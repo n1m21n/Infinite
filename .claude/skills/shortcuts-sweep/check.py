@@ -18,7 +18,8 @@ verdict line.
 import os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-MAIN = os.path.join(ROOT, "src", "main.cpp")
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+import appsrc
 
 KEY_ALIASES = {
     "delete": "Delete", "backspace": "Backspace", "space": "Space",
@@ -69,12 +70,12 @@ SUPER_ALLOW = [
 
 def main():
     quiet = "--quiet" in sys.argv
-    src = open(MAIN, encoding="utf-8", errors="replace").read()
+    src, locate = appsrc.read_indexed(ROOT)
 
     # ---- 1. the documented table -------------------------------------------
     tbl = re.search(r"static const ShortcutEntry kShortcuts\[\] = \{(.*?)\n      \};", src, re.S)
     if not tbl:
-        print("SHORTCUTSWEEP FAIL - could not find the kShortcuts table in src/main.cpp")
+        print("SHORTCUTSWEEP FAIL - could not find the kShortcuts table in src/main.cpp or src/app")
         return 1
     rows = re.findall(r'\{\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,\s*([^,]+?)\s*,\s*"([^"]*)"\s*\}', tbl.group(1))
 
@@ -132,7 +133,7 @@ def main():
 
         print("\n=== handled but absent from the kShortcuts help table ===")
         for k in undocumented:
-            print(f"  {k:12} main.cpp:{','.join(str(n) for n in handlers[k])}")
+            print(f"  {k:12} {', '.join(locate(n) for n in handlers[k])}")
         if not undocumented:
             print("  (none)")
 
@@ -148,7 +149,7 @@ def main():
 
         print("\n=== Super without Ctrl on the same line (macOS-only risk) ===")
         for ln, text in super_only:
-            print(f"  main.cpp:{ln}: {text[:110]}")
+            print(f"  {locate(ln)}: {text[:110]}")
         if not super_only:
             print("  (none)")
 

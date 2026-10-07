@@ -5,7 +5,7 @@ What may connect to what is decided in five places, and only two of them are
 generic. This checks that a node declaring a cable is actually reachable
 through the hand-maintained ones.
 
-  src/main.cpp:
+  src/main.cpp + src/app/**/*.cpp:
     InputCountFor        - how many input pins a node draws
     CableFor             - which ImageCable* an image input slot maps to
     IsInputSlotCompatible- what a slot accepts (generic fallbacks at the end)
@@ -36,7 +36,8 @@ Exit code 0 if checks 1-3 and 5 are clean.
 import os, re, sys, glob
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-MAIN = os.path.join(ROOT, "src", "main.cpp")
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+import appsrc
 RULES_DOC = os.path.join(ROOT, "docs", "reference", "connection-rules.md")
 
 # Classes whose image input is resolved through a base class already listed in
@@ -85,7 +86,7 @@ def classes_with(member_type, headers):
 
 
 def main():
-    src = open(MAIN, encoding="utf-8", errors="replace").read()
+    src = appsrc.read(ROOT)
     headers = sorted(glob.glob(os.path.join(ROOT, "src", "nodes", "*.h")))
 
     cable_for = block(src, "ImageCable* CableFor")
@@ -141,7 +142,7 @@ def main():
     # true. Messages are matched verbatim, so rewording one in the code
     # without rewording it in the doc is a failure, not a silent drift.
     print("=== refusal messages missing from docs/reference/connection-rules.md ===")
-    main_src = open(MAIN, encoding="utf-8", errors="replace").read()
+    main_src = appsrc.read(ROOT)
     # Grab the whole assignment, not just a literal after the `=`, so the
     # ternary forms ("modulator into an audio pin" vs. the general one) are
     # both picked up rather than only the first branch.

@@ -4,6 +4,140 @@
 
 namespace app
 {
+   // Every node renders its output at this size, square, above its params.
+   inline const float kPreviewSize = 190.0f;
+
+
+   // Render 3D's preview is a viewport you actually work in - orbiting and
+   // framing a scene through a thumbnail is not workable.
+   inline const float kViewportSize = 340.0f;
+
+
+   inline const float kViewportPanelMinWidth = 160.0f;
+
+
+   // Taller than the width floor's equivalent margin: a top/bottom card gives
+   // up two full rows (the dock combo/close row, then its own title row)
+   // before the image even starts, so a floor sized like the width one left
+   // next to nothing for the image itself - see the "so small" screenshot.
+   inline const float kViewportPanelMinHeight = 190.0f;
+
+
+   inline const float kParamWidth = 168.0f;
+
+
+   // Horizontal audio-node layout (docs/plans/audio/audio-node-ui-system.md
+   // v3): audio nodes lay their params out in a wide rack-style strip rather
+   // than a narrow vertical stack. v2 declared kAudioNodeWidth but nothing
+   // enforced it - the visualizer drew at 440, NodeSeparator drew at
+   // kPreviewSize (190), and the knob row grew to whatever it added up to
+   // (~556 for Oscillator), so one node body contained three different
+   // widths and the node took the widest. v3 makes the width a *scope*
+   // (BeginAudioBody/EndAudioBody) that every audio helper reads from, and
+   // lays rows out to fit it rather than letting them set it.
+   //
+   // Two sanctioned widths, nothing else: a full node, and a narrow one for
+   // a node with <=2 params (Gain, Splitter, Audio Out) so §7's "a one-param
+   // node is visually smaller" is true instead of aspirational.
+   inline const float kAudioNodeWidth = 440.0f;
+
+
+   inline const float kAudioNarrowWidth = 200.0f;
+
+
+   // Two-column layout width for large 3D nodes (Render 3D, Material)
+   inline const float kWideNodeWidth = 476.0f;
+
+
+   // A third width, for a node that is genuinely two parallel instruments
+   // side by side (Wavetable's engine pair). Stacking them vertically at 440
+   // put the node near 1600px tall - unreadable, and it forced an A/B tab whose
+   // hidden half silently shared its parent's parameter indices, so a
+   // modulator patched to engine A's attack drove engine B's the moment the
+   // tab flipped. Two columns fixes the height and the aliasing at once,
+   // because every param of both engines is now drawn every frame.
+   inline const float kAudioWideWidth = 960.0f;
+
+
+   // Knobs come in two sizes so a row has a visual hierarchy: large for the
+   // one or two params that define what the node is doing, small for the
+   // rest. A row of identical dials reads as a spreadsheet, which is what v2
+   // shipped.
+   // One knob size for every audio-node knob. The v3 grammar used two
+   // (kKnobLarge for "what the node is", kKnobSmall for the rest) on the
+   // theory that size carries hierarchy; in practice it just made every row
+   // look unfinished, because the mixed sizes read as an inconsistency rather
+   // than as a ranking. Hierarchy comes from grouping and ordering instead.
+   inline const float kKnobStd = 56.0f;
+
+
+   // ---- macro (front-panel control) node body metrics ----------------
+   // A macro node's body IS its control - there is no image preview to size
+   // it against, so it must not borrow kPreviewSize (190px). It used to: a
+   // 56px knob centred in a 190px cell, and flat controls centred vertically
+   // in a 190px-tall band they never filled, which is exactly the ring of
+   // dead space around every macro node. These three numbers are the whole
+   // grammar: one cell width for single controls, one wider cell for the
+   // 8-segment ones (radio selector, step gate) that genuinely need it, and
+   // one row height every flat control shares so a toggle, a number box, a
+   // selector and a step grid all read as the same family.
+   inline const float kMacroCell = 112.0f;
+
+
+   inline const float kMacroWideCell = 176.0f;
+
+
+   inline const float kMacroRowH = 26.0f;
+
+
+   inline const float kMacroFaderH = 96.0f;
+
+
+   inline const float kKnobLarge = kKnobStd;
+
+
+   inline const float kKnobSmall = kKnobStd;
+
+
+   inline const float kKnobDiameter = kKnobSmall;
+
+
+   // Shared height for a time-domain effect graph (Dynamics' transfer
+   // curve, Delay's tap graph, Reverb's decay envelope) - one number so the
+   // three read as the same instrument family instead of each picking its
+   // own. AudioFilter's frequency response keeps its own taller 190px (a
+   // curve read for precision at a glance needs more vertical resolution
+   // than these three, which are read for overall shape).
+   inline const float kAudioTimeVizH = 150.0f;
+
+
+   // Inset padding inside a section panel (AudioSection).
+   inline const float kAudioSectionPad = 8.0f;
+
+
+   inline const float kPinRadius = 7.0f;
+
+
+   inline const float kPinHit = 20.0f;
+
+bool IsThemeLight();
+
+ImU32 ScopeBgCol();
+
+ImU32 ScopeBorderCol();
+
+ImU32 ScopeGridCol();
+
+ImU32 ScopeMidLineCol();
+
+ImU32 ScopeTextCol();
+
+extern bool gCheckerboardBackdrop;
+
+void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f);
+
+void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float rounding = 4.0f);
+
 bool TextFocusClaimed();
 
 bool IsUserSpawnable(const std::string& name);
@@ -71,6 +205,16 @@ extern PluginScanner gPluginScanner;
       int  typeFilter = 0;
       bool descending = false;
    };
+
+extern BrowserFilterState gModulesFilter;
+
+extern BrowserFilterState gSampleFilter;
+
+extern BrowserFilterState gMediaFilter;
+
+extern BrowserFilterState gPluginFilter;
+
+extern BrowserFilterState gFieldFilter;
 
 extern ImVec4 gSamplerDragTestRowRect;
 
@@ -313,9 +457,20 @@ extern int gKbFocusParam;
 
 extern int gKbNudge;
 
+        // signed value steps queued for the focused param, applied in its widget
+   struct KbParamEntry { int node; int param; };
+
+extern std::vector<KbParamEntry> gKbParams;
+
 extern bool gKbZoomed;
 
 extern bool gNodeHelpShown;
+
+extern int gModBindingMenuNode;
+
+extern int gModBindingMenuParam;
+
+extern bool gOpenModBindingMenu;
 
 extern bool  gArrangePanelOpen;
 
@@ -361,6 +516,30 @@ bool ParamMidiLearnActive();
 bool ParamMidiLearnable(int nodeIndex, int paramIndex);
 
 bool ParamMidiLearnCommit(int nodeIndex, int paramIndex, const Platform::MidiCCValue& last);
+
+
+   struct ParamPinScreenInfo
+   {
+      int nodeIndex;
+      int paramIndex;
+      std::string nodeTitle;
+      std::string paramName;
+      ImVec2 screenPos;
+      ImVec2 rowMin;
+      ImVec2 rowMax;
+      // Round controls (ModKnob's Knob/KnobDb/KnobFreq styles) hit-test and
+      // draw the same rowMin/rowMax box as everything else, but that box also
+      // covers the caption text and pin dot below the cap - highlighting it
+      // whole reads as "the entire cell", not "this knob". These let the
+      // assign-mode hover highlight trace the actual knob circle instead.
+      // Left at their defaults (false/zero) for every non-round pin, which is
+      // why the other two push sites don't need to set them.
+      bool isCircle = false;
+      ImVec2 shapeCenter = ImVec2(0.0f, 0.0f);
+      float shapeRadius = 0.0f;
+   };
+
+extern std::vector<ParamPinScreenInfo> gParamPinScreenList;
 
 extern Patch::PerfLayoutRecord gPerfLayout;
 
@@ -428,6 +607,12 @@ extern ImVec2 gDragTestNodePos;
 
 extern ImVec2 gTestMouse;
 
+extern ImVec4 gPredTestSliderCanvas;
+
+extern int gPredTestNodeIndex;
+
+extern int gPredTestSizeXParam;
+
 extern std::vector<ImVec4> gWtTestRects;
 
 extern bool gWtDragOk;
@@ -437,6 +622,13 @@ extern std::vector<ImVec4> gWtTestScreen;
 extern ImVec2 gDragTestViewAnchor;
 
 extern ImVec4 gEqTestScreen;
+
+std::string FoldForSearch(const std::string& in);
+
+
+
+   // Lists at least this long get a search box without the call site asking for one.
+   inline constexpr size_t kDropdownAutoSearchMin = 12;
 
 
 
@@ -469,6 +661,10 @@ void CommitDropdownPick(int i);
 
 extern std::pair<int, int> gDropdownTestOpenKey;
 
+bool DropdownTestWantsOpen(bool registered, int nodeIndex, int paramIndex);
+
+extern bool gInsideNodeCanvas;
+
 
 
    // Same story for ImGui's colour picker: opened inside a node it inherits the
@@ -486,7 +682,65 @@ extern ColorRequest gColor;
 
 extern ImVec4 gColorPickerRect;
 
+ // x, y, w, h of the picker widget on screen
+
+   // And again for a comment's text. A multiline text field is an ImGui child
+   // window, which the canvas cannot transform at all: drawn inside the node it
+   // rendered the note at the canvas origin, nowhere near the comment it
+   // belonged to. So the note is painted into the node by hand and typing into
+   // it happens in a popup out here (see DrawCommentPreview).
+   struct CommentEditRequest
+   {
+      CommentNode* target = nullptr; // revalidated each frame; nodes can be deleted
+      bool justOpened = false;
+      // The double-click that opens the editor is also a click on the canvas,
+      // and the canvas takes the focus back when the button comes up - one
+      // frame after the popup appeared. So the field asks for the keyboard for
+      // the first few frames rather than only on the frame it appears, which
+      // otherwise left it open but dead until it was clicked a third time.
+      int framesOpen = 0;
+   };
+
+extern CommentEditRequest gCommentEdit;
+
 extern ImVec4 gCommentBodyRect;
+
+ // x, y, w, h
+
+   // ---- Field build step 17: .infdev device Save name-prompt --------------
+   // Same story as gDropdown/gCommentEdit above: a node draws a "Save"
+   // button, records what it wants to do, and the actual popup renders once
+   // per frame outside the canvas. `getDeviceFile` resolves the owning node
+   // by index and dynamic_casts back to the concrete type each time it is
+   // called (see DrawFieldDeviceControls below) rather than closing over a
+   // raw node pointer, so a node deleted while this popup is open is simply
+   // "not found" instead of a dangling read.
+   struct FieldDeviceSaveRequest
+   {
+      std::function<bool(Field::DeviceFile&)> getDeviceFile;
+      std::string domain;
+      char nameBuf[128] = {};
+      bool justOpened = false;
+   };
+
+
+
+   // Per-domain cache of the user's saved .infdev files under
+   // AppPaths::AppSupportDir() + "/Devices/<domain>/" - scanned once per
+   // session on first draw, not re-scanned every frame (plan §6). Save
+   // invalidates only its own domain's entry.
+   struct FieldDeviceLibraryCache
+   {
+      bool scanned = false;
+      std::vector<std::string> names; // file stem, for display
+      std::vector<std::string> paths; // matching full path, same order
+   };
+
+extern std::map<std::string, FieldDeviceLibraryCache> gFieldDeviceLibrary;
+
+const FieldDeviceLibraryCache& GetFieldDeviceLibrary(const std::string& domain);
+
+void InvalidateFieldDeviceLibrary(const std::string& domain);
 
 
 
@@ -521,7 +775,49 @@ extern std::vector<std::string> gDroppedFiles;
 
 extern ImVec2 gDropPos;
 
+bool HasExtension(const std::string& path, const std::vector<std::string>& exts);
+
+
+
+   // Finds the first node under a canvas-space point whose node.get()
+   // dynamic_casts to T - the Samples/Media drag-drop release handler's hit
+   // test, factored out so it isn't copy-pasted once per draggable node
+   // type (SamplerNode, VideoSourceNode, ImageSourceNode). Deliberately a
+   // plain rect test against ed::GetNodePosition/GetNodeSize rather than
+   // ed::GetHoveredNode() - see the release handler's own comment for why.
+   template <typename T>
+   T* FindNodeUnderCanvasPoint(const ImVec2& canvasPoint)
+   {
+      for (GraphNode& gn : gNodes)
+      {
+         auto* typed = gn.node ? dynamic_cast<T*>(gn.node.get()) : nullptr;
+         if (typed == nullptr)
+            continue;
+         const ImVec2 p = ed::GetNodePosition(gn.NodeId());
+         const ImVec2 s = ed::GetNodeSize(gn.NodeId());
+         if (canvasPoint.x >= p.x && canvasPoint.x <= p.x + s.x && canvasPoint.y >= p.y &&
+             canvasPoint.y <= p.y + s.y)
+            return typed;
+      }
+      return nullptr;
+   }
+
 int DrumSequencerLaneForCanvasPos(DrumSequencerNode* n, float canvasX, float canvasY);
+
+void OnFilesDropped(GLFWwindow* window, int count, const char** paths);
+
+void DropdownButton(const char* label, const std::vector<std::string>& options,
+                       int current, std::function<void(int)> onSelect, float width = kParamWidth,
+                       bool showCaption = true);
+
+bool DrawBrowserFilterStrip(BrowserFilterState& state,
+                               const char* searchHint,
+                               const std::vector<std::string>& sortNames,
+                               const std::vector<std::string>& typeNames);
+
+void LoadBrowserFilterPrefs();
+
+void SaveBrowserFilterPrefs();
 
 
 
@@ -672,33 +968,564 @@ extern BrowserFavorites gBrowserFavorites;
 
 extern bool gPatchDirty;
 
+void DrawFavoriteBadge(const ImVec2& itemMin, const ImVec2& itemMax, bool isFav);
+
+std::string TruncateWithEllipsis(const std::string& label, float maxWidth);
+
+extern int gCurrentNodeIndex;
+
+extern int gParamCounter;
+
+extern int gColorCounter;
+
+
+   // Discrete (bool / enum) params are numbered from their own base rather
+   // than sharing gParamCounter. Giving a checkbox or a dropdown an ordinal
+   // out of the float sequence would have shifted every float ordinal that
+   // draws after it in the same node - repointing the modulation bindings and
+   // performance-surface assignments in every patch already saved. Ordinals
+   // 0..kDiscreteParamBase-1 stay exactly where they were; discrete params
+   // live above that line, still inside the kParamBase..kColorBase pin block
+   // (see GraphNode::kColorBase, which caps this at 800).
+   inline const int kDiscreteParamBase = 400;
+
+extern int gDiscreteParamCounter;
+
+extern std::map<std::pair<int, std::string>, int> gDiscreteSlotByLabel;
+
+extern std::map<std::pair<int, int>, std::string> gDiscreteLabelBySlot;
+
+extern std::string gDiscreteSlotScope;
+
+
+
+   struct DiscreteSlotScope
+   {
+      std::string saved;
+      explicit DiscreteSlotScope(int subPanelIndex)
+         : saved(gDiscreteSlotScope)
+      {
+         if (subPanelIndex > 0)
+            gDiscreteSlotScope = saved + "#" + std::to_string(subPanelIndex);
+      }
+      ~DiscreteSlotScope() { gDiscreteSlotScope = saved; }
+   };
+
 int DiscreteParamSlot(int nodeIndex, const std::string& rawLabel);
+
+void ForgetDiscreteSlots(int nodeIndex);
+
+void ForgetAllDiscreteSlots();
+
+extern std::set<int> gDrawnColorPins;
+
+IPaletteSource* PaletteSourceByIndex(int nodeIndex);
 
 extern std::set<std::pair<int, int>> gTypedParam;
 
+extern std::set<std::pair<int, int>> gTypedParamNoAutoSelect;
+
+extern std::set<std::pair<int, int>> gTypedParamPendingInit;
+
+extern std::map<std::pair<int, int>, std::string> gTypedParamSeed;
+
+std::string TrimCopy(const std::string& s);
+
+bool TypedTextIsUntouchedSeed(const std::pair<int, int>& key, const std::string& trimmed);
+
 extern std::map<std::pair<int, int>, std::string> gTypedParamText;
+
+std::string TrimCopy(const std::string& s);
+
+extern std::set<int> gDrawnParamPins;
 
 extern bool gParamRegisterOnly;
 
 extern std::pair<int, int> gTypedParamJustOpened;
 
+extern bool gParamRightClickConsumedThisFrame;
+
 void BeginNodeParams(int nodeIndex);
 
 void EndNodeParams();
 
+void HelpTip(const char* fmt, ...);
+
 bool TextFocusClaimed();
+
+void BeginTypedEditFromCurrent(const std::pair<int, int>& editKey, int nodeIndex, int paramIndex,
+                                   float* value, const char* fmt, bool hasExpr);
+
+void HandleParamTypeHotkeys(const std::pair<int, int>& editKey, float* value);
+
+bool KbParamHook(int nodeIndex, int paramIndex, float* value, float minV, float maxV, float step,
+                    const char* fmt, ImVec2 rmin, ImVec2 rmax, bool circle);
+
+extern std::map<int, std::string> gAudioReadout;
+
+void SetAudioReadout(const char* label, const char* valueText);
+
+
+
+   // Widget styles for audio knobs and faders.
+   enum class AudioWidgetStyle
+   {
+      Knob,
+      KnobBipolar,
+      VFader,
+      // Same widget as VFader, routed through ConsoleFaderTaper - unity at
+      // 75% of throw instead of a linear-in-dB mapping. Only meaningful for
+      // a -60..+12 dB range; see the taper's own comment.
+      VFaderDb,
+      // Same widget as Knob, routed through ConsoleFaderTaper.
+      KnobDb,
+      // Logarithmic taper matching human ear frequency/pitch perception and visualizer response curves.
+      KnobFreq,
+      KnobLog,
+      KnobSkewAttack100,
+      KnobSkewDecay300,
+      KnobSkewRelease400,
+      KnobSkewDelay250,
+      KnobSkewGlide150,
+      KnobSkewGlide100,
+      KnobSkewStrum30,
+      KnobSkewStrum20,
+      KnobSkewFreqShifter12,
+      KnobSkewStereoBass120,
+      KnobSkewBassMono = KnobSkewStereoBass120,
+      KnobSkewSpread100 = KnobSkewFreqShifter12
+   };
+
+void FormatAudioParam(char* outBuf, size_t outSize, const char* fmt, float val);
+
+
+
+   // Skew (power law) taper parameterized by target 12 o'clock centre value.
+   // Follows JUCE's NormalisableRange::setSkewForCentre idiom:
+   // k = ln((centre - minV) / (maxV - minV)) / ln(0.5)
+   // PosToValue(p) = minV + (maxV - minV) * p^k
+   // ValueToPos(v) = ((v - minV) / (maxV - minV))^(1/k)
+   namespace SkewTaperMath
+   {
+      inline float PosToValue(float pos01, float minV, float maxV, float centre)
+      {
+         if (maxV <= minV || centre <= minV || centre >= maxV)
+            return minV + (maxV - minV) * std::clamp(pos01, 0.0f, 1.0f);
+         const float k = logf((centre - minV) / (maxV - minV)) / logf(0.5f);
+         return minV + (maxV - minV) * powf(std::clamp(pos01, 0.0f, 1.0f), k);
+      }
+
+      inline float ValueToPos(float value, float minV, float maxV, float centre)
+      {
+         if (maxV <= minV || centre <= minV || centre >= maxV)
+            return (maxV > minV) ? std::clamp((value - minV) / (maxV - minV), 0.0f, 1.0f) : 0.0f;
+         const float k = logf((centre - minV) / (maxV - minV)) / logf(0.5f);
+         const float norm = std::clamp((value - minV) / (maxV - minV), 0.0f, 1.0f);
+         return std::clamp(powf(norm, 1.0f / k), 0.0f, 1.0f);
+      }
+   }
+
+
+
+   // True logarithmic taper for ranges with minV > 0.
+   // Maps 0..1 throw to an octave/ratio-linear scale between minV and maxV.
+   namespace LogTaper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV)
+      {
+         const float lo = std::max(1e-4f, minV);
+         const float hi = std::max(lo + 1e-4f, maxV);
+         return lo * powf(hi / lo, std::clamp(pos01, 0.0f, 1.0f));
+      }
+
+      inline float ValueToPos(float value, float minV, float maxV)
+      {
+         const float lo = std::max(1e-4f, minV);
+         const float hi = std::max(lo + 1e-4f, maxV);
+         const float clampedVal = std::clamp(value, lo, hi);
+         return std::clamp((logf(clampedVal) - logf(lo)) / (logf(hi) - logf(lo)), 0.0f, 1.0f);
+      }
+   }
+
+
+
+   namespace FrequencyTaper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return LogTaper::PosToValue(pos01, minV, maxV); }
+      inline float ValueToPos(float value, float minV, float maxV) { return LogTaper::ValueToPos(value, minV, maxV); }
+   }
+
+
+
+   namespace SkewAttack100Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 100.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 100.0f); }
+   }
+
+
+
+   namespace SkewDecay300Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 300.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 300.0f); }
+   }
+
+
+
+   namespace SkewRelease400Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 400.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 400.0f); }
+   }
+
+
+
+   namespace SkewDelay250Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 250.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 250.0f); }
+   }
+
+
+
+   namespace SkewGlide150Taper
+   {
+      inline float CentreForRange(float maxV) { return maxV <= 10.0f ? 0.15f : 150.0f; }
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, CentreForRange(maxV)); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, CentreForRange(maxV)); }
+   }
+
+
+
+   namespace SkewGlide100Taper
+   {
+      inline float CentreForRange(float maxV) { return maxV <= 10.0f ? 0.10f : 100.0f; }
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, CentreForRange(maxV)); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, CentreForRange(maxV)); }
+   }
+
+
+
+   namespace SkewStrum30Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 30.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 30.0f); }
+   }
+
+
+
+   namespace SkewStrum20Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 20.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 20.0f); }
+   }
+
+
+
+   namespace SkewFreqShifter12Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 12.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 12.0f); }
+   }
+
+
+
+   namespace SkewStereoBass120Taper
+   {
+      inline float PosToValue(float pos01, float minV, float maxV) { return SkewTaperMath::PosToValue(pos01, minV, maxV, 120.0f); }
+      inline float ValueToPos(float value, float minV, float maxV) { return SkewTaperMath::ValueToPos(value, minV, maxV, 120.0f); }
+   }
+
+
+
+   // Piecewise-linear -60..+12 dB console taper: unity sits at 75% of throw
+   // and the range below -30 dB (near-inaudible) is compressed, instead of
+   // giving 0 -> -12 dB (a large, obvious level change) and -60 -> -30 dB
+   // (barely audible) equal pixel budget the way a linear-in-dB fader does.
+   // Only valid for a -60..+12 dB range - callers with a different minV/maxV
+   // should not opt in.
+   namespace ConsoleFaderTaper
+   {
+      struct Point { float pos, db; };
+      inline const Point kPoints[] = {
+         { 0.00f, -60.0f }, { 0.15f, -45.0f }, { 0.30f, -30.0f }, { 0.45f, -20.0f },
+         { 0.60f, -10.0f }, { 0.75f,   0.0f }, { 1.00f,  12.0f },
+      };
+      constexpr int kCount = sizeof(kPoints) / sizeof(kPoints[0]);
+      // Detents drawn on a tapered fader, in dB - meaningless as even quarters
+      // of the throw once the taper is nonlinear.
+      inline const float kDetentsDb[] = { 0.0f, -10.0f, -20.0f, -30.0f, -60.0f };
+      constexpr int kNumDetents = sizeof(kDetentsDb) / sizeof(kDetentsDb[0]);
+
+      inline float PosToDb(float pos)
+      {
+         pos = std::clamp(pos, 0.0f, 1.0f);
+         for (int i = 0; i + 1 < kCount; i++)
+         {
+            if (pos <= kPoints[i + 1].pos)
+            {
+               const float t = (pos - kPoints[i].pos) / (kPoints[i + 1].pos - kPoints[i].pos);
+               return kPoints[i].db + (kPoints[i + 1].db - kPoints[i].db) * t;
+            }
+         }
+         return kPoints[kCount - 1].db;
+      }
+
+      inline float DbToPos(float db)
+      {
+         if (db <= kPoints[0].db)
+            return kPoints[0].pos;
+         if (db >= kPoints[kCount - 1].db)
+            return kPoints[kCount - 1].pos;
+         for (int i = 0; i + 1 < kCount; i++)
+         {
+            if (db <= kPoints[i + 1].db)
+            {
+               const float t = (db - kPoints[i].db) / (kPoints[i + 1].db - kPoints[i].db);
+               return kPoints[i].pos + (kPoints[i + 1].pos - kPoints[i].pos) * t;
+            }
+         }
+         return kPoints[kCount - 1].pos;
+      }
+
+      inline float PosToValue(float pos01, float /*minV*/, float /*maxV*/) { return PosToDb(pos01); }
+      inline float ValueToPos(float value, float /*minV*/, float /*maxV*/) { return DbToPos(value); }
+   }
+
+float AudioLabelFontSize();
+
+void AudioLabelText(ImDrawList* dl, ImVec2 pos, ImU32 col, const char* text);
+
+ImVec2 AudioLabelSize(const char* text);
+
+bool AudioSliderFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
+                         float width, ImU32 fillColor, bool readOnly,
+                         FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                         bool vividState = false);
+
+void DrawModulationBindingMenu(int nodeIndex, int paramIndex, bool hovered);
+
+extern std::map<std::pair<int, int>, float> gDiscreteParamStore;
+
+extern std::map<std::pair<int, int>, float> gDiscreteParamLastWritten;
+
+
+
+   struct DiscreteParamHandle
+   {
+      bool registered = false; // false = not inside a node's param block
+      bool draw = true;        // false while gParamRegisterOnly is set
+      bool modulated = false;  // a cable is patched in: the widget goes read-only
+      bool driven = false;     // modulated OR written from outside; push value back
+      int nodeIndex = -1;
+      int paramIndex = -1;
+      float value = 0.0f;      // slot contents, i.e. what the apply pass last wrote
+   };
+
+std::string StripParamLabel(const char* label);
+
+extern const void* gPendingSrcAddr;
+
+const void* TakePendingSrcAddr(const void* fallback);
+
+int KbDiscreteHook(int nodeIndex, int paramIndex, bool modulated);
+
+DiscreteParamHandle RegisterDiscreteParam(const char* label, float current, float maxV,
+                                             bool isBool, const std::vector<std::string>* options,
+                                             bool momentary = false);
+
+ImVec4 AccentEmphasisHover();
+
+ImVec4 AccentEmphasisSelected();
+
+ImVec4 AccentEmphasisPressed();
+
+void PushPrimaryButtonStyle();
+
+void PopPrimaryButtonStyle();
+
+void PushDropdownStyle();
+
+void PopDropdownStyle();
+
+void PushElevatedPanelStyle(bool isChild);
+
+void PopElevatedPanelStyle();
+
+void PushDockedPanelStyle(bool isChild);
+
+void PopDockedPanelStyle();
+
+ImU32 PanelSeamColor();
+
+void DrawPanelSeam(bool vertical, bool facesStart);
+
+void ExpandPinHit(const ImVec2& c, float boxRight);
+
+void DrawDiscreteParamPin(const DiscreteParamHandle& h, const char* label, float width,
+                             float controlHeight = 0.0f);
+
+void DropdownButton(const char* label, const std::vector<std::string>& options,
+                       int current, std::function<void(int)> onSelect, float width,
+                       bool showCaption);
+
+void PushCheckboxStyle();
+
+void PopCheckboxStyle();
+
+void PushSliderStyle();
+
+void PopSliderStyle();
 
 extern std::set<ParamKey> gPredictorGrabs;
 
+extern std::set<ParamKey> gPredictorGrabsPrev;
+
 uint64_t UidForIndex(int nodeIndex);
+
+const char* PredictorBindRefusal(INode* srcNode, int dstNodeIndex, int dstParamIndex);
+
+bool IsInertPredictorBinding(int dstNodeIndex, int dstParamIndex);
+
+bool IsPredictionSourceNode(const GraphNode* gn);
+
+bool IsPredictionBinding(int nodeIndex, int paramIndex);
 
 float ParamToPos(const ParamRef& r, float v);
 
 float PosToParam(const ParamRef& r, float pos);
 
+
+
+   struct PredictorGrabCtx
+   {
+      IPredictor* pred = nullptr;
+      ParamKey key;
+      bool editable = false; // draw the editable path instead of the read-only one
+   };
+
+PredictorGrabCtx BeginPredictorGrab(const ParamRef& ref);
+
+void DrawPredictorDecor(const ParamRef& ref, float laneMin, float laneMax, float laneY);
+
+void EndPredictorGrab(const PredictorGrabCtx& c, const ParamRef& ref);
+
+
+
+   // Prediction green: pin ring, and the track/fill colours of a green-bound slider.
+   inline constexpr ImU32 kPredictionPinCol = IM_COL32(110, 215, 140, 255);
+
+bool ModCheckbox(const char* label, bool* value, bool* outUserChanged = nullptr);
+
+bool ModSlider(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
+                  float width = kParamWidth, bool audioStyle = false, float step = 0.0f,
+                  FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                  int explicitParamIndex = -1, const char* nameOverride = nullptr);
+
 extern std::map<std::pair<int, int>, float> gIntParamStore;
 
+extern std::map<std::pair<int, int>, int> gIntParamLastWritten;
+
+bool ModSliderInt(const char* label, int* value, int minV, int maxV, float width = kParamWidth,
+                     bool audioStyle = false);
+
+
+
+   // Optional non-linear position<->value mapping for VFaderFloat / KnobFloat. nullptr
+   // (the default at every call site but the console strip/channel faders)
+   // means plain linear, i.e. the original behaviour. A future non-dB taper
+   // could plug in here the same way - this is a general fader capability,
+   // not dB-specific plumbing hardcoded into the widget.
+   using FaderPosToValueFn = float (*)(float pos01, float minV, float maxV);
+
+
+   using FaderValueToPosFn = float (*)(float value, float minV, float maxV);
+
+bool VFaderFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
+                    float height, ImU32 fillColor, bool readOnly, float cellW = 0.0f,
+                    FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                    bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f,
+                    int gestureNodeIndex = -1, int gestureParamIndex = -1);
+
+bool KnobFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
+                  float diameter, ImU32 fillColor, bool readOnly, float cellW = 0.0f,
+                  FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                  bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f,
+                  bool activeTint = false);
+
+bool BipolarKnobFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
+                         float diameter, ImU32 fillColor, bool readOnly, float cellW = 0.0f,
+                         int gestureNodeIndex = -1, int gestureParamIndex = -1,
+                         bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f,
+                         bool activeTint = false, bool resetOnDoubleClick = false);
+
+bool ModKnob(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
+                float diameter = kKnobDiameter, float cellW = 0.0f,
+                AudioWidgetStyle style = AudioWidgetStyle::Knob, float step = 0.0f,
+                FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                int explicitParamIndex = -1, const char* nameOverride = nullptr);
+
+bool ModKnobInt(const char* label, int* value, int minV, int maxV, float diameter = kKnobDiameter,
+                   float cellW = 0.0f);
+
+void ColorSwatch(const char* label, float* col, const INode* owner);
+
+void CollapsedBindingPins(int nodeIndex, const ImVec2& tagMin, const ImVec2& tagMax, bool colors);
+
+void NodeSeparator(const char* label = nullptr, float width = kPreviewSize);
+
+const std::vector<std::string>& AlignOptions();
+
+bool EyeToggle(bool shown);
+
+bool ViewportToggle(bool shown);
+
+extern bool gGlobalScaleTooltipHovered;
+
+extern bool gGlobalScaleTooltipEnabled;
+
+bool GlobalScaleToggle(bool enabled);
+
+bool* GetNodeGlobalScaleFlag(INode* node);
+
+bool BypassToggle(bool bypassed);
+
+void DrawPin(int pinId, ed::PinKind kind, const char* label, bool labelFirst = false);
+
+#ifndef NDEBUG
+
+   // Test-only predictor for INFINITE_PREDBINDTEST. Never registered in a release build, and in a
+   // debug build only when that fixture asks for it, so ROUNDTRIPTEST's every-type sweep never
+   // meets it. Returns a settable fixed position, and records how it was driven.
+   class StubPredictorNode : public INode, public IModulator, public IPredictor
+   {
+   public:
+      static INode* Create() { return new StubPredictorNode(); }
+      unsigned int GetOutputTexture() override { return 0; }
+      int GetOutputWidth() const override { return 0; }
+      int GetOutputHeight() const override { return 0; }
+      void CookIfNeeded(int) override {}
+      float Value01() override { return pos; }
+
+      void Tick(int, double) override { ++tickCount; }
+      float ValuePos01For(const ParamKey& k, float) override { readKeys.insert(k); return pos; }
+      void OnGrab(const ParamKey& k) override { ++grabCount; lastGrab = k; }
+      void OnRelease(const ParamKey& k, float p, float v) override { ++releaseCount; lastRelease = k; releasePos = p; releaseVel = v; }
+
+      void VisitParams(ParamVisitor& v) override { v.Float("pos", pos); }
+
+      float pos = 0.5f;
+      int tickCount = 0, grabCount = 0, releaseCount = 0;
+      ParamKey lastGrab, lastRelease;
+      float releasePos = -1.0f, releaseVel = 0.0f;
+      std::set<ParamKey> readKeys;
+   };
+#endif
+
 void RegisterNodes();
+
+void ApplyTheme();
 
 IModulator* ModulatorForOutput(INode* node, int outputIndex);
 
@@ -714,7 +1541,7 @@ void ArrangeCommitEdit();
    // moved), pushes one timeline undo entry holding the pre-edit model.
    // Returns whether anything changed. The one shape every discrete timeline
    // edit (key, menu item, button) goes through.
-   inline template <class Op>
+   template <class Op>
    bool ArrangeEdit(Op&& op)
    {
       Arrange::Model before = gArrange;
@@ -807,6 +1634,8 @@ void ArrangeModelToPatchData(const Arrange::Model& m, Patch::Data& data);
 
 void PatchDataToArrangeModel(const Patch::Data& data, Arrange::Model& m,
                                 const std::function<uint64_t(int)>& resolveLegacy = {});
+
+IPaletteSource* PaletteSourceByIndex(int nodeIndex);
 
 int InputCountFor(const GraphNode& gn);
 

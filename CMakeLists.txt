@@ -416,6 +416,10 @@ set(COMMON_SOURCES
     src/app/selftest/Headless.cpp
     src/app/selftest/MiscTests.cpp
     src/app/selftest/PlatformTests.cpp
+    src/app/ui/BrowserUi.cpp
+    src/app/ui/ModWidgets.cpp
+    src/app/ui/ParamWidgets.cpp
+    src/app/ui/Theme.cpp
     src/core/GLUtil.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
