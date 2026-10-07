@@ -25871,18 +25871,26 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       int scale = 0, root = 0;
       KeySnapScaleRoot(n, scale, root);
       const uint32_t mask = KeySnapKernel::ScaleMask(scale, root);
-      const ImU32 noteCol = isLight ? IM_COL32(120, 60, 200, 70) : IM_COL32(190, 130, 255, 70);
-      const ImU32 rootCol = isLight ? IM_COL32(120, 60, 200, 170) : IM_COL32(210, 160, 255, 170);
-      for (int midi = 24; midi <= 120; midi++)
+      // Three tiers so the key reads at a glance: out-of-scale notes faint grey,
+      // in-scale notes teal, the root amber - none of them the spectrum's purple.
+      const ImU32 offCol = isLight ? IM_COL32(60, 60, 70, 40) : IM_COL32(200, 200, 215, 28);
+      const ImU32 noteCol = isLight ? IM_COL32(0, 130, 135, 190) : IM_COL32(60, 210, 205, 170);
+      const ImU32 rootCol = isLight ? IM_COL32(215, 120, 0, 255) : IM_COL32(255, 175, 50, 255);
+      for (int pass = 0; pass < 3; pass++) // off-scale first, root last, so root is never overdrawn
       {
-         const int pc = midi % 12;
-         if (!(mask & (1u << pc)))
-            continue;
-         const float hz = 440.0f * powf(2.0f, (float)(midi - 69) / 12.0f);
-         if (hz < loHz || hz > hiHz)
-            continue;
-         const float x = hzToX(hz);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), pc == root ? rootCol : noteCol, 1.0f);
+         for (int midi = 24; midi <= 120; midi++)
+         {
+            const int pc = midi % 12;
+            const int tier = pc == root ? 2 : ((mask & (1u << pc)) ? 1 : 0);
+            if (tier != pass)
+               continue;
+            const float hz = 440.0f * powf(2.0f, (float)(midi - 69) / 12.0f);
+            if (hz < loHz || hz > hiHz)
+               continue;
+            const float x = hzToX(hz);
+            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), tier == 2 ? rootCol : (tier == 1 ? noteCol : offCol),
+                        tier == 2 ? 1.5f : 1.0f);
+         }
       }
 
       KeySnapSpectrumState& st = sKeySnapSpectrums[n];
@@ -25961,6 +25969,15 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       {
+         AudioKnobRow row(3, kKnobLarge);
+         row.Knob("snap", n->ParamPtr("snap"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("glide", n->ParamPtr("glide"), 0.0f, 500.0f, "%.0fms", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+
+      {
          AudioKnobRow row(3, 20.0f, 0.0f, false);
          if (globalKey)
             ImGui::BeginDisabled();
@@ -25978,14 +25995,6 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                PushUndoCheckpoint();
             *n->ParamPtr("globalKey") = globalBool ? 1.0f : 0.0f;
          }
-         row.End();
-      }
-
-      {
-         AudioKnobRow row(3, kKnobLarge);
-         row.Knob("snap", n->ParamPtr("snap"), 0.0f, 1.0f, "%.2f", kKnobLarge);
-         row.Knob("glide", n->ParamPtr("glide"), 0.0f, 500.0f, "%.0fms", kKnobLarge);
-         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
 
