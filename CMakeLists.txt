@@ -397,6 +397,34 @@ endif()
 
 set(COMMON_SOURCES
     src/main.cpp
+    # main.cpp split begin (src/app/**: code that used to live in src/main.cpp)
+    src/app/frame/CookFrame.cpp
+    src/app/selftest/AudioSweepTests.cpp
+    src/app/selftest/AvRecTests.cpp
+    src/app/selftest/BenchScenes.cpp
+    src/app/selftest/DspFixtures1.cpp
+    src/app/selftest/DspFixtures2.cpp
+    src/app/selftest/DspFixtures3.cpp
+    src/app/selftest/FieldTests1.cpp
+    src/app/selftest/FieldTests2.cpp
+    src/app/selftest/Headless.cpp
+    src/app/selftest/MiscTests.cpp
+    src/app/selftest/PlatformTests.cpp
+    # main.cpp split end
+    # main.cpp split begin (src/app/**: code that used to live in src/main.cpp)
+    src/app/frame/CookFrame.cpp
+    src/app/selftest/AudioSweepTests.cpp
+    src/app/selftest/AvRecTests.cpp
+    src/app/selftest/BenchScenes.cpp
+    src/app/selftest/DspFixtures1.cpp
+    src/app/selftest/DspFixtures2.cpp
+    src/app/selftest/DspFixtures3.cpp
+    src/app/selftest/FieldTests1.cpp
+    src/app/selftest/FieldTests2.cpp
+    src/app/selftest/Headless.cpp
+    src/app/selftest/MiscTests.cpp
+    src/app/selftest/PlatformTests.cpp
+    # main.cpp split end
     src/core/GLUtil.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
