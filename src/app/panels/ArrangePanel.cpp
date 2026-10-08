@@ -13,6 +13,23 @@ namespace app
    {
       // One toolbar chip look: a 6% text-tinted well, accent when on (the play button turns green while playing),
       // hover/press stepping up from there. Pair with PopToolbarChip.
+      // Track-header toggle (S / M): a text-tinted well like ChipButton; `onCol` fills it when on (solo amber, mute accent).
+      bool MixToggle(const char* id, const char* letter, bool* v, float sz, const ImVec4& onCol)
+      {
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         const bool clicked = ImGui::InvisibleButton(id, ImVec2(sz, sz));
+         if (clicked) *v = !*v;
+         const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         const ImVec4 bg = *v ? onCol : ImVec4(t.x, t.y, t.z, 0.06f + 0.05f * hv);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(p, ImVec2(p.x + sz, p.y + sz), ImGui::GetColorU32(bg), tok::radius_tile);
+         const ImVec2 ts = ImGui::CalcTextSize(letter);
+         dl->AddText(ImVec2(std::round(p.x + (sz - ts.x) * 0.5f), std::round(p.y + (sz - ts.y) * 0.5f)),
+                     ImGui::GetColorU32(*v ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.8f)), letter);
+         return clicked;
+      }
+
       void PushToolbarChip(bool on, bool green = false)
       {
          const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
@@ -2696,10 +2713,10 @@ namespace app
             if (!isVideo)
             {
                bool solo = lane.solo;
-               mixGesture(AudioSoloButton("S##lanesolo", &solo, kMixCtl, kMixCtl), [&] { lane.solo = solo; });
+               mixGesture(MixToggle("##lanesolo", "S", &solo, kMixCtl, ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pal::c_F59E0BFF))), [&] { lane.solo = solo; });
                ImGui::SameLine(0.0f, kMixGap);
                bool mute = lane.mute;
-               mixGesture(AudioMuteButton("M##lanemute", &mute, kMixCtl, kMixCtl), [&] { lane.mute = mute; });
+               mixGesture(MixToggle("##lanemute", "M", &mute, kMixCtl, app::AccentEmphasisSelected()), [&] { lane.mute = mute; });
                ImGui::SameLine(0.0f, kMixGap);
                float pan = lane.pan;
                const bool panChanged = BipolarKnobFloat("##lanepan", &pan, -1.0f, 1.0f, "%.2f", kMixCtl, mixFill,
