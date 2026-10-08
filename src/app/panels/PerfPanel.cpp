@@ -2150,26 +2150,35 @@ namespace app
          const ImVec2 sp = ImGui::GetCursorScreenPos();
          const float stripW = ImGui::GetContentRegionAvail().x;
          ImDrawList* sdl = ImGui::GetWindowDrawList();
-         sdl->AddRectFilled(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(ImVec4(warn.x, warn.y, warn.z, 0.13f)), tok::radius_tile);
+         // Same recessed well as the Library list: neutral, with the warm colour only on the dot.
+         sdl->AddRectFilled(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(ImVec4(0, 0, 0, isLightT ? 0.04f : 0.27f)), tok::radius_pill);
+         sdl->AddRect(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
          const float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 6.0f);
          const float cy = sp.y + stripH * 0.5f;
          sdl->AddCircleFilled(ImVec2(sp.x + tok::space_3, cy), 4.0f, ImGui::GetColorU32(ImVec4(warn.x, warn.y, warn.z, 0.5f + 0.5f * pulse)), 12);
          const std::string axisStr = (gPerfMidiLearnAxis == 1) ? " \xC2\xB7 Y axis" : (elem.kind == 4 ? " \xC2\xB7 X axis" : "");
          const bool pad = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7);
-         const std::string head = "Listening for MIDI" + (elem.label.empty() ? std::string() : " \xC2\xB7 " + elem.label) + axisStr;
+         const std::string head = "Listening for MIDI";
+         const std::string target = (elem.label.empty() ? std::string() : elem.label) + axisStr;
          const char* hint = pad ? "Move a control or hit a pad on your controller. Esc cancels."
                                 : "Move a knob, fader or wheel on your controller. Esc cancels.";
          float tx = sp.x + tok::space_3 + 4.0f + tok::space_2;
          {
-            UiType::Scope ts(UiType::Size::Body, UiType::Weight::Semibold);
-            sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(warn), head.c_str());
-            tx += ImGui::CalcTextSize(head.c_str()).x + tok::space_3;
+            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
+            sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.6f)), head.c_str());
+            tx += ImGui::CalcTextSize(head.c_str()).x + tok::space_2;
+            if (!target.empty())
+            {
+               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.9f)), target.c_str());
+               tx += ImGui::CalcTextSize(target.c_str()).x;
+            }
+            tx += tok::space_3;
          }
          {
             UiType::Scope ts(UiType::Size::Caption);
             const float room = sp.x + stripW - 84.0f - tx;
             if (ImGui::CalcTextSize(hint).x <= room)
-               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.6f)), hint);
+               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.4f)), hint);
          }
          ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - 76.0f, sp.y + (stripH - ChipButton::kHeight) * 0.5f));
          if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::kHeight, 68.0f))
