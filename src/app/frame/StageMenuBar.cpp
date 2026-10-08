@@ -18,7 +18,7 @@ static void DrawPanelRail()
 {
    PanelRail::Begin(ImGui::GetMainViewport());
    const float first = (tok::bar_h - tok::tile) * 0.5f;
-   const float step = tok::tile + tok::space_1;
+   const float step = tok::tile + tok::space_3;
    if (PanelRail::Item("##railLibrary", first, IconsInfinite::Library, IconsInfinite::LibraryFill, gNodePanelOpen,
                        T("Library - search modules, samples, media and plugins")))
       gNodePanelOpen = !gNodePanelOpen;

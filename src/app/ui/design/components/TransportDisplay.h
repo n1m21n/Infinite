@@ -12,8 +12,8 @@
 namespace TransportDisplay
 {
    constexpr float kHeight = 40.0f;
-   constexpr float kCaptionY = 4.0f;  // caption top, from the well's top edge
-   constexpr float kValueY = 18.0f;   // value line top, from the well's top edge
+   constexpr float kCaptionY = 7.0f;  // caption top, from the well's top edge
+   constexpr float kValueY = 15.0f;   // value line top, from the well's top edge (caption + value ink is centred as one block, 5 pt apart)
    constexpr float kValueH = 18.0f;
 
    inline ImVec4 Text(float a)
