@@ -3754,13 +3754,36 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             Arrange::PlaceOverwrite(gArrange, gArrange.lanes[lane].id, c, &id);
             return id;
          };
-         addClip(0, 0, 2, "Intro");
+         const uint64_t intro = addClip(0, 0, 2, "Intro");
          const uint64_t sel = addClip(0, 3, 3, "Clip B");
-         addClip(1, 1, 4, "Overlay");
-         addClip(firstAudio, 0, 3, "Drums");
-         addClip(firstAudio + 1, 2, 4, "Bass");
-         gArrangeSel.insert(sel);
-         gArrangeSelAnchor = sel;
+         const uint64_t overlay = addClip(1, 1, 4, "Overlay");
+         const uint64_t drums = addClip(firstAudio, 0, 3, "Drums");
+         const uint64_t bass = addClip(firstAudio + 1, 2, 4, "Bass");
+         // Variants: arrgroup (clip group + track group), arrtrack / arrtgroup (track / track-group inspector),
+         // arrmulti (several clips selected), arrzoom (zoomed in so clips are wide), arrwide (wider panel).
+         uint64_t tgroup = 0;
+         if (o.find("arrgroup") != std::string::npos || o.find("arrtgroup") != std::string::npos)
+         {
+            Arrange::Group(gArrange, {intro, overlay});
+            Arrange::Group(gArrange, {drums, bass});
+            tgroup = Arrange::GroupSelectedLanes(gArrange, {gArrange.lanes[firstAudio].id, gArrange.lanes[firstAudio + 1].id});
+         }
+         if (o.find("arrzoom") != std::string::npos) gArrangePixelsPerBeat *= 2.5f;
+         if (o.find("arrwide") != std::string::npos) gArrangePanelWidth = 900.0f;
+         if (o.find("arrmulti") != std::string::npos)
+         {
+            gArrangeSel.insert(intro); gArrangeSel.insert(overlay); gArrangeSel.insert(sel);
+            gArrangeSelAnchor = sel;
+         }
+         else if (o.find("arrtgroup") != std::string::npos && tgroup != 0)
+            gArrangeRowSel.insert(tgroup);
+         else if (o.find("arrtrack") != std::string::npos)
+            gArrangeRowSel.insert(gArrange.lanes[firstAudio].id);
+         else
+         {
+            gArrangeSel.insert(sel);
+            gArrangeSelAnchor = sel;
+         }
          gArrangeClipSettingsPanelOpen = true;
       }
       // "library:field|samples|media|plugins" picks the mode shown (default Modules).

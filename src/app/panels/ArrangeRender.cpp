@@ -356,6 +356,21 @@ namespace app
 
    // Docked inspector child panel for whatever is currently selected on the timeline -
    // a clip, a track, or a group. Pinned to the right side of the timeline panel.
+   // Toggle as a chip (replaces ImGui::Checkbox in the inspector): flips *v and returns true when clicked.
+   static bool ToggleChip(const char* label, bool* v, float w, const ImVec4* onCol = nullptr)
+   {
+      if (!ChipButton::Draw(label, *v, 24.0f, w, false, onCol)) return false;
+      *v = !*v;
+      return true;
+   }
+
+   // Inspector panel title: Title size, semibold; every inspector mode uses it.
+   static void InspectorTitle(const char* text)
+   {
+      UiType::Scope s(UiType::Size::Title, UiType::Weight::Semibold);
+      ImGui::TextUnformatted(text);
+   }
+
    // Inspector section title: Caption, medium weight, muted, with a little air above.
    static void SectionHeader(const char* text)
    {
@@ -440,10 +455,7 @@ namespace app
          const char* clipKindLabel = isVideo
             ? (isSample ? "Video Sample" : "Video Clip")
             : (isSample ? "Audio Sample" : "Audio Clip");
-         {
-            UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
-            ImGui::TextUnformatted(clipKindLabel);
-         }
+         InspectorTitle(clipKindLabel);
          ImGui::SameLine(availW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
@@ -718,7 +730,7 @@ namespace app
                ImGui::Spacing();
                SectionHeader(T("Tempo Sync"));
                bool syncToTempo = clip->syncToTempo;
-               if (ImGui::Checkbox(L("Sync to Tempo##clipsync"), &syncToTempo))
+               if (ToggleChip(L("Sync to Tempo##clipsync"), &syncToTempo, ImGui::GetContentRegionAvail().x))
                   ArrangeEdit([&]() { ArrangeSetSampleSync(clipId, syncToTempo); });
                // Locked while sync is off: unsynced plays at native speed,
                // so Sample BPM would be a control that does nothing.
@@ -796,7 +808,7 @@ namespace app
                      // clip shows every box ticked.
                      bool active = !clip->IsModBypassed(paramIndex);
                      ImGui::PushID(paramIndex);
-                     if (ImGui::Checkbox(entry.second.c_str(), &active))
+                     if (ToggleChip(entry.second.c_str(), &active, ImGui::GetContentRegionAvail().x))
                      {
                         ArrangeEdit([&]() {
                            if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -846,7 +858,11 @@ namespace app
       }
       else if (gArrangeSel.size() > 1)
       {
-         ImGui::Text(T("Multiple Clips (%d)"), (int)gArrangeSel.size());
+         {
+            char mt[48];
+            snprintf(mt, sizeof(mt), T("Multiple Clips (%d)"), (int)gArrangeSel.size());
+            InspectorTitle(mt);
+         }
          ImGui::SameLine(availW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
@@ -855,10 +871,10 @@ namespace app
          // Multi-clip renaming
          static char sBulkRenameBuf[128] = "Clip";
          SectionHeader(T("Rename All Selected"));
-         ImGui::SetNextItemWidth(availW - 55.0f);
+         ImGui::SetNextItemWidth(availW - 56.0f - tok::space_1);
          FieldWell::InputText("##bulkrenametext", sBulkRenameBuf, sizeof(sBulkRenameBuf));
-         ImGui::SameLine();
-         if (ImGui::Button(L("Apply##bulkapplyrename")))
+         ImGui::SameLine(0.0f, tok::space_1);
+         if (ChipButton::Draw(L("Apply##bulkapplyrename"), false, ImGui::GetFrameHeight(), 56.0f))
          {
             ArrangeEdit([&]() {
                int idx = 1;
@@ -945,7 +961,7 @@ namespace app
          if (Arrange::Lane* lane = Arrange::FindLane(gArrange, rowId))
          {
             const bool isVideo = lane->type == Arrange::kLaneVideo;
-            ImGui::TextUnformatted(isVideo ? "Video Track" : "Audio Track");
+            InspectorTitle(isVideo ? "Video Track" : "Audio Track");
             ImGui::SameLine(availW - 18.0f);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;
@@ -987,16 +1003,18 @@ namespace app
             {
                SectionHeader(T("Audio Track Controls"));
                bool solo = lane->solo;
-               if (ImGui::Checkbox(L("Solo##tracksolo"), &solo))
+               const ImVec4 soloCol = ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pal::c_F59E0BFF));
+               const float halfW = (ImGui::GetContentRegionAvail().x - tok::space_1) * 0.5f;
+               if (ToggleChip(L("Solo##tracksolo"), &solo, halfW, &soloCol))
                {
                   ArrangeEdit([&]() {
                      if (Arrange::Lane* l = Arrange::FindLane(gArrange, rowId))
                         l->solo = solo;
                   });
                }
-               ImGui::SameLine();
+               ImGui::SameLine(0.0f, tok::space_1);
                bool mute = lane->mute;
-               if (ImGui::Checkbox(L("Mute##trackmute"), &mute))
+               if (ToggleChip(L("Mute##trackmute"), &mute, halfW))
                {
                   ArrangeEdit([&]() {
                      if (Arrange::Lane* l = Arrange::FindLane(gArrange, rowId))
@@ -1074,7 +1092,7 @@ namespace app
          }
          else if (const Arrange::TrackGroup* grp = Arrange::FindTrackGroup(gArrange, rowId))
          {
-            ImGui::TextUnformatted("Track Group");
+            InspectorTitle("Track Group");
             ImGui::SameLine(availW - 18.0f);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;

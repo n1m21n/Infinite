@@ -2268,8 +2268,12 @@ namespace app
          ImGui::PushID((int)(groupId & 0x7fffffff) | (1 << 30));
 
          const ImU32 tint = ArrangeMarkerColU32(grp->color);
-         dl->AddRectFilled(ImVec2(headerStartX, rowTop), ImVec2(rulerStartX + rulerWidth, rowTop + kLaneHeight),
-                            (tint & 0x00FFFFFFu) | 0x28000000u);
+         // Neutral band (the group colour stays on the chevron, folder and clip edges, not a tinted banner).
+         {
+            const ImVec4 gt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            dl->AddRectFilled(ImVec2(headerStartX, rowTop), ImVec2(rulerStartX + rulerWidth, rowTop + kLaneHeight),
+                              ImGui::GetColorU32(ImVec4(gt.x, gt.y, gt.z, 0.05f)));
+         }
          dl->AddLine(ImVec2(headerStartX, rowTop + kLaneHeight), ImVec2(rulerStartX + rulerWidth, rowTop + kLaneHeight),
                      tickCol, 1.0f);
          dl->AddLine(ImVec2(rulerStartX, rowTop), ImVec2(rulerStartX, rowTop + kLaneHeight), tickCol, 1.0f);
@@ -2286,10 +2290,10 @@ namespace app
          const bool grpRowSelected = gArrangeRowSel.count(groupId) != 0;
          if (grpRowSelected)
          {
-            const ImU32 selFill = isLight ? tok::U32(tok::pal::c_8B5CF623) : tok::U32(tok::pal::c_8B5CF62D);
-            const ImU32 selBorder = tok::U32(tok::pal::c_A78BFAB4);
-            dl->AddRectFilled(ImVec2(headerStartX + 1.0f, rowTop + 1.0f), ImVec2(rulerStartX - 1.0f, rowTop + kLaneHeight - 1.0f), selFill, 2.0f);
-            dl->AddRect(ImVec2(headerStartX + 1.0f, rowTop + 1.0f), ImVec2(rulerStartX - 1.0f, rowTop + kLaneHeight - 1.0f), selBorder, 2.0f, 0, 1.5f);
+            ImVec4 selAcc = app::AccentEmphasisSelected();
+            selAcc.w = 0.28f;
+            dl->AddRectFilled(ImVec2(headerStartX + 1.0f, rowTop + 1.0f), ImVec2(rulerStartX - 1.0f, rowTop + kLaneHeight - 1.0f),
+                              ImGui::GetColorU32(selAcc), tok::radius_tile);
          }
 
          ImGui::SetCursorScreenPos(ImVec2(indentX, rowTop + 4.0f));

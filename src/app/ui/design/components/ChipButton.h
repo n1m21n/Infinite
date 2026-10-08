@@ -12,8 +12,9 @@ namespace ChipButton
 {
    constexpr float kHeight = 22.0f;
 
-   // Returns true when clicked. `h` is the chip height, `minW` an optional width floor (0 = hug the label).
-   inline bool Draw(const char* label, bool on, float h = kHeight, float minW = 0.0f, bool soft = false)
+   // Returns true when clicked. `onCol` overrides the accent used when on (e.g. solo amber).
+   //  `h` is the chip height, `minW` an optional width floor (0 = hug the label).
+   inline bool Draw(const char* label, bool on, float h = kHeight, float minW = 0.0f, bool soft = false, const ImVec4* onCol = nullptr)
    {
       const char* key = std::strstr(label, "##");
       const std::string shown = key != nullptr ? std::string(label, key) : std::string(label);
@@ -24,7 +25,7 @@ namespace ChipButton
       const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec4 a = app::AccentEmphasisSelected();
+      const ImVec4 a = onCol != nullptr ? *onCol : app::AccentEmphasisSelected();
       // soft: a quiet selected state (text-tinted well, full-strength label) for secondary groups next to an accent chip
       const bool acc = on && !soft;
       const ImVec4 bg = acc ? a : ImVec4(t.x, t.y, t.z, (on ? 0.16f : 0.06f) + 0.05f * hv);
