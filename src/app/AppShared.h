@@ -2077,6 +2077,7 @@ void DropdownButton(const char* label, const std::vector<std::string>& options,
                        bool showCaption);
 
 void PushCheckboxStyle();
+bool NodeCheckbox(const char* label, bool* value);
 
 void PopCheckboxStyle();
 
@@ -3249,7 +3250,7 @@ void EndAudioSection();
             ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000)
                                                                      : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
-            ImGui::Checkbox(label, &shown);
+            NodeCheckbox(label, &shown);
             ImGui::EndDisabled();
             ImGui::PopStyleColor();
             DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3258,7 +3259,7 @@ void EndAudioSection();
          }
          else
          {
-            const bool clicked = ImGui::Checkbox(label, value);
+            const bool clicked = NodeCheckbox(label, value);
             if (outUserChanged)
                *outUserChanged = clicked;
             changed = clicked || changed;

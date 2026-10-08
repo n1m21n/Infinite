@@ -23,7 +23,7 @@ namespace app
       if (!h.registered)
       {
          PushCheckboxStyle();
-         bool changed = ImGui::Checkbox(label, value);
+         bool changed = NodeCheckbox(label, value);
          PopCheckboxStyle();
          if (outUserChanged)
             *outUserChanged = changed;
@@ -53,7 +53,7 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000)
                                                                   : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         ImGui::Checkbox(label, &shown);
+         NodeCheckbox(label, &shown);
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -62,7 +62,7 @@ namespace app
       }
       else
       {
-         bool clicked = ImGui::Checkbox(label, value);
+         bool clicked = NodeCheckbox(label, value);
          const bool hovered = ImGui::IsItemHovered();
          // Tab + Left/Right on a focused checkbox: right = on, left = off.
          const int step = KbDiscreteHook(h.nodeIndex, h.paramIndex, false);

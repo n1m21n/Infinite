@@ -1,4 +1,5 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
+#include "app/ui/design/UiAnim.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -683,6 +684,51 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_150_180_240_1000) : tok::V4(tok::palf::v_880_920_980_1000));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+   }
+
+
+   // The node checkbox: ImGui draws the box, we draw the tick (rounded stroke that draws on in 120 ms).
+   // Call between PushCheckboxStyle/PopCheckboxStyle; returns what ImGui::Checkbox returns.
+   bool NodeCheckbox(const char* label, bool* value)
+   {
+      const ImVec4 markCol = ImGui::GetStyleColorVec4(ImGuiCol_CheckMark);
+      ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(markCol.x, markCol.y, markCol.z, 0.0f));
+      const bool changed = ImGui::Checkbox(label, value);
+      ImGui::PopStyleColor();
+
+      const ImVec2 mn = ImGui::GetItemRectMin();
+      const float box = ImGui::GetFrameHeight();
+      const float p = UiAnim::Value(ImGui::GetItemID(), *value ? 1.0f : 0.0f, 120.0f);
+      if (p > 0.001f)
+      {
+         const ImVec2 a(mn.x + box * 0.27f, mn.y + box * 0.52f);
+         const ImVec2 b(mn.x + box * 0.43f, mn.y + box * 0.68f);
+         const ImVec2 c(mn.x + box * 0.74f, mn.y + box * 0.33f);
+         const float l1 = std::hypot(b.x - a.x, b.y - a.y), l2 = std::hypot(c.x - b.x, c.y - b.y);
+         float d = p * (l1 + l2);
+         ImVec2 tip = b;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImU32 col = ImGui::GetColorU32(markCol);
+         const float th = 2.0f;
+         dl->PathLineTo(a);
+         if (d <= l1)
+         {
+            tip = ImVec2(a.x + (b.x - a.x) * d / l1, a.y + (b.y - a.y) * d / l1);
+            dl->PathLineTo(tip);
+         }
+         else
+         {
+            d -= l1;
+            tip = ImVec2(b.x + (c.x - b.x) * d / l2, b.y + (c.y - b.y) * d / l2);
+            dl->PathLineTo(b);
+            dl->PathLineTo(tip);
+         }
+         dl->PathStroke(col, ImDrawFlags_None, th);
+         dl->AddCircleFilled(a, th * 0.5f, col, 8);
+         dl->AddCircleFilled(tip, th * 0.5f, col, 8);
+         dl->AddCircleFilled(b, th * 0.5f, col, 8);
+      }
+      return changed;
    }
 
 
