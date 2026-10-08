@@ -2141,18 +2141,41 @@ namespace app
       // MIDI Learn Alert Banner
       if (gPerfMidiLearnIdx >= 0 && gPerfMidiLearnIdx < (int)gPerfElements.size())
       {
-         ImGui::Spacing();
-         ImGui::PushStyleColor(ImGuiCol_Text, tok::U32(tok::pal::c_FFB92DFF));
+         // A slim status strip: pulsing dot, what is being learned, what to do, and Cancel as a chip.
          const auto& elem = gPerfElements[gPerfMidiLearnIdx];
-         std::string axisStr = (gPerfMidiLearnAxis == 1) ? " (Y Axis)" : (elem.kind == 4 ? " (X Axis)" : "");
-         std::string prompt = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7)
-            ? "MIDI Learn for '" + elem.label + "'" + axisStr + ": Move any CC knob/fader or hit a pad on your MIDI controller (Esc to cancel)..."
-            : "MIDI CC Learn for '" + elem.label + "'" + axisStr + ": Move any CC knob, fader, or wheel on your MIDI controller (Esc to cancel)...";
-         ImGui::Text("%s", prompt.c_str());
-         ImGui::SameLine();
-         if (ImGui::SmallButton(L("Cancel##cancelmidilearn")))
+         const bool isLightT = CategoryColors::IsThemeLight();
+         const ImVec4 warn = ImGui::ColorConvertU32ToFloat4(isLightT ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF));
+         const ImVec4 uiTxt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         const float stripH = 30.0f;
+         const ImVec2 sp = ImGui::GetCursorScreenPos();
+         const float stripW = ImGui::GetContentRegionAvail().x;
+         ImDrawList* sdl = ImGui::GetWindowDrawList();
+         sdl->AddRectFilled(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(ImVec4(warn.x, warn.y, warn.z, 0.13f)), tok::radius_tile);
+         const float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 6.0f);
+         const float cy = sp.y + stripH * 0.5f;
+         sdl->AddCircleFilled(ImVec2(sp.x + tok::space_3, cy), 4.0f, ImGui::GetColorU32(ImVec4(warn.x, warn.y, warn.z, 0.5f + 0.5f * pulse)), 12);
+         const std::string axisStr = (gPerfMidiLearnAxis == 1) ? " \xC2\xB7 Y axis" : (elem.kind == 4 ? " \xC2\xB7 X axis" : "");
+         const bool pad = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7);
+         const std::string head = "Listening for MIDI" + (elem.label.empty() ? std::string() : " \xC2\xB7 " + elem.label) + axisStr;
+         const char* hint = pad ? "Move a control or hit a pad on your controller. Esc cancels."
+                                : "Move a knob, fader or wheel on your controller. Esc cancels.";
+         float tx = sp.x + tok::space_3 + 4.0f + tok::space_2;
+         {
+            UiType::Scope ts(UiType::Size::Body, UiType::Weight::Semibold);
+            sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(warn), head.c_str());
+            tx += ImGui::CalcTextSize(head.c_str()).x + tok::space_3;
+         }
+         {
+            UiType::Scope ts(UiType::Size::Caption);
+            const float room = sp.x + stripW - 84.0f - tx;
+            if (ImGui::CalcTextSize(hint).x <= room)
+               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.6f)), hint);
+         }
+         ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - 76.0f, sp.y + (stripH - ChipButton::kHeight) * 0.5f));
+         if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::kHeight, 68.0f))
             gPerfMidiLearnIdx = -1;
-         ImGui::PopStyleColor();
+         ImGui::SetCursorScreenPos(ImVec2(sp.x, sp.y));
+         ImGui::Dummy(ImVec2(stripW, stripH + tok::space_2));
       }
 
       // ---- Sticky Header Toolbar ----
