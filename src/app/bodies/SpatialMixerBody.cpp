@@ -75,32 +75,42 @@ namespace app
       dl->AddText(ImVec2(p0.x + 5.0f, centre.y - 7.0f), text, "L");
       dl->AddText(ImVec2(p0.x + stageW - 12.0f, centre.y - 7.0f), text, "R");
 
-      // Listener seen from above, facing up (towards F): shoulders, neck, head
-      // with nose and ears - the same view as the reference body mesh, so
-      // left/right/front/back read at a glance.
+      // Listener seen from above, facing up (towards F): contour-mesh head -
+      // concentric rings and a cross, ears, nose, shoulders. Approved design D.
       {
-         const ImU32 skin = light ? IM_COL32(150, 165, 195, 255) : IM_COL32(86, 104, 140, 255);
-         const ImU32 skinHi = light ? IM_COL32(178, 192, 218, 255) : IM_COL32(112, 132, 170, 255);
-         const ImU32 shade = light ? IM_COL32(110, 124, 156, 255) : IM_COL32(62, 78, 112, 255);
-         const ImU32 rim = light ? IM_COL32(60, 72, 104, 255) : IM_COL32(170, 190, 225, 255);
-         const float cx = centre.x, cy = centre.y;
-         // shoulders: wide rounded slab behind the head
-         dl->AddEllipseFilled(ImVec2(cx, cy + 15.0f), ImVec2(30.0f, 10.0f), skin, 0.0f, 32);
-         dl->AddEllipse(ImVec2(cx, cy + 15.0f), ImVec2(30.0f, 10.0f), rim, 0.0f, 32, 1.0f);
-         // neck
-         dl->AddEllipseFilled(ImVec2(cx, cy + 8.0f), ImVec2(6.0f, 7.0f), shade, 0.0f, 16);
-         // ears (behind the head outline)
-         dl->AddEllipseFilled(ImVec2(cx - 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), skin, 0.0f, 12);
-         dl->AddEllipseFilled(ImVec2(cx + 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), skin, 0.0f, 12);
-         dl->AddEllipse(ImVec2(cx - 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), rim, 0.0f, 12, 1.0f);
-         dl->AddEllipse(ImVec2(cx + 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), rim, 0.0f, 12, 1.0f);
-         // nose
-         dl->AddTriangleFilled(ImVec2(cx - 3.5f, cy - 12.0f), ImVec2(cx + 3.5f, cy - 12.0f), ImVec2(cx, cy - 19.0f), skin);
-         dl->AddTriangle(ImVec2(cx - 3.5f, cy - 12.0f), ImVec2(cx + 3.5f, cy - 12.0f), ImVec2(cx, cy - 19.0f), rim, 1.0f);
-         // head: oval, lit from the front
-         dl->AddEllipseFilled(ImVec2(cx, cy), ImVec2(11.0f, 14.0f), skin, 0.0f, 32);
-         dl->AddEllipseFilled(ImVec2(cx, cy - 3.0f), ImVec2(7.0f, 8.0f), skinHi, 0.0f, 24);
-         dl->AddEllipse(ImVec2(cx, cy), ImVec2(11.0f, 14.0f), rim, 0.0f, 32, 1.3f);
+         const ImU32 body = light ? IM_COL32(205, 214, 235, 235) : IM_COL32(31, 42, 74, 235);
+         const ImU32 ln = light ? IM_COL32(60, 92, 170, 255) : IM_COL32(127, 163, 232, 255);
+         auto a = [&](ImU32 c, float f) { return (c & 0x00FFFFFF) | ((ImU32)(f * 255.0f) << 24); };
+         const float k = 0.55f, cx = centre.x, cy = centre.y;
+         auto E = [&](float x, float y, float rx, float ry, bool fill, ImU32 col, float t) {
+            if (fill)
+               dl->AddEllipseFilled(ImVec2(cx + x * k, cy + y * k), ImVec2(rx * k, ry * k), col, 0.0f, 32);
+            else
+               dl->AddEllipse(ImVec2(cx + x * k, cy + y * k), ImVec2(rx * k, ry * k), col, 0.0f, 32, t);
+         };
+         E(0, 52, 62, 22, true, body, 0);   E(0, 52, 62, 22, false, ln, 1.0f);
+         E(0, 52, 40, 14, false, a(ln, 0.5f), 1.0f); E(0, 52, 20, 7, false, a(ln, 0.4f), 1.0f);
+         for (int sgn = -1; sgn <= 1; sgn += 2)   // ears
+         {
+            E(27.0f * sgn, 4, 5, 12, true, body, 0);
+            E(27.0f * sgn, 4, 5, 12, false, ln, 1.0f);
+         }
+         // nose: filled arch above the head
+         dl->PathClear();
+         dl->PathLineTo(ImVec2(cx - 8 * k, cy - 28 * k));
+         dl->PathBezierQuadraticCurveTo(ImVec2(cx, cy - 56 * k), ImVec2(cx + 8 * k, cy - 28 * k), 12);
+         dl->PathFillConvex(body);
+         dl->PathLineTo(ImVec2(cx - 8 * k, cy - 28 * k));
+         dl->PathBezierQuadraticCurveTo(ImVec2(cx, cy - 56 * k), ImVec2(cx + 8 * k, cy - 28 * k), 12);
+         dl->PathStroke(ln, 0, 1.0f);
+         E(0, 0, 26, 33, true, body, 0);    E(0, 0, 26, 33, false, ln, 1.4f);
+         E(0, 0, 19, 25, false, a(ln, 0.7f), 1.0f);
+         E(0, 0, 12, 17, false, a(ln, 0.55f), 1.0f);
+         E(0, 0, 5, 8, false, a(ln, 0.45f), 1.0f);
+         dl->AddLine(ImVec2(cx, cy - 33 * k), ImVec2(cx, cy + 33 * k), a(ln, 0.5f));
+         dl->AddLine(ImVec2(cx - 26 * k, cy), ImVec2(cx + 26 * k, cy), a(ln, 0.5f));
+         dl->AddLine(ImVec2(cx - 18 * k, cy - 24 * k), ImVec2(cx + 18 * k, cy + 24 * k), a(ln, 0.3f));
+         dl->AddLine(ImVec2(cx + 18 * k, cy - 24 * k), ImVec2(cx - 18 * k, cy + 24 * k), a(ln, 0.3f));
       }
 
       // ---- dots ----------------------------------------------------------
