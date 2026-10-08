@@ -16,8 +16,27 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | 1 Engine | `feature/ui-engine` | 1a ImGui 1.90.9 -> 1.92.9 (dynamic fonts, 6 local patches re-applied, `imgui-patches.md`) | done, 47/47 smoke + ui group green; Windows/Linux CI not yet run |
 | 1 Engine | `feature/ui-engine` | 1b type engine: `UiType` (token sizes x Regular/Medium/Semibold), `UITYPETEST` | done; icon/text optical match comes with 1e (IconTile) |
 | 1 Engine | `feature/ui-engine` | 1c layout engine `UiLayout` (done: Row/Column/Split, Fixed/Flex, Snap, `UILAYOUTTEST`); 1d interaction `UiInteract` (done: stable-key IDs, state, per-frame semantic tree, `UIINTERACTTEST`); 1e first components (done: TextButton, PillGroup, Readout with tabular digits, Divider, `UICOMPTEST`; IconTile moves onto UiInteract in 1h); 1f gallery + goldens (done: `UiGallery`, `tools/design/golden.py`, macOS goldens light + dark in `tests/ui-golden/macos`; Windows/Linux goldens need their own first run); 1g ratchet on raw widgets (done: `ratchet.py` now also counts `ImGui::Button/SmallButton/Separator/SameLine/PushStyleColor/PushStyleVar` per file; baseline 959 in 32 files, may only fall); 1h top bar (done 2026-10-08, owner-approved from real-app shots: 40 pt bar, 28 pt tiles, one centre line, 24 pt section breaks, Library button + glyph, tabular readouts; ratchet 954; B6 re-run within noise); remaining for Block 1: 3-platform CI green, merge. 1d interaction + stable IDs, 1e first components, 1f gallery + goldens, 1g ratchet, 1h top bar proof surface | not started |
-| 2 Chrome | `feature/ui-chrome` | Arrange header, panels, mod matrix, perf mode, viewport, menus, tables, Settings, feedback | not started |
-| 3 Canvas + nodes | `feature/ui-canvas` | Node frame/pins/cables, controls C1-C12, visualizers, zoom LOD, node icons | not started |
+| 2 Chrome | `feature/ui-chrome` | Top bar, display box, rail, library panel | done (owner-approved 2026-10-08). Arrange header, menus, tables, Settings, mod matrix, perf mode still raw: see coverage table |
+| 3 Canvas + nodes | `feature/ui-canvas` | Node frame/pins/cables, controls C1-C12, visualizers, zoom LOD, node icons | in progress, see coverage table below |
+
+### Block 3 coverage (2026-10-08, from the app, light + dark checked on Chorus and Wavetable only)
+
+| Class | State |
+|---|---|
+| C1 knob | kept as is (owner decision: existing knobs stay; textured/3D later); mod pin centred (P2) |
+| C2 slider | outline removed both themes, radius 4. Hover/pressed easing open |
+| C3 vertical fader | not started |
+| C4 checkbox | outline removed, P10 budget met. Own tick + 120 ms draw-on open |
+| C5 switch | not started (Settings/panels only) |
+| C6 dropdown | borderless recess, radius 4. Chevron tried and rejected by owner |
+| C7 button, C8 toggle icons, C9 text entry, C10 swatch, C12 badges | not started |
+| C11 pin/dot | pin centred on knob; sizes/pulse open |
+| N1 node header | title Title/Medium, category same size dimmed; single-row header open |
+| N1 frame | 1 px hairline border done |
+| N2 sections, N3 cables (draw order over nodes), N4 groups, N5 grid/marquee | not started |
+| V1-V7 visualizers | not started |
+| Font sizes inside nodes | one size (15) in Chorus; other nodes not audited (`NoteBodies.cpp`, `SamplerBodies.cpp`, `StageKeyboard.cpp` scale text) |
+| Chrome A3-A7 (menus, panels, tables, timeline, dialogs/Settings) | not started; raw widgets 875 (stored 957), largest: SamplerBodies 125, ArrangePanel 112, ArrangeRender 56, StageMenuBar 53 |
 
 Root cause of the sizing complaints (found 2026-10-08): each call site derives its own icon size from row height (0.65 flag/track height/edit, 0.72 top-bar transport, 0.88 top-bar toggles, 0.9 search). No shared size token exists. Step 1 fixes that before any more icon art is judged.
 
