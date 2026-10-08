@@ -3736,16 +3736,20 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       if (o.find("arrangedemo") != std::string::npos)
       {
          gArrangePanelOpen = true;
-         gArrangePanelHeight = 560.0f;
+         gArrangePanelHeight = 900.0f;
          size_t firstAudio = 0;
          while (firstAudio < gArrange.lanes.size() && gArrange.lanes[firstAudio].type != Arrange::kLaneAudio) ++firstAudio;
          if (firstAudio + 1 < gArrange.lanes.size()) gArrange.lanes[firstAudio + 1].solo = true;
-         auto addClip = [](size_t lane, int bar, int bars, const char* name)
+         // Active clips need a source node (a clip without one draws as the hatched offline placeholder).
+         GraphNode* demoSrc = SpawnNode("Wavetable", "Synths", 0.0f, 0.0f);
+         auto addClip = [demoSrc](size_t lane, int bar, int bars, const char* name)
          {
             Arrange::Clip c;
             c.start = (Arrange::Tick)bar * Arrange::kTicksPerBar;
             c.length = (Arrange::Tick)bars * Arrange::kTicksPerBar;
             c.name = name;
+            // Active clips need a source: cycle through the loaded patch's nodes (none loaded = offline hatch).
+            if (demoSrc != nullptr) c.srcUid = demoSrc->uid;
             uint64_t id = 0;
             Arrange::PlaceOverwrite(gArrange, gArrange.lanes[lane].id, c, &id);
             return id;

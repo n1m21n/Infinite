@@ -19,7 +19,7 @@ namespace FieldWell
       fillX = std::clamp(fillX, mn.x, mx.x);
       if (fillX <= mn.x) return;
       ImVec4 ac = app::AccentEmphasisSelected();
-      ac.w = 0.45f;
+      ac.w = 0.32f;
       dl->PushClipRect(mn, ImVec2(fillX, mx.y), true);
       dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ac), tok::radius_tile);
       dl->PopClipRect();
@@ -40,5 +40,39 @@ namespace FieldWell
    {
       ImGui::PopStyleVar();
       ImGui::PopStyleColor(5);
+   }
+
+   // Text input in the same well (rename fields).
+   inline bool InputText(const char* label, char* buf, size_t size, ImGuiInputTextFlags flags = 0)
+   {
+      PushStyle();
+      const bool r = ImGui::InputText(label, buf, size, flags);
+      PopStyle();
+      return r;
+   }
+
+   // Row of round colour dots, `n` entries, `cols[i]` as ImU32. `selected` is the index with a ring (-1 = none).
+   // Returns the clicked index or -1. `names[i]` feeds the tooltip.
+   inline int SwatchRow(const ImU32* cols, const char* const* names, int n, int selected, float d = 16.0f)
+   {
+      int clicked = -1;
+      const float gap = 4.0f;
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      for (int i = 0; i < n; ++i)
+      {
+         if (i > 0) ImGui::SameLine(0.0f, gap);
+         ImGui::PushID(i);
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         if (ImGui::InvisibleButton("##sw", ImVec2(d, d))) clicked = i;
+         const bool hov = ImGui::IsItemHovered();
+         if (hov && names != nullptr) ImGui::SetTooltip("%s", names[i]);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 c(p.x + d * 0.5f, p.y + d * 0.5f);
+         dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), cols[i]);
+         if (i == selected)
+            dl->AddCircle(c, d * 0.5f + 2.0f, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.9f)), 0, 1.5f);
+         ImGui::PopID();
+      }
+      return clicked;
    }
 }

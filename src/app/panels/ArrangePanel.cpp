@@ -2,6 +2,7 @@
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -2321,7 +2322,7 @@ namespace app
                ImGui::SetKeyboardFocusHere();
                gArrangeRenameJustStarted = false;
             }
-            const bool grpNameEdited = ImGui::InputText("##groupname", grpNameBuf, sizeof(grpNameBuf),
+            const bool grpNameEdited = FieldWell::InputText("##groupname", grpNameBuf, sizeof(grpNameBuf),
                                                         ImGuiInputTextFlags_AutoSelectAll);
             if (ImGui::IsItemActivated())
                ArrangeGestureBegin();
@@ -2630,7 +2631,7 @@ namespace app
                ImGui::SetKeyboardFocusHere();
                gArrangeRenameJustStarted = false;
             }
-            const bool nameEdited = ImGui::InputText("##streamname", nameBuf, sizeof(nameBuf),
+            const bool nameEdited = FieldWell::InputText("##streamname", nameBuf, sizeof(nameBuf),
                                                      ImGuiInputTextFlags_AutoSelectAll);
             if (ImGui::IsItemActivated())
                ArrangeGestureBegin();
@@ -4438,7 +4439,7 @@ namespace app
       if (!gArrange.lanes.empty())
       {
          ImGui::SetCursorScreenPos(ImVec2(headerStartX + 4.0f, lanesContentBottom + 4.0f));
-         if (ImGui::Button(L("+ Add Track"), ImVec2(kHeaderWidth - 8.0f, 22.0f)))
+         if (ChipButton::Draw(L("+ Add Track"), false, 24.0f, kHeaderWidth - 8.0f))
          {
             gArrangeAddTrackInsertAfter = -1;
             ImGui::OpenPopup("##arrangeaddtrackpopup");

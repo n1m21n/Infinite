@@ -364,6 +364,18 @@ namespace app
       ImGui::TextDisabled("%s", text);
    }
 
+   // Inspector field row: label in a fixed left column, the field fills the rest of the row.
+   static constexpr float kRowLabelW = 72.0f;
+   static void RowLabel(const char* text)
+   {
+      ImGui::AlignTextToFramePadding();
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.72f));
+      ImGui::TextUnformatted(text);
+      ImGui::PopStyleColor();
+      ImGui::SameLine(kRowLabelW);
+   }
+
    void DrawArrangeClipSettingsChild(float panelW)
    {
       PushDockedPanelStyle(/*isChild=*/true);
@@ -399,7 +411,7 @@ namespace app
          clipId = *gArrangeSel.begin();
       Arrange::Clip* clip = clipId != 0 ? Arrange::FindClip(gArrange, clipId) : nullptr;
 
-      const float fieldW = std::max(70.0f, availW - 65.0f);
+      const float fieldW = std::max(70.0f, availW - kRowLabelW);
 
       auto tickField = [&](const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
                            ArrangeTickUnit unit, Arrange::Tick* out) -> bool
@@ -409,17 +421,12 @@ namespace app
 
       auto drawPaletteSwatches = [&](const std::function<void(uint32_t)>& onSelect)
       {
-         for (int pi = 0; pi < IM_ARRAYSIZE(kArrangePalette); pi++)
-         {
-            if (pi % 5 != 0) ImGui::SameLine(0.0f, 4.0f);
-            const ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kArrangePalette[pi].col);
-            ImGui::PushID(pi);
-            if (ImGui::ColorButton(kArrangePalette[pi].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(18, 18)))
-               onSelect(ArrangeMarkerRGBA(kArrangePalette[pi].col));
-            if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", kArrangePalette[pi].name);
-            ImGui::PopID();
-         }
+         constexpr int n = IM_ARRAYSIZE(kArrangePalette);
+         ImU32 cols[n];
+         const char* names[n];
+         for (int i = 0; i < n; ++i) { cols[i] = kArrangePalette[i].col; names[i] = kArrangePalette[i].name; }
+         const int hit = FieldWell::SwatchRow(cols, names, n, -1, 15.0f);
+         if (hit >= 0) onSelect(ArrangeMarkerRGBA(kArrangePalette[hit].col));
       };
 
       if (clip != nullptr)
@@ -446,7 +453,7 @@ namespace app
          char nameBuf[128];
          snprintf(nameBuf, sizeof(nameBuf), "%s", clip->name.c_str());
          ImGui::SetNextItemWidth(-FLT_MIN);
-         if (ImGui::InputText("##clipinspname", nameBuf, sizeof(nameBuf)))
+         if (FieldWell::InputText("##clipinspname", nameBuf, sizeof(nameBuf)))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -473,7 +480,8 @@ namespace app
          ImGui::Spacing();
          SectionHeader(T("Timing & Position"));
          Arrange::Tick newTick = 0;
-         if (tickField("Start##clipstart", clip->start, 0, Arrange::kMaxTick, ArrangeTickUnit::Position, &newTick))
+         RowLabel("Start");
+         if (tickField("##clipstart", clip->start, 0, Arrange::kMaxTick, ArrangeTickUnit::Position, &newTick))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -483,7 +491,8 @@ namespace app
                }
             });
          }
-         if (tickField("Length##cliplength", clip->length, Arrange::kPPQ / 16, Arrange::kMaxTick, ArrangeTickUnit::Length, &newTick))
+         RowLabel("Length");
+         if (tickField("##cliplength", clip->length, Arrange::kPPQ / 16, Arrange::kMaxTick, ArrangeTickUnit::Length, &newTick))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -493,7 +502,8 @@ namespace app
                }
             });
          }
-         if (tickField("Fade In##clipfadein", clip->fadeIn, 0, clip->length, ArrangeTickUnit::FadeMs, &newTick))
+         RowLabel("Fade In");
+         if (tickField("##clipfadein", clip->fadeIn, 0, clip->length, ArrangeTickUnit::FadeMs, &newTick))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -503,7 +513,8 @@ namespace app
                }
             });
          }
-         if (tickField("Fade Out##clipfadeout", clip->fadeOut, 0, clip->length, ArrangeTickUnit::FadeMs, &newTick))
+         RowLabel("Fade Out");
+         if (tickField("##clipfadeout", clip->fadeOut, 0, clip->length, ArrangeTickUnit::FadeMs, &newTick))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -521,13 +532,15 @@ namespace app
             // One line, not a paragraph: the button beside it is the whole
             // fix, and the reasoning belongs in a tooltip the user opens
             // when they want it rather than in permanent panel text.
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_650_200_1000), "Shared with another video track.");
+            ImGui::PushTextWrapPos(0.0f);
+             ImGui::TextDisabled("Shared with another video track.");
+             ImGui::PopTextWrapPos();
             ArrangeSharedSourceTooltip(
                "Both clips show the same frame - a video source reads the global transport, not "
                "the clip - and where they overlap the upper track hides this one's blend mode, "
                "opacity and grade.\n\nMake Unique gives this clip its own copy of the node, fed "
                "by the same inputs and carrying the same modulations.");
-            if (ImGui::Button(L("Make Unique##clipuniquevideo"), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Make Unique##clipuniquevideo"), false, 24.0f, ImGui::GetContentRegionAvail().x))
                ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
@@ -539,13 +552,15 @@ namespace app
          {
             ImGui::Spacing();
             SectionHeader(T("Playback & Trigger"));
-            ImGui::TextColored(tok::V4(tok::palf::v_1000_650_200_1000), "Shared with another track.");
+            ImGui::PushTextWrapPos(0.0f);
+             ImGui::TextDisabled("Shared with another track.");
+             ImGui::PopTextWrapPos();
             ArrangeSharedSourceTooltip(
                "The node holds one playback position and both tracks set it every block, so "
                "whichever is summed last wins and this clip can end up playing the other one's "
                "position.\n\nMake Unique gives this clip its own copy of the node, fed by the "
                "same inputs and carrying the same modulations.");
-            if (ImGui::Button(L("Make Unique##clipuniqueaudio"), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Make Unique##clipuniqueaudio"), false, 24.0f, ImGui::GetContentRegionAvail().x))
                ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
@@ -558,9 +573,15 @@ namespace app
             const std::vector<std::string>& modes = BlendModes::Names();
             const char* curBlendName = (clip->blendMode >= 0 && clip->blendMode < (int)modes.size())
                ? modes[clip->blendMode].c_str() : "Normal";
+            RowLabel("Blend");
             ImGui::SetNextItemWidth(fieldW);
             FieldWell::PushStyle();
-            const bool blendOpen = ImGui::BeginCombo(L("Blend##clipblend"), curBlendName);
+            const bool blendOpen = ImGui::BeginCombo("##clipblend", curBlendName, ImGuiComboFlags_NoArrowButton);
+            {
+               const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+               glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
+                                      ImGui::GetColorU32(ImGuiCol_TextDisabled));
+            }
             FieldWell::PopStyle();
             if (blendOpen)
             {
@@ -582,8 +603,9 @@ namespace app
             }
 
             float opacity = clip->opacity;
+            RowLabel("Opacity");
             ImGui::SetNextItemWidth(fieldW);
-            if (ArrangeSliderFloat("Opacity##clipop", &opacity, 0.0f, 1.0f, "%.2f"))
+            if (ArrangeSliderFloat("##clipop", &opacity, 0.0f, 1.0f, "%.2f"))
             {
                ArrangeEdit([&]() {
                   if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -595,8 +617,9 @@ namespace app
             }
 
             float brightness = clip->colorBrightness;
+            RowLabel("Bright");
             ImGui::SetNextItemWidth(fieldW);
-            if (ArrangeSliderFloat("Bright##clipbright", &brightness, -1.0f, 1.0f, "%.2f"))
+            if (ArrangeSliderFloat("##clipbright", &brightness, -1.0f, 1.0f, "%.2f"))
             {
                ArrangeEdit([&]() {
                   if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -608,8 +631,9 @@ namespace app
             }
 
             float contrast = clip->colorContrast;
+            RowLabel("Contrast");
             ImGui::SetNextItemWidth(fieldW);
-            if (ArrangeSliderFloat("Contrast##clipcont", &contrast, -1.0f, 1.0f, "%.2f"))
+            if (ArrangeSliderFloat("##clipcont", &contrast, -1.0f, 1.0f, "%.2f"))
             {
                ArrangeEdit([&]() {
                   if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -621,8 +645,9 @@ namespace app
             }
 
             float saturation = clip->colorSaturation;
+            RowLabel("Sat");
             ImGui::SetNextItemWidth(fieldW);
-            if (ArrangeSliderFloat("Sat##clipsat", &saturation, 0.0f, 2.0f, "%.2f"))
+            if (ArrangeSliderFloat("##clipsat", &saturation, 0.0f, 2.0f, "%.2f"))
             {
                ArrangeEdit([&]() {
                   if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -637,8 +662,9 @@ namespace app
          {
             SectionHeader(T("Audio Adjustments"));
             float gainDb = clip->gainDb;
+            RowLabel("Gain");
             ImGui::SetNextItemWidth(fieldW);
-            if (ArrangeSliderFloat("Gain##clipgain", &gainDb, -60.0f, 12.0f, "%.1f dB"))
+            if (ArrangeSliderFloat("##clipgain", &gainDb, -60.0f, 12.0f, "%.1f dB"))
             {
                ArrangeEdit([&]() {
                   if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -650,8 +676,9 @@ namespace app
             }
 
             float pan = clip->pan;
+            RowLabel("Pan");
             ImGui::SetNextItemWidth(fieldW);
-            if (ArrangeSliderFloat("Pan##clippan", &pan, -1.0f, 1.0f, "%.2f"))
+            if (ArrangeSliderFloat("##clippan", &pan, -1.0f, 1.0f, "%.2f"))
             {
                ArrangeEdit([&]() {
                   if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -663,8 +690,9 @@ namespace app
             }
 
             float pitch = clip->pitch;
+            RowLabel("Pitch");
             ImGui::SetNextItemWidth(fieldW);
-            if (ArrangeSliderFloat("Pitch##clippitch", &pitch, -24.0f, 24.0f, "%+.1f st"))
+            if (ArrangeSliderFloat("##clippitch", &pitch, -24.0f, 24.0f, "%+.1f st"))
             {
                ArrangeEdit([&]() {
                   if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -790,9 +818,9 @@ namespace app
             // ArrangeModel.h). Only Audio/Video Clip can be reassigned.
             if (!isSample)
             {
-               if (ImGui::Button(L("Assign Different Node..."), ImVec2(-FLT_MIN, 0)))
+               if (ChipButton::Draw(L("Assign Different Node..."), false, 24.0f, ImGui::GetContentRegionAvail().x))
                   gArrangeAssigningClipId = clipId;
-               if (ImGui::Button(L("Clear Source"), ImVec2(-FLT_MIN, 0)))
+               if (ChipButton::Draw(L("Clear Source"), false, 24.0f, ImGui::GetContentRegionAvail().x))
                {
                   ArrangeEdit([&]() {
                      if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -808,7 +836,7 @@ namespace app
          else if (!isSample)
          {
             SectionHeader(T("(unassigned)"));
-            if (ImGui::Button(L("Assign Node..."), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Assign Node..."), false, 24.0f, ImGui::GetContentRegionAvail().x))
                gArrangeAssigningClipId = clipId;
          }
          else
@@ -828,7 +856,7 @@ namespace app
          static char sBulkRenameBuf[128] = "Clip";
          SectionHeader(T("Rename All Selected"));
          ImGui::SetNextItemWidth(availW - 55.0f);
-         ImGui::InputText("##bulkrenametext", sBulkRenameBuf, sizeof(sBulkRenameBuf));
+         FieldWell::InputText("##bulkrenametext", sBulkRenameBuf, sizeof(sBulkRenameBuf));
          ImGui::SameLine();
          if (ImGui::Button(L("Apply##bulkapplyrename")))
          {
@@ -897,13 +925,13 @@ namespace app
          if (anyGrouped)
          {
             ImGui::Spacing();
-            if (ImGui::Button(L("Ungroup"), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Ungroup"), false, 24.0f, ImGui::GetContentRegionAvail().x))
                ArrangeUngroupSelection();
          }
 
          ImGui::Spacing();
          ImGui::Separator();
-         if (ImGui::Button(L("Delete Selected Clips"), ImVec2(-FLT_MIN, 0)))
+         if (ChipButton::Draw(L("Delete Selected Clips"), false, 24.0f, ImGui::GetContentRegionAvail().x))
          {
             ArrangeEdit([&]() {
                Arrange::Delete(gArrange, std::vector<uint64_t>(gArrangeSel.begin(), gArrangeSel.end()));
@@ -926,7 +954,7 @@ namespace app
             char trackName[128];
             snprintf(trackName, sizeof(trackName), "%s", lane->name.c_str());
             ImGui::SetNextItemWidth(-FLT_MIN);
-            if (ImGui::InputText("##trackinspname", trackName, sizeof(trackName)))
+            if (FieldWell::InputText("##trackinspname", trackName, sizeof(trackName)))
             {
                ArrangeEdit([&]() {
                   if (Arrange::Lane* l = Arrange::FindLane(gArrange, rowId))
@@ -977,8 +1005,9 @@ namespace app
                }
 
                float gainDb = lane->gainDb;
+               RowLabel("Gain");
                ImGui::SetNextItemWidth(fieldW);
-               if (ArrangeSliderFloat("Gain##trackgain", &gainDb, -60.0f, 12.0f, "%.1f dB"))
+               if (ArrangeSliderFloat("##trackgain", &gainDb, -60.0f, 12.0f, "%.1f dB"))
                {
                   ArrangeEdit([&]() {
                      if (Arrange::Lane* l = Arrange::FindLane(gArrange, rowId))
@@ -987,8 +1016,9 @@ namespace app
                }
 
                float pan = lane->pan;
+               RowLabel("Pan");
                ImGui::SetNextItemWidth(fieldW);
-               if (ArrangeSliderFloat("Pan##trackpan", &pan, -1.0f, 1.0f, "%.2f"))
+               if (ArrangeSliderFloat("##trackpan", &pan, -1.0f, 1.0f, "%.2f"))
                {
                   ArrangeEdit([&]() {
                      if (Arrange::Lane* l = Arrange::FindLane(gArrange, rowId))
@@ -1000,8 +1030,9 @@ namespace app
             {
                SectionHeader(T("Video Track Controls"));
                float opacity = lane->opacity;
+               RowLabel("Opacity");
                ImGui::SetNextItemWidth(fieldW);
-               if (ArrangeSliderFloat("Opacity##trackop", &opacity, 0.0f, 1.0f, "%.2f"))
+               if (ArrangeSliderFloat("##trackop", &opacity, 0.0f, 1.0f, "%.2f"))
                {
                   ArrangeEdit([&]() {
                      if (Arrange::Lane* l = Arrange::FindLane(gArrange, rowId))
@@ -1027,13 +1058,13 @@ namespace app
 
             ImGui::Spacing();
             ImGui::Separator();
-            if (ImGui::Button(L("Duplicate Track"), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Duplicate Track"), false, 24.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   Arrange::DuplicateLane(gArrange, rowId);
                });
             }
-            if (ImGui::Button(L("Delete Track"), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Delete Track"), false, 24.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   Arrange::RemoveLane(gArrange, rowId);
@@ -1052,7 +1083,7 @@ namespace app
             char grpName[128];
             snprintf(grpName, sizeof(grpName), "%s", grp->name.c_str());
             ImGui::SetNextItemWidth(-FLT_MIN);
-            if (ImGui::InputText("##grpinspname", grpName, sizeof(grpName)))
+            if (FieldWell::InputText("##grpinspname", grpName, sizeof(grpName)))
             {
                ArrangeEdit([&]() {
                   Arrange::RenameTrackGroup(gArrange, rowId, grpName);
@@ -1078,28 +1109,28 @@ namespace app
 
             ImGui::Spacing();
             ImGui::Separator();
-            if (ImGui::Button(L("Add Video Track to Group"), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Add Video Track to Group"), false, 24.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   const uint64_t newLaneId = Arrange::AddLane(gArrange, Arrange::kLaneVideo);
                   Arrange::SetLaneTrackGroup(gArrange, newLaneId, rowId);
                });
             }
-            if (ImGui::Button(L("Add Audio Track to Group"), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Add Audio Track to Group"), false, 24.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   const uint64_t newLaneId = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
                   Arrange::SetLaneTrackGroup(gArrange, newLaneId, rowId);
                });
             }
-            if (ImGui::Button(L("Ungroup (Keep Tracks)"), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Ungroup (Keep Tracks)"), false, 24.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   Arrange::RemoveTrackGroup(gArrange, rowId, false);
                });
                gArrangeRowSel.clear();
             }
-            if (ImGui::Button(L("Delete Group + Tracks"), ImVec2(-FLT_MIN, 0)))
+            if (ChipButton::Draw(L("Delete Group + Tracks"), false, 24.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
                   Arrange::RemoveTrackGroup(gArrange, rowId, true);

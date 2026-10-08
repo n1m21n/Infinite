@@ -15,7 +15,7 @@ namespace ChipButton
    // Returns true when clicked. `h` is the chip height, `minW` an optional width floor (0 = hug the label).
    inline bool Draw(const char* label, bool on, float h = kHeight, float minW = 0.0f, bool soft = false)
    {
-      const char* key = std::strstr(label, "###");
+      const char* key = std::strstr(label, "##");
       const std::string shown = key != nullptr ? std::string(label, key) : std::string(label);
       const ImVec2 ts = ImGui::CalcTextSize(shown.c_str());
       const ImVec2 sz(std::max(minW, ts.x + 2.0f * tok::space_2), h);
