@@ -524,28 +524,19 @@ void DrawMenuBar(FrameCtx& fc)
          const char* curScaleName = (curScale >= 0 && curScale < (int)scaleList.size()) ? scaleList[curScale].c_str() : "major";
          const std::string capScaleName = FormatScaleDisplayName(curScaleName);
 
-         // ---- The display: Tempo | Signature | Key, one well, captioned cells ----
+         // ---- The display: Tempo | Signature | Key | click, one well, values only ----
          namespace TD = TransportDisplay;
          const float fieldPad = tok::space_2;
-         const float cellPad = tok::space_3;
+         const float cellPad = tok::space_2;
          float tempoCellW, numW, slashW, denW, sigCellW, keyW, scaleW, keyCellW;
          {
-            tempoCellW = std::max(TD::ValueWidth("300.0"), 60.0f) + 2.0f * cellPad;
+            tempoCellW = TD::ValueWidth("300.0") + 2.0f * cellPad;
             numW = TD::ValueWidth("99") + fieldPad;
             denW = TD::ValueWidth("16") + fieldPad;
             slashW = TD::ValueWidth("/") + fieldPad;
             sigCellW = numW + slashW + denW + 2.0f * fieldPad;
-            static float sWidestScale = 0.0f;
-            static size_t sWidestFor = 0;
-            if (sWidestFor != scaleList.size())
-            {
-               sWidestScale = 0.0f;
-               for (const std::string& sc : scaleList)
-                  sWidestScale = std::max(sWidestScale, TD::ValueWidth(FormatScaleDisplayName(sc).c_str()));
-               sWidestFor = scaleList.size();
-            }
             keyW = TD::ValueWidth("C#") + fieldPad;
-            scaleW = std::max(sWidestScale, TD::ValueWidth(capScaleName.c_str())) + fieldPad;
+            scaleW = TD::ValueWidth(capScaleName.c_str()) + fieldPad;  // follows the current scale; the three cells re-share it
             keyCellW = keyW + scaleW + 2.0f * fieldPad;
             // The three cells share one width, the widest content, so the display reads as even thirds.
             const float cellW = std::max({ tempoCellW, sigCellW, keyCellW });
@@ -560,9 +551,6 @@ void DrawMenuBar(FrameCtx& fc)
          TD::Divider(wellMin.x + tempoCellW, wellMin.y);
          TD::Divider(wellMin.x + tempoCellW + sigCellW, wellMin.y);
          TD::Divider(wellMin.x + tempoCellW + sigCellW + keyCellW, wellMin.y);
-         TD::Caption(wellMin.x, tempoCellW, wellMin.y, T("Tempo"));
-         TD::Caption(wellMin.x + tempoCellW, sigCellW, wellMin.y, T("Signature"));
-         TD::Caption(wellMin.x + tempoCellW + sigCellW, keyCellW, wellMin.y, T("Key"));
 
          // One editable number: drag up/down, double-click or type to edit. `onDrag` gets the vertical delta in
          // points; `onCommit` gets the typed text.

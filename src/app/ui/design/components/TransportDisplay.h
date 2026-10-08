@@ -1,5 +1,5 @@
-// TransportDisplay: the tempo / signature / key readout in the top bar. One rounded well holds captioned cells
-// (small label over a tabular value), cells split by hairlines; each editable value is its own hover target.
+// TransportDisplay: the tempo / signature / key readout in the top bar. One rounded well holds cells
+// (a tabular value), cells split by hairlines; each editable value is its own hover target.
 // Drawing only: the transport logic stays with the caller.
 #pragma once
 #include <cmath>
@@ -11,10 +11,9 @@
 
 namespace TransportDisplay
 {
-   constexpr float kHeight = 40.0f;
-   constexpr float kCaptionY = 7.0f;  // caption top, from the well's top edge
-   constexpr float kValueY = 15.0f;   // value line top, from the well's top edge (caption + value ink is centred as one block, 5 pt apart)
+   constexpr float kHeight = 32.0f;
    constexpr float kValueH = 18.0f;
+   constexpr float kValueY = (kHeight - kValueH) * 0.5f;  // value line top, from the well's top edge: centred
 
    inline ImVec4 Text(float a)
    {
@@ -32,15 +31,6 @@ namespace TransportDisplay
    {
       ImGui::GetWindowDrawList()->AddLine(ImVec2(std::round(x), top + 6.0f), ImVec2(std::round(x), top + kHeight - 6.0f),
                                           ImGui::GetColorU32(Text(0.12f)), 1.0f);
-   }
-
-   // Small muted label centred over a cell.
-   inline void Caption(float cellX, float cellW, float top, const char* text)
-   {
-      UiType::Scope ts(UiType::Size::Caption, UiType::Weight::Medium);
-      const float w = ImGui::CalcTextSize(text).x;
-      ImGui::GetWindowDrawList()->AddText(ImVec2(std::round(cellX + (cellW - w) * 0.5f), std::round(top + kCaptionY)),
-                                          ImGui::GetColorU32(Text(0.5f)), text);
    }
 
    inline float ValueWidth(const char* widest)
