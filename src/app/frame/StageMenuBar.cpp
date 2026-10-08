@@ -919,6 +919,16 @@ void DrawMenuBar(FrameCtx& fc)
          // Returns false without drawing anything when there isn't room -
          // these are the first things dropped on a narrow window, since they
          // carry no text label and are the least essential of the cluster.
+         // The four toggles spread evenly across the Library panel's tab row: the span runs from the panel's
+         // inner left edge (kNodePanelWidth minus its 8 pt padding each side) to the hairline. Falls back to a
+         // tight pack when the window is too narrow for that span.
+         float iconGap = tok::space_1;
+         {
+            const float regionLeft = windowRight - (fc.kNodePanelWidth - 16.0f);
+            const float even = (cursorX - regionLeft - 4.0f * tok::tile) / 3.0f;
+            if (regionLeft >= leftClusterEndX + minGap && even > tok::space_1)
+               iconGap = even;
+         }
          auto TopBarIconToggle = [&](const char* id, bool isOpen, void (*draw)(ImDrawList*, ImVec2, float, ImU32, float), const char* tooltip, const char* glyphOff = nullptr, const char* glyphOn = nullptr)
          {
             const float btnW = tok::tile;
@@ -932,7 +942,7 @@ void DrawMenuBar(FrameCtx& fc)
                const bool clicked = IconTile::Draw(id, glyphOff, glyphOn, isOpen, 28.0f, ImGui::GetFrameHeight());
                if (ImGui::IsItemHovered())
                   HelpTip("%s", tooltip);
-               cursorX -= tok::space_1;
+               cursorX -= iconGap;
                return clicked;
             }
             if (isOpen)
@@ -956,7 +966,7 @@ void DrawMenuBar(FrameCtx& fc)
             else
                glyph::DrawPlaceholder(dl, center, iconSize, col, 0.0f);
 
-            cursorX -= itemGap;
+            cursorX -= iconGap;
             return clicked;
          };
 
