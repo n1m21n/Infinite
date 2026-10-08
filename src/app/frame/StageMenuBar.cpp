@@ -1,6 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/IconTile.h"
+#include "app/ui/design/components/Readout.h"
 #include "app/ui/design/components/TopBarParts.h"
 #include "app/ui/design/components/Divider.h"
 #include "app/ui/design/TokenColors.h"
@@ -305,6 +306,20 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::TextUnformatted(text);
          };
          const bool isLight = IsThemeLight();
+         // A live number: tabular digits in a slot as wide as its widest value, so it never
+         // shifts what sits beside it. `widest` is the longest text it can show.
+         auto TabLabel = [](const char* key, const char* text, const char* widest, bool dim)
+         {
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            float w;
+            {
+               UiType::Scope ts(UiType::Size::Title, UiType::Weight::Regular);
+               w = std::max(Readout::Measure(widest), Readout::Measure(text));
+            }
+            ImGui::Dummy(ImVec2(w, tok::tile));
+            Readout::Draw(key, UiLayout::Rect { p.x, p.y, w, tok::tile }, text, text, UiType::Size::Title,
+                          UiType::Weight::Regular, Readout::Align::Left, dim ? 0.5f : 1.0f);
+         };
 
          auto& SectionBreak = TopBarParts::SectionBreak;
          // Everything after the menus sits on one centre line, tok::tile tall in a tok::bar_h bar.
@@ -419,7 +434,9 @@ void DrawMenuBar(FrameCtx& fc)
             snprintf(barBeat, sizeof(barBeat), T("bar %d  beat %.2f"),
                      1 + (int)transport.Bars(),
                      std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
-            TopBarLabel(barBeat);
+            char barWidest[64];
+            snprintf(barWidest, sizeof(barWidest), T("bar %d  beat %.2f"), 99, 9.99);
+            TabLabel("topbar.barbeat", barBeat, barWidest, false);
             TopBarSameLine(12.0f);
          }
 
@@ -792,9 +809,9 @@ void DrawMenuBar(FrameCtx& fc)
          else
             snprintf(cpuReadout, sizeof(cpuReadout), "cpu --");
 
-         TopBarLabel(readout, true);
+         TabLabel("topbar.fps", readout, "99.9 fps   99.9 ms", true);
          TopBarSameLine(8.0f);
-         TopBarLabel(cpuReadout, true);
+         TabLabel("topbar.cpu", cpuReadout, audioDead ? cpuReadout : "cpu 99%", true);
 
          if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
             ImGui::SetTooltip(T("xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device"),
