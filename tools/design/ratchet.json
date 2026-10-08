@@ -1,1 +1,37 @@
-{}
+{
+ "colours": {},
+ "widgets": {
+  "src/app/AppShared.h": 15,
+  "src/app/bodies/AudioBodyKit.cpp": 20,
+  "src/app/bodies/AudioNodeBodies.cpp": 36,
+  "src/app/bodies/FieldParams.cpp": 8,
+  "src/app/bodies/GeometryParams.cpp": 23,
+  "src/app/bodies/NoteBodies.cpp": 18,
+  "src/app/bodies/OscBodies.cpp": 11,
+  "src/app/bodies/ParamBodies1.cpp": 51,
+  "src/app/bodies/ParamBodies2.cpp": 16,
+  "src/app/bodies/PreviewBodies.cpp": 12,
+  "src/app/bodies/SamplerBodies.cpp": 125,
+  "src/app/bodies/SpatialMixerBody.cpp": 5,
+  "src/app/frame/StageFloating.cpp": 24,
+  "src/app/frame/StageLayout.cpp": 4,
+  "src/app/frame/StageMenuBar.cpp": 55,
+  "src/app/frame/StageNodeBodies.cpp": 32,
+  "src/app/frame/StagePopupsA.cpp": 30,
+  "src/app/frame/StagePopupsB.cpp": 25,
+  "src/app/frame/StageSidePanels.cpp": 46,
+  "src/app/panels/ArrangePanel.cpp": 112,
+  "src/app/panels/ArrangeRender.cpp": 56,
+  "src/app/panels/ArrangeSupport2.cpp": 1,
+  "src/app/panels/HelpWindows.cpp": 3,
+  "src/app/panels/LibraryPanels.cpp": 18,
+  "src/app/panels/ModMatrixPanel.cpp": 16,
+  "src/app/panels/PerfPanel.cpp": 45,
+  "src/app/panels/SettingsWindow.cpp": 44,
+  "src/app/panels/ViewportPanel.cpp": 7,
+  "src/app/ui/BrowserUi.cpp": 3,
+  "src/app/ui/ModWidgets.cpp": 47,
+  "src/app/ui/ParamWidgets.cpp": 30,
+  "src/app/ui/Theme.cpp": 21
+ }
+}
