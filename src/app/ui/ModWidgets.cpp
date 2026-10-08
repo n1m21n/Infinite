@@ -2042,6 +2042,8 @@ namespace app
       const ImU32 pinFill = isPredPin
          ? (isLight ? IM_COL32(22, 163, 74, 255) : IM_COL32(34, 197, 94, 255))
          : (isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255));
+      if (kind == ed::PinKind::Output)
+         gPinAnchors[pinId] = c;
       dl->AddCircleFilled(c, kPinRadius, pinFill);
       dl->AddCircle(c, kPinRadius, isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255), 0, 1.5f);
 

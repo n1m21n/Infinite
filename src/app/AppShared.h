@@ -1725,6 +1725,12 @@ extern std::map<std::pair<int, int>, std::string> gTypedParamText;
 std::string TrimCopy(const std::string& s);
 
 extern std::set<int> gDrawnParamPins;
+// Screen position of pins/anchors this frame, for cables drawn by hand: every
+// output pin (DrawPin) and, for a modulated param whose control is not drawn
+// (an unselected lane/band), the on-screen thing that stands for it. See
+// NoteHiddenParamAnchor and the dotted-cable pass in DrawLinks.
+extern std::map<int, ImVec2> gPinAnchors;
+void NoteHiddenParamAnchor(int nodeIndex, int paramIndex, const ImVec2& screenPos);
 
 extern bool gParamRegisterOnly;
 

@@ -20,6 +20,21 @@ namespace app
       }
    }
 
+   namespace
+   {
+      // On = accent fill (no star suffix). Reads the state once so Push and Pop
+      // always pair, even though the click flips it in between.
+      bool LaneToggle(const char* label, bool on, float w)
+      {
+         if (on)
+            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+         const bool clicked = ImGui::Button(label, ImVec2(w, 0.0f));
+         if (on)
+            ImGui::PopStyleColor();
+         return clicked;
+      }
+   }
+
    void DrawSpatialMixerBody(GraphNode& gn, SpatialMixerNode* n)
    {
       const bool light = IsThemeLight();
@@ -196,6 +211,8 @@ namespace app
             continue;
          ImGui::PushID(s);
          const ImVec2 rp = ImGui::GetCursorScreenPos();
+         for (int k = 0; k < 5; k++)   // lane param ordinals: see laneParam below
+            NoteHiddenParamAnchor(gn.index, 3 + s * 5 + k, ImVec2(rp.x + 8.0f, rp.y + ImGui::GetFrameHeight() * 0.5f));
          const float ty = ImGui::GetStyle().FramePadding.y;   // centre text against the taller H/M/S buttons
          dl->AddCircleFilled(ImVec2(rp.x + 8.0f, rp.y + ty + ImGui::GetTextLineHeight() * 0.5f), 5.0f, DotColor(s, 1.0f), 16);
          ImGui::SetCursorScreenPos(ImVec2(rp.x + 20.0f, rp.y + ty));
@@ -216,7 +233,7 @@ namespace app
             ImGui::SetCursorScreenPos(ImVec2(x0 - 8.0f - tw, y + ty));
             ImGui::TextUnformatted(db);
             ImGui::SetCursorScreenPos(ImVec2(x0, y));
-            if (ImGui::Button(n->headLocked[s] ? "H*" : "H", ImVec2(bw, 0.0f)))
+            if (LaneToggle("H", n->headLocked[s], bw))
             {
                PushUndoCheckpoint();
                n->headLocked[s] = !n->headLocked[s];
@@ -224,13 +241,13 @@ namespace app
             if (ImGui::IsItemHovered())
                SetAudioReadout("head lock", n->headLocked[s] ? "stays in front of your head" : "fixed in the room");
             ImGui::SetCursorScreenPos(ImVec2(x0 + bw + gap, y));
-            if (ImGui::Button(n->mute[s] ? "M*" : "M", ImVec2(bw, 0.0f)))
+            if (LaneToggle("M", n->mute[s], bw))
             {
                PushUndoCheckpoint();
                n->mute[s] = !n->mute[s];
             }
             ImGui::SetCursorScreenPos(ImVec2(x0 + 2.0f * (bw + gap), y));
-            if (ImGui::Button(n->solo[s] ? "S*" : "S", ImVec2(bw, 0.0f)))
+            if (LaneToggle("S", n->solo[s], bw))
             {
                PushUndoCheckpoint();
                n->solo[s] = !n->solo[s];

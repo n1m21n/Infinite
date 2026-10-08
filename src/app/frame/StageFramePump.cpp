@@ -587,6 +587,7 @@ void DrawFramePump(FrameCtx& fc)
 
       PaletteBinding::Instance().ClearFrameColors();
       gDrawnParamPins.clear();
+      gPinAnchors.clear();
       gDrawnColorPins.clear();
       gParamRightClickConsumedThisFrame = false;
       RefreshParamDriverFlags();}

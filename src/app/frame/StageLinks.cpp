@@ -96,7 +96,37 @@ void DrawLinks(FrameCtx& fc)
             continue;
          const int paramPin = target->ParamPinId(link.first.second);
          if (gDrawnParamPins.count(paramPin) == 0)
-            continue; // no pin declared this frame: emitting the link would kill it
+         {
+            // No pin declared this frame: emitting the link would kill it. If the
+            // body told us where the hidden control lives, show the connection
+            // as a dotted cable to that spot instead.
+            const int srcPin = source->OutputPinId(link.second.outputIndex);
+            auto from = gPinAnchors.find(srcPin);
+            auto to = gPinAnchors.find(paramPin);
+            if (from != gPinAnchors.end() && to != gPinAnchors.end() && (gCableVisibilityMask & 0x4))
+            {
+               CategoryColors::Color c = CategoryColors::CableColorFor(CategoryColors::CableType::Modulation);
+               if (source->category == "Prediction" || dynamic_cast<IPredictor*>(source->node.get()) != nullptr)
+                  c = CategoryColors::ColorFor("Prediction");
+               const ImU32 col = ImColor(c.r, c.g, c.b, 0.8f);
+               const ImVec2 a = from->second, b = to->second;
+               const float dx = std::max(40.0f, std::fabs(b.x - a.x) * 0.5f);
+               const ImVec2 c1(a.x + dx, a.y), c2(b.x - dx, b.y);
+               ImDrawList* ddl = ImGui::GetWindowDrawList();
+               ImVec2 prev = a;
+               constexpr int kSeg = 48;
+               for (int i = 1; i <= kSeg; i++)
+               {
+                  const float t = (float)i / kSeg, u = 1.0f - t;
+                  const ImVec2 pt(u * u * u * a.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * b.x,
+                                  u * u * u * a.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * b.y);
+                  if ((i & 1) == 0)   // every other piece: dotted
+                     ddl->AddLine(prev, pt, col, 2.0f);
+                  prev = pt;
+               }
+            }
+            continue;
+         }
          gLinks.push_back({ kLinkIdBase + paramPin,
                             source->OutputPinId(link.second.outputIndex), paramPin });
       }
