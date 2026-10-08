@@ -68,7 +68,7 @@ namespace app
       // font the scale numbers crowded the bars and each other on a 200px
       // body. The node's own caption/readout strip keep the normal size.
       ImFont* font = ImGui::GetFont();
-      const float fs = ImGui::GetFontSize() * 0.72f;
+      const float fs = tok::type_caption;
       const float textH = fs;
       auto textSize = [&](const char* t) { return font->CalcTextSizeA(fs, FLT_MAX, 0.0f, t); };
       auto text = [&](ImVec2 p, ImU32 c, const char* t) { dl->AddText(font, fs, p, c, t); };

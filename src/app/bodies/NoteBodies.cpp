@@ -1992,7 +1992,7 @@ namespace app
       const float y0 = ImGui::GetCursorScreenPos().y;
       const float cellW = gAudioContentW / 4.0f;
       const float btnW = 36.0f;
-      ImGui::SetWindowFontScale(0.85f);
+      ImGui::SetWindowFontScale(tok::type_body / ImGui::GetFontSize());
       const float btnH = ImGui::GetFrameHeight();
       for (int i = 0; i < 4; i++)
       {
