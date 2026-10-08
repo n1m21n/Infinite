@@ -3037,12 +3037,12 @@ namespace app
             }
             // A grouped clip is edged in its group's colour (brighter when
             // the group is selected - the group frame drawn after the lanes
-            // carries the selection); a loose selected clip stays gold.
+            // carries the selection); a loose selected clip takes the accent.
             const bool grouped = clip.groupId != 0;
             const ImU32 clipBorderCol = grouped
                ? ArrangeGroupColor(clip.groupId, isSelected ? 255 : (clipHovered ? 235 : 190))
                : isSelected
-               ? tok::U32(tok::pal::c_FACC15FF) // gold for selected
+               ? ImGui::GetColorU32(app::AccentEmphasisSelected())
                : (clipActive ? tok::U32(tok::pal::c_FFFFFFF0) : (clipHovered ? tok::U32(tok::pal::c_E6E6F0DC) : tok::U32(tok::pal::c_141418B4)));
 
             dl->AddRectFilled(ImVec2(cLeft, cTop), ImVec2(cRight, cBottom),

@@ -2,6 +2,9 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/UiType.h"
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/FieldWell.h"
 
 namespace app
 {
@@ -353,6 +356,14 @@ namespace app
 
    // Docked inspector child panel for whatever is currently selected on the timeline -
    // a clip, a track, or a group. Pinned to the right side of the timeline panel.
+   // Inspector section title: Caption, medium weight, muted, with a little air above.
+   static void SectionHeader(const char* text)
+   {
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1 * 0.5f));
+      UiType::Scope s(UiType::Size::Caption, UiType::Weight::Medium);
+      ImGui::TextDisabled("%s", text);
+   }
+
    void DrawArrangeClipSettingsChild(float panelW)
    {
       PushDockedPanelStyle(/*isChild=*/true);
@@ -370,34 +381,17 @@ namespace app
          const ImVec2 bmax = ImGui::GetItemRectMax();
          const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
          const float iconSize = sz * 0.65f;
-         const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+         const ImU32 col = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_Text : ImGuiCol_TextDisabled);
          glyph::DrawX(dl, center, iconSize, col);
          return clicked;
       };
 
-      auto DrawBypassButton = [](const char* id, bool enabled, const char* labelActive = "Active", const char* labelBypassed = "Bypassed") -> bool
+      // Active = accent chip, Bypassed = quiet chip; full width, same family as the toolbar.
+      auto DrawBypassButton = [availW](const char* id, bool enabled, const char* labelActive = "Active", const char* labelBypassed = "Bypassed") -> bool
       {
-         bool toggled = false;
-         if (enabled)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B9812D));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_10B98150));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::U32(tok::pal::c_10B98178));
-            ImGui::PushStyleColor(ImGuiCol_Text, tok::U32(tok::pal::c_34D399FF));
-         }
-         else
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_EF444423));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_EF444446));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::U32(tok::pal::c_EF444464));
-            ImGui::PushStyleColor(ImGuiCol_Text, tok::U32(tok::pal::c_F87171FF));
-         }
          char buf[96];
-         snprintf(buf, sizeof(buf), "%s%s", enabled ? labelActive : labelBypassed, id);
-         if (ImGui::Button(buf, ImVec2(-FLT_MIN, 22.0f)))
-            toggled = true;
-         ImGui::PopStyleColor(4);
-         return toggled;
+         snprintf(buf, sizeof(buf), "%s###%s", enabled ? labelActive : labelBypassed, id);
+         return ChipButton::Draw(buf, enabled, 24.0f, availW);
       };
 
       uint64_t clipId = 0;
@@ -439,7 +433,10 @@ namespace app
          const char* clipKindLabel = isVideo
             ? (isSample ? "Video Sample" : "Video Clip")
             : (isSample ? "Audio Sample" : "Audio Clip");
-         ImGui::TextUnformatted(clipKindLabel);
+         {
+            UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
+            ImGui::TextUnformatted(clipKindLabel);
+         }
          ImGui::SameLine(availW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
@@ -474,7 +471,7 @@ namespace app
          }
 
          ImGui::Spacing();
-         ImGui::TextDisabled("%s", T("Timing & Position"));
+         SectionHeader(T("Timing & Position"));
          Arrange::Tick newTick = 0;
          if (tickField("Start##clipstart", clip->start, 0, Arrange::kMaxTick, ArrangeTickUnit::Position, &newTick))
          {
@@ -520,7 +517,7 @@ namespace app
          if (isVideo && ArrangeVideoSourceConflictClips().count(clipId))
          {
             ImGui::Spacing();
-            ImGui::TextDisabled("%s", T("Source"));
+            SectionHeader(T("Source"));
             // One line, not a paragraph: the button beside it is the whole
             // fix, and the reasoning belongs in a tooltip the user opens
             // when they want it rather than in permanent panel text.
@@ -541,7 +538,7 @@ namespace app
          if (!isVideo && gArrangeRetriggerConflictClipIds.count(clipId))
          {
             ImGui::Spacing();
-            ImGui::TextDisabled("%s", T("Playback & Trigger"));
+            SectionHeader(T("Playback & Trigger"));
             ImGui::TextColored(tok::V4(tok::palf::v_1000_650_200_1000), "Shared with another track.");
             ArrangeSharedSourceTooltip(
                "The node holds one playback position and both tracks set it every block, so "
@@ -557,12 +554,15 @@ namespace app
 
          if (isVideo)
          {
-            ImGui::TextDisabled("%s", T("Compositing & Video"));
+            SectionHeader(T("Compositing & Video"));
             const std::vector<std::string>& modes = BlendModes::Names();
             const char* curBlendName = (clip->blendMode >= 0 && clip->blendMode < (int)modes.size())
                ? modes[clip->blendMode].c_str() : "Normal";
             ImGui::SetNextItemWidth(fieldW);
-            if (ImGui::BeginCombo(L("Blend##clipblend"), curBlendName))
+            FieldWell::PushStyle();
+            const bool blendOpen = ImGui::BeginCombo(L("Blend##clipblend"), curBlendName);
+            FieldWell::PopStyle();
+            if (blendOpen)
             {
                for (int m = 0; m < (int)modes.size(); m++)
                {
@@ -635,7 +635,7 @@ namespace app
          }
          else
          {
-            ImGui::TextDisabled("%s", T("Audio Adjustments"));
+            SectionHeader(T("Audio Adjustments"));
             float gainDb = clip->gainDb;
             ImGui::SetNextItemWidth(fieldW);
             if (ArrangeSliderFloat("Gain##clipgain", &gainDb, -60.0f, 12.0f, "%.1f dB"))
@@ -688,7 +688,7 @@ namespace app
             if (isSample)
             {
                ImGui::Spacing();
-               ImGui::TextDisabled("%s", T("Tempo Sync"));
+               SectionHeader(T("Tempo Sync"));
                bool syncToTempo = clip->syncToTempo;
                if (ImGui::Checkbox(L("Sync to Tempo##clipsync"), &syncToTempo))
                   ArrangeEdit([&]() { ArrangeSetSampleSync(clipId, syncToTempo); });
@@ -716,7 +716,7 @@ namespace app
          }
 
          ImGui::Spacing();
-         ImGui::TextDisabled("%s", T("Color Tint"));
+         SectionHeader(T("Color Tint"));
          drawPaletteSwatches([&](uint32_t col) {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -732,7 +732,7 @@ namespace app
 
          ImGui::Spacing();
          ImGui::Separator();
-         ImGui::TextDisabled("%s", T("Source Node"));
+         SectionHeader(T("Source Node"));
          GraphNode* srcNode = FindNodeByUid(clip->srcUid);
          if (srcNode != nullptr)
          {
@@ -758,7 +758,7 @@ namespace app
                {
                   ImGui::Spacing();
                   ImGui::Separator();
-                  ImGui::TextDisabled("%s", T("Modulations"));
+                  SectionHeader(T("Modulations"));
                   PushCheckboxStyle();
                   for (const auto& entry : bound)
                   {
@@ -807,13 +807,13 @@ namespace app
          }
          else if (!isSample)
          {
-            ImGui::TextDisabled("%s", T("(unassigned)"));
+            SectionHeader(T("(unassigned)"));
             if (ImGui::Button(L("Assign Node..."), ImVec2(-FLT_MIN, 0)))
                gArrangeAssigningClipId = clipId;
          }
          else
          {
-            ImGui::TextDisabled("%s", T("(missing - sample's source node was deleted)"));
+            SectionHeader(T("(missing - sample's source node was deleted)"));
          }
       }
       else if (gArrangeSel.size() > 1)
@@ -826,7 +826,7 @@ namespace app
 
          // Multi-clip renaming
          static char sBulkRenameBuf[128] = "Clip";
-         ImGui::TextDisabled("%s", T("Rename All Selected"));
+         SectionHeader(T("Rename All Selected"));
          ImGui::SetNextItemWidth(availW - 55.0f);
          ImGui::InputText("##bulkrenametext", sBulkRenameBuf, sizeof(sBulkRenameBuf));
          ImGui::SameLine();
@@ -870,7 +870,7 @@ namespace app
          }
 
          ImGui::Spacing();
-         ImGui::TextDisabled("%s", T("Color Tint"));
+         SectionHeader(T("Color Tint"));
          drawPaletteSwatches([&](uint32_t col) {
             ArrangeEdit([&]() {
                const ImVec4 cv = ImGui::ColorConvertU32ToFloat4(col);
@@ -957,7 +957,7 @@ namespace app
             ImGui::Spacing();
             if (!isVideo)
             {
-               ImGui::TextDisabled("%s", T("Audio Track Controls"));
+               SectionHeader(T("Audio Track Controls"));
                bool solo = lane->solo;
                if (ImGui::Checkbox(L("Solo##tracksolo"), &solo))
                {
@@ -998,7 +998,7 @@ namespace app
             }
             else
             {
-               ImGui::TextDisabled("%s", T("Video Track Controls"));
+               SectionHeader(T("Video Track Controls"));
                float opacity = lane->opacity;
                ImGui::SetNextItemWidth(fieldW);
                if (ArrangeSliderFloat("Opacity##trackop", &opacity, 0.0f, 1.0f, "%.2f"))
@@ -1011,7 +1011,7 @@ namespace app
             }
 
             ImGui::Spacing();
-            ImGui::TextDisabled("%s", T("Track Tint"));
+            SectionHeader(T("Track Tint"));
             drawPaletteSwatches([&](uint32_t col) {
                ArrangeEdit([&]() {
                   if (Arrange::Lane* l = Arrange::FindLane(gArrange, rowId))
@@ -1069,7 +1069,7 @@ namespace app
             }
 
             ImGui::Spacing();
-            ImGui::TextDisabled("%s", T("Group Color"));
+            SectionHeader(T("Group Color"));
             drawPaletteSwatches([&](uint32_t col) {
                ArrangeEdit([&]() {
                   Arrange::RecolorTrackGroup(gArrange, rowId, col);
@@ -1109,17 +1109,17 @@ namespace app
          }
          else
          {
-            ImGui::TextDisabled("%s", T("No item selected."));
+            SectionHeader(T("No item selected."));
          }
       }
       else
       {
-         ImGui::TextDisabled("%s", T("Inspector"));
+         SectionHeader(T("Inspector"));
          ImGui::SameLine(availW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
          ImGui::Separator();
-         ImGui::TextDisabled("%s", T("Select a clip, track, or group to inspect its properties."));
+         SectionHeader(T("Select a clip, track, or group to inspect its properties."));
       }
 
       ImGui::EndChild();
