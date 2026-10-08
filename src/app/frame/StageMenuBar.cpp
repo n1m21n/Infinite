@@ -3,6 +3,7 @@
 #include "app/ui/design/components/IconTile.h"
 #include "app/ui/design/components/Readout.h"
 #include "app/ui/design/components/TopBarParts.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/PanelRail.h"
 #include "app/ui/design/components/TransportDisplay.h"
@@ -86,16 +87,17 @@ void DrawMenuBar(FrameCtx& fc)
          auto& MenuTile = TopBarParts::MenuTile;
          if (MenuTile(L("File")))
          {
-            if (ImGui::MenuItem(L("New"), MODKEY "+N"))
+            MenuParts::BeginContent();
+            if (MenuParts::Item(L("New"), MODKEY "+N"))
                GuardUnsavedChanges([]() { NewPatch(); });
-            if (ImGui::MenuItem(L("Open..."), MODKEY "+O"))
+            if (MenuParts::Item(L("Open..."), MODKEY "+O"))
             {
                const std::string path = Platform::OpenPatchDialog();
                if (!path.empty())
                   GuardUnsavedChanges([path]() { LoadPatchFrom(path); });
             }
 
-            if (ImGui::BeginMenu(L("Open Recent"), !Patch::Recents().empty()))
+            if (MenuParts::SubMenu(L("Open Recent"), !Patch::Recents().empty()))
             {
                // Copied before iterating: opening one calls NoteRecent, which
                // reorders the very list being walked.
@@ -105,21 +107,21 @@ void DrawMenuBar(FrameCtx& fc)
                   const size_t slash = entry.find_last_of('/');
                   const std::string name =
                      (slash == std::string::npos) ? entry : entry.substr(slash + 1);
-                  if (ImGui::MenuItem(name.c_str()))
+                  if (MenuParts::Item(name.c_str()))
                      GuardUnsavedChanges([entry]() { LoadPatchFrom(entry); });
                }
                ImGui::EndMenu();
             }
 
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Save"), MODKEY "+S"))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Save"), MODKEY "+S"))
                SavePatchInteractive(false);
-            if (ImGui::MenuItem(L("Save As..."), MODKEY "+Shift+S"))
+            if (MenuParts::Item(L("Save As..."), MODKEY "+Shift+S"))
                SavePatchInteractive(true);
 
             if (!gPatchPath.empty() || !gPatchStatus.empty())
             {
-               ImGui::Separator();
+               MenuParts::Separator();
                if (!gPatchPath.empty())
                {
                   const size_t slash = gPatchPath.find_last_of('/');
@@ -130,50 +132,54 @@ void DrawMenuBar(FrameCtx& fc)
                if (!gPatchStatus.empty())
                   ImGui::TextDisabled("%s", gPatchStatus.c_str());
             }
+            MenuParts::EndContent();
             ImGui::EndMenu();
          }
 
          if (MenuTile(L("Edit")))
          {
-            if (ImGui::MenuItem(L("Undo"), MODKEY "+Z", false, !gUndoStack.empty()))
+            MenuParts::BeginContent();
+            if (MenuParts::Item(L("Undo"), MODKEY "+Z", false, !gUndoStack.empty()))
                Undo();
-            if (ImGui::MenuItem(L("Redo"), MODKEY "+Shift+Z", false, !gRedoStack.empty()))
+            if (MenuParts::Item(L("Redo"), MODKEY "+Shift+Z", false, !gRedoStack.empty()))
                Redo();
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Cut / Copy"), MODKEY "+C"))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Cut / Copy"), MODKEY "+C"))
                gRequestCopy = true;
-            if (ImGui::MenuItem(L("Paste"), MODKEY "+V"))
+            if (MenuParts::Item(L("Paste"), MODKEY "+V"))
                gRequestPaste = true;
-            if (ImGui::MenuItem(L("Duplicate"), MODKEY "+D"))
+            if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
                gRequestDuplicate = true;
-            if (ImGui::MenuItem(L("Delete"), "Backspace"))
+            if (MenuParts::Item(L("Delete"), "Backspace"))
                gRequestDelete = true;
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Select All"), "Shift+A"))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Select All"), "Shift+A"))
                gRequestSelectAll = true;
-            if (ImGui::MenuItem(L("Bypass selection"), "B"))
+            if (MenuParts::Item(L("Bypass selection"), "B"))
                gRequestBypass = true;
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Group selection"), MODKEY "+G"))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Group selection"), MODKEY "+G"))
                gRequestGroup = true;
-            if (ImGui::MenuItem(L("Ungroup"), MODKEY "+U"))
+            if (MenuParts::Item(L("Ungroup"), MODKEY "+U"))
                gRequestUngroup = true;
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Add Node..."), "Shift+N"))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Add Node..."), "Shift+N"))
                gRequestAddNode = true;
-            if (ImGui::MenuItem(L("Add Note"), "/"))
+            if (MenuParts::Item(L("Add Note"), "/"))
                gRequestAddComment = true;
+            MenuParts::EndContent();
             ImGui::EndMenu();
          }
 
          if (MenuTile(L("Menu")))
          {
-            if (ImGui::MenuItem(L("Settings..."), MODKEY "+0"))
+            MenuParts::BeginContent();
+            if (MenuParts::Item(L("Settings..."), MODKEY "+0"))
                gSettingsOpen = true;
 
-            ImGui::Separator();
+            MenuParts::Separator();
 
-            if (ImGui::BeginMenu(L("Viewport panel")))
+            if (MenuParts::SubMenu(L("Viewport panel")))
             {
                ImGui::Checkbox(L("Show viewport panel"), &gViewportPanelOpen);
                if (gViewportPanelOpen)
@@ -187,16 +193,16 @@ void DrawMenuBar(FrameCtx& fc)
                   else
                      ImGui::SliderFloat(L("Height"), &gViewportPanelHeight,
                                         kViewportPanelMinHeight, 800.0f, "%.0f px");
-                  ImGui::Separator();
-                  if (!gViewportPanelNodes.empty() && ImGui::MenuItem(L("Clear cards")))
+                  MenuParts::Separator();
+                  if (!gViewportPanelNodes.empty() && MenuParts::Item(L("Clear cards")))
                      gViewportPanelNodes.clear();
-                  if (ImGui::MenuItem(L("Close viewport panel")))
+                  if (MenuParts::Item(L("Close viewport panel")))
                      gViewportPanelOpen = false;
                }
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu(L("Modulation matrix")))
+            if (MenuParts::SubMenu(L("Modulation matrix")))
             {
                // Plain themed widgets, same as "Viewport panel" above - this
                // is menu chrome, not a node body, so it takes the app's own
@@ -220,7 +226,7 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu(L("Performance Matrix")))
+            if (MenuParts::SubMenu(L("Performance Matrix")))
             {
                // Same reasoning as "Modulation matrix" above: plain themed
                // widgets, not the node-body P10 style.
@@ -241,7 +247,7 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu(L("Arrangement Timeline")))
+            if (MenuParts::SubMenu(L("Arrangement Timeline")))
             {
                ImGui::Checkbox(L("Show Arrangement Timeline"), &gArrangePanelOpen);
                if (gArrangePanelOpen)
@@ -264,14 +270,14 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu(L("Nodes")))
+            if (MenuParts::SubMenu(L("Nodes")))
             {
-               if (ImGui::MenuItem(L("Show all params")))
+               if (MenuParts::Item(L("Show all params")))
                {
                   for (GraphNode& gn : gNodes)
                      gn.showParams = true;
                }
-               if (ImGui::MenuItem(L("Hide all params")))
+               if (MenuParts::Item(L("Hide all params")))
                {
                   for (GraphNode& gn : gNodes)
                      gn.showParams = false;
@@ -279,10 +285,10 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::EndMenu();
             }
 
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("All shortcuts...")))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("All shortcuts...")))
                gShortcutsOpen = true;
-            if (ImGui::MenuItem(L("Help / module reference")))
+            if (MenuParts::Item(L("Help / module reference")))
                gHelpOpen = true;
 #ifndef NDEBUG
             // ImGui's built-in inspectors, not a custom tool: the Debugger's
@@ -292,20 +298,21 @@ void DrawMenuBar(FrameCtx& fc)
             // hand back "this exact knob, this exact number" instead of a
             // screenshot and a guess. Dev-only: excluded from Release builds
             // (NDEBUG) so shipped/public builds never expose these.
-            if (ImGui::MenuItem(L("UI Debugger / Item Picker"))) // i18n-ok (debug UI)
+            if (MenuParts::Item(L("UI Debugger / Item Picker"))) // i18n-ok (debug UI)
                gUiDebuggerOpen = true;
-            if (ImGui::MenuItem(L("UI Style Editor"))) // i18n-ok (debug UI)
+            if (MenuParts::Item(L("UI Style Editor"))) // i18n-ok (debug UI)
                gUiStyleEditorOpen = true;
 #endif
-            if (ImGui::MenuItem(L("Check for updates")))
+            if (MenuParts::Item(L("Check for updates")))
             {
                UpdateCheck::Start();
                gShowUpdateCheckModal = true;
             }
 
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Quit")))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Quit")))
                RequestClose(window);
+            MenuParts::EndContent();
             ImGui::EndMenu();
          }
 
