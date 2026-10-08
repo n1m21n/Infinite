@@ -393,7 +393,78 @@ void DrawMenuBar(FrameCtx& fc)
             }
          }
 
+         // Metronome: click toggles, right-click opens volume / accent (no hover
+         // text, by design). Sits
+         // right after Start Audio, ahead of the readouts.
+         TopBarSameLine(8.0f);
+         {
+            // Read once: the click below flips gMetronomeOn, and the push/pop
+            // pair must use the state it was pushed with.
+            const bool metronomeWasOn = gMetronomeOn;
+            if (metronomeWasOn)
+               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+            if (ImGui::Button("##metronomeBtn", ImVec2(32.0f, 0.0f)))
+               gMetronomeOn = !gMetronomeOn;
+            if (metronomeWasOn)
+               ImGui::PopStyleColor();
+            {
+               ImVec4 iconCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+               if (!metronomeWasOn)
+                  iconCol.w *= 0.78f;
+               // The pendulum flips side on every beat - a hard 0/1, no easing -
+               // so each click lands exactly as it snaps over. Upright when off
+               // or while the transport is stopped.
+               const float swing = (metronomeWasOn && isTransportPlaying)
+                                      ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
+                                      : 0.0f;
+               const ImVec2 bmin = ImGui::GetItemRectMin();
+               const ImVec2 bmax = ImGui::GetItemRectMax();
+               glyph::DrawMetronome(ImGui::GetWindowDrawList(),
+                                     ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
+                                     tok::icon_md, ImGui::GetColorU32(iconCol), swing);
+            }
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               ImGui::OpenPopup("##metronomePopup");
+
+            if (ImGui::BeginPopup("##metronomePopup"))
+            {
+               // The top bar flattens every frame colour to transparent; a
+               // slider needs its real theme frame back to be findable.
+               const ImGuiStyle& base = ImGui::GetStyle();
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, base.Colors[ImGuiCol_FrameBg]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
+               ImGui::SetNextItemWidth(120.0f);
+               const bool volChanged = ImGui::SliderFloat(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
+               ImGui::PopStyleColor(3);
+               if (volChanged)
+                  gMetronomeDirty = true;
+               if (ImGui::Selectable(L("accent first beat"), gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
+               {
+                  gMetronomeAccent = !gMetronomeAccent;
+                  gMetronomeDirty = true;
+               }
+               ImGui::EndPopup();
+            }
+            if (gMetronomeDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            {
+               SaveGeneralSettings();
+               gMetronomeDirty = false;
+            }
+            AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
+         }
+
          ImGui::Separator();
+
+         // Bar and beat lead the readout group: bar, beat, BPM, signature, key.
+         {
+            char barBeat[64];
+            snprintf(barBeat, sizeof(barBeat), T("bar %d  beat %.2f"),
+                     1 + (int)transport.Bars(),
+                     std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
+            TopBarLabel(barBeat);
+            TopBarSameLine(12.0f);
+         }
 
          static const int kDens[] = { 1, 2, 4, 8, 16 };
          auto SnapToValidDenominator = [](int val) -> int {
@@ -634,67 +705,6 @@ void DrawMenuBar(FrameCtx& fc)
             }
          }
 
-         // Metronome: click toggles, right-click opens volume / accent (no hover
-         // text, by design). Sits
-         // in the Tempo & Meter group because it follows exactly those two.
-         TopBarSameLine(8.0f);
-         {
-            // Read once: the click below flips gMetronomeOn, and the push/pop
-            // pair must use the state it was pushed with.
-            const bool metronomeWasOn = gMetronomeOn;
-            if (metronomeWasOn)
-               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-            if (ImGui::Button("##metronomeBtn", ImVec2(32.0f, 0.0f)))
-               gMetronomeOn = !gMetronomeOn;
-            if (metronomeWasOn)
-               ImGui::PopStyleColor();
-            {
-               ImVec4 iconCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-               if (!metronomeWasOn)
-                  iconCol.w *= 0.78f;
-               // The pendulum flips side on every beat - a hard 0/1, no easing -
-               // so each click lands exactly as it snaps over. Upright when off
-               // or while the transport is stopped.
-               const float swing = (metronomeWasOn && isTransportPlaying)
-                                      ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
-                                      : 0.0f;
-               const ImVec2 bmin = ImGui::GetItemRectMin();
-               const ImVec2 bmax = ImGui::GetItemRectMax();
-               glyph::DrawMetronome(ImGui::GetWindowDrawList(),
-                                     ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
-                                     tok::icon_md, ImGui::GetColorU32(iconCol), swing);
-            }
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-               ImGui::OpenPopup("##metronomePopup");
-
-            if (ImGui::BeginPopup("##metronomePopup"))
-            {
-               // The top bar flattens every frame colour to transparent; a
-               // slider needs its real theme frame back to be findable.
-               const ImGuiStyle& base = ImGui::GetStyle();
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, base.Colors[ImGuiCol_FrameBg]);
-               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
-               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
-               ImGui::SetNextItemWidth(120.0f);
-               const bool volChanged = ImGui::SliderFloat(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
-               ImGui::PopStyleColor(3);
-               if (volChanged)
-                  gMetronomeDirty = true;
-               if (ImGui::Selectable(L("accent first beat"), gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
-               {
-                  gMetronomeAccent = !gMetronomeAccent;
-                  gMetronomeDirty = true;
-               }
-               ImGui::EndPopup();
-            }
-            if (gMetronomeDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
-            {
-               SaveGeneralSettings();
-               gMetronomeDirty = false;
-            }
-            AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
-         }
-
          ImGui::Separator();
 
          // 3. Global Key & Scale
@@ -764,11 +774,6 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::Separator();
 
          // 4. Telemetry (Bar & beat, frame cost, CPU load)
-         char barBeatBuf[64];
-         snprintf(barBeatBuf, sizeof(barBeatBuf), T("bar %d  beat %.2f"),
-                  1 + (int)transport.Bars(),
-                  std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
-
          // Frame cost
          static double sSmoothedMs = 0.0;
          sSmoothedMs = (sSmoothedMs <= 0.0)
@@ -792,8 +797,6 @@ void DrawMenuBar(FrameCtx& fc)
          else
             snprintf(cpuReadout, sizeof(cpuReadout), "cpu --");
 
-         TopBarLabel(barBeatBuf, true);
-         TopBarSameLine(8.0f);
          TopBarLabel(readout, true);
          TopBarSameLine(8.0f);
          TopBarLabel(cpuReadout, true);
