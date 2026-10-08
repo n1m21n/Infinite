@@ -1073,6 +1073,17 @@ bool gHeadlessNeedProbe = false;
    // none, and emitting a link to an undeclared pin makes the editor treat the
    // link as dead and delete it - which silently dropped the modulation.
    std::set<int> gDrawnParamPins;
+   std::map<int, ImVec2> gPinAnchors;
+   std::map<int, int> gPinAlias;
+   void NoteHiddenParamAlias(int nodeIndex, int hiddenParam, int shownParam)
+   {
+      const int base = nodeIndex * GraphNode::kStride + GraphNode::kParamBase;
+      gPinAlias[base + hiddenParam] = base + shownParam;
+   }
+   void NoteHiddenParamAnchor(int nodeIndex, int paramIndex, const ImVec2& screenPos)
+   {
+      gPinAnchors[nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex] = screenPos;
+   }
 
    // Set while a collapsed node runs its parameter dispatch purely to
    // re-register its params (see the params block in the node loop). Every

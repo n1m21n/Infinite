@@ -96,7 +96,59 @@ void DrawLinks(FrameCtx& fc)
             continue;
          const int paramPin = target->ParamPinId(link.first.second);
          if (gDrawnParamPins.count(paramPin) == 0)
-            continue; // no pin declared this frame: emitting the link would kill it
+         {
+            // No pin declared this frame: emitting the link would kill it. If the
+            // body told us where the hidden control lives, show the connection
+            // as a dotted cable to that spot instead.
+            const int srcPin = source->OutputPinId(link.second.outputIndex);
+            auto from = gPinAnchors.find(srcPin);
+            auto alias = gPinAlias.find(paramPin);
+            auto to = gPinAnchors.find(alias != gPinAlias.end() ? alias->second : paramPin);
+            if (from != gPinAnchors.end() && to != gPinAnchors.end() && (gCableVisibilityMask & 0x4))
+            {
+               CategoryColors::Color c = CategoryColors::CableColorFor(CategoryColors::CableType::Modulation);
+               if (source->category == "Prediction" || dynamic_cast<IPredictor*>(source->node.get()) != nullptr)
+                  c = CategoryColors::ColorFor("Prediction");
+               const ImU32 col = ImColor(c.r, c.g, c.b, 0.8f);
+               const ImVec2 a = from->second, b = to->second;
+               const float dx = std::max(40.0f, std::fabs(b.x - a.x) * 0.5f);
+               const ImVec2 c1(a.x + dx, a.y), c2(b.x - dx, b.y);
+               ImDrawList* ddl = ImGui::GetWindowDrawList();
+               // Dashes by arc length, so dash size does not stretch with the cable.
+               constexpr int kSamples = 240;
+               constexpr float kDash = 6.0f, kGap = 5.0f;
+               ImVec2 prev = a;
+               float acc = 0.0f;   // distance along the cable since the last phase flip
+               bool on = true;
+               for (int i = 1; i <= kSamples; i++)
+               {
+                  const float t = (float)i / kSamples, u = 1.0f - t;
+                  const ImVec2 pt(u * u * u * a.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * b.x,
+                                  u * u * u * a.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * b.y);
+                  float seg = std::hypot(pt.x - prev.x, pt.y - prev.y);
+                  ImVec2 from = prev;
+                  while (seg > 0.0f)
+                  {
+                     const float room = (on ? kDash : kGap) - acc;
+                     const float step = std::min(seg, room);
+                     const float f = step / seg;
+                     const ImVec2 to(from.x + (pt.x - from.x) * f, from.y + (pt.y - from.y) * f);
+                     if (on)
+                        ddl->AddLine(from, to, col, 2.0f);
+                     from = to;
+                     seg -= step;
+                     acc += step;
+                     if (acc >= (on ? kDash : kGap) - 1e-4f)
+                     {
+                        acc = 0.0f;
+                        on = !on;
+                     }
+                  }
+                  prev = pt;
+               }
+            }
+            continue;
+         }
          gLinks.push_back({ kLinkIdBase + paramPin,
                             source->OutputPinId(link.second.outputIndex), paramPin });
       }

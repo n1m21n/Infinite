@@ -1725,6 +1725,16 @@ extern std::map<std::pair<int, int>, std::string> gTypedParamText;
 std::string TrimCopy(const std::string& s);
 
 extern std::set<int> gDrawnParamPins;
+// Screen position of pins/anchors this frame, for cables drawn by hand: every
+// output pin (DrawPin) and, for a modulated param whose control is not drawn
+// (an unselected lane/band), the on-screen thing that stands for it. See
+// NoteHiddenParamAnchor and the dotted-cable pass in DrawLinks.
+extern std::map<int, ImVec2> gPinAnchors;
+void NoteHiddenParamAnchor(int nodeIndex, int paramIndex, const ImVec2& screenPos);
+// A hidden param whose cable should land on another (drawn) param's pin: the EQ's
+// unselected bands share one set of knobs, so their dotted cables end on those.
+void NoteHiddenParamAlias(int nodeIndex, int hiddenParam, int shownParam);
+extern std::map<int, int> gPinAlias;
 
 extern bool gParamRegisterOnly;
 
@@ -3459,6 +3469,8 @@ void DrawImageSpectralSynthBody(GraphNode& gn, ImageSpectralSynthNode* n);
 void DrawAudioMeterBody(GraphNode& gn, AudioMeterNode* n);
 
 void DrawGainBody(GraphNode& gn, GainNode* n);
+void DrawSpatialMixerBody(GraphNode& gn, SpatialMixerNode* n);
+void DrawSpatialExportPanel(SpatialMixerNode* n);
 
 void DrawBlendAudioBody(GraphNode& gn, BlendAudioNode* n);
 
@@ -5731,6 +5743,7 @@ bool RunMidiFileFixture();
 bool RunMpeFixture();
 
 bool RunShapeResonatorFixture();
+bool RunSpatialFixture();
 
 bool RunSpectrumSlideFixture();
 

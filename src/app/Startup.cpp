@@ -386,6 +386,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_SHAPERESONATORTEST") != nullptr)
       return RunShapeResonatorFixture() ? 0 : 1;
 
+   if (getenv("INFINITE_SPATIALTEST") != nullptr)
+      return RunSpatialFixture() ? 0 : 1;
+
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
 

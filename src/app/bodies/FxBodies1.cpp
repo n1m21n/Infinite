@@ -803,6 +803,10 @@ namespace app
                                 gr.IsRecording(gCurrentNodeIndex, EqBandKnobParam(b, 2));
             const ImU32 recCol = IM_COL32(235, 70, 70, isSelected ? 255 : 190);
 
+            if (!isSelected)
+               for (int k = 0; k < 3; k++)
+                  NoteHiddenParamAlias(gCurrentNodeIndex, EqBandKnobParam(b, k), EqBandKnobParam(selected, k));
+
             const float dotR = isSelected ? (dotActiveHere ? 6.5f : 4.8f) : (dotActiveHere ? 5.0f : 3.2f);
             const ImU32 dotCol = dotRec ? recCol : IM_COL32(235, 245, 255, isSelected ? 255 : 170);
             if (bands[b].on)

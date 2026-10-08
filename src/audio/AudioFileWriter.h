@@ -24,7 +24,9 @@ public:
 
    // Opens `path` in the format deduced from extension (or explicitly specified).
    // Returns false if the file couldn't be created or initialized.
-   bool Open(const std::string& path, double sampleRate, int numChannels, Format format = Format::Auto);
+   // bitDepth (16 or 24) applies to WAV and FLAC; MP3 ignores it.
+   bool Open(const std::string& path, double sampleRate, int numChannels, Format format = Format::Auto,
+             int bitDepth = 16);
 
    // Converts `frames` interleaved float samples to the appropriate destination format and appends them.
    void Append(const float* interleaved, int frames);
@@ -48,6 +50,7 @@ private:
    std::string mPath;
    Format mFormat = Format::Wav;
    int mNumChannels = 2;
+   int mBitDepth = 16;
    double mSampleRate = 44100.0;
    int64_t mFramesWritten = 0;
    int64_t mBytesWrittenDirect = 0;

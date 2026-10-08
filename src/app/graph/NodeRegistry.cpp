@@ -209,6 +209,7 @@ namespace app
       // P2.8 routing nodes - the system's only summing/fan-out points, see
       // docs/plans/audio/audio-graph-semantics.md §1/§2.
       REGISTER_NODE(MixerNode, Mixer, "Utility");
+      REGISTER_NODE(SpatialMixerNode, Spatial Mixer, "Utility");
       REGISTER_NODE(SplitterNode, Splitter, "Utility");
       // "Blend Audio" not "Blend" - that name is taken by the image
       // compositing node (REGISTER_NODE(BlendNode, Blend, "Compositing") above).

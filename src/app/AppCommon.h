@@ -224,6 +224,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/NdiOutNode.h"
 #include "nodes/ProjectionNode.h"
 #include "nodes/AudioNodes.h"
+#include "nodes/SpatialMixerNode.h"
 #include "nodes/AudioMeterNode.h"
 #include "nodes/AudioEffectNode.h"
 #include "nodes/WavetableNode.h"

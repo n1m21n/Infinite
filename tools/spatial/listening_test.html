@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spatial listening test</title>
+<style>
+:root { --bg:#f7f6f2; --fg:#1f1f1d; --mut:#6b6a64; --acc:#d85a30; --line:#c9c7bd; }
+@media (prefers-color-scheme: dark) { :root { --bg:#1c1c1a; --fg:#eeede8; --mut:#a3a29b; --line:#4a4945; } }
+body { background:var(--bg); color:var(--fg); font:16px/1.5 -apple-system, system-ui, sans-serif; max-width:760px; margin:0 auto; padding:16px; }
+button { font:inherit; padding:8px 16px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--fg); cursor:pointer; }
+button.primary { background:var(--acc); color:#fff; border-color:var(--acc); }
+button:disabled { opacity:.4; cursor:default; }
+.row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+svg { touch-action:none; cursor:crosshair; }
+.mut { color:var(--mut); font-size:14px; }
+.err { color:#c0392b; font-size:14px; }
+</style>
+</head>
+<body>
+<h1>Spatial listening test</h1>
+<p class="mut">Use headphones. Quiet room. Each trial is three short noise bursts. Click where you heard it from above (top view) and how high (side view), then Next. Don't move your head.</p>
+
+<section id="setup">
+  <p><button id="lr">Headphone L/R check</button> <span class="mut">you should hear left, then right</span></p>
+  <p>Choose the bounced files (<code>logic_binaural.wav</code>, <code>mixer_pan.wav</code>):<br>
+  <input type="file" id="files" accept=".wav" multiple></p>
+  <div id="sessions"></div>
+  <p class="err" id="err"></p>
+</section>
+
+<section id="test" hidden>
+  <p><b id="title"></b> &middot; trial <span id="n"></span> / <span id="total"></span></p>
+  <p><button id="play">Replay</button> <button id="next" class="primary" disabled>Next</button> <span class="err" id="need"></span></p>
+  <div class="row">
+    <div>
+      <div class="mut">Top view: you, seen from above, facing up the screen</div>
+      <svg id="top" width="300" height="300" viewBox="-150 -150 300 300">
+        <circle r="130" fill="none" stroke="var(--line)"/>
+        <circle r="28" fill="none" stroke="var(--fg)"/>
+        <path d="M-7,-27 L0,-40 L7,-27" fill="none" stroke="var(--fg)"/>
+        <ellipse cx="-30" cy="0" rx="4" ry="9" fill="var(--fg)"/>
+        <ellipse cx="30" cy="0" rx="4" ry="9" fill="var(--fg)"/>
+        <text x="-48" y="5" text-anchor="middle" fill="var(--fg)" font-size="14">L</text>
+        <text x="48" y="5" text-anchor="middle" fill="var(--fg)" font-size="14">R</text>
+        <text x="-138" y="5" text-anchor="start" fill="var(--mut)" font-size="12">left</text>
+        <text x="138" y="5" text-anchor="end" fill="var(--mut)" font-size="12">right</text>
+        <text x="0" y="-136" text-anchor="middle" fill="var(--mut)" font-size="12">front</text>
+        <text x="0" y="146" text-anchor="middle" fill="var(--mut)" font-size="12">back</text>
+        <circle id="topDot" r="9" fill="var(--acc)" visibility="hidden"/>
+      </svg>
+    </div>
+    <div>
+      <div class="mut">Side view: height</div>
+      <svg id="side" width="300" height="300" viewBox="-150 -150 300 300">
+        <path d="M130,0 A130,130 0 0 0 0,-130" fill="none" stroke="var(--line)"/>
+        <line x1="0" y1="0" x2="140" y2="0" stroke="var(--line)" stroke-dasharray="4 4"/>
+        <circle r="28" fill="none" stroke="var(--fg)"/>
+        <text x="142" y="16" text-anchor="end" fill="var(--mut)" font-size="12">ear level</text>
+        <text x="6" y="-136" fill="var(--mut)" font-size="12">overhead</text>
+        <circle id="sideDot" r="9" fill="var(--acc)" visibility="hidden"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section id="done" hidden><p>Session saved. Pick the next session above, or you're finished.</p></section>
+
+<script>
+const T = __TIMING__;
+const ctx = new (window.AudioContext || window.webkitAudioContext)();
+let calib = 0, buffers = {}, cur = null, trial = 0, answers = [], az = null, el = null, replays = 0;
+const $ = id => document.getElementById(id);
+
+$("lr").onclick = async () => {
+  await ctx.resume();
+  [-1, 1].forEach((p, i) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(), s = ctx.createStereoPanner();
+    s.pan.value = p; g.gain.value = 0.15; o.frequency.value = 600;
+    o.connect(g).connect(s).connect(ctx.destination);
+    o.start(ctx.currentTime + i * 0.7); o.stop(ctx.currentTime + i * 0.7 + 0.4);
+  });
+};
+
+$("files").onchange = async e => {
+  $("err").textContent = "";
+  for (const f of e.target.files) {
+    const stem = f.name.replace(/\.wav$/i, "");
+    try { buffers[stem] = await ctx.decodeAudioData(await f.arrayBuffer()); }
+    catch { $("err").textContent = "Could not decode " + f.name; }
+  }
+  listSessions();
+};
+
+// Served over http (tools/spatial launch config): load the two bounces directly.
+(async () => {
+  if (location.protocol === "file:") return;
+  $("err").textContent = "Loading audio...";
+  for (const stem of ["logic_binaural", "mixer_pan"]) {
+    try {
+      const r = await fetch(stem + ".wav", { cache: "no-store" });
+      if (r.ok) buffers[stem] = await ctx.decodeAudioData(await r.arrayBuffer());
+    } catch {}
+  }
+  $("err").textContent = Object.keys(buffers).length ? "" : "Could not load the WAVs; use the file picker.";
+  listSessions();
+})();
+
+function listSessions() {
+  const keys = Object.keys(buffers).sort(() => Math.random() - 0.5);
+  $("sessions").innerHTML = "";
+  keys.forEach((k, i) => {
+    const b = document.createElement("button");
+    b.textContent = "Start session " + String.fromCharCode(65 + i);
+    b.onclick = () => start(k, b.textContent.replace("Start ", ""));
+    $("sessions").append(b, " ");
+  });
+};
+
+function start(stem, label) {
+  cur = stem; trial = 0; answers = []; calib = 2;
+  $("setup").hidden = true; $("done").hidden = true; $("test").hidden = false;
+  $("title").textContent = label; $("total").textContent = T.trials;
+  show();
+}
+
+function show() {
+  az = el = null; replays = 0;
+  $("topDot").setAttribute("visibility", "hidden");
+  $("sideDot").setAttribute("visibility", "hidden");
+  $("n").textContent = calib ? "orientation check " + (3 - calib) + " of 2" : trial + 1;
+  $("need").textContent = calib ? "Click where this tone comes from." : "";
+  $("next").disabled = true;
+  play();
+}
+
+async function play() {
+  await ctx.resume();
+  if (calib) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), sp = ctx.createStereoPanner();
+    sp.pan.value = calib === 2 ? -1 : 1; g.gain.value = 0.15; o.frequency.value = 600;
+    o.connect(g).connect(sp).connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime + 0.6);
+    return;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buffers[cur]; src.connect(ctx.destination);
+  src.start(0, T.lead + trial * T.slot, T.stim + 0.05);
+}
+
+$("play").onclick = () => { replays++; play(); };
+
+function pt(svg, ev) {
+  const r = svg.getBoundingClientRect();
+  return [(ev.clientX - r.left) / r.width * 300 - 150, (ev.clientY - r.top) / r.height * 300 - 150];
+}
+
+$("top").onpointerdown = ev => {
+  const [x, y] = pt($("top"), ev);
+  az = (Math.atan2(x, -y) * 180 / Math.PI + 360) % 360;
+  const d = $("topDot");
+  d.setAttribute("cx", 130 * Math.sin(az * Math.PI / 180));
+  d.setAttribute("cy", -130 * Math.cos(az * Math.PI / 180));
+  d.setAttribute("visibility", "visible");
+  ready();
+};
+
+$("side").onpointerdown = ev => {
+  const [x, y] = pt($("side"), ev);
+  el = Math.max(0, Math.min(90, Math.atan2(-y, Math.max(x, 0)) * 180 / Math.PI));
+  const d = $("sideDot");
+  d.setAttribute("cx", 130 * Math.cos(el * Math.PI / 180));
+  d.setAttribute("cy", -130 * Math.sin(el * Math.PI / 180));
+  d.setAttribute("visibility", "visible");
+  ready();
+};
+
+function ready() { $("next").disabled = !(az !== null && el !== null); }
+
+$("next").onclick = () => {
+  if (az === null || el === null) { $("need").textContent = "Click both views first"; return; }
+  if (calib) {
+    const left = calib === 2, ok = left ? az > 180 && az < 360 : az > 0 && az < 180;
+    if (!ok) { $("need").textContent = "That tone was on your " + (left ? "LEFT" : "RIGHT") + ". The head faces up the screen, away from you: your left ear is the L side."; return; }
+    calib--; show(); return;
+  }
+  answers.push({ trial, az: +az.toFixed(1), el: +el.toFixed(1), replays });
+  trial++;
+  if (trial < T.trials) { show(); return; }
+  const blob = new Blob([JSON.stringify({ condition: cur, answers }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "answers_" + cur + ".json"; a.click();
+  $("test").hidden = true; $("setup").hidden = false; $("done").hidden = false;
+};
+</script>
+</body>
+</html>
