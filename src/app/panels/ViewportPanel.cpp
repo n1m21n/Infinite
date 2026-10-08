@@ -2,6 +2,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/UiType.h"
 
 namespace app
 {
@@ -167,44 +168,68 @@ namespace app
    // Small breathing room between the title row and the render/image below
    // it - without this the render started at the exact next-line cursor with
    // zero gap, so it visually touched the title row.
-   constexpr float kViewportCardTitleGap = 6.0f;
+   // A card is a group well: padding on every side, a 28 px title row (title left, close tile right), then
+   // the render in a rounded tile.
+   constexpr float kViewportCardPad = tok::space_2;
+   constexpr float kViewportCardTitleRow = 28.0f;
 
    float ViewportPanelTitleHeight()
    {
-      return ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y + kViewportCardTitleGap;
+      return kViewportCardTitleRow;
    }
 
 
-   void DrawViewportPanelCard(GraphNode& gn, const ImVec2& imageSize)
+   void DrawViewportPanelCard(GraphNode& gn, const ImVec2& cardSize)
    {
       const float titleH = ViewportPanelTitleHeight();
+      const float pad = kViewportCardPad;
+      // The render's own box: the card minus its padding and title row.
+      const ImVec2 imageSize(std::max(16.0f, cardSize.x - pad * 2.0f), std::max(16.0f, cardSize.y - titleH - pad));
       char childId[32];
       snprintf(childId, sizeof(childId), "##viewportcard%d", gn.index);
       PushDockedPanelStyle(/*isChild=*/true);
-      ImGui::BeginChild(childId, ImVec2(imageSize.x, imageSize.y + titleH), false,
+      ImGui::BeginChild(childId, ImVec2(cardSize.x, cardSize.y), false,
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-
-      // Vector X, same as the search panel's folder-remove and the drum
-      // sequencer's per-lane clear - not ImGui's plain-text "X" button.
-      const float closeBtnW = 20.0f;
-      const bool closeRequested = ImGui::Button("##closeviewportcard", ImVec2(closeBtnW, 0));
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 cardMin = ImGui::GetWindowPos();
+      const ImVec2 cardMax(cardMin.x + cardSize.x, cardMin.y + cardSize.y);
       {
-         ImDrawList* dl = ImGui::GetWindowDrawList();
+         ImVec4 w = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         w.w *= 0.05f;
+         dl->AddRectFilled(cardMin, cardMax, ImGui::GetColorU32(w), tok::radius_group);
+      }
+
+      // Title row: name on the left, a quiet close tile on the right (neutral wash on hover, no red).
+      const float tile = 20.0f;
+      ImGui::SetCursorScreenPos(ImVec2(cardMax.x - pad - tile, cardMin.y + (titleH - tile) * 0.5f + 2.0f));
+      char closeId[40];
+      snprintf(closeId, sizeof(closeId), "##closeviewportcard%d", gn.index);
+      const bool closeRequested = ImGui::InvisibleButton(closeId, ImVec2(tile, tile));
+      {
          const ImVec2 bmin = ImGui::GetItemRectMin();
          const ImVec2 bmax = ImGui::GetItemRectMax();
-         const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-         const float iconSize = (bmax.y - bmin.y) * 0.65f;
-         const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-         glyph::DrawX(dl, center, iconSize, col);
+         const bool hot = ImGui::IsItemHovered();
+         ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         if (hot)
+            dl->AddRectFilled(bmin, bmax, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, ImGui::IsItemActive() ? 0.12f : 0.07f)),
+                              tok::radius_tile);
+         t.w *= hot ? 1.0f : 0.55f;
+         glyph::DrawX(dl, ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f), tile * 0.5f, ImGui::GetColorU32(t));
       }
-      ImGui::SameLine();
-      ImGui::TextUnformatted(NodeTitleWithInstance(gn).c_str());
-      ImGui::Dummy(ImVec2(0.0f, kViewportCardTitleGap));
+      {
+         UiType::Scope ts(UiType::Size::Body, UiType::Weight::Medium);
+         const std::string title = NodeTitleWithInstance(gn);
+         const float maxW = cardSize.x - pad * 2.0f - tile - tok::space_1;
+         dl->PushClipRect(ImVec2(cardMin.x + pad, cardMin.y), ImVec2(cardMin.x + pad + std::max(1.0f, maxW), cardMax.y), true);
+         dl->AddText(ImVec2(cardMin.x + pad, cardMin.y + (titleH - ImGui::GetTextLineHeight()) * 0.5f + 2.0f),
+                     ImGui::GetColorU32(ImGuiCol_Text), title.c_str());
+         dl->PopClipRect();
+      }
+      ImGui::SetCursorScreenPos(ImVec2(cardMin.x + pad, cardMin.y + titleH));
 
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + imageSize.x, origin.y + imageSize.y);
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      DrawCheckerboardBackdrop(dl, origin, br);
+      DrawCheckerboardBackdrop(dl, origin, br, tok::radius_tile);
 
       if (auto* geo = dynamic_cast<IGeometrySource*>(gn.node.get()))
       {
@@ -217,10 +242,10 @@ namespace app
          const unsigned int tex = viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(gn.node.get())),
                                                   cam, (int)imageSize.x, (int)imageSize.y);
          if (tex != 0)
-            dl->AddImage((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
+            dl->AddImageRounded((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0), IM_COL32_WHITE, tok::radius_tile);
          else
             dl->AddText(ImVec2(origin.x + 10, origin.y + imageSize.y * 0.5f - 8),
-                        tok::U32(tok::pal::c_787887FF), EmptyPreviewLabel(gn.node.get(), "no geometry"));
+                        ImGui::GetColorU32(ImGuiCol_TextDisabled), EmptyPreviewLabel(gn.node.get(), "no geometry"));
 
          ImGui::SetCursorScreenPos(origin);
          char btnId[32];
@@ -245,7 +270,7 @@ namespace app
          // matching drag-orbit just above on this same gNodeCameras entry.
          ApplyViewHotkeys(cam.azimuth, cam.elevation);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            dl->AddRect(origin, br, tok::U32(tok::pal::c_78C8FFC8), 4.0f, 0, 2.0f);
+            dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_tile, 0, 1.0f);
          // Layout cursor already sits at origin+imageSize from the
          // InvisibleButton above; the trailing Dummy(imageSize) below is
          // shared with the non-geometry branch, so rewind rather than
@@ -275,7 +300,7 @@ namespace app
          else
          {
             dl->AddText(ImVec2(origin.x + 10, origin.y + imageSize.y * 0.5f - 8),
-                        tok::U32(tok::pal::c_787887FF), EmptyPreviewLabel(gn.node.get(), "no input"));
+                        ImGui::GetColorU32(ImGuiCol_TextDisabled), EmptyPreviewLabel(gn.node.get(), "no input"));
          }
 
          // A Draw node's panel card is paintable, same as its inline preview
@@ -352,7 +377,7 @@ namespace app
             // this render's "orbit"/"elevation" sliders (main.cpp ~23053).
             ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-               dl->AddRect(origin, br, tok::U32(tok::pal::c_78C8FFC8), 4.0f, 0, 2.0f);
+               dl->AddRect(origin, br, ImGui::GetColorU32(ImGuiCol_CheckMark, 0.6f), tok::radius_tile, 0, 1.0f);
             ImGui::SetCursorScreenPos(origin);
          }
       }
@@ -427,7 +452,7 @@ namespace app
          }
 
          if (!first && horizontal)
-            ImGui::SameLine();
+            ImGui::SameLine(0.0f, tok::space_2);
          first = false;
 
          DrawViewportPanelCard(*gn, ImVec2(box, box));
@@ -435,16 +460,23 @@ namespace app
 
       if (nodes.empty())
       {
-         const char* msg = "No active viewport cards";
-         const char* hint = "Select nodes & press Shift+V or right-click to add";
-         const ImVec2 sz1 = ImGui::CalcTextSize(msg);
-         const ImVec2 sz2 = ImGui::CalcTextSize(hint);
-         const float padY = std::max(4.0f, (strip.y - sz1.y - sz2.y - 4.0f) * 0.5f);
-         const float padX1 = std::max(8.0f, (strip.x - sz1.x) * 0.5f);
-         const float padX2 = std::max(8.0f, (strip.x - sz2.x) * 0.5f);
-         ImGui::SetCursorPos(ImVec2(padX1, padY));
-         ImGui::TextDisabled("%s", msg);
-         ImGui::SetCursorPos(ImVec2(padX2, padY + sz1.y + 4.0f));
+         const char* msg = T("No active viewport cards");
+         const char* hint = T("Select nodes & press Shift+V or right-click to add");
+         float h1, h2, w1, w2;
+         {
+            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
+            h1 = ImGui::GetTextLineHeight();
+            w1 = ImGui::CalcTextSize(msg).x;
+         }
+         h2 = ImGui::GetTextLineHeight();
+         w2 = ImGui::CalcTextSize(hint).x;
+         const float y = std::max(4.0f, (strip.y - h1 - h2 - tok::space_1) * 0.5f);
+         ImGui::SetCursorPos(ImVec2(std::max(8.0f, (strip.x - w1) * 0.5f), y));
+         {
+            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
+            ImGui::TextUnformatted(msg);
+         }
+         ImGui::SetCursorPos(ImVec2(std::max(8.0f, (strip.x - w2) * 0.5f), y + h1 + tok::space_1));
          ImGui::TextDisabled("%s", hint);
       }
 

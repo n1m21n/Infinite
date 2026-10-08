@@ -199,6 +199,9 @@ void DrawPopupsB(FrameCtx& fc)
             searchJustOpened = false;
             ImGui::CloseCurrentPopup();
          }
+         // The accent ring ImGui draws on the nav-focused row (the first item of each opened category)
+         // is dropped here; the row keeps its quiet header wash, which only shows while the keyboard drives.
+         ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
          // Same search field as the Library panel (rounded well, our own magnifier glyph, clear button).
          // SetKeyboardFocusHere() targets the next item, which is its InputText.
          if (searchJustOpened)
@@ -343,6 +346,7 @@ void DrawPopupsB(FrameCtx& fc)
             gLinkDragSuggestions.clear();
             ImGui::CloseCurrentPopup();
          }
+         ImGui::PopStyleColor();
          ImGui::EndPopup();
       }
       else
