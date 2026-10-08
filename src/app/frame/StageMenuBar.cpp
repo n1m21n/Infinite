@@ -920,11 +920,11 @@ void DrawMenuBar(FrameCtx& fc)
          // these are the first things dropped on a narrow window, since they
          // carry no text label and are the least essential of the cluster.
          // The four toggles spread evenly across the Library panel's tab row: the span runs from the panel's
-         // inner left edge (kNodePanelWidth minus its 8 pt padding each side) to the hairline. Falls back to a
+         // inner left edge (kNodePanelWidth minus its 16 pt gap and padding each side) to the hairline. Falls back to a
          // tight pack when the window is too narrow for that span.
          float iconGap = tok::space_1;
          {
-            const float regionLeft = windowRight - (fc.kNodePanelWidth - 16.0f);
+            const float regionLeft = windowRight - (fc.kNodePanelWidth - 32.0f);
             const float even = (cursorX - regionLeft - 4.0f * tok::tile) / 3.0f;
             if (regionLeft >= leftClusterEndX + minGap && even > tok::space_1)
                iconGap = even;

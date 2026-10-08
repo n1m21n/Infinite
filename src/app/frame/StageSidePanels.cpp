@@ -272,30 +272,29 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SameLine(0.0f, 0.0f);
          PushDockedPanelStyle(/*isChild=*/true);
-         // See DrawModMatrixDocked's inner-content child for why
-         // AlwaysUseWindowPadding is needed alongside Border now.
+         // Floating card: the child itself is transparent; the rounded surface and its soft shadow are drawn
+         // on the parent list underneath, inset by the gap so the card never touches the window, top bar or canvas.
+         const float cardGap = tok::space_2;
+         {
+            const ImVec2 p0 = ImGui::GetCursorScreenPos();
+            const ImVec2 c0(p0.x + cardGap, p0.y + cardGap);
+            const ImVec2 c1(p0.x + kNodePanelWidth - cardGap, p0.y + graphHeight - cardGap);
+            ImDrawList* pdl = ImGui::GetWindowDrawList();
+            for (int i = 6; i >= 1; --i)   // soft shadow: stacked, widening, fainter rings
+               pdl->AddRectFilled(ImVec2(c0.x - i, c0.y - i + 2.0f), ImVec2(c1.x + i, c1.y + i + 2.0f),
+                                  IM_COL32(0, 0, 0, 7), tok::radius_group + i);
+            pdl->AddRectFilled(c0, c1, ImGui::GetColorU32(ImGuiCol_ChildBg), tok::radius_group);
+         }
+         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(cardGap + tok::space_2, cardGap + tok::space_2));
          ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight),
-                           ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
+                           ImGuiChildFlags_AlwaysUseWindowPadding);
+         ImGui::PopStyleVar();
+         ImGui::PopStyleColor();
          PopDockedPanelStyle();
-         // Same hairline as every other panel boundary. This panel has no
-         // resize grip to hang it off, so it draws the seam on its own left
-         // edge - the side that faces the canvas, since it is always the
-         // rightmost panel.
-         {
-            const ImVec2 wp = ImGui::GetWindowPos();
-            const ImVec2 ws = ImGui::GetWindowSize();
-            ImGui::GetWindowDrawList()->AddLine(ImVec2(wp.x + 0.5f, wp.y),
-                                                ImVec2(wp.x + 0.5f, wp.y + ws.y),
-                                                PanelSeamColor(), 1.0f);
-         }
 
-         // Title, then the five modes as one segmented control (the accent pill slides between them).
-         {
-            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + tok::space_1);
-            ImGui::TextUnformatted(T("Library"));
-         }
-         ImGui::Dummy(ImVec2(0, tok::space_1));
+         // The five modes as one segmented control (the accent pill slides between them). No title: the top bar
+         // button already names the panel.
          {
             static const int kModes[5] = { 0, 4, 1, 2, 3 };   // gSearchPanelMode value per segment
             const PillGroup::Segment segs[5] = { { "lib.modules", T("Modules") }, { "lib.field", T("Field") },
