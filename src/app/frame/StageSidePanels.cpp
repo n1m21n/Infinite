@@ -312,7 +312,7 @@ void DrawSidePanels(FrameCtx& fc)
             ImGui::SetCursorScreenPos(cp);
             ImGui::Dummy(ImVec2(r.w, r.h));
          }
-         ImGui::Dummy(ImVec2(0, tok::space_2));
+         ImGui::Dummy(ImVec2(0, tok::space_3));
 
          if (gSearchPanelMode == 0)
          {
@@ -367,7 +367,7 @@ void DrawSidePanels(FrameCtx& fc)
                wdl->AddRect(w0, w1, light ? IM_COL32(0, 0, 0, 14) : IM_COL32(255, 255, 255, 10), tok::radius_pill);
             }
             ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_1, tok::space_1));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
             ImGui::BeginChild("##nodepanellist", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
             ImGui::PopStyleVar();
             ImGui::PopStyleColor();

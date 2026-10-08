@@ -2,6 +2,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/LibraryParts.h"
+#include "app/ui/design/components/FilterBar.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -226,56 +227,10 @@ namespace app
       const BrowserFilterState before = state;
 
       LibraryParts::SearchField("browserquery", searchHint, state.query, sizeof(state.query));
-      ImGui::Dummy(ImVec2(0, tok::space_2));
+      ImGui::Dummy(ImVec2(0, tok::space_3));
 
-      // Second row: labelled Sort and Filter dropdowns, the direction toggle sits beside Sort.
-      const float spacing = tok::space_2;
-      const float avail = ImGui::GetContentRegionAvail().x;
-      const float arrowW = ImGui::GetFrameHeight();
-      const float remaining = avail - arrowW - 2.0f * spacing;
-      const float typeW = typeNames.empty() ? 0.0f : std::max(40.0f, remaining * 0.5f);
-      const float sortW = typeNames.empty() ? std::max(40.0f, remaining) : std::max(40.0f, remaining - typeW);
-
-      const ImVec2 rowTop = ImGui::GetCursorScreenPos();
-      {
-         UiType::Scope ts(UiType::Size::Title, UiType::Weight::Medium);
-         const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         const ImU32 col = ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.55f));
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddText(ImVec2(rowTop.x + tok::space_1, rowTop.y), col, T("Sort"));
-         if (!typeNames.empty())
-            dl->AddText(ImVec2(rowTop.x + sortW + arrowW + 2.0f * spacing + tok::space_1, rowTop.y), col, T("Filter"));
-         ImGui::Dummy(ImVec2(0, ImGui::GetFontSize() + tok::space_1));
-      }
-
-      UiType::Scope bodyType(UiType::Size::Title);
-      DropdownButton("sort", sortNames, state.sortMode, [&state](int i) { state.sortMode = i; }, sortW, false);
-
-      ImGui::SameLine(0.0f, spacing);
-      const bool dirClicked = ImGui::Button("##sortdir", ImVec2(arrowW, 0));
-      {
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImVec2 bmin = ImGui::GetItemRectMin();
-         const ImVec2 bmax = ImGui::GetItemRectMax();
-         const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-         const float iconSize = (bmax.y - bmin.y) * 0.75f;
-         const ImU32 col = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-         if (state.descending)
-            glyph::DrawChevronDown(dl, center, iconSize, col);
-         else
-            glyph::DrawChevronUp(dl, center, iconSize, col);
-      }
-      if (ImGui::IsItemHovered())
-         ImGui::SetTooltip("%s", state.descending ? T("Descending") : T("Ascending"));
-      if (dirClicked)
-         state.descending = !state.descending;
-
-      if (!typeNames.empty())
-      {
-         ImGui::SameLine(0.0f, spacing);
-         DropdownButton("type", typeNames, state.typeFilter, [&state](int i) { state.typeFilter = i; }, typeW, false);
-      }
-      ImGui::Dummy(ImVec2(0, tok::space_1));
+      FilterBar::Draw("browserfilter", state, sortNames, typeNames, T("Sort"), T("Filter"));
+      ImGui::Dummy(ImVec2(0, tok::space_3));
 
       return strcmp(before.query, state.query) != 0 || before.sortMode != state.sortMode ||
              before.typeFilter != state.typeFilter || before.descending != state.descending;
