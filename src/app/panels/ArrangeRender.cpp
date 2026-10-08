@@ -356,8 +356,7 @@ namespace app
    void DrawArrangeClipSettingsChild(float panelW)
    {
       PushDockedPanelStyle(/*isChild=*/true);
-      ImGui::BeginChild("##arrangeclipsettings_child", ImVec2(panelW, 0), true,
-                        ImGuiWindowFlags_AlwaysUseWindowPadding);
+      ImGui::BeginChild("##arrangeclipsettings_child", ImVec2(panelW, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, 0);
       PopDockedPanelStyle();
 
       const float availW = ImGui::GetContentRegionAvail().x;

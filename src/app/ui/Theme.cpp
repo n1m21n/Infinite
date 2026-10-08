@@ -486,7 +486,7 @@ namespace app
       // matrix" and Menu > "Performance Matrix" still drew an outline after
       // the dialog/popup borders were removed - they were never going through
       // PopupBorderSize at all. BeginChild zeroes ChildBorderSize itself
-      // unless ImGuiChildFlags_Border is passed, so this only reaches
+      // unless ImGuiChildFlags_Borders is passed, so this only reaches
       // submenus and the handful of deliberately-bordered children, which
       // push their own size back locally (the Field reference code boxes).
       style.ChildBorderSize = 0.0f;

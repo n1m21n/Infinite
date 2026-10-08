@@ -24,11 +24,14 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    ImGui_ImplGlfw_SetPointScale(r.pointScale);
 
    ImGuiIO& io = ImGui::GetIO();
-   if (rendererReady)
-      ImGui_ImplOpenGL3_DestroyFontsTexture();
+   // ImGui 1.92: the backend owns the atlas texture and glyphs rasterize on demand at the size
+   // and framebuffer scale they are drawn at, so there is no bake size and no global font scale.
+   (void)rendererReady;
    io.Fonts->Clear();
-
-   const float bakedPx = UiScale::BakedFontPx(r.bakeScale);
+   ImGuiStyle& uiStyle = ImGui::GetStyle();
+   uiStyle.FontSizeBase = UiScale::kBaseFontSize;
+   uiStyle.FontScaleMain = 1.0f;
+   const float bakedPx = 0.0f; // 0 = style.FontSizeBase
    const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
    std::string chosenFontPath;
    {
@@ -81,34 +84,16 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    if (uiFont != nullptr)
    {
       const bool ja = I18n::CurrentLanguage() == "ja";
-      const bool cjk = I18n::CurrentLanguageNeedsCjk();
       const std::string notoPath =
          BundledResourcePath(ja ? "fonts/NotoSansJP-Subset.otf" : "fonts/NotoSansSC-Subset.otf");
       if (!notoPath.empty())
       {
-         static ImVector<ImWchar> notoRanges; // must outlive the atlas build
-         ImFontGlyphRangesBuilder builder;
-         const std::vector<uint32_t> glyphs = cjk ? I18n::GlyphsForCurrentLanguage() : I18n::NativeNameGlyphs();
-         for (uint32_t cp : glyphs)
-            if (cp >= 0x2E00 && cp <= 0xFFFF)
-               builder.AddChar(static_cast<ImWchar>(cp));
-         if (cjk)
-         {
-            for (uint32_t cp = 0x3000; cp <= 0x30FF; cp++) // CJK punctuation, hiragana, katakana
-               builder.AddChar(static_cast<ImWchar>(cp));
-            for (uint32_t cp = 0xFF00; cp <= 0xFFEF; cp++) // fullwidth forms
-               builder.AddChar(static_cast<ImWchar>(cp));
-         }
-         notoRanges.clear();
-         builder.BuildRanges(&notoRanges);
+         // Dynamic atlas: only glyphs that are drawn are rasterized, so the whole subset face is merged.
          ImFontConfig cjkCfg;
          cjkCfg.MergeMode = true;
-         io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg, notoRanges.Data);
+         io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg);
       }
    }
-   // Only a real TTF is baked at bakedPx; ImGui's bitmap fallback is 13 px at 1x and must
-   // not be shrunk.
-   io.FontGlobalScale = uiFont != nullptr ? r.fontGlobalScale : 1.0f;
    if (uiFont == nullptr)
       io.Fonts->AddFontDefault();
 
@@ -130,7 +115,7 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
          ImFontConfig iconCfg;
          iconCfg.MergeMode = true;
          iconCfg.PixelSnapH = true;
-         iconCfg.GlyphMinAdvanceX = bakedPx;
+         iconCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
          io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
       }
    }
@@ -145,12 +130,10 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
          ImFontConfig glyphCfg;
          glyphCfg.MergeMode = true;
          glyphCfg.PixelSnapH = true;
-         glyphCfg.GlyphMinAdvanceX = bakedPx;
+         glyphCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
          io.Fonts->AddFontFromFileTTF(bundledGlyphs.c_str(), bakedPx, &glyphCfg, glyphRanges);
       }
    }
-   if (rendererReady)
-      ImGui_ImplOpenGL3_CreateFontsTexture();
 }
 
 int InitApp(FrameCtx& fc, int argc, char** argv)
@@ -934,6 +917,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    ImGuiStyle& style = ImGui::GetStyle();
    style.FrameRounding = 3.0f;
+   style.SelectableRounding = style.FrameRounding; // was a vendored ImGui patch before 1.92
    style.GrabRounding = 3.0f;
    style.WindowRounding = 4.0f;
    style.ItemSpacing = ImVec2(6, 5);

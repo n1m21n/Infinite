@@ -2506,7 +2506,7 @@ namespace app
       ImGui::BeginChild("##perfpanelinnercontent",
                         vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
+                        ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
       DrawPerfPanelContent();
       ImGui::EndChild();
       PopDockedPanelStyle();

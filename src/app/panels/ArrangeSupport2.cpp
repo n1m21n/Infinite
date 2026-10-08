@@ -228,7 +228,7 @@ namespace app
          {
             if (gArrangeTypedEdit.noAutoSelect)
             {
-               st->Stb.cursor = st->CurLenW;
+               st->ReloadUserBufAndMoveToEnd();
                st->ClearSelection();
             }
             else
@@ -309,7 +309,7 @@ namespace app
       if (format == NULL)
          format = "%.3f";
 
-      const bool hovered = ImGui::ItemHoverable(frame_bb, id, g.LastItemData.InFlags);
+      const bool hovered = ImGui::ItemHoverable(frame_bb, id, g.LastItemData.ItemFlags);
       if (hovered)
          ArrangeMarkFieldHot();
       {

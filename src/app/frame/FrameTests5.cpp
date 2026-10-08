@@ -1855,7 +1855,7 @@ void FrameTest_UISCALETEST(int frameId, GLFWwindow* window)
          // Phases, 8 frames each so the rebake and two node-editor layout passes settle:
          // scale 1.0 (reference), 1.5, 2.0, 1.25, then the user's own value is restored.
          // 1.25 asks for a fractional font size even on Retina (37.5 px); 1.5 does on
-         // Windows/X11 (22.5 px). ImGui truncates font sizes, see UiScale::BakedFontPx.
+         // Windows/X11 (22.5 px). (pre-1.92 note: ImGui truncated baked font sizes.)
          static const float kScales[] = { 1.0f, 1.5f, 2.0f, 1.25f };
          const int kPhases = 4;
          static float sUserScale = 1.0f;

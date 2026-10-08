@@ -1338,8 +1338,8 @@ namespace app
       const float timelineChildWidth = reservedRight > 0.0f ? -reservedRight : 0.0f;
       PushDockedPanelStyle(/*isChild=*/true);
       // Cmd/Ctrl+wheel zooms (above); it must not also scroll the lanes.
-      ImGui::BeginChild("##arrangetimelinescroll", ImVec2(timelineChildWidth, 0), false,
-                        ImGuiWindowFlags_AlwaysUseWindowPadding |
+      ImGui::BeginChild("##arrangetimelinescroll", ImVec2(timelineChildWidth, 0), ImGuiChildFlags_AlwaysUseWindowPadding,
+                        0 |
                         (arrangeWheelZoomMod ? ImGuiWindowFlags_NoScrollWithMouse : 0));
       PopDockedPanelStyle();
 
@@ -4532,7 +4532,7 @@ namespace app
       ImGui::BeginChild("##arrangepanelinnercontent",
                         vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
+                        ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
       DrawArrangePanelContent();
       ImGui::EndChild();
       PopDockedPanelStyle();

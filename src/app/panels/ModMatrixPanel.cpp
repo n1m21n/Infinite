@@ -41,7 +41,7 @@ namespace app
             {
                if (gTypedParamNoAutoSelect.count(editKey))
                {
-                  state->Stb.cursor = state->CurLenW;
+                  state->ReloadUserBufAndMoveToEnd();
                   state->ClearSelection();
                }
                else
@@ -1033,7 +1033,7 @@ namespace app
       ImGui::BeginChild("##modmatrixpanelcontent",
                         vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
+                        ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
       DrawModMatrixTable();
       ImGui::EndChild();
       PopDockedPanelStyle();

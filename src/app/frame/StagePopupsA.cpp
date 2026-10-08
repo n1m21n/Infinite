@@ -410,7 +410,7 @@ void DrawPopupsA(FrameCtx& fc)
                   {
                      if (gModRangeTypedNoAutoSelect)
                      {
-                        state->Stb.cursor = state->CurLenW;
+                        state->ReloadUserBufAndMoveToEnd();
                         state->ClearSelection();
                      }
                      else

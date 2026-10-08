@@ -763,7 +763,7 @@ namespace app
             // See DrawModMatrixDocked's inner-content child for why
             // AlwaysUseWindowPadding is needed alongside Border now.
             ImGui::BeginChild("##fieldrefcontent", ImVec2(0, 0),
-                              ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
+                              ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
 
             auto MatchesFilter = [](const char* text) -> bool {
                if (sFilterBuf[0] == '\0') return true;

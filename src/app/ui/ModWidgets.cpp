@@ -218,7 +218,7 @@ namespace app
             {
                if (gTypedParamNoAutoSelect.count(editKey))
                {
-                  state->Stb.cursor = state->CurLenW;
+                  state->ReloadUserBufAndMoveToEnd();
                   state->ClearSelection();
                }
                else
@@ -1400,7 +1400,7 @@ namespace app
             {
                if (gTypedParamNoAutoSelect.count(editKey))
                {
-                  state->Stb.cursor = state->CurLenW;
+                  state->ReloadUserBufAndMoveToEnd();
                   state->ClearSelection();
                }
                else

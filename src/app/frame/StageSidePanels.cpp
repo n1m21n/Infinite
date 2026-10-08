@@ -273,7 +273,7 @@ void DrawSidePanels(FrameCtx& fc)
          // See DrawModMatrixDocked's inner-content child for why
          // AlwaysUseWindowPadding is needed alongside Border now.
          ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight),
-                           ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
+                           ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
          PopDockedPanelStyle();
          // Same hairline as every other panel boundary. This panel has no
          // resize grip to hang it off, so it draws the seam on its own left
