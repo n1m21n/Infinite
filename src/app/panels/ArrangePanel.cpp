@@ -1,5 +1,6 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -1333,11 +1334,25 @@ namespace app
       const float reservedRight = (showVp && gArrangeViewportOnRight ? (kViewportW + ImGui::GetStyle().ItemSpacing.x) : 0.0f)
                                 + (gArrangeClipSettingsPanelOpen ? (kSettingsW + ImGui::GetStyle().ItemSpacing.x) : 0.0f);
       const float timelineChildWidth = reservedRight > 0.0f ? -reservedRight : 0.0f;
+      {
+         // The lanes sit in a recessed well (same surface as the Library list), not on a panel-coloured child.
+         const ImVec2 w0 = ImGui::GetCursorScreenPos();
+         const ImVec2 wa = ImGui::GetContentRegionAvail();
+         const ImVec2 w1(w0.x + (timelineChildWidth < 0.0f ? wa.x + timelineChildWidth : wa.x), w0.y + wa.y);
+         const bool wellLight = IsThemeLight();
+         ImDrawList* wdl = ImGui::GetWindowDrawList();
+         wdl->AddRectFilled(w0, w1, ImGui::GetColorU32(ImVec4(0, 0, 0, wellLight ? 0.04f : 0.27f)), tok::radius_pill);
+         wdl->AddRect(w0, w1, ImGui::GetColorU32(wellLight ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
+      }
       PushDockedPanelStyle(/*isChild=*/true);
+      ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
       // Cmd/Ctrl+wheel zooms (above); it must not also scroll the lanes.
       ImGui::BeginChild("##arrangetimelinescroll", ImVec2(timelineChildWidth, 0), ImGuiChildFlags_AlwaysUseWindowPadding,
                         0 |
                         (arrangeWheelZoomMod ? ImGuiWindowFlags_NoScrollWithMouse : 0));
+      ImGui::PopStyleVar();
+      ImGui::PopStyleColor();
       PopDockedPanelStyle();
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1436,11 +1451,13 @@ namespace app
       const ImVec2 rulerPos(rulerStartX, pinnedTopY);
       const ImVec2 rulerSize(rulerWidth, kRulerHeight);
       const bool isLight = IsThemeLight();
-      const ImU32 rulerBg = isLight ? tok::U32(tok::pal::c_EEEEF2FF) : tok::U32(tok::pal::c_202024FF);
-      const ImU32 markerStripBg = isLight ? tok::U32(tok::pal::c_E5E5EBFF) : tok::U32(tok::pal::c_1A1A1EFF);
-      const ImU32 tickCol = isLight ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_64646EFF);
-      const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text, 0.80f);
-      const ImU32 subTextCol = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.80f);
+      // The ruler and lanes share the well: no fills of their own, hairlines and ticks derived from the text colour.
+      const ImU32 rulerBg = 0;
+      const ImU32 markerStripBg = 0;
+      const ImU32 tickCol = ImGui::GetColorU32(ImGuiCol_Text, 0.38f);
+      const ImU32 hairCol = ImGui::GetColorU32(ImGuiCol_Text, 0.08f);
+      const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text, 0.85f);
+      const ImU32 subTextCol = ImGui::GetColorU32(ImGuiCol_Text, 0.38f);
 
       // Header-column corner, level with the ruler (above the first track
       // row) - otherwise blank/unstyled, reading as a hole next to the
@@ -1450,16 +1467,16 @@ namespace app
 
       dl->AddRectFilled(rulerPos, ImVec2(rulerPos.x + rulerSize.x, kTickStripTop), markerStripBg);
       dl->AddRectFilled(ImVec2(rulerPos.x, kTickStripTop), ImVec2(rulerPos.x + rulerSize.x, rulerPos.y + rulerSize.y), rulerBg);
-      dl->AddLine(ImVec2(headerStartX, kTickStripTop), ImVec2(rulerPos.x + rulerSize.x, kTickStripTop), tickCol, 0.5f);
       dl->AddLine(ImVec2(headerStartX, rulerPos.y + rulerSize.y), ImVec2(rulerPos.x + rulerSize.x, rulerPos.y + rulerSize.y),
-                  tickCol, 1.0f);
+                  hairCol, 1.0f);
 
       // ---- ruler ticks and labels ----
       // Primary label in the chosen unit; the other unit follows it, dimmer,
       // only where it fits before the next label.
       {
          const float rulerBottom = rulerPos.y + rulerSize.y;
-         const float labelY = kTickStripTop + 2.0f;
+         UiType::Scope labelScope(UiType::Size::Caption, UiType::Weight::Medium);
+         const float labelY = kTickStripTop + 4.0f;
          dl->PushClipRect(rulerPos, ImVec2(rulerPos.x + rulerSize.x, rulerBottom), true);
          auto drawLabelPair = [&](float x, float nextX, const std::string& primary, const std::string& secondary)
          {
@@ -2512,14 +2529,9 @@ namespace app
          const float rowH = laneRowH[i];
 
          // Lane background
-         const ImU32 laneBg = (i % 2 == 0)
-            ? (isLight ? tok::U32(tok::pal::c_F5F5F8FF) : tok::U32(tok::pal::c_18181CFF))
-            : (isLight ? tok::U32(tok::pal::c_FAFAFCFF) : tok::U32(tok::pal::c_1C1C20FF));
-         dl->AddRectFilled(ImVec2(headerStartX, curY),
-                           ImVec2(rulerStartX + rulerWidth, curY + rowH), laneBg);
          dl->AddLine(ImVec2(headerStartX, curY + rowH),
                      ImVec2(rulerStartX + rulerWidth, curY + rowH),
-                     tickCol, 0.5f);
+                     hairCol, 1.0f);
 
          // Header-column background drop target & selection click-catcher.
          // Submitted before the name box and mix strip below, so it MUST
@@ -2553,23 +2565,22 @@ namespace app
 
          if (gArrangeRowSel.count(laneId))
          {
-            const ImU32 selFill = isLight ? tok::U32(tok::pal::c_8B5CF623) : tok::U32(tok::pal::c_8B5CF62D);
-            const ImU32 selBorder = tok::U32(tok::pal::c_A78BFAB4);
-            dl->AddRectFilled(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f), selFill, 2.0f);
-            dl->AddRect(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f), selBorder, 2.0f, 0, 1.5f);
+            const ImVec4 selA = AccentEmphasisSelected();
+            dl->AddRectFilled(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f),
+                              ImGui::GetColorU32(ImVec4(selA.x, selA.y, selA.z, 0.28f)), tok::radius_tile);
          }
 
          // Beat/bar grid lines through the lane body
          for (const ArrangeGridLine& gl : arrangeGridLines)
          {
             const ImU32 gridCol = isLight
-               ? IM_COL32(0, 0, 0, gl.isMajor ? 60 : 22)
-               : IM_COL32(255, 255, 255, gl.isMajor ? 55 : 18);
+               ? IM_COL32(0, 0, 0, gl.isMajor ? 34 : 12)
+               : IM_COL32(255, 255, 255, gl.isMajor ? 32 : 10);
             dl->AddLine(ImVec2(gl.x, curY), ImVec2(gl.x, curY + rowH), gridCol, 1.0f);
          }
 
          // Header separator vertical line
-         dl->AddLine(ImVec2(rulerStartX, curY), ImVec2(rulerStartX, curY + rowH), tickCol, 1.0f);
+         dl->AddLine(ImVec2(rulerStartX, curY), ImVec2(rulerStartX, curY + rowH), hairCol, 1.0f);
 
          // ---- Header content ----
          const int laneDepth = (i < arrangeLaneDepth.size()) ? arrangeLaneDepth[i] : 0;
@@ -2717,16 +2728,40 @@ namespace app
             else
             {
                float pct = lane.opacity * 100.0f;
-               ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, (kMixCtl - ImGui::GetFontSize()) * 0.5f));
-               ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-               ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 6.0f);
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::U32(tok::pal::c_8B5CF6FF));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::U32(tok::pal::c_A078FAFF));
-               ImGui::SetNextItemWidth(kMixStripW);
-               const bool opChanged = ImGui::SliderFloat("##laneopacity", &pct, 0.0f, 100.0f, "%.0f%%",
-                                                         ImGuiSliderFlags_AlwaysClamp);
-               ImGui::PopStyleColor(2);
-               ImGui::PopStyleVar(3);
+               // A readout well that fills left to right (no grab stub): drag to set, double-click for 100%.
+               const ImVec2 op = ImGui::GetCursorScreenPos();
+               ImGui::InvisibleButton("##laneopacity", ImVec2(kMixStripW, kMixCtl));
+               bool opChanged = false;
+               if (ImGui::IsItemActive())
+               {
+                  const float np = std::clamp((ImGui::GetIO().MousePos.x - op.x) / kMixStripW, 0.0f, 1.0f) * 100.0f;
+                  opChanged = std::fabs(np - pct) > 0.01f;
+                  pct = np;
+               }
+               if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && pct != 100.0f)
+               {
+                  pct = 100.0f;
+                  opChanged = true;
+               }
+               {
+                  const ImVec4 ot = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                  const float hot = ImGui::IsItemHovered() || ImGui::IsItemActive() ? 0.04f : 0.0f;
+                  const ImVec2 oe(op.x + kMixStripW, op.y + kMixCtl);
+                  dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.06f + hot)), tok::radius_tile);
+                  const float fx = op.x + kMixStripW * std::clamp(pct / 100.0f, 0.0f, 1.0f);
+                  if (fx > op.x + 1.0f)
+                  {
+                     dl->PushClipRect(op, ImVec2(fx, oe.y), true);
+                     dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.12f)), tok::radius_tile);
+                     dl->PopClipRect();
+                  }
+                  char opTxt[16];
+                  snprintf(opTxt, sizeof(opTxt), "%.0f%%", pct);
+                  UiType::Scope opScope(UiType::Size::Caption, UiType::Weight::Medium);
+                  const ImVec2 otz = ImGui::CalcTextSize(opTxt);
+                  dl->AddText(ImVec2(std::round(op.x + (kMixStripW - otz.x) * 0.5f), std::round(op.y + (kMixCtl - otz.y) * 0.5f)),
+                              ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.85f)), opTxt);
+               }
                mixGesture(opChanged, [&] { lane.opacity = std::clamp(pct / 100.0f, 0.0f, 1.0f); });
             }
             ImGui::PopStyleVar();
@@ -4285,31 +4320,18 @@ namespace app
          if (emptyGridBottom > lanesContentBottom)
          {
             dl->PushClipRect(ImVec2(headerStartX, lanesContentBottom), ImVec2(rulerStartX + rulerWidth, emptyGridBottom), true);
-            // Continue the same alternating row-background stripes the real
-            // lanes use (main.cpp laneBg above) so this region reads as more
-            // of the same timeline instead of a visually distinct flat-black
-            // void - it's still empty, but no longer looks "cut off".
-            {
-               size_t rowIdx = gArrange.lanes.size();
-               for (float gy = lanesContentBottom; gy < emptyGridBottom; gy += kLaneHeight, rowIdx++)
-               {
-                  const ImU32 stripeBg = (rowIdx % 2 == 0)
-                     ? (isLight ? tok::U32(tok::pal::c_F5F5F8FF) : tok::U32(tok::pal::c_18181CFF))
-                     : (isLight ? tok::U32(tok::pal::c_FAFAFCFF) : tok::U32(tok::pal::c_1C1C20FF));
-                  dl->AddRectFilled(ImVec2(headerStartX, gy), ImVec2(rulerStartX + rulerWidth, std::min(gy + kLaneHeight, emptyGridBottom)), stripeBg);
-               }
-            }
+            // No zebra: the well is one surface, rows are told apart by hairlines.
             // Vertical beat/bar lines: the same ones drawn through every track
             // row above, continued down so the timeline still reads as a grid
             // instead of stopping dead at the last track.
             for (const ArrangeGridLine& gl : arrangeGridLines)
             {
                const ImU32 gridCol = isLight
-                  ? IM_COL32(0, 0, 0, gl.isMajor ? 60 : 22)
-                  : IM_COL32(255, 255, 255, gl.isMajor ? 55 : 18);
+                  ? IM_COL32(0, 0, 0, gl.isMajor ? 34 : 12)
+                  : IM_COL32(255, 255, 255, gl.isMajor ? 32 : 10);
                dl->AddLine(ImVec2(gl.x, lanesContentBottom), ImVec2(gl.x, emptyGridBottom), gridCol, 1.0f);
             }
-            const ImU32 emptyGridLine = isLight ? tok::U32(tok::pal::c_00000016) : tok::U32(tok::pal::c_FFFFFF12);
+            const ImU32 emptyGridLine = hairCol;
             for (float gy = lanesContentBottom + kLaneHeight; gy < emptyGridBottom; gy += kLaneHeight)
                dl->AddLine(ImVec2(rulerStartX, gy), ImVec2(rulerStartX + rulerWidth, gy), emptyGridLine, 1.0f);
             dl->PopClipRect();
@@ -4369,8 +4391,8 @@ namespace app
          {
             const float playheadX = beatToX(playBeats);
             const ImU32 playheadCol = tok::U32(tok::pal::c_EF4444FF);
-            dl->AddLine(ImVec2(playheadX, kTickStripTop), ImVec2(playheadX, lineBottom), playheadCol, 1.5f);
-            const float triSize = 7.0f;
+            dl->AddLine(ImVec2(playheadX, kTickStripTop), ImVec2(playheadX, lineBottom), playheadCol, 1.25f);
+            const float triSize = 5.0f;
             dl->AddTriangleFilled(ImVec2(playheadX - triSize, kTickStripTop), ImVec2(playheadX + triSize, kTickStripTop),
                                   ImVec2(playheadX, kTickStripTop + triSize * 1.6f), playheadCol);
          }
@@ -4379,7 +4401,7 @@ namespace app
             const float gx = tickToX(gArrangeScrubTick);
             const ImU32 ghostCol = tok::U32(tok::pal::c_EF444478);
             dl->AddLine(ImVec2(gx, kTickStripTop), ImVec2(gx, lineBottom), ghostCol, 1.5f);
-            const float triSize = 7.0f;
+            const float triSize = 5.0f;
             dl->AddTriangleFilled(ImVec2(gx - triSize, kTickStripTop), ImVec2(gx + triSize, kTickStripTop),
                                   ImVec2(gx, kTickStripTop + triSize * 1.6f), ghostCol);
             const std::string ghostLabel = ArrangeFormatBBT(gArrangeScrubTick) + "  |  " + ArrangeFormatTickSeconds(gArrangeScrubTick);
