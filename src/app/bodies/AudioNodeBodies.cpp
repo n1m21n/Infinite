@@ -350,22 +350,33 @@ namespace app
       const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
       ImGui::BeginDisabled(recording);
       const float half = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+      const float third = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
       const char* fmtNames[] = { "WAV", "FLAC" };
       for (int i = 0; i < 2; i++)
       {
          const bool active = (n->formatIndex == i);
          if (active)
             ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-         if (ImGui::Button(fmtNames[i], ImVec2(half, 0)))
+         if (ImGui::Button(fmtNames[i], ImVec2(third, 0)))
          {
             n->formatIndex = i;
             gPatchDirty = true;
          }
          if (active)
             ImGui::PopStyleColor();
-         if (i == 0)
-            ImGui::SameLine();
+         ImGui::SameLine();
       }
+      if (n->bit24)
+         ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+      if (ImGui::Button("24 bit##spatialDepth", ImVec2(third, 0)))
+      {
+         n->bit24 = !n->bit24;
+         gPatchDirty = true;
+      }
+      if (n->bit24)
+         ImGui::PopStyleColor();
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("depth", n->bit24 ? "24-bit file" : "16-bit file");
       ImGui::EndDisabled();
 
       if (n->live)

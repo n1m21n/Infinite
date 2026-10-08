@@ -18,6 +18,13 @@ namespace
    void WriteU32(FILE* f, uint32_t v) { fwrite(&v, 4, 1, f); }
    void WriteU16(FILE* f, uint16_t v) { fwrite(&v, 2, 1, f); }
 
+   // 24-bit PCM as a sign-extended int32 in [-8388607, 8388607].
+   int32_t FloatToPcm24(float v)
+   {
+      const float clamped = std::clamp(v, -1.0f, 1.0f);
+      return (int32_t)std::lround((double)clamped * 8388607.0);
+   }
+
    int16_t FloatToPcm16(float v)
    {
       const float clamped = std::clamp(v, -1.0f, 1.0f);
@@ -69,11 +76,11 @@ const char* AudioFileWriter::ExtensionForFormat(Format format)
 int64_t AudioFileWriter::BytesWritten() const
 {
    if (mFormat == Format::Wav)
-      return mFramesWritten * mNumChannels * 2;
+      return mFramesWritten * mNumChannels * (mBitDepth / 8);
    return mBytesWrittenDirect;
 }
 
-bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numChannels, Format format)
+bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numChannels, Format format, int bitDepth)
 {
    Close();
 
@@ -83,6 +90,7 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
    mPath = path;
    mSampleRate = sampleRate;
    mNumChannels = std::max(1, numChannels);
+   mBitDepth = bitDepth == 24 ? 24 : 16;
    mFramesWritten = 0;
    mBytesWrittenDirect = 0;
 
@@ -109,6 +117,8 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
          outFormat.mSampleRate = sampleRate;
          outFormat.mFormatID = kAudioFormatFLAC;
          outFormat.mChannelsPerFrame = (UInt32)mNumChannels;
+         if (mBitDepth == 24)
+            outFormat.mFormatFlags = 3; // encoder's source-bit-depth flag: 24-bit
 
          ExtAudioFileRef extRef = NULL;
          NSString* nsPath = [NSString stringWithUTF8String:path.c_str()];
@@ -168,7 +178,7 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
       return false;
 
    const uint32_t sr = (uint32_t)std::lround(sampleRate);
-   const uint16_t bitsPerSample = 16;
+   const uint16_t bitsPerSample = (uint16_t)mBitDepth;
    const uint16_t blockAlign = (uint16_t)(mNumChannels * (bitsPerSample / 8));
    const uint32_t byteRate = sr * blockAlign;
 
@@ -253,6 +263,21 @@ void AudioFileWriter::Append(const float* interleaved, int frames)
    if (mFormat == Format::Wav && mFile != nullptr)
    {
       const int numSamples = frames * mNumChannels;
+      if (mBitDepth == 24)
+      {
+         static thread_local std::vector<uint8_t> bytes;
+         bytes.resize((size_t)numSamples * 3);
+         for (int i = 0; i < numSamples; i++)
+         {
+            const int32_t v = FloatToPcm24(interleaved[i]);
+            bytes[(size_t)i * 3] = (uint8_t)(v & 0xFF);
+            bytes[(size_t)i * 3 + 1] = (uint8_t)((v >> 8) & 0xFF);
+            bytes[(size_t)i * 3 + 2] = (uint8_t)((v >> 16) & 0xFF);
+         }
+         fwrite(bytes.data(), 1, bytes.size(), mFile);
+         mFramesWritten += frames;
+         return;
+      }
       static thread_local std::vector<int16_t> scratch;
       scratch.resize((size_t)numSamples);
       for (int i = 0; i < numSamples; i++)
@@ -309,7 +334,7 @@ void AudioFileWriter::CloseWav()
    if (mFile == nullptr)
       return;
 
-   const uint32_t dataBytes = (uint32_t)(mFramesWritten * mNumChannels * 2);
+   const uint32_t dataBytes = (uint32_t)(mFramesWritten * mNumChannels * (mBitDepth / 8));
    const uint32_t riffSize = 36 + dataBytes;
 
    fseek(mFile, 4, SEEK_SET);

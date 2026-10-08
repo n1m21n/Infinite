@@ -2,6 +2,7 @@
 // stage with the listener's head at the centre and one draggable dot per
 // connected input, a source strip, and a knob row for the selected object.
 #include "app/AppShared.h"
+#include "platform/HeadTracker.h"
 
 namespace app
 {
@@ -26,12 +27,14 @@ namespace app
       const int pins = n->PinCount();
       n->selected = std::clamp(n->selected, 0, SpatialMixerNode::kMaxSlots - 1);
 
-      char stat[96];
+      char stat[112];
+      const bool tracked = n->trackMode == 1 && n->HeadTracked();
       if (n->IsRecording())
-         snprintf(stat, sizeof(stat), "REC %s  %.1fs", n->formatIndex == 1 ? "FLAC" : "WAV", n->ElapsedSeconds());
+         snprintf(stat, sizeof(stat), "REC %s %d-bit  %.1fs", n->formatIndex == 1 ? "FLAC" : "WAV", n->bit24 ? 24 : 16,
+                  n->ElapsedSeconds());
       else if (connected > 0)
-         snprintf(stat, sizeof(stat), "%d in -> %s   %+.1f dB", connected, n->renderMode == 1 ? "stereo" : "binaural",
-                  DspMath::LinearToDb(std::max(n->Level(), 1e-5f)));
+         snprintf(stat, sizeof(stat), "%d in -> %s%s  %.0f LUFS", connected, n->renderMode == 1 ? "stereo" : "binaural",
+                  tracked ? " - tracked" : "", std::max(n->LufsShort(), -99.0f));
       else
          snprintf(stat, sizeof(stat), "0 in -> binaural (idle)");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
@@ -182,8 +185,16 @@ namespace app
          const bool sel = (n->selected == s);
          if (ImGui::Selectable(("in " + std::to_string(s + 1)).c_str(), sel, 0, ImVec2(80.0f, 0.0f)))
             n->selected = s;
-         ImGui::SameLine(gAudioContentX - ImGui::GetWindowPos().x + gAudioContentW - 110.0f);
+         ImGui::SameLine(gAudioContentX - ImGui::GetWindowPos().x + gAudioContentW - 142.0f);
          ImGui::Text("%+.1f dB", n->gainDb[s]);
+         ImGui::SameLine();
+         if (ImGui::SmallButton(n->headLocked[s] ? "H*" : "H"))
+         {
+            PushUndoCheckpoint();
+            n->headLocked[s] = !n->headLocked[s];
+         }
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("head lock", n->headLocked[s] ? "stays in front of your head" : "fixed in the room");
          ImGui::SameLine();
          if (ImGui::SmallButton(n->mute[s] ? "M*" : "M"))
          {
@@ -211,10 +222,55 @@ namespace app
          row.End();
       }
       {
-         AudioKnobRow row(2, kKnobSmall);
+         AudioKnobRow row(4, kKnobSmall);
          row.Knob("level", &n->gainDb[sel], -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true);
+         row.Knob("room", &n->room, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.Knob("bass mono", &n->bassHz, 0.0f, 300.0f, "%.0f Hz", kKnobSmall);
          row.Knob("out", &n->outDb, -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true);
          row.End();
+      }
+
+      // ---- master: head tracking, limiter, hrtf, meter --------------------
+      {
+         const float half = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+         const bool trackOk = HeadTracker::Supported(HeadTracker::kHeadphones);
+         const std::vector<std::string> trackNames = { "head: off", trackOk ? "head: AirPods" : "head: AirPods (macOS)" };
+         AudioBareDropdown("##spatialTrack", trackNames, std::clamp(n->trackMode, 0, 1),
+                           [n](int i) {
+                              PushUndoCheckpoint();
+                              n->trackMode = i;
+                              gPatchDirty = true;
+                           },
+                           half);
+         ImGui::SameLine();
+         ImGui::BeginDisabled(n->trackMode == 0);
+         if (ImGui::Button("recenter##spatialRecenter", ImVec2(half, 0)))
+            n->RecenterHead();
+         ImGui::EndDisabled();
+         if (n->trackMode != 0 && ImGui::IsItemHovered())
+            SetAudioReadout("head", HeadTracker::Status());
+
+         AudioToggleButton("limit##spatialLimit", &n->limiter, half);
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("limiter", n->limiter ? "true-peak ceiling -1 dB on the output" : "off: output can clip");
+         ImGui::SameLine();
+         bool model = n->hrtf == 1;
+         if (AudioToggleButton(model ? "model##spatialHrtf" : "KEMAR##spatialHrtf", &model, half))
+         {
+            PushUndoCheckpoint();
+            n->hrtf = model ? 1 : 0;
+         }
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("ears", model ? "spherical-head model, no measured data" : "measured dummy-head (MIT KEMAR)");
+
+         char meter[96];
+         snprintf(meter, sizeof(meter), "%.1f LUFS   peak %.1f dB   gr %.1f dB", std::max(n->LufsShort(), -99.0f),
+                  std::max(n->TruePeakDb(), -99.0f), n->ReductionDb());
+         ImGui::TextUnformatted(meter);
+         if (ImGui::IsItemClicked())
+            n->ResetPeak();
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("meter", "short-term loudness, true peak (click to reset), limiter reduction");
       }
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
       DrawSpatialExportPanel(n);

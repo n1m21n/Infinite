@@ -3,6 +3,7 @@
 // real node's audio half with synthetic signals that have known answers.
 // Gated as an early exit before glfwInit(), like INFINITE_DSPTEST.
 #include "app/AppShared.h"
+#include "audio/dsp/SpatialMaster.h"
 
 namespace app
 {
@@ -144,18 +145,34 @@ namespace app
          const double d = Db(HfRms(fl, skip)) - Db(HfRms(bl, skip));
          check(d >= 2.0, "front-back HF contrast (dB)", d);
       }
-      // 5. Loudness flat +-1.5 dB round the circle (benchmark; power of both ears).
+      // Pink-ish (-3 dB/oct) noise, the spectral tilt of music and speech: loudness
+      // is judged on that, not on white noise whose energy sits above 6 kHz.
+      std::vector<float> pink(N);
+      {
+         double b0 = 0, b1 = 0, b2 = 0;
+         for (int i = 0; i < N; i++)
+         {
+            const double w = noise[i];
+            b0 = 0.99765 * b0 + w * 0.0990460;
+            b1 = 0.96300 * b1 + w * 0.2965164;
+            b2 = 0.57000 * b2 + w * 1.0526913;
+            pink[i] = (float)((b0 + b1 + b2 + w * 0.1848) * 0.05); // well under the limiter
+         }
+      }
+      // 5. Loudness flat +-1.5 dB round the circle, measured the way the node's
+      // own meter measures it (K-weighted, both ears summed).
       {
          double lo = 1e9, hi = -1e9;
-         for (int az = 0; az < 360; az += 45)
+         for (int az = 0; az < 360; az += 30)
          {
-            Rig r; place(r, (float)az, 0, 1);
-            std::vector<float> L, R; r.Render(noise, L, R, [](int) {});
-            const double p = Db(std::sqrt(Rms(L, skip) * Rms(L, skip) + Rms(R, skip) * Rms(R, skip)));
-            printf("  az %3d: %.2f dB\n", az, p);
+            Rig r; place(r, (float)az, 0, 1); r.node.limiter = false;
+            std::vector<float> L, R; r.Render(pink, L, R, [](int) {});
+            SpatialMaster::Loudness m; m.Prepare(kSr);
+            for (int i = 0; i < N; i++) m.Process(L[i], R[i]);
+            const double p = m.ShortTerm();
             lo = std::min(lo, p); hi = std::max(hi, p);
          }
-         check(hi - lo <= 3.0, "loudness spread round circle (dB, target <=3 now, <=1.5 with HRTF EQ)", hi - lo);
+         check(hi - lo <= 1.5, "loudness spread round circle (K-weighted dB, target <=1.5)", hi - lo);
       }
       // 6. Distance: doubling 2 m -> 4 m drops ~6 dB.
       {
@@ -191,6 +208,75 @@ namespace app
          r.audio->ProcessBlock(inputs, 1, out);
          check(Rms(L, 0) == 0.0 && Rms(R, 0) == 0.0, "unconnected input silent", Rms(L, 0));
       }
+      // 10. BS.1770 calibration: a 997 Hz full-scale sine in one channel is -3.01 LUFS.
+      {
+         SpatialMaster::Loudness m; m.Prepare(kSr);
+         for (int i = 0; i < (int)kSr * 4; i++)
+            m.Process((float)std::sin(2.0 * M_PI * 997.0 * i / kSr), 0.0f);
+         check(std::fabs(m.ShortTerm() + 3.01) < 0.1, "LUFS of 0 dBFS 997 Hz sine, one channel (want -3.01)", m.ShortTerm());
+      }
+      // 11. Limiter: a +14 dB hot source stays under the -1 dBTP ceiling; with the limiter off it does not.
+      {
+         double peaks[2];
+         for (int on = 0; on < 2; on++)
+         {
+            Rig r; place(r, 0, 0, 1);
+            r.node.gainDb[0] = 14.0f; r.node.limiter = (on == 1);
+            std::vector<float> L, R; r.Render(noise, L, R, [](int) {});
+            double pk = 0;
+            for (int i = skip; i < N; i++) pk = std::max(pk, (double)std::max(std::fabs(L[i]), std::fabs(R[i])));
+            peaks[on] = pk;
+         }
+         check(peaks[1] <= 0.8913 + 1e-3 && peaks[0] > 1.0, "limiter holds -1 dBFS ceiling (on, off peaks)", peaks[1]);
+      }
+      // 12. Room: an impulse leaves a tail with room, none without.
+      {
+         double tail[2];
+         for (int on = 0; on < 2; on++)
+         {
+            Rig r; place(r, 30, 0, 2); r.node.room = on ? 0.8f : 0.0f;
+            std::vector<float> imp(N, 0.0f); imp[1000] = 1.0f;
+            std::vector<float> L, R; r.Render(imp, L, R, [](int) {});
+            double e = 0; for (int i = 6000; i < N - 256; i++) e += (double)L[i] * L[i] + (double)R[i] * R[i];
+            tail[on] = e;
+         }
+         check(tail[0] < 1e-9 && tail[1] > 1e-6, "room adds a tail (tail energy off, on)", tail[1]);
+      }
+      // 13. Bass mono: a 40 Hz tone at 90 deg is level in both ears with bass mono, not without.
+      {
+         double ild[2];
+         std::vector<float> sine(N);
+         for (int i = 0; i < N; i++) sine[i] = 0.5f * (float)std::sin(2.0 * M_PI * 40.0 * i / kSr);
+         for (int on = 0; on < 2; on++)
+         {
+            Rig r; place(r, 90, 0, 1); r.node.bassHz = on ? 300.0f : 0.0f; r.node.limiter = false;
+            std::vector<float> L, R; r.Render(sine, L, R, [](int) {});
+            ild[on] = std::fabs(Db(Rms(R, skip)) - Db(Rms(L, skip)));
+         }
+         check(ild[1] < 0.5 && ild[0] > ild[1], "bass mono evens the ears at 40 Hz (|dB R-L| off, on)", ild[1]);
+      }
+      // 14. Head tracking: yaw +90 turns a front source to the left ear; head-locked stays put;
+      // the export file stays facing front.
+      {
+         double d[3];
+         for (int mode = 0; mode < 3; mode++)
+         {
+            Rig r; place(r, 0, 0, 1); r.node.trackMode = 1; r.node.SetHeadYaw(90.0f);
+            r.node.headLocked[0] = (mode == 1);
+            if (mode == 2) r.node.CaptureRing().enabled.store(true);
+            std::vector<float> L, R; r.Render(noise, L, R, [](int) {});
+            d[mode] = Db(Rms(R, skip)) - Db(Rms(L, skip));
+            if (mode == 2)
+            {
+               std::vector<float> ring(N * 2 + 16);
+               int got = r.node.CaptureRing().Read(ring.data(), (int)ring.size());
+               double fl = 0, fr = 0; for (int i = skip; i < got / 2; i++) { fl += ring[2 * i] * ring[2 * i]; fr += ring[2 * i + 1] * ring[2 * i + 1]; }
+               check(got > N && std::fabs(10 * std::log10(fr / fl)) < 0.5, "export file faces front while monitor is turned (|dB R-L|)", std::fabs(10 * std::log10(fr / fl)));
+            }
+         }
+         check(d[0] < -6.0, "yaw +90 puts a front source in the left ear (dB R-L)", d[0]);
+         check(std::fabs(d[1]) < 0.5, "head-locked source ignores yaw (|dB R-L|)", std::fabs(d[1]));
+      }
       // 9. Through the real engine as a terminal output (no output pin): the
       // node's own buffer reaches the device mix and is binaural (R louder
       // than L for a source at +90).
@@ -224,6 +310,40 @@ namespace app
          check(ild >= 6.0, "engine terminal path renders binaural (dB R-L)", ild);
          AudioTopology empty;
          AudioEngine::Instance().SetTopology(empty);
+      }
+      // 24-bit export: header says 24, data is 3 bytes/sample, and a known
+      // sample reads back within one 24-bit step.
+      {
+         const std::string path = "/tmp/infinite_spatial_24.wav";
+         AudioFileWriter w;
+         std::vector<float> x(2000);
+         for (size_t i = 0; i < x.size(); i++)
+            x[i] = 0.5f * std::sin(0.05f * (float)i);
+         bool good = w.Open(path, 48000.0, 2, AudioFileWriter::Format::Wav, 24);
+         if (good)
+         {
+            w.Append(x.data(), 1000);
+            w.Close();
+         }
+         FILE* f = good ? fopen(path.c_str(), "rb") : nullptr;
+         double err = 1.0;
+         if (f)
+         {
+            unsigned char h[44];
+            std::vector<unsigned char> d(6000);
+            if (fread(h, 1, 44, f) == 44 && fread(d.data(), 1, 6000, f) == 6000)
+            {
+               const int bits = h[34] | (h[35] << 8);
+               const unsigned dataBytes = h[40] | (h[41] << 8) | (h[42] << 16) | ((unsigned)h[43] << 24);
+               const size_t k = 777;
+               int v = d[k * 3] | (d[k * 3 + 1] << 8) | (d[k * 3 + 2] << 16);
+               if (v & 0x800000) v -= 0x1000000;
+               err = bits == 24 && dataBytes == 6000 ? std::fabs((double)v / 8388607.0 - (double)x[k]) : 1.0;
+            }
+            fclose(f);
+            remove(path.c_str());
+         }
+         check(err < 2e-7, "24-bit WAV export reads back (abs error)", err);
       }
       printf("SPATIALTEST %s\n", ok ? "OK" : "FAIL");
       return ok;

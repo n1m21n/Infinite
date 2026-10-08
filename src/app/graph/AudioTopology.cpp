@@ -446,7 +446,7 @@ namespace app
          const int idx = AudioBufferIndexOf(spatial, 0, bufferIndexOf);
          if (idx < 0)
             continue;
-         terminals.push_back({ idx, &spatial->CaptureRing() });
+         terminals.push_back({ idx, &spatial->PdcAnchor() });
          terminals.back().live = spatial->live;
       }
 

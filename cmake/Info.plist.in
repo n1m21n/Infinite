@@ -24,6 +24,8 @@
 	<string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Infinite listens to an audio input so the node graph can react to sound.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Infinite can read your headphones' head tracking so Spatial Mixer sounds stay fixed in the room as you turn.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Infinite can use a camera as a live image source.</string>
 	<key>CFBundleDocumentTypes</key>

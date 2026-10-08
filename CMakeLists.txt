@@ -640,6 +640,8 @@ set(COMMON_SOURCES
     src/nodes/ProjectionNode.cpp
     src/nodes/AudioNodes.cpp
     src/nodes/SpatialMixerNode.cpp
+    src/audio/dsp/HrtfSet.cpp
+    src/audio/dsp/HrtfKemarData.cpp
     src/nodes/AudioMeterNode.cpp
     src/nodes/NoteNodes.cpp
     src/nodes/WavetableNode.cpp
@@ -726,6 +728,7 @@ file(GLOB INFINITE_NOTO_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ext
 
 set(APPLE_SOURCES
     src/platform/Platform.mm
+    src/platform/HeadTracker.mm
     src/audio/AudioFileWriter.mm
     ${SYPHON_SOURCES}
 )
@@ -760,6 +763,7 @@ set(WIN32_SOURCES
     # exe shows Explorer's generic application icon everywhere.
     ${CMAKE_CURRENT_BINARY_DIR}/generated/Infinite.rc
     src/platform/win/PlatformWin.cpp
+    src/platform/HeadTrackerStub.cpp
     src/platform/win/TextWin.cpp
     src/platform/win/CrashHandlerWin.cpp
     # GL-only half of the Spout bridge (glad), kept out of PlatformWin.cpp's
@@ -791,6 +795,7 @@ set(WIN32_SOURCES
 
 set(LINUX_SOURCES
     src/platform/linux/PlatformLinux.cpp
+    src/platform/HeadTrackerStub.cpp
     src/platform/linux/TextLinux.cpp
     src/platform/linux/CrashHandlerLinux.cpp
     src/platform/linux/AudioDeviceLinux.cpp
@@ -1277,7 +1282,7 @@ if(NOT WIN32)
 endif()
 
 if(APPLE)
-    set_source_files_properties(src/platform/Platform.mm src/audio/AudioFileWriter.mm
+    set_source_files_properties(src/platform/Platform.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${SYPHON_SOURCES}
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")
@@ -1372,6 +1377,8 @@ if(APPLE)
         "-framework UniformTypeIdentifiers"
         "-framework AVFoundation"
         "-framework Vision"
+        "-framework CoreMotion"
+        "-framework QuartzCore"
         "-framework ModelIO"
         "-framework Accelerate"
         "-framework CoreMedia"

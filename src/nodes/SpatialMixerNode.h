@@ -51,9 +51,23 @@ public:
       return (slot >= 0 && slot < kMaxSlots) ? mChannelLevel[slot] : 0.0f;
    }
    float Level() const { return mLevel; }
+   float LufsShort() const { return mLufsShort; }
+   float LufsMomentary() const { return mLufsMomentary; }
+   float TruePeakDb() const { return mTruePeakDb; }
+   float ReductionDb() const { return mReductionDb; }
+   void ResetPeak();
+   // Listener head yaw (degrees, + = turned right) fed by the platform tracker; main thread.
+   void SetHeadYaw(float deg) { mHeadYaw = deg; mYawForced = true; } // test hook: bypasses the sensor
+   float HeadYaw() const { return mHeadYaw; }
+   bool HeadTracked() const { return mHeadFresh; } // a fresh sample arrived this frame
+   void RecenterHead();
 
    // ---- export (binaural WAV/FLAC, head facing front) -------------------
    AudioCaptureRing& CaptureRing() { return mCaptureRing; }
+   // Never enabled: the engine skips it, but its persistent compensation delay
+   // is what terminal-level PDC hangs on. The node's audio half writes
+   // CaptureRing() itself (it renders the file mix separately from the monitor).
+   AudioCaptureRing& PdcAnchor() { return mPdcAnchor; }
    bool StartRecording(const std::string& path);
    void StopRecording();
    bool IsRecording() const { return mWriter.IsOpen(); }
@@ -76,6 +90,13 @@ public:
    bool solo[kMaxSlots] = {};
    int selected = 0;                // UI selection, not saved
    float outDb = 0.0f;
+   bool headLocked[kMaxSlots] = {}; // stays in front of the head instead of in the room
+   float room = 0.0f;               // 0..1
+   float bassHz = 0.0f;             // 0 off, else mono below this
+   int hrtf = 0;                    // 0 measured (KEMAR), 1 spherical-head model
+   bool limiter = true;
+   bool bit24 = false;              // export depth: 16 or 24 bit
+   int trackMode = 0;               // 0 off, 1 AirPods / headphone motion, 2 webcam
    AudioCable inputs[kMaxSlots];
 
    // Where a freshly added object starts: spread round the front arc.
@@ -85,8 +106,14 @@ private:
    std::unique_ptr<AudioSpatialMixerNode> mAudioNode;
    int mLastCookFrame = -1;
    float mLevel = 0.0f;
+   float mLufsShort = -70.0f, mLufsMomentary = -70.0f, mTruePeakDb = -120.0f, mReductionDb = 0.0f;
+   float mHeadYaw = 0.0f;
+   bool mHeadFresh = false;
+   bool mYawForced = false;
+   int mTrackStarted = 0; // HeadTracker source this node holds a reference on
+   void SyncTracker();
    float mChannelLevel[kMaxSlots] = {};
-   AudioCaptureRing mCaptureRing;
+   AudioCaptureRing mCaptureRing, mPdcAnchor;
    AudioFileWriter mWriter;
    double mOpenSampleRate = 0.0;
 };
