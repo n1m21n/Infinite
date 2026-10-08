@@ -357,9 +357,8 @@ namespace app
          // the same RGB read as a different, washed-out color next to it.
          const ImU32 alpha = vividState ? (isLight ? 225 : 205) : (isLight ? 110 : 86);
          const ImU32 soft = (fillColor & 0x00FFFFFF) | (alpha << 24);
-         dl->AddRectFilled(r0, ImVec2(fillX, r1.y), soft, 3.0f);
+         dl->AddRectFilled(r0, ImVec2(fillX, r1.y), soft, 4.0f);
       }
-      dl->AddRect(r0, r1, isLight ? tok::U32(tok::pal::c_B4B9C8FF) : tok::U32(tok::pal::c_484C5CFF), 3.0f);
 
       std::string name(label);
       const size_t hash = name.find("##");
@@ -683,7 +682,7 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::V4(tok::palf::v_700_740_840_1000) : tok::V4(tok::palf::v_220_235_278_1000));
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_150_180_240_1000) : tok::V4(tok::palf::v_880_920_980_1000));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
 
 
@@ -714,7 +713,7 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::V4(tok::palf::v_700_740_840_1000) : tok::V4(tok::palf::v_220_235_278_1000));
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_150_180_240_1000) : tok::V4(tok::palf::v_880_920_980_1000));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
 
 
