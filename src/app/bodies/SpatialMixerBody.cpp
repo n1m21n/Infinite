@@ -60,16 +60,32 @@ namespace app
       dl->AddText(ImVec2(p0.x + 5.0f, centre.y - 7.0f), text, "L");
       dl->AddText(ImVec2(p0.x + stageW - 12.0f, centre.y - 7.0f), text, "R");
 
-      // Head, facing up: oval slightly longer front-to-back, nose, two ears.
+      // Listener seen from above, facing up (towards F): shoulders, neck, head
+      // with nose and ears - the same view as the reference body mesh, so
+      // left/right/front/back read at a glance.
       {
-         const ImU32 fill = light ? IM_COL32(235, 235, 238, 255) : IM_COL32(60, 62, 70, 255);
-         const ImU32 edge = light ? IM_COL32(40, 40, 46, 255) : IM_COL32(215, 215, 225, 255);
-         dl->AddEllipseFilled(centre, ImVec2(13.0f, 16.0f), fill, 0.0f, 32);
-         dl->AddEllipse(centre, ImVec2(13.0f, 16.0f), edge, 0.0f, 32, 1.5f);
-         dl->AddTriangleFilled(ImVec2(centre.x - 4.0f, centre.y - 15.0f), ImVec2(centre.x + 4.0f, centre.y - 15.0f),
-                               ImVec2(centre.x, centre.y - 22.0f), edge);
-         dl->AddEllipseFilled(ImVec2(centre.x - 14.0f, centre.y + 1.0f), ImVec2(2.5f, 5.0f), edge, 0.0f, 12);
-         dl->AddEllipseFilled(ImVec2(centre.x + 14.0f, centre.y + 1.0f), ImVec2(2.5f, 5.0f), edge, 0.0f, 12);
+         const ImU32 skin = light ? IM_COL32(150, 165, 195, 255) : IM_COL32(86, 104, 140, 255);
+         const ImU32 skinHi = light ? IM_COL32(178, 192, 218, 255) : IM_COL32(112, 132, 170, 255);
+         const ImU32 shade = light ? IM_COL32(110, 124, 156, 255) : IM_COL32(62, 78, 112, 255);
+         const ImU32 rim = light ? IM_COL32(60, 72, 104, 255) : IM_COL32(170, 190, 225, 255);
+         const float cx = centre.x, cy = centre.y;
+         // shoulders: wide rounded slab behind the head
+         dl->AddEllipseFilled(ImVec2(cx, cy + 15.0f), ImVec2(30.0f, 10.0f), skin, 0.0f, 32);
+         dl->AddEllipse(ImVec2(cx, cy + 15.0f), ImVec2(30.0f, 10.0f), rim, 0.0f, 32, 1.0f);
+         // neck
+         dl->AddEllipseFilled(ImVec2(cx, cy + 8.0f), ImVec2(6.0f, 7.0f), shade, 0.0f, 16);
+         // ears (behind the head outline)
+         dl->AddEllipseFilled(ImVec2(cx - 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), skin, 0.0f, 12);
+         dl->AddEllipseFilled(ImVec2(cx + 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), skin, 0.0f, 12);
+         dl->AddEllipse(ImVec2(cx - 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), rim, 0.0f, 12, 1.0f);
+         dl->AddEllipse(ImVec2(cx + 11.5f, cy + 1.0f), ImVec2(2.8f, 5.0f), rim, 0.0f, 12, 1.0f);
+         // nose
+         dl->AddTriangleFilled(ImVec2(cx - 3.5f, cy - 12.0f), ImVec2(cx + 3.5f, cy - 12.0f), ImVec2(cx, cy - 19.0f), skin);
+         dl->AddTriangle(ImVec2(cx - 3.5f, cy - 12.0f), ImVec2(cx + 3.5f, cy - 12.0f), ImVec2(cx, cy - 19.0f), rim, 1.0f);
+         // head: oval, lit from the front
+         dl->AddEllipseFilled(ImVec2(cx, cy), ImVec2(11.0f, 14.0f), skin, 0.0f, 32);
+         dl->AddEllipseFilled(ImVec2(cx, cy - 3.0f), ImVec2(7.0f, 8.0f), skinHi, 0.0f, 24);
+         dl->AddEllipse(ImVec2(cx, cy), ImVec2(11.0f, 14.0f), rim, 0.0f, 32, 1.3f);
       }
 
       // ---- dots ----------------------------------------------------------
@@ -180,32 +196,45 @@ namespace app
             continue;
          ImGui::PushID(s);
          const ImVec2 rp = ImGui::GetCursorScreenPos();
-         dl->AddCircleFilled(ImVec2(rp.x + 8.0f, rp.y + ImGui::GetTextLineHeight() * 0.5f), 5.0f, DotColor(s, 1.0f), 16);
-         ImGui::SetCursorScreenPos(ImVec2(rp.x + 20.0f, rp.y));
+         const float ty = ImGui::GetStyle().FramePadding.y;   // centre text against the taller H/M/S buttons
+         dl->AddCircleFilled(ImVec2(rp.x + 8.0f, rp.y + ty + ImGui::GetTextLineHeight() * 0.5f), 5.0f, DotColor(s, 1.0f), 16);
+         ImGui::SetCursorScreenPos(ImVec2(rp.x + 20.0f, rp.y + ty));
          const bool sel = (n->selected == s);
          if (ImGui::Selectable(("in " + std::to_string(s + 1)).c_str(), sel, 0, ImVec2(80.0f, 0.0f)))
             n->selected = s;
-         ImGui::SameLine(gAudioContentX - ImGui::GetWindowPos().x + gAudioContentW - 142.0f);
-         ImGui::Text("%+.1f dB", n->gainDb[s]);
-         ImGui::SameLine();
-         if (ImGui::SmallButton(n->headLocked[s] ? "H*" : "H"))
+         // Right-aligned cluster in screen space: dB readout, then H M S as equal
+         // fixed-width buttons ending on the content edge. Window-relative
+         // SameLine offsets drift inside the node canvas and widen the node.
          {
-            PushUndoCheckpoint();
-            n->headLocked[s] = !n->headLocked[s];
-         }
-         if (ImGui::IsItemHovered())
-            SetAudioReadout("head lock", n->headLocked[s] ? "stays in front of your head" : "fixed in the room");
-         ImGui::SameLine();
-         if (ImGui::SmallButton(n->mute[s] ? "M*" : "M"))
-         {
-            PushUndoCheckpoint();
-            n->mute[s] = !n->mute[s];
-         }
-         ImGui::SameLine();
-         if (ImGui::SmallButton(n->solo[s] ? "S*" : "S"))
-         {
-            PushUndoCheckpoint();
-            n->solo[s] = !n->solo[s];
+            const float bw = 22.0f, gap = 3.0f;
+            const float right = gAudioContentX + gAudioContentW;
+            const float x0 = right - 3.0f * bw - 2.0f * gap;
+            const float y = rp.y;
+            char db[24];
+            snprintf(db, sizeof(db), "%+.1f dB", n->gainDb[s]);
+            const float tw = ImGui::CalcTextSize(db).x;
+            ImGui::SetCursorScreenPos(ImVec2(x0 - 8.0f - tw, y + ty));
+            ImGui::TextUnformatted(db);
+            ImGui::SetCursorScreenPos(ImVec2(x0, y));
+            if (ImGui::Button(n->headLocked[s] ? "H*" : "H", ImVec2(bw, 0.0f)))
+            {
+               PushUndoCheckpoint();
+               n->headLocked[s] = !n->headLocked[s];
+            }
+            if (ImGui::IsItemHovered())
+               SetAudioReadout("head lock", n->headLocked[s] ? "stays in front of your head" : "fixed in the room");
+            ImGui::SetCursorScreenPos(ImVec2(x0 + bw + gap, y));
+            if (ImGui::Button(n->mute[s] ? "M*" : "M", ImVec2(bw, 0.0f)))
+            {
+               PushUndoCheckpoint();
+               n->mute[s] = !n->mute[s];
+            }
+            ImGui::SetCursorScreenPos(ImVec2(x0 + 2.0f * (bw + gap), y));
+            if (ImGui::Button(n->solo[s] ? "S*" : "S", ImVec2(bw, 0.0f)))
+            {
+               PushUndoCheckpoint();
+               n->solo[s] = !n->solo[s];
+            }
          }
          ImGui::PopID();
       }
@@ -213,22 +242,60 @@ namespace app
 
       // ---- knobs: selected object, then master ---------------------------
       const int sel = n->selected;
+      // Modulation addresses are per lane, not per knob position: a cable into
+      // "in 3 azimuth" stays on in 3 whichever lane is selected. Ordinals
+      // 0..2 are the master knobs, then five per lane (kLaneBase + lane * 5 + k).
+      // Every lane registers every frame (register-only when it is not the
+      // drawn one), so a cable keeps driving a lane that is off screen - the
+      // same mechanism as the EQ's hidden bands.
+      constexpr int kLaneBase = 3;
+      auto laneParam = [](int lane, int k) { return kLaneBase + lane * 5 + k; };
+      auto laneName = [](int lane, const char* what) { return "in " + std::to_string(lane + 1) + " " + what; };
+      {
+         const bool savedRegisterOnly = gParamRegisterOnly;
+         gParamRegisterOnly = true;
+         for (int lane = 0; lane < SpatialMixerNode::kMaxSlots; lane++)
+         {
+            if (lane == sel)
+               continue;
+            ModKnob("azimuth", &n->azimuth[lane], -180.0f, 180.0f, "%.0f deg", kKnobLarge, 0.0f, AudioWidgetStyle::Knob,
+                    0.0f, nullptr, nullptr, laneParam(lane, 0), laneName(lane, "azimuth").c_str());
+            ModKnob("elevation", &n->elevation[lane], -90.0f, 90.0f, "%.0f deg", kKnobLarge, 0.0f,
+                    AudioWidgetStyle::Knob, 0.0f, nullptr, nullptr, laneParam(lane, 1), laneName(lane, "elevation").c_str());
+            ModKnob("distance", &n->distance[lane], 0.2f, kEdgeMetres, "%.1f m", kKnobLarge, 0.0f,
+                    AudioWidgetStyle::Knob, 0.0f, nullptr, nullptr, laneParam(lane, 2), laneName(lane, "distance").c_str());
+            ModKnob("width", &n->width[lane], 0.0f, 1.0f, "%.2f", kKnobLarge, 0.0f, AudioWidgetStyle::Knob, 0.0f,
+                    nullptr, nullptr, laneParam(lane, 3), laneName(lane, "width").c_str());
+            ModKnob("level", &n->gainDb[lane], -60.0f, 12.0f, "%.1f dB", kKnobSmall, 0.0f, AudioWidgetStyle::KnobDb,
+                    0.0f, nullptr, nullptr, laneParam(lane, 4), laneName(lane, "level").c_str());
+         }
+         gParamRegisterOnly = savedRegisterOnly;
+      }
       {
          AudioKnobRow row(4, kKnobLarge);
-         row.Knob("azimuth", &n->azimuth[sel], -180.0f, 180.0f, "%.0f deg", kKnobLarge);
-         row.Knob("elevation", &n->elevation[sel], -90.0f, 90.0f, "%.0f deg", kKnobLarge);
-         row.Knob("distance", &n->distance[sel], 0.2f, kEdgeMetres, "%.1f m", kKnobLarge);
-         row.Knob("width", &n->width[sel], 0.0f, 1.0f, "%.2f", kKnobLarge);
+         const auto az = laneName(sel, "azimuth"), el = laneName(sel, "elevation"), di = laneName(sel, "distance"),
+                    wi = laneName(sel, "width"), lv = laneName(sel, "level");
+         row.Knob("azimuth", &n->azimuth[sel], -180.0f, 180.0f, "%.0f deg", kKnobLarge, false, false,
+                  AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 0), az.c_str());
+         row.Knob("elevation", &n->elevation[sel], -90.0f, 90.0f, "%.0f deg", kKnobLarge, false, false,
+                  AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 1), el.c_str());
+         row.Knob("distance", &n->distance[sel], 0.2f, kEdgeMetres, "%.1f m", kKnobLarge, false, false,
+                  AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 2), di.c_str());
+         row.Knob("width", &n->width[sel], 0.0f, 1.0f, "%.2f", kKnobLarge, false, false, AudioWidgetStyle::Knob,
+                  nullptr, nullptr, laneParam(sel, 3), wi.c_str());
          row.End();
+         AudioKnobRow row2(4, kKnobSmall);
+         row2.Knob("level", &n->gainDb[sel], -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true, false,
+                   AudioWidgetStyle::Knob, nullptr, nullptr, laneParam(sel, 4), lv.c_str());
+         row2.Knob("room", &n->room, 0.0f, 1.0f, "%.2f", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr,
+                   nullptr, 0);
+         row2.Knob("bass mono", &n->bassHz, 0.0f, 300.0f, "%.0f Hz", kKnobSmall, false, false,
+                   AudioWidgetStyle::Knob, nullptr, nullptr, 1);
+         row2.Knob("out", &n->outDb, -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true, false,
+                   AudioWidgetStyle::Knob, nullptr, nullptr, 2);
+         row2.End();
       }
-      {
-         AudioKnobRow row(4, kKnobSmall);
-         row.Knob("level", &n->gainDb[sel], -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true);
-         row.Knob("room", &n->room, 0.0f, 1.0f, "%.2f", kKnobSmall);
-         row.Knob("bass mono", &n->bassHz, 0.0f, 300.0f, "%.0f Hz", kKnobSmall);
-         row.Knob("out", &n->outDb, -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true);
-         row.End();
-      }
+      gParamCounter = kLaneBase + SpatialMixerNode::kMaxSlots * 5;
 
       // ---- master: head tracking, limiter, hrtf, meter --------------------
       {

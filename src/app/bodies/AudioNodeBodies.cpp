@@ -275,7 +275,8 @@ namespace app
 
       // Live: skip alignment against other Audio Outs (see AudioOutputNode::live).
       {
-         if (n->live)
+         const bool wasLive = n->live;   // the click flips n->live between Push and Pop
+         if (wasLive)
             ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
          if (ImGui::Button("live##audioOutLive", ImVec2(AudioFullWidth(), 0)))
          {
@@ -284,7 +285,7 @@ namespace app
             gPatchDirty = true;
             RebuildAudioTopology();
          }
-         if (n->live)
+         if (wasLive)
             ImGui::PopStyleColor();
          if (ImGui::IsItemHovered())
             SetAudioReadout("live", n->live ? "not delayed to match other outputs" : "aligned with other outputs");
@@ -366,20 +367,22 @@ namespace app
             ImGui::PopStyleColor();
          ImGui::SameLine();
       }
-      if (n->bit24)
+      const bool wasBit24 = n->bit24;   // Push and Pop must read the same value: the click flips it between them
+      if (wasBit24)
          ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
       if (ImGui::Button("24 bit##spatialDepth", ImVec2(third, 0)))
       {
          n->bit24 = !n->bit24;
          gPatchDirty = true;
       }
-      if (n->bit24)
+      if (wasBit24)
          ImGui::PopStyleColor();
       if (ImGui::IsItemHovered())
          SetAudioReadout("depth", n->bit24 ? "24-bit file" : "16-bit file");
       ImGui::EndDisabled();
 
-      if (n->live)
+      const bool wasLive = n->live;
+      if (wasLive)
          ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
       if (ImGui::Button("live##spatialLive", ImVec2(half, 0)))
       {
@@ -388,20 +391,21 @@ namespace app
          gPatchDirty = true;
          RebuildAudioTopology();
       }
-      if (n->live)
+      if (wasLive)
          ImGui::PopStyleColor();
       if (ImGui::IsItemHovered())
          SetAudioReadout("live", n->live ? "not delayed to match other outputs" : "aligned with other outputs");
       ImGui::SameLine();
-      if (n->renderMode == 1)
+      const bool wasStereo = (n->renderMode == 1);
+      if (wasStereo)
          ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-      if (ImGui::Button(n->renderMode == 1 ? "stereo##spatialMode" : "binaural##spatialMode", ImVec2(half, 0)))
+      if (ImGui::Button(wasStereo ? "stereo##spatialMode" : "binaural##spatialMode", ImVec2(half, 0)))
       {
          PushUndoCheckpoint();
          n->renderMode = 1 - n->renderMode;
          gPatchDirty = true;
       }
-      if (n->renderMode == 1)
+      if (wasStereo)
          ImGui::PopStyleColor();
       if (ImGui::IsItemHovered())
          SetAudioReadout("render", n->renderMode == 1 ? "speaker-safe pan, no ear filtering" : "headphones: ear filtering on");

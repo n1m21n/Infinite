@@ -1177,8 +1177,11 @@ void DrawNodeBodies(FrameCtx& fc)
          // edit time and never produces a picture of its own (GetOutputTexture
          // always returns 0), so an out pin on it is exactly as misleading as
          // one on a comment would be.
+         // Audio Out and Spatial Mixer are terminals: nothing can patch from them.
          if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment &&
-             dynamic_cast<FieldGraphNode*>(gn.node.get()) == nullptr)
+             dynamic_cast<FieldGraphNode*>(gn.node.get()) == nullptr &&
+             dynamic_cast<AudioOutputNode*>(gn.node.get()) == nullptr &&
+             dynamic_cast<SpatialMixerNode*>(gn.node.get()) == nullptr)
          {
             // GeometryTableNode draws its row pins (index 4 and up) itself,
             // inline in the table grid in its params panel - only the four
