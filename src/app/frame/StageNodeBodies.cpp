@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiType.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -267,7 +268,10 @@ void DrawNodeBodies(FrameCtx& fc)
 
          if (!isComment)
          {
-            ImGui::TextUnformatted(NodeTitle(gn).c_str());
+            {
+               UiType::Scope titleType(UiType::Size::Title, UiType::Weight::Medium);
+               ImGui::TextUnformatted(NodeTitle(gn).c_str());
+            }
             int instanceTotal = 0;
             const int instanceIdx = GetNodeInstanceIndex(gn, &instanceTotal);
             if (instanceTotal > 1)
@@ -283,8 +287,11 @@ void DrawNodeBodies(FrameCtx& fc)
             else
                ImGui::PushStyleColor(ImGuiCol_Text,
                                      ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f,
-                                            catColor.b * 0.6f + 0.4f, 1.0f));
-            ImGui::TextUnformatted(gn.category.c_str());
+                                            catColor.b * 0.6f + 0.4f, 0.75f));
+            {
+               UiType::Scope catType(UiType::Size::Caption);  // quiet: the title is the header's one loud line
+               ImGui::TextUnformatted(gn.category.c_str());
+            }
             ImGui::PopStyleColor();
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
          }
