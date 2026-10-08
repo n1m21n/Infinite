@@ -43,6 +43,7 @@ One owner per topic: if two files seem to disagree, the skill named in this tabl
 | `shortcuts-sweep` | Sweep | Keyboard shortcuts checks |
 | `audio-node-ui` | UI | Layout/widget grammar for audio node UI |
 | `node-ui-pillars` | UI | Symmetry/contrast rules for all node UI (load before any node UI edit) |
+| `infinite-design-system` | UI | How every element looks/moves: tokens, components, icons, motion, CI ratchet (load before any style/icon/chrome change) |
 | `node-param-audit` | Params | Which controls are modulatable (ParamRef inventory) |
 | `param-truth-audit` | Params | Does the DSP do what the control's range/gate/label claims |
 | `rhythmic-quantization-standard` | Timing | Standardized rhythmic divisions & quantize table |

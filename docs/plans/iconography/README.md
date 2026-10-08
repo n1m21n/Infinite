@@ -1,8 +1,21 @@
-# Iconography and chrome redesign
+# Infinite design system: iconography, controls and chrome
 
 Status: planned (2026-10-08). Owner: "dive deep into our own iconography foundations... make our own icons from scratch that fit the branding."
 Reference: Logic Pro screenshots (top bar, timeline header, sliders, browser table, accent picker). Borrow the *grammar*, never the glyphs.
-Skills to load before building: `node-ui-pillars`, `codebase-navigation`, `windows-parity`, `linux-parity`, `node-ui-sweep`, `panels-sweep`.
+Skills to load before building: `infinite-design-system`, `node-ui-pillars`, `codebase-navigation`, `windows-parity`, `linux-parity`, `node-ui-sweep`, `panels-sweep`.
+
+## Next session: start here
+
+Branch `feature/design-foundations` (holds this plan, the skill and `tools/design/inventory.py`). Block 1 = no visible change; needs no owner decision.
+
+1. `git checkout feature/design-foundations`, load `infinite-design-system`, run `python3 tools/design/inventory.py` to refresh the baseline.
+2. Create `src/app/ui/design/` with `tokens.json` (base tokens + roles derived from `CategoryColors::UiTheme`) and `tools/design/build_tokens.py` → `Tokens.gen.h`; wire into CMake.
+3. Take golden screenshots of every surface in light and dark **before** touching colours (`run-infinite-hygiene` headless routes).
+4. Move literal colours to role tokens surface by surface, one commit each, in this order: mod matrix (235) → perf (82) → shared widgets (83) → timeline (158) → canvas/popups/top bar/settings → node bodies (862, split by body file). After each: goldens identical.
+5. Add `tools/design/ratchet.json` + CI step (counts may only go down).
+6. Then the glyph pipeline + 12 pilot glyphs (section 3) and `UiAnim` (section 4b); pilot sheet goes to the owner for review.
+
+Open decisions (not needed for block 1; ask one per message when block 2 starts): switches only in Settings/panels (C5); node-family icons first (G12); Multicolor meaning; display box timecode mode.
 
 ## Where we are
 
@@ -13,6 +26,177 @@ Skills to load before building: `node-ui-pillars`, `codebase-navigation`, `windo
 | Sliders | Mostly stock ImGui grabs; only `AudioSliderFloat` draws its own (`src/app/ui/ParamWidgets.cpp:284`) | Dark rounded track, round light dot as the handle |
 | Tables | ImGui tables with grid lines | No grid lines, faint striped rows, tall rows, a full-width row highlight, expand arrows |
 | Accent | Fixed per theme (`t.accent`, `src/app/ui/Theme.cpp`) | User picks one of nine swatch dots, plus "Multicolor" |
+
+## 0. Scope: every UI class in Infinite
+
+This plan is the app's **design system**: it covers every element on screen, node bodies included, not just the top bar.
+
+Ownership split, so nothing conflicts:
+
+| Owner | Decides |
+|---|---|
+| `node-ui-pillars` + `audio-node-ui` | **Where** a control sits in a node (row grid, mod-dot alignment, `mix` last, selector left). Unchanged by this plan |
+| This plan | **How** every element looks, moves and responds (glyphs, shape, colour tokens, states, motion) |
+
+Inventory below is from the code (helper names, call counts from `src/app`).
+
+### A. Foundations (6), applied to everything below
+
+| # | Foundation | Section |
+|---|---|---|
+| F1 | Iconography (Infinite Glyphs) | 1–3 |
+| F2 | Colour tokens + accent | 4 (accent picker), `Theme.cpp` |
+| F3 | Typography (sizes, tabular digits, label case) | 4c |
+| F4 | Spacing + shape (grid unit 4, radii 2/4/6/8) | 4c |
+| F5 | States (rest, hover, pressed, on, disabled, focus, modulated) | 4b |
+| F6 | Motion (`UiAnim`, reduce motion) | 4b |
+
+### B. Controls inside nodes (12)
+
+| # | Class | Today (helper, uses) | Redesign |
+|---|---|---|---|
+| C1 | Knob | `KnobFloat`/`ModKnob`/`KnobInt`/`BipolarKnobFloat`, ~280 | Recessed ring, value arc in accent, **dot** at the arc tip; bipolar arc grows from 12 o'clock; modulation shown as a thin outer arc |
+| C2 | Horizontal slider | `ModSlider`, `AudioSliderFloat`, `SliderInt` | Dot slider (4) |
+| C3 | Vertical fader | `VFaderFloat` | Dot slider rotated; handle is a pill (Logic mixer style) |
+| C4 | Checkbox | `ModCheckbox`, `AudioKnobRow::Checkbox`, ~30 | Rounded square r=4, check glyph draws on in 120 ms; contrast budget per `node-ui-pillars` |
+| C5 | Switch | (none yet) | iOS-style pill switch, only in Settings and panels, never in a node grid cell |
+| C6 | Dropdown | `DropdownButton`, `PushDropdownStyle` | Pill button, value left, chevron glyph right; menu opens with 100 ms fade |
+| C7 | Button | primary / plain / icon tile | Three kinds only: primary (accent fill), plain (faint fill), icon tile (2) |
+| C8 | Toggle icon (bypass, eye, viewport, global scale) | `BypassToggle`, `EyeToggle`, `ViewportToggle`, `GlobalScaleToggle` | Icon tiles with outline/fill glyph pairs |
+| C9 | Text / number entry | `InputText`, typed edit on knobs | Recessed field, accent focus ring, tabular digits |
+| C10 | Colour swatch | `ColorSwatch` | Dot swatch (same as accent picker) |
+| C11 | Modulation dot / pin | `DrawDiscreteParamPin`, `DrawPin` | The brand dot: one size table, one colour rule, pulses gently while a source drives it |
+| C12 | Badge / decor | `DrawFavoriteBadge`, `DrawPredictorDecor` | Glyph badges from the icon font |
+
+### C. Visualizers inside nodes (7)
+
+| # | Class | Examples in code | Redesign |
+|---|---|---|---|
+| V1 | Scope / waveform | ~20 `Draw*Scope` / `Draw*Waveform` | Shared tokens already exist (`ScopeBgCol`, `ScopeGridCol`, ...): set them once, rounded r=4 well, 1.5px trace |
+| V2 | Meter | `DrawStripMeter`, `DrawModulatorMeter`, `DrawAudioMeterBody` | Rounded segments, peak hold dot |
+| V3 | Step / gate grid | `DrawPatternStepGrid`, `DrawArpGateGrid`, `DrawStutterGateGrid` | Rounded cells r=2, playhead column tint, on cells filled |
+| V4 | Curve editor | `DrawMiniCurveWidget`, `DrawVelocityCurveChart`, `DrawModCurveParams` | Curve 1.5px, handles are dots |
+| V5 | Keyboard | `DrawMidiKeyboard`, `DrawInteractiveKeyboard` | Rounded key bottoms, accent for held keys |
+| V6 | XY pad | `DrawFxPad` | Dot cursor with soft trail |
+| V7 | Sparkline | `DrawSparklineMiniGraph` | 1px line, end dot |
+
+### D. Canvas (5)
+
+| # | Class | Redesign |
+|---|---|---|
+| N1 | Node frame + header | Radius 8, category colour as a thin top band, title in medium weight, header glyphs from the icon font |
+| N2 | Node sections / separators | `BeginAudioSection`, `NodeSeparator`: hairline + small caps label |
+| N3 | Pins + cables | Dot pins (C11 sizes), cable ends land on the dot centre, hover thickens the cable |
+| N4 | Groups / backdrops | Radius 10, faint tint, header like N1 |
+| N5 | Canvas grid, marquee, minimap | Dot grid instead of lines, marquee in accent at 8% |
+
+### E. App chrome (8)
+
+| # | Class | Section |
+|---|---|---|
+| A1 | Top bar | 5 |
+| A2 | Display box (bar/beat/tempo) | 5 |
+| A3 | Menus + context menus | 4c |
+| A4 | Docked panels + seams | 4c |
+| A5 | Tables / lists (browser, mod matrix) | 4 |
+| A6 | Timeline (ruler, track header, clips) | 6 |
+| A7 | Dialogs, Settings, help windows | 4c |
+| A8 | Tooltips + toasts | 4b |
+
+**Total: 6 foundations + 32 component classes** (12 controls, 7 visualizers, 5 canvas, 8 chrome), **plus 15 classes added in 0b** (segmented control, customisable bars, display modes, notification dot, status light, search with scope, filter chips, inline cell glyphs, panel footer, empty state, node-type icons, rich tooltip, cursors, drag feedback, toast) → **47 component classes**.
+
+## 0b. Critical review: what the first draft missed
+
+Judged three ways: Logic references, an experienced product designer, current design-system practice.
+
+### Missed in the Logic references
+
+| # | Element | Where in Logic | Infinite version |
+|---|---|---|---|
+| G1 | **Segmented control** | Grid/list view toggle, browser view switch | Joined pill, one segment filled; replaces paired toggle buttons |
+| G2 | **Customisable bars** | Right-click → Track Header Components, Configure, Store as User Defaults | Right-click any bar (top bar, track header, node header) → show/hide items, store as default |
+| G3 | **Display modes** | Chevron on the LCD switches Beats / Time / Custom | Chevron on the display box: bars.beats, timecode, CPU/fps |
+| G4 | **Notification dot** | Red dot on browser / chat icons | Small red dot on a glyph = something new or needs attention |
+| G5 | **Status light** | Orange dot top-right (activity) | One status dot for audio engine / recording / projector live |
+| G6 | **Disabled state shown, not hidden** | Greyed tuner icon | Unavailable tools stay in place at 35% with a tooltip saying why |
+| G7 | **Search field with scope** | Magnifier + chevron, placeholder text | Search with scope menu (nodes / presets / files) |
+| G8 | **Filter chips** | Instrument / Genre / Descriptors, heart | Chip row in Browser: category, tag, favourite |
+| G9 | **Inline cell glyphs** | Lock, anchor, thumbnail in table rows | 16px glyphs and mini thumbnails allowed in table cells |
+| G10 | **Panel footer bar** | Preview speaker, loop, volume slider, item count | Browser footer: preview, loop, volume, count |
+| G11 | **Empty state** | "0 items" + "Get More Sounds" | Every list/panel has an empty state with one next action |
+| G12 | **Object icons** | Track icons (green line-art), plugin slot card with power colour | **Node-type icons**: one glyph per node family/type (~73 node types) for browser, headers, collapsed nodes |
+| G13 | **Rich tooltips** | `Track 15 "P15"` | Tooltip = name + value/identity + shortcut |
+
+### Missed by a designer's critique
+
+| # | Gap | Why it matters | Rule |
+|---|---|---|---|
+| G14 | **Semantic colour roles** | Accent, category colours (`CategoryColors.cpp`), state colours and "Multicolor" will collide | Fixed roles: record red, solo yellow, mute blue, modulation, prediction green, warning, error; accent never reuses a role colour |
+| G15 | **Accessibility** | Pro users work in dark rooms and on stage | Text contrast ≥ 4.5:1, controls ≥ 3:1, never colour alone (add shape or glyph), colour-blind check on role colours, full keyboard path (`docs/plans/keyboard-nav`) |
+| G16 | **Hit targets** | Small glyphs are hard to hit on a trackpad | Hit area ≥ 24×24 even when the glyph is 16; pins already use `ExpandPinHit` |
+| G17 | **Scale + density** | `gUiScale` exists; a 20px grid must survive 1x, 2x and user scale | Glyph font baked per scale; compact / regular density setting |
+| G18 | **Zoom level of detail** | Zoomed-out node canvases turn to mush | Below a zoom threshold nodes draw header + icon + pins only |
+| G19 | **Cursors** | 45 `SetMouseCursor` calls, all stock | Cursor set is part of iconography: pencil, scissors, trim, hand, link, no-drop |
+| G20 | **Drag and drop feedback** | Users can't see where a drop lands | Drop target highlight, insertion line, drag ghost with icon |
+| G21 | **Selection model** | Canvas, timeline, tables each draw selection differently | One look for hover / selected / focused / multi-select everywhere |
+| G22 | **Feedback surfaces** | Errors and saves are silent or modal | Toasts (non-blocking), inline errors (Field already keeps last working), progress for long jobs |
+| G23 | **Text expansion** | i18n is planned (`docs/plans/i18n`); German runs ~30% longer | No fixed-width text buttons; labels truncate with tooltip |
+| G24 | **Live performance mode** | Infinite is an instrument; the chrome must not steal attention or frames | Perf mode: no chrome animation, larger targets, output gets visual priority |
+| G25 | **Three platforms** | Logic is Mac-only; Windows/Linux have no global menu bar | Top bar spec for each platform: macOS keeps native menus; Windows/Linux keep in-window menus |
+
+### Missed by current design-system practice
+
+| # | Gap | Rule |
+|---|---|---|
+| G26 | **Tokens as the single source** | `tokens.json` (colour, radius, spacing, type, motion) → generated C++ header; no literal colours or radii at call sites |
+| G27 | **Component gallery** | In-app gallery window of every class in every state, light/dark. Debug builds only (`#ifndef NDEBUG`), per the no-debug-tools-in-release rule |
+| G28 | **Visual regression tests** | Headless render of the gallery to PNGs; CI diffs against goldens on all three platforms |
+| G29 | **UI performance budget** | ~280 knobs × arc segments adds vertices; budget per node and per frame, measured with the perf bench before/after |
+| G30 | **Migration without a mixed UI** | Switch one class at a time across the whole app (all knobs at once), never node by node, so old and new never sit side by side |
+| G31 | **Governance** | Icon request → draw on grid → lint → sheet review → merge; naming `verb-object` / `object` ; deprecation list |
+| G32 | **Measure** | Before/after: time to find a node, time to patch a known chain, mis-click rate in the self-test harness |
+
+## 0c. Inventory: proof that nothing is missed
+
+`tools/design/inventory.py` scans `src/app` + `src/arrange` and writes `inventory.md` (this folder): every element class × 13 screen surfaces, plus every drawn icon and where it is used. It is the checklist; the plan is done when its numbers say so.
+
+### What the scan found (2026-10-08)
+
+| Finding | Number | What it means |
+|---|---|---|
+| Literal colours (`IM_COL32`, raw `ImVec4`) | **1551** (nodes 862, mod matrix 235, timeline 158) | Tokens can't restyle these. The biggest hidden job: every one moves to a token or a role colour |
+| Hand-drawn shapes (`AddRect`, `AddCircle`, ...) | **749** (nodes 496, mod matrix 92, timeline 79, perf 39) | Custom UI the widget restyle won't touch: each must be reviewed by hand |
+| Hand-drawn text | 120 | Must use the type tokens (size, tabular digits) |
+| Drawn icons | 52 uses of 30 Tabler icons | All 30 get an Infinite Glyph; list in `inventory.md` |
+| **Close / cross controls** | 9 drawn X + 2 text `"x"` buttons (`AudioNodeBodies.cpp:163`, `ParamBodies2.cpp:574`) | One close glyph, one size, one hover (circle fill), one hit area, everywhere |
+| Text arrow buttons | `"<"` / `">"` in `SamplerBodies.cpp` | Chevron glyphs |
+| Feedback | One status string (`gPatchStatus`), no toast system | G22 builds the feedback layer |
+| Drag and drop | 7 sites (timeline, perf) | G20 drop/insert/ghost visuals |
+| Cursors | 45 sites (timeline 21, nodes 15) | G19 cursor set |
+
+### Per-surface checklist
+
+| Surface | Must cover |
+|---|---|
+| **Close / cross** | Every X: panel close, chip remove, binding remove, search clear, node delete, clip remove |
+| **Modulation matrix** | Rows (table style), mod dots, curve menu, eye toggles, range bars (hand-drawn, 92), source colours as role colours, empty state |
+| **Timeline / Arrange** | Header (section 6), ruler, track headers M/S, clips + waveforms + thumbnails, 13 tool glyphs (pointer, pencil, scissors, trim, range, hand, zoom, ...), cursors (21), loop band, playhead, drag/drop |
+| **Performance mode** | Pads/cells (39 shapes), 60 menu items, drag/drop, live-safe rules (G24) |
+| **Viewport panel** | Cards, toggles, close glyph, resize handles, empty state |
+| **Canvas + nodes** | Node frame/header, pins, cables, groups, minimap, marquee, zoom LOD (G18), every body control (C1–C12), visualizers (V1–V7) |
+| **Navigation** | Canvas pan/zoom feel (inertia, zoom to cursor), minimap, keyboard focus path (`docs/plans/keyboard-nav`), focus ring visibility, "jump to node" |
+| **User feedback** | Toasts, inline errors, progress, save state, undo hint, hover/press/on states (4b), tooltips (G13), empty states (G11) |
+| **Popups + menus** | 233 menu items + 82 popups: one menu style, shortcuts aligned, icons optional but consistent |
+| **Settings + help** | Grouped sections, switches (C5), tables, tabs |
+
+### Done means
+
+| Check | Target |
+|---|---|
+| `Tabler::` call sites | 0 |
+| Literal colours outside the token header | 0 (allow-list for data colours such as user clip colours) |
+| Hand-drawn shapes | Each reviewed and either on tokens or replaced by a shared helper |
+| Every class × surface cell in `inventory.md` | Appears in the gallery (G27) and in visual goldens (G28) |
 
 ## 1. Foundations: what the professional systems agree on
 
@@ -178,6 +362,19 @@ Implement once in the shared toggle helpers by also pushing `ImGuiCol_ButtonHove
 - `IconTile(...)` and `DotSlider(...)` read hover/press/on through it; no call site hand-rolls timing.
 - The app redraws every frame today (no idle throttle found), so eases cost only the map lookup. If an idle throttle lands later (perf initiative), `UiAnim` must report "still moving" to keep frames coming.
 
+## 4c. Type, spacing, menus, panels
+
+| Token | Value |
+|---|---|
+| Spacing unit | 4 (all gaps are 4, 8, 12, 16) |
+| Radii | 2 (cells), 4 (fields, checkbox, wells), 6 (icon tiles, buttons), 8 (pills, nodes), 10 (groups) |
+| Type sizes | 11 caption, 13 body, 15 title, 22 display digits |
+| Digits | Tabular everywhere a number changes (knob readouts, display box, tables) |
+| Labels | Lowercase in nodes (existing convention), Title Case in menus and Settings |
+| Menus | Radius 8, 4px inset rows, hover row pill, shortcut text muted and right-aligned, separators inset |
+| Panels | One elevation step per level (docked < elevated < popup); seams are hairlines, never gaps |
+| Dialogs | Grouped rows in rounded sections (Settings → Theme style from the Apple screenshot) |
+
 ## 5. Top bar
 
 ```
@@ -214,13 +411,72 @@ Each group is a pill (radius 8, faint fill). Groups collapse from the outside in
 
 | Block | What | Branch | Done when |
 |---|---|---|---|
-| 1 | Spec sign-off; 12 pilot glyphs for the top bar; pipeline (lint, build, sheet) | `feature/iconography` | Contact sheet approved in light and dark |
-| 2 | `UiAnim` helper, icon tile states, top bar groups, display box, dot slider, accent picker | `feature/topbar-redesign` | `node-ui-sweep` + `panels-sweep` pass; Windows/Linux CI green |
-| 3 | Timeline header, clean table style, remaining glyphs; retire `TablerIcons.h` | `feature/timeline-header` | No `Tabler::` call sites left |
+| 1 | **Foundations, no visible change first**: design folder + `tokens.json` + generator; move all 1551 literal colours and 749 hand-drawn shapes onto tokens/role colours (screenshots identical before/after); ratchet check in CI; gallery + goldens (G27–G28); glyph pipeline + 12 pilot glyphs; `UiAnim`; perf budget (G29) | `feature/design-foundations` | Literal colours = 0 outside allow-list; goldens unchanged; pilot sheet approved |
+| 2 | Node interior: controls C1–C12, visualizer tokens V1–V7, canvas N1–N5, node-type icons (G12), zoom level of detail (G18), cursors + drag feedback (G19–G21) | `feature/node-ui-redesign` | `node-ui-pillars` checklist + `node-ui-sweep` pass; Windows/Linux CI green |
+| 3 | Chrome: top bar, display box, timeline, tables, menus, panels, dialogs (A1–A8), G1–G11, G13, G22–G25; retire `TablerIcons.h` | `feature/chrome-redesign` | `panels-sweep` pass; no `Tabler::` call sites left |
 
 ### Pilot set (block 1)
 
 play · stop · record · capture · loop · metronome · count-in · browser · mixer · mod matrix · viewport · arrange
+
+## 8. Organisation: built so any future UI change is one small edit
+
+Owner rule (2026-10-08): future UI/UX updates must be very easy to execute. Every look-and-feel decision lives in exactly one place, and the tools refuse anything that bypasses it.
+
+### Where things live
+
+```
+src/app/ui/design/
+  tokens.json            ← THE source: colour roles, radii, spacing, type, motion, sizes
+  Tokens.gen.h           ← generated from tokens.json, never edited
+  Glyphs.gen.h           ← generated from art/icons, never edited
+  UiAnim.h / .cpp        ← the only animation timing code
+  components/            ← one file per component class (section 0 ids)
+     IconTile  Knob  DotSlider  Fader  Checkbox  Switch  Dropdown  Segmented
+     Chip  SearchField  Table  Menu  Tooltip  Toast  EmptyState  Pin  ...
+art/icons/src/*.svg      ← icon masters (16 and 20 px)
+tools/design/
+  build_tokens.py        ← tokens.json → Tokens.gen.h
+  build_glyphs.py        ← SVGs → font + Glyphs.gen.h
+  lint_icons.py          ← grid, stroke, padding checks
+  inventory.py           ← the coverage scan (section 0c)
+  ratchet.json           ← allowed counts of literal colours / raw ImGui widgets per file; may only go down
+docs/plans/iconography/  ← this spec + generated inventory.md
+.claude/skills/infinite-design-system/SKILL.md  ← the runbook
+```
+
+`CategoryColors::UiTheme` (6 base colours per theme preset) stays the user-facing theme; `tokens.json` defines how every role is **derived** from those 6 plus fixed role colours (record, solo, mute, modulation, prediction, warning, error), so all presets keep working.
+
+### The three layers
+
+| Layer | Example | Who may use it |
+|---|---|---|
+| Base tokens | `color.accent`, `radius.8`, `space.4`, `motion.hover_in = 120ms` | Only role tokens |
+| Role tokens | `control.knob.arc`, `surface.panel`, `state.record`, `text.muted` | Only components |
+| Components | `Knob(...)`, `IconTile(...)`, `Toast::Show(...)` | Every call site (nodes, panels, chrome) |
+
+A call site never names a colour, radius or duration. It names a component; the component names roles; roles name base tokens.
+
+### Recipes (what a future change costs)
+
+| Change | Edit |
+|---|---|
+| New accent / softer dark mode | `tokens.json`, one value |
+| All knobs get a thicker arc | `tokens.json` (`control.knob.arc_width`) or `components/Knob` |
+| Hover feels too slow | `tokens.json` (`motion.hover_in`) |
+| New icon | Add SVG to `art/icons/src`, run `build_glyphs.py` |
+| New kind of control | New file in `components/`, a gallery entry, a golden |
+| Restyle one surface (e.g. mod matrix rows) | That surface's component (`Table`), never the panel file |
+
+### Guards (so organisation can't rot)
+
+| Guard | Fails when |
+|---|---|
+| Ratchet (`tools/design/ratchet.json`, CI) | A file gains a literal colour, a raw `IM_COL32`, or a raw `ImGui::Button`/`Checkbox`/`Combo` outside `components/` |
+| Generated-file check | `Tokens.gen.h` / `Glyphs.gen.h` don't match their sources |
+| Icon lint | An SVG breaks the grid/stroke/padding spec |
+| Visual goldens | A component's pixels change without the golden being updated in the same commit |
+| Inventory | A component class has no gallery entry |
 
 ## Decisions
 
@@ -230,6 +486,8 @@ play · stop · record · capture · loop · metronome · count-in · browser ·
 | 2 | Delivery format | Icon font built from SVGs | One atlas, crisp, cross-platform, same as SF Symbols / Material |
 | 3 | Brand motif | The dot (pin = handle = icon terminal) | Already Infinite's meaning for signal; gives an identity that isn't Logic's |
 | 4 | Accent picker | 9 swatches + Multicolor | Accent already flows from one `t.accent` |
+| 5 | Order | Move all literal colours to tokens first, no visible change (owner approved 2026-10-08) | After it, a redesign is edits to `tokens.json` + `components/` |
+| 6 | Organisation | One design folder, three token layers, CI ratchet (section 8) | Owner: future UI changes must be very easy to execute |
 
 ## Open
 
