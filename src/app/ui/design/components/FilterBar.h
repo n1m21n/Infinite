@@ -98,7 +98,7 @@ namespace FilterBar
          dl->AddLine(ImVec2(cx - head, cy + (h - head) * d), ImVec2(cx, cy + h * d), col, 1.5f);
          dl->AddLine(ImVec2(cx + head, cy + (h - head) * d), ImVec2(cx, cy + h * d), col, 1.5f);
          if (s.hovered)
-            ImGui::SetTooltip("%s", descending ? T("Descending") : T("Ascending"));
+            ImGui::SetTooltip("%s", descending ? I18n::T("Descending") : I18n::T("Ascending"));
          return s.clicked;
       }
    }

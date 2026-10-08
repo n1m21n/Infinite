@@ -282,7 +282,7 @@ void DrawSidePanels(FrameCtx& fc)
             ImDrawList* pdl = ImGui::GetWindowDrawList();
             for (int i = 6; i >= 1; --i)   // soft shadow: stacked, widening, fainter rings
                pdl->AddRectFilled(ImVec2(c0.x - i, c0.y - i + 2.0f), ImVec2(c1.x + i, c1.y + i + 2.0f),
-                                  IM_COL32(0, 0, 0, 7), tok::radius_group + i);
+                                  ImGui::GetColorU32(ImVec4(0, 0, 0, 7 / 255.0f)), tok::radius_group + i);
             pdl->AddRectFilled(c0, c1, ImGui::GetColorU32(ImGuiCol_ChildBg), tok::radius_group);
          }
          ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
@@ -363,8 +363,8 @@ void DrawSidePanels(FrameCtx& fc)
                                w0.y + ImGui::GetContentRegionAvail().y);
                const bool light = CategoryColors::IsThemeLight();
                ImDrawList* wdl = ImGui::GetWindowDrawList();
-               wdl->AddRectFilled(w0, w1, light ? IM_COL32(0, 0, 0, 10) : IM_COL32(0, 0, 0, 70), tok::radius_pill);
-               wdl->AddRect(w0, w1, light ? IM_COL32(0, 0, 0, 14) : IM_COL32(255, 255, 255, 10), tok::radius_pill);
+               wdl->AddRectFilled(w0, w1, light ? ImGui::GetColorU32(ImVec4(0, 0, 0, 10 / 255.0f)) : ImGui::GetColorU32(ImVec4(0, 0, 0, 70 / 255.0f)), tok::radius_pill);
+               wdl->AddRect(w0, w1, light ? ImGui::GetColorU32(ImVec4(0, 0, 0, 14 / 255.0f)) : ImGui::GetColorU32(ImVec4(1, 1, 1, 10 / 255.0f)), tok::radius_pill);
             }
             ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
