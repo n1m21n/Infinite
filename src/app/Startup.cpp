@@ -3716,6 +3716,15 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gPerfPanelOpen = o.find("perf") != std::string::npos;
       gViewportPanelOpen = o.find("viewport") != std::string::npos;
       gNodePanelOpen = o.find("library") != std::string::npos;
+      // "perfdemo": one of each Performance control, for design review screenshots.
+      if (o.find("perfdemo") != std::string::npos)
+      {
+         gPerfPanelOpen = true;
+         gPerfEditMode = false;
+         gPerfPanelHeight = 620.0f;
+         for (int k = 0; k < 10; ++k)
+            AddPerfElementToCurrentPage(k);
+      }
       // "library:field|samples|media|plugins" picks the mode shown (default Modules).
       if (o.find("field") != std::string::npos) gSearchPanelMode = 4;
       else if (o.find("samples") != std::string::npos) gSearchPanelMode = 1;

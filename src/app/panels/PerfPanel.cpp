@@ -1,4 +1,5 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
+#include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/TokenColors.h"
@@ -383,22 +384,32 @@ namespace app
 
       // Card background & theme tint
       ImU32 themeTint = GetPerfElementColor(elem, dstNode, isLight);
-      ImU32 cardBg = isLight ? tok::U32(tok::pal::c_F5F7FCEB) : tok::U32(tok::pal::c_161921F0);
+      const float kCardR = tok::radius_pill;
+      const ImVec4 uiText = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const ImU32 cardBg = isLight ? ImGui::GetColorU32(ImVec4(1, 1, 1, 0.62f))
+                                   : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.06f));
+      const ImU32 cardHair = isLight ? ImGui::GetColorU32(ImVec4(0, 0, 0, 0.07f))
+                                     : ImGui::GetColorU32(ImVec4(1, 1, 1, 0.08f));
 
-      dl->AddRectFilled(cellPos, cardBR, cardBg, 6.0f);
+      // One recessed-well fill for every field-like control (NumBox, XY pad, step off, selector off, toggle off).
+      auto wellCol = [&](float a) { return ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, a)); };
+
+      dl->AddRectFilled(cellPos, cardBR, cardBg, kCardR);
       if (gPerfEditMode)
-         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : (isLight ? tok::U32(tok::pal::c_B4BECDC8) : tok::U32(tok::pal::c_414858C8)), 6.0f, 0, 1.2f);
+         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : (isLight ? tok::U32(tok::pal::c_B4BECDC8) : tok::U32(tok::pal::c_414858C8)), kCardR, 0, 1.2f);
       if (gPerfMidiLearnIdx == (int)elemIdx)
       {
          float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 8.0f);
          dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
-                     IM_COL32(255, (int)(160 + 50 * pulse), 30, 255), 7.0f, 0, 2.5f);
+                     ImGui::GetColorU32(ImVec4(app::AccentEmphasisSelected().x, app::AccentEmphasisSelected().y,
+                                               app::AccentEmphasisSelected().z, 0.55f + 0.45f * pulse)),
+                     kCardR + 1.0f, 0, 2.5f);
       }
       else if (gPerfEditMode && gPerfSelection.count(elemIdx) > 0)
          dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
-                     isLight ? tok::U32(tok::pal::c_1E6EDCFF) : tok::U32(tok::pal::c_5FA5FFFF), 7.0f, 0, 2.0f);
+                     isLight ? tok::U32(tok::pal::c_1E6EDCFF) : tok::U32(tok::pal::c_5FA5FFFF), kCardR + 1.0f, 0, 2.0f);
       else
-         dl->AddRect(cellPos, cardBR, isLight ? tok::U32(tok::pal::c_D7DEEBB4) : tok::U32(tok::pal::c_2A2E3AB4), 6.0f, 0, 1.0f);
+         dl->AddRect(cellPos, cardBR, cardHair, kCardR, 0, 1.0f);
 
       // Title/Label Header
       std::string displayLabel = elem.label;
@@ -426,10 +437,13 @@ namespace app
       }
 
       // Header background badge
-      dl->AddRectFilled(cellPos, ImVec2(cardBR.x, cellPos.y + 18.0f),
-                        (themeTint & 0x00FFFFFF) | 0x28000000, 6.0f, ImDrawFlags_RoundCornersTop);
-      ImVec2 titlePos(cellPos.x + 6.0f, cellPos.y + 2.0f);
-      ImU32 textCol = isLight ? tok::U32(tok::pal::c_1E2330FF) : tok::U32(tok::pal::c_E1E6F5FF);
+      // No bar: a quiet caption (like the Library section headers), with a small dot in the
+      // destination's colour when the control drives a node.
+      const float titleX = cellPos.x + tok::space_2 + (dstNode != nullptr ? 10.0f : 0.0f);
+      if (dstNode != nullptr)
+         dl->AddCircleFilled(ImVec2(cellPos.x + tok::space_2 + 3.0f, cellPos.y + 9.0f), 3.0f, themeTint, 12);
+      ImVec2 titlePos(titleX, cellPos.y + 3.0f);
+      ImU32 textCol = ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.65f));
 
       // In Edit Mode, full card invisible button handles right-click popup and dragging
       if (gPerfEditMode)
@@ -753,7 +767,10 @@ namespace app
       else
       {
          dl->PushClipRect(ImVec2(cellPos.x + 4.0f, cellPos.y), ImVec2(cardBR.x - 4.0f, cellPos.y + 18.0f), true);
-         dl->AddText(titlePos, textCol, displayLabel.c_str());
+         {
+            UiType::Scope ts(UiType::Size::Caption, UiType::Weight::Semibold);
+            dl->AddText(titlePos, textCol, displayLabel.c_str());
+         }
          dl->PopClipRect();
       }
 
@@ -934,9 +951,19 @@ namespace app
          ImVec4 btnCol = curVal ? ImVec4((themeTint & 0xFF) / 255.0f,
                                          ((themeTint >> 8) & 0xFF) / 255.0f,
                                          ((themeTint >> 16) & 0xFF) / 255.0f, 1.0f)
-                                : (isLight ? tok::V4(tok::palf::v_850_880_920_1000) : tok::V4(tok::palf::v_160_180_240_1000));
+                                : ImGui::ColorConvertU32ToFloat4(wellCol(0.08f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
          ImGui::PushStyleColor(ImGuiCol_Button, btnCol);
-         if (ImGui::Button(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize)))
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, curVal ? btnCol : ImGui::ColorConvertU32ToFloat4(wellCol(0.13f)));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, curVal ? btnCol : ImGui::ColorConvertU32ToFloat4(wellCol(0.18f)));
+         if (curVal)
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+         const bool toggleClicked = ImGui::Button(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize));
+         if (curVal)
+            ImGui::PopStyleColor();
+         ImGui::PopStyleColor(3);
+         ImGui::PopStyleVar();
+         if (toggleClicked)
          {
             bool newVal = !curVal;
             elem.value = newVal ? 1.0f : 0.0f;
@@ -956,7 +983,6 @@ namespace app
                }
             }
          }
-         ImGui::PopStyleColor();
       }
       else if (elem.kind == 4) // XY Pad (2x2)
       {
@@ -1012,16 +1038,15 @@ namespace app
             valY = newY;
          }
 
-         dl->AddRectFilled(origin, padBR, ScopeBgCol(), 4.0f);
-         dl->AddLine(ImVec2(origin.x + padSize * 0.5f, origin.y), ImVec2(origin.x + padSize * 0.5f, padBR.y), ScopeGridCol());
-         dl->AddLine(ImVec2(origin.x, origin.y + padSize * 0.5f), ImVec2(padBR.x, origin.y + padSize * 0.5f), ScopeGridCol());
-         dl->AddRect(origin, padBR, ScopeBorderCol(), 4.0f);
+         dl->AddRectFilled(origin, padBR, wellCol(0.07f), tok::radius_tile);
+         dl->AddLine(ImVec2(origin.x + padSize * 0.5f, origin.y + 4.0f), ImVec2(origin.x + padSize * 0.5f, padBR.y - 4.0f), wellCol(0.10f));
+         dl->AddLine(ImVec2(origin.x + 4.0f, origin.y + padSize * 0.5f), ImVec2(padBR.x - 4.0f, origin.y + padSize * 0.5f), wellCol(0.10f));
 
          float normX = kpX.valueToPos ? kpX.valueToPos(valX, minX, maxX) : ((maxX > minX) ? std::clamp((valX - minX) / (maxX - minX), 0.0f, 1.0f) : 0.0f);
          float normY = kpY.valueToPos ? kpY.valueToPos(valY, minY, maxY) : ((maxY > minY) ? std::clamp((valY - minY) / (maxY - minY), 0.0f, 1.0f) : 0.0f);
          ImVec2 orbPos(origin.x + normX * padSize, origin.y + (1.0f - normY) * padSize);
-         dl->AddCircleFilled(orbPos, 6.0f, themeTint);
-         dl->AddCircle(orbPos, 6.0f, isLight ? tok::U32(tok::pal::c_F0F0F0FF) : tok::U32(tok::pal::c_14141CFF), 0, 1.5f);
+         dl->AddCircleFilled(orbPos, 9.0f, (themeTint & 0x00FFFFFF) | 0x33000000);
+         dl->AddCircleFilled(orbPos, 5.5f, themeTint);
       }
       else if (elem.kind == 5) // Momentary Trigger / Bang (1x1)
       {
@@ -1140,22 +1165,21 @@ namespace app
          }
 
          float r = padSize * 0.44f;
-         ImU32 baseCol = isLight ? tok::U32(tok::pal::c_D7DEEBFF) : tok::U32(tok::pal::c_202430FF);
+         ImU32 baseCol = wellCol(0.08f);
          dl->AddCircleFilled(center, r, baseCol, 32);
 
          if (flash > 0.0f)
          {
             ImU32 flashCol = (themeTint & 0x00FFFFFF) | ((ImU32)(flash * 220.0f) << 24);
             dl->AddCircleFilled(center, r * (0.6f + 0.4f * flash), flashCol, 32);
-            dl->AddCircle(center, r + 2.0f * (1.0f - flash), IM_COL32(255, 225, 80, (int)(flash * 255.0f)), 32, 2.0f);
+            dl->AddCircle(center, r + 2.0f * (1.0f - flash), (themeTint & 0x00FFFFFF) | ((ImU32)(flash * 255.0f) << 24), 32, 2.0f);
          }
          else
          {
             dl->AddCircleFilled(center, r * 0.55f, (themeTint & 0x00FFFFFF) | 0x88000000, 32);
          }
-         dl->AddCircle(center, r, isLight ? tok::U32(tok::pal::c_AAB4C3FF) : tok::U32(tok::pal::c_3C4252FF), 32, 1.5f);
          if (hovered)
-            dl->AddCircle(center, r + 2.0f, tok::U32(tok::pal::c_FFFFFF50), 32, 1.2f);
+            dl->AddCircle(center, r + 2.0f, wellCol(0.25f), 32, 1.2f);
       }
       else if (elem.kind == 6) // Digital Number Box (1x1)
       {
@@ -1171,8 +1195,7 @@ namespace app
          ImVec2 bTL(centerX, centerY);
          ImVec2 bBR(centerX + boxW, centerY + boxH);
 
-         dl->AddRectFilled(bTL, bBR, isLight ? tok::U32(tok::pal::c_E6EBF5FF) : tok::U32(tok::pal::c_0F1118FF), 4.0f);
-         dl->AddRect(bTL, bBR, isLight ? tok::U32(tok::pal::c_B4BECDFF) : tok::U32(tok::pal::c_323848FF), 4.0f);
+         dl->AddRectFilled(bTL, bBR, wellCol(0.07f), tok::radius_tile);
 
          ImGui::SetCursorScreenPos(bTL);
          float v = dragSeed(val);
@@ -1256,9 +1279,10 @@ namespace app
             }
             else
             {
-               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::V4(tok::palf::v_880_900_940_1000) : tok::V4(tok::palf::v_180_200_260_1000));
-               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_300_350_450_1000) : tok::V4(tok::palf::v_700_750_850_1000));
+               ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(wellCol(0.08f)));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(wellCol(0.8f)));
             }
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
 
             // Either every button shows its option name or none of them do.
             // The old rule was per-button ("use the name if it is <= 4 chars"),
@@ -1282,6 +1306,7 @@ namespace app
                   if (t.dstIndex >= 0 && t.dstParam >= 0)
                      gPerfPendingWrites[{t.dstIndex, t.dstParam}] = newVal;
             }
+            ImGui::PopStyleVar();
             ImGui::PopStyleColor(2);
             ImGui::PopID();
          }
@@ -1375,19 +1400,12 @@ namespace app
 
             ImU32 stepBg = isOn
                ? themeTint
-               : (isLight ? tok::U32(tok::pal::c_D2D8E4FF) : tok::U32(tok::pal::c_1C1F28FF));
+               : wellCol(0.08f);
 
-            dl->AddRectFilled(sTL, sBR, stepBg, 3.0f);
+            dl->AddRectFilled(sTL, sBR, stepBg, tok::radius_tile);
 
             if (isCurrent && Transport::Instance().IsPlaying())
-            {
-               dl->AddRect(sTL, sBR, tok::U32(tok::pal::c_FFE650FF), 3.0f, 0, 2.0f);
-               dl->AddCircleFilled(ImVec2(sx + stepW * 0.5f, startY + 4.0f), 2.5f, tok::U32(tok::pal::c_FFF064FF));
-            }
-            else
-            {
-               dl->AddRect(sTL, sBR, isLight ? tok::U32(tok::pal::c_B4BECDC8) : tok::U32(tok::pal::c_303441C8), 3.0f);
-            }
+               dl->AddRectFilled(ImVec2(sx + 2.0f, sBR.y + 3.0f), ImVec2(sx + stepW - 2.0f, sBR.y + 5.0f), wellCol(0.85f), 1.0f);
          }
       }
 
@@ -1419,7 +1437,7 @@ namespace app
          {
             const ImVec2 bodyTL(cellPos.x, cellPos.y + 18.0f);
             dl->AddRectFilled(bodyTL, cardBR, isLight ? tok::U32(tok::pal::c_F5F7FC96) : tok::U32(tok::pal::c_161921A0),
-                              6.0f, ImDrawFlags_RoundCornersBottom);
+                              kCardR, ImDrawFlags_RoundCornersBottom);
             const char* tag = "bypassed";
             const ImVec2 tagSize = ImGui::CalcTextSize(tag);
             const ImVec2 tagTL(cardBR.x - tagSize.x - 10.0f, cellPos.y + 2.0f);
