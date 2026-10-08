@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
@@ -197,25 +198,14 @@ void DrawPopupsB(FrameCtx& fc)
             searchJustOpened = false;
             ImGui::CloseCurrentPopup();
          }
-         // Search glyph from the merged Lucide icon font (see main()'s font
-         // setup / IconsLucide.h) ahead of the input box - the one obviously
-         // net-positive icon spot from the Stage 5 iconography audit: this
-         // is the app's most-used search field (Shift+N node picker), it was
-         // plain text with no visual affordance before, and a leading icon
-         // is exactly the ImGui idiom for it. SetKeyboardFocusHere() still
-         // has to land on the InputText itself, so it moves down next to it
-         // rather than firing on the icon Text widget in between.
-         const float searchIconW = ImGui::CalcTextSize(IconsLucide::Search).x;
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextUnformatted(IconsLucide::Search);
-         ImGui::SameLine();
+         // Same search field as the Library panel (rounded well, our own magnifier glyph, clear button).
+         // SetKeyboardFocusHere() targets the next item, which is its InputText.
          if (searchJustOpened)
          {
             ImGui::SetKeyboardFocusHere();
             searchJustOpened = false;
          }
-         ImGui::SetNextItemWidth(-FLT_MIN);
-         ImGui::InputTextWithHint("##q", T("search nodes..."), searchBuf, sizeof(searchBuf));
+         LibraryParts::SearchField("nodepicker", T("search nodes..."), searchBuf, sizeof(searchBuf));
          ImGui::Separator();
 
          std::string q(searchBuf);

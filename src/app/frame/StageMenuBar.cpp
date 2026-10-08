@@ -727,7 +727,11 @@ void DrawMenuBar(FrameCtx& fc)
          {
             // Same tile as the panel toggles: outline glyph off, accent tile + filled glyph on.
             if (IconTile::Draw("##metronomeBtn", IconsInfinite::Metronome, IconsInfinite::MetronomeFill, gMetronomeOn,
-                               tok::tile, ImGui::GetFrameHeight()))
+                               tok::tile, ImGui::GetFrameHeight(), true,
+                               // Pendulum swings to the other side on every beat while the click is on and playing.
+                               (gMetronomeOn && isTransportPlaying)
+                                  ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
+                                  : 0.0f))
                gMetronomeOn = !gMetronomeOn;
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                ImGui::OpenPopup("##metronomePopup");

@@ -8,9 +8,10 @@
 
 namespace IconTile
 {
+   // `swingTarget` in -1..1 swaps the glyph for a metronome whose pendulum eases to that side; > 1 = ordinary glyph.
    // Returns true on click. `size` = tile edge (28 default), glyph is 20/28 of it. Tooltip is the caller's job.
    inline bool Draw(const char* id, const char* glyphOff, const char* glyphOn, bool on, float size = 28.0f,
-                    float rowH = 0.0f, bool enabled = true)
+                    float rowH = 0.0f, bool enabled = true, float swingTarget = 2.0f)
    {
       ImGuiWindow* win = ImGui::GetCurrentWindow();
       const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -52,8 +53,11 @@ namespace IconTile
          dl->AddRect(ImVec2(t0.x - 2, t0.y - 2), ImVec2(t1.x + 2, t1.y + 2),
                      ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_tile + 2.0f, 0, 2.0f);
       const float gs = size * (20.0f / 28.0f) * (down ? 0.94f : 1.0f);
-      glyph::Draw(dl, c, gs, ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, text.w * disabledA)),
-                  (on && glyphOn != nullptr) ? glyphOn : glyphOff);
+      const ImU32 glyphCol = ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, text.w * disabledA));
+      if (swingTarget <= 1.0f)
+         glyph::DrawMetronome(dl, c, gs, glyphCol, UiAnim::Value(aid + 2, swingTarget, 140.0f));
+      else
+         glyph::Draw(dl, c, gs, glyphCol, (on && glyphOn != nullptr) ? glyphOn : glyphOff);
       (void)win;
       return clicked && enabled;
    }

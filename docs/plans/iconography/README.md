@@ -36,6 +36,10 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | N2 sections, N3 cables (draw order over nodes), N4 groups, N5 grid/marquee | not started |
 | V1-V7 visualizers | not started |
 | Font sizes inside nodes | one size (15) in Chorus; other nodes not audited (`NoteBodies.cpp`, `SamplerBodies.cpp`, `StageKeyboard.cpp` scale text) |
+| A3 File / Edit / main menus | **rework**: owner request 2026-10-08, same recipe as the top bar (row height, hover wash, glyph + shortcut columns, hairline separators). Not started |
+| A7 Settings window + every tab | **rework**: owner request 2026-10-08. Every tab and every setting row on the design language: one row grammar (label left, control right), same controls as nodes (C2/C4/C6/C9), spacing tokens, symmetrical columns, light + dark proof per tab. Not started |
+| Node search popup | search field now uses `LibraryParts::SearchField` (magnifier was missing: Lucide font glyph not loaded). Done 2026-10-08 |
+| Top bar metronome | pendulum swings per beat again (eased 140 ms) via `IconTile` swing. Done 2026-10-08 |
 | Chrome A3-A7 (menus, panels, tables, timeline, dialogs/Settings) | not started; raw widgets 875 (stored 957), largest: SamplerBodies 125, ArrangePanel 112, ArrangeRender 56, StageMenuBar 53 |
 
 Root cause of the sizing complaints (found 2026-10-08): each call site derives its own icon size from row height (0.65 flag/track height/edit, 0.72 top-bar transport, 0.88 top-bar toggles, 0.9 search). No shared size token exists. Step 1 fixes that before any more icon art is judged.
