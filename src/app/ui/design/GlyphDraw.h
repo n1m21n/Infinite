@@ -8,11 +8,28 @@
 namespace glyph
 {
    // `size` is the 20-unit canvas edge in pixels; the font's 1000-unit em equals the canvas, so the text size is the same number.
+   // Where the glyph's top edge lands for a given canvas centre. Merged glyphs hang off the BASE font's baseline (line top
+   // + its ascent), not the icon font's own; the icon font puts grid y=10 (the canvas centre) 0.3 em above its baseline.
+   // AddText snaps its origin to whole pixels, so the drawn centre can differ from `center` by up to half a pixel.
+   inline float TopFor(ImFont* font, ImVec2 center, float size)
+   {
+      const float scale = size / font->FontSize;
+      return center.y + 0.3f * size - (float)(int)(font->Ascent + 0.5f) * scale;
+   }
+
+   // The centre a glyph is really drawn at: draw backing shapes (discs, tiles) here so they sit concentric with it.
+   inline ImVec2 SnappedCentre(ImVec2 center, float size)
+   {
+      ImFont* font = ImGui::GetFont();
+      const float raw = TopFor(font, center, size);
+      return ImVec2(center.x, center.y + ((float)(int)(raw + 0.5f) - raw));
+   }
+
    inline void Draw(ImDrawList* dl, ImVec2 center, float size, ImU32 col, const char* g)
    {
       ImFont* font = ImGui::GetFont();
       const ImVec2 ext = font->CalcTextSizeA(size, FLT_MAX, 0.0f, g);
-      dl->AddText(font, size, ImVec2(center.x - ext.x * 0.5f, center.y - size * 0.5f - (ext.y - size) * 0.5f), col, g);
+      dl->AddText(font, size, ImVec2(center.x - ext.x * 0.5f, (float)(int)(TopFor(font, center, size) + 0.5f)), col, g);
    }
 
    // Call-site wrappers (same argument order the retired glyph:: icons used). A trailing stroke argument is accepted and

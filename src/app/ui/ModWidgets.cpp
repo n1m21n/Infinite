@@ -1924,7 +1924,7 @@ namespace app
       {
          ImVec4 a = app::AccentEmphasisSelected();
          if (hovered) a = app::AccentEmphasisHover();
-         dl->AddCircleFilled(c, 6.75f, ImGui::GetColorU32(a), 32);
+         dl->AddCircleFilled(glyph::SnappedCentre(c, 18.0f), 6.6f, ImGui::GetColorU32(a), 32);
          glyph::Draw(dl, c, 18.0f, tok::U32(tok::pal::c_FFFFFFFF), IconsInfinite::PowerFill);
       }
       else
