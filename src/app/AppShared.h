@@ -1081,6 +1081,7 @@ extern uint64_t gArrangeRenamingLaneId;
 extern bool     gArrangeRenameJustStarted;
 
 extern bool     gArrangeClipSettingsPanelOpen;
+extern ImVec2   gArrangeInspectorMin, gArrangeInspectorMax;
 
 extern uint64_t gArrangeSettingsPanelTarget;
 

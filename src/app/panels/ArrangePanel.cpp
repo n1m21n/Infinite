@@ -101,7 +101,11 @@ namespace app
 
       // Mouse wheel horizontal zoom / pan across the timeline area
       const ImVec2 mouse = ImGui::GetIO().MousePos;
-      const bool overPanel = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
+      // The open Clip Settings card is not timeline: wheel, pinch and Cmd+wheel over it must not move the lanes.
+      const bool overInspector = gArrangeClipSettingsPanelOpen && mouse.x >= gArrangeInspectorMin.x &&
+                                 mouse.x < gArrangeInspectorMax.x && mouse.y >= gArrangeInspectorMin.y &&
+                                 mouse.y < gArrangeInspectorMax.y;
+      const bool overPanel = !overInspector && mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
                              mouse.y >= panelOrigin.y && mouse.y < panelOrigin.y + panelSize.y;
 
       // Trackpad pinch: GLFW's Cocoa backend never forwards magnifyWithEvent:
@@ -1211,7 +1215,7 @@ namespace app
       // Layout: Global Viewport Monitor alongside / above timeline lanes
       const bool isWide = panelSize.x >= 720.0f;
       const bool showVp = isWide && gArrangeShowViewport;
-      const float kSettingsW = 210.0f;
+      const float kSettingsW = 244.0f;
       const float kViewportW = isWide ? std::clamp(panelSize.x * 0.28f, 180.0f, 320.0f) : panelSize.x;
       const float kViewportH = isWide ? std::max(120.0f, panelSize.y - 40.0f) : 140.0f;
 

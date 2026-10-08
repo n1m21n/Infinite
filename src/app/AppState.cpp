@@ -689,6 +689,7 @@ bool gHeadlessNeedProbe = false;
    bool     gArrangeRenameJustStarted = false;
  // one-shot: focus the rename field the frame it opens
    bool     gArrangeClipSettingsPanelOpen = false;
+   ImVec2   gArrangeInspectorMin(0, 0), gArrangeInspectorMax(0, 0);   // last drawn Clip Settings rect (wheel/pinch must not reach the timeline)
  // docked per-clip inspector panel, toggled from the toolbar
    // Id (clip, lane or group) the inspector was last opened for via a
    // double-click, so a second double-click on the SAME row/clip closes it

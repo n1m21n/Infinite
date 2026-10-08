@@ -371,12 +371,70 @@ namespace app
       ImGui::TextUnformatted(text);
    }
 
-   // Inspector section title: Body size (same as the field labels), medium weight, muted, with a little air above.
+   // Inspector sections are cards: a soft well behind the title and its rows, drawn on a background channel
+   // so SectionHeader() only has to mark where one card ends and the next begins.
+   struct InspectorCards
+   {
+      ImDrawListSplitter split;
+      bool open = false;
+      float top = 0.0f;
+   };
+   static InspectorCards sCards;
+   static constexpr float kCardPad = tok::space_2;   // card edge to content, also how far a card reaches into the window padding
+
+   static void InspectorCardEnd()
+   {
+      if (!sCards.open)
+         return;
+      sCards.open = false;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 wp = ImGui::GetWindowPos();
+      const float x0 = wp.x + ImGui::GetWindowContentRegionMin().x - kCardPad;
+      const float x1 = wp.x + ImGui::GetWindowContentRegionMax().x + kCardPad;
+      const float y1 = ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y + kCardPad;
+      sCards.split.SetCurrentChannel(dl, 0);
+      if (y1 - sCards.top < 4.0f * kCardPad)   // nothing was drawn in it: no empty sliver
+      {
+         sCards.split.SetCurrentChannel(dl, 1);
+         return;
+      }
+      ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      dl->AddRectFilled(ImVec2(x0, sCards.top - kCardPad), ImVec2(x1, y1), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)),
+                        tok::radius_group);
+      sCards.split.SetCurrentChannel(dl, 1);
+      ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, y1));
+   }
+
+   // Inspector section title: Body size (same as the field labels), medium weight, muted. Starts a new card.
    static void SectionHeader(const char* text)
    {
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1 * 0.5f));
+      InspectorCardEnd();
+      ImGui::Dummy(ImVec2(0.0f, kCardPad));
+      sCards.top = ImGui::GetCursorScreenPos().y;
+      sCards.open = true;
       UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
       ImGui::TextDisabled("%s", text);
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1 * 0.5f));
+   }
+
+   // A card with no title (the name / state block under the panel title).
+   static void InspectorCardBegin()
+   {
+      InspectorCardEnd();
+      ImGui::Dummy(ImVec2(0.0f, kCardPad));
+      sCards.top = ImGui::GetCursorScreenPos().y;
+      sCards.open = true;
+   }
+
+   // Plain muted message (empty states), not a card.
+   static void InspectorNote(const char* text)
+   {
+      InspectorCardEnd();
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      UiType::Scope s(UiType::Size::Body, UiType::Weight::Regular);
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("%s", text);
+      ImGui::PopTextWrapPos();
    }
 
    // Inspector field row: label in a fixed left column, the field fills the rest of the row.
@@ -394,8 +452,15 @@ namespace app
    void DrawArrangeClipSettingsChild(float panelW)
    {
       PushDockedPanelStyle(/*isChild=*/true);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));
       ImGui::BeginChild("##arrangeclipsettings_child", ImVec2(panelW, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, 0);
+      ImGui::PopStyleVar();
       PopDockedPanelStyle();
+      gArrangeInspectorMin = ImGui::GetWindowPos();
+      gArrangeInspectorMax = ImVec2(gArrangeInspectorMin.x + ImGui::GetWindowSize().x, gArrangeInspectorMin.y + ImGui::GetWindowSize().y);
+      sCards.open = false;
+      sCards.split.Split(ImGui::GetWindowDrawList(), 2);
+      sCards.split.SetCurrentChannel(ImGui::GetWindowDrawList(), 1);
 
       const float availW = ImGui::GetContentRegionAvail().x;
 
@@ -459,7 +524,7 @@ namespace app
          ImGui::SameLine(availW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
-         ImGui::Separator();
+         InspectorCardBegin();
 
          // Name
          char nameBuf[128];
@@ -577,7 +642,6 @@ namespace app
          }
 
          ImGui::Spacing();
-         ImGui::Separator();
 
          if (isVideo)
          {
@@ -771,7 +835,6 @@ namespace app
          });
 
          ImGui::Spacing();
-         ImGui::Separator();
          SectionHeader(T("Source Node"));
          GraphNode* srcNode = FindNodeByUid(clip->srcUid);
          if (srcNode != nullptr)
@@ -797,7 +860,6 @@ namespace app
                if (!bound.empty())
                {
                   ImGui::Spacing();
-                  ImGui::Separator();
                   SectionHeader(T("Modulations"));
                   PushCheckboxStyle();
                   for (const auto& entry : bound)
@@ -847,13 +909,13 @@ namespace app
          }
          else if (!isSample)
          {
-            SectionHeader(T("(unassigned)"));
+            InspectorNote(T("(unassigned)"));
             if (ChipButton::Draw(L("Assign Node..."), false, 24.0f, ImGui::GetContentRegionAvail().x))
                gArrangeAssigningClipId = clipId;
          }
          else
          {
-            SectionHeader(T("(missing - sample's source node was deleted)"));
+            InspectorNote(T("(missing - sample's source node was deleted)"));
          }
       }
       else if (gArrangeSel.size() > 1)
@@ -866,7 +928,7 @@ namespace app
          ImGui::SameLine(availW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
-         ImGui::Separator();
+         InspectorCardBegin();
 
          // Multi-clip renaming
          static char sBulkRenameBuf[128] = "Clip";
@@ -945,8 +1007,8 @@ namespace app
                ArrangeUngroupSelection();
          }
 
-         ImGui::Spacing();
-         ImGui::Separator();
+         InspectorCardEnd();
+         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
          if (ChipButton::Draw(L("Delete Selected Clips"), false, 24.0f, ImGui::GetContentRegionAvail().x))
          {
             ArrangeEdit([&]() {
@@ -965,7 +1027,7 @@ namespace app
             ImGui::SameLine(availW - 18.0f);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;
-            ImGui::Separator();
+            InspectorCardBegin();
 
             char trackName[128];
             snprintf(trackName, sizeof(trackName), "%s", lane->name.c_str());
@@ -1074,8 +1136,8 @@ namespace app
                });
             });
 
-            ImGui::Spacing();
-            ImGui::Separator();
+            InspectorCardEnd();
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
             if (ChipButton::Draw(L("Duplicate Track"), false, 24.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
@@ -1096,7 +1158,7 @@ namespace app
             ImGui::SameLine(availW - 18.0f);
             if (DrawCloseBtn())
                gArrangeClipSettingsPanelOpen = false;
-            ImGui::Separator();
+            InspectorCardBegin();
 
             char grpName[128];
             snprintf(grpName, sizeof(grpName), "%s", grp->name.c_str());
@@ -1125,8 +1187,8 @@ namespace app
                });
             });
 
-            ImGui::Spacing();
-            ImGui::Separator();
+            InspectorCardEnd();
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
             if (ChipButton::Draw(L("Add Video Track to Group"), false, 24.0f, ImGui::GetContentRegionAvail().x))
             {
                ArrangeEdit([&]() {
@@ -1158,7 +1220,7 @@ namespace app
          }
          else
          {
-            SectionHeader(T("No item selected."));
+            InspectorNote(T("No item selected."));
          }
       }
       else
@@ -1167,10 +1229,12 @@ namespace app
          ImGui::SameLine(availW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
-         ImGui::Separator();
-         SectionHeader(T("Select a clip, track, or group to inspect its properties."));
+         InspectorCardBegin();
+         InspectorNote(T("Select a clip, track, or group to inspect its properties."));
       }
 
+      InspectorCardEnd();
+      sCards.split.Merge(ImGui::GetWindowDrawList());
       ImGui::EndChild();
    }
 
