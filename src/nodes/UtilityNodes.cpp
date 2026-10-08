@@ -85,6 +85,8 @@ Material MaterialNode::GetMaterial() const
    m.dispersion = dispersion;
    m.alphaCutoff = alphaCutoff;
    m.textureAlpha = textureAlpha;
+   m.normalStrength = normalStrength;
+   m.normalBump = normalBump ? 1 : 0;
    return m;
 }
 

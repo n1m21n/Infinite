@@ -481,6 +481,8 @@ void FrameTest_MATERIALSWEEPTEST(int frameId, GLFWwindow* window)
          probe.material.dispersion = 0.18f;
          probe.material.alphaCutoff = 0.4f;
          probe.material.textureAlpha = true;
+         probe.material.normalStrength = 1.7f;
+         probe.material.normalBump = 1;
 
          int frame = 22000;
          auto cook = [&](IGeometrySource* g) {
@@ -502,7 +504,8 @@ void FrameTest_MATERIALSWEEPTEST(int frameId, GLFWwindow* window)
                    near(a.iridescence, b.iridescence) && near(a.iridescenceIor, b.iridescenceIor) &&
                    near(a.iridescenceThickness, b.iridescenceThickness) && near(a.anisotropy, b.anisotropy) &&
                    near(a.anisotropyRotation, b.anisotropyRotation) && near(a.dispersion, b.dispersion) &&
-                   near(a.alphaCutoff, b.alphaCutoff) && a.textureAlpha == b.textureAlpha;
+                   near(a.alphaCutoff, b.alphaCutoff) && a.textureAlpha == b.textureAlpha &&
+                   near(a.normalStrength, b.normalStrength) && a.normalBump == b.normalBump;
          };
 
          struct Result { std::string name; bool ok; };

@@ -497,7 +497,10 @@ namespace app
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
       if (n->MapInput(kMapNormal).IsConnected())
+      {
+         ModCheckbox("bump (height map)##matNormalBump", &n->normalBump);
          ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f);
+      }
 
       const float colW = kParamWidth;
       const float gutter = 16.0f;
