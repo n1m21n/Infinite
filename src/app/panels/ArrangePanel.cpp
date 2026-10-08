@@ -17,7 +17,7 @@ namespace app
          const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          if (on)
          {
-            const ImVec4 a = green ? ImVec4(0.063f, 0.725f, 0.506f, 1.0f) : AccentEmphasisSelected();
+            const ImVec4 a = green ? ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pal::c_10B981FF)) : AccentEmphasisSelected();
             ImGui::PushStyleColor(ImGuiCol_Button, a);
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(std::min(1.0f, a.x * 1.04f + 0.01f), std::min(1.0f, a.y * 1.04f + 0.01f), std::min(1.0f, a.z * 1.04f + 0.01f), a.w));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(a.x * 0.85f, a.y * 0.85f, a.z * 0.85f, a.w));
