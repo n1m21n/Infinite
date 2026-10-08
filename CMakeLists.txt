@@ -479,6 +479,7 @@ set(COMMON_SOURCES
     src/app/ui/design/UiAnim.cpp
     src/app/ui/design/UiType.cpp
     src/app/ui/design/UiInteract.cpp
+    src/app/ui/design/UiGallery.cpp
     src/core/GLUtil.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp

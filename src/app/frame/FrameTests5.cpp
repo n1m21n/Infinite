@@ -2,6 +2,7 @@
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/UiLayout.h"
 #include "app/ui/design/UiInteract.h"
+#include "app/ui/design/UiGallery.h"
 #include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/components/Readout.h"
@@ -3068,6 +3069,28 @@ void FrameTest_UICOMPTEST(int frameId, GLFWwindow*)
       UiType::Pop();
       printf("%s\n", ok ? "UICOMPTEST OK" : "UICOMPTEST FAIL");
    }
+}
+
+
+void FrameTest_UIGALLERY(int frameId, GLFWwindow*)
+{
+   const char* mode = getenv("INFINITE_UIGALLERY");   // "light" or "dark"
+   if (mode == nullptr || frameId < 3)
+      return;
+   if (frameId == 3)
+   {
+      const bool wantLight = std::string(mode) == "light";
+      const int n = static_cast<int>(CategoryColors::PresetNames().size());
+      for (int i = 0; i < n; ++i)
+      {
+         CategoryColors::SetPresetTransient(i);
+         if (CategoryColors::IsThemeLight() == wantLight)
+            break;
+      }
+      ApplyTheme();
+      return;
+   }
+   UiGallery::Draw();
 }
 
 }

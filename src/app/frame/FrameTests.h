@@ -122,6 +122,7 @@ void FrameTest_UITYPETEST(int frameId, GLFWwindow* window);
 void FrameTest_UILAYOUTTEST(int frameId, GLFWwindow* window);
 void FrameTest_UIINTERACTTEST(int frameId, GLFWwindow* window);
 void FrameTest_UICOMPTEST(int frameId, GLFWwindow* window);
+void FrameTest_UIGALLERY(int frameId, GLFWwindow* window);
 void FrameTest_SIZETEST(int frameId, GLFWwindow* window);
 void FrameTest_SAMPLERDRAGTEST_2(int frameId, GLFWwindow* window);
 void FrameTest_PLUGINDRAGTEST_2(int frameId, GLFWwindow* window);

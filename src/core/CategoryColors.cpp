@@ -466,6 +466,13 @@ void SetPreset(int index)
    }
 }
 
+void SetPresetTransient(int index)
+{
+   const int count = (int)Presets().size();
+   if (count != 0)
+      gCurrent = std::max(0, std::min(index, count - 1));
+}
+
 const UiTheme& CurrentUiTheme()
 {
    return Presets()[gCurrent].ui;

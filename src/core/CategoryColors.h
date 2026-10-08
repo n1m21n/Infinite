@@ -40,6 +40,7 @@ namespace CategoryColors
    const std::vector<std::string>& PresetNames();
    int CurrentPreset();
    void SetPreset(int index); // clamps out-of-range, persists immediately
+   void SetPresetTransient(int index); // same, but never written to the user's theme file (tests, gallery)
 
    // All 10 node module categories
    const std::vector<std::string>& CategoryNames();
