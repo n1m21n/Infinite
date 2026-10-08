@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/UiAnim.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -580,6 +581,7 @@ void DrawFramePump(FrameCtx& fc)
       }
       ImGui::NewFrame();
       UiAnim::EndFrame();
+      UiInteract::BeginFrame();
       if (Bench::Tail().active)
          Bench::Tail().MarkAt(Bench::FrameTail::kMarkNewFrame, Bench::ScopedStageTimer::NowMs());
 

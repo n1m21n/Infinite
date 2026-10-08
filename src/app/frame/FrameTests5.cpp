@@ -1,6 +1,7 @@
 // Per-frame self-test blocks moved verbatim out of the main loop in main.cpp.
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/UiLayout.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/AppShared.h"
 
@@ -2981,6 +2982,52 @@ void FrameTest_UILAYOUTTEST(int frameId, GLFWwindow*)
    if (failures != 0)
       printf("UILAYOUTTEST FAIL: %d case(s) wrong, first: %s\n", failures, first);
    printf("%s\n", failures == 0 ? "UILAYOUTTEST OK" : "UILAYOUTTEST FAIL");
+}
+
+
+void FrameTest_UIINTERACTTEST(int frameId, GLFWwindow*)
+{
+   if (getenv("INFINITE_UIINTERACTTEST") == nullptr || (frameId != 5 && frameId != 6 && frameId != 7))
+      return;
+   static ImGuiID idEn = 0;
+   static bool ok = true;
+   auto bad = [&](const char* why) { printf("UIINTERACTTEST FAIL: %s\n", why); ok = false; };
+   if (frameId == 5 || frameId == 6)
+   {
+      ImGui::SetNextWindowPos(ImVec2(40, 40));
+      ImGui::SetNextWindowSize(ImVec2(300, 120));
+      ImGui::Begin("##uiinteracttest", nullptr, ImGuiWindowFlags_NoSavedSettings);
+      const bool en = frameId == 5;   // same key, label "translated" on the second frame
+      UiInteract::Item("test.play", { 50, 70, 28, 28 }, UiInteract::Role::Toggle, en ? "Play" : "Reproducir", true, "off");
+      UiInteract::Item("test.stop", { 90, 70, 28, 28 }, UiInteract::Role::Button, "Stop", false);
+      if (frameId == 5)
+         UiInteract::Item("test.stop", { 130, 70, 28, 28 }, UiInteract::Role::Button, "Stop again");
+      ImGui::End();
+   }
+   if (frameId == 6)
+   {
+      const UiInteract::Node* n = UiInteract::Find("test.play");
+      if (n == nullptr) { bad("frame 5 node missing from the tree"); return; }
+      idEn = n->id;
+      if (n->label != "Play" || n->value != "off" || n->role != UiInteract::Role::Toggle || !n->enabled)
+         bad("node fields wrong");
+      const UiInteract::Node* st = UiInteract::Find("test.stop");
+      if (st == nullptr || st->enabled)
+         bad("disabled node not recorded as disabled");
+      if (UiInteract::DuplicateKeys() != 1)
+         bad("duplicate key not counted");
+   }
+   if (frameId == 7)
+   {
+      const UiInteract::Node* n = UiInteract::Find("test.play");
+      if (n == nullptr || n->id != idEn)
+         bad("id changed when only the label changed");
+      else if (n->label != "Reproducir")
+         bad("label not updated");
+      if (UiInteract::DuplicateKeys() != 0)
+         bad("duplicate count did not reset");
+      printf("%s\n", ok ? "UIINTERACTTEST OK" : "UIINTERACTTEST FAIL");
+   }
 }
 
 }
