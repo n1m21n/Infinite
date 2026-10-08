@@ -8,6 +8,8 @@ Skills to load before building: `infinite-design-system`, `node-ui-pillars`, `co
 
 How we work: one surface at a time. Per surface: real-app before crop (`tools/design/context_shot.py`) -> change -> after crop -> owner approves -> commit. Flat mockups are not review material. Sections 0-8 below are reference spec; this table is the only place that says what is done.
 
+**Paused 2026-10-08:** steps 1-5 wait for sign-off on the UI system analysis (`docs/plans/ui-system/README.md`, sections 1-7). If approved, this table is rewritten to its three blocks (Engine, Chrome, Canvas + nodes).
+
 | # | Step | State |
 |---|---|---|
 | 0 | Tokens, ratchet (literal colours = 0), glyph pipeline, 56 glyphs, `UiAnim`, preview hook + `context_shot.py` | done |
