@@ -371,11 +371,11 @@ namespace app
       ImGui::TextUnformatted(text);
    }
 
-   // Inspector section title: Caption, medium weight, muted, with a little air above.
+   // Inspector section title: Body size (same as the field labels), medium weight, muted, with a little air above.
    static void SectionHeader(const char* text)
    {
       ImGui::Dummy(ImVec2(0.0f, tok::space_1 * 0.5f));
-      UiType::Scope s(UiType::Size::Caption, UiType::Weight::Medium);
+      UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
       ImGui::TextDisabled("%s", text);
    }
 
