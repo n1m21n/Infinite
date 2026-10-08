@@ -396,13 +396,13 @@ namespace app
 
       dl->AddRectFilled(cellPos, cardBR, cardBg, kCardR);
       if (gPerfEditMode)
-         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : (isLight ? tok::U32(tok::pal::c_B4BECDC8) : tok::U32(tok::pal::c_414858C8)), kCardR, 0, 1.2f);
+         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.22f)), kCardR, 0, 1.2f);
       if (gPerfMidiLearnIdx == (int)elemIdx)
       {
          float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 8.0f);
          dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
-                     ImGui::GetColorU32(ImVec4(app::AccentEmphasisSelected().x, app::AccentEmphasisSelected().y,
-                                               app::AccentEmphasisSelected().z, 0.55f + 0.45f * pulse)),
+                     (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) & 0x00FFFFFF
+                        | ((ImU32)((0.55f + 0.45f * pulse) * 255.0f) << 24),
                      kCardR + 1.0f, 0, 2.5f);
       }
       else if (gPerfEditMode && gPerfSelection.count(elemIdx) > 0)
@@ -909,7 +909,43 @@ namespace app
          float v = dragSeed(val);
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
-         const bool sliderMoved = AudioSliderFloat("##hslider", &v, minV, maxV, "%.2f", sliderW, fillCol, isModulated, p2v, v2p);
+         // Same anatomy as the vertical fader, turned on its side: a thin recessed track, a fill in the
+         // control's colour, tick marks above and below, and a rectangular cap with a centre line.
+         auto toPos = [&](float x) { return v2p ? std::clamp(v2p(x, minV, maxV), 0.0f, 1.0f) : std::clamp((x - minV) / (maxV - minV), 0.0f, 1.0f); };
+         const ImVec2 sTL = ImGui::GetCursorScreenPos();
+         const float sH = 30.0f;
+         ImGui::InvisibleButton("##hslider", ImVec2(sliderW, sH));
+         const bool sActive = !isModulated && ImGui::IsItemActive();
+         const bool sHover = ImGui::IsItemHovered();
+         bool sliderMoved = false;
+         const float left = sTL.x + 10.0f, right = sTL.x + sliderW - 10.0f, cy = sTL.y + sH * 0.5f;
+         if (sActive)
+         {
+            const float pos = std::clamp((ImGui::GetIO().MousePos.x - left) / (right - left), 0.0f, 1.0f);
+            const float next = p2v ? std::clamp(p2v(pos, minV, maxV), minV, maxV) : std::clamp(minV + (maxV - minV) * pos, minV, maxV);
+            if (next != v) { v = next; sliderMoved = true; }
+         }
+         const float capX = left + toPos(v) * (right - left);
+         const ImU32 tickCol = wellCol(0.2f);
+         for (int i = 0; i <= 4; i++)
+         {
+            const float x = left + (float)i * 0.25f * (right - left);
+            dl->AddLine(ImVec2(x, cy - 12.0f), ImVec2(x, cy - 9.0f), tickCol, 1.0f);
+            dl->AddLine(ImVec2(x, cy + 9.0f), ImVec2(x, cy + 12.0f), tickCol, 1.0f);
+         }
+         dl->AddRectFilled(ImVec2(left - 4.0f, cy - 3.0f), ImVec2(right + 4.0f, cy + 3.0f), wellCol(0.12f), 3.0f);
+         if (capX > left)
+            dl->AddRectFilled(ImVec2(left - 4.0f, cy - 2.0f), ImVec2(capX, cy + 2.0f), fillCol, 2.0f);
+         const ImVec2 cTL(capX - 6.0f, cy - 9.0f), cBR(capX + 6.0f, cy + 9.0f);
+         dl->AddRectFilled(cTL, cBR, isLight ? ImGui::GetColorU32(ImVec4(1, 1, 1, 0.95f)) : wellCol(0.28f), 3.0f);
+         dl->AddRect(cTL, cBR, wellCol(sActive ? 0.5f : (sHover ? 0.3f : 0.15f)), 3.0f);
+         dl->AddLine(ImVec2(capX, cy - 7.0f), ImVec2(capX, cy + 7.0f), wellCol(0.8f), 1.6f);
+         if (sHover || sActive)
+         {
+            char valBuf[48];
+            FormatAudioParam(valBuf, sizeof(valBuf), "%.2f", v);
+            SetAudioReadout(displayLabel.c_str(), valBuf);
+         }
          dragHold(v);
          if (sliderMoved)
          {

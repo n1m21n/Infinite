@@ -3717,13 +3717,20 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gViewportPanelOpen = o.find("viewport") != std::string::npos;
       gNodePanelOpen = o.find("library") != std::string::npos;
       // "perfdemo": one of each Performance control, for design review screenshots.
-      if (o.find("perfdemo") != std::string::npos)
+      // "perfedit" is the same in Edit Mode with the first two cards selected and the third in MIDI learn.
+      if (o.find("perfdemo") != std::string::npos || o.find("perfedit") != std::string::npos)
       {
          gPerfPanelOpen = true;
-         gPerfEditMode = false;
+         gPerfEditMode = o.find("perfedit") != std::string::npos;
          gPerfPanelHeight = 620.0f;
          for (int k = 0; k < 10; ++k)
             AddPerfElementToCurrentPage(k);
+         if (gPerfEditMode)
+         {
+            gPerfSelection.insert(0);
+            gPerfSelection.insert(1);
+            gPerfMidiLearnIdx = 2;
+         }
       }
       // "library:field|samples|media|plugins" picks the mode shown (default Modules).
       if (o.find("field") != std::string::npos) gSearchPanelMode = 4;
