@@ -13,7 +13,7 @@
 
 namespace LibraryParts
 {
-   constexpr float kFieldH = 32.0f;
+   constexpr float kFieldH = 36.0f;
    constexpr float kRowH = 26.0f;
    constexpr float kHeaderH = 28.0f;
 

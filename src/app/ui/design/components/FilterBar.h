@@ -15,7 +15,7 @@
 
 namespace FilterBar
 {
-   constexpr float kHeight = 32.0f;
+   constexpr float kHeight = 36.0f;
 
    namespace detail
    {
@@ -25,7 +25,9 @@ namespace FilterBar
       {
          const ImVec4 t = TextCol();
          dl->AddRectFilled(ImVec2(r.x, r.y), ImVec2(r.Right(), r.Bottom()),
-                           ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.07f + 0.03f * hv)), tok::radius_tile);
+                           ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.04f + 0.05f * hv)), tok::radius_tile);
+         dl->AddRect(ImVec2(r.x + 0.5f, r.y + 0.5f), ImVec2(r.Right() - 0.5f, r.Bottom() - 0.5f),
+                     ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.14f + 0.08f * hv)), tok::radius_tile);
          if (tint > 0.001f)
          {
             const ImVec4 a = app::AccentEmphasisSelected();
@@ -55,17 +57,20 @@ namespace FilterBar
          Well(dl, r, hv, on);
          const ImVec4 t = TextCol();
          UiType::Scope ts(UiType::Size::Title);
-         const std::string label = std::string(caption) + ": " + value;
-         const float tx = r.x + tok::space_3;
+         const std::string cap = std::string(caption) + "  ";
+         const float capW = ImGui::CalcTextSize(cap.c_str()).x;
+         const std::string label = value;
+         const float tx = r.x + tok::space_3 + capW;
          const float trail = r.Right() - tok::space_2 - 8.0f;
-         const float room = trail - tok::space_2 - tx;
+         const float room = trail - tok::space_2 - tx;  // value gets what the caption leaves
          std::string shown = label;
          while (shown.size() > 3 && ImGui::CalcTextSize(shown.c_str()).x > room)
             shown.pop_back();
          if (shown != label)
             shown += "...";
-         dl->AddText(ImVec2(tx, std::round(r.CenterY() - ImGui::GetFontSize() * 0.5f)),
-                     ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.92f)), shown.c_str());
+         const float ty = std::round(r.CenterY() - ImGui::GetFontSize() * 0.5f);
+         dl->AddText(ImVec2(r.x + tok::space_3, ty), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.5f)), cap.c_str());
+         dl->AddText(ImVec2(tx, ty), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.95f)), shown.c_str());
          bool cleared = false;
          if (active)
          {
@@ -118,7 +123,7 @@ namespace FilterBar
       std::vector<UiLayout::Cell> cells = { UiLayout::Flex(), UiLayout::Fixed(kHeight) };
       if (!typeNames.empty())
          cells.push_back(UiLayout::Flex());
-      const std::vector<UiLayout::Rect> c = UiLayout::Row(row, cells, tok::space_2);
+      const std::vector<UiLayout::Rect> c = UiLayout::Row(row, cells, tok::space_3);
 
       ImGui::PushID(key);
       const std::string kSort = std::string(key) + ".sort", kDir = std::string(key) + ".dir",
