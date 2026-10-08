@@ -3707,7 +3707,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    char recordPath[512] = "";
    snprintf(recordPath, sizeof(recordPath), "%s/infinite_output.mp4", desktopDir.c_str());
 
-   // Design previews: open docked panels for a screenshot (INFINITE_OPENPANELS=arrange,modmatrix,perf,viewport).
+   // Design previews: open docked panels for a screenshot (INFINITE_OPENPANELS=arrange,modmatrix,perf,viewport,library).
    if (const char* op = getenv("INFINITE_OPENPANELS"))
    {
       const std::string o(op);
@@ -3715,6 +3715,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gModMatrixOpen = o.find("modmatrix") != std::string::npos;
       gPerfPanelOpen = o.find("perf") != std::string::npos;
       gViewportPanelOpen = o.find("viewport") != std::string::npos;
+      gNodePanelOpen = o.find("library") != std::string::npos;
    }
 
    if (HeadlessJobActive())
