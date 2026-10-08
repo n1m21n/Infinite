@@ -1550,7 +1550,7 @@ namespace app
          // arc. At the old 2px the two visually touched and read as one
          // control with a wart on it rather than as a knob and its pin.
          const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - 8.0f);
-         const ImVec2 pinTL(pinX, cellOrigin.y + diameter - box);
+         const ImVec2 pinTL(pinX, cellOrigin.y + (diameter - box) * 0.5f);  // centred on the knob (node-ui-pillars P2)
          ImGui::SetCursorScreenPos(pinTL);
          ed::BeginPin(pinId, ed::PinKind::Input);
          ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
