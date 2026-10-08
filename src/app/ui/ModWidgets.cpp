@@ -1563,6 +1563,7 @@ namespace app
             dl->AddCircleFilled(c, 2.0f, pinColor);
          ExpandPinHit(c, pinTL.x + box);
          ed::EndPin();
+         gPinAnchors[pinId] = c;
          GraphNode* curGn = FindNodeByIndex(nodeIndex);
          ParamPinScreenInfo pinInfo{ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
                                       cellOrigin, ImVec2(cellOrigin.x + cell, cellOrigin.y + diameter + 16.0f) };

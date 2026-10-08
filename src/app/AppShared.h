@@ -1731,6 +1731,10 @@ extern std::set<int> gDrawnParamPins;
 // NoteHiddenParamAnchor and the dotted-cable pass in DrawLinks.
 extern std::map<int, ImVec2> gPinAnchors;
 void NoteHiddenParamAnchor(int nodeIndex, int paramIndex, const ImVec2& screenPos);
+// A hidden param whose cable should land on another (drawn) param's pin: the EQ's
+// unselected bands share one set of knobs, so their dotted cables end on those.
+void NoteHiddenParamAlias(int nodeIndex, int hiddenParam, int shownParam);
+extern std::map<int, int> gPinAlias;
 
 extern bool gParamRegisterOnly;
 

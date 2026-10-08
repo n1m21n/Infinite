@@ -805,7 +805,7 @@ namespace app
 
             if (!isSelected)
                for (int k = 0; k < 3; k++)
-                  NoteHiddenParamAnchor(gCurrentNodeIndex, EqBandKnobParam(b, k), ImVec2(hx[b], hy[b]));
+                  NoteHiddenParamAlias(gCurrentNodeIndex, EqBandKnobParam(b, k), EqBandKnobParam(selected, k));
 
             const float dotR = isSelected ? (dotActiveHere ? 6.5f : 4.8f) : (dotActiveHere ? 5.0f : 3.2f);
             const ImU32 dotCol = dotRec ? recCol : IM_COL32(235, 245, 255, isSelected ? 255 : 170);

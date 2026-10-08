@@ -102,7 +102,8 @@ void DrawLinks(FrameCtx& fc)
             // as a dotted cable to that spot instead.
             const int srcPin = source->OutputPinId(link.second.outputIndex);
             auto from = gPinAnchors.find(srcPin);
-            auto to = gPinAnchors.find(paramPin);
+            auto alias = gPinAlias.find(paramPin);
+            auto to = gPinAnchors.find(alias != gPinAlias.end() ? alias->second : paramPin);
             if (from != gPinAnchors.end() && to != gPinAnchors.end() && (gCableVisibilityMask & 0x4))
             {
                CategoryColors::Color c = CategoryColors::CableColorFor(CategoryColors::CableType::Modulation);
