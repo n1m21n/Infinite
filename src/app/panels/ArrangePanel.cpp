@@ -25,7 +25,7 @@ namespace app
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(p, ImVec2(p.x + sz, p.y + sz), ImGui::GetColorU32(bg), tok::radius_tile);
          const ImVec2 ts = ImGui::CalcTextSize(letter);
-         dl->AddText(ImVec2(std::round(p.x + (sz - ts.x) * 0.5f), std::round(p.y + (sz - ts.y) * 0.5f)),
+         dl->AddText(ImVec2(std::round(p.x + (sz - ts.x) * 0.5f), std::round(p.y + (sz - ts.y) * 0.5f) - 1.0f),
                      ImGui::GetColorU32(*v ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.8f)), letter);
          return clicked;
       }
@@ -2609,7 +2609,8 @@ namespace app
 
          // Old full sizes for mixer controls
          const float kMixCtl = 18.0f, kMixGap = 3.0f;
-         const float kMixStripW = kMixCtl * 4.0f + kMixGap * 3.0f; // 81px
+         const float kMixKnobGap = 9.0f; // knob arcs reach past their 18px box
+         const float kMixStripW = kMixCtl * 4.0f + kMixGap + 6.0f + kMixKnobGap; // 90px
          const bool isVideoForName = lane.type == Arrange::kLaneVideo;
 
          const float contentStartX = headerStartX + 4.0f + (float)laneDepth * kGroupIndent;
@@ -2717,7 +2718,7 @@ namespace app
                ImGui::SameLine(0.0f, kMixGap);
                bool mute = lane.mute;
                mixGesture(MixToggle("##lanemute", "M", &mute, kMixCtl, app::AccentEmphasisSelected()), [&] { lane.mute = mute; });
-               ImGui::SameLine(0.0f, kMixGap);
+               ImGui::SameLine(0.0f, 6.0f);
                float pan = lane.pan;
                const bool panChanged = BipolarKnobFloat("##lanepan", &pan, -1.0f, 1.0f, "%.2f", kMixCtl, mixFill,
                                                         false, 0.0f, -1, -1, false, 0.0f, 0.0f, false,
@@ -2730,7 +2731,7 @@ namespace app
                   else
                      ImGui::SetTooltip("%s %d", lane.pan < 0.0f ? "L" : "R", (int)std::lround(std::fabs(lane.pan) * 100.0f));
                }
-               ImGui::SameLine(0.0f, kMixGap);
+               ImGui::SameLine(0.0f, kMixKnobGap);
                float gainDb = lane.gainDb;
                bool gainChanged = KnobFloat("##lanegain", &gainDb, -60.0f, 12.0f, "%.1f dB", kMixCtl, mixFill, false);
                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && gainDb != 0.0f)
