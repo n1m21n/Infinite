@@ -36,6 +36,7 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | N2 sections, N3 cables (draw order over nodes), N4 groups, N5 grid/marquee | not started |
 | V1-V7 visualizers | not started |
 | Font sizes inside nodes | one size (15) in Chorus; other nodes not audited (`NoteBodies.cpp`, `SamplerBodies.cpp`, `StageKeyboard.cpp` scale text) |
+| Clip Settings, Render popup + progress/overwrite/fail dialogs, Viewport panel cards, node picker nav ring | done 2026-10-08 (`SectionCard` component; dark checked, light on Viewport only; dialogs not yet shot) |
 | A3 File / Edit / main menus | **rework**: owner request 2026-10-08, same recipe as the top bar (row height, hover wash, glyph + shortcut columns, hairline separators). Not started |
 | A7 Settings window + every tab | **rework**: owner request 2026-10-08. Every tab and every setting row on the design language: one row grammar (label left, control right), same controls as nodes (C2/C4/C6/C9), spacing tokens, symmetrical columns, light + dark proof per tab. Not started |
 | Node search popup | search field now uses `LibraryParts::SearchField` (magnifier was missing: Lucide font glyph not loaded). Done 2026-10-08 |
