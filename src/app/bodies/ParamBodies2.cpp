@@ -1,4 +1,5 @@
 // Generic node parameter bodies, part 2: curves, palettes, ramps, analyze (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -104,8 +105,8 @@ namespace app
       if (crosshair)
       {
          ImVec2 mid = toScreen(0.5f, 0.5f);
-         dl->AddLine(ImVec2(mid.x, origin.y), ImVec2(mid.x, br.y), isLight ? IM_COL32(100, 110, 130, 200) : IM_COL32(120, 124, 140, 200));
-         dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), isLight ? IM_COL32(100, 110, 130, 200) : IM_COL32(120, 124, 140, 200));
+         dl->AddLine(ImVec2(mid.x, origin.y), ImVec2(mid.x, br.y), isLight ? tok::U32(tok::pal::c_646E82C8) : tok::U32(tok::pal::c_787C8CC8));
+         dl->AddLine(ImVec2(origin.x, mid.y), ImVec2(br.x, mid.y), isLight ? tok::U32(tok::pal::c_646E82C8) : tok::U32(tok::pal::c_787C8CC8));
       }
 
       const int kSegments = 64;
@@ -120,14 +121,14 @@ namespace app
       {
          ImVec2 sp = toScreen(pts[i].x, pts[i].y);
          dl->AddCircleFilled(sp, i == nearest ? 6.0f : 4.5f, lineCol);
-         dl->AddCircle(sp, i == nearest ? 6.0f : 4.5f, isLight ? IM_COL32(240, 242, 248, 255) : IM_COL32(18, 18, 26, 255), 0, 1.5f);
+         dl->AddCircle(sp, i == nearest ? 6.0f : 4.5f, isLight ? tok::U32(tok::pal::c_F0F2F8FF) : tok::U32(tok::pal::c_12121AFF), 0, 1.5f);
       }
       if (liveX >= 0.0f)
       {
          float clampedX = std::min(1.0f, std::max(0.0f, liveX));
          ImVec2 dot = toScreen(clampedX, shape.Evaluate(clampedX));
-         dl->AddCircleFilled(dot, 5.0f, isLight ? IM_COL32(220, 130, 20, 255) : IM_COL32(255, 200, 60, 255));
-         dl->AddCircle(dot, 5.0f, isLight ? IM_COL32(240, 242, 248, 255) : IM_COL32(18, 18, 26, 255), 0, 1.5f);
+         dl->AddCircleFilled(dot, 5.0f, isLight ? tok::U32(tok::pal::c_DC8214FF) : tok::U32(tok::pal::c_FFC83CFF));
+         dl->AddCircle(dot, 5.0f, isLight ? tok::U32(tok::pal::c_F0F2F8FF) : tok::U32(tok::pal::c_12121AFF), 0, 1.5f);
       }
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
    }
@@ -138,10 +139,10 @@ namespace app
       DropdownButton("channel", CurvesNode::ChannelNames(), n->activeChannel,
                      [n](int i) { n->activeChannel = i; });
       const bool isLight = IsThemeLight();
-      ImU32 lineCol = isLight ? IM_COL32(30, 40, 60, 255) : IM_COL32(230, 235, 250, 255);
-      if (n->activeChannel == CurvesNode::kRed)   lineCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(255, 110, 110, 255);
-      if (n->activeChannel == CurvesNode::kGreen) lineCol = isLight ? IM_COL32(25, 160, 60, 255) : IM_COL32(120, 230, 130, 255);
-      if (n->activeChannel == CurvesNode::kBlue)  lineCol = isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(120, 170, 255, 255);
+      ImU32 lineCol = isLight ? tok::U32(tok::pal::c_1E283CFF) : tok::U32(tok::pal::c_E6EBFAFF);
+      if (n->activeChannel == CurvesNode::kRed)   lineCol = isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_FF6E6EFF);
+      if (n->activeChannel == CurvesNode::kGreen) lineCol = isLight ? tok::U32(tok::pal::c_19A03CFF) : tok::U32(tok::pal::c_78E682FF);
+      if (n->activeChannel == CurvesNode::kBlue)  lineCol = isLight ? tok::U32(tok::pal::c_1E64E6FF) : tok::U32(tok::pal::c_78AAFFFF);
       DrawCurveEditor(n->Shape(n->activeChannel), lineCol);
       if (ImGui::Button("Reset channel", ImVec2(kPreviewSize, 0)))
          n->ResetChannel(n->activeChannel);
@@ -192,8 +193,8 @@ namespace app
          snprintf(confText, sizeof(confText), "learning - %d%%", (int)std::round(badgeVal * 100.0f));
       else
          snprintf(confText, sizeof(confText), "%d%% conf", (int)std::round(badgeVal * 100.0f));
-      ImGui::TextColored(badgeVal > 0.6f ? (isLight ? ImVec4(0.1f, 0.6f, 0.2f, 1.0f) : ImVec4(0.2f, 0.85f, 0.35f, 1.0f))
-                                    : (isLight ? ImVec4(0.7f, 0.4f, 0.1f, 1.0f) : ImVec4(0.9f, 0.7f, 0.2f, 1.0f)),
+      ImGui::TextColored(badgeVal > 0.6f ? (isLight ? tok::V4(tok::palf::v_100_600_200_1000) : tok::V4(tok::palf::v_200_850_350_1000))
+                                    : (isLight ? tok::V4(tok::palf::v_700_400_100_1000) : tok::V4(tok::palf::v_900_700_200_1000)),
                          "%s", confText);
 
       PushCheckboxStyle();
@@ -210,7 +211,7 @@ namespace app
    {
       const bool isLight = IsThemeLight();
       const float in = n->input ? n->input->Value01() : n->constantIn;
-      DrawCurveEditor(n->curve, isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(230, 235, 250, 255), /*resetOnEmptyRightClick=*/true,
+      DrawCurveEditor(n->curve, isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_E6EBFAFF), /*resetOnEmptyRightClick=*/true,
                      /*crosshair=*/true, /*liveX=*/in);
       if (n->input == nullptr)
          ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
@@ -298,7 +299,7 @@ namespace app
       const float h = 118.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                        IM_COL32(18, 18, 24, 255), 4.0f);
+                        tok::U32(tok::pal::c_121218FF), 4.0f);
 
       const int count = std::max(1, n->SwatchCount());
       const float pad = 6.0f;
@@ -321,11 +322,11 @@ namespace app
          const float weight = n->SwatchWeight(i);
          dl->AddRectFilled(ImVec2(tl.x, br.y + 4.0f),
                            ImVec2(tl.x + (chipW - 2.0f) * std::min(1.0f, weight), br.y + 7.0f),
-                           IM_COL32(150, 156, 176, 255));
+                           tok::U32(tok::pal::c_969CB0FF));
 
          char idx[8];
          snprintf(idx, sizeof(idx), "%d", i + 1);
-         dl->AddText(ImVec2(tl.x + 2.0f, br.y + 9.0f), IM_COL32(118, 124, 144, 255), idx);
+         dl->AddText(ImVec2(tl.x + 2.0f, br.y + 9.0f), tok::U32(tok::pal::c_767C90FF), idx);
       }
 
       const char* status;
@@ -336,10 +337,10 @@ namespace app
       else
          status = "choose a photo, or cable one to 'ref'";
       dl->AddText(ImVec2(origin.x + pad, origin.y + h - 18.0f),
-                  IM_COL32(126, 132, 152, 255), status);
+                  tok::U32(tok::pal::c_7E8498FF), status);
 
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                  IM_COL32(70, 74, 90, 255), 4.0f);
+                  tok::U32(tok::pal::c_464A5AFF), 4.0f);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
    }
 
@@ -454,13 +455,13 @@ namespace app
          ImU32 col1 = IM_COL32((int)(c1[0] * 255), (int)(c1[1] * 255), (int)(c1[2] * 255), 255);
          dl->AddRectFilledMultiColor(tl, br, col0, col1, col1, col0);
       }
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(70, 74, 90, 255), 3.0f);
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::U32(tok::pal::c_464A5AFF), 3.0f);
 
       // stop track
       ImVec2 trackOrigin(origin.x, origin.y + barH + gap);
       ImVec2 trackBr(origin.x + size, trackOrigin.y + trackH);
-      dl->AddRectFilled(trackOrigin, trackBr, IM_COL32(16, 16, 22, 255), 3.0f);
-      dl->AddRect(trackOrigin, trackBr, IM_COL32(70, 74, 90, 255), 3.0f);
+      dl->AddRectFilled(trackOrigin, trackBr, tok::U32(tok::pal::c_101016FF), 3.0f);
+      dl->AddRect(trackOrigin, trackBr, tok::U32(tok::pal::c_464A5AFF), 3.0f);
 
       ImGui::SetCursorScreenPos(trackOrigin);
       ImGui::InvisibleButton("##colorramp", ImVec2(size, trackH));
@@ -543,7 +544,7 @@ namespace app
          float r = (i == nearest || isSel) ? 7.0f : 5.5f;
          ImVec2 tip(x, trackOrigin.y + 2.0f);
          dl->AddTriangleFilled(ImVec2(x - r, tip.y + r * 1.6f), ImVec2(x + r, tip.y + r * 1.6f), tip,
-                               isSel ? IM_COL32(255, 220, 120, 255) : IM_COL32(220, 224, 236, 255));
+                               isSel ? tok::U32(tok::pal::c_FFDC78FF) : tok::U32(tok::pal::c_DCE0ECFF));
          ImVec2 chipTl(x - r * 0.6f, tip.y + r * 1.6f + 1.0f);
          dl->AddRectFilled(chipTl, ImVec2(chipTl.x + r * 1.2f, chipTl.y + 5.0f), fill);
       }
@@ -656,7 +657,7 @@ namespace app
          }
          if (!n->ExpressionError().empty())
          {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "err: %s", n->ExpressionError().c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_400_400_1000), "err: %s", n->ExpressionError().c_str());
          }
          else
          {

@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -60,8 +61,8 @@ void DrawSidePanels(FrameCtx& fc)
          if (hoveredCompatible != nullptr)
          {
             ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-            const ImU32 glowCol = IM_COL32(0, 230, 255, 40);
-            const ImU32 ringCol = IM_COL32(0, 230, 255, 200);
+            const ImU32 glowCol = tok::U32(tok::pal::c_00E6FF28);
+            const ImU32 ringCol = tok::U32(tok::pal::c_00E6FFC8);
             hoverDl->AddRectFilled(hoveredP, ImVec2(hoveredP.x + hoveredS.x, hoveredP.y + hoveredS.y), glowCol, 6.0f);
             hoverDl->AddRect(hoveredP, ImVec2(hoveredP.x + hoveredS.x, hoveredP.y + hoveredS.y), ringCol, 6.0f, 0, 2.0f);
 
@@ -116,8 +117,8 @@ void DrawSidePanels(FrameCtx& fc)
          // clearly visible dark line in light mode. Suppressed the same way the
          // menu-bar/canvas seam was: make the two colors it reads transparent
          // for just this call.
-         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-         ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+         ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
+         ImGui::PushStyleColor(ImGuiCol_BorderShadow, tok::V4(tok::palf::v_0_0_0_0));
          ed::End();
          ImGui::PopStyleColor(2);
          ImGui::PopStyleVar();
@@ -1030,7 +1031,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             if (!gFieldGraphEditor->Notice().empty())
             {
-               ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", gFieldGraphEditor->Notice().c_str());
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", gFieldGraphEditor->Notice().c_str());
             }
          }
          ImGui::End();

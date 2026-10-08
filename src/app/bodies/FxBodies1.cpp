@@ -1,4 +1,5 @@
 // Filter, EQ, dynamics, delay, reverb and drive bodies + visualizers (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -179,8 +180,8 @@ namespace app
    {
       const float binWidth = (float)(sampleRate > 0.0 ? sampleRate : 44100.0) / 1024.0f;
       const float baselineY = origin.y + h;
-      const ImU32 fillCol = isLight ? IM_COL32(70, 90, 120, 40) : IM_COL32(210, 220, 235, 40);
-      const ImU32 lineCol = isLight ? IM_COL32(70, 90, 120, 130) : IM_COL32(210, 220, 235, 130);
+      const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_465A7828) : tok::U32(tok::pal::c_D2DCEB28);
+      const ImU32 lineCol = isLight ? tok::U32(tok::pal::c_465A7882) : tok::U32(tok::pal::c_D2DCEB82);
 
       float prevX = FilterVizFreqToX(binWidth, origin.x, w);
       float prevY = AudioSpectrumDbToY(20.0f * log10f(std::max(st.smoothed[1], 1.0e-6f)), origin.y, h);
@@ -315,7 +316,7 @@ namespace app
       if (cachedPoints > 1)
       {
          const float yBottom = origin.y + h;
-         const ImU32 fillCol = isLight ? IM_COL32(30, 110, 230, 32) : IM_COL32(100, 180, 255, 36);
+         const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_1E6EE620) : tok::U32(tok::pal::c_64B4FF24);
          for (int i = 0; i < cachedPoints - 1; i++)
          {
             const float x0 = origin.x + (float)i * (w / (float)(cachedPoints - 1));
@@ -332,7 +333,7 @@ namespace app
          const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
       // Live LFO sweep indicator (envAmount != 0): a second curve, in yellow,
       // overlaid on top of the static base curve above - it never replaces
@@ -362,7 +363,7 @@ namespace app
             const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(IM_COL32(255, 205, 60, 210), 0, 1.5f);
+         dl->PathStroke(tok::U32(tok::pal::c_FFCD3CD2), 0, 1.5f);
       }
 
       const float hx = FilterVizFreqToX(freq, origin.x, w);
@@ -394,11 +395,11 @@ namespace app
       // Handle stays at the real (non-LFO-shifted) freq/gain - it's the
       // knob-set value, and only the yellow overlay above should visually
       // sweep. Shift-drag on the handle adjusts Q / resonance.
-      dl->AddCircleFilled(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, IM_COL32(235, 245, 255, 255), 12);
-      dl->AddCircle(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, IM_COL32(20, 24, 32, 220), 12, 1.5f);
+      dl->AddCircleFilled(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, tok::U32(tok::pal::c_EBF5FFFF), 12);
+      dl->AddCircle(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, tok::U32(tok::pal::c_141820DC), 12, 1.5f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? (isLight ? IM_COL32(50, 120, 220, 255) : IM_COL32(110, 140, 180, 255))
+      dl->AddRect(origin, br, hovered ? (isLight ? tok::U32(tok::pal::c_3278DCFF) : tok::U32(tok::pal::c_6E8CB4FF))
                                       : ScopeBorderCol(), 3.0f);
 
       if (isNear)
@@ -641,7 +642,7 @@ namespace app
             const float y = FilterVizDbToY(cache.bandCurveDb[b][i], origin.y, h);
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(IM_COL32(150, 214, 255, 60), 0, 1.0f);
+         dl->PathStroke(tok::U32(tok::pal::c_96D6FF3C), 0, 1.0f);
       }
 
       // Composite curve, bright, with a soft fill down to the 0 dB baseline -
@@ -655,7 +656,7 @@ namespace app
          const float y0 = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          const float y1 = FilterVizDbToY(cache.curveDb[i + 1], origin.y, h);
          dl->AddQuadFilled(ImVec2(x0, baselineY), ImVec2(x1, baselineY), ImVec2(x1, y1), ImVec2(x0, y0),
-                           isLight ? IM_COL32(30, 110, 230, 30) : IM_COL32(150, 214, 255, 22));
+                           isLight ? tok::U32(tok::pal::c_1E6EE61E) : tok::U32(tok::pal::c_96D6FF16));
       }
 
       // Persistent selected-band caption - unlike the hover readout below,
@@ -679,7 +680,7 @@ namespace app
          const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
       // Handle positions for every band - one white dot each on the curve.
       float hx[5], hy[5];
@@ -818,12 +819,12 @@ namespace app
                dl->AddCircle(ImVec2(hx[b], hy[b]), dotR,
                              dotRec ? recCol : IM_COL32(235, 245, 255, isSelected ? 220 : 120), 12, 1.5f);
             }
-            dl->AddCircle(ImVec2(hx[b], hy[b]), dotR, IM_COL32(20, 24, 32, 220), 12, 1.2f);
+            dl->AddCircle(ImVec2(hx[b], hy[b]), dotR, tok::U32(tok::pal::c_141820DC), 12, 1.2f);
          }
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? (isLight ? IM_COL32(50, 120, 220, 255) : IM_COL32(110, 140, 180, 255))
+      dl->AddRect(origin, br, hovered ? (isLight ? tok::U32(tok::pal::c_3278DCFF) : tok::U32(tok::pal::c_6E8CB4FF))
                                       : ScopeBorderCol(), 3.0f);
 
       if (hovered || active)
@@ -1033,13 +1034,13 @@ namespace app
       // 1:1 reference diagonal (unprocessed signal), dim.
       dl->AddLine(ImVec2(DynVizDbToX(kDynVizMinDb, origin.x, curveW), DynVizDbToY(kDynVizMinDb, origin.y, h)),
                   ImVec2(DynVizDbToX(kDynVizMaxDb, origin.x, curveW), DynVizDbToY(kDynVizMaxDb, origin.y, h)),
-                  IM_COL32(255, 255, 255, 24), 1.0f);
+                  tok::U32(tok::pal::c_FFFFFF18), 1.0f);
 
       // Threshold marker - a vertical line at the knee so the point the
       // curve bends at reads as a control, not just an inflection the eye
       // has to find. Amber to stay distinct from the curve (blue) and the
       // live operating point (white) drawn below.
-      const ImU32 thresholdCol = isLight ? IM_COL32(210, 130, 20, 200) : IM_COL32(255, 180, 70, 190);
+      const ImU32 thresholdCol = isLight ? tok::U32(tok::pal::c_D28214C8) : tok::U32(tok::pal::c_FFB446BE);
       const float threshX = DynVizDbToX(threshold, origin.x, curveW);
       dl->AddLine(ImVec2(threshX, origin.y), ImVec2(threshX, curveBr.y), thresholdCol, 1.5f);
 
@@ -1057,7 +1058,7 @@ namespace app
          const float yDb = DynamicsDsp::GainComputerDb(xDb, threshold, ratio) + makeupDb;
          dl->PathLineTo(ImVec2(x, DynVizDbToY(yDb, origin.y, h)));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
       // Live operating point - where the signal actually is right now, read
       // straight off the kernel's own smoothed envelope (ExtraMeterValue),
@@ -1079,10 +1080,10 @@ namespace app
          if (liveGrDb > 0.05f)
          {
             dl->AddLine(ImVec2(dotX, unprocessedY), ImVec2(dotX, dotY),
-                        isLight ? IM_COL32(230, 120, 20, 150) : IM_COL32(255, 160, 60, 150), 2.5f);
+                        isLight ? tok::U32(tok::pal::c_E6781496) : tok::U32(tok::pal::c_FFA03C96), 2.5f);
          }
 
-         const ImU32 dotCol = isLight ? IM_COL32(20, 20, 20, 255) : IM_COL32(255, 255, 255, 255);
+         const ImU32 dotCol = isLight ? tok::U32(tok::pal::c_141414FF) : tok::U32(tok::pal::c_FFFFFFFF);
          dl->AddCircleFilled(ImVec2(dotX, dotY), 4.0f, dotCol);
          dl->AddCircle(ImVec2(dotX, dotY), 4.0f, ScopeBgCol(), 0, 1.5f);
       }
@@ -1102,7 +1103,7 @@ namespace app
          if (grT > 0.005f)
          {
             dl->AddRectFilled(ImVec2(meterOrigin.x + 1.0f, barTop), ImVec2(meterBr.x - 1.0f, meterBr.y),
-                              isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 160, 60, 220), 1.5f);
+                              isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFA03CDC), 1.5f);
          }
          dl->AddRect(meterOrigin, meterBr, ScopeBorderCol(), 2.0f);
       }
@@ -1214,7 +1215,7 @@ namespace app
       const float barBottom = y + std::clamp(grDb / 20.0f, 0.0f, 1.0f) * h;
       if (barBottom > y + 1.0f)
          dl->AddRectFilled(ImVec2(x + 4.0f, y), ImVec2(br.x - 4.0f, barBottom),
-                           isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 160, 60, 220), 2.0f);
+                           isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFA03CDC), 2.0f);
 
       dl->PopClipRect();
       dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
@@ -1314,7 +1315,7 @@ namespace app
          const float x = origin.x + std::clamp(t / windowSeconds, 0.0f, 1.0f) * w;
          const float barTopY = origin.y + barsH - amp * barsH;
          dl->AddRectFilled(ImVec2(x - barHalfW, barTopY), ImVec2(x + barHalfW, origin.y + barsH),
-                           isLight ? IM_COL32(30, 110, 230, 230) : IM_COL32(150, 214, 255, 220));
+                           isLight ? tok::U32(tok::pal::c_1E6EE6E6) : tok::U32(tok::pal::c_96D6FFDC));
          amp *= feedback;
          t += baseSeconds;
       }
@@ -1482,7 +1483,7 @@ namespace app
          const float y = br.y - amp * (h - 6.0f);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
       dl->PopClipRect();
       dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
@@ -1600,7 +1601,7 @@ namespace app
          const float y = origin.y + (0.5f - 0.5f * yOut) * h;
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
       dl->PopClipRect();
       dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
@@ -1732,7 +1733,7 @@ namespace app
       const float lastOut =
          std::clamp(WavetableShaperDsp::Shape(lastIn, table, position, driveDb, bias, smooth), -1.0f, 1.0f);
       const ImVec2 dot(origin.x + (0.5f + 0.5f * lastIn) * w, origin.y + (0.5f - 0.5f * lastOut) * h);
-      dl->AddCircleFilled(dot, 3.5f, isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 214, 120, 230));
+      dl->AddCircleFilled(dot, 3.5f, isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFD678E6));
 
       dl->PopClipRect();
       dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
@@ -1863,20 +1864,20 @@ namespace app
       dl->PathLineTo(apex);
       dl->PathLineTo(leftPt);
       dl->PathLineTo(rightPt);
-      dl->PathFillConvex(isLight ? IM_COL32(110, 90, 210, 80) : IM_COL32(150, 130, 230, 90));
+      dl->PathFillConvex(isLight ? tok::U32(tok::pal::c_6E5AD250) : tok::U32(tok::pal::c_9682E65A));
 
       dl->PathClear();
       dl->PathLineTo(leftPt);
       dl->PathLineTo(apex);
       dl->PathLineTo(rightPt);
-      dl->PathStroke(isLight ? IM_COL32(120, 80, 230, 235) : IM_COL32(190, 170, 255, 235), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_7850E6EB) : tok::U32(tok::pal::c_BEAAFFEB), 0, 1.8f);
 
       if (bassMonoHz > 0.0f)
       {
          char blo[24];
          snprintf(blo, sizeof(blo), "mono <%.0f Hz", bassMonoHz);
          dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f),
-                     isLight ? IM_COL32(210, 100, 20, 230) : IM_COL32(255, 196, 120, 210), blo);
+                     isLight ? tok::U32(tok::pal::c_D26414E6) : tok::U32(tok::pal::c_FFC478D2), blo);
       }
 
       dl->PopClipRect();
@@ -1937,7 +1938,7 @@ namespace app
       const float pitch = std::clamp(n->Param("pitch"), -24.0f, 24.0f);
       const float t = 0.5f + 0.5f * (pitch / 24.0f);
       const float markX = origin.x + t * w;
-      dl->AddCircleFilled(ImVec2(markX, midY), 6.0f, isLight ? IM_COL32(30, 110, 230, 245) : IM_COL32(150, 214, 255, 245));
+      dl->AddCircleFilled(ImVec2(markX, midY), 6.0f, isLight ? tok::U32(tok::pal::c_1E6EE6F5) : tok::U32(tok::pal::c_96D6FFF5));
 
       char buf[32];
       snprintf(buf, sizeof(buf), "%+.1f st", pitch);

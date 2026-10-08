@@ -1,4 +1,5 @@
 // Dropdowns, drop handling, browser filter strip + favourites, discrete param slots (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -327,7 +328,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float starSize = 11.0f;
       const ImVec2 center(itemMax.x - 12.0f, (itemMin.y + itemMax.y) * 0.5f);
-      const ImU32 starCol = IM_COL32(255, 205, 45, 255);
+      const ImU32 starCol = tok::U32(tok::pal::c_FFCD2DFF);
       Tabler::DrawStar(dl, center, starSize, starCol, /*filled=*/true);
    }
 

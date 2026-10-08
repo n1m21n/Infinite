@@ -1,4 +1,5 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -123,7 +124,7 @@ namespace app
          const CategoryColors::Color& c = CategoryColors::ColorFor(dstNode->category);
          return IM_COL32((int)(c.r * 255.0f), (int)(c.g * 255.0f), (int)(c.b * 255.0f), 255);
       }
-      return isLight ? IM_COL32(80, 90, 110, 255) : IM_COL32(140, 150, 175, 255);
+      return isLight ? tok::U32(tok::pal::c_505A6EFF) : tok::U32(tok::pal::c_8C96AFFF);
    }
 
 
@@ -363,8 +364,8 @@ namespace app
          // Draw live snap grid highlight at the non-overlapping target cell
          ImVec2 snapTL(gridOrigin.x + snapX * (cellSize + gap) + gap * 0.5f, gridOrigin.y + snapY * (cellSize + gap) + gap * 0.5f);
          ImVec2 snapBR(snapTL.x + cardSize.x, snapTL.y + cardSize.y);
-         dl->AddRectFilled(snapTL, snapBR, IM_COL32(70, 140, 255, 45), 6.0f);
-         dl->AddRect(snapTL, snapBR, IM_COL32(90, 180, 255, 220), 6.0f, 0, 2.0f);
+         dl->AddRectFilled(snapTL, snapBR, tok::U32(tok::pal::c_468CFF2D), 6.0f);
+         dl->AddRect(snapTL, snapBR, tok::U32(tok::pal::c_5AB4FFDC), 6.0f, 0, 2.0f);
 
          // Floating live card position
          cellPos = ImVec2(gridOrigin.x + gPerfDragOriginCellX * (cellSize + gap) + gap * 0.5f + (m.x - gPerfDragMouseStart.x),
@@ -380,11 +381,11 @@ namespace app
 
       // Card background & theme tint
       ImU32 themeTint = GetPerfElementColor(elem, dstNode, isLight);
-      ImU32 cardBg = isLight ? IM_COL32(245, 247, 252, 235) : IM_COL32(22, 25, 33, 240);
+      ImU32 cardBg = isLight ? tok::U32(tok::pal::c_F5F7FCEB) : tok::U32(tok::pal::c_161921F0);
 
       dl->AddRectFilled(cellPos, cardBR, cardBg, 6.0f);
       if (gPerfEditMode)
-         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : (isLight ? IM_COL32(180, 190, 205, 200) : IM_COL32(65, 72, 88, 200)), 6.0f, 0, 1.2f);
+         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : (isLight ? tok::U32(tok::pal::c_B4BECDC8) : tok::U32(tok::pal::c_414858C8)), 6.0f, 0, 1.2f);
       if (gPerfMidiLearnIdx == (int)elemIdx)
       {
          float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 8.0f);
@@ -393,9 +394,9 @@ namespace app
       }
       else if (gPerfEditMode && gPerfSelection.count(elemIdx) > 0)
          dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
-                     isLight ? IM_COL32(30, 110, 220, 255) : IM_COL32(95, 165, 255, 255), 7.0f, 0, 2.0f);
+                     isLight ? tok::U32(tok::pal::c_1E6EDCFF) : tok::U32(tok::pal::c_5FA5FFFF), 7.0f, 0, 2.0f);
       else
-         dl->AddRect(cellPos, cardBR, isLight ? IM_COL32(215, 222, 235, 180) : IM_COL32(42, 46, 58, 180), 6.0f, 0, 1.0f);
+         dl->AddRect(cellPos, cardBR, isLight ? tok::U32(tok::pal::c_D7DEEBB4) : tok::U32(tok::pal::c_2A2E3AB4), 6.0f, 0, 1.0f);
 
       // Title/Label Header
       std::string displayLabel = elem.label;
@@ -426,7 +427,7 @@ namespace app
       dl->AddRectFilled(cellPos, ImVec2(cardBR.x, cellPos.y + 18.0f),
                         (themeTint & 0x00FFFFFF) | 0x28000000, 6.0f, ImDrawFlags_RoundCornersTop);
       ImVec2 titlePos(cellPos.x + 6.0f, cellPos.y + 2.0f);
-      ImU32 textCol = isLight ? IM_COL32(30, 35, 48, 255) : IM_COL32(225, 230, 245, 255);
+      ImU32 textCol = isLight ? tok::U32(tok::pal::c_1E2330FF) : tok::U32(tok::pal::c_E1E6F5FF);
 
       // In Edit Mode, full card invisible button handles right-click popup and dragging
       if (gPerfEditMode)
@@ -688,16 +689,16 @@ namespace app
             if (ImGui::BeginMenu(L("Color Tint")))
             {
                static const struct { const char* name; ImU32 col; } kPaletteColors[10] = {
-                  { "Default", IM_COL32(110, 120, 140, 255) },
-                  { "Crimson", IM_COL32(239, 68, 68, 255) },
-                  { "Orange",  IM_COL32(249, 115, 22, 255) },
-                  { "Amber",   IM_COL32(245, 158, 11, 255) },
-                  { "Emerald", IM_COL32(16, 185, 129, 255) },
-                  { "Cyan",    IM_COL32(6, 182, 212, 255) },
-                  { "Blue",    IM_COL32(59, 130, 246, 255) },
-                  { "Purple",  IM_COL32(139, 92, 246, 255) },
-                  { "Magenta", IM_COL32(217, 70, 239, 255) },
-                  { "Rose",    IM_COL32(244, 63, 94, 255) }
+                  { "Default", tok::U32(tok::pal::c_6E788CFF) },
+                  { "Crimson", tok::U32(tok::pal::c_EF4444FF) },
+                  { "Orange",  tok::U32(tok::pal::c_F97316FF) },
+                  { "Amber",   tok::U32(tok::pal::c_F59E0BFF) },
+                  { "Emerald", tok::U32(tok::pal::c_10B981FF) },
+                  { "Cyan",    tok::U32(tok::pal::c_06B6D4FF) },
+                  { "Blue",    tok::U32(tok::pal::c_3B82F6FF) },
+                  { "Purple",  tok::U32(tok::pal::c_8B5CF6FF) },
+                  { "Magenta", tok::U32(tok::pal::c_D946EFFF) },
+                  { "Rose",    tok::U32(tok::pal::c_F43F5EFF) }
                };
 
                for (int ci = 0; ci < 10; ci++)
@@ -834,7 +835,7 @@ namespace app
 
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
-         ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
 
          float v = dragSeed(val);
          const bool knobMoved = KnobFloat("##knob", &v, minV, maxV, "%.2f", diameter, fillCol, isModulated, diameter, p2v, v2p);
@@ -861,7 +862,7 @@ namespace app
          const bool isDb = (minV < 0.0f && maxV <= 12.0f && kp.posToValue == ConsoleFaderTaper::PosToValue);
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
-         ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
 
          float v = dragSeed(val);
          const bool faderMoved = VFaderFloat("##vfader", &v, minV, maxV, isDb ? "%.1f dB" : "%.2f", faderH, fillCol, isModulated,
@@ -885,7 +886,7 @@ namespace app
          float sliderW = cardSize.x - 18.0f;
          ImGui::SetCursorScreenPos(ImVec2(cellPos.x + 9.0f, cellPos.y + 20.0f + (cardSize.y - 38.0f) * 0.5f));
 
-         ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
          float v = dragSeed(val);
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
@@ -931,7 +932,7 @@ namespace app
          ImVec4 btnCol = curVal ? ImVec4((themeTint & 0xFF) / 255.0f,
                                          ((themeTint >> 8) & 0xFF) / 255.0f,
                                          ((themeTint >> 16) & 0xFF) / 255.0f, 1.0f)
-                                : (isLight ? ImVec4(0.85f, 0.88f, 0.92f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
+                                : (isLight ? tok::V4(tok::palf::v_850_880_920_1000) : tok::V4(tok::palf::v_160_180_240_1000));
          ImGui::PushStyleColor(ImGuiCol_Button, btnCol);
          if (ImGui::Button(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize)))
          {
@@ -1018,7 +1019,7 @@ namespace app
          float normY = kpY.valueToPos ? kpY.valueToPos(valY, minY, maxY) : ((maxY > minY) ? std::clamp((valY - minY) / (maxY - minY), 0.0f, 1.0f) : 0.0f);
          ImVec2 orbPos(origin.x + normX * padSize, origin.y + (1.0f - normY) * padSize);
          dl->AddCircleFilled(orbPos, 6.0f, themeTint);
-         dl->AddCircle(orbPos, 6.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 1.5f);
+         dl->AddCircle(orbPos, 6.0f, isLight ? tok::U32(tok::pal::c_F0F0F0FF) : tok::U32(tok::pal::c_14141CFF), 0, 1.5f);
       }
       else if (elem.kind == 5) // Momentary Trigger / Bang (1x1)
       {
@@ -1137,7 +1138,7 @@ namespace app
          }
 
          float r = padSize * 0.44f;
-         ImU32 baseCol = isLight ? IM_COL32(215, 222, 235, 255) : IM_COL32(32, 36, 48, 255);
+         ImU32 baseCol = isLight ? tok::U32(tok::pal::c_D7DEEBFF) : tok::U32(tok::pal::c_202430FF);
          dl->AddCircleFilled(center, r, baseCol, 32);
 
          if (flash > 0.0f)
@@ -1150,9 +1151,9 @@ namespace app
          {
             dl->AddCircleFilled(center, r * 0.55f, (themeTint & 0x00FFFFFF) | 0x88000000, 32);
          }
-         dl->AddCircle(center, r, isLight ? IM_COL32(170, 180, 195, 255) : IM_COL32(60, 66, 82, 255), 32, 1.5f);
+         dl->AddCircle(center, r, isLight ? tok::U32(tok::pal::c_AAB4C3FF) : tok::U32(tok::pal::c_3C4252FF), 32, 1.5f);
          if (hovered)
-            dl->AddCircle(center, r + 2.0f, IM_COL32(255, 255, 255, 80), 32, 1.2f);
+            dl->AddCircle(center, r + 2.0f, tok::U32(tok::pal::c_FFFFFF50), 32, 1.2f);
       }
       else if (elem.kind == 6) // Digital Number Box (1x1)
       {
@@ -1168,8 +1169,8 @@ namespace app
          ImVec2 bTL(centerX, centerY);
          ImVec2 bBR(centerX + boxW, centerY + boxH);
 
-         dl->AddRectFilled(bTL, bBR, isLight ? IM_COL32(230, 235, 245, 255) : IM_COL32(15, 17, 24, 255), 4.0f);
-         dl->AddRect(bTL, bBR, isLight ? IM_COL32(180, 190, 205, 255) : IM_COL32(50, 56, 72, 255), 4.0f);
+         dl->AddRectFilled(bTL, bBR, isLight ? tok::U32(tok::pal::c_E6EBF5FF) : tok::U32(tok::pal::c_0F1118FF), 4.0f);
+         dl->AddRect(bTL, bBR, isLight ? tok::U32(tok::pal::c_B4BECDFF) : tok::U32(tok::pal::c_323848FF), 4.0f);
 
          ImGui::SetCursorScreenPos(bTL);
          float v = dragSeed(val);
@@ -1253,8 +1254,8 @@ namespace app
             }
             else
             {
-               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.88f, 0.90f, 0.94f, 1.0f) : ImVec4(0.18f, 0.20f, 0.26f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.3f, 0.35f, 0.45f, 1.0f) : ImVec4(0.7f, 0.75f, 0.85f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::V4(tok::palf::v_880_900_940_1000) : tok::V4(tok::palf::v_180_200_260_1000));
+               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_300_350_450_1000) : tok::V4(tok::palf::v_700_750_850_1000));
             }
 
             // Either every button shows its option name or none of them do.
@@ -1299,7 +1300,7 @@ namespace app
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f) * 0.44f;
          ImGui::SetCursorScreenPos(ImVec2(centerX - diameter * 0.5f, centerY - diameter * 0.5f));
 
-         ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
          float v = dragSeed(bipVal);
          const bool bipMoved = BipolarKnobFloat("##bipolarknob", &v, -1.0f, 1.0f, "%.2f", diameter, fillCol, isModulated, diameter);
          dragHold(v);
@@ -1372,18 +1373,18 @@ namespace app
 
             ImU32 stepBg = isOn
                ? themeTint
-               : (isLight ? IM_COL32(210, 216, 228, 255) : IM_COL32(28, 31, 40, 255));
+               : (isLight ? tok::U32(tok::pal::c_D2D8E4FF) : tok::U32(tok::pal::c_1C1F28FF));
 
             dl->AddRectFilled(sTL, sBR, stepBg, 3.0f);
 
             if (isCurrent && Transport::Instance().IsPlaying())
             {
-               dl->AddRect(sTL, sBR, IM_COL32(255, 230, 80, 255), 3.0f, 0, 2.0f);
-               dl->AddCircleFilled(ImVec2(sx + stepW * 0.5f, startY + 4.0f), 2.5f, IM_COL32(255, 240, 100, 255));
+               dl->AddRect(sTL, sBR, tok::U32(tok::pal::c_FFE650FF), 3.0f, 0, 2.0f);
+               dl->AddCircleFilled(ImVec2(sx + stepW * 0.5f, startY + 4.0f), 2.5f, tok::U32(tok::pal::c_FFF064FF));
             }
             else
             {
-               dl->AddRect(sTL, sBR, isLight ? IM_COL32(180, 190, 205, 200) : IM_COL32(48, 52, 65, 200), 3.0f);
+               dl->AddRect(sTL, sBR, isLight ? tok::U32(tok::pal::c_B4BECDC8) : tok::U32(tok::pal::c_303441C8), 3.0f);
             }
          }
       }
@@ -1415,14 +1416,14 @@ namespace app
          if (anyTarget && allBypassed)
          {
             const ImVec2 bodyTL(cellPos.x, cellPos.y + 18.0f);
-            dl->AddRectFilled(bodyTL, cardBR, isLight ? IM_COL32(245, 247, 252, 150) : IM_COL32(22, 25, 33, 160),
+            dl->AddRectFilled(bodyTL, cardBR, isLight ? tok::U32(tok::pal::c_F5F7FC96) : tok::U32(tok::pal::c_161921A0),
                               6.0f, ImDrawFlags_RoundCornersBottom);
             const char* tag = "bypassed";
             const ImVec2 tagSize = ImGui::CalcTextSize(tag);
             const ImVec2 tagTL(cardBR.x - tagSize.x - 10.0f, cellPos.y + 2.0f);
             const ImVec2 tagBR(cardBR.x - 4.0f, cellPos.y + 2.0f + tagSize.y);
             dl->AddRectFilled(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR, cardBg, 3.0f);
-            dl->AddText(tagTL, isLight ? IM_COL32(190, 110, 30, 255) : IM_COL32(240, 170, 70, 255), tag);
+            dl->AddText(tagTL, isLight ? tok::U32(tok::pal::c_BE6E1EFF) : tok::U32(tok::pal::c_F0AA46FF), tag);
             if (ImGui::IsMouseHoveringRect(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR))
                ImGui::SetTooltip("%s", T("This node is bypassed - the control still stores its value, which applies when the node is back in the chain"));
          }
@@ -2043,7 +2044,7 @@ namespace app
       const ImVec2 b(a.x + ts.x + 24.0f, a.y + ts.y + 12.0f);
       dl->AddRectFilled(a, b, IM_COL32(60, 40, 8, (int)(230 * pulse)), 6.0f);
       dl->AddRect(a, b, IM_COL32(255, 185, 45, (int)(255 * pulse)), 6.0f, 0, 1.5f);
-      dl->AddText(ImVec2(a.x + 12.0f, a.y + 6.0f), IM_COL32(255, 185, 45, 255), text);
+      dl->AddText(ImVec2(a.x + 12.0f, a.y + 6.0f), tok::U32(tok::pal::c_FFB92DFF), text);
    }
 
 
@@ -2083,7 +2084,7 @@ namespace app
       if (gPerfMidiLearnIdx >= 0 && gPerfMidiLearnIdx < (int)gPerfElements.size())
       {
          ImGui::Spacing();
-         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 185, 45, 255));
+         ImGui::PushStyleColor(ImGuiCol_Text, tok::U32(tok::pal::c_FFB92DFF));
          const auto& elem = gPerfElements[gPerfMidiLearnIdx];
          std::string axisStr = (gPerfMidiLearnAxis == 1) ? " (Y Axis)" : (elem.kind == 4 ? " (X Axis)" : "");
          std::string prompt = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7)
@@ -2115,8 +2116,8 @@ namespace app
       }
       else
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.58f, 0.32f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.68f, 0.38f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_180_580_320_1000));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_240_680_380_1000));
          if (ImGui::Button(L("Perform"), ImVec2(86, 24)))
             gPerfEditMode = true;
          ImGui::PopStyleColor(2);
@@ -2189,13 +2190,13 @@ namespace app
             const bool isSelected = (gPerfActivePage == p);
             if (isSelected)
             {
-               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.80f, 0.85f, 0.94f, 1.0f) : ImVec4(0.25f, 0.28f, 0.38f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.1f, 0.15f, 0.3f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::V4(tok::palf::v_800_850_940_1000) : tok::V4(tok::palf::v_250_280_380_1000));
+               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_100_150_300_1000) : tok::V4(tok::palf::v_1000_1000_1000_1000));
             }
             else
             {
-               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.92f, 0.94f, 0.96f, 0.7f) : ImVec4(0.14f, 0.16f, 0.22f, 0.7f));
-               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.35f, 0.40f, 0.50f, 1.0f) : ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::V4(tok::palf::v_920_940_960_700) : tok::V4(tok::palf::v_140_160_220_700));
+               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_350_400_500_1000) : tok::V4(tok::palf::v_650_700_800_1000));
             }
 
             // Explicit height matches "Edit Mode"/"Perform"/"+ Add Control"
@@ -2321,7 +2322,7 @@ namespace app
       if (gPerfEditMode)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         ImU32 gridCol = isLight ? IM_COL32(215, 220, 230, 80) : IM_COL32(48, 52, 65, 80);
+         ImU32 gridCol = isLight ? tok::U32(tok::pal::c_D7DCE650) : tok::U32(tok::pal::c_30344150);
          float gridMaxX = std::max(maxElemX + 200.0f, ImGui::GetWindowWidth());
          float gridMaxY = std::max(maxElemY + 200.0f, ImGui::GetWindowHeight());
          int numCols = (int)std::ceil(gridMaxX / (cellSize + gap)) + 1;
@@ -2567,8 +2568,8 @@ namespace app
 
       const bool isPredictor = dynamic_cast<IPredictor*>(mod) != nullptr ||
                                dynamic_cast<PredictiveModulatorNode*>(mod) != nullptr;
-      const ImU32 lineCol = isPredictor ? IM_COL32(34, 197, 94, 255)
-                                        : (isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(255, 190, 90, 255));
+      const ImU32 lineCol = isPredictor ? tok::U32(tok::pal::c_22C55EFF)
+                                        : (isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_FFBE5AFF));
 
       dl->PushClipRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), true); // backstop, not the primary fix
       for (size_t i = 1; i < history.size(); i++)

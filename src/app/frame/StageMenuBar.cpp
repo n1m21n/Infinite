@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -269,11 +270,11 @@ void DrawMenuBar(FrameCtx& fc)
 
          // Top bar controls styling: clean, symmetrical, unboxed with pixel-perfect alignment.
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_1000_1000_1000_80));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_1000_1000_1000_160));
          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.08f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 0.16f));
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_1000_1000_1000_80));
+         ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_1000_1000_1000_160));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
          ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 2.0f));
@@ -295,9 +296,9 @@ void DrawMenuBar(FrameCtx& fc)
          // 1. Transport (Play, Rewind, Audio On/Off)
          if (isTransportPlaying)
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.63f, 0.31f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.70f, 0.36f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.14f, 0.55f, 0.26f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_160_630_310_1000));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_200_700_360_1000));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_140_550_260_1000));
          }
          if (ImGui::Button("##transportplay", ImVec2(34, 0)))
             transport.TogglePlay();
@@ -308,7 +309,7 @@ void DrawMenuBar(FrameCtx& fc)
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.72f;
             const ImU32 col = isTransportPlaying
-                                  ? IM_COL32(255, 255, 255, 255)
+                                  ? tok::U32(tok::pal::c_FFFFFFFF)
                                   : ImGui::GetColorU32(ImGuiCol_Text);
             if (isTransportPlaying)
                Tabler::DrawPlayerPause(dl, center, iconSize, col);
@@ -348,11 +349,11 @@ void DrawMenuBar(FrameCtx& fc)
             const bool audioOn = engineOn;
             const bool audioIsLight = isLight;
             ImGui::PushStyleColor(ImGuiCol_Button, audioOn
-                                                       ? (audioIsLight ? ImVec4(0.20f, 0.62f, 0.34f, 1.0f) : ImVec4(0.16f, 0.52f, 0.28f, 1.0f))
-                                                       : (audioIsLight ? ImVec4(0.80f, 0.82f, 0.87f, 1.0f) : ImVec4(0.30f, 0.30f, 0.34f, 1.0f)));
+                                                       ? (audioIsLight ? tok::V4(tok::palf::v_200_620_340_1000) : tok::V4(tok::palf::v_160_520_280_1000))
+                                                       : (audioIsLight ? tok::V4(tok::palf::v_800_820_870_1000) : tok::V4(tok::palf::v_300_300_340_1000)));
             ImGui::PushStyleColor(ImGuiCol_Text, audioOn
-                                                     ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
-                                                     : (audioIsLight ? ImVec4(0.12f, 0.14f, 0.20f, 1.0f) : ImVec4(0.92f, 0.94f, 0.98f, 1.0f)));
+                                                     ? tok::V4(tok::palf::v_1000_1000_1000_1000)
+                                                     : (audioIsLight ? tok::V4(tok::palf::v_120_140_200_1000) : tok::V4(tok::palf::v_920_940_980_1000)));
             if (ImGui::Button(audioOn ? L("Stop Audio") : L("Start Audio")))
             {
                if (audioOn)
@@ -380,7 +381,7 @@ void DrawMenuBar(FrameCtx& fc)
                const ImVec2 bmax(bmin.x + textSize.x + pad.x * 2.0f, bmin.y + ImGui::GetFrameHeight());
                ImGui::InvisibleButton("##timelineAudioBadge", ImVec2(bmax.x - bmin.x, bmax.y - bmin.y));
                ImDrawList* dl = ImGui::GetWindowDrawList();
-               const ImU32 edge = audioIsLight ? IM_COL32(40, 130, 72, 255) : IM_COL32(96, 200, 132, 255);
+               const ImU32 edge = audioIsLight ? tok::U32(tok::pal::c_288248FF) : tok::U32(tok::pal::c_60C884FF);
                dl->AddRect(bmin, bmax, edge, 3.0f, 0, 1.0f);
                dl->AddText(ImVec2(bmin.x + pad.x, bmin.y + pad.y), edge, badge);
                if (ImGui::IsItemHovered())
@@ -829,10 +830,10 @@ void DrawMenuBar(FrameCtx& fc)
                cursorX -= updateWidth;
 
                ImGui::SameLine(cursorX);
-               ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.62f, 0.34f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.70f, 0.40f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.52f, 0.28f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_200_620_340_1000));
+               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_240_700_400_1000));
+               ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_160_520_280_1000));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_1000_1000_1000_1000));
                if (ImGui::Button(updateLabel))
                   Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/#download");
                ImGui::PopStyleColor(4);

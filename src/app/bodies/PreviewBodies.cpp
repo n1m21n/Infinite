@@ -1,4 +1,5 @@
 // Comment, group, draw and preview node bodies (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -42,7 +43,7 @@ namespace app
          dl->AddImage((ImTextureID)(intptr_t)node->GetOutputTexture(), tl,
                       ImVec2(tl.x + dw, tl.y + dh), ImVec2(0, 1), ImVec2(1, 0));
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
-                  IM_COL32(90, 130, 190, 255), 4.0f, 0, 2.0f);
+                  tok::U32(tok::pal::c_5A82BEFF), 4.0f, 0, 2.0f);
    }
 
 
@@ -117,7 +118,7 @@ namespace app
       dl->AddRect(origin, br, borderCol, 6.0f, 0, 1.2f);
 
       const ImU32 textCol = isLight
-         ? IM_COL32(30, 36, 48, 255)
+         ? tok::U32(tok::pal::c_1E2430FF)
          : IM_COL32((int)((n->color[0] * 0.5f + 0.5f) * 255),
                     (int)((n->color[1] * 0.5f + 0.5f) * 255),
                     (int)((n->color[2] * 0.5f + 0.5f) * 255), 255);
@@ -133,7 +134,7 @@ namespace app
       {
          dl->AddText(ImGui::GetFont(), drawFontSize,
                      ImVec2(origin.x + 8, origin.y + 8),
-                     isLight ? IM_COL32(140, 146, 160, 255) : IM_COL32(150, 150, 160, 255),
+                     isLight ? tok::U32(tok::pal::c_8C92A0FF) : tok::U32(tok::pal::c_9696A0FF),
                      "double-click or type to write", nullptr, w - 16.0f);
       }
       else
@@ -524,7 +525,7 @@ namespace app
       NodeSeparator("animation");
       if (n->IsRecordingStrokes())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_650_150_150_1000));
          if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
             n->StopRecording();
          ImGui::PopStyleColor();
@@ -548,7 +549,7 @@ namespace app
       {
          ImGui::TextDisabled("%zu marks over %.1f beats", n->RecordedStamps(), n->RecordedLength());
          if (n->IsPlayingBack())
-            ImGui::TextColored(ImVec4(0.5f, 0.95f, 0.6f, 1.0f), "playhead %.1f", n->PlayheadBeats());
+            ImGui::TextColored(tok::V4(tok::palf::v_500_950_600_1000), "playhead %.1f", n->PlayheadBeats());
          if (n->RecordingCapped())
             ImGui::TextDisabled("recording capped - further strokes won't be recorded");
       }
@@ -618,7 +619,7 @@ namespace app
       else
       {
          dl->AddText(ImVec2(origin.x + 10, origin.y + size * 0.5f - 8),
-                     IM_COL32(120, 120, 135, 255), EmptyPreviewLabel(node, "no input"));
+                     tok::U32(tok::pal::c_787887FF), EmptyPreviewLabel(node, "no input"));
       }
 
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
@@ -678,7 +679,7 @@ namespace app
 
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
+                     tok::U32(tok::pal::c_78C8FFC8), 4.0f, 0, 2.0f);
    }
 
 
@@ -782,7 +783,7 @@ namespace app
             const float top = midY - fgn->waveformMax[i] * h * 0.45f;
             const float bottom = midY - fgn->waveformMin[i] * h * 0.45f;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(40, 90, 200, 200) : IM_COL32(140, 160, 220, 175));
+                              isLight ? tok::U32(tok::pal::c_285AC8C8) : tok::U32(tok::pal::c_8CA0DCAF));
          }
       }
       else

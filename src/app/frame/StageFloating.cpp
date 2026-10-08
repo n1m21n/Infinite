@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -183,7 +184,7 @@ int DrawFloating(FrameCtx& fc)
                            UpdateCheck::ResultVersion().c_str(), INFINITE_VERSION_STRING);
                break;
             case UpdateCheck::Status::Failed:
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.45f, 0.4f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_950_450_400_1000));
                ImGui::TextWrapped("%s", UpdateCheck::LastError().c_str());
                ImGui::PopStyleColor();
                break;

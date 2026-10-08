@@ -1,4 +1,5 @@
 // Field node parameter bodies and scopes (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -48,8 +49,8 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
             }
             const ImU32 strokeCol = isLight
-               ? (pass == 0 ? IM_COL32(30, 110, 230, 50) : IM_COL32(20, 100, 230, 255))
-               : (pass == 0 ? IM_COL32(120, 200, 255, 46) : IM_COL32(150, 214, 255, 245));
+               ? (pass == 0 ? tok::U32(tok::pal::c_1E6EE632) : tok::U32(tok::pal::c_1464E6FF))
+               : (pass == 0 ? tok::U32(tok::pal::c_78C8FF2E) : tok::U32(tok::pal::c_96D6FFF5));
             dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
          }
       }
@@ -106,8 +107,8 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
             }
             const ImU32 strokeCol = isLight
-               ? (pass == 0 ? IM_COL32(30, 110, 230, 50) : IM_COL32(20, 100, 230, 255))
-               : (pass == 0 ? IM_COL32(120, 200, 255, 46) : IM_COL32(150, 214, 255, 245));
+               ? (pass == 0 ? tok::U32(tok::pal::c_1E6EE632) : tok::U32(tok::pal::c_1464E6FF))
+               : (pass == 0 ? tok::U32(tok::pal::c_78C8FF2E) : tok::U32(tok::pal::c_96D6FFF5));
             dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
          }
       }
@@ -164,8 +165,8 @@ namespace app
                dl->PathLineTo(ImVec2(origin.x + t * w, midY - v * h * 0.45f));
             }
             const ImU32 strokeCol = isLight
-               ? (pass == 0 ? IM_COL32(30, 110, 230, 50) : IM_COL32(20, 100, 230, 255))
-               : (pass == 0 ? IM_COL32(120, 200, 255, 46) : IM_COL32(150, 214, 255, 245));
+               ? (pass == 0 ? tok::U32(tok::pal::c_1E6EE632) : tok::U32(tok::pal::c_1464E6FF))
+               : (pass == 0 ? tok::U32(tok::pal::c_78C8FF2E) : tok::U32(tok::pal::c_96D6FFF5));
             dl->PathStroke(strokeCol, 0, pass == 0 ? 4.5f : 1.6f);
          }
       }
@@ -205,14 +206,14 @@ namespace app
          if (n->WasTruncated())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Truncated to %d vertices", n->ActualElementCount());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_800_200_1000), "Truncated to %d vertices", n->ActualElementCount());
             ImGui::PopTextWrapPos();
          }
 
          if (!n->Notice().empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
             ImGui::PopTextWrapPos();
          }
 
@@ -245,7 +246,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
             ImGui::PopTextWrapPos();
          }
       }
@@ -279,14 +280,14 @@ namespace app
          if (n->WasTruncated())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Truncated to %d vertices", n->ActualElementCount());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_800_200_1000), "Truncated to %d vertices", n->ActualElementCount());
             ImGui::PopTextWrapPos();
          }
 
          if (!n->Notice().empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
             ImGui::PopTextWrapPos();
          }
 
@@ -323,7 +324,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
             ImGui::PopTextWrapPos();
          }
       }
@@ -357,7 +358,7 @@ namespace app
          if (!n->Notice().empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
             ImGui::PopTextWrapPos();
          }
 
@@ -365,7 +366,7 @@ namespace app
          if (faults > 0)
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
             ImGui::PopTextWrapPos();
          }
       }
@@ -387,7 +388,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
             ImGui::PopTextWrapPos();
          }
       }
@@ -421,7 +422,7 @@ namespace app
          if (!n->Notice().empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
             ImGui::PopTextWrapPos();
          }
 
@@ -429,7 +430,7 @@ namespace app
          if (faults > 0)
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%llu NaN/inf recovery event(s)", (unsigned long long)faults);
             ImGui::PopTextWrapPos();
          }
       }
@@ -459,7 +460,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
             ImGui::PopTextWrapPos();
          }
       }
@@ -514,7 +515,7 @@ namespace app
          if (!n->Notice().empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
             ImGui::PopTextWrapPos();
          }
       }
@@ -536,7 +537,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
             ImGui::PopTextWrapPos();
          }
       }
@@ -609,7 +610,7 @@ namespace app
          if (!gParamRegisterOnly && !n->pinRefusal.empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", n->pinRefusal.c_str());
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->pinRefusal.c_str());
             ImGui::PopTextWrapPos();
          }
       }

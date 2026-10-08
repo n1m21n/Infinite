@@ -1,4 +1,5 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -67,14 +68,14 @@ namespace app
             }
          }
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bodyW);
-         ImGui::TextColored(ImVec4(0.5f, 0.9f, 1.0f, 1.0f), "source: %s", srcName);
+         ImGui::TextColored(tok::V4(tok::palf::v_500_900_1000_1000), "source: %s", srcName);
          ImGui::PopTextWrapPos();
       }
       else
       {
          if (Platform::AudioIsRunning())
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_650_150_150_1000));
             if (ImGui::Button("Stop listening", ImVec2(bodyW, 0)))
                n->Stop();
             ImGui::PopStyleColor();
@@ -94,16 +95,16 @@ namespace app
       const float h = 60.0f;
       ImGui::Dummy(ImVec2(bodyW, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), IM_COL32(16, 16, 22, 255), 3.0f);
+      dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::U32(tok::pal::c_101016FF), 3.0f);
       const float bw = bodyW / (float)Platform::kAudioBands;
       for (int i = 0; i < Platform::kAudioBands; i++)
       {
          const float v = std::min(1.0f, levels.bands[i] * n->gain);
          dl->AddRectFilled(ImVec2(origin.x + i * bw + 1, origin.y + h - v * h),
                            ImVec2(origin.x + (i + 1) * bw - 1, origin.y + h),
-                           IM_COL32(120, 200, 255, 235));
+                           tok::U32(tok::pal::c_78C8FFEB));
       }
-      dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), IM_COL32(70, 74, 90, 255), 3.0f);
+      dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::U32(tok::pal::c_464A5AFF), 3.0f);
 
       // --- Left Column ---
       ImGui::BeginGroup();
@@ -195,10 +196,10 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const bool isLight = IsThemeLight();
-      const ImU32 borderCol = isLight ? IM_COL32(60, 68, 85, 140) : IM_COL32(210, 218, 235, 70);
-      const ImU32 textCol = isLight ? IM_COL32(35, 40, 52, 255) : IM_COL32(222, 228, 240, 255);
-      const ImU32 pinFill = isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255);
-      const ImU32 pinRing = isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255);
+      const ImU32 borderCol = isLight ? tok::U32(tok::pal::c_3C44558C) : tok::U32(tok::pal::c_D2DAEB46);
+      const ImU32 textCol = isLight ? tok::U32(tok::pal::c_232834FF) : tok::U32(tok::pal::c_DEE4F0FF);
+      const ImU32 pinFill = isLight ? tok::U32(tok::pal::c_3278F0FF) : tok::U32(tok::pal::c_96BEFFFF);
+      const ImU32 pinRing = isLight ? tok::U32(tok::pal::c_283041FF) : tok::U32(tok::pal::c_14161EFF);
 
       dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, 8.0f, 0, 1.5f);
       for (int r = 1; r < rowCount; r++)
@@ -1214,7 +1215,7 @@ namespace app
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(14, 14, 20, 255), 3.0f);
+      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), tok::U32(tok::pal::c_0E0E14FF), 3.0f);
 
       const int count = std::clamp(n->bandCount, 2, AudioColorRampNode::kMaxBands);
       const float* energies = n->GetBandEnergies();
@@ -1257,10 +1258,10 @@ namespace app
             float mag = std::clamp(spec[bin] * 2.5f, 0.0f, 1.0f);
             pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - 4.0f)));
          }
-         dl->AddPolyline(pts.data(), (int)pts.size(), IM_COL32(255, 255, 255, 130), false, 1.2f);
+         dl->AddPolyline(pts.data(), (int)pts.size(), tok::U32(tok::pal::c_FFFFFF82), false, 1.2f);
       }
 
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(70, 74, 90, 255), 3.0f);
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::U32(tok::pal::c_464A5AFF), 3.0f);
 
       // 3. Interactive band-boundary dividers, drawn directly on the spectrum.
       ImGui::SetCursorScreenPos(origin);
@@ -1316,7 +1317,7 @@ namespace app
       {
          float x = toScreenX(n->crossoverPos[i]);
          bool isHov = (nearest == i || (sDragNode == n && sDragIndex == i));
-         ImU32 lineCol = isHov ? IM_COL32(255, 220, 100, 230) : IM_COL32(255, 255, 255, 100);
+         ImU32 lineCol = isHov ? tok::U32(tok::pal::c_FFDC64E6) : tok::U32(tok::pal::c_FFFFFF64);
          dl->AddLine(ImVec2(x, origin.y + 2.0f), ImVec2(x, origin.y + barH - 2.0f), lineCol, isHov ? 2.5f : 1.5f);
 
          if (isHov)
@@ -1332,7 +1333,7 @@ namespace app
       }
 
       const float readoutH = ImGui::GetTextLineHeight();
-      dl->AddText(ImVec2(origin.x, origin.y + barH + gap), IM_COL32(160, 166, 186, 255), readout);
+      dl->AddText(ImVec2(origin.x, origin.y + barH + gap), tok::U32(tok::pal::c_A0A6BAFF), readout);
 
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + barH + gap + readoutH + gap));
    }
@@ -1642,7 +1643,7 @@ namespace app
          // budget, so show what actually happened when they disagree.
          const int wanted = (n->samples <= 0) ? 0 : (1 << n->samples);
          if (n->ActiveSamples() != wanted)
-            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.35f, 1.0f),
+            ImGui::TextColored(tok::V4(tok::palf::v_950_750_350_1000),
                                "antialias reduced to %dx at this size",
                                n->ActiveSamples());
       }
@@ -1775,15 +1776,15 @@ namespace app
          {
             dl->AddRectFilled(headerPos,
                               ImVec2(headerPos.x + kPreviewSize, headerPos.y + rowHeight),
-                              dragging ? IM_COL32(70, 90, 130, 200) : IM_COL32(50, 54, 68, 160), 3.0f);
+                              dragging ? tok::U32(tok::pal::c_465A82C8) : tok::U32(tok::pal::c_323644A0), 3.0f);
          }
          // grip dots, so the header reads as draggable
          for (int d = 0; d < 3; d++)
          {
             dl->AddCircleFilled(ImVec2(headerPos.x + 6, headerPos.y + 5 + d * 4.0f), 1.3f,
-                                IM_COL32(140, 146, 168, 255));
+                                tok::U32(tok::pal::c_8C92A8FF));
             dl->AddCircleFilled(ImVec2(headerPos.x + 11, headerPos.y + 5 + d * 4.0f), 1.3f,
-                                IM_COL32(140, 146, 168, 255));
+                                tok::U32(tok::pal::c_8C92A8FF));
          }
          // Name the layer after whatever is feeding it - far more useful than
          // "layer C" once a stack has four things in it.
@@ -1804,7 +1805,7 @@ namespace app
             snprintf(title, sizeof(title), "%c  (empty)", 'A' + slot);
          }
          dl->AddText(ImVec2(headerPos.x + 20, headerPos.y + 2),
-                     source ? IM_COL32(190, 196, 215, 255) : IM_COL32(120, 124, 142, 255), title);
+                     source ? tok::U32(tok::pal::c_BEC4D7FF) : tok::U32(tok::pal::c_787C8EFF), title);
 
          char modeLabel[32];
          snprintf(modeLabel, sizeof(modeLabel), "mode##%d", slot);

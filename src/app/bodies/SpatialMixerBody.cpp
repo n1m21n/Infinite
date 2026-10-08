@@ -1,6 +1,7 @@
 // Spatial Mixer node body (docs/plans/spatial/README.md "Node spec"): a top-view
 // stage with the listener's head at the centre and one draggable dot per
 // connected input, a source strip, and a knob row for the selected object.
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "platform/HeadTracker.h"
 
@@ -62,9 +63,9 @@ namespace app
       const float R = std::min(stageW, stageH) * 0.5f - 14.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      const ImU32 line = light ? IM_COL32(0, 0, 0, 45) : IM_COL32(255, 255, 255, 40);
-      const ImU32 text = light ? IM_COL32(0, 0, 0, 150) : IM_COL32(255, 255, 255, 150);
-      dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? IM_COL32(0, 0, 0, 14) : IM_COL32(255, 255, 255, 10), 4.0f);
+      const ImU32 line = light ? tok::U32(tok::pal::c_0000002D) : tok::U32(tok::pal::c_FFFFFF28);
+      const ImU32 text = light ? tok::U32(tok::pal::c_00000096) : tok::U32(tok::pal::c_FFFFFF96);
+      dl->AddRectFilled(p0, ImVec2(p0.x + stageW, p0.y + stageH), light ? tok::U32(tok::pal::c_0000000E) : tok::U32(tok::pal::c_FFFFFF0A), 4.0f);
       dl->AddCircle(centre, R, line, 64);
       for (float m : { 1.0f, 2.0f })
          dl->AddCircle(centre, R * RadiusFracFromDist(m), line, 48);
@@ -78,10 +79,10 @@ namespace app
       // Listener seen from above, facing up (towards F): shoulders, neck, head
       // and ears - the same view as the reference body mesh. Facing is shown by F.
       {
-         const ImU32 skin = light ? IM_COL32(150, 165, 195, 255) : IM_COL32(86, 104, 140, 255);
-         const ImU32 skinHi = light ? IM_COL32(178, 192, 218, 255) : IM_COL32(112, 132, 170, 255);
-         const ImU32 shade = light ? IM_COL32(110, 124, 156, 255) : IM_COL32(62, 78, 112, 255);
-         const ImU32 rim = light ? IM_COL32(60, 72, 104, 255) : IM_COL32(170, 190, 225, 255);
+         const ImU32 skin = light ? tok::U32(tok::pal::c_96A5C3FF) : tok::U32(tok::pal::c_56688CFF);
+         const ImU32 skinHi = light ? tok::U32(tok::pal::c_B2C0DAFF) : tok::U32(tok::pal::c_7084AAFF);
+         const ImU32 shade = light ? tok::U32(tok::pal::c_6E7C9CFF) : tok::U32(tok::pal::c_3E4E70FF);
+         const ImU32 rim = light ? tok::U32(tok::pal::c_3C4868FF) : tok::U32(tok::pal::c_AABEE1FF);
          const float cx = centre.x, cy = centre.y;
          // shoulders: wide rounded slab behind the head
          dl->AddEllipseFilled(ImVec2(cx, cy + 15.0f), ImVec2(30.0f, 10.0f), skin, 0.0f, 32);
@@ -179,11 +180,11 @@ namespace app
          if (lvl > 0.002f)
             dl->AddCircle(d, r + 2.0f + lvl * 4.0f, DotColor(s, 0.5f), 24, 2.0f);
          dl->AddCircleFilled(d, r, DotColor(s, silent ? 0.25f : 1.0f), 24);
-         dl->AddCircle(d, r, light ? IM_COL32(0, 0, 0, 120) : IM_COL32(255, 255, 255, 120), 24, 1.0f);
+         dl->AddCircle(d, r, light ? tok::U32(tok::pal::c_00000078) : tok::U32(tok::pal::c_FFFFFF78), 24, 1.0f);
          char lab[4];
          snprintf(lab, sizeof(lab), "%d", s + 1);
          const ImVec2 ts = ImGui::CalcTextSize(lab);
-         dl->AddText(ImVec2(d.x - ts.x * 0.5f, d.y - ts.y * 0.5f), IM_COL32(0, 0, 0, 220), lab);
+         dl->AddText(ImVec2(d.x - ts.x * 0.5f, d.y - ts.y * 0.5f), tok::U32(tok::pal::c_000000DC), lab);
       }
 
       // Readout: hover or selected object.

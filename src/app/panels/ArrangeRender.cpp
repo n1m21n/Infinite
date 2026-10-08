@@ -1,4 +1,5 @@
 // Offline render windows, arrange clip settings and render queue (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -129,7 +130,7 @@ namespace app
       // clicks without needing per-panel disable flags scattered elsewhere.
       ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
       ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.35f));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::V4(tok::palf::v_0_0_0_350));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("##OfflineRenderBlocker", nullptr,
@@ -217,7 +218,7 @@ namespace app
       ImGuiIO& io = ImGui::GetIO();
       ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
       ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.35f));
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, tok::V4(tok::palf::v_0_0_0_350));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("##ArrangeWavRenderBlocker", nullptr,
@@ -286,11 +287,11 @@ namespace app
    {
       switch (status)
       {
-      case kArrangeJobDone:       return ImVec4(0.45f, 0.80f, 0.50f, 1.0f);
-      case kArrangeJobFailed:     return ImVec4(0.90f, 0.45f, 0.40f, 1.0f);
-      case kArrangeJobCancelled:  return ImVec4(0.70f, 0.65f, 0.40f, 1.0f);
+      case kArrangeJobDone:       return tok::V4(tok::palf::v_450_800_500_1000);
+      case kArrangeJobFailed:     return tok::V4(tok::palf::v_900_450_400_1000);
+      case kArrangeJobCancelled:  return tok::V4(tok::palf::v_700_650_400_1000);
       case kArrangeJobRendering:
-      case kArrangeJobFinalizing: return ImVec4(0.50f, 0.72f, 0.95f, 1.0f);
+      case kArrangeJobFinalizing: return tok::V4(tok::palf::v_500_720_950_1000);
       default:                    return ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
       }
    }
@@ -369,7 +370,7 @@ namespace app
          const ImVec2 bmax = ImGui::GetItemRectMax();
          const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
          const float iconSize = sz * 0.65f;
-         const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+         const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
          Tabler::DrawX(dl, center, iconSize, col);
          return clicked;
       };
@@ -379,17 +380,17 @@ namespace app
          bool toggled = false;
          if (enabled)
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(16, 185, 129, 45));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(16, 185, 129, 80));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(16, 185, 129, 120));
-            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(52, 211, 153, 255));
+            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B9812D));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_10B98150));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::U32(tok::pal::c_10B98178));
+            ImGui::PushStyleColor(ImGuiCol_Text, tok::U32(tok::pal::c_34D399FF));
          }
          else
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(239, 68, 68, 35));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(239, 68, 68, 70));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(239, 68, 68, 100));
-            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(248, 113, 113, 255));
+            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_EF444423));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_EF444446));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::U32(tok::pal::c_EF444464));
+            ImGui::PushStyleColor(ImGuiCol_Text, tok::U32(tok::pal::c_F87171FF));
          }
          char buf[96];
          snprintf(buf, sizeof(buf), "%s%s", enabled ? labelActive : labelBypassed, id);
@@ -523,7 +524,7 @@ namespace app
             // One line, not a paragraph: the button beside it is the whole
             // fix, and the reasoning belongs in a tooltip the user opens
             // when they want it rather than in permanent panel text.
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "Shared with another video track.");
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_650_200_1000), "Shared with another video track.");
             ArrangeSharedSourceTooltip(
                "Both clips show the same frame - a video source reads the global transport, not "
                "the clip - and where they overlap the upper track hides this one's blend mode, "
@@ -541,7 +542,7 @@ namespace app
          {
             ImGui::Spacing();
             ImGui::TextDisabled("%s", T("Playback & Trigger"));
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "Shared with another track.");
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_650_200_1000), "Shared with another track.");
             ArrangeSharedSourceTooltip(
                "The node holds one playback position and both tracks set it every block, so "
                "whichever is summed last wins and this clip can end up playing the other one's "

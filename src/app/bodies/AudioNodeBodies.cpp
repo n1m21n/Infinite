@@ -1,4 +1,5 @@
 // Plugin, audio-out, analog and audio-node dispatch bodies (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -157,9 +158,9 @@ namespace app
                ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW - unmapBtnW - 4.0f, /*audioStyle=*/true);
                ImGui::SameLine(0.0f, 2.0f);
                ImGui::PushID(i + 40000);
-               ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_0_0_0_0));
+               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_500_150_150_1000));
+               ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_600_200_200_1000));
                if (ImGui::SmallButton("x"))
                {
                   PushUndoCheckpoint();
@@ -298,7 +299,7 @@ namespace app
       // can't be mistaken for pressing Record.
       const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
       if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.75f, 0.18f, 0.18f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_750_180_180_1000));
       ImGui::BeginDisabled(!recording && !audioOn);
       if (ImGui::Button(recording ? "Stop##audioOutRec" : "Record##audioOutRec", ImVec2(btnW, 0)))
       {
@@ -333,10 +334,10 @@ namespace app
       ImGui::EndDisabled();
 
       const std::string destLabel = n->recordDirectory.empty() ? std::string("~/Desktop") : n->recordDirectory;
-      ImGui::TextColored(ImVec4(0.6f, 0.62f, 0.68f, 1.0f), "%s", destLabel.c_str());
+      ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "%s", destLabel.c_str());
 
       if (n->DroppedSampleCount() > 0)
-         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "dropped samples - device can't keep up");
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "dropped samples - device can't keep up");
 
       EndAudioBody();
    }
@@ -412,7 +413,7 @@ namespace app
 
       const float btnW = half;
       if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.75f, 0.18f, 0.18f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_750_180_180_1000));
       ImGui::BeginDisabled(!recording && !audioOn);
       if (ImGui::Button(recording ? "Stop##spatialRec" : "Record##spatialRec", ImVec2(btnW, 0)))
       {
@@ -442,13 +443,13 @@ namespace app
       }
       ImGui::EndDisabled();
       if (recording)
-         ImGui::TextColored(ImVec4(0.6f, 0.62f, 0.68f, 1.0f), "REC %.1fs  %.0f KB  (head facing front)",
+         ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "REC %.1fs  %.0f KB  (head facing front)",
                             n->ElapsedSeconds(), (double)n->FileSizeBytes() / 1024.0);
       else
-         ImGui::TextColored(ImVec4(0.6f, 0.62f, 0.68f, 1.0f), "%s",
+         ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "%s",
                             n->recordDirectory.empty() ? "~/Desktop" : n->recordDirectory.c_str());
       if (n->DroppedSampleCount() > 0)
-         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "dropped samples - device can't keep up");
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "dropped samples - device can't keep up");
    }
 
 
@@ -568,7 +569,7 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope  -  drag the handles", "##analogAmpEnv", &n->attack,
                         &n->decay, &n->sustain, &n->release, nullptr, 0.0f, 0.0f, nullptr,
-                        IM_COL32(150, 214, 255, 245));
+                        tok::U32(tok::pal::c_96D6FFF5));
       ImGui::PopID();
 
       ImGui::Dummy(ImVec2(0.0f, 2.0f));

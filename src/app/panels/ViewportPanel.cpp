@@ -1,4 +1,5 @@
 // Viewport panel cards and mini viewports (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -38,10 +39,10 @@ namespace app
       else
       {
          dl->AddText(ImVec2(origin.x + 10, origin.y + size * 0.5f - 8),
-                     IM_COL32(120, 120, 135, 255), EmptyPreviewLabel(gn.node.get(), "no geometry"));
+                     tok::U32(tok::pal::c_787887FF), EmptyPreviewLabel(gn.node.get(), "no geometry"));
       }
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                  IM_COL32(70, 74, 90, 255), 4.0f);
+                  tok::U32(tok::pal::c_464A5AFF), 4.0f);
 
       // Same drag-to-orbit / scroll-to-zoom feel as DrawPreview's embedded
       // Render3DNode viewport. Orbit rotates this node's own entry in
@@ -73,7 +74,7 @@ namespace app
       ApplyViewHotkeys(cam.azimuth, cam.elevation);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
+                     tok::U32(tok::pal::c_78C8FFC8), 4.0f, 0, 2.0f);
    }
 
 
@@ -192,7 +193,7 @@ namespace app
          const ImVec2 bmax = ImGui::GetItemRectMax();
          const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
          const float iconSize = (bmax.y - bmin.y) * 0.65f;
-         const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+         const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
          Tabler::DrawX(dl, center, iconSize, col);
       }
       ImGui::SameLine();
@@ -218,7 +219,7 @@ namespace app
             dl->AddImage((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
          else
             dl->AddText(ImVec2(origin.x + 10, origin.y + imageSize.y * 0.5f - 8),
-                        IM_COL32(120, 120, 135, 255), EmptyPreviewLabel(gn.node.get(), "no geometry"));
+                        tok::U32(tok::pal::c_787887FF), EmptyPreviewLabel(gn.node.get(), "no geometry"));
 
          ImGui::SetCursorScreenPos(origin);
          char btnId[32];
@@ -243,7 +244,7 @@ namespace app
          // matching drag-orbit just above on this same gNodeCameras entry.
          ApplyViewHotkeys(cam.azimuth, cam.elevation);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            dl->AddRect(origin, br, IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
+            dl->AddRect(origin, br, tok::U32(tok::pal::c_78C8FFC8), 4.0f, 0, 2.0f);
          // Layout cursor already sits at origin+imageSize from the
          // InvisibleButton above; the trailing Dummy(imageSize) below is
          // shared with the non-geometry branch, so rewind rather than
@@ -273,7 +274,7 @@ namespace app
          else
          {
             dl->AddText(ImVec2(origin.x + 10, origin.y + imageSize.y * 0.5f - 8),
-                        IM_COL32(120, 120, 135, 255), EmptyPreviewLabel(gn.node.get(), "no input"));
+                        tok::U32(tok::pal::c_787887FF), EmptyPreviewLabel(gn.node.get(), "no input"));
          }
 
          // A Draw node's panel card is paintable, same as its inline preview
@@ -350,7 +351,7 @@ namespace app
             // this render's "orbit"/"elevation" sliders (main.cpp ~23053).
             ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-               dl->AddRect(origin, br, IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
+               dl->AddRect(origin, br, tok::U32(tok::pal::c_78C8FFC8), 4.0f, 0, 2.0f);
             ImGui::SetCursorScreenPos(origin);
          }
       }

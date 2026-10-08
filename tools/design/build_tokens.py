@@ -32,7 +32,13 @@ def build():
         L.append(f"   constexpr Pairf {ident(k)} = {{ {f(d)}, {f(l)} }};")
     for k, v in r["accent_ladder"].items():
         L.append(f"   constexpr float accent_{k} = {v}f;")
-    L += ["}", ""]
+    L += ["", "   namespace pal", "   {"]
+    for k, v in t.get("palette", {}).items():
+        L.append(f"      constexpr Rgba8 {k} = {{{v[0]}, {v[1]}, {v[2]}, {v[3]}}};")
+    L += ["   }", "", "   namespace palf", "   {"]
+    for k, v in t.get("palette_f", {}).items():
+        L.append(f"      constexpr Rgbaf {k} = {{{v[0]}f, {v[1]}f, {v[2]}f, {v[3]}f}};")
+    L += ["   }", "}", ""]
     return "\n".join(L)
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 // Settings window (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -44,8 +45,8 @@ namespace app
                ImDrawList* dl = ImGui::GetWindowDrawList();
                const CategoryColors::Color swatchCols[3] = { t.panelBg, t.text, t.accent };
                const ImU32 borderCol = isLight
-                  ? ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 0.0f, 0.45f))
-                  : ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.45f));
+                  ? ImGui::GetColorU32(tok::V4(tok::palf::v_0_0_0_450))
+                  : ImGui::GetColorU32(tok::V4(tok::palf::v_1000_1000_1000_450));
                for (int s = 0; s < 3; s++)
                {
                   ImVec2 p0(pos.x + s * (sz + gap), pos.y);
@@ -575,7 +576,7 @@ namespace app
             ImGui::SeparatorText(T("Autosave"));
             if (gAutosaveFailed)
             {
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.35f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_1000_420_350_1000));
                ImGui::TextUnformatted(T("Autosave is FAILING - save manually"));
                ImGui::PopStyleColor();
                if (ImGui::IsItemHovered())
@@ -784,12 +785,12 @@ namespace app
                // vanished against this fixed dark background. Pin both to
                // an explicit light colour so the box is legible in either
                // theme instead of only in dark mode by accident.
-               ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.10f, 0.16f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.20f, 0.24f, 0.36f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.88f, 0.91f, 0.98f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.24f, 0.36f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.33f, 0.48f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.34f, 0.40f, 0.58f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_ChildBg, tok::V4(tok::palf::v_80_100_160_1000));
+               ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_200_240_360_1000));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_880_910_980_1000));
+               ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_200_240_360_1000));
+               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_280_330_480_1000));
+               ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_340_400_580_1000));
                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f);
                // ChildBorderSize is 0 app-wide (ApplyTheme) so submenus stop
                // drawing an outline; this box wants its explicit edge back,
@@ -834,27 +835,27 @@ namespace app
 
                   ImGui::TableNextColumn(); ImGui::Text("frame");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("60 fps / Bytecode VM");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "t, dt, frame");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "t, dt, frame");
                   ImGui::TableNextColumn(); ImGui::Text("Time in seconds, delta time, integer frame counter.");
 
                   ImGui::TableNextColumn(); ImGui::Text("element");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("60 x N / Bytecode VM");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "P, N, uv, Cd, i, count");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "P, N, uv, Cd, i, count");
                   ImGui::TableNextColumn(); ImGui::Text("Position (vec3), Normal (vec3), UV (vec2), Color (vec3), vertex index, total count.");
 
                   ImGui::TableNextColumn(); ImGui::Text("pixel");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("60 x W x H / GLSL");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "uv, xy, col, res, aspect, alpha");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "uv, xy, col, res, aspect, alpha");
                   ImGui::TableNextColumn(); ImGui::Text("Normalized UV [0..1], Pixel XY, Output color (vec3), Screen resolution, aspect ratio, output alpha.");
 
                   ImGui::TableNextColumn(); ImGui::Text("sample");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("48 kHz / Register VM");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "in, out, sr, n, freq, gate");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "in, out, sr, n, freq, gate");
                   ImGui::TableNextColumn(); ImGui::Text("Audio in/out, sample rate (sr), sample index (n), voice note Hz (freq), gate (1.0/0.0).");
 
                   ImGui::TableNextColumn(); ImGui::Text("graph");
                   ImGui::TableNextColumn(); ImGui::TextDisabled("Edit time / Interpreter");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "(none)");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "(none)");
                   ImGui::TableNextColumn(); ImGui::Text("Node graph metaprogramming: emit(), connect(), set(), place().");
 
                   ImGui::EndTable();
@@ -866,15 +867,15 @@ namespace app
             if ((sSelectedSection == 0 || sSelectedSection == 3) && MatchesFilter("declarations param state attrib output"))
             {
                ImGui::SeparatorText("3. Declarations");
-               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "param <type> <name> = <default> [<min>, <max>]");
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "param <type> <name> = <default> [<min>, <max>]");
                ImGui::TextWrapped("Declares an exposed control that auto-creates an interactive, modulatable knob/slider in the node UI.");
                DrawCodeBox("param float cutoff = 0.5 [0, 1]\nparam float resonance = 1.2 [0.1, 4.0]", "cb_param");
 
-               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "state <type> <name> = <init>");
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "state <type> <name> = <init>");
                ImGui::TextWrapped("Persistent delay cell (one execution unit of memory). Essential for feedback loops, filters, and integrators.");
                DrawCodeBox("state float z = 0\nz += (in - z) * cutoff\nout = z", "cb_state");
 
-               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "attrib <type> <name> = <init>");
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "attrib <type> <name> = <init>");
                ImGui::TextWrapped("Declares custom per-element attributes living on geometry points or vertices.");
                DrawCodeBox("attrib float heat = 0\nheat += bass * 0.1\nCd = vec3(heat, 0.2, 1.0 - heat)", "cb_attrib");
             }
@@ -901,31 +902,31 @@ namespace app
                   ImGui::TableHeadersRow();
 
                   ImGui::TableNextColumn(); ImGui::Text("Operators");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "%s", "+ - * / % ^, += -= *= /=");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "%s", "+ - * / % ^, += -= *= /=");
                   ImGui::TableNextColumn(); ImGui::Text("^ is right-associative power (2^3 == 8).");
 
                   ImGui::TableNextColumn(); ImGui::Text("Logic & Compare");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "== != < <= > >=, && || !");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "== != < <= > >=, && || !");
                   ImGui::TableNextColumn(); ImGui::Text("Standard boolean comparisons and logic gates.");
 
                   ImGui::TableNextColumn(); ImGui::Text("Trigonometry");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "sin, cos, tan, asin, acos, atan, atan2");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "sin, cos, tan, asin, acos, atan, atan2");
                   ImGui::TableNextColumn(); ImGui::Text("Standard trig functions (radians).");
 
                   ImGui::TableNextColumn(); ImGui::Text("Math Utilities");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "abs, floor, ceil, fract, clamp, lerp");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "abs, floor, ceil, fract, clamp, lerp");
                   ImGui::TableNextColumn(); ImGui::Text("lerp(a, b, t) is linear interpolation.");
 
                   ImGui::TableNextColumn(); ImGui::Text("Advanced Math");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "smoothstep, pow, sqrt, exp, log, min, max");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "smoothstep, pow, sqrt, exp, log, min, max");
                   ImGui::TableNextColumn(); ImGui::Text("Hermite interpolation, exponents, roots, min/max bounds.");
 
                   ImGui::TableNextColumn(); ImGui::Text("Vector Math");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "length, normalize, dot, cross, reflect");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "length, normalize, dot, cross, reflect");
                   ImGui::TableNextColumn(); ImGui::Text("Vector norms, dot/cross products, reflection.");
 
                   ImGui::TableNextColumn(); ImGui::Text("Pure Randomness");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "rand(t, seed), noise(t, seed)");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_800_1000_1000), "rand(t, seed), noise(t, seed)");
                   ImGui::TableNextColumn(); ImGui::Text("Deterministic, pure functions of time and seed.");
 
                   ImGui::EndTable();
@@ -940,25 +941,25 @@ namespace app
                ImGui::TextWrapped("element, pixel and sample are mutually incomparable domains - they never join implicitly. Every crossing between them goes through frame, either explicitly (reduce/resample/downsample) or via a reduce.");
                ImGui::Spacing();
 
-               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "reduce.<op>(x) - many to one, written explicitly");
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "reduce.<op>(x) - many to one, written explicitly");
                ImGui::BulletText("Ops: reduce.sum, reduce.rms, reduce.mean, reduce.min, reduce.max.");
                ImGui::BulletText("reduce.rms(in, loHz, hiHz) : 3-arg band-limited RMS, Sample domain only (Sample -> Frame).");
                ImGui::BulletText("Sample -> Frame only compiles inside a Field Synth/Effect (sample) kernel - 'in' is a sample-domain name, unreadable from element/pixel.");
                ImGui::BulletText("In the sample domain, reduce.rms(in, loHz, hiHz) is output-only: write it as 'output frame float name = reduce.rms(in, lo, hi)' (max one per kernel). The result cannot be read back into that same kernel's per-sample lines - it is a pin, driven onto another node's param through the modulation matrix.");
                DrawCodeBox("# inside a sample-domain kernel (Field Synth / Field Effect)\noutput frame float bass = reduce.rms(in, 20, 200)   # exposed as a pin, not usable below\nout = in   # per-sample processing is independent of the line above", "cb_reduce");
 
-               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "map(N) { ... } - one kernel invocation per lane, explicit");
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "map(N) { ... } - one kernel invocation per lane, explicit");
                ImGui::TextWrapped("Runs the body N times, once per lane, inside element or pixel kernels (the body domain must be the same or finer than the surrounding one). Cost is N x the body. The lane index inside the body is map_index; N must be a compile-time constant (1-64).");
 
-               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "broadcast - one to many, implicit, NEVER written");
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "broadcast - one to many, implicit, NEVER written");
                ImGui::TextWrapped("Coarse -> fine happens automatically via rate inference. Writing broadcast(...) is a compile error.");
                DrawCodeBox("amount = 0.5 + 0.5 * sin(t)   # frame domain\nP.y += amount                  # element domain reads it, no syntax needed", "cb_broadcast");
 
-               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "resample(x, Domain) - read domain A while standing in domain B");
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "resample(x, Domain) - read domain A while standing in domain B");
                ImGui::TextWrapped("Domain is a bare identifier: frame, element, pixel or sample. Samples rather than aggregates, so fine -> coarse can alias - prefer reduce.rms for levels/envelopes.");
                DrawCodeBox("level = resample(lfo, sample)   # frame -> sample, held for the block", "cb_resample");
 
-               ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "downsample(x, k) - run at a fraction of the ambient rate");
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "downsample(x, k) - run at a fraction of the ambient rate");
                ImGui::TextWrapped("k must be a compile-time constant integer literal >= 1. A non-constant k is refused at compile time.");
                DrawCodeBox("slow = downsample(lfo, 32)   # evaluates lfo once every 32 samples", "cb_downsample");
             }
@@ -979,7 +980,7 @@ namespace app
 
                   ImGui::TableNextColumn(); ImGui::Text("frame");
                   ImGui::TableNextColumn(); ImGui::Text("real branch");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "free");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_400_900_600_1000), "free");
 
                   ImGui::TableNextColumn(); ImGui::Text("element");
                   ImGui::TableNextColumn(); ImGui::Text("real branch");
@@ -991,7 +992,7 @@ namespace app
 
                   ImGui::TableNextColumn(); ImGui::Text("pixel");
                   ImGui::TableNextColumn(); ImGui::Text("predication");
-                  ImGui::TableNextColumn(); ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.4f, 1.0f), "always pays the sum of both sides (GPU evaluates both)");
+                  ImGui::TableNextColumn(); ImGui::TextColored(tok::V4(tok::palf::v_1000_700_400_1000), "always pays the sum of both sides (GPU evaluates both)");
 
                   ImGui::EndTable();
                }
@@ -1006,20 +1007,20 @@ namespace app
                ImGui::TextWrapped("Ready-to-use starting points - copy into a Field node's editor and adjust the param ranges.");
                ImGui::Spacing();
 
-               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Audio Synth: Sine Oscillator (Field Synth Node)");
+               ImGui::TextColored(tok::V4(tok::palf::v_400_900_600_1000), "Audio Synth: Sine Oscillator (Field Synth Node)");
                DrawCodeBox("state float phase = 0\nphase = phase + freq / sr\nphase = phase - floor(phase)\nout = sin(phase * 6.283185) * gate", "cb_recipe_synth");
 
-               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Audio Effect: 1-Pole Lowpass Filter (Field Effect Node)");
+               ImGui::TextColored(tok::V4(tok::palf::v_400_900_600_1000), "Audio Effect: 1-Pole Lowpass Filter (Field Effect Node)");
                DrawCodeBox("param float cutoff = 0.25 [0.01, 0.99]\nstate float z = 0\nz += (in - z) * cutoff\nout = z", "cb_recipe_filter");
 
-               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Audio Effect: Expose a Bass Level (Field Effect Node, reduce.rms)");
+               ImGui::TextColored(tok::V4(tok::palf::v_400_900_600_1000), "Audio Effect: Expose a Bass Level (Field Effect Node, reduce.rms)");
                ImGui::TextWrapped("reduce.rms(in, lo, hi) is output-only in v1: it must be its own 'output frame float <name> = reduce.rms(in, lo, hi)' declaration (at most one per kernel), and that value cannot be read back into this same kernel's per-sample lines - it can only be exposed as a pin and driven onto another node's param through the modulation matrix. Signal processing on 'in' happens independently, in ordinary per-sample lines.");
                DrawCodeBox("param float boost = 1.5 [0.5, 4.0]\noutput frame float bass = reduce.rms(in, 20.0, 200.0)\nout = in * boost", "cb_recipe_wah");
 
-               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Geometry Deformer: Wave Ripple (Field Modifier Node)");
+               ImGui::TextColored(tok::V4(tok::palf::v_400_900_600_1000), "Geometry Deformer: Wave Ripple (Field Modifier Node)");
                DrawCodeBox("param float speed = 2.0 [0, 10]\nparam float height = 0.3 [0, 2]\ndist = length(P.xz)\nP.y += sin(dist * 4.0 - t * speed) * height\nCd = vec3(0.5 + 0.5 * sin(P.y * 5.0), 0.4, 0.8)", "cb_recipe_geom");
 
-               ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.6f, 1.0f), "Pixel Shader: Radial Glow SDF (Field Pixel Node)");
+               ImGui::TextColored(tok::V4(tok::palf::v_400_900_600_1000), "Pixel Shader: Radial Glow SDF (Field Pixel Node)");
                DrawCodeBox("param float radius = 0.3 [0.05, 0.8]\np = uv - vec2(0.5, 0.5)\nd = length(p) - radius\nglow = clamp(0.02 / (abs(d) + 0.02), 0.0, 1.0)\ncol = vec3(glow * 0.9, glow * 0.4, glow * 1.0)", "cb_recipe_pixel");
 
                ImGui::TextWrapped("Want geometry or pixels to react to audio? A single kernel can't read 'in' from an element or pixel domain - drive a param from an audio-analysis node through the modulation matrix instead, and reference the param (e.g. 'height' above) from within the geometry/pixel kernel.");
@@ -1129,12 +1130,12 @@ namespace app
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
                   const float iconSize = (bmax.y - bmin.y) * 0.65f;
-                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+                  const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
                   Tabler::DrawX(dl, center, iconSize, col);
                }
 
                if (!g.error.empty())
-                  ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.5f, 1.0f), "   %s", g.error.c_str());
+                  ImGui::TextColored(tok::V4(tok::palf::v_1000_550_500_1000), "   %s", g.error.c_str());
 
                ImGui::PopID();
             }
@@ -1175,7 +1176,7 @@ namespace app
                      if (!currentCategory.empty())
                         ImGui::Separator();
                      currentCategory = p.category;
-                     ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "%s", currentCategory.c_str());
+                     ImGui::TextColored(tok::V4(tok::palf::v_600_800_1000_1000), "%s", currentCategory.c_str());
                   }
 
                   char itemLabel[256];

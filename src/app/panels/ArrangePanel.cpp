@@ -1,4 +1,5 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -341,11 +342,11 @@ namespace app
             const ImVec2 savedCursor = ImGui::GetCursorScreenPos();
             ImGui::SetCursorScreenPos(audioBtnPos);
             ImGui::PushStyleColor(ImGuiCol_Button, timelineMode
-               ? (arrangeToolbarLight ? ImVec4(0.20f, 0.62f, 0.34f, 1.0f) : ImVec4(0.16f, 0.52f, 0.28f, 1.0f))
-               : (arrangeToolbarLight ? ImVec4(0.80f, 0.82f, 0.87f, 1.0f) : ImVec4(0.30f, 0.30f, 0.34f, 1.0f)));
+               ? (arrangeToolbarLight ? tok::V4(tok::palf::v_200_620_340_1000) : tok::V4(tok::palf::v_160_520_280_1000))
+               : (arrangeToolbarLight ? tok::V4(tok::palf::v_800_820_870_1000) : tok::V4(tok::palf::v_300_300_340_1000)));
             ImGui::PushStyleColor(ImGuiCol_Text, timelineMode
-               ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
-               : (arrangeToolbarLight ? ImVec4(0.12f, 0.14f, 0.20f, 1.0f) : ImVec4(0.92f, 0.94f, 0.98f, 1.0f)));
+               ? tok::V4(tok::palf::v_1000_1000_1000_1000)
+               : (arrangeToolbarLight ? tok::V4(tok::palf::v_120_140_200_1000) : tok::V4(tok::palf::v_920_940_980_1000)));
             if (ImGui::Button(audioLabel, ImVec2(audioBtnW, 0.0f)))
             {
                if (timelineMode)
@@ -786,7 +787,7 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = viewportWasOn ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
+            const ImU32 icol = viewportWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             const float bw = 13.0f, bh = 9.0f;
             ImVec2 tl(center.x - bw * 0.5f, center.y - bh * 0.5f - 1.0f);
@@ -807,8 +808,8 @@ namespace app
          const bool arrangeIsPlaying = tr.IsPlaying();
          if (arrangeIsPlaying)
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(16, 185, 129, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(5, 150, 105, 255));
+            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B981FF));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_059669FF));
          }
          if (ImGui::Button("##arrangeplaybtn", ImVec2(30, 0)))
             tr.TogglePlay();
@@ -822,7 +823,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.6f;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = arrangeIsPlaying ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
+            const ImU32 icol = arrangeIsPlaying ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
             if (arrangeIsPlaying)
                Tabler::DrawPlayerPause(ImGui::GetWindowDrawList(), center, iconSize, icol);
             else
@@ -840,7 +841,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.72f;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol;
+            const ImU32 icol = hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             Tabler::DrawPlayerRewind(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
@@ -883,8 +884,8 @@ namespace app
          const bool snapWasOn = gArrange.settings.snapDivision > 0;
          if (snapWasOn)
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(16, 185, 129, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(5, 150, 105, 255));
+            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B981FF));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_059669FF));
          }
          if (ImGui::Button("##arrangesnapbtn", ImVec2(30, 0)))
          {
@@ -903,7 +904,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.62f;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = snapWasOn ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
+            const ImU32 icol = snapWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
             Tabler::DrawMagnet(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
@@ -948,8 +949,8 @@ namespace app
          const bool loopWasOn = loopNow.enabled; // see snapWasOn above
          if (loopWasOn)
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(16, 185, 129, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(5, 150, 105, 255));
+            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B981FF));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_059669FF));
          }
          if (ImGui::Button("##arrangeloopbtn", ImVec2(30, 0)))
             ArrangeSetLoop(!loopNow.enabled, loopNow.start, loopNow.end);
@@ -963,7 +964,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.65f;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = loopWasOn ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
+            const ImU32 icol = loopWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
             Tabler::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
@@ -972,8 +973,8 @@ namespace app
          const bool toolNonDefault = (gArrangeTool != ArrangeTool::Select);
          if (toolNonDefault)
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(16, 185, 129, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(5, 150, 105, 255));
+            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B981FF));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_059669FF));
          }
          const float toolBtnW = 34.0f;
          if (ImGui::Button("##arrangetoolmodepicker", ImVec2(toolBtnW, 0)))
@@ -1004,7 +1005,7 @@ namespace app
             const float iconSize = (bmax.y - bmin.y) * 0.65f;
             const ImVec2 center(bmin.x + 12.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = toolNonDefault ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
+            const ImU32 icol = toolNonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             switch (gArrangeTool)
             {
@@ -1072,7 +1073,7 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol;
+            const ImU32 icol = hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             Tabler::DrawFlag(ImGui::GetWindowDrawList(), center, (bmax.y - bmin.y) * 0.65f, icol);
          }
 
@@ -1101,7 +1102,7 @@ namespace app
             const ImVec2 rcenter((rbmin.x + rbmax.x) * 0.5f, (rbmin.y + rbmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
             const ImU32 barCol = anyResized
-               ? (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol)
+               ? (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol)
                : (arrangeIconCol & 0x60FFFFFFu);
             Tabler::DrawLineHeight(ImGui::GetWindowDrawList(), rcenter, (rbmax.y - rbmin.y) * 0.65f, barCol);
             if (hovered)
@@ -1128,7 +1129,7 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = inspectorWasOpen ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
+            const ImU32 icol = inspectorWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
             Tabler::DrawEdit(ImGui::GetWindowDrawList(), center, (bmax.y - bmin.y) * 0.65f, icol);
          }
 
@@ -1437,9 +1438,9 @@ namespace app
       const ImVec2 rulerPos(rulerStartX, pinnedTopY);
       const ImVec2 rulerSize(rulerWidth, kRulerHeight);
       const bool isLight = IsThemeLight();
-      const ImU32 rulerBg = isLight ? IM_COL32(238, 238, 242, 255) : IM_COL32(32, 32, 36, 255);
-      const ImU32 markerStripBg = isLight ? IM_COL32(229, 229, 235, 255) : IM_COL32(26, 26, 30, 255);
-      const ImU32 tickCol = isLight ? IM_COL32(140, 140, 150, 255) : IM_COL32(100, 100, 110, 255);
+      const ImU32 rulerBg = isLight ? tok::U32(tok::pal::c_EEEEF2FF) : tok::U32(tok::pal::c_202024FF);
+      const ImU32 markerStripBg = isLight ? tok::U32(tok::pal::c_E5E5EBFF) : tok::U32(tok::pal::c_1A1A1EFF);
+      const ImU32 tickCol = isLight ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_64646EFF);
       const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text, 0.80f);
       const ImU32 subTextCol = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.80f);
 
@@ -1567,7 +1568,7 @@ namespace app
             const bool dragged = gArrangeMarkerDragId == mk.id;
             dl->AddRectFilled(f0, f1, fcol, 3.0f, ImDrawFlags_RoundCornersRight);
             // A hairline edge so a pale flag still reads on the light ruler.
-            dl->AddRect(f0, f1, dragged ? IM_COL32(255, 255, 255, 230) : IM_COL32(0, 0, 0, isLight ? 110 : 150),
+            dl->AddRect(f0, f1, dragged ? tok::U32(tok::pal::c_FFFFFFE6) : IM_COL32(0, 0, 0, isLight ? 110 : 150),
                         3.0f, ImDrawFlags_RoundCornersRight, dragged ? 1.5f : 1.0f);
             dl->AddLine(ImVec2(fx, pinnedTopY), ImVec2(fx, rulerPos.y + rulerSize.y), fcol, 1.5f);
 
@@ -1598,7 +1599,7 @@ namespace app
             else
             {
                dl->AddText(ImVec2(fx + 5.0f, pinnedTopY + (kMarkerStripH - ImGui::GetFontSize()) * 0.5f),
-                           lum > 150.0f ? IM_COL32(20, 20, 24, 255) : IM_COL32(255, 255, 255, 255), nm);
+                           lum > 150.0f ? tok::U32(tok::pal::c_141418FF) : tok::U32(tok::pal::c_FFFFFFFF), nm);
             }
 
             const float hitX0 = std::max(rulerStartX, fx - 3.0f);
@@ -2132,14 +2133,14 @@ namespace app
                                                 : (relY < 0.30f ? 0 : relY > 0.70f ? 2 : 1);
                if (zone == 1)
                {
-                  dl->AddRect(rowMin, rowMax, IM_COL32(59, 130, 246, 255), 3.0f, 0, 2.0f);
+                  dl->AddRect(rowMin, rowMax, tok::U32(tok::pal::c_3B82F6FF), 3.0f, 0, 2.0f);
                }
                else
                {
                   const float lineY = (zone == 0) ? rowMin.y : rowMax.y;
-                  dl->AddLine(ImVec2(rowMin.x, lineY), ImVec2(rowMax.x, lineY), IM_COL32(59, 130, 246, 255), 2.5f);
-                  dl->AddCircleFilled(ImVec2(rowMin.x + 3.0f, lineY), 4.0f, IM_COL32(59, 130, 246, 255));
-                  dl->AddCircleFilled(ImVec2(rowMax.x - 3.0f, lineY), 4.0f, IM_COL32(59, 130, 246, 255));
+                  dl->AddLine(ImVec2(rowMin.x, lineY), ImVec2(rowMax.x, lineY), tok::U32(tok::pal::c_3B82F6FF), 2.5f);
+                  dl->AddCircleFilled(ImVec2(rowMin.x + 3.0f, lineY), 4.0f, tok::U32(tok::pal::c_3B82F6FF));
+                  dl->AddCircleFilled(ImVec2(rowMax.x - 3.0f, lineY), 4.0f, tok::U32(tok::pal::c_3B82F6FF));
                }
                if (payload->IsDelivery())
                {
@@ -2252,8 +2253,8 @@ namespace app
          const bool grpRowSelected = gArrangeRowSel.count(groupId) != 0;
          if (grpRowSelected)
          {
-            const ImU32 selFill = isLight ? IM_COL32(139, 92, 246, 35) : IM_COL32(139, 92, 246, 45);
-            const ImU32 selBorder = IM_COL32(167, 139, 250, 180);
+            const ImU32 selFill = isLight ? tok::U32(tok::pal::c_8B5CF623) : tok::U32(tok::pal::c_8B5CF62D);
+            const ImU32 selBorder = tok::U32(tok::pal::c_A78BFAB4);
             dl->AddRectFilled(ImVec2(headerStartX + 1.0f, rowTop + 1.0f), ImVec2(rulerStartX - 1.0f, rowTop + kLaneHeight - 1.0f), selFill, 2.0f);
             dl->AddRect(ImVec2(headerStartX + 1.0f, rowTop + 1.0f), ImVec2(rulerStartX - 1.0f, rowTop + kLaneHeight - 1.0f), selBorder, 2.0f, 0, 1.5f);
          }
@@ -2266,7 +2267,7 @@ namespace app
             });
          }
          const bool foldHovered = ImGui::IsItemHovered();
-         const ImU32 chevronCol = foldHovered ? (isLight ? IM_COL32(50, 50, 60, 255) : IM_COL32(240, 240, 240, 255)) : (tint | 0xE0000000u);
+         const ImU32 chevronCol = foldHovered ? (isLight ? tok::U32(tok::pal::c_32323CFF) : tok::U32(tok::pal::c_F0F0F0FF)) : (tint | 0xE0000000u);
          const ImVec2 chevCenter(indentX + 6.0f, rowTop + kLaneHeight * 0.5f);
          if (grp->collapsed)
             Tabler::DrawChevronRight(dl, chevCenter, 11.0f, chevronCol);
@@ -2306,9 +2307,9 @@ namespace app
          }
          else
          {
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, IM_COL32(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::U32(tok::pal::c_00000000));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::U32(tok::pal::c_00000000));
+            ImGui::PushStyleColor(ImGuiCol_Header, tok::U32(tok::pal::c_00000000));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
             ImGui::Selectable(ArrangeGroupDisplayName(*grp).c_str(), false, ImGuiSelectableFlags_None,
                               ImVec2(grpNameW, kLaneHeight - 8.0f));
@@ -2514,8 +2515,8 @@ namespace app
 
          // Lane background
          const ImU32 laneBg = (i % 2 == 0)
-            ? (isLight ? IM_COL32(245, 245, 248, 255) : IM_COL32(24, 24, 28, 255))
-            : (isLight ? IM_COL32(250, 250, 252, 255) : IM_COL32(28, 28, 32, 255));
+            ? (isLight ? tok::U32(tok::pal::c_F5F5F8FF) : tok::U32(tok::pal::c_18181CFF))
+            : (isLight ? tok::U32(tok::pal::c_FAFAFCFF) : tok::U32(tok::pal::c_1C1C20FF));
          dl->AddRectFilled(ImVec2(headerStartX, curY),
                            ImVec2(rulerStartX + rulerWidth, curY + rowH), laneBg);
          dl->AddLine(ImVec2(headerStartX, curY + rowH),
@@ -2554,8 +2555,8 @@ namespace app
 
          if (gArrangeRowSel.count(laneId))
          {
-            const ImU32 selFill = isLight ? IM_COL32(139, 92, 246, 35) : IM_COL32(139, 92, 246, 45);
-            const ImU32 selBorder = IM_COL32(167, 139, 250, 180);
+            const ImU32 selFill = isLight ? tok::U32(tok::pal::c_8B5CF623) : tok::U32(tok::pal::c_8B5CF62D);
+            const ImU32 selBorder = tok::U32(tok::pal::c_A78BFAB4);
             dl->AddRectFilled(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f), selFill, 2.0f);
             dl->AddRect(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f), selBorder, 2.0f, 0, 1.5f);
          }
@@ -2577,7 +2578,7 @@ namespace app
          for (int d = 0; d < laneDepth; d++)
          {
             const float lineX = headerStartX + 6.0f + (float)d * kGroupIndent;
-            dl->AddLine(ImVec2(lineX, curY), ImVec2(lineX, curY + rowH), IM_COL32(255, 255, 255, 24), 1.0f);
+            dl->AddLine(ImVec2(lineX, curY), ImVec2(lineX, curY + rowH), tok::U32(tok::pal::c_FFFFFF18), 1.0f);
          }
 
          // Old full sizes for mixer controls
@@ -2621,9 +2622,9 @@ namespace app
          }
          else
          {
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, IM_COL32(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::U32(tok::pal::c_00000000));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::U32(tok::pal::c_00000000));
+            ImGui::PushStyleColor(ImGuiCol_Header, tok::U32(tok::pal::c_00000000));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 2.0f));
             ImGui::Selectable(lane.name.c_str(), false, ImGuiSelectableFlags_None, nameBoxSize);
             ImGui::PopStyleVar();
@@ -2661,7 +2662,7 @@ namespace app
          const bool laneSilenced = !isVideo && (lane.mute || (anyLaneSolo && !lane.solo));
          if (rowH >= kMixCtl + 4.0f)
          {
-            const ImU32 mixFill = IM_COL32(16, 185, 129, 255);
+            const ImU32 mixFill = tok::U32(tok::pal::c_10B981FF);
             auto mixGesture = [&](bool changed, const std::function<void()>& apply)
             {
                if (ImGui::IsItemActivated())
@@ -2721,8 +2722,8 @@ namespace app
                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, (kMixCtl - ImGui::GetFontSize()) * 0.5f));
                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
                ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 6.0f);
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, IM_COL32(139, 92, 246, 255));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, IM_COL32(160, 120, 250, 255));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::U32(tok::pal::c_8B5CF6FF));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::U32(tok::pal::c_A078FAFF));
                ImGui::SetNextItemWidth(kMixStripW);
                const bool opChanged = ImGui::SliderFloat("##laneopacity", &pct, 0.0f, 100.0f, "%.0f%%",
                                                          ImGuiSliderFlags_AlwaysClamp);
@@ -2974,15 +2975,15 @@ namespace app
             // shows exactly the palette swatch the user picked, not a blended-down shade.
             ImU32 clipBaseCol = hasTint
                ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), 255)
-               : (isVideo ? IM_COL32(109, 40, 217, 210) : IM_COL32(5, 150, 105, 210));
+               : (isVideo ? tok::U32(tok::pal::c_6D28D9D2) : tok::U32(tok::pal::c_059669D2));
             ImU32 clipActiveCol = hasTint
                ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), 255)
-               : (isVideo ? IM_COL32(139, 92, 246, 255) : IM_COL32(16, 185, 129, 255));
+               : (isVideo ? tok::U32(tok::pal::c_8B5CF6FF) : tok::U32(tok::pal::c_10B981FF));
             const bool muted = !clip.enabled || offline || laneSilenced;
             if (muted)
             {
-               clipBaseCol = isLight ? IM_COL32(176, 178, 186, 220) : IM_COL32(72, 72, 80, 220);
-               clipActiveCol = isLight ? IM_COL32(160, 162, 170, 255) : IM_COL32(88, 88, 96, 255);
+               clipBaseCol = isLight ? tok::U32(tok::pal::c_B0B2BADC) : tok::U32(tok::pal::c_484850DC);
+               clipActiveCol = isLight ? tok::U32(tok::pal::c_A0A2AAFF) : tok::U32(tok::pal::c_585860FF);
             }
             // A grouped clip is edged in its group's colour (brighter when
             // the group is selected - the group frame drawn after the lanes
@@ -2991,14 +2992,14 @@ namespace app
             const ImU32 clipBorderCol = grouped
                ? ArrangeGroupColor(clip.groupId, isSelected ? 255 : (clipHovered ? 235 : 190))
                : isSelected
-               ? IM_COL32(250, 204, 21, 255) // gold for selected
-               : (clipActive ? IM_COL32(255, 255, 255, 240) : (clipHovered ? IM_COL32(230, 230, 240, 220) : IM_COL32(20, 20, 24, 180)));
+               ? tok::U32(tok::pal::c_FACC15FF) // gold for selected
+               : (clipActive ? tok::U32(tok::pal::c_FFFFFFF0) : (clipHovered ? tok::U32(tok::pal::c_E6E6F0DC) : tok::U32(tok::pal::c_141418B4)));
 
             dl->AddRectFilled(ImVec2(cLeft, cTop), ImVec2(cRight, cBottom),
                               clipActive ? clipActiveCol : clipBaseCol, 4.0f);
             if (muted)
                DrawArrangeHatch(dl, ImVec2(cLeft, cTop), ImVec2(cRight, cBottom),
-                                isLight ? IM_COL32(0, 0, 0, 45) : IM_COL32(255, 255, 255, 38));
+                                isLight ? tok::U32(tok::pal::c_0000002D) : tok::U32(tok::pal::c_FFFFFF26));
             if (grouped)
                dl->AddRectFilled(ImVec2(cLeft, cTop), ImVec2(cRight, cTop + 4.0f), ArrangeGroupColor(clip.groupId),
                                  4.0f, ImDrawFlags_RoundCornersTop);
@@ -3012,10 +3013,10 @@ namespace app
             {
                const float midY = (cTop + cBottom) * 0.5f;
                const float halfH = std::max(2.0f, (cBottom - cTop) * 0.5f - 5.0f);
-               const ImU32 waveCol = muted ? IM_COL32(255, 255, 255, 60) : IM_COL32(255, 255, 255, 115);
+               const ImU32 waveCol = muted ? tok::U32(tok::pal::c_FFFFFF3C) : tok::U32(tok::pal::c_FFFFFF73);
                dl->PushClipRect(ImVec2(cLeft + 1.0f, cTop + 1.0f), ImVec2(cRight - 1.0f, cBottom - 1.0f), true);
                dl->AddLine(ImVec2(cLeft + 1.0f, midY), ImVec2(cRight - 1.0f, midY),
-                           IM_COL32(255, 255, 255, 45), 1.0f);
+                           tok::U32(tok::pal::c_FFFFFF2D), 1.0f);
                // Audio Sample: a static peak array computed once at import
                // from the fully-decoded source file - see
                // ArrangePollMediaImports. Audio Clip: unchanged, the
@@ -3094,7 +3095,7 @@ namespace app
                   // convention every other AddImage of a node texture uses.
                   dl->AddImage((ImTextureID)(intptr_t)thumbIt->second.fbo.tex, tl, br,
                                ImVec2(0, 1), ImVec2(1, 0));
-                  dl->AddRect(tl, br, IM_COL32(0, 0, 0, 140), 2.0f);
+                  dl->AddRect(tl, br, tok::U32(tok::pal::c_0000008C), 2.0f);
                   dl->PopClipRect();
                   thumbRight = br.x;
                }
@@ -3108,15 +3109,15 @@ namespace app
                {
                   const float fInX = tickToX(clip.start + clip.fadeIn);
                   dl->AddTriangleFilled(ImVec2(clipX0, cTop), ImVec2(clipX0, cBottom), ImVec2(fInX, cTop),
-                                        IM_COL32(0, 0, 0, 50));
-                  dl->AddLine(ImVec2(clipX0, cBottom), ImVec2(fInX, cTop), IM_COL32(255, 255, 255, 150), 1.5f);
+                                        tok::U32(tok::pal::c_00000032));
+                  dl->AddLine(ImVec2(clipX0, cBottom), ImVec2(fInX, cTop), tok::U32(tok::pal::c_FFFFFF96), 1.5f);
                }
                if (clip.fadeOut > 0)
                {
                   const float fOutX = tickToX(clip.End() - clip.fadeOut);
                   dl->AddTriangleFilled(ImVec2(fOutX, cTop), ImVec2(clipX1, cBottom), ImVec2(clipX1, cTop),
-                                        IM_COL32(0, 0, 0, 50));
-                  dl->AddLine(ImVec2(fOutX, cTop), ImVec2(clipX1, cBottom), IM_COL32(255, 255, 255, 150), 1.5f);
+                                        tok::U32(tok::pal::c_00000032));
+                  dl->AddLine(ImVec2(fOutX, cTop), ImVec2(clipX1, cBottom), tok::U32(tok::pal::c_FFFFFF96), 1.5f);
                }
                dl->PopClipRect();
             }
@@ -3135,7 +3136,7 @@ namespace app
                {
                   const float midY = (cTop + cBottom) * 0.5f;
                   dl->AddText(ImVec2(cLeft + (cWidth - ts.x) * 0.5f, midY - ts.y * 0.5f),
-                              IM_COL32(255, 255, 255, 200), loadingLabel);
+                              tok::U32(tok::pal::c_FFFFFFC8), loadingLabel);
                }
             }
 
@@ -3158,14 +3159,14 @@ namespace app
             if (clipHovered && bladeCuts)
             {
                const float bx = tickToX(bladeTick);
-               dl->AddLine(ImVec2(bx, cTop), ImVec2(bx, cBottom), IM_COL32(255, 255, 255, 235), 1.5f);
+               dl->AddLine(ImVec2(bx, cTop), ImVec2(bx, cBottom), tok::U32(tok::pal::c_FFFFFFEB), 1.5f);
             }
 
             // Trim handle marks
             if (cWidth > 20.0f)
             {
-               const ImU32 handleCol = onLeftEdge ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 255, 255, 80);
-               const ImU32 handleRCol = onRightEdge ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 255, 255, 80);
+               const ImU32 handleCol = onLeftEdge ? tok::U32(tok::pal::c_FFFFFFDC) : tok::U32(tok::pal::c_FFFFFF50);
+               const ImU32 handleRCol = onRightEdge ? tok::U32(tok::pal::c_FFFFFFDC) : tok::U32(tok::pal::c_FFFFFF50);
                dl->AddLine(ImVec2(cLeft + 3.0f, cTop + 6.0f), ImVec2(cLeft + 3.0f, cBottom - 6.0f), handleCol, 2.0f);
                dl->AddLine(ImVec2(cRight - 3.0f, cTop + 6.0f), ImVec2(cRight - 3.0f, cBottom - 6.0f), handleRCol, 2.0f);
             }
@@ -3214,8 +3215,8 @@ namespace app
             else
             {
                const std::string fullLabel = clipLabel + " [" + ArrangeFormatLength(clip.length) + "]";
-               const ImU32 labelCol = muted ? (isLight ? IM_COL32(60, 60, 70, 255) : IM_COL32(190, 190, 200, 255))
-                                            : IM_COL32(255, 255, 255, 255);
+               const ImU32 labelCol = muted ? (isLight ? tok::U32(tok::pal::c_3C3C46FF) : tok::U32(tok::pal::c_BEBEC8FF))
+                                            : tok::U32(tok::pal::c_FFFFFFFF);
                // Starts after the thumbnail when there is one, so the two
                // never overlap.
                const float labelX = (thumbRight > cLeft ? thumbRight + 6.0f : cLeft + 8.0f);
@@ -3261,9 +3262,9 @@ namespace app
                if (gx1 > gx0)
                {
                   dl->AddRectFilled(ImVec2(gx0, curY + 2.0f), ImVec2(gx1, curY + rowH - 2.0f),
-                                    IM_COL32(16, 185, 129, 50), 3.0f);
+                                    tok::U32(tok::pal::c_10B98132), 3.0f);
                   dl->AddRect(ImVec2(gx0, curY + 2.0f), ImVec2(gx1, curY + rowH - 2.0f),
-                              IM_COL32(16, 185, 129, 200), 3.0f, 0, 1.5f);
+                              tok::U32(tok::pal::c_10B981C8), 3.0f, 0, 1.5f);
                }
                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && gArrangeDrag.mode == kArrangeDragNone)
                {
@@ -3437,11 +3438,11 @@ namespace app
             {
                const ImVec2 r0(rMinX, rMinY);
                const ImVec2 r1(rMaxX, rMaxY);
-               dl->AddRectFilled(r0, r1, IM_COL32(59, 130, 246, 22));
-               dl->AddRect(r0, r1, IM_COL32(96, 165, 250, 110), 0.0f, 0, 1.0f);
+               dl->AddRectFilled(r0, r1, tok::U32(tok::pal::c_3B82F616));
+               dl->AddRect(r0, r1, tok::U32(tok::pal::c_60A5FA6E), 0.0f, 0, 1.0f);
                // Subtle vertical boundary lines at x0 and x1
-               dl->AddLine(ImVec2(r0.x, r0.y), ImVec2(r0.x, r1.y), IM_COL32(255, 255, 255, 120), 1.0f);
-               dl->AddLine(ImVec2(r1.x, r0.y), ImVec2(r1.x, r1.y), IM_COL32(255, 255, 255, 120), 1.0f);
+               dl->AddLine(ImVec2(r0.x, r0.y), ImVec2(r0.x, r1.y), tok::U32(tok::pal::c_FFFFFF78), 1.0f);
+               dl->AddLine(ImVec2(r1.x, r0.y), ImVec2(r1.x, r1.y), tok::U32(tok::pal::c_FFFFFF78), 1.0f);
             }
          }
       }
@@ -3472,8 +3473,8 @@ namespace app
                const float x1 = std::min(rulerStartX + rulerWidth, tickToX(b));
                if (x1 <= x0)
                   continue;
-               dl->AddRectFilled(ImVec2(x0, y + 3.0f), ImVec2(x1, y + rowH - 3.0f), IM_COL32(239, 68, 68, 105), 3.0f);
-               dl->AddRect(ImVec2(x0, y + 3.0f), ImVec2(x1, y + rowH - 3.0f), IM_COL32(239, 68, 68, 235), 3.0f, 0, 1.5f);
+               dl->AddRectFilled(ImVec2(x0, y + 3.0f), ImVec2(x1, y + rowH - 3.0f), tok::U32(tok::pal::c_EF444469), 3.0f);
+               dl->AddRect(ImVec2(x0, y + 3.0f), ImVec2(x1, y + rowH - 3.0f), tok::U32(tok::pal::c_EF4444EB), 3.0f, 0, 1.5f);
             }
          }
       }
@@ -3514,28 +3515,28 @@ namespace app
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
-            Tabler::DrawScissors(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, IM_COL32(0, 0, 0, 200), 3.2f);
-            Tabler::DrawScissors(fg, mouse, 20.0f, IM_COL32(255, 255, 255, 255), 1.8f);
+            Tabler::DrawScissors(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
+            Tabler::DrawScissors(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
          }
          else if (gArrangeTool == ArrangeTool::Pencil)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
-            Tabler::DrawPencil(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, IM_COL32(0, 0, 0, 200), 3.2f);
-            Tabler::DrawPencil(fg, mouse, 20.0f, IM_COL32(255, 255, 255, 255), 1.8f);
+            Tabler::DrawPencil(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
+            Tabler::DrawPencil(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
          }
          else if (gArrangeTool == ArrangeTool::Zoom)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
             const bool zoomOut = ImGui::GetIO().KeyAlt || ImGui::IsMouseDown(ImGuiMouseButton_Right);
-            Tabler::DrawZoom(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, IM_COL32(0, 0, 0, 200), 3.2f);
-            Tabler::DrawZoom(fg, mouse, 20.0f, IM_COL32(255, 255, 255, 255), 1.8f);
+            Tabler::DrawZoom(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
+            Tabler::DrawZoom(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
             // Draw + or - indicator inside the magnifying glass center
             const ImVec2 zc(mouse.x - 2.0f, mouse.y - 2.0f);
-            fg->AddLine(ImVec2(zc.x - 2.5f, zc.y), ImVec2(zc.x + 2.5f, zc.y), IM_COL32(255, 255, 255, 255), 1.6f);
+            fg->AddLine(ImVec2(zc.x - 2.5f, zc.y), ImVec2(zc.x + 2.5f, zc.y), tok::U32(tok::pal::c_FFFFFFFF), 1.6f);
             if (!zoomOut)
-               fg->AddLine(ImVec2(zc.x, zc.y - 2.5f), ImVec2(zc.x, zc.y + 2.5f), IM_COL32(255, 255, 255, 255), 1.6f);
+               fg->AddLine(ImVec2(zc.x, zc.y - 2.5f), ImVec2(zc.x, zc.y + 2.5f), tok::U32(tok::pal::c_FFFFFFFF), 1.6f);
          }
          else if (gArrangeTool == ArrangeTool::Hand)
          {
@@ -4295,8 +4296,8 @@ namespace app
                for (float gy = lanesContentBottom; gy < emptyGridBottom; gy += kLaneHeight, rowIdx++)
                {
                   const ImU32 stripeBg = (rowIdx % 2 == 0)
-                     ? (isLight ? IM_COL32(245, 245, 248, 255) : IM_COL32(24, 24, 28, 255))
-                     : (isLight ? IM_COL32(250, 250, 252, 255) : IM_COL32(28, 28, 32, 255));
+                     ? (isLight ? tok::U32(tok::pal::c_F5F5F8FF) : tok::U32(tok::pal::c_18181CFF))
+                     : (isLight ? tok::U32(tok::pal::c_FAFAFCFF) : tok::U32(tok::pal::c_1C1C20FF));
                   dl->AddRectFilled(ImVec2(headerStartX, gy), ImVec2(rulerStartX + rulerWidth, std::min(gy + kLaneHeight, emptyGridBottom)), stripeBg);
                }
             }
@@ -4310,7 +4311,7 @@ namespace app
                   : IM_COL32(255, 255, 255, gl.isMajor ? 55 : 18);
                dl->AddLine(ImVec2(gl.x, lanesContentBottom), ImVec2(gl.x, emptyGridBottom), gridCol, 1.0f);
             }
-            const ImU32 emptyGridLine = isLight ? IM_COL32(0, 0, 0, 22) : IM_COL32(255, 255, 255, 18);
+            const ImU32 emptyGridLine = isLight ? tok::U32(tok::pal::c_00000016) : tok::U32(tok::pal::c_FFFFFF12);
             for (float gy = lanesContentBottom + kLaneHeight; gy < emptyGridBottom; gy += kLaneHeight)
                dl->AddLine(ImVec2(rulerStartX, gy), ImVec2(rulerStartX + rulerWidth, gy), emptyGridLine, 1.0f);
             dl->PopClipRect();
@@ -4330,8 +4331,8 @@ namespace app
             const float bx0 = std::max(rulerStartX, tickToX(bl.start));
             const float bx1 = std::min(rulerStartX + rulerWidth, tickToX(bl.end));
             const float bandBottom = fullTimelineBottom;
-            const ImU32 bandCol = gArrangeShiftDraggingLoop ? IM_COL32(250, 204, 21, 45) : IM_COL32(250, 204, 21, 30);
-            const ImU32 bandBorder = IM_COL32(250, 204, 21, 180);
+            const ImU32 bandCol = gArrangeShiftDraggingLoop ? tok::U32(tok::pal::c_FACC152D) : tok::U32(tok::pal::c_FACC151E);
+            const ImU32 bandBorder = tok::U32(tok::pal::c_FACC15B4);
             const bool isDraggingLeft = (gArrangeLoopDragMode == kArrangeLoopDragStart);
             const bool isDraggingRight = (gArrangeLoopDragMode == kArrangeLoopDragEnd);
             const bool isDraggingHeader = (gArrangeLoopDragMode == kArrangeLoopDragMove);
@@ -4340,18 +4341,18 @@ namespace app
             dl->AddRectFilled(ImVec2(bx0, kTickStripTop), ImVec2(bx1, bandBottom), bandCol);
 
             // Loop brace header bar in ruler
-            const ImU32 headerBarCol = isDraggingHeader ? IM_COL32(255, 235, 59, 255) : IM_COL32(250, 204, 21, 230);
+            const ImU32 headerBarCol = isDraggingHeader ? tok::U32(tok::pal::c_FFEB3BFF) : tok::U32(tok::pal::c_FACC15E6);
             dl->AddRectFilled(ImVec2(bx0, kTickStripTop), ImVec2(bx1, kTickStripTop + 4.0f), headerBarCol, 2.0f);
 
             // Left boundary line & bracket handle [
-            const ImU32 leftCol = isDraggingLeft ? IM_COL32(255, 255, 255, 255) : bandBorder;
+            const ImU32 leftCol = isDraggingLeft ? tok::U32(tok::pal::c_FFFFFFFF) : bandBorder;
             const float leftStroke = isDraggingLeft ? 2.5f : 1.5f;
             dl->AddLine(ImVec2(bx0, kTickStripTop), ImVec2(bx0, bandBottom), leftCol, leftStroke);
             dl->AddLine(ImVec2(bx0, kTickStripTop), ImVec2(bx0, kTickStripTop + 8.0f), leftCol, 3.0f);
             dl->AddLine(ImVec2(bx0, kTickStripTop + 8.0f), ImVec2(bx0 + 5.0f, kTickStripTop + 8.0f), leftCol, 2.0f);
 
             // Right boundary line & bracket handle ]
-            const ImU32 rightCol = isDraggingRight ? IM_COL32(255, 255, 255, 255) : bandBorder;
+            const ImU32 rightCol = isDraggingRight ? tok::U32(tok::pal::c_FFFFFFFF) : bandBorder;
             const float rightStroke = isDraggingRight ? 2.5f : 1.5f;
             dl->AddLine(ImVec2(bx1, kTickStripTop), ImVec2(bx1, bandBottom), rightCol, rightStroke);
             dl->AddLine(ImVec2(bx1, kTickStripTop), ImVec2(bx1, kTickStripTop + 8.0f), rightCol, 3.0f);
@@ -4369,7 +4370,7 @@ namespace app
          if (playBeats >= startBeat && playBeats <= endBeat)
          {
             const float playheadX = beatToX(playBeats);
-            const ImU32 playheadCol = IM_COL32(239, 68, 68, 255);
+            const ImU32 playheadCol = tok::U32(tok::pal::c_EF4444FF);
             dl->AddLine(ImVec2(playheadX, kTickStripTop), ImVec2(playheadX, lineBottom), playheadCol, 1.5f);
             const float triSize = 7.0f;
             dl->AddTriangleFilled(ImVec2(playheadX - triSize, kTickStripTop), ImVec2(playheadX + triSize, kTickStripTop),
@@ -4378,7 +4379,7 @@ namespace app
          if (gArrangeScrubbing && gArrangeScrubTick >= startTick && gArrangeScrubTick <= endTick)
          {
             const float gx = tickToX(gArrangeScrubTick);
-            const ImU32 ghostCol = IM_COL32(239, 68, 68, 120);
+            const ImU32 ghostCol = tok::U32(tok::pal::c_EF444478);
             dl->AddLine(ImVec2(gx, kTickStripTop), ImVec2(gx, lineBottom), ghostCol, 1.5f);
             const float triSize = 7.0f;
             dl->AddTriangleFilled(ImVec2(gx - triSize, kTickStripTop), ImVec2(gx + triSize, kTickStripTop),
@@ -4390,7 +4391,7 @@ namespace app
                lx = gx - 6.0f - ts.x;
             const ImVec2 l0(lx - 3.0f, kTickStripTop + kRulerHeight - kMarkerStripH + 2.0f);
             dl->AddRectFilled(l0, ImVec2(l0.x + ts.x + 6.0f, l0.y + ts.y + 2.0f),
-                              isLight ? IM_COL32(255, 255, 255, 230) : IM_COL32(20, 20, 24, 230), 3.0f);
+                              isLight ? tok::U32(tok::pal::c_FFFFFFE6) : tok::U32(tok::pal::c_141418E6), 3.0f);
             dl->AddText(ImVec2(lx, l0.y + 1.0f), ImGui::GetColorU32(ImGuiCol_Text), ghostLabel.c_str());
          }
       }
@@ -4453,14 +4454,14 @@ namespace app
          ImDrawList* odl = ImGui::GetWindowDrawList();
          const ImVec2 a = gArrangePanelRectMin, b = gArrangePanelRectMax;
          odl->PushClipRect(a, b, true);
-         odl->AddRectFilled(a, b, IM_COL32(0, 0, 0, 110));
+         odl->AddRectFilled(a, b, tok::U32(tok::pal::c_0000006E));
          const char* lockText = T("Rendering - timeline locked");
          const ImVec2 ts = ImGui::CalcTextSize(lockText);
          const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
          const ImVec2 t0(c.x - ts.x * 0.5f, c.y - ts.y * 0.5f);
          odl->AddRectFilled(ImVec2(t0.x - 12.0f, t0.y - 7.0f), ImVec2(t0.x + ts.x + 12.0f, t0.y + ts.y + 7.0f),
-                            IM_COL32(18, 18, 22, 225), 5.0f);
-         odl->AddText(t0, IM_COL32(235, 235, 240, 255), lockText);
+                            tok::U32(tok::pal::c_121216E1), 5.0f);
+         odl->AddText(t0, tok::U32(tok::pal::c_EBEBF0FF), lockText);
          odl->PopClipRect();
       }
 

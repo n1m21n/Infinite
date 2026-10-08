@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -68,8 +69,8 @@ void DrawPopupsB(FrameCtx& fc)
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-      ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_PopupBg, tok::V4(tok::palf::v_0_0_0_0));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
 
       if (ImGui::BeginPopup("##commentedit", ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                                              ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar))
@@ -92,11 +93,11 @@ void DrawPopupsB(FrameCtx& fc)
 
             const float fontScale = CommentFontScale(c->fontSize);
             ImGui::PushStyleColor(ImGuiCol_Text, textCol);
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, isLight ? ImVec4(0.0f, 0.0f, 0.0f, 0.15f) : ImVec4(1.0f, 1.0f, 1.0f, 0.18f));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, isLight ? ImVec4(0.0f, 0.0f, 0.0f, 0.30f) : ImVec4(1.0f, 1.0f, 1.0f, 0.35f));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, isLight ? ImVec4(0.0f, 0.0f, 0.0f, 0.45f) : ImVec4(1.0f, 1.0f, 1.0f, 0.50f));
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_0_0_0_0));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, tok::V4(tok::palf::v_0_0_0_0));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, isLight ? tok::V4(tok::palf::v_0_0_0_150) : tok::V4(tok::palf::v_1000_1000_1000_180));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, isLight ? tok::V4(tok::palf::v_0_0_0_300) : tok::V4(tok::palf::v_1000_1000_1000_350));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, isLight ? tok::V4(tok::palf::v_0_0_0_450) : tok::V4(tok::palf::v_1000_1000_1000_500));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * commentZoom, 8.0f * commentZoom));
             ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f * commentZoom);
@@ -726,8 +727,8 @@ void DrawPopupsB(FrameCtx& fc)
             // would land in the wrong spot at any pan/zoom.
             {
                ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-               const ImU32 glowCol = IM_COL32(0, 230, 255, 28);
-               const ImU32 ringCol = IM_COL32(0, 230, 255, 160);
+               const ImU32 glowCol = tok::U32(tok::pal::c_00E6FF1C);
+               const ImU32 ringCol = tok::U32(tok::pal::c_00E6FFA0);
                if (pInfo.isCircle)
                {
                   hoverDl->AddCircleFilled(pInfo.shapeCenter, pInfo.shapeRadius, glowCol, 24);
@@ -823,8 +824,8 @@ void DrawPopupsB(FrameCtx& fc)
                const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
                {
                   ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-                  const ImU32 glowCol = IM_COL32(120, 200, 255, 28);
-                  const ImU32 ringCol = IM_COL32(120, 200, 255, 170);
+                  const ImU32 glowCol = tok::U32(tok::pal::c_78C8FF1C);
+                  const ImU32 ringCol = tok::U32(tok::pal::c_78C8FFAA);
                   if (pInfo.isCircle)
                   {
                      hoverDl->AddCircleFilled(pInfo.shapeCenter, pInfo.shapeRadius, glowCol, 24);

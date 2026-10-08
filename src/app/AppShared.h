@@ -1,5 +1,6 @@
 #pragma once
 // Shared declarations for the code split out of main.cpp.
+#include "app/ui/design/TokenColors.h"
 #include "app/AppCommon.h"
 
 namespace app
@@ -2113,7 +2114,7 @@ void EndPredictorGrab(const PredictorGrabCtx& c, const ParamRef& ref);
 
 
    // Prediction green: pin ring, and the track/fill colours of a green-bound slider.
-   inline constexpr ImU32 kPredictionPinCol = IM_COL32(110, 215, 140, 255);
+   inline constexpr ImU32 kPredictionPinCol = tok::U32(tok::pal::c_6ED78CFF);
 
 bool ModCheckbox(const char* label, bool* value, bool* outUserChanged = nullptr);
 
@@ -2333,16 +2334,16 @@ uint32_t ArrangeMarkerRGBA(ImU32 col);
 
 
    inline const ArrangePaletteEntry kArrangePalette[10] = {
-      { "Default", IM_COL32(110, 120, 140, 255) },
-      { "Crimson", IM_COL32(239, 68, 68, 255) },
-      { "Orange",  IM_COL32(249, 115, 22, 255) },
-      { "Amber",   IM_COL32(245, 158, 11, 255) },
-      { "Emerald", IM_COL32(16, 185, 129, 255) },
-      { "Cyan",    IM_COL32(6, 182, 212, 255) },
-      { "Blue",    IM_COL32(59, 130, 246, 255) },
-      { "Purple",  IM_COL32(139, 92, 246, 255) },
-      { "Magenta", IM_COL32(217, 70, 239, 255) },
-      { "Rose",    IM_COL32(244, 63, 94, 255) }
+      { "Default", tok::U32(tok::pal::c_6E788CFF) },
+      { "Crimson", tok::U32(tok::pal::c_EF4444FF) },
+      { "Orange",  tok::U32(tok::pal::c_F97316FF) },
+      { "Amber",   tok::U32(tok::pal::c_F59E0BFF) },
+      { "Emerald", tok::U32(tok::pal::c_10B981FF) },
+      { "Cyan",    tok::U32(tok::pal::c_06B6D4FF) },
+      { "Blue",    tok::U32(tok::pal::c_3B82F6FF) },
+      { "Purple",  tok::U32(tok::pal::c_8B5CF6FF) },
+      { "Magenta", tok::U32(tok::pal::c_D946EFFF) },
+      { "Rose",    tok::U32(tok::pal::c_F43F5EFF) }
    };
 
 
@@ -3048,8 +3049,8 @@ void EndAudioSection();
          PushDropdownStyle();
          if (h.modulated)
          {
-            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
-                                                                : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
+                                                                : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
             ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
             ImGui::EndDisabled();
@@ -3144,8 +3145,8 @@ void EndAudioSection();
                PushDropdownStyle();
                if (h.modulated)
                {
-                  ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
-                                                                      : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
+                                                                      : tok::V4(tok::palf::v_1000_750_350_1000));
                   ImGui::BeginDisabled();
                   ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
                   ImGui::EndDisabled();
@@ -3239,8 +3240,8 @@ void EndAudioSection();
          if (h.modulated)
          {
             bool shown = *value;
-            ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? ImVec4(0.84f, 0.49f, 0.08f, 1.0f)
-                                                                     : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000)
+                                                                     : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
             ImGui::Checkbox(label, &shown);
             ImGui::EndDisabled();

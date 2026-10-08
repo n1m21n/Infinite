@@ -1,4 +1,5 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -289,18 +290,18 @@ namespace app
       const bool isLight = IsThemeLight();
       if (isLight)
       {
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.88f, 0.89f, 0.92f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.83f, 0.85f, 0.89f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.78f, 0.81f, 0.86f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_880_890_920_1000));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_830_850_890_1000));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_780_810_860_1000));
       }
       else
       {
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.055f, 0.060f, 0.080f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.085f, 0.092f, 0.118f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.100f, 0.108f, 0.138f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_55_60_80_1000));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_85_92_118_1000));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_100_108_138_1000));
       }
-      ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_0_0_0_0));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_0_0_0_0));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
 
       auto ValueToPos01 = [&](float v) -> float
@@ -358,7 +359,7 @@ namespace app
          const ImU32 soft = (fillColor & 0x00FFFFFF) | (alpha << 24);
          dl->AddRectFilled(r0, ImVec2(fillX, r1.y), soft, 3.0f);
       }
-      dl->AddRect(r0, r1, isLight ? IM_COL32(180, 185, 200, 255) : IM_COL32(72, 76, 92, 255), 3.0f);
+      dl->AddRect(r0, r1, isLight ? tok::U32(tok::pal::c_B4B9C8FF) : tok::U32(tok::pal::c_484C5CFF), 3.0f);
 
       std::string name(label);
       const size_t hash = name.find("##");
@@ -381,8 +382,8 @@ namespace app
          // white-on-dark/black-on-light rule as every other themed text in
          // the app, just forced to full strength since it now sits over a
          // near-opaque accent once the fill does cover it.
-         valCol = isLight ? IM_COL32(15, 15, 18, 255) : IM_COL32(245, 246, 250, 255);
-         nameCol = isLight ? IM_COL32(35, 35, 40, 220) : IM_COL32(226, 228, 236, 220);
+         valCol = isLight ? tok::U32(tok::pal::c_0F0F12FF) : tok::U32(tok::pal::c_F5F6FAFF);
+         nameCol = isLight ? tok::U32(tok::pal::c_232328DC) : tok::U32(tok::pal::c_E2E4ECDC);
       }
       else
       {
@@ -393,11 +394,11 @@ namespace app
          // board in both themes per feedback that every one of these read too
          // faint.
          valCol = isLight
-            ? (readOnly ? IM_COL32(78, 84, 100, 255) : IM_COL32(20, 24, 36, 255))
-            : (readOnly ? IM_COL32(205, 208, 220, 255) : IM_COL32(238, 241, 250, 255));
+            ? (readOnly ? tok::U32(tok::pal::c_4E5464FF) : tok::U32(tok::pal::c_141824FF))
+            : (readOnly ? tok::U32(tok::pal::c_CDD0DCFF) : tok::U32(tok::pal::c_EEF1FAFF));
          nameCol = isLight
-            ? (readOnly ? IM_COL32(100, 106, 122, 255) : IM_COL32(80, 86, 102, 255))
-            : (readOnly ? IM_COL32(178, 181, 196, 255) : IM_COL32(198, 202, 216, 255));
+            ? (readOnly ? tok::U32(tok::pal::c_646A7AFF) : tok::U32(tok::pal::c_505666FF))
+            : (readOnly ? tok::U32(tok::pal::c_B2B5C4FF) : tok::U32(tok::pal::c_C6CAD8FF));
       }
       AudioLabelText(dl, ImVec2(valX, textY), valCol, valBuf);
 
@@ -564,9 +565,9 @@ namespace app
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();
       const ImU32 pinColor = h.modulated
-         ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
-         : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(120, 128, 150, 255));
-      dl->AddCircleFilled(c, 4.0f, isLight ? IM_COL32(240, 243, 250, 255) : IM_COL32(18, 19, 25, 255));
+         ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF))
+         : (isLight ? tok::U32(tok::pal::c_A5AFC3FF) : tok::U32(tok::pal::c_788096FF));
+      dl->AddCircleFilled(c, 4.0f, isLight ? tok::U32(tok::pal::c_F0F3FAFF) : tok::U32(tok::pal::c_121319FF));
       dl->AddCircle(c, h.modulated ? 4.0f : 4.5f, pinColor, 12, 2.0f);
       if (h.modulated)
          dl->AddCircleFilled(c, 2.0f, pinColor);
@@ -629,8 +630,8 @@ namespace app
       {
          // Read-only look, matching a modulated slider: the value still reads
          // live, the control just stops taking input.
-         ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
-                                                             : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
+                                                             : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
          ImGui::Button(caption.c_str(), ImVec2(width, 0));
          ImGui::EndDisabled();
@@ -675,12 +676,12 @@ namespace app
       // accent brightness (bumped here vs. the old value): once the frame
       // stops competing with it, the checked state can and should be the
       // loudest thing in an unchecked row of quiet frames. See P10.
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.25f, 0.28f, 0.38f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.32f, 0.36f, 0.48f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_CheckMark, isLight ? ImVec4(0.20f, 0.55f, 0.95f, 1.0f) : ImVec4(0.55f, 0.82f, 1.0f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.70f, 0.74f, 0.84f, 1.0f) : ImVec4(0.22f, 0.235f, 0.278f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.88f, 0.92f, 0.98f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? tok::V4(tok::palf::v_860_880_940_1000) : tok::V4(tok::palf::v_160_180_240_1000));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? tok::V4(tok::palf::v_800_840_920_1000) : tok::V4(tok::palf::v_250_280_380_1000));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? tok::V4(tok::palf::v_740_780_880_1000) : tok::V4(tok::palf::v_320_360_480_1000));
+      ImGui::PushStyleColor(ImGuiCol_CheckMark, isLight ? tok::V4(tok::palf::v_200_550_950_1000) : tok::V4(tok::palf::v_550_820_1000_1000));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::V4(tok::palf::v_700_740_840_1000) : tok::V4(tok::palf::v_220_235_278_1000));
+      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_150_180_240_1000) : tok::V4(tok::palf::v_880_920_980_1000));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
    }
@@ -705,13 +706,13 @@ namespace app
    void PushSliderStyle()
    {
       const bool isLight = IsThemeLight();
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.25f, 0.28f, 0.38f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.32f, 0.36f, 0.48f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrab, isLight ? ImVec4(0.20f, 0.55f, 0.95f, 1.0f) : ImVec4(0.55f, 0.82f, 1.0f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, isLight ? ImVec4(0.14f, 0.45f, 0.85f, 1.0f) : ImVec4(0.70f, 0.90f, 1.0f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.70f, 0.74f, 0.84f, 1.0f) : ImVec4(0.22f, 0.235f, 0.278f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.88f, 0.92f, 0.98f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? tok::V4(tok::palf::v_860_880_940_1000) : tok::V4(tok::palf::v_160_180_240_1000));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? tok::V4(tok::palf::v_800_840_920_1000) : tok::V4(tok::palf::v_250_280_380_1000));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? tok::V4(tok::palf::v_740_780_880_1000) : tok::V4(tok::palf::v_320_360_480_1000));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrab, isLight ? tok::V4(tok::palf::v_200_550_950_1000) : tok::V4(tok::palf::v_550_820_1000_1000));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, isLight ? tok::V4(tok::palf::v_140_450_850_1000) : tok::V4(tok::palf::v_700_900_1000_1000));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::V4(tok::palf::v_700_740_840_1000) : tok::V4(tok::palf::v_220_235_278_1000));
+      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_150_180_240_1000) : tok::V4(tok::palf::v_880_920_980_1000));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
    }

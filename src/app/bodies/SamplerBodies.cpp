@@ -1,4 +1,5 @@
 // Sampler, slicer, molder, granular, drum sequencer, looper and MPC bodies (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -75,10 +76,10 @@ namespace app
 
       // Zone colours, shared by bars, hold lines and readouts: green for
       // normal level, amber for the last 6 dB of headroom, red for overs.
-      const ImU32 kGreen = isLight ? IM_COL32(40, 165, 90, 255) : IM_COL32(75, 215, 120, 255);
-      const ImU32 kAmber = isLight ? IM_COL32(222, 150, 30, 255) : IM_COL32(255, 190, 90, 255);
-      const ImU32 kRed = isLight ? IM_COL32(220, 55, 45, 255) : IM_COL32(255, 90, 80, 255);
-      const ImU32 slotCol = isLight ? IM_COL32(0, 0, 0, 14) : IM_COL32(255, 255, 255, 10);
+      const ImU32 kGreen = isLight ? tok::U32(tok::pal::c_28A55AFF) : tok::U32(tok::pal::c_4BD778FF);
+      const ImU32 kAmber = isLight ? tok::U32(tok::pal::c_DE961EFF) : tok::U32(tok::pal::c_FFBE5AFF);
+      const ImU32 kRed = isLight ? tok::U32(tok::pal::c_DC372DFF) : tok::U32(tok::pal::c_FF5A50FF);
+      const ImU32 slotCol = isLight ? tok::U32(tok::pal::c_0000000E) : tok::U32(tok::pal::c_FFFFFF0A);
       auto zoneCol = [&](float db) { return db > 0.0f ? kRed : db > -6.0f ? kAmber : kGreen; };
       auto withAlpha = [](ImU32 c, int a) { return (c & ~IM_COL32_A_MASK) | ((ImU32)a << IM_COL32_A_SHIFT); };
 
@@ -168,7 +169,7 @@ namespace app
          char buf[12];
          FormatDb(buf, sizeof(buf), maxPeak);
          const ImVec2 ts = textSize(buf);
-         const ImU32 txt = clipped ? IM_COL32(255, 255, 255, 255)
+         const ImU32 txt = clipped ? tok::U32(tok::pal::c_FFFFFFFF)
                                    : maxPeak > 1e-5f ? ImGui::GetColorU32(ImGuiCol_Text) : ScopeTextCol();
          text(ImVec2(bx + (barW - ts.x) * 0.5f, readTop + (readH - ts.y) * 0.5f), txt, buf);
       };
@@ -313,7 +314,7 @@ namespace app
       ImGui::SameLine();
       const bool recording = n->IsRecording();
       if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
@@ -335,7 +336,7 @@ namespace app
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
       if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(playing ? "Stop" : "Audition", ImVec2(90, 0)))
       {
          if (playing)
@@ -413,7 +414,7 @@ namespace app
          const ImVec2 textSize = ImGui::CalcTextSize(status);
          const ImVec2 rowPos = ImGui::GetCursorScreenPos();
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - textSize.x, rowPos.y));
-         ImGui::TextColored(ImVec4(0.6f, 0.63f, 0.72f, 1.0f), "%s", status);
+         ImGui::TextColored(tok::V4(tok::palf::v_600_630_720_1000), "%s", status);
       }
 
       ImGui::Dummy(ImVec2(0.0f, 6.0f));
@@ -529,7 +530,7 @@ namespace app
       ImGui::SameLine();
       const bool recording = n->IsRecording();
       if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
@@ -544,7 +545,7 @@ namespace app
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
       if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(playing ? "Stop" : "Audition", ImVec2(90, 0)))
       {
          if (playing)
@@ -682,7 +683,7 @@ namespace app
       ImGui::SameLine();
       const bool recording = n->IsRecording();
       if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
@@ -697,7 +698,7 @@ namespace app
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
       if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(playing ? "Stop" : "Audition", ImVec2(90, 0)))
       {
          if (playing)
@@ -817,13 +818,13 @@ namespace app
             const float top = midY - n->waveformMax[i] * h * 0.45f;
             const float bottom = midY - n->waveformMin[i] * h * 0.45f;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(40, 100, 230, 210) : IM_COL32(165, 180, 255, 210));
+                              isLight ? tok::U32(tok::pal::c_2864E6D2) : tok::U32(tok::pal::c_A5B4FFD2));
          }
 
          // Dim whatever the start/end range excludes.
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
+         const ImU32 dimCol = isLight ? tok::U32(tok::pal::c_FFFFFF8C) : tok::U32(tok::pal::c_00000082);
          if (startX > origin.x)
             dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
          if (endX < br.x)
@@ -831,12 +832,12 @@ namespace app
 
          const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
          dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 230), 2.0f);
+                     isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFC85AE6), 2.0f);
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+                     isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96EB), 2.0f);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+                     isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896EB), 2.0f);
       }
       else
       {
@@ -855,8 +856,8 @@ namespace app
          const float grip = 8.0f;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
+         const ImU32 startCol = isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96FF);
+         const ImU32 endCol = isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896FF);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
@@ -913,7 +914,7 @@ namespace app
             const float frac = std::clamp(n->partialBars[i] / maxAmp, 0.0f, 1.0f);
             const float top = br.y - frac * h;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, br.y),
-                              isLight ? IM_COL32(90, 70, 200, 200) : IM_COL32(180, 160, 255, 200));
+                              isLight ? tok::U32(tok::pal::c_5A46C8C8) : tok::U32(tok::pal::c_B4A0FFC8));
          }
       }
       dl->PopClipRect();
@@ -949,7 +950,7 @@ namespace app
       ImGui::SameLine();
       const bool recording = n->IsRecording();
       if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(recording ? "Stop##molderRec" : "Record##molderRec", ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
@@ -1082,12 +1083,12 @@ namespace app
             const float top = midY - n->waveformMax[i] * h * 0.45f;
             const float bottom = midY - n->waveformMin[i] * h * 0.45f;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(50, 160, 190, 210) : IM_COL32(110, 210, 240, 210));
+                              isLight ? tok::U32(tok::pal::c_32A0BED2) : tok::U32(tok::pal::c_6ED2F0D2));
          }
 
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
+         const ImU32 dimCol = isLight ? tok::U32(tok::pal::c_FFFFFF8C) : tok::U32(tok::pal::c_00000082);
          if (startX > origin.x)
             dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
          if (endX < br.x)
@@ -1098,7 +1099,7 @@ namespace app
          const float posClamped = std::clamp(n->position, n->start, n->end);
          const float activeFrac = (snap.selfActive && snap.selfPos >= 0.0f) ? snap.selfPos : posClamped;
          const float posX = origin.x + w * std::clamp(activeFrac, 0.0f, 1.0f);
-         const ImU32 yellowCol = isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 240);
+         const ImU32 yellowCol = isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFC85AF0);
          dl->AddLine(ImVec2(posX, origin.y), ImVec2(posX, br.y), yellowCol, 2.0f);
 
          // Polyphonic white playheads moving at different speeds according to incoming pitch
@@ -1114,9 +1115,9 @@ namespace app
          }
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+                     isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96EB), 2.0f);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+                     isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896EB), 2.0f);
       }
       else
       {
@@ -1135,8 +1136,8 @@ namespace app
          const float grip = 8.0f;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
+         const ImU32 startCol = isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96FF);
+         const ImU32 endCol = isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896FF);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
          dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
@@ -1190,7 +1191,7 @@ namespace app
       ImGui::SameLine();
       const bool recording = n->IsRecording();
       if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(recording ? "Stop##gmRec" : "Record##gmRec", ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
@@ -1205,7 +1206,7 @@ namespace app
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
       if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(playing ? "Stop##gmAud" : "Audition##gmAud", ImVec2(80, 0)))
       {
          if (playing)
@@ -1258,7 +1259,7 @@ namespace app
          const ImVec2 textSize = ImGui::CalcTextSize(status);
          const ImVec2 rowPos = ImGui::GetCursorScreenPos();
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - textSize.x, rowPos.y));
-         ImGui::TextColored(ImVec4(0.6f, 0.63f, 0.72f, 1.0f), "%s", status);
+         ImGui::TextColored(tok::V4(tok::palf::v_600_630_720_1000), "%s", status);
       }
 
       ImGui::Dummy(ImVec2(0.0f, 6.0f));
@@ -1355,7 +1356,7 @@ namespace app
       ImGui::SameLine();
       const bool recording = n->IsRecording();
       if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
       if (ImGui::Button(recording ? "Stop##granRec" : "Record##granRec", ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
@@ -1499,21 +1500,21 @@ namespace app
             const float top = midY - n->laneWaveMax[lane][i] * h * 0.45f;
             const float bottom = midY - n->laneWaveMin[lane][i] * h * 0.45f;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
+                              isLight ? tok::U32(tok::pal::c_1E6EE6D2) : tok::U32(tok::pal::c_96D6FFC8));
          }
 
          const float startX = origin.x + w * std::clamp(n->laneStart[lane], 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->laneEnd[lane], 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
+         const ImU32 dimCol = isLight ? tok::U32(tok::pal::c_FFFFFF8C) : tok::U32(tok::pal::c_00000082);
          if (startX > origin.x)
             dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
          if (endX < br.x)
             dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
 
          dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+                     isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96EB), 2.0f);
          dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+                     isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896EB), 2.0f);
       }
       else
       {
@@ -1531,8 +1532,8 @@ namespace app
          const float grip = 8.0f;
          const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
          const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = IM_COL32(220, 120, 150, 255);
+         const ImU32 startCol = tok::U32(tok::pal::c_78DC96FF);
+         const ImU32 endCol = tok::U32(tok::pal::c_DC7896FF);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y),
                                ImVec2(startGripX, origin.y + grip), startCol);
          dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y),
@@ -1609,7 +1610,7 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.65f;
-            const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+            const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
             Tabler::DrawX(dl, center, iconSize, col);
          }
          if (clearClicked)
@@ -1782,7 +1783,7 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(bmax.x - 5.0f, bmin.y + 5.0f), 2.5f,
-                                                        IM_COL32(255, 200, 100, 255));
+                                                        tok::U32(tok::pal::c_FFC864FF));
          }
       }
       return clicked;
@@ -1984,18 +1985,18 @@ namespace app
                // Colors mirror DrawPatternStepGrid's light-mode track-lane
                // palette (isGroupStart ? 212/218/230 : 224/228/238).
                const ImU32 frameCol = isLight
-                  ? (isBar ? IM_COL32(210, 215, 228, 255) : IM_COL32(224, 228, 238, 255))
-                  : (isBar ? IM_COL32(60, 64, 78, 255) : IM_COL32(40, 43, 53, 255));
+                  ? (isBar ? tok::U32(tok::pal::c_D2D7E4FF) : tok::U32(tok::pal::c_E0E4EEFF))
+                  : (isBar ? tok::U32(tok::pal::c_3C404EFF) : tok::U32(tok::pal::c_282B35FF));
                dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + cellW - cellGap, y0 + rowH), frameCol, 2.0f);
                if (vel > 0.0f)
                {
                   const float fillTop = y0 + (1.0f - vel) * rowH;
-                  const ImU32 fillCol = (s == curStep && n->run) ? IM_COL32(255, 200, 100, 255)
-                                                                 : IM_COL32(120, 200, 255, 220);
+                  const ImU32 fillCol = (s == curStep && n->run) ? tok::U32(tok::pal::c_FFC864FF)
+                                                                 : tok::U32(tok::pal::c_78C8FFDC);
                   dl->AddRectFilled(ImVec2(x0, fillTop), ImVec2(x0 + cellW - cellGap, y0 + rowH), fillCol, 2.0f);
                }
                if (s == curStep)
-                  dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + cellW - cellGap, y0 + rowH), IM_COL32(255, 255, 255, 130),
+                  dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + cellW - cellGap, y0 + rowH), tok::U32(tok::pal::c_FFFFFF82),
                               2.0f);
 
                ImGui::PopID();
@@ -2013,8 +2014,8 @@ namespace app
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
             ed::PinRect(pinMin, pinMax);
 
-            dl->AddCircleFilled(pinCenter, kPinRadius, isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255));
-            dl->AddCircle(pinCenter, kPinRadius, isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255), 0, 1.5f);
+            dl->AddCircleFilled(pinCenter, kPinRadius, isLight ? tok::U32(tok::pal::c_3278F0FF) : tok::U32(tok::pal::c_96BEFFFF));
+            dl->AddCircle(pinCenter, kPinRadius, isLight ? tok::U32(tok::pal::c_283041FF) : tok::U32(tok::pal::c_14161EFF), 0, 1.5f);
             ed::EndPin();
 
             ImGui::PopID();
@@ -2194,7 +2195,7 @@ namespace app
          const double beats = MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(n->take - 1, 0, MusicTime::kNumRateDivisions - 1));
          span = (float)(beats * 60.0 / bpm); // the take window it would record
       }
-      const ImU32 recCol = isLight ? IM_COL32(205, 55, 55, 255) : IM_COL32(235, 90, 90, 255);
+      const ImU32 recCol = isLight ? tok::U32(tok::pal::c_CD3737FF) : tok::U32(tok::pal::c_EB5A5AFF);
 
       if (span > 0.0f)
       {
@@ -2222,7 +2223,7 @@ namespace app
       {
          const float total = std::max(span, len);
          const float colW = w / (float)LooperNode::kWaveCols;
-         const ImU32 col = isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200);
+         const ImU32 col = isLight ? tok::U32(tok::pal::c_1E6EE6D2) : tok::U32(tok::pal::c_96D6FFC8);
          for (int c = 0; c < LooperNode::kWaveCols; c++)
          {
             if (total * (float)c / (float)LooperNode::kWaveCols >= len)
@@ -2238,7 +2239,7 @@ namespace app
       {
          const float x = origin.x + w * std::clamp(n->Position01(), 0.0f, 1.0f);
          dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y),
-                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 240), 2.0f);
+                     isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFC85AF0), 2.0f);
       }
       else if (st == LooperNode::kRecording)
       {
@@ -2542,22 +2543,22 @@ namespace app
                         n->selectedPad = pad;
                      const bool hit = lvl || (now - n->padFlash[pad]) < 0.14;
                      const bool lit = playing || hit;
-                     const ImU32 green = isLight ? IM_COL32(35, 150, 80, 255) : IM_COL32(60, 175, 100, 255);
-                     ImU32 fill = isLoaded ? (isLight ? IM_COL32(214, 221, 236, 255) : IM_COL32(40, 46, 64, 255))
-                                           : (isLight ? IM_COL32(232, 235, 242, 255) : IM_COL32(26, 28, 37, 255));
+                     const ImU32 green = isLight ? tok::U32(tok::pal::c_239650FF) : tok::U32(tok::pal::c_3CAF64FF);
+                     ImU32 fill = isLoaded ? (isLight ? tok::U32(tok::pal::c_D6DDECFF) : tok::U32(tok::pal::c_282E40FF))
+                                           : (isLight ? tok::U32(tok::pal::c_E8EBF2FF) : tok::U32(tok::pal::c_1A1C25FF));
                      if (hovered && !lit)
-                        fill = isLight ? IM_COL32(204, 212, 230, 255) : IM_COL32(52, 59, 80, 255);
+                        fill = isLight ? tok::U32(tok::pal::c_CCD4E6FF) : tok::U32(tok::pal::c_343B50FF);
                      if (lit)
                         fill = green;
                      dl->AddRectFilled(mn, mx, fill, 6.0f);
-                     const ImU32 selCol = isLight ? IM_COL32(50, 100, 230, 255) : IM_COL32(110, 160, 255, 255);
-                     const ImU32 edge = isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(85, 92, 115, 200);
+                     const ImU32 selCol = isLight ? tok::U32(tok::pal::c_3264E6FF) : tok::U32(tok::pal::c_6EA0FFFF);
+                     const ImU32 edge = isLight ? tok::U32(tok::pal::c_AAB2C3FF) : tok::U32(tok::pal::c_555C73C8);
                      dl->AddRect(mn, mx, isSel ? selCol : edge, 6.0f, 0, isSel ? 2.0f : 1.0f);
 
-                     const ImU32 ink = lit ? IM_COL32(255, 255, 255, 255)
-                                           : (isLoaded ? (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(215, 220, 235, 255))
-                                                       : IM_COL32(120, 128, 150, 255));
-                     const ImU32 dim = lit ? IM_COL32(255, 255, 255, 190) : (isLight ? IM_COL32(95, 105, 130, 255) : IM_COL32(150, 158, 180, 255));
+                     const ImU32 ink = lit ? tok::U32(tok::pal::c_FFFFFFFF)
+                                           : (isLoaded ? (isLight ? tok::U32(tok::pal::c_282D3CFF) : tok::U32(tok::pal::c_D7DCEBFF))
+                                                       : tok::U32(tok::pal::c_788096FF));
+                     const ImU32 dim = lit ? tok::U32(tok::pal::c_FFFFFFBE) : (isLight ? tok::U32(tok::pal::c_5F6982FF) : tok::U32(tok::pal::c_969EB4FF));
                      dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 1.0f, mx.y - 1.0f), true);
                      // All text in the pad is the size of a slider's label
                      // (AudioLabelText): number and mode tag on top, name below.
@@ -2583,7 +2584,7 @@ namespace app
                         const float wTop = mn.y + lh + 7.0f, wBot = mx.y - lh - 7.0f;
                         const float wy = (wTop + wBot) * 0.5f;
                         const float wh = wBot - wTop;
-                        const ImU32 wc = lit ? IM_COL32(255, 255, 255, 230) : (isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
+                        const ImU32 wc = lit ? tok::U32(tok::pal::c_FFFFFFE6) : (isLight ? tok::U32(tok::pal::c_1E6EE6D2) : tok::U32(tok::pal::c_96D6FFC8));
                         for (int i = 0; i < cnt; i++)
                         {
                            const float x = wx0 + (wx1 - wx0) * (float)i / (float)cnt;
@@ -2611,8 +2612,8 @@ namespace app
                      modDot = ImVec2(mx.x - 8.0f, mx.y - 8.0f);
                      if (anyMod)
                      {
-                        dl->AddCircleFilled(modDot, 4.0f, isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255));
-                        dl->AddCircle(modDot, 4.0f, isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(30, 32, 40, 255), 12, 1.0f);
+                        dl->AddCircleFilled(modDot, 4.0f, isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF));
+                        dl->AddCircle(modDot, 4.0f, isLight ? tok::U32(tok::pal::c_6E7382FF) : tok::U32(tok::pal::c_1E2028FF), 12, 1.0f);
                      }
                      dl->PopClipRect();
                   },
@@ -2685,7 +2686,7 @@ namespace app
             if (has)
             {
                const int cnt = n->padWaveCount[cur];
-               const ImU32 wc = isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200);
+               const ImU32 wc = isLight ? tok::U32(tok::pal::c_1E6EE6D2) : tok::U32(tok::pal::c_96D6FFC8);
                for (int i = 0; i < cnt; i++)
                {
                   const float x = origin.x + w * (float)i / (float)cnt;
@@ -2698,7 +2699,7 @@ namespace app
             else
                dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
             dl->PopClipRect();
-            dl->AddRect(origin, br, (!has && hov) ? (isLight ? IM_COL32(50, 100, 230, 255) : IM_COL32(110, 160, 255, 255)) : ScopeBorderCol(), 4.0f);
+            dl->AddRect(origin, br, (!has && hov) ? (isLight ? tok::U32(tok::pal::c_3264E6FF) : tok::U32(tok::pal::c_6EA0FFFF)) : ScopeBorderCol(), 4.0f);
             if (!has && hov)
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          }

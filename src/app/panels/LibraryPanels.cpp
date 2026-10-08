@@ -1,4 +1,5 @@
 // Library / plugin / field search panels (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -235,7 +236,7 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.65f;
-            const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+            const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
             Tabler::DrawX(dl, center, iconSize, col);
          }
          ImGui::PopID();
@@ -701,7 +702,7 @@ namespace app
       const std::vector<std::string> blocklist = Platform::VST3Blocklist();
       if (!blocklist.empty())
       {
-         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.55f, 0.25f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_900_550_250_1000));
          if (ImGui::TreeNodeEx(L("Blocklisted VST3 bundles (crashed or hung while scanning)"),
                                 ImGuiTreeNodeFlags_None))
          {

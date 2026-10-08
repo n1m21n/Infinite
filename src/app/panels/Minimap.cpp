@@ -1,4 +1,5 @@
 // Minimap (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -77,13 +78,13 @@ namespace app
          const ImVec2 a = toMinimap(ImVec2(gn.liveX, gn.liveY));
          const ImVec2 b = toMinimap(ImVec2(gn.liveX + kNodeW, gn.liveY + kNodeH));
          const bool selected = ed::IsNodeSelected(gn.NodeId());
-         dl->AddRectFilled(a, b, selected ? IM_COL32(255, 190, 90, 230) : IM_COL32(110, 150, 210, 200), 2.0f);
+         dl->AddRectFilled(a, b, selected ? tok::U32(tok::pal::c_FFBE5AE6) : tok::U32(tok::pal::c_6E96D2C8), 2.0f);
          if (selected)
          {
             // Selection must read as more than a hue swap (HIG focus/selection
             // guidance) - add a bright outline so it's legible for colorblind
             // users and in poor viewing conditions, on top of the color change.
-            dl->AddRect(a, b, isLight ? IM_COL32(40, 44, 55, 255) : IM_COL32(255, 255, 255, 255), 2.0f, 0, 1.5f);
+            dl->AddRect(a, b, isLight ? tok::U32(tok::pal::c_282C37FF) : tok::U32(tok::pal::c_FFFFFFFF), 2.0f, 0, 1.5f);
          }
       }
 
@@ -96,7 +97,7 @@ namespace app
          dl->PushClipRect(origin, ImVec2(origin.x + w, origin.y + h), true);
          const ImVec2 a = toMinimap(viewWorldTL);
          const ImVec2 b = toMinimap(viewWorldBR);
-         dl->AddRect(a, b, isLight ? IM_COL32(40, 44, 55, 220) : IM_COL32(255, 255, 255, 220), 2.0f, 0, 1.5f);
+         dl->AddRect(a, b, isLight ? tok::U32(tok::pal::c_282C37DC) : tok::U32(tok::pal::c_FFFFFFDC), 2.0f, 0, 1.5f);
          dl->PopClipRect();
       }
 

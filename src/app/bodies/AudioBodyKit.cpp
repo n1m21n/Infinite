@@ -1,4 +1,5 @@
 // Audio node body building blocks: columns, sections, knob rows, drift meters, gates (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -29,7 +30,7 @@ namespace app
       const float h = ImGui::GetTextLineHeight() + 6.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(p, ImVec2(p.x + width, p.y + h),
-                        isLight ? IM_COL32(0, 0, 0, 12) : IM_COL32(255, 255, 255, 10), 3.0f);
+                        isLight ? tok::U32(tok::pal::c_0000000C) : tok::U32(tok::pal::c_FFFFFF0A), 3.0f);
       const float textY = p.y + 3.0f;
       // Both texts are fitted to the strip: a long status string (a device
       // error, a file name) used to run out past the node's right edge. The
@@ -61,12 +62,12 @@ namespace app
          const std::string idleFit = fitText(idleStat, idleMax);
          if (!idleFit.empty())
             dl->AddText(ImVec2(p.x + 7.0f, textY),
-                        isLight ? IM_COL32(80, 88, 108, 255) : IM_COL32(132, 138, 158, 255),
+                        isLight ? tok::U32(tok::pal::c_50586CFF) : tok::U32(tok::pal::c_848A9EFF),
                         idleFit.c_str());
       }
       if (!readoutFit.empty())
          dl->AddText(ImVec2(p.x + width - 8.0f - readoutW, textY),
-                     isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(226, 232, 244, 255),
+                     isLight ? tok::U32(tok::pal::c_1E2434FF) : tok::U32(tok::pal::c_E2E8F4FF),
                      readoutFit.c_str());
       ImGui::Dummy(ImVec2(width, h));
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
@@ -165,9 +166,9 @@ namespace app
       if (cached > 0.0f)
       {
          dl->AddRectFilled(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                           isLight ? IM_COL32(0, 0, 0, 10) : IM_COL32(255, 255, 255, 9), 5.0f);
+                           isLight ? tok::U32(tok::pal::c_0000000A) : tok::U32(tok::pal::c_FFFFFF09), 5.0f);
          dl->AddRect(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                     isLight ? IM_COL32(0, 0, 0, 20) : IM_COL32(255, 255, 255, 16), 5.0f);
+                     isLight ? tok::U32(tok::pal::c_00000014) : tok::U32(tok::pal::c_FFFFFF10), 5.0f);
       }
 
       const float headerH = ImGui::GetTextLineHeight() + 4.0f;
@@ -180,7 +181,7 @@ namespace app
       const float ruleY = p.y + headerH + 2.0f;
       dl->AddLine(ImVec2(gAudioBodyX + kAudioSectionPad, ruleY),
                   ImVec2(gAudioBodyX + gAudioBodyW - kAudioSectionPad, ruleY),
-                  isLight ? IM_COL32(0, 0, 0, 22) : IM_COL32(255, 255, 255, 18), 1.0f);
+                  isLight ? tok::U32(tok::pal::c_00000016) : tok::U32(tok::pal::c_FFFFFF12), 1.0f);
       ImGui::Dummy(ImVec2(gAudioBodyW, headerH + 4.0f));
 
       ImGui::Indent(kAudioSectionPad);
@@ -230,14 +231,14 @@ namespace app
    ImU32 DriftLineColor(int i, int alpha)
    {
       static const ImU32 kRGB[] = {
-         IM_COL32(52, 211, 153, 0),  // green
-         IM_COL32(96, 165, 250, 0),  // blue
-         IM_COL32(251, 191, 36, 0),  // amber
-         IM_COL32(244, 114, 182, 0), // pink
-         IM_COL32(167, 139, 250, 0), // violet
-         IM_COL32(45, 212, 191, 0),  // teal
-         IM_COL32(248, 113, 113, 0), // red
-         IM_COL32(163, 230, 53, 0),  // lime
+         tok::U32(tok::pal::c_34D39900),  // green
+         tok::U32(tok::pal::c_60A5FA00),  // blue
+         tok::U32(tok::pal::c_FBBF2400),  // amber
+         tok::U32(tok::pal::c_F472B600), // pink
+         tok::U32(tok::pal::c_A78BFA00), // violet
+         tok::U32(tok::pal::c_2DD4BF00),  // teal
+         tok::U32(tok::pal::c_F8717100), // red
+         tok::U32(tok::pal::c_A3E63500),  // lime
       };
       const ImU32 c = kRGB[i % (int)(sizeof(kRGB) / sizeof(kRGB[0]))];
       return (c & 0x00FFFFFFu) | ((ImU32)std::clamp(alpha, 0, 255) << IM_COL32_A_SHIFT);
@@ -491,7 +492,7 @@ namespace app
          const ImVec2 p0 = ImGui::GetCursorScreenPos();
          const float mw = w - w * 0.3f - ImGui::GetStyle().ItemSpacing.x;
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), IM_COL32(255, 255, 255, 14), 3.0f);
+         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::U32(tok::pal::c_FFFFFF0E), 3.0f);
          char label[64];
          const int pct = n->LearningPercent();
          if (learning)
@@ -514,7 +515,7 @@ namespace app
          // label would otherwise draw straight past the node's edge instead of just past mw.
          dl->PushClipRect(p0, ImVec2(p0.x + mw, p0.y + h), true);
          const ImVec2 lsz = ImGui::CalcTextSize(label);
-         dl->AddText(ImVec2(p0.x + 6.0f, p0.y + (h - lsz.y) * 0.5f), IM_COL32(200, 200, 200, 200), label);
+         dl->AddText(ImVec2(p0.x + 6.0f, p0.y + (h - lsz.y) * 0.5f), tok::U32(tok::pal::c_C8C8C8C8), label);
          dl->PopClipRect();
          ImGui::Dummy(ImVec2(mw, h));
       }
@@ -579,17 +580,17 @@ namespace app
    {
       const bool isLight = IsThemeLight();
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(130, 138, 160, 200));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::U32(tok::pal::c_AAB2C3FF) : tok::U32(tok::pal::c_828AA0C8));
       ImGui::PushStyleColor(ImGuiCol_Button, *value ? (isLight ? activeBgLight : activeBgDark)
-                                                    : (isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(33, 36, 46, 255)));
+                                                    : (isLight ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_21242EFF)));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                             *value ? (isLight ? activeHoverLight : activeHoverDark)
-                                   : (isLight ? IM_COL32(208, 214, 225, 255) : IM_COL32(51, 56, 71, 255)));
+                                   : (isLight ? tok::U32(tok::pal::c_D0D6E1FF) : tok::U32(tok::pal::c_333847FF)));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive,
                             *value ? (isLight ? activeHitLight : activeHitDark)
-                                   : (isLight ? IM_COL32(195, 202, 215, 255) : IM_COL32(64, 70, 89, 255)));
+                                   : (isLight ? tok::U32(tok::pal::c_C3CAD7FF) : tok::U32(tok::pal::c_404659FF)));
       ImGui::PushStyleColor(ImGuiCol_Text, *value ? (isLight ? activeTextLight : activeTextDark)
-                                                  : (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255)));
+                                                  : (isLight ? tok::U32(tok::pal::c_282D3CFF) : tok::U32(tok::pal::c_D2D7E6FF)));
       const bool clicked = ImGui::Button(label, size);
       ImGui::PopStyleColor(5);
       ImGui::PopStyleVar();
@@ -602,10 +603,10 @@ namespace app
    bool AudioToggleButton(const char* label, bool* value, float width, float height)
    {
       return AudioToggleButtonEx(label, value, ImVec2(width, height),
-                                 IM_COL32(55, 115, 235, 255), IM_COL32(90, 115, 205, 255),
-                                 IM_COL32(75, 135, 245, 255), IM_COL32(108, 132, 220, 255),
-                                 IM_COL32(40, 95, 215, 255), IM_COL32(120, 144, 230, 255),
-                                 IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
+                                 tok::U32(tok::pal::c_3773EBFF), tok::U32(tok::pal::c_5A73CDFF),
+                                 tok::U32(tok::pal::c_4B87F5FF), tok::U32(tok::pal::c_6C84DCFF),
+                                 tok::U32(tok::pal::c_285FD7FF), tok::U32(tok::pal::c_7890E6FF),
+                                 tok::U32(tok::pal::c_FFFFFFFF), tok::U32(tok::pal::c_FFFFFFFF));
    }
 
    bool DrawGateButton(const char* id, float totalW, float height, const GatePainter& paint,
@@ -678,7 +679,7 @@ namespace app
       else
       {
          if (style == 1)
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
          ImGui::Button(label, ImVec2(btnW, 0));
          if (style == 1)
             ImGui::PopStyleColor();
@@ -698,20 +699,20 @@ namespace app
    bool AudioSoloButton(const char* label, bool* value, float width, float height)
    {
       return AudioToggleButtonEx(label, value, ImVec2(width, height),
-                                 IM_COL32(215, 160, 25, 255), IM_COL32(217, 166, 38, 255),
-                                 IM_COL32(235, 180, 45, 255), IM_COL32(235, 184, 56, 255),
-                                 IM_COL32(195, 140, 15, 255), IM_COL32(199, 148, 26, 255),
-                                 IM_COL32(25, 25, 30, 255), IM_COL32(25, 25, 30, 255));
+                                 tok::U32(tok::pal::c_D7A019FF), tok::U32(tok::pal::c_D9A626FF),
+                                 tok::U32(tok::pal::c_EBB42DFF), tok::U32(tok::pal::c_EBB838FF),
+                                 tok::U32(tok::pal::c_C38C0FFF), tok::U32(tok::pal::c_C7941AFF),
+                                 tok::U32(tok::pal::c_19191EFF), tok::U32(tok::pal::c_19191EFF));
    }
 
 
    bool AudioMuteButton(const char* label, bool* value, float width, float height)
    {
       return AudioToggleButtonEx(label, value, ImVec2(width, height),
-                                 IM_COL32(200, 45, 45, 255), IM_COL32(166, 41, 41, 255),
-                                 IM_COL32(220, 65, 65, 255), IM_COL32(191, 56, 56, 255),
-                                 IM_COL32(175, 35, 35, 255), IM_COL32(140, 31, 31, 255),
-                                 IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
+                                 tok::U32(tok::pal::c_C82D2DFF), tok::U32(tok::pal::c_A62929FF),
+                                 tok::U32(tok::pal::c_DC4141FF), tok::U32(tok::pal::c_BF3838FF),
+                                 tok::U32(tok::pal::c_AF2323FF), tok::U32(tok::pal::c_8C1F1FFF),
+                                 tok::U32(tok::pal::c_FFFFFFFF), tok::U32(tok::pal::c_FFFFFFFF));
    }
 
 
@@ -719,11 +720,11 @@ namespace app
    {
       const bool isLight = IsThemeLight();
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(130, 138, 160, 200));
-      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(33, 36, 46, 255));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? IM_COL32(208, 214, 225, 255) : IM_COL32(51, 56, 71, 255));
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? IM_COL32(195, 202, 215, 255) : IM_COL32(64, 70, 89, 255));
-      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::U32(tok::pal::c_AAB2C3FF) : tok::U32(tok::pal::c_828AA0C8));
+      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_21242EFF));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? tok::U32(tok::pal::c_D0D6E1FF) : tok::U32(tok::pal::c_333847FF));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? tok::U32(tok::pal::c_C3CAD7FF) : tok::U32(tok::pal::c_404659FF));
+      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::U32(tok::pal::c_282D3CFF) : tok::U32(tok::pal::c_D2D7E6FF));
       const bool clicked = ImGui::Button(label, ImVec2(width, height));
       ImGui::PopStyleColor(5);
       ImGui::PopStyleVar();

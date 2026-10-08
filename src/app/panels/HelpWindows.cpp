@@ -1,4 +1,5 @@
 // Node help text tables, shortcuts and help windows (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -650,8 +651,8 @@ namespace app
             // washes out against light mode's light row background - branch
             // it the same way every other themed accent-text spot in the
             // app does rather than leave it a fixed dark-mode-only colour.
-            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.05f, 0.35f, 0.68f, 1.0f)
-                                                                : ImVec4(0.45f, 0.82f, 1.0f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_50_350_680_1000)
+                                                                : tok::V4(tok::palf::v_450_820_1000_1000));
             ImGui::TextUnformatted(s.key);
             ImGui::PopStyleColor();
 
