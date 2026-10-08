@@ -4,24 +4,23 @@ Status: planned (2026-10-08). Owner: "dive deep into our own iconography foundat
 Reference: Logic Pro screenshots (top bar, timeline header, sliders, browser table, accent picker). Borrow the *grammar*, never the glyphs.
 Skills to load before building: `infinite-design-system`, `node-ui-pillars`, `codebase-navigation`, `windows-parity`, `linux-parity`, `node-ui-sweep`, `panels-sweep`.
 
-## Block 1 progress (2026-10-08)
+## STATUS (single tracker, updated 2026-10-08)
 
-Done: `tokens.json` + `tools/design/build_tokens.py` (committed `Tokens.gen.h`, `--check` in CI) + `TokenColors.h` bridge; `tools/design/ratchet.py` + `ratchet.json` + CI job `design-ratchet`; `Theme.cpp` and `ModMatrixPanel.cpp` on role tokens. Literal colours 1551 -> 1499 (ratchet counts files in `src/app` + `src/arrange` outside `ui/design/`).
-Golden method: `driver.sh --shot-only` is noisy run to run (~0.05% of pixels, live previews), so compare with a pixel-diff fraction, not `cmp`. It only shows the default theme and no mod matrix/timeline, so the per-surface goldens (step 3) still need a gallery or per-surface fixtures.
-Next: ModWidgets.cpp (100), PerfPanel.cpp (45), ParamWidgets.cpp (10), then timeline, canvas/popups/settings, node bodies. Then glyph pipeline + 12 pilots, `UiAnim`, gallery.
+How we work: one surface at a time. Per surface: real-app before crop (`tools/design/context_shot.py`) -> change -> after crop -> owner approves -> commit. Flat mockups are not review material. Sections 0-8 below are reference spec; this table is the only place that says what is done.
 
-## Next session: start here
+| # | Step | State |
+|---|---|---|
+| 0 | Tokens, ratchet (literal colours = 0), glyph pipeline, 56 glyphs, `UiAnim`, preview hook + `context_shot.py` | done |
+| 1 | **Metrics layer**: icon size tokens, tile sizes, gaps, baseline; one helper so no call site computes its own size | next |
+| 2 | Top bar (section 5): groups, sizing, spacing, metronome (approved Logic-style glyph + swing), display box | not started |
+| 3 | Arrange header (section 6): transport, Bars/Time, snap magnet (redraw), division, loop, tool, flag, track height, edit | not started |
+| 4 | Node toggle rows: eye, bypass (lit disc / dim ring), viewport; knobs (3 directions open) | not started |
+| 5 | Remaining chrome (blocks 2 and 3 of section 7), retire `TablerIcons.h`, gallery (debug only), goldens, perf budget | not started |
 
-Branch `feature/design-foundations` (holds this plan, the skill and `tools/design/inventory.py`). Block 1 = no visible change; needs no owner decision.
+Root cause of the sizing complaints (found 2026-10-08): each call site derives its own icon size from row height (0.65 flag/track height/edit, 0.72 top-bar transport, 0.88 top-bar toggles, 0.9 search). No shared size token exists. Step 1 fixes that before any more icon art is judged.
 
-1. `git checkout feature/design-foundations`, load `infinite-design-system`, run `python3 tools/design/inventory.py` to refresh the baseline.
-2. Create `src/app/ui/design/` with `tokens.json` (base tokens + roles derived from `CategoryColors::UiTheme`) and `tools/design/build_tokens.py` → `Tokens.gen.h`; wire into CMake.
-3. Take golden screenshots of every surface in light and dark **before** touching colours (`run-infinite-hygiene` headless routes).
-4. Move literal colours to role tokens surface by surface, one commit each, in this order: mod matrix (235) → perf (82) → shared widgets (83) → timeline (158) → canvas/popups/top bar/settings → node bodies (862, split by body file). After each: goldens identical.
-5. Add `tools/design/ratchet.json` + CI step (counts may only go down).
-6. Then the glyph pipeline + 12 pilot glyphs (section 3) and `UiAnim` (section 4b); pilot sheet goes to the owner for review.
+Open decisions (one per message): switches only in Settings/panels (C5); node-family icons first (G12); Multicolor meaning; display box timecode mode; knob direction.
 
-Open decisions (not needed for block 1; ask one per message when block 2 starts): switches only in Settings/panels (C5); node-family icons first (G12); Multicolor meaning; display box timecode mode.
 
 ## Where we are
 
