@@ -672,6 +672,17 @@ void DrawPopupsB(FrameCtx& fc)
          gRequestFitView = true; // same, for the audio node UI fixture
       if (getenv("INFINITE_LOADPATCH") != nullptr && (frameId == 2 || frameId == 4))
          gRequestFitView = true;
+      if (const char* fitNode = getenv("INFINITE_FITNODE"); fitNode != nullptr && frameId == 8)
+      {
+         // dev screenshot: close-up on one node (zoomed in, unlike gRequestFitViewNodeIndex)
+         if (GraphNode* n = FindNodeByIndex(atoi(fitNode)))
+         {
+            ed::ClearSelection();
+            ed::SelectNode(n->NodeId());
+            ed::NavigateToSelection(true, 0.0f);
+            ed::ClearSelection();
+         }
+      }
       FrameTest_AUDIOUITEST_2(frameId, window);
       if (getenv("INFINITE_HIDETEST") != nullptr && frameId == 3)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
