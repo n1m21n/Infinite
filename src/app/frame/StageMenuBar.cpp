@@ -2,6 +2,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/IconTile.h"
 #include "app/ui/design/components/TopBarParts.h"
+#include "app/ui/design/components/Divider.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
@@ -355,31 +356,10 @@ void DrawMenuBar(FrameCtx& fc)
          // Transport group: play, rewind, metronome - one tight cluster.
          TopBarSameLine(2.0f);
          {
-            // Read once: the click below flips gMetronomeOn, and the push/pop
-            // pair must use the state it was pushed with.
-            const bool metronomeWasOn = gMetronomeOn;
-            if (metronomeWasOn)
-               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-            if (ImGui::Button("##metronomeBtn", ImVec2(tok::tile + 4.0f, 0.0f)))
+            // Same tile as the panel toggles: outline glyph off, accent tile + filled glyph on.
+            if (IconTile::Draw("##metronomeBtn", IconsInfinite::Metronome, IconsInfinite::MetronomeFill, gMetronomeOn,
+                               tok::tile, ImGui::GetFrameHeight()))
                gMetronomeOn = !gMetronomeOn;
-            if (metronomeWasOn)
-               ImGui::PopStyleColor();
-            {
-               ImVec4 iconCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-               if (!metronomeWasOn)
-                  iconCol.w *= 0.78f;
-               // The pendulum flips side on every beat - a hard 0/1, no easing -
-               // so each click lands exactly as it snaps over. Upright when off
-               // or while the transport is stopped.
-               const float swing = (metronomeWasOn && isTransportPlaying)
-                                      ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
-                                      : 0.0f;
-               const ImVec2 bmin = ImGui::GetItemRectMin();
-               const ImVec2 bmax = ImGui::GetItemRectMax();
-               glyph::DrawMetronome(ImGui::GetWindowDrawList(),
-                                     ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
-                                     tok::icon_md, ImGui::GetColorU32(iconCol), swing);
-            }
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                ImGui::OpenPopup("##metronomePopup");
 
@@ -866,11 +846,14 @@ void DrawMenuBar(FrameCtx& fc)
             }
          }
 
+         // Node library: a labelled toggle, not a bare magnifier - it opens the panel that lists,
+         // searches and adds every node, so it is named for what it holds. A hairline sets it
+         // apart from the four icon-only panel toggles to its right.
          {
-            const char* searchLabel = T("search");
+            const char* libLabel = T("Nodes");
             const float iconSize = tok::icon_md;
-            const float iconSlot = iconSize + 7.0f;
-            const float textW = ImGui::CalcTextSize(searchLabel).x;
+            const float iconSlot = iconSize + 6.0f;
+            const float textW = ImGui::CalcTextSize(libLabel).x;
             const float totalW = iconSlot + textW + ImGui::GetStyle().FramePadding.x * 2.0f;
             if (cursorX - totalW >= leftClusterEndX + minGap)
             {
@@ -878,17 +861,35 @@ void DrawMenuBar(FrameCtx& fc)
 
                ImGui::SameLine(cursorX);
                const ImVec2 btnStart = ImGui::GetCursorScreenPos();
-               const bool clicked = ImGui::Button("##searchhit", ImVec2(totalW, 0.0f));
-               const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+               const bool clicked = ImGui::InvisibleButton("##nodeLibrary", ImVec2(totalW, tok::tile));
+               const bool hov = ImGui::IsItemHovered();
+               const bool down = ImGui::IsItemActive();
+               const ImGuiID aid = ImGui::GetItemID();
+               const float hv = UiAnim::Hover(aid, hov, tok::motion_hover_in, tok::motion_hover_out);
+               const float onv = UiAnim::Value(aid + 1, gNodePanelOpen ? 1.0f : 0.0f, gNodePanelOpen ? tok::motion_on : tok::motion_off);
                ImDrawList* dl = ImGui::GetWindowDrawList();
-               const float rowH = ImGui::GetItemRectSize().y;
-               const ImVec2 iconCenter(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSize * 0.5f, btnStart.y + rowH * 0.5f);
-               glyph::DrawSearch(dl, iconCenter, iconSize, col);
-               const float textY = btnStart.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f;
-               dl->AddText(ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSlot, textY), col, searchLabel);
+               const ImVec2 bmax(btnStart.x + totalW, btnStart.y + tok::tile);
+               const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+               const float overlay = (down ? 0.12f : 0.06f * hv) * (1.0f - onv);
+               if (overlay > 0.001f)
+                  dl->AddRectFilled(btnStart, bmax, ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, overlay)), tok::radius_tile);
+               if (onv > 0.001f)
+               {
+                  ImVec4 acc = down ? AccentEmphasisPressed() : AccentEmphasisSelected();
+                  acc.w = onv;
+                  dl->AddRectFilled(btnStart, bmax, ImGui::GetColorU32(acc), tok::radius_tile);
+               }
+               const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+               glyph::Draw(dl, ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSize * 0.5f, btnStart.y + tok::tile * 0.5f),
+                           iconSize, col, gNodePanelOpen ? IconsInfinite::BrowserFill : IconsInfinite::Browser);
+               dl->AddText(ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSlot, btnStart.y + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f), col, libLabel);
+               if (hov)
+                  HelpTip("%s", T("Node library - browse, search and add any node"));
                if (clicked)
                   gNodePanelOpen = !gNodePanelOpen;
-               cursorX -= itemGap;
+               cursorX -= tok::space_3;
+               Divider::Vertical(UiLayout::Rect { cursorX - 1.0f, btnStart.y, 1.0f, tok::tile }, 4.0f);
+               cursorX -= tok::space_3;
             }
          }
 

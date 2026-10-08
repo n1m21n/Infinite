@@ -1172,3 +1172,4 @@ Zoom in and out	Acercar y alejar
 Zoom the view into the selected node; Enter zooms back out to where you were	Acerca la vista al nodo seleccionado; Enter vuelve a alejar hasta donde estabas
 transform  ->  back into Feedback's input   <- this closes the loop	transform  ->  de vuelta a la entrada de Feedback   <- esto cierra el bucle
 {mod}+C / {mod}+V, or Shift+D / {mod}+D to duplicate in place	{mod}+C / {mod}+V, o Shift+D / {mod}+D para duplicar en el mismo lugar
+Node library - browse, search and add any node	Biblioteca de nodos: explora, busca y añade cualquier nodo
