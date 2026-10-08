@@ -4,6 +4,12 @@ Status: planned (2026-10-08). Owner: "dive deep into our own iconography foundat
 Reference: Logic Pro screenshots (top bar, timeline header, sliders, browser table, accent picker). Borrow the *grammar*, never the glyphs.
 Skills to load before building: `infinite-design-system`, `node-ui-pillars`, `codebase-navigation`, `windows-parity`, `linux-parity`, `node-ui-sweep`, `panels-sweep`.
 
+## Block 1 progress (2026-10-08)
+
+Done: `tokens.json` + `tools/design/build_tokens.py` (committed `Tokens.gen.h`, `--check` in CI) + `TokenColors.h` bridge; `tools/design/ratchet.py` + `ratchet.json` + CI job `design-ratchet`; `Theme.cpp` and `ModMatrixPanel.cpp` on role tokens. Literal colours 1551 -> 1499 (ratchet counts files in `src/app` + `src/arrange` outside `ui/design/`).
+Golden method: `driver.sh --shot-only` is noisy run to run (~0.05% of pixels, live previews), so compare with a pixel-diff fraction, not `cmp`. It only shows the default theme and no mod matrix/timeline, so the per-surface goldens (step 3) still need a gallery or per-surface fixtures.
+Next: ModWidgets.cpp (100), PerfPanel.cpp (45), ParamWidgets.cpp (10), then timeline, canvas/popups/settings, node bodies. Then glyph pipeline + 12 pilots, `UiAnim`, gallery.
+
 ## Next session: start here
 
 Branch `feature/design-foundations` (holds this plan, the skill and `tools/design/inventory.py`). Block 1 = no visible change; needs no owner decision.
