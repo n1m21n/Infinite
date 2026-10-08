@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE912;
+   inline constexpr unsigned kLast = 0xE934;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -24,4 +24,38 @@ namespace IconsInfinite
    inline constexpr const char* StopFill = "\xee\xa4\x90"; // U+E910 stop-fill
    inline constexpr const char* Viewport = "\xee\xa4\x91"; // U+E911 viewport
    inline constexpr const char* ViewportFill = "\xee\xa4\x92"; // U+E912 viewport-fill
+   inline constexpr const char* ChevronDown = "\xee\xa4\x93"; // U+E913 chevron-down
+   inline constexpr const char* ChevronRight = "\xee\xa4\x94"; // U+E914 chevron-right
+   inline constexpr const char* Close = "\xee\xa4\x95"; // U+E915 close
+   inline constexpr const char* Eye = "\xee\xa4\x96"; // U+E916 eye
+   inline constexpr const char* EyeOff = "\xee\xa4\x97"; // U+E917 eye-off
+   inline constexpr const char* Flag = "\xee\xa4\x98"; // U+E918 flag
+   inline constexpr const char* MetronomeBody = "\xee\xa4\x99"; // U+E919 metronome-body
+   inline constexpr const char* NoteSnap = "\xee\xa4\x9a"; // U+E91A note-snap
+   inline constexpr const char* NoteSnapFill = "\xee\xa4\x9b"; // U+E91B note-snap-fill
+   inline constexpr const char* Pause = "\xee\xa4\x9c"; // U+E91C pause
+   inline constexpr const char* PauseFill = "\xee\xa4\x9d"; // U+E91D pause-fill
+   inline constexpr const char* Pencil = "\xee\xa4\x9e"; // U+E91E pencil
+   inline constexpr const char* Perform = "\xee\xa4\x9f"; // U+E91F perform
+   inline constexpr const char* Pointer = "\xee\xa4\xa0"; // U+E920 pointer
+   inline constexpr const char* Power = "\xee\xa4\xa1"; // U+E921 power
+   inline constexpr const char* Rewind = "\xee\xa4\xa2"; // U+E922 rewind
+   inline constexpr const char* Snap = "\xee\xa4\xa3"; // U+E923 snap
+   inline constexpr const char* TrackHeight = "\xee\xa4\xa4"; // U+E924 track-height
+   inline constexpr const char* ChevronUp = "\xee\xa4\xa5"; // U+E925 chevron-up
+   inline constexpr const char* Edit = "\xee\xa4\xa6"; // U+E926 edit
+   inline constexpr const char* Folder = "\xee\xa4\xa7"; // U+E927 folder
+   inline constexpr const char* Grip = "\xee\xa4\xa8"; // U+E928 grip
+   inline constexpr const char* Hand = "\xee\xa4\xa9"; // U+E929 hand
+   inline constexpr const char* Placeholder = "\xee\xa4\xaa"; // U+E92A placeholder
+   inline constexpr const char* Plus = "\xee\xa4\xab"; // U+E92B plus
+   inline constexpr const char* PointerFill = "\xee\xa4\xac"; // U+E92C pointer-fill
+   inline constexpr const char* Range = "\xee\xa4\xad"; // U+E92D range
+   inline constexpr const char* Refresh = "\xee\xa4\xae"; // U+E92E refresh
+   inline constexpr const char* Scissors = "\xee\xa4\xaf"; // U+E92F scissors
+   inline constexpr const char* Search = "\xee\xa4\xb0"; // U+E930 search
+   inline constexpr const char* Star = "\xee\xa4\xb1"; // U+E931 star
+   inline constexpr const char* StarFill = "\xee\xa4\xb2"; // U+E932 star-fill
+   inline constexpr const char* Trim = "\xee\xa4\xb3"; // U+E933 trim
+   inline constexpr const char* Zoom = "\xee\xa4\xb4"; // U+E934 zoom
 }

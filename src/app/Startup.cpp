@@ -1172,7 +1172,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          getenv("INFINITE_MIDILEARNTEST") != nullptr ||
          getenv("INFINITE_KBCURSORTEST") != nullptr ||
          getenv("INFINITE_KBDISCRETETEST") != nullptr ||
-         getenv("INFINITE_MODMATRIXGEOM") != nullptr;
+         getenv("INFINITE_MODMATRIXGEOM") != nullptr ||
+         getenv("INFINITE_OPENPANELS") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
       {
@@ -3632,6 +3633,15 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             gNodes[3].showParams = true;
          }
 #endif
+         // Design previews: open docked panels for a screenshot (INFINITE_OPENPANELS=arrange,modmatrix,perf,viewport).
+         if (const char* op = getenv("INFINITE_OPENPANELS"))
+         {
+            const std::string o(op);
+            gArrangePanelOpen = o.find("arrange") != std::string::npos;
+            gModMatrixOpen = o.find("modmatrix") != std::string::npos;
+            gPerfPanelOpen = o.find("perf") != std::string::npos;
+            gViewportPanelOpen = o.find("viewport") != std::string::npos;
+         }
          if (getenv("INFINITE_MODMATRIXGEOM") != nullptr)
          {
             // A bound link is required: DrawModMatrixTable shows "No active
