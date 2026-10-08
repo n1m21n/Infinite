@@ -238,7 +238,7 @@ namespace app
 
       const ImVec2 rowTop = ImGui::GetCursorScreenPos();
       {
-         UiType::Scope ts(UiType::Size::Caption, UiType::Weight::Medium);
+         UiType::Scope ts(UiType::Size::Title, UiType::Weight::Medium);
          const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          const ImU32 col = ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.55f));
          ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -248,7 +248,7 @@ namespace app
          ImGui::Dummy(ImVec2(0, ImGui::GetFontSize() + tok::space_1));
       }
 
-      UiType::Scope bodyType(UiType::Size::Body);   // same size as the list rows below
+      UiType::Scope bodyType(UiType::Size::Title);
       DropdownButton("sort", sortNames, state.sortMode, [&state](int i) { state.sortMode = i; }, sortW, false);
 
       ImGui::SameLine(0.0f, spacing);

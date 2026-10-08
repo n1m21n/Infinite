@@ -83,7 +83,7 @@ namespace LibraryParts
       const float top = first ? tok::space_1 : tok::space_3;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::Dummy(ImVec2(w, top + kHeaderH - tok::space_2));
-      UiType::Scope ts(UiType::Size::Body, UiType::Weight::Semibold);
+      UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
       const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float y = std::round(p.y + top + (kHeaderH - tok::space_2 - ImGui::GetFontSize()) * 0.5f + 2.0f);
@@ -137,7 +137,7 @@ namespace LibraryParts
          dl->AddCircleFilled(ImVec2(x + 3.0f, cy), 3.0f, ImGui::GetColorU32(ImVec4(dot->x, dot->y, dot->z, 1.0f)), 12);
          x += 6.0f + tok::space_2;
       }
-      UiType::Scope ts(UiType::Size::Body);
+      UiType::Scope ts(UiType::Size::Title);
       dl->AddText(ImVec2(x, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(text), label.c_str());
 
       const ImVec2 trail(p.x + w - tok::space_3 - 6.0f, cy);
