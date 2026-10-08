@@ -2052,6 +2052,8 @@ void PushPrimaryButtonStyle();
 void PopPrimaryButtonStyle();
 
 void PushDropdownStyle();
+// Quiet chevron at a dropdown button's right edge, drawn after the button; skipped when the centred caption leaves no room.
+void DrawDropdownChevron(const char* caption, ImVec2 mn, ImVec2 mx);
 
 void PopDropdownStyle();
 
@@ -3059,6 +3061,7 @@ void EndAudioSection();
                                                                 : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
             ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
+            DrawDropdownChevron(caption.c_str(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
             ImGui::EndDisabled();
             ImGui::PopStyleColor();
             DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3067,8 +3070,9 @@ void EndAudioSection();
          }
          else
          {
-            if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)) ||
-                DropdownTestWantsOpen(h.registered, h.nodeIndex, h.paramIndex))
+            const bool dropdownPressed = ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
+            DrawDropdownChevron(caption.c_str(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+            if (dropdownPressed || DropdownTestWantsOpen(h.registered, h.nodeIndex, h.paramIndex))
             {
                gDropdown.options = options;
                gDropdown.categories = categories;

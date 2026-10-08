@@ -1,6 +1,7 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/GlyphDraw.h"
 
 namespace app
 {
@@ -586,6 +587,20 @@ namespace app
    }
 
 
+   // The dropdown affordance: a quiet chevron at the button's right edge, drawn only when the centred caption leaves room.
+   void DrawDropdownChevron(const char* caption, ImVec2 mn, ImVec2 mx)
+   {
+      const float size = 8.0f, pad = 4.0f;
+      const char* hash = std::strstr(caption, "##");
+      const float textW = ImGui::CalcTextSize(caption, hash).x;
+      const float w = mx.x - mn.x;
+      if (w - pad - size < w * 0.5f + textW * 0.5f + 2.0f)  // the chevron must clear the centred caption
+         return;
+      ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      t.w *= 0.45f;
+      glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(mx.x - pad - size * 0.5f, (mn.y + mx.y) * 0.5f), size, ImGui::GetColorU32(t));
+   }
+
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
                        bool showCaption)
@@ -634,6 +649,7 @@ namespace app
                                                              : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
          ImGui::Button(caption.c_str(), ImVec2(width, 0));
+         DrawDropdownChevron(caption.c_str(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          // BeginDisabled swallows hover, so ask the rect directly - otherwise
@@ -642,7 +658,8 @@ namespace app
                                    ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
                                                               ImGui::GetItemRectMax()));
       }
-      else if (ImGui::Button(caption.c_str(), ImVec2(width, 0)))
+      else if (const bool pressed = ImGui::Button(caption.c_str(), ImVec2(width, 0));
+               (DrawDropdownChevron(caption.c_str(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax()), pressed))
       {
          gDropdown.options = options;
          gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind
