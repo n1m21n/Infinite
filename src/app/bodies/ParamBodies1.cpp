@@ -1646,12 +1646,14 @@ namespace app
          const bool isSelected = (b == n->selected);
          if (isSelected)
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+            PushSelectedButtonColors();
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
          }
          else
          {
             ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::V4(tok::palf::v_880_900_940_1000) : tok::V4(tok::palf::v_180_200_260_1000));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
             ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_300_350_450_1000) : tok::V4(tok::palf::v_700_750_850_1000));
          }
 
@@ -1661,7 +1663,7 @@ namespace app
             PushUndoCheckpoint();
             n->selected = b;
          }
-         ImGui::PopStyleColor(2);
+         ImGui::PopStyleColor(4);
          ImGui::PopID();
       }
 

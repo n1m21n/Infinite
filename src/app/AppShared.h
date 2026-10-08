@@ -2042,6 +2042,10 @@ ImVec4 AccentEmphasisSelected();
 
 ImVec4 AccentEmphasisPressed();
 
+// Selected/on button look that survives hover (accent kept, ~4% brighter). Push and Pop are a pair (3 colours).
+void PushSelectedButtonColors();
+void PopSelectedButtonColors();
+
 void PushPrimaryButtonStyle();
 
 void PopPrimaryButtonStyle();

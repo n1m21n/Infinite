@@ -28,10 +28,10 @@ namespace app
       bool LaneToggle(const char* label, bool on, float w)
       {
          if (on)
-            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+            PushSelectedButtonColors();
          const bool clicked = ImGui::Button(label, ImVec2(w, 0.0f));
          if (on)
-            ImGui::PopStyleColor();
+            PopSelectedButtonColors();
          return clicked;
       }
    }

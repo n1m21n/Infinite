@@ -946,10 +946,10 @@ void DrawMenuBar(FrameCtx& fc)
                return clicked;
             }
             if (isOpen)
-               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+               PushSelectedButtonColors();
             const bool clicked = ImGui::Button(id, ImVec2(btnW, 0.0f));
             if (isOpen)
-               ImGui::PopStyleColor();
+               PopSelectedButtonColors();
             if (ImGui::IsItemHovered())
                HelpTip("%s", tooltip);
 

@@ -345,6 +345,8 @@ Today every ImGui state change is instant: hover, press and toggle colours snap 
 
 ### Selected must not look like hover (owner report, 2026-10-08)
 
+Status: done. Shared `PushSelectedButtonColors` / `PopSelectedButtonColors` (Theme.cpp); every inline accent site uses them; `ChipButton` keeps the accent on hover by construction.
+
 A button that is already on/selected (accent fill) changes colour when hovered today, which reads as "something just changed" when nothing did. App-wide: every inline `PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected())` site, `AudioToggleButton`, the segment strips and `LaneToggle` (Spatial Mixer).
 
 | State | Rule |

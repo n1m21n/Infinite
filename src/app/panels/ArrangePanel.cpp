@@ -598,21 +598,21 @@ namespace app
                if (!audioOnly)
                {
                   const int fmtActive = rset.renderFormat == 1 ? 1 : 0;
-                  if (fmtActive == 0) ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+                  if (fmtActive == 0) PushSelectedButtonColors();
                   if (ImGui::Button(L(".mp4##arrRenderMp4"), ImVec2(56, 0)))
                   {
                      rset.renderFormat = 0;
                      gPatchDirty = true;
                   }
-                  if (fmtActive == 0) ImGui::PopStyleColor();
+                  if (fmtActive == 0) PopSelectedButtonColors();
                   ImGui::SameLine();
-                  if (fmtActive == 1) ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+                  if (fmtActive == 1) PushSelectedButtonColors();
                   if (ImGui::Button(L(".mov##arrRenderMov"), ImVec2(56, 0)))
                   {
                      rset.renderFormat = 1;
                      gPatchDirty = true;
                   }
-                  if (fmtActive == 1) ImGui::PopStyleColor();
+                  if (fmtActive == 1) PopSelectedButtonColors();
                }
 
                ImGui::Separator();
@@ -773,15 +773,14 @@ namespace app
             const bool viewportWasOn = gArrangeShowViewport;
             if (viewportWasOn)
             {
-               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
+               PushSelectedButtonColors();
             }
             if (ImGui::Button("##arrangeshowviewport", ImVec2(30, 0)))
                gArrangeShowViewport = !gArrangeShowViewport;
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangeviewportctx"))
                ImGui::OpenPopup("##arrangeviewportctx");
             if (viewportWasOn)
-               ImGui::PopStyleColor(2);
+               PopSelectedButtonColors();
             if (ImGui::IsItemHovered())
                HelpTip(viewportWasOn ? T("Viewport Monitor: Visible (Right-click for Dock Position)") : T("Toggle Viewport Monitor (Right-click for Dock Position)"));
             const ImVec2 bmin = ImGui::GetItemRectMin();
@@ -862,13 +861,12 @@ namespace app
                const bool on = shownUnit == u;
                if (on)
                {
-                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-                  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
+                  PushSelectedButtonColors();
                }
                if (ImGui::Button(kUnitLabels[u], ImVec2(44.0f, 0.0f)))
                   ArrangeSetTimeDisplay(u);
                if (on)
-                  ImGui::PopStyleColor(2);
+                  PopSelectedButtonColors();
                if (ImGui::IsItemHovered())
                   HelpTip(u == 0 ? T("Switch display to Bars / Beats (BBT)") : T("Switch display to Time (Minutes:Seconds)"));
             }
@@ -1116,13 +1114,12 @@ namespace app
          const bool inspectorWasOpen = gArrangeClipSettingsPanelOpen;
          if (inspectorWasOpen)
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
+            PushSelectedButtonColors();
          }
          if (ImGui::Button("##clipsettingstoggle", ImVec2(30, 0)))
             gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
          if (inspectorWasOpen)
-            ImGui::PopStyleColor(2);
+            PopSelectedButtonColors();
          if (ImGui::IsItemHovered())
             HelpTip(inspectorWasOpen ? T("Clip / Track Inspector: Open") : T("Toggle Clip / Track Inspector"));
          {

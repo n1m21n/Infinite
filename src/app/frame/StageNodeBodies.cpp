@@ -916,7 +916,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const float halfBtnW = (kPreviewSize - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
                const bool pngActive = (n->imageFormat == 0);
                if (pngActive)
-                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+                  PushSelectedButtonColors();
                if (ImGui::Button(L(".png##imgPng"), ImVec2(halfBtnW, 0)))
                {
                   n->imageFormat = 0;
@@ -928,12 +928,12 @@ void DrawNodeBodies(FrameCtx& fc)
                   gPatchDirty = true;
                }
                if (pngActive)
-                  ImGui::PopStyleColor();
+                  PopSelectedButtonColors();
                ImGui::SameLine();
 
                const bool jpgActive = (n->imageFormat == 1);
                if (jpgActive)
-                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+                  PushSelectedButtonColors();
                if (ImGui::Button(L(".jpg##imgJpg"), ImVec2(halfBtnW, 0)))
                {
                   n->imageFormat = 1;
@@ -945,7 +945,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   gPatchDirty = true;
                }
                if (jpgActive)
-                  ImGui::PopStyleColor();
+                  PopSelectedButtonColors();
 
                if (ImGui::Button(L("Export Image"), ImVec2(kPreviewSize, 0)))
                   ExportImage(n, n->exportImagePath);
@@ -970,7 +970,7 @@ void DrawNodeBodies(FrameCtx& fc)
                ImGui::BeginDisabled(n->IsRecording());
                const bool mp4Active = (n->videoFormat == 0);
                if (mp4Active)
-                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+                  PushSelectedButtonColors();
                if (ImGui::Button(L(".mp4##vidMp4"), ImVec2(halfBtnW, 0)))
                {
                   n->videoFormat = 0;
@@ -982,12 +982,12 @@ void DrawNodeBodies(FrameCtx& fc)
                   gPatchDirty = true;
                }
                if (mp4Active)
-                  ImGui::PopStyleColor();
+                  PopSelectedButtonColors();
                ImGui::SameLine();
 
                const bool movActive = (n->videoFormat == 1);
                if (movActive)
-                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+                  PushSelectedButtonColors();
                if (ImGui::Button(L(".mov##vidMov"), ImVec2(halfBtnW, 0)))
                {
                   n->videoFormat = 1;
@@ -999,7 +999,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   gPatchDirty = true;
                }
                if (movActive)
-                  ImGui::PopStyleColor();
+                  PopSelectedButtonColors();
                ImGui::EndDisabled();
 
                // Both of these are read once, at StartRecording, and latched

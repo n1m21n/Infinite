@@ -135,6 +135,18 @@ namespace app
 
    ImVec4 AccentEmphasisPressed() { return AccentTint(tok::accent_pressed); }
 
+   // A button that is already on keeps its accent when hovered: same hue, ~4% brighter (a hint of life, no colour
+   // change). Press darkens; release returns to the selected look. Pair with PopSelectedButtonColors.
+   void PushSelectedButtonColors()
+   {
+      const ImVec4 sel = AccentEmphasisSelected();
+      const auto up = [](float c) { return std::min(1.0f, c * 1.04f + 0.01f); };
+      ImGui::PushStyleColor(ImGuiCol_Button, sel);
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(up(sel.x), up(sel.y), up(sel.z), sel.w));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, AccentEmphasisPressed());
+   }
+   void PopSelectedButtonColors() { ImGui::PopStyleColor(3); }
+
 
    // Shared "this is the recommended action" emphasis for a modal dialog's
    // button row - the app's accent color on exactly one button, matching
