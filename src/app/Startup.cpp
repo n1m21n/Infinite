@@ -3732,6 +3732,33 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             gPerfMidiLearnIdx = 2;
          }
       }
+      // "arrangedemo": video and audio tracks with clips, one selected, Clip Settings open (design review shots).
+      if (o.find("arrangedemo") != std::string::npos)
+      {
+         gArrangePanelOpen = true;
+         gArrangePanelHeight = 560.0f;
+         size_t firstAudio = 0;
+         while (firstAudio < gArrange.lanes.size() && gArrange.lanes[firstAudio].type != Arrange::kLaneAudio) ++firstAudio;
+         if (firstAudio + 1 < gArrange.lanes.size()) gArrange.lanes[firstAudio + 1].solo = true;
+         auto addClip = [](size_t lane, int bar, int bars, const char* name)
+         {
+            Arrange::Clip c;
+            c.start = (Arrange::Tick)bar * Arrange::kTicksPerBar;
+            c.length = (Arrange::Tick)bars * Arrange::kTicksPerBar;
+            c.name = name;
+            uint64_t id = 0;
+            Arrange::PlaceOverwrite(gArrange, gArrange.lanes[lane].id, c, &id);
+            return id;
+         };
+         addClip(0, 0, 2, "Intro");
+         const uint64_t sel = addClip(0, 3, 3, "Clip B");
+         addClip(1, 1, 4, "Overlay");
+         addClip(firstAudio, 0, 3, "Drums");
+         addClip(firstAudio + 1, 2, 4, "Bass");
+         gArrangeSel.insert(sel);
+         gArrangeSelAnchor = sel;
+         gArrangeClipSettingsPanelOpen = true;
+      }
       // "library:field|samples|media|plugins" picks the mode shown (default Modules).
       if (o.find("field") != std::string::npos) gSearchPanelMode = 4;
       else if (o.find("samples") != std::string::npos) gSearchPanelMode = 1;
