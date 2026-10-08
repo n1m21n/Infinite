@@ -113,15 +113,36 @@ void DrawLinks(FrameCtx& fc)
                const float dx = std::max(40.0f, std::fabs(b.x - a.x) * 0.5f);
                const ImVec2 c1(a.x + dx, a.y), c2(b.x - dx, b.y);
                ImDrawList* ddl = ImGui::GetWindowDrawList();
+               // Dashes by arc length, so dash size does not stretch with the cable.
+               constexpr int kSamples = 240;
+               constexpr float kDash = 6.0f, kGap = 5.0f;
                ImVec2 prev = a;
-               constexpr int kSeg = 48;
-               for (int i = 1; i <= kSeg; i++)
+               float acc = 0.0f;   // distance along the cable since the last phase flip
+               bool on = true;
+               for (int i = 1; i <= kSamples; i++)
                {
-                  const float t = (float)i / kSeg, u = 1.0f - t;
+                  const float t = (float)i / kSamples, u = 1.0f - t;
                   const ImVec2 pt(u * u * u * a.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * b.x,
                                   u * u * u * a.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * b.y);
-                  if ((i & 1) == 0)   // every other piece: dotted
-                     ddl->AddLine(prev, pt, col, 2.0f);
+                  float seg = std::hypot(pt.x - prev.x, pt.y - prev.y);
+                  ImVec2 from = prev;
+                  while (seg > 0.0f)
+                  {
+                     const float room = (on ? kDash : kGap) - acc;
+                     const float step = std::min(seg, room);
+                     const float f = step / seg;
+                     const ImVec2 to(from.x + (pt.x - from.x) * f, from.y + (pt.y - from.y) * f);
+                     if (on)
+                        ddl->AddLine(from, to, col, 2.0f);
+                     from = to;
+                     seg -= step;
+                     acc += step;
+                     if (acc >= (on ? kDash : kGap) - 1e-4f)
+                     {
+                        acc = 0.0f;
+                        on = !on;
+                     }
+                  }
                   prev = pt;
                }
             }
