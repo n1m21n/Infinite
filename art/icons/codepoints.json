@@ -1,0 +1,21 @@
+{
+ "arrange": 59648,
+ "browser": 59649,
+ "browser-fill": 59650,
+ "capture": 59651,
+ "capture-fill": 59652,
+ "count-in": 59653,
+ "loop": 59654,
+ "metronome": 59655,
+ "metronome-fill": 59656,
+ "mixer": 59657,
+ "mod-matrix": 59658,
+ "play": 59659,
+ "play-fill": 59660,
+ "record": 59661,
+ "record-fill": 59662,
+ "stop": 59663,
+ "stop-fill": 59664,
+ "viewport": 59665,
+ "viewport-fill": 59666
+}

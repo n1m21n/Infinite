@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
@@ -314,7 +315,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (isTransportPlaying)
                Tabler::DrawPlayerPause(dl, center, iconSize, col);
             else
-               Tabler::DrawPlayerPlay(dl, center, iconSize, col, true);
+               glyph::Draw(dl, center, iconSize, col, IconsInfinite::PlayFill);
          }
          if (ImGui::IsItemHovered())
             HelpTip(T("%s (Space)"), isTransportPlaying ? T("Pause") : T("Play"));
@@ -881,7 +882,7 @@ void DrawMenuBar(FrameCtx& fc)
          // Returns false without drawing anything when there isn't room -
          // these are the first things dropped on a narrow window, since they
          // carry no text label and are the least essential of the cluster.
-         auto TopBarIconToggle = [&](const char* id, bool isOpen, void (*draw)(ImDrawList*, ImVec2, float, ImU32, float), const char* tooltip)
+         auto TopBarIconToggle = [&](const char* id, bool isOpen, void (*draw)(ImDrawList*, ImVec2, float, ImU32, float), const char* tooltip, const char* glyphOff = nullptr, const char* glyphOn = nullptr)
          {
             const float btnW = 38.0f;
             if (cursorX - btnW < leftClusterEndX + minGap)
@@ -903,7 +904,9 @@ void DrawMenuBar(FrameCtx& fc)
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.88f;
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-            if (draw != nullptr)
+            if (glyphOff != nullptr)
+               glyph::Draw(dl, center, iconSize * 0.9f, col, (isOpen && glyphOn != nullptr) ? glyphOn : glyphOff);
+            else if (draw != nullptr)
                draw(dl, center, iconSize, col, 0.0f);
             else
                Tabler::DrawPlaceholder(dl, center, iconSize, col, 0.0f);
@@ -912,13 +915,13 @@ void DrawMenuBar(FrameCtx& fc)
             return clicked;
          };
 
-         if (TopBarIconToggle("##arrangePanelToggle", gArrangePanelOpen, &Tabler::DrawBox3D, T("Arrangement timeline")))
+         if (TopBarIconToggle("##arrangePanelToggle", gArrangePanelOpen, nullptr, T("Arrangement timeline"), IconsInfinite::Arrange))
             gArrangePanelOpen = !gArrangePanelOpen;
          if (TopBarIconToggle("##perfPanelToggle", gPerfPanelOpen, &Tabler::DrawDisc, T("Performance mode")))
             gPerfPanelOpen = !gPerfPanelOpen;
-         if (TopBarIconToggle("##modMatrixToggle", gModMatrixOpen, &Tabler::DrawGridDots, T("Modulation matrix")))
+         if (TopBarIconToggle("##modMatrixToggle", gModMatrixOpen, nullptr, T("Modulation matrix"), IconsInfinite::ModMatrix))
             gModMatrixOpen = !gModMatrixOpen;
-         if (TopBarIconToggle("##viewportPanelToggle", gViewportPanelOpen, &Tabler::DrawLayoutSidebar, T("Viewport panel")))
+         if (TopBarIconToggle("##viewportPanelToggle", gViewportPanelOpen, nullptr, T("Viewport panel"), IconsInfinite::Viewport, IconsInfinite::ViewportFill))
             gViewportPanelOpen = !gViewportPanelOpen;
 
          ImGui::PopStyleColor(6);

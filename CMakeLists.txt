@@ -1091,6 +1091,9 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
         COMMAND ${CMAKE_COMMAND} -E make_directory
                 "$<TARGET_FILE_DIR:Infinite>/Resources/drumkits/infinite-basic"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -1141,6 +1144,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 "$<TARGET_FILE_DIR:Infinite>/Resources/lang"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon_1024.png"
@@ -1440,7 +1446,8 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf")
     list(APPEND INFINITE_FONT_FILES ${INFINITE_NOTO_FILES})
     set(INFINITE_ICON_FONT_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf")
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf")
     target_sources(Infinite PRIVATE ${INFINITE_FONT_FILES} ${INFINITE_ICON_FONT_FILES} ${INFINITE_LANG_FILES})
     set_source_files_properties(${INFINITE_LANG_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/lang")
     set_source_files_properties(${INFINITE_FONT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/fonts")

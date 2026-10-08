@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/Glyphs.gen.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -131,6 +132,21 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
          iconCfg.PixelSnapH = true;
          iconCfg.GlyphMinAdvanceX = bakedPx;
          io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
+      }
+   }
+   // Infinite Glyphs (art/icons/src -> tools/design/build_glyphs.py): our own icon set, merged the
+   // same way as Lucide above. Codepoints come from the generated Glyphs.gen.h.
+   if (uiFont != nullptr)
+   {
+      const std::string bundledGlyphs = BundledResourcePath("icons/infinite-glyphs.ttf");
+      if (!bundledGlyphs.empty())
+      {
+         static const ImWchar glyphRanges[] = { (ImWchar)IconsInfinite::kFirst, (ImWchar)IconsInfinite::kLast, 0 };
+         ImFontConfig glyphCfg;
+         glyphCfg.MergeMode = true;
+         glyphCfg.PixelSnapH = true;
+         glyphCfg.GlyphMinAdvanceX = bakedPx;
+         io.Fonts->AddFontFromFileTTF(bundledGlyphs.c_str(), bakedPx, &glyphCfg, glyphRanges);
       }
    }
    if (rendererReady)
