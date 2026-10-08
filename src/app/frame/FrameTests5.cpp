@@ -2,6 +2,10 @@
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/UiLayout.h"
 #include "app/ui/design/UiInteract.h"
+#include "app/ui/design/components/Divider.h"
+#include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/Readout.h"
+#include "app/ui/design/components/TextButton.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/AppShared.h"
 
@@ -3027,6 +3031,42 @@ void FrameTest_UIINTERACTTEST(int frameId, GLFWwindow*)
       if (UiInteract::DuplicateKeys() != 0)
          bad("duplicate count did not reset");
       printf("%s\n", ok ? "UIINTERACTTEST OK" : "UIINTERACTTEST FAIL");
+   }
+}
+
+
+void FrameTest_UICOMPTEST(int frameId, GLFWwindow*)
+{
+   if (getenv("INFINITE_UICOMPTEST") == nullptr || (frameId != 5 && frameId != 6))
+      return;
+   ImGui::SetNextWindowPos(ImVec2(40, 40));
+   ImGui::SetNextWindowSize(ImVec2(420, 120));
+   ImGui::Begin("##uicomptest", nullptr, ImGuiWindowFlags_NoSavedSettings);
+   const std::vector<UiLayout::Rect> cells = UiLayout::Row({ 50, 70, 380, 28 },
+      { UiLayout::Fixed(TextButton::WidthFor("Export")), UiLayout::Fixed(1), UiLayout::Fixed(160), UiLayout::Flex() });
+   TextButton::Draw("comp.export", cells[0], "Export", TextButton::Kind::Primary);
+   Divider::Vertical(cells[1]);
+   static const PillGroup::Segment segs[] = { { "comp.a", "Live" }, { "comp.b", "Arrange" }, { "comp.c", "Mix" } };
+   PillGroup::Draw("comp.mode", cells[2], segs, 3, 1);
+   Readout::Draw("comp.bpm", cells[3], "120.0", "Tempo", UiType::Size::Body, UiType::Weight::Regular, Readout::Align::Right);
+   ImGui::End();
+   if (frameId == 6)
+   {
+      bool ok = true;
+      auto bad = [&](const char* why) { printf("UICOMPTEST FAIL: %s\n", why); ok = false; };
+      const UiInteract::Node* e = UiInteract::Find("comp.export");
+      const UiInteract::Node* m = UiInteract::Find("comp.b");
+      const UiInteract::Node* b = UiInteract::Find("comp.bpm");
+      if (e == nullptr || e->role != UiInteract::Role::Button || e->label != "Export") bad("TextButton node");
+      if (m == nullptr || m->role != UiInteract::Role::Tab || m->value != "selected") bad("PillGroup selected segment");
+      if (b == nullptr || b->role != UiInteract::Role::Readout || b->value != "120.0") bad("Readout node");
+      if (UiInteract::Find("comp.a") == nullptr || UiInteract::Find("comp.a")->value != "") bad("unselected segment has a value");
+      if (UiInteract::DuplicateKeys() != 0) bad("duplicate keys");
+      // Tabular digits: "1111" and "0000" measure the same.
+      UiType::Push(UiType::Size::Body);
+      if (std::fabs(Readout::Measure("1111") - Readout::Measure("0000")) > 0.01f) bad("digits are not tabular");
+      UiType::Pop();
+      printf("%s\n", ok ? "UICOMPTEST OK" : "UICOMPTEST FAIL");
    }
 }
 

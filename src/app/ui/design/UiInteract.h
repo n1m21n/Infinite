@@ -36,6 +36,9 @@ namespace UiInteract
    State Item(const char* key, const UiLayout::Rect& rect, Role role, const char* label,
               bool enabled = true, const char* value = nullptr);
 
+   // Records a semantic node for something drawn but not interactive (a readout, a label).
+   void Note(const char* key, const UiLayout::Rect& rect, Role role, const char* label, const char* value = nullptr);
+
    // The ID Item() uses for `key` in the current ID stack; for UiAnim slots that belong to the item.
    ImGuiID IdFor(const char* key);
 

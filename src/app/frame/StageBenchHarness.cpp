@@ -2223,6 +2223,7 @@ void DrawBenchHarness(FrameCtx& fc)
       FrameTest_UITYPETEST(frameId, window);
       FrameTest_UILAYOUTTEST(frameId, window);
       FrameTest_UIINTERACTTEST(frameId, window);
+      FrameTest_UICOMPTEST(frameId, window);
 
       FrameTest_SIZETEST(frameId, window);
 

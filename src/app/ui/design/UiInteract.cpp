@@ -29,6 +29,11 @@ namespace UiInteract
       return s;
    }
 
+   void Note(const char* key, const UiLayout::Rect& r, Role role, const char* label, const char* value)
+   {
+      sBuilding.push_back(Node{ ImGui::GetID(key), key, label != nullptr ? label : "", value != nullptr ? value : "", role, true, r });
+   }
+
    void BeginFrame()
    {
       sLast.swap(sBuilding);
