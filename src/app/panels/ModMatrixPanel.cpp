@@ -2,6 +2,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
+#include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/AppShared.h"
 #include "app/ui/design/TokenColors.h"
@@ -299,24 +300,6 @@ namespace app
       ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - 1.5f, cy - 8.0f), ImVec2(cx + 1.5f, cy + 8.0f), col, 1.5f);
    }
 
-   // Small toggle chip in the same construction as the Library's chips: well (6% text), accent when on.
-   bool ChipToggle(const char* label, bool on)
-   {
-      const ImVec2 ts = ImGui::CalcTextSize(label);
-      const ImVec2 sz(ts.x + 2.0f * tok::space_2, 22.0f);
-      const ImVec2 p = ImGui::GetCursorScreenPos();
-      const bool clicked = ImGui::InvisibleButton(label, sz);
-      const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
-      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec4 a = app::AccentEmphasisSelected();
-      const ImVec4 bg = on ? a : ImVec4(t.x, t.y, t.z, 0.06f + 0.05f * hv);
-      dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(bg), tok::radius_tile);
-      dl->AddText(ImVec2(std::round(p.x + (sz.x - ts.x) * 0.5f), std::round(p.y + (sz.y - ts.y) * 0.5f)),
-                  ImGui::GetColorU32(on ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.8f)), label);
-      return clicked;
-   }
-
    // Next column with text baseline aligned to the frame-height controls (Lo/Hi wells, chips) in the same row.
    void NextCell()
    {
@@ -591,7 +574,7 @@ namespace app
                // doesn't checkpoint either (a range edit, not a structural
                // change like Unbind or the enable toggle above).
                NextCell();
-               if (ChipToggle(I18n::T("Inv"), src.lo > src.hi))
+               if (ChipButton::Draw(I18n::T("Inv"), src.lo > src.hi))
                   mod.SetRange(dstIndex, dstParam, src.hi, src.lo);
 
                // Curve
@@ -885,7 +868,7 @@ namespace app
                }
 
                NextCell();
-               if (ChipToggle(I18n::T("Full"), false))
+               if (ChipButton::Draw(I18n::T("Full"), false))
                   rec.ClearPlaybackRange(dstIndex, dstParam);
 
                // Curve

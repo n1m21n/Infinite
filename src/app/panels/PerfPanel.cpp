@@ -1,4 +1,6 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -2070,6 +2072,8 @@ namespace app
    }
 
 
+   constexpr float kPerfChipH = 28.0f;   // toolbar chips: one tile high
+
    void DrawPerfPanelContent()
    {
       if (gPerfLayout.pageCount < 1) gPerfLayout.pageCount = 1;
@@ -2106,28 +2110,14 @@ namespace app
       // WindowPadding with no added Spacing(), which is the gap this now
       // matches.
       // Mode Switch Button (Edit / Perform)
-      if (gPerfEditMode)
-      {
-         ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
-         if (ImGui::Button(L("Edit Mode"), ImVec2(86, 24)))
-            gPerfEditMode = false;
-         ImGui::PopStyleColor(2);
-      }
-      else
-      {
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_180_580_320_1000));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_240_680_380_1000));
-         if (ImGui::Button(L("Perform"), ImVec2(86, 24)))
-            gPerfEditMode = true;
-         ImGui::PopStyleColor(2);
-      }
+      if (ChipButton::Draw(gPerfEditMode ? L("Edit Mode") : L("Perform"), gPerfEditMode, kPerfChipH, 86.0f))
+         gPerfEditMode = !gPerfEditMode;
 
       // Add Control button in Edit Mode
       if (gPerfEditMode)
       {
          ImGui::SameLine();
-         if (ImGui::Button(L("+ Add Control"), ImVec2(100, 24)))
+         if (ChipButton::Draw(L("+ Add Control"), false, kPerfChipH, 100.0f))
             ImGui::OpenPopup("##perfaddcontrolmenu");
 
          if (ImGui::BeginPopup("##perfaddcontrolmenu"))
@@ -2147,8 +2137,8 @@ namespace app
          }
       }
 
-      // Page Tabs
-      ImGui::SameLine();
+      // Page Tabs (a wider gap separates them from the mode controls)
+      ImGui::SameLine(0.0f, tok::space_4);
       // No cursor-Y fudge: the page-tab and "+" buttons below now take an
       // explicit 24px height, matching "Edit Mode"/"Perform"/"+ Add
       // Control" exactly, so they already share the same baseline without
@@ -2188,33 +2178,8 @@ namespace app
          else
          {
             const bool isSelected = (gPerfActivePage == p);
-            if (isSelected)
-            {
-               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::V4(tok::palf::v_800_850_940_1000) : tok::V4(tok::palf::v_250_280_380_1000));
-               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_100_150_300_1000) : tok::V4(tok::palf::v_1000_1000_1000_1000));
-            }
-            else
-            {
-               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::V4(tok::palf::v_920_940_960_700) : tok::V4(tok::palf::v_140_160_220_700));
-               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_350_400_500_1000) : tok::V4(tok::palf::v_650_700_800_1000));
-            }
-
-            // Explicit height matches "Edit Mode"/"Perform"/"+ Add Control"
-            // (all 24px) - this used to auto-fit to ImGui's default frame
-            // height, a few px shorter, which is what the -2.0f cursor nudge
-            // above the loop was trying (and failing) to paper over. Width
-            // gets its own explicit floor too: a plain auto-fit button is
-            // only text-width + 2*FramePadding.x (8px total) wide, so the
-            // selected page's highlight fill hugged its own label tighter
-            // than every other chip-style control in the app (page tab or
-            // not) - moving between pages by clicking through the highlight
-            // is what made that cramped fit visible.
-            const float tabW = std::max(60.0f, ImGui::CalcTextSize(pageTitle.c_str()).x + 24.0f);
-            if (ImGui::Button(pageTitle.c_str(), ImVec2(tabW, 24)))
-            {
+            if (ChipButton::Draw(pageTitle.c_str(), isSelected, kPerfChipH, 60.0f, /*soft=*/true))
                gPerfActivePage = p;
-            }
-            ImGui::PopStyleColor(2);
 
             // Double click to rename page
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -2288,7 +2253,7 @@ namespace app
       if (gPerfLayout.pageCount < 12)
       {
          ImGui::SameLine();
-         if (ImGui::Button(L("+##addpagebtn"), ImVec2(24, 24)))
+         if (ChipButton::Draw(L("+##addpagebtn"), false, kPerfChipH, kPerfChipH))
          {
             PushUndoCheckpoint();
             int newP = gPerfLayout.pageCount++;
@@ -2444,7 +2409,7 @@ namespace app
 
    void DrawPerfPanelDocked(const char* id, const ImVec2& size)
    {
-      const float kGrip = 6.0f;
+      const float kGrip = PanelFrame::kGap;   // the grip strip is the gap on the canvas-facing side
       const int dock = gPerfPanelDock;
       const bool vertical = (dock == 1 || dock == 2);
       const bool gripFirst = (dock == 0 || dock == 1);
@@ -2457,9 +2422,8 @@ namespace app
       // viewports: it was never a coloured divider, it was a hole. Give the
       // outer child the same opaque panelBg fill the content child already
       // has so the panel is solid edge to edge.
-      PushDockedPanelStyle(/*isChild=*/true);
+      // Outer child is transparent: the panel floats as a card on the canvas colour (PanelFrame).
       ImGui::BeginChild(id, size, false);
-      PopDockedPanelStyle();
       gPerfPanelRectMin = ImGui::GetWindowPos();
       gPerfPanelRectMax = ImVec2(gPerfPanelRectMin.x + ImGui::GetWindowSize().x,
                                  gPerfPanelRectMin.y + ImGui::GetWindowSize().y);
@@ -2499,17 +2463,21 @@ namespace app
       }
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+      const ImVec2 cardSize = vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
+                                       : ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+      PanelFrame::Insets in;
+      switch (dock)   // the grip side needs no inset of its own
+      {
+         case 0: in.t = 0.0f; break;
+         case 1: in.l = 0.0f; break;
+         case 2: in.r = 0.0f; break;
+         default: in.b = 0.0f; break;
+      }
       PushDockedPanelStyle(/*isChild=*/true);
-      // Same padding-loss trap as ModMatrix's content child above - this is
-      // the exact cause of "Edit Mode / Perform" sitting flush against the
-      // panel edge with no breathing room.
-      ImGui::BeginChild("##perfpanelinnercontent",
-                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
-                                 : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
-      DrawPerfPanelContent();
-      ImGui::EndChild();
+      PanelFrame::BeginCard("##perfpanelinnercontent", cardSize, in);
       PopDockedPanelStyle();
+      DrawPerfPanelContent();
+      PanelFrame::EndCard();
 
       if (!gripFirst)
       {
