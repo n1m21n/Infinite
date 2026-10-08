@@ -1,5 +1,6 @@
 // Modulation matrix panel (moved verbatim from main.cpp).
 #include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/AppShared.h"
@@ -290,6 +291,39 @@ namespace app
    }
 
 
+   // Row kind marker: a short rounded rail (colour = modulation / expression / recording), not a dot.
+   void KindRail(ImVec2 cell, float cellH, ImU32 col)
+   {
+      const float cx = std::round(cell.x + cellH * 0.5f);
+      const float cy = cell.y + cellH * 0.5f;
+      ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - 1.5f, cy - 8.0f), ImVec2(cx + 1.5f, cy + 8.0f), col, 1.5f);
+   }
+
+   // Small toggle chip in the same construction as the Library's chips: well (6% text), accent when on.
+   bool ChipToggle(const char* label, bool on)
+   {
+      const ImVec2 ts = ImGui::CalcTextSize(label);
+      const ImVec2 sz(ts.x + 2.0f * tok::space_2, 22.0f);
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const bool clicked = ImGui::InvisibleButton(label, sz);
+      const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec4 a = app::AccentEmphasisSelected();
+      const ImVec4 bg = on ? a : ImVec4(t.x, t.y, t.z, 0.06f + 0.05f * hv);
+      dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), ImGui::GetColorU32(bg), tok::radius_tile);
+      dl->AddText(ImVec2(std::round(p.x + (sz.x - ts.x) * 0.5f), std::round(p.y + (sz.y - ts.y) * 0.5f)),
+                  ImGui::GetColorU32(on ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.8f)), label);
+      return clicked;
+   }
+
+   // Next column with text baseline aligned to the frame-height controls (Lo/Hi wells, chips) in the same row.
+   void NextCell()
+   {
+      ImGui::TableNextColumn();
+      ImGui::AlignTextToFramePadding();
+   }
+
    void DrawModMatrixTable()
    {
       Modulation& mod = Modulation::Instance();
@@ -330,9 +364,14 @@ namespace app
          // the app (all of which are the single subtle PanelSeamColor
          // hairline). The inner rules stay: this is a dense multi-column
          // matrix and losing row/column separation would hurt readability.
-         const ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_BordersInnerV |
-                                       ImGuiTableFlags_RowBg |
+         const ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerH |
                                        ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+         // Library look: no grid, no zebra; only a hairline under the header. Rows breathe (5 pt cell padding).
+         const ImVec4 tcol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(tok::space_2, 5.0f));
+         ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(tcol.x, tcol.y, tcol.z, 0.10f));
+         ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, ImVec4(0, 0, 0, 0));
          // An explicit, fixed outer_size.y - with ScrollY and the default
          // (0,0), ImGui auto-extends the table's own height to fit its
          // content instead of clipping/scrolling at a fixed size (see the
@@ -374,7 +413,12 @@ namespace app
             ImGui::TableSetupColumn(L("Curve"), ImGuiTableColumnFlags_WidthFixed, wCurve);
             ImGui::TableSetupColumn(L("Signal"), ImGuiTableColumnFlags_WidthFixed, vertical ? 42.0f : 55.0f);
             ImGui::TableSetupColumn("##unbind", ImGuiTableColumnFlags_WidthFixed, 20.0f);
-            ImGui::TableHeadersRow();
+            {
+               UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tcol.x, tcol.y, tcol.z, 0.6f));
+               ImGui::TableHeadersRow();
+               ImGui::PopStyleColor();
+            }
 
             // Row actions mutate mLinks. SetEnabled/SetRange only mutate a
             // Source in place, but Unbind erases it - break immediately
@@ -431,7 +475,7 @@ namespace app
                bool unbound = false;
 
                // Enable toggle
-               ImGui::TableNextColumn();
+               NextCell();
                // A predictor bound to a discrete param (only reachable via a patch file, paste or
                // undo - the cable drop refuses it) is inert: the apply loop never writes it.
                const bool inert = IsInertPredictorBinding(dstIndex, dstParam);
@@ -447,8 +491,7 @@ namespace app
                   PushUndoCheckpoint();
                   mod.SetEnabled(dstIndex, dstParam, !src.enabled);
                }
-               ImGui::GetWindowDrawList()->AddCircleFilled(
-                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, dotColour);
+               KindRail(dotCursor, dotH, dotColour);
                if (inert && ImGui::IsItemHovered())
                   ImGui::SetTooltip("%s", T("A predictor drives continuous parameters only - this binding is inactive."));
 
@@ -457,17 +500,17 @@ namespace app
                ImGui::PushStyleColor(ImGuiCol_Text, textColour);
 
                // Source
-               ImGui::TableNextColumn();
+               NextCell();
                if (ImGui::Selectable(NodeTitleWithInstance(*srcNode).c_str(), false))
                   gPendingSelect.push_back(srcNode->NodeId());
 
                // Destination
-               ImGui::TableNextColumn();
+               NextCell();
                if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                // Parameter
-               ImGui::TableNextColumn();
+               NextCell();
                if (known != nullptr)
                   ImGui::TextUnformatted(known->name.c_str());
                else
@@ -475,7 +518,7 @@ namespace app
 
                // Value - this frame's live value only; a collapsed node's
                // destination hasn't registered a float* to read this frame.
-               ImGui::TableNextColumn();
+               NextCell();
                if (frameRef != nullptr && frameRef->value != nullptr)
                   ImGui::Text(isInt ? "%.0f" : "%.3f", *frameRef->value);
                else
@@ -484,7 +527,7 @@ namespace app
                ImGui::PopStyleColor();
 
                // Confidence
-               ImGui::TableNextColumn();
+               NextCell();
                float conf = -1.0f;
                if (srcNode != nullptr && srcNode->node != nullptr)
                {
@@ -522,12 +565,12 @@ namespace app
                const std::pair<int, int> loKey(dstIndex, -(dstParam * 2 + 1));
                const std::pair<int, int> hiKey(dstIndex, -(dstParam * 2 + 2));
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChanged |= TypableRangeField("##lo", loKey, &lo, step, minV, maxV,
                                                  isInt ? "%.0f" : "%.3f", /*noBorder=*/true);
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChanged |= TypableRangeField("##hi", hiKey, &hi, step, minV, maxV,
                                                  isInt ? "%.0f" : "%.3f", /*noBorder=*/true);
@@ -547,12 +590,12 @@ namespace app
                // Invert - matches the ##modbind popup's own Invert, which
                // doesn't checkpoint either (a range edit, not a structural
                // change like Unbind or the enable toggle above).
-               ImGui::TableNextColumn();
-               if (ImGui::SmallButton(L("Inv")))
+               NextCell();
+               if (ChipToggle(I18n::T("Inv"), src.lo > src.hi))
                   mod.SetRange(dstIndex, dstParam, src.hi, src.lo);
 
                // Curve
-               ImGui::TableNextColumn();
+               NextCell();
                float curveVal = src.curve;
                float liveIn01 = -1.0f;
                if (src.nodeIndex >= 0 && srcNode != nullptr && srcNode->node != nullptr)
@@ -564,7 +607,7 @@ namespace app
                   mod.SetCurve(dstIndex, dstParam, curveVal);
 
                // Real-time Sparkline
-               ImGui::TableNextColumn();
+               NextCell();
                float liveSig01 = (liveIn01 >= 0.0f) ? liveIn01 : 0.5f;
                if (liveIn01 < 0.0f && frameRef != nullptr && frameRef->value != nullptr && hi != lo)
                   liveSig01 = std::clamp((*frameRef->value - lo) / (hi - lo), 0.0f, 1.0f);
@@ -574,7 +617,7 @@ namespace app
                                       vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
 
                // Unbind
-               ImGui::TableNextColumn();
+               NextCell();
                {
                   // At-rest fill is transparent rather than the theme's
                   // opaque Button colour (t.panelBg): this button sits inside
@@ -646,23 +689,22 @@ namespace app
                ImGui::TableNextRow();
 
                // Enable dot: purple for expression
-               ImGui::TableNextColumn();
+               NextCell();
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
-               ImGui::GetWindowDrawList()->AddCircleFilled(
-                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, tok::U32(tok::expression));
+               KindRail(dotCursor, dotH, tok::U32(tok::expression));
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted("Expression");
 
-               ImGui::TableNextColumn();
+               NextCell();
                if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
                const bool isIntE = known != nullptr && known->step > 0.0f;
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted(known != nullptr ? known->name.c_str() : "?");
 
                const ParamRef* frameRef = nullptr;
@@ -674,13 +716,13 @@ namespace app
                      break;
                   }
                }
-               ImGui::TableNextColumn();
+               NextCell();
                if (frameRef != nullptr && frameRef->value != nullptr)
                   ImGui::Text(isIntE ? "%.0f" : "%.3f", *frameRef->value);
                else
                   ImGui::TextUnformatted("--");
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted("--");
 
                const float minVE = known != nullptr ? known->minValue : 0.0f;
@@ -696,11 +738,11 @@ namespace app
                const std::pair<int, int> loKeyE(dstIndex, -(dstParam * 2 + 1) - 3000000);
                const std::pair<int, int> hiKeyE(dstIndex, -(dstParam * 2 + 2) - 3000000);
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChangedE |= TypableRangeField("##elo", loKeyE, &loE, stepE, minVE, maxVE,
                                                   isIntE ? "%.0f" : "%.3f", /*noBorder=*/true);
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChangedE |= TypableRangeField("##ehi", hiKeyE, &hiE, stepE, minVE, maxVE,
                                                   isIntE ? "%.0f" : "%.3f", /*noBorder=*/true);
@@ -711,10 +753,10 @@ namespace app
                   mod.SetExpressionRange(dstIndex, dstParam, loE, hiE);
                }
 
-               ImGui::TableNextColumn(); // invert - not meaningful for an expression's range
+               NextCell(); // invert - not meaningful for an expression's range
 
                // Curve
-               ImGui::TableNextColumn();
+               NextCell();
                float exprCurveVal = mod.ExpressionCurveFor(dstIndex, dstParam);
                float liveExpr01 = -1.0f;
                if (frameRef != nullptr && frameRef->value != nullptr && hiE != loE)
@@ -723,7 +765,7 @@ namespace app
                   mod.SetExpressionCurve(dstIndex, dstParam, exprCurveVal);
 
                // Real-time Sparkline
-               ImGui::TableNextColumn();
+               NextCell();
                float liveExprSig01 = (liveExpr01 >= 0.0f) ? liveExpr01 : 0.5f;
                auto& histE = gModMatrixSparklines[{dstIndex, dstParam + 2000000}];
                histE.Push(liveExprSig01);
@@ -731,7 +773,7 @@ namespace app
                                       vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
 
                bool unboundExpr = false;
-               ImGui::TableNextColumn();
+               NextCell();
                {
                   ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
@@ -777,23 +819,22 @@ namespace app
                ImGui::TableNextRow();
 
                // Enable dot: red for recording
-               ImGui::TableNextColumn();
+               NextCell();
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
-               ImGui::GetWindowDrawList()->AddCircleFilled(
-                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, tok::U32(tok::record));
+               KindRail(dotCursor, dotH, tok::U32(tok::record));
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted("Recording");
 
-               ImGui::TableNextColumn();
+               NextCell();
                if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
                const bool isIntR = known != nullptr && known->step > 0.0f;
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted(known != nullptr ? known->name.c_str() : "?");
 
                const ParamRef* frameRef = nullptr;
@@ -805,14 +846,14 @@ namespace app
                      break;
                   }
                }
-               ImGui::TableNextColumn();
+               NextCell();
                if (frameRef != nullptr && frameRef->value != nullptr)
                   ImGui::Text(isIntR ? T("%.0f (%.2fx)") : T("%.3f (%.2fx)"), *frameRef->value,
                               rec.PlaybackSpeedFor(dstIndex, dstParam));
                else
                   ImGui::TextUnformatted("--");
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted("--");
 
                const float minVR = known != nullptr ? known->minValue : pbEntry.second.recordedMin;
@@ -828,11 +869,11 @@ namespace app
                const std::pair<int, int> loKeyR(dstIndex, -(dstParam * 2 + 1) - 5000000);
                const std::pair<int, int> hiKeyR(dstIndex, -(dstParam * 2 + 2) - 5000000);
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChangedR |= TypableRangeField("##rlo", loKeyR, &loR, stepR, minVR, maxVR,
                                                   isIntR ? "%.0f" : "%.3f", /*noBorder=*/true);
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChangedR |= TypableRangeField("##rhi", hiKeyR, &hiR, stepR, minVR, maxVR,
                                                   isIntR ? "%.0f" : "%.3f", /*noBorder=*/true);
@@ -843,12 +884,12 @@ namespace app
                   rec.SetPlaybackRange(dstIndex, dstParam, loR, hiR);
                }
 
-               ImGui::TableNextColumn();
-               if (ImGui::SmallButton(L("Full")))
+               NextCell();
+               if (ChipToggle(I18n::T("Full"), false))
                   rec.ClearPlaybackRange(dstIndex, dstParam);
 
                // Curve
-               ImGui::TableNextColumn();
+               NextCell();
                float recCurveVal = rec.PlaybackCurveFor(dstIndex, dstParam);
                float liveRec01 = -1.0f;
                if (frameRef != nullptr && frameRef->value != nullptr && hiR != loR)
@@ -857,7 +898,7 @@ namespace app
                   rec.SetPlaybackCurve(dstIndex, dstParam, recCurveVal);
 
                // Real-time Sparkline
-               ImGui::TableNextColumn();
+               NextCell();
                float liveRecSig01 = (liveRec01 >= 0.0f) ? liveRec01 : 0.5f;
                auto& histR = gModMatrixSparklines[{dstIndex, dstParam + 4000000}];
                histR.Push(liveRecSig01);
@@ -865,7 +906,7 @@ namespace app
                                       vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
 
                bool unboundRec = false;
-               ImGui::TableNextColumn();
+               NextCell();
                {
                   ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
@@ -923,7 +964,7 @@ namespace app
                ImGui::TableNextRow();
                for (int col = 0; col < 12; ++col)
                {
-                  ImGui::TableNextColumn();
+                  NextCell();
                   ImGui::Dummy(ImVec2(1.0f, ImGui::GetTextLineHeight()));
                }
                const float after = ImGui::GetCursorPosY();
@@ -943,6 +984,8 @@ namespace app
             }
 
             ImGui::EndTable();
+            ImGui::PopStyleColor(3);
+            ImGui::PopStyleVar();
          }
       }
 
