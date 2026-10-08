@@ -2,6 +2,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/Knob.h"
 
 namespace app
 {
@@ -902,77 +903,20 @@ namespace app
       const float angleLo = hasRange ? aMin + ValueToPos01(rangeLo) * (aMax - aMin) : 0.0f;
       const float angleHi = hasRange ? aMin + ValueToPos01(rangeHi) * (aMax - aMin) : 0.0f;
 
-      const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      if (isLight)
-      {
-         // Soft under-knob shadow: a couple of low-alpha, downward-offset
-         // circles drawn before the bezel fill approximate a blurred drop
-         // shadow (ImGui has no native blur) - same layering idiom as the
-         // hover ring below, just larger radius / lower alpha / offset down.
-         // Kept dark even in light mode so it still reads as a shadow, not
-         // a glow.
-         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_1E202810), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_1E202816), 32);
-         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_DCE0EAFF), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_F2F5FAFF), 32);
-         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         // The guide ring covers the knob's whole travel, not just the
-         // value-proportional fill arc below - tinting it when recording is
-         // what makes the state readable at a glance regardless of where the
-         // value happens to sit (a knob near its low end barely shows any
-         // fill arc at all otherwise).
-         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_C3C8D4FF), 0, 3.0f);
-         if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
-         {
-            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
-            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
-            dl->PathStroke(rangeCol, 0, 5.0f);
-         }
-         if (t > 0.0f)
-         {
-            dl->PathArcTo(center, radius + 2.5f, aMin, angle, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
-         }
-         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
-         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_8C91A0FF) : tok::U32(tok::pal::c_282D3CFF), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_AFB4C3FF), 32, 1.0f);
-         if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_0000001E), 32, 3.0f);
-      }
-      else
-      {
-         // Dark theme: the panel behind a knob is already near-black, so the
-         // shadow needs a touch more alpha than the light-theme version to
-         // still separate the bezel from the body - same two-layer fake-blur
-         // idiom, tuned darker/stronger for this background.
-         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_0000002D), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_0000003C), 32);
-         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_242630FF), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_16171EFF), 32);
-         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_3A3E4CFF), 0, 3.0f);
-         if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
-         {
-            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
-            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
-            dl->PathStroke(rangeCol, 0, 5.0f);
-         }
-         if (t > 0.0f)
-         {
-            dl->PathArcTo(center, radius + 2.5f, aMin, angle, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
-         }
-         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
-         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_C8CAD4FF) : tok::U32(tok::pal::c_EEF0F8FF), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_4A4E5EFF), 32, 1.0f);
-         if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_FFFFFF28), 32, 3.0f);
-      }
+      Knob::Look look;
+      look.t = t;
+      look.bipolar = false;
+      look.readOnly = readOnly;
+      look.hovered = hovered;
+      look.hasRange = hasRange;
+      look.angleLo = angleLo;
+      look.angleHi = angleHi;
+      look.fill = activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : fillColor;
+      look.activeTint = activeTint;
+      // Range band: the value colour at ~half strength.
+      look.rangeFill = (fillColor & 0x00FFFFFF) | 0x78000000;
+      Knob::Paint(dl, center, radius, look);
 
       // The knob's permanent caption is the param *name*, not its value - a
       // hardware knob doesn't print a live number on its cap either. The
@@ -984,9 +928,7 @@ namespace app
          // Clip rather than let a long caption widen the cell and break the
          // row's fit-to-body-width guarantee.
          ImVec2 textSize = ImGui::CalcTextSize(caption);
-         const ImU32 capCol = isLight
-            ? (readOnly ? tok::U32(tok::pal::c_7D8291FF) : tok::U32(tok::pal::c_323746FF))
-            : (readOnly ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_B0B6C6FF));
+         const ImU32 capCol = Knob::CaptionColor(readOnly);
          const float capY = p.y + diameter + 4.0f;
          if (textSize.x <= cell)
          {
@@ -1099,89 +1041,20 @@ namespace app
       const float angleLo = hasRange ? aMin + ValueToPos01(rangeLo) * (aMax - aMin) : 0.0f;
       const float angleHi = hasRange ? aMin + ValueToPos01(rangeHi) * (aMax - aMin) : 0.0f;
 
-      const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      if (isLight)
-      {
-         // Soft under-knob shadow - see KnobFloat's identical treatment
-         // above for the rationale (fake-blur via layered low-alpha circles,
-         // offset down so the bezel reads as sitting above the panel).
-         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_1E202810), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_1E202816), 32);
-         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_DCE0EAFF), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_F2F5FAFF), 32);
-         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_C3C8D4FF), 0, 3.0f);
-         if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
-         {
-            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
-            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
-            dl->PathStroke(rangeCol, 0, 5.0f);
-         }
-
-         // Center tick
-         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::U32(tok::pal::c_969BAAFF), 1.5f);
-
-         // Arc from center (12 o'clock) to current angle
-         if (angle < aMid)
-         {
-            dl->PathArcTo(center, radius + 2.5f, angle, aMid, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
-         }
-         else if (angle > aMid)
-         {
-            dl->PathArcTo(center, radius + 2.5f, aMid, angle, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
-         }
-
-         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
-         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_8C91A0FF) : tok::U32(tok::pal::c_282D3CFF), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_AFB4C3FF), 32, 1.0f);
-         if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_0000001E), 32, 3.0f);
-      }
-      else
-      {
-         // Dark theme: slightly stronger alpha than the light version, same
-         // rationale as KnobFloat's dark branch above.
-         const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_0000002D), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_0000003C), 32);
-         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_242630FF), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_16171EFF), 32);
-         dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_3A3E4CFF), 0, 3.0f);
-         if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
-         {
-            const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
-            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
-            dl->PathStroke(rangeCol, 0, 5.0f);
-         }
-
-         // Center tick
-         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::U32(tok::pal::c_646978FF), 1.5f);
-
-         // Arc from center (12 o'clock) to current angle
-         if (angle < aMid)
-         {
-            dl->PathArcTo(center, radius + 2.5f, angle, aMid, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
-         }
-         else if (angle > aMid)
-         {
-            dl->PathArcTo(center, radius + 2.5f, aMid, angle, 32);
-            dl->PathStroke(fillColor, 0, 3.0f);
-         }
-
-         const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
-         const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_787D8CFF) : tok::U32(tok::pal::c_E6EBF5FF), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_4A4E5EFF), 32, 1.0f);
-         if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_FFFFFF28), 32, 3.0f);
-      }
+      Knob::Look look;
+      look.t = t;
+      look.bipolar = true;
+      look.readOnly = readOnly;
+      look.hovered = hovered;
+      look.hasRange = hasRange;
+      look.angleLo = angleLo;
+      look.angleHi = angleHi;
+      look.fill = activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : fillColor;
+      look.activeTint = activeTint;
+      // Range band: the value colour at ~half strength.
+      look.rangeFill = (fillColor & 0x00FFFFFF) | 0x78000000;
+      Knob::Paint(dl, center, radius, look);
 
       // rowH has always reserved room for a caption here; nothing ever drew
       // one, so a bipolar knob sat in a nameless gap while every plain knob
@@ -1189,9 +1062,7 @@ namespace app
       if (caption[0] != '\0')
       {
          const ImVec2 textSize = ImGui::CalcTextSize(caption);
-         const ImU32 capCol = isLight
-            ? (readOnly ? tok::U32(tok::pal::c_7D8291FF) : tok::U32(tok::pal::c_323746FF))
-            : (readOnly ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_B0B6C6FF));
+         const ImU32 capCol = Knob::CaptionColor(readOnly);
          const float capY = p.y + diameter + 4.0f;
          if (textSize.x <= cell)
          {
@@ -1535,8 +1406,8 @@ namespace app
             HandleParamTypeHotkeys(editKey, value);
       }
 
-      // The modulation pin, tucked into the cell's left margin at the knob's
-      // base - inside the cell the row already paid for, outside the knob's
+      // The modulation pin, tucked into the cell's left margin level with the knob's
+      // centre - inside the cell the row already paid for, outside the knob's
       // own interactive rect so a drag from the pin starts a link instead of
       // turning the knob. Same pin id, same ed::BeginPin/EndPin pair, same
       // Modulation registration as before: only where it is drawn changed.
@@ -1550,7 +1421,7 @@ namespace app
          // arc. At the old 2px the two visually touched and read as one
          // control with a wart on it rather than as a knob and its pin.
          const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - 8.0f);
-         const ImVec2 pinTL(pinX, cellOrigin.y + diameter - box);
+         const ImVec2 pinTL(pinX, cellOrigin.y + (diameter - box) * 0.5f);  // centred on the knob (node-ui-pillars P2)
          ImGui::SetCursorScreenPos(pinTL);
          ed::BeginPin(pinId, ed::PinKind::Input);
          ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
