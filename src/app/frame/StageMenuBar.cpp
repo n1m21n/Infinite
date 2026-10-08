@@ -353,43 +353,7 @@ void DrawMenuBar(FrameCtx& fc)
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Rewind (Return)"));
 
-         // Transport group: play, rewind, metronome - one tight cluster.
-         TopBarSameLine(2.0f);
-         {
-            // Same tile as the panel toggles: outline glyph off, accent tile + filled glyph on.
-            if (IconTile::Draw("##metronomeBtn", IconsInfinite::Metronome, IconsInfinite::MetronomeFill, gMetronomeOn,
-                               tok::tile, ImGui::GetFrameHeight()))
-               gMetronomeOn = !gMetronomeOn;
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-               ImGui::OpenPopup("##metronomePopup");
-
-            if (ImGui::BeginPopup("##metronomePopup"))
-            {
-               // The top bar flattens every frame colour to transparent; a
-               // slider needs its real theme frame back to be findable.
-               const ImGuiStyle& base = ImGui::GetStyle();
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, base.Colors[ImGuiCol_FrameBg]);
-               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
-               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
-               ImGui::SetNextItemWidth(120.0f);
-               const bool volChanged = ImGui::SliderFloat(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
-               ImGui::PopStyleColor(3);
-               if (volChanged)
-                  gMetronomeDirty = true;
-               if (ImGui::Selectable(L("accent first beat"), gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
-               {
-                  gMetronomeAccent = !gMetronomeAccent;
-                  gMetronomeDirty = true;
-               }
-               ImGui::EndPopup();
-            }
-            if (gMetronomeDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
-            {
-               SaveGeneralSettings();
-               gMetronomeDirty = false;
-            }
-            AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
-         }
+         // Transport group: play and rewind.
 
          SectionBreak();
 
@@ -698,6 +662,44 @@ void DrawMenuBar(FrameCtx& fc)
             }
          }
 
+         // The click belongs with tempo and meter: BPM, signature, metronome.
+         TopBarSameLine(tok::space_3);
+         {
+            // Same tile as the panel toggles: outline glyph off, accent tile + filled glyph on.
+            if (IconTile::Draw("##metronomeBtn", IconsInfinite::Metronome, IconsInfinite::MetronomeFill, gMetronomeOn,
+                               tok::tile, ImGui::GetFrameHeight()))
+               gMetronomeOn = !gMetronomeOn;
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               ImGui::OpenPopup("##metronomePopup");
+
+            if (ImGui::BeginPopup("##metronomePopup"))
+            {
+               // The top bar flattens every frame colour to transparent; a
+               // slider needs its real theme frame back to be findable.
+               const ImGuiStyle& base = ImGui::GetStyle();
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, base.Colors[ImGuiCol_FrameBg]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
+               ImGui::SetNextItemWidth(120.0f);
+               const bool volChanged = ImGui::SliderFloat(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
+               ImGui::PopStyleColor(3);
+               if (volChanged)
+                  gMetronomeDirty = true;
+               if (ImGui::Selectable(L("accent first beat"), gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
+               {
+                  gMetronomeAccent = !gMetronomeAccent;
+                  gMetronomeDirty = true;
+               }
+               ImGui::EndPopup();
+            }
+            if (gMetronomeDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            {
+               SaveGeneralSettings();
+               gMetronomeDirty = false;
+            }
+            AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
+         }
+
          SectionBreak();
 
          // 3. Global Key & Scale
@@ -846,11 +848,11 @@ void DrawMenuBar(FrameCtx& fc)
             }
          }
 
-         // Node library: a labelled toggle, not a bare magnifier - it opens the panel that lists,
+         // Library: a labelled toggle, not a bare magnifier - it opens the panel that lists,
          // searches and adds every node, so it is named for what it holds. A hairline sets it
          // apart from the four icon-only panel toggles to its right.
          {
-            const char* libLabel = T("Nodes");
+            const char* libLabel = T("Library");
             const float iconSize = tok::icon_md;
             const float iconSlot = iconSize + 6.0f;
             const float textW = ImGui::CalcTextSize(libLabel).x;
@@ -881,10 +883,10 @@ void DrawMenuBar(FrameCtx& fc)
                }
                const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
                glyph::Draw(dl, ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSize * 0.5f, btnStart.y + tok::tile * 0.5f),
-                           iconSize, col, gNodePanelOpen ? IconsInfinite::BrowserFill : IconsInfinite::Browser);
+                           iconSize, col, gNodePanelOpen ? IconsInfinite::LibraryFill : IconsInfinite::Library);
                dl->AddText(ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSlot, btnStart.y + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f), col, libLabel);
                if (hov)
-                  HelpTip("%s", T("Node library - browse, search and add any node"));
+                  HelpTip("%s", T("Library - search modules, samples, media and plugins"));
                if (clicked)
                   gNodePanelOpen = !gNodePanelOpen;
                cursorX -= tok::space_3;

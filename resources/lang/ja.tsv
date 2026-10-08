@@ -1172,4 +1172,5 @@ Zoom in and out	ズームイン／ズームアウト
 Zoom the view into the selected node; Enter zooms back out to where you were	選択したノードにビューをズームします。Enter で元の位置にズームアウトします
 transform  ->  back into Feedback's input   <- this closes the loop	transform  ->  Feedback の入力に戻す   <- ここでループが閉じる
 {mod}+C / {mod}+V, or Shift+D / {mod}+D to duplicate in place	{mod}+C / {mod}+V、または Shift+D / {mod}+D でその場に複製
-Node library - browse, search and add any node	ノードライブラリ: ノードを閲覧・検索・追加
+Library - search modules, samples, media and plugins	ライブラリ: モジュール、サンプル、メディア、プラグインを検索
+Library	ライブラリ

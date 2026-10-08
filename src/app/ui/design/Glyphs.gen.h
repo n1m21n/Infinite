@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE937;
+   inline constexpr unsigned kLast = 0xE939;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -61,4 +61,6 @@ namespace IconsInfinite
    inline constexpr const char* Cube = "\xee\xa4\xb5"; // U+E935 cube
    inline constexpr const char* GridDots = "\xee\xa4\xb6"; // U+E936 grid-dots
    inline constexpr const char* PowerFill = "\xee\xa4\xb7"; // U+E937 power-fill
+   inline constexpr const char* Library = "\xee\xa4\xb8"; // U+E938 library
+   inline constexpr const char* LibraryFill = "\xee\xa4\xb9"; // U+E939 library-fill
 }

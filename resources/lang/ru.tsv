@@ -1172,4 +1172,5 @@ Zoom in and out	Приблизить и отдалить
 Zoom the view into the selected node; Enter zooms back out to where you were	Приблизить вид к выбранному узлу; Enter возвращает к прежнему виду
 transform  ->  back into Feedback's input   <- this closes the loop	transform  ->  обратно на вход Feedback   <- это замыкает петлю
 {mod}+C / {mod}+V, or Shift+D / {mod}+D to duplicate in place	{mod}+C / {mod}+V или Shift+D / {mod}+D для дублирования на месте
-Node library - browse, search and add any node	Библиотека нод: просмотр, поиск и добавление любой ноды
+Library - search modules, samples, media and plugins	Библиотека: поиск модулей, сэмплов, медиа и плагинов
+Library	Библиотека
