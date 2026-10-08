@@ -1,5 +1,7 @@
 // Modulation matrix panel (moved verbatim from main.cpp).
 #include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/UiType.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/AppShared.h"
 #include "app/ui/design/TokenColors.h"
 
@@ -298,8 +300,21 @@ namespace app
       GestureRecorder& rec = GestureRecorder::Instance();
       if (mod.Links().empty() && mod.Expressions().empty() && rec.Playbacks().empty())
       {
-         ImGui::TextDisabled("%s", T("No active modulations."));
-         ImGui::TextDisabled("%s", T("Patch a modulator, type a formula, or record a gesture to see it here."));
+         // Empty state: centred in the card, one size, weight carries the title.
+         const char* head = T("No active modulations.");
+         const char* hint = T("Patch a modulator, type a formula, or record a gesture to see it here.");
+         const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         const float lineH = ImGui::GetTextLineHeight();
+         const float y0 = std::max(0.0f, (panelSize.y - lineH * 2.0f - tok::space_1) * 0.5f);
+         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y0);
+         auto centred = [&](const char* t, float a)
+         {
+            ImGui::SetCursorPosX(std::max(0.0f, (panelSize.x - ImGui::CalcTextSize(t).x) * 0.5f) + ImGui::GetCursorPosX());
+            ImGui::TextColored(ImVec4(dim.x, dim.y, dim.z, a), "%s", t);
+         };
+         { UiType::Scope ts(UiType::Size::Body, UiType::Weight::Semibold); centred(head, 0.7f); }
+         ImGui::Dummy(ImVec2(0, tok::space_1));
+         centred(hint, 0.45f);
       }
       else
       {
@@ -962,7 +977,7 @@ namespace app
    // dock/size globals and calling DrawModMatrixTable for its content.
    void DrawModMatrixDocked(const char* id, const ImVec2& size)
    {
-      const float kGrip = 6.0f;
+      const float kGrip = PanelFrame::kGap;   // the grip strip is the gap on the canvas-facing side
       const int dock = gModMatrixDock;
       const bool vertical = (dock == 1 || dock == 2);  // grip is a column, not a row
       const bool gripFirst = (dock == 0 || dock == 1); // canvas is above / to the left
@@ -975,9 +990,8 @@ namespace app
       // viewports: it was never a coloured divider, it was a hole. Give the
       // outer child the same opaque panelBg fill the content child already
       // has so the panel is solid edge to edge.
-      PushDockedPanelStyle(/*isChild=*/true);
+      // Outer child is transparent: the panel floats as a card on the canvas colour (PanelFrame).
       ImGui::BeginChild(id, size, false);
-      PopDockedPanelStyle();
       const ImVec2 inner = ImGui::GetContentRegionAvail();
 
       auto grip = [&]()
@@ -1024,19 +1038,21 @@ namespace app
       // fixed height for both orientations keeps that loop's target
       // stable.
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+      const ImVec2 cardSize = vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
+                                       : ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+      PanelFrame::Insets in;
+      switch (dock)   // the grip side needs no inset of its own
+      {
+         case 0: in.t = 0.0f; break;
+         case 1: in.l = 0.0f; break;
+         case 2: in.r = 0.0f; break;
+         default: in.b = 0.0f; break;
+      }
       PushDockedPanelStyle(/*isChild=*/true);
-      // ChildBorderSize is 0 app-wide now (submenus need it, see ApplyTheme),
-      // and ImGui auto-zeroes a bordered child's WindowPadding whenever its
-      // resolved border size is 0 - so plain `true` here silently lost this
-      // panel's inner padding along with the border it no longer draws.
-      // AlwaysUseWindowPadding opts back into the real padding regardless.
-      ImGui::BeginChild("##modmatrixpanelcontent",
-                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
-                                 : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
-      DrawModMatrixTable();
-      ImGui::EndChild();
+      PanelFrame::BeginCard("##modmatrixpanelcontent", cardSize, in);
       PopDockedPanelStyle();
+      DrawModMatrixTable();
+      PanelFrame::EndCard();
 
       if (!gripFirst)
       {
