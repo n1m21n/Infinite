@@ -547,13 +547,19 @@ void DrawMenuBar(FrameCtx& fc)
             keyW = TD::ValueWidth("C#") + fieldPad;
             scaleW = std::max(sWidestScale, TD::ValueWidth(capScaleName.c_str())) + fieldPad;
             keyCellW = keyW + scaleW + 2.0f * fieldPad;
+            // The three cells share one width, the widest content, so the display reads as even thirds.
+            const float cellW = std::max({ tempoCellW, sigCellW, keyCellW });
+            tempoCellW = sigCellW = keyCellW = cellW;
          }
          const float centreY = ImGui::GetCursorScreenPos().y + tok::tile * 0.5f;
          const ImVec2 wellMin(std::round(ImGui::GetCursorScreenPos().x), std::round(centreY - TD::kHeight * 0.5f));
-         const ImVec2 wellMax(wellMin.x + tempoCellW + sigCellW + keyCellW, wellMin.y + TD::kHeight);
+         // The metronome is the display's last cell: a square the height of the well, set off by a hairline.
+         const float clickCellW = TD::kHeight;
+         const ImVec2 wellMax(wellMin.x + tempoCellW + sigCellW + keyCellW + clickCellW, wellMin.y + TD::kHeight);
          TD::Well(wellMin, wellMax);
          TD::Divider(wellMin.x + tempoCellW, wellMin.y);
          TD::Divider(wellMin.x + tempoCellW + sigCellW, wellMin.y);
+         TD::Divider(wellMin.x + tempoCellW + sigCellW + keyCellW, wellMin.y);
          TD::Caption(wellMin.x, tempoCellW, wellMin.y, T("Tempo"));
          TD::Caption(wellMin.x + tempoCellW, sigCellW, wellMin.y, T("Signature"));
          TD::Caption(wellMin.x + tempoCellW + sigCellW, keyCellW, wellMin.y, T("Key"));
@@ -646,7 +652,7 @@ void DrawMenuBar(FrameCtx& fc)
          {
             int tsNum = transport.TimeSigNumerator();
             const int tsDen = transport.TimeSigDenominator();
-            const float sx = wellMin.x + tempoCellW + fieldPad;
+            const float sx = std::round(wellMin.x + tempoCellW + (sigCellW - (numW + slashW + denW)) * 0.5f);
             char numShown[16], denShown[16];
             snprintf(numShown, sizeof(numShown), "%d", tsNum);
             snprintf(denShown, sizeof(denShown), "%d", tsDen);
@@ -728,8 +734,8 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndPopup();
          }
 
-         // The click: the same tile as the panel rail, to the right of the display.
-         ImGui::SetCursorScreenPos(ImVec2(wellMax.x + tok::space_2, centreY - tok::tile * 0.5f));
+         // The click: the same tile as the panel rail, inside the display's last cell.
+         ImGui::SetCursorScreenPos(ImVec2(wellMax.x - clickCellW + (clickCellW - tok::tile) * 0.5f, centreY - tok::tile * 0.5f));
          {
             // Same tile as the panel toggles: outline glyph off, accent tile + filled glyph on.
             if (IconTile::Draw("##metronomeBtn", IconsInfinite::Metronome, IconsInfinite::MetronomeFill, gMetronomeOn,

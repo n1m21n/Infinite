@@ -30,7 +30,7 @@ namespace tok
    constexpr float motion_tooltip_fade = 100.0f;
    constexpr float motion_accent_fade = 200.0f;
    constexpr float hit_min = 24.0f;
-   constexpr float bar_h = 40.0f;
+   constexpr float bar_h = 48.0f;
    constexpr float tile = 28.0f;
 
    struct Rgba8 { unsigned char r, g, b, a; };
