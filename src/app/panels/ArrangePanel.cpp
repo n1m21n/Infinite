@@ -1,11 +1,44 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
 {
+   namespace
+   {
+      // One toolbar chip look: a 6% text-tinted well, accent when on (the play button turns green while playing),
+      // hover/press stepping up from there. Pair with PopToolbarChip.
+      void PushToolbarChip(bool on, bool green = false)
+      {
+         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         if (on)
+         {
+            const ImVec4 a = green ? ImVec4(0.063f, 0.725f, 0.506f, 1.0f) : AccentEmphasisSelected();
+            ImGui::PushStyleColor(ImGuiCol_Button, a);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(std::min(1.0f, a.x * 1.04f + 0.01f), std::min(1.0f, a.y * 1.04f + 0.01f), std::min(1.0f, a.z * 1.04f + 0.01f), a.w));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(a.x * 0.85f, a.y * 0.85f, a.z * 0.85f, a.w));
+         }
+         else
+         {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(t.x, t.y, t.z, 0.06f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(t.x, t.y, t.z, 0.11f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(t.x, t.y, t.z, 0.16f));
+         }
+         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+      }
+      void PopToolbarChip()
+      {
+         ImGui::PopStyleVar(2);
+         ImGui::PopStyleColor(4);
+      }
+   }
+
    void DrawArrangePanelContent()
    {
       // Every id this panel holds (selection, anchor, rename/context/assign
@@ -339,17 +372,11 @@ namespace app
             const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             const bool timelineMode = gAudioMode == AudioMode::Timeline;
             const char* audioLabel = timelineMode ? T("Timeline Audio On") : T("Enable Timeline Audio");
-            const float audioBtnW = ImGui::CalcTextSize(audioLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f + 12.0f;
-            const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - audioBtnW - 6.0f, panelOrigin.y + 2.0f);
+            const float audioBtnW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
+            const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - audioBtnW, panelOrigin.y);
             const ImVec2 savedCursor = ImGui::GetCursorScreenPos();
             ImGui::SetCursorScreenPos(audioBtnPos);
-            ImGui::PushStyleColor(ImGuiCol_Button, timelineMode
-               ? (arrangeToolbarLight ? tok::V4(tok::palf::v_200_620_340_1000) : tok::V4(tok::palf::v_160_520_280_1000))
-               : (arrangeToolbarLight ? tok::V4(tok::palf::v_800_820_870_1000) : tok::V4(tok::palf::v_300_300_340_1000)));
-            ImGui::PushStyleColor(ImGuiCol_Text, timelineMode
-               ? tok::V4(tok::palf::v_1000_1000_1000_1000)
-               : (arrangeToolbarLight ? tok::V4(tok::palf::v_120_140_200_1000) : tok::V4(tok::palf::v_920_940_980_1000)));
-            if (ImGui::Button(audioLabel, ImVec2(audioBtnW, 0.0f)))
+            if (ChipButton::Draw(audioLabel, timelineMode, tok::tile))
             {
                if (timelineMode)
                {
@@ -366,7 +393,6 @@ namespace app
                   }
                }
             }
-            ImGui::PopStyleColor(2);
             // Only a failure explains itself on hover; the label says the rest.
             if (ImGui::IsItemHovered() && !gAudioStartError.empty() && !engineOn)
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
@@ -439,11 +465,11 @@ namespace app
             };
 
             const char* renderLabel = ArrangeRenderBusy() ? "Rendering..." : "Render";
-            const float renderBtnW = ImGui::CalcTextSize(renderLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f + 12.0f;
-            const ImVec2 renderBtnPos(audioBtnPos.x - renderBtnW - 8.0f, panelOrigin.y + 2.0f);
+            const float renderBtnW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
+            const ImVec2 renderBtnPos(audioBtnPos.x - renderBtnW - tok::space_2, panelOrigin.y);
             ImGui::SetCursorScreenPos(renderBtnPos);
             ImGui::BeginDisabled(ArrangeRenderBusy());
-            if (ImGui::Button(renderLabel, ImVec2(renderBtnW, 0.0f)))
+            if (ChipButton::Draw(renderLabel, false, tok::tile))
             {
                if (rset.renderRangeKind == kArrangeRangeCustom && rset.renderRangeEnd <= rset.renderRangeStart)
                {
@@ -550,13 +576,13 @@ namespace app
                      else if (sArrangeRenderResPreset == 4) { rset.renderWidth = 1080; rset.renderHeight = 1920; }
                      gPatchDirty = true;
                   }
-                  ImGui::SameLine();
+                  ImGui::SameLine(0.0f, tok::space_1);
                   ImGui::SetNextItemWidth(60.0f);
                   if (ImGui::InputInt("##arrResW", &rset.renderWidth, 0, 0))
                      gPatchDirty = true;
-                  ImGui::SameLine(0.0f, 4.0f);
+                  ImGui::SameLine(0.0f, tok::space_1);
                   ImGui::TextDisabled("%s", T("x"));
-                  ImGui::SameLine(0.0f, 4.0f);
+                  ImGui::SameLine(0.0f, tok::space_1);
                   ImGui::SetNextItemWidth(60.0f);
                   if (ImGui::InputInt("##arrResH", &rset.renderHeight, 0, 0))
                      gPatchDirty = true;
@@ -580,7 +606,7 @@ namespace app
                ImGui::SetNextItemWidth(200.0f);
                if (ImGui::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
                   sArrangeRenderFileName = renderNameBuf;
-               ImGui::SameLine();
+               ImGui::SameLine(0.0f, tok::space_1);
                ImGui::TextDisabled("%s", renderExtension());
 
                char renderFolderBuf[512];
@@ -606,7 +632,7 @@ namespace app
                      gPatchDirty = true;
                   }
                   if (fmtActive == 0) PopSelectedButtonColors();
-                  ImGui::SameLine();
+                  ImGui::SameLine(0.0f, tok::space_1);
                   if (fmtActive == 1) PushSelectedButtonColors();
                   if (ImGui::Button(L(".mov##arrRenderMov"), ImVec2(56, 0)))
                   {
@@ -691,7 +717,7 @@ namespace app
                   ImGui::CloseCurrentPopup();
                }
                ImGui::EndDisabled();
-               ImGui::SameLine();
+               ImGui::SameLine(0.0f, tok::space_1);
                if (ImGui::Button(L("Cancel"), ImVec2(70, 0)))
                   ImGui::CloseCurrentPopup();
                ImGui::EndPopup();
@@ -729,7 +755,7 @@ namespace app
                   }
                   ImGui::CloseCurrentPopup();
                }
-               ImGui::SameLine();
+               ImGui::SameLine(0.0f, tok::space_1);
                if (ImGui::Button(L("Auto-rename"), ImVec2(100, 0)))
                {
                   ArrangeRenderJob job = sArrangePendingJob;
@@ -747,7 +773,7 @@ namespace app
                   }
                   ImGui::CloseCurrentPopup();
                }
-               ImGui::SameLine();
+               ImGui::SameLine(0.0f, tok::space_1);
                if (ImGui::Button(L("Cancel"), ImVec2(80, 0)))
                   ImGui::CloseCurrentPopup();
                ImGui::EndPopup();
@@ -772,23 +798,19 @@ namespace app
          // Rewind, Bars/Time) over there too.
          {
             const bool viewportWasOn = gArrangeShowViewport;
-            if (viewportWasOn)
-            {
-               PushSelectedButtonColors();
-            }
-            if (ImGui::Button("##arrangeshowviewport", ImVec2(30, 0)))
+            PushToolbarChip(viewportWasOn);
+            if (ImGui::Button("##arrangeshowviewport", ImVec2(30, tok::tile)))
                gArrangeShowViewport = !gArrangeShowViewport;
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangeviewportctx"))
                ImGui::OpenPopup("##arrangeviewportctx");
-            if (viewportWasOn)
-               PopSelectedButtonColors();
+            PopToolbarChip();
             if (ImGui::IsItemHovered())
                HelpTip(viewportWasOn ? T("Viewport Monitor: Visible (Right-click for Dock Position)") : T("Toggle Viewport Monitor (Right-click for Dock Position)"));
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = viewportWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
+            const ImU32 icol = viewportWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             const float bw = 13.0f, bh = 9.0f;
             ImVec2 tl(center.x - bw * 0.5f, center.y - bh * 0.5f - 1.0f);
@@ -805,17 +827,12 @@ namespace app
          // Infinite toolbar's own transport controls (see the top toolbar's
          // "##transportrewind" a bit further down in this file) rather than
          // plain text labels.
-         ImGui::SameLine(0.0f, 14.0f);
+         ImGui::SameLine(0.0f, tok::space_4);
          const bool arrangeIsPlaying = tr.IsPlaying();
-         if (arrangeIsPlaying)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B981FF));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_059669FF));
-         }
-         if (ImGui::Button("##arrangeplaybtn", ImVec2(30, 0)))
+         PushToolbarChip(arrangeIsPlaying, /*green=*/true);
+         if (ImGui::Button("##arrangeplaybtn", ImVec2(30, tok::tile)))
             tr.TogglePlay();
-         if (arrangeIsPlaying)
-            ImGui::PopStyleColor(2);
+         PopToolbarChip();
          if (ImGui::IsItemHovered())
             HelpTip(arrangeIsPlaying ? T("Pause (Space)") : T("Play (Space)"));
          {
@@ -824,15 +841,18 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = arrangeIsPlaying ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
+            const ImU32 icol = arrangeIsPlaying ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             if (arrangeIsPlaying)
                glyph::DrawPlayerPause(ImGui::GetWindowDrawList(), center, iconSize, icol);
             else
                glyph::DrawPlayerPlay(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
-         ImGui::SameLine();
-         if (ImGui::Button("##arrangerewindbtn", ImVec2(30, 0)))
+         ImGui::SameLine(0.0f, tok::space_1);
+         PushToolbarChip(false);
+         const bool rewindClicked = ImGui::Button("##arrangerewindbtn", ImVec2(30, tok::tile));
+         PopToolbarChip();
+         if (rewindClicked)
             tr.Rewind();
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Return to Start (Enter)"));
@@ -842,7 +862,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
+            const ImU32 icol = arrangeIconCol;
             glyph::DrawPlayerRewind(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
@@ -850,28 +870,20 @@ namespace app
          // fields speak (Settings::timeDisplay, saved with the patch). A view
          // change only - every position stays in ticks. The selected half
          // takes the shared "selected" accent tint; the other stays quiet.
-         ImGui::SameLine(0.0f, 14.0f);
+         ImGui::SameLine(0.0f, tok::space_4);
          {
-            const int shownUnit = gArrange.settings.timeDisplay; // pre-click, for the push/pop pairs
-            const char* kUnitLabels[2] = { "Bars##arrunitbars", "Time##arrunittime" };
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, ImGui::GetStyle().ItemSpacing.y));
-            for (int u = 0; u < 2; u++)
-            {
-               if (u == 1)
-                  ImGui::SameLine();
-               const bool on = shownUnit == u;
-               if (on)
-               {
-                  PushSelectedButtonColors();
-               }
-               if (ImGui::Button(kUnitLabels[u], ImVec2(44.0f, 0.0f)))
-                  ArrangeSetTimeDisplay(u);
-               if (on)
-                  PopSelectedButtonColors();
-               if (ImGui::IsItemHovered())
-                  HelpTip(u == 0 ? T("Switch display to Bars / Beats (BBT)") : T("Switch display to Time (Minutes:Seconds)"));
-            }
-            ImGui::PopStyleVar();
+            const int shownUnit = gArrange.settings.timeDisplay;
+            static const PillGroup::Segment kUnitSegs[2] = { { "arrange.unit.bars", "Bars" }, { "arrange.unit.time", "Time" } };
+            const ImVec2 up = ImGui::GetCursorScreenPos();
+            const UiLayout::Rect ur{ up.x, up.y, 104.0f, tok::tile };
+            const int pickedUnit = PillGroup::Draw("arrangeunit", ur, kUnitSegs, 2, shownUnit);
+            if (ImGui::IsMouseHoveringRect(ImVec2(ur.x, ur.y), ImVec2(ur.Right(), ur.Bottom())))
+               HelpTip(ImGui::GetIO().MousePos.x < ur.CenterX() ? T("Switch display to Bars / Beats (BBT)")
+                                                                 : T("Switch display to Time (Minutes:Seconds)"));
+            ImGui::SetCursorScreenPos(up);
+            ImGui::Dummy(ImVec2(ur.w, ur.h));
+            if (pickedUnit >= 0)
+               ArrangeSetTimeDisplay(pickedUnit);
          }
 
          // Snap: the magnet toggles the grid off <-> the last division that
@@ -880,22 +892,17 @@ namespace app
          // the same musical grid at any zoom and any tempo. It covers clip
          // move/trim, marker drags, the ruler scrub, the loop drag and the
          // arrow-key nudge.
-         ImGui::SameLine(0.0f, 14.0f);
+         ImGui::SameLine(0.0f, tok::space_4);
          const bool snapWasOn = gArrange.settings.snapDivision > 0;
-         if (snapWasOn)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B981FF));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_059669FF));
-         }
-         if (ImGui::Button("##arrangesnapbtn", ImVec2(30, 0)))
+         PushToolbarChip(snapWasOn);
+         if (ImGui::Button("##arrangesnapbtn", ImVec2(30, tok::tile)))
          {
             if (snapWasOn)
                ArrangeSetSnap(0, false);
             else
                ArrangeSetSnap(std::max(1, gArrangeLastSnapDivision), gArrange.settings.snapTriplet);
          }
-         if (snapWasOn)
-            ImGui::PopStyleColor(2);
+         PopToolbarChip();
          if (ImGui::IsItemHovered())
             HelpTip(snapWasOn ? T("Snap to Grid: On") : T("Snap to Grid: Off"));
          {
@@ -904,7 +911,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = snapWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
+            const ImU32 icol = snapWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             glyph::DrawMagnet(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
@@ -912,7 +919,7 @@ namespace app
          // RateDivision entries (names and lengths from that one table -
          // rhythmic-quantization-standard); this list only says which of
          // them a timeline grid offers, mapped onto snapDivision/snapTriplet.
-         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::SameLine(0.0f, tok::space_1);
          {
             using GridChoice = ArrangeGridChoice;
             const auto& kGridChoices = kArrangeGridChoices;
@@ -924,10 +931,10 @@ namespace app
                   curName = choiceName(c);
             char gridBtn[48];
             snprintf(gridBtn, sizeof(gridBtn), "%s##arrgriddiv", curName);
-            PushDropdownStyle();
-            if (ImGui::Button(gridBtn, ImVec2(58.0f, 0.0f)))
+            PushToolbarChip(false);
+            if (ImGui::Button(gridBtn, ImVec2(58.0f, tok::tile)))
                ImGui::OpenPopup("##arrgridpopup");
-            PopDropdownStyle();
+            PopToolbarChip();
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Snap Grid Division"));
             if (ImGui::BeginPopup("##arrgridpopup"))
@@ -944,18 +951,13 @@ namespace app
 
          // Loop region toggle. The region itself is a Shift+drag on the
          // ruler; right-clicking the ruler disarms it.
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tok::space_1);
          const Arrange::LoopRange loopNow = gArrange.settings.loop; // the loop as of this frame
          const bool loopWasOn = loopNow.enabled; // see snapWasOn above
-         if (loopWasOn)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B981FF));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_059669FF));
-         }
-         if (ImGui::Button("##arrangeloopbtn", ImVec2(30, 0)))
+         PushToolbarChip(loopWasOn);
+         if (ImGui::Button("##arrangeloopbtn", ImVec2(30, tok::tile)))
             ArrangeSetLoop(!loopNow.enabled, loopNow.start, loopNow.end);
-         if (loopWasOn)
-            ImGui::PopStyleColor(2);
+         PopToolbarChip();
          if (ImGui::IsItemHovered())
             HelpTip(loopWasOn ? T("Loop Region: Enabled") : T("Toggle Loop Region (Shift+drag on ruler)"));
          {
@@ -964,25 +966,20 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = loopWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
+            const ImU32 icol = loopWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             glyph::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
          // Tool Selector (Select A, Trim T, Range R, Blade B, Zoom Z, Hand H)
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tok::space_1);
          const bool toolNonDefault = (gArrangeTool != ArrangeTool::Select);
-         if (toolNonDefault)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_10B981FF));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::U32(tok::pal::c_059669FF));
-         }
+         PushToolbarChip(toolNonDefault);
          const float toolBtnW = 34.0f;
-         if (ImGui::Button("##arrangetoolmodepicker", ImVec2(toolBtnW, 0)))
+         if (ImGui::Button("##arrangetoolmodepicker", ImVec2(toolBtnW, tok::tile)))
          {
             ImGui::OpenPopup("##arrangetoolpopup");
          }
-         if (toolNonDefault)
-            ImGui::PopStyleColor(2);
+         PopToolbarChip();
 
          const char* toolTooltip = T("Tool: Select (A)");
          switch (gArrangeTool)
@@ -1005,7 +1002,7 @@ namespace app
             const float iconSize = tok::icon_md;
             const ImVec2 center(bmin.x + 12.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = toolNonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
+            const ImU32 icol = toolNonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             switch (gArrangeTool)
             {
@@ -1063,8 +1060,11 @@ namespace app
          }
 
          // Add Marker (M): drops one at the playhead, on the snap grid.
-         ImGui::SameLine();
-         if (ImGui::Button("##arrangemarkerbtn", ImVec2(30, 0)))
+         ImGui::SameLine(0.0f, tok::space_1);
+         PushToolbarChip(false);
+         const bool markerClicked = ImGui::Button("##arrangemarkerbtn", ImVec2(30, tok::tile));
+         PopToolbarChip();
+         if (markerClicked)
             ArrangeAddMarkerAtPlayhead();
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Add Marker at Playhead (M)"));
@@ -1073,7 +1073,7 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
+            const ImU32 icol = arrangeIconCol;
             glyph::DrawFlag(ImGui::GetWindowDrawList(), center, tok::icon_md, icol);
          }
 
@@ -1082,14 +1082,17 @@ namespace app
          // to the Inspector toggle below - both act on the header column/row
          // layout, and are the two icons most likely to be reached for
          // together.
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tok::space_1);
          {
             bool anyResized = false;
             for (const Arrange::Lane& lane : gArrange.lanes)
                if (lane.rowHeight > 0.0f) { anyResized = true; break; }
 
             ImGui::BeginDisabled(!anyResized);
-            if (ImGui::Button("##arrangeresetrowh", ImVec2(30, 0)))
+            PushToolbarChip(false);
+            const bool resetClicked = ImGui::Button("##arrangeresetrowh", ImVec2(30, tok::tile));
+            PopToolbarChip();
+            if (resetClicked)
             {
                ArrangeEdit([&]() {
                   for (Arrange::Lane& lane : gArrange.lanes)
@@ -1102,7 +1105,7 @@ namespace app
             const ImVec2 rcenter((rbmin.x + rbmax.x) * 0.5f, (rbmin.y + rbmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
             const ImU32 barCol = anyResized
-               ? (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol)
+               ? arrangeIconCol
                : (arrangeIconCol & 0x60FFFFFFu);
             glyph::DrawLineHeight(ImGui::GetWindowDrawList(), rcenter, tok::icon_md, barCol);
             if (hovered)
@@ -1111,16 +1114,12 @@ namespace app
 
          // Inspector / Clip Settings toggle. Icon is the edit/pencil
          // glyph for clip/track settings.
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tok::space_1);
          const bool inspectorWasOpen = gArrangeClipSettingsPanelOpen;
-         if (inspectorWasOpen)
-         {
-            PushSelectedButtonColors();
-         }
-         if (ImGui::Button("##clipsettingstoggle", ImVec2(30, 0)))
+         PushToolbarChip(inspectorWasOpen);
+         if (ImGui::Button("##clipsettingstoggle", ImVec2(30, tok::tile)))
             gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
-         if (inspectorWasOpen)
-            PopSelectedButtonColors();
+         PopToolbarChip();
          if (ImGui::IsItemHovered())
             HelpTip(inspectorWasOpen ? T("Clip / Track Inspector: Open") : T("Toggle Clip / Track Inspector"));
          {
@@ -1128,7 +1127,7 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = inspectorWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
+            const ImU32 icol = inspectorWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             glyph::DrawEdit(ImGui::GetWindowDrawList(), center, tok::icon_md, icol);
          }
 
@@ -1168,7 +1167,7 @@ namespace app
             }
             ImGui::EndMenu();
          }
-         ImGui::Separator();
+         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
          if (ImGui::MenuItem(L("Close Arrangement Timeline")))
          {
             gArrangePanelOpen = false;
