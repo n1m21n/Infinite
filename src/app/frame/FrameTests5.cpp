@@ -1,5 +1,6 @@
 // Per-frame self-test blocks moved verbatim out of the main loop in main.cpp.
 #include "app/ui/design/UiType.h"
+#include "app/ui/design/UiLayout.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/AppShared.h"
 
@@ -2970,4 +2971,16 @@ void FrameTest_UITYPETEST(int frameId, GLFWwindow*)
    printf("UITYPETEST regular %.1f semibold %.1f icon %.1f\n", wr, ws, wicon);
    printf("%s\n", ok ? "UITYPETEST OK" : "UITYPETEST FAIL");
 }
+
+void FrameTest_UILAYOUTTEST(int frameId, GLFWwindow*)
+{
+   if (getenv("INFINITE_UILAYOUTTEST") == nullptr || frameId != 4)
+      return;
+   const char* first = "";
+   const int failures = UiLayout::SelfCheck(&first);
+   if (failures != 0)
+      printf("UILAYOUTTEST FAIL: %d case(s) wrong, first: %s\n", failures, first);
+   printf("%s\n", failures == 0 ? "UILAYOUTTEST OK" : "UILAYOUTTEST FAIL");
+}
+
 }
