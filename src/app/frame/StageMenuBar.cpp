@@ -5,6 +5,8 @@
 #include "app/ui/design/components/TopBarParts.h"
 #include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/PanelRail.h"
+#include "app/ui/design/components/TransportDisplay.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
@@ -491,220 +493,243 @@ void DrawMenuBar(FrameCtx& fc)
          static bool sFieldJustOpened = false;
          static float sDragAccumY = 0.0f;
 
-         // 2. Tempo & Meter (BPM + Time Signature)
-         {
-            float bpm = transport.Tempo();
-            TopBarLabel("BPM", true);
-            TopBarSameLine(4.0f);
-
-            if (sActiveField == TopBarField::Bpm)
+         // 3. Global Key & Scale
+         static const char* const kKeyNames[] = {
+            "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+         };
+         auto FormatScaleDisplayName = [](const std::string& name) -> std::string {
+            std::string out = name;
+            bool capNext = true;
+            for (size_t i = 0; i < out.size(); i++)
             {
-               ImGui::SetNextItemWidth(54.0f);
+               if (std::isalpha((unsigned char)out[i]))
+               {
+                  if (capNext)
+                  {
+                     out[i] = (char)std::toupper((unsigned char)out[i]);
+                     capNext = false;
+                  }
+               }
+               else
+               {
+                  capNext = true;
+               }
+            }
+            return out;
+         };
+
+         int curKey = transport.Key();
+         int curScale = transport.Scale();
+         const auto& scaleList = MusicTime::ScaleTypeList();
+         const char* curScaleName = (curScale >= 0 && curScale < (int)scaleList.size()) ? scaleList[curScale].c_str() : "major";
+         const std::string capScaleName = FormatScaleDisplayName(curScaleName);
+
+         // ---- The display: Tempo | Signature | Key, one well, captioned cells ----
+         namespace TD = TransportDisplay;
+         const float fieldPad = tok::space_2;
+         const float cellPad = tok::space_3;
+         float tempoCellW, numW, slashW, denW, sigCellW, keyW, scaleW, keyCellW;
+         {
+            tempoCellW = std::max(TD::ValueWidth("300.0"), 60.0f) + 2.0f * cellPad;
+            numW = TD::ValueWidth("99") + fieldPad;
+            denW = TD::ValueWidth("16") + fieldPad;
+            slashW = TD::ValueWidth("/") + fieldPad;
+            sigCellW = numW + slashW + denW + 2.0f * fieldPad;
+            static float sWidestScale = 0.0f;
+            static size_t sWidestFor = 0;
+            if (sWidestFor != scaleList.size())
+            {
+               sWidestScale = 0.0f;
+               for (const std::string& sc : scaleList)
+                  sWidestScale = std::max(sWidestScale, TD::ValueWidth(FormatScaleDisplayName(sc).c_str()));
+               sWidestFor = scaleList.size();
+            }
+            keyW = TD::ValueWidth("C#") + fieldPad;
+            scaleW = std::max(sWidestScale, TD::ValueWidth(capScaleName.c_str())) + fieldPad;
+            keyCellW = keyW + scaleW + 2.0f * fieldPad;
+         }
+         const float centreY = ImGui::GetCursorScreenPos().y + tok::tile * 0.5f;
+         const ImVec2 wellMin(std::round(ImGui::GetCursorScreenPos().x), std::round(centreY - TD::kHeight * 0.5f));
+         const ImVec2 wellMax(wellMin.x + tempoCellW + sigCellW + keyCellW, wellMin.y + TD::kHeight);
+         TD::Well(wellMin, wellMax);
+         TD::Divider(wellMin.x + tempoCellW, wellMin.y);
+         TD::Divider(wellMin.x + tempoCellW + sigCellW, wellMin.y);
+         TD::Caption(wellMin.x, tempoCellW, wellMin.y, T("Tempo"));
+         TD::Caption(wellMin.x + tempoCellW, sigCellW, wellMin.y, T("Signature"));
+         TD::Caption(wellMin.x + tempoCellW + sigCellW, keyCellW, wellMin.y, T("Key"));
+
+         // One editable number: drag up/down, double-click or type to edit. `onDrag` gets the vertical delta in
+         // points; `onCommit` gets the typed text.
+         auto Field = [&](TopBarField which, const char* id, float x, float w, const char* shown, const char* editInit,
+                          bool decimal, auto&& onDrag, auto&& onCommit, const char* tip)
+         {
+            const ImVec2 mn(x, wellMin.y), mx(x + w, wellMin.y + TD::kHeight);
+            ImGui::SetCursorScreenPos(mn);
+            if (sActiveField == which)
+            {
+               ImGui::SetCursorScreenPos(ImVec2(x + 2.0f, wellMin.y + TD::kValueY - 1.0f));
+               ImGui::SetNextItemWidth(w - 4.0f);
                if (sFieldJustOpened)
                {
                   ImGui::SetKeyboardFocusHere();
                   sFieldJustOpened = false;
                }
-               const bool entered = ImGui::InputText("##bpmInput", sFieldText, sizeof(sFieldText),
-                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 1.0f));
+               const bool entered = FieldWell::InputText(id, sFieldText, sizeof(sFieldText),
+                                                         ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               ImGui::PopStyleVar();
                if (entered || ImGui::IsItemDeactivated())
                {
-                  char* end = nullptr;
-                  float parsed = strtof(sFieldText, &end);
-                  if (end != sFieldText && parsed > 0.0f)
-                     transport.SetTempo(std::clamp(parsed, 20.0f, 300.0f));
+                  onCommit(sFieldText);
                   sActiveField = TopBarField::None;
                }
+               return;
             }
-            else
+            ImGui::InvisibleButton(id, ImVec2(w, TD::kHeight));
+            const bool hov = ImGui::IsItemHovered();
+            const float hv = UiAnim::Hover(ImGui::GetItemID(), hov, tok::motion_hover_in, tok::motion_hover_out);
+            TD::Wash(mn, mx, hv, ImGui::IsItemActive());
+            TD::Value(id, x, w, wellMin.y, shown);
+            if (!ImGui::IsItemActive() && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip) && tip != nullptr)
+               HelpTip("%s", tip);
+            if (hov)
             {
-               char bpmBuf[32];
-               snprintf(bpmBuf, sizeof(bpmBuf), "%.1f###bpmBtn", bpm);
-               ImGui::Button(bpmBuf);
-               if (!ImGui::IsItemActive() && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
-                  HelpTip("%s", T("Tempo - drag, double-click or type to change.\nArrangement Timeline clips keep their bar/beat positions:\na tempo change moves their times in seconds, not their bars."));
-               if (ImGui::IsItemHovered())
+               ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+               if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                {
-                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                  sActiveField = which;
+                  snprintf(sFieldText, sizeof(sFieldText), "%s", editInit);
+                  sFieldJustOpened = true;
+               }
+               else
+               {
+                  ImGuiIO& io = ImGui::GetIO();
+                  for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
                   {
-                     sActiveField = TopBarField::Bpm;
-                     snprintf(sFieldText, sizeof(sFieldText), "%.1f", bpm);
-                     sFieldJustOpened = true;
-                  }
-                  else
-                  {
-                     ImGuiIO& io = ImGui::GetIO();
-                     for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+                     const ImWchar ch = io.InputQueueCharacters[i];
+                     if ((ch >= '0' && ch <= '9') || (decimal && (ch == '.' || ch == '-')))
                      {
-                        ImWchar ch = io.InputQueueCharacters[i];
-                        if ((ch >= '0' && ch <= '9') || ch == '.' || ch == '-')
-                        {
-                           sActiveField = TopBarField::Bpm;
-                           sFieldText[0] = (char)ch;
-                           sFieldText[1] = '\0';
-                           sFieldJustOpened = true;
-                           break;
-                        }
+                        sActiveField = which;
+                        sFieldText[0] = (char)ch;
+                        sFieldText[1] = '\0';
+                        sFieldJustOpened = true;
+                        break;
                      }
                   }
                }
-               if (ImGui::IsItemActive())
-               {
-                  const float dy = -ImGui::GetIO().MouseDelta.y;
-                  const float speed = ImGui::GetIO().KeyShift ? 0.05f : 0.25f;
-                  bpm = std::clamp(bpm + dy * speed, 20.0f, 300.0f);
-                  transport.SetTempo(bpm);
-               }
             }
+            if (ImGui::IsItemActive())
+               onDrag(-ImGui::GetIO().MouseDelta.y);
+         };
+
+         // Tempo
+         {
+            const float bpm = transport.Tempo();
+            char shown[32], edit[32];
+            snprintf(shown, sizeof(shown), "%.1f", bpm);
+            snprintf(edit, sizeof(edit), "%.1f", bpm);
+            Field(TopBarField::Bpm, "##bpmField", wellMin.x, tempoCellW, shown, edit, true,
+                  [&](float dy) {
+                     const float speed = ImGui::GetIO().KeyShift ? 0.05f : 0.25f;
+                     transport.SetTempo(std::clamp(bpm + dy * speed, 20.0f, 300.0f));
+                  },
+                  [&](const char* text) {
+                     char* end = nullptr;
+                     const float parsed = strtof(text, &end);
+                     if (end != text && parsed > 0.0f)
+                        transport.SetTempo(std::clamp(parsed, 20.0f, 300.0f));
+                  },
+                  T("Tempo - drag, double-click or type to change.\nArrangement Timeline clips keep their bar/beat positions:\na tempo change moves their times in seconds, not their bars."));
          }
 
-         TopBarSameLine(8.0f);
-
-         // Time signature (numerator / denominator)
+         // Signature
          {
             int tsNum = transport.TimeSigNumerator();
             const int tsDen = transport.TimeSigDenominator();
-
-            // Numerator
-            if (sActiveField == TopBarField::TsNum)
-            {
-               ImGui::SetNextItemWidth(30.0f);
-               if (sFieldJustOpened)
-               {
-                  ImGui::SetKeyboardFocusHere();
-                  sFieldJustOpened = false;
-               }
-               const bool entered = ImGui::InputText("##tsNumInput", sFieldText, sizeof(sFieldText),
-                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
-               if (entered || ImGui::IsItemDeactivated())
-               {
-                  int parsed = atoi(sFieldText);
-                  if (parsed > 0)
-                     transport.SetTimeSignature(std::clamp(parsed, 1, 99), tsDen);
-                  sActiveField = TopBarField::None;
-               }
-            }
-            else
-            {
-               char numBuf[16];
-               snprintf(numBuf, sizeof(numBuf), "%d###tsNumBtn", tsNum);
-               ImGui::Button(numBuf);
-               if (ImGui::IsItemHovered())
-               {
-                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-                  {
-                     sActiveField = TopBarField::TsNum;
-                     snprintf(sFieldText, sizeof(sFieldText), "%d", tsNum);
-                     sFieldJustOpened = true;
-                  }
-                  else
-                  {
-                     ImGuiIO& io = ImGui::GetIO();
-                     for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+            const float sx = wellMin.x + tempoCellW + fieldPad;
+            char numShown[16], denShown[16];
+            snprintf(numShown, sizeof(numShown), "%d", tsNum);
+            snprintf(denShown, sizeof(denShown), "%d", tsDen);
+            Field(TopBarField::TsNum, "##tsNumField", sx, numW, numShown, numShown, false,
+                  [&](float dy) {
+                     sDragAccumY += dy;
+                     const float kStep = 6.0f;
+                     if (std::abs(sDragAccumY) >= kStep)
                      {
-                        ImWchar ch = io.InputQueueCharacters[i];
-                        if (ch >= '0' && ch <= '9')
-                        {
-                           sActiveField = TopBarField::TsNum;
-                           sFieldText[0] = (char)ch;
-                           sFieldText[1] = '\0';
-                           sFieldJustOpened = true;
-                           break;
-                        }
+                        const int steps = (int)(sDragAccumY / kStep);
+                        sDragAccumY -= steps * kStep;
+                        tsNum = std::clamp(tsNum + steps, 1, 99);
+                        transport.SetTimeSignature(tsNum, tsDen);
                      }
-                  }
-               }
-               if (ImGui::IsItemActive())
-               {
-                  const float dy = -ImGui::GetIO().MouseDelta.y;
-                  sDragAccumY += dy;
-                  const float kStep = 6.0f;
-                  if (std::abs(sDragAccumY) >= kStep)
-                  {
-                     int steps = (int)(sDragAccumY / kStep);
-                     sDragAccumY -= steps * kStep;
-                     tsNum = std::clamp(tsNum + steps, 1, 99);
-                     transport.SetTimeSignature(tsNum, tsDen);
-                  }
-               }
-            }
-
-            TopBarSameLine(3.0f);
-            TopBarLabel("/", true);
-            TopBarSameLine(3.0f);
-
-            // Denominator
-            if (sActiveField == TopBarField::TsDen)
-            {
-               ImGui::SetNextItemWidth(30.0f);
-               if (sFieldJustOpened)
-               {
-                  ImGui::SetKeyboardFocusHere();
-                  sFieldJustOpened = false;
-               }
-               const bool entered = ImGui::InputText("##tsDenInput", sFieldText, sizeof(sFieldText),
-                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
-               if (entered || ImGui::IsItemDeactivated())
-               {
-                  int parsed = atoi(sFieldText);
-                  int snapped = SnapToValidDenominator(parsed);
-                  transport.SetTimeSignature(tsNum, snapped);
-                  sActiveField = TopBarField::None;
-               }
-            }
-            else
-            {
-               char denBuf[16];
-               snprintf(denBuf, sizeof(denBuf), "%d###tsDenBtn", tsDen);
-               ImGui::Button(denBuf);
-               if (ImGui::IsItemHovered())
-               {
-                  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-                  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-                  {
-                     sActiveField = TopBarField::TsDen;
-                     snprintf(sFieldText, sizeof(sFieldText), "%d", tsDen);
-                     sFieldJustOpened = true;
-                  }
-                  else
-                  {
-                     ImGuiIO& io = ImGui::GetIO();
-                     for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
+                  },
+                  [&](const char* text) {
+                     const int parsed = atoi(text);
+                     if (parsed > 0)
+                        transport.SetTimeSignature(std::clamp(parsed, 1, 99), tsDen);
+                  },
+                  nullptr);
+            TD::Value("##tsSlash", sx + numW, slashW, wellMin.y, "/", 0.5f);
+            Field(TopBarField::TsDen, "##tsDenField", sx + numW + slashW, denW, denShown, denShown, false,
+                  [&](float dy) {
+                     sDragAccumY += dy;
+                     const float kStep = 10.0f;
+                     if (std::abs(sDragAccumY) >= kStep)
                      {
-                        ImWchar ch = io.InputQueueCharacters[i];
-                        if (ch >= '0' && ch <= '9')
-                        {
-                           sActiveField = TopBarField::TsDen;
-                           sFieldText[0] = (char)ch;
-                           sFieldText[1] = '\0';
-                           sFieldJustOpened = true;
-                           break;
-                        }
+                        const int steps = (int)(sDragAccumY / kStep);
+                        sDragAccumY -= steps * kStep;
+                        const int curIdx = DenToIdx(tsDen);
+                        const int nextIdx = std::clamp(curIdx + steps, 0, 4);
+                        if (nextIdx != curIdx)
+                           transport.SetTimeSignature(tsNum, kDens[nextIdx]);
                      }
-                  }
-               }
-               if (ImGui::IsItemActive())
-               {
-                  const float dy = -ImGui::GetIO().MouseDelta.y;
-                  sDragAccumY += dy;
-                  const float kStep = 10.0f;
-                  if (std::abs(sDragAccumY) >= kStep)
-                  {
-                     int steps = (int)(sDragAccumY / kStep);
-                     sDragAccumY -= steps * kStep;
-                     int curIdx = DenToIdx(tsDen);
-                     int nextIdx = std::clamp(curIdx + steps, 0, 4);
-                     if (nextIdx != curIdx)
-                        transport.SetTimeSignature(tsNum, kDens[nextIdx]);
-                  }
-               }
-            }
+                  },
+                  [&](const char* text) {
+                     transport.SetTimeSignature(tsNum, SnapToValidDenominator(atoi(text)));
+                  },
+                  nullptr);
          }
 
-         // The click belongs with tempo and meter: BPM, signature, metronome.
-         TopBarSameLine(tok::space_3);
+         // Key and scale: two pick fields that open lists.
+         {
+            auto Pick = [&](const char* id, float x, float w, const char* shown, const char* popup)
+            {
+               ImGui::SetCursorScreenPos(ImVec2(x, wellMin.y));
+               if (ImGui::InvisibleButton(id, ImVec2(w, TD::kHeight)))
+                  ImGui::OpenPopup(popup);
+               const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+               TD::Wash(ImVec2(x, wellMin.y), ImVec2(x + w, wellMin.y + TD::kHeight), hv, ImGui::IsItemActive());
+               TD::Value(id, x, w, wellMin.y, shown);
+            };
+            // The pair is centred in the cell at its own width, so a short scale name sits next to the key.
+            const float curScaleW = TD::ValueWidth(capScaleName.c_str()) + fieldPad;
+            const float cellX = wellMin.x + tempoCellW + sigCellW;
+            const float kx = std::round(cellX + (keyCellW - (keyW + curScaleW)) * 0.5f);
+            Pick("##keyField", kx, keyW, kKeyNames[std::clamp(curKey, 0, 11)], "##globalKeyPopup");
+            Pick("##scaleField", kx + keyW, curScaleW, capScaleName.c_str(), "##globalScalePopup");
+         }
+
+         if (ImGui::BeginPopup("##globalKeyPopup"))
+         {
+            for (int i = 0; i < 12; i++)
+            {
+               if (ImGui::Selectable(kKeyNames[i], i == curKey))
+                  transport.SetKey(i);
+            }
+            ImGui::EndPopup();
+         }
+         if (ImGui::BeginPopup("##globalScalePopup"))
+         {
+            for (int i = 0; i < (int)scaleList.size(); i++)
+            {
+               const std::string capOpt = FormatScaleDisplayName(scaleList[i]);
+               if (ImGui::Selectable(capOpt.c_str(), i == curScale))
+                  transport.SetScale(i);
+            }
+            ImGui::EndPopup();
+         }
+
+         // The click: the same tile as the panel rail, to the right of the display.
+         ImGui::SetCursorScreenPos(ImVec2(wellMax.x + tok::space_2, centreY - tok::tile * 0.5f));
          {
             // Same tile as the panel toggles: outline glyph off, accent tile + filled glyph on.
             if (IconTile::Draw("##metronomeBtn", IconsInfinite::Metronome, IconsInfinite::MetronomeFill, gMetronomeOn,
@@ -739,72 +764,6 @@ void DrawMenuBar(FrameCtx& fc)
                gMetronomeDirty = false;
             }
             AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
-         }
-
-         SectionBreak();
-
-         // 3. Global Key & Scale
-         static const char* const kKeyNames[] = {
-            "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
-         };
-         auto FormatScaleDisplayName = [](const std::string& name) -> std::string {
-            std::string out = name;
-            bool capNext = true;
-            for (size_t i = 0; i < out.size(); i++)
-            {
-               if (std::isalpha((unsigned char)out[i]))
-               {
-                  if (capNext)
-                  {
-                     out[i] = (char)std::toupper((unsigned char)out[i]);
-                     capNext = false;
-                  }
-               }
-               else
-               {
-                  capNext = true;
-               }
-            }
-            return out;
-         };
-
-         int curKey = transport.Key();
-         int curScale = transport.Scale();
-         const auto& scaleList = MusicTime::ScaleTypeList();
-         const char* curScaleName = (curScale >= 0 && curScale < (int)scaleList.size()) ? scaleList[curScale].c_str() : "major";
-         const std::string capScaleName = FormatScaleDisplayName(curScaleName);
-
-         {
-            TopBarLabel("Key", true);
-            TopBarSameLine(4.0f);
-
-            if (ImGui::Button(kKeyNames[std::clamp(curKey, 0, 11)]))
-               ImGui::OpenPopup("##globalKeyPopup");
-
-            TopBarSameLine(4.0f);
-
-            if (ImGui::Button(capScaleName.c_str()))
-               ImGui::OpenPopup("##globalScalePopup");
-         }
-
-         if (ImGui::BeginPopup("##globalKeyPopup"))
-         {
-            for (int i = 0; i < 12; i++)
-            {
-               if (ImGui::Selectable(kKeyNames[i], i == curKey))
-                  transport.SetKey(i);
-            }
-            ImGui::EndPopup();
-         }
-         if (ImGui::BeginPopup("##globalScalePopup"))
-         {
-            for (int i = 0; i < (int)scaleList.size(); i++)
-            {
-               const std::string capOpt = FormatScaleDisplayName(scaleList[i]);
-               if (ImGui::Selectable(capOpt.c_str(), i == curScale))
-                  transport.SetScale(i);
-            }
-            ImGui::EndPopup();
          }
 
          // Width of the centred group, measured for next frame's placement.
