@@ -1,6 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/IconTile.h"
+#include "app/ui/design/components/TopBarParts.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
@@ -32,16 +33,25 @@ void DrawMenuBar(FrameCtx& fc)
       // "bar between the viewports" the ItemSpacing gaps were producing, at
       // the window edges and under the menu bar.
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+      // The bar is tok::bar_h tall: ImGui sizes it from FramePadding.y at Begin.
+      const float barPadY = (tok::bar_h - ImGui::GetFontSize()) * 0.5f;
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, barPadY));
       ImGui::Begin("Infinite", nullptr,
                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
                    ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar |
                    ImGuiWindowFlags_NoScrollWithMouse);
-      ImGui::PopStyleVar();
+      ImGui::PopStyleVar(2);
 
-      if (ImGui::BeginMenuBar())
+      // BeginMenuBar aligns text to FramePadding.y, so the bar's padding is what
+      // centres the File/Edit/Menu labels; popped at once so no menu popup inherits it.
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, barPadY));
+      const bool menuBarOpen = ImGui::BeginMenuBar();
+      ImGui::PopStyleVar();
+      if (menuBarOpen)
       {
-         if (ImGui::BeginMenu(L("File")))
+         auto& MenuTile = TopBarParts::MenuTile;
+         if (MenuTile(L("File")))
          {
             if (ImGui::MenuItem(L("New"), MODKEY "+N"))
                GuardUnsavedChanges([]() { NewPatch(); });
@@ -90,7 +100,7 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndMenu();
          }
 
-         if (ImGui::BeginMenu(L("Edit")))
+         if (MenuTile(L("Edit")))
          {
             if (ImGui::MenuItem(L("Undo"), MODKEY "+Z", false, !gUndoStack.empty()))
                Undo();
@@ -123,7 +133,7 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndMenu();
          }
 
-         if (ImGui::BeginMenu(L("Menu")))
+         if (MenuTile(L("Menu")))
          {
             if (ImGui::MenuItem(L("Settings..."), MODKEY "+0"))
                gSettingsOpen = true;
@@ -265,7 +275,6 @@ void DrawMenuBar(FrameCtx& fc)
                RequestClose(window);
             ImGui::EndMenu();
          }
-         ImGui::Separator();
 
          Transport& transport = Transport::Instance();
          const bool isTransportPlaying = transport.IsPlaying();
@@ -278,8 +287,9 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_1000_1000_1000_80));
          ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_1000_1000_1000_160));
          ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5.0f, 2.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
+         // 28 pt controls (tok::tile) on one centre line; the cursor Y below pins them in the bar.
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, (tok::tile - ImGui::GetFontSize()) * 0.5f));
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
          auto TopBarSameLine = [](float spacing = 4.0f) {
@@ -295,6 +305,10 @@ void DrawMenuBar(FrameCtx& fc)
          };
          const bool isLight = IsThemeLight();
 
+         auto& SectionBreak = TopBarParts::SectionBreak;
+         // Everything after the menus sits on one centre line, tok::tile tall in a tok::bar_h bar.
+         SectionBreak();
+
          // 1. Transport (Play, Rewind, Audio On/Off)
          if (isTransportPlaying)
          {
@@ -302,7 +316,7 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_200_700_360_1000));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_140_550_260_1000));
          }
-         if (ImGui::Button("##transportplay", ImVec2(34, 0)))
+         if (ImGui::Button("##transportplay", ImVec2(tok::tile + 4.0f, 0)))
             transport.TogglePlay();
          {
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -324,7 +338,7 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::PopStyleColor(3);
 
          TopBarSameLine(2.0f);
-         if (ImGui::Button("##transportrewind", ImVec2(34, 0)))
+         if (ImGui::Button("##transportrewind", ImVec2(tok::tile + 4.0f, 0)))
             transport.Rewind();
          {
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -338,7 +352,66 @@ void DrawMenuBar(FrameCtx& fc)
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Rewind (Return)"));
 
-         TopBarSameLine(4.0f);
+         // Transport group: play, rewind, metronome - one tight cluster.
+         TopBarSameLine(2.0f);
+         {
+            // Read once: the click below flips gMetronomeOn, and the push/pop
+            // pair must use the state it was pushed with.
+            const bool metronomeWasOn = gMetronomeOn;
+            if (metronomeWasOn)
+               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+            if (ImGui::Button("##metronomeBtn", ImVec2(tok::tile + 4.0f, 0.0f)))
+               gMetronomeOn = !gMetronomeOn;
+            if (metronomeWasOn)
+               ImGui::PopStyleColor();
+            {
+               ImVec4 iconCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+               if (!metronomeWasOn)
+                  iconCol.w *= 0.78f;
+               // The pendulum flips side on every beat - a hard 0/1, no easing -
+               // so each click lands exactly as it snaps over. Upright when off
+               // or while the transport is stopped.
+               const float swing = (metronomeWasOn && isTransportPlaying)
+                                      ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
+                                      : 0.0f;
+               const ImVec2 bmin = ImGui::GetItemRectMin();
+               const ImVec2 bmax = ImGui::GetItemRectMax();
+               glyph::DrawMetronome(ImGui::GetWindowDrawList(),
+                                     ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
+                                     tok::icon_md, ImGui::GetColorU32(iconCol), swing);
+            }
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               ImGui::OpenPopup("##metronomePopup");
+
+            if (ImGui::BeginPopup("##metronomePopup"))
+            {
+               // The top bar flattens every frame colour to transparent; a
+               // slider needs its real theme frame back to be findable.
+               const ImGuiStyle& base = ImGui::GetStyle();
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, base.Colors[ImGuiCol_FrameBg]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
+               ImGui::SetNextItemWidth(120.0f);
+               const bool volChanged = ImGui::SliderFloat(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
+               ImGui::PopStyleColor(3);
+               if (volChanged)
+                  gMetronomeDirty = true;
+               if (ImGui::Selectable(L("accent first beat"), gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
+               {
+                  gMetronomeAccent = !gMetronomeAccent;
+                  gMetronomeDirty = true;
+               }
+               ImGui::EndPopup();
+            }
+            if (gMetronomeDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            {
+               SaveGeneralSettings();
+               gMetronomeDirty = false;
+            }
+            AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
+         }
+
+         SectionBreak();
 
          // Audio engine power, nothing else: Start starts the device, Stop
          // stops it, and neither touches gAudioMode (which driver the engine
@@ -393,68 +466,8 @@ void DrawMenuBar(FrameCtx& fc)
             }
          }
 
-         // Metronome: click toggles, right-click opens volume / accent (no hover
-         // text, by design). Sits
-         // right after Start Audio, ahead of the readouts.
-         TopBarSameLine(8.0f);
-         {
-            // Read once: the click below flips gMetronomeOn, and the push/pop
-            // pair must use the state it was pushed with.
-            const bool metronomeWasOn = gMetronomeOn;
-            if (metronomeWasOn)
-               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-            if (ImGui::Button("##metronomeBtn", ImVec2(32.0f, 0.0f)))
-               gMetronomeOn = !gMetronomeOn;
-            if (metronomeWasOn)
-               ImGui::PopStyleColor();
-            {
-               ImVec4 iconCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-               if (!metronomeWasOn)
-                  iconCol.w *= 0.78f;
-               // The pendulum flips side on every beat - a hard 0/1, no easing -
-               // so each click lands exactly as it snaps over. Upright when off
-               // or while the transport is stopped.
-               const float swing = (metronomeWasOn && isTransportPlaying)
-                                      ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
-                                      : 0.0f;
-               const ImVec2 bmin = ImGui::GetItemRectMin();
-               const ImVec2 bmax = ImGui::GetItemRectMax();
-               glyph::DrawMetronome(ImGui::GetWindowDrawList(),
-                                     ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
-                                     tok::icon_md, ImGui::GetColorU32(iconCol), swing);
-            }
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-               ImGui::OpenPopup("##metronomePopup");
 
-            if (ImGui::BeginPopup("##metronomePopup"))
-            {
-               // The top bar flattens every frame colour to transparent; a
-               // slider needs its real theme frame back to be findable.
-               const ImGuiStyle& base = ImGui::GetStyle();
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, base.Colors[ImGuiCol_FrameBg]);
-               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
-               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
-               ImGui::SetNextItemWidth(120.0f);
-               const bool volChanged = ImGui::SliderFloat(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
-               ImGui::PopStyleColor(3);
-               if (volChanged)
-                  gMetronomeDirty = true;
-               if (ImGui::Selectable(L("accent first beat"), gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
-               {
-                  gMetronomeAccent = !gMetronomeAccent;
-                  gMetronomeDirty = true;
-               }
-               ImGui::EndPopup();
-            }
-            if (gMetronomeDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
-            {
-               SaveGeneralSettings();
-               gMetronomeDirty = false;
-            }
-            AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
-         }
-
-         ImGui::Separator();
+         SectionBreak();
 
          // Bar and beat lead the readout group: bar, beat, BPM, signature, key.
          {
@@ -496,7 +509,7 @@ void DrawMenuBar(FrameCtx& fc)
          // 2. Tempo & Meter (BPM + Time Signature)
          {
             float bpm = transport.Tempo();
-            TopBarLabel("BPM");
+            TopBarLabel("BPM", true);
             TopBarSameLine(4.0f);
 
             if (sActiveField == TopBarField::Bpm)
@@ -705,7 +718,7 @@ void DrawMenuBar(FrameCtx& fc)
             }
          }
 
-         ImGui::Separator();
+         SectionBreak();
 
          // 3. Global Key & Scale
          static const char* const kKeyNames[] = {
@@ -739,7 +752,7 @@ void DrawMenuBar(FrameCtx& fc)
          const std::string capScaleName = FormatScaleDisplayName(curScaleName);
 
          {
-            TopBarLabel("Key");
+            TopBarLabel("Key", true);
             TopBarSameLine(4.0f);
 
             if (ImGui::Button(kKeyNames[std::clamp(curKey, 0, 11)]))
@@ -771,7 +784,7 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndPopup();
          }
 
-         ImGui::Separator();
+         SectionBreak();
 
          // 4. Telemetry (Bar & beat, frame cost, CPU load)
          // Frame cost
@@ -822,7 +835,7 @@ void DrawMenuBar(FrameCtx& fc)
          // first, then search, then Update) rather than drawn on top of the
          // left cluster - the bar crops instead of clutters.
          const float windowRight = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x;
-         const float itemGap = ImGui::GetStyle().ItemSpacing.x * 3.0f;
+         const float itemGap = tok::space_2;
          const float minGap = 12.0f;
          float cursorX = windowRight;
 
@@ -888,7 +901,7 @@ void DrawMenuBar(FrameCtx& fc)
          // carry no text label and are the least essential of the cluster.
          auto TopBarIconToggle = [&](const char* id, bool isOpen, void (*draw)(ImDrawList*, ImVec2, float, ImU32, float), const char* tooltip, const char* glyphOff = nullptr, const char* glyphOn = nullptr)
          {
-            const float btnW = 38.0f;
+            const float btnW = tok::tile;
             if (cursorX - btnW < leftClusterEndX + minGap)
                return false;
             cursorX -= btnW;
@@ -899,7 +912,7 @@ void DrawMenuBar(FrameCtx& fc)
                const bool clicked = IconTile::Draw(id, glyphOff, glyphOn, isOpen, 28.0f, ImGui::GetFrameHeight());
                if (ImGui::IsItemHovered())
                   HelpTip("%s", tooltip);
-               cursorX -= itemGap;
+               cursorX -= tok::space_1;
                return clicked;
             }
             if (isOpen)

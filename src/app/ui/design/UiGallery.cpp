@@ -37,7 +37,7 @@ namespace UiGallery
       const UiLayout::Rect page = UiLayout::Rect{ top.x, top.y, ds.x, ds.y }.Inset(pad);
       // Sections stacked in one column; each is a heading line then a row of samples.
       const std::vector<UiLayout::Rect> sec = UiLayout::Column(page, { UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(rowH),
-                                                   UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(100) },
+                                                   UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(100), UiLayout::Fixed(14), UiLayout::Fixed(36) },
                                            gap);
 
       Heading(sec[0], "TEXT BUTTON - quiet, primary, disabled");
@@ -100,6 +100,47 @@ namespace UiGallery
                                                    ImGui::GetColorU32(ImGuiCol_Text), names[i]);
             }
          }
+      }
+      Heading(sec[12], "TOP BAR - proposed (same components, one 8 pt gap, tabular readouts, 4 equal icon tiles)");
+      {
+         const float barH = 36.0f;
+         UiLayout::Rect bar = sec[13];
+         bar.w = std::min(bar.w, 1500.0f);
+         ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(bar.x, bar.y), ImVec2(bar.Right(), bar.Bottom()),
+                                                   ImGui::GetColorU32(ImVec4(0.5f, 0.5f, 0.5f, 0.06f)), tok::radius_tile);
+         const UiLayout::Rect in = bar.Inset(0.0f, 0.0f, tok::space_2, 0.0f);
+         const float g = tok::space_2;
+         const float wFile = TextButton::WidthFor("File"), wEdit = TextButton::WidthFor("Edit"), wMenu = TextButton::WidthFor("Menu");
+         const float wAudio = TextButton::WidthFor("Start Audio");
+         const auto c = UiLayout::Row(in, { UiLayout::Fixed(wFile), UiLayout::Fixed(wEdit), UiLayout::Fixed(wMenu), UiLayout::Fixed(1),
+                                            UiLayout::Fixed(28), UiLayout::Fixed(28), UiLayout::Fixed(wAudio), UiLayout::Fixed(28), UiLayout::Fixed(1),
+                                            UiLayout::Fixed(130), UiLayout::Fixed(84), UiLayout::Fixed(36), UiLayout::Fixed(72), UiLayout::Fixed(1),
+                                            UiLayout::Fixed(110), UiLayout::Flex(),
+                                            UiLayout::Fixed(28), UiLayout::Fixed(28), UiLayout::Fixed(28), UiLayout::Fixed(28),
+                                            UiLayout::Fixed(TextButton::WidthFor("Search")) },
+                                      g, UiLayout::Align::Center, barH);
+         TextButton::Draw("tb.file", c[0], "File"); TextButton::Draw("tb.edit", c[1], "Edit"); TextButton::Draw("tb.menu", c[2], "Menu");
+         Divider::Vertical(c[3], 8);
+         auto tile = [&](const char* k, const UiLayout::Rect& r, const char* off, const char* on, bool v) {
+            ImGui::SetCursorScreenPos(ImVec2(r.x, r.y + (barH - 28) * 0.5f));
+            IconTile::Draw(k, off, on, v, 28.0f, 28.0f);
+         };
+         tile("tb.play", c[4], IconsInfinite::Play, IconsInfinite::PauseFill, true);
+         tile("tb.rewind", c[5], IconsInfinite::Rewind, nullptr, false);
+         TextButton::Draw("tb.audio", c[6], "Start Audio");
+         tile("tb.metro", c[7], IconsInfinite::Metronome, IconsInfinite::MetronomeFill, false);
+         Divider::Vertical(c[8], 8);
+         Readout::Draw("tb.pos", c[9], "bar 1  beat 2.16", "Position", UiType::Size::Body, UiType::Weight::Medium, Readout::Align::Left);
+         Readout::Draw("tb.bpm", c[10], "120.0 BPM", "Tempo", UiType::Size::Body, UiType::Weight::Medium, Readout::Align::Left);
+         Readout::Draw("tb.sig", c[11], "4/4", "Time signature", UiType::Size::Body, UiType::Weight::Medium, Readout::Align::Left);
+         Readout::Draw("tb.key", c[12], "Key C Major", "Key", UiType::Size::Body, UiType::Weight::Medium, Readout::Align::Left);
+         Divider::Vertical(c[13], 8);
+         Readout::Draw("tb.perf", c[14], "52.9 fps  18.9 ms", "Frame rate", UiType::Size::Caption, UiType::Weight::Regular, Readout::Align::Left, 0.55f);
+         tile("tb.viewport", c[16], IconsInfinite::Viewport, IconsInfinite::ViewportFill, false);
+         tile("tb.mod", c[17], IconsInfinite::GridDots, nullptr, false);
+         tile("tb.perf2", c[18], IconsInfinite::Perform, nullptr, false);
+         tile("tb.arrange", c[19], IconsInfinite::Cube, nullptr, false);
+         TextButton::Draw("tb.search", c[20], "Search");
       }
       ImGui::PopID();
       ImGui::End();

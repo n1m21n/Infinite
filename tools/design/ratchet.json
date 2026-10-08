@@ -15,7 +15,7 @@
   "src/app/bodies/SpatialMixerBody.cpp": 5,
   "src/app/frame/StageFloating.cpp": 24,
   "src/app/frame/StageLayout.cpp": 4,
-  "src/app/frame/StageMenuBar.cpp": 55,
+  "src/app/frame/StageMenuBar.cpp": 53,
   "src/app/frame/StageNodeBodies.cpp": 32,
   "src/app/frame/StagePopupsA.cpp": 30,
   "src/app/frame/StagePopupsB.cpp": 25,
