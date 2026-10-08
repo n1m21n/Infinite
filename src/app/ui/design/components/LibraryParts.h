@@ -36,19 +36,27 @@ namespace LibraryParts
       ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(text.x, text.y, text.z, 0.07f));
       ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(text.x, text.y, text.z, 0.10f));
       ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(text.x, text.y, text.z, 0.10f));
+      // ImGui's own nav ring is replaced by ours below, drawn only in keyboard mode.
+      ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
       ImGui::SetNextItemWidth(w);
       const bool changed = ImGui::InputTextWithHint("##q", hint, buf, cap);
-      ImGui::PopStyleColor(3);
+      ImGui::PopStyleColor(4);
       ImGui::PopStyleVar(3);
       const bool active = ImGui::IsItemActive();
       const bool hasText = buf[0] != '\0';
-      const float focus = UiAnim::Value(ImGui::GetItemID() + 7, active ? 1.0f : 0.0f, tok::motion_focus);
+      // Focus ring only while navigating by keyboard; mouse use gets none.
+      static bool kbd = false;  // Tab / arrow-key navigation switches the ring on; leaving the field resets it
+      if (!active)
+         kbd = false;
+      else if (ImGui::IsKeyPressed(ImGuiKey_Tab) || ImGui::IsKeyPressed(ImGuiKey_DownArrow))
+         kbd = true;
+      const float focus = UiAnim::Value(ImGui::GetItemID() + 7, (active && kbd) ? 1.0f : 0.0f, tok::motion_focus);
 
       if (focus > 0.001f)
       {
          const ImVec4 a = app::AccentEmphasisSelected();
          dl->AddRect(p, ImVec2(p.x + w, p.y + kFieldH), ImGui::GetColorU32(ImVec4(a.x, a.y, a.z, 0.85f * focus)),
-                     tok::radius_tile, 0, 1.5f);
+                     tok::radius_tile, 0, 1.0f);
       }
       glyph::Draw(dl, ImVec2(p.x + tok::space_2 + 8.0f, p.y + kFieldH * 0.5f), 16.0f,
                   ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, active ? 0.8f : 0.5f)), IconsInfinite::Search);

@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "imgui_internal.h"
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
@@ -203,6 +204,7 @@ void DrawPopupsB(FrameCtx& fc)
          if (searchJustOpened)
          {
             ImGui::SetKeyboardFocusHere();
+            ImGui::GetCurrentContext()->NavCursorVisible = false;  // no focus ring until the keyboard navigates
             searchJustOpened = false;
          }
          LibraryParts::SearchField("nodepicker", T("search nodes..."), searchBuf, sizeof(searchBuf));
