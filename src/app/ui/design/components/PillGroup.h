@@ -19,7 +19,8 @@ namespace PillGroup
    };
 
    // Returns the index clicked this frame, or -1. `selected` is the current index.
-   inline int Draw(const char* groupKey, const UiLayout::Rect& r, const Segment* segs, int count, int selected)
+   inline int Draw(const char* groupKey, const UiLayout::Rect& r, const Segment* segs, int count, int selected,
+                   UiType::Size labelSize = UiType::Size::Body)
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
@@ -52,7 +53,7 @@ namespace PillGroup
          if (s.focused)
             dl->AddRect(ImVec2(cr.x - 1, cr.y - 1), ImVec2(cr.Right() + 1, cr.Bottom() + 1),
                         ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_pill + 1.0f, 0, 2.0f);
-         UiType::Scope ts(UiType::Size::Body, UiType::Weight::Medium);
+         UiType::Scope ts(labelSize, UiType::Weight::Medium);
          const ImVec2 sz = ImGui::CalcTextSize(segs[i].label);
          dl->AddText(ImVec2(std::round(cr.CenterX() - sz.x * 0.5f), std::round(cr.CenterY() - sz.y * 0.5f)),
                      ImGui::GetColorU32(text), segs[i].label);

@@ -1174,3 +1174,7 @@ transform  ->  back into Feedback's input   <- this closes the loop	transform  -
 {mod}+C / {mod}+V, or Shift+D / {mod}+D to duplicate in place	{mod}+C / {mod}+V，或 Shift+D / {mod}+D 原位复制
 Library - search modules, samples, media and plugins	资源库：搜索模块、采样、媒体和插件
 Library	资源库
+Sort	排序
+Filter	筛选
+Descending	降序
+Ascending	升序

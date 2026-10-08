@@ -1,5 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/LibraryParts.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -287,37 +289,31 @@ void DrawSidePanels(FrameCtx& fc)
                                                 PanelSeamColor(), 1.0f);
          }
 
-         // Mode switcher: Modules is the original, always-present catalogue;
-         // Samples and Media extend it per docs/plans/audio/README.md P3e.
-         // Kept as plain selectable-style buttons rather than an ImGui tab
-         // bar so the active mode reads clearly against the panel's own
-         // dark background.
-         // Sized dynamically across the 5 browser modes (Modules, Field, Samples, Media, Plugins).
-         // Styled with centered alignment and dedicated gaps so labels never collide or clip.
-         // Selectable's highlight is rounded app-wide (see the FrameRounding
-         // patch in imgui_widgets.cpp), so anything tighter than ~8px reads
-         // as one unbroken block between adjacent tabs with no visible seam.
-         const float tabGap = 8.0f;
-         const float totalAvailW = ImGui::GetContentRegionAvail().x;
-         const float tabW = std::max(40.0f, std::floor((totalAvailW - tabGap * 4.0f) / 5.0f));
-
-         ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));
-         if (ImGui::Selectable(L("Modules"), gSearchPanelMode == 0, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 0;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable(L("Field"), gSearchPanelMode == 4, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 4;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable(L("Samples"), gSearchPanelMode == 1, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 1;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable(L("Media"), gSearchPanelMode == 2, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 2;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable(L("Plugins"), gSearchPanelMode == 3, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 3;
-         ImGui::PopStyleVar();
-         ImGui::Separator();
+         // Title, then the five modes as one segmented control (the accent pill slides between them).
+         {
+            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + tok::space_1);
+            ImGui::TextUnformatted(T("Library"));
+         }
+         ImGui::Dummy(ImVec2(0, tok::space_1));
+         {
+            static const int kModes[5] = { 0, 4, 1, 2, 3 };   // gSearchPanelMode value per segment
+            const PillGroup::Segment segs[5] = { { "lib.modules", T("Modules") }, { "lib.field", T("Field") },
+                                                 { "lib.samples", T("Samples") }, { "lib.media", T("Media") },
+                                                 { "lib.plugins", T("Plugins") } };
+            int sel = 0;
+            for (int i = 0; i < 5; ++i)
+               if (kModes[i] == gSearchPanelMode)
+                  sel = i;
+            const ImVec2 cp = ImGui::GetCursorScreenPos();
+            const UiLayout::Rect r{ cp.x, cp.y, ImGui::GetContentRegionAvail().x, 32.0f };
+            const int hit = PillGroup::Draw("lib.tabs", r, segs, 5, sel, UiType::Size::Body);
+            if (hit >= 0)
+               gSearchPanelMode = kModes[hit];
+            ImGui::SetCursorScreenPos(cp);
+            ImGui::Dummy(ImVec2(r.w, r.h));
+         }
+         ImGui::Dummy(ImVec2(0, tok::space_2));
 
          if (gSearchPanelMode == 0)
          {
@@ -360,7 +356,6 @@ void DrawSidePanels(FrameCtx& fc)
                   ? categoryIds[gModulesFilter.typeFilter] : std::string();
 
             std::string spawnName, spawnCategory;
-            ImGui::Separator();
             ImGui::BeginChild("##nodepanellist", ImVec2(0, 0), false);
 
             // No cache: at ~170 entries, filtering+sorting this list from
@@ -423,19 +418,16 @@ void DrawSidePanels(FrameCtx& fc)
                   ImGui::PushID(match.first.c_str());
                   const bool isFav = gBrowserFavorites.IsFavoriteModule(match.first);
                   const float availW = ImGui::GetContentRegionAvail().x;
-                  const float badgeReserve = 20.0f;
                   const std::string rowLabel =
-                     TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - badgeReserve));
-                  if (ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0)))
+                     TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - 64.0f));
+                  const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
+                  if (row.clicked)
                   {
                      spawnName = match.first;
                      spawnCategory = match.second;
                   }
-                  if (ImGui::IsItemHovered() && rowLabel != DisplayName(match.first))
+                  if (row.hovered && rowLabel != DisplayName(match.first))
                      ImGui::SetTooltip("%s", DisplayName(match.first).c_str());
-                  const ImVec2 selMin = ImGui::GetItemRectMin();
-                  const ImVec2 selMax = ImGui::GetItemRectMax();
-                  DrawFavoriteBadge(selMin, selMax, isFav);
                   if (ImGui::BeginPopupContextItem("##mod_ctx"))
                   {
                      if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
@@ -455,6 +447,7 @@ void DrawSidePanels(FrameCtx& fc)
                // Category view (default - today's behaviour, unchanged for
                // people who don't touch the sort control): grouped
                // headings in NodeFactory's own registration order.
+               bool firstSection = true;
                for (const std::string& category : NodeFactory::Instance().GetCategories())
                {
                   if (!categoryFilter.empty() && category != categoryFilter)
@@ -480,25 +473,23 @@ void DrawSidePanels(FrameCtx& fc)
                   if (gModulesFilter.descending)
                      std::reverse(matches.begin(), matches.end());
 
-                  ImGui::SeparatorText(DisplayName(category).c_str());
+                  LibraryParts::SectionHeader(DisplayName(category).c_str(), (int)matches.size(), firstSection);
+                  firstSection = false;
                   for (const std::string& name : matches)
                   {
                      ImGui::PushID(name.c_str());
                      const bool isFav = gBrowserFavorites.IsFavoriteModule(name);
                      const float availW = ImGui::GetContentRegionAvail().x;
-                     const float badgeReserve = 20.0f;
                      const std::string rowLabel =
-                        TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - badgeReserve));
-                     if (ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0)))
+                        TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - 64.0f));
+                     const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
+                     if (row.clicked)
                      {
                         spawnName = name;
                         spawnCategory = category;
                      }
-                     if (ImGui::IsItemHovered() && rowLabel != DisplayName(name))
+                     if (row.hovered && rowLabel != DisplayName(name))
                         ImGui::SetTooltip("%s", DisplayName(name).c_str());
-                     const ImVec2 selMin = ImGui::GetItemRectMin();
-                     const ImVec2 selMax = ImGui::GetItemRectMax();
-                     DrawFavoriteBadge(selMin, selMax, isFav);
                      if (ImGui::BeginPopupContextItem("##mod_cat_ctx"))
                      {
                         if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))

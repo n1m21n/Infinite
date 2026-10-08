@@ -3716,6 +3716,15 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gPerfPanelOpen = o.find("perf") != std::string::npos;
       gViewportPanelOpen = o.find("viewport") != std::string::npos;
       gNodePanelOpen = o.find("library") != std::string::npos;
+      // ",light" / ",dark" picks the first theme preset of that brightness for the screenshot (not saved).
+      const bool wantLight = o.find("light") != std::string::npos;
+      if (wantLight || o.find("dark") != std::string::npos)
+         for (int i = 0, n = static_cast<int>(CategoryColors::PresetNames().size()); i < n; ++i)
+         {
+            CategoryColors::SetPresetTransient(i);
+            if (CategoryColors::IsThemeLight() == wantLight)
+               break;
+         }
    }
 
    if (HeadlessJobActive())

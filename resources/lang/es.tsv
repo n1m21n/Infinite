@@ -1174,3 +1174,7 @@ transform  ->  back into Feedback's input   <- this closes the loop	transform  -
 {mod}+C / {mod}+V, or Shift+D / {mod}+D to duplicate in place	{mod}+C / {mod}+V, o Shift+D / {mod}+D para duplicar en el mismo lugar
 Library - search modules, samples, media and plugins	Biblioteca: busca módulos, samples, medios y plugins
 Library	Biblioteca
+Sort	ORDENAR
+Filter	FILTRO
+Descending	Descendente
+Ascending	Ascendente
