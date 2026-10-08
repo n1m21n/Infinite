@@ -2,6 +2,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/components/LibraryParts.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -272,25 +273,7 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SameLine(0.0f, 0.0f);
          PushDockedPanelStyle(/*isChild=*/true);
-         // Floating card: the child itself is transparent; the rounded surface and its soft shadow are drawn
-         // on the parent list underneath, inset by the gap so the card never touches the window, top bar or canvas.
-         const float cardGap = tok::space_2;
-         {
-            const ImVec2 p0 = ImGui::GetCursorScreenPos();
-            const ImVec2 c0(p0.x + cardGap, p0.y + cardGap);
-            const ImVec2 c1(p0.x + kNodePanelWidth - cardGap, p0.y + graphHeight - cardGap);
-            ImDrawList* pdl = ImGui::GetWindowDrawList();
-            for (int i = 6; i >= 1; --i)   // soft shadow: stacked, widening, fainter rings
-               pdl->AddRectFilled(ImVec2(c0.x - i, c0.y - i + 2.0f), ImVec2(c1.x + i, c1.y + i + 2.0f),
-                                  ImGui::GetColorU32(ImVec4(0, 0, 0, 7 / 255.0f)), tok::radius_group + i);
-            pdl->AddRectFilled(c0, c1, ImGui::GetColorU32(ImGuiCol_ChildBg), tok::radius_group);
-         }
-         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(cardGap + tok::space_2, cardGap + tok::space_2));
-         ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight),
-                           ImGuiChildFlags_AlwaysUseWindowPadding);
-         ImGui::PopStyleVar();
-         ImGui::PopStyleColor();
+         PanelFrame::BeginCard("##nodepanel", ImVec2(kNodePanelWidth, graphHeight));
          PopDockedPanelStyle();
 
          // The five modes as one segmented control (the accent pill slides between them). No title: the top bar
