@@ -536,7 +536,11 @@ void DrawMenuBar(FrameCtx& fc)
             slashW = TD::ValueWidth("/") + fieldPad;
             sigCellW = numW + slashW + denW + 2.0f * fieldPad;
             keyW = TD::ValueWidth("C#") + fieldPad;
-            scaleW = TD::ValueWidth(capScaleName.c_str()) + fieldPad;  // follows the current scale; the three cells re-share it
+            // Fixed for every scale: sized to the longest name, so choosing "Minor Pentatonic" never resizes the bar.
+            scaleW = 0.0f;
+            for (const std::string& n : scaleList)
+               scaleW = std::max(scaleW, TD::ValueWidth(FormatScaleDisplayName(n).c_str()));
+            scaleW += fieldPad;
             keyCellW = keyW + scaleW + 2.0f * fieldPad;
             // The three cells share one width, the widest content, so the display reads as even thirds.
             const float cellW = std::max({ tempoCellW, sigCellW, keyCellW });
@@ -694,8 +698,8 @@ void DrawMenuBar(FrameCtx& fc)
                TD::Wash(ImVec2(x, wellMin.y), ImVec2(x + w, wellMin.y + TD::kHeight), hv, ImGui::IsItemActive());
                TD::Value(id, x, w, wellMin.y, shown);
             };
-            // The pair is centred in the cell at its own width, so a short scale name sits next to the key.
-            const float curScaleW = TD::ValueWidth(capScaleName.c_str()) + fieldPad;
+            // Key and scale keep fixed widths (the scale's is the longest name's), so the pair never moves.
+            const float curScaleW = scaleW;
             const float cellX = wellMin.x + tempoCellW + sigCellW;
             const float kx = std::round(cellX + (keyCellW - (keyW + curScaleW)) * 0.5f);
             Pick("##keyField", kx, keyW, kKeyNames[std::clamp(curKey, 0, 11)], "##globalKeyPopup");
