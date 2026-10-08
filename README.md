@@ -10,6 +10,12 @@ A unified node-based audiovisual modular workstation for **macOS**, **Windows**,
 
 ![Infinite Screenshot](website/assets/screenshot.png)
 
+## Download
+
+[![macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/n1m21n/Infinite/releases/latest/download/Infinite.dmg) [![Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-windows-x64.zip) [![Windows ARM64](https://img.shields.io/badge/Download-Windows%20ARM64-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-windows-ARM64.zip) [![Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/n1m21n/Infinite/releases/latest/download/Infinite-x86_64.AppImage)
+
+Always the newest release. All files, checksums and release notes are on the [Releases page](https://github.com/n1m21n/Infinite/releases/latest).
+
 ---
 
 ## Video Tutorial
