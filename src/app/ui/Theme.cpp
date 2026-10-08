@@ -516,7 +516,7 @@ namespace app
       ed::SetCurrentEditor(gEditor);
       ed::Style& edStyle = ed::GetStyle();
       edStyle.Colors[ed::StyleColor_Bg] = vec(t.windowBg, isLight ? 1.0f : 0.784f);
-      edStyle.Colors[ed::StyleColor_Grid] = vec(t.border, isLight ? 0.50f : 0.35f);
+      edStyle.Colors[ed::StyleColor_Grid] = vec(t.border, !gShowCanvasGrid ? 0.0f : (isLight ? 0.16f : 0.12f));
       edStyle.Colors[ed::StyleColor_NodeBg] = vec(t.panelBg, isLight ? 0.95f : 0.80f);
       edStyle.Colors[ed::StyleColor_NodeBorder] = vec(t.border, isLight ? 0.70f : 0.40f);
       edStyle.NodeRounding = CategoryColors::GetNodeRounding();

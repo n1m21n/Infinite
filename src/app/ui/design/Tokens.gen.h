@@ -7,6 +7,7 @@ namespace tok
    constexpr float space_2 = 8.0f;
    constexpr float space_3 = 12.0f;
    constexpr float space_4 = 16.0f;
+   constexpr float space_5 = 24.0f;
    constexpr float radius_cell = 2.0f;
    constexpr float radius_field = 4.0f;
    constexpr float radius_tile = 6.0f;
@@ -29,6 +30,8 @@ namespace tok
    constexpr float motion_tooltip_fade = 100.0f;
    constexpr float motion_accent_fade = 200.0f;
    constexpr float hit_min = 24.0f;
+   constexpr float bar_h = 40.0f;
+   constexpr float tile = 28.0f;
 
    struct Rgba8 { unsigned char r, g, b, a; };
    struct Rgbaf { float r, g, b, a; };

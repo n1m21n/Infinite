@@ -292,6 +292,11 @@ namespace app
             ImGui::SeparatorText(T("Grid & Canvas"));
             if (ImGui::Checkbox(L("Snap to grid"), &gSnapToGrid))
                SaveWorkspaceSettings();
+            if (ImGui::Checkbox(L("Show canvas grid"), &gShowCanvasGrid))
+            {
+               ApplyTheme();
+               SaveWorkspaceSettings();
+            }
             ImGui::SetNextItemWidth(180.0f);
             ImGui::SliderFloat(L("Grid size"), &gGridSnap, 5.0f, 100.0f, "%.0f px");
             if (ImGui::IsItemDeactivatedAfterEdit())

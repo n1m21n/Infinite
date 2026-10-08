@@ -195,6 +195,7 @@ namespace app
    std::vector<LinkInfo> gLinks;
 
    bool gSnapToGrid = true;
+   bool gShowCanvasGrid = false;   // the faint line grid behind the nodes; off by default, Settings > Canvas & Workspace
 
    float gGridSnap = 20.0f;
 

@@ -19,6 +19,8 @@ def build():
     for k, v in b["motion_ms"].items():
         L.append(f"   constexpr float motion_{k} = {float(v)}f;")
     L.append(f"   constexpr float hit_min = {float(b['hit_min'])}f;")
+    L.append(f"   constexpr float bar_h = {float(b['bar_h'])}f;")
+    L.append(f"   constexpr float tile = {float(b['tile'])}f;")
     r = t["roles"]
     L += ["", "   struct Rgba8 { unsigned char r, g, b, a; };", "   struct Rgbaf { float r, g, b, a; };", "   struct Pair8 { Rgba8 dark, light; };", "   struct Pairf { Rgbaf dark, light; };"]
     for k, v in r["pairs"].items():

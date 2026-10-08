@@ -313,6 +313,8 @@ namespace app
          const std::string val = line.substr(eq + 1);
          if (key == "snapToGrid")
             gSnapToGrid = (val != "0");
+         else if (key == "showCanvasGrid")
+            gShowCanvasGrid = (val != "0");
          else if (key == "gridSnap")
             gGridSnap = std::strtof(val.c_str(), nullptr);
          else if (key == "zoomSensitivity")
@@ -338,6 +340,7 @@ namespace app
          return;
       std::ofstream file(path);
       file << "snapToGrid=" << (gSnapToGrid ? 1 : 0) << "\n";
+      file << "showCanvasGrid=" << (gShowCanvasGrid ? 1 : 0) << "\n";
       file << "gridSnap=" << gGridSnap << "\n";
       file << "zoomSensitivity=" << gZoomSensitivity << "\n";
       file << "minimapEnabled=" << (gMinimapEnabled ? 1 : 0) << "\n";

@@ -398,6 +398,7 @@ void DisconnectLinkById(int id);
 void DisconnectFieldPinBridge(int nodeIndex, int slot, bool isOutput);
 
 extern bool gSnapToGrid;
+extern bool gShowCanvasGrid;
 
 extern float gGridSnap;
 
