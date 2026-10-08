@@ -2349,7 +2349,33 @@ void FrameTest_GROUP3DTEST(int frameId, GLFWwindow* window)
          printf("  self-referencing group flattens to %zu (cap %d)  %s\n", loopFlat,
                 Render3DNode::kMaxDraw, loopOk ? "OK" : "FAIL");
 
-         printf("%s\n", (flatOk && trisOk && loopOk) ? "GROUP3DTEST OK" : "GROUP3DTEST FAIL - BUG");
+         // The group's own thumbnail: Group 3D hands out an empty mesh, so the
+         // node viewport has to bake the children itself. It used to read
+         // "no geometry" for any group.
+         NodeViewport viewport;
+         const size_t previewTris = viewport.GroupPreviewMesh(&outer).indices.size() / 3;
+         const bool previewOk = previewTris == perCube * 6;
+         printf("  group preview triangles %zu (expect %zu)  %s\n", previewTris, perCube * 6,
+                previewOk ? "OK" : "FAIL");
+
+         // Nothing changed, so the cached bake must be kept (a revision bump
+         // here would re-upload every frame) ...
+         const unsigned long long steadyRev = viewport.GroupPreviewRevision();
+         viewport.GroupPreviewMesh(&outer);
+         const bool steadyOk = viewport.GroupPreviewRevision() == steadyRev;
+         // ... and moving one child, which bumps no mesh revision, must rebuild it.
+         cubes[5]->posX = 3.0f;
+         viewport.GroupPreviewMesh(&outer);
+         const bool movedOk = viewport.GroupPreviewRevision() != steadyRev;
+         printf("  preview cached when idle %s, rebuilt when a child moves %s\n",
+                steadyOk ? "OK" : "FAIL", movedOk ? "OK" : "FAIL");
+
+         // A self-referencing group must still terminate in the preview.
+         const bool loopPreviewOk = viewport.GroupPreviewMesh(&loop).indices.size() / 3 <= perCube * 64;
+         printf("  self-referencing group preview terminates  %s\n", loopPreviewOk ? "OK" : "FAIL");
+
+         const bool allOk = flatOk && trisOk && loopOk && previewOk && steadyOk && movedOk && loopPreviewOk;
+         printf("%s\n", allOk ? "GROUP3DTEST OK" : "GROUP3DTEST FAIL - BUG");
       }
 }
 
