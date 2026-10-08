@@ -45,7 +45,11 @@ def main():
     fb.setupGlyphOrder(order)
     fb.setupCharacterMap({reg[n]: n for n in names})
     fb.setupGlyf({".notdef": notdef, **glyphs})
-    fb.setupHorizontalMetrics({g: (UPM, 0) for g in order})
+    def lsb(g):
+        if g == ".notdef": return 0
+        gl = glyphs[g]; gl.recalcBounds(None)
+        return int(round(gl.xMin)) if gl.numberOfContours else 0
+    fb.setupHorizontalMetrics({g: (UPM, lsb(g)) for g in order})  # lsb must equal xMin or renderers shift the glyph
     fb.setupHorizontalHeader(ascent=800, descent=-200)
     fb.setupNameTable({"familyName": "Infinite Glyphs", "styleName": "Regular"})
     fb.setupOS2(sTypoAscender=800, sTypoDescender=-200, usWinAscent=800, usWinDescent=200)

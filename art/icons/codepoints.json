@@ -51,5 +51,7 @@
  "star": 59697,
  "star-fill": 59698,
  "trim": 59699,
- "zoom": 59700
+ "zoom": 59700,
+ "cube": 59701,
+ "grid-dots": 59702
 }

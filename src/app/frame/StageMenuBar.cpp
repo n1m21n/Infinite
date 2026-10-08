@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/components/IconTile.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
@@ -313,7 +314,7 @@ void DrawMenuBar(FrameCtx& fc)
                                   ? tok::U32(tok::pal::c_FFFFFFFF)
                                   : ImGui::GetColorU32(ImGuiCol_Text);
             if (isTransportPlaying)
-               Tabler::DrawPlayerPause(dl, center, iconSize, col);
+               glyph::DrawPlayerPause(dl, center, iconSize, col);
             else
                glyph::Draw(dl, center, iconSize, col, IconsInfinite::PlayFill);
          }
@@ -332,7 +333,7 @@ void DrawMenuBar(FrameCtx& fc)
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.72f;
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-            Tabler::DrawPlayerRewind(dl, center, iconSize, col);
+            glyph::DrawPlayerRewind(dl, center, iconSize, col);
          }
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Rewind (Return)"));
@@ -659,7 +660,7 @@ void DrawMenuBar(FrameCtx& fc)
                                       : 0.0f;
                const ImVec2 bmin = ImGui::GetItemRectMin();
                const ImVec2 bmax = ImGui::GetItemRectMax();
-               Tabler::DrawMetronome(ImGui::GetWindowDrawList(),
+               glyph::DrawMetronome(ImGui::GetWindowDrawList(),
                                      ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
                                      (bmax.y - bmin.y) * 0.84f, ImGui::GetColorU32(iconCol), swing);
             }
@@ -866,7 +867,7 @@ void DrawMenuBar(FrameCtx& fc)
                ImDrawList* dl = ImGui::GetWindowDrawList();
                const float rowH = ImGui::GetItemRectSize().y;
                const ImVec2 iconCenter(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSize * 0.5f, btnStart.y + rowH * 0.5f);
-               Tabler::DrawSearch(dl, iconCenter, iconSize, col);
+               glyph::DrawSearch(dl, iconCenter, iconSize, col);
                const float textY = btnStart.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f;
                dl->AddText(ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSlot, textY), col, searchLabel);
                if (clicked)
@@ -890,6 +891,14 @@ void DrawMenuBar(FrameCtx& fc)
             cursorX -= btnW;
             ImGui::SameLine(cursorX);
 
+            if (glyphOff != nullptr)
+            {
+               const bool clicked = IconTile::Draw(id, glyphOff, glyphOn, isOpen, 28.0f, ImGui::GetFrameHeight());
+               if (ImGui::IsItemHovered())
+                  HelpTip("%s", tooltip);
+               cursorX -= itemGap;
+               return clicked;
+            }
             if (isOpen)
                ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
             const bool clicked = ImGui::Button(id, ImVec2(btnW, 0.0f));
@@ -909,17 +918,17 @@ void DrawMenuBar(FrameCtx& fc)
             else if (draw != nullptr)
                draw(dl, center, iconSize, col, 0.0f);
             else
-               Tabler::DrawPlaceholder(dl, center, iconSize, col, 0.0f);
+               glyph::DrawPlaceholder(dl, center, iconSize, col, 0.0f);
 
             cursorX -= itemGap;
             return clicked;
          };
 
-         if (TopBarIconToggle("##arrangePanelToggle", gArrangePanelOpen, nullptr, T("Arrangement timeline"), IconsInfinite::Arrange))
+         if (TopBarIconToggle("##arrangePanelToggle", gArrangePanelOpen, nullptr, T("Arrangement timeline"), IconsInfinite::Cube))
             gArrangePanelOpen = !gArrangePanelOpen;
-         if (TopBarIconToggle("##perfPanelToggle", gPerfPanelOpen, &Tabler::DrawDisc, T("Performance mode")))
+         if (TopBarIconToggle("##perfPanelToggle", gPerfPanelOpen, &glyph::DrawDisc, T("Performance mode")))
             gPerfPanelOpen = !gPerfPanelOpen;
-         if (TopBarIconToggle("##modMatrixToggle", gModMatrixOpen, nullptr, T("Modulation matrix"), IconsInfinite::ModMatrix))
+         if (TopBarIconToggle("##modMatrixToggle", gModMatrixOpen, nullptr, T("Modulation matrix"), IconsInfinite::GridDots))
             gModMatrixOpen = !gModMatrixOpen;
          if (TopBarIconToggle("##viewportPanelToggle", gViewportPanelOpen, nullptr, T("Viewport panel"), IconsInfinite::Viewport, IconsInfinite::ViewportFill))
             gViewportPanelOpen = !gViewportPanelOpen;
