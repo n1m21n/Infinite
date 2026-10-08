@@ -4,6 +4,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/FieldWell.h"
 
 namespace app
@@ -150,9 +151,12 @@ namespace app
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                                ImGuiCond_Always, ImVec2(0.5f, 0.5f));
       PushElevatedPanelStyle(/*isChild=*/false);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
       ImGui::Begin(L("Offline Render"), nullptr,
-                    ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar |
                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
+      SectionCard::Title(T("Rendering"));
 
       const int total = std::max(1, n->OfflineFramesTotal());
       const int done = std::min(n->OfflineFramesDone(), total);
@@ -190,21 +194,22 @@ namespace app
       // at whatever fraction the render reached, which is precisely what
       // made a slow cancel look like a hang.
       if (n->IsOfflineCancelling())
-         ImGui::ProgressBar(-1.0f * (float)ImGui::GetTime(), ImVec2(280, 0), "");
+         SectionCard::Progress(-1.0f, 300.0f);
       else
-         ImGui::ProgressBar(frac, ImVec2(280, 0));
+         SectionCard::Progress(frac, 300.0f);
 
       ImGui::BeginDisabled(n->IsOfflineFinalizing());
-      if (ImGui::Button(L("Cancel"), ImVec2(120, 0)))
+      if (ChipButton::Draw(L("Cancel"), false, 28.0f, 100.0f))
          n->RequestFinishOfflineRender(true);
       ImGui::EndDisabled();
-      ImGui::SameLine();
+      ImGui::SameLine(0.0f, tok::space_2);
       ImGui::BeginDisabled(qTotal <= 1);
-      if (ImGui::Button(L("Cancel All"), ImVec2(120, 0)))
+      if (ChipButton::Draw(L("Cancel All"), false, 28.0f, 100.0f))
          ArrangeRenderCancelAll();
       ImGui::EndDisabled();
 
       ImGui::End();
+      ImGui::PopStyleVar(2);
       PopElevatedPanelStyle();
    }
 
@@ -238,9 +243,12 @@ namespace app
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                               ImGuiCond_Always, ImVec2(0.5f, 0.5f));
       PushElevatedPanelStyle(/*isChild=*/false);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
       ImGui::Begin(L("Rendering Audio"), nullptr,
-                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar |
                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
+      SectionCard::Title(T("Rendering Audio"));
 
       const long long total = std::max<long long>(1, gArrangeWavRender.framesTotal);
       const long long done = std::min(gArrangeWavRender.framesDone, total);
@@ -257,17 +265,18 @@ namespace app
       ArrangeRenderQueuePosition(qIdx, qTotal);
       if (qTotal > 1 && qIdx > 0)
          ImGui::TextDisabled(T("Job %d of %d"), qIdx, qTotal);
-      ImGui::ProgressBar(frac, ImVec2(280, 0));
+      SectionCard::Progress(frac, 300.0f);
       ImGui::BeginDisabled(gArrangeWavRender.cancelRequested);
-      if (ImGui::Button(L("Cancel"), ImVec2(120, 0)))
+      if (ChipButton::Draw(L("Cancel"), false, 28.0f, 100.0f))
          ArrangeRenderCancelActive();
       ImGui::EndDisabled();
-      ImGui::SameLine();
+      ImGui::SameLine(0.0f, tok::space_2);
       ImGui::BeginDisabled(qTotal <= 1);
-      if (ImGui::Button(L("Cancel All"), ImVec2(120, 0)))
+      if (ChipButton::Draw(L("Cancel All"), false, 28.0f, 100.0f))
          ArrangeRenderCancelAll();
       ImGui::EndDisabled();
       ImGui::End();
+      ImGui::PopStyleVar(2);
       PopElevatedPanelStyle();
    }
 
@@ -365,66 +374,11 @@ namespace app
    }
 
    // Inspector panel title: Title size, semibold; every inspector mode uses it.
-   static void InspectorTitle(const char* text)
-   {
-      UiType::Scope s(UiType::Size::Title, UiType::Weight::Semibold);
-      ImGui::TextUnformatted(text);
-   }
-
-   // Inspector sections are cards: a soft well behind the title and its rows, drawn on a background channel
-   // so SectionHeader() only has to mark where one card ends and the next begins.
-   struct InspectorCards
-   {
-      ImDrawListSplitter split;
-      bool open = false;
-      float top = 0.0f;
-   };
-   static InspectorCards sCards;
-   static constexpr float kCardPad = tok::space_2;   // card edge to content, also how far a card reaches into the window padding
-
-   static void InspectorCardEnd()
-   {
-      if (!sCards.open)
-         return;
-      sCards.open = false;
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 wp = ImGui::GetWindowPos();
-      const float x0 = wp.x + ImGui::GetWindowContentRegionMin().x - kCardPad;
-      const float x1 = wp.x + ImGui::GetWindowContentRegionMax().x + kCardPad;
-      const float y1 = ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y + kCardPad;
-      sCards.split.SetCurrentChannel(dl, 0);
-      if (y1 - sCards.top < 4.0f * kCardPad)   // nothing was drawn in it: no empty sliver
-      {
-         sCards.split.SetCurrentChannel(dl, 1);
-         return;
-      }
-      ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      dl->AddRectFilled(ImVec2(x0, sCards.top - kCardPad), ImVec2(x1, y1), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)),
-                        tok::radius_group);
-      sCards.split.SetCurrentChannel(dl, 1);
-      ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, y1));
-   }
-
-   // Inspector section title: Body size (same as the field labels), medium weight, muted. Starts a new card.
-   static void SectionHeader(const char* text)
-   {
-      InspectorCardEnd();
-      ImGui::Dummy(ImVec2(0.0f, kCardPad));
-      sCards.top = ImGui::GetCursorScreenPos().y;
-      sCards.open = true;
-      UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
-      ImGui::TextDisabled("%s", text);
-      ImGui::Dummy(ImVec2(0.0f, tok::space_1 * 0.5f));
-   }
-
-   // A card with no title (the name / state block under the panel title).
-   static void InspectorCardBegin()
-   {
-      InspectorCardEnd();
-      ImGui::Dummy(ImVec2(0.0f, kCardPad));
-      sCards.top = ImGui::GetCursorScreenPos().y;
-      sCards.open = true;
-   }
+   static void InspectorTitle(const char* text) { SectionCard::Title(text); }
+   static void InspectorCardEnd() { SectionCard::End(); }
+   static void InspectorCardBegin() { SectionCard::Begin(); }
+   static void SectionHeader(const char* text) { SectionCard::Begin(text); }
+   static constexpr float kCardPad = SectionCard::kPad;
 
    // Plain muted message (empty states), not a card.
    static void InspectorNote(const char* text)
@@ -437,17 +391,8 @@ namespace app
       ImGui::PopTextWrapPos();
    }
 
-   // Inspector field row: label in a fixed left column, the field fills the rest of the row.
-   static constexpr float kRowLabelW = 72.0f;
-   static void RowLabel(const char* text)
-   {
-      ImGui::AlignTextToFramePadding();
-      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(t.x, t.y, t.z, 0.72f));
-      ImGui::TextUnformatted(text);
-      ImGui::PopStyleColor();
-      ImGui::SameLine(kRowLabelW);
-   }
+   static constexpr float kRowLabelW = SectionCard::kLabelW;
+   static void RowLabel(const char* text) { SectionCard::RowLabel(text); }
 
    void DrawArrangeClipSettingsChild(float panelW)
    {
@@ -458,9 +403,7 @@ namespace app
       PopDockedPanelStyle();
       gArrangeInspectorMin = ImGui::GetWindowPos();
       gArrangeInspectorMax = ImVec2(gArrangeInspectorMin.x + ImGui::GetWindowSize().x, gArrangeInspectorMin.y + ImGui::GetWindowSize().y);
-      sCards.open = false;
-      sCards.split.Split(ImGui::GetWindowDrawList(), 2);
-      sCards.split.SetCurrentChannel(ImGui::GetWindowDrawList(), 1);
+      SectionCard::BeginWindow();
 
       const float availW = ImGui::GetContentRegionAvail().x;
 
@@ -1233,8 +1176,7 @@ namespace app
          InspectorNote(T("Select a clip, track, or group to inspect its properties."));
       }
 
-      InspectorCardEnd();
-      sCards.split.Merge(ImGui::GetWindowDrawList());
+      SectionCard::EndWindow();
       ImGui::EndChild();
    }
 
@@ -1308,17 +1250,23 @@ namespace app
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                               ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 0.0f), ImVec2(560.0f, 400.0f));
-      if (ImGui::BeginPopupModal(L("Render failed##arrangeRenderFail"), nullptr,
-                                 ImGuiWindowFlags_AlwaysAutoResize))
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
+      const bool failOpen = ImGui::BeginPopupModal(L("Render failed##arrangeRenderFail"), nullptr,
+                                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
+      ImGui::PopStyleVar();
+      if (failOpen)
       {
-         ImGui::PushTextWrapPos(520.0f);
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
+         SectionCard::Title(T("Render failed"));
+         ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 360.0f);
          ImGui::TextWrapped("%s", T("The timeline render did not start."));
          ImGui::Dummy(ImVec2(0, 4));
          ImGui::TextWrapped("%s", gArrangeRenderFailNotice.c_str());
          ImGui::PopTextWrapPos();
-         ImGui::Dummy(ImVec2(0, 4));
-         if (ImGui::Button(L("OK"), ImVec2(100, 0)))
+         ImGui::Dummy(ImVec2(0, tok::space_1));
+         if (ChipButton::Draw(L("OK"), true, 28.0f, 100.0f))
             ImGui::CloseCurrentPopup();
+         ImGui::PopStyleVar();
          ImGui::EndPopup();
       }
    }

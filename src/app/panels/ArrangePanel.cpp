@@ -3,6 +3,7 @@
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -56,6 +57,32 @@ namespace app
          ImGui::PopStyleVar(2);
          ImGui::PopStyleColor(4);
       }
+   }
+
+   // Combo in the field-well style with the inspector's small chevron (no ImGui arrow button).
+   // `items` is the zero-separated list ImGui::Combo takes.
+   static bool WellCombo(const char* id, int* current, const char* items)
+   {
+      std::vector<const char*> list;
+      for (const char* it = items; *it != '\0'; it += std::strlen(it) + 1)
+         list.push_back(it);
+      const char* cur = (*current >= 0 && *current < (int)list.size()) ? list[*current] : "";
+      bool changed = false;
+      const bool open = ImGui::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
+      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+      glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
+                             ImGui::GetColorU32(ImGuiCol_TextDisabled));
+      if (open)
+      {
+         for (int i = 0; i < (int)list.size(); ++i)
+            if (ImGui::Selectable(list[i], *current == i))
+            {
+               *current = i;
+               changed = true;
+            }
+         ImGui::EndCombo();
+      }
+      return changed;
    }
 
    void DrawArrangePanelContent()
@@ -508,16 +535,29 @@ namespace app
             ImGui::EndDisabled();
             ImGui::SetCursorScreenPos(savedCursor);
 
-            if (ImGui::BeginPopup("##arrangeRenderPopup"))
+            if (ImGui::GetFrameCount() == 30 && getenv("INFINITE_RENDERPOPUPTEST") != nullptr)   // design review shot
             {
-               ImGui::Text("%s", T("Timeline Render Settings"));
-               ImGui::Separator();
+               ImGui::OpenPopup("##arrangeRenderPopup");
+               ImGui::SetNextWindowPos(ImVec2(24.0f, 120.0f));
+            }
+            ImGui::SetNextWindowSize(ImVec2(344.0f, 0.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));
+            const bool renderPopupOpen = ImGui::BeginPopup("##arrangeRenderPopup");
+            ImGui::PopStyleVar();
+            if (renderPopupOpen)
+            {
+               ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
+               FieldWell::PushStyle();
+               SectionCard::BeginWindow();
+               const float fieldW = ImGui::GetContentRegionAvail().x - SectionCard::kLabelW;
+               SectionCard::Title(T("Render Timeline"));
 
                // ---- Time range ----
-               ImGui::TextDisabled("%s", T("Range:"));
-               ImGui::SetNextItemWidth(150.0f);
+               SectionCard::Begin(T("Range"));
+               SectionCard::RowLabel(T("Span"));
+               ImGui::SetNextItemWidth(fieldW);
                int rangeKind = std::clamp(rset.renderRangeKind, 0, 3);
-               if (ImGui::Combo("##arrRangeKind", &rangeKind, I18n::TList("Whole arrangement\0Loop\0Marker A -> B\0Custom\0")))
+               if (WellCombo("##arrRangeKind", &rangeKind, I18n::TList("Whole arrangement\0Loop\0Marker A -> B\0Custom\0")))
                {
                   rset.renderRangeKind = rangeKind;
                   gPatchDirty = true;
@@ -541,13 +581,14 @@ namespace app
                      markerItems.push_back('\0');
                      sArrangeRenderMarkerA = std::clamp(sArrangeRenderMarkerA, 0, markerCount - 1);
                      sArrangeRenderMarkerB = std::clamp(sArrangeRenderMarkerB, 0, markerCount - 1);
-                     ImGui::SetNextItemWidth(110.0f);
-                     ImGui::Combo("##arrMarkA", &sArrangeRenderMarkerA, markerItems.c_str());
-                     ImGui::SameLine(0.0f, 6.0f);
+                     SectionCard::RowLabel(T("Markers"));
+                     ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
+                     WellCombo("##arrMarkA", &sArrangeRenderMarkerA, markerItems.c_str());
+                     ImGui::SameLine(0.0f, tok::space_1);
                      ImGui::TextDisabled("->");
-                     ImGui::SameLine(0.0f, 6.0f);
-                     ImGui::SetNextItemWidth(110.0f);
-                     ImGui::Combo("##arrMarkB", &sArrangeRenderMarkerB, markerItems.c_str());
+                     ImGui::SameLine(0.0f, tok::space_1);
+                     ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
+                     WellCombo("##arrMarkB", &sArrangeRenderMarkerB, markerItems.c_str());
                   }
                }
                else if (rset.renderRangeKind == kArrangeRangeCustom)
@@ -558,7 +599,7 @@ namespace app
                   auto tickField = [&](const char* id, Arrange::Tick& t) {
                      char buf[48];
                      snprintf(buf, sizeof(buf), "%s", ArrangeFormatPos(t).c_str());
-                     ImGui::SetNextItemWidth(90.0f);
+                     ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
                      if (ImGui::InputText(id, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
                      {
                         const Arrange::Tick parsed = ArrangeParsePos(buf);
@@ -569,28 +610,35 @@ namespace app
                         }
                      }
                   };
+                  SectionCard::RowLabel(T("Custom"));
                   tickField("##arrRangeStart", rset.renderRangeStart);
-                  ImGui::SameLine(0.0f, 6.0f);
+                  ImGui::SameLine(0.0f, tok::space_1);
                   ImGui::TextDisabled("->");
-                  ImGui::SameLine(0.0f, 6.0f);
+                  ImGui::SameLine(0.0f, tok::space_1);
                   tickField("##arrRangeEnd", rset.renderRangeEnd);
                }
                currentRange(rangeA, rangeB);
-
-               ImGui::Separator();
 
                const bool audioOnly = effectiveVideoSource() == kArrangeVideoNone;
 
                // ---- Resolution / fps (video jobs only) ----
                if (!audioOnly)
                {
-                  ImGui::TextDisabled("%s", T("Resolution:"));
+                  SectionCard::Begin(T("Video"));
+                  SectionCard::RowLabel(T("Size"));
                   static int sArrangeRenderResPreset = 0; // 0=Match Clips, 1..4 fixed, 5=Custom
                   int detectedClipW = 0, detectedClipH = 0;
                   ArrangeRenderDetectClipSize(detectedClipW, detectedClipH);
                   const char* kResPresets[] = { T("Match Clips"), "1080p", "4K", "720p", T("Vertical"), T("Custom") };
-                  ImGui::SetNextItemWidth(120.0f);
-                  if (ImGui::Combo("##arrResPreset", &sArrangeRenderResPreset, kResPresets, IM_ARRAYSIZE(kResPresets)))
+                  ImGui::SetNextItemWidth(fieldW);
+                  std::string resItems;
+                  for (const char* r : kResPresets)
+                  {
+                     resItems += r;
+                     resItems.push_back('\0');
+                  }
+                  resItems.push_back('\0');
+                  if (WellCombo("##arrResPreset", &sArrangeRenderResPreset, resItems.c_str()))
                   {
                      if (sArrangeRenderResPreset == 0) { rset.renderWidth = detectedClipW; rset.renderHeight = detectedClipH; }
                      else if (sArrangeRenderResPreset == 1) { rset.renderWidth = 1920; rset.renderHeight = 1080; }
@@ -599,34 +647,32 @@ namespace app
                      else if (sArrangeRenderResPreset == 4) { rset.renderWidth = 1080; rset.renderHeight = 1920; }
                      gPatchDirty = true;
                   }
-                  ImGui::SameLine(0.0f, tok::space_1);
-                  ImGui::SetNextItemWidth(60.0f);
+                  SectionCard::RowLabel("");
+                  ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
                   if (ImGui::InputInt("##arrResW", &rset.renderWidth, 0, 0))
                      gPatchDirty = true;
                   ImGui::SameLine(0.0f, tok::space_1);
                   ImGui::TextDisabled("%s", T("x"));
                   ImGui::SameLine(0.0f, tok::space_1);
-                  ImGui::SetNextItemWidth(60.0f);
+                  ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
                   if (ImGui::InputInt("##arrResH", &rset.renderHeight, 0, 0))
                      gPatchDirty = true;
                   rset.renderWidth = std::clamp(rset.renderWidth, 16, 7680);
                   rset.renderHeight = std::clamp(rset.renderHeight, 16, 4320);
 
-                  ImGui::SetNextItemWidth(90.0f);
-                  if (ImGui::InputInt(L("fps##arrRenderFps"), &rset.renderFps))
+                  SectionCard::RowLabel(T("Rate"));
+                  ImGui::SetNextItemWidth(fieldW);
+                  if (ImGui::InputInt("##arrRenderFps", &rset.renderFps, 0, 0))
                      gPatchDirty = true;
                   rset.renderFps = std::clamp(rset.renderFps, 1, 240);
-
-                  ImGui::Separator();
                }
 
-               ImGui::Separator();
-
                // ---- Output file ----
-               ImGui::TextDisabled("%s", T("Output File:"));
+               SectionCard::Begin(T("Output"));
+               SectionCard::RowLabel(T("Name"));
                char renderNameBuf[256];
                snprintf(renderNameBuf, sizeof(renderNameBuf), "%s", sArrangeRenderFileName.c_str());
-               ImGui::SetNextItemWidth(200.0f);
+               ImGui::SetNextItemWidth(fieldW - 36.0f);
                if (ImGui::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
                   sArrangeRenderFileName = renderNameBuf;
                ImGui::SameLine(0.0f, tok::space_1);
@@ -634,7 +680,8 @@ namespace app
 
                char renderFolderBuf[512];
                snprintf(renderFolderBuf, sizeof(renderFolderBuf), "%s", rset.renderFolder.c_str());
-               ImGui::SetNextItemWidth(260.0f);
+               SectionCard::RowLabel(T("Folder"));
+               ImGui::SetNextItemWidth(fieldW);
                if (ImGui::InputText("##arrangeRenderFolder", renderFolderBuf, sizeof(renderFolderBuf)))
                {
                   rset.renderFolder = renderFolderBuf;
@@ -648,24 +695,21 @@ namespace app
                if (!audioOnly)
                {
                   const int fmtActive = rset.renderFormat == 1 ? 1 : 0;
-                  if (fmtActive == 0) PushSelectedButtonColors();
-                  if (ImGui::Button(L(".mp4##arrRenderMp4"), ImVec2(56, 0)))
+                  SectionCard::RowLabel(T("Format"));
+                  if (ChipButton::Draw(".mp4##arrRenderMp4", fmtActive == 0, 24.0f, 56.0f))
                   {
                      rset.renderFormat = 0;
                      gPatchDirty = true;
                   }
-                  if (fmtActive == 0) PopSelectedButtonColors();
                   ImGui::SameLine(0.0f, tok::space_1);
-                  if (fmtActive == 1) PushSelectedButtonColors();
-                  if (ImGui::Button(L(".mov##arrRenderMov"), ImVec2(56, 0)))
+                  if (ChipButton::Draw(".mov##arrRenderMov", fmtActive == 1, 24.0f, 56.0f))
                   {
                      rset.renderFormat = 1;
                      gPatchDirty = true;
                   }
-                  if (fmtActive == 1) PopSelectedButtonColors();
                }
-
-               ImGui::Separator();
+               SectionCard::End();
+               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
 
                // Builds the job the two submit buttons share, so "Render Now"
                // and "Add to Queue" can never disagree about what was asked
@@ -734,15 +778,18 @@ namespace app
                // missing.
                const bool canRender = !sArrangeRenderFileName.empty();
                ImGui::BeginDisabled(!canRender || ArrangeRenderBusy());
-               if (ImGui::Button(L("Render Now"), ImVec2(110, 0)))
+               if (ChipButton::Draw(L("Render Now"), true, 28.0f, 140.0f))
                {
                   submitJob(true);
                   ImGui::CloseCurrentPopup();
                }
                ImGui::EndDisabled();
-               ImGui::SameLine(0.0f, tok::space_1);
-               if (ImGui::Button(L("Cancel"), ImVec2(70, 0)))
+               ImGui::SameLine(0.0f, tok::space_2);
+               if (ChipButton::Draw(L("Cancel"), false, 28.0f, 88.0f))
                   ImGui::CloseCurrentPopup();
+               SectionCard::EndWindow();
+               FieldWell::PopStyle();
+               ImGui::PopStyleVar();
                ImGui::EndPopup();
             }
 
@@ -755,14 +802,22 @@ namespace app
                ImGui::OpenPopup(L("Overwrite file?##arrangeOverwrite"));
                sArrangeOpenOverwrite = false;
             }
-            if (ImGui::BeginPopupModal(L("Overwrite file?##arrangeOverwrite"), nullptr,
-                                       ImGuiWindowFlags_AlwaysAutoResize))
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
+            ImGui::SetNextWindowSizeConstraints(ImVec2(340.0f, 0.0f), ImVec2(520.0f, 400.0f));
+            const bool overwriteOpen = ImGui::BeginPopupModal(L("Overwrite file?##arrangeOverwrite"), nullptr,
+                                                              ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
+            ImGui::PopStyleVar();
+            if (overwriteOpen)
             {
+               ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
+               SectionCard::Title(T("Overwrite file?"));
                const bool queuedClash = ArrangeRenderPathQueued(sArrangePendingJob.path, 0);
                ImGui::TextUnformatted(queuedClash ? T("Another queued job already writes:") : T("This file already exists:"));
+               ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 320.0f);
                ImGui::TextDisabled("%s", sArrangePendingJob.path.c_str());
-               ImGui::Dummy(ImVec2(0, 4));
-               if (ImGui::Button(L("Overwrite"), ImVec2(100, 0)))
+               ImGui::PopTextWrapPos();
+               ImGui::Dummy(ImVec2(0, tok::space_1));
+               if (ChipButton::Draw(L("Overwrite"), true, 28.0f, 100.0f))
                {
                   ArrangeRenderJob job = sArrangePendingJob;
                   job.id = gArrangeRenderNextJobId++;
@@ -778,8 +833,8 @@ namespace app
                   }
                   ImGui::CloseCurrentPopup();
                }
-               ImGui::SameLine(0.0f, tok::space_1);
-               if (ImGui::Button(L("Auto-rename"), ImVec2(100, 0)))
+               ImGui::SameLine(0.0f, tok::space_2);
+               if (ChipButton::Draw(L("Auto-rename"), false, 28.0f, 100.0f))
                {
                   ArrangeRenderJob job = sArrangePendingJob;
                   job.path = ArrangeRenderUniquePath(job.path);
@@ -796,9 +851,10 @@ namespace app
                   }
                   ImGui::CloseCurrentPopup();
                }
-               ImGui::SameLine(0.0f, tok::space_1);
-               if (ImGui::Button(L("Cancel"), ImVec2(80, 0)))
+               ImGui::SameLine(0.0f, tok::space_2);
+               if (ChipButton::Draw(L("Cancel"), false, 28.0f, 80.0f))
                   ImGui::CloseCurrentPopup();
+               ImGui::PopStyleVar();
                ImGui::EndPopup();
             }
          }
