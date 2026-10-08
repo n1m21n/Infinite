@@ -302,7 +302,7 @@ namespace app
       }
       ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_0_0_0_0));
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_0_0_0_0));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
       auto ValueToPos01 = [&](float v) -> float
       {
