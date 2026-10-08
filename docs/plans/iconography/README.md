@@ -8,16 +8,16 @@ Skills to load before building: `infinite-design-system`, `node-ui-pillars`, `co
 
 How we work: one surface at a time. Per surface: real-app before crop (`tools/design/context_shot.py`) -> change -> after crop -> owner approves -> commit. Flat mockups are not review material. Sections 0-8 below are reference spec; this table is the only place that says what is done.
 
-**Paused 2026-10-08:** steps 1-5 wait for sign-off on the UI system analysis (`docs/plans/ui-system/README.md`, sections 1-7). If approved, this table is rewritten to its three blocks (Engine, Chrome, Canvas + nodes).
+**Approved 2026-10-08:** the UI system analysis (`docs/plans/ui-system/README.md`) is signed off. This table now tracks its three blocks; the old steps 1-5 are folded into them (step 1 metrics layer = Block 1 type + layout engine, steps 2-3 = Block 2 top bar / Arrange header, step 4 = Block 3, step 5 = Block 2 + 3).
 
-| # | Step | State |
-|---|---|---|
-| 0 | Tokens, ratchet (literal colours = 0), glyph pipeline, 56 glyphs, `UiAnim`, preview hook + `context_shot.py` | done |
-| 1 | **Metrics layer**: icon size tokens, tile sizes, gaps, baseline; one helper so no call site computes its own size | next |
-| 2 | Top bar (section 5): groups, sizing, spacing, metronome (approved Logic-style glyph + swing), display box | not started |
-| 3 | Arrange header (section 6): transport, Bars/Time, snap magnet (redraw), division, loop, tool, flag, track height, edit | not started |
-| 4 | Node toggle rows: eye, bypass (lit disc / dim ring), viewport; knobs (3 directions open) | not started |
-| 5 | Remaining chrome (blocks 2 and 3 of section 7), retire `TablerIcons.h`, gallery (debug only), goldens, perf budget | not started |
+| Block | Branch | Step | State |
+|---|---|---|---|
+| 0 | `feature/design-foundations` | Tokens, ratchet, glyph pipeline, 56 glyphs, `UiAnim`, panels on own glyphs, main merged in | done (merge into `main` pending: `main` is checked out in a Codex worktree) |
+| 1 Engine | `feature/ui-engine` | 1a ImGui 1.90.9 -> 1.92.9 (dynamic fonts, 6 local patches re-applied, `imgui-patches.md`) | done, 47/47 smoke + ui group green; Windows/Linux CI not yet run |
+| 1 Engine | `feature/ui-engine` | 1b type engine: sizes x weights from tokens, icon/text optical match | next |
+| 1 Engine | `feature/ui-engine` | 1c layout engine, 1d interaction + stable IDs, 1e first components, 1f gallery + goldens, 1g ratchet, 1h top bar proof surface | not started |
+| 2 Chrome | `feature/ui-chrome` | Arrange header, panels, mod matrix, perf mode, viewport, menus, tables, Settings, feedback | not started |
+| 3 Canvas + nodes | `feature/ui-canvas` | Node frame/pins/cables, controls C1-C12, visualizers, zoom LOD, node icons | not started |
 
 Root cause of the sizing complaints (found 2026-10-08): each call site derives its own icon size from row height (0.65 flag/track height/edit, 0.72 top-bar transport, 0.88 top-bar toggles, 0.9 search). No shared size token exists. Step 1 fixes that before any more icon art is judged.
 
