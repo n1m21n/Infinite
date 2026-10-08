@@ -7,6 +7,7 @@
 #include <cmath>
 #include <string>
 #include "app/AppShared.h"
+#include "core/CategoryColors.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
@@ -147,4 +148,23 @@ namespace LibraryParts
          glyph::Draw(dl, trail, 14.0f, ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.6f * hv)), IconsInfinite::Plus);
       return r;
    }
+
+   // The recessed list well: a darker rounded surface under a scrolling child, so the controls above read as a
+   // header and the list as its own surface. Pair with EndWell. Fills the rest of the panel.
+   inline void BeginWell(const char* id)
+   {
+      const ImVec2 w0 = ImGui::GetCursorScreenPos();
+      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      const ImVec2 w1(w0.x + avail.x, w0.y + avail.y);
+      const bool light = CategoryColors::IsThemeLight();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(w0, w1, ImGui::GetColorU32(ImVec4(0, 0, 0, light ? 0.04f : 0.27f)), tok::radius_pill);
+      dl->AddRect(w0, w1, ImGui::GetColorU32(light ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
+      ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
+      ImGui::BeginChild(id, ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
+      ImGui::PopStyleVar();
+      ImGui::PopStyleColor();
+   }
+   inline void EndWell() { ImGui::EndChild(); }
 }

@@ -355,22 +355,7 @@ void DrawSidePanels(FrameCtx& fc)
                   ? categoryIds[gModulesFilter.typeFilter] : std::string();
 
             std::string spawnName, spawnCategory;
-            // The list sits in a recessed well, so the controls above read as a header and the list as its own
-            // surface: darker than the card, rounded, with a faint rim.
-            {
-               const ImVec2 w0 = ImGui::GetCursorScreenPos();
-               const ImVec2 w1(w0.x + ImGui::GetContentRegionAvail().x,
-                               w0.y + ImGui::GetContentRegionAvail().y);
-               const bool light = CategoryColors::IsThemeLight();
-               ImDrawList* wdl = ImGui::GetWindowDrawList();
-               wdl->AddRectFilled(w0, w1, light ? ImGui::GetColorU32(ImVec4(0, 0, 0, 10 / 255.0f)) : ImGui::GetColorU32(ImVec4(0, 0, 0, 70 / 255.0f)), tok::radius_pill);
-               wdl->AddRect(w0, w1, light ? ImGui::GetColorU32(ImVec4(0, 0, 0, 14 / 255.0f)) : ImGui::GetColorU32(ImVec4(1, 1, 1, 10 / 255.0f)), tok::radius_pill);
-            }
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
-            ImGui::BeginChild("##nodepanellist", ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
-            ImGui::PopStyleVar();
-            ImGui::PopStyleColor();
+            LibraryParts::BeginWell("##nodepanellist");
 
             // No cache: at ~170 entries, filtering+sorting this list from
             // NodeFactory every frame is well under the cost that made

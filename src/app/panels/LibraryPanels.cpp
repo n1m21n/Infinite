@@ -2,6 +2,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/LibraryParts.h"
 
 namespace app
 {
@@ -279,8 +280,6 @@ namespace app
       else if (!folderToScan.empty())
          scanner.StartScan(folderToScan);
 
-      ImGui::Separator();
-
       struct LibraryFilterCache
       {
          std::string lastQuery;
@@ -344,7 +343,7 @@ namespace app
       // spacing wastes a row's worth of height every 4-5 entries.
       const ImVec2 savedItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(savedItemSpacing.x, 2.0f));
-      ImGui::BeginChild("##librarypanellist", ImVec2(0, 0), false);
+      LibraryParts::BeginWell("##librarypanellist");
       // A scanned library folder can hold tens of thousands of files -
       // submitting a Selectable (now a button too) for every one of them
       // regardless of scroll position is what tanked this panel's frame
@@ -365,7 +364,7 @@ namespace app
 
             ImGui::PushID(entry.path.c_str());
 
-            const float rowH = ImGui::GetFrameHeight();
+            const float rowH = LibraryParts::kRowH;
             const bool isFav = mediaKind ? gBrowserFavorites.IsFavoriteMedia(entry.path) : gBrowserFavorites.IsFavoriteSample(entry.path);
 
          // Media mode has no audition - images/video get no play button, and
@@ -459,11 +458,9 @@ namespace app
          const float availW = ImGui::GetContentRegionAvail().x;
          // Reserved unconditionally (not just when isFav) so a row's text
          // doesn't reflow when its favourite state toggles.
-         const float badgeReserve = 20.0f;
+         const float badgeReserve = 40.0f;
          const std::string rowLabel = TruncateWithEllipsis(entry.fileName, std::max(20.0f, availW - badgeReserve));
-         ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0));
-         const ImVec2 selMin = ImGui::GetItemRectMin();
-         const ImVec2 selMax = ImGui::GetItemRectMax();
+         LibraryParts::Row("row", rowLabel, nullptr, isFav);
          if (!mediaKind && getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
          {
             const ImVec2 mn = ImGui::GetItemRectMin();
@@ -500,7 +497,6 @@ namespace app
             ImGui::SetTooltip("%s", gPreviewErrorMessage.c_str());
          }
 
-         DrawFavoriteBadge(selMin, selMax, isFav);
 
          if (ImGui::BeginPopupContextItem("##entry_ctx"))
          {
@@ -746,8 +742,6 @@ namespace app
       ImGui::TextDisabled("%s", T("VST3 support is not compiled into this build."));
 #endif
 
-      ImGui::Separator();
-
       // Its own BrowserFilterState, like the Samples and Media modes each
       // have, so switching tabs and back keeps this mode's in-progress
       // query, sort and filter.
@@ -851,7 +845,7 @@ namespace app
          sCache.lastDescending = gPluginFilter.descending;
       }
 
-      ImGui::BeginChild("##pluginpanellist", ImVec2(0, 0), false);
+      LibraryParts::BeginWell("##pluginpanellist");
       // INFINITE_PLUGINDRAGTEST captures the FIRST matching row, not the last:
       // this list is every installed effect, and the rows past the visible
       // height are drawn but clipped, so a synthetic press aimed at the last
@@ -872,11 +866,9 @@ namespace app
             label += "  -  " + entry.manufacturer;
 
          const float availW = ImGui::GetContentRegionAvail().x;
-         const float badgeReserve = 20.0f;
+         const float badgeReserve = 40.0f;
          const std::string rowLabel = TruncateWithEllipsis(label, std::max(20.0f, availW - badgeReserve));
-         ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0));
-         const ImVec2 selMin = ImGui::GetItemRectMin();
-         const ImVec2 selMax = ImGui::GetItemRectMax();
+         LibraryParts::Row("row", rowLabel, nullptr, isFav);
          if (!testRowCaptured && getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
          {
             const ImVec2 mn = ImGui::GetItemRectMin();
@@ -898,7 +890,6 @@ namespace app
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip(T("%s\n%s"), entry.format.c_str(), entry.identifier.c_str());
 
-         DrawFavoriteBadge(selMin, selMax, isFav);
 
          if (ImGui::BeginPopupContextItem("##plugin_ctx"))
          {
@@ -1050,8 +1041,7 @@ namespace app
       if (gFieldFilter.descending)
          std::reverse(matches.begin(), matches.end());
 
-      ImGui::Separator();
-      ImGui::BeginChild("##fieldpanellist", ImVec2(0, 0), false);
+      LibraryParts::BeginWell("##fieldpanellist");
 
       ImGuiListClipper clipper;
       clipper.Begin((int)matches.size());
@@ -1064,11 +1054,11 @@ namespace app
 
             const bool isFav = gBrowserFavorites.IsFavoriteFieldPreset(entry.name);
             const float availW = ImGui::GetContentRegionAvail().x;
-            const float badgeReserve = 20.0f;
+            const float badgeReserve = 40.0f;
             const float catTagReserve = 70.0f;
 
             const std::string rowLabel = TruncateWithEllipsis(entry.name, std::max(20.0f, availW - badgeReserve - catTagReserve));
-            if (ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0)))
+            if (LibraryParts::Row("row", rowLabel, nullptr, isFav).clicked)
             {
                const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                SpawnFieldPresetNode(entry, spawnPos.x, spawnPos.y);
@@ -1095,8 +1085,7 @@ namespace app
                gFieldDragIndex = entry.presetIndex;
             }
 
-            DrawFavoriteBadge(selMin, selMax, isFav);
-
+   
             if (ImGui::BeginPopupContextItem("##field_ctx"))
             {
                if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))

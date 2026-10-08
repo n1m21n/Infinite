@@ -3716,6 +3716,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gPerfPanelOpen = o.find("perf") != std::string::npos;
       gViewportPanelOpen = o.find("viewport") != std::string::npos;
       gNodePanelOpen = o.find("library") != std::string::npos;
+      // "library:field|samples|media|plugins" picks the mode shown (default Modules).
+      if (o.find("field") != std::string::npos) gSearchPanelMode = 4;
+      else if (o.find("samples") != std::string::npos) gSearchPanelMode = 1;
+      else if (o.find("media") != std::string::npos) gSearchPanelMode = 2;
+      else if (o.find("plugins") != std::string::npos) gSearchPanelMode = 3;
       // ",light" / ",dark" picks the first theme preset of that brightness for the screenshot (not saved).
       const bool wantLight = o.find("light") != std::string::npos;
       if (wantLight || o.find("dark") != std::string::npos)
