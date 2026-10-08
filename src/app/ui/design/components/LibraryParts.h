@@ -14,7 +14,7 @@
 namespace LibraryParts
 {
    constexpr float kFieldH = 32.0f;
-   constexpr float kRowH = 28.0f;
+   constexpr float kRowH = 26.0f;
    constexpr float kHeaderH = 28.0f;
 
    // Search field: rounded well, magnifier at the left, clear (x) at the right while there is text.
@@ -88,13 +88,13 @@ namespace LibraryParts
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float y = std::round(p.y + top + (kHeaderH - tok::space_2 - ImGui::GetFontSize()) * 0.5f + 2.0f);
       const ImU32 col = ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.6f));
-      dl->AddText(ImVec2(p.x + tok::space_2, y), col, label);
+      dl->AddText(ImVec2(p.x + tok::space_3, y), col, label);
       if (count >= 0)
       {
          char n[16];
          snprintf(n, sizeof(n), "%d", count);
          const ImVec2 sz = ImGui::CalcTextSize(n);
-         dl->AddText(ImVec2(p.x + w - tok::space_2 - sz.x, y),
+         dl->AddText(ImVec2(p.x + w - tok::space_3 - sz.x, y),
                      ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.35f)), n);
       }
    }
@@ -114,7 +114,9 @@ namespace LibraryParts
       const float w = ImGui::GetContentRegionAvail().x;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::PushID(id);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 0.0f));   // rows butt up; the hover tile carries the gap
       r.clicked = ImGui::InvisibleButton("##row", ImVec2(w, kRowH));
+      ImGui::PopStyleVar();
       r.hovered = ImGui::IsItemHovered();
       const bool down = ImGui::IsItemActive();
       const float hv = UiAnim::Hover(ImGui::GetItemID(), r.hovered, tok::motion_hover_in, tok::motion_hover_out);
