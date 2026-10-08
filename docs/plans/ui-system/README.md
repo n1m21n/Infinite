@@ -81,13 +81,13 @@ Rules: a surface never calls `ImGui::Button/Separator/SameLine/PushStyle*`; a co
 
 | Metric | Source | Value now |
 |---|---|---|
-| Raw ImGui widget/flow calls in surfaces (`Button`, `SameLine`, `Dummy`, `SetCursorScreenPos`, `PushStyleColor`, `Separator`) | `tools/design/inventory.py` (extend) | ~1,365 |
+| Raw ImGui widget/flow calls in surfaces (`Button`, `SameLine`, `Dummy`, `SetCursorScreenPos`, `PushStyleColor`, `Separator`) | `tools/design/inventory.py` (extend) | ~1,365; ratchet subset (`Button`, `SmallButton`, `Separator`, `SameLine`, `PushStyleColor`, `PushStyleVar`) = **959 in 32 files** (2026-10-08) |
 | Float / `ImVec2` literals in UI files | inventory | ~9.9k / 346 |
 | Type sizes / weights in use | `PushFont` count | 1 / 1 |
 | Components | `components/` | 1 |
 | Widgets with label-derived IDs | grep `T(`/`L(` labels | 320 |
-| Canvas B6 pan p50 / p95 | perf bench | 8.4 / 12.2 ms |
-| Font atlas size (px, MB) | log at startup | record |
+| Canvas B6 pan p50 / p95 | perf bench | 8.4 / 12.2 ms (unpaced, perf plan). 2026-10-08 A/B, main `4b5a0a30` vs `feature/ui-engine` after 1g, 300 nodes, visible, vsync paced: frame p50 16.67 / 16.67, p95 17.22 / 16.89, pan/zoom stage 16.67 both; canvas stages equal (node_bodies 2.03 / 2.02 ms, imgui_render 0.43 / 0.44 ms); footprint 951.5 / 948.7 MB. Within +5 % |
+| Font atlas size (px, MB) | log at startup | not measured on the old bake; footprint above is the proxy (no increase). Dynamic atlas now |
 | Node text sharpness at 2× canvas zoom | headless shot | record |
 | Golden shots of every surface, light + dark | `context_shot.py` | record |
 
