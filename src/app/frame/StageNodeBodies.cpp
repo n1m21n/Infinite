@@ -288,10 +288,7 @@ void DrawNodeBodies(FrameCtx& fc)
                ImGui::PushStyleColor(ImGuiCol_Text,
                                      ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f,
                                             catColor.b * 0.6f + 0.4f, 0.75f));
-            {
-               UiType::Scope catType(UiType::Size::Caption);  // quiet: the title is the header's one loud line
-               ImGui::TextUnformatted(gn.category.c_str());
-            }
+            ImGui::TextUnformatted(gn.category.c_str());  // same size as everything in the node; only colour/weight rank it
             ImGui::PopStyleColor();
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
          }
