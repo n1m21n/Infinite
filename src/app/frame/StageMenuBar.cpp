@@ -4,11 +4,38 @@
 #include "app/ui/design/components/Readout.h"
 #include "app/ui/design/components/TopBarParts.h"
 #include "app/ui/design/components/Divider.h"
+#include "app/ui/design/components/PanelRail.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
 {
+// The rail of panel toggles down the right edge. Library sits on the top bar's centre line; the four
+// panels follow below a hairline, one tile apart.
+static void DrawPanelRail()
+{
+   PanelRail::Begin(ImGui::GetMainViewport());
+   const float first = (tok::bar_h - tok::tile) * 0.5f;
+   const float step = tok::tile + tok::space_1;
+   if (PanelRail::Item("##railLibrary", first, IconsInfinite::Library, IconsInfinite::LibraryFill, gNodePanelOpen,
+                       T("Library - search modules, samples, media and plugins")))
+      gNodePanelOpen = !gNodePanelOpen;
+   const float groupTop = tok::bar_h + tok::space_2;
+   if (PanelRail::Item("##railViewport", groupTop, IconsInfinite::Viewport, IconsInfinite::ViewportFill, gViewportPanelOpen,
+                       T("Viewport panel")))
+      gViewportPanelOpen = !gViewportPanelOpen;
+   if (PanelRail::Item("##railModMatrix", groupTop + step, IconsInfinite::GridDots, nullptr, gModMatrixOpen,
+                       T("Modulation matrix")))
+      gModMatrixOpen = !gModMatrixOpen;
+   if (PanelRail::Item("##railPerf", groupTop + 2.0f * step, IconsInfinite::Perform, nullptr, gPerfPanelOpen,
+                       T("Performance mode")))
+      gPerfPanelOpen = !gPerfPanelOpen;
+   if (PanelRail::Item("##railArrange", groupTop + 3.0f * step, IconsInfinite::Cube, nullptr, gArrangePanelOpen,
+                       T("Arrangement timeline")))
+      gArrangePanelOpen = !gArrangePanelOpen;
+   PanelRail::End();
+}
+
 void DrawMenuBar(FrameCtx& fc)
 {
    auto& window = fc.window;
@@ -18,7 +45,9 @@ void DrawMenuBar(FrameCtx& fc)
       // ---------------- node editor ----------------
       vp = ImGui::GetMainViewport();
       ImGui::SetNextWindowPos(vp->WorkPos);
-      ImGui::SetNextWindowSize(vp->WorkSize);
+      // The panel rail is a separate window down the right edge; the shell (menu bar, canvas, docked panels)
+      // takes the rest, so every dock lays out against the narrower width without knowing about the rail.
+      ImGui::SetNextWindowSize(ImVec2(vp->WorkSize.x - PanelRail::kWidth, vp->WorkSize.y));
       // NoScrollbar/NoScrollWithMouse: this window is a fixed full-screen
       // shell (also NoResize/NoMove) whose every region is meant to be
       // divided exactly among the menu bar, canvas and docked panels, never
@@ -426,19 +455,14 @@ void DrawMenuBar(FrameCtx& fc)
          }
 
 
-         SectionBreak();
-
-         // Bar and beat lead the readout group: bar, beat, BPM, signature, key.
-         {
-            char barBeat[64];
-            snprintf(barBeat, sizeof(barBeat), T("bar %d  beat %.2f"),
-                     1 + (int)transport.Bars(),
-                     std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
-            char barWidest[64];
-            snprintf(barWidest, sizeof(barWidest), T("bar %d  beat %.2f"), 99, 9.99);
-            TabLabel("topbar.barbeat", barBeat, barWidest, false);
-            TopBarSameLine(12.0f);
-         }
+         // Left cluster ends here: menus, transport, audio. Tempo, meter, click and key sit centred in the
+         // bar; the readouts sit at the right. The centred group is placed from last frame's measured width.
+         const float leftClusterEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
+         static float sCentreW = 0.0f;
+         const float centreX = std::max(leftClusterEndX + tok::space_5,
+                                        std::round((ImGui::GetWindowWidth() - sCentreW) * 0.5f));
+         ImGui::SameLine(centreX);
+         const float centreStartScreenX = ImGui::GetCursorScreenPos().x;
 
          static const int kDens[] = { 1, 2, 4, 8, 16 };
          auto SnapToValidDenominator = [](int val) -> int {
@@ -783,10 +807,12 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndPopup();
          }
 
-         SectionBreak();
+         // Width of the centred group, measured for next frame's placement.
+         sCentreW = ImGui::GetItemRectMax().x - centreStartScreenX;
+         const float centreEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
 
-         // 4. Telemetry (Bar & beat, frame cost, CPU load)
-         // Frame cost
+         // 4. Telemetry (frame cost, CPU load) at the right edge, with Update beside it when a newer
+         // version exists. The panel toggles live on the rail down the window's right edge.
          static double sSmoothedMs = 0.0;
          sSmoothedMs = (sSmoothedMs <= 0.0)
                           ? gLastFrameMs
@@ -809,40 +835,26 @@ void DrawMenuBar(FrameCtx& fc)
          else
             snprintf(cpuReadout, sizeof(cpuReadout), "cpu --");
 
-         TabLabel("topbar.fps", readout, "99.9 fps   99.9 ms", true);
-         TopBarSameLine(8.0f);
-         TabLabel("topbar.cpu", cpuReadout, audioDead ? cpuReadout : "cpu 99%", true);
+         auto TabWidth = [](const char* widest, const char* text)
+         {
+            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Regular);
+            return std::max(Readout::Measure(widest), Readout::Measure(text));
+         };
+         const char* cpuWidest = audioDead ? cpuReadout : "cpu 99%";
+         const float fpsW = TabWidth("99.9 fps   99.9 ms", readout);
+         const float cpuW = TabWidth(cpuWidest, cpuReadout);
+         const float telemetryGap = tok::space_2;
+         const float telemetryW = fpsW + telemetryGap + cpuW;
 
-         if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
-            ImGui::SetTooltip(T("xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device"),
-                              (unsigned long long)xruns,
-                              (unsigned long long)xrunParts.deadline,
-                              (unsigned long long)xrunParts.os);
-
-         // Left cluster's true rightmost extent (window-local X), used below
-         // to crop the right cluster instead of letting it overlap the left
-         // one when the window gets too narrow to fit both.
-         const float leftClusterEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
-
-         // Far right: an "Update" button (green, shown only while a newer
-         // version is actually available), then icon buttons for the
-         // Viewport panel, Modulation matrix and Performance mode, then a
-         // search icon+label - all sharing the same transparent/hover-fill
-         // button style as BPM/Key/Scale so they read as one family of
-         // controls rather than the dimmed bar/beat/fps/cpu cluster.
-         // On a narrow window these are dropped one at a time (icon toggles
-         // first, then search, then Update) rather than drawn on top of the
-         // left cluster - the bar crops instead of clutters.
-         const float windowRight = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x;
-         const float itemGap = tok::space_2;
-         const float minGap = 12.0f;
+         const float windowRight = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - tok::space_3;
+         const float minGap = tok::space_4;
          float cursorX = windowRight;
 
          if (UpdateCheck::UpdateAvailable())
          {
             const char* updateLabel = T("Update");
             const float updateWidth = ImGui::CalcTextSize(updateLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-            if (cursorX - updateWidth >= leftClusterEndX + minGap)
+            if (cursorX - updateWidth - telemetryGap - telemetryW >= centreEndX + minGap)
             {
                cursorX -= updateWidth;
 
@@ -861,127 +873,31 @@ void DrawMenuBar(FrameCtx& fc)
                }
                if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                   UpdateCheck::Dismiss();
-               cursorX -= itemGap;
+               cursorX -= telemetryGap;
             }
          }
 
-         // Library: a labelled toggle, not a bare magnifier - it opens the panel that lists,
-         // searches and adds every node, so it is named for what it holds. A hairline sets it
-         // apart from the four icon-only panel toggles to its right.
+         // On a narrow window the readouts are dropped rather than drawn over the centred group.
+         if (cursorX - telemetryW >= centreEndX + minGap)
          {
-            const char* libLabel = T("Library");
-            const float iconSize = tok::icon_md;
-            const float iconSlot = iconSize + 6.0f;
-            const float textW = ImGui::CalcTextSize(libLabel).x;
-            const float totalW = iconSlot + textW + ImGui::GetStyle().FramePadding.x * 2.0f;
-            if (cursorX - totalW >= leftClusterEndX + minGap)
-            {
-               cursorX -= totalW;
+            ImGui::SameLine(cursorX - telemetryW);
+            TabLabel("topbar.fps", readout, "99.9 fps   99.9 ms", true);
+            TopBarSameLine(telemetryGap);
+            TabLabel("topbar.cpu", cpuReadout, cpuWidest, true);
 
-               ImGui::SameLine(cursorX);
-               const ImVec2 btnStart = ImGui::GetCursorScreenPos();
-               const bool clicked = ImGui::InvisibleButton("##nodeLibrary", ImVec2(totalW, tok::tile));
-               const bool hov = ImGui::IsItemHovered();
-               const bool down = ImGui::IsItemActive();
-               const ImGuiID aid = ImGui::GetItemID();
-               const float hv = UiAnim::Hover(aid, hov, tok::motion_hover_in, tok::motion_hover_out);
-               const float onv = UiAnim::Value(aid + 1, gNodePanelOpen ? 1.0f : 0.0f, gNodePanelOpen ? tok::motion_on : tok::motion_off);
-               ImDrawList* dl = ImGui::GetWindowDrawList();
-               const ImVec2 bmax(btnStart.x + totalW, btnStart.y + tok::tile);
-               const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-               const float overlay = (down ? 0.12f : 0.06f * hv) * (1.0f - onv);
-               if (overlay > 0.001f)
-                  dl->AddRectFilled(btnStart, bmax, ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, overlay)), tok::radius_tile);
-               if (onv > 0.001f)
-               {
-                  ImVec4 acc = down ? AccentEmphasisPressed() : AccentEmphasisSelected();
-                  acc.w = onv;
-                  dl->AddRectFilled(btnStart, bmax, ImGui::GetColorU32(acc), tok::radius_tile);
-               }
-               const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-               glyph::Draw(dl, ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSize * 0.5f, btnStart.y + tok::tile * 0.5f),
-                           iconSize, col, gNodePanelOpen ? IconsInfinite::LibraryFill : IconsInfinite::Library);
-               dl->AddText(ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSlot, btnStart.y + (tok::tile - ImGui::GetTextLineHeight()) * 0.5f), col, libLabel);
-               if (hov)
-                  HelpTip("%s", T("Library - search modules, samples, media and plugins"));
-               if (clicked)
-                  gNodePanelOpen = !gNodePanelOpen;
-               cursorX -= tok::space_3;
-               Divider::Vertical(UiLayout::Rect { cursorX - 1.0f, btnStart.y, 1.0f, tok::tile }, 4.0f);
-               cursorX -= tok::space_3;
-            }
+            if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
+               ImGui::SetTooltip(T("xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device"),
+                                 (unsigned long long)xruns,
+                                 (unsigned long long)xrunParts.deadline,
+                                 (unsigned long long)xrunParts.os);
          }
-
-         // Icon-only toggle buttons for Viewport / Modulation matrix /
-         // Performance mode - a little larger than the transport play/
-         // rewind buttons (38px, icon at 88% of the row height) since these
-         // carry no text label to help them read at a glance.
-         // Returns false without drawing anything when there isn't room -
-         // these are the first things dropped on a narrow window, since they
-         // carry no text label and are the least essential of the cluster.
-         // The four toggles spread evenly across the Library panel's tab row: the span runs from the panel's
-         // inner left edge (kNodePanelWidth minus its 16 pt gap and padding each side) to the hairline. Falls back to a
-         // tight pack when the window is too narrow for that span.
-         float iconGap = tok::space_1;
-         {
-            const float regionLeft = windowRight - (fc.kNodePanelWidth - 32.0f);
-            const float even = (cursorX - regionLeft - 4.0f * tok::tile) / 3.0f;
-            if (regionLeft >= leftClusterEndX + minGap && even > tok::space_1)
-               iconGap = even;
-         }
-         auto TopBarIconToggle = [&](const char* id, bool isOpen, void (*draw)(ImDrawList*, ImVec2, float, ImU32, float), const char* tooltip, const char* glyphOff = nullptr, const char* glyphOn = nullptr)
-         {
-            const float btnW = tok::tile;
-            if (cursorX - btnW < leftClusterEndX + minGap)
-               return false;
-            cursorX -= btnW;
-            ImGui::SameLine(cursorX);
-
-            if (glyphOff != nullptr)
-            {
-               const bool clicked = IconTile::Draw(id, glyphOff, glyphOn, isOpen, 28.0f, ImGui::GetFrameHeight());
-               if (ImGui::IsItemHovered())
-                  HelpTip("%s", tooltip);
-               cursorX -= iconGap;
-               return clicked;
-            }
-            if (isOpen)
-               PushSelectedButtonColors();
-            const bool clicked = ImGui::Button(id, ImVec2(btnW, 0.0f));
-            if (isOpen)
-               PopSelectedButtonColors();
-            if (ImGui::IsItemHovered())
-               HelpTip("%s", tooltip);
-
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 bmin = ImGui::GetItemRectMin();
-            const ImVec2 bmax = ImGui::GetItemRectMax();
-            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = tok::icon_md;
-            const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-            if (glyphOff != nullptr)
-               glyph::Draw(dl, center, iconSize, col, (isOpen && glyphOn != nullptr) ? glyphOn : glyphOff);
-            else if (draw != nullptr)
-               draw(dl, center, iconSize, col, 0.0f);
-            else
-               glyph::DrawPlaceholder(dl, center, iconSize, col, 0.0f);
-
-            cursorX -= iconGap;
-            return clicked;
-         };
-
-         if (TopBarIconToggle("##arrangePanelToggle", gArrangePanelOpen, nullptr, T("Arrangement timeline"), IconsInfinite::Cube))
-            gArrangePanelOpen = !gArrangePanelOpen;
-         if (TopBarIconToggle("##perfPanelToggle", gPerfPanelOpen, &glyph::DrawDisc, T("Performance mode")))
-            gPerfPanelOpen = !gPerfPanelOpen;
-         if (TopBarIconToggle("##modMatrixToggle", gModMatrixOpen, nullptr, T("Modulation matrix"), IconsInfinite::GridDots))
-            gModMatrixOpen = !gModMatrixOpen;
-         if (TopBarIconToggle("##viewportPanelToggle", gViewportPanelOpen, nullptr, T("Viewport panel"), IconsInfinite::Viewport, IconsInfinite::ViewportFill))
-            gViewportPanelOpen = !gViewportPanelOpen;
 
          ImGui::PopStyleColor(6);
          ImGui::PopStyleVar(4);
 
          ImGui::EndMenuBar();
-      }}
+      }
+
+      DrawPanelRail();
+   }
 }
