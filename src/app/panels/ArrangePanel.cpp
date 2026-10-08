@@ -1,4 +1,5 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -821,13 +822,13 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.6f;
+            const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = arrangeIsPlaying ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
             if (arrangeIsPlaying)
-               Tabler::DrawPlayerPause(ImGui::GetWindowDrawList(), center, iconSize, icol);
+               glyph::DrawPlayerPause(ImGui::GetWindowDrawList(), center, iconSize, icol);
             else
-               Tabler::DrawPlayerPlay(ImGui::GetWindowDrawList(), center, iconSize, icol);
+               glyph::DrawPlayerPlay(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
          ImGui::SameLine();
@@ -839,10 +840,10 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.72f;
+            const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
-            Tabler::DrawPlayerRewind(ImGui::GetWindowDrawList(), center, iconSize, icol);
+            glyph::DrawPlayerRewind(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
          // Bars | Time: which unit the ruler, the clip popup and the loop
@@ -902,10 +903,10 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.62f;
+            const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = snapWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
-            Tabler::DrawMagnet(ImGui::GetWindowDrawList(), center, iconSize, icol);
+            glyph::DrawMagnet(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
          // Grid division dropdown. The divisions are MusicTime's own
@@ -962,10 +963,10 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.65f;
+            const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = loopWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
-            Tabler::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
+            glyph::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
          // Tool Selector (Select A, Trim T, Range R, Blade B, Zoom Z, Hand H)
@@ -1002,24 +1003,24 @@ namespace app
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
-            const float iconSize = (bmax.y - bmin.y) * 0.65f;
+            const float iconSize = tok::icon_md;
             const ImVec2 center(bmin.x + 12.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = toolNonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             switch (gArrangeTool)
             {
-               case ArrangeTool::Select: Tabler::DrawPointer(tdl, center, iconSize, icol, true); break;
-               case ArrangeTool::Trim:   Tabler::DrawTrim(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Range:  Tabler::DrawRange(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Blade:  Tabler::DrawScissors(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Zoom:   Tabler::DrawZoom(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Hand:   Tabler::DrawHand(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Pencil: Tabler::DrawPencil(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Select: glyph::DrawPointer(tdl, center, iconSize, icol, true); break;
+               case ArrangeTool::Trim:   glyph::DrawTrim(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Range:  glyph::DrawRange(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Blade:  glyph::DrawScissors(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Zoom:   glyph::DrawZoom(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Hand:   glyph::DrawHand(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Pencil: glyph::DrawPencil(tdl, center, iconSize, icol); break;
             }
             // Small chevron down on the right edge
             const ImVec2 chevCenter(bmax.x - 6.5f, (bmin.y + bmax.y) * 0.5f);
-            Tabler::DrawChevronDown(tdl, chevCenter, 8.0f, icol, 1.3f);
+            glyph::DrawChevronDown(tdl, chevCenter, 8.0f, icol, 1.3f);
          }
 
          if (ImGui::BeginPopup("##arrangetoolpopup"))
@@ -1074,7 +1075,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
-            Tabler::DrawFlag(ImGui::GetWindowDrawList(), center, (bmax.y - bmin.y) * 0.65f, icol);
+            glyph::DrawFlag(ImGui::GetWindowDrawList(), center, tok::icon_md, icol);
          }
 
          // Reset Row Heights: any track drag-resized off the default row
@@ -1104,7 +1105,7 @@ namespace app
             const ImU32 barCol = anyResized
                ? (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol)
                : (arrangeIconCol & 0x60FFFFFFu);
-            Tabler::DrawLineHeight(ImGui::GetWindowDrawList(), rcenter, (rbmax.y - rbmin.y) * 0.65f, barCol);
+            glyph::DrawLineHeight(ImGui::GetWindowDrawList(), rcenter, tok::icon_md, barCol);
             if (hovered)
                HelpTip(anyResized ? T("Reset all track heights to default") : T("All tracks already at default height"));
          }
@@ -1130,7 +1131,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
             const ImU32 icol = inspectorWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : (hovered ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol);
-            Tabler::DrawEdit(ImGui::GetWindowDrawList(), center, (bmax.y - bmin.y) * 0.65f, icol);
+            glyph::DrawEdit(ImGui::GetWindowDrawList(), center, tok::icon_md, icol);
          }
 
          // The routing mode (gAudioMode) is owned by the "Enable Timeline
@@ -2270,11 +2271,11 @@ namespace app
          const ImU32 chevronCol = foldHovered ? (isLight ? tok::U32(tok::pal::c_32323CFF) : tok::U32(tok::pal::c_F0F0F0FF)) : (tint | 0xE0000000u);
          const ImVec2 chevCenter(indentX + 6.0f, rowTop + kLaneHeight * 0.5f);
          if (grp->collapsed)
-            Tabler::DrawChevronRight(dl, chevCenter, 11.0f, chevronCol);
+            glyph::DrawChevronRight(dl, chevCenter, 11.0f, chevronCol);
          else
-            Tabler::DrawChevronDown(dl, chevCenter, 11.0f, chevronCol);
+            glyph::DrawChevronDown(dl, chevCenter, 11.0f, chevronCol);
 
-         Tabler::DrawFolder(dl, ImVec2(indentX + 20.0f, rowTop + kLaneHeight * 0.5f), 13.0f, tint);
+         glyph::DrawFolder(dl, ImVec2(indentX + 20.0f, rowTop + kLaneHeight * 0.5f), 13.0f, tint);
 
          ImGui::SameLine(0.0f, 6.0f);
 
@@ -3515,23 +3516,23 @@ namespace app
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
-            Tabler::DrawScissors(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
-            Tabler::DrawScissors(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
+            glyph::DrawScissors(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
+            glyph::DrawScissors(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
          }
          else if (gArrangeTool == ArrangeTool::Pencil)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
-            Tabler::DrawPencil(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
-            Tabler::DrawPencil(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
+            glyph::DrawPencil(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
+            glyph::DrawPencil(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
          }
          else if (gArrangeTool == ArrangeTool::Zoom)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
             const bool zoomOut = ImGui::GetIO().KeyAlt || ImGui::IsMouseDown(ImGuiMouseButton_Right);
-            Tabler::DrawZoom(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
-            Tabler::DrawZoom(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
+            glyph::DrawZoom(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
+            glyph::DrawZoom(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
             // Draw + or - indicator inside the magnifying glass center
             const ImVec2 zc(mouse.x - 2.0f, mouse.y - 2.0f);
             fg->AddLine(ImVec2(zc.x - 2.5f, zc.y), ImVec2(zc.x + 2.5f, zc.y), tok::U32(tok::pal::c_FFFFFFFF), 1.6f);

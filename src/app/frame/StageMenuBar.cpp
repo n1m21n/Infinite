@@ -309,7 +309,7 @@ void DrawMenuBar(FrameCtx& fc)
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.72f;
+            const float iconSize = tok::icon_md;
             const ImU32 col = isTransportPlaying
                                   ? tok::U32(tok::pal::c_FFFFFFFF)
                                   : ImGui::GetColorU32(ImGuiCol_Text);
@@ -331,7 +331,7 @@ void DrawMenuBar(FrameCtx& fc)
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.72f;
+            const float iconSize = tok::icon_md;
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
             glyph::DrawPlayerRewind(dl, center, iconSize, col);
          }
@@ -662,7 +662,7 @@ void DrawMenuBar(FrameCtx& fc)
                const ImVec2 bmax = ImGui::GetItemRectMax();
                glyph::DrawMetronome(ImGui::GetWindowDrawList(),
                                      ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
-                                     (bmax.y - bmin.y) * 0.84f, ImGui::GetColorU32(iconCol), swing);
+                                     tok::icon_md, ImGui::GetColorU32(iconCol), swing);
             }
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                ImGui::OpenPopup("##metronomePopup");
@@ -852,7 +852,7 @@ void DrawMenuBar(FrameCtx& fc)
 
          {
             const char* searchLabel = T("search");
-            const float iconSize = ImGui::GetFrameHeight() * 0.9f;
+            const float iconSize = tok::icon_md;
             const float iconSlot = iconSize + 7.0f;
             const float textW = ImGui::CalcTextSize(searchLabel).x;
             const float totalW = iconSlot + textW + ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -911,10 +911,10 @@ void DrawMenuBar(FrameCtx& fc)
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.88f;
+            const float iconSize = tok::icon_md;
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
             if (glyphOff != nullptr)
-               glyph::Draw(dl, center, iconSize * 0.9f, col, (isOpen && glyphOn != nullptr) ? glyphOn : glyphOff);
+               glyph::Draw(dl, center, iconSize, col, (isOpen && glyphOn != nullptr) ? glyphOn : glyphOff);
             else if (draw != nullptr)
                draw(dl, center, iconSize, col, 0.0f);
             else

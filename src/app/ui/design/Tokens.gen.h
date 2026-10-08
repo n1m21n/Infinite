@@ -16,6 +16,9 @@ namespace tok
    constexpr float type_body = 13.0f;
    constexpr float type_title = 15.0f;
    constexpr float type_display = 22.0f;
+   constexpr float icon_sm = 14.0f;
+   constexpr float icon_md = 18.0f;
+   constexpr float icon_lg = 20.0f;
    constexpr float motion_hover_in = 120.0f;
    constexpr float motion_hover_out = 180.0f;
    constexpr float motion_press = 0.0f;
