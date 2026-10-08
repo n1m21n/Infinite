@@ -88,7 +88,7 @@ void DrawLayout(FrameCtx& fc)
          liveCfg.NavigateButtonIndex = gPanWithLeft ? 0 : 1;
       }
 
-      kNodePanelWidth = 300.0f;
+      kNodePanelWidth = 340.0f;
       const bool viewportPanelOpen = gViewportPanelOpen;
       viewportBottom = viewportPanelOpen && gViewportPanelDock == 0;
       viewportRight = viewportPanelOpen && gViewportPanelDock == 1;
