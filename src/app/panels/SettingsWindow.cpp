@@ -865,7 +865,7 @@ namespace app
             }
 
             // Section 3: Declarations
-            if ((sSelectedSection == 0 || sSelectedSection == 3) && MatchesFilter("declarations param state attrib output"))
+            if ((sSelectedSection == 0 || sSelectedSection == 3) && MatchesFilter("declarations param state attrib output input image img offset sampling"))
             {
                ImGui::SeparatorText("3. Declarations");
                ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "param <type> <name> = <default> [<min>, <max>]");
@@ -875,6 +875,10 @@ namespace app
                ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "state <type> <name> = <init>");
                ImGui::TextWrapped("Persistent delay cell (one execution unit of memory). Essential for feedback loops, filters, and integrators.");
                DrawCodeBox("state float z = 0\nz += (in - z) * cutoff\nout = z", "cb_state");
+
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "input pixel image img; img(coord)");
+               ImGui::TextWrapped("Field Pixel: img is the current-pixel RGBA input. img(vec2) samples it at normalized coordinates, clamped to the source's edge texel centres. Filtering follows the source sampler (normally linear). Only a declared image input is callable; col is the RGB output. No connected image reads transparent black.");
+               DrawCodeBox("input pixel image img;\nc = img(uv + vec2(1.0 / res.x, 0));\ncol = c.rgb; alpha = c.a;", "cb_imageoffset");
 
                ImGui::TextColored(tok::V4(tok::palf::v_1000_800_400_1000), "attrib <type> <name> = <init>");
                ImGui::TextWrapped("Declares custom per-element attributes living on geometry points or vertices.");

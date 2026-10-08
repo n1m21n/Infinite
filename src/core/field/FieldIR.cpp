@@ -152,6 +152,7 @@ namespace Field
          bool isOutputPin = false;
          bool isInputPin = false;
          bool isStructuralGeometry = false;
+         bool isImageInput = false;
       };
 
       struct ElementScope
@@ -594,6 +595,9 @@ namespace Field
                   return ir;
                }
 
+               // Declared image inputs and pixel state cells support coordinate
+               // reads. Image inputs always read the source; state reads use the
+               // previous cook's bank. Ordinary locals/outputs aren't callable.
                // 0. Build step 22 (OPEN-C): a call whose callee names a state
                // cell is an offset read of that cell - `A(uv + d)` - not a
                // function call. Bare `A` stays sugar for `A(uv)`, so this is
@@ -602,6 +606,39 @@ namespace Field
                // lookup so an ordinary function name is untouched.
                if (const VarSymbol* stSym = scope.Find(call->callee))
                {
+                  if (stSym->isImageInput)
+                  {
+                     if (scope.targetDomain != Domain::Pixel || stSym->domain != Domain::Pixel)
+                     {
+                        error.severity = Severity::Error;
+                        error.span = call->span;
+                        error.message = "offset reads of image '" + call->callee + "' are only legal in a pixel-domain kernel";
+                        return nullptr;
+                     }
+                     if (call->args.size() != 1)
+                     {
+                        error.severity = Severity::Error;
+                        error.span = call->span;
+                        error.message = "an offset read of image '" + call->callee + "' takes exactly 1 argument: " + call->callee + "(uv + d)";
+                        return nullptr;
+                     }
+                     auto coordIR = LowerAstExpr(call->args[0], scope, error);
+                     if (!coordIR) return nullptr;
+                     if (coordIR->type.kind != DataType::Vec2)
+                     {
+                        error.severity = Severity::Error;
+                        error.span = call->args[0]->span;
+                        error.message = "an offset read of image '" + call->callee + "' needs a vec2 coordinate (got " + coordIR->type.ToString() + ")";
+                        error.hint = "e.g. " + call->callee + "(uv + vec2(1.0 / res.x, 0))";
+                        return nullptr;
+                     }
+                     auto ir = std::make_shared<IRNode>(IRKind::ImageRead, call->span);
+                     ir->varName = call->callee;
+                     ir->type = FieldType(DataType::Vec4, 4);
+                     ir->domain = Domain::Pixel;
+                     ir->children.push_back(coordIR);
+                     return ir;
+                  }
                   if (stSym->isState)
                   {
                      if (stSym->domain != Domain::Pixel)
@@ -1903,6 +1940,7 @@ namespace Field
                sym.isInputPin = true;
                sym.isReadOnly = true;
                sym.isStructuralGeometry = (decl->typeName == "geometry");
+               sym.isImageInput = (decl->typeName == "image");
                scope.Add(sym);
 
                return nullptr;
@@ -3532,6 +3570,7 @@ namespace Field
             sym.isInputPin = !isOutput;
             sym.isReadOnly = true;
             sym.isStructuralGeometry = (!isOutput && typeName == "geometry");
+            sym.isImageInput = (!isOutput && typeName == "image");
             scope.Add(sym);
             continue;
          }

@@ -133,6 +133,7 @@ ASCII, no special characters, in every example in every skill and every doc.
 | `@P.y += bass * 2` | `P.y += bass * 2` | the sigil was removed by owner decision |
 | `@Cd = vec3(1,0,0)` | `Cd = vec3(1,0,0)` | same |
 | `v@P` / `f@heat` | `P` / `heat` | Field has no type-prefix sigil either |
+| `col(uv + offset)` | `input pixel image img; c = img(uv + offset); col = c.rgb; alpha = c.a;` | Only declared pixel image inputs support coordinate reads; `col` stays the RGB output |
 
 ## 5. Reserved words, per domain
 
@@ -477,6 +478,26 @@ as a checkable fact:
 
 
 ---
+
+## Coordinate reads of a pixel image input
+
+```glsl
+input pixel image img;
+c = img(uv + vec2(1.0 / res.x, 0));
+col = c.rgb;
+alpha = c.a;
+```
+
+`img` is the current-pixel RGBA source; `img(coord)` returns a `vec4` sampled
+at one normalized `vec2` coordinate. Only a declared `input pixel image` is
+callable, only inside a pixel kernel. Output names (including `col`) and
+ordinary vec4 locals cannot be called. One image input is supported.
+Coordinates clamp to the source texture's edge texel centres (source size,
+not output `res`); filtering follows its sampler, normally GL_LINEAR.
+Disconnected inputs read transparent black. `1/res.x` shifts one texel only
+when source and output widths match. Image reads count toward the fetch
+budget without selecting the 32F state-simulation bank. Image wrap/border
+annotations are not supported; state cells keep their own boundary modes.
 
 ## Offset reads of a pixel state cell (build step 22, OPEN-C answered)
 

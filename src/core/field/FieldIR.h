@@ -30,7 +30,8 @@ namespace Field
       Binary,
       Call,
       Access,
-      StateRead
+      StateRead,
+      ImageRead // Declared pixel image sampled at its vec2 child coordinate.
    };
 
    struct IRNode;

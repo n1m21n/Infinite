@@ -231,6 +231,12 @@ entry if a refactor makes it stale.
 
 - **Render 3D draws a flattened list, not its four pins.** `Render3DNode::CollectDraw()`/`FlattenedGeometry()` (`Geometry3DNodes.cpp`) expand `Group3DNode` children (`GroupChildCount`/`GroupChild` on `IGeometrySource`) depth-first into `mDraw`, capped at `kMaxDraw` (64) and depth 8. `mGpu` and `SceneSignature` are sized from it, so any new per-slot loop in Render 3D must iterate `mDraw`, not `kSlots`. `kSlots` itself must not change: saved pin indices depend on it.
 
+- **Field pixel image coordinate reads** connect two declaration paths in
+  `FieldIR.cpp` (shared `LowerAstStmt` and `LowerPixelProgramToIR` pin pre-scan)
+  to `GlslBackend.cpp`'s `ImageRead` and `FieldPixelNode::CookIfNeeded`'s unit-1
+  binding. Both paths must mark image symbols. Image fetches count toward
+  `offsetReadCount`; `usesOffsetReads` stays state-only because it selects 32F.
+
 ## Adding to this map
 
 At the end of a task that touched `src/`, if you found a cross-file wiring

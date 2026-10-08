@@ -107,6 +107,10 @@ namespace Field
 
             switch (node->kind)
             {
+               case IRKind::ImageRead:
+                  // Rejected by the front end outside a pixel kernel.
+                  break;
+
                case IRKind::Literal:
                {
                   int reg = AllocReg();
