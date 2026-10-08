@@ -262,7 +262,7 @@ namespace app
       // Every lane registers every frame (register-only when it is not the
       // drawn one), so a cable keeps driving a lane that is off screen - the
       // same mechanism as the EQ's hidden bands.
-      constexpr int kLaneBase = 3;
+      static constexpr int kLaneBase = 3;
       auto laneParam = [](int lane, int k) { return kLaneBase + lane * 5 + k; };
       auto laneName = [](int lane, const char* what) { return "in " + std::to_string(lane + 1) + " " + what; };
       {
