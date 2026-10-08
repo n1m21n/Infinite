@@ -3278,7 +3278,7 @@ void EndAudioSection();
          if (gParamRegisterOnly)
             return;
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, rowH));
+         ImGui::Dummy(ImVec2(gAudioContentW, rowH + tok::space_1 + 2.0f));  // row gap: a caption never touches the next row's knob
       }
    };
 

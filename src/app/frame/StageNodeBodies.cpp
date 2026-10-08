@@ -172,8 +172,10 @@ void DrawNodeBodies(FrameCtx& fc)
             }
             else
             {
+               // Hairline: the category tint fill carries identity; selection (the editor's own colour) is the loud state.
                ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                                  ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+                                  ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.55f : 0.40f));
+               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 1.0f);
             }
          }
 
@@ -1262,8 +1264,8 @@ void DrawNodeBodies(FrameCtx& fc)
          ed::PopStyleColor(2);
          if (isComment)
             ed::PopStyleVar(3);
-         else if (hasCookWarning || hasLiveIssue)
-            ed::PopStyleVar();
+         else
+            ed::PopStyleVar();  // border width: warning widths, or the 1 px hairline
 
          if (b6TrackVis && !b6NodeIsVisible)
          {
