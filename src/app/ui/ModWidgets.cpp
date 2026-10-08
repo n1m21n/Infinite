@@ -1,4 +1,5 @@
 // Modulatable sliders, knobs, faders, toggles, pins (moved verbatim from main.cpp).
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -1826,29 +1827,7 @@ namespace app
       ImU32 col = hovered ? tok::U32(tok::pal::c_EBF0FFFF)
                           : (shown ? tok::U32(tok::pal::c_96BEFFFF) : tok::U32(tok::pal::c_787C8CFF));
 
-      // almond outline: two arcs meeting at the corners
-      const float rx = 9.0f, ry = 5.5f;
-      dl->PathClear();
-      for (int i = 0; i <= 16; i++)
-      {
-         float t = (float)i / 16.0f;
-         float x = -rx + 2.0f * rx * t;
-         float y = -ry * (float)sin(3.14159f * t);
-         dl->PathLineTo(ImVec2(c.x + x, c.y + y));
-      }
-      for (int i = 0; i <= 16; i++)
-      {
-         float t = (float)i / 16.0f;
-         float x = rx - 2.0f * rx * t;
-         float y = ry * (float)sin(3.14159f * t);
-         dl->PathLineTo(ImVec2(c.x + x, c.y + y));
-      }
-      dl->PathStroke(col, ImDrawFlags_Closed, 1.6f);
-
-      if (shown)
-         dl->AddCircleFilled(c, 2.6f, col);
-      else
-         dl->AddLine(ImVec2(c.x - rx, c.y + ry * 0.9f), ImVec2(c.x + rx, c.y - ry * 0.9f), col, 1.6f);
+      glyph::Draw(dl, c, 18.0f, col, shown ? IconsInfinite::Eye : IconsInfinite::EyeOff);
 
       return pressed;
    }
@@ -1871,17 +1850,7 @@ namespace app
       ImU32 col = hovered ? tok::U32(tok::pal::c_EBF0FFFF)
                           : (shown ? tok::U32(tok::pal::c_96BEFFFF) : tok::U32(tok::pal::c_787C8CFF));
 
-      // A little screen/monitor glyph: rounded rect body plus a stand, filled
-      // when the viewport is on so it reads at a glance in a busy graph.
-      const float bw = 13.0f, bh = 9.0f;
-      ImVec2 tl(c.x - bw * 0.5f, c.y - bh * 0.5f - 1.0f);
-      ImVec2 br(c.x + bw * 0.5f, c.y + bh * 0.5f - 1.0f);
-      if (shown)
-         dl->AddRectFilled(tl, br, col, 1.5f);
-      else
-         dl->AddRect(tl, br, col, 1.5f, 0, 1.4f);
-      dl->AddLine(ImVec2(c.x, br.y), ImVec2(c.x, br.y + 2.5f), col, 1.4f);
-      dl->AddLine(ImVec2(c.x - 3.5f, br.y + 2.5f), ImVec2(c.x + 3.5f, br.y + 2.5f), col, 1.4f);
+      glyph::Draw(dl, c, 18.0f, col, shown ? IconsInfinite::ViewportFill : IconsInfinite::Viewport);
 
       return pressed;
    }
@@ -1902,48 +1871,7 @@ namespace app
       ImU32 col = hovered ? tok::U32(tok::pal::c_F5F8FFFF)
                           : (enabled ? tok::U32(tok::pal::c_B991FFFF) : tok::U32(tok::pal::c_787C8CFF));
 
-      // Draw slanted note head helper with high segment count for smooth curves
-      auto DrawNoteHead = [&](ImVec2 center, float rx, float ry, float angleRad, bool filled)
-      {
-         const float cosA = cosf(angleRad);
-         const float sinA = sinf(angleRad);
-         const int kSegs = 24;
-         dl->PathClear();
-         for (int i = 0; i < kSegs; i++)
-         {
-            const float t = (float)i / (float)kSegs * 6.2831853f;
-            const float ex = rx * cosf(t);
-            const float ey = ry * sinf(t);
-            const float px = center.x + ex * cosA - ey * sinA;
-            const float py = center.y + ex * sinA + ey * cosA;
-            dl->PathLineTo(ImVec2(px, py));
-         }
-         if (filled)
-            dl->PathFillConvex(col);
-         else
-            dl->PathStroke(col, ImDrawFlags_Closed, 1.4f);
-      };
-
-      const float angle = -0.38f; // ~ -22 degrees slant
-      const ImVec2 head1(c.x - 3.8f, c.y + 3.0f);
-      const ImVec2 head2(c.x + 2.8f, c.y + 1.2f);
-      const float rx = 2.4f, ry = 1.7f;
-
-      DrawNoteHead(head1, rx, ry, angle, enabled);
-      DrawNoteHead(head2, rx, ry, angle, enabled);
-
-      const float stem1X = head1.x + 1.5f;
-      const float stem2X = head2.x + 1.5f;
-      const float top1Y = c.y - 4.5f;
-      const float top2Y = c.y - 6.3f;
-      const float stemThickness = 1.4f;
-
-      // Stems
-      dl->AddLine(ImVec2(stem1X, head1.y + 0.5f), ImVec2(stem1X, top1Y), col, stemThickness);
-      dl->AddLine(ImVec2(stem2X, head2.y + 0.5f), ImVec2(stem2X, top2Y), col, stemThickness);
-
-      // Connecting top beam
-      dl->AddLine(ImVec2(stem1X - 0.4f, top1Y + 0.3f), ImVec2(stem2X + 0.4f, top2Y + 0.3f), col, 2.2f);
+      glyph::Draw(dl, c, 18.0f, col, enabled ? IconsInfinite::NoteSnapFill : IconsInfinite::NoteSnap);
 
       if (hovered)
       {
@@ -1991,29 +1919,18 @@ namespace app
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      ImU32 col = hovered ? tok::U32(tok::pal::c_EBF0FFFF)
-                          : (bypassed ? tok::U32(tok::pal::c_F58C3CFF) : tok::U32(tok::pal::c_787C8CFF));
-
-      // IEC 60417-5009 Power symbol: an open arc (from 45 deg to 315 deg) plus a vertical line
-      const float r = 5.0f;
-      const float startAngle = 0.785398f; // ~45 deg
-      const float endAngle = 5.497787f;   // ~315 deg
-      dl->PathClear();
-      const int arcSegments = 16;
-      for (int i = 0; i <= arcSegments; i++)
+      // Lit disc when the node is live, dim ring when bypassed (FabFilter-style lit button).
+      if (!bypassed)
       {
-         float t = (float)i / (float)arcSegments;
-         float angle = startAngle + (endAngle - startAngle) * t;
-         dl->PathLineTo(ImVec2(c.x + sinf(angle) * r, c.y - cosf(angle) * r));
+         ImVec4 a = app::AccentEmphasisSelected();
+         if (hovered) a = app::AccentEmphasisHover();
+         dl->AddCircleFilled(c, 6.75f, ImGui::GetColorU32(a), 32);
+         glyph::Draw(dl, c, 18.0f, tok::U32(tok::pal::c_FFFFFFFF), IconsInfinite::PowerFill);
       }
-      dl->PathStroke(col, 0, 1.6f);
-      // Vertical power stroke at top center
-      dl->AddLine(ImVec2(c.x, c.y - r - 2.0f), ImVec2(c.x, c.y + 0.5f), col, 1.6f);
-
-      if (bypassed)
+      else
       {
-         // Diagonal strike through
-         dl->AddLine(ImVec2(c.x - r - 1.0f, c.y + r + 1.0f), ImVec2(c.x + r + 1.0f, c.y - r - 1.0f), tok::U32(tok::pal::c_F56432FF), 1.5f);
+         const ImU32 col = hovered ? tok::U32(tok::pal::c_EBF0FFFF) : tok::U32(tok::pal::c_787C8CFF);
+         glyph::Draw(dl, c, 18.0f, col, IconsInfinite::Power);
       }
 
       return pressed;
