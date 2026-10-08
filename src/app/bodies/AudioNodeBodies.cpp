@@ -341,6 +341,102 @@ namespace app
    }
 
 
+   // Export panel of the Spatial Mixer: record the binaural render (head facing
+   // front) as WAV/FLAC, plus the terminal-output `live` switch. Same
+   // Record/Choose behaviour as Audio Out.
+   void DrawSpatialExportPanel(SpatialMixerNode* n)
+   {
+      const bool recording = n->IsRecording();
+      const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
+      ImGui::BeginDisabled(recording);
+      const float half = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+      const char* fmtNames[] = { "WAV", "FLAC" };
+      for (int i = 0; i < 2; i++)
+      {
+         const bool active = (n->formatIndex == i);
+         if (active)
+            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+         if (ImGui::Button(fmtNames[i], ImVec2(half, 0)))
+         {
+            n->formatIndex = i;
+            gPatchDirty = true;
+         }
+         if (active)
+            ImGui::PopStyleColor();
+         if (i == 0)
+            ImGui::SameLine();
+      }
+      ImGui::EndDisabled();
+
+      if (n->live)
+         ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+      if (ImGui::Button("live##spatialLive", ImVec2(half, 0)))
+      {
+         PushUndoCheckpoint();
+         n->live = !n->live;
+         gPatchDirty = true;
+         RebuildAudioTopology();
+      }
+      if (n->live)
+         ImGui::PopStyleColor();
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("live", n->live ? "not delayed to match other outputs" : "aligned with other outputs");
+      ImGui::SameLine();
+      if (n->renderMode == 1)
+         ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+      if (ImGui::Button(n->renderMode == 1 ? "stereo##spatialMode" : "binaural##spatialMode", ImVec2(half, 0)))
+      {
+         PushUndoCheckpoint();
+         n->renderMode = 1 - n->renderMode;
+         gPatchDirty = true;
+      }
+      if (n->renderMode == 1)
+         ImGui::PopStyleColor();
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("render", n->renderMode == 1 ? "speaker-safe pan, no ear filtering" : "headphones: ear filtering on");
+
+      const float btnW = half;
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.75f, 0.18f, 0.18f, 1.0f));
+      ImGui::BeginDisabled(!recording && !audioOn);
+      if (ImGui::Button(recording ? "Stop##spatialRec" : "Record##spatialRec", ImVec2(btnW, 0)))
+      {
+         if (recording)
+            n->StopRecording();
+         else
+         {
+            const std::string ext = (n->formatIndex == 1) ? "flac" : "wav";
+            const std::string dir = n->recordDirectory.empty() ? AppPaths::DesktopDir() : n->recordDirectory;
+            n->StartRecording(dir + "/" + DefaultRecordingFileName(dir, ext));
+         }
+      }
+      ImGui::EndDisabled();
+      if (recording)
+         ImGui::PopStyleColor();
+      ImGui::SameLine();
+      ImGui::BeginDisabled(recording);
+      if (ImGui::Button("Choose...##spatialChoose", ImVec2(btnW, 0)))
+      {
+         const std::string chosen = Platform::OpenFolderDialog("Choose recording folder",
+            n->recordDirectory.empty() ? AppPaths::DesktopDir() : n->recordDirectory);
+         if (!chosen.empty())
+         {
+            n->recordDirectory = chosen;
+            gPatchDirty = true;
+         }
+      }
+      ImGui::EndDisabled();
+      if (recording)
+         ImGui::TextColored(ImVec4(0.6f, 0.62f, 0.68f, 1.0f), "REC %.1fs  %.0f KB  (head facing front)",
+                            n->ElapsedSeconds(), (double)n->FileSizeBytes() / 1024.0);
+      else
+         ImGui::TextColored(ImVec4(0.6f, 0.62f, 0.68f, 1.0f), "%s",
+                            n->recordDirectory.empty() ? "~/Desktop" : n->recordDirectory.c_str());
+      if (n->DroppedSampleCount() > 0)
+         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "dropped samples - device can't keep up");
+   }
+
+
    void DrawAnalogBody(GraphNode& gn, AnalogNode* n)
    {
       const bool noteDriven = n->noteInput.GetSource() != nullptr;
@@ -528,6 +624,8 @@ namespace app
          DrawAudioMeterBody(gn, n);
       else if (auto* n = dynamic_cast<MixerNode*>(gn.node.get()))
          DrawMixerBody(gn, n);
+      else if (auto* n = dynamic_cast<SpatialMixerNode*>(gn.node.get()))
+         DrawSpatialMixerBody(gn, n);
       else if (auto* n = dynamic_cast<SplitterNode*>(gn.node.get()))
          DrawSplitterBody(gn, n);
       else if (auto* n = dynamic_cast<BlendAudioNode*>(gn.node.get()))

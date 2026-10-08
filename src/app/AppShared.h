@@ -3459,6 +3459,8 @@ void DrawImageSpectralSynthBody(GraphNode& gn, ImageSpectralSynthNode* n);
 void DrawAudioMeterBody(GraphNode& gn, AudioMeterNode* n);
 
 void DrawGainBody(GraphNode& gn, GainNode* n);
+void DrawSpatialMixerBody(GraphNode& gn, SpatialMixerNode* n);
+void DrawSpatialExportPanel(SpatialMixerNode* n);
 
 void DrawBlendAudioBody(GraphNode& gn, BlendAudioNode* n);
 
@@ -5731,6 +5733,7 @@ bool RunMidiFileFixture();
 bool RunMpeFixture();
 
 bool RunShapeResonatorFixture();
+bool RunSpatialFixture();
 
 bool RunSpectrumSlideFixture();
 

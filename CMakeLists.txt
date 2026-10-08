@@ -412,6 +412,7 @@ set(COMMON_SOURCES
     src/app/bodies/ParamBodies2.cpp
     src/app/bodies/PreviewBodies.cpp
     src/app/bodies/SamplerBodies.cpp
+    src/app/bodies/SpatialMixerBody.cpp
     src/app/frame/CookFrame.cpp
     src/app/frame/FrameStatics.cpp
     src/app/frame/FrameTests1.cpp
@@ -469,6 +470,7 @@ set(COMMON_SOURCES
     src/app/selftest/Headless.cpp
     src/app/selftest/I18nTests.cpp
     src/app/selftest/MiscTests.cpp
+    src/app/selftest/SpatialTests.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
     src/app/ui/ModWidgets.cpp
@@ -637,6 +639,7 @@ set(COMMON_SOURCES
     src/platform/ndi/NdiRuntime.cpp
     src/nodes/ProjectionNode.cpp
     src/nodes/AudioNodes.cpp
+    src/nodes/SpatialMixerNode.cpp
     src/nodes/AudioMeterNode.cpp
     src/nodes/NoteNodes.cpp
     src/nodes/WavetableNode.cpp

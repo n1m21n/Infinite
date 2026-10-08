@@ -807,6 +807,8 @@ namespace app
          return MpcNodeWidth();
       if (auto* mixer = dynamic_cast<MixerNode*>(node))
          return std::max(280.0f, (float)mixer->numChannels * 80.0f);
+      if (dynamic_cast<SpatialMixerNode*>(node) != nullptr)
+         return kAudioNodeWidth;
       if (dynamic_cast<WavetableNode*>(node) != nullptr ||
           dynamic_cast<DrumSequencerNode*>(node) != nullptr)
          return kAudioWideWidth;
