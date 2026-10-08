@@ -1,5 +1,6 @@
 // Theme: colours, scope palette, panel/button/dropdown styles, ApplyTheme (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/ui/design/TokenColors.h"
 
 namespace app
 {
@@ -30,38 +31,38 @@ namespace app
 
    ImU32 ScopeBgCol()
    {
-      return IsThemeLight() ? IM_COL32(236, 240, 248, 255) : IM_COL32(11, 12, 16, 255);
+      return tok::U32(tok::scope_bg, IsThemeLight());
    }
 
 
    ImU32 ScopeBorderCol()
    {
-      return IsThemeLight() ? IM_COL32(185, 192, 208, 255) : IM_COL32(64, 68, 84, 255);
+      return tok::U32(tok::scope_border, IsThemeLight());
    }
 
 
    ImU32 ScopeGridCol()
    {
-      return IsThemeLight() ? IM_COL32(208, 215, 228, 255) : IM_COL32(255, 255, 255, 26);
+      return tok::U32(tok::scope_grid, IsThemeLight());
    }
 
 
    ImU32 ScopeMidLineCol()
    {
-      return IsThemeLight() ? IM_COL32(178, 186, 204, 255) : IM_COL32(255, 255, 255, 46);
+      return tok::U32(tok::scope_midline, IsThemeLight());
    }
 
 
    ImU32 ScopeTextCol()
    {
-      return IsThemeLight() ? IM_COL32(70, 78, 96, 255) : IM_COL32(120, 128, 150, 255);
+      return tok::U32(tok::scope_text, IsThemeLight());
    }
  // settings file written once the drag ends
 
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding)
    {
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, isLight ? IM_COL32(238, 240, 246, 255) : IM_COL32(18, 18, 24, 255), rounding);
+      dl->AddRectFilled(origin, br, tok::U32(tok::backdrop_base, isLight), rounding);
       if (!gCheckerboardBackdrop)
          return;
       const float cell = 12.0f;
@@ -75,7 +76,7 @@ namespace app
                continue;
             const ImVec2 tl(origin.x + x * cell, origin.y + y * cell);
             const ImVec2 cbr(std::min(br.x, tl.x + cell), std::min(br.y, tl.y + cell));
-            dl->AddRectFilled(tl, cbr, isLight ? IM_COL32(220, 224, 232, 255) : IM_COL32(30, 30, 38, 255));
+            dl->AddRectFilled(tl, cbr, tok::U32(tok::backdrop_check, isLight));
          }
       }
    }
@@ -128,11 +129,11 @@ namespace app
    // on the theme - the exact class of drift this ladder exists to end - and
    // both values landed too weak to read as a selection at a glance. Selected
    // is 0.60 accent, everywhere, in every theme; hover and pressed bracket it.
-   ImVec4 AccentEmphasisHover() { return AccentTint(0.36f); }
+   ImVec4 AccentEmphasisHover() { return AccentTint(tok::accent_hover); }
 
-   ImVec4 AccentEmphasisSelected() { return AccentTint(0.60f); }
+   ImVec4 AccentEmphasisSelected() { return AccentTint(tok::accent_selected); }
 
-   ImVec4 AccentEmphasisPressed() { return AccentTint(0.78f); }
+   ImVec4 AccentEmphasisPressed() { return AccentTint(tok::accent_pressed); }
 
 
    // Shared "this is the recommended action" emphasis for a modal dialog's
@@ -174,10 +175,10 @@ namespace app
       // brighter panel needed a real edge), but that was the one dropdown
       // border left standing after every other border in the app was
       // deleted rather than recolored - same fix applies here.
-      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.28f, 0.31f, 0.42f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.35f, 0.39f, 0.52f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.90f, 0.93f, 0.98f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::dropdown_fill, isLight));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::dropdown_hover, isLight));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::dropdown_active, isLight));
+      ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::dropdown_text, isLight));
       ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
