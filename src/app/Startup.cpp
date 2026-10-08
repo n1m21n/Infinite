@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/UiType.h"
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/frame/FrameCtx.h"
 
@@ -77,61 +78,87 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
       fallbackCfg.MergeMode = true;
       io.Fonts->AddFontFromFileTTF(bundledInter.c_str(), bakedPx, &fallbackCfg, kUiGlyphRanges);
    }
-   // CJK: Inter has no Han/kana, so a subsetted Noto face is merged for exactly the glyphs the
-   // active language table needs. Every language also gets the picker's native names (日本語,
-   // 中文简体) so the Language list never shows '?'. Noto SC for zh and for names, JP for ja:
-   // the two draw the same Han code points with different shapes. Absent file => '?' only.
-   if (uiFont != nullptr)
-   {
-      const bool ja = I18n::CurrentLanguage() == "ja";
-      const std::string notoPath =
-         BundledResourcePath(ja ? "fonts/NotoSansJP-Subset.otf" : "fonts/NotoSansSC-Subset.otf");
-      if (!notoPath.empty())
-      {
-         // Dynamic atlas: only glyphs that are drawn are rasterized, so the whole subset face is merged.
-         ImFontConfig cjkCfg;
-         cjkCfg.MergeMode = true;
-         io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg);
-      }
-   }
    if (uiFont == nullptr)
       io.Fonts->AddFontDefault();
-
-   // Merge a small slice of the Lucide icon font (external/icons/Lucide,
-   // ISC license) into the same atlas at PUA codepoints, so icon glyphs
-   // can be dropped into ordinary ImGui::Text/Button calls alongside UI
-   // text (see IconsLucide.h). MergeMode=true means it rides the same
-   // baseline/line-height as the font just loaded rather than becoming a
-   // separate selectable font - the standard ImGui icon-font idiom.
-   // Restricted to one explicit range (currently just the "search" glyph,
-   // U+E151) rather than Lucide's full 1000+ icon set - the atlas only
-   // pays texture memory for glyphs actually in use.
-   if (uiFont != nullptr)
+   // Every weight is its own ImFont, so each carries the same merged stack: CJK, Lucide, Infinite Glyphs.
+   auto mergeExtras = [&]()
    {
-      const std::string bundledLucide = BundledResourcePath("icons/lucide.ttf");
-      if (!bundledLucide.empty())
+      // CJK: Inter has no Han/kana, so a subsetted Noto face is merged for exactly the glyphs the
+      // active language table needs. Every language also gets the picker's native names (日本語,
+      // 中文简体) so the Language list never shows '?'. Noto SC for zh and for names, JP for ja:
+      // the two draw the same Han code points with different shapes. Absent file => '?' only.
+      if (true)
       {
-         static const ImWchar iconRanges[] = { 0xE151, 0xE151, 0 };
-         ImFontConfig iconCfg;
-         iconCfg.MergeMode = true;
-         iconCfg.PixelSnapH = true;
-         iconCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
-         io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
+         const bool ja = I18n::CurrentLanguage() == "ja";
+         const std::string notoPath =
+            BundledResourcePath(ja ? "fonts/NotoSansJP-Subset.otf" : "fonts/NotoSansSC-Subset.otf");
+         if (!notoPath.empty())
+         {
+            // Dynamic atlas: only glyphs that are drawn are rasterized, so the whole subset face is merged.
+            ImFontConfig cjkCfg;
+            cjkCfg.MergeMode = true;
+            io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg);
+         }
       }
-   }
-   // Infinite Glyphs (art/icons/src -> tools/design/build_glyphs.py): our own icon set, merged the
-   // same way as Lucide above. Codepoints come from the generated Glyphs.gen.h.
-   if (uiFont != nullptr)
-   {
-      const std::string bundledGlyphs = BundledResourcePath("icons/infinite-glyphs.ttf");
-      if (!bundledGlyphs.empty())
+      // Merge a small slice of the Lucide icon font (external/icons/Lucide,
+      // ISC license) into the same atlas at PUA codepoints, so icon glyphs
+      // can be dropped into ordinary ImGui::Text/Button calls alongside UI
+      // text (see IconsLucide.h). MergeMode=true means it rides the same
+      // baseline/line-height as the font just loaded rather than becoming a
+      // separate selectable font - the standard ImGui icon-font idiom.
+      // Restricted to one explicit range (currently just the "search" glyph,
+      // U+E151) rather than Lucide's full 1000+ icon set - the atlas only
+      // pays texture memory for glyphs actually in use.
+      if (true)
       {
-         static const ImWchar glyphRanges[] = { (ImWchar)IconsInfinite::kFirst, (ImWchar)IconsInfinite::kLast, 0 };
-         ImFontConfig glyphCfg;
-         glyphCfg.MergeMode = true;
-         glyphCfg.PixelSnapH = true;
-         glyphCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
-         io.Fonts->AddFontFromFileTTF(bundledGlyphs.c_str(), bakedPx, &glyphCfg, glyphRanges);
+         const std::string bundledLucide = BundledResourcePath("icons/lucide.ttf");
+         if (!bundledLucide.empty())
+         {
+            static const ImWchar iconRanges[] = { 0xE151, 0xE151, 0 };
+            ImFontConfig iconCfg;
+            iconCfg.MergeMode = true;
+            iconCfg.PixelSnapH = true;
+            iconCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
+            io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
+         }
+      }
+      // Infinite Glyphs (art/icons/src -> tools/design/build_glyphs.py): our own icon set, merged the
+      // same way as Lucide above. Codepoints come from the generated Glyphs.gen.h.
+      if (true)
+      {
+         const std::string bundledGlyphs = BundledResourcePath("icons/infinite-glyphs.ttf");
+         if (!bundledGlyphs.empty())
+         {
+            static const ImWchar glyphRanges[] = { (ImWchar)IconsInfinite::kFirst, (ImWchar)IconsInfinite::kLast, 0 };
+            ImFontConfig glyphCfg;
+            glyphCfg.MergeMode = true;
+            glyphCfg.PixelSnapH = true;
+            glyphCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
+            io.Fonts->AddFontFromFileTTF(bundledGlyphs.c_str(), bakedPx, &glyphCfg, glyphRanges);
+         }
+      }
+   };
+   mergeExtras();
+   UiType::Reset();
+   UiType::Register(UiType::Weight::Regular, uiFont != nullptr ? uiFont : io.Fonts->Fonts[0]);
+   // Medium and SemiBold are Inter's own weights; a user-chosen face (Atkinson) has no weights to
+   // give, so it keeps one weight and the hierarchy comes from size alone.
+   const bool interIsPrimary = uiFont != nullptr && uiFontPath != nullptr && std::strcmp(uiFontPath, bundledInter.c_str()) == 0;
+   if (interIsPrimary)
+   {
+      const struct { UiType::Weight w; const char* file; } kWeights[] = {
+         { UiType::Weight::Medium, "fonts/Inter-Medium.ttf" },
+         { UiType::Weight::Semibold, "fonts/Inter-SemiBold.ttf" },
+      };
+      for (const auto& wf : kWeights)
+      {
+         const std::string path = BundledResourcePath(wf.file);
+         ImFont* f = path.empty() ? nullptr : io.Fonts->AddFontFromFileTTF(path.c_str(), bakedPx, nullptr, kUiGlyphRanges);
+         if (f != nullptr)
+         {
+            mergeExtras();
+            UiType::Register(wf.w, f);
+         }
       }
    }
 }

@@ -118,6 +118,7 @@ void FrameTest_MINIVIEWPORTTEST(int frameId, GLFWwindow* window);
 void FrameTest_DEPTHTEST(int frameId, GLFWwindow* window);
 void FrameTest_3DTEST(int frameId, GLFWwindow* window);
 void FrameTest_UISCALETEST(int frameId, GLFWwindow* window);
+void FrameTest_UITYPETEST(int frameId, GLFWwindow* window);
 void FrameTest_SIZETEST(int frameId, GLFWwindow* window);
 void FrameTest_SAMPLERDRAGTEST_2(int frameId, GLFWwindow* window);
 void FrameTest_PLUGINDRAGTEST_2(int frameId, GLFWwindow* window);

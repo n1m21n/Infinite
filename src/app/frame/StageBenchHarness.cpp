@@ -2220,6 +2220,7 @@ void DrawBenchHarness(FrameCtx& fc)
       FrameTest_3DTEST(frameId, window);
 
       FrameTest_UISCALETEST(frameId, window);
+      FrameTest_UITYPETEST(frameId, window);
 
       FrameTest_SIZETEST(frameId, window);
 

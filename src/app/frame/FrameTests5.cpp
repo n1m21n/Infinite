@@ -1,4 +1,6 @@
 // Per-frame self-test blocks moved verbatim out of the main loop in main.cpp.
+#include "app/ui/design/UiType.h"
+#include "app/ui/design/Glyphs.gen.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -2925,5 +2927,47 @@ void FrameTest_LOOPERTRIGTEST(int frameId, GLFWwindow* window)
             }
          }
       }
+}
+
+void FrameTest_UITYPETEST(int frameId, GLFWwindow*)
+{
+   if (getenv("INFINITE_UITYPETEST") == nullptr || frameId != 4)
+      return;
+   bool ok = true;
+   auto bad = [&](const char* why) { printf("UITYPETEST FAIL: %s\n", why); ok = false; };
+   // The default face is Inter, so all three weights must be real fonts.
+   if (UiType::Registered() != 3)
+      bad("expected Regular, Medium and Semibold registered");
+   if (UiType::Font(UiType::Weight::Semibold) == UiType::Font(UiType::Weight::Regular))
+      bad("Semibold is the same font as Regular");
+   // Sizes come from the tokens, one step apart in the scale.
+   const UiType::Size order[] = { UiType::Size::Caption, UiType::Size::Body, UiType::Size::Title, UiType::Size::Display };
+   float prevH = 0.0f;
+   for (UiType::Size sz : order)
+   {
+      UiType::Push(sz);
+      if (std::fabs(ImGui::GetFontSize() - UiType::Px(sz)) > 0.01f)
+         bad("pushed size is not the token size");
+      const float h = ImGui::GetTextLineHeight();
+      if (!(h > prevH))
+         bad("line height does not grow with the type scale");
+      prevH = h;
+      UiType::Pop();
+   }
+   // Heavier weight is wider for the same text and size, and glyph icons still resolve in it.
+   const char* sample = "Hamburgefonstiv 120.0 BPM";
+   UiType::Push(UiType::Size::Title, UiType::Weight::Regular);
+   const float wr = ImGui::CalcTextSize(sample).x;
+   UiType::Pop();
+   UiType::Push(UiType::Size::Title, UiType::Weight::Semibold);
+   const float ws = ImGui::CalcTextSize(sample).x;
+   const float wicon = ImGui::CalcTextSize(IconsInfinite::Close).x;
+   UiType::Pop();
+   if (!(ws > wr))
+      bad("Semibold text is not wider than Regular");
+   if (!(wicon >= UiScale::kBaseFontSize - 0.5f))
+      bad("glyph icon missing from the Semibold stack");
+   printf("UITYPETEST regular %.1f semibold %.1f icon %.1f\n", wr, ws, wicon);
+   printf("%s\n", ok ? "UITYPETEST OK" : "UITYPETEST FAIL");
 }
 }
