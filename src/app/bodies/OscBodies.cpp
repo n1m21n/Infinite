@@ -1291,7 +1291,6 @@ namespace app
                                                              : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
          ImGui::Button(caption.c_str(), ImVec2(width, 0));
-         DrawDropdownChevron(caption.c_str(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -1299,9 +1298,7 @@ namespace app
                                                               ImGui::GetItemRectMax()));
          return;
       }
-      const bool bareOpen = ImGui::Button(caption.c_str(), ImVec2(width, 0));
-      DrawDropdownChevron(caption.c_str(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-      if (bareOpen)
+      if (ImGui::Button(caption.c_str(), ImVec2(width, 0)))
       {
          gDropdown.options = options;
          gDropdown.categories = categories;
