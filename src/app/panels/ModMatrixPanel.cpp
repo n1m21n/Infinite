@@ -1,5 +1,6 @@
 // Modulation matrix panel (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/ui/design/TokenColors.h"
 
 namespace app
 {
@@ -188,11 +189,8 @@ namespace app
       const bool isLight = IsThemeLight();
       const ImVec2 maxPos(pos.x + w, pos.y + h);
 
-      const ImU32 bgCol = isLight ? (hovered ? IM_COL32(225, 230, 240, 255) : IM_COL32(235, 238, 246, 255))
-                                  : (hovered ? IM_COL32(32, 35, 45, 255)   : IM_COL32(22, 24, 32, 255));
-      const ImU32 borderCol = active ? (isLight ? IM_COL32(60, 140, 240, 255) : IM_COL32(80, 160, 255, 255))
-                                     : (hovered ? (isLight ? IM_COL32(160, 175, 200, 255) : IM_COL32(70, 75, 95, 255))
-                                                : (isLight ? IM_COL32(195, 205, 220, 255) : IM_COL32(45, 48, 62, 255)));
+      const ImU32 bgCol = tok::U32(hovered ? tok::curvebox_bg_hover : tok::curvebox_bg, isLight);
+      const ImU32 borderCol = tok::U32(active ? tok::curvebox_border_active : hovered ? tok::curvebox_border_hover : tok::curvebox_border, isLight);
       dl->AddRectFilled(pos, maxPos, bgCol, 3.0f);
       dl->AddRect(pos, maxPos, borderCol, 3.0f, 0, 1.0f);
 
@@ -202,7 +200,7 @@ namespace app
       const float plotH = h - padY * 2.0f;
       const ImVec2 plotMin(pos.x + padX, pos.y + padY);
 
-      const ImU32 refCol = isLight ? IM_COL32(170, 180, 195, 120) : IM_COL32(70, 75, 95, 120);
+      const ImU32 refCol = tok::U32(tok::curvebox_ref, isLight);
       dl->AddLine(ImVec2(plotMin.x, plotMin.y + plotH), ImVec2(plotMin.x + plotW, plotMin.y), refCol, 1.0f);
 
       auto evalPt = [&](float xNorm) -> ImVec2 {
@@ -211,9 +209,7 @@ namespace app
       };
 
       const bool isCurved = std::abs(*curve) > 0.001f;
-      const ImU32 curveCol = active ? (isLight ? IM_COL32(20, 120, 240, 255) : IM_COL32(80, 180, 255, 255))
-                                    : (isCurved ? (isLight ? IM_COL32(30, 140, 210, 255) : IM_COL32(70, 200, 230, 255))
-                                                : (isLight ? IM_COL32(110, 120, 140, 200) : IM_COL32(150, 160, 180, 200)));
+      const ImU32 curveCol = tok::U32(active ? tok::curve_active : isCurved ? tok::curve_bent : tok::curve_idle, isLight);
       const float lineThickness = (active || hovered) ? 2.0f : 1.5f;
 
       const int kSegments = 20;
@@ -227,16 +223,15 @@ namespace app
       }
 
       const ImVec2 midPt = evalPt(0.5f);
-      const ImU32 dotCol = isCurved ? (isLight ? IM_COL32(20, 120, 240, 255) : IM_COL32(80, 200, 255, 255))
-                                    : (isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(140, 150, 170, 255));
+      const ImU32 dotCol = tok::U32(isCurved ? tok::curve_dot_bent : tok::curve_dot_idle, isLight);
       dl->AddCircleFilled(midPt, (hovered || active) ? 3.0f : 2.0f, dotCol);
 
       if (liveInput01 >= 0.0f && liveInput01 <= 1.0f)
       {
          const ImVec2 livePt = evalPt(liveInput01);
-         const ImU32 liveCol = isLight ? IM_COL32(235, 100, 30, 255) : IM_COL32(255, 180, 50, 255);
+         const ImU32 liveCol = tok::U32(tok::curve_live, isLight);
          dl->AddCircleFilled(livePt, 3.5f, liveCol);
-         dl->AddCircle(livePt, 3.5f, isLight ? IM_COL32(255, 255, 255, 255) : IM_COL32(20, 20, 26, 255), 0, 1.0f);
+         dl->AddCircle(livePt, 3.5f, tok::U32(tok::curve_live_ring, isLight), 0, 1.0f);
       }
 
       if (isCurved)
@@ -245,7 +240,7 @@ namespace app
          snprintf(valBuf, sizeof(valBuf), "%+.2f", *curve);
          ImFont* font = ImGui::GetFont();
          const float tinySize = ImGui::GetFontSize() * 0.62f;
-         const ImU32 valCol = isLight ? IM_COL32(90, 98, 115, 220) : IM_COL32(160, 168, 185, 220);
+         const ImU32 valCol = tok::U32(tok::curve_value_text, isLight);
          dl->AddText(font, tinySize, ImVec2(pos.x + 2.0f, pos.y + 1.0f), valCol, valBuf);
       }
 
@@ -259,8 +254,8 @@ namespace app
       const ImVec2 pos = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      const ImU32 bgCol = isLight ? IM_COL32(235, 238, 246, 200) : IM_COL32(20, 22, 28, 200);
-      const ImU32 borderCol = isLight ? IM_COL32(200, 205, 215, 255) : IM_COL32(40, 44, 56, 255);
+      const ImU32 bgCol = tok::U32(tok::sparkline_bg, isLight);
+      const ImU32 borderCol = tok::U32(tok::sparkline_border, isLight);
       dl->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), bgCol, 2.0f);
       dl->AddRect(pos, ImVec2(pos.x + width, pos.y + height), borderCol, 2.0f);
 
@@ -393,7 +388,7 @@ namespace app
                   gModMatrixScrollPending = false;
                }
                if (isHighlightTarget && ImGui::GetTime() < gModMatrixHighlightUntil)
-                  ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(234, 179, 8, 60));
+                  ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, tok::U32(tok::modulation_row));
 
                // Resolve against this frame's ParamRef when the destination
                // drew this frame (the same lazy legacy-conversion pass the
@@ -426,8 +421,8 @@ namespace app
                const bool inert = IsInertPredictorBinding(dstIndex, dstParam);
                const bool isPred = IsPredictionSourceNode(srcNode);
                const ImU32 dotColour = (src.enabled && !inert)
-                                          ? (isPred ? IM_COL32(34, 197, 94, 255) : IM_COL32(234, 179, 8, 255))
-                                          : IM_COL32(110, 110, 120, 255);
+                                          ? (isPred ? tok::U32(tok::prediction) : tok::U32(tok::modulation))
+                                          : tok::U32(tok::inert);
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
@@ -559,7 +554,7 @@ namespace app
                   liveSig01 = std::clamp((*frameRef->value - lo) / (hi - lo), 0.0f, 1.0f);
                auto& hist = gModMatrixSparklines[{dstIndex, dstParam}];
                hist.Push(liveSig01);
-               DrawSparklineMiniGraph("##sigspark", hist, isPred ? IM_COL32(34, 197, 94, 255) : IM_COL32(234, 179, 8, 255),
+               DrawSparklineMiniGraph("##sigspark", hist, isPred ? tok::U32(tok::prediction) : tok::U32(tok::modulation),
                                       vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
 
                // Unbind
@@ -578,7 +573,7 @@ namespace app
                   // theme it's drawn over. Hover/active keep the theme's
                   // usual button colours (free per P10, and how every other
                   // icon-button in the app already behaves).
-                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+                  ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
                   if (ImGui::Button("##unbindmod", ImVec2(btnW, 0)))
                   {
@@ -606,7 +601,7 @@ namespace app
                      (int)((disabled4.y * 0.6f + text4.y * 0.4f) * 255.0f),
                      (int)((disabled4.z * 0.6f + text4.z * 0.4f) * 255.0f),
                      255);
-                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : idleCol;
+                  const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover) : idleCol;
                   Tabler::DrawX(dl, center, iconSize, col);
                }
 
@@ -640,7 +635,7 @@ namespace app
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
                ImGui::GetWindowDrawList()->AddCircleFilled(
-                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, IM_COL32(168, 85, 247, 255));
+                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, tok::U32(tok::expression));
 
                ImGui::TableNextColumn();
                ImGui::TextUnformatted("Expression");
@@ -716,13 +711,13 @@ namespace app
                float liveExprSig01 = (liveExpr01 >= 0.0f) ? liveExpr01 : 0.5f;
                auto& histE = gModMatrixSparklines[{dstIndex, dstParam + 2000000}];
                histE.Push(liveExprSig01);
-               DrawSparklineMiniGraph("##exprspark", histE, IM_COL32(168, 85, 247, 255),
+               DrawSparklineMiniGraph("##exprspark", histE, tok::U32(tok::expression),
                                       vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
 
                bool unboundExpr = false;
                ImGui::TableNextColumn();
                {
-                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+                  ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
                   if (ImGui::Button("##unbindexpr", ImVec2(btnW, 0)))
                   {
@@ -736,7 +731,7 @@ namespace app
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
                   const float iconSize = (bmax.y - bmin.y) * 0.6f;
-                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255)
+                  const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover)
                                                             : ImGui::GetColorU32(ImGuiCol_TextDisabled);
                   Tabler::DrawX(dl, center, iconSize, col);
                }
@@ -771,7 +766,7 @@ namespace app
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
                ImGui::GetWindowDrawList()->AddCircleFilled(
-                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, IM_COL32(239, 68, 68, 255));
+                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, tok::U32(tok::record));
 
                ImGui::TableNextColumn();
                ImGui::TextUnformatted("Recording");
@@ -850,13 +845,13 @@ namespace app
                float liveRecSig01 = (liveRec01 >= 0.0f) ? liveRec01 : 0.5f;
                auto& histR = gModMatrixSparklines[{dstIndex, dstParam + 4000000}];
                histR.Push(liveRecSig01);
-               DrawSparklineMiniGraph("##recspark", histR, IM_COL32(239, 68, 68, 255),
+               DrawSparklineMiniGraph("##recspark", histR, tok::U32(tok::record),
                                       vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
 
                bool unboundRec = false;
                ImGui::TableNextColumn();
                {
-                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+                  ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
                   if (ImGui::Button("##unbindrec", ImVec2(btnW, 0)))
                   {
@@ -869,7 +864,7 @@ namespace app
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
                   const float iconSize = (bmax.y - bmin.y) * 0.6f;
-                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255)
+                  const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover)
                                                             : ImGui::GetColorU32(ImGuiCol_TextDisabled);
                   Tabler::DrawX(dl, center, iconSize, col);
                }

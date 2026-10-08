@@ -26,7 +26,7 @@
  "src/app/panels/HelpWindows.cpp": 2,
  "src/app/panels/LibraryPanels.cpp": 2,
  "src/app/panels/Minimap.cpp": 8,
- "src/app/panels/ModMatrixPanel.cpp": 50,
+ "src/app/panels/ModMatrixPanel.cpp": 2,
  "src/app/panels/PerfPanel.cpp": 82,
  "src/app/panels/SettingsWindow.cpp": 39,
  "src/app/panels/ViewportPanel.cpp": 8,

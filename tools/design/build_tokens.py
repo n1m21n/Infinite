@@ -24,6 +24,8 @@ def build():
     for k, v in r["pairs"].items():
         d, l = v["dark"], v["light"]
         L.append(f"   constexpr Pair8 {ident(k)} = {{ {{{d[0]}, {d[1]}, {d[2]}, {d[3]}}}, {{{l[0]}, {l[1]}, {l[2]}, {l[3]}}} }};")
+    for k, v in r.get("fixed", {}).items():
+        L.append(f"   constexpr Rgba8 {ident(k)} = {{{v[0]}, {v[1]}, {v[2]}, {v[3]}}};")
     for k, v in r["pairs_f"].items():
         d, l = v["dark"], v["light"]
         f = lambda c: "{" + ", ".join(f"{x}f" for x in c) + "}"
