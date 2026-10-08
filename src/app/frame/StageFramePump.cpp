@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/UiAnim.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -578,6 +579,7 @@ void DrawFramePump(FrameCtx& fc)
          gNavOwnsKeys = navOn && nio.NavVisible;
       }
       ImGui::NewFrame();
+      UiAnim::EndFrame();
       if (Bench::Tail().active)
          Bench::Tail().MarkAt(Bench::FrameTail::kMarkNewFrame, Bench::ScopedStageTimer::NowMs());
 

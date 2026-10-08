@@ -1,4 +1,5 @@
 // Dropdowns, drop handling, browser filter strip + favourites, discrete param slots (moved verbatim from main.cpp).
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -251,9 +252,9 @@ namespace app
          const float iconSize = (bmax.y - bmin.y) * 0.75f;
          const ImU32 col = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
          if (state.descending)
-            Tabler::DrawChevronDown(dl, center, iconSize, col);
+            glyph::DrawChevronDown(dl, center, iconSize, col);
          else
-            Tabler::DrawChevronUp(dl, center, iconSize, col);
+            glyph::DrawChevronUp(dl, center, iconSize, col);
       }
       if (dirClicked)
          state.descending = !state.descending;
@@ -329,7 +330,7 @@ namespace app
       const float starSize = 11.0f;
       const ImVec2 center(itemMax.x - 12.0f, (itemMin.y + itemMax.y) * 0.5f);
       const ImU32 starCol = tok::U32(tok::pal::c_FFCD2DFF);
-      Tabler::DrawStar(dl, center, starSize, starCol, /*filled=*/true);
+      glyph::DrawStar(dl, center, starSize, starCol, /*filled=*/true);
    }
 
 

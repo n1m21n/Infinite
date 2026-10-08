@@ -476,6 +476,7 @@ set(COMMON_SOURCES
     src/app/ui/ModWidgets.cpp
     src/app/ui/ParamWidgets.cpp
     src/app/ui/Theme.cpp
+    src/app/ui/design/UiAnim.cpp
     src/core/GLUtil.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp

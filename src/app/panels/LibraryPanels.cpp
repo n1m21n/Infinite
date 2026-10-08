@@ -1,4 +1,5 @@
 // Library / plugin / field search panels (moved verbatim from main.cpp).
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -179,7 +180,7 @@ namespace app
 
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-         Tabler::DrawPlus(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
+         glyph::DrawPlus(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
          dl->AddText(ImVec2(startX + iconSize + iconGap, centerY - ImGui::GetTextLineHeight() * 0.5f), col, addLabel);
 
          if (clicked)
@@ -221,7 +222,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.72f;
             const ImU32 col = ImGui::IsItemHovered() || scanning ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-            Tabler::DrawRefresh(dl, center, iconSize, col);
+            glyph::DrawRefresh(dl, center, iconSize, col);
          }
          if (refreshClicked)
             folderToScan = folder;
@@ -237,7 +238,7 @@ namespace app
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.65f;
             const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-            Tabler::DrawX(dl, center, iconSize, col);
+            glyph::DrawX(dl, center, iconSize, col);
          }
          ImGui::PopID();
       }
@@ -263,7 +264,7 @@ namespace app
 
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImU32 col = ImGui::GetColorU32(scanning ? ImGuiCol_TextDisabled : ImGuiCol_Text);
-         Tabler::DrawRefresh(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
+         glyph::DrawRefresh(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
          dl->AddText(ImVec2(startX + iconSize + iconGap, centerY - ImGui::GetTextLineHeight() * 0.5f), col, refreshLabel);
 
          if (clicked)
@@ -411,9 +412,9 @@ namespace app
                const ImU32 iconCol = (ImGui::IsItemHovered() || isPlaying) ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
                const float iconSize = btnH * 0.85f;
                if (isPlaying)
-                  Tabler::DrawPlayerPause(dl, center, iconSize, iconCol);
+                  glyph::DrawPlayerPause(dl, center, iconSize, iconCol);
                else
-                  Tabler::DrawPlayerPlay(dl, center, iconSize, iconCol, true);
+                  glyph::DrawPlayerPlay(dl, center, iconSize, iconCol, true);
             }
             if (clicked)
             {

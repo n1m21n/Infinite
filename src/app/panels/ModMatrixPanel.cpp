@@ -1,4 +1,5 @@
 // Modulation matrix panel (moved verbatim from main.cpp).
+#include "app/ui/design/GlyphDraw.h"
 #include "app/AppShared.h"
 #include "app/ui/design/TokenColors.h"
 
@@ -602,7 +603,7 @@ namespace app
                      (int)((disabled4.z * 0.6f + text4.z * 0.4f) * 255.0f),
                      255);
                   const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover) : idleCol;
-                  Tabler::DrawX(dl, center, iconSize, col);
+                  glyph::DrawX(dl, center, iconSize, col);
                }
 
                ImGui::PopID();
@@ -733,7 +734,7 @@ namespace app
                   const float iconSize = (bmax.y - bmin.y) * 0.6f;
                   const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover)
                                                             : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-                  Tabler::DrawX(dl, center, iconSize, col);
+                  glyph::DrawX(dl, center, iconSize, col);
                }
 
                ImGui::PopID();
@@ -866,7 +867,7 @@ namespace app
                   const float iconSize = (bmax.y - bmin.y) * 0.6f;
                   const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover)
                                                             : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-                  Tabler::DrawX(dl, center, iconSize, col);
+                  glyph::DrawX(dl, center, iconSize, col);
                }
 
                ImGui::PopID();

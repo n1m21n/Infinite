@@ -1,4 +1,5 @@
 // Viewport panel cards and mini viewports (moved verbatim from main.cpp).
+#include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -194,7 +195,7 @@ namespace app
          const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
          const float iconSize = (bmax.y - bmin.y) * 0.65f;
          const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-         Tabler::DrawX(dl, center, iconSize, col);
+         glyph::DrawX(dl, center, iconSize, col);
       }
       ImGui::SameLine();
       ImGui::TextUnformatted(NodeTitleWithInstance(gn).c_str());
