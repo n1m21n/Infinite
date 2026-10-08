@@ -1,4 +1,5 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -4479,14 +4480,13 @@ namespace app
 
    void DrawArrangePanelDocked(const char* id, const ImVec2& size)
    {
-      const float kGrip = 6.0f;
+      const float kGrip = PanelFrame::kGap;   // the grip strip is the gap on the canvas-facing side
       const int dock = ArrangePanelDock();
       const bool vertical = (dock == 1 || dock == 2);
       const bool gripFirst = (dock == 0 || dock == 1);
 
-      PushDockedPanelStyle(/*isChild=*/true);
+      // Outer child is transparent: the panel floats as a card on the canvas colour (PanelFrame).
       ImGui::BeginChild(id, size, false);
-      PopDockedPanelStyle();
 
       gArrangePanelRectMin = ImGui::GetWindowPos();
       gArrangePanelRectMax = ImVec2(gArrangePanelRectMin.x + ImGui::GetWindowSize().x,
@@ -4525,14 +4525,19 @@ namespace app
       }
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
-      PushDockedPanelStyle(/*isChild=*/true);
-      ImGui::BeginChild("##arrangepanelinnercontent",
-                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
-                                 : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
+      const ImVec2 cardSize = vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
+                                       : ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+      PanelFrame::Insets in;
+      switch (dock)   // the grip side needs no inset of its own
+      {
+         case 0: in.t = 0.0f; break;
+         case 1: in.l = 0.0f; break;
+         case 2: in.r = 0.0f; break;
+         default: in.b = 0.0f; break;
+      }
+      PanelFrame::BeginCard("##arrangepanelinnercontent", cardSize, in);
       DrawArrangePanelContent();
-      ImGui::EndChild();
-      PopDockedPanelStyle();
+      PanelFrame::EndCard();
 
       if (!gripFirst)
       {
@@ -4541,8 +4546,10 @@ namespace app
          grip();
       }
 
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+      // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
+      const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
+      ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
       ImGui::EndChild();
-      ImGui::PopStyleVar();
+      ImGui::GetStyle().ItemSpacing = savedSpacing;
    }
 }

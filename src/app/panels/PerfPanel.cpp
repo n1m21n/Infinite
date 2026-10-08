@@ -2573,9 +2573,11 @@ namespace app
       // spacing. Without this, the ItemSpacing between the panel and whatever
       // is laid out next shows a strip of the shell window's windowBg, which
       // reads as a bar separating the two viewports.
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+      // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
+      const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
+      ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
       ImGui::EndChild();
-      ImGui::PopStyleVar();
+      ImGui::GetStyle().ItemSpacing = savedSpacing;
 
       // No divider line along the canvas-facing edge, in either theme. This
       // hairline was a fixed dark constant, then a theme-derived one, and was
