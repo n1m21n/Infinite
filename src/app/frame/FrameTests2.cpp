@@ -2424,6 +2424,161 @@ void FrameTest_FIELDPIXELTEST(int frameId, GLFWwindow* window)
             printf("[FIELDPIXELTEST] Assertion 27 (Advection Transports): %s\n", pass ? "OK" : "FAIL");
          }
 
+
+         // Image-coordinate language corpus: invalid calls must fail in the
+         // front end rather than producing an invalid or misleading shader.
+         {
+            std::ifstream corpus("tests/field/image-offset-corpus.txt");
+            if (!corpus.is_open())
+            {
+               // Cocoa changes cwd to Contents/Resources during glfwInit.
+               // Resolve against this fixture's build-time source path too.
+               auto root = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path().parent_path();
+               corpus.clear();
+               corpus.open(root / "tests/field/image-offset-corpus.txt");
+            }
+            bool pass = corpus.good();
+            int cases = 0;
+            std::string line;
+            while (std::getline(corpus, line))
+            {
+               if (line.empty() || line[0] == '#') continue;
+               size_t a = line.find(" | "), b = line.find(" | ", a + 3);
+               if (a == std::string::npos || b == std::string::npos) { pass = false; continue; }
+               std::string domain = line.substr(0, a), expect = line.substr(a + 3, b - a - 3);
+               std::string code = line.substr(b + 3);
+               for (size_t p = code.find("\\n"); p != std::string::npos; p = code.find("\\n", p + 1))
+                  code.replace(p, 2, "\n");
+               bool ok; std::string error;
+               if (domain == "pixel")
+               {
+                  FieldPixelNode node; node.code = code; ok = node.Apply(); error = node.LastError();
+               }
+               else
+               {
+                  FieldElementNode node; node.code = code; ok = node.Apply(); error = node.LastError();
+               }
+               bool good = expect == "OK" ? ok : (!ok && error.find(expect) != std::string::npos);
+               if (!good) printf("[FIELDPIXELTEST] image corpus case %d FAIL: %s\n", cases, error.c_str());
+               pass = pass && good; ++cases;
+            }
+            printf("[FIELDPIXELTEST] Assertion 28 (Image Read Corpus, %d cases): %s\n", cases, pass && cases == 12 ? "OK" : "FAIL");
+         }
+
+         // Readback proves identity, one-texel shift, half-texel interpolation,
+         // alpha and clamping on a non-square source with a repeat sampler.
+         {
+            const int w = 96, h = 64;
+            FieldPixelNode source;
+            source.width = (float)w; source.height = (float)h;
+            source.code = "col = vec3(uv.x, uv.y, step(0.5, fract(uv.x * 12))); alpha = uv.x;";
+            bool pass = source.Apply(); source.CookIfNeeded(12000);
+            glBindTexture(GL_TEXTURE_2D, source.GetOutputTexture());
+            GLint filter = 0; glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, &filter);
+            pass = pass && filter == GL_LINEAR;
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            unsigned int scratch = 0;
+            auto read = [&](FieldPixelNode& node, int nw, int nh) {
+               std::vector<float> pixels;
+               GLUtil::ReadTexturePixels(scratch, node.GetOutputTexture(), nw, nh, pixels);
+               return pixels;
+            };
+            auto src = read(source, w, h);
+            FieldPixelNode effect; effect.width = (float)w; effect.height = (float)h;
+            auto render = [&](const char* expr, int frame) {
+               effect.code = std::string("input pixel image img; c = ") + expr + "; col = c.rgb; alpha = c.a;";
+               bool ok = effect.Apply();
+               if (!ok) printf("[FIELDPIXELTEST] image GPU compile FAIL: %s\n", effect.LastError().c_str());
+               pass = pass && ok;
+               if (effect.DeclaredImageInputCount() > 0) effect.DeclaredImageInput(0)->Connect(&source);
+               effect.CookIfNeeded(frame);
+               return read(effect, (int)effect.width, (int)effect.height);
+            };
+            auto bare = render("img", 12001), identity = render("img(uv)", 12002);
+            auto shift = render("img(uv + vec2(1/res.x, 0))", 12003);
+            auto half = render("img(uv + vec2(0.5/res.x, 0))", 12004);
+            pass = pass && src.size() == (size_t)w*h*4 && bare.size() == src.size() && identity.size() == src.size() && shift.size() == src.size() && half.size() == src.size();
+            if (pass)
+               for (int y=0; y<h; ++y) for (int x=0; x<w; ++x) for (int c=0; c<4; ++c)
+               {
+                  size_t at = (y*w+x)*4+c, next = (y*w+std::min(x+1,w-1))*4+c;
+                  pass = pass && bare[at] == identity[at] && std::abs(shift[at]-src[next]) < 0.006f &&
+                         std::abs(half[at]-(src[at]+src[next])*0.5f) < 0.006f;
+               }
+            // A different output size must clamp to SOURCE texel centres.
+            effect.width = 192; effect.height = 108;
+            auto edge = render("img(vec2(-2, 2))", 12005);
+            size_t topLeft = (h-1)*w*4;
+            pass = pass && edge.size() == (size_t)192*108*4;
+            if (src.size() > topLeft+3 && edge.size() >= 4)
+               for (int c=0; c<4; ++c) pass = pass && std::abs(edge[c]-src[topLeft+c]) < 0.001f;
+            auto disconnected = render("img(uv)", 12006);
+            effect.DeclaredImageInput(0)->Disconnect(); effect.CookIfNeeded(12007);
+            disconnected = read(effect, 192, 108);
+            pass = pass && !disconnected.empty();
+            for (float v : disconnected) pass = pass && v == 0.0f;
+            pass = pass && effect.EmitResult().offsetReadCount == 1 && !effect.EmitResult().usesOffsetReads;
+            if (scratch) glDeleteFramebuffers(1, &scratch);
+            printf("[FIELDPIXELTEST] Assertion 29 (Image Sampling GPU): %s\n", pass ? "OK" : "FAIL");
+         }
+
+         // Six camera presets render finite pixels at 1080p, including both
+         // mode endpoints. Reusing a node catches stale param-uniform indices.
+         {
+            FieldPixelNode source; source.width = 1920; source.height = 1080;
+            source.code = "col = vec3(uv.x, uv.y, 0.25); alpha = 0.75;";
+            bool pass = source.Apply(); source.CookIfNeeded(13000);
+            FieldPixelNode fx; fx.width = 1920; fx.height = 1080;
+            unsigned int scratch = 0;
+            int count = 0, frame = 13001;
+            const char* names[] = {"Levels", "Scanlines / Interlace", "Lens Dirt + Flare", "Polar Coords", "Chromatic Aberration", "Zoom Blur"};
+            for (const char* name : names)
+               for (const auto& preset : FieldPixelNode::Presets())
+                  if (std::string(preset.name) == name)
+                  {
+                     ++count; fx.code = preset.code;
+                     bool ok = fx.Apply(); pass = pass && ok;
+                     if (!ok) { printf("[FIELDPIXELTEST] camera preset '%s' FAIL: %s\n", name, fx.LastError().c_str()); continue; }
+                     fx.DeclaredImageInput(0)->Connect(&source);
+                     for (int endpoint = 0; endpoint < 3; ++endpoint)
+                     {
+                        if (endpoint > 0)
+                           for (const auto& uniform : fx.EmitResult().uniforms)
+                              if (uniform.paramIndex >= 0)
+                                 if (auto* param = fx.GetParamTable().Find(uniform.varName))
+                                    param->value = endpoint == 1 ? param->minValue : param->maxValue;
+                        fx.CookIfNeeded(frame++);
+                        std::vector<float> px;
+                        GLUtil::ReadTexturePixels(scratch, fx.GetOutputTexture(), 1920, 1080, px);
+                        pass = pass && px.size() == (size_t)1920*1080*4;
+                        for (float v : px) pass = pass && std::isfinite(v);
+                        // A gradient gives an analytic reference for the
+                        // fixed taps; this catches accidentally identical taps.
+                        if (std::string(name) == "Zoom Blur" && px.size() == (size_t)1920*1080*4)
+                        {
+                           const float u = 1440.5f / 1920.0f;
+                           const float amount = fx.GetParamTable().Find("amount")->value;
+                           const float centre = fx.GetParamTable().Find("centreX")->value;
+                           double expected = 0.0;
+                           for (int k = 0; k < 16; ++k)
+                           {
+                              double fraction = (double)k / 15.0;
+                              double coord = u - (u - centre) * amount * fraction;
+                              coord = std::max(0.5 / 1920.0, std::min(1.0 - 0.5 / 1920.0, coord));
+                              expected += coord * (1.0 - 0.5 * fraction) / 12.0;
+                           }
+                           float actual = px[(810*1920+1440)*4];
+                           bool good = std::abs(actual - expected) < 0.003;
+                           if (!good) printf("[FIELDPIXELTEST] zoom taps FAIL: got %f expected %f\n", actual, expected);
+                           pass = pass && good && fx.EmitResult().offsetReadCount == 16;
+                        }
+                     }
+                  }
+            if (scratch) glDeleteFramebuffers(1, &scratch);
+            printf("[FIELDPIXELTEST] Assertion 30 (Camera FX at 1920x1080, %d presets): %s\n", count, pass && count == 6 ? "OK" : "FAIL");
+         }
+
          printf("[FIELDPIXELTEST] Test suite complete.\n");
       }
 }

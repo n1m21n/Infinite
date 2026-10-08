@@ -74,6 +74,7 @@ namespace Field
          std::unordered_map<std::string, BoundaryMode> stateBoundary;
          std::unordered_map<std::string, std::vector<float>> stateInit;
          int offsetReadCount = 0;
+         int imageReadCount = 0;
          std::unordered_set<std::string> paramNames;
          std::unordered_set<std::string> imageInputNames;
          std::vector<int> lineToIrNode;
@@ -92,6 +93,12 @@ namespace Field
             return "fld_t" + std::to_string(tempCounter++);
          }
       };
+
+      std::string BoundaryCoord(const std::string& coord, BoundaryMode mode, const std::string& half)
+      {
+         if (mode == BoundaryMode::Wrap) return "fract(" + coord + ")";
+         return "clamp(" + coord + ", " + half + ", vec2(1.0) - " + half + ")";
+      }
 
       std::string EmitNode(const IRNodePtr& node, EmitterContext& ctx)
       {
@@ -123,6 +130,17 @@ namespace Field
                }
             }
 
+            case IRKind::ImageRead:
+            {
+               std::string coord = EmitNode(node->children[0], ctx);
+               if (!ctx.error.empty()) return "";
+               std::string c = BoundaryCoord(coord, BoundaryMode::Clamp,
+                                            "(0.5 / vec2(textureSize(fld_srcTex, 0)))");
+               ctx.offsetReadCount++;
+               ctx.imageReadCount++;
+               return "texture(fld_srcTex, " + c + ")";
+            }
+
             case IRKind::Variable:
             case IRKind::StateRead:
             {
@@ -151,11 +169,7 @@ namespace Field
                   // texel's centre rather than blending with whatever the
                   // sampler decides lives past it.
                   std::string half = "(0.5 / fld_res)";
-                  std::string c;
-                  if (bm == BoundaryMode::Wrap)
-                     c = "fract(" + coord + ")";
-                  else
-                     c = "clamp(" + coord + ", " + half + ", vec2(1.0) - " + half + ")";
+                  std::string c = BoundaryCoord(coord, bm, half);
 
                   std::string fetch = "texture(fld_s_bank0, " + c + ")." + chanNames[chan];
 
@@ -740,7 +754,8 @@ namespace Field
       ctx.EmitLine("}");
 
       result.offsetReadCount = ctx.offsetReadCount;
-      result.usesOffsetReads = ctx.offsetReadCount > 0;
+      // Only state neighbour reads need the 32F simulation bank.
+      result.usesOffsetReads = ctx.offsetReadCount > ctx.imageReadCount;
 
       result.source = ctx.out.str();
       result.branchCount = ctx.branchCount;

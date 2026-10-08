@@ -193,33 +193,25 @@ current build, not a design ceiling - say so explicitly when a request
 implies more independent moving+colliding bodies, or richer per-object state,
 than 4 scalar floats can hold.
 
-## 7. Image input can only be read at the current pixel - no offset sampling
+## 7. Image input supports coordinate reads
 
-Field Pixel does have an image input: an `image` pin (parsed in `FieldParse.cpp`
-alongside `geometry`/`audio`; type-checked in `FieldIR.cpp:1679-1694`) aliases
-straight to the same texture `col` already reads (`GlslBackend.cpp:208-214`,
-`"src"`). So a preset can genuinely take a user-supplied image as input.
+Declare `input pixel image img;`. Bare `img` is the current-pixel RGBA
+sample. `img(coord)` reads the same source at one normalized `vec2`
+coordinate, returning `vec4`. This supports translation, polar warps,
+chromatic offsets and multi-tap zoom blur as editable presets. `col` is
+still the RGB output, never callable. Assign `alpha = c.a` when remapping
+the picture so alpha follows the sampled coordinate.
 
-**What it cannot do: read that image at any coordinate other than the current
-pixel's own `uv`.** `col`/`src` are computed once, up front, as
-`texture(fld_srcTex, vUv)` (`GlslBackend.cpp:683`) - a fixed sample, not a
-function. There is no `Call`-kind handling anywhere in `GlslBackend.cpp` for
-an image name (only `state` names get that, via the `A(coord)` offset-read
-added in build step 22 - see `field-language`'s offset-reads section). So a
-kernel cannot say "sample the input image shifted by `(dx, dy)`" to translate,
-warp, or reposition it.
+The coordinate clamps to the source texture's edge texel centres, including
+when the output resolution differs. Filtering follows the source sampler
+(normally GL_LINEAR); no extra sampler or texture unit is allocated. Only
+one declared image input is supported. A disconnected image reads transparent
+black. Fetch counts include image reads, but only state offset reads request
+the high-precision simulation buffer. Bounded multi-tap kernels still pay
+for every tap per pixel; Zoom Blur uses 16 fixed taps.
 
-**Practical consequence:** anything that needs to pick an input image up and
-move it - a floating sprite, a shape that bounces and collides using its own
-pixel content, image-based advection/warping - is **not buildable as a preset
-in this build**. It requires a real compiler feature (an image-domain
-offset-read, mirroring `state`'s), not clever kernel text. What *is*
-buildable today with an image input: reading it once per pixel and
-compositing/thresholding/color-mapping it in place (it can react to `t`,
-`param`s, or a moving procedural pattern layered on top via `mix`/parity
-blend) - just not repositioning the image itself. Say this limitation
-explicitly rather than attempting an offset read that will silently resolve
-to the same fixed-`uv` sample and produce a static, non-moving result.
+Depth of field and fog still need a depth pin, which Field Pixel does not
+have. Coordinate reads do not make depth available.
 
 ## 8. Before shipping a new preset
 
@@ -229,10 +221,12 @@ to the same fixed-`uv` sample and produce a static, non-moving result.
    field, not a bare `1/dist`?
 3. Read it once for a divide-by-zero or `1/x` at `x=0` on the predicated-`if`
    path (§4) - add a small epsilon to any denominator that can hit zero.
-4. Build (`cmake --build build -j 8`) - this only checks the C++ string
-   compiles, **not** that the GLSL inside it is valid. The Field pixel
-   compiler runs at preset-load time inside the app; there is no headless
-   CLI to check GLSL validity ahead of time (confirmed - no such tool
-   exists in this repo as of this writing). Say so explicitly when handing
-   off a new preset, and ask the user to load it once and check for a
-   compile-error banner - don't claim "verified" for the GLSL body itself.
+4. Build (`cmake --build build -j 8`) and run `INFINITE_FIELDPIXELTEST=1
+   INFINITE_EXITAFTER=35 ./build/Infinite.app/Contents/MacOS/Infinite` from
+   the repository root. Its preset compilation check uses the actual GL
+   driver; the camera-FX checks also render at 1920x1080 and read back
+   finite pixels at defaults and parameter endpoints. A build alone only
+   checks the C++ string
+   compiles, **not** that the GLSL inside it is valid. Extend the GPU harness
+   with behavior assertions for a new preset; compilation alone cannot
+   prove that an effect does what its name promises.

@@ -1,0 +1,13 @@
+# domain | expected error substring (OK for success) | kernel (escaped newlines)
+pixel | OK | input pixel image img;\ncol = img(uv).rgb;
+pixel | OK | input pixel image img;\ncol = img(uv + vec2(1/res.x, 0)).rgb;
+pixel | exactly 1 argument | input pixel image img;\ncol = img().rgb;
+pixel | exactly 1 argument | input pixel image img;\ncol = img(uv, uv).rgb;
+pixel | needs a vec2 coordinate | input pixel image img;\ncol = img(1).rgb;
+pixel | needs a vec2 coordinate | input pixel image img;\ncol = img(vec3(1)).rgb;
+pixel | unknown function | col = col(uv);
+pixel | unknown function | c = vec4(1);\ncol = c(uv).rgb;
+pixel | unknown function | output pixel image pic = vec4(1);\ncol = pic(uv).rgb;
+pixel | only one | input pixel image a;\ninput pixel image b;\ncol = a(uv).rgb + b(uv).rgb;
+element | only legal | input element image img;\nP = img(uv).rgb;
+element | pixel-domain | input pixel image img;\nP = img(uv).rgb;

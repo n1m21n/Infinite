@@ -94,6 +94,118 @@ const std::vector<FieldPixelNode::Preset>& FieldPixelNode::Presets()
 {
    static const std::vector<Preset> kPresets = {
       { "Default (UV Gradient)", "col = vec3(uv.x, uv.y, 0.5);" },
+      { "Levels",
+        "input pixel image img;\n"
+        "param float inBlack = 0.0 [0.0, 1.0];\n"
+        "param float inWhite = 1.0 [0.0, 1.0];\n"
+        "param float gamma = 1.0 [0.1, 4.0];\n"
+        "param float outBlack = 0.0 [0.0, 1.0];\n"
+        "param float outWhite = 1.0 [0.0, 1.0];\n"
+        "c = clamp((img.rgb - inBlack) / max(inWhite - inBlack, 0.0001), 0.0, 1.0);\n"
+        "col = outBlack + pow(c, 1.0 / max(gamma, 0.0001)) * (outWhite - outBlack);\n"
+        "alpha = img.a;" },
+      { "Scanlines / Interlace",
+        "input pixel image img;\n"
+        "param float lines = 2.0 [1.0, 16.0];\n"
+        "param float depth = 0.5 [0.0, 1.0];\n"
+        "param float rollSpeed = 0.0 [-10.0, 10.0];\n"
+        "stripe = 0.5 + 0.5 * cos((uv.y * res.y + t * rollSpeed) * 3.14159265 / max(lines, 1.0));\n"
+        "col = img.rgb * (1.0 - depth * stripe);\n"
+        "alpha = img.a;" },
+      { "Lens Dirt + Flare",
+        "# Procedural dirt and ghost discs; no extra image pin required.\n"
+        "input pixel image img;\n"
+        "param float dirtAmount = 0.25 [0.0, 1.0];\n"
+        "param float flareX = 0.75 [0.0, 1.0];\n"
+        "param float flareY = 0.7 [0.0, 1.0];\n"
+        "param float flareStrength = 0.3 [0.0, 2.0];\n"
+        "param float ghosts = 4.0 [1.0, 8.0];\n"
+        "p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n"
+        "fpos = vec2((flareX - 0.5) * aspect, flareY - 0.5);\n"
+        "lum = dot(img.rgb, vec3(0.2126, 0.7152, 0.0722));\n"
+        "dirt = pow(0.5 + 0.5 * sin(p.x * 43.0 + sin(p.y * 27.0)) * cos(p.y * 39.0), 4.0);\n"
+        "flare = 0.0;\n"
+        "centre = fpos * 1.000000;\n"
+        "disc = 1.0 - smoothstep(0.017500, 0.035000, length(p - centre));\n"
+        "flare += disc * step(0.5, ghosts) / 1.0;\n"
+        "centre = fpos * 0.650000;\n"
+        "disc = 1.0 - smoothstep(0.023500, 0.047000, length(p - centre));\n"
+        "flare += disc * step(1.5, ghosts) / 2.0;\n"
+        "centre = fpos * 0.300000;\n"
+        "disc = 1.0 - smoothstep(0.029500, 0.059000, length(p - centre));\n"
+        "flare += disc * step(2.5, ghosts) / 3.0;\n"
+        "centre = fpos * -0.050000;\n"
+        "disc = 1.0 - smoothstep(0.035500, 0.071000, length(p - centre));\n"
+        "flare += disc * step(3.5, ghosts) / 4.0;\n"
+        "centre = fpos * -0.400000;\n"
+        "disc = 1.0 - smoothstep(0.041500, 0.083000, length(p - centre));\n"
+        "flare += disc * step(4.5, ghosts) / 5.0;\n"
+        "centre = fpos * -0.750000;\n"
+        "disc = 1.0 - smoothstep(0.047500, 0.095000, length(p - centre));\n"
+        "flare += disc * step(5.5, ghosts) / 6.0;\n"
+        "centre = fpos * -1.100000;\n"
+        "disc = 1.0 - smoothstep(0.053500, 0.107000, length(p - centre));\n"
+        "flare += disc * step(6.5, ghosts) / 7.0;\n"
+        "centre = fpos * -1.450000;\n"
+        "disc = 1.0 - smoothstep(0.059500, 0.119000, length(p - centre));\n"
+        "flare += disc * step(7.5, ghosts) / 8.0;\n"
+        "col = img.rgb + dirtAmount * dirt * lum + flareStrength * flare * vec3(1.0, 0.7, 0.4);\n"
+        "alpha = img.a;" },
+      { "Polar Coords",
+        "# mode: 0 = to polar, 1 = from polar. Twist is measured in turns.\n"
+        "input pixel image img;\n"
+        "param float mode = 0.0 [0.0, 1.0];\n"
+        "param float twist = 0.0 [-2.0, 2.0];\n"
+        "p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n"
+        "radius = length(p);\n"
+        "toPolar = vec2(fract(atan2(p.y, p.x + 0.000001) / 6.2831853 + 0.5 + twist * radius), radius * 2.0);\n"
+        "angle = (uv.x - 0.5 - twist * uv.y * 0.5) * 6.2831853;\n"
+        "fromPolar = vec2(cos(angle) * uv.y * 0.5 / aspect, sin(angle) * uv.y * 0.5) + 0.5;\n"
+        "c = img(mix(toPolar, fromPolar, step(0.5, mode)));\n"
+        "col = c.rgb;\n"
+        "alpha = c.a;" },
+      { "Chromatic Aberration",
+        "# radial: 0 = horizontal linear split, 1 = radial split.\n"
+        "input pixel image img;\n"
+        "param float amount = 0.01 [0.0, 0.1];\n"
+        "param float radial = 1.0 [0.0, 1.0];\n"
+        "p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\n"
+        "dir = mix(vec2(1.0, 0.0), p, radial);\n"
+        "offset = vec2(dir.x / aspect, dir.y) * amount;\n"
+        "r = img(uv + offset);\n"
+        "g = img(uv);\n"
+        "b = img(uv - offset);\n"
+        "col = vec3(r.r, g.g, b.b);\n"
+        "alpha = g.a;" },
+      { "Zoom Blur",
+        "# Editable 16-tap counterpart to the Effects radialblur node.\n"
+        "input pixel image img;\n"
+        "param float amount = 0.2 [0.0, 1.0];\n"
+        "param float centreX = 0.5 [0.0, 1.0];\n"
+        "param float centreY = 0.5 [0.0, 1.0];\n"
+        "centre = vec2(centreX, centreY);\n"
+        "p = vec2((uv.x - centre.x) * aspect, uv.y - centre.y);\n"
+        "dir = vec2(p.x / aspect, p.y);\n"
+        "sum = vec4(0.0);\n"
+        "sum += img(uv - dir * amount * 0.00000000) * 1.00000000;\n"
+        "sum += img(uv - dir * amount * 0.06666667) * 0.96666667;\n"
+        "sum += img(uv - dir * amount * 0.13333333) * 0.93333333;\n"
+        "sum += img(uv - dir * amount * 0.20000000) * 0.90000000;\n"
+        "sum += img(uv - dir * amount * 0.26666667) * 0.86666667;\n"
+        "sum += img(uv - dir * amount * 0.33333333) * 0.83333333;\n"
+        "sum += img(uv - dir * amount * 0.40000000) * 0.80000000;\n"
+        "sum += img(uv - dir * amount * 0.46666667) * 0.76666667;\n"
+        "sum += img(uv - dir * amount * 0.53333333) * 0.73333333;\n"
+        "sum += img(uv - dir * amount * 0.60000000) * 0.70000000;\n"
+        "sum += img(uv - dir * amount * 0.66666667) * 0.66666667;\n"
+        "sum += img(uv - dir * amount * 0.73333333) * 0.63333333;\n"
+        "sum += img(uv - dir * amount * 0.80000000) * 0.60000000;\n"
+        "sum += img(uv - dir * amount * 0.86666667) * 0.56666667;\n"
+        "sum += img(uv - dir * amount * 0.93333333) * 0.53333333;\n"
+        "sum += img(uv - dir * amount * 1.00000000) * 0.50000000;\n"
+        "c = sum / 12.0;\n"
+        "col = c.rgb;\n"
+        "alpha = c.a;" },
       { "Color Gradient",
         "param float angle = 45.0 [0.0, 360.0];\n"
         "param float speed = 0.5 [0.0, 5.0];\n"
@@ -932,6 +1044,11 @@ bool FieldPixelNode::Apply()
    // every uniform location read -1 (so params and hoisted values froze) and
    // GetOutputTexture() could flip between mOut and the state bank.
    Field::GlslEmitResult emit = Field::EmitGlsl(ir);
+   if (!emit.error.empty())
+   {
+      mLastError = emit.error;
+      return false;
+   }
 
    std::string compileErr;
    unsigned int program = GLUtil::CompileProgram(emit.source.c_str(), &compileErr);

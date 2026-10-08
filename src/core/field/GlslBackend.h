@@ -36,8 +36,8 @@ namespace Field
       int branchCount = 0;
       std::vector<int> lineToIrNode;
 
-      // Build step 22 (OPEN-C): how many offset reads of a state cell the
-      // kernel performs, and whether it performs any at all. A kernel that
+      // Coordinate-read count includes both state and image fetches.
+      // usesOffsetReads flags STATE neighbour reads only. A kernel that
       // reads its neighbours is a simulation - it integrates for minutes, so
       // its cells need 32-bit storage, where a plain trails kernel does not.
       // The count is the number the node face shows next to the byte count,

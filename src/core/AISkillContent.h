@@ -126,7 +126,7 @@ P += vec2(1, 0)      # vec2 into vec3 — ERROR, no implicit fill
 |---|---|
 | Arithmetic | `+ - * / % ^` (`^` is right-associative power: `2^3 == 8`) |
 | Compound assign | `+= -= *= /=` |
-| Compare / logic | `== != < <= > >= && || !` |
+| Compare / logic | `== != < <= > >= && \|\| !` |
 | Trig | `sin cos tan asin acos atan atan2` |
 | Math utilities | `abs floor ceil fract clamp lerp` (`lerp(a, b, t)`) |
 | Advanced math | `smoothstep pow sqrt exp log min max` |
@@ -351,6 +351,21 @@ Primitive that displaces `P` procedurally should compute `N` to match, not
 leave it at its default, or lighting will look wrong.
 
 ### Field Pixel (per-pixel kernel, GLSL-backed: writes `col`)
+
+Declare `input pixel image img;` to read a patched image. Bare `img` is the
+current pixel (vec4); `img(coord)` samples at one normalized vec2 coordinate,
+clamped to the source texture's edge texel centres. Filtering follows the
+source sampler, normally linear. Preserve sampled alpha with `alpha = c.a`.
+Only declared image inputs are callable; `col(coord)` is invalid. One image
+input is supported, and an unconnected input reads transparent black.
+`1/res.x` is a one-source-texel shift only if source and output widths match.
+
+```glsl
+input pixel image img;
+c = img(uv + vec2(1.0 / res.x, 0));
+col = c.rgb;
+alpha = c.a;
+```
 
 **Aspect correction is the single most common mistake in this domain.**
 `uv` runs `[0,1]` on both axes regardless of the canvas's actual width and
