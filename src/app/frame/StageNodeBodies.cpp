@@ -561,7 +561,20 @@ void DrawNodeBodies(FrameCtx& fc)
          // collapsed (so the "mod"/"pal" collapsed-tag affordance has
          // nothing to stand in for), and there is no mesh for the viewport
          // toggle - see the comment above isAudioBody.
-         if (!isAudioBody && !isComment)
+         // Name-only macros have nothing behind the eye, so their toggle row would hold bypass alone. Bypass
+         // then shares the output pin's row (left edge vs right edge), which makes the body symmetrical and
+         // drops a row. A modulated macro keeps the toggle row: its "mod" tag lives there.
+         const bool isMacroNode =
+            dynamic_cast<MacroKnobNode*>(gn.node.get()) || dynamic_cast<MacroSliderNode*>(gn.node.get()) ||
+            dynamic_cast<MacroBipolarKnobNode*>(gn.node.get()) || dynamic_cast<MacroTriggerNode*>(gn.node.get()) ||
+            dynamic_cast<MacroNumBoxNode*>(gn.node.get());
+         if (isMacroNode && !isComment)
+            gn.showParams = false;
+         const bool bypassOnOutputRow = isMacroNode && !isComment && CanBypass(gn) && !gn.hasModulatedParams &&
+                                        !gn.hasPaletteColors;
+         if (bypassOnOutputRow)
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));   // the gap the toggle row gave; also ends the body on an item, not a SetCursorPos
+         if (!isAudioBody && !isComment && !bypassOnOutputRow)
          {
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
             const bool isWide = (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr ||
@@ -574,13 +587,7 @@ void DrawNodeBodies(FrameCtx& fc)
             }
             // Name-only macros have nothing behind the eye, so the
             // toggle is dropped and bypass is the row's first control.
-            const bool isMacroNode =
-               dynamic_cast<MacroKnobNode*>(gn.node.get()) || dynamic_cast<MacroSliderNode*>(gn.node.get()) ||
-               dynamic_cast<MacroBipolarKnobNode*>(gn.node.get()) || dynamic_cast<MacroTriggerNode*>(gn.node.get()) ||
-               dynamic_cast<MacroNumBoxNode*>(gn.node.get());
-            if (isMacroNode)
-               gn.showParams = false;
-            else
+            if (!isMacroNode)
             {
                if (EyeToggle(gn.showParams))
                   gn.showParams = !gn.showParams;
@@ -1217,6 +1224,20 @@ void DrawNodeBodies(FrameCtx& fc)
             if (itemW <= contentW)
             {
                float pad = std::max(0.0f, contentW - itemW);
+               if (bypassOnOutputRow)
+               {
+                  // Bypass at the row's left edge, level with the output pin; the pad shrinks by its footprint.
+                  if (BypassToggle(gn.node->bypassed))
+                  {
+                     PushUndoCheckpoint();
+                     gn.node->bypassed = !gn.node->bypassed;
+                     if (dynamic_cast<IAudioSource*>(gn.node.get()) != nullptr ||
+                         dynamic_cast<INoteSource*>(gn.node.get()) != nullptr)
+                        RebuildAudioTopology();
+                  }
+                  ImGui::SameLine(0.0f, 0.0f);
+                  pad = std::max(0.0f, pad - 22.0f);
+               }
                ImGui::Dummy(ImVec2(pad, 1.0f));
                for (int o = 0; o < outputs; o++)
                {
