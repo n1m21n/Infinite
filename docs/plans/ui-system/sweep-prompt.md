@@ -97,8 +97,8 @@ Status: `todo`, `ok` (checked, matches), `fixed <sha>`, `decision` (needs owner)
 | Effects (image) | 24 shot dark (blurs, distortions, glow, crop); share one frame/preview | fixed | todo | Fixed: filter titles spaced via DisplayName (gaussian blur, add noise...); patch keys unchanged. Displace (2 inputs) has no bypass, per rule. Params panel not shot |
 | Compositing | 16 shot dark (Fit..Audio Color Ramp + invert/opacity/drop shadow) | ok | todo | Same frame/preview as Effects; multi-input nodes have no bypass per rule; node width follows title length (reaction diffusion, remove background slightly wider) - left |
 | Source | 13 (all dark; Draw, Text, Shape, Noise light) | fixed | ok | Fixed: Draw canvas shows "draw here" until the first stroke (was a blank black square). Decision left: Text default string renders very small in its preview |
-| 3D / geometry | Render 3D worst case | todo | todo | |
-| Utility | | todo | todo | |
+| 3D / geometry | 32 shot dark (all but Render 3D) | ok | todo | Nodes with a wide pin header (Material, Audio Ribbon, Join Geometry, Switcher 3D, Group 3D) are wider than their preview, which sits left/off-centre - decision needed. Ocean preview is faint (dark water on dark checker); Audio Ribbon preview is empty at silence (mesh invisible). Render 3D params panel not shot |
+| Utility | 15 shot dark (Output..Blend Audio) | ok | todo | No chrome defects at gallery zoom; audio ones covered by the Audio sweeps. Syphon In/Out not shot (macOS-only labels) |
 
 ### Audio effects visualizer matrix
 
