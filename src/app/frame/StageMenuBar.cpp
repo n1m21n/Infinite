@@ -130,8 +130,7 @@ void DrawMenuBar(FrameCtx& fc)
                   ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(ImVec4(1, 1, 1, hov ? 1.0f : 0.92f)), 5.0f);
             if (hov)
                HelpTip("%s", T("About Infinite"));
-            ImGui::SameLine(0.0f, 8.0f);
-            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, p0.y));
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + 8.0f, p0.y));
          }
          // File, Edit and Menu are three closed tiles that read as one section: a shared well sits behind them.
          ImDrawList* menuDl = ImGui::GetWindowDrawList();
@@ -962,7 +961,7 @@ void DrawMenuBar(FrameCtx& fc)
                dl->AddLine(ImVec2(c.x - 4.5f, c.y), ImVec2(c.x, c.y + 4.5f), fg, 1.8f);
                dl->AddLine(ImVec2(c.x + 4.5f, c.y), ImVec2(c.x, c.y + 4.5f), fg, 1.8f);
                dl->AddLine(ImVec2(c.x - 5.5f, c.y + 7.0f), ImVec2(c.x + 5.5f, c.y + 7.0f), fg, 1.8f);
-               dl->AddCircleFilled(ImVec2(mx.x - 4.0f, mn.y + 4.0f), 3.0f, ImGui::GetColorU32(ImVec4(0.97f, 0.35f, 0.30f, 1.0f)), 12);
+               StatusDot::OnLastItem(StatusDot::State::Error);
                if (clicked)
                   Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/#download");
                if (hov)
