@@ -112,11 +112,15 @@ void DrawMenuBar(FrameCtx& fc)
       if (menuBarOpen)
       {
          auto& MenuTile = TopBarParts::MenuTile;
+         float* sMenuMidYPtr = nullptr;
          // Infinite mark (the app icon): opens the About dialog.
          {
-            const float s = 24.0f;
+            const float s = tok::tile;
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
-            const float cy = ImGui::GetWindowPos().y + tok::bar_h * 0.5f;
+            // Same centre line as the File/Edit/Menu well (measured last frame), same height.
+            static float sMenuMidY = 0.0f;
+            const float cy = sMenuMidY > 0.0f ? sMenuMidY : ImGui::GetWindowPos().y + tok::bar_h * 0.5f;
+            sMenuMidYPtr = &sMenuMidY;
             ImGui::SetCursorScreenPos(ImVec2(p0.x + 4.0f, cy - s * 0.5f));
             if (ImGui::InvisibleButton("##brandlogo", ImVec2(s, s)))
                gShowAboutModal = true;
@@ -415,7 +419,10 @@ void DrawMenuBar(FrameCtx& fc)
          menuDl->ChannelsSetCurrent(0);
          {
             const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-            menuDl->AddRectFilled(ImVec2(menuGroupP.x - 2.0f, menuGroupY0), ImVec2(menuGroupMaxX + 2.0f, menuGroupY1),
+            const float mid = (menuGroupY0 + menuGroupY1) * 0.5f;
+            if (sMenuMidYPtr != nullptr)
+               *sMenuMidYPtr = mid;
+            menuDl->AddRectFilled(ImVec2(menuGroupP.x - 2.0f, mid - tok::tile * 0.5f), ImVec2(menuGroupMaxX + 2.0f, mid + tok::tile * 0.5f),
                ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.06f)), tok::radius_tile);
          }
          menuDl->ChannelsMerge();
