@@ -570,6 +570,16 @@ void DrawNodeBodies(FrameCtx& fc)
             dynamic_cast<MacroNumBoxNode*>(gn.node.get());
          if (isMacroNode && !isComment)
             gn.showParams = false;
+         const auto drawBypassToggle = [&]()
+         {
+            if (!BypassToggle(gn.node->bypassed))
+               return;
+            PushUndoCheckpoint();
+            gn.node->bypassed = !gn.node->bypassed;
+            if (dynamic_cast<IAudioSource*>(gn.node.get()) != nullptr ||
+                dynamic_cast<INoteSource*>(gn.node.get()) != nullptr)
+               RebuildAudioTopology();
+         };
          const bool bypassOnOutputRow = isMacroNode && !isComment && CanBypass(gn) && !gn.hasModulatedParams &&
                                         !gn.hasPaletteColors;
          if (bypassOnOutputRow)
@@ -599,16 +609,8 @@ void DrawNodeBodies(FrameCtx& fc)
                // sit where they do on every other node.
                ImGui::Dummy(ImVec2(22.0f, 18.0f));
             }
-            else if (BypassToggle(gn.node->bypassed))
-            {
-               PushUndoCheckpoint();
-               gn.node->bypassed = !gn.node->bypassed;
-               if (dynamic_cast<IAudioSource*>(gn.node.get()) != nullptr ||
-                   dynamic_cast<INoteSource*>(gn.node.get()) != nullptr)
-               {
-                  RebuildAudioTopology();
-               }
-            }
+            else
+               drawBypassToggle();
             // Mini viewport toggle, only for nodes that actually have a mesh to
             // show - excludes CameraNode/LightNode, which appear in the stat-box
             // branch above but implement no geometry interface, and
@@ -1227,15 +1229,8 @@ void DrawNodeBodies(FrameCtx& fc)
                if (bypassOnOutputRow)
                {
                   // Bypass at the row's left edge, level with the output pin; the pad shrinks by its footprint.
-                  if (BypassToggle(gn.node->bypassed))
-                  {
-                     PushUndoCheckpoint();
-                     gn.node->bypassed = !gn.node->bypassed;
-                     if (dynamic_cast<IAudioSource*>(gn.node.get()) != nullptr ||
-                         dynamic_cast<INoteSource*>(gn.node.get()) != nullptr)
-                        RebuildAudioTopology();
-                  }
-                  ImGui::SameLine(0.0f, 0.0f);
+                  drawBypassToggle();
+                  ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y));   // beside the toggle; the pad Dummy follows
                   pad = std::max(0.0f, pad - 22.0f);
                }
                ImGui::Dummy(ImVec2(pad, 1.0f));

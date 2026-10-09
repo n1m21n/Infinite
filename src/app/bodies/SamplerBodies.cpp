@@ -1856,8 +1856,8 @@ namespace app
          const int page = std::clamp(n->editPage, 0, (steps - 1) / pageSteps);
          const int pageFirst = page * pageSteps;
          const int pageCols = std::min(gridCols, steps - pageFirst);
-         const float toggleW = 20.0f;
-         const float gutterW = toggleW * 3.0f + 2.0f * 2.0f + 6.0f; // R | M | S (70px)
+         const float toggleW = 24.0f; // the small button's own padding makes it wider than 20, which put S under the first step cell
+         const float gutterW = toggleW * 3.0f + 2.0f * 2.0f + 6.0f; // R | M | S (82px)
          const float rightGutterW = 32.0f; // Output pin gutter on the right
          const float rowH = 28.0f;
          const float rowGap = 2.0f;
