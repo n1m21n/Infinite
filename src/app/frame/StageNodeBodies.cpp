@@ -281,7 +281,8 @@ void DrawNodeBodies(FrameCtx& fc)
                ImGui::SameLine(0.0f, 4.0f);
                ImGui::TextDisabled("#%d", instanceIdx);
             }
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 2.0f);
+            // One header row: title, instance number, then the category dimmed to its right.
+            ImGui::SameLine(0.0f, tok::space_2);
             if (isLight)
                ImGui::PushStyleColor(ImGuiCol_Text,
                                      ImVec4(catColor.r * 0.75f, catColor.g * 0.75f,
