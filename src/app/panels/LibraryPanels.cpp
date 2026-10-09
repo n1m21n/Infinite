@@ -1,4 +1,5 @@
 // Library / plugin / field search panels (moved verbatim from main.cpp).
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -165,25 +166,7 @@ namespace app
       ImGui::PushID(idPrefix);
 
       {
-         const char* addLabel = T("Add folder...");
-         const float iconSize = ImGui::GetFrameHeight() * 0.65f;
-         const float iconGap = 6.0f;
-         const ImVec2 btnPos = ImGui::GetCursorScreenPos();
-         const bool clicked = ImGui::Button("##addfolder", ImVec2(-1.0f, 0));
-         const ImVec2 bmin = ImGui::GetItemRectMin();
-         const ImVec2 bmax = ImGui::GetItemRectMax();
-         const float btnW = bmax.x - bmin.x;
-         const float btnH = bmax.y - bmin.y;
-         const float textW = ImGui::CalcTextSize(addLabel).x;
-         const float totalContentW = iconSize + iconGap + textW;
-         const float startX = bmin.x + (btnW - totalContentW) * 0.5f;
-         const float centerY = bmin.y + btnH * 0.5f;
-
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-         glyph::DrawPlus(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
-         dl->AddText(ImVec2(startX + iconSize + iconGap, centerY - ImGui::GetTextLineHeight() * 0.5f), col, addLabel);
-
+         const bool clicked = LibraryParts::ActionButton("addfolder", T("Add folder..."), LibraryParts::Icon::Plus);
          if (clicked)
          {
             const std::string path = Platform::OpenFolderDialog();
@@ -204,43 +187,16 @@ namespace app
       for (const std::string& folder : scanner.Folders())
       {
          ImGui::PushID(folder.c_str());
-         const float btnW = ImGui::GetFrameHeight();
+         const float btnW = 24.0f;
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + panelW - 2.0f * btnW - 14.0f);
          ImGui::TextDisabled("%s", folder.c_str());
          ImGui::PopTextWrapPos();
          ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
-         if (scanning)
-            ImGui::BeginDisabled();
-         // Drawn as a vector arc-with-arrowhead, not the U+21BB clockwise
-         // arrow character it used to be - this font has no glyph range
-         // beyond Basic Latin (see DrawBrowserFilterStrip's sort-direction
-         // comment), so that rendered as a literal '?'.
-         const bool refreshClicked = ImGui::Button("##refreshfolder", ImVec2(btnW, 0));
-         {
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 bmin = ImGui::GetItemRectMin();
-            const ImVec2 bmax = ImGui::GetItemRectMax();
-            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.72f;
-            const ImU32 col = ImGui::IsItemHovered() || scanning ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-            glyph::DrawRefresh(dl, center, iconSize, col);
-         }
-         if (refreshClicked)
+         if (LibraryParts::IconButton("refreshfolder", LibraryParts::Icon::Refresh, !scanning))
             folderToScan = folder;
-         if (scanning)
-            ImGui::EndDisabled();
          ImGui::SameLine(panelW - btnW);
-         if (ImGui::Button("##removefolder", ImVec2(btnW, 0)))
+         if (LibraryParts::IconButton("removefolder", LibraryParts::Icon::Close, true, true))
             folderToRemove = folder;
-         {
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 bmin = ImGui::GetItemRectMin();
-            const ImVec2 bmax = ImGui::GetItemRectMax();
-            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.65f;
-            const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::pal::c_E63C3CFF) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-            glyph::DrawX(dl, center, iconSize, col);
-         }
          ImGui::PopID();
       }
       if (!folderToRemove.empty())
@@ -248,30 +204,9 @@ namespace app
 
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
       {
-         if (scanning)
-            ImGui::BeginDisabled();
-         const char* refreshLabel = T("Refresh all");
-         const float iconSize = ImGui::GetFrameHeight() * 0.65f;
-         const float iconGap = 6.0f;
-         const bool clicked = ImGui::Button("##refreshall", ImVec2(-1.0f, 0));
-         const ImVec2 bmin = ImGui::GetItemRectMin();
-         const ImVec2 bmax = ImGui::GetItemRectMax();
-         const float btnW = bmax.x - bmin.x;
-         const float btnH = bmax.y - bmin.y;
-         const float textW = ImGui::CalcTextSize(refreshLabel).x;
-         const float totalContentW = iconSize + iconGap + textW;
-         const float startX = bmin.x + (btnW - totalContentW) * 0.5f;
-         const float centerY = bmin.y + btnH * 0.5f;
-
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImU32 col = ImGui::GetColorU32(scanning ? ImGuiCol_TextDisabled : ImGuiCol_Text);
-         glyph::DrawRefresh(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
-         dl->AddText(ImVec2(startX + iconSize + iconGap, centerY - ImGui::GetTextLineHeight() * 0.5f), col, refreshLabel);
-
+         const bool clicked = LibraryParts::ActionButton("refreshall", T("Refresh all"), LibraryParts::Icon::Refresh, !scanning);
          if (clicked)
             scanAll = true;
-         if (scanning)
-            ImGui::EndDisabled();
          if (scanning)
             ImGui::TextDisabled(T("scanning... (%d found)"), scanner.FilesFoundSoFar());
       }
@@ -498,16 +433,16 @@ namespace app
          }
 
 
-         if (ImGui::BeginPopupContextItem("##entry_ctx"))
+         if (MenuParts::BeginContextItem("##entry_ctx"))
          {
-            if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
+            if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
             {
                if (mediaKind)
                   gBrowserFavorites.ToggleMedia(entry.path);
                else
                   gBrowserFavorites.ToggleSample(entry.path);
             }
-            if (ImGui::MenuItem(L("Add to canvas")))
+            if (MenuParts::Item(L("Add to canvas")))
             {
                const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                PushUndoCheckpoint();
@@ -539,7 +474,7 @@ namespace app
                   }
                }
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
 
          ImGui::PopID();
@@ -891,11 +826,11 @@ namespace app
             ImGui::SetTooltip(T("%s\n%s"), entry.format.c_str(), entry.identifier.c_str());
 
 
-         if (ImGui::BeginPopupContextItem("##plugin_ctx"))
+         if (MenuParts::BeginContextItem("##plugin_ctx"))
          {
-            if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
+            if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                gBrowserFavorites.TogglePlugin(entry.identifier);
-            if (ImGui::MenuItem(L("Add to canvas")))
+            if (MenuParts::Item(L("Add to canvas")))
             {
                const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                PushUndoCheckpoint();
@@ -906,7 +841,7 @@ namespace app
                   gPatchDirty = true;
                }
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
 
          ImGui::PopID();
@@ -1086,16 +1021,16 @@ namespace app
             }
 
    
-            if (ImGui::BeginPopupContextItem("##field_ctx"))
+            if (MenuParts::BeginContextItem("##field_ctx"))
             {
-               if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
+               if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                   gBrowserFavorites.ToggleFieldPreset(entry.name);
-               if (ImGui::MenuItem(L("Add to canvas")))
+               if (MenuParts::Item(L("Add to canvas")))
                {
                   const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                   SpawnFieldPresetNode(entry, spawnPos.x, spawnPos.y);
                }
-               ImGui::EndPopup();
+               MenuParts::EndPopup();
             }
 
             ImGui::PopID();

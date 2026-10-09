@@ -372,34 +372,27 @@ void DrawPopupsB(FrameCtx& fc)
          dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(opt.c_str()).x);
       for (const std::string& cat : gDropdown.categories)
          dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(cat.c_str()).x);
-      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + ImGui::GetStyle().WindowPadding.x * 2.0f
+      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * 2.0f
                                                  + dropdownTextPadX * 2.0f
                                                  + ImGui::GetStyle().ScrollbarSize,
-                                              120.0f, 400.0f);
+                                              160.0f, 400.0f);
       ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(520, 480));
-      if (ImGui::BeginPopup("##dropdown"))
+      if (MenuParts::BeginPopup("##dropdown"))
       {
          const bool showSearch = gDropdown.focusSearch || gDropdown.options.size() >= kDropdownAutoSearchMin;
          if (showSearch)
          {
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 3.0f));
             if (ImGui::IsWindowAppearing())
+            {
                ImGui::SetKeyboardFocusHere();
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::InputTextWithHint("##ddsearch", "Search...", gDropdown.filterBuf, sizeof(gDropdown.filterBuf));
-            ImGui::PopStyleVar();
-            ImGui::Separator();
+               ImGui::GetCurrentContext()->NavCursorVisible = false; // no focus ring until the keyboard navigates
+            }
+            LibraryParts::SearchField("ddsearch", T("search..."), gDropdown.filterBuf, sizeof(gDropdown.filterBuf));
+            MenuParts::Separator();
          }
 
          const std::string q = showSearch ? FoldForSearch(gDropdown.filterBuf) : std::string();
 
-         // The pill still spans the full row (NoPadWithHalfSpacing below
-         // keeps the gap between rows real, and item spacing is tightened
-         // slightly so that gap isn't oversized), but the label is drawn
-         // with its own left inset instead of starting flush with the
-         // pill's edge - otherwise the text reads as glued to the window
-         // border with no breathing room.
-         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, ImMax(2.0f, ImGui::GetStyle().ItemSpacing.y - 2.0f)));
          std::string lastCategory;
          for (int i = 0; i < (int)gDropdown.options.size(); i++)
          {
@@ -418,30 +411,14 @@ void DrawPopupsB(FrameCtx& fc)
                if (gDropdown.categories[i] != lastCategory)
                {
                   if (i > 0)
-                     ImGui::Separator();
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
-                  ImGui::TextUnformatted(gDropdown.categories[i].c_str());
-                  ImGui::PopStyleColor();
+                     MenuParts::Separator();
+                  ImGui::TextDisabled("%s", gDropdown.categories[i].c_str());
                   lastCategory = gDropdown.categories[i];
                }
             }
-            bool selected = (i == gDropdown.current);
+            const bool selected = (i == gDropdown.current);
             ImGui::PushID(i);
-            const ImVec2 rowMin = ImGui::GetCursorScreenPos();
-            const float rowWidth = ImGui::GetContentRegionAvail().x;
-            // NoPadWithHalfSpacing: Selectable pads its hit/fill rect into
-            // half of ItemSpacing on each side by default so a stack of rows
-            // reads as one continuous menu - which is exactly what erased
-            // the gap between the selected row's pill and a hovered
-            // neighbour's pill (e.g. "oct +0" selected, "oct +1" hovered).
-            // Opting out restores a real gap between rows, so the two
-            // highlight states stay visually distinct.
-            const bool clicked = ImGui::Selectable("##ddrow", selected,
-                                                    ImGuiSelectableFlags_NoPadWithHalfSpacing, ImVec2(rowWidth, 0.0f));
-            const float rowH = ImGui::GetItemRectSize().y;
-            ImGui::GetWindowDrawList()->AddText(
-               ImVec2(rowMin.x + dropdownTextPadX, rowMin.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f),
-               ImGui::GetColorU32(ImGuiCol_Text), gDropdown.options[i].c_str());
+            const bool clicked = MenuParts::Choice(gDropdown.options[i].c_str(), selected);
             ImGui::PopID();
             if (clicked)
             {
@@ -452,8 +429,7 @@ void DrawPopupsB(FrameCtx& fc)
                ImGui::SetScrollHereY(0.5f);
          }
 
-         ImGui::PopStyleVar();
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Field build step 17: .infdev device Save name-prompt - same

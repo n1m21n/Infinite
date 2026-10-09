@@ -1,4 +1,5 @@
 // Viewport panel cards and mini viewports (moved verbatim from main.cpp).
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -427,12 +428,16 @@ namespace app
       const float bar = ImGui::GetStyle().ScrollbarSize;
       const ImVec2 panelOrigin = ImGui::GetCursorScreenPos();
       const ImVec2 strip = ImGui::GetContentRegionAvail();
-      const float box = horizontal ? std::max(48.0f, strip.y - bar)
-                                   : std::max(48.0f, strip.x - bar);
+      // Cards keep a margin to the strip's edge on every side, at every dock position.
+      const float pad = tok::space_2;
+      const float box = horizontal ? std::max(48.0f, strip.y - bar - 2.0f * pad)
+                                   : std::max(48.0f, strip.x - bar - 2.0f * pad);
 
       PushDockedPanelStyle(/*isChild=*/true);
-      ImGui::BeginChild("##viewportcards", strip, false,
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
+      ImGui::BeginChild("##viewportcards", strip, ImGuiChildFlags_AlwaysUseWindowPadding,
                         horizontal ? ImGuiWindowFlags_HorizontalScrollbar : 0);
+      ImGui::PopStyleVar();
 
       // Snapshot before drawing: a card's own close button mutates
       // gViewportPanelNodes, which would otherwise invalidate this loop.
@@ -498,24 +503,24 @@ namespace app
       if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
          ImGui::OpenPopup("##viewportpanelctx");
 
-      if (ImGui::BeginPopup("##viewportpanelctx"))
+      if (MenuParts::BeginPopup("##viewportpanelctx"))
       {
          static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
          for (int i = 0; i < 4; i++)
-            if (ImGui::MenuItem(L(kDockLabels[i]), nullptr, i == gViewportPanelDock))
+            if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gViewportPanelDock))
                gViewportPanelDock = i;
-         ImGui::Separator();
-         if (ImGui::MenuItem(L("Close panel")))
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Close panel")))
             gViewportPanelOpen = false;
          if (!gViewportPanelNodes.empty())
          {
-            if (ImGui::MenuItem(L("Clear all cards")))
+            if (MenuParts::Item(L("Clear all cards")))
             {
                gViewportPanelNodes.clear();
                gViewportPanelOpen = false;
             }
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
    }
 

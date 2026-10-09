@@ -85,6 +85,67 @@ namespace LibraryParts
       return changed;
    }
 
+   enum class Icon { Plus, Refresh, Close };
+
+   inline void DrawIcon(ImDrawList* dl, ImVec2 c, float size, ImU32 col, Icon icon)
+   {
+      if (icon == Icon::Plus) glyph::DrawPlus(dl, c, size, col);
+      else if (icon == Icon::Refresh) glyph::DrawRefresh(dl, c, size, col);
+      else glyph::DrawX(dl, c, size, col);
+   }
+
+   // Full-width action: same well, height and radius as the search field, glyph + label centred.
+   inline bool ActionButton(const char* id, const char* label, Icon icon, bool enabled = true)
+   {
+      const float w = ImGui::GetContentRegionAvail().x;
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      ImGui::PushID(id);
+      if (!enabled)
+         ImGui::BeginDisabled();
+      const bool clicked = ImGui::InvisibleButton("##btn", ImVec2(w, kFieldH));
+      const bool hot = ImGui::IsItemHovered();
+      const bool down = ImGui::IsItemActive();
+      if (!enabled)
+         ImGui::EndDisabled();
+      const float hv = UiAnim::Hover(ImGui::GetItemID(), hot, tok::motion_hover_in, tok::motion_hover_out);
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(p, ImVec2(p.x + w, p.y + kFieldH),
+                        ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, (down ? 0.14f : 0.07f + 0.04f * hv))), tok::radius_tile);
+      const float iconSize = 14.0f;
+      const float textW = ImGui::CalcTextSize(label).x;
+      const float x0 = p.x + std::floor((w - (iconSize + tok::space_2 + textW)) * 0.5f);
+      const float cy = p.y + kFieldH * 0.5f;
+      const ImU32 col = ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, enabled ? 0.9f : 0.4f));
+      DrawIcon(dl, ImVec2(x0 + iconSize * 0.5f, cy), iconSize, col, icon);
+      dl->AddText(ImVec2(x0 + iconSize + tok::space_2, std::floor(cy - ImGui::GetTextLineHeight() * 0.5f)), col, label);
+      ImGui::PopID();
+      return clicked && enabled;
+   }
+
+   // Small square icon action (refresh / remove) on a folder row.
+   inline bool IconButton(const char* id, Icon icon, bool enabled = true, bool danger = false)
+   {
+      const float s = 24.0f;
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      ImGui::PushID(id);
+      if (!enabled)
+         ImGui::BeginDisabled();
+      const bool clicked = ImGui::InvisibleButton("##ib", ImVec2(s, s));
+      const bool hot = ImGui::IsItemHovered();
+      if (!enabled)
+         ImGui::EndDisabled();
+      const float hv = UiAnim::Hover(ImGui::GetItemID(), hot, tok::motion_hover_in, tok::motion_hover_out);
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(p, ImVec2(p.x + s, p.y + s), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.07f + 0.05f * hv)), tok::radius_tile);
+      const ImU32 col = (danger && hot) ? tok::U32(tok::pal::c_E63C3CFF)
+                                         : ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, enabled ? 0.45f + 0.45f * hv : 0.3f));
+      DrawIcon(dl, ImVec2(p.x + s * 0.5f, p.y + s * 0.5f), 13.0f, col, icon);
+      ImGui::PopID();
+      return clicked && enabled;
+   }
+
    // "Audio  12": body semibold, dimmed, with the item count right-aligned. Space above (not on the first one).
    inline void SectionHeader(const char* label, int count, bool first = false)
    {

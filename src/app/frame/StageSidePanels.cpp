@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PillGroup.h"
@@ -408,16 +409,16 @@ void DrawSidePanels(FrameCtx& fc)
                   }
                   if (row.hovered && rowLabel != DisplayName(match.first))
                      ImGui::SetTooltip("%s", DisplayName(match.first).c_str());
-                  if (ImGui::BeginPopupContextItem("##mod_ctx"))
+                  if (MenuParts::BeginContextItem("##mod_ctx"))
                   {
-                     if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
+                     if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                         gBrowserFavorites.ToggleModule(match.first);
-                     if (ImGui::MenuItem(L("Add to canvas")))
+                     if (MenuParts::Item(L("Add to canvas")))
                      {
                         spawnName = match.first;
                         spawnCategory = match.second;
                      }
-                     ImGui::EndPopup();
+                     MenuParts::EndPopup();
                   }
                   ImGui::PopID();
                }
@@ -470,16 +471,16 @@ void DrawSidePanels(FrameCtx& fc)
                      }
                      if (row.hovered && rowLabel != DisplayName(name))
                         ImGui::SetTooltip("%s", DisplayName(name).c_str());
-                     if (ImGui::BeginPopupContextItem("##mod_cat_ctx"))
+                     if (MenuParts::BeginContextItem("##mod_cat_ctx"))
                      {
-                        if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
+                        if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                            gBrowserFavorites.ToggleModule(name);
-                        if (ImGui::MenuItem(L("Add to canvas")))
+                        if (MenuParts::Item(L("Add to canvas")))
                         {
                            spawnName = name;
                            spawnCategory = category;
                         }
-                        ImGui::EndPopup();
+                        MenuParts::EndPopup();
                      }
                      ImGui::PopID();
                   }

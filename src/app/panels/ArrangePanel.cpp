@@ -1,4 +1,5 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -1098,44 +1099,44 @@ namespace app
             glyph::DrawChevronDown(tdl, chevCenter, 8.0f, icol, 1.3f);
          }
 
-         if (ImGui::BeginPopup("##arrangetoolpopup"))
+         if (MenuParts::BeginPopup("##arrangetoolpopup"))
          {
-            if (ImGui::MenuItem(L("Select"), "A", gArrangeTool == ArrangeTool::Select))
+            if (MenuParts::Item(L("Select"), "A", gArrangeTool == ArrangeTool::Select))
             {
                gArrangeTool = ArrangeTool::Select;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Trim"), "T", gArrangeTool == ArrangeTool::Trim))
+            if (MenuParts::Item(L("Trim"), "T", gArrangeTool == ArrangeTool::Trim))
             {
                gArrangeTool = ArrangeTool::Trim;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Range Selection"), "R", gArrangeTool == ArrangeTool::Range))
+            if (MenuParts::Item(L("Range Selection"), "R", gArrangeTool == ArrangeTool::Range))
             {
                gArrangeTool = ArrangeTool::Range;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Blade"), "B", gArrangeTool == ArrangeTool::Blade))
+            if (MenuParts::Item(L("Blade"), "B", gArrangeTool == ArrangeTool::Blade))
             {
                gArrangeTool = ArrangeTool::Blade;
                gArrangeBladeOn = true;
             }
-            if (ImGui::MenuItem(L("Zoom"), "Z", gArrangeTool == ArrangeTool::Zoom))
+            if (MenuParts::Item(L("Zoom"), "Z", gArrangeTool == ArrangeTool::Zoom))
             {
                gArrangeTool = ArrangeTool::Zoom;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Hand"), "H", gArrangeTool == ArrangeTool::Hand))
+            if (MenuParts::Item(L("Hand"), "H", gArrangeTool == ArrangeTool::Hand))
             {
                gArrangeTool = ArrangeTool::Hand;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Pencil (Draw Clip)"), "P", gArrangeTool == ArrangeTool::Pencil))
+            if (MenuParts::Item(L("Pencil (Draw Clip)"), "P", gArrangeTool == ArrangeTool::Pencil))
             {
                gArrangeTool = ArrangeTool::Pencil;
                gArrangeBladeOn = false;
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
 
          // Add Marker (M): drops one at the playhead, on the snap grid.
@@ -1227,18 +1228,18 @@ namespace app
              ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangedockctx"))
             ImGui::OpenPopup("##arrangedockctx");
       }
-      if (ImGui::BeginPopup("##arrangedockctx"))
+      if (MenuParts::BeginPopup("##arrangedockctx"))
       {
-         if (ImGui::BeginMenu(L("Dock Position")))
+         if (MenuParts::SubMenu(L("Dock Position")))
          {
             const bool panelTop = gArrange.settings.dockSide == 1;
-            if (ImGui::MenuItem(L("Timeline at Bottom"), nullptr, !panelTop) && panelTop)
+            if (MenuParts::Item(L("Timeline at Bottom"), nullptr, !panelTop) && panelTop)
             {
                gArrange.settings.dockSide = 0;
                gArrange.revision++; // a model field like any other (WP5b)
                gPatchDirty = true;
             }
-            if (ImGui::MenuItem(L("Timeline at Top"), nullptr, panelTop) && !panelTop)
+            if (MenuParts::Item(L("Timeline at Top"), nullptr, panelTop) && !panelTop)
             {
                gArrange.settings.dockSide = 1;
                gArrange.revision++;
@@ -1247,23 +1248,23 @@ namespace app
             ImGui::EndMenu();
          }
          ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-         if (ImGui::MenuItem(L("Close Arrangement Timeline")))
+         if (MenuParts::Item(L("Close Arrangement Timeline")))
          {
             gArrangePanelOpen = false;
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
-      if (ImGui::BeginPopup("##arrangeviewportctx"))
+      if (MenuParts::BeginPopup("##arrangeviewportctx"))
       {
-         if (ImGui::BeginMenu(L("Viewport Position")))
+         if (MenuParts::SubMenu(L("Viewport Position")))
          {
-            if (ImGui::MenuItem(L("Dock Left"), nullptr, !gArrangeViewportOnRight))
+            if (MenuParts::Item(L("Dock Left"), nullptr, !gArrangeViewportOnRight))
                gArrangeViewportOnRight = false;
-            if (ImGui::MenuItem(L("Dock Right"), nullptr, gArrangeViewportOnRight))
+            if (MenuParts::Item(L("Dock Right"), nullptr, gArrangeViewportOnRight))
                gArrangeViewportOnRight = true;
             ImGui::EndMenu();
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       ImGui::Separator();
@@ -1380,17 +1381,17 @@ namespace app
              !ImGui::IsPopupOpen("##arrangeviewportctx"))
             ImGui::OpenPopup("##arrangeviewportctx");
 
-         if (ImGui::BeginPopup("##arrangeviewportctx"))
+         if (MenuParts::BeginPopup("##arrangeviewportctx"))
          {
-            if (ImGui::BeginMenu(L("Viewport Position")))
+            if (MenuParts::SubMenu(L("Viewport Position")))
             {
-               if (ImGui::MenuItem(L("Dock Left"), nullptr, !gArrangeViewportOnRight))
+               if (MenuParts::Item(L("Dock Left"), nullptr, !gArrangeViewportOnRight))
                   gArrangeViewportOnRight = false;
-               if (ImGui::MenuItem(L("Dock Right"), nullptr, gArrangeViewportOnRight))
+               if (MenuParts::Item(L("Dock Right"), nullptr, gArrangeViewportOnRight))
                   gArrangeViewportOnRight = true;
                ImGui::EndMenu();
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
 
          ImGui::EndChild();
@@ -1912,7 +1913,7 @@ namespace app
 
       if (openMarkerCtx)
          ImGui::OpenPopup("##arrangemarkerctx");
-      if (ImGui::BeginPopup("##arrangemarkerctx"))
+      if (MenuParts::BeginPopup("##arrangemarkerctx"))
       {
          const Arrange::Marker* cm = nullptr;
          for (const Arrange::Marker& mk : gArrange.markers)
@@ -1927,13 +1928,13 @@ namespace app
             const uint32_t curColor = cm->color;
             ImGui::TextDisabled(T("Marker: %s"), cm->name.c_str());
             ImGui::TextDisabled("%s  |  %s", ArrangeFormatBBT(cm->pos).c_str(), ArrangeFormatTickSeconds(cm->pos).c_str());
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Rename")))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Rename")))
             {
                gArrangeRenamingMarkerId = mid;
                snprintf(gArrangeRenameMarkerBuffer, sizeof(gArrangeRenameMarkerBuffer), "%s", cm->name.c_str());
             }
-            ImGui::Separator();
+            MenuParts::Separator();
             ImGui::TextDisabled("%s", T("Colour"));
             for (int pi = 0; pi < 10; pi++)
             {
@@ -1949,11 +1950,11 @@ namespace app
                   ImGui::PopStyleVar();
                ImGui::PopID();
             }
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Delete Marker")))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Delete Marker")))
                ArrangeEdit([&]() { Arrange::DeleteMarker(gArrange, mid); });
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Lane grid lines (every lane stripes its body with these): the snap
@@ -2517,13 +2518,13 @@ namespace app
             ImGui::OpenPopup("##arrangeaddtrackpopup");
          }
       }
-      if (ImGui::BeginPopup("##arrangeaddtrackpopup"))
+      if (MenuParts::BeginPopup("##arrangeaddtrackpopup"))
       {
-         if (ImGui::MenuItem(L("Video Track")))
+         if (MenuParts::Item(L("Video Track")))
             InsertArrangeTrack(true);
-         if (ImGui::MenuItem(L("Audio Track")))
+         if (MenuParts::Item(L("Audio Track")))
             InsertArrangeTrack(false);
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Clip lane drawing to below the (now pinned) ruler strip, so a track
@@ -4128,19 +4129,19 @@ namespace app
       // click-to-assign flow.
       if (openAddClip)
          ImGui::OpenPopup("##arrangeaddclip");
-      if (ImGui::BeginPopup("##arrangeaddclip"))
+      if (MenuParts::BeginPopup("##arrangeaddclip"))
       {
          ImGui::TextDisabled(T("Add Clip at %s"), ArrangeFormatPos(addClipAtTick).c_str());
-         ImGui::Separator();
-         if (ImGui::MenuItem(L("Add Clip")))
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Add Clip")))
             AddUnassignedClipAt(addClipToLaneId, addClipAtTick);
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // ---- lane group-membership context menu (from the drag-handle) ----
       if (openLaneCtx)
          ImGui::OpenPopup("##arrangelanectx");
-      if (ImGui::BeginPopup("##arrangelanectx"))
+      if (MenuParts::BeginPopup("##arrangelanectx"))
       {
          Arrange::Lane* ctxLane = Arrange::FindLane(gArrange, ctxLaneId);
          if (ctxLane == nullptr)
@@ -4153,33 +4154,33 @@ namespace app
             for (size_t k = 0; k < gArrange.lanes.size(); k++)
                if (gArrange.lanes[k].id == ctxLaneId) { laneIdx = (int)k; break; }
 
-            if (ImGui::MenuItem(L("Add Video Track")))
+            if (MenuParts::Item(L("Add Video Track")))
             {
                gArrangeAddTrackInsertAfter = laneIdx;
                InsertArrangeTrack(true);
             }
-            if (ImGui::MenuItem(L("Add Audio Track")))
+            if (MenuParts::Item(L("Add Audio Track")))
             {
                gArrangeAddTrackInsertAfter = laneIdx;
                InsertArrangeTrack(false);
             }
-            if (ImGui::MenuItem(L("Rename Track"), MODKEY "+R"))
+            if (MenuParts::Item(L("Rename Track"), MODKEY "+R"))
             {
                gArrangeRenamingLaneId = ctxLaneId;
                gArrangeRenameJustStarted = true;
             }
-            if (ImGui::MenuItem(L("Delete Track")))
+            if (MenuParts::Item(L("Delete Track")))
                laneToDelete = ctxLaneId;
-            ImGui::Separator();
+            MenuParts::Separator();
 
             const uint64_t curGroupId = ctxLane->groupId;
-            if (curGroupId != 0 && ImGui::MenuItem(L("Remove from Group")))
+            if (curGroupId != 0 && MenuParts::Item(L("Remove from Group")))
                ArrangeEdit([&]() { Arrange::SetLaneTrackGroup(gArrange, ctxLaneId, 0); });
 
             // Wraps this one track as the sole child of a brand-new group at
             // the track's current position (same parent it already had) -
             // reversible via the group's own Ungroup.
-            if (ImGui::MenuItem(L("Convert to Group")))
+            if (MenuParts::Item(L("Convert to Group")))
                ArrangeEdit([&]() { Arrange::AddTrackGroup(gArrange, { ctxLaneId }, std::string(), curGroupId); });
 
             // Right-clicked a track that's part of a larger multi-row
@@ -4194,7 +4195,7 @@ namespace app
                for (uint64_t rowId : gArrangeRowSel)
                   if (Arrange::FindLane(gArrange, rowId) != nullptr)
                      selLaneIds.push_back(rowId);
-               if (selLaneIds.size() > 1 && ImGui::MenuItem(L("Group Selected")))
+               if (selLaneIds.size() > 1 && MenuParts::Item(L("Group Selected")))
                {
                   ArrangeEdit([&]()
                   {
@@ -4223,21 +4224,21 @@ namespace app
             }
 
 
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Render Track")) && !ArrangeRenderBusy())
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Render Track")) && !ArrangeRenderBusy())
             {
                ArrangeRenderJob job = ArrangeBuildLaneScopedRenderJob(
                   { ctxLaneId }, ctxLane->name.empty() ? ("Track " + std::to_string(ctxLaneId)) : ctxLane->name);
                ArrangeCommitLaneScopedRenderJob(job);
             }
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // ---- track-group header context menu ----
       if (openGroupCtx)
          ImGui::OpenPopup("##arrangegroupctx");
-      if (ImGui::BeginPopup("##arrangegroupctx"))
+      if (MenuParts::BeginPopup("##arrangegroupctx"))
       {
          const Arrange::TrackGroup* ctxGrp = Arrange::FindTrackGroup(gArrange, ctxGroupId);
          if (ctxGrp == nullptr)
@@ -4260,30 +4261,30 @@ namespace app
                for (size_t k = 0; k < gArrange.lanes.size(); k++)
                   if (gArrange.lanes[k].id == subtreeLanes.back()) { lastLaneIdx = (int)k; break; }
             }
-            if (ImGui::MenuItem(L("Add Video Track")))
+            if (MenuParts::Item(L("Add Video Track")))
             {
                gArrangeAddTrackInsertAfter = lastLaneIdx;
                InsertArrangeTrack(true, ctxGroupId);
             }
-            if (ImGui::MenuItem(L("Add Audio Track")))
+            if (MenuParts::Item(L("Add Audio Track")))
             {
                gArrangeAddTrackInsertAfter = lastLaneIdx;
                InsertArrangeTrack(false, ctxGroupId);
             }
-            if (ImGui::MenuItem(L("Rename Group"), MODKEY "+R"))
+            if (MenuParts::Item(L("Rename Group"), MODKEY "+R"))
             {
                gArrangeRenamingLaneId = ctxGroupId;
                gArrangeRenameJustStarted = true;
             }
-            ImGui::Separator();
+            MenuParts::Separator();
 
-            if (ImGui::MenuItem(L("Duplicate Group")))
+            if (MenuParts::Item(L("Duplicate Group")))
                ArrangeEdit([&]() { Arrange::DuplicateTrackGroup(gArrange, ctxGroupId); });
-            if (ImGui::MenuItem(L("Toggle Enabled"), nullptr, grpWasEnabled))
+            if (MenuParts::Item(L("Toggle Enabled"), nullptr, grpWasEnabled))
                ArrangeEdit([&]() { Arrange::SetTrackGroupEnabled(gArrange, ctxGroupId, grpWasEnabled ? 0 : 1); });
 
 
-            if (ImGui::MenuItem(L("Render Group")) && !ArrangeRenderBusy())
+            if (MenuParts::Item(L("Render Group")) && !ArrangeRenderBusy())
             {
                const std::vector<uint64_t> subtreeLanes = Arrange::LanesInTrackGroupRecursive(gArrange, ctxGroupId);
                if (!subtreeLanes.empty())
@@ -4293,13 +4294,13 @@ namespace app
                }
             }
 
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Ungroup (Keep Tracks)")))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Ungroup (Keep Tracks)")))
                ArrangeEdit([&]() { Arrange::RemoveTrackGroup(gArrange, ctxGroupId, /*deleteLanes=*/false); });
-            if (ImGui::MenuItem(L("Delete Group + Tracks")))
+            if (MenuParts::Item(L("Delete Group + Tracks")))
                ArrangeEdit([&]() { Arrange::RemoveTrackGroup(gArrange, ctxGroupId, /*deleteLanes=*/true); });
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Row drag-and-drop reorder/regroup, and lane delete - after the loop
@@ -4530,15 +4531,15 @@ namespace app
             ImGui::OpenPopup("##arrangeemptyspacectx");
          }
       }
-      if (ImGui::BeginPopup("##arrangeemptyspacectx"))
+      if (MenuParts::BeginPopup("##arrangeemptyspacectx"))
       {
-         if (ImGui::MenuItem(L("Add Video Track")))
+         if (MenuParts::Item(L("Add Video Track")))
             ArrangeEdit([&]() { Arrange::AddLane(gArrange, Arrange::kLaneVideo); });
-         if (ImGui::MenuItem(L("Add Audio Track")))
+         if (MenuParts::Item(L("Add Audio Track")))
             ArrangeEdit([&]() { Arrange::AddLane(gArrange, Arrange::kLaneAudio); });
-         if (ImGui::MenuItem(L("Add Track Group")))
+         if (MenuParts::Item(L("Add Track Group")))
             ArrangeEdit([&]() { Arrange::AddTrackGroup(gArrange, {}, "New Group"); });
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       ImGui::SetCursorScreenPos(scrollTL);

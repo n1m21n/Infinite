@@ -40,13 +40,14 @@ namespace MenuParts
       ImGui::PopStyleVar();
    }
 
-   inline void Wash(bool hot, bool down, bool open)
+   inline void Wash(bool hot, bool down, bool open, ImGuiWindow* w = nullptr)
    {
       const ImGuiID id = ImGui::GetItemID();
       const float hv = UiAnim::Hover(id, hot || open, tok::motion_hover_in, tok::motion_hover_out);
       if (hv <= 0.001f)
          return;
-      ImGuiWindow* w = ImGui::GetCurrentWindow();
+      if (w == nullptr)
+         w = ImGui::GetCurrentWindow();
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const float a = (down ? 0.12f : (open ? 0.10f : 0.07f)) * hv;
       w->DrawList->AddRectFilled(ImVec2(w->Pos.x + kInset, ImGui::GetItemRectMin().y + 1.0f),
@@ -97,11 +98,12 @@ namespace MenuParts
 
    inline bool SubMenu(const char* label, bool enabled = true)
    {
+      ImGuiWindow* parent = ImGui::GetCurrentWindow();
       PushPopupPad();
       const bool open = ImGui::BeginMenu(label, enabled);
       ImGui::PopStyleVar();
-      // Item rect is the parent row; the wash is drawn on top of its text at low alpha, same as the bar tiles.
-      Wash(enabled && ImGui::IsItemHovered(), false, open);
+      // Item rect is the parent row. An open submenu has become the current window, so the wash goes to the parent's draw list.
+      Wash(enabled && (open || ImGui::IsItemHovered()), false, open, parent);
       return open;
    }
 

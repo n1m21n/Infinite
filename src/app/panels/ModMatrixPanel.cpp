@@ -1,4 +1,5 @@
 // Modulation matrix panel (moved verbatim from main.cpp).
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
@@ -147,47 +148,47 @@ namespace app
          changed = true;
       }
 
-      if (ImGui::BeginPopupContextItem("##curve_ctx"))
+      if (MenuParts::BeginContextItem("##curve_ctx"))
       {
          ImGui::TextDisabled("%s", T("Modulation Curve"));
-         ImGui::Separator();
-         if (ImGui::MenuItem(L("Linear (Reset)"), nullptr, std::abs(*curve) < 0.001f))
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Linear (Reset)"), nullptr, std::abs(*curve) < 0.001f))
          {
             PushUndoCheckpoint();
             *curve = 0.0f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Ease In (+0.50)"), nullptr, std::abs(*curve - 0.5f) < 0.05f))
+         if (MenuParts::Item(L("Ease In (+0.50)"), nullptr, std::abs(*curve - 0.5f) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = 0.5f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Ease Out (-0.50)"), nullptr, std::abs(*curve - (-0.5f)) < 0.05f))
+         if (MenuParts::Item(L("Ease Out (-0.50)"), nullptr, std::abs(*curve - (-0.5f)) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = -0.5f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Steep Exp (+0.85)"), nullptr, std::abs(*curve - 0.85f) < 0.05f))
+         if (MenuParts::Item(L("Steep Exp (+0.85)"), nullptr, std::abs(*curve - 0.85f) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = 0.85f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Steep Log (-0.85)"), nullptr, std::abs(*curve - (-0.85f)) < 0.05f))
+         if (MenuParts::Item(L("Steep Log (-0.85)"), nullptr, std::abs(*curve - (-0.85f)) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = -0.85f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Invert Curve"), nullptr, false, std::abs(*curve) > 0.001f))
+         if (MenuParts::Item(L("Invert Curve"), nullptr, false, std::abs(*curve) > 0.001f))
          {
             PushUndoCheckpoint();
             *curve = -*curve;
             changed = true;
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -984,16 +985,16 @@ namespace app
       if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
          ImGui::OpenPopup("##modmatrixctx");
 
-      if (ImGui::BeginPopup("##modmatrixctx"))
+      if (MenuParts::BeginPopup("##modmatrixctx"))
       {
          static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
          for (int i = 0; i < 4; i++)
-            if (ImGui::MenuItem(L(kDockLabels[i]), nullptr, i == gModMatrixDock))
+            if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gModMatrixDock))
                gModMatrixDock = i;
-         ImGui::Separator();
-         if (ImGui::MenuItem(L("Close panel")))
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Close panel")))
             gModMatrixOpen = false;
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
    }
 
