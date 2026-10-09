@@ -890,7 +890,7 @@ void DrawSidePanels(FrameCtx& fc)
                   gSketchEditor->svgName.clear();
                   gSketchEditor->Apply();
                }
-               ImGui::TextDisabled("SVG: %s (%d KB). svgSet(\"#id\", \"attr\", value), svgText, svgBox, svgDraw(x, y, w, h)",
+               ImGui::TextDisabled(T("SVG: %s (%d KB). svgSet(\"#id\", \"attr\", value), svgText, svgBox, svgDraw(x, y, w, h)"),
                                    gSketchEditor->svgName.c_str(), (int)(gSketchEditor->svg.size() / 1024));
             }
             else
