@@ -324,7 +324,67 @@ namespace app
 
       pw.fullscreen = fullscreen;
       pw.monitorIndex = monitorIndex;
+      if (const char* name = glfwGetMonitorName(monitor))
+         pw.monitorName = name;
+      if (fullscreen)
+         pw.returnToMonitor.clear();
       glfwShowWindow(w);
+   }
+
+   // Display hot-plug. Called once a frame; does nothing unless the set of monitors changed. A fullscreen output whose
+   // display went away drops to its windowed box on a remaining display (so the show keeps rendering and stays
+   // visible) and remembers that display; when one of the same name comes back it goes fullscreen there again.
+   // Polled rather than callback-driven: glfwGetMonitors is cached by GLFW, so the poll costs a few string compares,
+   // and the same code runs on macOS, Windows and Linux.
+   void UpdateProjectorsForMonitors()
+   {
+      if (gProjectorWindows.empty())
+         return;
+      int count = 0;
+      GLFWmonitor** monitors = glfwGetMonitors(&count);
+      std::string sig;
+      for (int i = 0; i < count; i++)
+      {
+         const char* n = glfwGetMonitorName(monitors[i]);
+         sig += (n != nullptr ? n : "?");
+         sig += '|';
+      }
+      static std::string sLast;
+      if (sig == sLast)
+         return;
+      sLast = sig;
+      if (count <= 0)
+         return;
+      auto find = [&](const std::string& name) {
+         for (int i = 0; i < count; i++)
+         {
+            const char* n = glfwGetMonitorName(monitors[i]);
+            if (n != nullptr && name == n)
+               return i;
+         }
+         return -1;
+      };
+      for (ProjectorWindow& pw : gProjectorWindows)
+      {
+         if (pw.fullscreen)
+         {
+            const int at = find(pw.monitorName);
+            if (at < 0)
+            {
+               const std::string gone = pw.monitorName;
+               SetProjectorFullscreen(pw, 0, false);
+               pw.returnToMonitor = gone;
+            }
+            else
+               pw.monitorIndex = at;
+         }
+         else if (!pw.returnToMonitor.empty())
+         {
+            const int at = find(pw.returnToMonitor);
+            if (at >= 0)
+               SetProjectorFullscreen(pw, at, true);
+         }
+      }
    }
 
 

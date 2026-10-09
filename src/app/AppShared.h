@@ -1201,6 +1201,8 @@ extern bool gMinimapEnabled;
       int nodeIndex = -1; // GraphNode::index this window shows
       bool fullscreen = false;
       int monitorIndex = -1;   // display it was last placed on by us
+      std::string monitorName; // that display's name, to find it again after a hot-plug
+      std::string returnToMonitor; // set when its fullscreen display vanished: go fullscreen there again when it is back
       int windowedX = 100, windowedY = 100, windowedW = 1280, windowedH = 720; // restore box
    };
 
@@ -5665,6 +5667,8 @@ void PaceProjectorPresent(GLFWwindow* canvas);
 void MoveProjectorToMonitor(ProjectorWindow& pw, int monitorIndex);
 
 void ToggleProjectorFullscreen(ProjectorWindow& pw);
+
+void UpdateProjectorsForMonitors();
 
 void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn);
 
