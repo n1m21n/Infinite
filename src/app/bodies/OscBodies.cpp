@@ -1415,7 +1415,7 @@ namespace app
          const float y = ImGui::GetCursorScreenPos().y;
          const float onW = 14.0f + 4.0f + ImGui::GetFrameHeight();
          const float gap = ImGui::GetStyle().ItemSpacing.x;
-         const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
+         const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
          const float tableW = std::max(60.0f, w - onW - octW - semiW - fineW - gap * 4.0f);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
@@ -1743,7 +1743,7 @@ namespace app
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = 5.0f;
-         const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
+         const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
          const float waveW = std::max(70.0f, w - octW - semiW - fineW - gap * 3.0f);
          static const std::vector<std::string> kOscWaveNames = SynthModes::WaveformTypeSubset(
             { SynthModes::kWaveSine, SynthModes::kWaveTriangle, SynthModes::kWaveSaw, SynthModes::kWaveSquare });
@@ -1847,7 +1847,7 @@ namespace app
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = 5.0f;
-         const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
+         const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
          const float matW = std::max(80.0f, w - octW - semiW - fineW - gap * 3.0f);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
@@ -2015,10 +2015,9 @@ namespace app
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = 4.0f;
-         const float octW = 60.0f, semiW = 68.0f, fineW = 84.0f;
-         const float remW = std::max(120.0f, w - octW - semiW - fineW - gap * 4.0f);
-         const float orbW = remW * 0.55f;
-         const float chanW = remW * 0.45f;
+         const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
+         const float orbW = (w - gap) * 0.5f;
+         const float chanW = w - gap - orbW;
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          AudioBareDropdown("wtOrbit", WaveTerrainNode::OrbitTypeNames(), n->orbitType,
@@ -2028,18 +2027,23 @@ namespace app
          AudioBareDropdown("wtChan", WaveTerrainNode::ChannelModeNames(), n->channel,
                            [n](int i) { PushUndoCheckpoint(); n->channel = i; }, chanW);
 
-         ImGui::SetCursorScreenPos(ImVec2(x0 + orbW + chanW + gap * 2.0f, y));
+         // Selectors on their own row; tuning row below is the same size as every synth header.
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         ImGui::Dummy(ImVec2(0.0f, 4.0f));
+         const float y2 = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          AudioSlider("fine", &n->fine, -50.0f, 50.0f, "%.1f c", fineW);
 
-         ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y2));
          AudioBareDropdown("wtOct", OctaveNames(), n->octave + 4,
                            [n](int i) { PushUndoCheckpoint(); n->octave = i - 4; }, octW);
 
-         ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y2));
          AudioBareDropdown("wtSemi", SemiNames(), n->semi + 12,
                            [n](int i) { PushUndoCheckpoint(); n->semi = i - 12; }, semiW);
 
-         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
@@ -2341,10 +2345,9 @@ namespace app
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = 4.0f;
-         const float octW = 56.0f, semiW = 64.0f, fineW = 76.0f;
-         const float remW = std::max(140.0f, w - octW - semiW - fineW - gap * 4.0f);
-         const float preW = remW * 0.58f;
-         const float domW = remW * 0.42f;
+         const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
+         const float preW = (w - gap) * 0.58f;
+         const float domW = w - gap - preW;
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          AudioBareDropdown("eqPreset", EquationNode::PresetNames(), n->presetIndex,
@@ -2354,18 +2357,22 @@ namespace app
          AudioBareDropdown("eqDom", EquationNode::DomainNames(), n->domainMode,
                            [n](int i) { PushUndoCheckpoint(); n->domainMode = i; n->CompileEquation(); }, domW);
 
-         ImGui::SetCursorScreenPos(ImVec2(x0 + preW + domW + gap * 2.0f, y));
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         ImGui::Dummy(ImVec2(0.0f, 4.0f));
+         const float y2 = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          AudioSlider("fine", &n->fine, -50.0f, 50.0f, "%.1f c", fineW);
 
-         ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y2));
          AudioBareDropdown("eqOct", OctaveNames(), n->octave + 4,
                            [n](int i) { PushUndoCheckpoint(); n->octave = i - 4; }, octW);
 
-         ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y2));
          AudioBareDropdown("eqSemi", SemiNames(), n->semi + 12,
                            [n](int i) { PushUndoCheckpoint(); n->semi = i - 12; }, semiW);
 
-         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::SetCursorScreenPos(ImVec2(x0, y2));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
       }
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
@@ -2512,7 +2519,7 @@ namespace app
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = 4.0f;
-         const float octW = 60.0f, semiW = 68.0f, fineW = 84.0f;
+         const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
          const float remW = std::max(120.0f, w - octW - semiW - fineW - gap * 3.0f);
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));

@@ -3023,7 +3023,7 @@ void EndAudioSection();
          const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
          const float pinW = 16.0f;
          float btnX = cellX0 + 4.0f;
-         float btnW = std::min(cellW - 8.0f, 118.0f);
+         float btnW = std::min(cellW - 8.0f, 112.0f);
 
          if (h.registered)
          {
@@ -3051,7 +3051,7 @@ void EndAudioSection();
             DrawDiscreteParamPin(h, label, cellW - (pinX - cellX0) - pinW);
             btnX = pinX + pinW;
             const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
-            btnW = std::max(20.0f, std::min(btnRight - btnX, 118.0f));
+            btnW = std::max(20.0f, std::min(btnRight - btnX, 112.0f));
          }
 
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
@@ -3456,6 +3456,9 @@ ADSRLayout ComputeADSRLayout(ImVec2 origin, float w, float h, float attackMs, fl
 const std::vector<std::string>& WavetableNames();
 
 const std::vector<std::string>& OctaveNames();
+
+// One size for the header tuning selectors (oct / semi / fine) in every synth, so the headers line up node to node.
+constexpr float kTuneOctW = 74.0f, kTuneSemiW = 82.0f, kTuneFineW = 104.0f;
 
 void AudioBareDropdown(const char* id, const std::vector<std::string>& options, int current,
                           std::function<void(int)> onSelect, float width,

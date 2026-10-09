@@ -489,7 +489,7 @@ namespace app
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = 5.0f;
-         const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
+         const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
          const float waveW = std::max(70.0f, w - octW - semiW - fineW - gap * 3.0f);
          ImGui::PushID(idBase);
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
