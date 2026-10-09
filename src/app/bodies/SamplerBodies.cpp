@@ -896,6 +896,8 @@ namespace app
                               isLight ? tok::U32(tok::pal::c_5A46C8C8) : tok::U32(tok::pal::c_B4A0FFC8));
          }
       }
+      else
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, br}, "partials");
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
 
@@ -1240,11 +1242,9 @@ namespace app
 
       // Row 2: key | order (or seed if random)
       {
-         const float pinIndent = 18.0f; // 14px pin + 4px spacing matching ModSlider
-         const float halfTrackW = AudioHalfWidth() - pinIndent;
+         // AudioBareDropdown draws its own pin and spends the cell width on pin + field, same as a slider.
+         const float halfTrackW = AudioHalfWidth();
 
-         ImGui::Dummy(ImVec2(14.0f, 14.0f));
-         ImGui::SameLine(0.0f, 4.0f);
          static const std::vector<std::string> kKeyNames = { "Level", "Bright", "Random" };
          AudioBareDropdown("gmKey", kKeyNames, n->key, [n](int i) {
             PushUndoCheckpoint();
@@ -1263,8 +1263,6 @@ namespace app
          }
          else
          {
-            ImGui::Dummy(ImVec2(14.0f, 14.0f));
-            ImGui::SameLine(0.0f, 4.0f);
             static const std::vector<std::string> kOrderNames = { "Ascending", "Descending" };
             AudioBareDropdown("gmOrder", kOrderNames, n->descending ? 1 : 0, [n](int i) {
                PushUndoCheckpoint();

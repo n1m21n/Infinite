@@ -1287,7 +1287,8 @@ namespace app
          if (!h.draw)
             return;
          DrawDiscreteParamPin(h, id, width, ImGui::GetFrameHeight());
-         width = std::max(24.0f, width - 18.0f);
+         // The pin consumes pin_box + 4; the field takes the rest so pin + field fill exactly the cell and the next cell on the row starts where a slider's would.
+         width = std::max(24.0f, width - (tok::pin_box + 4.0f));
       }
 
       const std::string caption = options[safe] + "##" + id;
