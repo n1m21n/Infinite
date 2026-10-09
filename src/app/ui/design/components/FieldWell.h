@@ -1,6 +1,8 @@
 // FieldWell: the recessed well behind a numeric/combo field (same 6% text tint as ChipButton) and its value fill.
 #pragma once
 #include <algorithm>
+#include <type_traits>
+#include "imgui_internal.h"
 #include "app/AppShared.h"
 
 namespace FieldWell
@@ -27,6 +29,7 @@ namespace FieldWell
       dl->PopClipRect();
    }
 
+
    // For ImGui's own frames (DragFloat, combo): the same well colours and rounding; the arrow button is transparent.
    inline void PushStyle()
    {
@@ -44,6 +47,36 @@ namespace FieldWell
    {
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(6);
+   }
+
+   // Slider in the well: accent fill drawn behind the value text; double-click or Ctrl+click types a number.
+   // The first click of a double-click would otherwise snap the value to the click position, so it is undone
+   // when the second click opens the text field (Esc then leaves the original value).
+   template <class T>
+   inline bool Slider(const char* label, T* v, T lo, T hi, const char* fmt, ImGuiSliderFlags fl = 0)
+   {
+      constexpr ImGuiDataType dt = std::is_same<T, int>::value ? ImGuiDataType_S32 : ImGuiDataType_Float;
+      const ImGuiID id = ImGui::GetID(label);
+      const float w = ImGui::CalcItemWidth();
+      const ImVec2 mn = ImGui::GetCursorScreenPos(), mx(mn.x + w, mn.y + ImGui::GetFrameHeight());
+      static ImGuiID sId = 0;
+      static T sPrev = T();
+      bool restored = false;
+      const bool editing = ImGui::TempInputIsActive(id);
+      if (!editing && ImGui::IsMouseHoveringRect(mn, mx) && ImGui::IsMouseClicked(0))
+      {
+         if (ImGui::GetIO().MouseClickedCount[0] == 1) { sId = id; sPrev = *v; }
+         else if (sId == id && *v != sPrev) { *v = sPrev; restored = true; }
+      }
+      if (!editing && hi != lo)
+         Fill(ImGui::GetWindowDrawList(), mn, mx, mn.x + w * std::clamp((float)(*v - lo) / (float)(hi - lo), 0.0f, 1.0f));
+      PushStyle();
+      ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
+      const bool r = ImGui::SliderScalar(label, dt, v, &lo, &hi, fmt, fl | ImGuiSliderFlags_AlwaysClamp);
+      ImGui::PopStyleColor(2);
+      PopStyle();
+      return r || restored;
    }
 
    // Text input in the same well (rename fields).

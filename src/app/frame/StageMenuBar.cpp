@@ -189,13 +189,13 @@ void DrawMenuBar(FrameCtx& fc)
                   ImGui::SetNextItemWidth(150);
                   if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
                   {
-                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Width"), &gViewportPanelWidth,
-                                        kViewportPanelMinWidth, 900.0f, "%.0f px"); FieldWell::PopStyle();
+                     FieldWell::Slider(L("Width"), &gViewportPanelWidth,
+                                        kViewportPanelMinWidth, 900.0f, "%.0f px");
                   }
                   else
                   {
-                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Height"), &gViewportPanelHeight,
-                                        kViewportPanelMinHeight, 800.0f, "%.0f px"); FieldWell::PopStyle();
+                     FieldWell::Slider(L("Height"), &gViewportPanelHeight,
+                                        kViewportPanelMinHeight, 800.0f, "%.0f px");
                   }
                   MenuParts::Separator();
                   if (!gViewportPanelNodes.empty() && MenuParts::Item(L("Clear cards")))
@@ -222,13 +222,13 @@ void DrawMenuBar(FrameCtx& fc)
                   ImGui::SetNextItemWidth(150);
                   if (gModMatrixDock == 1 || gModMatrixDock == 2)
                   {
-                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Width"), &gModMatrixWidth,
-                                        kModMatrixMinWidth, 900.0f, "%.0f px"); FieldWell::PopStyle();
+                     FieldWell::Slider(L("Width"), &gModMatrixWidth,
+                                        kModMatrixMinWidth, 900.0f, "%.0f px");
                   }
                   else
                   {
-                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Height"), &gModMatrixHeight,
-                                        kModMatrixMinHeight, 800.0f, "%.0f px"); FieldWell::PopStyle();
+                     FieldWell::Slider(L("Height"), &gModMatrixHeight,
+                                        kModMatrixMinHeight, 800.0f, "%.0f px");
                   }
                }
                ImGui::EndMenu();
@@ -246,13 +246,13 @@ void DrawMenuBar(FrameCtx& fc)
                   ImGui::SetNextItemWidth(150);
                   if (gPerfPanelDock == 1 || gPerfPanelDock == 2)
                   {
-                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Width"), &gPerfPanelWidth,
-                                        kPerfPanelMinWidth, 900.0f, "%.0f px"); FieldWell::PopStyle();
+                     FieldWell::Slider(L("Width"), &gPerfPanelWidth,
+                                        kPerfPanelMinWidth, 900.0f, "%.0f px");
                   }
                   else
                   {
-                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Height"), &gPerfPanelHeight,
-                                        kPerfPanelMinHeight, 800.0f, "%.0f px"); FieldWell::PopStyle();
+                     FieldWell::Slider(L("Height"), &gPerfPanelHeight,
+                                        kPerfPanelMinHeight, 800.0f, "%.0f px");
                   }
                   MenuParts::Check(L("Edit Mode"), &gPerfEditMode);
                }
@@ -279,8 +279,8 @@ void DrawMenuBar(FrameCtx& fc)
                      gPatchDirty = true;
                   }
                   ImGui::SetNextItemWidth(150);
-                  FieldWell::PushStyle(); ImGui::SliderFloat(L("Height"), &gArrangePanelHeight,
-                                     kArrangePanelMinHeight, 800.0f, "%.0f px"); FieldWell::PopStyle();
+                  FieldWell::Slider(L("Height"), &gArrangePanelHeight,
+                                     kArrangePanelMinHeight, 800.0f, "%.0f px");
                }
                ImGui::EndMenu();
             }
@@ -771,7 +771,7 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
                ImGui::SetNextItemWidth(120.0f);
-               const bool volChanged = ImGui::SliderFloat(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
+               const bool volChanged = FieldWell::Slider(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
                ImGui::PopStyleColor(3);
                if (volChanged)
                   gMetronomeDirty = true;

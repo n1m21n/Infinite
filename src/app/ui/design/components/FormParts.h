@@ -146,38 +146,18 @@ namespace FormParts
       return changed;
    }
 
-   inline void FillSlider(float frac)
-   {
-      const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
-      FieldWell::Fill(ImGui::GetWindowDrawList(), mn, mx, mn.x + (mx.x - mn.x) * std::clamp(frac, 0.0f, 1.0f));
-   }
-
    inline bool SliderFloat(const char* label, float* v, float lo, float hi, const char* fmt = "%.3f", ImGuiSliderFlags fl = 0)
    {
       Label(label);
       ImGui::SetNextItemWidth(kControlW);
-      FieldWell::PushStyle();
-      ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
-      const bool r = ImGui::SliderFloat(Id(label).c_str(), v, lo, hi, fmt, fl);
-      ImGui::PopStyleColor(2);
-      FieldWell::PopStyle();
-      FillSlider((*v - lo) / (hi - lo));
-      return r;
+      return FieldWell::Slider(Id(label).c_str(), v, lo, hi, fmt, fl);
    }
 
    inline bool SliderInt(const char* label, int* v, int lo, int hi, const char* fmt = "%d", ImGuiSliderFlags fl = 0)
    {
       Label(label);
       ImGui::SetNextItemWidth(kControlW);
-      FieldWell::PushStyle();
-      ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
-      const bool r = ImGui::SliderInt(Id(label).c_str(), v, lo, hi, fmt, fl);
-      ImGui::PopStyleColor(2);
-      FieldWell::PopStyle();
-      FillSlider((float)(*v - lo) / (float)(hi - lo));
-      return r;
+      return FieldWell::Slider(Id(label).c_str(), v, lo, hi, fmt, fl);
    }
 
    // Action button: a chip, 28 pt tall. A size's x is a width floor.
