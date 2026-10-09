@@ -44,6 +44,8 @@ namespace app
       if (node->GetOutputTexture() != 0)
          dl->AddImage((ImTextureID)(intptr_t)node->GetOutputTexture(), tl,
                       ImVec2(tl.x + dw, tl.y + dh), ImVec2(0, 1), ImVec2(1, 0));
+      if (!node->HasStrokes())
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize)}, "draw here");
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
                   tok::U32(tok::pal::c_5A82BEFF), 4.0f, 0, 2.0f);
    }

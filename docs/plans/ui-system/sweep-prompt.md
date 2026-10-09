@@ -96,7 +96,7 @@ Status: `todo`, `ok` (checked, matches), `fixed <sha>`, `decision` (needs owner)
 | Macros | XY pad now uses the wide macro cell (XY, Step Gate, Radio share one width); other 8 ok, dark + light shot. Left: Toggle/Trigger onto Switch/ActionButton, rename on caption double-click | done | done | dark+light |
 | Effects (image) | 24 shot dark (blurs, distortions, glow, crop); share one frame/preview | fixed | todo | Fixed: filter titles spaced via DisplayName (gaussian blur, add noise...); patch keys unchanged. Displace (2 inputs) has no bypass, per rule. Params panel not shot |
 | Compositing | 16 shot dark (Fit..Audio Color Ramp + invert/opacity/drop shadow) | ok | todo | Same frame/preview as Effects; multi-input nodes have no bypass per rule; node width follows title length (reaction diffusion, remove background slightly wider) - left |
-| Source | | todo | todo | |
+| Source | 13 (all dark; Draw, Text, Shape, Noise light) | fixed | ok | Fixed: Draw canvas shows "draw here" until the first stroke (was a blank black square). Decision left: Text default string renders very small in its preview |
 | 3D / geometry | Render 3D worst case | todo | todo | |
 | Utility | | todo | todo | |
 
