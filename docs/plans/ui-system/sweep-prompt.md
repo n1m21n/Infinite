@@ -68,7 +68,7 @@ Status: `todo`, `ok` (checked, matches), `fixed <sha>`, `decision` (needs owner)
 | Settings window (all 6 tabs) | ok (Appearance tab) | ok | reference; other 5 tabs not shot |
 | All Shortcuts | ok | ok | cards + pad, filter gap |
 | Help / module reference | ok | ok | cards, header fill off |
-| Colour picker | todo | todo | |
+| Colour picker | closed | closed | closed by owner 2026-10-09 |
 | Node help popups | todo | todo | |
 | Unsaved changes / Recover dialogs | ok | decision | light: card edge barely separates from the scrim; Recover dialog not shot |
 | Export / render dialogs | todo | todo | |

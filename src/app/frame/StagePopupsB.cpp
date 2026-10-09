@@ -612,26 +612,24 @@ void DrawPopupsB(FrameCtx& fc)
             gAudioDropPicker.paths.clear();
       }
 
-      // ---- small trash button on a hovered cable ----
-      // Appears at the point where the cursor touches the cable and stays while the cursor is on it or on
-      // the button; a click disconnects that one cable (same path as selecting it and pressing Delete).
+      // ---- trash button on a hovered cable ----
+      // Sits at the middle of the cable while it is hovered and stays while the cursor is on the cable or the
+      // button; a click disconnects that one cable (same path as selecting it and pressing Delete).
       {
          static int sTrashLink = 0;
-         static ImVec2 sTrashPos(0.0f, 0.0f);
          static double sTrashSeen = -1.0;
          const double now = ImGui::GetTime();
          const ed::LinkId hovered = ed::GetHoveredLink();
-         if (hovered && !ImGui::IsMouseDown(0))
+         if (hovered)
          {
-            if ((int)hovered.Get() != sTrashLink)
-               sTrashLink = (int)hovered.Get();
-            sTrashPos = ImGui::GetMousePos();
+            sTrashLink = (int)hovered.Get();
             sTrashSeen = now;
          }
-         if (sTrashLink != 0 && now - sTrashSeen < 0.6)
+         ImVec2 canvasMid;
+         if (sTrashLink != 0 && now - sTrashSeen < 0.5 && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
          {
-            const float r = 8.0f;
-            const ImVec2 c(sTrashPos.x + 12.0f, sTrashPos.y - 12.0f);
+            const float r = 11.0f;
+            const ImVec2 c = ed::CanvasToScreen(canvasMid);
             const ImVec2 m = ImGui::GetMousePos();
             const bool over = (m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= (r + 2.0f) * (r + 2.0f);
             if (over)
@@ -641,17 +639,19 @@ void DrawPopupsB(FrameCtx& fc)
             const ImU32 fg = ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.95f));
             dl->AddCircleFilled(c, r, ImGui::GetColorU32(over ? ImGuiCol_ButtonHovered : ImGuiCol_PopupBg), 24);
             dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_Border), 24, 1.0f);
-            dl->AddLine(ImVec2(c.x - 3.5f, c.y - 2.5f), ImVec2(c.x + 3.5f, c.y - 2.5f), fg, 1.2f); // lid
-            dl->AddLine(ImVec2(c.x - 1.0f, c.y - 4.0f), ImVec2(c.x + 1.0f, c.y - 4.0f), fg, 1.2f); // handle
-            dl->AddLine(ImVec2(c.x - 2.7f, c.y - 2.5f), ImVec2(c.x - 2.2f, c.y + 3.5f), fg, 1.2f); // body
-            dl->AddLine(ImVec2(c.x + 2.7f, c.y - 2.5f), ImVec2(c.x + 2.2f, c.y + 3.5f), fg, 1.2f);
-            dl->AddLine(ImVec2(c.x - 2.2f, c.y + 3.5f), ImVec2(c.x + 2.2f, c.y + 3.5f), fg, 1.2f);
+            dl->AddLine(ImVec2(c.x - 5.0f, c.y - 3.5f), ImVec2(c.x + 5.0f, c.y - 3.5f), fg, 1.5f); // lid
+            dl->AddLine(ImVec2(c.x - 1.6f, c.y - 5.5f), ImVec2(c.x + 1.6f, c.y - 5.5f), fg, 1.5f); // handle
+            dl->AddLine(ImVec2(c.x - 3.6f, c.y - 3.5f), ImVec2(c.x - 3.0f, c.y + 5.0f), fg, 1.5f); // body
+            dl->AddLine(ImVec2(c.x + 3.6f, c.y - 3.5f), ImVec2(c.x + 3.0f, c.y + 5.0f), fg, 1.5f);
+            dl->AddLine(ImVec2(c.x - 3.0f, c.y + 5.0f), ImVec2(c.x + 3.0f, c.y + 5.0f), fg, 1.5f);
             if (over && ImGui::IsMouseClicked(0))
             {
+               PushUndoCheckpoint();
                DisconnectLinkById(sTrashLink);
-               ed::DeleteLink(ed::LinkId(sTrashLink));
                sTrashLink = 0;
             }
+            if (over)
+               ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
          }
          else
             sTrashLink = 0;
