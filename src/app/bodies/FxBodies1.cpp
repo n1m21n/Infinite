@@ -105,7 +105,9 @@ namespace app
          const float y = FilterVizDbToY(db, origin.y, h);
          dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + w, y),
                      db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
-         if (kDbLabeled[i])
+         // a dB label never lands on the frequency row
+         const float labelY = y - (db == 0.0f ? 14.0f : 1.0f);
+         if (kDbLabeled[i] && labelY + ImGui::GetTextLineHeight() < textY)
          {
             char buf[8];
             if (db == 0.0f)
