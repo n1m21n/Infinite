@@ -36,6 +36,23 @@ art/icons/src/*.svg ──build_glyphs.py──▶ font + Glyphs.gen.h ──▶
 | `components/Switch.h`, `GlyphToggle.h`, `VFader.h` | Switch (Settings/panels, `FormParts::Switch`), bare-glyph header toggle, vertical fader drawing |
 | `tools/design/` | `build_tokens.py`, `build_glyphs.py`, `lint_icons.py`, `inventory.py`, `ratchet.json` |
 
+## Colour roles (G14)
+
+Fixed meaning, one colour per role; the accent never reuses a role colour.
+
+| Role | Colour | Note |
+|---|---|---|
+| Record | red | |
+| Solo | yellow | collides with favourite (gold) |
+| Learn | amber | collides with modulation |
+| Modulation | amber | |
+| Expression | violet | |
+| Prediction | green | |
+| Go / running | green | |
+| Favourite | gold | |
+
+Known collisions are listed, not yet resolved; pair the colour with a glyph or label so colour is never the only cue.
+
 ## Recipes
 
 | Change | Do |

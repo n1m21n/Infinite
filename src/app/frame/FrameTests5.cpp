@@ -3074,6 +3074,20 @@ void FrameTest_UICOMPTEST(int frameId, GLFWwindow*)
 
 void FrameTest_UIGALLERY(int frameId, GLFWwindow*)
 {
+#ifndef NDEBUG
+   // Review shots of the real canvas in the light theme (INFINITE_AUDIOUITEST + this): no gallery drawn.
+   if (frameId == 3 && getenv("INFINITE_FORCELIGHT") != nullptr)
+   {
+      const int n = static_cast<int>(CategoryColors::PresetNames().size());
+      for (int i = 0; i < n; ++i)
+      {
+         CategoryColors::SetPresetTransient(i);
+         if (CategoryColors::IsThemeLight())
+            break;
+      }
+      ApplyTheme();
+   }
+#endif
    const char* mode = getenv("INFINITE_UIGALLERY");   // "light" or "dark"
    if (mode == nullptr || frameId < 3)
       return;
