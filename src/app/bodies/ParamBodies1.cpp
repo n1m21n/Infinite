@@ -2,6 +2,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
 
 namespace app
 {
@@ -1251,7 +1252,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 br(origin.x + size, origin.y + size);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
 
       for (int i = 1; i < 4; i++)
       {
@@ -1291,7 +1292,7 @@ namespace app
                                             : (isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFBE5AFF));
       dl->AddCircleFilled(orb, 9.0f, orbColor);
       dl->AddCircle(orb, 9.0f, isLight ? tok::U32(tok::pal::c_F0F0F0FF) : tok::U32(tok::pal::c_14141CFF), 0, 2.0f);
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
    }
 
 
@@ -1800,7 +1801,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 br(origin.x + size, origin.y + size);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       for (int i = 1; i < 4; i++)
       {
          float f = (float)i / 4.0f;
@@ -1820,7 +1821,7 @@ namespace app
                                             : (isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFBE5AFF));
       dl->AddCircleFilled(orb, 9.0f, orbColor);
       dl->AddCircle(orb, 9.0f, isLight ? tok::U32(tok::pal::c_F0F0F0FF) : tok::U32(tok::pal::c_14141CFF), 0, 2.0f);
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
    }
 
 

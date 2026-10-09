@@ -3,6 +3,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
 
 namespace app
 {
@@ -74,7 +75,7 @@ namespace app
       auto textSize = [&](const char* t) { return font->CalcTextSizeA(fs, FLT_MAX, 0.0f, t); };
       auto text = [&](ImVec2 p, ImU32 c, const char* t) { dl->AddText(font, fs, p, c, t); };
 
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
 
       // Zone colours, shared by bars, hold lines and readouts: green for
       // normal level, amber for the last 6 dB of headroom, red for overs.
@@ -191,7 +192,7 @@ namespace app
       caption(rx + barW * 0.5f, "R");
       caption(scaleCx, "dB");
 
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::Border(dl, origin, br);
 
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##audiometer", ImVec2(w, h));
@@ -780,7 +781,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -823,7 +824,7 @@ namespace app
                      n->IsAnalyzing() ? "analyzing..." : "no sample loaded");
       }
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
 
       if (hasSample)
       {
@@ -876,7 +877,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
 
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const int count = n->partialBarCount;
@@ -896,7 +897,7 @@ namespace app
          }
       }
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::Border(dl, origin, br);
 
       // Draws into the draw list only, above - without this the cursor never
       // advances past `origin`, so everything drawn after this call (the
@@ -1041,7 +1042,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -1099,7 +1100,7 @@ namespace app
                      n->IsRendering() ? "molding..." : "no sample loaded");
       }
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
 
       if (hasSample)
       {
@@ -1446,7 +1447,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -1484,7 +1485,7 @@ namespace app
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
 
       if (hasSample)
       {
@@ -2143,7 +2144,7 @@ namespace app
       const double bpm = std::max(1.0f, tr.Tempo());
       const double bar = std::max(1e-6, tr.BeatsPerBar());
 
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
       const float midY = origin.y + h * 0.5f;
       dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
@@ -2215,7 +2216,7 @@ namespace app
       else if (st == LooperNode::kArmed)
          dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "waiting for the next grid line");
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -2640,7 +2641,7 @@ namespace app
             if (!has && ImGui::IsItemClicked(ImGuiMouseButton_Left))
                openLoadPad = cur;
             // Same drawing as DrawSamplerWaveform.
-            dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+            AudioViz::Fill(dl, origin, br);
             dl->PushClipRect(origin, br, true);
             const float midY = origin.y + h * 0.5f;
             dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);

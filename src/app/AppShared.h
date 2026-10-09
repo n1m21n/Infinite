@@ -3052,6 +3052,8 @@ void EndAudioSection();
             btnX = pinX + pinW;
             const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
             btnW = std::max(20.0f, std::min(btnRight - btnX, 112.0f));
+            // Never clip the value: grow toward the cell's right edge when the text needs more than the symmetric width.
+            btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - 4.0f - btnX, 112.0f)));
          }
 
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
@@ -3148,6 +3150,8 @@ void EndAudioSection();
                   btnX = pinX + pinW;
                   const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
                   btnW = std::max(20.0f, std::min(btnRight - btnX, 112.0f));
+                  // Never clip the value: grow toward the cell's right edge when the text needs more than the symmetric width.
+                  btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - 4.0f - btnX, 112.0f)));
                }
 
                ImGui::SetCursorScreenPos(ImVec2(btnX, y0));

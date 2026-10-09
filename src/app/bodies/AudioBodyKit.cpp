@@ -1,6 +1,7 @@
 // Audio node body building blocks: columns, sections, knob rows, drift meters, gates (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
 
 namespace app
 {
@@ -310,7 +311,7 @@ namespace app
       const float h = 90.0f; // same as DrawModulatorMeter, so the node header keeps its height
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h), ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, ImVec2(origin.x + w, origin.y + h));
       // Fixed 0..1 axis with quarter guides, exactly as the generic meter draws them: overlaid
       // destinations are only comparable at all because they share one scale.
       for (int q = 1; q < 4; q++)
@@ -323,7 +324,7 @@ namespace app
       const int count = n->SlotCount();
       if (count == 0)
       {
-         dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), ScopeBorderCol(), 4.0f);
+         AudioViz::Border(dl, origin, ImVec2(origin.x + w, origin.y + h));
          ImGui::Dummy(ImVec2(w, h));
          return;
       }
@@ -351,7 +352,7 @@ namespace app
       }
       if (live.empty())
       {
-         dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), ScopeBorderCol(), 4.0f);
+         AudioViz::Border(dl, origin, ImVec2(origin.x + w, origin.y + h));
          ImGui::Dummy(ImVec2(w, h));
          return;
       }
@@ -383,7 +384,7 @@ namespace app
          dl->AddCircleFilled(prev, 2.0f, col);
       }
       dl->PopClipRect();
-      dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, ImVec2(origin.x + w, origin.y + h));
       ImGui::Dummy(ImVec2(w, h));
       DrawDriftLegend(n);
    }

@@ -29,6 +29,16 @@ namespace AudioViz
    }
    inline Frame Begin(float w, float h) { return Begin(ImGui::GetCursorScreenPos(), w, h); }
 
+   // The two halves of the frame for visualizers that manage their own clip (viewers with several layers).
+   inline void Fill(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx)
+   {
+      dl->AddRectFilled(mn, mx, app::ScopeBgCol(), tok::radius_field);
+   }
+   inline void Border(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx, ImU32 hotBorder = 0)
+   {
+      dl->AddRect(mn, mx, hotBorder ? hotBorder : app::ScopeBorderCol(), tok::radius_field);
+   }
+
    // Ends the clip and draws the border; `hotBorder` (0 = none) replaces the border colour while hovered.
    inline void End(const Frame& f, ImU32 hotBorder = 0)
    {

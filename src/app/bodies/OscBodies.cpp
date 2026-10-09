@@ -2,6 +2,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
 
 namespace app
 {
@@ -24,7 +25,7 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -58,7 +59,7 @@ namespace app
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -82,7 +83,7 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -116,7 +117,7 @@ namespace app
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -159,7 +160,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -222,7 +223,7 @@ namespace app
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
 
       if (hasSample)
       {
@@ -328,7 +329,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -391,7 +392,7 @@ namespace app
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
 
       if (hasSample && n->MarkersAreEditable())
       {
@@ -443,7 +444,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -485,7 +486,7 @@ namespace app
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
 
       if (hasSample)
       {
@@ -558,7 +559,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -636,7 +637,7 @@ namespace app
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
 
       if (hasSample)
       {
@@ -696,7 +697,7 @@ namespace app
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 tl(x, y), br(x + w, y + h);
-      dl->AddRectFilled(tl, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, tl, br);
 
       // Calibrated to a fixed -60..0 dBFS window rather than linear
       // amplitude - a linear meter crushes the bottom 40 dB of useful range
@@ -725,7 +726,7 @@ namespace app
          dl->AddRectFilled(ImVec2(x + 1.0f, br.y - 1.0f - (h - 2.0f) * lvl),
                            ImVec2(br.x - 1.0f, br.y - 1.0f), col, 2.0f);
       }
-      dl->AddRect(tl, br, ScopeBorderCol(), tok::radius_field);
+      AudioViz::Border(dl, tl, br);
    }
 
 
@@ -779,7 +780,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       // Perspective: each successive frame steps right and up by a fixed
@@ -825,7 +826,7 @@ namespace app
                             ImVec2(handleX, br.y - 9.0f), Fade(triCol));
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? tok::U32(tok::pal::c_6E8CB4FF) : ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br, hovered ? tok::U32(tok::pal::c_6E8CB4FF) : 0);
       dl->AddText(ImVec2(origin.x + 9.0f, origin.y + 5.0f),
                   Fade(isLight ? tok::U32(tok::pal::c_283041FF) : tok::U32(tok::pal::c_A0ACC4FF)),
                   Wavetable::TableName(eng.table));
@@ -938,7 +939,7 @@ namespace app
 
       const bool isLight = IsThemeLight();
       // Sleek rounded background
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       // Subtle horizontal level guidelines at 25%, 50%, 75%
@@ -1146,7 +1147,7 @@ namespace app
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, (hovered || active) ? tok::U32(tok::pal::c_6E8CB4FF) : ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br, (hovered || active) ? tok::U32(tok::pal::c_6E8CB4FF) : 0);
 
       // State the panel's timebase so the fit-to-width layout is honest
       // instead of hidden: without this, a 200 ms envelope and an 8 s
@@ -1612,7 +1613,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -1711,7 +1712,7 @@ namespace app
       dl->PathStroke(isLight ? tok::U32(tok::pal::c_1464E6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -1962,7 +1963,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -1990,7 +1991,7 @@ namespace app
          }
       }
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
 
@@ -2465,7 +2466,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -2493,7 +2494,7 @@ namespace app
          }
       }
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
 
