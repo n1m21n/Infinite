@@ -2,6 +2,7 @@
 // docs/plans/sketch/README.md that don't need a window. Prints one line per check;
 // exits non-zero if any fails. With an argument, writes the plan example to that PPM.
 #include "SketchEngine.h"
+#include "SketchPresets.h"
 
 #include <chrono>
 #include <cstdio>
@@ -111,6 +112,40 @@ int main(int argc, char** argv)
    SketchEngine e6;
    e6.Compile("function draw(t){ if (typeof std!=='undefined'||typeof os!=='undefined'||typeof require!=='undefined') throw new Error('leak'); background(0); }", err);
    Check(e6.Run(g, x1, err), "no std/os/require in the sandbox");
+
+   // Every shipped preset compiles, runs, draws something, and prints a pixel hash
+   // (compare these across OSes for the identical-pixels exit criterion).
+   {
+      const char* font = std::getenv("SKETCH_FONT");
+      const char* dump = std::getenv("SKETCH_DUMP_DIR");
+      int n = 0;
+      const SketchPresets::Entry* pe = SketchPresets::All(n);
+      for (int i = 0; i < n; ++i)
+      {
+         SketchEngine pr;
+         if (font) pr.SetFontFile(font);
+         SketchEngine::Frame pf; pf.width = 1920; pf.height = 1080; pf.t = 2.0; pf.frame = 120; pf.seed = 1;
+         std::vector<uint8_t> o;
+         Check(pr.Compile(pe[i].code, err), (std::string("preset compiles: ") + pe[i].name).c_str());
+         bool ok = pr.Run(pf, o, err);
+         Check(ok, (std::string("preset runs: ") + pe[i].name + " " + err.message).c_str());
+         if (!ok) continue;
+         auto t1 = std::chrono::steady_clock::now();
+         for (int k = 0; k < 5; ++k) pr.Run(pf, o, err);
+         double pms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count() / 5;
+         std::printf("INFO  preset %-14s %6.2f ms  hash %016llx\n", pe[i].name, pms, (unsigned long long)Hash(o));
+         if (dump)
+         {
+            std::string path = std::string(dump) + "/" + std::to_string(i) + ".ppm";
+            if (FILE* fp = std::fopen(path.c_str(), "wb"))
+            {
+               std::fprintf(fp, "P6\n%d %d\n255\n", pf.width, pf.height);
+               for (size_t q = 0; q < o.size(); q += 4) std::fwrite(&o[q], 1, 3, fp);
+               std::fclose(fp);
+            }
+         }
+      }
+   }
 
    if (argc > 1)
    {

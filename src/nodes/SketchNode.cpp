@@ -1,6 +1,7 @@
 #include "SketchNode.h"
 
 #include "core/gl3.h"
+#include "core/sketch/SketchPresets.h"
 #include "Transport.h"
 
 #include <algorithm>
@@ -11,79 +12,17 @@ namespace
 {
 std::string gFontPath;
 
-const char* kBurst = R"(// Radial burst. Every param() is a knob you can modulate.
-param("count", 12, 1, 64);
-param("spin", 0.2, 0, 2);
-param("size", 30, 4, 120);
-
-function draw(t) {
-  background(0.05);
-  translate(width / 2, height / 2);
-  noStroke();
-  const r = min(width, height) * 0.2;
-  for (let i = 0; i < count; i++) {
-    rotate(TAU / count + spin * t * 0.1);
-    fill(hsl(i / count, 0.7, 0.6));
-    circle(r * 1.2 + r * 0.4 * sin(t + i), 0, size);
-  }
-}
-)";
-
-const char* kFlow = R"(// Flow-field lines.
-param("lines", 220, 20, 600);
-param("scale", 2.5, 0.5, 8);
-param("weight", 1.5, 0.5, 6);
-
-function draw(t) {
-  background(0.04, 0.05, 0.08);
-  noFill();
-  strokeWeight(weight);
-  for (let i = 0; i < lines; i++) {
-    let x = ((i * 0.6180339) % 1) * width;
-    let y = ((i * 0.7548776) % 1) * height;
-    stroke(hsl(0.55 + 0.2 * (i / lines), 0.6, 0.65), 0.7);
-    beginShape();
-    for (let s = 0; s < 40; s++) {
-      vertex(x, y);
-      const a = noise(x / width * scale, y / height * scale, t * 0.2) * TAU * 2;
-      x += cos(a) * 10;
-      y += sin(a) * 10;
-    }
-    endShape();
-  }
-}
-)";
-
-const char* kTree = R"(// L-system style recursive tree.
-param("depth", 9, 2, 12);
-param("angle", 0.45, 0.1, 1.2);
-param("sway", 0.08, 0, 0.4);
-
-function branch(len, d) {
-  strokeWeight(max(1, d * 0.9));
-  stroke(0.35 + 0.05 * (12 - d), 0.55, 0.3 + 0.04 * (12 - d));
-  line(0, 0, 0, -len);
-  translate(0, -len);
-  if (d <= 0) return;
-  push(); rotate(angle + sway * sin(t * 1.3 + d)); branch(len * 0.74, d - 1); pop();
-  push(); rotate(-angle + sway * sin(t * 1.1 + d)); branch(len * 0.74, d - 1); pop();
-}
-
-function draw(tt) {
-  background(0.93, 0.92, 0.88);
-  translate(width / 2, height * 0.95);
-  branch(height * 0.2, depth);
-}
-)";
 } // namespace
 
 const std::vector<SketchNode::Preset>& SketchNode::Presets()
 {
-   static const std::vector<Preset> p = {
-      {"Radial burst", kBurst},
-      {"Flow field", kFlow},
-      {"Tree", kTree},
-   };
+   static const std::vector<Preset> p = [] {
+      std::vector<Preset> v;
+      int n = 0;
+      const SketchPresets::Entry* e = SketchPresets::All(n);
+      for (int i = 0; i < n; ++i) v.push_back({e[i].name, e[i].code});
+      return v;
+   }();
    return p;
 }
 
