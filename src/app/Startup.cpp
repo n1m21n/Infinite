@@ -352,6 +352,76 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return 0;
    }
 
+   if (getenv("INFINITE_LIBREFRESHTEST") != nullptr)
+   {
+      // The Library panel's Refresh buttons call StartScan(folder) / StartScan() on the mode's scanner and the
+      // frame loop polls it; this drives the same calls headless for Samples, Media and Plugins.
+      namespace fs = std::filesystem;
+      const fs::path dir = fs::temp_directory_path() / "infinite_librefresh";
+      std::error_code ec;
+      fs::remove_all(dir, ec);
+      fs::create_directories(dir, ec);
+      const auto touch = [&](const char* name) { std::ofstream(dir / name) << "x"; };
+      const auto wait = [](auto& sc)
+      {
+         for (int i = 0; i < 1200; ++i)
+         {
+            sc.PollResults();
+            if (!sc.IsScanning())
+               return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+         }
+         return false;
+      };
+      const auto countIn = [&](SampleScanner& sc)
+      {
+         int n = 0;
+         for (const auto& e : sc.Index())
+            if (e.folderRoot == dir.string())
+               ++n;
+         return n;
+      };
+      const auto runMode = [&](const char* mode, SampleScanner& sc, const char* a, const char* b)
+      {
+         bool ok = true;
+         const auto check = [&](const char* what, bool c) { if (!c) { ok = false; printf("  [FAIL] %s: %s\n", mode, what); } };
+         touch(a);
+         sc.AddFolder(dir.string());
+         sc.StartScan(dir.string());
+         check("per-folder scan finishes", wait(sc));
+         check("per-folder scan finds the file", countIn(sc) == 1);
+         touch(b);
+         sc.StartScan(dir.string());
+         check("per-folder refresh finishes", wait(sc));
+         check("per-folder refresh picks up the new file", countIn(sc) == 2);
+         fs::remove(dir / a, ec);
+         const uint64_t v = sc.IndexVersion();
+         sc.StartScan();
+         check("refresh all finishes", wait(sc));
+         check("refresh all drops the deleted file", countIn(sc) == 1);
+         check("index version moved", sc.IndexVersion() != v);
+         sc.RemoveFolder(dir.string());
+         check("removing the folder drops its entries", countIn(sc) == 0);
+         printf("LIBREFRESH %s %s\n", mode, ok ? "OK" : "FAIL");
+         fs::remove(dir / b, ec);
+         return ok;
+      };
+      bool all = true;
+      all &= runMode("samples", gSampleScanner, "a.wav", "b.wav");
+      all &= runMode("media", gMediaScanner, "a.png", "b.png");
+      {
+         const uint64_t v = gPluginScanner.IndexVersion();
+         gPluginScanner.StartScan(dir.string());
+         const bool done = wait(gPluginScanner);
+         const bool ok = done && gPluginScanner.IndexVersion() != v;
+         printf("LIBREFRESH plugins %s\n", ok ? "OK" : "FAIL");
+         all &= ok;
+      }
+      fs::remove_all(dir, ec);
+      printf("LIBREFRESH TEST %s\n", all ? "OK" : "FAIL");
+      return 0;
+   }
+
    if (getenv("INFINITE_BROWSERSORTTEST") != nullptr)
       return RunBrowserSortTest() ? 0 : 1;
 
