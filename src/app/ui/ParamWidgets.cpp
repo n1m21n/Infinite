@@ -38,12 +38,36 @@ namespace app
    {
       if (!CategoryColors::GetTooltips())
          return;
+      // One delay for every help tip (tok::motion_tooltip_delay), counted from when the pointer comes to rest on
+      // the item, and one maximum width. Callers keep their own IsItemHovered() gate; this adds the delay.
+      // The rest timer is ours (not ImGui's per-item one) because some callers gate on a rect, not the last item.
+      static ImVec2 sRestPos(-1.0f, -1.0f);
+      static double sRestSince = 0.0;
+      static int sLastFrame = -10;
+      const ImVec2 mp = ImGui::GetIO().MousePos;
+      const int frame = ImGui::GetFrameCount();
+      if (frame != sLastFrame + 1 && frame != sLastFrame)
+         sRestSince = ImGui::GetTime();
+      if (std::fabs(mp.x - sRestPos.x) > 2.0f || std::fabs(mp.y - sRestPos.y) > 2.0f)
+      {
+         sRestPos = mp;
+         sRestSince = ImGui::GetTime();
+      }
+      sLastFrame = frame;
+      if ((ImGui::GetTime() - sRestSince) * 1000.0 < tok::motion_tooltip_delay)
+         return;
       // Inside a node the editor's canvas transform is live and would offset the tooltip from the cursor.
       if (gInsideNodeCanvas)
          ed::Suspend();
       va_list args;
       va_start(args, fmt);
-      ImGui::SetTooltipV(fmt, args);
+      if (ImGui::BeginTooltip())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);   // one max width: about 24 em
+         ImGui::TextV(fmt, args);
+         ImGui::PopTextWrapPos();
+         ImGui::EndTooltip();
+      }
       va_end(args);
       if (gInsideNodeCanvas)
          ed::Resume();

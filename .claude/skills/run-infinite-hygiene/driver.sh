@@ -714,6 +714,20 @@ for spec in "${SELECTED_TESTS[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
+# Design lints + component-gallery goldens run whenever the ui group did (tools/design/).
+if [[ " ${SELECTED_TESTS[*]:-} " == *" FINDTEST:190 "* ]]; then
+  step "Design lints and gallery goldens"
+  for lint in "contrast.py" "motion_lint.py" "ratchet.py" "golden.py"; do
+    if lint_out=$(python3 "$ROOT/tools/design/$lint" 2>&1); then
+      echo "  [pass]  design/$lint  — $(echo "$lint_out" | tail -1)"; PASS=$((PASS+1))
+    else
+      echo "  [FAIL]  design/$lint"; echo "$lint_out" | tail -8 | sed 's/^/          /'
+      FAIL=$((FAIL+1)); FAILED_NAMES+=("design/$lint")
+    fi
+  done
+fi
+
+# ---------------------------------------------------------------------------
 step "Summary"
 echo "passed: $PASS   failed: $FAIL   xfail (known, see known-test-failures.txt): ${#XFAIL_NAMES[@]}"
 if [ ${#XFAIL_NAMES[@]} -gt 0 ]; then

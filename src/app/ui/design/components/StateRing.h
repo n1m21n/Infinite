@@ -4,6 +4,7 @@
 #include <cmath>
 #include "imgui.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/UiAnim.h"
 #include "app/ui/design/Tokens.gen.h"
 
 namespace StateRing
@@ -18,7 +19,7 @@ namespace StateRing
                                       : (isLight ? tok::U32(tok::pal::c_1E6EDCFF) : tok::U32(tok::pal::c_5FA5FFFF));
       if (kind == Kind::Learn)
       {
-         const float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 5.0f);
+         const float pulse = UiAnim::ReduceMotion() ? 1.0f : 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 5.0f);
          col = (col & 0x00FFFFFF) | ((ImU32)((0.55f + 0.45f * pulse) * 255.0f) << 24);
       }
       const ImVec2 ra(a.x - kOutset, a.y - kOutset), rb(b.x + kOutset, b.y + kOutset);
@@ -34,7 +35,7 @@ namespace StateRing
                                       : (isLight ? tok::U32(tok::pal::c_1E6EDCFF) : tok::U32(tok::pal::c_5FA5FFFF));
       if (kind == Kind::Learn)
       {
-         const float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 5.0f);
+         const float pulse = UiAnim::ReduceMotion() ? 1.0f : 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 5.0f);
          col = (col & 0x00FFFFFF) | ((ImU32)((0.55f + 0.45f * pulse) * 255.0f) << 24);
       }
       dl->AddCircle(c, r + 2.0f, col, 0, 1.5f);

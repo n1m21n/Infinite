@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include "app/AppShared.h"
+#include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
 
@@ -118,7 +119,7 @@ namespace SectionCard
          x1 = p.x + w * std::clamp(frac, 0.0f, 1.0f);
       else
       {
-         const float ph = std::fmod((float)ImGui::GetTime() * 0.8f, 1.0f);
+         const float ph = UiAnim::ReduceMotion() ? 0.7f : std::fmod((float)ImGui::GetTime() * 0.8f, 1.0f);   // still bar under reduce-motion
          x0 = p.x + w * std::max(0.0f, ph * 1.4f - 0.4f);
          x1 = p.x + w * std::min(1.0f, ph * 1.4f);
       }

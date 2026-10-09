@@ -97,6 +97,8 @@ namespace CategoryColors
    // messages and rejection reasons always show.
    bool GetTooltips();
    void SetTooltips(bool on, bool saveToFile = true);
+   bool GetReduceMotion();
+   void SetReduceMotion(bool on, bool saveToFile = true);
 
    // Interface font id: "" is the bundled default (Inter); anything else names an entry in
    // main.cpp's interface font table. Unknown ids fall back to the default there.

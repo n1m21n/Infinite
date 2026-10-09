@@ -15,6 +15,23 @@ namespace PanelFrame
       float l = kGap, t = kGap, r = kGap, b = kGap;
    };
 
+   // Style for a small floating window over the canvas (find bar, quick pickers): opaque panel fill, hairline border,
+   // group radius. Pair with PopFloatingStyle() after End().
+   inline void PushFloatingStyle()
+   {
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tok::radius_group);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(t.border.r, t.border.g, t.border.b, 0.9f));
+   }
+   inline void PopFloatingStyle()
+   {
+      ImGui::PopStyleColor(2);
+      ImGui::PopStyleVar(3);
+   }
+
    // Draw the card surface for the rect starting at the cursor with the given outer size.
    inline void DrawSurface(ImVec2 size, Insets in = {})
    {

@@ -308,6 +308,7 @@ float gUiScale = -1.0f;
 std::string gUiFont;
 std::string gLanguage;
 bool gTooltips = false; // help tooltips are opt-in
+bool gReduceMotion = false; // chrome eases become instant (UiAnim)
 
 std::string ThemePath()
 {
@@ -422,6 +423,10 @@ void LoadAppearanceOverrides()
       else if (key == "ui.scale")
       {
          gUiScale = std::strtof(val.c_str(), nullptr);
+      }
+      else if (key == "ui.reducemotion")
+      {
+         gReduceMotion = (val == "1");
       }
       else if (key == "ui.tooltips")
       {
@@ -747,6 +752,18 @@ void SetTooltips(bool on, bool saveToFile)
       SaveAppearanceOverrides();
 }
 
+bool GetReduceMotion()
+{
+   return gReduceMotion;
+}
+
+void SetReduceMotion(bool on, bool saveToFile)
+{
+   gReduceMotion = on;
+   if (saveToFile)
+      SaveAppearanceOverrides();
+}
+
 std::string GetUiFont()
 {
    return gUiFont;
@@ -843,6 +860,8 @@ void SaveAppearanceOverrides()
       file << "ui.lang=" << gLanguage << "\n";
    if (gTooltips)
       file << "ui.tooltips=1\n";
+   if (gReduceMotion)
+      file << "ui.reducemotion=1\n";
 }
 
 int SemanticRank(const std::string& category)

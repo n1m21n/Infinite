@@ -584,6 +584,9 @@ void DrawFramePump(FrameCtx& fc)
       // A focus ring belongs to keyboard navigation only; any mouse click hides one an earlier Enter left behind.
       if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          ImGui::GetCurrentContext()->NavCursorVisible = false;
+      static const bool sEnvReduce = std::getenv("INFINITE_REDUCEMOTION") != nullptr;
+      UiAnim::SetReduceMotion(sEnvReduce || CategoryColors::GetReduceMotion());
+      ImGui::GetStyle().HoverDelayNormal = tok::motion_tooltip_delay * 0.001f;   // the one tooltip delay
       UiAnim::EndFrame();
       UiInteract::BeginFrame();
       if (Bench::Tail().active)

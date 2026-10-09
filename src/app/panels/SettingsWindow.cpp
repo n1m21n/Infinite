@@ -219,6 +219,13 @@ namespace app
                if (FormParts::Switch(L("Help tooltips"), &tips))
                   CategoryColors::SetTooltips(tips);
             }
+            {
+               bool rm = CategoryColors::GetReduceMotion();
+               if (FormParts::Switch(L("Reduce motion"), &rm))
+                  CategoryColors::SetReduceMotion(rm);
+               if (ImGui::IsItemHovered())
+                  HelpTip("%s", L("Hover and toggle eases become instant. Nothing in the UI animates a value."));
+            }
 
             {
                const std::string currentFont = CategoryColors::GetUiFont();

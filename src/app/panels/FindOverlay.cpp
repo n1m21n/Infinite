@@ -3,6 +3,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "nodes/UtilityNodes.h"
 
 namespace app
@@ -126,11 +127,7 @@ void DrawFind()
    const ImVec2 pos(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f, gGraphScreenTL.y + 14.0f);
    ImGui::SetNextWindowPos(pos, ImGuiCond_Always, ImVec2(0.5f, 0.0f));
    ImGui::SetNextWindowSize(ImVec2(w, 0.0f));
-   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
-   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
-   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-   ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 1.0f));
-   ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(t.border.r, t.border.g, t.border.b, 0.9f));
+   PanelFrame::PushFloatingStyle();
    bool stay = true;
    if (ImGui::Begin("##canvasfind", nullptr,
                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -163,8 +160,7 @@ void DrawFind()
          stay = false;
    }
    ImGui::End();
-   ImGui::PopStyleColor(2);
-   ImGui::PopStyleVar(3);
+   PanelFrame::PopFloatingStyle();
 
    if (sJumpTo >= 0)
    {
