@@ -572,7 +572,8 @@ void DrawFramePump(FrameCtx& fc)
          ImGuiContext& navCtx = *ImGui::GetCurrentContext();
          const bool navPopup = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
          const bool navPanel = navCtx.NavWindow != nullptr && navCtx.NavWindow->RootWindow != nullptr &&
-                               std::strcmp(navCtx.NavWindow->RootWindow->Name, "Infinite") != 0;
+                               std::strcmp(navCtx.NavWindow->RootWindow->Name, "Infinite") != 0 &&
+                               !(navCtx.NavWindow->RootWindow->Flags & ImGuiWindowFlags_NoNav);   // the panel rail is a NoNav strip, not a panel
          const bool navOn = navPopup || navPanel;
          ImGuiIO& nio = ImGui::GetIO();
          if (navOn) nio.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
