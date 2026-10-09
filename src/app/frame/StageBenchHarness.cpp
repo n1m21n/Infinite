@@ -560,7 +560,8 @@ void DrawBenchHarness(FrameCtx& fc)
                const float targetScrollX = u * sBenchB6GridMaxX;
                const float targetScrollY = u * sBenchB6GridMaxY;
                ed::SetViewScroll(ImVec2(targetScrollX, targetScrollY));
-               ed::SetViewZoom(1.0f);
+               static const float sPanZoom = getenv("INFINITE_BENCH_B6ZOOM") ? std::clamp((float)atof(getenv("INFINITE_BENCH_B6ZOOM")), 0.1f, 2.0f) : 1.0f;
+               ed::SetViewZoom(sPanZoom);
             }
             else if (activeMode == "zoom")
             {

@@ -627,6 +627,11 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer, doub
          const double t1 = NowMs();
          const int sId = (entry.stageId >= 0 && entry.stageId < kAudioStageCount) ? entry.stageId : (int)kAudioStageOther;
          outStageMs[sId] += (t1 - t0);
+         if (mNodeCostOn.load(std::memory_order_relaxed))
+         {
+            const float prev = entry.node->costMs.load(std::memory_order_relaxed);
+            entry.node->costMs.store(prev + 0.05f * ((float)(t1 - t0) - prev), std::memory_order_relaxed);
+         }
       }
       else
       {
@@ -909,6 +914,8 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
 #endif
 
    const double sampleRate = mSampleRate.load(std::memory_order_relaxed);
+   if (sampleRate > 0.0 && mNodeCostOn.load(std::memory_order_relaxed))
+      mBlockBudgetMs.store((float)(1000.0 * numFrames / sampleRate), std::memory_order_relaxed);
    const double nowMs = NowMs();
    const double lastMs = mLastCallbackMs.load(std::memory_order_relaxed);
    if (lastMs >= 0.0 && sampleRate > 0.0)

@@ -248,6 +248,12 @@ void DrawMenuBar(FrameCtx& fc)
 
             MenuParts::Separator();
 
+            {
+               bool ct = CategoryColors::GetCookTimes();
+               if (MenuParts::Check(L("Cook times"), &ct))
+                  CategoryColors::SetCookTimes(ct);
+            }
+
             if (MenuParts::SubMenu(L("Viewport panel")))
             {
                MenuParts::Check(L("Show viewport panel"), &gViewportPanelOpen);

@@ -308,6 +308,7 @@ float gUiScale = -1.0f;
 std::string gUiFont;
 std::string gLanguage;
 bool gTooltips = false; // help tooltips are opt-in
+bool gCookTimes = false;   // canvas Cook times overlay (View menu), off by default
 bool gReduceMotion = false; // chrome eases become instant (UiAnim)
 
 std::string ThemePath()
@@ -423,6 +424,10 @@ void LoadAppearanceOverrides()
       else if (key == "ui.scale")
       {
          gUiScale = std::strtof(val.c_str(), nullptr);
+      }
+      else if (key == "ui.cooktimes")
+      {
+         gCookTimes = (val == "1");
       }
       else if (key == "ui.reducemotion")
       {
@@ -752,6 +757,18 @@ void SetTooltips(bool on, bool saveToFile)
       SaveAppearanceOverrides();
 }
 
+bool GetCookTimes()
+{
+   return gCookTimes;
+}
+
+void SetCookTimes(bool on, bool saveToFile)
+{
+   gCookTimes = on;
+   if (saveToFile)
+      SaveAppearanceOverrides();
+}
+
 bool GetReduceMotion()
 {
    return gReduceMotion;
@@ -862,6 +879,8 @@ void SaveAppearanceOverrides()
       file << "ui.tooltips=1\n";
    if (gReduceMotion)
       file << "ui.reducemotion=1\n";
+   if (gCookTimes)
+      file << "ui.cooktimes=1\n";
 }
 
 int SemanticRank(const std::string& category)

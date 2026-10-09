@@ -97,6 +97,8 @@ namespace CategoryColors
    // messages and rejection reasons always show.
    bool GetTooltips();
    void SetTooltips(bool on, bool saveToFile = true);
+   bool GetCookTimes();
+   void SetCookTimes(bool on, bool saveToFile = true);
    bool GetReduceMotion();
    void SetReduceMotion(bool on, bool saveToFile = true);
 

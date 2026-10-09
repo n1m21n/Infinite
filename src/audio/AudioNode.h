@@ -59,6 +59,10 @@ public:
    // the old rate are invalid at the new one.
    double preparedForSampleRate = -1.0;
 
+   // Smoothed ProcessBlock time in ms, written by the audio thread only while AudioEngine::SetNodeCostMeasure(true)
+   // (the canvas Cook times overlay); read by the main thread.
+   std::atomic<float> costMs { 0.0f };
+
    // Must match kAudioMaxNodeInputs (AudioEngine.h) - a static_assert there
    // checks it. Can't reference that constant directly: AudioEngine.h is the
    // one that includes AudioNode.h, not the other way around.

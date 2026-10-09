@@ -471,7 +471,10 @@ int DrawTestsB(FrameCtx& fc)
          ConditionalStageTimer timerCookAll((benchB6Stages && benchStagesCpuSample) ? &sStageCookAll : nullptr, Bench::FrameTail::kCookAll);
          for (GraphNode& gn : gNodes)
             if (!gn.node->bypassed)
+            {
+               CookProbe::Scope probe(gn.node.get());
                gn.node->CookIfNeeded(frameId);
+            }
       }
 
       // Arrangement monitor (overhaul WP4): after the cook, so the clips it

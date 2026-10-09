@@ -587,6 +587,8 @@ void DrawFramePump(FrameCtx& fc)
       static const bool sEnvReduce = std::getenv("INFINITE_REDUCEMOTION") != nullptr;
       UiAnim::SetReduceMotion(sEnvReduce || CategoryColors::GetReduceMotion());
       ImGui::GetStyle().HoverDelayNormal = tok::motion_tooltip_delay * 0.001f;   // the one tooltip delay
+      if (CookProbe::gOn.load(std::memory_order_relaxed))
+         CookProbe::EndFrame();
       UiAnim::EndFrame();
       UiInteract::BeginFrame();
       if (Bench::Tail().active)

@@ -391,7 +391,10 @@ int DrawFloating(FrameCtx& fc)
                 dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<NdiOutNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
+            {
+               CookProbe::Scope probe(gn.node.get());
                gn.node->CookIfNeeded(frameId);
+            }
          }
          Bench::NodeGpuRing() = nullptr;
       }

@@ -456,6 +456,7 @@ set(COMMON_SOURCES
     src/app/panels/LibraryPanels.cpp
     src/app/panels/Minimap.cpp
     src/app/panels/FindOverlay.cpp
+    src/app/panels/CookOverlay.cpp
     src/app/panels/ModMatrixPanel.cpp
     src/app/panels/PerfPanel.cpp
     src/app/panels/SettingsWindow.cpp
@@ -485,6 +486,7 @@ set(COMMON_SOURCES
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
     src/core/CategoryColors.cpp
+    src/core/CookProbe.cpp
     src/core/I18n.cpp
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp

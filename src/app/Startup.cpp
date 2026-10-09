@@ -3624,6 +3624,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          sBenchB6Variant = "n=" + std::to_string(nodeCount) + ",mode=" + sBenchB6Mode;
          if (sBenchB6Collapsed)
             sBenchB6Variant += ",collapsed=1";
+         if (const char* z = getenv("INFINITE_BENCH_B6ZOOM"))
+            sBenchB6Variant += std::string(",zoom=") + z;
          if (!sBenchB6Vsync)
             sBenchB6Variant += ",vsync=0";
          if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
