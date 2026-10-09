@@ -1055,7 +1055,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // One GitHub Releases request, once per launch - see src/core/UpdateCheck.h.
    // No-ops under the self-test env vars, so headless/CI runs never touch
    // the network.
-   UpdateCheck::Start();
+   if (UpdateCheck::AutoCheckEnabled())
+      UpdateCheck::Start();
 
    static std::string iniPath = settingsDir.empty() ? std::string("imgui.ini")
                                                     : settingsDir + "/imgui.ini";

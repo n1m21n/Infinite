@@ -33,3 +33,6 @@ Decision held: no paid Apple account. Nothing here was signed up for or publishe
 | Azure Trusted Signing | roughly 10 USD a month | Cheap and CI friendly; identity validation needed, and availability by country has been limited | account, validation, one CI step |
 | Homebrew cask | free | `brew install --cask` is one line for users; Homebrew has been tightening rules for apps that are not notarized, so check current policy before investing | a small cask file in a tap, updated per release |
 | winget | free | Manifest pull request to microsoft/winget-pkgs with installer URL and SHA256; a zip build needs the portable layout | about half a day, then one PR per release |
+
+## Update check, settled
+Settings > Application & Updates now has "Check for updates when Infinite starts" (default on, with a line saying what is sent: one request to GitHub Releases). Turning it off writes `update-check-off` in the app support folder and the launch request stops; the explicit Check for updates buttons still work. Default on is the decision: the update dot depends on it and nothing is sent beyond the request.

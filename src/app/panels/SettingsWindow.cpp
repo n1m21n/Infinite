@@ -684,6 +684,12 @@ namespace app
             ImGui::Spacing();
             FormParts::Section(T("Application & Updates"));
             ImGui::Text(T("Version: %s"), INFINITE_VERSION_STRING);
+            {
+               bool autoCheck = UpdateCheck::AutoCheckEnabled();
+               if (FormParts::Switch(L("Check for updates when Infinite starts"), &autoCheck))
+                  UpdateCheck::SetAutoCheckEnabled(autoCheck);
+               ImGui::TextDisabled("%s", T("One request to GitHub Releases, nothing else is sent."));
+            }
             if (FormParts::Button(L("Check for updates...")))
             {
                UpdateCheck::Start();

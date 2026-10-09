@@ -55,6 +55,11 @@ namespace UpdateCheck
    // stays hidden until a newer one appears.
    void Dismiss();
 
+   // Whether Start() is called by itself once at launch. On by default; the marker file is only ever written
+   // when the user turns it off in Settings. The explicit "Check for updates" buttons work either way.
+   bool AutoCheckEnabled();
+   void SetAutoCheckEnabled(bool on);
+
    // Joins the worker if running. Call before the process exits.
    void Shutdown();
 }
