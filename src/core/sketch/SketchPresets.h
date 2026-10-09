@@ -27,7 +27,7 @@ function draw(t) {
 }
 )"},
 {"Flow field", R"(// Flow-field lines.
-param("lines", 220, 20, 600);
+param("lines", 140, 20, 600);
 param("scale", 2.5, 0.5, 8);
 param("weight", 1.5, 0.5, 6);
 
@@ -40,7 +40,7 @@ function draw(t) {
     let y = ((i * 0.7548776) % 1) * height;
     stroke(hsl(0.55 + 0.2 * (i / lines), 0.6, 0.65), 0.7);
     beginShape();
-    for (let s = 0; s < 40; s++) {
+    for (let s = 0; s < 32; s++) {
       vertex(x, y);
       const a = noise(x / width * scale, y / height * scale, t * 0.2) * TAU * 2;
       x += cos(a) * 10;

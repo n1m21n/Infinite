@@ -646,6 +646,7 @@ bool SketchEngine::Run(const Frame& f, std::vector<uint8_t>& rgba, SketchError& 
          for (int x = 0; x < W; ++x, s += 4, d += 4)
          {
             const uint32_t a = s[3];
+            if (a == 255) { d[0] = s[2]; d[1] = s[1]; d[2] = s[0]; d[3] = 255; continue; }  // opaque: swizzle only
             if (a == 0) { d[0] = d[1] = d[2] = d[3] = 0; continue; }
             d[0] = (uint8_t)std::min<uint32_t>(255, (s[2] * 255u + a / 2) / a);
             d[1] = (uint8_t)std::min<uint32_t>(255, (s[1] * 255u + a / 2) / a);
