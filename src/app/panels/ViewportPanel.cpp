@@ -1,5 +1,6 @@
 // Viewport panel cards and mini viewports (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -428,15 +429,11 @@ namespace app
       const float bar = ImGui::GetStyle().ScrollbarSize;
       const ImVec2 panelOrigin = ImGui::GetCursorScreenPos();
       const ImVec2 strip = ImGui::GetContentRegionAvail();
-      // Cards keep a margin to the strip's edge on every side, at every dock position.
-      const float pad = tok::space_2;
-      const float box = horizontal ? std::max(48.0f, strip.y - bar - 2.0f * pad)
-                                   : std::max(48.0f, strip.x - bar - 2.0f * pad);
+      // The PanelFrame card around this already keeps space_2 to the edge on every side, so cards fill the strip.
+      const float box = horizontal ? std::max(48.0f, strip.y - bar) : std::max(48.0f, strip.x - bar);
 
-      PushDockedPanelStyle(/*isChild=*/true);
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
-      ImGui::BeginChild("##viewportcards", strip, ImGuiChildFlags_AlwaysUseWindowPadding,
-                        horizontal ? ImGuiWindowFlags_HorizontalScrollbar : 0);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+      ImGui::BeginChild("##viewportcards", strip, false, horizontal ? ImGuiWindowFlags_HorizontalScrollbar : 0);
       ImGui::PopStyleVar();
 
       // Snapshot before drawing: a card's own close button mutates
@@ -486,7 +483,6 @@ namespace app
       }
 
       ImGui::EndChild();
-      PopDockedPanelStyle();
 
       // Right-click anywhere on the panel - empty space or a card - to
       // reposition or close it. Replaces the dock-combo/close-button header
@@ -538,7 +534,7 @@ namespace app
    // node canvas, whose window would win the hover instead).
    void DrawViewportPanelDocked(const char* id, const ImVec2& size)
    {
-      const float kGrip = 6.0f;
+      const float kGrip = PanelFrame::kGap;   // the grip strip is the gap on the canvas-facing side
       const int dock = gViewportPanelDock;
       const bool vertical = (dock == 1 || dock == 2);  // grip is a column, not a row
       const bool gripFirst = (dock == 0 || dock == 1); // canvas is above / to the left
@@ -551,9 +547,8 @@ namespace app
       // viewports: it was never a coloured divider, it was a hole. Give the
       // outer child the same opaque panelBg fill the content child already
       // has so the panel is solid edge to edge.
-      PushDockedPanelStyle(/*isChild=*/true);
+      // Outer child is transparent: the panel floats as a card on the canvas colour (PanelFrame).
       ImGui::BeginChild(id, size, false);
-      PopDockedPanelStyle();
       const ImVec2 inner = ImGui::GetContentRegionAvail();
 
       auto grip = [&]()
@@ -596,12 +591,21 @@ namespace app
       // well as the grip itself - otherwise the two together overrun the
       // panel and the panel grows a scrollbar of its own.
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
-      ImGui::BeginChild("##viewportpanelcontent",
-                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), 0)
-                                 : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        false);
+      const ImVec2 cardSize = vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
+                                       : ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+      PanelFrame::Insets in;
+      switch (dock)   // the grip side needs no inset of its own
+      {
+         case 0: in.t = 0.0f; break;
+         case 1: in.l = 0.0f; break;
+         case 2: in.r = 0.0f; break;
+         default: in.b = 0.0f; break;
+      }
+      PushDockedPanelStyle(/*isChild=*/true);
+      PanelFrame::BeginCard("##viewportpanelcontent", cardSize, in);
+      PopDockedPanelStyle();
       DrawViewportPanelContainer();
-      ImGui::EndChild();
+      PanelFrame::EndCard();
 
       if (!gripFirst)
       {

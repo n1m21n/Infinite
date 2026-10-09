@@ -15,18 +15,12 @@ namespace app
    void PerfPanelDockCombo()
    {
       static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
-      MenuParts::PushPopupPad();
-      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
-      const bool dockOpen = ImGui::BeginCombo("##perfpaneldock", T(kDockLabels[gPerfPanelDock]));
-      ImGui::PopStyleVar(2);
-      if (dockOpen)
+      if (MenuParts::BeginCombo("##perfpaneldock", T(kDockLabels[gPerfPanelDock])))
       {
-         MenuParts::BeginContent();
          for (int i = 0; i < 4; i++)
             if (MenuParts::Choice(L(kDockLabels[i]), i == gPerfPanelDock))
                gPerfPanelDock = i;
-         MenuParts::EndContent();
-         ImGui::EndCombo();
+         MenuParts::EndCombo();
       }
    }
 
