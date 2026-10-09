@@ -240,7 +240,7 @@ namespace FormParts
    }
 
    // Tables, collapsing headers and bullets in reference windows: hairline rules, quiet banding, rounded headers.
-   inline void PushReferenceStyle()
+   inline void PushReferenceStyle(bool headerFill = true)
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec4 edge = CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.07f) : ImVec4(1, 1, 1, 0.06f);
@@ -249,7 +249,7 @@ namespace FormParts
       ImGui::PushStyleColor(ImGuiCol_TableRowBg, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, ImVec4(t.x, t.y, t.z, 0.035f));
       ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(t.x, t.y, t.z, 0.06f));
+      ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(t.x, t.y, t.z, headerFill ? 0.06f : 0.0f));   // off when a card is the surface
       ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(t.x, t.y, t.z, 0.09f));
       ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(t.x, t.y, t.z, 0.12f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);

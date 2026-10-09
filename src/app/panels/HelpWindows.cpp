@@ -526,6 +526,7 @@ namespace app
       if (filterBuf[0] != '\0' && FormParts::Button(L("Clear")))
          filterBuf[0] = '\0';
 
+      ImGui::Dummy(ImVec2(0.0f, SectionCard::kPad));   // the first card reaches kPad above its cursor
       std::string filter = filterBuf;
       for (char& c : filter)
          c = (char)tolower((unsigned char)c);
@@ -697,7 +698,9 @@ namespace app
          return;
       }
 
-      FormParts::PushReferenceStyle();
+      SectionCard::BeginWindow();
+      FormParts::PushReferenceStyle(/*headerFill=*/false);   // each section is a card; the header is its title
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Getting started"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          ImGui::TextWrapped("%s", T("Infinite is a node graph. Every node renders an image and passes it down a cable to the next one. A typical patch reads left to right:"));
@@ -709,6 +712,7 @@ namespace app
          ImGui::TextWrapped("%s", T("Nothing enforces that order - any output can feed any input, including back into effects for feedback-style chains."));
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Controls"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          if (ImGui::BeginTable("controls", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
@@ -748,6 +752,7 @@ namespace app
          }
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Transport and modulation"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          ImGui::TextWrapped("%s", T("The top bar holds a global clock: Play/Pause, Rewind and BPM. Everything time-based reads from it - modulators, video playback and animated shaders - so pausing freezes the whole patch and changing the tempo retimes all of it at once."));
@@ -757,6 +762,7 @@ namespace app
          ImGui::TextWrapped("%s", T("Every slider has a small dot to its left. Patch a modulator into that dot and the slider turns amber and becomes read-only - the value is now being driven. Delete the cable to take manual control back."));
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Arrangement timeline"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          ImGui::TextWrapped("%s", T("Shift+T opens a timeline docked beside the canvas. It does not replace the patch - it schedules it. A track ('lane') is video or audio, and every clip on it points at a node that already exists in your graph; the clip decides WHEN that node is heard or seen, not what it does."));
@@ -778,6 +784,7 @@ namespace app
          ImGui::TextWrapped("%s", T("Right-click a track or group header to render or export just that track or group; the full patch export is still in the top bar."));
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Using Feedback"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          ImGui::TextWrapped("%s", T("A Feedback node outputs what its input produced on the PREVIOUS frame. That one-frame delay is the whole point: it lets you wire a cycle without the graph chasing its own tail forever."));
@@ -795,6 +802,7 @@ namespace app
          ImGui::TextWrapped("%s", T("If you just want trails, use the Trails node instead - it is that same loop wrapped into one node, with decay, drift, zoom and rotation built in. Reaction Diffusion is the other pre-wired feedback node: it needs no input at all and simulates a chemical system frame over frame."));
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Module reference")))
       {
          struct Entry { const char* name; const char* text; };
@@ -990,6 +998,7 @@ namespace app
          }
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Tips")))
       {
          ImGui::Bullet(); ImGui::TextWrapped("%s", T("Put a Fit node before a Blend or Layer Stack when your sources are different sizes."));
@@ -1005,6 +1014,7 @@ namespace app
 #endif
       }
 
+      SectionCard::EndWindow();
       FormParts::PopReferenceStyle();
       FormParts::WindowEdge();
       ImGui::End();
