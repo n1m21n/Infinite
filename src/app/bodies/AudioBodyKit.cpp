@@ -324,6 +324,7 @@ namespace app
       const int count = n->SlotCount();
       if (count == 0)
       {
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + w, origin.y + h)}, "no targets");
          AudioViz::Border(dl, origin, ImVec2(origin.x + w, origin.y + h));
          ImGui::Dummy(ImVec2(w, h));
          return;
@@ -352,6 +353,7 @@ namespace app
       }
       if (live.empty())
       {
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + w, origin.y + h)}, "no targets");
          AudioViz::Border(dl, origin, ImVec2(origin.x + w, origin.y + h));
          ImGui::Dummy(ImVec2(w, h));
          return;

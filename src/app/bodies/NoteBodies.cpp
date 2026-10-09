@@ -1009,6 +1009,24 @@ namespace app
    }
 
 
+   // The "NN% conf" badge sits on the right of the readout strip; shorten the idle
+   // stat so the two never print on top of each other (200 pt nodes).
+   void FitStatBesideConf(char* stat, size_t cap, float conf, float bodyW)
+   {
+      if (conf <= 0.0f)
+         return;
+      char badge[32];
+      snprintf(badge, sizeof(badge), "%d%% conf", (int)std::round(conf * 100.0f));
+      const float maxW = bodyW - ImGui::CalcTextSize(badge).x - 36.0f;
+      std::string out = stat;
+      if (ImGui::CalcTextSize(out.c_str()).x <= maxW)
+         return;
+      while (!out.empty() && ImGui::CalcTextSize((out + "...").c_str()).x > maxW)
+         out.pop_back();
+      snprintf(stat, cap, "%s...", out.c_str());
+   }
+
+
    void DrawPredictiveQuantizeBody(GraphNode& gn, PredictiveQuantizeNode* n)
    {
       const float conf = n->Confidence01();
@@ -1020,6 +1038,7 @@ namespace app
       else
          snprintf(stat, sizeof(stat), "wire notes in - always adapting");
 
+      FitStatBesideConf(stat, sizeof(stat), conf, kAudioNarrowWidth);
       const ImVec2 statusPos = ImGui::GetCursorScreenPos();
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
@@ -1054,6 +1073,7 @@ namespace app
       else
          snprintf(stat, sizeof(stat), "wire notes in - always adapting");
 
+      FitStatBesideConf(stat, sizeof(stat), conf, kAudioNarrowWidth);
       const ImVec2 statusPos = ImGui::GetCursorScreenPos();
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
@@ -1097,6 +1117,7 @@ namespace app
       else
          snprintf(stat, sizeof(stat), "wire notes in, press Learn");
 
+      FitStatBesideConf(stat, sizeof(stat), conf, kAudioNarrowWidth);
       const ImVec2 statusPos = ImGui::GetCursorScreenPos();
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
@@ -1181,6 +1202,7 @@ namespace app
       else
          snprintf(stat, sizeof(stat), "wire notes in, press Learn");
 
+      FitStatBesideConf(stat, sizeof(stat), conf, kAudioNodeWidth);
       const ImVec2 statusPos = ImGui::GetCursorScreenPos();
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
@@ -1198,7 +1220,7 @@ namespace app
          const float w = gAudioContentW;
          const float h = ImGui::GetFrameHeight();
          const bool learning = n->IsLearning();
-         if (ActionButton::Draw(learning ? "Stop##predLearn" : "Learn##predLearn", ImVec2(w * 0.3f, h)))
+         if (ActionButton::Draw(learning ? "Stop##predLearn" : "Learn##predLearn", ImVec2(w * 0.25f - 2.0f, h)))
          {
             PushUndoCheckpoint();
             n->SetLearning(!learning);
@@ -1206,7 +1228,7 @@ namespace app
          ImGui::SameLine();
          // Learning meter: how much the model beats a memoryless one, per captured bar.
          const ImVec2 p0 = ImGui::GetCursorScreenPos();
-         const float mw = w - w * 0.3f - ImGui::GetStyle().ItemSpacing.x;
+         const float mw = w - (w * 0.25f - 2.0f) - ImGui::GetStyle().ItemSpacing.x;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::U32(tok::pal::c_FFFFFF0E), 3.0f);
          const auto& c = n->Curve();
@@ -1224,6 +1246,8 @@ namespace app
                dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), tok::U32(tok::pal::c_78C88CE6), 1.5f);
             }
          }
+         if (c.size() < 2)
+            AudioViz::IdleLabel(AudioViz::Frame{dl, p0, ImVec2(p0.x + mw, p0.y + h)}, "learning meter");
          if (conf > 0.0f)
          {
             char confStr[32];
@@ -1234,6 +1258,7 @@ namespace app
          }
          ImGui::Dummy(ImVec2(mw, h));
       }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
       {
          AudioKnobRow row(4);
          row.Knob("stray", &n->stray, 0.0f, 1.0f, "%.2f", kKnobSmall);
