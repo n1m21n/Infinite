@@ -341,7 +341,12 @@ void DrawPopupsA(FrameCtx& fc)
          gModRangeTypedPendingInit = false;
          gModRangeTypedNoAutoSelect = false;
       }
-      if (MenuParts::BeginPopup("##modbind"))
+      bool modbindOpen;
+      {
+         MenuParts::ZoomScope modbindZoom(gModBindingMenuZoom);
+         modbindOpen = MenuParts::BeginPopup("##modbind");
+      }
+      if (modbindOpen)
       {
          Modulation& mod = Modulation::Instance();
          GestureRecorder& rec = GestureRecorder::Instance();

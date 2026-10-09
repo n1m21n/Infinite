@@ -197,7 +197,7 @@ namespace app
 
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
-                       bool showCaption);
+                       bool showCaption, bool segmented);
 
 
    // Search box + sort dropdown + type-filter dropdown for one mode of the

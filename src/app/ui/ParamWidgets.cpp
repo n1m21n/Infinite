@@ -423,6 +423,7 @@ namespace app
          gModBindingMenuNode = nodeIndex;
          gModBindingMenuParam = paramIndex;
          gOpenModBindingMenu = true;
+         gModBindingMenuZoom = PopupZoomNow();
          gParamRightClickConsumedThisFrame = true;
       }
    }
@@ -581,7 +582,7 @@ namespace app
 
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
-                       bool showCaption)
+                       bool showCaption, bool segmented)
    {
       if (options.empty())
          return;
@@ -628,7 +629,10 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                              : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         NodeDropdownField(caption.c_str(), ImVec2(width, 0), inner.c_str());
+         if (segmented)
+            DropdownField::DrawSegments(caption.c_str(), options, safeCurrent, width, inner.c_str());
+         else
+            NodeDropdownField(caption.c_str(), ImVec2(width, 0), inner.c_str());
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          // BeginDisabled swallows hover, so ask the rect directly - otherwise
@@ -637,6 +641,13 @@ namespace app
                                    ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
                                                               ImGui::GetItemRectMax()));
       }
+      else if (segmented)
+      {
+         // Short choices: a click selects directly (no popup); everything else is the dropdown's contract.
+         const int picked = DropdownField::DrawSegments(caption.c_str(), options, safeCurrent, width, inner.c_str());
+         if (picked >= 0 && picked != safeCurrent && onSelect)
+            onSelect(picked);
+      }
       else if (NodeDropdownField(caption.c_str(), ImVec2(width, 0), inner.c_str()))
       {
          gDropdown.options = options;
@@ -644,6 +655,7 @@ namespace app
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
+         gDropdown.zoom = PopupZoomNow();
          gDropdown.focusSearch = false;
       }
       if (h.registered && h.draw)

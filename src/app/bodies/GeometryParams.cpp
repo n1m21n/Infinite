@@ -7,6 +7,8 @@
 
 namespace app
 {
+   inline const std::vector<std::string> kAxisXYZ = { "x", "y", "z" };
+
    void DrawAudioFileParams(AudioFileNode* n)
    {
       if (ActionButton::Draw("Choose audio...", ImVec2(kPreviewSize, 0)))
@@ -153,7 +155,7 @@ namespace app
                         [n](int i) { n->followMode = i; });
          if (n->followMode == PathNode::kFollowSlice)
          {
-            ModSliderInt("axis 0=X 1=Y 2=Z", &n->sliceAxis, 0, 2);
+            DropdownButton("axis", kAxisXYZ, n->sliceAxis, [n](int i) { PushUndoCheckpoint(); n->sliceAxis = i; }, kParamWidth, true, true);
             ModSlider("slice at", &n->slicePosition, -3.0f, 3.0f);
          }
          ModSliderInt("contour", &n->contourIndex, 0, 8);
@@ -268,7 +270,7 @@ namespace app
 
       if (n->sampleMode == GeometryTableNode::kContour)
       {
-         ModSliderInt("axis 0=X 1=Y 2=Z", &n->sliceAxis, 0, 2);
+         DropdownButton("axis", kAxisXYZ, n->sliceAxis, [n](int i) { PushUndoCheckpoint(); n->sliceAxis = i; }, kParamWidth, true, true);
          ModSlider("slice at", &n->slicePosition, -3.0f, 3.0f);
       }
       if (n->sampleMode == GeometryTableNode::kScatter)
@@ -389,7 +391,7 @@ namespace app
       // parameterisation for them to act on.
       if (n->mode != MeshOps::kWrapNearest)
       {
-         ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+         DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
          // With a target the radius always follows the target's size, so the
          // only control is a multiplier - and the resolved value is shown so
          // that link stays visible. Without one there is nothing to follow,
@@ -1035,7 +1037,7 @@ namespace app
             ModSlider("strength", &n->amount, 0.0f, 1.0f);
             break;
          case GeometryOpNode::kMirror:
-            ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+            DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
             ModSlider("plane offset", &n->mirrorOffset, -2.0f, 2.0f);
             ModCheckbox("keep original", &n->keepOriginal);
             ModCheckbox("weld seam", &n->weldSeam);
@@ -1055,12 +1057,12 @@ namespace app
                   ModSlider("every", &n->selectC, 1.0f, 32.0f, "%.0f");
                   break;
                case 2: // position along an axis
-                  ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+                  DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
                   ModSlider("min", &n->selectA, -3.0f, 3.0f);
                   ModSlider("max", &n->selectB, -3.0f, 3.0f);
                   break;
                case 3: // normal direction
-                  ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+                  DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
                   ModSlider("facing", &n->selectA, -1.0f, 1.0f);
                   ModSlider("sign", &n->selectC, -1.0f, 1.0f);
                   break;
@@ -1110,11 +1112,11 @@ namespace app
             ModSlider("turns", &n->turns, 0.05f, 6.0f);
             ModSlider("rise / turn", &n->rise, -2.0f, 2.0f);
             ModSlider("radius", &n->radiusOffset, 0.0f, 3.0f);
-            ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+            DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
             break;
          default:
             ModSlider("angle", &n->amount, -171.8873f, 171.8873f, "%.1f\xC2\xB0");
-            ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+            DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
             break;
       }
    }

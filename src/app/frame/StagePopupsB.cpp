@@ -371,15 +371,21 @@ void DrawPopupsB(FrameCtx& fc)
       const float dropdownTextPadX = 8.0f;
       float dropdownMaxTextW = 0.0f;
       for (const std::string& opt : gDropdown.options)
-         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(opt.c_str()).x);
+         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(opt.c_str()).x * gDropdown.zoom);
       for (const std::string& cat : gDropdown.categories)
-         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(cat.c_str()).x);
-      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * 2.0f
-                                                 + dropdownTextPadX * 2.0f
+         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(cat.c_str()).x * gDropdown.zoom);
+      const float ddZoom = gDropdown.zoom;
+      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * 2.0f * ddZoom
+                                                 + dropdownTextPadX * 2.0f * ddZoom
                                                  + ImGui::GetStyle().ScrollbarSize,
-                                              160.0f, 400.0f);
-      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(520, 480));
-      if (MenuParts::BeginPopup("##dropdown"))
+                                              160.0f * ddZoom, 400.0f * ddZoom);
+      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(520 * ddZoom, 480 * ddZoom));
+      bool ddOpen;
+      {
+         MenuParts::ZoomScope ddZoomScope(ddZoom);
+         ddOpen = MenuParts::BeginPopup("##dropdown");
+      }
+      if (ddOpen)
       {
          const bool showSearch = gDropdown.focusSearch || gDropdown.options.size() >= kDropdownAutoSearchMin;
          if (showSearch)
@@ -700,6 +706,38 @@ void DrawPopupsB(FrameCtx& fc)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
       if ((getenv("INFINITE_AUDIOUITEST") != nullptr || getenv("INFINITE_FXGALLERY") != nullptr || getenv("INFINITE_NODEGALLERY") != nullptr) && frameId == 3)
          gRequestFitView = true; // same, for the audio node UI fixture
+      if (getenv("INFINITE_NODEGALLERY") != nullptr && frameId == 12)
+      {
+         // Review aid: INFINITE_GALLERYZOOM=<z> zooms the canvas, INFINITE_GALLERYOPENDD=<param index> opens that
+         // dropdown on the first node, so a popup can be judged at any zoom (screenshot at a later frame).
+         if (const char* z = getenv("INFINITE_GALLERYZOOM"))
+         {
+            gKbSavedZoom = (float)atof(z);
+            gKbSavedScroll = ImVec2(-60.0f, -40.0f);
+            gKbViewRestore = true; // applied inside the editor scope next frame
+         }
+      }
+      if (getenv("INFINITE_NODEGALLERY") != nullptr && frameId == 24)
+      {
+         if (const char* d = getenv("INFINITE_GALLERYOPENDD"))
+         {
+            gDropdownTestOpenKey = std::pair<int, int>(0, atoi(d));
+            if (atoi(d) < 0) // synthetic list, opened as a node control would at the canvas zoom
+            {
+               gDropdown.options.clear();
+               for (int i = -12; i <= 12; ++i)
+                  gDropdown.options.push_back("semi " + std::string(i > 0 ? "+" : "") + std::to_string(i));
+               gDropdown.categories.clear();
+               gDropdown.onSelect = [](int) {};
+               gDropdown.current = 12;
+               gDropdown.justOpened = true;
+               const char* z = getenv("INFINITE_GALLERYZOOM");
+               gDropdown.zoom = std::clamp(z ? (float)atof(z) : 1.0f, 0.5f, 1.0f);
+               gDropdown.focusSearch = false;
+               gDropdown.filterBuf[0] = '\0';
+            }
+         }
+      }
       if (getenv("INFINITE_NODELIST") != nullptr && frameId == 1)
       {
          // Review aid: every registered type by category, one line each ("NODELIST <category>|<type>").
