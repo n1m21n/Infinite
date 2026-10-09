@@ -45,14 +45,21 @@ namespace CheckBox
    inline bool Box(const char* id, bool* v)
    {
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const bool clicked = ImGui::InvisibleButton(id, ImVec2(kSize, kSize));
+      // G16: hit area 24x24 around the 16 box; layout keeps the 16 box (Dummy below).
+      constexpr float kHit = 24.0f;
+      ImGui::SetCursorScreenPos(ImVec2(p.x - (kHit - kSize) * 0.5f, p.y - (kHit - kSize) * 0.5f));
+      const bool clicked = ImGui::InvisibleButton(id, ImVec2(kHit, kHit));
+      const bool hovered = ImGui::IsItemHovered();
+      const bool focused = ImGui::IsItemFocused();
+      const ImGuiID iid = ImGui::GetItemID();
+      ImGui::SetCursorScreenPos(p);
+      ImGui::Dummy(ImVec2(kSize, kSize));
       if (clicked)
          *v = !*v;
-      const ImGuiID iid = ImGui::GetItemID();
-      const float hv = UiAnim::Hover(iid, ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+      const float hv = UiAnim::Hover(iid, hovered, tok::motion_hover_in, tok::motion_hover_out);
       const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);
       Draw(ImGui::GetWindowDrawList(), p, onv, hv);
-      if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible)
+      if (focused && ImGui::GetIO().NavVisible)
          ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x - 2, p.y - 2), ImVec2(p.x + kSize + 2, p.y + kSize + 2),
                                              ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_field + 2.0f, 0, 1.5f);
       return clicked;
