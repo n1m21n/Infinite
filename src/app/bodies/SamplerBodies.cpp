@@ -1,4 +1,5 @@
 // Sampler, slicer, molder, granular, drum sequencer, looper and MPC bodies (moved verbatim from main.cpp).
+#include "app/ui/design/components/StepCell.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -1944,26 +1945,22 @@ namespace app
                }
 
                const bool isBar = (s % stepsPerBar) == 0;
-               // Was a hardcoded near-black cell fill regardless of theme -
-               // this is the drum sequencer's own step grid (distinct from
-               // PatternNode's already theme-aware DrawPatternStepGrid), and
-               // was the source of the "black boxes" seen in light presets.
-               // Colors mirror DrawPatternStepGrid's light-mode track-lane
-               // palette (isGroupStart ? 212/218/230 : 224/228/238).
-               const ImU32 frameCol = isLight
-                  ? (isBar ? tok::U32(tok::pal::c_C8CEDAFF) : tok::U32(tok::pal::c_D6DCE8FF))
-                  : (isBar ? tok::U32(tok::pal::c_464A5AFF) : tok::U32(tok::pal::c_3C404EFF));
-               dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + cellW - cellGap, y0 + rowH), frameCol, 2.0f);
+               // The shared step recess and playhead edge; the velocity bar fills it from below, and a bar start
+               // carries a hairline on its left edge so the grid still reads in bars.
+               const ImVec2 cMin(x0, y0), cMax(x0 + cellW - cellGap, y0 + rowH);
+               StepCell::Draw(dl, cMin, cMax, false, false, ImGui::IsItemHovered());
                if (vel > 0.0f)
                {
                   const float fillTop = y0 + (1.0f - vel) * rowH;
-                  const ImU32 fillCol = (s == curStep && n->run) ? tok::U32(tok::pal::c_FFC864FF)
-                                                                 : tok::U32(tok::pal::c_78C8FFDC);
-                  dl->AddRectFilled(ImVec2(x0, fillTop), ImVec2(x0 + cellW - cellGap, y0 + rowH), fillCol, 2.0f);
+                  const ImU32 fillCol = (s == curStep && n->run) ? (isLight ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC864FF))
+                                                                 : (isLight ? tok::U32(tok::pal::c_2878EBF0) : tok::U32(tok::pal::c_78C8FFDC));
+                  dl->AddRectFilled(ImVec2(x0 + 1.0f, fillTop), ImVec2(cMax.x - 1.0f, y0 + rowH - 1.0f), fillCol, 2.0f);
                }
+               if (isBar && s > 0)
+                  dl->AddLine(ImVec2(x0 - cellGap * 0.5f, y0), ImVec2(x0 - cellGap * 0.5f, y0 + rowH),
+                              isLight ? tok::U32(tok::pal::c_B4BCCCFF) : tok::U32(tok::pal::c_404454FF), 1.0f);
                if (s == curStep)
-                  dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + cellW - cellGap, y0 + rowH), tok::U32(tok::pal::c_FFFFFF82),
-                              2.0f);
+                  StepCell::PlayheadOutline(dl, cMin, cMax);
 
                ImGui::PopID();
             }
