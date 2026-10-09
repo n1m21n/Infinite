@@ -26,12 +26,15 @@ namespace app
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
 
+      // R12: plotted values and handles live in an inset box so nothing touches or crosses the frame.
+      const float pad = 6.0f;
+      const float inner = size - 2.0f * pad;
       auto toScreen = [&](float x, float y) {
-         return ImVec2(origin.x + x * size, origin.y + (1.0f - y) * size);
+         return ImVec2(origin.x + pad + x * inner, origin.y + pad + (1.0f - y) * inner);
       };
       auto toCurve = [&](ImVec2 p) {
-         return ImVec2(std::min(1.0f, std::max(0.0f, (p.x - origin.x) / size)),
-                       std::min(1.0f, std::max(0.0f, 1.0f - (p.y - origin.y) / size)));
+         return ImVec2(std::min(1.0f, std::max(0.0f, (p.x - origin.x - pad) / inner)),
+                       std::min(1.0f, std::max(0.0f, 1.0f - (p.y - origin.y - pad) / inner)));
       };
 
       std::vector<CurveShape::Point>& pts = shape.points;
@@ -100,10 +103,10 @@ namespace app
       for (int i = 1; i < 4; i++)
       {
          float f = (float)i / 4.0f;
-         dl->AddLine(ImVec2(origin.x + size * f, origin.y), ImVec2(origin.x + size * f, br.y), ScopeGridCol());
-         dl->AddLine(ImVec2(origin.x, origin.y + size * f), ImVec2(br.x, origin.y + size * f), ScopeGridCol());
+         dl->AddLine(ImVec2(origin.x + pad + inner * f, origin.y), ImVec2(origin.x + pad + inner * f, br.y), ScopeGridCol());
+         dl->AddLine(ImVec2(origin.x, origin.y + pad + inner * f), ImVec2(br.x, origin.y + pad + inner * f), ScopeGridCol());
       }
-      dl->AddLine(origin, ImVec2(br.x, br.y), ScopeMidLineCol()); // identity reference
+      dl->AddLine(toScreen(0.0f, 0.0f), toScreen(1.0f, 1.0f), ScopeMidLineCol()); // identity reference
       if (crosshair)
       {
          ImVec2 mid = toScreen(0.5f, 0.5f);
@@ -438,6 +441,8 @@ namespace app
       const float barH = 26.0f;
       const float trackH = 22.0f;
       const float gap = 4.0f;
+      const float pad = 7.0f; // R12: stop handles (radius up to 7) stay inside the frame
+      const float inner = size - 2.0f * pad;
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -451,13 +456,13 @@ namespace app
          float c0[3], c1[3];
          n->Evaluate(t0, c0);
          n->Evaluate(t1, c1);
-         ImVec2 tl(origin.x + t0 * size, origin.y);
-         ImVec2 br(origin.x + t1 * size + 1.0f, origin.y + barH);
+         ImVec2 tl(origin.x + pad + t0 * inner, origin.y);
+         ImVec2 br(origin.x + pad + t1 * inner + (i + 1 == kSegments ? 0.0f : 1.0f), origin.y + barH);
          ImU32 col0 = IM_COL32((int)(c0[0] * 255), (int)(c0[1] * 255), (int)(c0[2] * 255), 255);
          ImU32 col1 = IM_COL32((int)(c1[0] * 255), (int)(c1[1] * 255), (int)(c1[2] * 255), 255);
          dl->AddRectFilledMultiColor(tl, br, col0, col1, col1, col0);
       }
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::U32(tok::pal::c_464A5AFF), 3.0f);
+      dl->AddRect(ImVec2(origin.x + pad, origin.y), ImVec2(origin.x + size - pad, origin.y + barH), tok::U32(tok::pal::c_464A5AFF), 3.0f);
 
       // stop track
       ImVec2 trackOrigin(origin.x, origin.y + barH + gap);
@@ -470,9 +475,9 @@ namespace app
       const bool hovered = ImGui::IsItemHovered();
       const bool active = ImGui::IsItemActive();
 
-      auto toScreenX = [&](float x) { return trackOrigin.x + x * size; };
+      auto toScreenX = [&](float x) { return trackOrigin.x + pad + x * inner; };
       auto toX = [&](float screenX) {
-         return std::min(1.0f, std::max(0.0f, (screenX - trackOrigin.x) / size));
+         return std::min(1.0f, std::max(0.0f, (screenX - trackOrigin.x - pad) / inner));
       };
 
       static ColorRampNode* sDragNode = nullptr;

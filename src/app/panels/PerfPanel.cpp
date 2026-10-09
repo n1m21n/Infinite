@@ -2598,6 +2598,10 @@ namespace app
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
       const float h = 90.0f;
+      const float pad = 6.0f; // R12: plotted values stay inside the frame by this inset
+      const float innerW = kPreviewSize - 2.0f * pad;
+      const float innerH = h - 2.0f * pad;
+      auto yOf = [&](float v) { return origin.y + pad + innerH - (v - lo) / range * innerH; };
       ImDrawList* dl = ImGui::GetWindowDrawList();
       // Was a hardcoded near-black fill regardless of theme - on a light
       // preset (e.g. GitHub Light) this read as a solid black box in every
@@ -2613,10 +2617,10 @@ namespace app
       dl->PushClipRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), true); // backstop, not the primary fix
       for (size_t i = 1; i < history.size(); i++)
       {
-         float x0 = origin.x + kPreviewSize * (float)(i - 1) / 160.0f;
-         float x1 = origin.x + kPreviewSize * (float)i / 160.0f;
-         float y0 = origin.y + h - (history[i - 1] - lo) / range * h;
-         float y1 = origin.y + h - (history[i] - lo) / range * h;
+         float x0 = origin.x + pad + innerW * (float)(i - 1) / 160.0f;
+         float x1 = origin.x + pad + innerW * (float)i / 160.0f;
+         float y0 = yOf(history[i - 1]);
+         float y1 = yOf(history[i]);
          dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), lineCol, 1.6f);
       }
       dl->PopClipRect();
@@ -2633,21 +2637,21 @@ namespace app
          // faint quarter guides so the axis reads as a scale, not a blank box
          for (int q = 1; q < 4; q++)
          {
-            const float gy = origin.y + h - ((q * 0.25f) - lo) / range * h;
+            const float gy = yOf(q * 0.25f);
             dl->AddLine(ImVec2(origin.x, gy), ImVec2(origin.x + kPreviewSize, gy),
                         ScopeMidLineCol(), q == 2 ? 1.0f : 0.5f);
          }
          if (!history.empty())
          {
-            const float cy = origin.y + h - (history.back() - lo) / range * h;
-            dl->AddCircleFilled(ImVec2(origin.x + kPreviewSize * (float)(history.size() - 1) / 160.0f, cy),
+            const float cy = yOf(history.back());
+            dl->AddCircleFilled(ImVec2(origin.x + pad + innerW * (float)(history.size() - 1) / 160.0f, cy),
                                 3.0f, lineCol);
          }
       }
       if (outOfContract)
       {
-         const float y0line = origin.y + h - (0.0f - lo) / range * h;
-         const float y1line = origin.y + h - (1.0f - lo) / range * h;
+         const float y0line = yOf(0.0f);
+         const float y1line = yOf(1.0f);
          const ImU32 hairlineCol = ScopeMidLineCol();
          if (y0line >= origin.y && y0line <= origin.y + h)
             dl->AddLine(ImVec2(origin.x, y0line), ImVec2(origin.x + kPreviewSize, y0line), hairlineCol, 1.0f);

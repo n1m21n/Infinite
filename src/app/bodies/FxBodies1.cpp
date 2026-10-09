@@ -1276,7 +1276,7 @@ namespace app
       for (int tapIdx = 0; tapIdx < 24 && amp > 0.02f && t < windowSeconds; tapIdx++)
       {
          const float x = origin.x + std::clamp(t / windowSeconds, 0.0f, 1.0f) * w;
-         const float barTopY = origin.y + barsH - amp * barsH;
+         const float barTopY = origin.y + barsH - amp * (barsH - 6.0f); // inset: the first echo never touches the frame
          dl->AddRectFilled(ImVec2(x - barHalfW, barTopY), ImVec2(x + barHalfW, origin.y + barsH),
                            isLight ? tok::U32(tok::pal::c_1E6EE6E6) : tok::U32(tok::pal::c_96D6FFDC));
          amp *= feedback;
