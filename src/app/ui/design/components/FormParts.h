@@ -8,7 +8,9 @@
 #include <string>
 #include <vector>
 #include "app/AppShared.h"
+#include "app/ui/design/GlyphDraw.h"
 #include "core/TablerIcons.h"
+#include "app/ui/design/UiType.h"
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -97,6 +99,32 @@ namespace FormParts
    }
    inline void EndCombo() { ImGui::EndCombo(); }
 
+   // Unlabelled well combo for toolbars: `w` wide, items as a zero-separated list.
+   inline bool BareCombo(const char* id, int* current, const char* const* arr, int n, float w)
+   {
+      std::vector<const char*> list(arr, arr + n);
+      const char* cur = (*current >= 0 && *current < (int)list.size()) ? list[*current] : "";
+      ImGui::SetNextItemWidth(w);
+      FieldWell::PushStyle();
+      const bool open = ImGui::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
+      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+      glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
+                             ImGui::GetColorU32(ImGuiCol_TextDisabled));
+      FieldWell::PopStyle();
+      bool changed = false;
+      if (open)
+      {
+         for (int i = 0; i < (int)list.size(); ++i)
+            if (ImGui::Selectable(list[i], *current == i))
+            {
+               *current = i;
+               changed = true;
+            }
+         ImGui::EndCombo();
+      }
+      return changed;
+   }
+
    // `items` is the zero-separated list ImGui::Combo takes.
    inline bool Combo(const char* label, int* current, const char* items)
    {
@@ -177,5 +205,55 @@ namespace FormParts
    {
       ImGui::PopStyleVar(3);
       ImGui::PopStyleColor(7);
+   }
+
+   // Hairline outline on a floating window; call just before ImGui::End().
+   inline void WindowEdge(float rounding = 12.0f)
+   {
+      const ImVec2 p = ImGui::GetWindowPos(), z = ImGui::GetWindowSize();
+      ImGui::GetWindowDrawList()->AddRect(ImVec2(p.x + 0.5f, p.y + 0.5f), ImVec2(p.x + z.x - 0.5f, p.y + z.y - 0.5f),
+                                          EdgeCol(), rounding);
+   }
+
+   // Muted section title for long reference text (no card): Body size, medium.
+   inline void Heading(const char* text)
+   {
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+      {
+         UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+         ImGui::TextDisabled("%s", text);
+      }
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1 * 0.5f));
+   }
+
+   // Tables, collapsing headers and bullets in reference windows: hairline rules, quiet banding, rounded headers.
+   inline void PushReferenceStyle()
+   {
+      const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const ImVec4 edge = CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.07f) : ImVec4(1, 1, 1, 0.06f);
+      ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, edge);
+      ImGui::PushStyleColor(ImGuiCol_TableBorderLight, edge);
+      ImGui::PushStyleColor(ImGuiCol_TableRowBg, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, ImVec4(t.x, t.y, t.z, 0.035f));
+      ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(t.x, t.y, t.z, 0.06f));
+      ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(t.x, t.y, t.z, 0.09f));
+      ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(t.x, t.y, t.z, 0.12f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
+   }
+   inline void PopReferenceStyle()
+   {
+      ImGui::PopStyleVar();
+      ImGui::PopStyleColor(8);
+   }
+
+   // Search / filter field in the well style.
+   inline bool SearchInput(const char* id, const char* hint, char* buf, size_t cap, float w)
+   {
+      ImGui::SetNextItemWidth(w);
+      FieldWell::PushStyle();
+      const bool r = ImGui::InputTextWithHint(id, hint, buf, cap);
+      FieldWell::PopStyle();
+      return r;
    }
 }

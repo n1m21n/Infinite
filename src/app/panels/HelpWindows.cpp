@@ -1,6 +1,7 @@
 // Node help text tables, shortcuts and help windows (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/FormParts.h"
 
 namespace app
 {
@@ -506,18 +507,18 @@ namespace app
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
-      if (!ImGui::Begin("All Shortcuts", open))
+      if (!ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse))
       {
          ImGui::End();
          PopElevatedPanelStyle();
          return;
       }
 
+      FormParts::PushReferenceStyle();
       static char filterBuf[128] = "";
-      ImGui::SetNextItemWidth(250);
-      ImGui::InputTextWithHint("##filter", "Filter shortcuts...", filterBuf, sizeof(filterBuf));
+      FormParts::SearchInput("##filter", "Filter shortcuts...", filterBuf, sizeof(filterBuf), 250.0f);
       ImGui::SameLine();
-      if (filterBuf[0] != '\0' && ImGui::SmallButton(L("Clear")))
+      if (filterBuf[0] != '\0' && FormParts::Button(L("Clear")))
          filterBuf[0] = '\0';
 
       std::string filter = filterBuf;
@@ -623,14 +624,14 @@ namespace app
                inTable = false;
             }
             lastCat = s.category;
-            ImGui::SeparatorText(T(s.category));
+            FormParts::Heading(T(s.category));
          }
 
          if (!inTable)
          {
             char tableId[64];
             snprintf(tableId, sizeof(tableId), "tbl_%s", s.category);
-            if (ImGui::BeginTable(tableId, 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+            if (ImGui::BeginTable(tableId, 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
             {
                ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, 150.0f);
                ImGui::TableSetupColumn(T("Shortcut"), ImGuiTableColumnFlags_WidthFixed, 180.0f);
@@ -651,8 +652,7 @@ namespace app
             // washes out against light mode's light row background - branch
             // it the same way every other themed accent-text spot in the
             // app does rather than leave it a fixed dark-mode-only colour.
-            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_50_350_680_1000)
-                                                                : tok::V4(tok::palf::v_450_820_1000_1000));
+            ImGui::PushStyleColor(ImGuiCol_Text, app::AccentEmphasisSelected());
             ImGui::TextUnformatted(s.key);
             ImGui::PopStyleColor();
 
@@ -664,6 +664,8 @@ namespace app
       if (inTable)
          ImGui::EndTable();
 
+      FormParts::PopReferenceStyle();
+      FormParts::WindowEdge();
       ImGui::End();
       PopElevatedPanelStyle();
    }
@@ -679,13 +681,14 @@ namespace app
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(720, 620), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
-      if (!ImGui::Begin("Infinite - help & module reference", open))
+      if (!ImGui::Begin("Infinite - help & module reference", open, ImGuiWindowFlags_NoCollapse))
       {
          ImGui::End();
          PopElevatedPanelStyle();
          return;
       }
 
+      FormParts::PushReferenceStyle();
       if (ImGui::CollapsingHeader(L("Getting started"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          ImGui::TextWrapped("%s", T("Infinite is a node graph. Every node renders an image and passes it down a cable to the next one. A typical patch reads left to right:"));
@@ -699,7 +702,7 @@ namespace app
 
       if (ImGui::CollapsingHeader(L("Controls"), ImGuiTreeNodeFlags_DefaultOpen))
       {
-         if (ImGui::BeginTable("controls", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+         if (ImGui::BeginTable("controls", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
          {
             ImGui::TableSetupColumn(T("Action"));
             ImGui::TableSetupColumn(T("How"));
@@ -964,7 +967,7 @@ namespace app
 
          for (const Group& group : groups)
          {
-            ImGui::SeparatorText(group.category);
+            FormParts::Heading(group.category);
             for (const Entry& entry : group.entries)
             {
                ImGui::Bullet();
@@ -993,6 +996,8 @@ namespace app
 #endif
       }
 
+      FormParts::PopReferenceStyle();
+      FormParts::WindowEdge();
       ImGui::End();
       PopElevatedPanelStyle();
    }
