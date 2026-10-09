@@ -1507,7 +1507,9 @@ namespace app
             pinInfo.shapeRadius = diameter * 0.5f + 2.0f;
          }
          gParamPinScreenList.push_back(pinInfo);
-         ImGui::SetCursorScreenPos(cursorAfter);
+         // Put the cursor back without SetCursorScreenPos: as the last call before EndGroup it counts as
+         // "extending the parent's boundaries without an item" and ImGui flags it (Compare's last slider).
+         ImGui::GetCurrentWindow()->DC.CursorPos = cursorAfter;
       }
 
       {
@@ -1700,7 +1702,7 @@ namespace app
       // The stubs are placed out of layout order, so hand the cursor back where
       // the tag row left it. Call this only once the whole row is drawn: nothing
       // after it may rely on SameLine().
-      ImGui::SetCursorScreenPos(restoreCursor);
+      ImGui::GetCurrentWindow()->DC.CursorPos = restoreCursor;   // not SetCursorScreenPos: see ModKnob's pin restore
    }
 
 
