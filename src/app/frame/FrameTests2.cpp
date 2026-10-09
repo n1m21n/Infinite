@@ -1235,12 +1235,19 @@ void FrameTest_GROUPTEST(int frameId, GLFWwindow* window)
                if (dynamic_cast<GroupNode*>(g.node.get()) != nullptr)
                   groupsLeft++;
             }
-            // The group is gone, its three member nodes are untouched, and
-            // they are unowned again rather than still bound to a dead group.
+            // Ungroup with a member selected is member-scoped: that node is
+            // detached, the group and its other two members stay.
             const bool freed = GroupOwning(gNodes[0].index) == nullptr;
-            printf("after ungroup: %zu groups left, %zu nodes, member freed=%d  %s\n",
-                   groupsLeft, gNodes.size(), (int)freed,
-                   (groupsLeft == 0 && gNodes.size() == 3 && freed) ? "UNGROUP OK" : "FAIL");
+            size_t othersKept = 0;
+            for (GraphNode& g : gNodes)
+            {
+               if (g.index != gNodes[0].index && dynamic_cast<GroupNode*>(g.node.get()) == nullptr &&
+                   GroupOwning(g.index) != nullptr)
+                  othersKept++;
+            }
+            printf("after ungroup: %zu groups left, %zu nodes, member freed=%d, others kept=%zu  %s\n",
+                   groupsLeft, gNodes.size(), (int)freed, othersKept,
+                   (groupsLeft == 1 && gNodes.size() == 4 && freed && othersKept == 2) ? "UNGROUP OK" : "FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
