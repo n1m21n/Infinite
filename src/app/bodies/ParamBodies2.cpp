@@ -190,7 +190,7 @@ namespace app
             n->ResetProfile();
          }
       }
-      ImGui::SameLine();
+      // Confidence reads on its own status line under the buttons, not squeezed beside Learn.
       char confText[32];
       // While learning, show THIS take's own local progress - not the blended confidence, which
       // is mostly settled shared/house-style weight and barely moves as this instance learns.
