@@ -415,7 +415,7 @@ namespace app
    void DrawClothParams(ClothNode* n)
    {
       ImGui::TextDisabled("%zu triangles, %zu links", n->TriangleCount(), n->ConstraintCount());
-      if (ActionButton::Draw("Reset", ImVec2(kParamWidth, 0)))
+      if (ActionButton::Column("Reset", kParamWidth))
          n->Reset();
 
       NodeSeparator("solver");
@@ -449,7 +449,7 @@ namespace app
    void DrawParticleSystemParams(ParticleSystemNode* n)
    {
       ImGui::TextDisabled("%zu alive", n->AliveCount());
-      if (ActionButton::Draw("Reset", ImVec2(kParamWidth, 0)))
+      if (ActionButton::Column("Reset", kParamWidth))
          n->Reset();
 
       NodeSeparator("emitter");
@@ -783,7 +783,7 @@ namespace app
 
    void DrawModelParams(ModelSourceNode* n)
    {
-      if (ActionButton::Draw("Open model...", ImVec2(kParamWidth, 0)))
+      if (ActionButton::Column("Open model...", kParamWidth))
       {
          const std::string path = Platform::OpenModelDialog();
          if (!path.empty())
@@ -1614,7 +1614,7 @@ namespace app
       const float colW = kParamWidth;
       const float gutter = 16.0f;
 
-      if (ActionButton::Draw("Frame scene", ImVec2(colW, 0)))
+      if (ActionButton::Column("Frame scene", colW))
          FrameSceneInView(n);
 
       // --- Left Column ---

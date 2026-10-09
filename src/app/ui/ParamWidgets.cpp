@@ -573,9 +573,9 @@ namespace app
    }
 
 
-   bool NodeDropdownField(const char* caption, ImVec2 size)
+   bool NodeDropdownField(const char* caption, ImVec2 size, const char* label)
    {
-      return DropdownField::Draw(caption, size);
+      return DropdownField::Draw(caption, size, label);
    }
 
 
@@ -618,6 +618,8 @@ namespace app
       }
 
       const std::string caption = options[safeCurrent] + "##" + label;
+      // R1: the parameter name lives inside the face, not beside it.
+      const std::string inner = showCaption ? StripParamLabel(label) : std::string();
       PushDropdownStyle();
       if (h.modulated)
       {
@@ -626,7 +628,7 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                              : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         NodeDropdownField(caption.c_str(), ImVec2(width, 0));
+         NodeDropdownField(caption.c_str(), ImVec2(width, 0), inner.c_str());
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          // BeginDisabled swallows hover, so ask the rect directly - otherwise
@@ -635,7 +637,7 @@ namespace app
                                    ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
                                                               ImGui::GetItemRectMax()));
       }
-      else if (NodeDropdownField(caption.c_str(), ImVec2(width, 0)))
+      else if (NodeDropdownField(caption.c_str(), ImVec2(width, 0), inner.c_str()))
       {
          gDropdown.options = options;
          gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind
@@ -653,10 +655,6 @@ namespace app
             onSelect(stepped);
       }
       PopDropdownStyle();
-      if (!showCaption)
-         return;
-      ImGui::SameLine();
-      ImGui::TextDisabled("%s", StripParamLabel(label).c_str());
    }
 
 

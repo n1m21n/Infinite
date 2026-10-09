@@ -748,30 +748,32 @@ namespace app
             n->SetGridSize(n->gridW, gh);
       }
 
-      const float btnW = (colW - 12.0f) * 0.25f;
+      const float btnW = ActionButton::RowWidth(4, kParamWidth);
+      ActionButton::RowBegin();
       if (ActionButton::Draw("Reset Corners", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->ResetCorners();
       }
-      ImGui::SameLine(0.0f, 4.0f);
+      ActionButton::RowNext();
       if (ActionButton::Draw("Reset All", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->ResetAllPoints();
       }
-      ImGui::SameLine(0.0f, 4.0f);
+      ActionButton::RowNext();
       if (ActionButton::Draw("Flip H", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->FlipH();
       }
-      ImGui::SameLine(0.0f, 4.0f);
+      ActionButton::RowNext();
       if (ActionButton::Draw("Flip V", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->FlipV();
       }
+      ActionButton::RowEnd();
    }
 
 

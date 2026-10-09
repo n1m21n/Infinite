@@ -23,6 +23,20 @@ namespace ActionButton
    // between them takes that look; an explicit Kind at the call wins.
    inline Kind& Scoped() { static Kind k = Kind::Plain; return k; }
 
+   // Where the slider/dropdown faces start and how wide they are inside a param column of `colW`
+   // (the 12px pin box + 4px gap sit left of every face). Button rows span exactly that.
+   inline float ColumnIndent() { return 16.0f; }
+   inline float ColumnWidth(float colW) { return std::max(1.0f, colW - ColumnIndent()); }
+   // Width of each of `n` equal buttons laid across the slider column of `colW` with the 4px gutter.
+   inline float RowWidth(int n, float colW)
+   {
+      return std::max(1.0f, (ColumnWidth(colW) - tok::space_1 * (float)(n - 1)) / (float)std::max(1, n));
+   }
+   // Start a row / continue it: call RowBegin() before the first button, RowNext() between buttons.
+   inline void RowBegin() { ImGui::Indent(ColumnIndent()); }
+   inline void RowNext() { ImGui::SameLine(0.0f, tok::space_1); }
+   inline void RowEnd() { ImGui::Unindent(ColumnIndent()); }
+
    inline bool Draw(const char* label, ImVec2 size = ImVec2(0, 0), Kind kind = Kind::Plain)
    {
       if (kind == Kind::Plain)
@@ -61,5 +75,14 @@ namespace ActionButton
       dl->AddText(ImVec2(std::round(p.x + (w - ts.x) * 0.5f), std::round(p.y + (h - ts.y) * 0.5f)),
                   ImGui::GetColorU32(kind == Kind::Solo ? ImVec4(0.10f, 0.10f, 0.12f, 1.0f) : solid ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.85f)), shown.c_str());
       return clicked;
+   }
+
+   // One button across the whole slider column of `colW`.
+   inline bool Column(const char* label, float colW, Kind kind = Kind::Plain)
+   {
+      ImGui::Indent(ColumnIndent());
+      const bool c = Draw(label, ImVec2(ColumnWidth(colW), 0), kind);
+      ImGui::Unindent(ColumnIndent());
+      return c;
    }
 }

@@ -2067,7 +2067,7 @@ void PopPrimaryButtonStyle();
 
 void PushDropdownStyle();
 // Closed face of a node dropdown (field well + value + chevron); returns true when clicked.
-bool NodeDropdownField(const char* caption, ImVec2 size);
+bool NodeDropdownField(const char* caption, ImVec2 size, const char* label = nullptr);
 
 void PopDropdownStyle();
 
