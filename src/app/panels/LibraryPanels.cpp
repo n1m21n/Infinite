@@ -337,7 +337,7 @@ namespace app
             // the plugin editor's open/close button). A triangle/two bars
             // reads as a transport icon at a glance; "|>" as literal text
             // does not.
-            const bool clicked = ImGui::Button("##preview", ImVec2(btnW, btnH));
+            const bool clicked = ActionButton::Draw("##preview", ImVec2(btnW, btnH));
             {
                ImDrawList* dl = ImGui::GetWindowDrawList();
                const ImVec2 bmin = ImGui::GetItemRectMin();

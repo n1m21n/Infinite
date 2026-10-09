@@ -1565,7 +1565,7 @@ namespace app
          const float btnW = 20.0f;
          const float rowY = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - btnW, rowY));
-         const bool clearClicked = ImGui::Button("##clearlane", ImVec2(btnW, 0));
+         const bool clearClicked = ActionButton::Draw("##clearlane", ImVec2(btnW, 0));
          {
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImVec2 bmin = ImGui::GetItemRectMin();

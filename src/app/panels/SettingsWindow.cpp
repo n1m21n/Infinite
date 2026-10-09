@@ -731,7 +731,7 @@ namespace app
             {
                ImGui::SameLine(0.0f, 6.0f);
                const float btnW = ImGui::GetFrameHeight();
-               if (ImGui::Button("##clearfieldsearch", ImVec2(btnW, 0)))
+               if (ActionButton::Draw("##clearfieldsearch", ImVec2(btnW, 0)))
                   sFilterBuf[0] = '\0';
                ImDrawList* dl = ImGui::GetWindowDrawList();
                const ImVec2 bmin = ImGui::GetItemRectMin();
@@ -1127,7 +1127,7 @@ namespace app
                ImGui::SameLine();
                ImGui::SetCursorPosX(btnX);
                {
-                  if (ImGui::Button("##removeexprglobal", ImVec2(btnW, 0)))
+                  if (ActionButton::Draw("##removeexprglobal", ImVec2(btnW, 0)))
                      removeAt = (int)i;
                   ImDrawList* dl = ImGui::GetWindowDrawList();
                   const ImVec2 bmin = ImGui::GetItemRectMin();

@@ -36,29 +36,9 @@ namespace app
 
       void PushToolbarChip(bool on, bool green = false)
       {
-         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-         if (on)
-         {
-            const ImVec4 a = green ? ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pal::c_10B981FF)) : AccentEmphasisSelected();
-            ImGui::PushStyleColor(ImGuiCol_Button, a);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(std::min(1.0f, a.x * 1.04f + 0.01f), std::min(1.0f, a.y * 1.04f + 0.01f), std::min(1.0f, a.z * 1.04f + 0.01f), a.w));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(a.x * 0.85f, a.y * 0.85f, a.z * 0.85f, a.w));
-         }
-         else
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(t.x, t.y, t.z, 0.06f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(t.x, t.y, t.z, 0.11f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(t.x, t.y, t.z, 0.16f));
-         }
-         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+         ActionButton::Scoped() = !on ? ActionButton::Kind::Plain : green ? ActionButton::Kind::Go : ActionButton::Kind::Selected;
       }
-      void PopToolbarChip()
-      {
-         ImGui::PopStyleVar(2);
-         ImGui::PopStyleColor(4);
-      }
+      void PopToolbarChip() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
    }
 
    // Combo in the field-well style with the inspector's small chevron (no ImGui arrow button).
@@ -855,7 +835,7 @@ namespace app
          {
             const bool viewportWasOn = gArrangeShowViewport;
             PushToolbarChip(viewportWasOn);
-            if (ImGui::Button("##arrangeshowviewport", ImVec2(30, tok::tile)))
+            if (ActionButton::Draw("##arrangeshowviewport", ImVec2(30, tok::tile)))
                gArrangeShowViewport = !gArrangeShowViewport;
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangeviewportctx"))
                ImGui::OpenPopup("##arrangeviewportctx");
@@ -886,7 +866,7 @@ namespace app
          ImGui::SameLine(0.0f, tok::space_4);
          const bool arrangeIsPlaying = tr.IsPlaying();
          PushToolbarChip(arrangeIsPlaying, /*green=*/true);
-         if (ImGui::Button("##arrangeplaybtn", ImVec2(30, tok::tile)))
+         if (ActionButton::Draw("##arrangeplaybtn", ImVec2(30, tok::tile)))
             tr.TogglePlay();
          PopToolbarChip();
          if (ImGui::IsItemHovered())
@@ -906,7 +886,7 @@ namespace app
 
          ImGui::SameLine(0.0f, tok::space_1);
          PushToolbarChip(false);
-         const bool rewindClicked = ImGui::Button("##arrangerewindbtn", ImVec2(30, tok::tile));
+         const bool rewindClicked = ActionButton::Draw("##arrangerewindbtn", ImVec2(30, tok::tile));
          PopToolbarChip();
          if (rewindClicked)
             tr.Rewind();
@@ -951,7 +931,7 @@ namespace app
          ImGui::SameLine(0.0f, tok::space_4);
          const bool snapWasOn = gArrange.settings.snapDivision > 0;
          PushToolbarChip(snapWasOn);
-         if (ImGui::Button("##arrangesnapbtn", ImVec2(30, tok::tile)))
+         if (ActionButton::Draw("##arrangesnapbtn", ImVec2(30, tok::tile)))
          {
             if (snapWasOn)
                ArrangeSetSnap(0, false);
@@ -1011,7 +991,7 @@ namespace app
          const Arrange::LoopRange loopNow = gArrange.settings.loop; // the loop as of this frame
          const bool loopWasOn = loopNow.enabled; // see snapWasOn above
          PushToolbarChip(loopWasOn);
-         if (ImGui::Button("##arrangeloopbtn", ImVec2(30, tok::tile)))
+         if (ActionButton::Draw("##arrangeloopbtn", ImVec2(30, tok::tile)))
             ArrangeSetLoop(!loopNow.enabled, loopNow.start, loopNow.end);
          PopToolbarChip();
          if (ImGui::IsItemHovered())
@@ -1031,7 +1011,7 @@ namespace app
          const bool toolNonDefault = (gArrangeTool != ArrangeTool::Select);
          PushToolbarChip(toolNonDefault);
          const float toolBtnW = 34.0f;
-         if (ImGui::Button("##arrangetoolmodepicker", ImVec2(toolBtnW, tok::tile)))
+         if (ActionButton::Draw("##arrangetoolmodepicker", ImVec2(toolBtnW, tok::tile)))
          {
             ImGui::OpenPopup("##arrangetoolpopup");
          }
@@ -1118,7 +1098,7 @@ namespace app
          // Add Marker (M): drops one at the playhead, on the snap grid.
          ImGui::SameLine(0.0f, tok::space_1);
          PushToolbarChip(false);
-         const bool markerClicked = ImGui::Button("##arrangemarkerbtn", ImVec2(30, tok::tile));
+         const bool markerClicked = ActionButton::Draw("##arrangemarkerbtn", ImVec2(30, tok::tile));
          PopToolbarChip();
          if (markerClicked)
             ArrangeAddMarkerAtPlayhead();
@@ -1146,7 +1126,7 @@ namespace app
 
             ImGui::BeginDisabled(!anyResized);
             PushToolbarChip(false);
-            const bool resetClicked = ImGui::Button("##arrangeresetrowh", ImVec2(30, tok::tile));
+            const bool resetClicked = ActionButton::Draw("##arrangeresetrowh", ImVec2(30, tok::tile));
             PopToolbarChip();
             if (resetClicked)
             {
@@ -1173,7 +1153,7 @@ namespace app
          ImGui::SameLine(0.0f, tok::space_1);
          const bool inspectorWasOpen = gArrangeClipSettingsPanelOpen;
          PushToolbarChip(inspectorWasOpen);
-         if (ImGui::Button("##clipsettingstoggle", ImVec2(30, tok::tile)))
+         if (ActionButton::Draw("##clipsettingstoggle", ImVec2(30, tok::tile)))
             gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
          PopToolbarChip();
          if (ImGui::IsItemHovered())

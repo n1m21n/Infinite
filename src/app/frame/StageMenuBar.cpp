@@ -391,13 +391,8 @@ void DrawMenuBar(FrameCtx& fc)
          SectionBreak();
 
          // 1. Transport (Play, Rewind, Audio On/Off)
-         if (isTransportPlaying)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_160_630_310_1000));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_200_700_360_1000));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_140_550_260_1000));
-         }
-         if (ImGui::Button("##transportplay", ImVec2(tok::tile + 4.0f, 0)))
+         if (ActionButton::Draw("##transportplay", ImVec2(tok::tile + 4.0f, 0),
+                                isTransportPlaying ? ActionButton::Kind::Go : ActionButton::Kind::Plain))
             transport.TogglePlay();
          {
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -415,11 +410,9 @@ void DrawMenuBar(FrameCtx& fc)
          }
          if (ImGui::IsItemHovered())
             HelpTip(T("%s (Space)"), isTransportPlaying ? T("Pause") : T("Play"));
-         if (isTransportPlaying)
-            ImGui::PopStyleColor(3);
 
          TopBarSameLine(2.0f);
-         if (ImGui::Button("##transportrewind", ImVec2(tok::tile + 4.0f, 0)))
+         if (ActionButton::Draw("##transportrewind", ImVec2(tok::tile + 4.0f, 0)))
             transport.Rewind();
          {
             ImDrawList* dl = ImGui::GetWindowDrawList();

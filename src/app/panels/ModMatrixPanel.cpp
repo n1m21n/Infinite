@@ -618,7 +618,7 @@ namespace app
                   // icon-button in the app already behaves).
                   ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
-                  if (ImGui::Button("##unbindmod", ImVec2(btnW, 0)))
+                  if (ActionButton::Draw("##unbindmod", ImVec2(btnW, 0)))
                   {
                      PushUndoCheckpoint();
                      mod.Unbind(dstIndex, dstParam);
@@ -761,7 +761,7 @@ namespace app
                {
                   ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
-                  if (ImGui::Button("##unbindexpr", ImVec2(btnW, 0)))
+                  if (ActionButton::Draw("##unbindexpr", ImVec2(btnW, 0)))
                   {
                      PushUndoCheckpoint();
                      mod.ClearExpression(dstIndex, dstParam);
@@ -894,7 +894,7 @@ namespace app
                {
                   ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
-                  if (ImGui::Button("##unbindrec", ImVec2(btnW, 0)))
+                  if (ActionButton::Draw("##unbindrec", ImVec2(btnW, 0)))
                   {
                      rec.StopPlayback(dstIndex, dstParam);
                      unboundRec = true;
