@@ -95,7 +95,7 @@ Status: `todo`, `ok` (checked, matches), `fixed <sha>`, `decision` (needs owner)
 | Prediction | 8 (dark only) | fixed | todo | Fixed: Predictive LFO scope shows "no targets" at rest; "NN% conf" badge no longer overprints the stat on 200 pt nodes (stat shortens, shared FitStatBesideConf); Predictive Notes Learn button = one grid cell, idle "learning meter" label, 4 pt gap above knobs. Light/collapsed/modulated/high-contrast not shot. |
 | Macros | XY pad now uses the wide macro cell (XY, Step Gate, Radio share one width); other 8 ok, dark + light shot. Left: Toggle/Trigger onto Switch/ActionButton, rename on caption double-click | done | done | dark+light |
 | Effects (image) | 24 shot dark (blurs, distortions, glow, crop); share one frame/preview | fixed | todo | Fixed: filter titles spaced via DisplayName (gaussian blur, add noise...); patch keys unchanged. Displace (2 inputs) has no bypass, per rule. Params panel not shot |
-| Compositing | | todo | todo | |
+| Compositing | 16 shot dark (Fit..Audio Color Ramp + invert/opacity/drop shadow) | ok | todo | Same frame/preview as Effects; multi-input nodes have no bypass per rule; node width follows title length (reaction diffusion, remove background slightly wider) - left |
 | Source | | todo | todo | |
 | 3D / geometry | Render 3D worst case | todo | todo | |
 | Utility | | todo | todo | |
