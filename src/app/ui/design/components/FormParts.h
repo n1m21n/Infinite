@@ -39,8 +39,8 @@ namespace FormParts
       const bool hov = ImGui::IsItemHovered();
       const ImVec2 c(p.x + d * 0.5f, p.y + d * 0.5f);
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)));
-      dl->AddCircle(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(0, 0, 0, 0.18f)), 0, 1.0f);
+      dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), 48);   // 48 segments: the auto count facets a 9 px circle
+      dl->AddCircle(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(0, 0, 0, 0.18f)), 48, 1.0f);
       if (click)
          ImGui::OpenPopup(id);
       bool changed = false;

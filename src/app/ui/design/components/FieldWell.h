@@ -212,9 +212,9 @@ namespace FieldWell
          if (hov && names != nullptr) ImGui::SetTooltip("%s", names[i]);
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(p.x + d * 0.5f, p.y + d * 0.5f);
-         dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), cols[i]);
+         dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), cols[i], 48);
          if (i == selected)
-            dl->AddCircle(c, d * 0.5f + 2.0f, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.9f)), 0, 1.5f);
+            dl->AddCircle(c, d * 0.5f + 2.0f, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.9f)), 48, 1.5f);
          ImGui::PopID();
       }
       return clicked;

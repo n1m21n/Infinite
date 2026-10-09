@@ -1,6 +1,8 @@
 // DialogParts: the one modal dialog layout. No title bar; a medium-weight title, dimmed message lines, then a
 // right-aligned button row where the last button is the primary (accent) action. Same elevated panel as Settings.
 #pragma once
+#include <algorithm>
+#include <cstring>
 #include <initializer_list>
 #include "app/AppShared.h"
 #include "app/ui/design/UiType.h"
@@ -10,15 +12,16 @@
 
 namespace DialogParts
 {
-   constexpr float kButtonW = 104.0f;
+   constexpr float kButtonMinW = 72.0f;   // buttons hug their label, never stretch
+   constexpr float kButtonH = 24.0f;
 
    // Call after OpenPopup; pair a true result with End().
    inline bool Begin(const char* name)
    {
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSizeConstraints(ImVec2(360.0f, 0.0f), ImVec2(560.0f, 4000.0f));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(280.0f, 0.0f), ImVec2(480.0f, 4000.0f));
       app::PushElevatedPanelStyle(false);
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_5, tok::space_5));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
       const bool open = ImGui::BeginPopupModal(name, nullptr,
          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings);
       ImGui::PopStyleVar();
@@ -44,9 +47,17 @@ namespace DialogParts
    // Right-aligned row; returns the clicked index or -1. The last label is the primary action.
    inline int Buttons(std::initializer_list<const char*> labels)
    {
-      ImGui::Dummy(ImVec2(0.0f, tok::space_4));
+      ImGui::Dummy(ImVec2(0.0f, tok::space_2));
       const int n = (int)labels.size();
-      const float total = kButtonW * n + tok::space_2 * (n - 1);
+      // Labels may carry a "##id" suffix (L()); measure only what is shown.
+      const auto widthOf = [](const char* l)
+      {
+         const char* end = std::strstr(l, "##");
+         return std::max(kButtonMinW, ImGui::CalcTextSize(l, end).x + 2.0f * tok::space_3);
+      };
+      float total = tok::space_2 * (n - 1);
+      for (const char* l : labels)
+         total += widthOf(l);
       const float avail = ImGui::GetContentRegionAvail().x;
       if (avail > total)
          ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - total);
@@ -55,7 +66,7 @@ namespace DialogParts
       {
          if (i > 0)
             ImGui::SameLine(0.0f, tok::space_2);
-         if (ChipButton::Draw(l, i == n - 1, FormParts::kRowH, kButtonW))
+         if (ChipButton::Draw(l, i == n - 1, kButtonH, widthOf(l)))
             clicked = i;
          ++i;
       }
