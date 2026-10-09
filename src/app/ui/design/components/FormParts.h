@@ -22,6 +22,7 @@ namespace FormParts
 {
    constexpr float kLabelW = 200.0f;
    constexpr float kControlW = 220.0f;
+   constexpr float kSliderW = 150.0f;   // a bar with one number needs less run than a dropdown
    constexpr float kRowH = 28.0f;
 
    // The hairline edge every surface carries (same value the Library wells use).
@@ -176,14 +177,14 @@ namespace FormParts
    inline bool SliderFloat(const char* label, float* v, float lo, float hi, const char* fmt = "%.3f", ImGuiSliderFlags fl = 0)
    {
       Label(label);
-      ImGui::SetNextItemWidth(kControlW);
+      ImGui::SetNextItemWidth(kSliderW);
       return FieldWell::Slider(Id(label).c_str(), v, lo, hi, fmt, fl);
    }
 
    inline bool SliderInt(const char* label, int* v, int lo, int hi, const char* fmt = "%d", ImGuiSliderFlags fl = 0)
    {
       Label(label);
-      ImGui::SetNextItemWidth(kControlW);
+      ImGui::SetNextItemWidth(kSliderW);
       return FieldWell::Slider(Id(label).c_str(), v, lo, hi, fmt, fl);
    }
 
