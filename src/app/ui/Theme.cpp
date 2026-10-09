@@ -450,9 +450,26 @@ namespace app
       style.Colors[ImGuiCol_ScrollbarGrab] = vec(t.text, 0.22f);
       style.Colors[ImGuiCol_ScrollbarGrabHovered] = vec(t.text, 0.40f);
       style.Colors[ImGuiCol_ScrollbarGrabActive] = vec(t.text, 0.55f);
-      style.Colors[ImGuiCol_CheckMark] = vec(t.accent);
-      style.Colors[ImGuiCol_SliderGrab] = vec(t.accent, 0.85f);
-      style.Colors[ImGuiCol_SliderGrabActive] = vec(t.accent);
+      // G15: the checked / active control colour keeps 3:1 against the panel. Pulled toward the text colour only
+      // as far as needed, so themes whose accent already passes are unchanged.
+      ImVec4 ctrlAccent = vec(t.accent);
+      {
+         auto lum = [](float r, float g, float b) {
+            auto f = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
+            return 0.2126f * f(r) + 0.7152f * f(g) + 0.0722f * f(b);
+         };
+         const float panelL = lum(t.panelBg.r, t.panelBg.g, t.panelBg.b);
+         for (float k = 0.0f; k < 1.0f; k += 0.05f)
+         {
+            ctrlAccent = ImVec4(t.accent.r + (t.text.r - t.accent.r) * k, t.accent.g + (t.text.g - t.accent.g) * k,
+                                t.accent.b + (t.text.b - t.accent.b) * k, 1.0f);
+            const float l = lum(ctrlAccent.x, ctrlAccent.y, ctrlAccent.z);
+            if ((std::max(l, panelL) + 0.05f) / (std::min(l, panelL) + 0.05f) >= 3.0f) break;
+         }
+      }
+      style.Colors[ImGuiCol_CheckMark] = ctrlAccent;
+      style.Colors[ImGuiCol_SliderGrab] = ImVec4(ctrlAccent.x, ctrlAccent.y, ctrlAccent.z, 0.85f);
+      style.Colors[ImGuiCol_SliderGrabActive] = ctrlAccent;
       // Idle Button was pinned to the exact same color as the panel it sits
       // on (panelBg, no offset) - a button was distinguishable from plain
       // text only once hovered, so buttons like "Show all cables" or

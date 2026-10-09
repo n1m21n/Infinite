@@ -1601,6 +1601,10 @@ void FrameTest_THEMECONTRASTTEST(int frameId, GLFWwindow* window)
             const bool good = lowest >= 4.499f;
             ok = ok && good;
             printf("[THEMECONTRASTTEST] %-18s lowest %.2f  %s\n", names[i].c_str(), lowest, good ? "ok" : "FAIL");
+            // G15 non-text: the accent (checked / active state) vs panel. Reported only; the recessed frame fill is
+            // deliberately quiet (node-ui-pillars P10), so 3:1 applies to the active state, not the resting frame.
+            printf("[THEMECONTRASTTEST]   accent/panel %.2f%s\n", CategoryColors::ContrastRatio(t.accent, t.panelBg),
+                   CategoryColors::ContrastRatio(t.accent, t.panelBg) < 3.0f ? "  below 3:1" : "");
          }
          printf("[THEMECONTRASTTEST] %s\n", ok ? "THEMECONTRASTTEST OK" : "THEMECONTRASTTEST FAIL");
          glfwSetWindowShouldClose(window, GLFW_TRUE);
