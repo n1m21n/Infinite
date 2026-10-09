@@ -179,6 +179,9 @@ std::string NodeTitle(const GraphNode& gn);
 
 void PushUndoCheckpoint();
 
+// Same, with a name for the history panel and the Edit menu ("Move node"). A null or empty label is derived later.
+void PushUndoCheckpoint(const char* label);
+
 extern bool gSuppressUndoCheckpoints;
 
 void PushArrangeUndo();
@@ -5280,6 +5283,8 @@ void LoadWorkspaceSettings();
 
 void SaveWorkspaceSettings();
 
+void PersistPanelLayoutIfChanged();
+
 void LoadAudioSettings();
 
 void SaveAudioSettings();
@@ -5330,6 +5335,9 @@ extern bool gSuppressUndoCheckpoints;
       // here, so the two entry kinds coexist with no remapping.
       bool arrangeOnly = false;
       Arrange::Model arrange;
+      // What the edit this entry undoes was called ("Move node"). Empty until named: a call site that passed no label
+      // gets one derived from the before/after patches the first time something shows it. Never written to a patch.
+      std::string label;
    };
 
 extern std::deque<UndoEntry> gUndoStack;
@@ -5427,9 +5435,20 @@ void NoteGraphEditedForLiveIssues();
 
 void RefreshLiveIssues();
 
-void PushUndoSnapshot(Patch::Data snapshot);
+void PushUndoSnapshot(Patch::Data snapshot, const char* label = nullptr);
 
 void PushUndoCheckpoint();
+
+void PushUndoCheckpoint(const char* label);
+
+// History panel and menu. Labels of the undo stack, newest first / the redo stack, nearest first.
+std::string UndoLabelAt(size_t indexFromTop);
+std::string RedoLabelAt(size_t indexFromNearest);
+// Moves the document `undos` steps back (positive) or `redos` forward by repeating Undo/Redo, one status line at the end.
+void JumpInHistory(int undos, int redos);
+extern bool gHistoryOpen;
+extern float gHistoryWidth;
+void DrawHistoryDocked(const char* id, const ImVec2& size);
 
 extern Patch::Data gDragStartSnapshot;
 
@@ -5905,6 +5924,7 @@ int RunVST3BlocklistTest();
 #endif
 
 void RunRpcBatchTest();
+void RunHistoryTest();
 
 void RunPatchWatchTest();
 

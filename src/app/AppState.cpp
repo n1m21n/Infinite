@@ -432,6 +432,8 @@ bool gHeadlessNeedProbe = false;
    // active modulation binding. Session UI state only, like gNodePanelOpen
    // above - not serialized to patch data or tracked by undo.
    bool  gModMatrixOpen = false;
+   bool  gHistoryOpen = false;
+   float gHistoryWidth = 300.0f;
 
    int   gModMatrixDock = 0;
               // 0 = bottom, 1 = right, 2 = left, 3 = top

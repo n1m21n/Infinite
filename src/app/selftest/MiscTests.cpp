@@ -1422,6 +1422,83 @@ int RunVST3BlocklistTest()
 // is one of the two that triggers the redirect) rather than reimplementing
 // the check, so a regression in the real function is what this catches.
 // Headless like PLUGINSCANTEST above - no GL/ImGui needed.
+// ====================================================== INFINITE_HISTORYTEST
+//
+// Block I1: undo entries carry names (explicit or derived from the before/after patches), a jump through history lands
+// on the right state, redo entries survive until a new edit, and no label is ever written into a patch.
+void RunHistoryTest()
+{
+   using json = nlohmann::json;
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+   auto Call = [&](const char* m, const json& p, json& r, std::string& e) { return HandleRpcCommand(m, p, r, e); };
+   json r;
+   std::string e;
+
+   NewPatch();
+   // Five different edits.
+   Call("create_node", { {"typeName", "Shape"}, {"category", "Source"} }, r, e);                 // 1 add Shape
+   const int shapeIdx = r.value("index", -1);
+   Call("create_node", { {"typeName", "Output"}, {"category", "Utility"} }, r, e);               // 2 add Output
+   const int outIdx = r.value("index", -1);
+   json prm;
+   Call("get_params", { {"index", shapeIdx} }, prm, e);
+   std::string floatName;
+   for (auto it = prm.begin(); it != prm.end() && floatName.empty(); ++it)
+      if (it.key().rfind("f ", 0) == 0)
+         floatName = it.key().substr(2);
+   Call("set_param", { {"index", shapeIdx}, {"name", floatName}, {"value", 0.37} }, r, e);        // 3 param edit
+   if (GraphNode* gn = FindNodeByIndex(shapeIdx))
+   {
+      PushUndoCheckpoint("Bypass");                                                              // 4 bypass
+      gn->node->bypassed = true;
+   }
+   RemoveNodeByIndex(outIdx);                                                                     // 5 delete Output (pushes its own checkpoint)
+
+   Check("five edits are on the undo stack", gUndoStack.size() == 5);
+   const std::string l0 = UndoLabelAt(0), l1 = UndoLabelAt(1), l2 = UndoLabelAt(2), l3 = UndoLabelAt(3), l4 = UndoLabelAt(4);
+   printf("  labels newest first: %s | %s | %s | %s | %s\n", l0.c_str(), l1.c_str(), l2.c_str(), l3.c_str(), l4.c_str());
+   Check("explicit labels are kept", l0.find("Delete") == 0 && l1 == "Bypass");
+   Check("a param edit is named by what changed", l2.find(floatName) == 0 && l2.find("0.37") != std::string::npos);
+   Check("an added node is named by its type", l3 == "Add Output" && l4 == "Add Shape");
+
+   // Save and load: labels are not in the file, and loading clears the history.
+   const std::string path = "/tmp/infinite_history_test.inf";
+   SavePatchTo(path);
+   std::string text;
+   {
+      std::ifstream in(path);
+      text.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+   }
+   Check("labels are not serialised", text.find("Bypass") == std::string::npos && text.find("Delete") == std::string::npos &&
+                                         text.find("Add Output") == std::string::npos);
+
+   // Jump to the state right after edit 3 (two undos): Output is back, Shape is not bypassed.
+   JumpInHistory(2, 0);
+   Check("jump back applies two undos", gUndoStack.size() == 3 && gRedoStack.size() == 2);
+   Check("jump back landed on the right state", gNodes.size() == 2 && FindNodeByIndex(shapeIdx) != nullptr && !FindNodeByIndex(shapeIdx)->node->bypassed);
+   Check("redo entries keep their names", RedoLabelAt(0) == "Bypass" && RedoLabelAt(1).find("Delete") == 0);
+   Check("undo entry names survive the jump", UndoLabelAt(0).find(floatName) == 0);
+
+   // Jump forward one: the bypass is back.
+   JumpInHistory(0, 1);
+   Check("jump forward re-applies the redo", FindNodeByIndex(shapeIdx) != nullptr && FindNodeByIndex(shapeIdx)->node->bypassed && gRedoStack.size() == 1);
+
+   // A new edit drops the redo side.
+   PushUndoCheckpoint("Edit");
+   Check("a new edit clears redo", gRedoStack.empty());
+
+   SavePatchTo(path);
+   Check("loading clears history", LoadPatchFrom(path) && gUndoStack.empty() && gRedoStack.empty());
+   remove(path.c_str());
+   printf("HISTORYTEST %s\n", ok ? "OK" : "FAIL");
+}
+
 // ====================================================== INFINITE_RPCBATCHTEST
 //
 // R495: the live RPC methods, driven through the real HandleRpcCommand.

@@ -1,5 +1,6 @@
 // Patch load, auto layout, field graph regenerate, undo/redo, copy/paste (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/UndoDescribe.h"
 #include "core/Notices.h"
 
 namespace app
@@ -786,7 +787,7 @@ namespace app
    }
 
 
-   void PushUndoSnapshot(Patch::Data snapshot)
+   void PushUndoSnapshot(Patch::Data snapshot, const char* label)
    {
       if (gSuppressUndoCheckpoints)
          return;
@@ -795,6 +796,8 @@ namespace app
       // one that captures its Patch::Data early (the node drag) cannot change
       // a recording in between, so "now" is the pre-mutation state either way.
       gUndoStack.push_back({ std::move(snapshot), GestureRecorder::Instance().Playbacks() });
+      if (label != nullptr)
+         gUndoStack.back().label = label;
       if (gUndoStack.size() > kMaxUndoDepth)
          gUndoStack.pop_front();
       // A fresh action invalidates whatever redo history pointed at a future
@@ -812,6 +815,48 @@ namespace app
       if (gSuppressUndoCheckpoints)
          return;
       PushUndoSnapshot(BuildPatchData());
+   }
+
+
+   void PushUndoCheckpoint(const char* label)
+   {
+      if (gSuppressUndoCheckpoints)
+         return;
+      PushUndoSnapshot(BuildPatchData(), label);
+   }
+
+
+   // Label of the i-th undo entry from the top (0 = the edit Undo would undo now). A call site that gave no label
+   // gets one from comparing this entry's state with the next one (or the live graph, for the top), then keeps it.
+   std::string UndoLabelAt(size_t i)
+   {
+      if (i >= gUndoStack.size())
+         return std::string();
+      UndoEntry& e = gUndoStack[gUndoStack.size() - 1 - i];
+      if (e.label.empty())
+      {
+         if (e.arrangeOnly)
+            return "Edit timeline";
+         // The top entry's "after" is the live graph, which keeps changing: derive but do not cache it.
+         const bool top = (i == 0);
+         const std::string derived =
+            top ? UndoDescribe::Change(e.patch, BuildPatchData())
+                : (gUndoStack[gUndoStack.size() - i].arrangeOnly ? std::string("Edit")
+                                                                 : UndoDescribe::Change(e.patch, gUndoStack[gUndoStack.size() - i].patch));
+         if (!top)
+            e.label = derived;
+         return derived;
+      }
+      return e.label;
+   }
+
+
+   std::string RedoLabelAt(size_t i)
+   {
+      if (i >= gRedoStack.size())
+         return std::string();
+      const UndoEntry& e = gRedoStack[gRedoStack.size() - 1 - i];
+      return e.label.empty() ? std::string("Edit") : e.label;
    }
 
 
@@ -1421,18 +1466,21 @@ namespace app
    {
       if (gUndoStack.empty())
          return;
+      const std::string what = UndoLabelAt(0);
       if (gUndoStack.back().arrangeOnly)
       {
          UndoEntry prev = std::move(gUndoStack.back());
          gUndoStack.pop_back();
          ApplyArrangeOnlyEntry(prev);
+         prev.label = what;
          gRedoStack.push_back(std::move(prev));
          gPatchDirty = true;
-         gPatchStatus = "Undo";
+         gPatchStatus = "Undo " + what;
          return;
       }
       MovementLog::NoteMark(MovementLog::Mark::Undo);
       gRedoStack.push_back({ BuildPatchData(), GestureRecorder::Instance().Playbacks() });
+      gRedoStack.back().label = what;
       UndoEntry prev = std::move(gUndoStack.back());
       gUndoStack.pop_back();
       std::map<int, int> remap;
@@ -1446,7 +1494,7 @@ namespace app
       // the recorder, so restoring earlier would just be wiped.
       GestureRecorder::Instance().Restore(RemapGestures(prev.gestures, remap), GestureClockNow());
       gPatchDirty = true;
-      gPatchStatus = "Undo";
+      gPatchStatus = "Undo " + what;
    }
 
 
@@ -1454,18 +1502,21 @@ namespace app
    {
       if (gRedoStack.empty())
          return;
+      const std::string what = RedoLabelAt(0);
       if (gRedoStack.back().arrangeOnly)
       {
          UndoEntry next = std::move(gRedoStack.back());
          gRedoStack.pop_back();
          ApplyArrangeOnlyEntry(next);
+         next.label = what;
          gUndoStack.push_back(std::move(next));
          gPatchDirty = true;
-         gPatchStatus = "Redo";
+         gPatchStatus = "Redo " + what;
          return;
       }
       MovementLog::NoteMark(MovementLog::Mark::Redo);
       gUndoStack.push_back({ BuildPatchData(), GestureRecorder::Instance().Playbacks() });
+      gUndoStack.back().label = what;
       UndoEntry next = std::move(gRedoStack.back());
       gRedoStack.pop_back();
       std::map<int, int> remap;
@@ -1477,6 +1528,16 @@ namespace app
       gArrangeMarkerDragId = 0; // a flag drag's gesture just closed too
       GestureRecorder::Instance().Restore(RemapGestures(next.gestures, remap), GestureClockNow());
       gPatchDirty = true;
-      gPatchStatus = "Redo";
+      gPatchStatus = "Redo " + what;
+   }
+
+
+   void JumpInHistory(int undos, int redos)
+   {
+      for (int i = 0; i < undos && !gUndoStack.empty(); i++)
+         Undo();
+      for (int i = 0; i < redos && !gRedoStack.empty(); i++)
+         Redo();
+      gPatchStatus = "History: jumped " + std::to_string(undos > 0 ? undos : redos) + (undos > 0 ? " back" : " forward");
    }
 }

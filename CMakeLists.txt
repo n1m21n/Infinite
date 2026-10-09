@@ -458,6 +458,7 @@ set(COMMON_SOURCES
     src/app/panels/FindOverlay.cpp
     src/app/panels/CookOverlay.cpp
     src/app/panels/NoticeStack.cpp
+    src/app/panels/HistoryPanel.cpp
     src/app/panels/TemplatesWindow.cpp
     src/app/panels/Diagnostics.cpp
     src/app/panels/ModMatrixPanel.cpp
@@ -491,6 +492,7 @@ set(COMMON_SOURCES
     src/core/CategoryColors.cpp
     src/core/CookProbe.cpp
     src/core/Notices.cpp
+    src/core/UndoDescribe.cpp
     src/core/I18n.cpp
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp

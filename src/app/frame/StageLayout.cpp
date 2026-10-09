@@ -89,6 +89,7 @@ void DrawLayout(FrameCtx& fc)
       }
 
       kNodePanelWidth = 360.0f;
+      PersistPanelLayoutIfChanged();
       const bool viewportPanelOpen = gViewportPanelOpen;
       viewportBottom = viewportPanelOpen && gViewportPanelDock == 0;
       viewportRight = viewportPanelOpen && gViewportPanelDock == 1;
@@ -333,6 +334,11 @@ void DrawLayout(FrameCtx& fc)
       if (matrixRight) rightReserved += gModMatrixWidth;
       if (perfRight) rightReserved += gPerfPanelWidth;
       if (arrangeRight) rightReserved += gArrangePanelWidth;
+      if (gHistoryOpen)
+      {
+         gHistoryWidth = std::min(gHistoryWidth, std::max(220.0f, ImGui::GetContentRegionAvail().x * 0.5f));
+         rightReserved += gHistoryWidth;
+      }
       const float graphWidth = rightReserved > 0.0f
                                   ? std::max(200.0f, ImGui::GetContentRegionAvail().x - rightReserved)
                                   : 0.0f;

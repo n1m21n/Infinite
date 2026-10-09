@@ -16,7 +16,7 @@ Rule held throughout: fixes go in shared code, never behind `#ifdef` in a compon
 | HiDPI / UI scale | `glfwSetWindowContentScaleCallback` calls `UiScale::RequestRescale` (`Startup.cpp`) | Same callback | Same callback | Shared. `UISCALETEST` has one known failure (Render 3D width at 1.25), already in the leftovers list |
 | Cmd vs Ctrl | `MODKEY` is `Cmd` | `Ctrl` | `Ctrl` | One macro in `AppCommon.h`; menus and tooltips build labels from it |
 | File dialogs | `Platform::OpenPatchDialog` in `Platform.mm` | `PlatformWin.cpp` | `PlatformLinux.cpp` | Three implementations behind one `Platform::` signature; not exercised off macOS |
-| Panel docks and open panels across restart | `imgui.ini` in the settings directory (`Startup.cpp`) | Same path logic | Same path logic | Shared. Survival on Win/Linux not exercised |
+| Panel docks and open panels across restart | Dock side/size and open state were not saved; now `panel*` keys in `Infinite.workspace-settings` (`PatchIO.cpp`, debounced) | Same file, same code | Same file, same code | **Fixed** in shared code. Not exercised across a restart on Win/Linux |
 | Projector on a display with another scale | Framebuffer size is read every frame before drawing | Same | Same | Shared; redraw size follows the framebuffer, not the window size |
 | **Display unplugged under a fullscreen projector** | Window kept its stale fullscreen state, nothing re-placed it | Same | Same | **Fixed** (below) |
 | **Display returns** | Output stayed where the OS had left it | Same | Same | **Fixed** (below) |

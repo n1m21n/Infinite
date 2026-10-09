@@ -956,7 +956,7 @@ namespace app
          return false;
       }
 
-      PushUndoCheckpoint();
+      PushUndoCheckpoint("Connect cable");
       WireInputSlot(*srcNode, *dstNode, dstSlot, srcOutputIndex);
       if (srcIsAudioNode || srcIsNoteSource ||
           dstNode->node->AudioInputSlot(dstSlot) != nullptr ||

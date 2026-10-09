@@ -39,6 +39,9 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railArrange", groupTop + 3.0f * step, IconsInfinite::Cube, nullptr, gArrangePanelOpen,
                        T("Arrangement timeline")))
       gArrangePanelOpen = !gArrangePanelOpen;
+   if (PanelRail::Item("##railHistory", groupTop + 4.0f * step, IconsInfinite::History, nullptr, gHistoryOpen,
+                       T("Edit history - jump back to any earlier edit")))
+      gHistoryOpen = !gHistoryOpen;
    PanelRail::End();
 }
 
@@ -208,10 +211,16 @@ void DrawMenuBar(FrameCtx& fc)
             if (GroupTile(L("Edit")))
          {
             MenuParts::BeginContent();
-            if (MenuParts::Item(L("Undo"), MODKEY "+Z", false, !gUndoStack.empty()))
-               Undo();
-            if (MenuParts::Item(L("Redo"), MODKEY "+Shift+Z", false, !gRedoStack.empty()))
-               Redo();
+            {
+               // "Undo Move node": the item names the edit it would undo.
+               const std::string undoText = gUndoStack.empty() ? std::string(L("Undo")) : std::string(L("Undo")) + " " + UndoLabelAt(0);
+               const std::string redoText = gRedoStack.empty() ? std::string(L("Redo")) : std::string(L("Redo")) + " " + RedoLabelAt(0);
+               if (MenuParts::Item(undoText.c_str(), MODKEY "+Z", false, !gUndoStack.empty()))
+                  Undo();
+               if (MenuParts::Item(redoText.c_str(), MODKEY "+Shift+Z", false, !gRedoStack.empty()))
+                  Redo();
+               MenuParts::Check(L("History"), &gHistoryOpen);
+            }
             MenuParts::Separator();
             if (MenuParts::Item(L("Cut / Copy"), MODKEY "+C"))
                gRequestCopy = true;

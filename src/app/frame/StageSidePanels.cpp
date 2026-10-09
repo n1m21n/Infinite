@@ -305,6 +305,12 @@ void DrawSidePanels(FrameCtx& fc)
          DrawArrangePanelDocked("##arrangepanel_right", ImVec2(gArrangePanelWidth, graphHeight));
       }
 
+      // Right-docked edit history (always right; Edit > History or Shift+U)
+      if (gHistoryOpen)
+      {
+         DrawHistoryDocked("##historypanel_right", ImVec2(gHistoryWidth, graphHeight));
+      }
+
       // ---- node browser / search panel ----
       // Always sticks to the rightmost edge of the window
       if (gNodePanelOpen)

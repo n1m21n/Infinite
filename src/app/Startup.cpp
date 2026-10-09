@@ -1091,6 +1091,13 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
                                        : settingsDir + "/InfiniteEqDragTest.json";
       remove(graphPath.c_str());
    }
+   else if (getenv("INFINITE_EXITAFTER") != nullptr && getenv("IMAGERESYNTH_SCREENSHOT") == nullptr)
+   {
+      // Any other headless fixture: start from the default view and never leave a pan/zoom behind for the next one
+      // (FINDTEST and the drag tests move the camera; later fixtures read FrameParams, which needs their nodes on screen).
+      graphPath = settingsDir.empty() ? std::string("InfiniteSelfTest.json") : settingsDir + "/InfiniteSelfTest.json";
+      remove(graphPath.c_str());
+   }
    else if (!graphPath.empty())
    {
       if (FILE* f = fopen(graphPath.c_str(), "rb"))
@@ -3834,6 +3841,11 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gPerfPanelOpen = o.find("perf") != std::string::npos;
       gViewportPanelOpen = o.find("viewport") != std::string::npos;
       gNodePanelOpen = o.find("library") != std::string::npos;
+      gHistoryOpen = o.find("history") != std::string::npos;
+      // "historydemo": a few named edits so the History panel has rows for a review shot.
+      if (o.find("historydemo") != std::string::npos)
+         for (const char* l : {"Add Shape", "Move node", "Connect cable", "amount 0.20 \xE2\x86\x92 0.55", "Bypass"})
+            PushUndoCheckpoint(l);
       // "dock=N" (0 bottom, 1 right, 2 left, 3 top): put every docked panel on that side for review shots.
       if (const size_t dk = o.find("dock="); dk != std::string::npos)
       {

@@ -574,6 +574,7 @@ namespace app
          { I18N_KEY("Canvas & View"), I18N_KEY("Rubber-band Select"), "Shift + Drag", I18N_KEY("Select multiple nodes in box") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Toggle Params"), "Shift+H", I18N_KEY("Show / hide parameter knobs & sliders") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Viewport Panel"), "Shift+V", I18N_KEY("Toggle viewport panel (or dock selected nodes)") },
+         { I18N_KEY("Edit & Canvas"), I18N_KEY("Edit History"), "Shift+U", I18N_KEY("Toggle the docked list of edits; click one to jump to it") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Modulation Matrix"), "Shift+M", I18N_KEY("Toggle docked modulation matrix") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Performance Matrix"), "Shift+P", I18N_KEY("Toggle docked performance matrix") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Arrangement Timeline"), "Shift+T", I18N_KEY("Toggle docked arrangement timeline") },
