@@ -96,7 +96,18 @@ namespace FieldWell
       PushStyle();
       ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
+      // The text field gets a quiet accent edge instead of ImGui's bright blue nav ring.
+      const bool typing = editing || sTypeId == id;
+      if (typing)
+      {
+         ImVec4 ac = app::AccentEmphasisSelected();
+         ac.w = 0.6f;
+         ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_Border, ac);
+      }
       const bool r = ImGui::SliderScalar(label, dt, v, &lo, &hi, fmt, fl | ImGuiSliderFlags_AlwaysClamp);
+      if (typing)
+         ImGui::PopStyleColor(2);
       ImGui::PopStyleColor(2);
       PopStyle();
       return r || restored;
