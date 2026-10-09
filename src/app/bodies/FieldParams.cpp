@@ -184,6 +184,7 @@ namespace app
 
    void DrawFieldElementParams(FieldElementNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them
       n->SetNodeIndex(gCurrentNodeIndex);
 
       if (!gParamRegisterOnly)
@@ -258,6 +259,7 @@ namespace app
 
    void DrawFieldPrimitiveParams(FieldPrimitiveNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them
       n->SetNodeIndex(gCurrentNodeIndex);
 
       if (!gParamRegisterOnly)
@@ -336,6 +338,7 @@ namespace app
 
    void DrawFieldSampleParams(FieldSampleNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them
       n->SetNodeIndex(gCurrentNodeIndex);
 
       if (!gParamRegisterOnly)
@@ -400,6 +403,7 @@ namespace app
 
    void DrawFieldSynthParams(FieldSynthNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them
       n->SetNodeIndex(gCurrentNodeIndex);
 
       if (!gParamRegisterOnly)
@@ -472,6 +476,7 @@ namespace app
 
    void DrawFieldGraphParams(FieldGraphNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them
       n->SetNodeIndex(gCurrentNodeIndex);
 
       if (!gParamRegisterOnly)
@@ -549,6 +554,7 @@ namespace app
 
    void DrawFieldPixelParams(FieldPixelNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them
       n->SetNodeIndex(gCurrentNodeIndex);
 
       if (!gParamRegisterOnly)
