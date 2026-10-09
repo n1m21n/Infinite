@@ -1160,7 +1160,8 @@ namespace app
          else
             snprintf(timeText, sizeof(timeText), "%.0f ms", totalMs);
          const ImVec2 tsz = ImGui::CalcTextSize(timeText);
-         dl->AddText(ImVec2(br.x - 6.0f - tsz.x, br.y - 4.0f - tsz.y),
+         // Top-right: the release segment always ends at the bottom-right, so a label there sat on the curve and the end handle.
+         dl->AddText(ImVec2(br.x - 6.0f - tsz.x, origin.y + 4.0f),
                      isLight ? tok::U32(tok::pal::c_3C4455A0) : tok::U32(tok::pal::c_8C96AC8C), timeText);
       }
 
