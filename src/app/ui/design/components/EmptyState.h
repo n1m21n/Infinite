@@ -54,6 +54,16 @@ namespace EmptyState
       }
    }
 
+   // The node-body variant: one centred Caption-size line (previews and scopes are small, so no Body weight).
+   inline void DrawCaption(const ImVec2& min, const ImVec2& max, const char* message)
+   {
+      UiType::Scope cap(UiType::Size::Caption);
+      const ImVec2 ts = ImGui::CalcTextSize(message);
+      const float cx = (min.x + max.x) * 0.5f;
+      const float maxW = std::max(40.0f, max.x - min.x - 2.0f * tok::space_2);
+      DrawWrapped(ImGui::GetWindowDrawList(), cx, (min.y + max.y) * 0.5f - ts.y * 0.5f, maxW, ImGui::GetColorU32(ImGuiCol_TextDisabled), message);
+   }
+
    // Convenience: centred in the current window's content area.
    inline void DrawInWindow(const char* message, const char* hint = nullptr)
    {

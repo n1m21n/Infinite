@@ -4,11 +4,21 @@ namespace
 {
    using T = FilterParamDef::Type;
 
+   // UI labels are lowercase app-wide; the stored key is uniformName, so this never touches a saved patch.
+   std::string Lower(const char* s)
+   {
+      std::string out(s);
+      for (char& c : out)
+         if (c >= 'A' && c <= 'Z')
+            c = (char)(c - 'A' + 'a');
+      return out;
+   }
+
    FilterParamDef E(const char* label, const char* uniform,
                     std::vector<std::string> options, int defaultIndex = 0)
    {
       FilterParamDef p;
-      p.label = label;
+      p.label = Lower(label);
       p.uniformName = uniform;
       p.type = FilterParamDef::Type::Enum;
       p.minVal = 0.0f;
@@ -21,7 +31,7 @@ namespace
    FilterParamDef P(const char* label, const char* uniform, T type, float minV, float maxV, float def0, float def1 = 0, float def2 = 0, bool isDegrees = false)
    {
       FilterParamDef p;
-      p.label = label;
+      p.label = Lower(label);
       p.uniformName = uniform;
       p.type = type;
       p.minVal = minV;
@@ -38,7 +48,7 @@ namespace
    // readable (e.g. a combined color-adjustments node).
    FilterParamDef S(const char* section, FilterParamDef p)
    {
-      p.sectionLabel = section;
+      p.sectionLabel = Lower(section);
       return p;
    }
 

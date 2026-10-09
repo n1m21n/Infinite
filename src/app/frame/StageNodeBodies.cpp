@@ -229,7 +229,7 @@ void DrawNodeBodies(FrameCtx& fc)
                if (const char* named = gn.node->InputLabel(slot))
                   snprintf(label, sizeof(label), "%s", named);
                else if (inputs == 1)
-                  label[0] = '\0';
+                  snprintf(label, sizeof(label), "in"); // R6: no bare pin dot
                else
                   snprintf(label, sizeof(label), "%c", 'A' + slot);
                const float thisW = kPinHit + 4.0f + ImGui::CalcTextSize(label).x;

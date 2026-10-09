@@ -1,4 +1,5 @@
 // Sampler, slicer, molder, granular, drum sequencer, looper and MPC bodies (moved verbatim from main.cpp).
+#include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -820,8 +821,7 @@ namespace app
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(),
-                     n->IsAnalyzing() ? "analyzing..." : "no sample loaded");
+         EmptyState::DrawCaption(origin, br, n->IsAnalyzing() ? "analyzing..." : "no sample loaded");
       }
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
@@ -1098,8 +1098,7 @@ namespace app
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(),
-                     n->IsRendering() ? "molding..." : "no sample loaded");
+         EmptyState::DrawCaption(origin, br, n->IsRendering() ? "molding..." : "no sample loaded");
       }
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
@@ -2657,7 +2656,7 @@ namespace app
                }
             }
             else
-               dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
+               EmptyState::DrawCaption(origin, br, "no sample loaded");
             dl->PopClipRect();
             AudioViz::Border(dl, origin, br, (!has && hov) ? (isLight ? tok::U32(tok::pal::c_3264E6FF) : tok::U32(tok::pal::c_6EA0FFFF)) : 0);
             if (!has && hov)

@@ -1,4 +1,5 @@
 // Comment, group, draw and preview node bodies (moved verbatim from main.cpp).
+#include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
@@ -619,8 +620,7 @@ namespace app
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 10, origin.y + size * 0.5f - 8),
-                     tok::U32(tok::pal::c_787887FF), EmptyPreviewLabel(node, "no input"));
+         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(node, "no input"));
       }
 
       if (render != nullptr && render->FlattenedGeometry().empty())

@@ -3,6 +3,7 @@
 // sibling's edge, so every visualizer in an audio node body shares one rectangle, corner radius and
 // border role. A visualizer that is also a control passes `hot` to End to raise the border.
 #pragma once
+#include "app/ui/design/components/EmptyState.h"
 #include <imgui.h>
 #include "app/AppShared.h"
 #include "app/ui/design/Tokens.gen.h"
@@ -50,8 +51,6 @@ namespace AudioViz
    // flat trace reads as "waiting for input" and never as a broken visualizer. Call before End (inside the clip).
    inline void IdleLabel(const Frame& f, const char* text = "no input")
    {
-      const ImVec2 ts = ImGui::CalcTextSize(text);
-      f.dl->AddText(ImVec2(0.5f * (f.origin.x + f.br.x - ts.x), 0.5f * (f.origin.y + f.br.y - ts.y)),
-                    app::ScopeTextCol(), text);
+      EmptyState::DrawCaption(f.origin, f.br, text);
    }
 }

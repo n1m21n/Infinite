@@ -1,4 +1,5 @@
 // Oscillator, wavetable, ADSR, equation and spectral-synth bodies (moved verbatim from main.cpp).
+#include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
@@ -219,7 +220,7 @@ namespace app
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
+         EmptyState::DrawCaption(origin, br, "no sample loaded");
       }
 
       dl->PopClipRect();
@@ -388,7 +389,7 @@ namespace app
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
+         EmptyState::DrawCaption(origin, br, "no sample loaded");
       }
 
       dl->PopClipRect();
@@ -482,7 +483,7 @@ namespace app
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
+         EmptyState::DrawCaption(origin, br, "no sample loaded");
       }
 
       dl->PopClipRect();
@@ -633,7 +634,7 @@ namespace app
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
+         EmptyState::DrawCaption(origin, br, "no sample loaded");
       }
 
       dl->PopClipRect();
