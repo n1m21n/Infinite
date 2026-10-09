@@ -1,4 +1,5 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
+#include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/StateRing.h"
@@ -2365,6 +2366,15 @@ namespace app
       {
          if (gPerfElements[i].page == gPerfActivePage)
             DrawPerfElement(i, gridOrigin, cellSize, mouseOverAnyElement);
+      }
+      {
+         bool pageHasElements = false;
+         for (const auto& el : gPerfElements)
+            pageHasElements = pageHasElements || el.page == gPerfActivePage;
+         if (!pageHasElements)
+            EmptyState::DrawInWindow(T("Nothing on this page"),
+                                     gPerfEditMode ? T("Use + Add Control to place a knob, pad or switch")
+                                                   : T("Switch to Edit Mode to add controls"));
       }
 
       // ---- Edit-mode selection shortcuts ----
