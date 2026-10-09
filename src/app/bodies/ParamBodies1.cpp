@@ -1794,27 +1794,27 @@ namespace app
 
       if (n->IsRecordingPath())
       {
-         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.48f, 0), ActionButton::Kind::Record))
+         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.31f, 0), ActionButton::Kind::Record))
             n->StopRecording();
       }
-      else if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * 0.31f, 0)))
       {
          n->StartRecording();
       }
       ImGui::SameLine();
       if (n->IsPlayingPath())
       {
-         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.31f, 0)))
             n->StopPath();
       }
-      else if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * 0.31f, 0)))
       {
          n->PlayPath();
       }
-      ModCheckbox("loop", &n->loopPath);
       ImGui::SameLine();
-      if (ActionButton::Draw("clear"))
+      if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * 0.31f, 0)))
          n->ClearPath();
+      ModCheckbox("loop", &n->loopPath);
       ModSlider("speed", &n->speed, 0.05f, 4.0f);
    }
 }
