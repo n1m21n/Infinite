@@ -137,7 +137,7 @@ void DrawMenuBar(FrameCtx& fc)
          {
             // Menu-bar items do not share a y after the first; pin each tile to the group's line.
             if (menuGroupY1 > 0.0f)
-               ImGui::SetCursorScreenPos(ImVec2(menuGroupMaxX + 16.0f, menuGroupP.y));
+               ImGui::SetCursorScreenPos(ImVec2(menuGroupMaxX + 2.0f, menuGroupP.y));
             const bool open = MenuTile(label);
             menuGroupMaxX = std::max(menuGroupMaxX, ImGui::GetItemRectMax().x);
             if (menuGroupY1 <= 0.0f)
@@ -489,7 +489,7 @@ void DrawMenuBar(FrameCtx& fc)
          if (ImGui::IsItemHovered())
             HelpTip(T("%s (Space)"), isTransportPlaying ? T("Pause") : T("Play"));
 
-         TopBarSameLine(2.0f);
+         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + 4.0f, ImGui::GetItemRectMin().y));
          if (ActionButton::Draw("##transportrewind", ImVec2(tok::tile + 4.0f, 0)))
             transport.Rewind();
          {
@@ -517,11 +517,7 @@ void DrawMenuBar(FrameCtx& fc)
          {
             const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             const bool audioOn = engineOn;
-            // One fixed width for both labels so the centred group never changes size.
-            static float sAudioW = 0.0f;
-            if (sAudioW <= 0.0f)
-               sAudioW = std::max(ImGui::CalcTextSize(L("Start Audio")).x, ImGui::CalcTextSize(L("Stop Audio")).x) + 2.0f * tok::space_2;
-            if (ChipButton::Draw(audioOn ? L("Stop Audio") : L("Start Audio"), audioOn, tok::tile, sAudioW, true))
+            if (ChipButton::Draw(audioOn ? L("Stop Audio") : L("Start Audio"), audioOn, tok::tile, 0.0f, true))
             {
                if (audioOn)
                {
