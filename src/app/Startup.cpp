@@ -3719,6 +3719,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gPerfPanelOpen = o.find("perf") != std::string::npos;
       gViewportPanelOpen = o.find("viewport") != std::string::npos;
       gNodePanelOpen = o.find("library") != std::string::npos;
+      // "dock=N" (0 bottom, 1 right, 2 left, 3 top): put every docked panel on that side for review shots.
+      if (const size_t dk = o.find("dock="); dk != std::string::npos)
+      {
+         const int d = atoi(o.c_str() + dk + 5);
+         gModMatrixDock = gPerfPanelDock = gViewportPanelDock = d;
+      }
       // "perfdemo": one of each Performance control, for design review screenshots.
       // "perfedit" is the same in Edit Mode with the first two cards selected and the third in MIDI learn.
       if (o.find("perfdemo") != std::string::npos || o.find("perfedit") != std::string::npos)
