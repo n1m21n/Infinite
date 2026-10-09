@@ -1,4 +1,5 @@
 // Settings window (moved verbatim from main.cpp).
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -1167,24 +1168,24 @@ namespace app
                ImGui::OpenPopup("ExprPresetsMenuSettings");
             }
 
-            if (ImGui::BeginPopup("ExprPresetsMenuSettings"))
+            if (MenuParts::BeginPopup("ExprPresetsMenuSettings"))
             {
                ImGui::TextDisabled("%s", T("Click to insert preset global:"));
-               ImGui::Separator();
+               MenuParts::Separator();
                std::string currentCategory;
                for (const ExprGlobals::Preset& p : ExprGlobals::Presets())
                {
                   if (p.category != currentCategory)
                   {
                      if (!currentCategory.empty())
-                        ImGui::Separator();
+                        MenuParts::Separator();
                      currentCategory = p.category;
-                     ImGui::TextColored(tok::V4(tok::palf::v_600_800_1000_1000), "%s", currentCategory.c_str());
+                     ImGui::TextDisabled("%s", currentCategory.c_str());
                   }
 
                   char itemLabel[256];
                   snprintf(itemLabel, sizeof(itemLabel), "%s = %s", p.name.c_str(), p.expr.c_str());
-                  if (ImGui::MenuItem(itemLabel, nullptr))
+                  if (MenuParts::Item(itemLabel))
                   {
                      PushUndoCheckpoint();
                      bool found = false;
@@ -1209,7 +1210,7 @@ namespace app
                      ImGui::SetTooltip(T("%s\nFormula: %s"), p.description.c_str(), p.expr.c_str());
                   }
                }
-               ImGui::EndPopup();
+               MenuParts::EndPopup();
             }
 
             FormParts::PopReferenceStyle();

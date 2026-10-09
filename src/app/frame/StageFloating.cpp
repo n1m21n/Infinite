@@ -139,73 +139,58 @@ int DrawFloating(FrameCtx& fc)
          ImGui::OpenPopup(L("Check for updates"));
          gShowUpdateCheckModal = false;
       }
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSize(ImVec2(380, 0), ImGuiCond_Appearing);
-      bool isUpdateCheckOpen = true;
-      if (ImGui::BeginPopupModal(L("Check for updates"), &isUpdateCheckOpen, ImGuiWindowFlags_AlwaysAutoResize))
+      if (DialogParts::Begin(L("Check for updates")))
       {
-         if (!isUpdateCheckOpen)
-            ImGui::CloseCurrentPopup();
-
-         UpdateCheck::Status status = UpdateCheck::GetStatus();
+         DialogParts::Title(T("Check for updates"));
+         const UpdateCheck::Status status = UpdateCheck::GetStatus();
+         char msg[256];
          switch (status)
          {
             case UpdateCheck::Status::Idle:
             case UpdateCheck::Status::Checking:
-            {
-               // Text-only "spinner" - a handful of dots cycling off the
-               // clock, so the modal never looks frozen while the request
-               // is in flight.
-               int dots = ((int)(ImGui::GetTime() * 2.0) % 4);
-               ImGui::Text(T("Checking for updates%.*s"), dots, "...");
+               // A few dots cycling off the clock so the dialog never looks frozen while the request is in flight.
+               snprintf(msg, sizeof(msg), T("Checking for updates%.*s"), (int)(ImGui::GetTime() * 2.0) % 4, "...");
+               DialogParts::Message(msg);
                break;
-            }
             case UpdateCheck::Status::UpToDate:
-               ImGui::Text(T("You're running the latest version (%s)."), INFINITE_VERSION_STRING);
+               snprintf(msg, sizeof(msg), T("You're running the latest version (%s)."), INFINITE_VERSION_STRING);
+               DialogParts::Message(msg);
                break;
             case UpdateCheck::Status::UpdateAvailable:
-               ImGui::Text(T("Version %s is available (you have %s)."),
-                           UpdateCheck::ResultVersion().c_str(), INFINITE_VERSION_STRING);
+               snprintf(msg, sizeof(msg), T("Version %s is available (you have %s)."),
+                        UpdateCheck::ResultVersion().c_str(), INFINITE_VERSION_STRING);
+               DialogParts::Message(msg);
                break;
             case UpdateCheck::Status::Failed:
-               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_950_450_400_1000));
-               ImGui::TextWrapped("%s", UpdateCheck::LastError().c_str());
-               ImGui::PopStyleColor();
+               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
+               DialogParts::Message(UpdateCheck::LastError().c_str());
+               ImGui::PopTextWrapPos();
                break;
          }
 
-         ImGui::Separator();
-
          if (status == UpdateCheck::Status::UpdateAvailable)
          {
-            PushPrimaryButtonStyle();
-            const bool doDownload = ImGui::Button(L("Download latest version"));
-            PopPrimaryButtonStyle();
-            if (doDownload)
+            const int pick = DialogParts::Buttons({ L("Later"), L("Download") });
+            if (pick == 1)
                Platform::OpenExternalUrl(UpdateCheck::DownloadUrl());
-            ImGui::SameLine();
-            if (ImGui::Button(L("Later")))
+            if (pick >= 0)
                ImGui::CloseCurrentPopup();
          }
          else if (status == UpdateCheck::Status::Failed)
          {
-            PushPrimaryButtonStyle();
-            const bool doRetry = ImGui::Button(L("Retry"));
-            PopPrimaryButtonStyle();
-            if (doRetry)
+            const int pick = DialogParts::Buttons({ L("Close"), L("Retry") });
+            if (pick == 1)
                UpdateCheck::Start();
-            ImGui::SameLine();
-            if (ImGui::Button(L("Close")))
+            else if (pick == 0)
                ImGui::CloseCurrentPopup();
          }
          else if (status == UpdateCheck::Status::UpToDate)
          {
-            if (ImGui::Button(L("Close")))
+            if (DialogParts::Buttons({ L("Close") }) == 0)
                ImGui::CloseCurrentPopup();
          }
          // Idle/Checking: no buttons yet, just wait for Poll() to land a result.
-
-         ImGui::EndPopup();
+         DialogParts::End();
       }
 
       if (gShowAutosaveRecoveryModal)

@@ -1,5 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/StateRing.h"
 #include "imgui_internal.h"
 #include "app/ui/design/components/LibraryParts.h"
@@ -443,13 +445,13 @@ void DrawPopupsB(FrameCtx& fc)
       }
       if (ImGui::BeginPopup("##fielddevicesave"))
       {
-         ImGui::TextUnformatted(T("Save device as:"));
+         ImGui::TextDisabled("%s", T("Save device as:"));
          ImGui::SetNextItemWidth(220.0f);
-         bool enterPressed = ImGui::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
-                                              sizeof(gFieldDeviceSave.nameBuf),
-                                              ImGuiInputTextFlags_EnterReturnsTrue);
-         ImGui::SameLine();
-         bool doSave = enterPressed || ImGui::Button(L("Save##fielddevicesaveconfirm"));
+         bool enterPressed = FieldWell::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
+                                                  sizeof(gFieldDeviceSave.nameBuf),
+                                                  ImGuiInputTextFlags_EnterReturnsTrue);
+         ImGui::SameLine(0.0f, tok::space_2);
+         bool doSave = enterPressed || ChipButton::Draw(L("Save##fielddevicesaveconfirm"), true, ImGui::GetFrameHeight());
          if (doSave && gFieldDeviceSave.nameBuf[0] != '\0')
          {
             Field::DeviceFile device;
@@ -484,7 +486,7 @@ void DrawPopupsB(FrameCtx& fc)
          ImGui::SetNextWindowPos(popupPos, ImGuiCond_Appearing);
       }
       ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(360, 480));
-      if (ImGui::BeginPopup("##audiodroppicker"))
+      if (MenuParts::BeginPopup("##audiodroppicker"))
       {
          if (gAudioDropPicker.paths.empty())
          {
@@ -504,7 +506,7 @@ void DrawPopupsB(FrameCtx& fc)
             {
                ImGui::TextDisabled(T("Load %d samples into:"), (int)gAudioDropPicker.paths.size());
             }
-            ImGui::Separator();
+            MenuParts::Separator();
 
             struct PickerOption
             {
@@ -526,7 +528,7 @@ void DrawPopupsB(FrameCtx& fc)
 
             for (const auto& opt : kOptions)
             {
-               if (ImGui::MenuItem(opt.name, opt.category))
+               if (MenuParts::Item(opt.name, opt.category))
                {
                   if (std::string(opt.name) == "MPC")
                   {
@@ -602,7 +604,7 @@ void DrawPopupsB(FrameCtx& fc)
                }
             }
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
       else
       {

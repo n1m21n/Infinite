@@ -152,12 +152,12 @@ namespace app
    void ViewportPanelDockCombo()
    {
       static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
-      if (ImGui::BeginCombo("##viewportdock", T(kDockLabels[gViewportPanelDock])))
+      if (MenuParts::BeginCombo("##viewportdock", T(kDockLabels[gViewportPanelDock])))
       {
          for (int i = 0; i < 4; i++)
-            if (ImGui::Selectable(L(kDockLabels[i]), i == gViewportPanelDock))
+            if (MenuParts::Choice(L(kDockLabels[i]), i == gViewportPanelDock))
                gViewportPanelDock = i;
-         ImGui::EndCombo();
+         MenuParts::EndCombo();
       }
    }
 
@@ -636,12 +636,12 @@ namespace app
    void ModMatrixDockCombo()
    {
       static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
-      if (ImGui::BeginCombo("##modmatrixdock", T(kDockLabels[gModMatrixDock])))
+      if (MenuParts::BeginCombo("##modmatrixdock", T(kDockLabels[gModMatrixDock])))
       {
          for (int i = 0; i < 4; i++)
-            if (ImGui::Selectable(L(kDockLabels[i]), i == gModMatrixDock))
+            if (MenuParts::Choice(L(kDockLabels[i]), i == gModMatrixDock))
                gModMatrixDock = i;
-         ImGui::EndCombo();
+         MenuParts::EndCombo();
       }
    }
 }

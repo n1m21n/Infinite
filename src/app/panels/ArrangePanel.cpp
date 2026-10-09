@@ -1,5 +1,6 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -69,19 +70,19 @@ namespace app
          list.push_back(it);
       const char* cur = (*current >= 0 && *current < (int)list.size()) ? list[*current] : "";
       bool changed = false;
-      const bool open = ImGui::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
+      const bool open = MenuParts::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
       glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
                              ImGui::GetColorU32(ImGuiCol_TextDisabled));
       if (open)
       {
          for (int i = 0; i < (int)list.size(); ++i)
-            if (ImGui::Selectable(list[i], *current == i))
+            if (MenuParts::Choice(list[i], *current == i))
             {
                *current = i;
                changed = true;
             }
-         ImGui::EndCombo();
+         MenuParts::EndCombo();
       }
       return changed;
    }
@@ -803,24 +804,20 @@ namespace app
                ImGui::OpenPopup(L("Overwrite file?##arrangeOverwrite"));
                sArrangeOpenOverwrite = false;
             }
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
-            ImGui::SetNextWindowSizeConstraints(ImVec2(340.0f, 0.0f), ImVec2(520.0f, 400.0f));
-            const bool overwriteOpen = ImGui::BeginPopupModal(L("Overwrite file?##arrangeOverwrite"), nullptr,
-                                                              ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
-            ImGui::PopStyleVar();
-            if (overwriteOpen)
+            if (DialogParts::Begin(L("Overwrite file?##arrangeOverwrite")))
             {
-               ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
-               SectionCard::Title(T("Overwrite file?"));
+               DialogParts::Title(T("Overwrite file?"));
                const bool queuedClash = ArrangeRenderPathQueued(sArrangePendingJob.path, 0);
-               ImGui::TextUnformatted(queuedClash ? T("Another queued job already writes:") : T("This file already exists:"));
-               ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 320.0f);
-               ImGui::TextDisabled("%s", sArrangePendingJob.path.c_str());
+               DialogParts::Message(queuedClash ? T("Another queued job already writes:") : T("This file already exists:"));
+               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
+               DialogParts::Message(sArrangePendingJob.path.c_str());
                ImGui::PopTextWrapPos();
-               ImGui::Dummy(ImVec2(0, tok::space_1));
-               if (ChipButton::Draw(L("Overwrite"), true, 28.0f, 100.0f))
+               const int pick = DialogParts::Buttons({ L("Cancel"), L("Auto-rename"), L("Overwrite") });
+               if (pick == 1 || pick == 2)
                {
                   ArrangeRenderJob job = sArrangePendingJob;
+                  if (pick == 1)
+                     job.path = ArrangeRenderUniquePath(job.path);
                   job.id = gArrangeRenderNextJobId++;
                   job.status = kArrangeJobQueued;
                   if (sArrangePendingStartNow)
@@ -832,31 +829,10 @@ namespace app
                   {
                      gArrangeRenderQueue.push_back(job);
                   }
-                  ImGui::CloseCurrentPopup();
                }
-               ImGui::SameLine(0.0f, tok::space_2);
-               if (ChipButton::Draw(L("Auto-rename"), false, 28.0f, 100.0f))
-               {
-                  ArrangeRenderJob job = sArrangePendingJob;
-                  job.path = ArrangeRenderUniquePath(job.path);
-                  job.id = gArrangeRenderNextJobId++;
-                  job.status = kArrangeJobQueued;
-                  if (sArrangePendingStartNow)
-                  {
-                     gArrangeRenderQueue.insert(gArrangeRenderQueue.begin(), job);
-                     gArrangeRenderQueueRunning = true;
-                  }
-                  else
-                  {
-                     gArrangeRenderQueue.push_back(job);
-                  }
+               if (pick >= 0)
                   ImGui::CloseCurrentPopup();
-               }
-               ImGui::SameLine(0.0f, tok::space_2);
-               if (ChipButton::Draw(L("Cancel"), false, 28.0f, 80.0f))
-                  ImGui::CloseCurrentPopup();
-               ImGui::PopStyleVar();
-               ImGui::EndPopup();
+               DialogParts::End();
             }
          }
 
@@ -3673,7 +3649,7 @@ namespace app
       // ---- clip context menu (acts on the selection; ids only) ----
       if (openClipCtx)
          ImGui::OpenPopup("##arrangeclipctx");
-      if (ImGui::BeginPopup("##arrangeclipctx"))
+      if (MenuParts::BeginPopup("##arrangeclipctx"))
       {
          Arrange::Clip* cp = Arrange::FindClip(gArrange, gArrangeCtxClipId);
          if (cp == nullptr)
@@ -3711,7 +3687,7 @@ namespace app
                // would either apply nonsensically or silently do nothing to
                // the rest of the batch - only offer what unambiguously means
                // the same thing across every selected clip.
-               if (ImGui::MenuItem(L("Rename"), MODKEY "+R"))
+               if (MenuParts::Item(L("Rename"), MODKEY "+R"))
                {
                   const std::string label = !cp->name.empty() ? cp->name
                      : (ctxNode != nullptr ? NodeTitle(*ctxNode) : std::string("Unassigned"));
@@ -3722,7 +3698,7 @@ namespace app
                         gArrangeRenameTargetIds.push_back(id);
                   snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
                }
-               if (ImGui::BeginMenu(L("Color Tint")))
+               if (MenuParts::SubMenu(L("Color Tint")))
                {
                   const auto& kPaletteColors = kArrangePalette;
                   for (int ci2 = 0; ci2 < 10; ci2++)
@@ -3759,7 +3735,7 @@ namespace app
                // rejects any Sample clip in the batch (see its own comment),
                // so a mixed Sample/Clip selection just leaves the Samples
                // untouched rather than needing a separate check here.
-               if (ctxSelectionSingleType && ImGui::MenuItem(L("Assign Node...")))
+               if (ctxSelectionSingleType && MenuParts::Item(L("Assign Node...")))
                {
                   gArrangeAssigningClipId = cid;
                   gArrangeAssignTargetIds.clear();
@@ -3774,7 +3750,7 @@ namespace app
             // Rename and Active/Bypass: apply to every clip type, mirroring
             // the double-click-to-rename and '0'-key shortcuts this menu
             // just gives an explicit, discoverable entry point for.
-            if (ImGui::MenuItem(L("Rename"), MODKEY "+R"))
+            if (MenuParts::Item(L("Rename"), MODKEY "+R"))
             {
                const std::string label = !cp->name.empty() ? cp->name
                   : (ctxNode != nullptr ? NodeTitle(*ctxNode) : std::string("Unassigned"));
@@ -3782,9 +3758,9 @@ namespace app
                gArrangeRenameTargetIds.clear();
                snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
             }
-            if (ImGui::MenuItem(L("Active"), nullptr, cp->enabled))
+            if (MenuParts::Item(L("Active"), nullptr, cp->enabled))
                ArrangeToggleEnabledSelection();
-            ImGui::Separator();
+            MenuParts::Separator();
             // Fade fields: live on the model, one undo entry per drag of a
             // field (opened on the first change, pushed on deactivate, and
             // only if something changed).
@@ -3880,7 +3856,7 @@ namespace app
                if (cp->sampleDropped)
                {
                   bool syncToTempo = cp->syncToTempo;
-                  if (ImGui::Checkbox(L("Sync to Tempo"), &syncToTempo))
+                  if (MenuParts::Check(L("Sync to Tempo"), &syncToTempo))
                      ArrangeEdit([&]() { ArrangeSetSampleSync(cid, syncToTempo); });
 
                   // Sample BPM only means something while synced (unsynced
@@ -3897,7 +3873,7 @@ namespace app
                   if (const Arrange::Clip* ci = Arrange::FindClip(gArrange, cid))
                   {
                      if (ci->origBpm > 0.0f && ci->origBpm != ci->sampleBpm &&
-                         ImGui::Selectable(L("Reset Sample BPM to Detected")))
+                         MenuParts::Item(L("Reset Sample BPM to Detected")))
                      {
                         const float detected = ci->origBpm;
                         ArrangeEdit([&]() { ArrangeSetSampleBpm(cid, detected); });
@@ -3908,7 +3884,7 @@ namespace app
                      ArrangeDrawSampleTempoInfo(*ci);
                }
 
-               ImGui::Separator();
+               MenuParts::Separator();
             }
             else if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneVideo)
             {
@@ -3943,10 +3919,10 @@ namespace app
                }
                fieldGestureEnd();
 
-               ImGui::Separator();
+               MenuParts::Separator();
             }
 
-            if (ctxSelectionSingleType && ctxLaneType != Arrange::kLaneAudio && ImGui::BeginMenu(L("Compositing")))
+            if (ctxSelectionSingleType && ctxLaneType != Arrange::kLaneAudio && MenuParts::SubMenu(L("Compositing")))
             {
                // How this clip lays over the lanes below it. Applies to every
                // selected video clip, like Color Tint.
@@ -3955,7 +3931,7 @@ namespace app
                for (int m = 0; m < (int)modes.size(); m++)
                {
                   ImGui::PushID(m + 900);
-                  if (ImGui::MenuItem(modes[m].c_str(), nullptr, curMode == m))
+                  if (MenuParts::Item(modes[m].c_str(), nullptr, curMode == m))
                   {
                      ArrangeEdit([&]()
                      {
@@ -3977,7 +3953,7 @@ namespace app
                ImGui::EndMenu();
             }
 
-            if (ctxLaneType == Arrange::kLaneVideo && ImGui::BeginMenu(L("Color Grade")))
+            if (ctxLaneType == Arrange::kLaneVideo && MenuParts::SubMenu(L("Color Grade")))
             {
                // Basic grade only: brightness/contrast/saturation, consumed
                // by the compositor as a per-clip shader pass. Defaults are a
@@ -4021,7 +3997,7 @@ namespace app
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu(L("Color Tint")))
+            if (MenuParts::SubMenu(L("Color Tint")))
             {
                const auto& kPaletteColors = kArrangePalette; // shared with the marker colours
                for (int ci2 = 0; ci2 < 10; ci2++)
@@ -4059,7 +4035,7 @@ namespace app
             // doc comment in ArrangeModel.h). Only Audio/Video Clip can be
             // reassigned.
             cp = Arrange::FindClip(gArrange, cid);
-            if (cp != nullptr && !cp->sampleDropped && ImGui::MenuItem(L("Assign Node...")))
+            if (cp != nullptr && !cp->sampleDropped && MenuParts::Item(L("Assign Node...")))
             {
                gArrangeAssigningClipId = cid;
                gArrangeAssignTargetIds.clear();
@@ -4071,7 +4047,7 @@ namespace app
             if (ctxNode != nullptr)
             {
                const std::vector<int> outs = ArrangeOutputsOfType(*ctxNode, ctxLaneType);
-               if (outs.size() > 1 && ImGui::BeginMenu(L("Output")))
+               if (outs.size() > 1 && MenuParts::SubMenu(L("Output")))
                {
                   const int curOut = Arrange::FindClip(gArrange, cid)->srcOutput;
                   for (int o : outs)
@@ -4079,7 +4055,7 @@ namespace app
                      const char* outName = ctxNode->node->OutputLabel(o);
                      char outItem[96];
                      snprintf(outItem, sizeof(outItem), "%s##arrout%d", outName != nullptr ? outName : "out", o);
-                     if (ImGui::MenuItem(outItem, nullptr, curOut == o) && curOut != o)
+                     if (MenuParts::Item(outItem, nullptr, curOut == o) && curOut != o)
                      {
                         ArrangeEdit([&]()
                         {
@@ -4098,15 +4074,15 @@ namespace app
             } // end else (single-clip specific properties)
 
             // Group, Ungroup, and Delete: available for both multi-selection and single-clip / group-selection
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Group"), MODKEY "+G", false, ArrangeCanGroupSelection()))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Group"), MODKEY "+G", false, ArrangeCanGroupSelection()))
                ArrangeGroupSelection();
-            if (ImGui::MenuItem(L("Ungroup"), MODKEY "+Shift+G", false, ArrangeCanUngroupSelection()))
+            if (MenuParts::Item(L("Ungroup"), MODKEY "+Shift+G", false, ArrangeCanUngroupSelection()))
                ArrangeUngroupSelection();
-            if (ImGui::MenuItem(L("Delete"), "Backspace", false, !ctxSelIds.empty()))
+            if (MenuParts::Item(L("Delete"), "Backspace", false, !ctxSelIds.empty()))
                ArrangeDeleteSelection();
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
       else if (gArrangeMixGestureLaneId != 0 && !ImGui::IsAnyItemActive())
       {

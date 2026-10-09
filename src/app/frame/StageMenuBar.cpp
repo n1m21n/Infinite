@@ -271,7 +271,18 @@ void DrawMenuBar(FrameCtx& fc)
                   int dockSide = gArrange.settings.dockSide == 1 ? 1 : 0;
                   ImGui::SetNextItemWidth(150);
                   FieldWell::PushStyle();
-                  const bool dockChanged = ImGui::Combo(L("Dock"), &dockSide, I18n::TList("Bottom\0Top\0"));
+                  static const char* kDockNames[] = { I18N_KEY("Bottom"), I18N_KEY("Top") };
+                  bool dockChanged = false;
+                  if (MenuParts::BeginCombo("##arrdock", T(kDockNames[dockSide])))
+                  {
+                     for (int i = 0; i < 2; ++i)
+                        if (MenuParts::Choice(L(kDockNames[i]), i == dockSide))
+                        {
+                           dockSide = i;
+                           dockChanged = true;
+                        }
+                     MenuParts::EndCombo();
+                  }
                   FieldWell::PopStyle();
                   if (dockChanged && dockSide != gArrange.settings.dockSide)
                   {
@@ -721,24 +732,24 @@ void DrawMenuBar(FrameCtx& fc)
             Pick("##scaleField", kx + keyW, curScaleW, capScaleName.c_str(), "##globalScalePopup");
          }
 
-         if (ImGui::BeginPopup("##globalKeyPopup"))
+         if (MenuParts::BeginPopup("##globalKeyPopup"))
          {
             for (int i = 0; i < 12; i++)
             {
-               if (ImGui::Selectable(kKeyNames[i], i == curKey))
+               if (MenuParts::Choice(kKeyNames[i], i == curKey))
                   transport.SetKey(i);
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
-         if (ImGui::BeginPopup("##globalScalePopup"))
+         if (MenuParts::BeginPopup("##globalScalePopup"))
          {
             for (int i = 0; i < (int)scaleList.size(); i++)
             {
                const std::string capOpt = FormatScaleDisplayName(scaleList[i]);
-               if (ImGui::Selectable(capOpt.c_str(), i == curScale))
+               if (MenuParts::Choice(capOpt.c_str(), i == curScale))
                   transport.SetScale(i);
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
 
          // The click: the same tile as the panel rail, inside the display's last cell.
@@ -755,7 +766,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                ImGui::OpenPopup("##metronomePopup");
 
-            if (ImGui::BeginPopup("##metronomePopup"))
+            if (MenuParts::BeginPopup("##metronomePopup"))
             {
                // The top bar flattens every frame colour to transparent; a
                // slider needs its real theme frame back to be findable.
@@ -768,12 +779,9 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::PopStyleColor(3);
                if (volChanged)
                   gMetronomeDirty = true;
-               if (ImGui::Selectable(L("accent first beat"), gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
-               {
-                  gMetronomeAccent = !gMetronomeAccent;
+               if (MenuParts::Check(L("accent first beat"), &gMetronomeAccent))
                   gMetronomeDirty = true;
-               }
-               ImGui::EndPopup();
+               MenuParts::EndPopup();
             }
             if (gMetronomeDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
             {
@@ -829,19 +837,14 @@ void DrawMenuBar(FrameCtx& fc)
          if (UpdateCheck::UpdateAvailable())
          {
             const char* updateLabel = T("Update");
-            const float updateWidth = ImGui::CalcTextSize(updateLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+            const float updateWidth = ImGui::CalcTextSize(updateLabel).x + 2.0f * tok::space_2;
             if (cursorX - updateWidth - telemetryGap - telemetryW >= centreEndX + minGap)
             {
                cursorX -= updateWidth;
 
                ImGui::SameLine(cursorX);
-               ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_200_620_340_1000));
-               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_240_700_400_1000));
-               ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_160_520_280_1000));
-               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_1000_1000_1000_1000));
-               if (ImGui::Button(updateLabel))
+               if (ChipButton::Draw(updateLabel, true, tok::tile))
                   Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/#download");
-               ImGui::PopStyleColor(4);
                if (ImGui::IsItemHovered())
                {
                   ImGui::SetTooltip(T("version %s is available (you have %s) - click to download"),

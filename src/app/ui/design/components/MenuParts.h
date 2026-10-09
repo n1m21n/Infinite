@@ -154,4 +154,21 @@ namespace MenuParts
       EndContent();
       ImGui::EndPopup();
    }
+
+   // A combo whose list is a menu: same padding, row pitch and wash. Pair a true result with EndCombo().
+   inline bool BeginCombo(const char* id, const char* preview, ImGuiComboFlags flags = 0)
+   {
+      PushPopupPad();
+      const bool open = ImGui::BeginCombo(id, preview, flags);
+      ImGui::PopStyleVar();
+      if (open)
+         BeginContent();
+      return open;
+   }
+
+   inline void EndCombo()
+   {
+      EndContent();
+      ImGui::EndCombo();
+   }
 }

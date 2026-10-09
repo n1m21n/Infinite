@@ -4,6 +4,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/components/FieldWell.h"
 
@@ -595,7 +596,7 @@ namespace app
             RowLabel("Blend");
             ImGui::SetNextItemWidth(fieldW);
             FieldWell::PushStyle();
-            const bool blendOpen = ImGui::BeginCombo("##clipblend", curBlendName, ImGuiComboFlags_NoArrowButton);
+            const bool blendOpen = MenuParts::BeginCombo("##clipblend", curBlendName, ImGuiComboFlags_NoArrowButton);
             {
                const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
                glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
@@ -607,7 +608,7 @@ namespace app
                for (int m = 0; m < (int)modes.size(); m++)
                {
                   const bool sel = (clip->blendMode == m);
-                  if (ImGui::Selectable(modes[m].c_str(), sel))
+                  if (MenuParts::Choice(modes[m].c_str(), sel))
                   {
                      ArrangeEdit([&]() {
                         if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -618,7 +619,7 @@ namespace app
                      });
                   }
                }
-               ImGui::EndCombo();
+               MenuParts::EndCombo();
             }
 
             float opacity = clip->opacity;
@@ -1168,7 +1169,7 @@ namespace app
       }
       else
       {
-         SectionHeader(T("Inspector"));
+         InspectorTitle(T("Inspector"));
          ImGui::SameLine(availW - 18.0f);
          if (DrawCloseBtn())
             gArrangeClipSettingsPanelOpen = false;
@@ -1246,28 +1247,16 @@ namespace app
          ImGui::OpenPopup(L("Render failed##arrangeRenderFail"));
          gArrangeRenderFailNoticeOpen = false;
       }
-      ImGuiIO& io = ImGui::GetIO();
-      ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
-                              ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 0.0f), ImVec2(560.0f, 400.0f));
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
-      const bool failOpen = ImGui::BeginPopupModal(L("Render failed##arrangeRenderFail"), nullptr,
-                                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
-      ImGui::PopStyleVar();
-      if (failOpen)
+      if (DialogParts::Begin(L("Render failed##arrangeRenderFail")))
       {
-         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
-         SectionCard::Title(T("Render failed"));
-         ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + 360.0f);
-         ImGui::TextWrapped("%s", T("The timeline render did not start."));
-         ImGui::Dummy(ImVec2(0, 4));
-         ImGui::TextWrapped("%s", gArrangeRenderFailNotice.c_str());
+         DialogParts::Title(T("Render failed"));
+         DialogParts::Message(T("The timeline render did not start."));
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
+         DialogParts::Message(gArrangeRenderFailNotice.c_str());
          ImGui::PopTextWrapPos();
-         ImGui::Dummy(ImVec2(0, tok::space_1));
-         if (ChipButton::Draw(L("OK"), true, 28.0f, 100.0f))
+         if (DialogParts::Buttons({ L("OK") }) == 0)
             ImGui::CloseCurrentPopup();
-         ImGui::PopStyleVar();
-         ImGui::EndPopup();
+         DialogParts::End();
       }
    }
 
