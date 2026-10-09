@@ -77,7 +77,7 @@ fi
 ln -s /Applications "$STAGE/Applications"
 
 echo "==> building dmg"
-hdiutil create -volname "Infinite" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+"$ROOT/tools/dmg/layout.sh" "$STAGE" "$DMG"
 rm -rf "$STAGE"
 
 if [ -d "$ROOT/website/assets" ]; then
