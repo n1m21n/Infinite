@@ -1,4 +1,5 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
+#include <cmath>
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/MenuParts.h"
@@ -711,26 +712,34 @@ namespace app
                   { "Rose",    tok::U32(tok::pal::c_F43F5EFF) }
                };
 
+               ImU32 cols[10];
+               const char* names[10];
+               int selected = -1;
                for (int ci = 0; ci < 10; ci++)
                {
-                  if (ci % 5 != 0) ImGui::SameLine();
-                  ImGui::PushID(ci + 500);
-                  ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kPaletteColors[ci].col);
-                  if (ImGui::ColorButton(kPaletteColors[ci].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(24, 24)))
+                  cols[ci] = kPaletteColors[ci].col;
+                  names[ci] = kPaletteColors[ci].name;
+                  const ImVec4 c = ImGui::ColorConvertU32ToFloat4(cols[ci]);
+                  const bool isDefault = ci == 0 && elem.colorR == 0.0f && elem.colorG == 0.0f && elem.colorB == 0.0f;
+                  if (isDefault || (ci > 0 && std::fabs(elem.colorR - c.x) < 0.01f && std::fabs(elem.colorG - c.y) < 0.01f &&
+                                    std::fabs(elem.colorB - c.z) < 0.01f))
+                     selected = ci;
+               }
+               for (int row = 0; row < 2; row++)
+               {
+                  const int hit = FieldWell::SwatchRow(cols + row * 5, names + row * 5, 5, selected - row * 5, 18.0f);
+                  if (hit >= 0)
                   {
+                     const int ci = row * 5 + hit;
                      PushUndoCheckpoint();
                      if (ci == 0)
-                     {
                         elem.colorR = elem.colorG = elem.colorB = 0.0f;
-                     }
                      else
                      {
-                        elem.colorR = cVec.x; elem.colorG = cVec.y; elem.colorB = cVec.z;
+                        const ImVec4 c = ImGui::ColorConvertU32ToFloat4(cols[ci]);
+                        elem.colorR = c.x; elem.colorG = c.y; elem.colorB = c.z;
                      }
                   }
-                  if (ImGui::IsItemHovered())
-                     ImGui::SetTooltip("%s", kPaletteColors[ci].name);
-                  ImGui::PopID();
                }
                ImGui::EndMenu();
             }

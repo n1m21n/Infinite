@@ -115,3 +115,6 @@ Fill one row per effect while sweeping. A column that differs from the majority 
 | Note Sequencer, step bars | bar columns | yes | playhead | StepCell.PlayheadOutline | step line | yes | StepCell |
 | Scope boxes (Render 3D preview, Sampler, stage previews) | AudioViz.Fill/Border | yes | idle labels | AudioViz | n/a | n/a | AudioViz |
 | Out-pin groups, menus/dropdown/list rows | section gap above out pins; rows 24 pt, search 28 | yes | n/a | none | n/a | n/a | MenuParts, LibraryParts |
+| Ocean, Audio Ribbon (mesh winding) | previews were culled/faint: faces now wind +Y; Audio Ribbon carved out of the audio-body gate so params + eye/power/screen row draw | yes | visible at silence | none | triangles | n/a | MeshOps::Ocean, AudioRibbonNode, IsAudioBodyNode |
+| Perf Color Tint submenu | round swatches via FieldWell::SwatchRow with selected ring | yes | n/a | none | n/a | n/a | FieldWell |
+| Top bar bottom edge; cable trash button | 1 px border under the bar; hover a cable for a small trash that disconnects it | yes | hover | none | n/a | n/a | StageMenuBar, StageLinks |

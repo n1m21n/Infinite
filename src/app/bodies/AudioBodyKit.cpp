@@ -741,6 +741,7 @@ namespace app
       // case for it either - it rendered as a bare pin column with no "Edit
       // Field..." button and no way to reach DrawFieldSampleParams at all.
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
+          dynamic_cast<AudioRibbonNode*>(node) != nullptr ||
           dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
           dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr ||
           dynamic_cast<FieldSampleNode*>(node) != nullptr ||

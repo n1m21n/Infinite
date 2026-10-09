@@ -870,6 +870,12 @@ void DrawMenuBar(FrameCtx& fc)
          ImGui::PopStyleColor(6);
          ImGui::PopStyleVar(4);
 
+         // Bottom edge: separates the bar from the canvas.
+         {
+            const ImRect r = ImGui::GetCurrentWindow()->MenuBarRect();
+            ImGui::GetWindowDrawList()->AddLine(ImVec2(r.Min.x, r.Max.y - 0.5f), ImVec2(r.Max.x, r.Max.y - 0.5f),
+                                                ImGui::GetColorU32(ImGuiCol_Border), 1.0f);
+         }
          ImGui::EndMenuBar();
       }
 
