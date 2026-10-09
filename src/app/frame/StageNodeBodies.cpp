@@ -306,6 +306,13 @@ void DrawNodeBodies(FrameCtx& fc)
             dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr;
          IGeometrySource* geoSourceForViewport = dynamic_cast<IGeometrySource*>(gn.node.get());
+         // Breathing room between the title bar and a macro's main control.
+         if (dynamic_cast<MacroKnobNode*>(gn.node.get()) || dynamic_cast<MacroSliderNode*>(gn.node.get()) ||
+             dynamic_cast<MacroBipolarKnobNode*>(gn.node.get()) || dynamic_cast<MacroXYNode*>(gn.node.get()) ||
+             dynamic_cast<MacroToggleNode*>(gn.node.get()) || dynamic_cast<MacroTriggerNode*>(gn.node.get()) ||
+             dynamic_cast<MacroNumBoxNode*>(gn.node.get()) || dynamic_cast<MacroRadioSelectorNode*>(gn.node.get()) ||
+             dynamic_cast<MacroStepGateNode*>(gn.node.get()))
+            ImGui::Dummy(ImVec2(0.0f, 10.0f));
          if (multiOutModulator)
             ; // these draw their own meters in the params panel
          else if (auto* macroKnob = dynamic_cast<MacroKnobNode*>(gn.node.get()))
