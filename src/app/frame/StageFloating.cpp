@@ -148,7 +148,7 @@ int DrawFloating(FrameCtx& fc)
       }
       if (DialogParts::Begin(L("About Infinite")))
       {
-         const float w = 320.0f;
+         const float w = 400.0f;
          ImGui::Dummy(ImVec2(w, 0.0f));
          const auto Centered = [&](const char* text, bool dim)
          {
@@ -184,10 +184,16 @@ int DrawFloating(FrameCtx& fc)
          Credit(T("Contributors"), "Ricardo Palmieri");
          Credit(T("Agent"), "Claude (Anthropic)");
          DialogParts::Message(T("MIT licensed"));
-         const int pick = DialogParts::Buttons({ L("Website"), L("Close") });
+         const int pick = DialogParts::Buttons({ L("Check for updates"), L("Website"), L("Close") });
          if (pick == 0)
+         {
+            UpdateCheck::Start();
+            gShowUpdateCheckModal = true;
+            ImGui::CloseCurrentPopup();
+         }
+         if (pick == 1)
             Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/");
-         if (pick == 1 || ImGui::IsKeyPressed(ImGuiKey_Escape))
+         if (pick == 2 || ImGui::IsKeyPressed(ImGuiKey_Escape))
             ImGui::CloseCurrentPopup();
          DialogParts::End();
       }
