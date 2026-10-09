@@ -764,15 +764,20 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
       {
-         AudioKnobRow row(5);
+         // Selectors on their own row so the scale name is never clipped; knobs below on a 3-cell grid.
+         AudioKnobRow sel(2);
          if (n->useGlobalScale)
             ImGui::BeginDisabled();
-         row.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
+         sel.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
                       [n](int i) { PushUndoCheckpoint(); n->scale = i; });
-         row.Dropdown("root", NoteNameList(), n->root,
+         sel.Dropdown("root", NoteNameList(), n->root,
                       [n](int i) { PushUndoCheckpoint(); n->root = i; });
          if (n->useGlobalScale)
             ImGui::EndDisabled();
+         sel.End();
+      }
+      {
+         AudioKnobRow row(3);
          row.KnobInt("lo", &n->rangeLow, 0, 127, kKnobSmall);
          row.KnobInt("hi", &n->rangeHigh, 0, 127, kKnobSmall);
          row.Knob("chance", &n->chance, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
