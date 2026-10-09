@@ -90,6 +90,9 @@ namespace app
                   FaderPosToValueFn posToValue, FaderValueToPosFn valueToPos,
                   int explicitParamIndex, const char* nameOverride)
    {
+      // One slider look everywhere: accent fill behind the value, no grab square. The plain ImGui
+      // branches below are kept only until they are deleted; nothing reaches them.
+      audioStyle = true;
       const int nodeIndex = gCurrentNodeIndex;
       const int paramIndex = (explicitParamIndex >= 0) ? explicitParamIndex : gParamCounter++;
       // nameOverride: what the matrix / binding menu / perf picker call the
