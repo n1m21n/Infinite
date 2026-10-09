@@ -906,6 +906,7 @@ void DrawKeyboard(FrameCtx& fc)
       ed::Suspend();
 
       DrawMinimap();
+      DrawFind();
 
       // Deferred from GlobalScaleToggle() above - see comment on
       // gGlobalScaleTooltipHovered. This is the first point after the

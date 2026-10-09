@@ -43,6 +43,7 @@ void FrameTest_GROUPTEST(int frameId, GLFWwindow* window);
 void FrameTest_LIVETEST(int frameId, GLFWwindow* window);
 void FrameTest_GLTFDROPTEST(int frameId, GLFWwindow* window);
 void FrameTest_NAVTEST(int frameId, GLFWwindow* window);
+void FrameTest_FINDTEST(int frameId, GLFWwindow* window);
 void FrameTest_THEMECONTRASTTEST(int frameId, GLFWwindow* window);
 void FrameTest_TEXTFOCUSTEST(int frameId, GLFWwindow* window);
 void FrameTest_UXLEFTOVERSTEST(int frameId, GLFWwindow* window);

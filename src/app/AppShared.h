@@ -5460,6 +5460,14 @@ bool HandleRpcCommand(const std::string& method, const nlohmann::json& params,
 
 void DrawMinimap();
 
+// Find on the canvas (Cmd/Ctrl+F), src/app/panels/FindOverlay.cpp.
+void DrawFind();
+bool FindIsOpen();
+int FindMatchCount();
+int FindMatchNodeIndex(int i);   // GraphNode::index of the i-th match, -1 out of range
+int FindCurrentMatch();
+bool FindIsMatch(int nodeIndex);
+
 std::string BundledResourcePath(const char* relPath);
 
 void SetWindowIcon(GLFWwindow* window);

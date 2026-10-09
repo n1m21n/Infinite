@@ -455,6 +455,7 @@ set(COMMON_SOURCES
     src/app/panels/HelpWindows.cpp
     src/app/panels/LibraryPanels.cpp
     src/app/panels/Minimap.cpp
+    src/app/panels/FindOverlay.cpp
     src/app/panels/ModMatrixPanel.cpp
     src/app/panels/PerfPanel.cpp
     src/app/panels/SettingsWindow.cpp

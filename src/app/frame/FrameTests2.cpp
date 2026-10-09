@@ -3112,4 +3112,120 @@ void FrameTest_FIELDGRAPHRATETEST(int frameId, GLFWwindow* window)
          printf("%s\n", allOk ? "FIELDGRAPHRATE OK" : "SUSPECT");
       }
 }
+
+// Cmd/Ctrl+F find on a 400-node patch: by type, by comment text, by title with arrow stepping. Real key and
+// character events, so the shortcut, the field, the match list, the jump and Esc are all exercised.
+void FrameTest_FINDTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_FINDTEST") == nullptr)
+      return;
+   ImGuiIO& tio = ImGui::GetIO();
+   tio.ConfigInputTrickleEventQueue = false;
+   tio.AddFocusEvent(true);
+   static bool ok = true;
+   static int drumIdx = -1, needleIdx = -1;
+   auto check = [&](bool good, const char* what) {
+      ok = ok && good;
+      printf("findtest %-52s %s\n", what, good ? "ok" : "FAIL");
+   };
+   auto tap = [&](ImGuiKey key, int at, bool ctrl) {
+      if (frameId == at)
+      {
+         if (ctrl) tio.AddKeyEvent(ImGuiMod_Ctrl, true);
+         tio.AddKeyEvent(key, true);
+      }
+      if (frameId == at + 1)
+      {
+         tio.AddKeyEvent(key, false);
+         if (ctrl) tio.AddKeyEvent(ImGuiMod_Ctrl, false);
+      }
+   };
+   auto type = [&](const char* text, int at) {
+      if (frameId == at)
+         for (const char* c = text; *c; ++c) tio.AddInputCharacter(*c);
+   };
+   auto nodeCentreNear = [&](int idx) {
+      GraphNode* gn = FindNodeByIndex(idx);
+      if (gn == nullptr) return false;
+      const ImVec2 p = ed::GetNodePosition(gn->NodeId());
+      const ImVec2 sz = ed::GetNodeSize(gn->NodeId());
+      const ImVec2 mid(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f);
+      return std::fabs(mid.x - gViewCenterCanvas.x) < 90.0f && std::fabs(mid.y - gViewCenterCanvas.y) < 90.0f;
+   };
+   auto onlySelected = [&](int idx) {
+      for (GraphNode& gn : gNodes)
+         if (ed::IsNodeSelected(gn.NodeId()) != (gn.index == idx)) return false;
+      return true;
+   };
+
+   if (frameId == 3)
+   {
+      for (int i = 0; i < 400; ++i)
+      {
+         const float x = (float)(i % 20) * 420.0f, y = (float)(i / 20) * 320.0f;
+         GraphNode* gn = nullptr;
+         if (i == 237) gn = SpawnNode("Drum Sequencer", "Synths", x, y);
+         else if (i % 4 == 0) gn = SpawnNode("Comment", "Compositing", x, y);
+         else gn = SpawnNode("Equation Synth", "Synths", x, y);
+         if (gn == nullptr) continue;
+         const int idx = gn->index;
+         if (i == 237) drumIdx = idx;
+         if (auto* c = dynamic_cast<CommentNode*>(gn->node.get()))
+            c->text = (i == 76) ? "needle-comment-77 retune the bass" : "note " + std::to_string(i);
+         if (i == 76) needleIdx = idx;
+      }
+      check(gNodes.size() >= 400 && drumIdx >= 0 && needleIdx >= 0, "400-node fixture spawned");
+   }
+   // By type.
+   tap(ImGuiKey_F, 14, true);
+   if (frameId == 17) check(FindIsOpen(), "Cmd/Ctrl+F opens the field");
+   type("drum seq", 19);
+   if (frameId == 23)
+   {
+      check(FindMatchCount() == 1 && FindMatchNodeIndex(0) == drumIdx, "type: 'drum seq' finds the one Drum Sequencer");
+      check(!gRequestFitView, "typing in the field raises no fit-view request");
+   }
+   tap(ImGuiKey_Enter, 24, false);
+   if (frameId == 60)
+   {
+      check(onlySelected(drumIdx), "Enter selects exactly that node");
+      check(nodeCentreNear(drumIdx), "Enter centres the view on it");
+   }
+   tap(ImGuiKey_Escape, 62, false);
+   if (frameId == 66) check(!FindIsOpen(), "Esc closes");
+   // By comment text.
+   tap(ImGuiKey_F, 68, true);
+   type("needle comment", 72);
+   if (frameId == 76)
+      check(FindMatchCount() == 1 && FindMatchNodeIndex(0) == needleIdx, "comment: 'needle comment' finds the one comment");
+   tap(ImGuiKey_Enter, 77, false);
+   if (frameId == 115)
+   {
+      check(onlySelected(needleIdx), "comment hit is selected");
+      check(nodeCentreNear(needleIdx), "comment hit is centred");
+   }
+   tap(ImGuiKey_Escape, 117, false);
+   // By title, stepping with the arrows.
+   tap(ImGuiKey_F, 121, true);
+   type("equation", 125);
+   if (frameId == 129) check(FindMatchCount() > 100, "title: 'equation' finds the synths");
+   tap(ImGuiKey_DownArrow, 130, false);
+   tap(ImGuiKey_DownArrow, 132, false);
+   if (frameId == 135) check(FindCurrentMatch() == 2, "two Down presses step to the third match");
+   const int third = frameId == 135 ? FindMatchNodeIndex(2) : -1;
+   static int thirdIdx = -1;
+   if (frameId == 135) thirdIdx = third;
+   tap(ImGuiKey_Enter, 136, false);
+   if (frameId == 175)
+   {
+      check(onlySelected(thirdIdx), "stepped hit is selected");
+      check(nodeCentreNear(thirdIdx), "stepped hit is centred");
+   }
+   tap(ImGuiKey_Escape, 177, false);
+   if (frameId == 181)
+   {
+      check(!FindIsOpen(), "Esc closes again");
+      printf("%s\n", ok ? "FIND TEST OK" : "FIND TEST FAIL");
+   }
+}
 }

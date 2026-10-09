@@ -578,6 +578,7 @@ namespace app
          { I18N_KEY("Canvas & View"), I18N_KEY("Performance Matrix"), "Shift+P", I18N_KEY("Toggle docked performance matrix") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Arrangement Timeline"), "Shift+T", I18N_KEY("Toggle docked arrangement timeline") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Fit View to Content"), "F / Shift+Y", I18N_KEY("Frame the whole patch in the canvas view") },
+         { I18N_KEY("Canvas & View"), I18N_KEY("Find"), MODKEY "+F", I18N_KEY("Find a node by title, type, comment text or param name. Up / Down step, Enter jumps to it, Esc closes") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Pan Canvas (keys)"), "W / A / S / D", I18N_KEY("Hold to pan the canvas up / left / down / right. Not while a hovered audio keyboard node is using the letters") },
 
          // Transport & Audio

@@ -25,3 +25,4 @@ MOLDERTEST|"reconstruction error -6.7 dB FAIL" (wants < -20dB) — genuine, unde
 PREDBINDTEST|prints nothing at all (empty log, rc=0) in this build tree because the whole fixture — the stub IPredictor at src/main.cpp:5543 and the verdict block at src/main.cpp:89417 — is inside `#ifndef NDEBUG`, and `build/` is CMAKE_BUILD_TYPE=Release (-O3 -DNDEBUG, see build/CMakeCache.txt). Not a regression: it is compiled out, so no frame count can make it speak. Its driver entry was also wrong (40 frames against a verdict that prints at frameId==110, src/main.cpp:89596) and is now 120, so it will report properly the moment it runs against a Debug tree. To exercise it: configure a Debug build and run INFINITE_PREDBINDTEST=1 INFINITE_EXITAFTER=120 against that binary.
 
 
+UISCALETEST|Render 3D is 445 wide at UI scale 1.0 but 421 at 1.25 (outside the 1% tolerance); present since before Node polish 2 (bisected to 7d30a25f or earlier), not caused by block K
