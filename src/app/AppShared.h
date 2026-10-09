@@ -3617,6 +3617,7 @@ void DrawCVToPitchParams(CVToPitchNode* n);
 void DrawNoteToCVParams(NoteToCVNode* n);
 
 void DrawVelocityToCVParams(VelocityToCVNode* n);
+void DrawMidiOutParams(MidiOutNode* n);
 
 void DrawCVRecorderParams(CVRecorderNode* n);
 
@@ -5861,6 +5862,7 @@ void RunVideoExactTest();
 void RunRecExportTest(int width, int height, bool starved, const char* label);
 
 bool RunAudioPdcTest();
+bool RunMidiOutTest();
 bool RunI18nTest();
 
 #if defined(__linux__)

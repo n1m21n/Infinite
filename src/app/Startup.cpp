@@ -572,6 +572,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return 0;
    }
 
+   if (getenv("INFINITE_MIDIOUTTEST") != nullptr)
+   {
+      RunMidiOutTest();
+      return 0; // verdict is the printf line, not $?
+   }
+
    if (getenv("INFINITE_I18NTEST") != nullptr)
    {
       RunI18nTest();

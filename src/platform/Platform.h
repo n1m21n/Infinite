@@ -996,6 +996,40 @@ namespace Platform
    bool MidiClockIsPresent(); // pulses seen within the last couple of seconds
    float MidiClockBpm();      // smoothed estimate; 0 if not enough pulses yet
 
+   // ---- MIDI output (docs/plans/midi-out) ----------------------------------
+   // Sends to a hardware or virtual MIDI destination. None of this is audio-thread
+   // safe: the OS calls allocate and lock. The audio thread never calls it; it pushes
+   // into a MidiOutSink (platform/common/MidiOutSink.h) whose own thread calls
+   // MidiOutSend.
+   struct MidiOutHandle;
+
+   // Seconds on std::chrono::steady_clock's timeline. The one clock MidiOutSend's
+   // deliverAtSeconds is expressed in, so callers need no OS time API.
+   double MidiOutNowSeconds();
+
+   // Names of the connected destinations, in a stable order. Our own virtual
+   // source ("Infinite") is not a destination and never appears here.
+   std::vector<std::string> MidiOutListDevices();
+
+   // Main thread. Opens the destination whose name matches exactly (saved names are
+   // rebound by name on load; handles change every launch). Returns null and fills
+   // outError if it is gone or cannot be opened.
+   MidiOutHandle* MidiOutOpen(const std::string& name, std::string& outError);
+   void MidiOutClose(MidiOutHandle* handle);
+
+   // The MIDI-out thread only. `bytes` is one complete channel or system-realtime
+   // message (1-3 bytes; SysEx is out of scope for v1). Delivered at deliverAtSeconds
+   // (MidiOutNowSeconds timeline); a time in the past sends at once. macOS timestamps
+   // the packet, Linux schedules it on an ALSA queue, Windows waits (at most ~20 ms)
+   // before midiOutShortMsg, so Windows jitter is about 1 ms. Returns false if the
+   // device vanished.
+   bool MidiOutSend(MidiOutHandle* handle, const unsigned char* bytes, size_t len,
+                    double deliverAtSeconds);
+
+   // True where Infinite can publish its own "Infinite" virtual source that DAWs see
+   // (macOS, Linux). False on Windows: WinMM cannot create one; loopMIDI is the answer.
+   bool MidiOutVirtualAvailable();
+
    // ---- video recording ---------------------------------------------------
    struct RecorderHandle;
 

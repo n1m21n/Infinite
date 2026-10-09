@@ -768,6 +768,7 @@ namespace app
           dynamic_cast<FieldSynthNode*>(node) != nullptr ||
           dynamic_cast<NoteToCVNode*>(node) != nullptr ||
           dynamic_cast<VelocityToCVNode*>(node) != nullptr ||
+          dynamic_cast<MidiOutNode*>(node) != nullptr ||
           dynamic_cast<CVRecorderNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
