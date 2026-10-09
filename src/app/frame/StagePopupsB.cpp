@@ -626,13 +626,14 @@ void DrawPopupsB(FrameCtx& fc)
             sTrashSeen = now;
          }
          ImVec2 canvasMid;
-         if (sTrashLink != 0 && now - sTrashSeen < 0.5 && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
+         if (sTrashLink != 0 && now - sTrashSeen < 1.5 && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
          {
             const float r = 11.0f;
             const ImVec2 c = ed::CanvasToScreen(canvasMid);
             const ImVec2 m = ImGui::GetMousePos();
             const bool over = (m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= (r + 2.0f) * (r + 2.0f);
-            if (over)
+            // Stays while the cursor is anywhere near the button, so there is time to travel along the cable to it.
+            if ((m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= 48.0f * 48.0f)
                sTrashSeen = now;
             ImDrawList* dl = ImGui::GetForegroundDrawList();
             const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
