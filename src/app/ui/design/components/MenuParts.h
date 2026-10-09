@@ -159,8 +159,9 @@ namespace MenuParts
    inline bool BeginCombo(const char* id, const char* preview, ImGuiComboFlags flags = 0)
    {
       PushPopupPad();
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
       const bool open = ImGui::BeginCombo(id, preview, flags);
-      ImGui::PopStyleVar();
+      ImGui::PopStyleVar(2);
       if (open)
          BeginContent();
       return open;

@@ -16,8 +16,9 @@ namespace app
    {
       static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
       MenuParts::PushPopupPad();
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
       const bool dockOpen = ImGui::BeginCombo("##perfpaneldock", T(kDockLabels[gPerfPanelDock]));
-      ImGui::PopStyleVar();
+      ImGui::PopStyleVar(2);
       if (dockOpen)
       {
          MenuParts::BeginContent();
