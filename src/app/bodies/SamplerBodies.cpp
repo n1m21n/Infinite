@@ -2526,13 +2526,17 @@ namespace app
                      snprintf(num, sizeof(num), "%d", pad + 1);
                      AudioLabelText(dl, ImVec2(mn.x + 5.0f, mn.y + 3.0f), ink, num);
                      // Mode tag; a synced pad also shows its division ("loop 1/8").
+                     // An empty pad has no mode to report yet, so it shows only its number.
                      char tag[32];
                      snprintf(tag, sizeof(tag), "%s", kModeTag[std::clamp(n->padMode[pad], 0, 2)]);
                      if (n->padSync[pad] == MpcNode::kSynced)
                         snprintf(tag, sizeof(tag), "%s %s", kModeTag[std::clamp(n->padMode[pad], 0, 2)],
                                  MusicTime::RateDivisionName(n->padDiv[pad]));
-                     const ImVec2 ts = AudioLabelSize(tag);
-                     AudioLabelText(dl, ImVec2(mx.x - ts.x - 5.0f, mn.y + 3.0f), dim, tag);
+                     if (isLoaded)
+                     {
+                        const ImVec2 ts = AudioLabelSize(tag);
+                        AudioLabelText(dl, ImVec2(mx.x - ts.x - 5.0f, mn.y + 3.0f), dim, tag);
+                     }
                      if (isLoaded)
                      {
                         // Waveform, drawn as the Sampler draws its own: bars
