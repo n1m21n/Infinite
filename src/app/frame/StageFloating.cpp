@@ -274,16 +274,16 @@ int DrawFloating(FrameCtx& fc)
       }
       if (DialogParts::Begin(L("Recover Autosave")))
       {
-         DialogParts::Title(T("Infinite closed unexpectedly."));
+         DialogParts::Title(T("Infinite didn't close properly last time."));
          if (!gAutosaveRecoveryTimestamp.empty())
          {
             char msg[256];
-            snprintf(msg, sizeof(msg), T("A recovered version of your work from %s is available."),
+            snprintf(msg, sizeof(msg), T("Your work from %s was saved automatically. Recover it to carry on, or discard it; your saved patch files are untouched."),
                      gAutosaveRecoveryTimestamp.c_str());
             DialogParts::Message(msg);
          }
          else
-            DialogParts::Message(T("A recovered version of your work is available."));
+            DialogParts::Message(T("Your work was saved automatically. Recover it to carry on, or discard it; your saved patch files are untouched."));
          const int pick = DialogParts::Buttons({ L("Discard"), L("Recover") });
          if (pick == 0)
          {

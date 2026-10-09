@@ -269,6 +269,17 @@ namespace Platform
       }
    }
 
+   void RevealLogs()
+   {
+      const std::string dir = AppPaths::AppSupportDir();
+      if (dir.empty())
+         return;
+      const std::string file = dir + "/log.txt";
+      if (FILE* f = std::fopen(file.c_str(), "a"))
+         std::fclose(f);
+      RevealInFileManager(file);
+   }
+
    void ShowFatalError(const std::string& title, const std::string& message)
    {
       std::fprintf(stderr, "[FATAL] %s: %s\n", title.c_str(), message.c_str());

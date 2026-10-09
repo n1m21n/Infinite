@@ -1,15 +1,59 @@
 // Patch load, auto layout, field graph regenerate, undo/redo, copy/paste (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/Notices.h"
 
 namespace app
 {
  // R30, defined with the live-issue state below
+
+   // Node types a patch named that this build does not have, collected by ApplyPatchData and reported once by
+   // the open that asked for them (undo and paste go through ApplyPatchData too and stay quiet).
+   std::vector<std::string> gSkippedNodeTypes;
+
+   std::string PatchFileName(const std::string& path)
+   {
+      const size_t slash = path.find_last_of("/\\");
+      return slash == std::string::npos ? path : path.substr(slash + 1);
+   }
+
+   // Opening failed before anything was replaced: say so, say the open patch is untouched, say what to try.
+   void PostOpenFailed(const std::string& path, const std::string& error)
+   {
+      const std::string name = path.empty() ? std::string("the patch") : PatchFileName(path);
+      if (error.find("newer version") != std::string::npos)
+         Notices::Post(Notices::Level::Error, "patch.open", name + " was made with a newer Infinite",
+                       "Your current patch is untouched. Update Infinite to open this one.");
+      else if (error.find("not an Infinite patch") != std::string::npos || error.find("file is empty") != std::string::npos)
+         Notices::Post(Notices::Level::Error, "patch.open", name + " isn't a patch Infinite can read",
+                       "Your current patch is untouched. If you expected a patch, the file may be damaged - try a backup or the autosave.");
+      else
+         Notices::Post(Notices::Level::Error, "patch.open", "Couldn't open " + name,
+                       error + ". Your current patch is untouched.");
+   }
+
+   // Opened, but some nodes could not be created. The rest is intact; saving over the file would drop them.
+   void PostSkippedTypes(const std::string& path)
+   {
+      if (gSkippedNodeTypes.empty())
+         return;
+      std::string names;
+      for (size_t i = 0; i < gSkippedNodeTypes.size() && i < 4; ++i)
+         names += (i ? ", " : "") + gSkippedNodeTypes[i];
+      if (gSkippedNodeTypes.size() > 4)
+         names += ", ...";
+      Notices::Post(Notices::Level::Warning, "patch.skipped",
+                    "Opened " + PatchFileName(path) + " without " + std::to_string(gSkippedNodeTypes.size()) +
+                       (gSkippedNodeTypes.size() == 1 ? " node" : " nodes"),
+                    "This version doesn't have: " + names + ". The rest of the patch is intact. Use Save As if you want to keep the original file whole.");
+      gSkippedNodeTypes.clear();
+   }
 
    void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap, bool keepIndices)
    {
       NoteGraphEditedForLiveIssues();
       ScopedPerfTimer perfTimer("ApplyPatchData");
       gSuppressUndoCheckpoints = true;
+      gSkippedNodeTypes.clear();
       NewPatch();
 
       // Saved indices are remapped rather than reused: they only have to be
@@ -38,6 +82,8 @@ namespace app
             // A patch naming a node type this build does not have still opens;
             // it just comes back missing that node.
             fprintf(stderr, "patch: unknown node type '%s', skipped\n", rec.typeName.c_str());
+            if (std::find(gSkippedNodeTypes.begin(), gSkippedNodeTypes.end(), rec.typeName) == gSkippedNodeTypes.end())
+               gSkippedNodeTypes.push_back(rec.typeName);
             continue;
          }
          remap[rec.index] = spawned->index;
@@ -404,6 +450,7 @@ namespace app
       if (!Patch::Read(path, data, error))
       {
          gPatchStatus = std::string(T("Open failed: ")) + error;
+         PostOpenFailed(path, error);
          return false;
       }
       return LoadPatchDataImpl(data, path, reload);
@@ -544,6 +591,7 @@ namespace app
          if (!resolveErrors.empty())
          {
             gPatchStatus = std::string(T("Open failed: line "))  + std::to_string(resolveErrors.front().line) + ": " + resolveErrors.front().message;
+            PostOpenFailed(path, "line " + std::to_string(resolveErrors.front().line) + ": " + resolveErrors.front().message);
             return false;
          }
       }
@@ -590,6 +638,7 @@ namespace app
          PushUndoCheckpoint(); // Cmd+Z returns to the graph as it was before the reload
          const std::string keptPath = gPatchPath;
          ApplyPatchData(data, &pending.remap, HeadlessJobActive());
+         PostSkippedTypes(path);
          ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
          StashPendingKeyed(pending);
          gArrangePatchGeneration++;
@@ -607,6 +656,7 @@ namespace app
          return true;
       }
       ApplyPatchData(data, &pending.remap, HeadlessJobActive());
+      PostSkippedTypes(path);
       ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
       StashPendingKeyed(pending);
       // New document: drop the old one's clip clipboard and selection.

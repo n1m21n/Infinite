@@ -138,9 +138,13 @@ namespace Platform
    // AppPaths::AppSupportDir() + "/log.txt", so a user who hits a startup
    // failure they can't see (see above) has something to attach to a report.
    // Best-effort: never throws, silently does nothing if the file can't be
-   // opened. No-op on macOS - stderr already reaches a visible terminal or
-   // Console.app there.
+   // opened. macOS and Linux also echo to stderr; Windows redirects stderr into
+   // the same file.
    void AppendLogLine(const std::string& line);
+
+   // Help > Reveal logs: shows AppPaths::AppSupportDir() + "/log.txt" selected in the OS file manager (the file is
+   // created empty first so there is always something to select). Same file AppendLogLine writes on every platform.
+   void RevealLogs();
 
    // Reports a fatal startup failure through every channel a user might
    // actually see: stderr (unconditionally, matches prior behavior) and,

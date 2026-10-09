@@ -8,6 +8,31 @@
 
 namespace app
 {
+
+// A click on a node's error/warning badge: the one place each NodeIssue::Fix is carried out.
+static void RunNodeIssueFix(GraphNode& gn, const NodeIssue& issue)
+{
+   switch (issue.fix)
+   {
+   case NodeIssue::Fix::Relink:
+      if (gn.node->Relink())
+         gPatchStatus = std::string(T("Relinked ")) + NodeTitle(gn);
+      break;
+   case NodeIssue::Fix::AudioSettings:
+      gSettingsOpen = true;
+      break;
+   case NodeIssue::Fix::Plugins:
+      gNodePanelOpen = true;
+      gSearchPanelMode = 3;
+      break;
+   case NodeIssue::Fix::ShowNode:
+      ed::SelectNode(gn.NodeId(), false);
+      ed::NavigateToSelection(false, 0.2f);
+      break;
+   case NodeIssue::Fix::None:
+      break;
+   }
+}
 void DrawNodeBodies(FrameCtx& fc)
 {
    ImGuiIO& io = ImGui::GetIO();
@@ -314,6 +339,11 @@ void DrawNodeBodies(FrameCtx& fc)
                ? ImVec4(catColor.r * 0.75f, catColor.g * 0.75f, catColor.b * 0.75f, 1.0f)
                : ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f, catColor.b * 0.6f + 0.4f, 0.75f);
             NodeHeader::Category(gn.category.c_str(), catText);
+            if (const NodeIssue issue = gn.node->Issue())
+            {
+               if (NodeHeader::IssueBadge(issue))
+                  RunNodeIssueFix(gn, issue);
+            }
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
          }
 

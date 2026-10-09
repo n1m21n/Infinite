@@ -1,5 +1,6 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/Notices.h"
 
 namespace app
 {
@@ -668,6 +669,8 @@ namespace app
                // and inspect beats one silently erased.
                gAutosaveRecoveryError = error;
                gPatchStatus = std::string(T("Autosave found but could not be read: ")) + error;
+               Notices::Post(Notices::Level::Warning, "autosave.unreadable", "Last session's autosave couldn't be read",
+                             "It is left on disk, not deleted. Your saved patches are unaffected.");
             }
          }
          // Marker present, no autosave: nothing to offer, not an error.
@@ -690,6 +693,8 @@ namespace app
       if (!Patch::Write(path, data, error))
       {
          gPatchStatus = std::string(T("Save failed: ")) + error;
+         Notices::Post(Notices::Level::Error, "patch.save", "Couldn't save the patch",
+                       error + ". Your patch is still open and unchanged. Check the disk has space and the folder can be written to, or use Save As to pick another place.");
          return false;
       }
 

@@ -3,6 +3,9 @@
 #include "imgui.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/Glyphs.gen.h"
+#include "app/ui/design/TokenColors.h"
+#include "core/CategoryColors.h"
+#include "core/NodeIssue.h"
 #include "app/ui/design/Tokens.gen.h"
 
 // Node header: title row carries the category to the right of the title, dimmed, led by its family glyph.
@@ -42,5 +45,35 @@ namespace NodeHeader
       ImGui::PushStyleColor(ImGuiCol_Text, col);
       ImGui::TextUnformatted(text);
       ImGui::PopStyleColor();
+   }
+
+   // The one error/warning badge on a node title: glyph + colour (red error, amber warning), never colour alone.
+   // Hover says why, a click returns true so the caller runs the fix. Sits on the title row, so it is there at
+   // every zoom and on collapsed nodes alike.
+   inline bool IssueBadge(const NodeIssue& issue)
+   {
+      if (!issue)
+         return false;
+      const bool err = issue.level == NodeIssue::Level::Error;
+      const ImU32 col = tok::U32(err ? tok::action_record : tok::action_learn, CategoryColors::IsThemeLight());
+      ImGui::SameLine(0.0f, tok::space_2);
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float h = ImGui::GetTextLineHeight();
+      const bool clicked = ImGui::InvisibleButton("##nodeissue", ImVec2(kFamilyGlyph + 2.0f, h));
+      const bool hot = ImGui::IsItemHovered();
+      glyph::Draw(ImGui::GetWindowDrawList(), ImVec2(p.x + (kFamilyGlyph + 2.0f) * 0.5f, p.y + h * 0.5f),
+                  kFamilyGlyph + (hot ? 2.0f : 0.0f), col, err ? IconsInfinite::Error : IconsInfinite::Warning);
+      if (hot)
+      {
+         ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         if (ImGui::BeginTooltip())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+            ImGui::TextUnformatted(issue.reason.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+         }
+      }
+      return clicked && issue.fix != NodeIssue::Fix::None;
    }
 }

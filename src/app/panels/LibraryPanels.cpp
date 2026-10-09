@@ -4,6 +4,7 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/BusyLine.h"
 #include "app/ui/design/components/LibraryParts.h"
 
 namespace app
@@ -209,7 +210,7 @@ namespace app
          if (clicked)
             scanAll = true;
          if (scanning)
-            ImGui::TextDisabled(T("scanning... (%d found)"), scanner.FilesFoundSoFar());
+            BusyLine::Draw(T("Scanning folders - found so far"), -1.0f, scanner.FilesFoundSoFar());
       }
       if (scanAll)
          scanner.StartScan();
@@ -610,7 +611,7 @@ namespace app
          ImGui::EndDisabled();
 
       if (scanning)
-         ImGui::TextDisabled(T("scanning... (%d found)"), gPluginScanner.PluginsFoundSoFar());
+         BusyLine::Draw(T("Scanning plugins - found so far"), -1.0f, gPluginScanner.PluginsFoundSoFar());
       else if (gPluginScanner.Index().empty())
          ImGui::TextDisabled("%s", T("no plugins indexed yet - hit Rescan plugins"));
 

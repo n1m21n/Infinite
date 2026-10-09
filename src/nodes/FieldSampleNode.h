@@ -178,6 +178,7 @@ public:
    // previously-active program in place on failure.
    bool Apply();
    const std::string& LastError() const { return mLastError; }
+   NodeIssue Issue() const override { return NodeIssues::FieldCompile(mLastError); }
    const std::string& Notice() const { return mNotice; }
 
    void SetNodeIndex(int idx) { mNodeIndex = idx; }

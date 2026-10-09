@@ -908,6 +908,7 @@ void DrawKeyboard(FrameCtx& fc)
       DrawMinimap();
       DrawFind();
       DrawCookOverlay();
+      DrawNotices();
 
       // Deferred from GlobalScaleToggle() above - see comment on
       // gGlobalScaleTooltipHovered. This is the first point after the

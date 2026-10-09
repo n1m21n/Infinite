@@ -143,6 +143,7 @@ public:
 
    bool Apply();
    const std::string& LastError() const { return mLastError; }
+   NodeIssue Issue() const override { return NodeIssues::FieldCompile(mLastError); }
    const std::string& Notice() const { return mNotice; }
    const Field::ParamTable& GetParamTable() const { return mParamTable; }
    Field::ParamTable& GetParamTable() { return mParamTable; }

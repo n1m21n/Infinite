@@ -1,4 +1,6 @@
 // Offline render windows, arrange clip settings and render queue (moved verbatim from main.cpp).
+#include <algorithm>
+#include <cctype>
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -1234,7 +1236,15 @@ namespace app
       job.status = kArrangeJobFailed;
       job.message = why;
       gArrangeRenderActiveJobId = 0;
-      gArrangeRenderFailNotice = "\"" + job.path + "\"\n\n" + why;
+      // The next step depends on what the encoder said; the words differ, the reassurance does not.
+      std::string lower = why;
+      std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+      const char* next = "Check the folder can be written to and try again.";
+      if (lower.find("space") != std::string::npos || lower.find("disk full") != std::string::npos)
+         next = "The disk looks full. Free some space or choose another folder, then render again.";
+      else if (lower.find("codec") != std::string::npos || lower.find("encoder") != std::string::npos)
+         next = "This computer can't encode that format. Pick another codec or format in the render settings and try again.";
+      gArrangeRenderFailNotice = "\"" + job.path + "\"\n\n" + why + "\n\n" + next;
       gArrangeRenderFailNoticeOpen = true;
       fprintf(stderr, "timeline render failed: %s (%s)\n", why.c_str(), job.path.c_str());
    }
@@ -1250,7 +1260,7 @@ namespace app
       if (DialogParts::Begin(L("Render failed##arrangeRenderFail")))
       {
          DialogParts::Title(T("Render failed"));
-         DialogParts::Message(T("The timeline render did not start."));
+         DialogParts::Message(T("The render stopped before it finished. Your patch was not changed."));
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
          DialogParts::Message(gArrangeRenderFailNotice.c_str());
          ImGui::PopTextWrapPos();

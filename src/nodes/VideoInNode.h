@@ -37,6 +37,7 @@ public:
    }
 
    const std::string& LastError() const { return mLastError; }
+   NodeIssue Issue() const override;
    // B8 bench only: nullptr unless Bench::MediaIoEnabled() was on when this
    // node first cooked.
    const Bench::MediaCameraCounters* BenchCounters() const { return mBench.get(); }

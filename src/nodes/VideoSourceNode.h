@@ -57,6 +57,8 @@ public:
 
    const std::string& LastError() const { return mLastError; }
    const std::string& LoadedPath() const { return mLoadedPath; }
+   NodeIssue Issue() const override { return NodeIssues::MediaFile(mLoadedPath, mLastError); }
+   bool Relink() override { return OpenViaDialog(); }
    double Duration() const { return mDuration; }
    double Position() const { return mPosition; }
 

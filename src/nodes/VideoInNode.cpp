@@ -1,4 +1,5 @@
 #include "VideoInNode.h"
+#include <chrono>
 
 #include "gl3.h"
 #include "BenchReport.h"
@@ -243,4 +244,24 @@ void VideoInNode::CookIfNeeded(int frameId)
          }
       }
    }
+}
+
+NodeIssue VideoInNode::Issue() const
+{
+   if (!active || mCamera != nullptr || mLastError.empty())
+      return {};
+   // The OS is asked at most once a second: this runs while the node is drawn.
+   static auto lastAsk = std::chrono::steady_clock::time_point{};
+   static Platform::CameraAuthorization cached = Platform::CameraAuthorization::Authorized;
+   const auto now = std::chrono::steady_clock::now();
+   if (now - lastAsk > std::chrono::seconds(1))
+   {
+      cached = Platform::CameraAuthorizationStatus();
+      lastAsk = now;
+   }
+   if (cached == Platform::CameraAuthorization::Denied || cached == Platform::CameraAuthorization::Restricted)
+      return NodeIssue::Err("Camera access is off for Infinite, so there is no picture. Allow it in your system's privacy settings "
+                            "(Camera), then switch this node off and on. Your patch is unchanged.");
+   return NodeIssue::Warn("The camera didn't start: " + NodeIssues::FirstLine(mLastError) +
+                          ". Check it is connected and not in use by another app. Your patch is unchanged.");
 }

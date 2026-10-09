@@ -222,6 +222,13 @@ public:
 
    // Why the tap isn't live, or empty when it is. See CookIfNeeded.
    const std::string& Status() const { return mStatus; }
+   NodeIssue Issue() const override
+   {
+      if (mStatus.empty())
+         return {};
+      return NodeIssue::Warn("No audio input: " + NodeIssues::FirstLine(mStatus) + ". The rest of the patch keeps running. Click to open audio settings.",
+                             NodeIssue::Fix::AudioSettings);
+   }
 
    float gainDb = 0.0f;
    int channelMode = 0; // 0 = Stereo (1+2), 1 = Input 1 (mono), 2 = Input 2 (mono), 3 = Input 3 (mono)...

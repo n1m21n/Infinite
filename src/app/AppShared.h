@@ -5463,6 +5463,9 @@ void DrawMinimap();
 // Find on the canvas (Cmd/Ctrl+F), src/app/panels/FindOverlay.cpp.
 void DrawFind();
 void DrawCookOverlay();   // View > Cook times; see CookOverlay.cpp
+std::string BuildSystemInfo();   // Help > Copy system info; see Diagnostics.cpp
+void CopySystemInfo();
+void DrawNotices();       // Notices::Active() as cards, bottom-right; see NoticeStack.cpp
 bool FindIsOpen();
 int FindMatchCount();
 int FindMatchNodeIndex(int i);   // GraphNode::index of the i-th match, -1 out of range

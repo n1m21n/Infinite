@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE944;
+   inline constexpr unsigned kLast = 0xE946;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -74,4 +74,6 @@ namespace IconsInfinite
    inline constexpr const char* FamilySource = "\xee\xa5\x82"; // U+E942 family-source
    inline constexpr const char* FamilySynths = "\xee\xa5\x83"; // U+E943 family-synths
    inline constexpr const char* FamilyUtility = "\xee\xa5\x84"; // U+E944 family-utility
+   inline constexpr const char* Error = "\xee\xa5\x85"; // U+E945 error
+   inline constexpr const char* Warning = "\xee\xa5\x86"; // U+E946 warning
 }

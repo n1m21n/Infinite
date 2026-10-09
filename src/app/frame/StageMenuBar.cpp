@@ -391,6 +391,10 @@ void DrawMenuBar(FrameCtx& fc)
                gShortcutsOpen = true;
             if (MenuParts::Item(L("Help / module reference")))
                gHelpOpen = true;
+            if (MenuParts::Item(L("Copy system info")))
+               CopySystemInfo();
+            if (MenuParts::Item(L("Reveal logs")))
+               Platform::RevealLogs();
 #ifndef NDEBUG
             // ImGui's built-in inspectors, not a custom tool: the Debugger's
             // Tools > Item Picker names the exact ImGuiCol_*/style var and

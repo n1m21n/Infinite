@@ -125,6 +125,7 @@ public:
    // Field compilation & UI
    bool Apply();
    const std::string& LastError() const { return mLastError; }
+   NodeIssue Issue() const override { return NodeIssues::FieldCompile(mLastError); }
    const std::string& Notice() const { return mNotice; }
    bool WasTruncated() const { return mWasTruncated; }
    int ActualElementCount() const { return mActualElementCount; }
