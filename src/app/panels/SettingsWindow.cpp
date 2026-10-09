@@ -19,7 +19,7 @@ namespace app
       ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
       // Cards reach SectionCard::kPad into the window padding, so 16 leaves an 8 pt margin to the window edge on every side.
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
+      FormParts::PushWindowPad();
       const bool settingsVisible = ImGui::Begin(L("Settings"), open, ImGuiWindowFlags_NoCollapse);
       ImGui::PopStyleVar();
       if (!settingsVisible)

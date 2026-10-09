@@ -180,6 +180,12 @@ namespace FormParts
    }
 
    // Frame tint for a tab bar so the tabs read as chips: quiet at rest, a text-tinted well when selected.
+   // Window padding for form windows: cards reach SectionCard::kPad into it, so space_4 leaves an 8 pt margin.
+   inline void PushWindowPad()
+   {
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
+   }
+
    inline void PushTabStyle()
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
