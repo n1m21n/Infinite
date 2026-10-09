@@ -406,7 +406,25 @@ namespace app
 
       ImGuiStyle& style = ImGui::GetStyle();
       style.Colors[ImGuiCol_Text] = vec(t.text);
-      style.Colors[ImGuiCol_TextDisabled] = vec(t.textDim);
+      // G15: dim text keeps 4.5:1 against the panel in every theme, ported presets included. The dim colour
+      // is pulled toward full text colour only as far as needed, so themes that already pass are unchanged.
+      {
+         auto lum = [](float r, float g, float b) {
+            auto f = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
+            return 0.2126f * f(r) + 0.7152f * f(g) + 0.0722f * f(b);
+         };
+         auto ratio = [](float a, float b) { return (std::max(a, b) + 0.05f) / (std::min(a, b) + 0.05f); };
+         const float panelL = lum(t.panelBg.r, t.panelBg.g, t.panelBg.b);
+         float k = 0.0f;
+         ImVec4 dim = vec(t.textDim);
+         for (; k < 1.0f; k += 0.05f)
+         {
+            dim = ImVec4(t.textDim.r + (t.text.r - t.textDim.r) * k, t.textDim.g + (t.text.g - t.textDim.g) * k,
+                         t.textDim.b + (t.text.b - t.textDim.b) * k, 1.0f);
+            if (ratio(lum(dim.x, dim.y, dim.z), panelL) >= 4.5f) break;
+         }
+         style.Colors[ImGuiCol_TextDisabled] = dim;
+      }
       style.Colors[ImGuiCol_WindowBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_ChildBg] = vec(t.panelBg, 0.0f);
       style.Colors[ImGuiCol_PopupBg] = vec(t.panelBg, 0.98f);

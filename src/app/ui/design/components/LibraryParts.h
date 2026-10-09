@@ -66,8 +66,8 @@ namespace LibraryParts
       {
          const ImVec2 c(p.x + w - tok::space_2 - 8.0f, p.y + kFieldH * 0.5f);
          const ImVec2 saved = ImGui::GetCursorScreenPos();
-         ImGui::SetCursorScreenPos(ImVec2(c.x - 10.0f, c.y - 10.0f));
-         if (ImGui::InvisibleButton("##clear", ImVec2(20.0f, 20.0f)))
+         ImGui::SetCursorScreenPos(ImVec2(c.x - 12.0f, c.y - 12.0f));
+         if (ImGui::InvisibleButton("##clear", ImVec2(24.0f, 24.0f)))
             cleared = true;
          const bool hov = ImGui::IsItemHovered();
          ImGui::SetCursorScreenPos(saved);
