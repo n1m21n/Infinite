@@ -310,7 +310,7 @@ namespace app
       const float h = 90.0f; // same as DrawModulatorMeter, so the node header keeps its height
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h), ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h), ScopeBgCol(), tok::radius_field);
       // Fixed 0..1 axis with quarter guides, exactly as the generic meter draws them: overlaid
       // destinations are only comparable at all because they share one scale.
       for (int q = 1; q < 4; q++)

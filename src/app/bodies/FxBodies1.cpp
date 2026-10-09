@@ -236,7 +236,7 @@ namespace app
          PushUndoCheckpoint();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       // Graticule that keeps this from reading as blank at rest (§3f).
@@ -572,7 +572,7 @@ namespace app
          PushUndoCheckpoint();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       DrawFilterGraticule(dl, origin, w, h);
@@ -1015,7 +1015,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, ImVec2(curveBr.x, br.y), ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, ImVec2(curveBr.x, br.y), ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, curveBr, true);
 
       static const float kDbTicks[] = { -48.0f, -36.0f, -24.0f, -12.0f, 0.0f };
@@ -1196,7 +1196,7 @@ namespace app
       const ImVec2 origin(x, y);
       const ImVec2 br(x + w, y + h);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float grDb = std::clamp(n->ExtraMeterValue(0), 0.0f, 20.0f);
@@ -1284,7 +1284,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       // Amplitude gridlines, same 25%-step reading aid Dynamics/Reverb use.
@@ -1442,7 +1442,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float predelaySeconds = n->Param("predelay") * 0.001f;
@@ -1570,7 +1570,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       // Center gridlines (x=0, y=0) plus quarter-amplitude ticks, the same
@@ -1666,7 +1666,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       for (int i = -2; i <= 2; i++)
@@ -1818,7 +1818,7 @@ namespace app
       const float radius = std::min(w * 0.48f, h - 26.0f);
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       // Concentric dB rings, apex-centered, sweeping only the upper half.
@@ -1927,7 +1927,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;

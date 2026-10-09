@@ -95,7 +95,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 br(origin.x + size, origin.y + size);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       for (int i = 1; i < 4; i++)
       {
          float f = (float)i / 4.0f;

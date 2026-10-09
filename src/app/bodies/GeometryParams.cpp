@@ -1255,7 +1255,7 @@ namespace app
             float mag = std::clamp(spec[bin] * 2.5f, 0.0f, 1.0f);
             pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - 4.0f)));
          }
-         dl->AddPolyline(pts.data(), (int)pts.size(), tok::U32(tok::pal::c_FFFFFF82), false, 1.2f);
+         dl->AddPolyline(pts.data(), (int)pts.size(), tok::U32(tok::pal::c_FFFFFF82), false, 1.5f);
       }
 
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::U32(tok::pal::c_464A5AFF), 3.0f);

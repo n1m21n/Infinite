@@ -24,7 +24,7 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -82,7 +82,7 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -159,7 +159,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -328,7 +328,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -443,7 +443,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -558,7 +558,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -779,7 +779,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       // Perspective: each successive frame steps right and up by a fixed
@@ -938,7 +938,7 @@ namespace app
 
       const bool isLight = IsThemeLight();
       // Sleek rounded background
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       // Subtle horizontal level guidelines at 25%, 50%, 75%
@@ -1612,7 +1612,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -1962,7 +1962,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -2458,7 +2458,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;

@@ -1,4 +1,5 @@
 // Audio-in, mixer, keyboard and note node bodies (moved verbatim from main.cpp).
+#include "app/ui/design/UiType.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -271,7 +272,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       static const int kWhiteOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
@@ -395,7 +396,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       static const int kWhiteOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
@@ -595,9 +596,10 @@ namespace app
       // visually dominant element, not a text line under six sliders.
       char st[16];
       snprintf(st, sizeof(st), "%+d st", n->LastSemitone());
-      ImGui::SetWindowFontScale(1.8f);
-      ImGui::TextUnformatted(st);
-      ImGui::SetWindowFontScale(1.0f);
+      {
+         UiType::Scope readout(UiType::Size::Display, UiType::Weight::Medium);
+         ImGui::TextUnformatted(st);
+      }
 
       if (n->input == nullptr)
          ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
@@ -920,7 +922,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       for (int i = 1; i < 4; i++)
@@ -2157,7 +2159,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const ImVec2 center((origin.x + br.x) * 0.5f, (origin.y + br.y) * 0.5f);

@@ -22,7 +22,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -171,7 +171,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -316,7 +316,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float logMin = log10f(50.0f), logMax = log10f(8000.0f);
@@ -471,7 +471,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float rateHz = std::max(100.0f, n->Param("rate"));
@@ -595,7 +595,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float attackDb = n->Param("attack");
@@ -788,7 +788,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -893,7 +893,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float shift = n->Param("shift");
@@ -1066,7 +1066,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const int shape = std::clamp((int)(n->Param("shape") + 0.5f), 0, 3);
@@ -1193,7 +1193,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float logMin = log10f(100.0f), logMax = log10f(5000.0f);
@@ -1269,7 +1269,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float logMin = log10f(20.0f), logMax = log10f(20000.0f);
@@ -1435,7 +1435,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -1550,7 +1550,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       // Grid lines: 100Hz, 1kHz, 10kHz
@@ -1717,7 +1717,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float loHz = 50.0f, hiHz = 5000.0f;
@@ -1869,7 +1869,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float loHz = 50.0f, hiHz = 12000.0f;
@@ -1980,7 +1980,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float loHz = 30.0f, hiHz = 12000.0f;

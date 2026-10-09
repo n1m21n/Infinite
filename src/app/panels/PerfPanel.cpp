@@ -2589,7 +2589,7 @@ namespace app
       // modulator node's (LFO, Pattern, ...) header. Reuse the same
       // theme-aware scope palette DrawCurveEditor already uses.
       dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                        ScopeBgCol(), 4.0f);
+                        ScopeBgCol(), tok::radius_field);
 
       const bool isPredictor = dynamic_cast<IPredictor*>(mod) != nullptr ||
                                dynamic_cast<PredictiveModulatorNode*>(mod) != nullptr;

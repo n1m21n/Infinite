@@ -74,7 +74,7 @@ namespace app
       auto textSize = [&](const char* t) { return font->CalcTextSizeA(fs, FLT_MAX, 0.0f, t); };
       auto text = [&](ImVec2 p, ImU32 c, const char* t) { dl->AddText(font, fs, p, c, t); };
 
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
 
       // Zone colours, shared by bars, hold lines and readouts: green for
       // normal level, amber for the last 6 dB of headroom, red for overs.
@@ -780,7 +780,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -876,7 +876,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
 
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const int count = n->partialBarCount;
@@ -1041,7 +1041,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -1446,7 +1446,7 @@ namespace app
       }
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -2143,7 +2143,7 @@ namespace app
       const double bpm = std::max(1.0f, tr.Tempo());
       const double bar = std::max(1e-6, tr.BeatsPerBar());
 
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
       dl->PushClipRect(origin, br, true);
       const float midY = origin.y + h * 0.5f;
       dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
@@ -2640,7 +2640,7 @@ namespace app
             if (!has && ImGui::IsItemClicked(ImGuiMouseButton_Left))
                openLoadPad = cur;
             // Same drawing as DrawSamplerWaveform.
-            dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+            dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
             dl->PushClipRect(origin, br, true);
             const float midY = origin.y + h * 0.5f;
             dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);

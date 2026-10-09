@@ -380,7 +380,7 @@ void DrawNodeBodies(FrameCtx& fc)
             ImGui::Dummy(ImVec2(boxW, h));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + boxW, origin.y + h);
-            dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+            dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
             dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
             char line[64] = "";
             if (auto* o = dynamic_cast<GeometryOpNode*>(gn.node.get()))
@@ -466,7 +466,7 @@ void DrawNodeBodies(FrameCtx& fc)
             ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize * 0.45f));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + kPreviewSize, origin.y + kPreviewSize * 0.45f);
-            dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+            dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
             dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
             const std::string& name = GeometryNode::ShapeNames()[
                std::max(0, std::min(geo->shape, (int)GeometryNode::ShapeNames().size() - 1))];

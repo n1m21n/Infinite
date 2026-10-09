@@ -913,10 +913,8 @@ void DrawKeyboard(FrameCtx& fc)
       if (gGlobalScaleTooltipHovered)
       {
          ImGui::BeginTooltip();
-         ImGui::SetWindowFontScale(0.85f);
          ImGui::TextUnformatted(gGlobalScaleTooltipEnabled ? "Global Scale: ON (click to disable)"
                                                             : "Global Scale: OFF (click to enable)");
-         ImGui::SetWindowFontScale(1.0f);
          ImGui::EndTooltip();
       }
 
