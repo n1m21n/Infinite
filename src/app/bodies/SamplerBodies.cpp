@@ -1583,7 +1583,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
          char chokeLabel[8];
          snprintf(chokeLabel, sizeof(chokeLabel), n->laneChoke[lane] == 0 ? "choke -" : "choke %d", n->laneChoke[lane]);
-         if (ActionButton::Draw(chokeLabel, ImVec2(70.0f, 0)))
+         if (NodeDropdownField(chokeLabel, ImVec2(70.0f, 0)))
          {
             PushUndoCheckpoint();
             n->laneChoke[lane] = (n->laneChoke[lane] + 1) % 4;
@@ -1702,7 +1702,7 @@ namespace app
                            std::function<void(int)> onSelect, bool focusSearch)
    {
       const std::string label = std::string(caption) + "##" + id;
-      if (ActionButton::Draw(label.c_str(), ImVec2(width, 0)))
+      if (NodeDropdownField(label.c_str(), ImVec2(width, 0)))
       {
          gDropdown.options = options;
          gDropdown.categories = categories;

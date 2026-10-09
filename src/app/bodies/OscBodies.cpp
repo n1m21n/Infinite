@@ -1291,7 +1291,7 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                              : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         ActionButton::Draw(caption.c_str(), ImVec2(width, 0));
+         NodeDropdownField(caption.c_str(), ImVec2(width, 0));
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -1299,7 +1299,7 @@ namespace app
                                                               ImGui::GetItemRectMax()));
          return;
       }
-      if (ActionButton::Draw(caption.c_str(), ImVec2(width, 0)))
+      if (NodeDropdownField(caption.c_str(), ImVec2(width, 0)))
       {
          gDropdown.options = options;
          gDropdown.categories = categories;
