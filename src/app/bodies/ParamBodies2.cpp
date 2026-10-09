@@ -623,6 +623,7 @@ namespace app
       const float b = n->RawB();
       const float res = n->Value(ImageAnalyzeNode::kResult);
 
+      gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
       const float gutter = 16.0f;
 

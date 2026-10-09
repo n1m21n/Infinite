@@ -29,7 +29,11 @@ extern float gViewportPanelHeight;
    inline const float kViewportPanelMinHeight = 190.0f;
 
 
-   inline const float kParamWidth = 168.0f;
+   // Param column width. 168 by default; a node whose pin header is wider stretches it to the header
+   // (StageNodeBodies, R3) so the body fills the node. kParamWidth reads the live value.
+   inline constexpr float kParamWidthBase = 168.0f;
+   inline float gParamWidthLive = kParamWidthBase;
+   inline const float& kParamWidth = gParamWidthLive;
 
 
    // Horizontal audio-node layout (docs/plans/audio/audio-node-ui-system.md

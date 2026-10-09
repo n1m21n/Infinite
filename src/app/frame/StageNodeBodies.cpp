@@ -204,6 +204,7 @@ void DrawNodeBodies(FrameCtx& fc)
          const ImVec2 topRowPos = ImGui::GetCursorPos();
          int inputs = InputCountFor(gn);
          float maxInputY = topRowPos.y;
+         float headerRightX = 0.0f;   // screen x of the pin header's right edge: a long header sets the node width, so `out` aligns to it too
 
          if (mixerNode != nullptr && mixerNode->numChannels > 0)
          {
@@ -252,6 +253,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   }
                }
                DrawPin(gn.InputPinId(slot), ed::PinKind::Input, label);
+               headerRightX = std::max(headerRightX, ImGui::GetItemRectMax().x);
                rowUsed += thisW;
             }
             if (inputs > 0)
@@ -291,6 +293,7 @@ void DrawNodeBodies(FrameCtx& fc)
          // ed::GetNodeSize() is scaled by the current zoom, so feeding it back
          // into padding inflated the node a little more every frame until it
          // covered the canvas and swallowed every click.
+         gParamWidthLive = std::max(kParamWidthBase, headerRightX - ImGui::GetCursorScreenPos().x);
          ImGui::BeginGroup();
 
          if (!isComment)
@@ -1252,7 +1255,8 @@ void DrawNodeBodies(FrameCtx& fc)
          }
 
          ImGui::EndGroup();
-         const float contentW = ImGui::GetItemRectSize().x;
+         gParamWidthLive = kParamWidthBase;
+         const float contentW = std::max(ImGui::GetItemRectSize().x, headerRightX - ImGui::GetItemRectMin().x);
 
          // --- output dots, bottom-right: cables start here ---
          // A comment is not in the signal graph, and an out pin on one is worse

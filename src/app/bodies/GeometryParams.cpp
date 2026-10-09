@@ -55,6 +55,7 @@ namespace app
 
    void DrawAudioAnalyzeParams(AudioAnalyzeNode* n)
    {
+      gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
       const float gutter = 16.0f;
       const float bodyW = colW * 2 + gutter;
@@ -497,6 +498,7 @@ namespace app
          ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f);
       }
 
+      gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
       const float gutter = 16.0f;
 
@@ -1613,6 +1615,7 @@ namespace app
       ImGui::SameLine(0.0f, 16.0f);
       ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
 
+      gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
       const float gutter = 16.0f;
 
