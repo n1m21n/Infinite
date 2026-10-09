@@ -618,15 +618,18 @@ void DrawPopupsB(FrameCtx& fc)
       {
          static int sTrashLink = 0;
          static double sTrashSeen = -1.0;
+         static int sTrashGone = 0; // a cable just deleted: ignore it until the cursor leaves it
          const double now = ImGui::GetTime();
          const ed::LinkId hovered = ed::GetHoveredLink();
-         if (hovered)
+         if (!hovered || (int)hovered.Get() != sTrashGone)
+            sTrashGone = 0;
+         if (hovered && (int)hovered.Get() != sTrashGone && FindLink((int)hovered.Get()) != nullptr)
          {
             sTrashLink = (int)hovered.Get();
             sTrashSeen = now;
          }
          ImVec2 canvasMid;
-         if (sTrashLink != 0 && now - sTrashSeen < 1.5 && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
+         if (sTrashLink != 0 && FindLink(sTrashLink) != nullptr && now - sTrashSeen < 1.5 && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
          {
             const float r = 11.0f;
             const ImVec2 c = ed::CanvasToScreen(canvasMid);
@@ -649,7 +652,9 @@ void DrawPopupsB(FrameCtx& fc)
             {
                PushUndoCheckpoint();
                DisconnectLinkById(sTrashLink);
+               sTrashGone = sTrashLink;
                sTrashLink = 0;
+               sTrashSeen = -1.0;
             }
             if (over)
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
