@@ -37,6 +37,7 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | Old popups | done 2026-10-09: `##colorpick`, `##nodehelp` on `MenuParts::BeginPopup`; `##arrgridpopup` and Render Timeline already on MenuParts / SectionCard; `##commentedit` stays a transparent in-place editor on `FieldWell::InputTextMultiline` (decision: it is the note itself, not a popup card). Sweep: mod matrix rows on `MenuParts::Choice`, MIDI learn on `MenuParts::Item`. Raw widgets 470 |
 | G1 segmented control | done: `PillGroup` already in Arrange unit toggle and the Library mode switch; no paired toggle buttons left |
 | G11 empty states | partly done 2026-10-09: `EmptyState.h` on mod matrix, Samples, Plugins. Open: Perf panel, Viewport, Arrange (has its own prompt) |
+| A8 tooltips | checked 2026-10-09: all 38 tooltip sites go through ImGui popup styling (PopupBg, `PopupRounding` 12, no border), so they match menus in both themes; help tips gated by Settings via `HelpTip`. Toasts: none exist yet (G22, not started) |
 | N1 node header | done 2026-10-09: one row (title Title/Medium, instance number, category dimmed) via `NodeHeader::Category` |
 | N1 frame | 1 px hairline border done |
 | N2 separators | done 2026-10-09: `NodeSeparator` hairline and label use themed Border / TextDisabled (were fixed dark-only palette colours) |
