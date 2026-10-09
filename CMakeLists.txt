@@ -891,7 +891,8 @@ target_include_directories(sketch_deps PUBLIC external/quickjs-ng external/pluto
 target_compile_definitions(sketch_deps PRIVATE PLUTOVG_BUILD PLUTOVG_BUILD_STATIC _GNU_SOURCE)
 target_compile_definitions(sketch_deps PUBLIC PLUTOVG_BUILD_STATIC)
 if(MSVC)
-    target_compile_options(sketch_deps PRIVATE /w)
+    # quickjs-ng uses C11 atomics (MSVC 17.5+).
+    target_compile_options(sketch_deps PRIVATE /w /std:c11 /experimental:c11atomics)
 else()
     target_compile_options(sketch_deps PRIVATE -w)
 endif()
