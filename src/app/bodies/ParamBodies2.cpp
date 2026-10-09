@@ -3,6 +3,8 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/components/GlyphToggle.h"
+#include "app/ui/design/Glyphs.gen.h"
 
 namespace app
 {
@@ -237,7 +239,8 @@ namespace app
 
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       ImGui::TextDisabled("%s", n->Status().c_str());
-      ImGui::TextDisabled("engine: %s", Platform::MattingBackend().c_str());
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("engine: %s", Platform::MattingBackend().c_str());
       ImGui::PopTextWrapPos();
 
       ModSlider("feather", &n->feather, 0.0f, 4.0f);
@@ -579,7 +582,7 @@ namespace app
          ColorSwatch(label, n->stopColor[idx], n);
          ImGui::SameLine(size - 18.0f);
          ImGui::BeginDisabled(n->stopCount <= 2);
-         if (ActionButton::Draw("x"))
+         if (GlyphToggle::Draw("##delstop", IconsInfinite::Close, IconsInfinite::Close, false))
          {
             PushUndoCheckpoint();
             n->RemoveStop(idx);
