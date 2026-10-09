@@ -90,7 +90,7 @@ namespace FormParts
    {
       Label(label);
       ImGui::SetNextItemWidth(kControlW);
-      FieldWell::PushStyle();
+      FieldWell::PushStyle(ImGui::GetID(Id(label).c_str()) ^ 0x9e3779b9u);
       MenuParts::PushPopupPad();
       const bool open = ImGui::BeginCombo(Id(label).c_str(), preview, ImGuiComboFlags_NoArrowButton);
       ImGui::PopStyleVar();
@@ -114,7 +114,7 @@ namespace FormParts
       std::vector<const char*> list(arr, arr + n);
       const char* cur = (*current >= 0 && *current < (int)list.size()) ? list[*current] : "";
       ImGui::SetNextItemWidth(w);
-      FieldWell::PushStyle();
+      FieldWell::PushStyle(ImGui::GetID(id) ^ 0x9e3779b9u);
       MenuParts::PushPopupPad();
       const bool open = ImGui::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
       ImGui::PopStyleVar();
@@ -244,7 +244,7 @@ namespace FormParts
    inline bool SearchInput(const char* id, const char* hint, char* buf, size_t cap, float w)
    {
       ImGui::SetNextItemWidth(w);
-      FieldWell::PushStyle();
+      FieldWell::PushStyle(ImGui::GetID(id) ^ 0x9e3779b9u);
       const bool r = ImGui::InputTextWithHint(id, hint, buf, cap);
       FieldWell::PopStyle();
       return r;

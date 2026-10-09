@@ -1,6 +1,7 @@
 // FieldWell: the recessed well behind a numeric/combo field (same 6% text tint as ChipButton) and its value fill.
 #pragma once
 #include <algorithm>
+#include "app/ui/design/UiAnim.h"
 #include <type_traits>
 #include "imgui_internal.h"
 #include "app/AppShared.h"
@@ -31,11 +32,21 @@ namespace FieldWell
 
 
    // For ImGui's own frames (DragFloat, combo): the same well colours and rounding; the arrow button is transparent.
-   inline void PushStyle()
+   // With an item `id` (the id the widget will get) the hover tint eases in and out like the app's own
+   // controls; the rect test uses the next item's cursor position and width, so call it right before the widget.
+   inline void PushStyle(ImGuiID id = 0)
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(t.x, t.y, t.z, 0.06f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(t.x, t.y, t.z, 0.10f));
+      float rest = 0.06f, hover = 0.10f;
+      if (id != 0)
+      {
+         const ImVec2 mn = ImGui::GetCursorScreenPos();
+         const bool hot = ImGui::IsMouseHoveringRect(mn, ImVec2(mn.x + ImGui::CalcItemWidth(), mn.y + ImGui::GetFrameHeight())) &&
+                          ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
+         rest = hover = 0.06f + 0.04f * UiAnim::Hover(id, hot, tok::motion_hover_in, tok::motion_hover_out);
+      }
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(t.x, t.y, t.z, rest));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(t.x, t.y, t.z, hover));
       ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(t.x, t.y, t.z, 0.12f));
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
@@ -93,7 +104,7 @@ namespace FieldWell
       }
       if (!editing && hi != lo)
          Fill(ImGui::GetWindowDrawList(), mn, mx, mn.x + w * std::clamp((float)(*v - lo) / (float)(hi - lo), 0.0f, 1.0f));
-      PushStyle();
+      PushStyle(id ^ 0x9e3779b9u);
       ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0, 0, 0, 0));
       // The text field gets a quiet accent edge instead of ImGui's bright blue nav ring.
