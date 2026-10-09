@@ -1,4 +1,5 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
+#include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -2593,8 +2594,7 @@ namespace app
       // preset (e.g. GitHub Light) this read as a solid black box in every
       // modulator node's (LFO, Pattern, ...) header. Reuse the same
       // theme-aware scope palette DrawCurveEditor already uses.
-      dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                        ScopeBgCol(), tok::radius_field);
+      AudioViz::Fill(dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + h));
 
       const bool isPredictor = dynamic_cast<IPredictor*>(mod) != nullptr ||
                                dynamic_cast<PredictiveModulatorNode*>(mod) != nullptr;
@@ -2645,8 +2645,7 @@ namespace app
          if (y1line >= origin.y && y1line <= origin.y + h)
             dl->AddLine(ImVec2(origin.x, y1line), ImVec2(origin.x + kPreviewSize, y1line), hairlineCol, 1.0f);
       }
-      dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                  outOfContract ? lineCol : ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + h), outOfContract ? lineCol : 0);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
       ImGui::Text("%.3f", value);
    }

@@ -1337,7 +1337,7 @@ namespace app
       // the track is 18px narrower than the cell - sizing the cell against the
       // text alone (what 0.44, then 0.52, did) leaves the text overlapping
       // even though the arithmetic looked right.
-      const float fieldsW = std::clamp(full * 0.58f, 230.0f, 300.0f);
+      const float fieldsW = std::clamp(full * 0.66f, 260.0f, 320.0f);
       const float curveW = full - fieldsW - gap;
       const float halfW = (fieldsW - gap) * 0.5f;
       const float rowH = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y;
