@@ -781,7 +781,7 @@ namespace app
    void DrawLFOParams(LFONode* n)
    {
       DropdownButton("shape", LFONode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
-      ModSlider("rate (beats)", &n->rateBeats, 0.05f, 32.0f);
+      ModSlider("rate", &n->rateBeats, 0.05f, 32.0f, "%.2f beats");
       ModSlider("phase", &n->phase, 0.0f, 1.0f);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
@@ -790,11 +790,11 @@ namespace app
 
    void DrawRandomParams(RandomNode* n)
    {
-      ModSlider("rate (beats)", &n->rateBeats, 0.05f, 32.0f);
+      ModSlider("rate", &n->rateBeats, 0.05f, 32.0f, "%.2f beats");
       ModSlider("smooth", &n->smooth, 0.0f, 1.0f);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
-      ModSlider("seed", &n->seed, 0.0f, 200.0f);
+      ModSlider("seed", &n->seed, 0.0f, 200.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -1117,7 +1117,7 @@ namespace app
       ModSlider("speed", &n->speed, -2.0f, 2.0f);
       ModSlider("contrast", &n->contrast, 0.1f, 4.0f);
       ModSlider("brightness", &n->brightness, -0.5f, 0.5f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
       ModCheckbox("rgb noise", &n->colorNoise);
       if (!n->colorNoise)
       {
@@ -1133,7 +1133,7 @@ namespace app
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModSlider("scale", &n->scale, 0.5f, 60.0f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
 
       if (n->textureType == 0) // Voronoi
       {
@@ -1365,7 +1365,7 @@ namespace app
       ModCheckbox("auto iterate", &n->autoIterate);
       if (n->autoIterate)
          ModSlider("steps / beat", &n->stepsPerBeat, 0.05f, 16.0f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -1671,7 +1671,7 @@ namespace app
    void DrawMacroStepGateParams(MacroStepGateNode* n)
    {
       MacroNameField(n->label, kMacroWideCell);
-      ModSlider("rate (beats)", &n->rateBeats, 0.05f, 4.0f);
+      ModSlider("rate", &n->rateBeats, 0.05f, 4.0f, "%.2f beats");
    }
 
 
@@ -1691,8 +1691,11 @@ namespace app
       ImGui::TextDisabled("%s", n->Status().c_str());
       ImGui::PopTextWrapPos();
 
-      ImGui::Text("bound: %s", n->BindingLabel().c_str());
-      ImGui::ProgressBar(n->Value01(), ImVec2(kPreviewSize * 0.6f, 0), "");
+      if (n->IsBound())
+         ImGui::Text("bound: %s", n->BindingLabel().c_str());
+      else
+         ImGui::TextDisabled("not learned");
+      ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
 
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
@@ -1722,8 +1725,11 @@ namespace app
       ImGui::TextDisabled("%s", n->Status().c_str());
       ImGui::PopTextWrapPos();
 
-      ImGui::Text("bound: %s", n->BindingLabel().c_str());
-      ImGui::ProgressBar(n->Value01(), ImVec2(kPreviewSize * 0.6f, 0), "");
+      if (n->IsBound())
+         ImGui::Text("bound: %s", n->BindingLabel().c_str());
+      else
+         ImGui::TextDisabled("not learned");
+      ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
 
       if (n->mode == MidiTriggerNode::kKeyboard)
       {

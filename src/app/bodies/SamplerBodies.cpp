@@ -1579,9 +1579,9 @@ namespace app
             n->ClearLane(lane);
          }
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
-         char chokeLabel[8];
-         snprintf(chokeLabel, sizeof(chokeLabel), n->laneChoke[lane] == 0 ? "choke -" : "choke %d", n->laneChoke[lane]);
-         if (NodeDropdownField(chokeLabel, ImVec2(70.0f, 0)))
+         char chokeLabel[16];
+         snprintf(chokeLabel, sizeof(chokeLabel), n->laneChoke[lane] == 0 ? "off" : "%d", n->laneChoke[lane]);
+         if (NodeDropdownField(chokeLabel, ImVec2(92.0f, 0), "choke"))
          {
             PushUndoCheckpoint();
             n->laneChoke[lane] = (n->laneChoke[lane] + 1) % 4;
@@ -1869,7 +1869,7 @@ namespace app
          n->gridCanvasRowH = rowH + rowGap;
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const bool isLight = IsThemeLight();
-         const int curStep = n->CurrentStep();
+         const int curStep = n->run ? n->CurrentStep() : -1; // no playhead while stopped
          const double beatsPerBar = Transport::Instance().BeatsPerBar();
          const double beatsPerStep = std::max(1e-6, MusicTime::BeatsFor((MusicTime::RateDivision)n->rate));
          const int stepsPerBar = std::max(1, (int)std::lround(beatsPerBar / beatsPerStep));
@@ -1946,8 +1946,8 @@ namespace app
                // Colors mirror DrawPatternStepGrid's light-mode track-lane
                // palette (isGroupStart ? 212/218/230 : 224/228/238).
                const ImU32 frameCol = isLight
-                  ? (isBar ? tok::U32(tok::pal::c_D2D7E4FF) : tok::U32(tok::pal::c_E0E4EEFF))
-                  : (isBar ? tok::U32(tok::pal::c_3C404EFF) : tok::U32(tok::pal::c_282B35FF));
+                  ? (isBar ? tok::U32(tok::pal::c_C8CEDAFF) : tok::U32(tok::pal::c_D6DCE8FF))
+                  : (isBar ? tok::U32(tok::pal::c_464A5AFF) : tok::U32(tok::pal::c_3C404EFF));
                dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + cellW - cellGap, y0 + rowH), frameCol, 2.0f);
                if (vel > 0.0f)
                {

@@ -807,7 +807,7 @@ namespace app
    void DrawRateModeControls(AudioKnobRow& row, int* rateMode, float* rateBeats, float* rateSeconds)
    {
       static const std::vector<std::string> kRateModes = { "Synced", "Free" };
-      row.Dropdown("sync", kRateModes, *rateMode, [rateMode](int i) { PushUndoCheckpoint(); *rateMode = i; });
+      row.Dropdown("mode", kRateModes, *rateMode, [rateMode](int i) { PushUndoCheckpoint(); *rateMode = i; });
       if (*rateMode == 0)
       {
          int div = NearestRateDivision(*rateBeats);
@@ -1515,7 +1515,8 @@ namespace app
 
    void DrawNoteSequencerBody(GraphNode& gn, NoteSequencerNode* n)
    {
-      const int cur = n->CurrentStep();
+      // No playhead while the transport is stopped: it would read as a position that is not moving.
+      const int cur = Transport::Instance().IsPlaying() ? n->CurrentStep() : -1;
       const int steps = std::clamp(n->steps, 1, NoteSequencerNode::kMaxSteps);
       char stat[80];
       if (cur >= 0 && cur < steps)
@@ -1524,7 +1525,7 @@ namespace app
          if (n->useGlobalScale)
             playNote = MusicTime::SnapToScale(playNote, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
          playNote = std::clamp(playNote, 0, 127);
-         snprintf(stat, sizeof(stat), "step %d/%d - %s%d (%+dst)%s",
+         snprintf(stat, sizeof(stat), "step %d/%d \xC2\xB7 %s%d (%+dst)%s",
                   cur + 1, steps,
                   NoteNameList()[playNote % 12].c_str(), playNote / 12 - 1,
                   playNote - 60,
@@ -1532,7 +1533,7 @@ namespace app
       }
       else
       {
-         snprintf(stat, sizeof(stat), "step 0/%d", steps);
+         snprintf(stat, sizeof(stat), "%d steps, looped", steps);
       }
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
@@ -1785,7 +1786,7 @@ namespace app
             const int dispOct = dispNote / 12 - 1;
             const int stFromC4 = dispNote - 60;
             if (n->stepEnabled[hoverStep])
-               ImGui::TextDisabled("step %d: %s%d (%+dst) | vel %.0f%% (dbl-click to mute)",
+               ImGui::TextDisabled("step %d: %s%d (%+dst) \xC2\xB7 vel %.0f%% (dbl-click to mute)",
                                    hoverStep + 1, NoteNameList()[dispPc].c_str(), dispOct, stFromC4,
                                    n->stepVelocity[hoverStep] * 100.0f);
             else
@@ -1794,7 +1795,7 @@ namespace app
          }
          else
          {
-            ImGui::TextDisabled("%d steps, looped", steps);
+            ImGui::Dummy(ImVec2(0.0f, ImGui::GetTextLineHeight())); // hover line keeps its row; the idle text lives in the status line
          }
       }
 

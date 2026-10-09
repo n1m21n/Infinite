@@ -3081,13 +3081,18 @@ void EndAudioSection();
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
 
          const std::string caption = options[safe] + "##" + label;
+         // The parameter name sits inside the face (dim, left) whenever it fits beside the value.
+         const std::string inName = StripParamLabel(label);
+         const char* inLabel = (!inName.empty() &&
+                                btnW >= ImGui::CalcTextSize(options[safe].c_str()).x + ImGui::CalcTextSize(inName.c_str()).x + 3.0f * tok::space_2)
+                                  ? inName.c_str() : nullptr;
          PushDropdownStyle();
          if (h.modulated)
          {
             ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                                 : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
-            NodeDropdownField(caption.c_str(), ImVec2(btnW, 0));
+            NodeDropdownField(caption.c_str(), ImVec2(btnW, 0), inLabel);
             ImGui::EndDisabled();
             ImGui::PopStyleColor();
             DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3096,7 +3101,7 @@ void EndAudioSection();
          }
          else
          {
-            if (NodeDropdownField(caption.c_str(), ImVec2(btnW, 0)) ||
+            if (NodeDropdownField(caption.c_str(), ImVec2(btnW, 0), inLabel) ||
                 DropdownTestWantsOpen(h.registered, h.nodeIndex, h.paramIndex))
             {
                gDropdown.options = options;
@@ -3373,7 +3378,17 @@ void DrawPredictiveModulatorParams(PredictiveModulatorNode* n);
          if (p.isDeclared)
          {
             const int paramIndex = kFieldDeclaredParamBase + p.id;
-            ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, paramIndex);
+            // Units from the declared name; wide ranges drop the meaningless decimals.
+            const std::string& nm = p.name;
+            auto has = [&](const char* sub) { return nm.find(sub) != std::string::npos; };
+            const char* fmt = (p.maxValue - p.minValue) >= 100.0f ? "%.0f" : "%.3f";
+            if (has("cutoff") || has("freq") || has("hz"))
+               fmt = "%.0f Hz";
+            else if (has("_ms") || has(" ms") || has("ms_"))
+               fmt = "%.0f ms";
+            else if (has("db"))
+               fmt = "%.1f dB";
+            ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, fmt, kParamWidth, false, 0.0f, nullptr, nullptr, paramIndex);
          }
       }
    }

@@ -274,7 +274,7 @@ namespace app
          ModSlider("slice at", &n->slicePosition, -3.0f, 3.0f);
       }
       if (n->sampleMode == GeometryTableNode::kScatter)
-         ModSlider("seed", &n->seed, 0.0f, 32.0f);
+         ModSlider("seed", &n->seed, 0.0f, 32.0f, "%.0f", kParamWidth, false, 1.0f);
 
       NodeSeparator("range");
       DropdownButton("space", GeometryTableNode::SpaceNames(), n->space,
@@ -326,7 +326,7 @@ namespace app
       ModSlider("height", &n->height, -3.0f, 3.0f);
       ModSlider("twist", &n->twist, -180.0f, 180.0f, "%.1f\xC2\xB0");
       if (n->preset == 3)
-         ModSlider("seed", &n->seed, 0.0f, 100.0f);
+         ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
 
       NodeSeparator("tube");
       ModSlider("radius", &n->radius, 0.0f, 0.5f);
@@ -484,7 +484,7 @@ namespace app
       ModSlider("end size", &n->endSize, 0.0f, 0.5f);
       ColorSwatch("start colour", n->startColor, n);
       ColorSwatch("end colour", n->endColor, n);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -611,7 +611,7 @@ namespace app
       ModCheckbox("auto step", &n->autoStep);
       if (n->autoStep)
          ModSlider("steps per beat", &n->stepsPerBeat, 0.05f, 8.0f);
-      ModSlider("seed", &n->seed, 0.0f, 1000.0f);
+      ModSlider("seed", &n->seed, 0.0f, 1000.0f, "%.0f", kParamWidth, false, 1.0f);
       ModSliderInt("triangle budget", &n->triangleBudget, 2000, 500000);
 
       NodeSeparator("operators");
@@ -717,7 +717,7 @@ namespace app
       if (n->method == MeshOps::kDistributePoisson)
          ModSlider("min distance", &n->minDistance, 0.005f, 1.0f);
       ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -737,7 +737,7 @@ namespace app
       ModSlider("spacing y", &n->spacingY, 0.01f, 2.0f);
       ModSlider("jitter", &n->jitter, 0.0f, 1.0f);
       ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
       ColorSwatch("tint", n->tint, n);
    }
 
@@ -1028,7 +1028,7 @@ namespace app
             static const std::vector<std::string> kExplodeByNames = { "Faces", "Loose Parts" };
             DropdownButton("by", kExplodeByNames, n->explodeBy, [n](int i) { n->explodeBy = i; });
             ModSlider("amount", &n->amount, 0.0f, 3.0f);
-            ModSlider("seed", &n->seed, 0.0f, 100.0f);
+            ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
             break;
          }
          case GeometryOpNode::kSmooth:
@@ -1419,7 +1419,7 @@ namespace app
          ColorSwatch("ramp end", n->rampB, n);
          break;
       case SetColorNode::kRandom:
-         ModSlider("seed", &n->seed, 0.0f, 100.0f);
+         ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
          break;
       case SetColorNode::kPalette:
          ModSliderInt("palette offset", &n->paletteOffset, 0, 32);
@@ -1451,7 +1451,7 @@ namespace app
       ModSlider("rotation random", &n->rotationRandom, 0.0f, 1.0f);
       ModSlider("normal offset", &n->normalOffset, -0.5f, 0.5f);
       ModCheckbox("align to normal", &n->alignToNormal);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
