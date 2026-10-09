@@ -54,9 +54,13 @@ namespace PillGroup
             dl->AddRect(ImVec2(cr.x - 1, cr.y - 1), ImVec2(cr.Right() + 1, cr.Bottom() + 1),
                         ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_pill + 1.0f, 0, 2.0f);
          UiType::Scope ts(labelSize, UiType::Weight::Medium);
-         const ImVec2 sz = ImGui::CalcTextSize(segs[i].label);
+         // A longer label (another language, a bigger font) is cut with an ellipsis instead of spilling out of its pill.
+         std::string shown(segs[i].label);
+         if (ImGui::CalcTextSize(segs[i].label).x > cr.w - 8.0f)
+            shown = app::TruncateWithEllipsis(shown, cr.w - 8.0f);
+         const ImVec2 sz = ImGui::CalcTextSize(shown.c_str());
          dl->AddText(ImVec2(std::round(cr.CenterX() - sz.x * 0.5f), std::round(cr.CenterY() - sz.y * 0.5f)),
-                     ImGui::GetColorU32(text), segs[i].label);
+                     ImGui::GetColorU32(text), shown.c_str());
          if (s.clicked)
             clicked = i;
       }

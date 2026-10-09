@@ -985,6 +985,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // Interface language: an explicit choice wins, otherwise the first OS preference that is one of
    // our six, otherwise English. The first ApplyUiScale() below applies it before the font bake.
    I18n::SetResourceDir(BundledResourcePath("lang"));
+   // Review hook: INFINITE_UISCALE=1.5 forces the UI scale for this run only (nothing is saved).
+   if (const char* us = getenv("INFINITE_UISCALE"); us != nullptr && atof(us) > 0.0)
+      CategoryColors::SetUiScale((float)atof(us), false);
    {
       std::string lang = CategoryColors::GetLanguage();
       if (!I18n::IsSupported(lang))

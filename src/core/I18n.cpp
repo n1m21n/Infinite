@@ -1,6 +1,7 @@
 #include "I18n.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -56,6 +57,19 @@ namespace
       return p == std::string::npos ? key : key.substr(0, p);
    }
 
+   // Review hook (INFINITE_PSEUDO=1): every translated string grows by 40 % with '~' so layouts that only fit the
+   // English text show themselves. Not a language and not in any menu; an environment variable like the other INFINITE_* review hooks.
+   bool PseudoOn()
+   {
+      static const bool on = std::getenv("INFINITE_PSEUDO") != nullptr;
+      return on;
+   }
+   std::string Pad(const std::string& s)
+   {
+      const std::vector<uint32_t> cps = Utf8ToCodepoints(s);
+      return s + std::string((cps.size() * 2 + 4) / 5 + 1, '~');
+   }
+
    const char* Lookup(const std::string& fullKey)
    {
       auto it = gGen->table.find(fullKey);
@@ -66,6 +80,17 @@ namespace
    {
       if (key == nullptr)
          return "";
+      if (PseudoOn() && key[0] != '\0')
+      {
+         const std::string full = "p\x01" + ComposeKey(ctx, key);
+         auto c = gGen->labels.find(full);
+         if (c == gGen->labels.end())
+         {
+            const char* hit = gCurrent == "en" ? nullptr : Lookup(ComposeKey(ctx, key));
+            c = gGen->labels.emplace(full, Pad(hit != nullptr ? hit : key)).first;
+         }
+         return c->second.c_str();
+      }
       if (gCurrent == "en" || gGen->table.empty())
          return key;
       const char* hit = Lookup(ComposeKey(ctx, key));
@@ -92,6 +117,8 @@ namespace
          hit = Lookup(ComposeKey(ctx, visible.c_str()));
       }
       std::string out = hit != nullptr ? hit : visible;
+      if (PseudoOn())
+         out = Pad(out);
       out += "###";
       out += key;
       return gGen->labels.emplace(full, std::move(out)).first->second.c_str();
@@ -315,7 +342,7 @@ const char* TList(const char* items)
       p += n + 1;
    }
    raw.push_back('\0');
-   if (gCurrent == "en" || gGen->table.empty())
+   if (!PseudoOn() && (gCurrent == "en" || gGen->table.empty()))
       return items;
    auto cached = gGen->lists.find(raw);
    if (cached != gGen->lists.end())
@@ -324,7 +351,7 @@ const char* TList(const char* items)
    for (const char* q = items; *q != '\0'; q += std::strlen(q) + 1)
    {
       const char* hit = Lookup(q);
-      out += hit != nullptr ? hit : q;
+      out += PseudoOn() ? Pad(hit != nullptr ? hit : q) : std::string(hit != nullptr ? hit : q);
       out.push_back('\0');
    }
    return gGen->lists.emplace(raw, std::move(out)).first->second.c_str();

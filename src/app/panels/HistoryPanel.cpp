@@ -56,10 +56,12 @@ namespace
       const size_t nUndo = gUndoStack.size();
       const size_t nRedo = gRedoStack.size();
       ImGui::TextUnformatted(T("History"));
+      ImGui::PushTextWrapPos(0.0f);
       if (nUndo >= kMaxUndoDepth)
          ImGui::TextDisabled(T("Showing the last %d edits; older ones are dropped."), (int)kMaxUndoDepth);
       else
          ImGui::TextDisabled("%s", T("Click an edit to go back or forward to it."));
+      ImGui::PopTextWrapPos();
       ImGui::Spacing();
 
       if (nUndo == 0 && nRedo == 0)

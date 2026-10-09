@@ -14,12 +14,13 @@ namespace DialogParts
 {
    constexpr float kButtonMinW = 72.0f;   // buttons hug their label, never stretch
    constexpr float kButtonH = 24.0f;
+   constexpr float kMaxW = 480.0f;        // widest a dialog grows; longer text wraps (other languages, bigger fonts)
 
    // Call after OpenPopup; pair a true result with End().
    inline bool Begin(const char* name)
    {
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSizeConstraints(ImVec2(280.0f, 0.0f), ImVec2(480.0f, 4000.0f));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(280.0f, 0.0f), ImVec2(kMaxW, 4000.0f));
       app::PushElevatedPanelStyle(false);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
       const bool open = ImGui::BeginPopupModal(name, nullptr,
@@ -33,14 +34,18 @@ namespace DialogParts
    inline void Title(const char* text)
    {
       UiType::Scope s(UiType::Size::Title, UiType::Weight::Medium);
+      ImGui::PushTextWrapPos(kMaxW - tok::space_4);
       ImGui::TextUnformatted(text);
+      ImGui::PopTextWrapPos();
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));
    }
 
    inline void Message(const char* text)
    {
       ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+      ImGui::PushTextWrapPos(kMaxW - tok::space_4);
       ImGui::TextUnformatted(text);
+      ImGui::PopTextWrapPos();
       ImGui::PopStyleColor();
    }
 
