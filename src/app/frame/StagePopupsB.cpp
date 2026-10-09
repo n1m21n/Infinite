@@ -631,8 +631,11 @@ void DrawPopupsB(FrameCtx& fc)
          ImVec2 canvasMid;
          if (sTrashLink != 0 && FindLink(sTrashLink) != nullptr && now - sTrashSeen < 0.12 && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
          {
-            const float r = 11.0f;
             const ImVec2 c = ed::CanvasToScreen(canvasMid);
+            // Scales with the canvas zoom so it stays proportionate to the cable when zoomed out.
+            const float zoom = ed::CanvasToScreen(ImVec2(1.0f, 0.0f)).x - ed::CanvasToScreen(ImVec2(0.0f, 0.0f)).x;
+            const float k = std::min(1.0f, std::max(0.4f, zoom));
+            const float r = 11.0f * k;
             const ImVec2 m = ImGui::GetMousePos();
             const bool over = (m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= (r + 2.0f) * (r + 2.0f);
             // Stays while the cursor is on the button (or just beside it); gone ~0.1 s after the cursor leaves both.
@@ -643,11 +646,11 @@ void DrawPopupsB(FrameCtx& fc)
             const ImU32 fg = ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.95f));
             dl->AddCircleFilled(c, r, ImGui::GetColorU32(over ? ImGuiCol_ButtonHovered : ImGuiCol_PopupBg), 24);
             dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_Border), 24, 1.0f);
-            dl->AddLine(ImVec2(c.x - 5.0f, c.y - 3.5f), ImVec2(c.x + 5.0f, c.y - 3.5f), fg, 1.5f); // lid
-            dl->AddLine(ImVec2(c.x - 1.6f, c.y - 5.5f), ImVec2(c.x + 1.6f, c.y - 5.5f), fg, 1.5f); // handle
-            dl->AddLine(ImVec2(c.x - 3.6f, c.y - 3.5f), ImVec2(c.x - 3.0f, c.y + 5.0f), fg, 1.5f); // body
-            dl->AddLine(ImVec2(c.x + 3.6f, c.y - 3.5f), ImVec2(c.x + 3.0f, c.y + 5.0f), fg, 1.5f);
-            dl->AddLine(ImVec2(c.x - 3.0f, c.y + 5.0f), ImVec2(c.x + 3.0f, c.y + 5.0f), fg, 1.5f);
+            dl->AddLine(ImVec2(c.x - 5.0f * k, c.y - 3.5f * k), ImVec2(c.x + 5.0f * k, c.y - 3.5f * k), fg, std::max(1.0f, 1.5f * k)); // lid
+            dl->AddLine(ImVec2(c.x - 1.6f * k, c.y - 5.5f * k), ImVec2(c.x + 1.6f * k, c.y - 5.5f * k), fg, std::max(1.0f, 1.5f * k)); // handle
+            dl->AddLine(ImVec2(c.x - 3.6f * k, c.y - 3.5f * k), ImVec2(c.x - 3.0f * k, c.y + 5.0f * k), fg, std::max(1.0f, 1.5f * k)); // body
+            dl->AddLine(ImVec2(c.x + 3.6f * k, c.y - 3.5f * k), ImVec2(c.x + 3.0f * k, c.y + 5.0f * k), fg, std::max(1.0f, 1.5f * k));
+            dl->AddLine(ImVec2(c.x - 3.0f * k, c.y + 5.0f * k), ImVec2(c.x + 3.0f * k, c.y + 5.0f * k), fg, std::max(1.0f, 1.5f * k));
             if (over && ImGui::IsMouseClicked(0))
             {
                PushUndoCheckpoint();
