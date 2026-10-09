@@ -2255,20 +2255,20 @@ namespace app
       dl->AddText(ImVec2(origin.x + 4.0f, midY + scaleY - 13.0f), textCol, "-1");
       if (n->domainMode == EquationDsp::kDomainZeroToOne)
       {
-         dl->AddText(ImVec2(origin.x + 4.0f, midY + 2.0f), textCol, "0");
-         dl->AddText(ImVec2(br.x - 14.0f, midY + 2.0f), textCol, "1");
+         dl->AddText(ImVec2(origin.x + 24.0f, br.y - 13.0f), textCol, "0");
+         dl->AddText(ImVec2(br.x - 14.0f, br.y - 13.0f), textCol, "1");
       }
       else if (n->domainMode == EquationDsp::kDomainNegPiToPi)
       {
-         dl->AddText(ImVec2(origin.x + 4.0f, midY + 2.0f), textCol, "-pi");
-         dl->AddText(ImVec2(originX + 3.0f, midY + 2.0f), textCol, "0");
-         dl->AddText(ImVec2(br.x - 22.0f, midY + 2.0f), textCol, "+pi");
+         dl->AddText(ImVec2(origin.x + 24.0f, br.y - 13.0f), textCol, "-pi");
+         dl->AddText(ImVec2(originX + 3.0f, br.y - 13.0f), textCol, "0");
+         dl->AddText(ImVec2(br.x - 22.0f, br.y - 13.0f), textCol, "+pi");
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 4.0f, midY + 2.0f), textCol, "-1");
-         dl->AddText(ImVec2(originX + 3.0f, midY + 2.0f), textCol, "0");
-         dl->AddText(ImVec2(br.x - 14.0f, midY + 2.0f), textCol, "+1");
+         dl->AddText(ImVec2(origin.x + 24.0f, br.y - 13.0f), textCol, "-1");
+         dl->AddText(ImVec2(originX + 3.0f, br.y - 13.0f), textCol, "0");
+         dl->AddText(ImVec2(br.x - 14.0f, br.y - 13.0f), textCol, "+1");
       }
 
       if (n->scopeCacheCount > 1 && n->ActiveVoices() > 0)

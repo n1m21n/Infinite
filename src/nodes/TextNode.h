@@ -31,7 +31,7 @@ public:
    // Public - the ImGui params panel writes into these directly (InputText, sliders, etc).
    std::string text = "Text";
    std::string fontName;
-   float fontSize = 48.0f;
+   float fontSize = 160.0f;
    float color[3] = { 1.0f, 1.0f, 1.0f };
    float tracking = 0.0f;
    float posX = 0.5f; // normalized, 0..1

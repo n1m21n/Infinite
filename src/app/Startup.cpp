@@ -1188,6 +1188,36 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          getenv("INFINITE_KBDISCRETETEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
+      if (const char* ng = getenv("INFINITE_NODEGALLERY"); ng != nullptr)
+      {
+         // Review fixture for any family: INFINITE_NODEGALLERY="Category|Type A,Type B,..." lays the nodes out on a
+         // grid (INFINITE_GALLERYGRID="cols,dx,dy", default 5,480,620) and frames them at frame 3.
+         std::string spec = ng;
+         const size_t bar = spec.find('|');
+         const std::string cat = bar == std::string::npos ? "Utility" : spec.substr(0, bar);
+         std::string rest = bar == std::string::npos ? spec : spec.substr(bar + 1);
+         int cols = 5;
+         float dx = 480.0f, dy = 620.0f;
+         if (const char* g = getenv("INFINITE_GALLERYGRID"))
+            sscanf(g, "%d,%f,%f", &cols, &dx, &dy);
+         int i = 0;
+         size_t pos = 0;
+         while (pos <= rest.size())
+         {
+            size_t comma = rest.find(',', pos);
+            if (comma == std::string::npos)
+               comma = rest.size();
+            const std::string name = rest.substr(pos, comma - pos);
+            if (!name.empty())
+            {
+               GraphNode* spawned = SpawnNode(name.c_str(), cat.c_str(), (float)(i % cols) * dx, (float)(i / cols) * dy);
+               if (spawned != nullptr && getenv("INFINITE_GALLERYPARAMS") != nullptr)
+                  spawned->showParams = true;   // review shots of the "show params" panel
+               i++;
+            }
+            pos = comma + 1;
+         }
+      }
       if (const char* gallery = getenv("INFINITE_FXGALLERY"); gallery != nullptr)
       {
          // Review fixture: every AudioEffects node on a non-overlapping grid, 13 per page
