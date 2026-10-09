@@ -510,7 +510,7 @@ namespace app
       PushElevatedPanelStyle(/*isChild=*/false);
       FormParts::PushWindowPad();   // same 16 pt inset as Settings; cards reach 8 pt into it
       const bool shortcutsVisible = ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse);
-      ImGui::PopStyleVar();
+      FormParts::PopWindowPad();
       if (!shortcutsVisible)
       {
          ImGui::End();
@@ -690,7 +690,7 @@ namespace app
       PushElevatedPanelStyle(/*isChild=*/false);
       FormParts::PushWindowPad();   // same 16 pt inset as Settings
       const bool helpVisible = ImGui::Begin("Infinite - help & module reference", open, ImGuiWindowFlags_NoCollapse);
-      ImGui::PopStyleVar();
+      FormParts::PopWindowPad();
       if (!helpVisible)
       {
          ImGui::End();

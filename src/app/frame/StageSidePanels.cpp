@@ -19,7 +19,7 @@ namespace
       app::PushElevatedPanelStyle(/*isChild=*/false);
       FormParts::PushWindowPad();
       const bool visible = ImGui::Begin(name, open, ImGuiWindowFlags_NoCollapse);
-      ImGui::PopStyleVar();
+      FormParts::PopWindowPad();
       if (visible)
       {
          SectionCard::BeginWindow();

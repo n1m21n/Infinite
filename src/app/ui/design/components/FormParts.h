@@ -189,10 +189,14 @@ namespace FormParts
 
    // Frame tint for a tab bar so the tabs read as chips: quiet at rest, a text-tinted well when selected.
    // Window padding for form windows: cards reach SectionCard::kPad into it, so space_4 leaves an 8 pt margin.
+   // Push before ImGui::Begin and PopWindowPad right after it: the window padding insets the content, and the
+   // frame padding is what insets the title text (left edge on the content line, air above and below).
    inline void PushWindowPad()
    {
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_4, tok::space_3 + 2.0f));
    }
+   inline void PopWindowPad() { ImGui::PopStyleVar(2); }
 
    inline void PushTabStyle()
    {

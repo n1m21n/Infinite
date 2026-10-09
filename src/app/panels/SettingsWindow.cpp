@@ -23,7 +23,7 @@ namespace app
       // Cards reach SectionCard::kPad into the window padding, so 16 leaves an 8 pt margin to the window edge on every side.
       FormParts::PushWindowPad();
       const bool settingsVisible = ImGui::Begin(L("Settings"), open, ImGuiWindowFlags_NoCollapse);
-      ImGui::PopStyleVar();
+      FormParts::PopWindowPad();
       if (!settingsVisible)
       {
          ImGui::End();
