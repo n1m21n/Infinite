@@ -975,8 +975,7 @@ namespace app
          // Playhead outline
          if (isCurrent)
          {
-            dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                        isLight ? tok::U32(tok::pal::c_E18214F0) : tok::U32(tok::pal::c_FFD250E6), 2.0f, 0, 1.5f);
+            StepCell::PlayheadOutline(dl, ImVec2(x0, origin.y), ImVec2(x1, br.y));
          }
 
          // Step number label below column

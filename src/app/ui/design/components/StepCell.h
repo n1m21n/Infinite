@@ -8,6 +8,14 @@
 
 namespace StepCell
 {
+   // Playhead outline for column-style step displays (bars, piano-roll columns): same edge as a gate cell's playhead.
+   inline void PlayheadOutline(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx, float thickness = 1.5f)
+   {
+      const bool light = app::IsThemeLight();
+      dl->AddRect(mn, mx, light ? tok::U32(tok::pal::c_E18214F0) : tok::U32(tok::pal::c_FFD250E6), tok::radius_field, 0,
+                  thickness);
+   }
+
    inline void Draw(ImDrawList* dl, const ImVec2& mn, const ImVec2& mx, bool on, bool playhead = false,
                     bool hovered = false)
    {

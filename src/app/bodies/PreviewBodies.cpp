@@ -626,8 +626,7 @@ namespace app
       if (render != nullptr && render->FlattenedGeometry().empty())
          AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + size, origin.y + size)}, "patch geometry in");
 
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                  ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, ImVec2(origin.x + size, origin.y + size));
 
       // A Render 3D preview is a viewport, not a picture: drag to orbit, scroll
       // to zoom. An InvisibleButton is what makes this safe inside the node

@@ -1743,8 +1743,7 @@ namespace app
             // Playhead column outline
             if (isCurrent)
             {
-               dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, vy1),
-                           isLight ? tok::U32(tok::pal::c_E18214F0) : tok::U32(tok::pal::c_FFD250E6), 2.0f, 0, 1.5f);
+               StepCell::PlayheadOutline(dl, ImVec2(x0, origin.y), ImVec2(x1, vy1));
             }
 
             // ---- Step number label below each column (Pattern-style) ----

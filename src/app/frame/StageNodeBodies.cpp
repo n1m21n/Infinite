@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/UiType.h"
@@ -401,8 +402,8 @@ void DrawNodeBodies(FrameCtx& fc)
             ImGui::Dummy(ImVec2(boxW, h));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + boxW, origin.y + h);
-            dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-            dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+            AudioViz::Fill(dl, origin, br);
+            AudioViz::Border(dl, origin, br);
             char line[64] = "";
             if (auto* o = dynamic_cast<GeometryOpNode*>(gn.node.get()))
             {
@@ -487,8 +488,8 @@ void DrawNodeBodies(FrameCtx& fc)
             ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize * 0.45f));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + kPreviewSize, origin.y + kPreviewSize * 0.45f);
-            dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-            dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+            AudioViz::Fill(dl, origin, br);
+            AudioViz::Border(dl, origin, br);
             const std::string& name = GeometryNode::ShapeNames()[
                std::max(0, std::min(geo->shape, (int)GeometryNode::ShapeNames().size() - 1))];
             dl->AddText(ImVec2(origin.x + 12, origin.y + 14),
