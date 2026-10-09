@@ -320,8 +320,9 @@ namespace app
       }
       else
       {
-         ImGui::TextDisabled("no image - patch into Render 3D's env pin anyway");
-         ImGui::TextDisabled("to use its procedural sky instead");
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("no image: Render 3D uses its procedural sky");
+         ImGui::PopTextWrapPos();
       }
 
       ModSlider("intensity", &n->intensity, 0.0f, 8.0f);

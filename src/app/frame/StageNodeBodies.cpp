@@ -478,6 +478,30 @@ void DrawNodeBodies(FrameCtx& fc)
                         NodeTitleWithInstance(gn).c_str());
             dl->AddText(ImVec2(origin.x + 12, origin.y + 28),
                         isLight ? tok::U32(tok::pal::c_5F697DFF) : tok::U32(tok::pal::c_82889CFF), line);
+            // R11: scene nodes (camera / light / particles) get a small gizmo on the right instead of an empty box.
+            const ImU32 gz = isLight ? tok::U32(tok::pal::c_5F697DFF) : tok::U32(tok::pal::c_82889CFF);
+            const ImVec2 gc(br.x - 30.0f, origin.y + h * 0.5f);
+            if (dynamic_cast<CameraNode*>(gn.node.get()) != nullptr)
+            {
+               dl->AddRect(ImVec2(gc.x - 14, gc.y - 8), ImVec2(gc.x + 4, gc.y + 8), gz, 2.0f, 0, 1.5f);
+               dl->AddTriangle(ImVec2(gc.x + 4, gc.y), ImVec2(gc.x + 14, gc.y - 8), ImVec2(gc.x + 14, gc.y + 8), gz, 1.5f);
+            }
+            else if (dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
+            {
+               dl->AddCircle(gc, 5.0f, gz, 0, 1.5f);
+               for (int r = 0; r < 8; ++r)
+               {
+                  const float a = (float)r * 0.7853982f;
+                  dl->AddLine(ImVec2(gc.x + cosf(a) * 8.0f, gc.y + sinf(a) * 8.0f),
+                              ImVec2(gc.x + cosf(a) * 13.0f, gc.y + sinf(a) * 13.0f), gz, 1.5f);
+               }
+            }
+            else if (dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr)
+            {
+               static const float kDots[7][3] = { {-12,6,1.5f}, {-6,-5,2.0f}, {0,3,1.5f}, {4,-8,1.5f}, {9,2,2.0f}, {13,-4,1.5f}, {-2,10,1.0f} };
+               for (const auto& d : kDots)
+                  dl->AddCircleFilled(ImVec2(gc.x + d[0], gc.y + d[1] * 0.8f), d[2], gz);
+            }
          }
          else if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
          {
