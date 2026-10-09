@@ -15,6 +15,7 @@
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/Switch.h"
 #include "app/ui/design/components/SectionCard.h"
 
 namespace FormParts
@@ -82,6 +83,17 @@ namespace FormParts
       const float pad = (ImGui::GetFrameHeight() - CheckBox::kSize) * 0.5f;
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
       const bool r = CheckBox::Box(Id(label).c_str(), v);
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
+      return r;
+   }
+
+   // Immediate-effect boolean in Settings and panels (C5).
+   inline bool Switch(const char* label, bool* v)
+   {
+      Label(label);
+      const float pad = (ImGui::GetFrameHeight() - ::Switch::kH) * 0.5f;
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
+      const bool r = ::Switch::Box(Id(label).c_str(), v);
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + pad);
       return r;
    }

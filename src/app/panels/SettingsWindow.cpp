@@ -218,7 +218,7 @@ namespace app
             }
             {
                bool tips = CategoryColors::GetTooltips();
-               if (FormParts::Checkbox(L("Help tooltips"), &tips))
+               if (FormParts::Switch(L("Help tooltips"), &tips))
                   CategoryColors::SetTooltips(tips);
             }
 
@@ -297,9 +297,9 @@ namespace app
          {
             ImGui::Spacing();
             FormParts::Section(T("Grid & Canvas"));
-            if (FormParts::Checkbox(L("Snap to grid"), &gSnapToGrid))
+            if (FormParts::Switch(L("Snap to grid"), &gSnapToGrid))
                SaveWorkspaceSettings();
-            if (FormParts::Checkbox(L("Show canvas grid"), &gShowCanvasGrid))
+            if (FormParts::Switch(L("Show canvas grid"), &gShowCanvasGrid))
             {
                ApplyTheme();
                SaveWorkspaceSettings();
@@ -313,7 +313,7 @@ namespace app
 
             ImGui::Spacing();
             FormParts::Section(T("Minimap"));
-            if (FormParts::Checkbox(L("Show minimap"), &gMinimapEnabled))
+            if (FormParts::Switch(L("Show minimap"), &gMinimapEnabled))
                SaveWorkspaceSettings();
             if (gMinimapEnabled)
             {
@@ -344,17 +344,17 @@ namespace app
             bool showAudNote = (gCableVisibilityMask & 0x2) != 0;
             bool showImg = (gCableVisibilityMask & 0x1) != 0;
 
-            if (FormParts::Checkbox(L("Modulation cables"), &showMod))
+            if (FormParts::Switch(L("Modulation cables"), &showMod))
             {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x4) | (showMod ? 0x4 : 0);
                SaveWorkspaceSettings();
             }
-            if (FormParts::Checkbox(L("Audio & note cables"), &showAudNote))
+            if (FormParts::Switch(L("Audio & note cables"), &showAudNote))
             {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x2) | (showAudNote ? 0x2 : 0);
                SaveWorkspaceSettings();
             }
-            if (FormParts::Checkbox(L("Image & geometry cables"), &showImg))
+            if (FormParts::Switch(L("Image & geometry cables"), &showImg))
             {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x1) | (showImg ? 0x1 : 0);
                SaveWorkspaceSettings();
@@ -590,7 +590,7 @@ namespace app
                                     path.empty() ? T("the settings directory") : path.c_str());
                }
             }
-            if (FormParts::Checkbox(L("Autosave enabled"), &gAutosaveEnabled))
+            if (FormParts::Switch(L("Autosave enabled"), &gAutosaveEnabled))
                SaveGeneralSettings();
             int seconds = gAutosaveSeconds;
             if (FormParts::SliderInt(L("Autosave interval"), &seconds, 15, 300, "%d sec"))
@@ -630,7 +630,7 @@ namespace app
             if (gVsync && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                HelpTip("%s", T("Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap."));
 
-            if (FormParts::Checkbox(L("Vsync"), &gVsync))
+            if (FormParts::Switch(L("Vsync"), &gVsync))
             {
                SetCanvasSwapInterval(gVsync ? 1 : 0);
                SaveGeneralSettings();
@@ -640,7 +640,7 @@ namespace app
             ImGui::Spacing();
             FormParts::Section(T("Movement Log"));
             bool moveLogEnabled = MovementLog::IsEnabled();
-            if (FormParts::Checkbox(L("Record movement log"), &moveLogEnabled))
+            if (FormParts::Switch(L("Record movement log"), &moveLogEnabled))
             {
                MovementLog::SetEnabled(moveLogEnabled);
             }
