@@ -1767,7 +1767,7 @@ namespace app
 
    void DrawMacroXYBody(MacroXYNode* n)
    {
-      const float size = kPreviewSize;
+      const float size = kMacroWideCell;
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImGui::InvisibleButton("##macroxy", ImVec2(size, size));
       if (ImGui::IsItemActive())
