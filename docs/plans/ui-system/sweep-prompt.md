@@ -111,3 +111,7 @@ Fill one row per effect while sweeping. A column that differs from the majority 
 | Delay, Reverb, Drive, Stereo, Pitch Shifter, Chorus, Flanger, Phaser, Bitcrush, Transient Shaper, Ring Mod, Freq Shifter, Tremolo, Formant, Wavetable Shaper, Resonator Bank, Cycle Shaper, Key-Snap, Shape Resonator | params-derived shape | yes | shape drawn from params | AudioViz (border radius was 3 vs fill 4; fixed) | stat strip | yes where a mix exists | AudioViz |
 | Spec Blur, Spectrum Slide | live spectrum | yes | was a flat line; now "no input" label | AudioViz | stat strip | yes | AudioViz.IdleLabel |
 | Stutter | gate grid | yes | steps lit | none (decision: a grid, not a scope) | stat strip | no mix param | none |
+| Macro Toggle, Trigger | shared Switch / ActionButton, caption rename | yes | on/off, bang flash | none | caption | n/a | no params panel (name-only like other macros) |
+| Note Sequencer, step bars | bar columns | yes | playhead | StepCell.PlayheadOutline | step line | yes | StepCell |
+| Scope boxes (Render 3D preview, Sampler, stage previews) | AudioViz.Fill/Border | yes | idle labels | AudioViz | n/a | n/a | AudioViz |
+| Out-pin groups, menus/dropdown/list rows | section gap above out pins; rows 24 pt, search 28 | yes | n/a | none | n/a | n/a | MenuParts, LibraryParts |
