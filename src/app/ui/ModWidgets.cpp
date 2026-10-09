@@ -1601,17 +1601,24 @@ namespace app
 
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const ImVec2 rowStart = ImGui::GetCursorScreenPos();
       const float box = tok::pin_box;
+      // centred on the face, like every param pin (P2)
+      ImGui::SetCursorScreenPos(ImVec2(rowStart.x, rowStart.y + (ImGui::GetFrameHeight() - box) * 0.5f));
+      const ImVec2 p = ImGui::GetCursorScreenPos();
       ImGui::Dummy(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       PinDot::Swatch(dl, c, isBound, IsThemeLight());
       ExpandPinHit(c, p.x + box);
       ed::EndPin();
-      ImGui::SameLine(0.0f, 4.0f);
+      ImGui::SetCursorScreenPos(ImVec2(rowStart.x + box + 4.0f, rowStart.y));
 
-      if (ColourChip::Draw(label, col))
+      char boundCaption[96];
+      snprintf(boundCaption, sizeof(boundCaption), "%s  #%d", label, bound.swatchIndex + 1);
+      const ImVec4 boundTint = ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pin_colour_bound, IsThemeLight()));
+      if (ColourChip::DrawRow(label, isBound ? boundCaption : label, col, std::max(24.0f, kParamWidth - (tok::pin_box + 4.0f)),
+                              isBound ? &boundTint : nullptr))
       {
          if (isBound)
          {
@@ -1638,12 +1645,6 @@ namespace app
             gColor.justOpened = true;
          }
       }
-      ImGui::SameLine();
-      if (isBound)
-         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pin_colour_bound, IsThemeLight())), "%s  #%d",
-                            label, bound.swatchIndex + 1);
-      else
-         ImGui::TextDisabled("%s", label);
 
       ImGui::PopID();
       ImGui::PopID();

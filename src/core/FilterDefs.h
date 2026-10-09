@@ -36,6 +36,11 @@ struct FilterParamDef
    // point of GL upload (FilterNode::CookIfNeeded). The shader itself still
    // receives radians, matching the rest of the app's rotation convention.
    bool isDegrees = false;
+
+   // Float params only: printf format of the slider value (carries the unit: "%.0f px", "%.2f rad"). Empty = "%.3f".
+   // `integer` snaps the slider to whole numbers; the stored value stays a float so saved patches are unchanged.
+   std::string format;
+   bool integer = false;
 };
 
 struct FilterDef

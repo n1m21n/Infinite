@@ -2,7 +2,7 @@
 //   Cable   - the round patch pin on a node edge or in a body (data = blue, prediction = green).
 //   Param   - the ring beside a control that a cable or expression can drive. Idle = grey ring; driven = filled
 //             centre in the source colour (modulation amber, expression violet, prediction green) that pulses gently.
-//   Swatch  - the square palette pin beside a colour field (square on purpose: it accepts a different cable).
+//   Swatch  - the round palette pin beside a colour field (filled, where the param pin is a ring: it accepts a palette cable).
 // Call sites pass state, never a colour, radius or duration.
 #pragma once
 #include <cmath>
@@ -61,11 +61,10 @@ namespace PinDot
       dl->AddCircle(c, r, tok::U32(tok::pin_edge, isLight), 0, 1.5f);
    }
 
-   // Palette pin: a small rounded square.
+   // Palette pin: a small filled dot.
    inline void Swatch(ImDrawList* dl, ImVec2 c, bool bound, bool isLight)
    {
       const float r = tok::pin_r_colour;
-      dl->AddRectFilled(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r),
-                        tok::U32(bound ? tok::pin_colour_bound : tok::pin_colour, isLight), 1.0f);
+      dl->AddCircleFilled(c, r + 0.5f, tok::U32(bound ? tok::pin_colour_bound : tok::pin_colour, isLight));
    }
 }

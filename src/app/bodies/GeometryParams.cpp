@@ -1847,6 +1847,27 @@ namespace app
          const FilterParamDef& p = def.params[i];
          if (!p.sectionLabel.empty())
             NodeSeparator(p.sectionLabel.c_str());
+         if (def.name == "convolve" && i < 9)
+         {
+            // The 3x3 kernel reads as the matrix it is: nine number cells, each a full slider (same pin, typing,
+            // menus, recording and binding as any other param), named k11..k33 for the modulation matrix.
+            if (i == 0)
+            {
+               const float gap = tok::space_1;
+               const float cellW = std::floor((kParamWidth - 2.0f * gap) / 3.0f);
+               for (size_t k = 0; k < 9; k++)
+               {
+                  const FilterParamDef& kp = def.params[k];
+                  ImGui::PushID((int)k);
+                  if (k % 3 != 0)
+                     ImGui::SameLine(0.0f, gap);
+                  ModSlider(("##" + kp.label).c_str(), n->ParamPtr(k), kp.minVal, kp.maxVal, "%.1f", cellW, false, 0.0f,
+                            nullptr, nullptr, -1, kp.label.c_str());
+                  ImGui::PopID();
+               }
+            }
+            continue;
+         }
          ImGui::PushID((int)i);
          if (p.type == FilterParamDef::Type::Color)
          {
@@ -1871,7 +1892,8 @@ namespace app
          }
          else
          {
-            ModSlider(p.label.c_str(), n->ParamPtr(i), p.minVal, p.maxVal);
+            ModSlider(p.label.c_str(), n->ParamPtr(i), p.minVal, p.maxVal,
+                      p.format.empty() ? "%.3f" : p.format.c_str(), kParamWidth, false, p.integer ? 1.0f : 0.0f);
          }
          ImGui::PopID();
       }

@@ -57,10 +57,30 @@ namespace app
          readoutFit = fitText(readout.c_str(), width - 16.0f);
          readoutW = ImGui::CalcTextSize(readoutFit.c_str()).x;
       }
+      // One status grammar (R10): "<what> · <state>". Legacy " - " / "  -  " separators become the middle dot,
+      // ASCII "->" becomes an arrow, and a trailing separator is dropped.
+      auto normaliseStat = [](const char* in) {
+         std::string s = in;
+         auto replaceAll = [&](const std::string& a, const std::string& b) {
+            for (size_t pos = 0; (pos = s.find(a, pos)) != std::string::npos; pos += b.size())
+               s.replace(pos, a.size(), b);
+         };
+         replaceAll("->", "\xE2\x86\x92");
+         replaceAll("  -  ", " \xC2\xB7 ");
+         replaceAll(" - ", " \xC2\xB7 ");
+         for (;;)
+         {
+            while (!s.empty() && s.back() == ' ') s.pop_back();
+            if (s.size() >= 2 && s.compare(s.size() - 2, 2, "\xC2\xB7") == 0) { s.resize(s.size() - 2); continue; }
+            break;
+         }
+         return s;
+      };
       if (idleStat != nullptr && idleStat[0] != '\0')
       {
+         const std::string idleNorm = normaliseStat(idleStat);
          const float idleMax = width - 14.0f - (readoutW > 0.0f ? readoutW + 14.0f : 0.0f);
-         const std::string idleFit = fitText(idleStat, idleMax);
+         const std::string idleFit = fitText(idleNorm.c_str(), idleMax);
          if (!idleFit.empty())
             dl->AddText(ImVec2(p.x + 7.0f, textY),
                         isLight ? tok::U32(tok::pal::c_50586CFF) : tok::U32(tok::pal::c_848A9EFF),

@@ -43,6 +43,20 @@ namespace
       return p;
    }
 
+   // Display format (carries the unit) and whole-number snapping; storage is untouched.
+   FilterParamDef F(const char* fmt, FilterParamDef p)
+   {
+      p.format = fmt;
+      return p;
+   }
+
+   FilterParamDef N(const char* fmt, FilterParamDef p)
+   {
+      p.format = fmt;
+      p.integer = true;
+      return p;
+   }
+
    // Tags a param with a section header, drawn above it in the params panel -
    // for filters whose param list is long enough that a flat list stops being
    // readable (e.g. a combined color-adjustments node).
@@ -89,7 +103,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   }\n"
         "   fragColor = sum / total;\n"
         "}\n",
-        { P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f) }, 1,
+        { F("%.1f px", P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f)) }, 1,
         "uniform float uRadius;\n"
         "void main() {\n"
         "   vec4 sum = vec4(0.0); float total = 0.0;\n"
@@ -108,7 +122,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "      sum += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius));\n"
         "   fragColor = sum / 9.0;\n"
         "}\n",
-        { P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f) }, 1,
+        { F("%.1f px", P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f)) }, 1,
         "uniform float uRadius;\n"
         "void main() {\n"
         "   vec4 sum = vec4(0.0);\n"
@@ -129,8 +143,8 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   }\n"
         "   fragColor = sum / float(N);\n"
         "}\n",
-        { P("Angle", "uAngle", T::Float, 0.0f, 6.2832f, 0.0f),
-          P("Distance", "uDistance", T::Float, 0.0f, 60.0f, 15.0f) } },
+        { F("%.2f rad", P("Angle", "uAngle", T::Float, 0.0f, 6.2832f, 0.0f)),
+          F("%.0f px", P("Distance", "uDistance", T::Float, 0.0f, 60.0f, 15.0f)) } },
 
       { "radialblur", "Effects",
         "uniform float uAmount;\n"
@@ -166,7 +180,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   fragColor = vec4(c.rgb + (c.rgb - blur.rgb) * uAmount, c.a);\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.0f, 3.0f, 0.6f),
-          P("Radius", "uRadius", T::Float, 0.1f, 5.0f, 1.5f) } },
+          F("%.1f px", P("Radius", "uRadius", T::Float, 0.1f, 5.0f, 1.5f)) } },
 
       // ---------------- Effects: distortion family ----------------
       { "twirl", "Effects",
@@ -183,7 +197,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   vec2 rd = vec2(c*d.x - s*d.y, s*d.x + c*d.y);\n"
         "   fragColor = texture(uSrc, center + rd);\n"
         "}\n",
-        { P("Angle", "uAngle", T::Float, -6.2832f, 6.2832f, 2.0f),
+        { F("%.2f rad", P("Angle", "uAngle", T::Float, -6.2832f, 6.2832f, 2.0f)),
           P("Radius", "uRadius", T::Float, 0.05f, 1.0f, 0.5f),
           P("Center X", "uCenterX", T::Float, 0.0f, 1.0f, 0.5f),
           P("Center Y", "uCenterY", T::Float, 0.0f, 1.0f, 0.5f) } },
@@ -237,7 +251,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   vec2 uv = (floor(vUv * res / block) * block + block * 0.5) / res;\n"
         "   fragColor = texture(uSrc, uv);\n"
         "}\n",
-        { P("Block Size", "uBlockSize", T::Float, 1.0f, 64.0f, 8.0f) } },
+        { N("%.0f px", P("Block Size", "uBlockSize", T::Float, 1.0f, 64.0f, 8.0f)) } },
 
       // ---------------- Effects: noise / vignette ----------------
       { "addnoise", "Effects",
@@ -323,7 +337,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   vec3 col = floor(c.rgb * levels) / (levels - 1.0);\n"
         "   fragColor = vec4(clamp(col, 0.0, 1.0), c.a);\n"
         "}\n",
-        { P("Levels", "uLevels", T::Float, 2.0f, 32.0f, 6.0f) } },
+        { N("%.0f", P("Levels", "uLevels", T::Float, 2.0f, 32.0f, 6.0f)) } },
 
       { "threshold", "Compositing",
         "uniform float uThreshold;\n"
@@ -341,7 +355,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   vec3 col = c.rgb * pow(2.0, uExposure);\n"
         "   fragColor = vec4(clamp(col, 0.0, 1.0), c.a);\n"
         "}\n",
-        { P("Exposure", "uExposure", T::Float, -3.0f, 3.0f, 0.0f) } },
+        { F("%.2f EV", P("Exposure", "uExposure", T::Float, -3.0f, 3.0f, 0.0f)) } },
 
       // ---------------- Alpha / opacity operators ----------------
       // Nothing above edits an existing alpha channel directly - chroma/luma
@@ -390,7 +404,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   if (uInvert == 1) luma = 1.0 - luma;\n"
         "   fragColor = vec4(c.rgb, luma);\n"
         "}\n",
-        { E("invert", "uInvert", { "Off", "On" }, 0) } },
+        { P("invert", "uInvert", T::Bool, 0.0f, 1.0f, 0.0f) } },
 
       // Low/high/gamma remap matches the Black Point / White Point / Gamma
       // convention used by the "color adjustments" Levels section below:
@@ -435,7 +449,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { P("Threshold", "uThreshold", T::Float, 0.0f, 1.0f, 0.6f),
           P("Intensity", "uIntensity", T::Float, 0.0f, 5.0f, 1.4f),
-          P("Radius", "uRadius", T::Float, 0.5f, 12.0f, 4.0f) }, 1,
+          F("%.1f px", P("Radius", "uRadius", T::Float, 0.5f, 12.0f, 4.0f)) }, 1,
         "uniform float uThreshold;\n"
         "uniform float uRadius;\n"
         "void main() {\n"
@@ -465,7 +479,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   fragColor = vec4(mix(c.rgb, screen, uAmount), c.a);\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.0f, 1.0f, 0.6f),
-          P("Radius", "uRadius", T::Float, 0.5f, 12.0f, 4.0f) }, 1,
+          F("%.1f px", P("Radius", "uRadius", T::Float, 0.5f, 12.0f, 4.0f)) }, 1,
         "uniform float uRadius;\n"
         "void main() {\n"
         "   vec3 blur = vec3(0.0); float total = 0.0;\n"
@@ -536,7 +550,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Amount", "uAmount", T::Float, 0.0f, 2.0f, 0.6f),
           P("Detail", "uDetail", T::Float, 0.02f, 1.0f, 0.4f),
           P("Speed", "uSpeed", T::Float, 0.0f, 4.0f, 1.0f),
-          P("Seed", "uSeed", T::Float, 0.0f, 100.0f, 0.0f) } },
+          N("%.0f", P("Seed", "uSeed", T::Float, 0.0f, 100.0f, 0.0f)) } },
 
       // ---------------- Effects: lens / warp ----------------
       { "lensdistortion", "Effects",
@@ -622,7 +636,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         { E("axis", "uAxis", { "Mirror X", "Mirror Y", "Both" }, 0),
           P("Center X", "uCenterX", T::Float, 0.0f, 1.0f, 0.5f),
           P("Center Y", "uCenterY", T::Float, 0.0f, 1.0f, 0.5f),
-          E("flip", "uFlip", { "Off", "On" }, 0) } },
+          P("flip", "uFlip", T::Bool, 0.0f, 1.0f, 0.0f) } },
 
       { "kaleidoscope", "Effects",
         "uniform float uSegments;\n"
@@ -640,8 +654,8 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   vec2 uv = vec2(cos(a), sin(a)) * r * max(uZoom, 0.01) + 0.5;\n"
         "   fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
         "}\n",
-        { P("Segments", "uSegments", T::Float, 2.0f, 32.0f, 6.0f),
-          P("Rotation", "uRotation", T::Float, 0.0f, 6.2832f, 0.0f),
+        { N("%.0f", P("Segments", "uSegments", T::Float, 2.0f, 32.0f, 6.0f)),
+          F("%.2f rad", P("Rotation", "uRotation", T::Float, 0.0f, 6.2832f, 0.0f)),
           P("Zoom", "uZoom", T::Float, 0.2f, 3.0f, 1.0f),
           P("Center X", "uCenterX", T::Float, 0.0f, 1.0f, 0.5f),
           P("Center Y", "uCenterY", T::Float, 0.0f, 1.0f, 0.5f) } },
@@ -656,7 +670,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   if (mod(cell.y, 2.0) > 0.5) f.y = 1.0 - f.y;\n"
         "   fragColor = texture(uSrc, f);\n"
         "}\n",
-        { P("Tiles", "uTiles", T::Float, 1.0f, 12.0f, 2.0f) } },
+        { N("%.0f", P("Tiles", "uTiles", T::Float, 1.0f, 12.0f, 2.0f)) } },
 
       // ---------------- Keying ----------------
       { "chroma key", "Compositing",
@@ -711,7 +725,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         { P("Low", "uLow", T::Float, 0.0f, 1.0f, 0.1f),
           P("High", "uHigh", T::Float, 0.0f, 1.0f, 1.0f),
           P("Softness", "uSoftness", T::Float, 0.001f, 0.3f, 0.03f),
-          E("invert", "uInvert", { "Off", "On" }, 0),
+          P("invert", "uInvert", T::Bool, 0.0f, 1.0f, 0.0f),
           E("show", "uShowMatte", { "Keyed", "Matte" }, 0) } },
 
       // ---------------- Effects: framing / surface ----------------
@@ -759,8 +773,8 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   else fragColor = vec4(vec3(clamp(e + 0.5, 0.0, 1.0)), src.a);\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.0f, 8.0f, 2.0f),
-          P("Angle", "uAngle", T::Float, 0.0f, 6.2832f, 0.785f),
-          P("Distance", "uDistance", T::Float, 0.5f, 12.0f, 1.5f),
+          F("%.2f rad", P("Angle", "uAngle", T::Float, 0.0f, 6.2832f, 0.785f)),
+          F("%.1f px", P("Distance", "uDistance", T::Float, 0.5f, 12.0f, 1.5f)),
           E("style", "uKeepColor", { "Grey", "Over colour" }, 0) } },
 
       { "normal map", "Effects",
@@ -870,8 +884,8 @@ const std::vector<FilterDef>& GetFilterDefs()
         "      fragColor = vec4(vec3(d), c.a);\n"
         "   }\n"
         "}\n",
-        { P("Scale", "uScale", T::Float, 10.0f, 300.0f, 80.0f),
-          P("Angle", "uAngle", T::Float, 0.0f, 1.5708f, 0.4f),
+        { N("%.0f", P("Scale", "uScale", T::Float, 10.0f, 300.0f, 80.0f)),
+          F("%.2f rad", P("Angle", "uAngle", T::Float, 0.0f, 1.5708f, 0.4f)),
           E("style", "uColorMode", { "Mono", "Colour" }, 0) } },
 
       { "edge sobel", "Effects",
@@ -891,7 +905,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   fragColor = vec4(vec3(e), texture(uSrc, vUv).a);\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.1f, 8.0f, 1.5f),
-          E("invert", "uInvert", { "Off", "On" }, 0) } },
+          P("invert", "uInvert", T::Bool, 0.0f, 1.0f, 0.0f) } },
 
       { "edge outline", "Effects",
         "uniform float uThickness;\n"
@@ -906,7 +920,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   float e = step(uThreshold, length(vec2(gx, gy)));\n"
         "   fragColor = vec4(mix(c.rgb, uColor, e), max(c.a, e));\n"
         "}\n",
-        { P("Thickness", "uThickness", T::Float, 1.0f, 10.0f, 2.0f),
+        { N("%.0f px", P("Thickness", "uThickness", T::Float, 1.0f, 10.0f, 2.0f)),
           P("Threshold", "uThreshold", T::Float, 0.01f, 1.0f, 0.15f),
           P("Colour", "uColor", T::Color, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f) } },
 
@@ -930,7 +944,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   vec3 graded = mix(s0, s1, f);\n"
         "   fragColor = vec4(mix(c.rgb, graded, uMix), c.a);\n"
         "}\n",
-        { P("LUT Size", "uSize", T::Float, 2.0f, 64.0f, 16.0f),
+        { N("%.0f", P("LUT Size", "uSize", T::Float, 2.0f, 64.0f, 16.0f)),
           P("Mix", "uMix", T::Float, 0.0f, 1.0f, 1.0f) },
         2 },
 
@@ -1096,8 +1110,8 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   vec3 shadow = uColor * shadowSample.a * uOpacity;\n"
         "   fragColor = vec4(mix(shadow, c.rgb, c.a), max(c.a, shadowSample.a * uOpacity));\n"
         "}\n",
-        { P("Offset X", "uOffsetX", T::Float, -20.0f, 20.0f, 4.0f),
-          P("Offset Y", "uOffsetY", T::Float, -20.0f, 20.0f, 4.0f),
+        { F("%.1f px", P("Offset X", "uOffsetX", T::Float, -20.0f, 20.0f, 4.0f)),
+          F("%.1f px", P("Offset Y", "uOffsetY", T::Float, -20.0f, 20.0f, 4.0f)),
           P("Color", "uColor", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f),
           P("Opacity", "uOpacity", T::Float, 0.0f, 1.0f, 0.6f) } },
    };
