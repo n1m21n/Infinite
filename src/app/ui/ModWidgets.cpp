@@ -1716,13 +1716,13 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float y = origin.y + 6.0f;
-      const ImU32 col = tok::U32(tok::pal::c_4E5264FF);
+      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Border, 0.6f);   // themed hairline: reads in light and dark
 
       if (label != nullptr && label[0] != '\0')
       {
          const ImVec2 textSize = ImGui::CalcTextSize(label);
          dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + 10.0f, y), col);
-         dl->AddText(ImVec2(origin.x + 16.0f, origin.y), tok::U32(tok::pal::c_969CB4FF), label);
+         dl->AddText(ImVec2(origin.x + 16.0f, origin.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), label);
          const float lineStart = origin.x + 22.0f + textSize.x;
          if (lineStart < origin.x + width)
             dl->AddLine(ImVec2(lineStart, y), ImVec2(origin.x + width, y), col);

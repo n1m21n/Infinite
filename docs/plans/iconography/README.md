@@ -37,7 +37,8 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | Old popups | done 2026-10-09: `##colorpick`, `##nodehelp` on `MenuParts::BeginPopup`; `##arrgridpopup` and Render Timeline already on MenuParts / SectionCard; `##commentedit` stays a transparent in-place editor on `FieldWell::InputTextMultiline` (decision: it is the note itself, not a popup card). Sweep: mod matrix rows on `MenuParts::Choice`, MIDI learn on `MenuParts::Item`. Raw widgets 470 |
 | N1 node header | title Title/Medium, category same size dimmed; single-row header open |
 | N1 frame | 1 px hairline border done |
-| N2 sections, N3 cables (draw order over nodes), N4 groups, N5 grid/marquee | not started |
+| N2 separators | done 2026-10-09: `NodeSeparator` hairline and label use themed Border / TextDisabled (were fixed dark-only palette colours) |
+| N3 cables, N4 groups, N5 marquee | partly done 2026-10-09: link hover/selected border, group radius (`radius_group` 10) and marquee fill/border (accent 8% / 60%) set in `Theme.cpp` editor style. Open: cable draw order over nodes, ends on dot centre, dot grid (editor draws lines only; decision: keep the faint line grid), minimap |
 | V1-V7 visualizers | not started |
 | Font sizes inside nodes | one size (15) in Chorus; other nodes not audited (`NoteBodies.cpp`, `SamplerBodies.cpp`, `StageKeyboard.cpp` scale text) |
 | Clip Settings, Render popup + progress/overwrite/fail dialogs, Viewport panel cards, node picker nav ring | done 2026-10-08 (`SectionCard` component; dark checked, light on Viewport only; dialogs not yet shot) |
