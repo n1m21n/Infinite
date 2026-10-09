@@ -25,9 +25,7 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 |---|---|
 | C1 knob | kept as is (owner decision: existing knobs stay; textured/3D later); mod pin centred (P2) |
 | C2 slider | outline removed both themes, radius 4. Hover/pressed easing open |
-| C3 vertical fader | not started |
-| C4 checkbox | outline removed, P10 budget met. Own tick + 120 ms draw-on open |
-| C5 switch | not started (Settings/panels only) |
+| C4 checkbox | done (2026-10-09): outline removed, P10 budget met, own tick with 120 ms draw-on |
 | C6 dropdown | borderless recess, radius 4. Chevron tried and rejected by owner |
 | C7 button | done (2026-10-09): `ActionButton` (plain / primary + semantic Selected, Record, Learn, Go, Solo kinds); all `ImGui::Button`/`SmallButton` in `src/app` converted; icon-only `##` buttons go to IconTile in C8. Decision: semantic fills are tokens `action.*`; Perf panel buttons use the accent, no per-node tint |
 | C3 vertical fader | done (2026-10-09): `VFader.h`, pill handle, one tone path for both themes |
@@ -36,6 +34,7 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | C9 text entry | done (2026-10-09): `FieldWell::InputText/WithHint/Multiline/InputInt`; typed-value edit of controls keeps `PushTypedEditStyle` |
 | C10 swatch, C12 badges | done (2026-10-09): `ColourChip.h` rounded colour field; favourite star on token `badge.favorite`; palette pin stays the square `PinDot::Swatch` (decision: square = palette-cable target, dot = cable) |
 | C11 pin/dot | **done 2026-10-09**: `PinDot` component (Cable r7 / small r5, Param ring r4.5 -> r4 + centre dot when driven, Swatch square r4), one 12 pt box, sizes in `tokens.json` `pin`, colours in `pin.*` role pairs (idle grey, modulation amber, expression violet, prediction green), 0.72-1.0 slow pulse while driven (off under reduce-motion). Slider, knob, discrete, patch, lane, colour pins all draw through it. Decision: the idle ring stays grey, never accent |
+| Old popups | done 2026-10-09: `##colorpick`, `##nodehelp` on `MenuParts::BeginPopup`; `##arrgridpopup` and Render Timeline already on MenuParts / SectionCard; `##commentedit` stays a transparent in-place editor on `FieldWell::InputTextMultiline` (decision: it is the note itself, not a popup card). Sweep: mod matrix rows on `MenuParts::Choice`, MIDI learn on `MenuParts::Item`. Raw widgets 470 |
 | N1 node header | title Title/Medium, category same size dimmed; single-row header open |
 | N1 frame | 1 px hairline border done |
 | N2 sections, N3 cables (draw order over nodes), N4 groups, N5 grid/marquee | not started |
@@ -46,7 +45,6 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | A7 Settings window + every tab | **done 2026-10-09** (ebae9c06, 977377b3, 8790f748, c892a7f6): FormParts rows, section cards, hairline edges, round colour dots, reference style for Field Language / Expression Globals / Shortcuts / Help, 16 pt window padding, shared slider (type-to-edit, eased hover), slim scrollbars. Open: preset swatch strip still squares; tab hover not eased; Clip Settings and Render dialogs not re-verified |
 | Node search popup | search field now uses `LibraryParts::SearchField` (magnifier was missing: Lucide font glyph not loaded). Done 2026-10-08 |
 | Top bar metronome | pendulum swings per beat again (eased 140 ms) via `IconTile` swing. Done 2026-10-08 |
-| Chrome A3-A7 (menus, panels, tables, timeline, dialogs/Settings) | not started; raw widgets 875 (stored 957), largest: SamplerBodies 125, ArrangePanel 112, ArrangeRender 56, StageMenuBar 53 |
 
 Root cause of the sizing complaints (found 2026-10-08): each call site derives its own icon size from row height (0.65 flag/track height/edit, 0.72 top-bar transport, 0.88 top-bar toggles, 0.9 search). No shared size token exists. Step 1 fixes that before any more icon art is judged.
 
