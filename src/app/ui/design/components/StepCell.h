@@ -16,10 +16,10 @@ namespace StepCell
       dl->AddRectFilled(mn, mx, light ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_0B0C10FF), r);
       if (on)
          dl->AddRectFilled(mn, mx,
-                           playhead ? (light ? tok::U32(tok::pal::c_FFFFFFFF) : tok::U32(tok::pal::c_E1F2FFFF))
+                           playhead ? (light ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC850FF))
                                     : (light ? tok::U32(tok::pal::c_2878EBF0) : tok::U32(tok::pal::c_96D6FFC8)),
                            r);
-      const ImU32 edge = playhead ? (light ? tok::U32(tok::pal::c_1E64E6FF) : tok::U32(tok::pal::c_FFFFFFFF))
+      const ImU32 edge = playhead ? (light ? tok::U32(tok::pal::c_E18214F0) : tok::U32(tok::pal::c_FFD250E6))
                                   : (hovered ? (light ? tok::U32(tok::pal::c_1E64E6FF) : tok::U32(tok::pal::c_96D6FFC8))
                                              : (light ? tok::U32(tok::pal::c_B4BCCCFF) : tok::U32(tok::pal::c_404454FF)));
       dl->AddRect(mn, mx, edge, r, 0, playhead ? 2.0f : 1.0f);

@@ -1750,9 +1750,9 @@ namespace app
          }
 
          // Grid outer border
-         dl->AddRect(origin, br, isLight ? tok::U32(tok::pal::c_B9C0D0FF) : tok::U32(tok::pal::c_414655FF), 4.0f);
+         AudioViz::Border(dl, origin, br);
 
-         const float labelRowH = ImGui::GetFontSize() + 5.0f;
+         const float labelRowH = ImGui::GetFontSize() + 9.0f;
          ImGui::SetCursorScreenPos(ImVec2(origin.x, br.y + labelRowH));
          if (hoverStep >= 0)
          {

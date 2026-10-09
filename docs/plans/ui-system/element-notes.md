@@ -25,7 +25,7 @@ The rule: each element type has ONE grammar, drawn by a shared component; the no
 - **Random Note Generator / Note Switcher / Note Merge — router family**: same dots as Note Router.
 
 ## Open decisions
-- Playhead colour: StepCell uses white/blue; Note Sequencer uses amber (collides with the modulation role). Proposal: Note Sequencer adopts StepCell's playhead.
+- Playhead colour: DECIDED amber everywhere (StepCell and Note Sequencer column outline, step number, cap, velocity fill). Known collision with the modulation role; playhead is always a filled/outlined cell, never a pin.
 - Shared chip component for Note Sequencer chips and any value tag inside a viewer.
 
 ## Template for the next families (fill before touching each)
