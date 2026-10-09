@@ -2183,6 +2183,13 @@ void RunClipboardTest()
       gp.recordedMax = 0.9f;
       GestureRecorder::Instance().SetPlayback(shapeIdx, 1, gp);
    }
+   if (GraphNode* fg = FindNodeByIndex(fieldIdx))
+      if (auto* fgn = dynamic_cast<FieldGraphNode*>(fg->node.get()))
+      {
+         fgn->Ownership().Set("child", shapeIdx);
+         fgn->Ownership().Set("gone", outIdx); // owned but never copied
+         fgn->ownershipText = fgn->Ownership().ToText();
+      }
    std::vector<std::pair<std::string, std::string>> before;
    Patch::SaveParams(shape->node.get(), before);
 
@@ -2220,6 +2227,18 @@ void RunClipboardTest()
          hasGroup = hasGroup || gn->typeName == "Group";
       }
    Check("comment, group and Field graph nodes came across", hasNote && hasGroup && hasField);
+   {
+      bool ownsPasted = false, droppedUncopied = false;
+      for (int idx : r.newIndices)
+         if (GraphNode* gn = FindNodeByIndex(idx))
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(gn->node.get()))
+            {
+               ownsPasted = pShape != nullptr && fgn->Ownership().Get("child") == pShape->index;
+               droppedUncopied = !fgn->Ownership().Has("gone");
+            }
+      Check("a Field graph owns the pasted copy of its child, not the original", ownsPasted);
+      Check("a child that was not copied is dropped from ownership", droppedUncopied);
+   }
    Check("pasted nodes got new uids", pShape != nullptr && pShape->uid != shapeUid);
    if (pShape != nullptr)
    {

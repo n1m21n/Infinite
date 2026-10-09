@@ -119,6 +119,9 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
             iconCfg.MergeMode = true;
             iconCfg.PixelSnapH = true;
             iconCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
+#ifndef NDEBUG
+            iconCfg.SizePixels = UiScale::kBaseFontSize; // Debug ImGui asserts a reference size beside GlyphMinAdvanceX
+#endif
             io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
          }
       }
@@ -134,6 +137,9 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
             glyphCfg.MergeMode = true;
             glyphCfg.PixelSnapH = true;
             glyphCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
+#ifndef NDEBUG
+            glyphCfg.SizePixels = UiScale::kBaseFontSize; // Debug ImGui asserts a reference size beside GlyphMinAdvanceX
+#endif
             io.Fonts->AddFontFromFileTTF(bundledGlyphs.c_str(), bakedPx, &glyphCfg, glyphRanges);
          }
       }

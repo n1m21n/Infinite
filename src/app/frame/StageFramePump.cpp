@@ -488,7 +488,7 @@ void DrawFramePump(FrameCtx& fc)
          rmin = ImVec2(gPredTestSliderScreen.x, gPredTestSliderScreen.y);
          rmax = ImVec2(gPredTestSliderScreen.z, gPredTestSliderScreen.w);
          const float cy = (rmin.y + rmax.y) * 0.5f;
-         const float x30 = rmin.x + (rmax.x - rmin.x) * 0.3f, x70 = rmin.x + (rmax.x - rmin.x) * 0.7f;
+         const float x30 = rmin.x + (rmax.x - rmin.x) * 0.3f, x45 = rmin.x + (rmax.x - rmin.x) * 0.45f, x70 = rmin.x + (rmax.x - rmin.x) * 0.7f;
          auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
          switch (frameId)
          {
@@ -496,7 +496,9 @@ void DrawFramePump(FrameCtx& fc)
             case 62: btn(true); break;
             case 64: gTestMouse = ImVec2(x70, cy); break;
             case 66: btn(false); break;
-            case 72: gTestMouse = ImVec2(x30, cy); break;
+            // The second press starts away from the first: two presses on one spot inside the double-click time
+            // (a headless run is fast) open the slider's typed-entry field instead of dragging.
+            case 72: gTestMouse = ImVec2(x45, cy); break;
             case 74: btn(true); break;
             case 76: gTestMouse = ImVec2(x70, cy); break;
             case 80: btn(false); break;
