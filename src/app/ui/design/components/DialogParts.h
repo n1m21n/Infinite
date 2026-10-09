@@ -29,7 +29,7 @@ namespace DialogParts
 
    inline void Title(const char* text)
    {
-      UiType::Scope s(UiType::Size::Body, UiType::Weight::Medium);
+      UiType::Scope s(UiType::Size::Title, UiType::Weight::Medium);
       ImGui::TextUnformatted(text);
       ImGui::Dummy(ImVec2(0.0f, tok::space_1));
    }
