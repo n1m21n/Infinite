@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <mutex>
 #include <string>
@@ -59,6 +60,13 @@ public:
    // finished scan's results without ever blocking on the worker thread.
    void PollResults();
 
+   // True when the last scan that covered `folder` could not open its root (deleted, unmounted, no permission).
+   // Main thread only; cleared when a later scan opens it again.
+   bool IsFolderMissing(const std::string& folder) const
+   {
+      return std::find(mMissingFolders.begin(), mMissingFolders.end(), folder) != mMissingFolders.end();
+   }
+
    const std::vector<Entry>& Index() const { return mIndex; }
    uint64_t IndexVersion() const { return mIndexVersion; }
 
@@ -87,6 +95,8 @@ private:
    std::thread mScanThread;
    std::mutex mResultMutex;
    std::vector<Entry> mPendingResult; // guarded by mResultMutex
+   std::vector<std::string> mPendingMissing; // roots the scan could not open; guarded by mResultMutex
+   std::vector<std::string> mMissingFolders; // published by PollResults
    std::atomic<bool> mResultReady { false };
    std::atomic<bool> mScanning { false };
    std::atomic<int> mFilesFound { 0 };

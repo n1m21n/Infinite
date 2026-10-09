@@ -129,9 +129,12 @@ void SampleScanner::RemoveFolder(const std::string& path)
    mFolders.erase(std::remove(mFolders.begin(), mFolders.end(), path), mFolders.end());
    SaveFoldersToDisk();
    ++mIndexVersion;
-   // Entries from the removed folder stay in the index until the next
-   // Refresh - matching "manual refresh only" (no implicit rescan on every
-   // folder-list edit), same as the plan's Refresh-button-only contract.
+   // Drop the folder's entries now. A later scan only replaces entries from folders it covers, and a removed
+   // folder is never covered again, so leaving them would list its files forever. (A scan already in flight
+   // for it is filtered out in PollResults.)
+   mIndex.erase(std::remove_if(mIndex.begin(), mIndex.end(), [&](const Entry& e) { return e.folderRoot == path; }), mIndex.end());
+   mMissingFolders.erase(std::remove(mMissingFolders.begin(), mMissingFolders.end(), path), mMissingFolders.end());
+   SaveIndexToDisk();
 }
 
 void SampleScanner::StartScan(const std::string& folder)
@@ -150,9 +153,15 @@ void SampleScanner::StartScan(const std::string& folder)
 void SampleScanner::ScanThreadMain(std::vector<std::string> folders)
 {
    std::vector<Entry> found;
+   std::vector<std::string> missing;
 
    for (const std::string& root : folders)
    {
+      {
+         std::error_code rootEc;
+         if (!fs::is_directory(root, rootEc))
+            missing.push_back(root);   // reported to the UI; the walk below then finds nothing
+      }
       // Manual stack-based walk rather than recursive_directory_iterator:
       // per LWG2723, libc++ sends the iterator straight to end() the moment
       // increment() reports *any* error (not just permission-denied), which
@@ -217,6 +226,7 @@ void SampleScanner::ScanThreadMain(std::vector<std::string> folders)
    {
       std::lock_guard<std::mutex> lock(mResultMutex);
       mPendingResult = std::move(found);
+      mPendingMissing = std::move(missing);
    }
    mResultReady.store(true, std::memory_order_release);
    mScanning.store(false, std::memory_order_relaxed);
@@ -240,10 +250,19 @@ void SampleScanner::PollResults()
       if (std::find(mScanningFolders.begin(), mScanningFolders.end(), e.folderRoot) == mScanningFolders.end())
          merged.push_back(std::move(e));
    for (Entry& e : mPendingResult)
-      merged.push_back(std::move(e));
+      if (std::find(mFolders.begin(), mFolders.end(), e.folderRoot) != mFolders.end())   // not a folder removed mid-scan
+         merged.push_back(std::move(e));
 
    mIndex = std::move(merged);
    mPendingResult.clear();
+   // Folders this scan covered are re-judged; ones it did not cover keep their earlier verdict.
+   mMissingFolders.erase(std::remove_if(mMissingFolders.begin(), mMissingFolders.end(),
+                            [&](const std::string& f)
+                            { return std::find(mScanningFolders.begin(), mScanningFolders.end(), f) != mScanningFolders.end(); }),
+                         mMissingFolders.end());
+   for (std::string& f : mPendingMissing)
+      mMissingFolders.push_back(std::move(f));
+   mPendingMissing.clear();
    mResultReady.store(false, std::memory_order_relaxed);
    ++mIndexVersion;
    lock.unlock();

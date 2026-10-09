@@ -190,7 +190,7 @@ namespace app
          ImGui::PushID(folder.c_str());
          const float btnW = 24.0f;
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + panelW - 2.0f * btnW - 14.0f);
-         ImGui::TextDisabled("%s", folder.c_str());
+         ImGui::TextDisabled(scanner.IsFolderMissing(folder) ? "%s  (not found)" : "%s", folder.c_str());
          ImGui::PopTextWrapPos();
          ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
          if (LibraryParts::IconButton("refreshfolder", LibraryParts::Icon::Refresh, !scanning))
@@ -281,7 +281,17 @@ namespace app
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(savedItemSpacing.x, 2.0f));
       LibraryParts::BeginWell("##librarypanellist");
       if (filtered.empty())
-         EmptyState::DrawInWindow(T("Nothing to show"), T("Try clearing the search or filter"));
+      {
+         // Say what is actually wrong: no folders, nothing indexed yet, or just a search/filter that hides everything.
+         if (scanner.Folders().empty())
+            EmptyState::DrawInWindow(T("No folders yet"), T("Add a folder to build the library"));
+         else if (scanning && scanner.Index().empty())
+            EmptyState::DrawInWindow(T("Scanning..."), T("Files appear when the scan finishes"));
+         else if (scanner.Index().empty())
+            EmptyState::DrawInWindow(T("Nothing indexed"), T("Refresh all to scan your folders"));
+         else
+            EmptyState::DrawInWindow(T("Nothing to show"), T("Try clearing the search or filter"));
+      }
       // A scanned library folder can hold tens of thousands of files -
       // submitting a Selectable (now a button too) for every one of them
       // regardless of scroll position is what tanked this panel's frame
@@ -785,7 +795,14 @@ namespace app
 
       LibraryParts::BeginWell("##pluginpanellist");
       if (sCache.filtered.empty())
-         EmptyState::DrawInWindow(T("No plugins found"), T("Try clearing the search or filter"));
+      {
+         if (gPluginScanner.IsScanning() && gPluginScanner.Index().empty())
+            EmptyState::DrawInWindow(T("Scanning..."), T("Plugins appear when the scan finishes"));
+         else if (gPluginScanner.Index().empty())
+            EmptyState::DrawInWindow(T("No plugins indexed"), T("Hit Rescan plugins"));
+         else
+            EmptyState::DrawInWindow(T("No plugins found"), T("Try clearing the search or filter"));
+      }
       // INFINITE_PLUGINDRAGTEST captures the FIRST matching row, not the last:
       // this list is every installed effect, and the rows past the visible
       // height are drawn but clipped, so a synthetic press aimed at the last
