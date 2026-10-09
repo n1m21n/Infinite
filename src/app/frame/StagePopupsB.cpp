@@ -700,6 +700,24 @@ void DrawPopupsB(FrameCtx& fc)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
       if ((getenv("INFINITE_AUDIOUITEST") != nullptr || getenv("INFINITE_FXGALLERY") != nullptr || getenv("INFINITE_NODEGALLERY") != nullptr) && frameId == 3)
          gRequestFitView = true; // same, for the audio node UI fixture
+      if (getenv("INFINITE_NODELIST") != nullptr && frameId == 1)
+      {
+         // Review aid: every registered type by category, one line each ("NODELIST <category>|<type>").
+         for (const std::string& cat : NodeFactory::Instance().GetCategories())
+            for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(cat))
+               printf("NODELIST %s|%s\n", cat.c_str(), name.c_str());
+         fflush(stdout);
+      }
+      if (getenv("INFINITE_GALLERYSIZES") != nullptr && frameId == 30)
+      {
+         // Review aid for the gallery: canvas size of every node, to compare params closed vs open.
+         for (const GraphNode& gn : gNodes)
+         {
+            const ImVec2 s = ed::GetNodeSize(gn.NodeId());
+            printf("NODESIZE %s|%.0f|%.0f\n", gn.typeName.c_str(), s.x, s.y);
+         }
+         fflush(stdout);
+      }
       if (getenv("INFINITE_LOADPATCH") != nullptr && (frameId == 2 || frameId == 4))
          gRequestFitView = true;
       if (const char* fitNode = getenv("INFINITE_FITNODE"); fitNode != nullptr && frameId == 8)
