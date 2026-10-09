@@ -29,6 +29,7 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
 
    const float bakedPx = UiScale::BakedFontPx(r.bakeScale);
    const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
+   SketchNode::SetFontPath(bundledInter);   // text() in Sketch
    std::string chosenFontPath;
    {
       const std::string wanted = CategoryColors::GetUiFont();

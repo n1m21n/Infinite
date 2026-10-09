@@ -595,6 +595,9 @@ set(COMMON_SOURCES
     src/audio/NoteModel.cpp
     src/nodes/OscNodes.cpp
     src/nodes/NoiseNode.cpp
+    src/nodes/SketchNode.cpp
+    src/core/sketch/SketchEngine.cpp
+    src/app/bodies/SketchParams.cpp
     src/nodes/TextureNode.cpp
     src/nodes/ResynthNode.cpp
     src/nodes/MacroNodes.cpp
