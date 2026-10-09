@@ -738,7 +738,7 @@ void DrawPopupsB(FrameCtx& fc)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
       if ((getenv("INFINITE_AUDIOUITEST") != nullptr || getenv("INFINITE_FXGALLERY") != nullptr || getenv("INFINITE_NODEGALLERY") != nullptr) && frameId == 3)
          gRequestFitView = true; // same, for the audio node UI fixture
-      if (getenv("INFINITE_NODEGALLERY") != nullptr && frameId == 12)
+      if ((getenv("INFINITE_NODEGALLERY") != nullptr || getenv("INFINITE_LOADPATCH") != nullptr) && frameId == 12)
       {
          // Review aid: INFINITE_GALLERYZOOM=<z> zooms the canvas, INFINITE_GALLERYOPENDD=<param index> opens that
          // dropdown on the first node, so a popup can be judged at any zoom (screenshot at a later frame).

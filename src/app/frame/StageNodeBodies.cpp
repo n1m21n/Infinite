@@ -125,6 +125,14 @@ void DrawNodeBodies(FrameCtx& fc)
                gHeadlessDrawn.insert(gn.index);
          }
 
+         // Canvas level of detail: zoomed out past kLodZoom the param section collapses exactly as if the eye were
+         // closed (title, preview and pins stay; bound params keep registering through the register-only pass, so
+         // modulation, ordinals and pins do not move). The saved gn.showParams is untouched: zoom back in and the
+         // section returns.
+         constexpr float kLodZoom = 0.45f;
+         const float canvasZoom = ed::CanvasToScreen(ImVec2(1.0f, 0.0f)).x - ed::CanvasToScreen(ImVec2(0.0f, 0.0f)).x; // screen px per canvas px
+         const bool paramsOpen = gn.showParams && canvasZoom >= kLodZoom;
+
          // Category tint: same idea as DrawGroupNode's stored colour, but from
          // the static per-category table since categories are a fixed
          // vocabulary, not something a user repicks per node. Blended into the
@@ -664,8 +672,8 @@ void DrawNodeBodies(FrameCtx& fc)
             }
             ImVec2 modTagMin(0.0f, 0.0f), modTagMax(0.0f, 0.0f);
             ImVec2 palTagMin(0.0f, 0.0f), palTagMax(0.0f, 0.0f);
-            const bool modTag = !gn.showParams && gn.hasModulatedParams;
-            const bool palTag = !gn.showParams && gn.hasPaletteColors;
+            const bool modTag = !paramsOpen && gn.hasModulatedParams;
+            const bool palTag = !paramsOpen && gn.hasPaletteColors;
             if (modTag)
             {
                // make it obvious a collapsed node still has live modulation,
@@ -728,7 +736,7 @@ void DrawNodeBodies(FrameCtx& fc)
          // untouched, and an empty clip rect swallows any raw draw-list work
          // the params body does around them. Gated on there being a binding at
          // all so the common collapsed node costs exactly what it did before.
-         const bool registerOnlyParams = !isAudioBody && !isComment && !gn.showParams &&
+         const bool registerOnlyParams = !isAudioBody && !isComment && !paramsOpen &&
                                          (gn.IsParamDriven() || gHeadlessProbeAll);
          ImGuiWindow* paramsWindow = ImGui::GetCurrentWindow();
          const bool savedSkipItems = paramsWindow->SkipItems;
@@ -738,7 +746,7 @@ void DrawNodeBodies(FrameCtx& fc)
             paramsWindow->SkipItems = true;
             ImGui::GetWindowDrawList()->PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(0.0f, 0.0f), false);
          }
-         if (!isAudioBody && !isComment && (gn.showParams || registerOnlyParams))
+         if (!isAudioBody && !isComment && (paramsOpen || registerOnlyParams))
          {
             if (auto* n = dynamic_cast<ImageSourceNode*>(gn.node.get()))
                DrawImageSourceParams(n);
