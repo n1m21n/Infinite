@@ -632,7 +632,7 @@ namespace app
 
       NodeSeparator("sample", colW);
       DropdownButton("sample mode", ImageAnalyzeNode::SampleModeNames(), n->sampleMode,
-                     [n](int i) { PushUndoCheckpoint(); n->sampleMode = i; }, colW);
+                     [n](int i) { PushUndoCheckpoint(); n->sampleMode = i; }, colW, /*showCaption=*/false);
 
       if (n->sampleMode == ImageAnalyzeNode::kPointProbe ||
           n->sampleMode == ImageAnalyzeNode::kBoxRegion ||
@@ -646,7 +646,7 @@ namespace app
 
       NodeSeparator("operation", colW);
       DropdownButton("operation", ImageAnalyzeNode::MathOpNames(), n->mathOp,
-                     [n](int i) { PushUndoCheckpoint(); n->mathOp = i; }, colW);
+                     [n](int i) { PushUndoCheckpoint(); n->mathOp = i; }, colW, /*showCaption=*/false);
 
       if (n->mathOp == ImageAnalyzeNode::kCustomExpression)
       {

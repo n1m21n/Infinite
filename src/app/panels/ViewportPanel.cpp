@@ -23,9 +23,8 @@ namespace app
       const bool isMaterial = (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr);
       const float size = isMaterial ? kViewportSize : kPreviewSize;
 
-      if (isMaterial)
       {
-         const float offset = WideNodeCentreOffset(gn.node.get(), size);
+         const float offset = isMaterial ? WideNodeCentreOffset(gn.node.get(), size) : CachedCentreOffset(gn.node.get(), size);
          if (offset > 0.0f)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
       }

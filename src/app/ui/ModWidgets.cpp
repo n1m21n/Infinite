@@ -1813,12 +1813,19 @@ namespace app
 
    static std::unordered_map<const INode*, float> gNodeWidthCache;
    void CacheNodeWidth(const INode* node, float width) { gNodeWidthCache[node] = width; }
+   // Like WideNodeCentreOffset but with no first-frame fallback: 0 until the node has been laid out once, so a
+   // small node never opens wide.
+   float CachedCentreOffset(const INode* node, float contentW)
+   {
+      auto it = gNodeWidthCache.find(node);
+      return it == gNodeWidthCache.end() ? 0.0f : std::max(0.0f, (it->second - 16.0f - contentW) * 0.5f);
+   }
    float WideNodeCentreOffset(const INode* node, float contentW)
    {
       float nodeW = kWideNodeWidth;
       auto it = gNodeWidthCache.find(node);
       if (it != gNodeWidthCache.end())
-         nodeW = std::max(nodeW, it->second - 16.0f);   // 16 = node padding left + right
+         nodeW = it->second - 16.0f;   // 16 = node padding left + right; the real width, not a floor, or a narrow node centres off to the right
       return std::max(0.0f, (nodeW - contentW) * 0.5f);
    }
 

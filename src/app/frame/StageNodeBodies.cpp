@@ -218,6 +218,10 @@ void DrawNodeBodies(FrameCtx& fc)
          else
          {
             const float pinSpacing = (inputs > 4) ? 8.0f : 12.0f;
+            // A long pin header (Render 3D: 9 pins, Material: 9) would otherwise set the node's width and leave an
+            // empty strip beside the params columns. Wrap it into rows no wider than two param columns.
+            const float wrapW = kParamWidth * 2.0f + 16.0f + 48.0f;
+            float rowUsed = 0.0f;
             for (int slot = 0; slot < inputs; slot++)
             {
                char label[24];
@@ -227,9 +231,19 @@ void DrawNodeBodies(FrameCtx& fc)
                   label[0] = '\0';
                else
                   snprintf(label, sizeof(label), "%c", 'A' + slot);
+               const float thisW = kPinHit + 4.0f + ImGui::CalcTextSize(label).x;
+               if (slot > 0)
+               {
+                  if (rowUsed + pinSpacing + thisW > wrapW)
+                     rowUsed = 0.0f;   // next pin starts a new row (no SameLine)
+                  else
+                  {
+                     ImGui::SameLine(0.0f, pinSpacing);
+                     rowUsed += pinSpacing;
+                  }
+               }
                DrawPin(gn.InputPinId(slot), ed::PinKind::Input, label);
-               if (slot + 1 < inputs)
-                  ImGui::SameLine(0.0f, pinSpacing);
+               rowUsed += thisW;
             }
             if (inputs > 0)
                maxInputY = std::max(maxInputY, ImGui::GetCursorPosY());
@@ -1264,9 +1278,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   {
                      const float by = y + kPinHit + 1.0f;
                      const float v = std::clamp(mod->Value01(), 0.0f, 1.0f);
-                     gdl->AddRectFilled(ImVec2(x, by), ImVec2(x + cellW, by + 3.0f),
-                                        gridLight ? tok::U32(tok::pal::c_D6DCE8FF) : tok::U32(tok::pal::c_20232EFF), 1.5f);
-                     if (v > 0.0f)
+                     // No resting track: an empty rule at silence reads as a stray line. The bar exists only while the output is live.
+                     if (v > 0.004f)
                         gdl->AddRectFilled(ImVec2(x, by), ImVec2(x + cellW * v, by + 3.0f),
                                            gridLight ? tok::U32(tok::pal::c_2378EBFF) : tok::U32(tok::pal::c_50AAFFFF), 1.5f);
                   }

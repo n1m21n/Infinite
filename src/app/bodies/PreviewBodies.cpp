@@ -595,9 +595,8 @@ namespace app
          render != nullptr || dynamic_cast<ViewportNode*>(node) != nullptr;
       const float size = wantsBigCanvas ? kViewportSize : kPreviewSize;
 
-      if (render != nullptr)
       {
-         const float offset = WideNodeCentreOffset(node, size);
+         const float offset = render != nullptr ? WideNodeCentreOffset(node, size) : CachedCentreOffset(node, size);
          if (offset > 0.0f)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
       }
