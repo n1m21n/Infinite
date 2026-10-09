@@ -212,8 +212,16 @@ namespace app
          // over the neighbouring engine. This is the same defect the knob path
          // fixed; the slider path never got it.
          const std::string typedId = std::string("##typed") + label;
+         // Quiet edit field: no bright nav ring, a 60% accent edge instead (same as FieldWell::Slider).
+         ImVec4 accentEdge = ImGui::GetStyleColorVec4(ImGuiCol_SliderGrab);
+         accentEdge.w = 0.6f;
+         ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_Border, accentEdge);
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
          const bool entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf),
                                                ImGuiInputTextFlags_EnterReturnsTrue);
+         ImGui::PopStyleVar();
+         ImGui::PopStyleColor(2);
          gTypedParamText[editKey] = buf;
          if (gTypedParamPendingInit.count(editKey) && ImGui::IsItemActive())
          {
