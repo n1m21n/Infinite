@@ -4,6 +4,7 @@
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/StepCell.h"
+#include "app/ui/design/components/Switch.h"
 
 namespace app
 {
@@ -1373,14 +1374,46 @@ namespace app
    // to a 190px image preview that isn't there. MacroBodyEnd is the second
    // half of that contract for the hand-drawn controls; the knob and fader
    // widgets already do it themselves (see KnobFloat's tail).
-   void MacroBodyEnd(const ImVec2& origin, float cellW, float contentH, const std::string& caption)
+   void MacroBodyEnd(const ImVec2& origin, float cellW, float contentH, const std::string& caption,
+                     std::string* editLabel = nullptr)
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
       const ImU32 capCol = isLight ? tok::U32(tok::pal::c_323746FF) : tok::U32(tok::pal::c_B0B6C6FF);
       const float textH = ImGui::GetTextLineHeight();
       const float capY = origin.y + contentH + 4.0f;
-      if (!caption.empty())
+      bool renaming = false;
+      if (editLabel != nullptr)
+      {
+         // Double-click the caption to rename in place; Enter / click away commits.
+         static ImGuiID sRenaming = 0;
+         const ImGuiID rid = ImGui::GetID("##macrorename");
+         ImGui::SetCursorScreenPos(ImVec2(origin.x, capY));
+         ImGui::InvisibleButton("##macrocaptionhit", ImVec2(cellW, textH));
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            sRenaming = rid;
+         if (sRenaming == rid)
+         {
+            renaming = true;
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%s", editLabel->c_str());
+            ImGui::SetCursorScreenPos(ImVec2(origin.x, capY - 2.0f));
+            ImGui::SetNextItemWidth(cellW);
+            if (ImGui::IsWindowAppearing() || ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+               ImGui::SetKeyboardFocusHere();
+            if (FieldWell::InputTextWithHint("##macrorenamefield", "name", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+               *editLabel = buf;
+               sRenaming = 0;
+            }
+            else if (!ImGui::IsItemActive() && !ImGui::IsItemActivated() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            {
+               *editLabel = buf;
+               sRenaming = 0;
+            }
+         }
+      }
+      if (!caption.empty() && !renaming)
       {
          const ImVec2 ts = ImGui::CalcTextSize(caption.c_str());
          if (ts.x <= cellW)
@@ -1466,51 +1499,21 @@ namespace app
 
    void DrawMacroToggleBody(MacroToggleNode* n)
    {
-      const float btnH = kMacroRowH + 4.0f;   // a switch reads as a switch only if it has some body
-      const float btnW = 72.0f;
+      // The shared Switch, enlarged to read as a front-panel control.
+      constexpr float kScale = 1.7f;
+      const float btnW = Switch::kW * kScale, btnH = Switch::kH * kScale;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const ImVec2 bTL(origin.x + (kMacroCell - btnW) * 0.5f, origin.y);
-      const ImVec2 bBR(bTL.x + btnW, bTL.y + btnH);
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const bool isLight = IsThemeLight();
-
-      ImGui::SetCursorScreenPos(bTL);
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + (kMacroCell - btnW) * 0.5f, origin.y + 2.0f));
       ImGui::PushID(901);
-      if (ImGui::InvisibleButton("##macrotogglebtn", ImVec2(btnW, btnH)))
+      bool v = n->state;
+      if (Switch::Box("##macrotogglebtn", &v, kScale))
       {
-         PushUndoCheckpoint();
-         n->state = !n->state;
+         PushUndoCheckpoint();   // snapshot before the flip lands
+         n->state = v;
       }
-      const bool hovered = ImGui::IsItemHovered();
       ImGui::PopID();
-
-      const float rad = btnH * 0.5f;
-      const ImU32 bgCol = n->state
-         ? (isLight ? tok::U32(tok::pal::c_22C55EFF) : tok::U32(tok::pal::c_16A34AFF))
-         : (isLight ? tok::U32(tok::pal::c_D7DEEBFF) : tok::U32(tok::pal::c_242834FF));
-      dl->AddRectFilled(bTL, bBR, bgCol, rad);
-      dl->AddRect(bTL, bBR, hovered ? tok::U32(tok::pal::c_FFFFFF78)
-                                    : (isLight ? tok::U32(tok::pal::c_B4BECDFF) : tok::U32(tok::pal::c_373E4EFF)),
-                  rad, 0, 1.2f);
-
-      const float thumbR = rad - 4.0f;
-      const float thumbX = n->state ? (bBR.x - rad) : (bTL.x + rad);
-      const float thumbY = bTL.y + rad;
-      dl->AddCircleFilled(ImVec2(thumbX, thumbY), thumbR, tok::U32(tok::pal::c_FFFFFFFF));
-      dl->AddCircle(ImVec2(thumbX, thumbY), thumbR,
-                    isLight ? tok::U32(tok::pal::c_B4B4B4FF) : tok::U32(tok::pal::c_282832FF), 0, 1.0f);
-
-      const char* text = n->state ? "ON" : "OFF";
-      const ImVec2 tSize = ImGui::CalcTextSize(text);
-      const float textX = n->state ? (bTL.x + (rad * 2.0f - tSize.x) * 0.5f)
-                                   : (bBR.x - rad * 2.0f + (rad * 2.0f - tSize.x) * 0.5f);
-      dl->AddText(ImVec2(textX, bTL.y + (btnH - tSize.y) * 0.5f),
-                  n->state ? tok::U32(tok::pal::c_FFFFFFFF)
-                           : (isLight ? tok::U32(tok::pal::c_5A6478FF) : tok::U32(tok::pal::c_A0AABEFF)),
-                  text);
-
-      MacroBodyEnd(origin, kMacroCell, btnH, n->label.empty() ? std::string("toggle") : n->label);
+      ImGui::SetCursorScreenPos(origin);
+      MacroBodyEnd(origin, kMacroCell, btnH + 4.0f, n->label.empty() ? std::string("toggle") : n->label, &n->label);
    }
 
 
@@ -1523,25 +1526,20 @@ namespace app
 
    void DrawMacroTriggerBody(MacroTriggerNode* n)
    {
-      // Sized so the pad's overall footprint (2 * (r + bezel)) matches
-      // kKnobStd - a bang and a knob are peers on a front panel and must not
-      // differ in size for no reason.
-      const float r = 22.0f;
-      const float bezel = 3.0f;
-      const float contentH = (r + bezel) * 2.0f;
+      // The shared ActionButton; held or just fired it takes the Primary (accent) look.
+      constexpr float kBtnH = 30.0f;
+      const float btnW = 72.0f;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const ImVec2 center(origin.x + kMacroCell * 0.5f, origin.y + contentH * 0.5f);
-
-      ImGui::SetCursorScreenPos(ImVec2(center.x - r - bezel, origin.y));
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + (kMacroCell - btnW) * 0.5f, origin.y + 2.0f));
       ImGui::PushID(902);
-      ImGui::InvisibleButton("##macrotriggerbtn", ImVec2(contentH, contentH));
+      ActionButton::Draw("bang##macrotriggerbtn", ImVec2(btnW, kBtnH),
+                         n->flash > 0.0f ? ActionButton::Kind::Primary : ActionButton::Kind::Plain);
       n->pressed = ImGui::IsItemActive();
       if (ImGui::IsItemActivated())
       {
          n->justTriggered = true;
          n->flash = 1.0f;
       }
-      const bool hovered = ImGui::IsItemHovered();
       ImGui::PopID();
 
       if (n->pressed)
@@ -1551,36 +1549,8 @@ namespace app
          n->flash -= ImGui::GetIO().DeltaTime * 4.0f;
          if (n->flash < 0.0f) n->flash = 0.0f;
       }
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const bool isLight = IsThemeLight();
-
-      // Outer bezel ring
-      dl->AddCircleFilled(center, r + bezel, isLight ? tok::U32(tok::pal::c_D2DAE6FF) : tok::U32(tok::pal::c_1E222CFF), 32);
-      dl->AddCircle(center, r + bezel, isLight ? tok::U32(tok::pal::c_AFB9C8FF) : tok::U32(tok::pal::c_323846FF), 32, 1.2f);
-
-      // Inner pad
-      if (n->flash > 0.0f)
-      {
-         ImU32 flashCol = IM_COL32(245, 158, 11, (int)(n->flash * 255.0f));
-         dl->AddCircleFilled(center, r, flashCol, 32);
-         dl->AddCircle(center, r, tok::U32(tok::pal::c_FFE664FF), 32, 2.0f);
-      }
-      else
-      {
-         ImU32 padCol = isLight ? tok::U32(tok::pal::c_EBF0FAFF) : tok::U32(tok::pal::c_2A303EFF);
-         dl->AddCircleFilled(center, r, padCol, 32);
-         dl->AddCircle(center, r, isLight ? tok::U32(tok::pal::c_BEC8D7FF) : tok::U32(tok::pal::c_3C4455FF), 32, 1.0f);
-      }
-      if (hovered)
-         dl->AddCircle(center, r + 2.0f, tok::U32(tok::pal::c_FFFFFF50), 32, 1.0f);
-
-      // Centred dot
-      dl->AddCircleFilled(center, 4.5f,
-                          n->flash > 0.0f ? tok::U32(tok::pal::c_FFFFFFFF)
-                                          : (isLight ? tok::U32(tok::pal::c_8C96AAFF) : tok::U32(tok::pal::c_505A6EFF)), 16);
-
-      MacroBodyEnd(origin, kMacroCell, contentH, n->label.empty() ? std::string("bang") : n->label);
+      ImGui::SetCursorScreenPos(origin);
+      MacroBodyEnd(origin, kMacroCell, kBtnH + 4.0f, n->label.empty() ? std::string("bang") : n->label, &n->label);
    }
 
 

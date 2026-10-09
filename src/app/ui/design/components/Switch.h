@@ -10,8 +10,10 @@ namespace Switch
    constexpr float kW = 30.0f;
    constexpr float kH = 16.0f;
 
-   inline bool Box(const char* id, bool* v)
+   // `scale` enlarges the whole switch (macro front-panel controls); 1 is the Settings size.
+   inline bool Box(const char* id, bool* v, float scale = 1.0f)
    {
+      const float kW = Switch::kW * scale, kH = Switch::kH * scale;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const bool clicked = ImGui::InvisibleButton(id, ImVec2(kW, kH));
       if (clicked)
