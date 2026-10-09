@@ -1703,8 +1703,6 @@ namespace app
 
       if (n->IsBound())
          ImGui::Text("bound: %s", n->BindingLabel().c_str());
-      else
-         ImGui::TextDisabled("not learned");
       ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
 
       ModSlider("low", &n->low, 0.0f, 1.0f);
@@ -1737,8 +1735,6 @@ namespace app
 
       if (n->IsBound())
          ImGui::Text("bound: %s", n->BindingLabel().c_str());
-      else
-         ImGui::TextDisabled("not learned");
       ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
 
       if (n->mode == MidiTriggerNode::kKeyboard)

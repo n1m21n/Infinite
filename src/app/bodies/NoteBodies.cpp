@@ -2326,7 +2326,7 @@ namespace app
       // it starts attack, falling back below it starts release (see the
       // class comment on EnvelopeNode, ModulatorNodes.h).
       AudioKnobRow row2(2);
-      row2.Knob("in", &n->constantIn, 0.0f, 1.0f, "%.2f", kKnobSmall);
+      row2.Knob("input", &n->constantIn, 0.0f, 1.0f, "%.2f", kKnobSmall);
       row2.Knob("threshold", &n->threshold, 0.0f, 1.0f, "%.2f", kKnobSmall);
       row2.End();
 

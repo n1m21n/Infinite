@@ -533,7 +533,7 @@ namespace app
          else if (n->HasFit())
             snprintf(label, sizeof(label), "fit - radius %.2f", n->SpectralRadius());
          else
-            snprintf(label, sizeof(label), "wire input in, press Learn");
+            snprintf(label, sizeof(label), "wire input, press Learn");
          // Clip to the meter's own box - AddText doesn't wrap or clip on its own, so a longer
          // label would otherwise draw straight past the node's edge instead of just past mw.
          dl->PushClipRect(p0, ImVec2(p0.x + mw, p0.y + h), true);
@@ -551,7 +551,7 @@ namespace app
       ModSlider("low", &n->low, 0.0f, 1.0f, "%.2f");
       ModSlider("high", &n->high, 0.0f, 1.0f, "%.2f");
       if (n->input == nullptr)
-         ModSlider("constantIn", &n->constantIn, 0.0f, 1.0f, "%.2f");
+         ModSlider("constant", &n->constantIn, 0.0f, 1.0f, "%.2f");
    }
 
 

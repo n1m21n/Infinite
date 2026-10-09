@@ -699,12 +699,9 @@ namespace app
 
    void DrawNullModulatorParams(NullModulatorNode* n)
    {
-      const float v = n->Value01();
-      ImGui::Text("Value: %.3f", v);
-      ImGui::ProgressBar(std::clamp(v, 0.0f, 1.0f), ImVec2(kPreviewSize * 0.85f, 0), "");
       if (!n->input)
       {
-         ModSlider("constant in", &n->constantIn, 0.0f, 1.0f);
+         ModSlider("constant", &n->constantIn, 0.0f, 1.0f);
       }
       else
       {
