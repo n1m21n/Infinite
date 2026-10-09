@@ -2149,13 +2149,13 @@ namespace app
 
    void DrawBouncingBallsVisualizer(BouncingBallsNode* n)
    {
+      // The frame is the full body width like every other viewer (shared left/right edges); the square
+      // arena the physics needs sits centred inside it.
       const float fullW = gAudioBodyW;
-      // Shrunk well below the full card width (>=33% smaller than before)
-      // and centered in the row, rather than filling it edge to edge.
-      const float w = fullW * 0.6f;
-      const float h = w; // square canvas - the shape itself needs equal aspect
+      const float w = fullW;
+      const float h = fullW * 0.6f;
       const ImVec2 rowOrigin = ImGui::GetCursorScreenPos();
-      const ImVec2 origin(rowOrigin.x + (fullW - w) * 0.5f, rowOrigin.y);
+      const ImVec2 origin = rowOrigin;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
@@ -2163,7 +2163,7 @@ namespace app
       dl->PushClipRect(origin, br, true);
 
       const ImVec2 center((origin.x + br.x) * 0.5f, (origin.y + br.y) * 0.5f);
-      const float scale = (w * 0.5f - 6.0f) / BouncingBallsNode::kBound;
+      const float scale = (std::min(w, h) * 0.5f - 6.0f) / BouncingBallsNode::kBound;
       auto ToScreen = [&](float x, float y) { return ImVec2(center.x + x * scale, center.y - y * scale); };
 
       const ImU32 outlineCol = isLight ? tok::U32(tok::pal::c_8C96AFFF) : tok::U32(tok::pal::c_96A5BEFF);
