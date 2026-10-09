@@ -119,10 +119,10 @@ namespace app
 
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      const float faderH = 138.0f;
+      const float faderH = kFaderH;
       const float stripTop = ImGui::GetCursorScreenPos().y;
       const float cx = gAudioContentX + 0.5f * gAudioContentW;
-      DrawStripMeter(cx + 14.0f, stripTop + 6.0f, 8.0f, faderH - 12.0f, n->Level());
+      DrawStripMeter(cx + kFaderMeterDx, stripTop + kFaderMeterPad, kFaderMeterW, faderH - 2.0f * kFaderMeterPad, n->Level());
       AudioKnobRow row(1, faderH);
       row.Fader("trim", &n->gainDb, -60.0f, 12.0f, "%.1f dB", faderH, /*dbTaper=*/true);
       row.End();
@@ -172,7 +172,7 @@ namespace app
       if (count > 0)
       {
          const float cellW = gAudioContentW / (float)count;
-         const float faderH = 138.0f;
+         const float faderH = kFaderH;
          const float stripTop = ImGui::GetCursorScreenPos().y;
 
          // Meters first, drawn straight to the draw list so they cost no layout
@@ -180,7 +180,7 @@ namespace app
          for (int i = 0; i < count; i++)
          {
             const float cx = gAudioContentX + ((float)i + 0.5f) * cellW;
-            DrawStripMeter(cx + 14.0f, stripTop + 6.0f, 8.0f, faderH - 12.0f, n->ChannelLevel(i));
+            DrawStripMeter(cx + kFaderMeterDx, stripTop + kFaderMeterPad, kFaderMeterW, faderH - 2.0f * kFaderMeterPad, n->ChannelLevel(i));
          }
 
          {

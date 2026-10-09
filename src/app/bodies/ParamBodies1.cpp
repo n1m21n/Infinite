@@ -1437,11 +1437,11 @@ namespace app
 
    void DrawMacroSliderBody(MacroSliderNode* n)
    {
-      // kMacroFaderH, not kPreviewSize - 12: a 178px fader beside a 56px knob
-      // was the single worst size mismatch in the family, and nothing about a
-      // 0..1 macro needs that much travel.
+      // kFaderH (the Mixer / Gain fader), not kPreviewSize - 12 and not a private
+      // height: one fader size app-wide. No level meter: a macro value is a
+      // control, not a signal, and the accent fill already shows it.
       const std::string caption = n->label.empty() ? std::string("slider") : n->label;
-      ModKnob(caption.c_str(), &n->value, 0.0f, 1.0f, "%.2f", kMacroFaderH, kMacroCell, AudioWidgetStyle::VFader);
+      ModKnob(caption.c_str(), &n->value, 0.0f, 1.0f, "%.2f", kFaderH, kMacroCell, AudioWidgetStyle::VFader);
    }
 
 

@@ -645,7 +645,7 @@ namespace app
    // Visual width the fader occupies inside its cell (track plus the cap's
    // overhang). The interactive rect matches, for the same reason KnobFloat's
    // does: the cell's side margins belong to ModKnob's modulation pin.
-   const float kFaderWidth = 22.0f;
+   const float kFaderWidth = kFaderW;
 
 
    // Vertical fader with KnobFloat's exact contract - draws at the cursor,
@@ -661,7 +661,7 @@ namespace app
       const float cell = cellW > 0.0f ? cellW : kFaderWidth;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float textH = ImGui::GetTextLineHeight();
-      const float rowH = height + 4.0f + textH;
+      const float rowH = height + kKnobCaptionGap + textH;
 
       auto ValueToPos01 = [&](float v) -> float
       {
@@ -781,7 +781,7 @@ namespace app
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const char* caption = label[0] == '#' ? "" : label;
       const float textH = (caption[0] == '\0') ? 0.0f : ImGui::GetTextLineHeight();
-      const float rowH = (caption[0] == '\0') ? diameter : (diameter + 4.0f + textH);
+      const float rowH = (caption[0] == '\0') ? diameter : (diameter + kKnobCaptionGap + textH);
 
       auto ValueToPos01 = [&](float v) -> float
       {
@@ -977,7 +977,7 @@ namespace app
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const char* caption = label[0] == '#' ? "" : label;
       const float textH = (caption[0] == '\0') ? 0.0f : ImGui::GetTextLineHeight();
-      const float rowH = (caption[0] == '\0') ? diameter : (diameter + 4.0f + textH);
+      const float rowH = (caption[0] == '\0') ? diameter : (diameter + kKnobCaptionGap + textH);
 
       auto ValueToPos01 = [&](float v) -> float {
          return (maxV > minV) ? std::clamp((v - minV) / (maxV - minV), 0.0f, 1.0f) : 0.5f;
@@ -1395,7 +1395,7 @@ namespace app
          // Same footprint the widget would have had, so the row is identical
          // whether or not one of its cells is being typed into.
          ImGui::SetCursorScreenPos(cellOrigin);
-         ImGui::Dummy(ImVec2(cell, diameter + 4.0f + ImGui::GetTextLineHeight()));
+         ImGui::Dummy(ImVec2(cell, diameter + kKnobCaptionGap + ImGui::GetTextLineHeight()));
       }
       else if (modulated)
       {

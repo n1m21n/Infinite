@@ -96,7 +96,16 @@ extern float gViewportPanelHeight;
    inline const float kMacroRowH = 26.0f;
 
 
-   inline const float kMacroFaderH = 96.0f;
+   // ---- element-size table (docs/plans/ui-system/element-sizes.md) ----
+   // One number per control, read by every node. A fader is the Mixer / Gain
+   // fader everywhere (Macro Slider included); a knob caption always sits
+   // kKnobCaptionGap under the cap. Do not write these as literals in a body.
+   inline const float kFaderH = 138.0f;          // vertical fader travel box (Mixer, Gain, Macro Slider)
+   inline const float kFaderW = 22.0f;           // fader hit width; handle drawn 18 x 12 (VFader.h)
+   inline const float kFaderMeterW = 8.0f;       // level meter beside a fader (signal faders only)
+   inline const float kFaderMeterDx = 14.0f;     // meter left edge, from the fader's cell centre
+   inline const float kFaderMeterPad = 6.0f;     // meter inset top/bottom of the fader box
+   inline const float kKnobCaptionGap = 4.0f;    // cap bottom to caption top
 
 
    inline const float kKnobLarge = kKnobStd;
@@ -2918,7 +2927,7 @@ void EndAudioSection();
          y0 = gParamRegisterOnly ? 0.0f : ImGui::GetCursorScreenPos().y;
          cellW = gAudioContentW / (float)count;
          index = 0;
-         rowH = headerH + maxDia + (hasCaptions && !gParamRegisterOnly ? (4.0f + ImGui::GetTextLineHeight()) : 0.0f);
+         rowH = headerH + maxDia + (hasCaptions && !gParamRegisterOnly ? (kKnobCaptionGap + ImGui::GetTextLineHeight()) : 0.0f);
       }
 
       void Place(float dia) const
