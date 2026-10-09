@@ -432,9 +432,10 @@ namespace app
       // applied to the seam above bottom-docked panels.
       style.Colors[ImGuiCol_MenuBarBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_ScrollbarBg] = vec(t.windowBg);
-      style.Colors[ImGuiCol_ScrollbarGrab] = vec(t.border);
-      style.Colors[ImGuiCol_ScrollbarGrabHovered] = shade(t.border, 0.25f);
-      style.Colors[ImGuiCol_ScrollbarGrabActive] = vec(t.accent);
+      // Quiet text-tinted pill that deepens on hover/drag; the track stays flat.
+      style.Colors[ImGuiCol_ScrollbarGrab] = vec(t.text, 0.22f);
+      style.Colors[ImGuiCol_ScrollbarGrabHovered] = vec(t.text, 0.40f);
+      style.Colors[ImGuiCol_ScrollbarGrabActive] = vec(t.text, 0.55f);
       style.Colors[ImGuiCol_CheckMark] = vec(t.accent);
       style.Colors[ImGuiCol_SliderGrab] = vec(t.accent, 0.85f);
       style.Colors[ImGuiCol_SliderGrabActive] = vec(t.accent);

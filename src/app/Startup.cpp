@@ -954,6 +954,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // knob row. Left unset before this, which meant they inherited 0.
    style.PopupRounding = 12.0f;
    style.ScrollbarRounding = 10.0f;
+   // 12 pt track with a 3 pt inset: a 6 pt pill with an even gutter on both sides.
+   style.ScrollbarSize = 12.0f;
+   style.ScrollbarPadding = 3.0f;
    // No ScaleAllSizes: style metrics are in points, and the point scale (ApplyUiScale above)
    // grows them together with every other size on screen.
 
