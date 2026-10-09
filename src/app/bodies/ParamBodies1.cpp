@@ -5,9 +5,19 @@
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/StepCell.h"
 #include "app/ui/design/components/Switch.h"
+#include "app/ui/design/components/EmptyState.h"
 
 namespace app
 {
+   // R5: a node body's "nothing here yet" message, centred in a quiet block the width of the param column.
+   static void EmptyBlock(const char* message, const char* hint)
+   {
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const ImVec2 sz(kPreviewSize, 52.0f);
+      ImGui::Dummy(sz);
+      EmptyState::Draw(p, ImVec2(p.x + sz.x, p.y + sz.y), message, hint);
+   }
+
    // Copies every parameter VisitParams declares, for any node type, by
    // routing through the same save/load format used for patch files: write src
    // to an in-memory param list, then read it back into dst. This used to be a
@@ -95,9 +105,9 @@ namespace app
          const std::string file = n->CurrentFileName();
          ImGui::TextDisabled("%d/%d  %s", n->CurrentImageNumber(), n->ImageCount(), file.c_str());
       }
-      else
-         ImGui::TextDisabled("Choose a folder containing images.");
       ImGui::PopTextWrapPos();
+      if (n->ImageCount() == 0)
+         EmptyBlock("No images", "Choose a folder containing images");
    }
 
 
@@ -155,13 +165,11 @@ namespace app
       const auto& servers = n->AvailableServers();
       if (servers.empty())
       {
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
 #if defined(_WIN32)
-         ImGui::TextDisabled("No active Spout senders found.");
+         EmptyBlock("No active Spout senders", "Start a sender, then Refresh");
 #else
-         ImGui::TextDisabled("No active Syphon servers found.");
+         EmptyBlock("No active Syphon servers", "Start a server, then Refresh");
 #endif
-         ImGui::PopTextWrapPos();
       }
       else
       {
@@ -198,14 +206,11 @@ namespace app
 
    void DrawNdiOutParams(NdiOutNode* n)
    {
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       if (!Ndi::Available())
       {
-         ImGui::TextDisabled("NDI runtime not found (install from ndi.video)");
-         ImGui::PopTextWrapPos();
+         EmptyBlock("NDI runtime not found", "Install it from ndi.video");
          return;
       }
-      ImGui::PopTextWrapPos();
 
       ImGui::SetNextItemWidth(kPreviewSize);
       if (FieldWell::InputText("##ndi_name", &n->sourceNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
@@ -242,9 +247,7 @@ namespace app
       const std::vector<std::string> sources = n->AvailableSources();
       if (sources.empty())
       {
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextDisabled("No NDI sources found on the network.");
-         ImGui::PopTextWrapPos();
+         EmptyBlock("No NDI sources", "Sources on this network appear here");
          return;
       }
 
