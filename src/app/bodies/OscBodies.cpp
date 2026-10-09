@@ -2221,14 +2221,11 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool isLight = IsThemeLight();
 
-      const ImU32 bgCol = isLight ? tok::U32(tok::pal::c_F5F7FAFF) : tok::U32(tok::pal::c_101218FF);
-      const ImU32 borderCol = isLight ? tok::U32(tok::pal::c_C8CDD7FF) : tok::U32(tok::pal::c_282E3CFF);
       const ImU32 gridCol = isLight ? tok::U32(tok::pal::c_D7DCE6B4) : tok::U32(tok::pal::c_202634B4);
       const ImU32 axisCol = isLight ? tok::U32(tok::pal::c_8C96AAF0) : tok::U32(tok::pal::c_465573F0);
       const ImU32 textCol = isLight ? tok::U32(tok::pal::c_788291C8) : tok::U32(tok::pal::c_8291AAC8);
 
-      dl->AddRectFilled(origin, br, bgCol, 4.0f);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float midY = origin.y + h * 0.5f;
       float originX = origin.x;
@@ -2327,8 +2324,7 @@ namespace app
          dl->AddText(ImVec2(pillTl.x + 4.0f, pillTl.y + 2.0f), isLight ? tok::U32(tok::pal::c_0078C8F0) : tok::U32(tok::pal::c_50D2FFF0), tag);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, borderCol, 4.0f);
+      AudioViz::End(vizFrame);
       ImGui::Dummy(ImVec2(w, h));
    }
 
