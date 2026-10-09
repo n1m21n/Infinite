@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/StatusDot.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/IconTile.h"
 #include "app/ui/design/components/Readout.h"
@@ -452,6 +453,8 @@ void DrawMenuBar(FrameCtx& fc)
                      fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
                }
             }
+            if (audioOn || !gAudioStartError.empty())
+               StatusDot::OnLastItem(!audioOn ? StatusDot::State::Error : StatusDot::State::Ok);
             if (!audioOn && !gAudioStartError.empty() && ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
 

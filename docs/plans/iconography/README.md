@@ -39,6 +39,7 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | G11 empty states | partly done 2026-10-09: `EmptyState.h` on mod matrix, Samples, Plugins. Open: Perf panel, Viewport, Arrange (has its own prompt) |
 | A8 tooltips | checked 2026-10-09: all 38 tooltip sites go through ImGui popup styling (PopupBg, `PopupRounding` 12, no border), so they match menus in both themes; help tips gated by Settings via `HelpTip`. Toasts: none exist yet (G22, not started) |
 | G12 node icons | decided and built 2026-10-09: **family icons** (11 categories, not ~73 per-type; per-type waits until a browser/collapsed-node need exists). `art/icons/src/family-*-20.svg`, shown before the category in the node header via `NodeHeader::FamilyGlyph`. Prediction glyph is the weakest; redraw if it reads poorly at 14 px |
+| G4/G5 status dot | done 2026-10-09 (not seen running: headless has no audio device): `StatusDot.h`, green/red on the Start Audio chip using the action role tokens (G14: go = ok, record = error, learn = warn). Warn (xruns) not wired to the chip yet; xruns stay in the readout tooltip |
 | N1 node header | done 2026-10-09: one row (title Title/Medium, instance number, category dimmed) via `NodeHeader::Category` |
 | N1 frame | 1 px hairline border done |
 | N2 separators | done 2026-10-09: `NodeSeparator` hairline and label use themed Border / TextDisabled (were fixed dark-only palette colours) |
