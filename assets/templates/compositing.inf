@@ -1,0 +1,67 @@
+infinite-patch 1
+# Compositing: layers, trails and feedback
+node 1 Source Shape
+  id shape
+  pos 0 156
+  c fillColor 1 0.45 0.3
+  f size 0.18
+  f posX 0.3
+end
+node 2 Compositing Trails
+  id tr
+  pos 460 318
+end
+node 3 Compositing Layer Stack
+  id lay
+  pos 920 318
+end
+node 4 Source Ramp
+  id bg
+  pos 0 712
+  c stopColor0 0.05 0.1 0.35
+  c stopColor1 0.55 0.2 0.6
+end
+node 5 Utility Output
+  id out
+  pos 1380 156
+end
+node 6 Compositing Comment
+  pos 0 0
+  s text Compositing combines and reshapes pictures: stack them, fade them, trail them.
+  f width 340
+  f height 120
+end
+node 7 Compositing Comment
+  pos 460 156
+  s text Trails leaves a fading copy of what came before. Try Decay: higher is longer trails.
+  f width 300
+  f height 126
+end
+node 8 Compositing Comment
+  pos 920 156
+  s text Layer Stack puts pictures on top of each other. Its inputs go bottom to top.
+  f width 300
+  f height 126
+end
+node 9 Compositing Comment
+  pos 0 566
+  s text This colour wash is the bottom layer.
+  f width 300
+  f height 110
+end
+node 90 Modulators LFO
+  id lfo
+  pos 0 1272
+  f rateBeats 5
+end
+node 91 Modulators LFO
+  id lfo2
+  pos 410 1272
+  f rateBeats 3
+end
+cable tr 0 shape
+cable lay 0 bg
+cable lay 1 tr
+cable out 0 lay
+mod shape posY lfo 0 0 0.3 0.5
+mod shape posX lfo2 0 0 0.3 0.5

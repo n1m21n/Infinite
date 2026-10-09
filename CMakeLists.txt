@@ -458,6 +458,7 @@ set(COMMON_SOURCES
     src/app/panels/FindOverlay.cpp
     src/app/panels/CookOverlay.cpp
     src/app/panels/NoticeStack.cpp
+    src/app/panels/TemplatesWindow.cpp
     src/app/panels/Diagnostics.cpp
     src/app/panels/ModMatrixPanel.cpp
     src/app/panels/PerfPanel.cpp
@@ -1109,6 +1110,11 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/drumkits/infinite-basic"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
         COMMENT "Copying bundled fonts and drum kit next to Infinite.exe")
     target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
 elseif(APPLE)
@@ -1177,6 +1183,11 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/drumkits/infinite-basic"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
         COMMENT "Copying bundled fonts, icon, drum kit, ONNX Runtime libraries and model next to Infinite")
     # THIRD_PARTY_NOTICES condition 3 / GPL source-offer condition 2: the
     # FFmpeg and x264 licence texts ship inside the bundle wherever the
@@ -1474,6 +1485,11 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/06-low-tom.wav"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/07-high-tom.wav"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/08-bell.wav")
+    file(GLOB INFINITE_TEMPLATE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/*.inf" "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/index.txt")
+    file(GLOB INFINITE_TEMPLATE_THUMBS "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/thumbs/*.png")
+    target_sources(Infinite PRIVATE ${INFINITE_TEMPLATE_FILES} ${INFINITE_TEMPLATE_THUMBS})
+    set_source_files_properties(${INFINITE_TEMPLATE_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates")
+    set_source_files_properties(${INFINITE_TEMPLATE_THUMBS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/thumbs")
     target_sources(Infinite PRIVATE ${INFINITE_DRUMKIT_FILES})
     set_source_files_properties(${INFINITE_DRUMKIT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/drumkits/infinite-basic")
 endif()

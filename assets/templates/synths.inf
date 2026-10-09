@@ -1,0 +1,65 @@
+infinite-patch 1
+# Synths: sounds from notes
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+end
+node 2 Synths Wavetable
+  id synth
+  pos 480 1040
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1640 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2560
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1 0.45 0.3
+  f size 0.2
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Synths turn notes into sound. Analog, Wavetable, Sampler and others all take notes in.
+  f width 340
+  f height 120
+end
+node 8 Compositing Comment
+  pos 0 878
+  s text Plays a random note twice a beat.
+  f width 300
+  f height 110
+end
+node 9 Compositing Comment
+  pos 480 878
+  s text The Wavetable synth morphs between wave shapes. Try Position to change the tone, and the Filter.
+  f width 300
+  f height 126
+end
+node 10 Compositing Comment
+  pos 1640 878
+  s text Sound reaches your speakers here.
+  f width 300
+  f height 110
+end
+node 11 Compositing Comment
+  pos 0 0
+  s text A small picture that follows the sound, so you can see it as well as hear it.
+  f width 300
+  f height 126
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.12 0.4
+mod pic sizeY ana 0 0 1 0.5 0.12 0.4

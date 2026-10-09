@@ -1,0 +1,74 @@
+infinite-patch 1
+# Audio Effects: shape the sound
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 878
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1024
+end
+node 3 AudioEffects Delay
+  id echo
+  pos 1340 1040
+end
+node 4 AudioEffects Reverb
+  id room
+  pos 1960 1040
+end
+node 5 Utility Audio Out
+  id speakers
+  pos 2580 878
+end
+node 6 Modulators Audio Analyze
+  id ana
+  pos 0 2184
+end
+node 7 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1 0.45 0.3
+  f size 0.2
+end
+node 8 Utility Output
+  id out
+  pos 460 0
+end
+node 9 Compositing Comment
+  pos 0 722
+  s text Audio effects change a sound. Wire them in a row between the synth and the speakers.
+  f width 340
+  f height 120
+end
+node 10 Compositing Comment
+  pos 1340 878
+  s text Delay repeats the sound. Try Feedback for more repeats and Mix for how loud they are.
+  f width 300
+  f height 126
+end
+node 11 Compositing Comment
+  pos 1960 878
+  s text Reverb makes the sound feel like it is in a room. Try Size and Decay.
+  f width 300
+  f height 126
+end
+node 12 Compositing Comment
+  pos 480 878
+  s text Effects sit between the sound and the speakers, in order.
+  f width 300
+  f height 110
+end
+node 13 Compositing Comment
+  pos 0 0
+  s text A small picture that follows the sound, so you can see it as well as hear it.
+  f width 300
+  f height 126
+end
+note synth 0 notes
+aud echo 0 synth
+aud room 0 echo
+aud speakers 0 room
+aud ana 0 room
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.12 0.4
+mod pic sizeY ana 0 0 1 0.5 0.12 0.4

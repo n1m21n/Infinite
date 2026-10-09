@@ -443,6 +443,10 @@ namespace app
    bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload);
 
 
+   // A template is read from the app bundle but opened as an untitled document: no path, no recents entry, no
+   // file watch, so Save asks where to put it and the shipped file can't be overwritten.
+   static bool gOpeningTemplate = false;
+
    bool LoadPatchFromImpl(const std::string& path, bool reload)
    {
       Patch::Data data;
@@ -672,12 +676,13 @@ namespace app
       gUndoStack.clear();
       gRedoStack.clear();
 
-      gPatchPath = path;
+      gPatchPath = gOpeningTemplate ? std::string() : path;
       gPatchDirty = false;
-      gPatchStatus = openNote.empty() ? "Opened" : openNote;
+      gPatchStatus = gOpeningTemplate ? "Opened from a template" : (openNote.empty() ? "Opened" : openNote);
       gRequestFitView = true;
-      NotePatchFileStamp(path);
-      if (HeadlessJobActive())
+      if (!gOpeningTemplate)
+         NotePatchFileStamp(path);
+      if (HeadlessJobActive() || gOpeningTemplate)
          return true; // a batch job leaves recents and the real autosave alone
       Patch::NoteRecent(path);
       // The autosave from whatever was open before is no longer relevant
@@ -689,6 +694,14 @@ namespace app
 
 
    bool LoadPatchFrom(const std::string& path) { return LoadPatchFromImpl(path, false); }
+
+   bool OpenTemplate(const std::string& path)
+   {
+      gOpeningTemplate = true;
+      const bool ok = LoadPatchFromImpl(path, false);
+      gOpeningTemplate = false;
+      return ok;
+   }
 
 
    // `Infinite --canonicalize in out`: data-level Read -> Write, so an authored

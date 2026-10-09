@@ -1,0 +1,24 @@
+infinite-patch 1
+# Field: write a picture as a formula
+node 1 Source FieldPixel
+  id pix
+  pos 0 340
+  s code col = vec3(0.5 + 0.5 * sin(uv.x * 10.0 + t), 0.5 + 0.5 * sin(uv.y * 10.0 - t), 0.6);
+end
+node 2 Utility Output
+  id out
+  pos 500 156
+end
+node 3 Compositing Comment
+  pos 0 0
+  s text Field lets you write your own picture, sound or shape in a few lines.
+  f width 340
+  f height 120
+end
+node 4 Compositing Comment
+  pos 0 156
+  s text Field draws each pixel from a formula. uv is the position, t is time. Double-click to open the editor and change the 10.0 values.
+  f width 300
+  f height 148
+end
+cable out 0 pix

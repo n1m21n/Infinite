@@ -5478,6 +5478,11 @@ void SetWindowIcon(GLFWwindow* window);
 
 void SavePatchInteractive(bool forceDialog);
 
+// Templates (TemplatesWindow.cpp): the window, the empty-canvas invitation, and the open-as-untitled-copy.
+void DrawTemplates();
+void OpenTemplatesWindow();
+bool OpenTemplate(const std::string& path);
+
 
 
    // Set for one frame when an action was deferred because the patch has

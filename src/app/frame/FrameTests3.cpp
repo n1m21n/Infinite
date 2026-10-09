@@ -1913,7 +1913,58 @@ void FrameTest_ROUNDTRIPTEST(int frameId, GLFWwindow* window)
             }
          }
 
-         printf("%s\n", (copyFails == 0 && loadFails == 0 && fieldGraphRoundTripOk) ? "ROUND TRIP OK" : "SUSPECT");
+         // Every shipped template (Resources/templates, listed in index.txt): reads, every node type exists,
+         // it explains itself (at least two Comment nodes), it has a thumbnail, and it survives write + read.
+         int templatesTested = 0, templatesBad = 0;
+         {
+            std::ifstream idx(BundledResourcePath("templates/index.txt"));
+            std::string line;
+            while (std::getline(idx, line))
+            {
+               if (line.empty() || line[0] == '#')
+                  continue;
+               const std::string slug = line.substr(0, line.find('|'));
+               templatesTested++;
+               Patch::Data d, back;
+               std::string err;
+               const std::string path = BundledResourcePath(("templates/" + slug + ".inf").c_str());
+               std::string why;
+               int comments = 0;
+               if (!Patch::Read(path, d, err))
+                  why = "does not read: " + err;
+               else
+               {
+                  for (const Patch::NodeRecord& n : d.nodes)
+                  {
+                     std::unique_ptr<INode> made(NodeFactory::Instance().MakeNode(n.typeName));
+                     if (made == nullptr)
+                        why = "unknown node type " + n.typeName;
+                     if (n.typeName == "Comment")
+                        comments++;
+                  }
+                  if (why.empty() && comments < 2)
+                     why = "has fewer than two Comment nodes";
+                  if (why.empty() && !std::ifstream(BundledResourcePath(("templates/thumbs/" + slug + ".png").c_str())).good())
+                     why = "no thumbnail";
+                  const std::string tmp = std::string("/tmp/infinite_template_rt_") + slug + ".inf";
+                  if (why.empty() && (!Patch::Write(tmp, d, err) || !Patch::Read(tmp, back, err)))
+                     why = "write/read failed: " + err;
+                  if (why.empty() && (back.nodes.size() != d.nodes.size() || back.cables.size() != d.cables.size() ||
+                                      back.audio.size() != d.audio.size() || back.notes.size() != d.notes.size()))
+                     why = "node or cable count changed on round trip";
+                  std::remove(tmp.c_str());
+               }
+               if (!why.empty())
+               {
+                  templatesBad++;
+                  printf("  template %s: %s\n", slug.c_str(), why.c_str());
+               }
+            }
+            printf("templates: %d/%d round trip  %s\n", templatesTested - templatesBad, templatesTested,
+                   (templatesTested > 0 && templatesBad == 0) ? "OK" : "FAIL");
+         }
+
+         printf("%s\n", (copyFails == 0 && loadFails == 0 && fieldGraphRoundTripOk && templatesTested > 0 && templatesBad == 0) ? "ROUND TRIP OK" : "SUSPECT");
       }
 }
 

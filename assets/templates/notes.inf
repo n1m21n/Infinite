@@ -1,0 +1,69 @@
+infinite-patch 1
+# Notes: notes that make patterns
+node 1 Notes Note Sequencer
+  id seq
+  pos 0 1040
+end
+node 2 Notes Arpeggiator
+  id arp
+  pos 1060 1040
+end
+node 3 Synths Analog
+  id synth
+  pos 1560 1024
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 2420 878
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2184
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1 0.45 0.3
+  f size 0.2
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Notes nodes make and change musical notes. Wire them into a synth to hear them.
+  f width 340
+  f height 120
+end
+node 9 Compositing Comment
+  pos 0 878
+  s text The Sequencer plays a row of steps. Click steps to turn them on, and drag them to change notes.
+  f width 300
+  f height 126
+end
+node 10 Compositing Comment
+  pos 1060 878
+  s text The Arpeggiator turns each note into a run of notes. Try Mode and Octaves.
+  f width 300
+  f height 126
+end
+node 11 Compositing Comment
+  pos 1560 878
+  s text Any synth can play these notes.
+  f width 300
+  f height 110
+end
+node 12 Compositing Comment
+  pos 0 0
+  s text A small picture that follows the sound, so you can see it as well as hear it.
+  f width 300
+  f height 126
+end
+note arp 0 seq
+note synth 0 arp
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.12 0.4
+mod pic sizeY ana 0 0 1 0.5 0.12 0.4

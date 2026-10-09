@@ -158,6 +158,8 @@ void DrawMenuBar(FrameCtx& fc)
             MenuParts::BeginContent();
             if (MenuParts::Item(L("New"), MODKEY "+N"))
                GuardUnsavedChanges([]() { NewPatch(); });
+            if (MenuParts::Item(L("New from template...")))
+               OpenTemplatesWindow();
             if (MenuParts::Item(L("Open..."), MODKEY "+O"))
             {
                const std::string path = Platform::OpenPatchDialog();
