@@ -26,7 +26,7 @@ public:
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override { mSampleRate = sampleRate; }
 
-   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
       NoteEvent evts[64];
       const double now = Platform::MidiOutNowSeconds();
@@ -36,6 +36,9 @@ public:
       if (mWasPlaying && !playing)
          ReleaseAll(now);
       mWasPlaying = playing;
+
+      const double offsetSec = (double)mOffsetMs.load(std::memory_order_relaxed) * 0.001;
+      const double base = now + offsetSec; // every message this block is shifted by the same offset
 
       const int panicSeq = mPanicSeq.load(std::memory_order_acquire);
       if (panicSeq != mSeenPanic)
@@ -65,7 +68,7 @@ public:
             if (e.bendUpdate)
                continue; // pitch bend out is D11, out of scope for v1
             const int note = std::clamp(e.note, 0, 127);
-            const double at = now + (double)std::max(0, e.frameOffset) / sr;
+            const double at = base + (double)std::max(0, e.frameOffset) / sr;
             if (e.isNoteOn)
             {
                // A retrigger of a sounding pitch: close the old one first, or the hardware
@@ -86,12 +89,34 @@ public:
             }
          }
       } while (n == 64);
+
+      if (mSink.IsOpen())
+      {
+         SendControllers(base);
+         SendClock(base, playing, std::max(1, output.numFrames));
+      }
+      else
+      {
+         mLastSentCc[0] = mLastSentCc[1] = mLastSentCc[2] = mLastSentCc[3] = -1; // resend on open
+         mClockRunning = false;
+      }
    }
 
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // Main thread only.
-   void SetChannel(int ch1to16) { mChannel.store(ch1to16, std::memory_order_relaxed); }
+   void SetParams(const MidiOutNode& n)
+   {
+      mChannel.store(n.channel, std::memory_order_relaxed);
+      mOffsetMs.store(std::clamp(n.offsetMs, -50.0f, 50.0f), std::memory_order_relaxed);
+      mClockOn.store(n.clock, std::memory_order_relaxed);
+      for (int i = 0; i < MidiOutNode::kCcRows; i++)
+      {
+         mCcOn[i].store(n.ccOn[i], std::memory_order_relaxed);
+         mCcNum[i].store(std::clamp(n.ccNum[i], 0, 127), std::memory_order_relaxed);
+         mCcVal[i].store(std::clamp(n.ccVal[i], 0.0f, 1.0f), std::memory_order_relaxed);
+      }
+   }
    void RequestPanic() { mPanicSeq.fetch_add(1, std::memory_order_release); }
    void RequestFlush() { mFlushRequest.store(true, std::memory_order_release); }
    int HeldCount() const { return mHeldCount.load(std::memory_order_relaxed); }
@@ -99,10 +124,103 @@ public:
 private:
    static constexpr uint8_t kNone = 0xFF;
 
+   // Timestamps never go backwards. Each block is stamped from the wall clock at its start, so a
+   // callback that arrives early (or a block whose clock pulses reach past the next block's
+   // start) would otherwise queue a message before one already sent. CoreMIDI and ALSA reorder
+   // by timestamp, and a note-off overtaking its note-on is a stuck note.
+   double Stamp(double at)
+   {
+      mLastAt = std::max(at, mLastAt);
+      return mLastAt;
+   }
+
    void Send(int status, int d1, int d2, double at)
    {
       const unsigned char b[3] = { (unsigned char)status, (unsigned char)d1, (unsigned char)d2 };
-      mSink.Push(b, 3, at);
+      mSink.Push(b, 3, Stamp(at));
+   }
+
+   void SendRealtime(int status, double at)
+   {
+      const unsigned char b = (unsigned char)status;
+      mSink.Push(&b, 1, Stamp(at));
+   }
+
+   // Song Position Pointer: 14-bit count of MIDI beats (sixteenth notes) since the start.
+   void SendSongPosition(double beats, double at)
+   {
+      const int sixteenths = std::clamp((int)std::floor(beats * 4.0 + 1e-6), 0, 16383);
+      Send(0xF2, sixteenths & 0x7F, (sixteenths >> 7) & 0x7F, at);
+   }
+
+   // A controller goes out when its 0..127 value changes, so a modulator that moves the knob a
+   // fraction of a step sends nothing. At most one message per row per block, which is far
+   // under the plan's 1 msg/ms ceiling.
+   void SendControllers(double at)
+   {
+      const int ch = std::clamp(mChannel.load(std::memory_order_relaxed), 1, 16) - 1;
+      for (int i = 0; i < MidiOutNode::kCcRows; i++)
+      {
+         if (!mCcOn[i].load(std::memory_order_relaxed))
+         {
+            mLastSentCc[i] = -1; // turning a row back on resends its value
+            continue;
+         }
+         const int v = std::clamp((int)std::lround(mCcVal[i].load(std::memory_order_relaxed) * 127.0f), 0, 127);
+         if (v == mLastSentCc[i])
+            continue;
+         mLastSentCc[i] = v;
+         Send(0xB0 | ch, mCcNum[i].load(std::memory_order_relaxed), v, at);
+      }
+   }
+
+   // Infinite as clock master (D4): 24 pulses per quarter note from the Transport, with
+   // Start / Continue / Stop and a Song Position Pointer on locate. Off while an external clock
+   // is present, so two masters never feed each other.
+   void SendClock(double at, bool playing, int frames)
+   {
+      const bool want = mClockOn.load(std::memory_order_relaxed) && playing && !Platform::MidiClockIsPresent();
+      const Transport& tr = Transport::Instance();
+      const double bpm = std::max(1.0f, tr.Tempo());
+      const double b0 = tr.BlockStartBeats();
+      const double sr = mSampleRate > 0.0 ? mSampleRate : 44100.0;
+      const double b1 = b0 + (double)frames * bpm / (60.0 * sr);
+
+      if (!want)
+      {
+         if (mClockRunning)
+            SendRealtime(0xFC, at);
+         mClockRunning = false;
+         return;
+      }
+
+      if (!mClockRunning)
+      {
+         if (b0 < 1e-6)
+            SendRealtime(0xFA, at); // from the top: Start
+         else
+         {
+            SendSongPosition(b0, at);
+            SendRealtime(0xFB, at); // from the middle: Continue
+         }
+         mNextPulse = (long long)std::ceil(b0 * 24.0 - 1e-6);
+         mClockRunning = true;
+      }
+      else if (std::fabs(b0 - mExpectedBeat) > 0.01)
+      {
+         // Seek or loop lap while running.
+         SendSongPosition(b0, at);
+         mNextPulse = (long long)std::ceil(b0 * 24.0 - 1e-6);
+      }
+      mExpectedBeat = b1;
+
+      while ((double)mNextPulse / 24.0 < b1 - 1e-9)
+      {
+         const double pulseBeat = (double)mNextPulse / 24.0;
+         const double dt = std::max(0.0, (pulseBeat - b0) * 60.0 / bpm);
+         SendRealtime(0xF8, at + dt);
+         mNextPulse++;
+      }
    }
 
    void ForgetHeld()
@@ -143,6 +261,16 @@ private:
    int mSeenPanic = 0;
    uint8_t mHeldChannel[128];
    std::atomic<int> mChannel { 1 };
+   std::atomic<float> mOffsetMs { 0.0f };
+   std::atomic<bool> mClockOn { false };
+   std::atomic<bool> mCcOn[MidiOutNode::kCcRows] = {};
+   std::atomic<int> mCcNum[MidiOutNode::kCcRows] = {};
+   std::atomic<float> mCcVal[MidiOutNode::kCcRows] = {};
+   int mLastSentCc[MidiOutNode::kCcRows] = { -1, -1, -1, -1 };
+   bool mClockRunning = false;
+   long long mNextPulse = 0;
+   double mExpectedBeat = 0.0;
+   double mLastAt = 0.0; // newest timestamp handed to the sink; see Stamp()
    std::atomic<int> mPanicSeq { 0 };
    std::atomic<bool> mFlushRequest { false };
    std::atomic<int> mHeldCount { 0 };
@@ -168,6 +296,18 @@ void MidiOutNode::VisitParams(ParamVisitor& v)
 {
    v.Text("device", device);
    v.Int("channel", channel);
+   v.Float("offsetMs", offsetMs);
+   v.Bool("clock", clock);
+   // Names are stable keys in the patch file (INode.h), so these four-row names must not change.
+   static const char* const kOn[kCcRows] = { "cc1On", "cc2On", "cc3On", "cc4On" };
+   static const char* const kNum[kCcRows] = { "cc1Num", "cc2Num", "cc3Num", "cc4Num" };
+   static const char* const kVal[kCcRows] = { "cc1Val", "cc2Val", "cc3Val", "cc4Val" };
+   for (int i = 0; i < kCcRows; i++)
+   {
+      v.Bool(kOn[i], ccOn[i]);
+      v.Int(kNum[i], ccNum[i]);
+      v.Float(kVal[i], ccVal[i]);
+   }
 }
 
 void MidiOutNode::Panic()
@@ -245,5 +385,6 @@ void MidiOutNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    channel = std::clamp(channel, 1, 16);
    ServiceDevice();
-   Audio().SetChannel(channel);
+   offsetMs = std::clamp(offsetMs, -50.0f, 50.0f);
+   Audio().SetParams(*this);
 }

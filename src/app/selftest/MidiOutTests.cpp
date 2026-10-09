@@ -2,6 +2,7 @@
 #include "app/AppShared.h"
 
 #include <chrono>
+#include <cmath>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -9,6 +10,7 @@
 #include "audio/NoteEvent.h"
 #include "audio/NoteEventQueue.h"
 #include "core/Transport.h"
+#include "platform/Platform.h"
 
 namespace app
 {
@@ -165,6 +167,123 @@ bool RunMidiOutTest()
       }
       const auto last = cap.Take();
       check(last.size() == 1 && Is(last[0], 0x81, 48, 0), "delete mid-note emits the note-off");
+   }
+
+   // ---- phase 2: offset, CC rows, clock ---------------------------------------------------
+   {
+      Capture cap;
+      NoteEventQueue q;
+      MidiOutNode node;
+      node.channel = 1;
+      node.UseTestSink([&](const MidiOutSink::Msg& m) { cap.Add(m); });
+      AudioNode* an = node.AudioNodeForNotePorts();
+      an->PrepareToPlay(48000.0, 512);
+      an->SetNoteInbox(&q, q.RegisterConsumer());
+
+      // Offset shifts timestamps by exactly offsetMs (D7), and only timestamps.
+      node.offsetMs = 0.0f;
+      node.CookIfNeeded(1);
+      q.Push(On(60, 0.5f, 0));
+      const double t0 = Platform::MidiOutNowSeconds();
+      Block(an);
+      const auto a = cap.Take();
+      node.offsetMs = 20.0f;
+      node.CookIfNeeded(2);
+      q.Push(Off(60, 0));
+      const double t1 = Platform::MidiOutNowSeconds();
+      Block(an);
+      const auto b = cap.Take();
+      check(a.size() == 1 && b.size() == 1 && Is(b[0], 0x80, 60, 0), "offset leaves the bytes alone");
+      // Measured against the wall clock taken just before each block, since the blocks run apart.
+      check(a.size() == 1 && b.size() == 1 && std::fabs((a[0].at - t0)) < 0.005 &&
+               std::fabs((b[0].at - t1) - 0.020) < 0.005,
+            "offset +20 ms puts the timestamp 20 ms after the block's own start");
+      node.offsetMs = 0.0f;
+
+      // CC rows: nothing while off; sent once on enable; only on change; modulated value follows.
+      node.ccNum[1] = 74;
+      node.ccVal[1] = 0.5f;
+      node.CookIfNeeded(3);
+      Block(an);
+      check(cap.Take().empty(), "CC row off sends nothing");
+      node.ccOn[1] = true;
+      node.CookIfNeeded(4);
+      Block(an);
+      const auto c1 = cap.Take();
+      check(c1.size() == 1 && Is(c1[0], 0xB0, 74, 64), "CC row on: sends cc74 = round(0.5*127) = 64");
+      node.CookIfNeeded(5);
+      Block(an);
+      check(cap.Take().empty(), "unchanged value is not resent");
+      node.ccVal[1] = 0.5f + 0.001f; // still rounds to 64
+      node.CookIfNeeded(6);
+      Block(an);
+      check(cap.Take().empty(), "a change under one MIDI step is not sent");
+      node.ccVal[1] = 1.0f;
+      node.CookIfNeeded(7);
+      Block(an);
+      const auto c2 = cap.Take();
+      check(c2.size() == 1 && Is(c2[0], 0xB0, 74, 127), "modulated value change sends the new step");
+      node.ccOn[1] = false;
+      node.CookIfNeeded(8);
+
+      // Clock: 120 BPM, 4 bars = 384 pulses, Start first, Stop last.
+      Transport& tr = Transport::Instance();
+      tr.NotifyAudioEngineStarted(48000.0);
+      tr.SetTempo(120.0f);
+      tr.Rewind();
+      node.clock = true;
+      node.CookIfNeeded(9);
+      tr.SetPlaying(true);
+      const int blocks = 750; // 750 * 512 frames = 16.0 beats at 120 BPM, 48 kHz
+      std::vector<MidiOutSink::Msg> all;
+      for (int i = 0; i < blocks; i++)
+      {
+         tr.AdvanceAudioClock(512);
+         Block(an);
+         if ((i % 50) == 49)
+         {
+            const auto part = cap.Take();
+            all.insert(all.end(), part.begin(), part.end());
+         }
+      }
+      tr.SetPlaying(false);
+      Block(an);
+      {
+         const auto part = cap.Take();
+         all.insert(all.end(), part.begin(), part.end());
+      }
+      int pulses = 0, starts = 0, stops = 0;
+      bool startFirst = !all.empty() && all.front().len == 1 && all.front().bytes[0] == 0xFA;
+      bool stopLast = !all.empty() && all.back().len == 1 && all.back().bytes[0] == 0xFC;
+      bool pulsesOrdered = true;
+      double lastPulseAt = -1.0;
+      for (const auto& m : all)
+      {
+         if (m.len != 1) continue;
+         if (m.bytes[0] == 0xF8) { pulses++; if (m.at < lastPulseAt - 1e-9) pulsesOrdered = false; lastPulseAt = m.at; }
+         if (m.bytes[0] == 0xFA) starts++;
+         if (m.bytes[0] == 0xFC) stops++;
+      }
+      check(pulses == 384, "clock: 120 BPM x 4 bars = exactly 384 pulses");
+      check(starts == 1 && startFirst, "clock: one Start, and it comes first");
+      check(stops == 1 && stopLast, "clock: one Stop, and it comes last");
+      check(pulsesOrdered, "clock: pulse timestamps never go backwards");
+
+      // Locate: Song Position Pointer then Continue when starting mid-song.
+      tr.SeekBeats(8.0);
+      tr.SetPlaying(true);
+      tr.AdvanceAudioClock(512);
+      Block(an);
+      const auto mid = cap.Take();
+      bool spp = false, cont = false;
+      for (size_t i = 0; i + 1 < mid.size(); i++)
+         if (mid[i].len == 3 && mid[i].bytes[0] == 0xF2 && mid[i].bytes[1] == 32 && mid[i].bytes[2] == 0 &&
+             mid[i + 1].len == 1 && mid[i + 1].bytes[0] == 0xFB)
+            spp = cont = true; // 8 beats = 32 sixteenths
+      check(spp && cont, "start mid-song: Song Position 32 then Continue");
+      tr.SetPlaying(false);
+      node.clock = false;
+      tr.Rewind();
    }
 
    // ---- param round trip ------------------------------------------------------------------

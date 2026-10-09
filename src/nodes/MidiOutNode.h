@@ -37,6 +37,15 @@ public:
    // means "no device chosen yet", which the node treats as silent, not as an error.
    std::string device;
    int channel = 1; // 1..16
+   float offsetMs = 0.0f; // -50..50, shifts everything this node sends (D7)
+   bool clock = false;    // send 24 ppqn clock + start/stop/continue/SPP from the Transport (D4)
+
+   // Four CC rows (D3). `ccVal` is 0..1 and modulatable, so any LFO or macro cable can turn a
+   // hardware knob; the audio half sends a CC only when the 0..127 value changes.
+   static constexpr int kCcRows = 4;
+   bool ccOn[kCcRows] = { false, false, false, false };
+   int ccNum[kCcRows] = { 1, 74, 71, 91 }; // mod wheel, cutoff, resonance, reverb send
+   float ccVal[kCcRows] = { 0.0f, 0.0f, 0.0f, 0.0f };
    NoteCable noteInput;
 
    // Main thread, UI. All cheap.

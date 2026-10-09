@@ -680,6 +680,19 @@ namespace app
       });
 
       ModSliderInt("channel", &n->channel, 1, 16);
+      ModSlider("offset (ms)", &n->offsetMs, -50.0f, 50.0f, "%.1f");
+      NodeCheckbox("clock##midiOutClock", &n->clock);
+
+      // Stable labels, so a modulation cable stays bound when the cc number changes.
+      static const char* const kOnLbl[MidiOutNode::kCcRows] = { "cc1##midiOutCc1", "cc2##midiOutCc2", "cc3##midiOutCc3", "cc4##midiOutCc4" };
+      static const char* const kNumLbl[MidiOutNode::kCcRows] = { "cc1 #", "cc2 #", "cc3 #", "cc4 #" };
+      static const char* const kValLbl[MidiOutNode::kCcRows] = { "cc1 value", "cc2 value", "cc3 value", "cc4 value" };
+      for (int i = 0; i < MidiOutNode::kCcRows; i++)
+      {
+         NodeCheckbox(kOnLbl[i], &n->ccOn[i]);
+         ModSliderInt(kNumLbl[i], &n->ccNum[i], 0, 127);
+         ModSlider(kValLbl[i], &n->ccVal[i], 0.0f, 1.0f);
+      }
 
       if (ActionButton::Draw("panic##midiOutPanic", ImVec2(kPreviewSize, 0)))
          n->Panic();
