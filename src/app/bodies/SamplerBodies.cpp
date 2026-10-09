@@ -580,7 +580,7 @@ namespace app
       }
       ImGui::SameLine();
       ImGui::BeginDisabled(!onsetMode);
-      if (AudioSliderInt("onsets", &n->onsets, 1, SlicerNode::kMaxSlices, halfW))
+      if (AudioSliderInt("count", &n->onsets, 1, SlicerNode::kMaxSlices, halfW))
          n->onsets = std::clamp(n->onsets, 1, SlicerNode::kMaxSlices);
       ImGui::EndDisabled();
 
@@ -2210,9 +2210,9 @@ namespace app
       }
 
       if (st == LooperNode::kEmpty)
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no loop - press Rec");
+         EmptyState::DrawCaption(origin, br, "no loop yet");
       else if (st == LooperNode::kArmed)
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "waiting for the next grid line");
+         EmptyState::DrawCaption(origin, br, "waiting for the next grid line");
       dl->PopClipRect();
       AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
