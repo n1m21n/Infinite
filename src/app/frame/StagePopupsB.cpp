@@ -768,6 +768,25 @@ void DrawPopupsB(FrameCtx& fc)
             }
          }
       }
+      if (const char* live = getenv("INFINITE_LIVESTATE"); live != nullptr && frameId == 6)
+      {
+         // Review aid: INFINITE_LIVESTATE=<dir with sample.wav and live.mid> loads that sample into every Sampler,
+         // Slicer and Granular and the MIDI into every MIDI File, then starts the transport so a shot shows
+         // waveforms, playheads and visualisers with real data.
+         const std::string dir = live;
+         for (GraphNode& gn : gNodes)
+         {
+            if (auto* n = dynamic_cast<SamplerNode*>(gn.node.get()))
+               n->LoadFile(dir + "/sample.wav");
+            else if (auto* n2 = dynamic_cast<SlicerNode*>(gn.node.get()))
+               n2->LoadFile(dir + "/sample.wav");
+            else if (auto* n3 = dynamic_cast<GranularNode*>(gn.node.get()))
+               n3->LoadFile(dir + "/sample.wav");
+            else if (auto* n4 = dynamic_cast<MidiFileNode*>(gn.node.get()))
+               n4->LoadFile(dir + "/live.mid");
+         }
+         Transport::Instance().SetPlaying(true);
+      }
       if (getenv("INFINITE_NODELIST") != nullptr && frameId == 1)
       {
          // Review aid: every registered type by category, one line each ("NODELIST <category>|<type>").
