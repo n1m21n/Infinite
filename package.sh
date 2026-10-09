@@ -40,6 +40,8 @@ APP="$BUILD/Infinite.app"
 
 # Runtime state the app writes next to itself must not ship inside the bundle.
 rm -f "$APP/Contents/Resources/Infinite.json" "$APP/Contents/Resources/imgui.ini"
+# Licence texts travel with the app (before signing, so the seal covers them).
+cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES" "$APP/Contents/Resources/"
 
 echo "==> verifying the bundle is self-contained"
 if otool -L "$APP/Contents/MacOS/Infinite" | grep -qE '/opt/homebrew|/usr/local/(lib|opt)'; then

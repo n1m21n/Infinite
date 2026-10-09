@@ -65,6 +65,8 @@ if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
 New-Item -ItemType Directory -Force (Split-Path -Parent $Stage) | Out-Null
 New-Item -ItemType Directory -Force $Stage | Out-Null
 Copy-Item $Exe $Stage
+Copy-Item (Join-Path $PSScriptRoot "LICENSE") $Stage
+Copy-Item (Join-Path $PSScriptRoot "THIRD_PARTY_NOTICES") $Stage
 # The out-of-process VST3 scanner (src/scanner_main_win.cpp) must sit next to
 # Infinite.exe - Platform::ScannerExecutablePath() looks for it there.
 if (Test-Path $ScannerExe) { Copy-Item $ScannerExe $Stage }

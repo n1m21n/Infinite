@@ -101,6 +101,7 @@ int DrawFloating(FrameCtx& fc)
          if (sDlg && ImGui::GetFrameCount() > 20)
          {
             if (!strcmp(sDlg, "unsaved")) gShowUnsavedChangesModal = true;
+            else if (!strcmp(sDlg, "about")) gShowAboutModal = true;
             else if (!strcmp(sDlg, "recover")) { gShowAutosaveRecoveryModal = true; gAutosaveRecoveryTimestamp = "14:32"; }
             sDlg = nullptr;
          }
@@ -182,6 +183,17 @@ int DrawFloating(FrameCtx& fc)
          char ver[64];
          snprintf(ver, sizeof(ver), T("version %s"), INFINITE_VERSION_STRING);
          Centered(ver, true);
+         {
+            // Which build this is: the day it was compiled and whether it is a shipped (Release) or a Debug one.
+#ifdef NDEBUG
+            const char* kind = "release";
+#else
+            const char* kind = "debug";
+#endif
+            char build[96];
+            snprintf(build, sizeof(build), T("build %s, %s"), __DATE__, kind);
+            Centered(build, true);
+         }
          ImGui::Dummy(ImVec2(0.0f, tok::space_3));
          const auto Credit = [&](const char* role, const char* names)
          {
@@ -193,6 +205,32 @@ int DrawFloating(FrameCtx& fc)
          Credit(T("Contributors"), "Ricardo Palmieri");
          Credit(T("Agent"), "Claude (Anthropic)");
          DialogParts::Message(T("MIT licensed"));
+         {
+            struct L { const char* label; const char* url; };
+            const L links[] = { { T("Source code"), "https://github.com/n1m21n/Infinite" },
+                                { T("Licence"), "https://github.com/n1m21n/Infinite/blob/main/LICENSE" },
+                                { T("Third-party notices"), "https://github.com/n1m21n/Infinite/blob/main/THIRD_PARTY_NOTICES" },
+                                { T("Releases"), "https://github.com/n1m21n/Infinite/releases" } };
+            // Laid out by hand so they wrap with the dialog instead of overflowing it.
+            const float x0 = ImGui::GetCursorPosX(), maxX = x0 + ImGui::GetContentRegionAvail().x;
+            const float lineH = ImGui::GetTextLineHeight() + tok::space_1;
+            float x = x0, y = ImGui::GetCursorPosY();
+            for (const L& l : links)
+            {
+               const float w = ImGui::CalcTextSize(l.label).x;
+               if (x > x0 && x + w > maxX)
+               {
+                  x = x0;
+                  y += lineH;
+               }
+               ImGui::SetCursorPos(ImVec2(x, y));
+               if (ImGui::TextLink(l.label))
+                  Platform::OpenExternalUrl(l.url);
+               x += w + tok::space_4;
+            }
+            ImGui::SetCursorPos(ImVec2(x0, y + lineH));
+            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         }
          const int pick = DialogParts::Buttons({ L("Check for updates"), L("Website"), L("Close") });
          if (pick == 0)
          {
