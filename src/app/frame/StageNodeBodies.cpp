@@ -1,6 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiType.h"
+#include "app/ui/design/components/NodeHeader.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -282,17 +283,10 @@ void DrawNodeBodies(FrameCtx& fc)
                ImGui::TextDisabled("#%d", instanceIdx);
             }
             // One header row: title, instance number, then the category dimmed to its right.
-            ImGui::SameLine(0.0f, tok::space_2);
-            if (isLight)
-               ImGui::PushStyleColor(ImGuiCol_Text,
-                                     ImVec4(catColor.r * 0.75f, catColor.g * 0.75f,
-                                            catColor.b * 0.75f, 1.0f));
-            else
-               ImGui::PushStyleColor(ImGuiCol_Text,
-                                     ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f,
-                                            catColor.b * 0.6f + 0.4f, 0.75f));
-            ImGui::TextUnformatted(gn.category.c_str());  // same size as everything in the node; only colour/weight rank it
-            ImGui::PopStyleColor();
+            const ImVec4 catText = isLight
+               ? ImVec4(catColor.r * 0.75f, catColor.g * 0.75f, catColor.b * 0.75f, 1.0f)
+               : ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f, catColor.b * 0.6f + 0.4f, 0.75f);
+            NodeHeader::Category(gn.category.c_str(), catText);
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
          }
 
