@@ -70,19 +70,19 @@ Status: `todo`, `ok` (checked, matches), `fixed <sha>`, `decision` (needs owner)
 | Help / module reference | ok | ok | cards, header fill off |
 | Colour picker | closed | closed | closed by owner 2026-10-09 |
 | Node help popups | todo | todo | |
-| Unsaved changes / Recover dialogs | ok | decision | light: card edge barely separates from the scrim; Recover dialog not shot |
+| Unsaved changes / Recover dialogs | ok | fixed (B11) | modal edge 0.055 -> 0.16 alpha in light via DialogParts.End; both dialogs shot dark+light; hook INFINITE_OPENDIALOG=unsaved|recover |
 | Export / render dialogs | todo | todo | |
 | Field editor | todo | todo | |
-| Library panel | todo | todo | |
+| Library panel | ok | ok | B15 shot dark+light, Modules mode; refresh verified headless by LIBREFRESHTEST (Samples, Media, Plugins) |
 | Viewport panel: bottom, right, left, top | fixed (all 4 docks) | todo | empty state was hand-rolled and clipped in the left dock; now EmptyState (wraps) |
-| Modulations panel: 4 docks | ok (bottom, right) | todo | reference |
-| Perf panel: 4 docks, edit mode | todo | todo | |
-| Arrange panel: 4 docks, inspector | todo | todo | |
+| Modulations panel: 4 docks | ok (bottom, right) | ok (bottom) | B15 empty state centred, same card as Perf |
+| Perf panel: 4 docks, edit mode | ok (bottom, perfdemo) | ok (bottom) | B15; other docks and edit mode not shot this round |
+| Arrange panel: 4 docks, inspector | ok (bottom, inspector) | ok (bottom, inspector) | B15; other docks not shot this round |
 | Top bar, menus (File/Edit/Menu) | fixed | todo | flash fix not seen on screen |
 | Context menus (canvas, node, cable) | todo | todo | |
 | Toasts, tooltips, empty states | todo | todo | |
 | Minimap, canvas, cables, grid | todo | todo | |
-| Right rail (panel toggles) | todo | todo | |
+| Right rail (panel toggles) | ok | ok | B15: active toggle accent, spacing even in every shot |
 
 ### B. Nodes
 
