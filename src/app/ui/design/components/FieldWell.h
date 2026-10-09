@@ -68,6 +68,29 @@ namespace FieldWell
          if (ImGui::GetIO().MouseClickedCount[0] == 1) { sId = id; sPrev = *v; }
          else if (sId == id && *v != sPrev) { *v = sPrev; restored = true; }
       }
+      // Hover + start typing a number: opens the field next frame; the first character is replayed into it.
+      static ImGuiID sTypeId = 0;
+      static ImWchar sTypeCh = 0;
+      if (editing && sTypeId == id && sTypeCh != 0)
+      {
+         ImGui::GetIO().AddInputCharacter(sTypeCh);
+         sTypeId = 0;
+         sTypeCh = 0;
+      }
+      else if (!editing && ImGui::GetCurrentContext()->ActiveId == 0 && ImGui::IsMouseHoveringRect(mn, mx) &&
+               ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+      {
+         for (const ImWchar c : ImGui::GetIO().InputQueueCharacters)
+            if ((c >= '0' && c <= '9') || c == '-' || c == '.')
+            {
+               sTypeId = id;
+               sTypeCh = c;
+               ImGuiContext& g = *ImGui::GetCurrentContext();
+               g.NavNextActivateId = id;
+               g.NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+               break;
+            }
+      }
       if (!editing && hi != lo)
          Fill(ImGui::GetWindowDrawList(), mn, mx, mn.x + w * std::clamp((float)(*v - lo) / (float)(hi - lo), 0.0f, 1.0f));
       PushStyle();
