@@ -100,6 +100,7 @@ namespace Platform
    struct MidiOutHandle
    {
       MIDIEndpointRef destination = 0;
+      MIDIEndpointRef source = 0; // set for the virtual device: MIDIReceived publishes to subscribers
    };
 
    double MidiOutNowSeconds()
@@ -111,6 +112,7 @@ namespace Platform
    std::vector<std::string> MidiOutListDevices()
    {
       std::vector<std::string> names;
+      names.push_back(kMidiOutVirtualDevice);
       const ItemCount count = MIDIGetNumberOfDestinations();
       for (ItemCount i = 0; i < count; i++)
       {
@@ -123,6 +125,20 @@ namespace Platform
    MidiOutHandle* MidiOutOpen(const std::string& name, std::string& outError)
    {
       outError.clear();
+      if (name == kMidiOutVirtualDevice)
+      {
+         if (!AcquireClient(outError)) return nullptr;
+         MIDIEndpointRef src = 0;
+         if (MIDISourceCreate(gOutClient, CFSTR("Infinite"), &src) != noErr)
+         {
+            ReleaseClient();
+            outError = "could not create the Infinite virtual MIDI source";
+            return nullptr;
+         }
+         MidiOutHandle* h = new MidiOutHandle();
+         h->source = src;
+         return h;
+      }
       MIDIEndpointRef found = 0;
       const ItemCount count = MIDIGetNumberOfDestinations();
       for (ItemCount i = 0; i < count && !found; i++)
@@ -144,6 +160,7 @@ namespace Platform
    void MidiOutClose(MidiOutHandle* handle)
    {
       if (!handle) return;
+      if (handle->source) MIDIEndpointDispose(handle->source);
       delete handle;
       ReleaseClient();
    }
@@ -163,6 +180,8 @@ namespace Platform
       pkt = MIDIPacketListAdd(list, sizeof(buffer), pkt, ts, len, bytes);
       if (!pkt) return false;
 
+      if (handle->source)
+         return MIDIReceived(handle->source, list) == noErr;
       return MIDISend(gOutPort, handle->destination, list) == noErr;
    }
 

@@ -32,6 +32,7 @@ public:
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
    AudioNode* AudioNodeForNotePorts() override;
+   bool KeepsAudioHalfWhenBypassed() const override { return true; } // releases held notes on bypass
 
    // Saved by name, never by handle (D10): handles change every launch on every OS. Empty
    // means "no device chosen yet", which the node treats as silent, not as an error.

@@ -37,6 +37,25 @@ public:
          ReleaseAll(now);
       mWasPlaying = playing;
 
+      // Bypassed: let go of everything, stop the clock, swallow incoming notes, send nothing new.
+      if (mBypassed.load(std::memory_order_relaxed))
+      {
+         if (!mWasBypassed)
+         {
+            mWasBypassed = true;
+            ReleaseAll(now);
+         }
+         int dropped;
+         do
+         {
+            dropped = mInbox != nullptr ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
+         } while (dropped == 64);
+         if (mSink.IsOpen())
+            SendClock(now + (double)mOffsetMs.load(std::memory_order_relaxed) * 0.001, false, std::max(1, output.numFrames));
+         return;
+      }
+      mWasBypassed = false;
+
       const double offsetSec = (double)mOffsetMs.load(std::memory_order_relaxed) * 0.001;
       const double base = now + offsetSec; // every message this block is shifted by the same offset
 
@@ -117,6 +136,7 @@ public:
          mCcVal[i].store(std::clamp(n.ccVal[i], 0.0f, 1.0f), std::memory_order_relaxed);
       }
    }
+   void SetBypassed(bool b) override { mBypassed.store(b, std::memory_order_relaxed); }
    void RequestPanic() { mPanicSeq.fetch_add(1, std::memory_order_release); }
    void RequestFlush() { mFlushRequest.store(true, std::memory_order_release); }
    int HeldCount() const { return mHeldCount.load(std::memory_order_relaxed); }
@@ -273,6 +293,8 @@ private:
    double mLastAt = 0.0; // newest timestamp handed to the sink; see Stamp()
    std::atomic<int> mPanicSeq { 0 };
    std::atomic<bool> mFlushRequest { false };
+   std::atomic<bool> mBypassed { false };
+   bool mWasBypassed = false; // audio thread only
    std::atomic<int> mHeldCount { 0 };
 };
 

@@ -91,6 +91,7 @@ namespace Platform
    std::vector<std::string> MidiOutListDevices()
    {
       std::vector<std::string> names;
+      names.push_back(kMidiOutVirtualDevice);
       snd_seq_t* seq = nullptr;
       if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0)
          return names;
@@ -112,22 +113,25 @@ namespace Platform
       }
       snd_seq_set_client_name(seq, "Infinite");
 
+      // The virtual device is the same port with nobody connected: other apps subscribe to
+      // "Infinite" themselves (aconnect, a DAW), and events go to whoever has.
+      const bool isVirtual = name == kMidiOutVirtualDevice;
       const Destination* found = nullptr;
       const std::vector<Destination> all = ListDestinations(seq, snd_seq_client_id(seq));
       for (const Destination& d : all)
          if (d.name == name) { found = &d; break; }
-      if (!found)
+      if (!found && !isVirtual)
       {
          snd_seq_close(seq);
          outError = "MIDI output \"" + name + "\" is not connected";
          return nullptr;
       }
 
-      const int port = snd_seq_create_simple_port(seq, "Infinite Out",
+      const int port = snd_seq_create_simple_port(seq, isVirtual ? "Infinite" : "Infinite Out",
          SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ, SND_SEQ_PORT_TYPE_MIDI_GENERIC | SND_SEQ_PORT_TYPE_APPLICATION);
       const int queue = port >= 0 ? snd_seq_alloc_queue(seq) : -1;
       if (port < 0 || queue < 0 ||
-          snd_seq_connect_to(seq, port, found->client, found->port) < 0)
+          (found && snd_seq_connect_to(seq, port, found->client, found->port) < 0))
       {
          if (queue >= 0) snd_seq_free_queue(seq, queue);
          snd_seq_close(seq);
@@ -141,8 +145,8 @@ namespace Platform
       h->seq = seq;
       h->port = port;
       h->queue = queue;
-      h->destClient = found->client;
-      h->destPort = found->port;
+      h->destClient = found ? found->client : 0;
+      h->destPort = found ? found->port : 0;
       h->openedAt = MidiOutNowSeconds();
       return h;
    }

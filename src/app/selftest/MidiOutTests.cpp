@@ -169,6 +169,50 @@ bool RunMidiOutTest()
       check(last.size() == 1 && Is(last[0], 0x81, 48, 0), "delete mid-note emits the note-off");
    }
 
+   // ---- phase 3: bypass releases held notes and goes quiet (D9) -----------------------------
+   {
+      Capture cap;
+      NoteEventQueue q;
+      MidiOutNode node;
+      node.channel = 2;
+      node.UseTestSink([&](const MidiOutSink::Msg& m) { cap.Add(m); });
+      node.CookIfNeeded(1);
+      AudioNode* an = node.AudioNodeForNotePorts();
+      an->PrepareToPlay(48000.0, 512);
+      an->SetNoteInbox(&q, q.RegisterConsumer());
+      check(node.KeepsAudioHalfWhenBypassed(), "MIDI Out stays in the topology when bypassed");
+
+      q.Push(On(62, 0.5f, 0));
+      Block(an);
+      cap.Take();
+      an->SetBypassed(true);
+      q.Push(On(64, 0.5f, 0)); // arrives while bypassed: must be swallowed
+      Block(an);
+      const auto held = cap.Take();
+      check(held.size() == 1 && Is(held[0], 0x81, 62, 0), "bypass sends note-off for the held note and nothing for new notes");
+      an->SetBypassed(false);
+      q.Push(On(65, 0.5f, 0));
+      Block(an);
+      const auto after = cap.Take();
+      check(after.size() == 1 && Is(after[0], 0x91, 65, 64), "un-bypass plays again, without the swallowed note");
+   }
+
+   // ---- phase 3: the virtual device is listed first where it exists ---------------------------
+   if (Platform::MidiOutVirtualAvailable())
+   {
+      const auto devs = Platform::MidiOutListDevices();
+      check(!devs.empty() && devs[0] == Platform::kMidiOutVirtualDevice, "virtual device is listed first");
+      std::string err;
+      Platform::MidiOutHandle* h = Platform::MidiOutOpen(Platform::kMidiOutVirtualDevice, err);
+      check(h != nullptr, "virtual device opens");
+      if (h)
+      {
+         const unsigned char b[3] = { 0x90, 60, 64 };
+         check(Platform::MidiOutSend(h, b, 3, Platform::MidiOutNowSeconds()), "virtual device accepts a message");
+         Platform::MidiOutClose(h);
+      }
+   }
+
    // ---- phase 2: offset, CC rows, clock ---------------------------------------------------
    {
       Capture cap;

@@ -1007,8 +1007,13 @@ namespace Platform
    // deliverAtSeconds is expressed in, so callers need no OS time API.
    double MidiOutNowSeconds();
 
-   // Names of the connected destinations, in a stable order. Our own virtual
-   // source ("Infinite") is not a destination and never appears here.
+   // Name of the entry that publishes Infinite's own virtual source (macOS, Linux). It is
+   // listed first by MidiOutListDevices where MidiOutVirtualAvailable() is true, and opening it
+   // creates a source called "Infinite" that DAWs and other apps can subscribe to.
+   constexpr const char* kMidiOutVirtualDevice = "Infinite (virtual)";
+
+   // Names of the connected destinations, in a stable order, led by kMidiOutVirtualDevice
+   // where available.
    std::vector<std::string> MidiOutListDevices();
 
    // Main thread. Opens the destination whose name matches exactly (saved names are

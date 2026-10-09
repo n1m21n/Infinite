@@ -96,6 +96,10 @@ public:
    }
    virtual void Reset() {}
 
+   // Main thread, from the topology rebuild, only for nodes whose INode returns true from
+   // KeepsAudioHalfWhenBypassed. Called on every rebuild with the current flag.
+   virtual void SetBypassed(bool /*bypassed*/) {}
+
    // Arrangement Timeline retrigger (main.cpp's RunTopology lookahead pass):
    // requests that this node seek its own playback position back to the
    // start the next time it cooks, without otherwise disturbing its
