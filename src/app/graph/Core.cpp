@@ -140,6 +140,17 @@ namespace app
       // give the 2D/compositing one a distinct label.
       if (name == "transform")
          return "2d transform";
+      // Image-filter keys are the one-word patch keys of the FilterDef table; the UI reads them spaced like
+      // every other node name.
+      static const std::pair<const char*, const char*> kFilterLabels[] = {
+         { "gaussianblur", "gaussian blur" }, { "boxblur", "box blur" },     { "motionblur", "motion blur" },
+         { "radialblur", "radial blur" },     { "unsharpmask", "unsharp mask" }, { "pinchpunch", "pinch punch" },
+         { "addnoise", "add noise" },         { "diffuseglow", "diffuse glow" }, { "lensdistortion", "lens distortion" },
+         { "gradientmap", "gradient map" },   { "outerglow", "outer glow" },     { "coloroverlay", "color overlay" },
+         { "dropshadow", "drop shadow" } };
+      for (const auto& f : kFilterLabels)
+         if (name == f.first)
+            return f.second;
       // Registered type keys stay "Drift"/"Moves" (patches/undo/copy-paste/help-table lookups all key
       // off them), but both read as generic node names next to the rest of the Prediction category -
       // give them the descriptive names the design settled on without touching the saved token.

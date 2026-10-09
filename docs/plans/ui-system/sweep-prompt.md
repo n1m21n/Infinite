@@ -94,7 +94,7 @@ Status: `todo`, `ok` (checked, matches), `fixed <sha>`, `decision` (needs owner)
 | Modulators | 28 (all dark; Audio to CV, Palette, LFO also light) | fixed | ok | Fixed: Palette hint no longer overruns the node edge; Audio to CV mode dropdown moves to the left cell (P3). 2-input nodes (Math, Compare) show no bypass, per rule. Collapsed/modulated/high-contrast not shot. |
 | Prediction | 8 (dark only) | fixed | todo | Fixed: Predictive LFO scope shows "no targets" at rest; "NN% conf" badge no longer overprints the stat on 200 pt nodes (stat shortens, shared FitStatBesideConf); Predictive Notes Learn button = one grid cell, idle "learning meter" label, 4 pt gap above knobs. Light/collapsed/modulated/high-contrast not shot. |
 | Macros | XY pad now uses the wide macro cell (XY, Step Gate, Radio share one width); other 8 ok, dark + light shot. Left: Toggle/Trigger onto Switch/ActionButton, rename on caption double-click | done | done | dark+light |
-| Effects (image) | FilterDef pattern | todo | todo | |
+| Effects (image) | 24 shot dark (blurs, distortions, glow, crop); share one frame/preview | fixed | todo | Fixed: filter titles spaced via DisplayName (gaussian blur, add noise...); patch keys unchanged. Displace (2 inputs) has no bypass, per rule. Params panel not shot |
 | Compositing | | todo | todo | |
 | Source | | todo | todo | |
 | 3D / geometry | Render 3D worst case | todo | todo | |
