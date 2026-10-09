@@ -1,5 +1,6 @@
 // Node help text tables, shortcuts and help windows (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/SectionCard.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/FormParts.h"
 
@@ -507,13 +508,17 @@ namespace app
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
-      if (!ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse))
+      FormParts::PushWindowPad();   // same 16 pt inset as Settings; cards reach 8 pt into it
+      const bool shortcutsVisible = ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse);
+      ImGui::PopStyleVar();
+      if (!shortcutsVisible)
       {
          ImGui::End();
          PopElevatedPanelStyle();
          return;
       }
 
+      SectionCard::BeginWindow();
       FormParts::PushReferenceStyle();
       static char filterBuf[128] = "";
       FormParts::SearchInput("##filter", "Filter shortcuts...", filterBuf, sizeof(filterBuf), 250.0f);
@@ -624,7 +629,7 @@ namespace app
                inTable = false;
             }
             lastCat = s.category;
-            FormParts::Heading(T(s.category));
+            SectionCard::Begin(T(s.category));
          }
 
          if (!inTable)
@@ -664,6 +669,7 @@ namespace app
       if (inTable)
          ImGui::EndTable();
 
+      SectionCard::EndWindow();
       FormParts::PopReferenceStyle();
       FormParts::WindowEdge();
       ImGui::End();
@@ -681,7 +687,10 @@ namespace app
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(720, 620), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
-      if (!ImGui::Begin("Infinite - help & module reference", open, ImGuiWindowFlags_NoCollapse))
+      FormParts::PushWindowPad();   // same 16 pt inset as Settings
+      const bool helpVisible = ImGui::Begin("Infinite - help & module reference", open, ImGuiWindowFlags_NoCollapse);
+      ImGui::PopStyleVar();
+      if (!helpVisible)
       {
          ImGui::End();
          PopElevatedPanelStyle();
