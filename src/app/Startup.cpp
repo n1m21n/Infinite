@@ -1188,6 +1188,19 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          getenv("INFINITE_KBDISCRETETEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
+      if (const char* gallery = getenv("INFINITE_FXGALLERY"); gallery != nullptr)
+      {
+         // Review fixture: every AudioEffects node on a non-overlapping grid, 13 per page
+         // (INFINITE_FXGALLERY=1 or 2), framed at frame 3 so a 3200x2000 shot reads at ~1:1.
+         static const char* kFx[] = { "Audio Filter", "EQ", "Dynamics", "Limiter", "Delay", "Reverb", "Drive",
+                                      "Stereo", "Pitch Shifter", "Chorus", "Flanger", "Phaser", "Bitcrush",
+                                      "Transient Shaper", "Stutter", "Ring Mod", "Frequency Shifter", "Tremolo",
+                                      "Formant Filter", "Wavetable Shaper", "Resonator Bank", "Cycle Shaper",
+                                      "Spec Blur", "Key-Snap", "Spectrum Slide", "Shape Resonator" };
+         const int page = atoi(gallery) == 2 ? 1 : 0;
+         for (int i = 0; i < 13; i++)
+            SpawnNode(kFx[page * 13 + i], "AudioEffects", (float)(i % 5) * 480.0f, (float)(i / 5) * 620.0f);
+      }
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
       {
          // Visual fixture for the audio node UI (audio-node-ui-system.md

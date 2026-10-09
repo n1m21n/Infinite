@@ -1,6 +1,7 @@
 // Modulation/spectral effect bodies + visualizers (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
 
 namespace app
 {
@@ -22,8 +23,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float midY = origin.y + h * 0.5f;
       dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
@@ -56,8 +56,7 @@ namespace app
       snprintf(buf, sizeof(buf), "%.1f ms", delayMs);
       dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), ScopeTextCol(), buf);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -171,8 +170,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float midY = origin.y + h * 0.5f;
       const float delayMs = n->Param("delay");
@@ -213,8 +211,7 @@ namespace app
       snprintf(buf, sizeof(buf), "%.2f ms", delayMs);
       dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), ScopeTextCol(), buf);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -316,8 +313,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float logMin = log10f(50.0f), logMax = log10f(8000.0f);
       auto freqToX = [&](float hz) {
@@ -364,8 +360,7 @@ namespace app
       if (spread > 0.01f)
          drawTrace(powf(2.0f, spread * 0.5f), 110);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -471,8 +466,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float rateHz = std::max(100.0f, n->Param("rate"));
       const float bits = std::max(1.0f, n->Param("bits"));
@@ -511,8 +505,7 @@ namespace app
          dl->PathLineTo(pts[i]);
       dl->PathStroke(isLight ? tok::U32(tok::pal::c_7850E6F5) : tok::U32(tok::pal::c_BEA0FFF5), 0, 1.8f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       char buf[48];
       snprintf(buf, sizeof(buf), "%.0f Hz - %.0f bit", rateHz, bits);
@@ -595,8 +588,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float attackDb = n->Param("attack");
       const float sustainDb = n->Param("sustain");
@@ -652,8 +644,7 @@ namespace app
       dl->AddCircleFilled(ImVec2(peakX, peakY), 3.0f + transientAmount * 4.0f,
                           isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFC478E6));
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -788,8 +779,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float midY = origin.y + h * 0.5f;
       dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
@@ -811,8 +801,7 @@ namespace app
       }
       dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -893,8 +882,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float shift = n->Param("shift");
       const float spread = n->Param("spread");
@@ -982,8 +970,7 @@ namespace app
       dl->AddText(ImVec2(br.x - textSz.x - 10.0f, origin.y + 8.0f),
                   isLight ? tok::U32(tok::pal::c_283750F0) : tok::U32(tok::pal::c_E6EEFFF0), valBuf);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1066,8 +1053,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const int shape = std::clamp((int)(n->Param("shape") + 0.5f), 0, 3);
       const int dspWaveform = TremoloKernel::ShapeToDspWaveform(shape);
@@ -1115,8 +1101,7 @@ namespace app
          dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE66E) : tok::U32(tok::pal::c_96D6FF6E), 0, 1.4f);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1193,8 +1178,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float logMin = log10f(100.0f), logMax = log10f(5000.0f);
       auto freqToX = [&](float hz) {
@@ -1221,8 +1205,7 @@ namespace app
          dl->AddText(ImVec2(x - 7.0f, peakY - 14.0f), ScopeTextCol(), kFormantLabels[i]);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1269,8 +1252,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float logMin = log10f(20.0f), logMax = log10f(20000.0f);
       auto freqToX = [&](float hz) {
@@ -1343,8 +1325,7 @@ namespace app
          dl->AddCircleFilled(ImVec2(x, peakY), 3.0f, stemCol);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1435,8 +1416,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float midY = origin.y + h * 0.5f;
       dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeGridCol(), 1.0f);
@@ -1477,8 +1457,7 @@ namespace app
       for (int i = 0; i < kPlotPoints - 1; i++)
          dl->AddLine(pts[i], pts[i + 1], waveCol, 2.0f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1550,8 +1529,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       // Grid lines: 100Hz, 1kHz, 10kHz
       const double sr = 48000.0;
@@ -1600,6 +1578,7 @@ namespace app
 
       const int kPlotPoints = 128;
       ImVec2 pts[kPlotPoints];
+      float peak = 0.0f;
       for (int i = 0; i < kPlotPoints; i++)
       {
          const float frac = (float)i / (float)(kPlotPoints - 1);
@@ -1610,7 +1589,10 @@ namespace app
          // Map -60 dB .. 0 dB to height
          const float normY = std::clamp((db + 60.0f) / 60.0f, 0.0f, 1.0f);
          pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * 0.9f) - 2.0f);
+         peak = std::max(peak, normY);
       }
+      if (peak < 0.02f)
+         AudioViz::IdleLabel(vizFrame);
 
       const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_8C46DC2D) : tok::U32(tok::pal::c_B464FF2D);
       const ImU32 lineCol = isLight ? tok::U32(tok::pal::c_963CE6F0) : tok::U32(tok::pal::c_C882FFF0);
@@ -1627,8 +1609,7 @@ namespace app
          dl->AddLine(pts[i], pts[i + 1], lineCol, 2.0f);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       const float blurTime = n->Param("blurTime");
       const float tilt = n->Param("tilt");
@@ -1717,8 +1698,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float loHz = 50.0f, hiHz = 5000.0f;
       const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
@@ -1798,8 +1778,7 @@ namespace app
          dl->AddLine(pts[i], pts[i + 1], lineCol, 2.0f);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1869,8 +1848,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float loHz = 50.0f, hiHz = 12000.0f;
       const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
@@ -1912,6 +1890,7 @@ namespace app
       const double sr = 48000.0;
       const int kPlotPoints = 160;
       ImVec2 pts[kPlotPoints];
+      float peak = 0.0f;
       for (int i = 0; i < kPlotPoints; i++)
       {
          const float frac = (float)i / (float)(kPlotPoints - 1);
@@ -1920,7 +1899,10 @@ namespace app
          const float db = 20.0f * log10f(std::max(st.smoothed[bin], 1e-4f));
          const float normY = std::clamp((db + 60.0f) / 60.0f, 0.0f, 1.0f);
          pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * 0.9f) - 6.0f);
+         peak = std::max(peak, normY);
       }
+      if (peak < 0.02f)
+         AudioViz::IdleLabel(vizFrame);
       const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_8C46DC2D) : tok::U32(tok::pal::c_B464FF2D);
       const ImU32 lineCol = isLight ? tok::U32(tok::pal::c_963CE6F0) : tok::U32(tok::pal::c_C882FFF0);
       for (int i = 0; i < kPlotPoints - 1; i++)
@@ -1938,8 +1920,7 @@ namespace app
       dl->AddLine(ImVec2(origin.x + 8.0f, ty), ImVec2(br.x - 8.0f, ty), trackCol, 1.0f);
       dl->AddCircleFilled(ImVec2(origin.x + 8.0f + slide * (w - 16.0f), ty), 2.5f, dotCol);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1980,8 +1961,7 @@ namespace app
       const ImVec2 br(origin.x + w, origin.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float loHz = 30.0f, hiHz = 12000.0f;
       const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
@@ -2011,8 +1991,7 @@ namespace app
          dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 6.0f), isLight ? tok::U32(tok::pal::c_28283CA0) : tok::U32(tok::pal::c_FFFFFF96),
                      solving ? "solving shape..." : "no modes");
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];

@@ -88,7 +88,7 @@ Status: `todo`, `ok` (checked, matches), `fixed <sha>`, `decision` (needs owner)
 
 | Family | Nodes | Dark | Light | Notes |
 |---|---|---|---|---|
-| AudioEffects (16) | one shared visualizer grammar | todo | todo | first |
+| AudioEffects (26 effect bodies) | one shared visualizer grammar | fixed | fixed | frame on `AudioViz` (new); Limiter rebuilt on the Dynamics gain-computer view; idle label on Spec Blur / Spectrum Slide; shots `fx{1,2}-{dark,light}-after2.png` (gallery: `INFINITE_FXGALLERY=1|2`); collapsed/modulated/high-contrast not shot |
 | Synths | | todo | todo | |
 | Notes | | todo | todo | |
 | Modulators | | todo | todo | |
@@ -106,4 +106,8 @@ Fill one row per effect while sweeping. A column that differs from the majority 
 
 | Effect | Visualizer kind | Full width | Idle state | Frame / graticule | Readout idle text | mix last | Shared component |
 |---|---|---|---|---|---|---|---|
-| (todo) | | | | | | | |
+| Audio Filter, EQ | response curve + spectrum | yes | graticule + curve | AudioViz, 190 tall (interactive) | band/filter text | yes (EQ has no mix) | AudioViz |
+| Dynamics, Limiter | gain-computer curve + GR meter | yes | curve + ceiling/threshold | AudioViz x2 (curve, meter) | "ceiling / ratio" text | yes (Limiter has no mix) | `DrawGainComputerVisualizer` (Limiter was a 64 px side meter; fixed) |
+| Delay, Reverb, Drive, Stereo, Pitch Shifter, Chorus, Flanger, Phaser, Bitcrush, Transient Shaper, Ring Mod, Freq Shifter, Tremolo, Formant, Wavetable Shaper, Resonator Bank, Cycle Shaper, Key-Snap, Shape Resonator | params-derived shape | yes | shape drawn from params | AudioViz (border radius was 3 vs fill 4; fixed) | stat strip | yes where a mix exists | AudioViz |
+| Spec Blur, Spectrum Slide | live spectrum | yes | was a flat line; now "no input" label | AudioViz | stat strip | yes | AudioViz.IdleLabel |
+| Stutter | gate grid | yes | steps lit | none (decision: a grid, not a scope) | stat strip | no mix param | none |

@@ -644,7 +644,7 @@ void DrawPopupsB(FrameCtx& fc)
       }
       if (getenv("INFINITE_PALETTETEST") != nullptr && frameId == 3)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
-      if (getenv("INFINITE_AUDIOUITEST") != nullptr && frameId == 3)
+      if ((getenv("INFINITE_AUDIOUITEST") != nullptr || getenv("INFINITE_FXGALLERY") != nullptr) && frameId == 3)
          gRequestFitView = true; // same, for the audio node UI fixture
       if (getenv("INFINITE_LOADPATCH") != nullptr && (frameId == 2 || frameId == 4))
          gRequestFitView = true;

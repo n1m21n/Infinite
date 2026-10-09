@@ -1,6 +1,7 @@
 // Filter, EQ, dynamics, delay, reverb and drive bodies + visualizers (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
 
 namespace app
 {
@@ -236,8 +237,7 @@ namespace app
          PushUndoCheckpoint();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       // Graticule that keeps this from reading as blank at rest (§3f).
       DrawFilterGraticule(dl, origin, w, h);
@@ -398,9 +398,7 @@ namespace app
       dl->AddCircleFilled(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, tok::U32(tok::pal::c_EBF5FFFF), 12);
       dl->AddCircle(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, tok::U32(tok::pal::c_141820DC), 12, 1.5f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? (isLight ? tok::U32(tok::pal::c_3278DCFF) : tok::U32(tok::pal::c_6E8CB4FF))
-                                      : ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame, hovered ? (isLight ? tok::U32(tok::pal::c_3278DCFF) : tok::U32(tok::pal::c_6E8CB4FF)) : 0);
 
       if (isNear)
       {
@@ -572,8 +570,7 @@ namespace app
          PushUndoCheckpoint();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       DrawFilterGraticule(dl, origin, w, h);
 
@@ -823,9 +820,7 @@ namespace app
          }
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? (isLight ? tok::U32(tok::pal::c_3278DCFF) : tok::U32(tok::pal::c_6E8CB4FF))
-                                      : ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame, hovered ? (isLight ? tok::U32(tok::pal::c_3278DCFF) : tok::U32(tok::pal::c_6E8CB4FF)) : 0);
 
       if (hovered || active)
       {
@@ -1002,7 +997,18 @@ namespace app
    }
 
 
-   void DrawDynamicsVisualizer(AudioEffectNode* n, float threshold, float ratio, float makeupDb)
+   constexpr float kLimiterVizRatio = 1000.0f; // a brick-wall: slope past threshold is 1/1000
+
+   struct GainVizLive
+   {
+      float inDb;  // raw input level, dB
+      float grDb;  // gain reduction, dB (>= 0)
+   };
+
+   // The gain-computer picture shared by Dynamics and Limiter (a limiter is the same curve with an
+   // infinite ratio): transfer curve + threshold marker + live operating point + slim GR meter.
+   void DrawGainComputerVisualizer(const char* readoutKey, float threshold, float ratio, float makeupDb,
+                                   float inGainDb, const GainVizLive& live)
    {
       const float w = gAudioBodyW;
       const float h = kAudioTimeVizH;
@@ -1015,8 +1021,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, ImVec2(curveBr.x, br.y), ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, curveBr, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, curveW, h);
 
       static const float kDbTicks[] = { -48.0f, -36.0f, -24.0f, -12.0f, 0.0f };
       for (float db : kDbTicks)
@@ -1055,7 +1060,7 @@ namespace app
       {
          const float x = origin.x + (float)i * (curveW / (float)(kNumPoints - 1));
          const float xDb = DynVizXToDb(x, origin.x, curveW);
-         const float yDb = DynamicsDsp::GainComputerDb(xDb, threshold, ratio) + makeupDb;
+         const float yDb = DynamicsDsp::GainComputerDb(xDb + inGainDb, threshold, ratio) + makeupDb;
          dl->PathLineTo(ImVec2(x, DynVizDbToY(yDb, origin.y, h)));
       }
       dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
@@ -1065,12 +1070,12 @@ namespace app
       // never recomputed from the static curve. That's what makes attack and
       // release visible: the dot lags behind a sudden input jump and eases
       // back down exactly on the kernel's own timing, not an idealized one.
-      const float liveInDb = std::clamp(n->ExtraMeterValue(0), kDynVizMinDb, kDynVizMaxDb);
-      const float liveGrDb = std::clamp(n->ExtraMeterValue(1), 0.0f, 40.0f);
+      const float liveInDb = std::clamp(live.inDb, kDynVizMinDb, kDynVizMaxDb);
+      const float liveGrDb = std::clamp(live.grDb, 0.0f, 40.0f);
       const bool hasSignal = liveInDb > kDynVizMinDb + 0.5f;
       if (hasSignal)
       {
-         const float liveOutDb = liveInDb - liveGrDb + makeupDb;
+         const float liveOutDb = liveInDb + inGainDb - liveGrDb + makeupDb;
          const float dotX = DynVizDbToX(liveInDb, origin.x, curveW);
          const float unprocessedY = DynVizDbToY(liveInDb, origin.y, h);
          const float dotY = DynVizDbToY(liveOutDb, origin.y, h);
@@ -1088,8 +1093,7 @@ namespace app
          dl->AddCircle(ImVec2(dotX, dotY), 4.0f, ScopeBgCol(), 0, 1.5f);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, ImVec2(curveBr.x, br.y), ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       // Gain-reduction meter, a slim bar riding the curve's right edge -
       // release shows here as the bar's own fall time, since it reads the
@@ -1097,7 +1101,7 @@ namespace app
       {
          const ImVec2 meterOrigin(curveBr.x + grMeterGap, origin.y);
          const ImVec2 meterBr(br.x, br.y);
-         dl->AddRectFilled(meterOrigin, meterBr, ScopeBgCol(), 2.0f);
+         const AudioViz::Frame meterFrame = AudioViz::Begin(meterOrigin, grMeterW, h);
          const float grT = std::clamp(liveGrDb / 24.0f, 0.0f, 1.0f);
          const float barTop = meterOrigin.y + (meterBr.y - meterOrigin.y) * (1.0f - grT);
          if (grT > 0.005f)
@@ -1105,17 +1109,24 @@ namespace app
             dl->AddRectFilled(ImVec2(meterOrigin.x + 1.0f, barTop), ImVec2(meterBr.x - 1.0f, meterBr.y),
                               isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFA03CDC), 1.5f);
          }
-         dl->AddRect(meterOrigin, meterBr, ScopeBorderCol(), 2.0f);
+         AudioViz::End(meterFrame);
       }
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
          if (hasSignal)
-            snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, %.0f:1", liveInDb, liveGrDb, ratio);
+         {
+            if (ratio >= kLimiterVizRatio)
+               snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, limit", liveInDb, liveGrDb);
+            else
+               snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, %.0f:1", liveInDb, liveGrDb, ratio);
+         }
+         else if (ratio >= kLimiterVizRatio)
+            snprintf(buf, sizeof(buf), "ceiling %.0f dB", threshold + makeupDb);
          else
             snprintf(buf, sizeof(buf), "%.0f dB in -> %.0f dB out, %.0f:1", threshold, threshold + makeupDb, ratio);
-         SetAudioReadout("dynamics", buf);
+         SetAudioReadout(readoutKey, buf);
       }
 
       ImGui::Dummy(ImVec2(w, h));
@@ -1130,7 +1141,8 @@ namespace app
                analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-      DrawDynamicsVisualizer(n, n->Param("threshold"), n->Param("ratio"), n->Param("makeup"));
+      DrawGainComputerVisualizer("dynamics", n->Param("threshold"), n->Param("ratio"), n->Param("makeup"), 0.0f,
+                                 { n->ExtraMeterValue(0), n->ExtraMeterValue(1) });
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       // KHS Audio Compressor's control surface: threshold, ratio, attack,
@@ -1190,45 +1202,6 @@ namespace app
    // the reference brief asked for, and distinct enough from
    // DrawStripMeter's plain level bar (no scale, grows up) to warrant its
    // own small ImDrawList routine rather than reusing that primitive.
-   void DrawLimiterVisualizer(AudioEffectNode* n, float x, float y, float w, float h)
-   {
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 origin(x, y);
-      const ImVec2 br(x + w, y + h);
-      const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
-
-      const float grDb = std::clamp(n->ExtraMeterValue(0), 0.0f, 20.0f);
-
-      static const float kTicks[] = { 0.0f, -10.0f, -20.0f };
-      for (float db : kTicks)
-      {
-         const float t = std::clamp(-db / 20.0f, 0.0f, 1.0f);
-         const float ty = y + t * h;
-         dl->AddLine(ImVec2(x, ty), ImVec2(br.x, ty), db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
-         char buf[8];
-         snprintf(buf, sizeof(buf), "%.0f", db);
-         dl->AddText(ImVec2(x + 3.0f, ty - (db == 0.0f ? 12.0f : 1.0f)), ScopeTextCol(), buf);
-      }
-
-      const float barBottom = y + std::clamp(grDb / 20.0f, 0.0f, 1.0f) * h;
-      if (barBottom > y + 1.0f)
-         dl->AddRectFilled(ImVec2(x + 4.0f, y), ImVec2(br.x - 4.0f, barBottom),
-                           isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFA03CDC), 2.0f);
-
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
-
-      if (ImGui::IsMouseHoveringRect(origin, br))
-      {
-         char buf[64];
-         snprintf(buf, sizeof(buf), "-%.1f dB GR, out %.1f dB", grDb, n->ExtraMeterValue(1));
-         SetAudioReadout("limiter", buf);
-      }
-   }
-
-
    void DrawLimiterBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[64];
@@ -1237,32 +1210,23 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      const float meterW = 64.0f;
-      const float meterGap = 12.0f;
-      const float meterRightPad = 12.0f;
-      const float savedContentW = gAudioContentW;
-      const float knobAreaW = savedContentW - meterW - meterGap - meterRightPad;
-      const float bodyTop = ImGui::GetCursorScreenPos().y;
+      // ExtraMeterValue(0) = GR, (1) = output level; the curve wants the raw input level back.
+      const float inGain = n->Param("inGain");
+      const float outGain = n->Param("outGain");
+      const float gr = std::clamp(n->ExtraMeterValue(0), 0.0f, 20.0f);
+      const float outDb = n->ExtraMeterValue(1);
+      const float inDb = outDb - inGain + gr - outGain;
+      DrawGainComputerVisualizer("limiter", n->Param("threshold"), kLimiterVizRatio, outGain, inGain, { inDb, gr });
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      // Two rows of two beside a full-height meter, per the reference
-      // layout: threshold/release above, in/out gain below.
-      gAudioContentW = knobAreaW;
       {
-         AudioKnobRow row(2, kKnobLarge);
+         AudioKnobRow row(4);
          row.Knob("threshold", n->ParamPtr("threshold"), -30.0f, 0.0f, "%.1f dB", kKnobLarge);
          row.Knob("release", n->ParamPtr("release"), 5.0f, 1000.0f, "%.0f ms", kKnobLarge);
+         row.Knob("in gain", n->ParamPtr("inGain"), -12.0f, 24.0f, "%.1f dB");
+         row.Knob("out gain", n->ParamPtr("outGain"), -24.0f, 12.0f, "%.1f dB");
          row.End();
       }
-      {
-         AudioKnobRow row(2, kKnobLarge);
-         row.Knob("in gain", n->ParamPtr("inGain"), -12.0f, 24.0f, "%.1f dB", kKnobLarge);
-         row.Knob("out gain", n->ParamPtr("outGain"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
-         row.End();
-      }
-      gAudioContentW = savedContentW;
-
-      const float bodyBottom = ImGui::GetCursorScreenPos().y;
-      DrawLimiterVisualizer(n, gAudioContentX + knobAreaW + meterGap, bodyTop, meterW, bodyBottom - bodyTop);
 
       EndAudioBody();
    }
@@ -1284,8 +1248,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       // Amplitude gridlines, same 25%-step reading aid Dynamics/Reverb use.
       for (int i = 1; i < 4; i++)
@@ -1323,8 +1286,7 @@ namespace app
       dl->AddLine(ImVec2(origin.x, origin.y + barsH), ImVec2(br.x, origin.y + barsH), ScopeMidLineCol(),
                   1.0f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1442,8 +1404,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float predelaySeconds = n->Param("predelay") * 0.001f;
       const float decaySeconds = std::max(0.05f, n->Param("decay"));
@@ -1485,8 +1446,7 @@ namespace app
       }
       dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1570,8 +1530,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       // Center gridlines (x=0, y=0) plus quarter-amplitude ticks, the same
       // reading aid Dynamics/Reverb give their curves.
@@ -1603,8 +1562,7 @@ namespace app
       }
       dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1666,8 +1624,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       for (int i = -2; i <= 2; i++)
       {
@@ -1735,8 +1692,7 @@ namespace app
       const ImVec2 dot(origin.x + (0.5f + 0.5f * lastIn) * w, origin.y + (0.5f - 0.5f * lastOut) * h);
       dl->AddCircleFilled(dot, 3.5f, isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFD678E6));
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1818,8 +1774,7 @@ namespace app
       const float radius = std::min(w * 0.48f, h - 26.0f);
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       // Concentric dB rings, apex-centered, sweeping only the upper half.
       const int kNumRings = 5;
@@ -1880,8 +1835,7 @@ namespace app
                      isLight ? tok::U32(tok::pal::c_D26414E6) : tok::U32(tok::pal::c_FFC478D2), blo);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1927,8 +1881,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), tok::radius_field);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float midY = origin.y + h * 0.5f;
       dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeGridCol(), 1.0f);
@@ -1944,8 +1897,7 @@ namespace app
       snprintf(buf, sizeof(buf), "%+.1f st", pitch);
       dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), ScopeTextCol(), buf);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
          SetAudioReadout("pitch shifter", buf);
