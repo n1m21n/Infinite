@@ -1094,6 +1094,132 @@ namespace Platform
       return true;
    }
 
+   bool HttpDownload(const std::string& url, const std::string& userAgent,
+                     const std::string& destPath, const HttpProgress& progress,
+                     std::string& outError, int timeoutSeconds)
+   {
+      outError.clear();
+      const bool isHttps = url.rfind("https://", 0) == 0;
+      if (!isHttps && url.rfind("http://", 0) != 0)
+      {
+         outError = "url must be http(s)";
+         return false;
+      }
+
+      URL_COMPONENTS parts;
+      ZeroMemory(&parts, sizeof(parts));
+      parts.dwStructSize = sizeof(parts);
+      wchar_t hostBuf[256] = {};
+      wchar_t pathBuf[2048] = {};
+      parts.lpszHostName = hostBuf;
+      parts.dwHostNameLength = (DWORD)(sizeof(hostBuf) / sizeof(hostBuf[0]));
+      parts.lpszUrlPath = pathBuf;
+      parts.dwUrlPathLength = (DWORD)(sizeof(pathBuf) / sizeof(pathBuf[0]));
+      const std::wstring wideUrl = WinCommon::Utf8ToWide(url);
+      if (!WinHttpCrackUrl(wideUrl.c_str(), 0, 0, &parts))
+      {
+         outError = "malformed url";
+         return false;
+      }
+
+      WinHttpHandleGuard session(WinHttpOpen(WinCommon::Utf8ToWide(userAgent).c_str(),
+         WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
+      if (!session.handle)
+      {
+         outError = "WinHttpOpen failed";
+         return false;
+      }
+      const int perOpMs = 30 * 1000; // stall timeout per operation; timeoutSeconds bounds the whole transfer
+      WinHttpSetTimeouts(session, perOpMs, perOpMs, perOpMs, perOpMs);
+
+      WinHttpHandleGuard connect(WinHttpConnect(session, parts.lpszHostName, parts.nPort, 0));
+      if (!connect.handle)
+      {
+         outError = "WinHttpConnect failed";
+         return false;
+      }
+      WinHttpHandleGuard request(WinHttpOpenRequest(connect, L"GET", parts.lpszUrlPath,
+         nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+         isHttps ? WINHTTP_FLAG_SECURE : 0));
+      if (!request.handle)
+      {
+         outError = "WinHttpOpenRequest failed";
+         return false;
+      }
+      if (!WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+             WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+          !WinHttpReceiveResponse(request, nullptr))
+      {
+         outError = "request failed (network or TLS error)";
+         return false;
+      }
+      DWORD statusCode = 0;
+      DWORD statusSize = sizeof(statusCode);
+      WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+         WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
+      if (statusCode < 200 || statusCode >= 300)
+      {
+         outError = "http status " + std::to_string((long)statusCode);
+         return false;
+      }
+      DWORD lenHeader = 0;
+      DWORD lenSize = sizeof(lenHeader);
+      uint64_t total = 0;
+      if (WinHttpQueryHeaders(request, WINHTTP_QUERY_CONTENT_LENGTH | WINHTTP_QUERY_FLAG_NUMBER,
+             WINHTTP_HEADER_NAME_BY_INDEX, &lenHeader, &lenSize, WINHTTP_NO_HEADER_INDEX))
+         total = lenHeader;
+
+      FILE* f = _wfopen(WinCommon::Utf8ToWide(destPath).c_str(), L"wb");
+      if (!f)
+      {
+         outError = "cannot write the download";
+         return false;
+      }
+      const auto started = std::chrono::steady_clock::now();
+      uint64_t done = 0;
+      std::vector<char> buf(64 * 1024);
+      bool ok = true;
+      for (;;)
+      {
+         DWORD read = 0;
+         if (!WinHttpReadData(request, buf.data(), (DWORD)buf.size(), &read))
+         {
+            outError = "WinHttpReadData failed";
+            ok = false;
+            break;
+         }
+         if (read == 0)
+            break;
+         if (fwrite(buf.data(), 1, read, f) != read)
+         {
+            outError = "cannot write the download";
+            ok = false;
+            break;
+         }
+         done += read;
+         if (progress && !progress(done, total))
+         {
+            outError = "cancelled";
+            ok = false;
+            break;
+         }
+         if (std::chrono::steady_clock::now() - started > std::chrono::seconds(timeoutSeconds))
+         {
+            outError = "timed out";
+            ok = false;
+            break;
+         }
+      }
+      ok = (fclose(f) == 0) && ok;
+      if (!ok)
+      {
+         if (outError.empty())
+            outError = "cannot write the download";
+         _wremove(WinCommon::Utf8ToWide(destPath).c_str());
+      }
+      return ok;
+   }
+
    // ---- output/projector window --------------------------------------------
    // See Platform.h's comment on why this exists only on Windows: there is no
    // OS-level "make this window fullscreen" affordance here, so main.cpp

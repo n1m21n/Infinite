@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -1263,6 +1264,17 @@ namespace Platform
    bool HttpGet(const std::string& url, const std::string& userAgent,
                 std::string& outBody, std::string& outError,
                 int timeoutSeconds = 10);
+
+   // Streams an HTTPS GET to `destPath` (no size cap, nothing held in memory).
+   // Call from a worker thread. `progress(done, total)` runs on the calling
+   // thread as bytes arrive (total is 0 when the server does not say); return
+   // false from it to cancel. Returns false on any failure, cancel or non-2xx and
+   // fills outError; a partial destPath is deleted. timeoutSeconds bounds the
+   // whole transfer.
+   using HttpProgress = std::function<bool(uint64_t done, uint64_t total)>;
+   bool HttpDownload(const std::string& url, const std::string& userAgent,
+                     const std::string& destPath, const HttpProgress& progress,
+                     std::string& outError, int timeoutSeconds = 600);
 
    // ---- output/projector window (Windows only) ----------------------------
    // Windows has no OS-level "make this app window fullscreen" affordance -

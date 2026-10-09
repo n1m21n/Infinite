@@ -2155,6 +2155,28 @@ int RunExtensionsTest()
    check(Extensions::Remove("demo") && Extensions::PackDir("demo").empty(), "remove");
    check(!Extensions::Remove("../x"), "remove refuses a bad id");
 
+   // Streaming download, only when a local server URL is supplied (no network in CI).
+   if (const char* url = getenv("INFINITE_EXTENSIONSTEST_URL"))
+   {
+      const std::string dest = root + "/dl.bin";
+      uint64_t lastDone = 0, lastTotal = 0;
+      std::string derr;
+      bool ok = Platform::HttpDownload(url, "Infinite-test", dest,
+         [&](uint64_t d, uint64_t t) { lastDone = d; lastTotal = t; return true; }, derr, 60);
+      check(ok, "download completes");
+      std::error_code sec;
+      const auto sz = std::filesystem::file_size(AppPaths::FsPath(dest), sec);
+      check(!sec && sz > 1048576, "download is larger than the old 1 MB HttpGet cap");
+      check(lastDone == sz, "progress ends at the file size");
+      check(lastTotal == 0 || lastTotal == sz, "progress total matches when known");
+      bool cancelled = !Platform::HttpDownload(url, "Infinite-test", root + "/dl2.bin",
+         [](uint64_t, uint64_t) { return false; }, derr, 60);
+      check(cancelled && derr == "cancelled", "cancel stops the download");
+      check(!std::filesystem::exists(AppPaths::FsPath(root + "/dl2.bin")), "cancel leaves no partial file");
+      check(!Platform::HttpDownload("http://127.0.0.1:9/none", "Infinite-test", root + "/dl3.bin", nullptr, derr, 5)
+            && !derr.empty(), "unreachable server reports an error");
+   }
+
    std::filesystem::remove_all(AppPaths::FsPath(root), ec);
    printf("EXTENSIONSTEST %s\n", fails == 0 ? "ALL PASS" : "FAILED");
    return fails == 0 ? 0 : 1;

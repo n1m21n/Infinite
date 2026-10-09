@@ -156,6 +156,7 @@ namespace
    State gView;             // main-thread copy, refreshed by Poll()
    std::thread gWorker;
    std::atomic<bool> gBusy { false };
+   std::atomic<bool> gCancel { false };
 
    template <class Fn> bool RunWorker(Fn fn)
    {
@@ -189,6 +190,7 @@ namespace
       std::lock_guard<std::mutex> l(gMutex);
       gShared.busyId = id;
       gShared.busyLabel = label;
+      gShared.progress = -1.0f;
    }
 
    void Finish(bool ok, const std::string& msg)
@@ -196,6 +198,7 @@ namespace
       std::lock_guard<std::mutex> l(gMutex);
       gShared.busyId.clear();
       gShared.busyLabel.clear();
+      gShared.progress = -1.0f;
       gShared.installed = ScanInstalled();
       gShared.message = msg;
       gShared.messageIsError = !ok;
@@ -499,12 +502,39 @@ void InstallAsync(const Pack& pack)
    RunWorker([pack]()
    {
       SetBusy(pack.id, "Downloading");
-      std::string body, httpErr;
-      if (!Platform::HttpGet(pack.url, std::string("Infinite/") + INFINITE_VERSION_STRING, body, httpErr, 600))
+      gCancel.store(false);
+      const std::string root = RootDir();
+      if (root.empty())
       {
-         Finish(false, "Download failed: " + (httpErr.empty() ? std::string("network error") : httpErr));
+         Finish(false, "Install failed: no writable extensions folder");
          return;
       }
+      const std::string part = root + "/.download-" + pack.id + ".part";
+      std::string httpErr;
+      const bool got = Platform::HttpDownload(pack.url, std::string("Infinite/") + INFINITE_VERSION_STRING, part,
+         [&pack](uint64_t done, uint64_t total)
+         {
+            const uint64_t denom = total ? total : pack.size;
+            {
+               std::lock_guard<std::mutex> l(gMutex);
+               gShared.progress = denom ? (float)((double)done / (double)denom) : -1.0f;
+               if (gShared.progress > 1.0f) gShared.progress = 1.0f;
+            }
+            return !gCancel.load();
+         }, httpErr, 600);
+      if (!got)
+      {
+         Finish(false, httpErr == "cancelled" ? std::string("Download cancelled")
+                                              : "Download failed: " + (httpErr.empty() ? std::string("network error") : httpErr));
+         return;
+      }
+      std::string body;
+      {
+         std::ifstream in(AppPaths::FsPath(part), std::ios::binary);
+         body.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      }
+      std::error_code rmEc;
+      fs::remove(AppPaths::FsPath(part), rmEc);
       SetBusy(pack.id, "Installing");
       std::string id, err;
       if (InstallZip(body, pack.sha256, pack.id, id, err))
@@ -544,6 +574,11 @@ void RemoveAsync(const std::string& id)
       else
          Finish(false, "Could not remove " + id);
    });
+}
+
+void CancelInstall()
+{
+   gCancel.store(true);
 }
 
 void Poll()

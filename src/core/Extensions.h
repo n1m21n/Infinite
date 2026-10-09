@@ -65,7 +65,8 @@ namespace Extensions
       bool catalogLoading = false;
       std::string catalogError;
       std::string busyId;        // pack being installed, "" when idle
-      std::string busyLabel;     // "Downloading", "Verifying", "Installing"
+      std::string busyLabel;     // "Downloading", "Installing", "Removing"
+      float progress = -1.0f;    // 0..1 while downloading, -1 when unknown
       std::vector<std::pair<std::string, std::string>> installed; // id, version
       std::string message;       // last result line
       bool messageIsError = false;
@@ -75,6 +76,7 @@ namespace Extensions
    void InstallAsync(const Pack& pack);         // download + verify + unpack
    void InstallFileAsync(const std::string& path); // offline: a local pack file
    void RemoveAsync(const std::string& id);
+   void CancelInstall();                        // stops a running download
    void Poll();                                 // main thread, once per frame
    const State& GetState();
    void Shutdown();

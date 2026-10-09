@@ -1277,7 +1277,12 @@ namespace app
                   const bool update = have && offer && *have != offer->version;
                   ImGui::TableSetColumnIndex(1);
                   if (ex.busyId == id)
-                     ImGui::Text("%s...", T(ex.busyLabel.c_str()));
+                  {
+                     if (ex.progress >= 0.0f)
+                        ImGui::ProgressBar(ex.progress, ImVec2(-FLT_MIN, 0), (std::string(T(ex.busyLabel.c_str())) + " " + std::to_string((int)(ex.progress * 100.0f)) + "%").c_str());
+                     else
+                        ImGui::Text("%s...", T(ex.busyLabel.c_str()));
+                  }
                   else if (!have)
                      ImGui::TextDisabled("%s", T("Not installed"));
                   else if (update)
@@ -1285,6 +1290,13 @@ namespace app
                   else
                      ImGui::Text(T("Installed v%s"), have->c_str());
                   ImGui::TableSetColumnIndex(2);
+                  if (ex.busyId == id && ex.busyLabel == "Downloading")
+                  {
+                     if (ImGui::Button(T("Cancel"), ImVec2(100, 0)))
+                        Extensions::CancelInstall();
+                     ImGui::PopID();
+                     return;
+                  }
                   ImGui::BeginDisabled(busy);
                   if ((!have || update) && offer)
                   {
