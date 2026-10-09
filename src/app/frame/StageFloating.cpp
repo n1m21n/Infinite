@@ -134,6 +134,64 @@ int DrawFloating(FrameCtx& fc)
          DialogParts::End();
       }
 
+      // ---- about modal: brand mark between the title and the credits ----
+#ifndef NDEBUG
+      {
+         static bool sAboutShot = getenv("INFINITE_OPENABOUT") != nullptr;
+         if (sAboutShot && ImGui::GetFrameCount() > 20) { gShowAboutModal = true; sAboutShot = false; }
+      }
+#endif
+      if (gShowAboutModal)
+      {
+         ImGui::OpenPopup(L("About Infinite"));
+         gShowAboutModal = false;
+      }
+      if (DialogParts::Begin(L("About Infinite")))
+      {
+         const float w = 320.0f;
+         ImGui::Dummy(ImVec2(w, 0.0f));
+         const auto Centered = [&](const char* text, bool dim)
+         {
+            const float tw = ImGui::CalcTextSize(text).x;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - tw) * 0.5f));
+            if (dim) DialogParts::Message(text); else ImGui::TextUnformatted(text);
+         };
+         if (const ImTextureID tex = BrandLogoTexture())
+         {
+            const float s = 96.0f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - s) * 0.5f);
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            ImGui::Dummy(ImVec2(s, s));
+            ImGui::GetWindowDrawList()->AddImageRounded(tex, p, ImVec2(p.x + s, p.y + s), ImVec2(0, 0), ImVec2(1, 1),
+                                                        IM_COL32_WHITE, 20.0f);
+         }
+         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         {
+            UiType::Scope s(UiType::Size::Title, UiType::Weight::Medium);
+            Centered("Infinite", false);
+         }
+         char ver[64];
+         snprintf(ver, sizeof(ver), T("version %s"), INFINITE_VERSION_STRING);
+         Centered(ver, true);
+         ImGui::Dummy(ImVec2(0.0f, tok::space_3));
+         const auto Credit = [&](const char* role, const char* names)
+         {
+            DialogParts::Message(role);
+            ImGui::TextUnformatted(names);
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         };
+         Credit(T("Author"), "Naman Soni");
+         Credit(T("Contributors"), "Ricardo Palmieri");
+         Credit(T("Agent"), "Claude (Anthropic)");
+         DialogParts::Message(T("MIT licensed"));
+         const int pick = DialogParts::Buttons({ L("Website"), L("Close") });
+         if (pick == 0)
+            Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/");
+         if (pick == 1 || ImGui::IsKeyPressed(ImGuiKey_Escape))
+            ImGui::CloseCurrentPopup();
+         DialogParts::End();
+      }
+
       // ---- check for updates modal ----
       if (gShowUpdateCheckModal)
       {

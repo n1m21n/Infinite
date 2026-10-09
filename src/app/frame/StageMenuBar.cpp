@@ -12,6 +12,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "app/ui/design/BrandLogo.gen.h"
 
 namespace app
 {
@@ -39,6 +40,30 @@ static void DrawPanelRail()
                        T("Arrangement timeline")))
       gArrangePanelOpen = !gArrangePanelOpen;
    PanelRail::End();
+}
+
+ImTextureID BrandLogoTexture()
+{
+   static GLuint tex = 0;
+   static bool tried = false;
+   if (!tried)
+   {
+      tried = true;
+      int w = 0, h = 0, n = 0;
+      unsigned char* px = stbi_load_from_memory(brandlogo::kPng, (int)sizeof(brandlogo::kPng), &w, &h, &n, 4);
+      if (px != nullptr)
+      {
+         glGenTextures(1, &tex);
+         glBindTexture(GL_TEXTURE_2D, tex);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+         stbi_image_free(px);
+      }
+   }
+   return (ImTextureID)(intptr_t)tex;
 }
 
 void DrawMenuBar(FrameCtx& fc)
@@ -87,22 +112,22 @@ void DrawMenuBar(FrameCtx& fc)
       if (menuBarOpen)
       {
          auto& MenuTile = TopBarParts::MenuTile;
-         // Infinite mark: a lemniscate drawn in the accent colour, just left of the menu.
+         // Infinite mark (the app icon): opens the About dialog.
          {
-            const float w = 24.0f, h = 12.0f;
+            const float s = 24.0f;
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
             const float cy = ImGui::GetWindowPos().y + tok::bar_h * 0.5f;
-            const ImVec2 c(p0.x + 4.0f + w * 0.5f, cy);
-            ImGui::Dummy(ImVec2(w + 8.0f, 1.0f));
-            ImVec2 pts[49];
-            for (int i = 0; i < 49; i++)
-            {
-               const float a = (float)i / 48.0f * 6.2831853f;
-               const float d = 1.0f + std::sin(a) * std::sin(a);
-               pts[i] = ImVec2(c.x + (w * 0.5f) * std::cos(a) / d, c.y + h * 0.9f * std::sin(a) * std::cos(a) / d);
-            }
-            ImGui::GetWindowDrawList()->AddPolyline(pts, 49, ImGui::GetColorU32(ImGuiCol_CheckMark), 0, 2.0f);
-            ImGui::SameLine(0.0f, 4.0f);
+            ImGui::SetCursorScreenPos(ImVec2(p0.x + 4.0f, cy - s * 0.5f));
+            if (ImGui::InvisibleButton("##brandlogo", ImVec2(s, s)))
+               gShowAboutModal = true;
+            const bool hov = ImGui::IsItemHovered();
+            if (const ImTextureID tex = BrandLogoTexture())
+               ImGui::GetWindowDrawList()->AddImageRounded(tex, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                  ImVec2(0, 0), ImVec2(1, 1), ImGui::GetColorU32(ImVec4(1, 1, 1, hov ? 1.0f : 0.92f)), 5.0f);
+            if (hov)
+               HelpTip("%s", T("About Infinite"));
+            ImGui::SameLine(0.0f, 8.0f);
+            ImGui::GetCurrentWindow()->DC.CursorPosPrevLine.y = p0.y;
          }
          // One compact tile, closed by default: File and Edit are submenus, then the former Menu items.
          if (MenuTile(L("Menu")))
@@ -351,6 +376,8 @@ void DrawMenuBar(FrameCtx& fc)
             if (MenuParts::Item(L("UI Style Editor"))) // i18n-ok (debug UI)
                gUiStyleEditorOpen = true;
 #endif
+            if (MenuParts::Item(L("About Infinite")))
+               gShowAboutModal = true;
             if (MenuParts::Item(L("Check for updates")))
             {
                UpdateCheck::Start();
@@ -410,8 +437,9 @@ void DrawMenuBar(FrameCtx& fc)
 
          auto& SectionBreak = TopBarParts::SectionBreak;
          // Everything after the menus sits on one centre line, tok::tile tall in a tok::bar_h bar.
-         SectionBreak();
 
+         auto drawTransport = [&]()
+         {
          // 1. Transport (Play, Rewind, Audio On/Off)
          if (ActionButton::Draw("##transportplay", ImVec2(tok::tile + 4.0f, 0),
                                 isTransportPlaying ? ActionButton::Kind::Go : ActionButton::Kind::Plain))
@@ -448,10 +476,10 @@ void DrawMenuBar(FrameCtx& fc)
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Rewind (Return)"));
 
-         // Transport group: play and rewind.
+         };
 
-         SectionBreak();
-
+         auto drawAudio = [&]()
+         {
          // Audio engine power, nothing else: Start starts the device, Stop
          // stops it, and neither touches gAudioMode (which driver the engine
          // plays - the canvas or the Arrangement Timeline - is the panel's
@@ -490,7 +518,7 @@ void DrawMenuBar(FrameCtx& fc)
                      : T("The Arrangement Timeline will drive audio once the engine is started."));
             }
          }
-
+         };
 
          // Left cluster ends here: menus, transport, audio. Tempo, meter, click and key sit centred in the
          // bar; the readouts sit at the right. The centred group is placed from last frame's measured width.
@@ -500,6 +528,9 @@ void DrawMenuBar(FrameCtx& fc)
                                         std::round((ImGui::GetWindowWidth() - sCentreW) * 0.5f));
          ImGui::SameLine(centreX);
          const float centreStartScreenX = ImGui::GetCursorScreenPos().x;
+         // Transport sits just left of the tempo, audio power just right of it.
+         drawTransport();
+         SectionBreak();
 
          static const int kDens[] = { 1, 2, 4, 8, 16 };
          auto SnapToValidDenominator = [](int val) -> int {
@@ -808,6 +839,11 @@ void DrawMenuBar(FrameCtx& fc)
             AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
          }
 
+         // Audio power, just right of the click.
+         SectionBreak();
+         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, centreY - tok::tile * 0.5f));
+         drawAudio();
+
          // Width of the centred group, measured for next frame's placement.
          sCentreW = ImGui::GetItemRectMax().x - centreStartScreenX;
          const float centreEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
@@ -851,21 +887,42 @@ void DrawMenuBar(FrameCtx& fc)
          const float minGap = tok::space_4;
          float cursorX = windowRight;
 
-         if (UpdateCheck::UpdateAvailable())
+         // Update: a quiet icon tile (down arrow in an accent wash, with a dot) that only exists while a newer
+         // version is available. Click downloads; right-click dismisses until the next version.
+         bool showUpdate = UpdateCheck::UpdateAvailable();
+#ifndef NDEBUG
+         if (getenv("INFINITE_SHOW_UPDATE_ICON") != nullptr)
+            showUpdate = true;
+#endif
+         if (showUpdate)
          {
-            const char* updateLabel = T("Update");
-            const float updateWidth = ImGui::CalcTextSize(updateLabel).x + 2.0f * tok::space_2;
+            const float updateWidth = tok::tile;
             if (cursorX - updateWidth - telemetryGap - telemetryW >= centreEndX + minGap)
             {
                cursorX -= updateWidth;
-
                ImGui::SameLine(cursorX);
-               if (ChipButton::Draw(updateLabel, true, tok::tile))
+               ImGui::PushID("##updateicon");
+               const bool clicked = ImGui::InvisibleButton("##update", ImVec2(tok::tile, tok::tile));
+               ImGui::PopID();
+               const bool hov = ImGui::IsItemHovered();
+               const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+               const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               const ImVec4 ac = ImGui::GetStyleColorVec4(ImGuiCol_CheckMark);
+               dl->AddRectFilled(mn, mx, ImGui::GetColorU32(ImVec4(ac.x, ac.y, ac.z, hov ? 0.28f : 0.16f)), tok::radius_tile);
+               const ImU32 fg = ImGui::GetColorU32(ac);
+               dl->AddLine(ImVec2(c.x, c.y - 6.0f), ImVec2(c.x, c.y + 4.0f), fg, 1.8f);
+               dl->AddLine(ImVec2(c.x - 4.5f, c.y), ImVec2(c.x, c.y + 4.5f), fg, 1.8f);
+               dl->AddLine(ImVec2(c.x + 4.5f, c.y), ImVec2(c.x, c.y + 4.5f), fg, 1.8f);
+               dl->AddLine(ImVec2(c.x - 5.5f, c.y + 7.0f), ImVec2(c.x + 5.5f, c.y + 7.0f), fg, 1.8f);
+               dl->AddCircleFilled(ImVec2(mx.x - 4.0f, mn.y + 4.0f), 3.0f, ImGui::GetColorU32(ImVec4(0.97f, 0.35f, 0.30f, 1.0f)), 12);
+               if (clicked)
                   Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/#download");
-               if (ImGui::IsItemHovered())
+               if (hov)
                {
-                  ImGui::SetTooltip(T("version %s is available (you have %s) - click to download"),
-                                     UpdateCheck::LatestVersion().c_str(), INFINITE_VERSION_STRING);
+                  const std::string& lv = UpdateCheck::LatestVersion();
+                  ImGui::SetTooltip(T("version %s is available (you have %s) - click to download, right-click to dismiss"),
+                                     lv.empty() ? "?" : lv.c_str(), INFINITE_VERSION_STRING);
                }
                if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                   UpdateCheck::Dismiss();

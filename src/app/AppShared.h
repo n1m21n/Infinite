@@ -1468,6 +1468,9 @@ extern bool gUiStyleEditorOpen;
 extern bool gSettingsOpen;
 
 extern bool gShowUpdateCheckModal;
+extern bool gShowAboutModal;
+// The app icon as a GL texture (created on first call); 0 if it could not be decoded.
+ImTextureID BrandLogoTexture();
 
 extern std::vector<std::string> gDroppedFiles;
 

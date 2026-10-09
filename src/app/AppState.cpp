@@ -970,6 +970,7 @@ bool gHeadlessNeedProbe = false;
    bool gSettingsOpen = false;
 
    bool gShowUpdateCheckModal = false;
+   bool gShowAboutModal = false;
 
 
    // Files dropped on the window, consumed on the next frame so the spawn can
