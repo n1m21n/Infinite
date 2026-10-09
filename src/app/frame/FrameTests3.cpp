@@ -691,10 +691,10 @@ void FrameTest_FIELDPINSTEST(int frameId, GLFWwindow* window)
          // moves when index 1 appears).
          {
             FieldElementNode n;
-            bool pass = (n.OutputCount() == 1) && (std::string(n.OutputLabel(0)) == "geo") &&
+            bool pass = (n.OutputCount() == 1) && (std::string(n.OutputLabel(0)) == "out") &&
                         (n.ModulatorOutput(1) == nullptr);
             n.publishScalarOutput = true;
-            pass = pass && (n.OutputCount() == 2) && (std::string(n.OutputLabel(0)) == "geo") &&
+            pass = pass && (n.OutputCount() == 2) && (std::string(n.OutputLabel(0)) == "out") &&
                    (std::string(n.OutputLabel(1)) == "publish") && (n.ModulatorOutput(1) != nullptr) &&
                    (n.ModulatorOutput(0) == nullptr);
             printf("[FIELDPINSTEST] Assertion 1 (FieldElementNode publish pin, append-only): %s\n", pass ? "OK" : "FAIL");
@@ -1002,7 +1002,7 @@ void FrameTest_FIELDPINNODETEST(int frameId, GLFWwindow* window)
             n.code = "output element float foo = 1.0\nP.y += 0.0\n";
             bool applied = n.Apply();
             bool pass = applied && (n.OutputCount() == 2) &&
-                        (std::string(n.OutputLabel(0)) == "geo") &&
+                        (std::string(n.OutputLabel(0)) == "out") &&
                         (std::string(n.OutputLabel(1)) == "foo") &&
                         (n.ModulatorOutput(1) != nullptr) &&
                         (n.ModulatorOutput(1)->Value01() == 0.0f);

@@ -431,7 +431,7 @@ namespace app
       DropdownButton("font", fonts, fontIdx, [n, &fonts](int i) { n->fontName = fonts[i]; });
 
       ModSlider("size", &n->fontSize, 8.0f, 300.0f);
-      ColorSwatch("color", n->color, n);
+      ColorSwatch("colour", n->color, n);
       ModSlider("tracking", &n->tracking, -10.0f, 40.0f);
       ModSlider("pos x", &n->posX, 0.0f, 1.0f);
       ModSlider("pos y", &n->posY, 0.0f, 1.0f);

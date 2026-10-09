@@ -945,11 +945,11 @@ namespace app
                ImGui::TextWrapped("Runs the body N times, once per lane, inside element or pixel kernels (the body domain must be the same or finer than the surrounding one). Cost is N x the body. The lane index inside the body is map_index; N must be a compile-time constant (1-64).");
 
                ImGui::TextColored(app::AccentEmphasisSelected(), "broadcast - one to many, implicit, NEVER written");
-               ImGui::TextWrapped("Coarse -> fine happens automatically via rate inference. Writing broadcast(...) is a compile error.");
+               ImGui::TextWrapped("Coarse \xE2\x86\x92 fine happens automatically via rate inference. Writing broadcast(...) is a compile error.");
                DrawCodeBox("amount = 0.5 + 0.5 * sin(t)   # frame domain\nP.y += amount                  # element domain reads it, no syntax needed", "cb_broadcast");
 
                ImGui::TextColored(app::AccentEmphasisSelected(), "resample(x, Domain) - read domain A while standing in domain B");
-               ImGui::TextWrapped("Domain is a bare identifier: frame, element, pixel or sample. Samples rather than aggregates, so fine -> coarse can alias - prefer reduce.rms for levels/envelopes.");
+               ImGui::TextWrapped("Domain is a bare identifier: frame, element, pixel or sample. Samples rather than aggregates, so fine \xE2\x86\x92 coarse can alias - prefer reduce.rms for levels/envelopes.");
                DrawCodeBox("level = resample(lfo, sample)   # frame -> sample, held for the block", "cb_resample");
 
                ImGui::TextColored(app::AccentEmphasisSelected(), "downsample(x, k) - run at a fraction of the ambient rate");

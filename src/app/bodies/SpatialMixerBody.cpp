@@ -52,7 +52,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%d in -> %s%s  %.0f LUFS", connected, n->renderMode == 1 ? "stereo" : "binaural",
                   tracked ? " - tracked" : "", std::max(n->LufsShort(), -99.0f));
       else
-         snprintf(stat, sizeof(stat), "0 in -> binaural (idle)");
+         snprintf(stat, sizeof(stat), "0 in \xE2\x86\x92 binaural (idle)");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 

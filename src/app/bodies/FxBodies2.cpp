@@ -1932,7 +1932,7 @@ namespace app
    {
       const float slide = n->Param("slide");
       char stat[64];
-      snprintf(stat, sizeof(stat), "slide %.0f%% - in -> to", slide * 100.0f);
+      snprintf(stat, sizeof(stat), "slide %.0f%% - in \xE2\x86\x92 to", slide * 100.0f);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawSpectrumSlideVisualizer(n);

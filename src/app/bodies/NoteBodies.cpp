@@ -256,7 +256,7 @@ namespace app
    void DrawSplitterBody(GraphNode& gn, SplitterNode*)
    {
       char stat[48];
-      snprintf(stat, sizeof(stat), "1 in -> up to %d out", SplitterNode::kMaxFanout);
+      snprintf(stat, sizeof(stat), "1 in \xE2\x86\x92 up to %d out", SplitterNode::kMaxFanout);
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       EndAudioBody();
    }

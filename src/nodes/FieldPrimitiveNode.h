@@ -41,7 +41,7 @@ public:
    int OutputCount() const override { return NativeOutputCount() + DeclaredOutputCount(); }
    const char* OutputLabel(int index) const override
    {
-      if (index == 0) return "geo";
+      if (index == 0) return "out";
       if (publishScalarOutput && index == 1) return "publish";
       int declIdx = index - NativeOutputCount();
       int seen = 0;

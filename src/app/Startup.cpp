@@ -55,7 +55,7 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    // not baked (thousands of glyphs, and no bundled face has them).
    static const ImWchar kUiGlyphRanges[] = {
       0x0020, 0x00FF, 0x0100, 0x024F, 0x0370, 0x03FF, 0x0400, 0x04FF,
-      0x1E00, 0x1EFF, 0x2000, 0x206F, 0x20A0, 0x20CF, 0
+      0x1E00, 0x1EFF, 0x2000, 0x206F, 0x2190, 0x21FF, 0x20A0, 0x20CF, 0
    };
    ImFont* uiFont = nullptr;
    const char* uiFontPath = nullptr;
