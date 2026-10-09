@@ -1,7 +1,13 @@
 # Field Notes node: Field script in, note events out
 
-> Status: **design, not built.** Written 2026-10-09 against `feature/ui-canvas`
-> @ `f8857acb`. Line numbers drift; re-locate by symbol.
+> Status: **design settled, not built.** Written 2026-10-09 against
+> `feature/ui-canvas` @ `f8857acb`. All decisions in §10 are final (owner
+> delegated them 2026-10-09). Line numbers drift; re-locate by symbol.
+>
+> **Owner's intent, verbatim in spirit:** a person writes their own Field
+> script that generates notes, and plugs the output into other note nodes or
+> straight into synths. Everything below serves that; anything that doesn't
+> is out of v1.
 >
 > Skills that own the rules this doc leans on: `field-language` (syntax),
 > `field-compiler` (backend), `field-integration` (INode wiring),
@@ -137,7 +143,7 @@ A three-note chord arrives as three note-ons with the same `frameOffset`.
 Field Synth's snapshot keeps only the last (`FieldSynthNode.cpp`, the
 `noteOnEdge` loop) — fine for a kick, wrong for a harmoniser.
 
-**Proposed rule:** on a sample with *k* input note-ons, Field Notes runs the
+**Rule (D5):** on a sample with *k* input note-ons, Field Notes runs the
 kernel *k* times, once per event in arrival order, each with its own
 `noteOn/noteNum/noteVel`; `state` carries through (events are processed in
 sequence, like a VST MIDI effect walking its event list). `n` and `beat` are
@@ -270,7 +276,7 @@ Grammar from `audio-node-ui` / `node-ui-pillars`. Kept to the KHS bar:
 │ │ code editor (same widget as Field      │ │
 │ │ Synth), errors underlined in place     │ │
 │ └───────────────────────────────────────┘ │
-│  [Preset ▾]  [Root  C ]  [Scale  Major ]  │   ← field wells, no chevrons
+│  [Preset Euclid] [Root  C ] [Scale Major] │   ← field wells, no chevrons
 │  (knob)(knob)(knob)(knob)  ← one per param │
 │ ▮▮ ▮  ▮▮▮ ▮   ▮▮  ← note-roll strip, 2 bars │
 │ 3 notes/beat · 0 dropped · C4 E4 G4        │   ← readout strip
@@ -353,29 +359,34 @@ in time with the metronome.
 
 ---
 
-## 10. Decisions proposed (owner approves / changes)
+## 10. Decisions (settled)
 
-| # | Decision | Proposed | Alternative |
-|---|---|---|---|
-| D1 | Which backend runs the script | **sample domain**, sample-accurate | frame domain (60 Hz = up to 16 ms jitter: audible) |
-| D2 | Output spelling | **`note(pitch, vel, len)` statement** | reserved outputs `pitch`/`vel`/`trig` (mono only, no chords) |
-| D3 | Pitch unit | **MIDI number**, plus new `noteNum` read | Hz everywhere (matches `notePitch`, but every script does `ftom`) |
-| D4 | `len = 0` means | **follow the input note** | always require a length (breaks transpose/harmonise of held notes) |
-| D5 | Same-sample chord input | **run the kernel once per event** (§3.4) | keep Field Synth's last-wins snapshot (harmoniser plays one note of three) |
-| D6 | Unguarded `note()` | **compile error** | allow it (48 k notes/s, instantly floods the queue) |
-| D7 | Scale source | **node's own Root/Scale wells** | a project-wide key (doesn't exist yet; would be a separate feature) |
-| D8 | Name | **Field Notes** | Field Sequencer, Field MIDI |
+Each one is judged against the same principles: it's a **live instrument**
+(timing must feel right, nothing may get stuck), **Field stays one primitive**
+(no new domain, bare names), **notes must cable into what already exists**,
+and **KHS-minimal** (smallest surface that does the job).
+
+| # | Decision | Chosen | Why (principle) | Rejected |
+|---|---|---|---|---|
+| D1 | Backend | **sample domain**, sample-accurate | instrument: a note 16 ms late is audible; the register machine is already RT-safe and cheap | frame domain (60 Hz jitter) |
+| D2 | Output spelling | **`note(pitch, vel, len)` statement** | chords and polyphony from one script; reads like what it does | reserved `pitch`/`vel`/`trig` outputs (mono only) |
+| D3 | Pitch unit | **MIDI number**, plus `noteNum` read | every note node downstream speaks MIDI numbers; scripts stay integer-simple | Hz everywhere |
+| D4 | `len = 0` | **follow the input note** | lets the same node transpose/harmonise held notes from Keyboard or MIDI Notes, i.e. "interact with other notes" | mandatory length |
+| D5 | Same-sample chord input | **kernel runs once per event** | a harmoniser that drops 2 of 3 chord notes is broken | last-wins snapshot |
+| D6 | Unguarded `note()` | **compile error with a fix-it hint** | errors where you type (`IsValidName` precedent); 48 k notes/s is never intended | allow |
+| D7 | Scale source | **node's own Root/Scale wells** | self-contained node; no project-wide key exists | project key (separate feature, not built) |
+| D8 | Name / category | **Field Notes**, `Notes` | sits next to Field Synth / Field Effect in the palette and with the other note nodes | Field Sequencer, Field MIDI |
+| D9 | Note-roll strip | **ship it** (2 bars, ≤30 Hz, decimated) | a generative script is unreadable without seeing what it plays; the cost rule in `audio-node-ui` bounds it | readout only |
+| D10 | Presets | **the 5 in §3.5** (Transpose, Harmoniser, Ratchet, Euclidean, Scale Walk) | covers both jobs; each is a starting point to edit, which is the point of the node | larger library |
+| D11 | Starter template | **Field Notes → Field Synth → Audio Out**, Euclidean preset | the owner's exact use case, playable on first open | none |
 
 ---
 
-## 11. Open questions (not blocking v1)
+## 11. Out of v1 (decided, not open)
 
-- **Note-roll strip vs. readout only** — the strip is the one thing that makes
-  a generative script legible. Cost is bounded (≤30 Hz, decimated) but it is
-  the biggest UI piece.
-- **CC / pitch bend out** — `NoteEvent` already carries `bendSemitones`. A
-  `bend(semitones)` statement is a natural v2; MIDI CC out depends on the
-  MIDI-out plan (`docs/plans/midi-out/`).
-- **Prediction tie-in** — Predictive Notes could feed Field Notes, and Field
-  Notes' `noteNum` history is exactly the rung-4 "learns from what you play"
-  input `algorithms.md` §9.2 wanted. Leave the door open, build nothing.
+| Item | Why not now | Door left open by |
+|---|---|---|
+| Pitch bend out (`bend(semitones)`) | not needed to generate notes | `NoteEvent::bendSemitones` already exists |
+| MIDI CC out / external MIDI out | belongs to the MIDI-out plan (`docs/plans/midi-out/`) | Field Notes' outbox is a normal `NoteEventQueue`, so MIDI Out will consume it with no change here |
+| Declared extra inputs (`input note float x`) | `param` + modulation matrix already lets any modulator drive the script | `PinTable` dynamic-pin path, same as Field Synth |
+| Prediction tie-in | not asked for | Predictive Notes can already cable into Field Notes' input |
