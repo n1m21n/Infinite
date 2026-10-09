@@ -87,6 +87,23 @@ void DrawMenuBar(FrameCtx& fc)
       if (menuBarOpen)
       {
          auto& MenuTile = TopBarParts::MenuTile;
+         // Infinite mark: a lemniscate drawn in the accent colour, just left of the menu.
+         {
+            const float w = 24.0f, h = 12.0f;
+            const ImVec2 p0 = ImGui::GetCursorScreenPos();
+            const float cy = ImGui::GetWindowPos().y + tok::bar_h * 0.5f;
+            const ImVec2 c(p0.x + 4.0f + w * 0.5f, cy);
+            ImGui::Dummy(ImVec2(w + 8.0f, 1.0f));
+            ImVec2 pts[49];
+            for (int i = 0; i < 49; i++)
+            {
+               const float a = (float)i / 48.0f * 6.2831853f;
+               const float d = 1.0f + std::sin(a) * std::sin(a);
+               pts[i] = ImVec2(c.x + (w * 0.5f) * std::cos(a) / d, c.y + h * 0.9f * std::sin(a) * std::cos(a) / d);
+            }
+            ImGui::GetWindowDrawList()->AddPolyline(pts, 49, ImGui::GetColorU32(ImGuiCol_CheckMark), 0, 2.0f);
+            ImGui::SameLine(0.0f, 4.0f);
+         }
          // One compact tile, closed by default: File and Edit are submenus, then the former Menu items.
          if (MenuTile(L("Menu")))
          {
