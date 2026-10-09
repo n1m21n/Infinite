@@ -5925,6 +5925,7 @@ int RunVST3BlocklistTest();
 
 void RunRpcBatchTest();
 void RunHistoryTest();
+void RunClipboardTest();
 
 void RunPatchWatchTest();
 

@@ -1,5 +1,6 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/graph/NodeClipboard.h"
 
 namespace app
 {
@@ -2140,4 +2141,122 @@ bool RunPerfPanelSelfTest()
    printf("[PERF MATRIX TEST] PASS\n");
    return true;
 }
+
+void RunClipboardTest()
+{
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+
+   NewPatch();
+   const int shapeIdx = SpawnNode("Shape", "Source", 100.0f, 100.0f)->index;
+   const int blurIdx = SpawnNode("gaussianblur", "Effects", 300.0f, 100.0f)->index;
+   const int lfoIdx = SpawnNode("LFO", "Modulators", 100.0f, 300.0f)->index;
+   const int outIdx = SpawnNode("Output", "Utility", 500.0f, 100.0f)->index;
+   const int noteIdx = SpawnNode("Comment", "Compositing", 100.0f, 500.0f)->index;
+   const int groupIdx = SpawnNode("Group", "Compositing", 50.0f, 450.0f)->index;
+   const int fieldIdx = SpawnNode("Field Graph", "Compositing", 300.0f, 300.0f)->index;
+   // Every spawn can move gNodes, so the pointers are taken only now.
+   GraphNode* shape = FindNodeByIndex(shapeIdx);
+   GraphNode* blur = FindNodeByIndex(blurIdx);
+   GraphNode* outside = FindNodeByIndex(outIdx);
+   const uint64_t shapeUid = shape->uid;
+   ImageCable* in0 = CableFor(*blur, 0);
+   if (in0 != nullptr)
+      in0->Connect(shape->node.get(), 0);
+   if (ImageCable* toOut = CableFor(*outside, 0))
+      toOut->Connect(blur->node.get(), 0);
+   Modulation::Source src;
+   src.nodeIndex = lfoIdx;
+   src.depth = 0.5f;
+   Modulation::Instance().RestoreLink(shapeIdx, 0, src);
+   Modulation::Instance().SetExpression(blurIdx, 0, "0.25 + 0.5");
+   std::vector<std::pair<std::string, std::string>> before;
+   Patch::SaveParams(shape->node.get(), before);
+
+   // Copy everything except the Output.
+   const std::string text = NodeClipboardSerialize({ shapeIdx, blurIdx, lfoIdx, noteIdx, groupIdx, fieldIdx });
+   Check("selection serialises with the header", text.rfind("infinite-nodes v", 0) == 0);
+   Check("a node that was not copied is not in the text", text.find("Output") == std::string::npos);
+   Check("the text is recognised as nodes", LooksLikeNodeClipboard(text));
+
+   // Into another patch: only the pasted nodes exist, so nothing can collide by luck.
+   NewPatch();
+   SpawnNode("Noise", "Source", 0.0f, 0.0f);
+   const size_t baseCount = gNodes.size();
+   const size_t undoBefore = gUndoStack.size();
+   const NodePasteResult r = NodeClipboardPaste(text, ImVec2(1000.0f, 1000.0f));
+   Check("paste succeeds", r.ok && r.pasted == 6 && r.skipped == 0);
+   Check("six nodes added", gNodes.size() == baseCount + 6);
+   Check("one undo step", gUndoStack.size() == undoBefore + 1);
+
+   std::set<uint64_t> uids;
+   bool uniqueUids = true;
+   for (const GraphNode& gn : gNodes)
+      uniqueUids = uniqueUids && uids.insert(gn.uid).second;
+   Check("uids are unique", uniqueUids);
+   GraphNode* pShape = nullptr; GraphNode* pBlur = nullptr; GraphNode* pLfo = nullptr;
+   bool hasNote = false, hasGroup = false, hasField = false;
+   for (int idx : r.newIndices)
+      if (GraphNode* gn = FindNodeByIndex(idx))
+      {
+         if (gn->typeName == "Shape") pShape = gn;
+         if (gn->typeName == "gaussianblur") pBlur = gn;
+         if (gn->typeName == "LFO") pLfo = gn;
+         hasField = hasField || gn->typeName == "Field Graph";
+         hasNote = hasNote || gn->typeName == "Comment";
+         hasGroup = hasGroup || gn->typeName == "Group";
+      }
+   Check("comment, group and Field graph nodes came across", hasNote && hasGroup && hasField);
+   Check("pasted nodes got new uids", pShape != nullptr && pShape->uid != shapeUid);
+   if (pShape != nullptr)
+   {
+      std::vector<std::pair<std::string, std::string>> after;
+      Patch::SaveParams(pShape->node.get(), after);
+      Check("params survive", after == before);
+   }
+   bool cabled = false;
+   if (pBlur != nullptr && pShape != nullptr)
+      if (ImageCable* c = CableFor(*pBlur, 0))
+         cabled = c->Resolved() == pShape->node.get();
+   Check("a cable between copied nodes is kept", cabled);
+   bool modKept = false;
+   if (pShape != nullptr && pLfo != nullptr)
+      for (const auto& l : Modulation::Instance().Links())
+         modKept = modKept || (l.first.first == pShape->index && l.second.nodeIndex == pLfo->index);
+   Check("a binding between copied nodes is kept", modKept);
+   Check("an expression is kept", pBlur != nullptr && Modulation::Instance().HasExpression(pBlur->index, 0));
+
+   // The cable into the Output was to an uncopied node: nothing should be wired to it.
+   bool strayCable = false;
+   for (int idx : r.newIndices)
+      if (GraphNode* gn = FindNodeByIndex(idx))
+         if (gn->typeName == "Output")
+            strayCable = true;
+   Check("no uncopied node came along", !strayCable);
+
+   // Refusals leave the patch alone.
+   const size_t nNow = gNodes.size();
+   const std::string newer = "infinite-nodes v" + std::to_string(Patch::FormatVersion() + 1) + "\ninfinite-patch 99\n";
+   const NodePasteResult rn = NodeClipboardPaste(newer, ImVec2(0, 0));
+   Check("a newer format is refused calmly", !rn.ok && !rn.message.empty() && gNodes.size() == nNow);
+   const NodePasteResult rg = NodeClipboardPaste("infinite-nodes v1\nnot a patch", ImVec2(0, 0));
+   Check("garbage after the header is refused", !rg.ok && gNodes.size() == nNow);
+   Check("plain text is not nodes", !LooksLikeNodeClipboard("hello") && !LooksLikeNodeClipboard(""));
+
+   // A node type this build lacks is left out, the rest still pastes.
+   std::string withUnknown = text;
+   const size_t at = withUnknown.find("node ");
+   if (at != std::string::npos)
+      withUnknown += "node 99 Source NoSuchNodeType\n  pos 0 0\n  flags 1 0 0 0\nend\n";
+   const NodePasteResult ru = NodeClipboardPaste(withUnknown, ImVec2(0, 0));
+   Check("an unknown node type is skipped, the rest pastes", ru.ok && ru.skipped == 1 && ru.pasted == 6);
+
+   printf("CLIPBOARDTEST %s\n", ok ? "OK" : "FAIL");
+}
+
 }

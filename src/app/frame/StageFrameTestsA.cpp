@@ -1924,6 +1924,8 @@ void DrawFrameTestsA(FrameCtx& fc)
          RunRpcBatchTest();
       if (getenv("INFINITE_HISTORYTEST") != nullptr && frameId == 4)
          RunHistoryTest();
+      if (getenv("INFINITE_CLIPBOARDTEST") != nullptr && frameId == 4)
+         RunClipboardTest();
 
       if (getenv("INFINITE_PATCHWATCHTEST") != nullptr && frameId == 4) // needs the ImGui context, so in-loop
          RunPatchWatchTest();

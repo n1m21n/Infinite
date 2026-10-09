@@ -227,6 +227,18 @@ void LoadParams(INode* node, const std::vector<std::pair<std::string, std::strin
    node->VisitParams(reader);
 }
 
+int FormatVersion() { return kVersion; }
+
+static void WriteBody(std::ostream& file, const Data& data);
+
+bool WriteText(const Data& data, std::string& out)
+{
+   std::ostringstream stream;
+   WriteBody(stream, data);
+   out = stream.str();
+   return true;
+}
+
 bool Write(const std::string& path, const Data& data, std::string& outError)
 {
    std::ofstream file(path);
@@ -235,7 +247,17 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       outError = "could not open " + path + " for writing";
       return false;
    }
+   WriteBody(file, data);
+   if (!file.good())
+   {
+      outError = "write failed partway through " + path;
+      return false;
+   }
+   return true;
+}
 
+static void WriteBody(std::ostream& file, const Data& data)
+{
    file << kMagic << " " << kVersion << "\n";
    for (const NodeRecord& node : data.nodes)
    {
@@ -475,12 +497,6 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "\n";
    }
 
-   if (!file.good())
-   {
-      outError = "write failed partway through " + path;
-      return false;
-   }
-   return true;
 }
 
 bool Read(const std::string& path, Data& outData, std::string& outError)

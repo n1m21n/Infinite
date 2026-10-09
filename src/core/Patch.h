@@ -486,6 +486,10 @@ namespace Patch
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);
+   // The same text Write puts in a file, held in memory (the node clipboard).
+   bool WriteText(const Data& data, std::string& out);
+   // The format version this build writes and the newest it reads.
+   int FormatVersion();
    bool Read(const std::string& path, Data& outData, std::string& outError);
    // The same parser over patch source held in memory (the live RPC's load_patch_text).
    bool ReadText(const std::string& text, Data& outData, std::string& outError);

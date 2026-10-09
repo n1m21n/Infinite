@@ -1,8 +1,10 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/frame/FrameCtx.h"
+#include "app/graph/NodeClipboard.h"
 
 namespace app
 {
+   static std::string gOwnNodeClipboardText;
 void DrawKeyboard(FrameCtx& fc)
 {
    ImGuiIO& io = ImGui::GetIO();
@@ -748,11 +750,42 @@ void DrawKeyboard(FrameCtx& fc)
                clipboardOrigGroup.push_back(IndexOfGroupNode(GroupOwning(gn->index)));
             }
             CaptureClusterLinks(toCopy, clipboardCluster);
+            // The same selection as text on the system clipboard, so another patch or window can paste it.
+            // gOwnNodeClipboardText lets this process tell its own copy (fast path below) from a foreign one.
+            gOwnNodeClipboardText = NodeClipboardSerialize(toCopy);
+            if (!gOwnNodeClipboardText.empty())
+               ImGui::SetClipboardText(gOwnNodeClipboardText.c_str());
          }
       }
 
-      const bool doPaste = (gRequestPaste || (!typing && !gPerfMatrixFocused && !gArrangeFocused && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false))) && !clipboard.empty();
+      const bool pasteAsked = gRequestPaste || (!typing && !gPerfMatrixFocused && !gArrangeFocused && cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false));
       gRequestPaste = false;
+      // Nodes copied somewhere else (another patch, another window) arrive as text. Our own copy stays on the
+      // in-process path below, which keeps live node state the text does not.
+      bool doPaste = pasteAsked && !clipboard.empty();
+      if (pasteAsked)
+      {
+         const char* sys = ImGui::GetClipboardText();
+         const std::string sysText = sys != nullptr ? sys : "";
+         if (LooksLikeNodeClipboard(sysText) && sysText != gOwnNodeClipboardText)
+         {
+            doPaste = false;
+            const ImVec2 mouse = ImGui::GetMousePos();
+            const bool overGraph = mouse.x >= gGraphScreenTL.x && mouse.y >= gGraphScreenTL.y &&
+                                   mouse.x <= gGraphScreenTL.x + gGraphScreenSize.x &&
+                                   mouse.y <= gGraphScreenTL.y + gGraphScreenSize.y;
+            const ImVec2 at = overGraph ? ed::ScreenToCanvas(mouse) : gViewCenterCanvas;
+            const NodePasteResult r = NodeClipboardPaste(sysText, at);
+            gPatchStatus = r.message;
+            if (r.ok)
+            {
+               ed::ClearSelection();
+               for (int idx : r.newIndices)
+                  if (GraphNode* gn = FindNodeByIndex(idx))
+                     ed::SelectNode(gn->NodeId(), true);
+            }
+         }
+      }
       if (doPaste)
       {
          // Recomputed fresh against the canvas as it stands right now, so a

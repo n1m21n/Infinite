@@ -445,6 +445,7 @@ set(COMMON_SOURCES
     src/app/graph/PatchFiles.cpp
     src/app/graph/PatchIO.cpp
     src/app/graph/PatchLoad.cpp
+    src/app/graph/NodeClipboard.cpp
     src/app/graph/Projector.cpp
     src/app/graph/Rpc.cpp
     src/app/graph/Wiring.cpp
