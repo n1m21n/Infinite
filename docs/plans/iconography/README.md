@@ -38,6 +38,7 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | G1 segmented control | done: `PillGroup` already in Arrange unit toggle and the Library mode switch; no paired toggle buttons left |
 | G11 empty states | partly done 2026-10-09: `EmptyState.h` on mod matrix, Samples, Plugins. Open: Perf panel, Viewport, Arrange (has its own prompt) |
 | A8 tooltips | checked 2026-10-09: all 38 tooltip sites go through ImGui popup styling (PopupBg, `PopupRounding` 12, no border), so they match menus in both themes; help tips gated by Settings via `HelpTip`. Toasts: none exist yet (G22, not started) |
+| G12 node icons | decided and built 2026-10-09: **family icons** (11 categories, not ~73 per-type; per-type waits until a browser/collapsed-node need exists). `art/icons/src/family-*-20.svg`, shown before the category in the node header via `NodeHeader::FamilyGlyph`. Prediction glyph is the weakest; redraw if it reads poorly at 14 px |
 | N1 node header | done 2026-10-09: one row (title Title/Medium, instance number, category dimmed) via `NodeHeader::Category` |
 | N1 frame | 1 px hairline border done |
 | N2 separators | done 2026-10-09: `NodeSeparator` hairline and label use themed Border / TextDisabled (were fixed dark-only palette colours) |

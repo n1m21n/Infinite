@@ -56,5 +56,16 @@
  "grid-dots": 59702,
  "power-fill": 59703,
  "library": 59704,
- "library-fill": 59705
+ "library-fill": 59705,
+ "family-3d": 59706,
+ "family-audio-effects": 59707,
+ "family-compositing": 59708,
+ "family-effects": 59709,
+ "family-macros": 59710,
+ "family-modulators": 59711,
+ "family-notes": 59712,
+ "family-prediction": 59713,
+ "family-source": 59714,
+ "family-synths": 59715,
+ "family-utility": 59716
 }

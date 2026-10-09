@@ -4,7 +4,7 @@
 namespace IconsInfinite
 {
    inline constexpr unsigned kFirst = 0xE900;
-   inline constexpr unsigned kLast = 0xE939;
+   inline constexpr unsigned kLast = 0xE944;
    inline constexpr const char* Arrange = "\xee\xa4\x80"; // U+E900 arrange
    inline constexpr const char* Browser = "\xee\xa4\x81"; // U+E901 browser
    inline constexpr const char* BrowserFill = "\xee\xa4\x82"; // U+E902 browser-fill
@@ -63,4 +63,15 @@ namespace IconsInfinite
    inline constexpr const char* PowerFill = "\xee\xa4\xb7"; // U+E937 power-fill
    inline constexpr const char* Library = "\xee\xa4\xb8"; // U+E938 library
    inline constexpr const char* LibraryFill = "\xee\xa4\xb9"; // U+E939 library-fill
+   inline constexpr const char* Family3d = "\xee\xa4\xba"; // U+E93A family-3d
+   inline constexpr const char* FamilyAudioEffects = "\xee\xa4\xbb"; // U+E93B family-audio-effects
+   inline constexpr const char* FamilyCompositing = "\xee\xa4\xbc"; // U+E93C family-compositing
+   inline constexpr const char* FamilyEffects = "\xee\xa4\xbd"; // U+E93D family-effects
+   inline constexpr const char* FamilyMacros = "\xee\xa4\xbe"; // U+E93E family-macros
+   inline constexpr const char* FamilyModulators = "\xee\xa4\xbf"; // U+E93F family-modulators
+   inline constexpr const char* FamilyNotes = "\xee\xa5\x80"; // U+E940 family-notes
+   inline constexpr const char* FamilyPrediction = "\xee\xa5\x81"; // U+E941 family-prediction
+   inline constexpr const char* FamilySource = "\xee\xa5\x82"; // U+E942 family-source
+   inline constexpr const char* FamilySynths = "\xee\xa5\x83"; // U+E943 family-synths
+   inline constexpr const char* FamilyUtility = "\xee\xa5\x84"; // U+E944 family-utility
 }
