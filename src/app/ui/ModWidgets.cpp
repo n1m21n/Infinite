@@ -2,6 +2,8 @@
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/GlyphToggle.h"
+#include "app/ui/design/components/VFader.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -716,94 +718,16 @@ namespace app
 
       const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      if (isLight)
-      {
-         dl->AddRectFilled(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                           tok::U32(tok::pal::c_D7DAE4FF), 3.0f);
-         dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                     tok::U32(tok::pal::c_BEC3D0FF), 3.0f);
-         if (hasRange)
-            dl->AddRectFilled(ImVec2(cx - 5.0f, std::min(capYLo, capYHi)), ImVec2(cx + 5.0f, std::max(capYLo, capYHi)),
-                              tok::U32(tok::pal::c_FFBE5A6E));
-         if (t > 0.0f)
-            dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
-
-         if (valueToPos == nullptr)
-         {
-            for (int i = 0; i <= 4; i++)
-            {
-               const float y = bottom - (float)i * 0.25f * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), tok::U32(tok::pal::c_AAAFBEFF), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), tok::U32(tok::pal::c_AAAFBEFF), 1.0f);
-            }
-         }
-         else
-         {
-            for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
-            {
-               const float dpos = std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f);
-               const float y = bottom - dpos * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), tok::U32(tok::pal::c_AAAFBEFF), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), tok::U32(tok::pal::c_AAAFBEFF), 1.0f);
-            }
-         }
-         const ImU32 capCol = readOnly ? tok::U32(tok::pal::c_C8CCD6FF) : tok::U32(tok::pal::c_ECF0F8FF);
-         dl->AddRectFilled(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f), capCol, 3.0f);
-         dl->AddRect(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f),
-                     tok::U32(tok::pal::c_B4B9C8FF), 3.0f);
-         dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
-                     readOnly ? tok::U32(tok::pal::c_8C91A0FF) : tok::U32(tok::pal::c_282D3CFF), 1.6f);
-         if (active && !readOnly)
-            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
-                        tok::U32(tok::pal::c_326EDCA0), 4.0f, 0, 2.0f);
-         else if (hovered && !readOnly)
-            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
-                        tok::U32(tok::pal::c_0000001E), 4.0f, 0, 2.0f);
-      }
+      float tickY[ConsoleFaderTaper::kNumDetents > 5 ? ConsoleFaderTaper::kNumDetents : 5];
+      int nTicks = 0;
+      if (valueToPos == nullptr)
+         for (int i = 0; i <= 4; i++)
+            tickY[nTicks++] = bottom - (float)i * 0.25f * (bottom - top);
       else
-      {
-         dl->AddRectFilled(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                           tok::U32(tok::pal::c_0E0F14FF), 3.0f);
-         dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                     tok::U32(tok::pal::c_3A3E4CFF), 3.0f);
-         if (hasRange)
-            dl->AddRectFilled(ImVec2(cx - 5.0f, std::min(capYLo, capYHi)), ImVec2(cx + 5.0f, std::max(capYLo, capYHi)),
-                              tok::U32(tok::pal::c_FFBE5A78));
-         if (t > 0.0f)
-            dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
-
-         if (valueToPos == nullptr)
-         {
-            for (int i = 0; i <= 4; i++)
-            {
-               const float y = bottom - (float)i * 0.25f * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), tok::U32(tok::pal::c_FFFFFF22), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), tok::U32(tok::pal::c_FFFFFF22), 1.0f);
-            }
-         }
-         else
-         {
-            for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
-            {
-               const float dpos = std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f);
-               const float y = bottom - dpos * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), tok::U32(tok::pal::c_FFFFFF22), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), tok::U32(tok::pal::c_FFFFFF22), 1.0f);
-            }
-         }
-         const ImU32 capCol = readOnly ? tok::U32(tok::pal::c_606372FF) : tok::U32(tok::pal::c_484D5EFF);
-         dl->AddRectFilled(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f), capCol, 3.0f);
-         dl->AddRect(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f),
-                     tok::U32(tok::pal::c_121319C8), 3.0f);
-         dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
-                     readOnly ? tok::U32(tok::pal::c_C8CAD4FF) : tok::U32(tok::pal::c_EEF0F8FF), 1.6f);
-         if (active && !readOnly)
-            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
-                        tok::U32(tok::pal::c_6EB4FFB4), 4.0f, 0, 2.0f);
-         else if (hovered && !readOnly)
-            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
-                        tok::U32(tok::pal::c_FFFFFF3C), 4.0f, 0, 2.0f);
-      }
+         for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
+            tickY[nTicks++] = bottom - std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f) * (bottom - top);
+      VFader::Draw(dl, cx, top, bottom, capY, t > 0.0f, fillColor, tickY, nTicks, hasRange, capYLo, capYHi,
+                   hovered, active, readOnly, isLight);
 
       // Caption below, same baseline rule as the knob's.
       const char* caption = label[0] == '#' ? "" : label;
@@ -1824,20 +1748,7 @@ namespace app
    // and an emoji would not render in a non-emoji face.
    bool EyeToggle(bool shown)
    {
-      const float w = 26.0f;
-      const float h = 18.0f;
-      ImVec2 origin = ImGui::GetCursorScreenPos();
-      const bool pressed = ImGui::InvisibleButton("##eye", ImVec2(w, h));
-      const bool hovered = ImGui::IsItemHovered();
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      ImU32 col = hovered ? tok::U32(tok::pal::c_EBF0FFFF)
-                          : (shown ? tok::U32(tok::pal::c_96BEFFFF) : tok::U32(tok::pal::c_787C8CFF));
-
-      glyph::Draw(dl, c, 18.0f, col, shown ? IconsInfinite::Eye : IconsInfinite::EyeOff);
-
-      return pressed;
+      return GlyphToggle::Draw("##eye", IconsInfinite::EyeOff, IconsInfinite::Eye, shown, 26.0f);
    }
 
 
@@ -1847,20 +1758,7 @@ namespace app
    // than overloading the eye icon.
    bool ViewportToggle(bool shown)
    {
-      const float w = 22.0f;
-      const float h = 18.0f;
-      ImVec2 origin = ImGui::GetCursorScreenPos();
-      const bool pressed = ImGui::InvisibleButton("##miniviewport", ImVec2(w, h));
-      const bool hovered = ImGui::IsItemHovered();
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      ImU32 col = hovered ? tok::U32(tok::pal::c_EBF0FFFF)
-                          : (shown ? tok::U32(tok::pal::c_96BEFFFF) : tok::U32(tok::pal::c_787C8CFF));
-
-      glyph::Draw(dl, c, 18.0f, col, shown ? IconsInfinite::ViewportFill : IconsInfinite::Viewport);
-
-      return pressed;
+      return GlyphToggle::Draw("##miniviewport", IconsInfinite::Viewport, IconsInfinite::ViewportFill, shown);
    }
 
 
@@ -1868,18 +1766,8 @@ namespace app
    // rendering a high-precision beamed musical note (♫) symbol.
    bool GlobalScaleToggle(bool enabled)
    {
-      const float w = 22.0f;
-      const float h = 18.0f;
-      ImVec2 origin = ImGui::GetCursorScreenPos();
-      const bool pressed = ImGui::InvisibleButton("##globalscale", ImVec2(w, h));
+      const bool pressed = GlyphToggle::Draw("##globalscale", IconsInfinite::NoteSnap, IconsInfinite::NoteSnapFill, enabled);
       const bool hovered = ImGui::IsItemHovered();
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      ImU32 col = hovered ? tok::U32(tok::pal::c_F5F8FFFF)
-                          : (enabled ? tok::U32(tok::pal::c_B991FFFF) : tok::U32(tok::pal::c_787C8CFF));
-
-      glyph::Draw(dl, c, 18.0f, col, enabled ? IconsInfinite::NoteSnapFill : IconsInfinite::NoteSnap);
 
       if (hovered)
       {
@@ -1919,29 +1807,7 @@ namespace app
    // rendering an IEC 60417-5009 power symbol.
    bool BypassToggle(bool bypassed)
    {
-      const float w = 22.0f;
-      const float h = 18.0f;
-      ImVec2 origin = ImGui::GetCursorScreenPos();
-      const bool pressed = ImGui::InvisibleButton("##bypass", ImVec2(w, h));
-      const bool hovered = ImGui::IsItemHovered();
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      // Lit disc when the node is live, dim ring when bypassed (FabFilter-style lit button).
-      if (!bypassed)
-      {
-         ImVec4 a = app::AccentEmphasisSelected();
-         if (hovered) a = app::AccentEmphasisHover();
-         dl->AddCircleFilled(glyph::SnappedCentre(c, 18.0f), 6.6f, ImGui::GetColorU32(a), 32);
-         glyph::Draw(dl, c, 18.0f, tok::U32(tok::pal::c_FFFFFFFF), IconsInfinite::PowerFill);
-      }
-      else
-      {
-         const ImU32 col = hovered ? tok::U32(tok::pal::c_EBF0FFFF) : tok::U32(tok::pal::c_787C8CFF);
-         glyph::Draw(dl, c, 18.0f, col, IconsInfinite::Power);
-      }
-
-      return pressed;
+      return GlyphToggle::Draw("##bypass", IconsInfinite::Power, IconsInfinite::PowerFill, !bypassed, 22.0f, true);
    }
 
 

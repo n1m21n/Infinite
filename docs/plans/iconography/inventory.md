@@ -9,7 +9,7 @@ Counts are call sites, not on-screen instances. Test/bench files are excluded.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Icon (Tabler, drawn) | · | · | · | · | · | · | · | · | · | · | · | · | · | **0** |
 | Icon (font glyph) | · | · | · | · | · | · | · | · | · | · | · | · | · | **0** |
-| Button | 2 | 9 | 6 | 6 | 13 | · | 1 | 49 | 4 | · | 14 | · | · | **104** |
+| Button | 2 | 5 | 6 | 6 | 13 | · | 1 | 49 | 4 | · | 14 | · | · | **100** |
 | Toggle (bypass/eye/viewport/scale) | · | 4 | · | · | · | · | 5 | · | · | · | · | · | 1 | **10** |
 | Checkbox | · | 2 | · | · | · | · | 1 | 113 | 1 | · | · | · | · | **117** |
 | Dropdown | 1 | · | 1 | 2 | 2 | 1 | · | 133 | 1 | · | · | 13 | · | **154** |
@@ -27,7 +27,7 @@ Counts are call sites, not on-screen instances. Test/bench files are excluded.
 | Drag and drop | · | · | 3 | · | 4 | · | · | · | · | · | · | · | · | **7** |
 | Mod dot / pin | · | 3 | · | · | · | · | 6 | 4 | 2 | · | · | · | · | **15** |
 | Separator | 10 | 3 | 8 | 1 | 13 | · | 1 | 62 | · | 23 | 7 | 2 | · | **130** |
-| Hand-drawn shape | · | 72 | 38 | 6 | 78 | 1 | 12 | 492 | 8 | 4 | · | 2 | · | **713** |
+| Hand-drawn shape | · | 45 | 38 | 6 | 78 | 1 | 12 | 492 | 8 | 4 | · | 2 | · | **686** |
 | Hand-drawn text | · | 7 | 6 | 4 | 9 | 1 | 7 | 85 | 1 | 1 | · | · | · | **121** |
 | Literal colour | · | 2 | 2 | · | 9 | · | 2 | 57 | 1 | · | · | · | · | **73** |
 | Close / cross control | · | · | · | · | · | · | · | · | · | · | · | · | · | **0** |
