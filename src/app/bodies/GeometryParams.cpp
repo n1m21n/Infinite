@@ -435,7 +435,7 @@ namespace app
       ModSlider("wind x", &n->windX, -20.0f, 20.0f);
       ModSlider("wind y", &n->windY, -20.0f, 20.0f);
       ModSlider("wind z", &n->windZ, -20.0f, 20.0f);
-      ModSlider("wind turbulence", &n->windTurbulence, 0.0f, 20.0f);
+      ModSlider("turbulence", &n->windTurbulence, 0.0f, 20.0f);
 
       NodeSeparator("ground");
       ModCheckbox("collide with ground", &n->groundEnabled);
