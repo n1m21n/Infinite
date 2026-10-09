@@ -1107,7 +1107,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // crash marker/autosave left by the real app - see UsingAutosaveTestPaths
    // for the two tests that deliberately exercise this function directly
    // against their own redirected files instead.
-   if (getenv("INFINITE_EXITAFTER") == nullptr && !HeadlessJobActive())
+   if (!IsHeadlessProcess())   // also screenshot runs (IMAGERESYNTH_SCREENSHOT), which have no EXITAFTER
       CheckAutosaveRecovery();
 
    // Embedded local control server (see docs/plans - RemoteControl) - lets an

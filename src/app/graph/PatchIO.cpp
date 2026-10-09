@@ -558,7 +558,8 @@ namespace app
 
    void PollAutosave()
    {
-      if (!gAutosaveEnabled || gNodes.empty())
+      // A harness or screenshot run must never overwrite the real user's crash-recovery file.
+      if (!gAutosaveEnabled || gNodes.empty() || (IsHeadlessProcess() && !UsingAutosaveTestPaths()))
          return;
       const double now = glfwGetTime();
       if (gLastAutosaveTime > 0.0 && now - gLastAutosaveTime < (double)gAutosaveSeconds)
