@@ -856,6 +856,46 @@ add_executable(field-preset-check
 )
 target_include_directories(field-preset-check PRIVATE src src/core)
 
+# Headless checks for the Sketch engine (docs/plans/sketch/README.md exit criteria
+# that need no window): compile, params, determinism, abort, memory, errors.
+add_executable(sketch-check src/core/sketch/SketchCheck.cpp src/core/sketch/SketchEngine.cpp)
+target_include_directories(sketch-check PRIVATE src/core/sketch)
+target_link_libraries(sketch-check PRIVATE sketch_deps)
+
+# Sketch node dependencies (docs/plans/sketch/README.md): quickjs-ng (JS engine,
+# no quickjs-libc so a patch cannot reach files or network) and plutovg (CPU
+# Canvas-2D rasteriser, same pixels on all three OSes). Vendored as plain
+# source, built as one static C library; see each VENDORED_COMMIT.txt.
+add_library(sketch_deps STATIC
+    external/quickjs-ng/quickjs.c
+    external/quickjs-ng/libregexp.c
+    external/quickjs-ng/libunicode.c
+    external/quickjs-ng/dtoa.c
+    external/plutovg/source/plutovg-blend.c
+    external/plutovg/source/plutovg-canvas.c
+    external/plutovg/source/plutovg-font.c
+    external/plutovg/source/plutovg-matrix.c
+    external/plutovg/source/plutovg-paint.c
+    external/plutovg/source/plutovg-path.c
+    external/plutovg/source/plutovg-rasterize.c
+    external/plutovg/source/plutovg-surface.c
+    external/plutovg/source/plutovg-ft-math.c
+    external/plutovg/source/plutovg-ft-raster.c
+    external/plutovg/source/plutovg-ft-stroker.c
+)
+set_target_properties(sketch_deps PROPERTIES C_STANDARD 11 C_EXTENSIONS ON POSITION_INDEPENDENT_CODE ON)
+target_include_directories(sketch_deps PUBLIC external/quickjs-ng external/plutovg/include)
+target_compile_definitions(sketch_deps PRIVATE PLUTOVG_BUILD PLUTOVG_BUILD_STATIC _GNU_SOURCE)
+target_compile_definitions(sketch_deps PUBLIC PLUTOVG_BUILD_STATIC)
+if(MSVC)
+    target_compile_options(sketch_deps PRIVATE /w)
+else()
+    target_compile_options(sketch_deps PRIVATE -w)
+endif()
+if(NOT WIN32)
+    target_link_libraries(sketch_deps PUBLIC m)
+endif()
+
 add_executable(Infinite ${COMMON_SOURCES})
 
 # Exposes INFINITE_VERSION to C++ as a string literal (UpdateCheck.cpp,
@@ -908,7 +948,7 @@ target_include_directories(Infinite PRIVATE
     src/platform/ndi
 )
 
-target_link_libraries(Infinite PRIVATE glfw)
+target_link_libraries(Infinite PRIVATE glfw sketch_deps)
 
 if(WIN32)
     # SpoutGL's own headers (Spout.h chain) plus sse2neon.h, which its
