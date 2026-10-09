@@ -292,21 +292,10 @@ namespace app
                          bool vividState)
    {
       const bool isLight = IsThemeLight();
-      if (isLight)
-      {
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_880_890_920_1000));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_830_850_890_1000));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_780_810_860_1000));
-      }
-      else
-      {
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_55_60_80_1000));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_85_92_118_1000));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_100_108_138_1000));
-      }
+      // The same recessed well as every other field (FieldWell): tint, hover, border and rounding come from there.
+      FieldWell::PushStyle(ImGui::GetID(label));
       ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_0_0_0_0));
       ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_0_0_0_0));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
       auto ValueToPos01 = [&](float v) -> float
       {
@@ -342,8 +331,8 @@ namespace app
                                       readOnly ? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None);
          pos01 = ValueToPos01(*value);
       }
-      ImGui::PopStyleVar();
-      ImGui::PopStyleColor(5);
+      ImGui::PopStyleColor(2);
+      FieldWell::PopStyle();
 
       const ImVec2 r0 = ImGui::GetItemRectMin();
       const ImVec2 r1 = ImGui::GetItemRectMax();
@@ -361,7 +350,9 @@ namespace app
          // the same RGB read as a different, washed-out color next to it.
          const ImU32 alpha = vividState ? (isLight ? 225 : 205) : (isLight ? 110 : 86);
          const ImU32 soft = (fillColor & 0x00FFFFFF) | (alpha << 24);
-         dl->AddRectFilled(r0, ImVec2(fillX, r1.y), soft, 4.0f);
+         dl->PushClipRect(r0, ImVec2(fillX, r1.y), true);
+         dl->AddRectFilled(r0, r1, soft, tok::radius_tile);
+         dl->PopClipRect();
       }
 
       std::string name(label);
