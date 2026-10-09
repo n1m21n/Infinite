@@ -2054,6 +2054,8 @@ void PushPrimaryButtonStyle();
 void PopPrimaryButtonStyle();
 
 void PushDropdownStyle();
+// Closed face of a node dropdown (field well + value + chevron); returns true when clicked.
+bool NodeDropdownField(const char* caption, ImVec2 size);
 
 void PopDropdownStyle();
 
@@ -2079,7 +2081,7 @@ void DropdownButton(const char* label, const std::vector<std::string>& options,
                        bool showCaption);
 
 void PushCheckboxStyle();
-bool NodeCheckbox(const char* label, bool* value);
+bool NodeCheckbox(const char* label, bool* value, bool modulated = false);
 
 void PopCheckboxStyle();
 
@@ -3061,7 +3063,7 @@ void EndAudioSection();
             ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                                 : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
-            ActionButton::Draw(caption.c_str(), ImVec2(btnW, 0));
+            NodeDropdownField(caption.c_str(), ImVec2(btnW, 0));
             ImGui::EndDisabled();
             ImGui::PopStyleColor();
             DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3070,7 +3072,7 @@ void EndAudioSection();
          }
          else
          {
-            if (ActionButton::Draw(caption.c_str(), ImVec2(btnW, 0)) ||
+            if (NodeDropdownField(caption.c_str(), ImVec2(btnW, 0)) ||
                 DropdownTestWantsOpen(h.registered, h.nodeIndex, h.paramIndex))
             {
                gDropdown.options = options;
@@ -3157,7 +3159,7 @@ void EndAudioSection();
                   ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                                       : tok::V4(tok::palf::v_1000_750_350_1000));
                   ImGui::BeginDisabled();
-                  ActionButton::Draw(caption.c_str(), ImVec2(btnW, 0));
+                  NodeDropdownField(caption.c_str(), ImVec2(btnW, 0));
                   ImGui::EndDisabled();
                   ImGui::PopStyleColor();
                   DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3166,7 +3168,7 @@ void EndAudioSection();
                }
                else
                {
-                  if (ActionButton::Draw(caption.c_str(), ImVec2(btnW, 0)))
+                  if (NodeDropdownField(caption.c_str(), ImVec2(btnW, 0)))
                   {
                      gDropdown.options = options;
                      gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind
@@ -3252,7 +3254,7 @@ void EndAudioSection();
             ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000)
                                                                      : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
-            NodeCheckbox(label, &shown);
+            NodeCheckbox(label, &shown, true);
             ImGui::EndDisabled();
             ImGui::PopStyleColor();
             DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,

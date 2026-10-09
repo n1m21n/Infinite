@@ -11,7 +11,8 @@ namespace CheckBox
    constexpr float kSize = 16.0f;
 
    // Box at `p`; `onv` and `hv` are the eased on / hover values in 0..1.
-   inline void Draw(ImDrawList* dl, ImVec2 p, float onv, float hv)
+   // `tint` (optional) replaces the accent fill, e.g. the amber of a modulated box.
+   inline void Draw(ImDrawList* dl, ImVec2 p, float onv, float hv, const ImVec4* tint = nullptr)
    {
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImVec2 q(p.x + kSize, p.y + kSize);
@@ -20,7 +21,7 @@ namespace CheckBox
                   tok::radius_field);
       if (onv <= 0.001f)
          return;
-      ImVec4 a = app::AccentEmphasisSelected();
+      ImVec4 a = tint ? *tint : app::AccentEmphasisSelected();
       a.w *= onv;
       dl->AddRectFilled(p, q, ImGui::GetColorU32(a), tok::radius_field);
       // Tick: two strokes, drawn along their length by `onv`.

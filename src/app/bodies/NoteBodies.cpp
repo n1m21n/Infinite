@@ -94,7 +94,7 @@ namespace app
          PushDropdownStyle();
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + 4.0f, ImGui::GetCursorScreenPos().y));
          const std::string caption = options[currentIdx] + "##audioin_input";
-         if (ActionButton::Draw(caption.c_str(), ImVec2(gAudioContentW - 8.0f, 0)))
+         if (NodeDropdownField(caption.c_str(), ImVec2(gAudioContentW - 8.0f, 0)))
          {
             gDropdown.options = options;
             gDropdown.categories = categories;

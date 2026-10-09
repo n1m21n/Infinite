@@ -59,7 +59,7 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000)
                                                                   : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         NodeCheckbox(label, &shown);
+         NodeCheckbox(label, &shown, true);
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,

@@ -1,6 +1,8 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/CheckBox.h"
+#include "app/ui/design/components/DropdownField.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/AppShared.h"
@@ -580,6 +582,12 @@ namespace app
    }
 
 
+   bool NodeDropdownField(const char* caption, ImVec2 size)
+   {
+      return DropdownField::Draw(caption, size);
+   }
+
+
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
                        bool showCaption)
@@ -627,7 +635,7 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                              : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         ActionButton::Draw(caption.c_str(), ImVec2(width, 0));
+         NodeDropdownField(caption.c_str(), ImVec2(width, 0));
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          // BeginDisabled swallows hover, so ask the rect directly - otherwise
@@ -636,7 +644,7 @@ namespace app
                                    ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
                                                               ImGui::GetItemRectMax()));
       }
-      else if (ActionButton::Draw(caption.c_str(), ImVec2(width, 0)))
+      else if (NodeDropdownField(caption.c_str(), ImVec2(width, 0)))
       {
          gDropdown.options = options;
          gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind
@@ -681,48 +689,35 @@ namespace app
    }
 
 
-   // The node checkbox: ImGui draws the box, we draw the tick (rounded stroke that draws on in 120 ms).
-   // Call between PushCheckboxStyle/PopCheckboxStyle; returns what ImGui::Checkbox returns.
-   bool NodeCheckbox(const char* label, bool* value)
+   // The node checkbox: the design-system box (CheckBox::Draw: rounded field-well tint, accent fill, self-drawing
+   // tick) with ImGui::Checkbox's footprint (frame-height square, inner spacing, label), so rows keep their grid.
+   // `modulated` swaps the accent for the modulation amber. Returns true when a click flipped the value.
+   bool NodeCheckbox(const char* label, bool* value, bool modulated)
    {
-      const ImVec4 markCol = ImGui::GetStyleColorVec4(ImGuiCol_CheckMark);
-      ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(markCol.x, markCol.y, markCol.z, 0.0f));
-      const bool changed = ImGui::Checkbox(label, value);
-      ImGui::PopStyleColor();
-
-      const ImVec2 mn = ImGui::GetItemRectMin();
+      const ImGuiStyle& st = ImGui::GetStyle();
       const float box = ImGui::GetFrameHeight();
-      const float p = UiAnim::Value(ImGui::GetItemID(), *value ? 1.0f : 0.0f, 120.0f);
-      if (p > 0.001f)
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float textW = ImGui::CalcTextSize(label, nullptr, true).x;
+      const bool clicked = ImGui::InvisibleButton(label, ImVec2(box + (textW > 0.0f ? st.ItemInnerSpacing.x + textW : 0.0f), box));
+      const bool hovered = ImGui::IsItemHovered();
+      const ImGuiID iid = ImGui::GetItemID();
+      if (clicked)
+         *value = !*value;
+      const float hv = UiAnim::Hover(iid, hovered, tok::motion_hover_in, tok::motion_hover_out);
+      const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, *value, tok::motion_on, tok::motion_off);
+      const ImVec4 amber = IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000) : tok::V4(tok::palf::v_1000_750_350_1000);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 bp(p.x + (box - CheckBox::kSize) * 0.5f, p.y + (box - CheckBox::kSize) * 0.5f);
+      CheckBox::Draw(dl, bp, onv, hv, modulated ? &amber : nullptr);
+      if (textW > 0.0f)
       {
-         const ImVec2 a(mn.x + box * 0.27f, mn.y + box * 0.52f);
-         const ImVec2 b(mn.x + box * 0.43f, mn.y + box * 0.68f);
-         const ImVec2 c(mn.x + box * 0.74f, mn.y + box * 0.33f);
-         const float l1 = std::hypot(b.x - a.x, b.y - a.y), l2 = std::hypot(c.x - b.x, c.y - b.y);
-         float d = p * (l1 + l2);
-         ImVec2 tip = b;
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImU32 col = ImGui::GetColorU32(markCol);
-         const float th = 2.0f;
-         dl->PathLineTo(a);
-         if (d <= l1)
-         {
-            tip = ImVec2(a.x + (b.x - a.x) * d / l1, a.y + (b.y - a.y) * d / l1);
-            dl->PathLineTo(tip);
-         }
-         else
-         {
-            d -= l1;
-            tip = ImVec2(b.x + (c.x - b.x) * d / l2, b.y + (c.y - b.y) * d / l2);
-            dl->PathLineTo(b);
-            dl->PathLineTo(tip);
-         }
-         dl->PathStroke(col, ImDrawFlags_None, th);
-         dl->AddCircleFilled(a, th * 0.5f, col, 8);
-         dl->AddCircleFilled(tip, th * 0.5f, col, 8);
-         dl->AddCircleFilled(b, th * 0.5f, col, 8);
+         const char* end = ImGui::FindRenderedTextEnd(label);
+         dl->AddText(ImVec2(p.x + box + st.ItemInnerSpacing.x, p.y + st.FramePadding.y), ImGui::GetColorU32(ImGuiCol_Text), label, end);
       }
-      return changed;
+      if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible)
+         dl->AddRect(ImVec2(bp.x - 2, bp.y - 2), ImVec2(bp.x + CheckBox::kSize + 2, bp.y + CheckBox::kSize + 2),
+                     ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_field + 2.0f, 0, 1.5f);
+      return clicked;
    }
 
 
