@@ -87,10 +87,10 @@ extern float gViewportPanelHeight;
    // 8-segment ones (radio selector, step gate) that genuinely need it, and
    // one row height every flat control shares so a toggle, a number box, a
    // selector and a step grid all read as the same family.
-   inline const float kMacroCell = 112.0f;
+   inline const float kMacroCell = 184.0f;
 
 
-   inline const float kMacroWideCell = 176.0f;
+   inline const float kMacroWideCell = 200.0f;
 
 
    inline const float kMacroRowH = 26.0f;

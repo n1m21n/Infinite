@@ -565,9 +565,20 @@ void DrawNodeBodies(FrameCtx& fc)
                if (offset > 0.0f)
                   ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
             }
-            if (EyeToggle(gn.showParams))
-               gn.showParams = !gn.showParams;
-            ImGui::SameLine();
+            // Name-only macros have nothing behind the eye, so the
+            // toggle is dropped and bypass is the row's first control.
+            const bool isMacroNode =
+               dynamic_cast<MacroKnobNode*>(gn.node.get()) || dynamic_cast<MacroSliderNode*>(gn.node.get()) ||
+               dynamic_cast<MacroBipolarKnobNode*>(gn.node.get()) || dynamic_cast<MacroTriggerNode*>(gn.node.get()) ||
+               dynamic_cast<MacroNumBoxNode*>(gn.node.get());
+            if (isMacroNode)
+               gn.showParams = false;
+            else
+            {
+               if (EyeToggle(gn.showParams))
+                  gn.showParams = !gn.showParams;
+               ImGui::SameLine();
+            }
             if (!CanBypass(gn))
             {
                // Same footprint as BypassToggle, so the toggles to its right
