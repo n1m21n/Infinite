@@ -2081,19 +2081,19 @@ namespace app
    {
       if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
       {
-         if (ImGui::MenuItem(L("Listening... (click or Esc to cancel)")))
+         if (MenuParts::Item(L("Listening... (click or Esc to cancel)")))
             MidiLearnCancelAll();
          return;
       }
       if (!ParamMidiLearnable(nodeIndex, paramIndex))
       {
          ImGui::BeginDisabled();
-         ImGui::MenuItem(L("MIDI learn (already driven by something else)"));
+         MenuParts::Item(L("MIDI learn (already driven by something else)"));
          ImGui::EndDisabled();
          return;
       }
       const Modulation::Source cur = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
-      if (ImGui::MenuItem(cur.nodeIndex >= 0 ? "Re-learn MIDI" : "MIDI learn"))
+      if (MenuParts::Item(cur.nodeIndex >= 0 ? "Re-learn MIDI" : "MIDI learn"))
          StartParamMidiLearn(nodeIndex, paramIndex);
    }
 

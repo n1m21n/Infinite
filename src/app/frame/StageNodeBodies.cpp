@@ -1014,7 +1014,7 @@ void DrawNodeBodies(FrameCtx& fc)
                ImGui::SetNextItemWidth(kParamWidth);
                ImGui::SliderInt(L("fps"), &n->recordFps, 1, 60);
 
-               ImGui::Checkbox(L("include audio"), &n->includeAudio);
+               ModCheckbox(L("include audio"), &n->includeAudio);
                ImGui::EndDisabled();
                if (n->IsRecording() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                   ImGui::SetTooltip("%s", T("locked for the current take"));

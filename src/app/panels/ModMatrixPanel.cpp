@@ -485,12 +485,12 @@ namespace app
 
                // Source
                NextCell();
-               if (ImGui::Selectable(NodeTitleWithInstance(*srcNode).c_str(), false))
+               if (MenuParts::Choice(NodeTitleWithInstance(*srcNode).c_str(), false))
                   gPendingSelect.push_back(srcNode->NodeId());
 
                // Destination
                NextCell();
-               if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
+               if (MenuParts::Choice(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                // Parameter
@@ -683,7 +683,7 @@ namespace app
                ImGui::TextUnformatted("Expression");
 
                NextCell();
-               if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
+               if (MenuParts::Choice(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
@@ -813,7 +813,7 @@ namespace app
                ImGui::TextUnformatted("Recording");
 
                NextCell();
-               if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
+               if (MenuParts::Choice(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                const ParamRef* known = mod.KnownParam(dstIndex, dstParam);

@@ -17,10 +17,10 @@ Counts are call sites, not on-screen instances. Test/bench files are excluded.
 | Slider / fader / drag | · | 14 | 2 | · | 2 | · | 2 | 609 | 3 | 1 | · | 9 | · | **642** |
 | Text / number field | 1 | 4 | 2 | · | 15 | · | 6 | 11 | · | 3 | 7 | 2 | · | **51** |
 | Colour swatch / picker | · | 1 | 1 | · | 3 | · | 1 | 44 | · | 1 | · | · | · | **51** |
-| List row / tree | · | 4 | · | · | 2 | 4 | · | 2 | · | · | · | 8 | · | **20** |
+| List row / tree | · | · | · | · | 2 | 4 | · | 2 | · | · | · | 8 | · | **16** |
 | Table | · | 1 | · | · | · | · | · | · | · | · | · | 7 | · | **8** |
 | Tabs | · | · | · | · | · | · | · | · | · | · | · | 7 | · | **7** |
-| Menu / menu item | · | · | 3 | · | · | · | · | · | · | · | · | · | · | **3** |
+| Menu / menu item | · | · | · | · | · | · | · | · | · | · | · | · | · | **0** |
 | Popup / context menu | 5 | 2 | 2 | 2 | 30 | · | 4 | · | · | 18 | · | 2 | 3 | **68** |
 | Tooltip | 7 | 1 | 4 | · | 18 | 2 | 4 | 1 | 3 | 3 | 3 | 10 | 1 | **57** |
 | Mouse cursor | 1 | 1 | 1 | 1 | 21 | · | · | 15 | · | 2 | 1 | · | · | **43** |
