@@ -1,5 +1,6 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -747,7 +748,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(cellPos.x + 4.0f, cellPos.y + 1.0f));
          ImGui::SetNextItemWidth(cardSize.x - 8.0f);
          ImGui::SetKeyboardFocusHere();
-         if (ImGui::InputText("##renamingelemfield", gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer),
+         if (FieldWell::InputText("##renamingelemfield", gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer),
                               ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
          {
             PushUndoCheckpoint();
@@ -2214,7 +2215,7 @@ namespace app
          {
             ImGui::SetNextItemWidth(90.0f);
             ImGui::SetKeyboardFocusHere();
-            if (ImGui::InputText("##renamingpagetab", gPerfRenamePageBuffer, sizeof(gPerfRenamePageBuffer),
+            if (FieldWell::InputText("##renamingpagetab", gPerfRenamePageBuffer, sizeof(gPerfRenamePageBuffer),
                                  ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
             {
                PushUndoCheckpoint();

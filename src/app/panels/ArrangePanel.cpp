@@ -582,7 +582,7 @@ namespace app
                      char buf[48];
                      snprintf(buf, sizeof(buf), "%s", ArrangeFormatPos(t).c_str());
                      ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
-                     if (ImGui::InputText(id, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
+                     if (FieldWell::InputText(id, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
                      {
                         const Arrange::Tick parsed = ArrangeParsePos(buf);
                         if (parsed >= 0)
@@ -631,20 +631,20 @@ namespace app
                   }
                   SectionCard::RowLabel("");
                   ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
-                  if (ImGui::InputInt("##arrResW", &rset.renderWidth, 0, 0))
+                  if (FieldWell::InputInt("##arrResW", &rset.renderWidth, 0, 0))
                      gPatchDirty = true;
                   ImGui::SameLine(0.0f, tok::space_1);
                   ImGui::TextDisabled("%s", T("x"));
                   ImGui::SameLine(0.0f, tok::space_1);
                   ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
-                  if (ImGui::InputInt("##arrResH", &rset.renderHeight, 0, 0))
+                  if (FieldWell::InputInt("##arrResH", &rset.renderHeight, 0, 0))
                      gPatchDirty = true;
                   rset.renderWidth = std::clamp(rset.renderWidth, 16, 7680);
                   rset.renderHeight = std::clamp(rset.renderHeight, 16, 4320);
 
                   SectionCard::RowLabel(T("Rate"));
                   ImGui::SetNextItemWidth(fieldW);
-                  if (ImGui::InputInt("##arrRenderFps", &rset.renderFps, 0, 0))
+                  if (FieldWell::InputInt("##arrRenderFps", &rset.renderFps, 0, 0))
                      gPatchDirty = true;
                   rset.renderFps = std::clamp(rset.renderFps, 1, 240);
                }
@@ -655,7 +655,7 @@ namespace app
                char renderNameBuf[256];
                snprintf(renderNameBuf, sizeof(renderNameBuf), "%s", sArrangeRenderFileName.c_str());
                ImGui::SetNextItemWidth(fieldW - 36.0f);
-               if (ImGui::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
+               if (FieldWell::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
                   sArrangeRenderFileName = renderNameBuf;
                ImGui::SameLine(0.0f, tok::space_1);
                ImGui::TextDisabled("%s", renderExtension());
@@ -664,7 +664,7 @@ namespace app
                snprintf(renderFolderBuf, sizeof(renderFolderBuf), "%s", rset.renderFolder.c_str());
                SectionCard::RowLabel(T("Folder"));
                ImGui::SetNextItemWidth(fieldW);
-               if (ImGui::InputText("##arrangeRenderFolder", renderFolderBuf, sizeof(renderFolderBuf)))
+               if (FieldWell::InputText("##arrangeRenderFolder", renderFolderBuf, sizeof(renderFolderBuf)))
                {
                   rset.renderFolder = renderFolderBuf;
                   gPatchDirty = true;
@@ -1633,7 +1633,7 @@ namespace app
                   ImGui::SetKeyboardFocusHere();
                   sMarkerRenameFocusedId = mk.id;
                }
-               const bool commit = ImGui::InputText("##renamingmarker", gArrangeRenameMarkerBuffer,
+               const bool commit = FieldWell::InputText("##renamingmarker", gArrangeRenameMarkerBuffer,
                                                     sizeof(gArrangeRenameMarkerBuffer),
                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
                if (commit || ImGui::IsItemDeactivated())
@@ -3257,7 +3257,7 @@ namespace app
                   ImGui::SetKeyboardFocusHere();
                   sArrangeRenameFocusedId = clip.id;
                }
-               const bool commit = ImGui::InputText("##renamingclipfield", gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer),
+               const bool commit = FieldWell::InputText("##renamingclipfield", gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer),
                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
                if (commit || ImGui::IsItemDeactivated())
                {

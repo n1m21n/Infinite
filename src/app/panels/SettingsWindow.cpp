@@ -1,5 +1,6 @@
 // Settings window (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -1079,7 +1080,7 @@ namespace app
                snprintf(nameBuf, sizeof(nameBuf), "%s", g.name.c_str());
                ImGui::SetNextItemWidth(130.0f);
                FieldWell::PushStyle();
-               const bool nameEdited = ImGui::InputText("##name", nameBuf, sizeof(nameBuf));
+               const bool nameEdited = FieldWell::InputText("##name", nameBuf, sizeof(nameBuf));
                FieldWell::PopStyle();
                if (nameEdited)
                {
@@ -1097,7 +1098,7 @@ namespace app
                snprintf(exprBuf, sizeof(exprBuf), "%s", g.expr.c_str());
                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 150.0f);
                FieldWell::PushStyle();
-               const bool exprEdited = ImGui::InputText("##expr", exprBuf, sizeof(exprBuf));
+               const bool exprEdited = FieldWell::InputText("##expr", exprBuf, sizeof(exprBuf));
                FieldWell::PopStyle();
                if (exprEdited)
                {

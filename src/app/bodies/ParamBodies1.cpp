@@ -1,5 +1,6 @@
 // Generic node parameter bodies, part 1 (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -106,7 +107,7 @@ namespace app
       return;
 #else
       ImGui::SetNextItemWidth(kPreviewSize);
-      if (ImGui::InputText("##syphon_name", &n->serverNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
+      if (FieldWell::InputText("##syphon_name", &n->serverNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
       {
          n->SetServerName(n->serverNameInput);
       }
@@ -204,7 +205,7 @@ namespace app
       ImGui::PopTextWrapPos();
 
       ImGui::SetNextItemWidth(kPreviewSize);
-      if (ImGui::InputText("##ndi_name", &n->sourceNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
+      if (FieldWell::InputText("##ndi_name", &n->sourceNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
          n->SetSourceName(n->sourceNameInput);
       if (ImGui::IsItemDeactivatedAfterEdit())
          n->SetSourceName(n->sourceNameInput);
@@ -271,7 +272,7 @@ namespace app
    {
       ModSliderInt("port", &n->port, 1, 65535);
       ImGui::SetNextItemWidth(kParamWidth);
-      ImGui::InputText("address", &n->address);
+      FieldWell::InputText("address", &n->address);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
    }
@@ -280,10 +281,10 @@ namespace app
    void DrawOscSendParams(OscSendNode* n)
    {
       ImGui::SetNextItemWidth(kParamWidth);
-      ImGui::InputText("host", &n->host);
+      FieldWell::InputText("host", &n->host);
       ModSliderInt("port", &n->port, 1, 65535);
       ImGui::SetNextItemWidth(kParamWidth);
-      ImGui::InputText("address", &n->address);
+      FieldWell::InputText("address", &n->address);
       ModSlider("epsilon", &n->epsilon, 0.0f, 0.1f, "%.4f");
       ModSlider("interval (ms)", &n->intervalMs, 1.0f, 1000.0f, "%.0f");
       if (n->LastSent() < 0.0f)
@@ -401,7 +402,7 @@ namespace app
       char buf[512];
       snprintf(buf, sizeof(buf), "%s", n->text.c_str());
       ImGui::SetNextItemWidth(kParamWidth);
-      if (ImGui::InputText("text", buf, sizeof(buf)))
+      if (FieldWell::InputText("text", buf, sizeof(buf)))
          n->text = buf;
 
       const std::vector<std::string>& fonts = TextNode::AvailableFonts();
@@ -1421,7 +1422,7 @@ namespace app
       char buf[64];
       snprintf(buf, sizeof(buf), "%s", label.c_str());
       ImGui::SetNextItemWidth(cellW);
-      if (ImGui::InputTextWithHint("##macroname", "name", buf, sizeof(buf)))
+      if (FieldWell::InputTextWithHint("##macroname", "name", buf, sizeof(buf)))
          label = buf;
    }
 

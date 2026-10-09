@@ -1,5 +1,6 @@
 // Comment, group, draw and preview node bodies (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -478,7 +479,7 @@ namespace app
          }
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0.35f));
          ImGui::SetNextItemWidth(std::max(60.0f, n->width - 40.0f));
-         if (ImGui::InputText("##grouprename", &n->label, ImGuiInputTextFlags_EnterReturnsTrue) ||
+         if (FieldWell::InputText("##grouprename", &n->label, ImGuiInputTextFlags_EnterReturnsTrue) ||
              ImGui::IsItemDeactivated())
             n->renaming = false;
          ImGui::PopStyleColor();

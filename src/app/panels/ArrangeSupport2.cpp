@@ -215,7 +215,7 @@ namespace app
       }
       char buf[128];
       snprintf(buf, sizeof(buf), "%s", gArrangeTypedEdit.text.c_str());
-      const bool entered = ImGui::InputText(strId, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
+      const bool entered = FieldWell::InputText(strId, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
       gArrangeTypedEdit.text = buf;
       // Selection is driven explicitly rather than by a flag, for the reason
       // spelled out at the canvas equivalent: focus arrives through

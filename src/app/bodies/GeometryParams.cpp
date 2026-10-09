@@ -1,5 +1,6 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
 #include "app/ui/design/components/PinDot.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -757,7 +758,7 @@ namespace app
       char buf[256];
       snprintf(buf, sizeof(buf), "%s", n->text.c_str());
       ImGui::SetNextItemWidth(kParamWidth);
-      if (ImGui::InputText("text", buf, sizeof(buf)))
+      if (FieldWell::InputText("text", buf, sizeof(buf)))
          n->text = buf;
 
       {

@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/NodeHeader.h"
 #include "app/frame/FrameCtx.h"
@@ -902,7 +903,7 @@ void DrawNodeBodies(FrameCtx& fc)
                char imgBuf[512];
                snprintf(imgBuf, sizeof(imgBuf), "%s", n->exportImagePath.c_str());
                ImGui::SetNextItemWidth(kPreviewSize);
-               if (ImGui::InputText("##imagePath", imgBuf, sizeof(imgBuf)))
+               if (FieldWell::InputText("##imagePath", imgBuf, sizeof(imgBuf)))
                {
                   n->exportImagePath = imgBuf;
                   std::string low = n->exportImagePath;
@@ -956,7 +957,7 @@ void DrawNodeBodies(FrameCtx& fc)
                char vidBuf[512];
                snprintf(vidBuf, sizeof(vidBuf), "%s", n->recordVideoPath.c_str());
                ImGui::SetNextItemWidth(kPreviewSize);
-               if (ImGui::InputText("##videoPath", vidBuf, sizeof(vidBuf)))
+               if (FieldWell::InputText("##videoPath", vidBuf, sizeof(vidBuf)))
                {
                   n->recordVideoPath = vidBuf;
                   std::string low = n->recordVideoPath;
@@ -1104,7 +1105,7 @@ void DrawNodeBodies(FrameCtx& fc)
 
                ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || gOfflineRender.active);
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::InputInt(L("render fps"), &n->offlineFps);
+               FieldWell::InputInt(L("render fps"), &n->offlineFps);
                n->offlineFps = std::clamp(n->offlineFps, 1, 240);
 
                // Duration is typed, not dragged: a render queue's length is a
@@ -1112,7 +1113,7 @@ void DrawNodeBodies(FrameCtx& fc)
                // exact value on a 1..600 slider is fiddly. The presets are
                // the common takes; the field takes anything up to an hour.
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::InputInt(L("duration (s)"), &n->offlineDurationSeconds);
+               FieldWell::InputInt(L("duration (s)"), &n->offlineDurationSeconds);
                n->offlineDurationSeconds = std::clamp(n->offlineDurationSeconds, 1, 3600);
                for (int preset : { 15, 30, 45, 60 })
                {
@@ -1127,7 +1128,7 @@ void DrawNodeBodies(FrameCtx& fc)
                }
 
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::InputInt(L("preroll frames"), &n->offlinePrerollFrames);
+               FieldWell::InputInt(L("preroll frames"), &n->offlinePrerollFrames);
                n->offlinePrerollFrames = std::clamp(n->offlinePrerollFrames, 0, 600);
                ImGui::EndDisabled();
 

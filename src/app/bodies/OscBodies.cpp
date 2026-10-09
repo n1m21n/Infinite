@@ -1,5 +1,6 @@
 // Oscillator, wavetable, ADSR, equation and spectral-synth bodies (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -2379,7 +2380,7 @@ namespace app
          std::strncpy(buf, n->formula.c_str(), sizeof(buf));
          buf[sizeof(buf) - 1] = '\0';
          ImGui::SetNextItemWidth(gAudioContentW);
-         if (ImGui::InputTextWithHint("##formula", "y = f(x, a, b, c, d, t)", buf, sizeof(buf)))
+         if (FieldWell::InputTextWithHint("##formula", "y = f(x, a, b, c, d, t)", buf, sizeof(buf)))
          {
             PushUndoCheckpoint();
             n->formula = buf;

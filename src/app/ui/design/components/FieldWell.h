@@ -1,5 +1,6 @@
 // FieldWell: the recessed well behind a numeric/combo field (same 6% text tint as ChipButton) and its value fill.
 #pragma once
+#include <string>
 #include <algorithm>
 #include "app/ui/design/UiAnim.h"
 #include <type_traits>
@@ -150,6 +151,46 @@ namespace FieldWell
    {
       PushStyle();
       const bool r = ImGui::InputText(label, buf, size, flags);
+      PopStyle();
+      return r;
+   }
+
+   inline bool InputText(const char* label, std::string* str, ImGuiInputTextFlags flags = 0)
+   {
+      PushStyle();
+      const bool r = ImGui::InputText(label, str, flags);
+      PopStyle();
+      return r;
+   }
+
+   inline bool InputTextWithHint(const char* label, const char* hint, char* buf, size_t size, ImGuiInputTextFlags flags = 0)
+   {
+      PushStyle();
+      const bool r = ImGui::InputTextWithHint(label, hint, buf, size, flags);
+      PopStyle();
+      return r;
+   }
+
+   inline bool InputTextMultiline(const char* label, char* buf, size_t size, ImVec2 sz, ImGuiInputTextFlags flags = 0)
+   {
+      PushStyle();
+      const bool r = ImGui::InputTextMultiline(label, buf, size, sz, flags);
+      PopStyle();
+      return r;
+   }
+
+   inline bool InputTextMultiline(const char* label, std::string* str, ImVec2 sz, ImGuiInputTextFlags flags = 0)
+   {
+      PushStyle();
+      const bool r = ImGui::InputTextMultiline(label, str, sz, flags);
+      PopStyle();
+      return r;
+   }
+
+   inline bool InputInt(const char* label, int* v, int step = 0, int stepFast = 0, ImGuiInputTextFlags flags = 0)
+   {
+      PushStyle();
+      const bool r = ImGui::InputInt(label, v, step, stepFast, flags);
       PopStyle();
       return r;
    }

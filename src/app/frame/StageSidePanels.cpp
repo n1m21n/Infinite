@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PillGroup.h"
@@ -595,7 +596,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastEdited = gFormulaEditor;
             }
 
-            ImGui::InputTextMultiline("##glsl", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##glsl", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
 
             PushPrimaryButtonStyle();
@@ -665,7 +666,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldElementEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
@@ -729,7 +730,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldPrimitiveEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldPrimitiveCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldPrimitiveCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
@@ -778,7 +779,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldPixelEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
@@ -842,7 +843,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldSampleEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
@@ -906,7 +907,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldSynthEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldSynthCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldSynthCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
@@ -970,7 +971,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldGraphEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();

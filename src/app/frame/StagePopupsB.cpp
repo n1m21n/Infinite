@@ -110,7 +110,7 @@ void DrawPopupsB(FrameCtx& fc)
             ImGui::SetWindowFontScale(commentZoom * fontScale);
 
             // Filling the whole popup cleanly at 1:1 scale with the canvas card
-            ImGui::InputTextMultiline("##commenttext", &c->text, ImVec2(gCommentEditRect.z, gCommentEditRect.w));
+            FieldWell::InputTextMultiline("##commenttext", &c->text, ImVec2(gCommentEditRect.z, gCommentEditRect.w));
 
             ImGui::SetWindowFontScale(1.0f);
             ImGui::PopStyleVar(3);

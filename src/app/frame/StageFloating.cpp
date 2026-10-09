@@ -1,5 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/frame/FrameCtx.h"
 #include "app/ui/design/components/DialogParts.h"
 
@@ -47,7 +48,7 @@ int DrawFloating(FrameCtx& fc)
             ImGuiStyle& style = ImGui::GetStyle();
             ImGui::TextDisabled("%s", T("Live-editing this ImGuiStyle for inspection only - not saved."));
             static char colorFilter[64] = "";
-            ImGui::InputTextWithHint("##colorfilter", "filter colors...", colorFilter, sizeof(colorFilter));
+            FieldWell::InputTextWithHint("##colorfilter", "filter colors...", colorFilter, sizeof(colorFilter));
             if (ImGui::BeginChild("##colorlist"))
             {
                for (int i = 0; i < ImGuiCol_COUNT; i++)

@@ -1,5 +1,6 @@
 // Generic node parameter bodies, part 2: curves, palettes, ramps, analyze (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -651,7 +652,7 @@ namespace app
          char buf[256];
          snprintf(buf, sizeof(buf), "%s", n->customFormula.c_str());
          ImGui::SetNextItemWidth(colW);
-         if (ImGui::InputText("formula", buf, sizeof(buf)))
+         if (FieldWell::InputText("formula", buf, sizeof(buf)))
          {
             n->customFormula = buf;
          }
