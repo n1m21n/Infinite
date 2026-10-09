@@ -113,6 +113,42 @@ int main(int argc, char** argv)
    e6.Compile("function draw(t){ if (typeof std!=='undefined'||typeof os!=='undefined'||typeof require!=='undefined') throw new Error('leak'); background(0); }", err);
    Check(e6.Run(g, x1, err), "no std/os/require in the sandbox");
 
+   // SVG: parse, draw, animate attributes by selector, and no history between frames.
+   {
+      const char* svg = "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='100' viewBox='0 0 200 100'>"
+                        "<rect id='bg' width='200' height='100' fill='#224'/>"
+                        "<circle id='dot' cx='50' cy='50' r='30' fill='red'/>"
+                        "<text id='label' x='100' y='60' font-size='24' fill='white'>hi</text></svg>";
+      SketchEngine sv;
+      SketchError se;
+      Check(sv.SetSvg(svg, se) && sv.HasSvg(), "SVG parses");
+      Check(!sv.SetSvg("<svg", se) && sv.HasSvg(), "bad SVG is rejected and the old one kept");
+      sv.SetSvg(svg, se);
+      Check(sv.Compile("function draw(t){ background(0); svgDraw(); }", se), "svg sketch compiles");
+      SketchEngine::Frame sf; sf.width = 400; sf.height = 200;
+      std::vector<uint8_t> a1, a2, a3;
+      Check(sv.Run(sf, a1, se), "svgDraw runs");
+      Check(a1[(100 * 400 + 100) * 4 + 3] == 255 && a1[(100 * 400 + 100) * 4] != 0 || a1[(100 * 400 + 100) * 4 + 2] != 0, "svgDraw paints the SVG");
+      Check(sv.Compile("function draw(t){ background(0); svgSet('#dot','fill', t>0 ? 'lime' : 'red'); svgDraw(); }", se), "svgSet sketch compiles");
+      sf.t = 0; sv.Run(sf, a2, se);
+      sf.t = 1; Check(sv.Run(sf, a3, se), "svgSet runs");
+      Check(Hash(a2) != Hash(a3), "svgSet changes the picture");
+      // After a frame that set an attribute, a frame that does not must match a clean render.
+      Check(sv.Compile("function draw(t){ background(0); if (t > 0) svgSet('#dot','fill','blue'); svgDraw(); }", se), "conditional svgSet compiles");
+      sf.t = 1; sv.Run(sf, a2, se);
+      sf.t = 0; sv.Run(sf, a3, se);
+      SketchEngine fresh; fresh.SetSvg(svg, se);
+      fresh.Compile("function draw(t){ background(0); svgDraw(); }", se);
+      fresh.Run(sf, a1, se);
+      Check(Hash(a3) == Hash(a1), "svgSet leaves no state behind for the next frame");
+      Check(sv.Compile("function draw(t){ const b = svgBox('#dot'); if (!b || b[2] < 59 || b[2] > 61) throw new Error('box ' + b); svgText('#label','ok'); background(0); svgDraw(10, 10, 100, 100); }", se)
+            && sv.Run(sf, a1, se), "svgBox and svgText work");
+      SketchEngine none;
+      none.Compile("function draw(t){ svgDraw(); }", se);
+      Check(!none.Run(sf, a1, se) && se.Any(), "svgDraw without an SVG is a clear error");
+      sf.t = 0;
+   }
+
    // Every shipped preset compiles, runs, draws something, and prints a pixel hash
    // (compare these across OSes for the identical-pixels exit criterion).
    {
@@ -124,6 +160,7 @@ int main(int argc, char** argv)
       {
          SketchEngine pr;
          if (font) pr.SetFontFile(font);
+         if (pe[i].svg) pr.SetSvg(pe[i].svg, err);
          SketchEngine::Frame pf; pf.width = 1920; pf.height = 1080; pf.t = 2.0; pf.frame = 120; pf.seed = 1;
          std::vector<uint8_t> o;
          Check(pr.Compile(pe[i].code, err), (std::string("preset compiles: ") + pe[i].name).c_str());

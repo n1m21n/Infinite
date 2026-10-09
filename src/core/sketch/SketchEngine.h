@@ -37,6 +37,13 @@ public:
    // Optional font used by text(); a TTF/OTF path. Call before Run.
    void SetFontFile(const std::string& path);
 
+   // Optional SVG document the script can animate and draw: svgSet(selector, attr,
+   // value), svgText(selector, str), svgBox(selector), svgDraw(x, y, w, h) and the
+   // svgWidth/svgHeight globals. Empty text removes it. On a parse error the
+   // previous document is kept and false returned.
+   bool SetSvg(const std::string& text, SketchError& err);
+   bool HasSvg() const;
+
    struct Frame
    {
       int width = 512, height = 512;

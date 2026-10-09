@@ -29,6 +29,8 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Text("code", code);
+      v.Text("svg", svg);
+      v.Text("svgName", svgName);
       v.Float("width", width);
       v.Float("height", height);
       v.Bool("animate", animate);
@@ -44,7 +46,7 @@ public:
    void SetNodeIndex(int idx) { mNodeIndex = idx; }
    int NodeIndex() const { return mNodeIndex; }
 
-   struct Preset { const char* name; const char* code; };
+   struct Preset { const char* name; const char* code; const char* svg; };
    static const std::vector<Preset>& Presets();
    static const std::vector<std::string>& PresetNames();
    void LoadPreset(int index);
@@ -53,6 +55,12 @@ public:
    static void SetFontPath(const std::string& path);
 
    std::string code;
+   std::string svg;       // optional SVG source, saved with the patch so it stays portable
+   std::string svgName;   // file name it came from, for display only
+
+   // Reads an .svg file into `svg` (and, if the script is still the default, swaps in the
+   // SVG starter so the dropped file animates straight away). False + LastError on failure.
+   bool LoadSvgFile(const std::string& path);
    float width = 1024.0f;
    float height = 1024.0f;
    bool animate = true;
@@ -62,7 +70,7 @@ private:
    SketchEngine mEngine;
    Field::ParamTable mParamTable;
    std::string mLastError, mNotice;
-   std::string mCompiledCode;
+   std::string mCompiledCode, mCompiledSvg;
    bool mCompiledOnce = false;
    int mLastCookFrame = -1;
    int mNodeIndex = -1;

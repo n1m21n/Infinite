@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <fstream>
+#include <sstream>
 
 namespace
 {
@@ -20,7 +22,7 @@ const std::vector<SketchNode::Preset>& SketchNode::Presets()
       std::vector<Preset> v;
       int n = 0;
       const SketchPresets::Entry* e = SketchPresets::All(n);
-      for (int i = 0; i < n; ++i) v.push_back({e[i].name, e[i].code});
+      for (int i = 0; i < n; ++i) v.push_back({e[i].name, e[i].code, e[i].svg});
       return v;
    }();
    return p;
@@ -51,8 +53,39 @@ void SketchNode::LoadPreset(int index)
    if (index >= 0 && index < (int)p.size())
    {
       code = p[index].code;
+      svg = p[index].svg ? p[index].svg : "";
+      svgName = svg.empty() ? "" : "example";
       Apply();
    }
+}
+
+bool SketchNode::LoadSvgFile(const std::string& path)
+{
+   std::ifstream in(path, std::ios::binary);
+   if (!in) { mLastError = "could not open " + path; return false; }
+   std::ostringstream ss;
+   ss << in.rdbuf();
+   std::string text = ss.str();
+   if (text.size() > (size_t)8 * 1024 * 1024) { mLastError = "SVG is larger than 8 MB"; return false; }
+   SketchError err;
+   SketchEngine probe;
+   if (!probe.SetSvg(text, err)) { mLastError = "SVG: " + err.message; return false; }
+
+   svg = std::move(text);
+   const size_t slash = path.find_last_of("/\\");
+   svgName = slash == std::string::npos ? path : path.substr(slash + 1);
+
+   // A fresh sketch still showing one of the built-in presets has nothing to lose:
+   // swap in a script that just draws the SVG. Anything the user wrote is left alone.
+   bool isPreset = false;
+   for (const auto& p : Presets()) if (code == p.code) isPreset = true;
+   if (isPreset || code.empty())
+      code = "// Your SVG, drawn fitted into the frame. Animate it by id:\n"
+             "//   svgSet(\"#id\", \"attr\", value)   svgText(\"#id\", \"text\")   svgBox(\"#id\")\n"
+             "// svgWidth / svgHeight give the SVG's own size. Add param() knobs to drive it.\n"
+             "function draw(t) {\n  background(0.07);\n  svgDraw();\n}\n";
+   Apply();
+   return true;
 }
 
 bool SketchNode::Apply()
@@ -61,6 +94,12 @@ bool SketchNode::Apply()
    mCompiledCode = code;
    SketchError err;
    mEngine.SetFontFile(gFontPath);
+   mCompiledSvg = svg;
+   if (!mEngine.SetSvg(svg, err))
+   {
+      mLastError = "SVG: " + err.message;
+      return false;
+   }
    if (!mEngine.Compile(code, err))
    {
       mLastError = err.line > 0 ? "line " + std::to_string(err.line) + ": " + err.message : err.message;
@@ -85,7 +124,7 @@ void SketchNode::CookIfNeeded(int frameId)
    if (mLastCookFrame == frameId) return;
    mLastCookFrame = frameId;
 
-   if (!mCompiledOnce || code != mCompiledCode) Apply();
+   if (!mCompiledOnce || code != mCompiledCode || svg != mCompiledSvg) Apply();
    if (!mEngine.HasProgram()) return;
 
    const int w = std::max(16, std::min(4096, (int)width));

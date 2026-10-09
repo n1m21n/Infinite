@@ -869,6 +869,33 @@ void DrawSidePanels(FrameCtx& fc)
                ImGui::EndCombo();
             }
 
+            // SVG: dropped on the canvas, or pasted here (no file dialog needed).
+            ImGui::SameLine();
+            if (ImGui::Button(L("Paste SVG"), ImVec2(100, 0)))
+            {
+               const char* clip = ImGui::GetClipboardText();
+               if (clip && std::strstr(clip, "<svg"))
+               {
+                  gSketchEditor->svg = clip;
+                  gSketchEditor->svgName = "pasted";
+                  gSketchEditor->Apply();
+               }
+            }
+            if (!gSketchEditor->svg.empty())
+            {
+               ImGui::SameLine();
+               if (ImGui::Button(L("Clear SVG"), ImVec2(100, 0)))
+               {
+                  gSketchEditor->svg.clear();
+                  gSketchEditor->svgName.clear();
+                  gSketchEditor->Apply();
+               }
+               ImGui::TextDisabled("SVG: %s (%d KB). svgSet(\"#id\", \"attr\", value), svgText, svgBox, svgDraw(x, y, w, h)",
+                                   gSketchEditor->svgName.c_str(), (int)(gSketchEditor->svg.size() / 1024));
+            }
+            else
+               ImGui::TextDisabled("%s", T("No SVG yet: drop an .svg on the canvas, or copy SVG text and press Paste SVG."));
+
             static char editBuf[32768];
             static SketchNode* lastEdited = nullptr;
             static std::string lastKnownCode;

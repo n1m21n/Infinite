@@ -863,7 +863,7 @@ target_include_directories(field-preset-check PRIVATE src src/core)
 # that need no window): compile, params, determinism, abort, memory, errors.
 add_executable(sketch-check src/core/sketch/SketchCheck.cpp src/core/sketch/SketchEngine.cpp)
 target_include_directories(sketch-check PRIVATE src/core/sketch)
-target_link_libraries(sketch-check PRIVATE sketch_deps)
+target_link_libraries(sketch-check PRIVATE sketch_deps lunasvg_lib)
 
 # Sketch node dependencies (docs/plans/sketch/README.md): quickjs-ng (JS engine,
 # no quickjs-libc so a patch cannot reach files or network) and plutovg (CPU
@@ -898,6 +898,32 @@ else()
 endif()
 if(NOT WIN32)
     target_link_libraries(sketch_deps PUBLIC m)
+endif()
+
+# SVG for Sketch (svgSet/svgDraw): lunasvg renders through the plutovg above, so
+# an SVG and a sketch share one rasteriser. System fonts are off so text in an
+# SVG draws the same on every OS (the app registers the bundled Inter instead).
+add_library(lunasvg_lib STATIC
+    external/lunasvg/source/graphics.cpp
+    external/lunasvg/source/lunasvg.cpp
+    external/lunasvg/source/svgelement.cpp
+    external/lunasvg/source/svggeometryelement.cpp
+    external/lunasvg/source/svglayoutstate.cpp
+    external/lunasvg/source/svgpaintelement.cpp
+    external/lunasvg/source/svgparser.cpp
+    external/lunasvg/source/svgproperty.cpp
+    external/lunasvg/source/svgrenderstate.cpp
+    external/lunasvg/source/svgtextelement.cpp
+)
+set_target_properties(lunasvg_lib PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON POSITION_INDEPENDENT_CODE ON)
+target_include_directories(lunasvg_lib PUBLIC external/lunasvg/include)
+target_compile_definitions(lunasvg_lib PRIVATE LUNASVG_BUILD LUNASVG_DISABLE_LOAD_SYSTEM_FONTS)
+target_compile_definitions(lunasvg_lib PUBLIC LUNASVG_BUILD_STATIC)
+target_link_libraries(lunasvg_lib PUBLIC sketch_deps)
+if(MSVC)
+    target_compile_options(lunasvg_lib PRIVATE /w)
+else()
+    target_compile_options(lunasvg_lib PRIVATE -w)
 endif()
 
 add_executable(Infinite ${COMMON_SOURCES})
@@ -952,7 +978,7 @@ target_include_directories(Infinite PRIVATE
     src/platform/ndi
 )
 
-target_link_libraries(Infinite PRIVATE glfw sketch_deps)
+target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib)
 
 if(WIN32)
     # SpoutGL's own headers (Spout.h chain) plus sse2neon.h, which its

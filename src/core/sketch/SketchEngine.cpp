@@ -12,6 +12,7 @@ extern "C"
 #include "quickjs.h"
 #include "plutovg.h"
 }
+#include "lunasvg.h"
 
 namespace
 {
@@ -85,6 +86,11 @@ struct Program
    std::vector<std::pair<float, float>> shape;
    int W = 0, H = 0;
 
+   // Optional SVG (owned by SketchEngine::Impl). svgTouched: a script changed it
+   // this frame, so the next frame starts from a fresh parse.
+   lunasvg::Document* svg = nullptr;
+   bool svgTouched = false;
+
    ~Program() { Free(); }
    void Free()
    {
@@ -103,6 +109,9 @@ struct SketchEngine::Impl
    Program* prog = nullptr;
    std::string fontPath;
    plutovg_font_face_t* font = nullptr;
+   std::string svgText;
+   std::unique_ptr<lunasvg::Document> svg;
+   bool svgDirty = false;      // a script mutated `svg`: re-parse before the next run
    ~Impl()
    {
       delete prog;
@@ -432,6 +441,92 @@ FN(js_param)
    return JS_UNDEFINED;
 }
 
+// ---- SVG: svgSet / svgText / svgBox / svgDraw ----------------------------------
+bool Str(JSContext* c, JSValueConst v, std::string& out)
+{
+   const char* s = JS_ToCString(c, v);
+   if (!s) return false;
+   out = s;
+   JS_FreeCString(c, s);
+   return true;
+}
+
+lunasvg::ElementList SvgSelect(Program* p, const std::string& sel)
+{
+   if (!p->svg) return {};
+   return p->svg->querySelectorAll(sel);
+}
+
+FN(js_svgSet)
+{
+   NEEDN(3);
+   Program* p = P(c);
+   if (!p->svg) return JS_ThrowTypeError(c, "no SVG loaded in this node");
+   std::string sel, attr, val;
+   if (!Str(c, argv[0], sel) || !Str(c, argv[1], attr) || !Str(c, argv[2], val)) return JS_EXCEPTION;
+   auto els = SvgSelect(p, sel);
+   for (auto& e : els) e.setAttribute(attr, val);
+   if (!els.empty()) p->svgTouched = true;
+   return JS_NewInt32(c, (int)els.size());
+}
+
+FN(js_svgText)
+{
+   NEEDN(2);
+   Program* p = P(c);
+   if (!p->svg) return JS_ThrowTypeError(c, "no SVG loaded in this node");
+   std::string sel, val;
+   if (!Str(c, argv[0], sel) || !Str(c, argv[1], val)) return JS_EXCEPTION;
+   int n = 0;
+   for (auto& e : SvgSelect(p, sel))
+      for (auto& child : e.children())
+         if (child.isTextNode()) { child.toTextNode().setData(val); ++n; break; }
+   if (n) p->svgTouched = true;
+   return JS_NewInt32(c, n);
+}
+
+// svgBox("#id") -> [x, y, w, h] in SVG user units (global, after transforms), or null.
+FN(js_svgBox)
+{
+   NEEDN(1);
+   Program* p = P(c);
+   if (!p->svg) return JS_ThrowTypeError(c, "no SVG loaded in this node");
+   std::string sel;
+   if (!Str(c, argv[0], sel)) return JS_EXCEPTION;
+   auto els = SvgSelect(p, sel);
+   if (els.empty()) return JS_NULL;
+   lunasvg::Box b = els[0].getGlobalBoundingBox();
+   JSValue a = JS_NewArray(c);
+   JS_SetPropertyUint32(c, a, 0, JS_NewFloat64(c, b.x));
+   JS_SetPropertyUint32(c, a, 1, JS_NewFloat64(c, b.y));
+   JS_SetPropertyUint32(c, a, 2, JS_NewFloat64(c, b.w));
+   JS_SetPropertyUint32(c, a, 3, JS_NewFloat64(c, b.h));
+   return a;
+}
+
+// svgDraw([x, y, w, h]): draws the SVG fitted (aspect kept, centred) inside the box
+// under the current transform. With no arguments it fills the canvas.
+FN(js_svgDraw)
+{
+   Program* p = P(c);
+   if (!p->svg) return JS_ThrowTypeError(c, "no SVG loaded in this node");
+   float x = 0, y = 0, w = (float)p->W, h = (float)p->H;
+   if (argc >= 4)
+   {
+      if (!Num(c, argv[0], x) || !Num(c, argv[1], y) || !Num(c, argv[2], w) || !Num(c, argv[3], h)) return JS_EXCEPTION;
+   }
+   const float sw = p->svg->width(), sh = p->svg->height();
+   if (sw <= 0 || sh <= 0 || w <= 0 || h <= 0) return JS_UNDEFINED;
+   const float s = std::min(w / sw, h / sh);
+   plutovg_matrix_t m;
+   plutovg_canvas_get_matrix(p->cv, &m);
+   plutovg_matrix_translate(&m, x + (w - sw * s) * 0.5f, y + (h - sh * s) * 0.5f);
+   plutovg_matrix_scale(&m, s, s);
+   lunasvg::Bitmap bmp(plutovg_surface_get_data(p->surf), p->W, p->H, plutovg_surface_get_stride(p->surf));
+   p->svg->render(bmp, lunasvg::Matrix(m));
+   return JS_UNDEFINED;
+}
+
 int Interrupt(JSContext*, void* op)
 {
    Program* p = (Program*)op;
@@ -496,7 +591,44 @@ void SketchEngine::SetFontFile(const std::string& path)
    mImpl->fontPath = path;
    if (mImpl->font) { plutovg_font_face_destroy(mImpl->font); mImpl->font = nullptr; }
    if (!path.empty()) mImpl->font = plutovg_font_face_load_from_file(path.c_str(), 0);
+
+   // lunasvg's font cache is process-wide and system fonts are compiled out, so give
+   // SVG <text> the same bundled face under the usual family names (once per path).
+   static std::string registered;
+   if (!path.empty() && path != registered)
+   {
+      registered = path;
+      const char* families[] = {"Inter", "sans-serif", "Arial", "Helvetica", "system-ui"};
+      std::string bold = path;
+      const size_t slash = bold.find_last_of("/\\");
+      if (slash != std::string::npos) bold = bold.substr(0, slash + 1) + "Inter-SemiBold.ttf";
+      bool haveBold = false;
+      if (bold != path)
+         if (std::FILE* f = std::fopen(bold.c_str(), "rb")) { haveBold = true; std::fclose(f); }
+      for (const char* fam : families)
+      {
+         lunasvg_add_font_face_from_file(fam, false, false, path.c_str());
+         lunasvg_add_font_face_from_file(fam, true, false, haveBold ? bold.c_str() : path.c_str());
+      }
+   }
 }
+
+bool SketchEngine::SetSvg(const std::string& text, SketchError& err)
+{
+   err = SketchError{};
+   if (text.empty())
+   {
+      mImpl->svg.reset(); mImpl->svgText.clear(); mImpl->svgDirty = false;
+      return true;
+   }
+   auto doc = lunasvg::Document::loadFromData(text);
+   if (!doc) { err.message = "could not parse the SVG"; return false; }
+   mImpl->svg = std::move(doc);
+   mImpl->svgText = text;
+   mImpl->svgDirty = false;
+   return true;
+}
+bool SketchEngine::HasSvg() const { return mImpl->svg != nullptr; }
 
 bool SketchEngine::Compile(const std::string& code, SketchError& err)
 {
@@ -542,6 +674,10 @@ bool SketchEngine::Compile(const std::string& code, SketchError& err)
    Reg(c, g, "noise", js_noise, 3);
    Reg(c, g, "hsl", js_hsl, 3);
    Reg(c, g, "param", js_param, 4);
+   Reg(c, g, "svgSet", js_svgSet, 3);
+   Reg(c, g, "svgText", js_svgText, 2);
+   Reg(c, g, "svgBox", js_svgBox, 1);
+   Reg(c, g, "svgDraw", js_svgDraw, 4);
    JS_FreeValue(c, g);
 
    // Math.random must be reproducible too (S7): route it to the seeded stream.
@@ -599,6 +735,11 @@ bool SketchEngine::Run(const Frame& f, std::vector<uint8_t>& rgba, SketchError& 
    p->shape.clear();
    p->inShape = false;
    p->font = mImpl->font;
+   if (mImpl->svg && mImpl->svgDirty)   // undo last frame's svgSet so frames never depend on history
+      if (auto fresh = lunasvg::Document::loadFromData(mImpl->svgText)) mImpl->svg = std::move(fresh);
+   mImpl->svgDirty = false;
+   p->svg = mImpl->svg.get();
+   p->svgTouched = false;
    p->rng.s = (f.seed * 2654435761u) ^ ((uint32_t)f.frame * 40503u + 1u);
    if (!p->rng.s) p->rng.s = 1;
 
@@ -608,6 +749,8 @@ bool SketchEngine::Run(const Frame& f, std::vector<uint8_t>& rgba, SketchError& 
    JS_SetPropertyStr(c, g, "t", JS_NewFloat64(c, f.t));
    JS_SetPropertyStr(c, g, "beat", JS_NewFloat64(c, f.beat));
    JS_SetPropertyStr(c, g, "frame", JS_NewInt32(c, f.frame));
+   JS_SetPropertyStr(c, g, "svgWidth", JS_NewFloat64(c, p->svg ? p->svg->width() : 0));
+   JS_SetPropertyStr(c, g, "svgHeight", JS_NewFloat64(c, p->svg ? p->svg->height() : 0));
    for (const auto& d : p->params)
    {
       float v = d.def;
@@ -632,6 +775,8 @@ bool SketchEngine::Run(const Frame& f, std::vector<uint8_t>& rgba, SketchError& 
       JS_FreeValue(c, ex);
    }
    JS_FreeValue(c, r);
+   mImpl->svgDirty = p->svgTouched;
+   p->svg = nullptr;
 
    if (ok)
    {

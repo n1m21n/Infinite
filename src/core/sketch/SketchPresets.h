@@ -4,7 +4,7 @@
 // between frames, so scrubbing and export give the same pixels.
 namespace SketchPresets
 {
-struct Entry { const char* name; const char* code; };
+struct Entry { const char* name; const char* code; const char* svg = nullptr; };  // svg: optional document the preset animates
 
 inline const Entry* All(int& n)
 {
@@ -175,6 +175,38 @@ function draw(t) {
   }
 }
 )"},
+{"SVG animate", R"JS(// Animate any SVG by id. Drop your own .svg on the canvas, then
+// drive its attributes: svgSet("#id", "attr", value). svgDraw() paints it
+// fitted into the frame, and svgBox("#id") gives an element's bounds.
+param("spin", 0.5, -3, 3);
+param("hue", 0.0, 0, 1);
+param("pulse", 6, 0, 20);
+
+function hex(h) {
+  const c = hsl(h % 1, 0.7, 0.6);
+  return "#" + c.map(v => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
+}
+
+function draw(t) {
+  background(0.07);
+  for (let i = 0; i < 6; i++) svgSet("#p" + i, "fill", hex(hue + i / 6));
+  svgSet("#wheel", "transform", "rotate(" + (t * spin * 60) + " 100 100)");
+  svgSet("#core", "r", 16 + pulse * sin(t * 3));
+  const m = min(width, height) * 0.9;
+  svgDraw((width - m) / 2, (height - m) / 2, m, m);
+}
+)JS", R"SVG(<svg xmlns="http://www.w3.org/2000/svg" width="200" height="212" viewBox="0 0 200 212">
+<g id="wheel">
+<ellipse id="p0" cx="100" cy="48" rx="14" ry="34" transform="rotate(0 100 100)"/>
+<ellipse id="p1" cx="100" cy="48" rx="14" ry="34" transform="rotate(60 100 100)"/>
+<ellipse id="p2" cx="100" cy="48" rx="14" ry="34" transform="rotate(120 100 100)"/>
+<ellipse id="p3" cx="100" cy="48" rx="14" ry="34" transform="rotate(180 100 100)"/>
+<ellipse id="p4" cx="100" cy="48" rx="14" ry="34" transform="rotate(240 100 100)"/>
+<ellipse id="p5" cx="100" cy="48" rx="14" ry="34" transform="rotate(300 100 100)"/>
+</g>
+<circle id="core" cx="100" cy="100" r="16" fill="#ffffff"/>
+<text id="word" x="100" y="206" text-anchor="middle" font-size="14" fill="#ffffff">vector</text>
+</svg>)SVG"},
    };
    n = (int)(sizeof(k) / sizeof(k[0]));
    return k;
