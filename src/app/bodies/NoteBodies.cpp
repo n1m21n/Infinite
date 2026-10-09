@@ -1368,8 +1368,18 @@ namespace app
       static const std::vector<std::string> kModes = { "Round Robin", "Random", "Probability", "Chain" };
       const int mask = n->LastRoutedMask();
       char stat[64];
-      snprintf(stat, sizeof(stat), "%s%s", kModes[std::clamp(n->mode, 0, 3)].c_str(),
-               mask == 0 ? "" : " - active");
+      if (mask == 0)
+         snprintf(stat, sizeof(stat), "idle");
+      else
+      {
+         char outs[16] = "";
+         int o = 0;
+         for (int i = 0; i < 4 && o < 12; ++i)
+            if (mask & (1 << i))
+               o += snprintf(outs + o, sizeof(outs) - (size_t)o, o > 0 ? " %d" : "%d", i + 1);
+         snprintf(stat, sizeof(stat), "holding out %s", outs);
+      }
+      (void)kModes;
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
@@ -1844,8 +1854,6 @@ namespace app
          ImGui::SameLine();
          ImGui::TextDisabled("%s", n->path.substr(n->path.find_last_of("/\\") == std::string::npos ? 0 : n->path.find_last_of("/\\") + 1).c_str());
       }
-      else
-         ImGui::TextDisabled("Load a .mid file, or drop one on the canvas");
 
       {
          const float w = gAudioBodyW;
@@ -1892,7 +1900,7 @@ namespace app
             dl->PopClipRect();
          }
          else
-            AudioViz::IdleLabel(AudioViz::Frame{dl, origin, br}, "no file");
+            AudioViz::IdleLabel(AudioViz::Frame{dl, origin, br}, "drop a .mid file");
          ImGui::Dummy(ImVec2(w, h));
       }
 
