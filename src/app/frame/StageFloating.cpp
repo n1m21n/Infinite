@@ -1,6 +1,7 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
 #include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
+#include "app/ui/design/components/DialogParts.h"
 
 namespace app
 {
@@ -99,45 +100,28 @@ int DrawFloating(FrameCtx& fc)
          ImGui::OpenPopup(L("Unsaved Changes"));
          gShowUnsavedChangesModal = false;
       }
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      if (ImGui::BeginPopupModal(L("Unsaved Changes"), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+      if (DialogParts::Begin(L("Unsaved Changes")))
       {
-         ImGui::Text("%s", T("This patch has unsaved changes."));
-         ImGui::Text("%s", T("Save before closing?"));
-         ImGui::Separator();
-         const float btnW = 100.0f;
-         const float spacing = ImGui::GetStyle().ItemSpacing.x;
-         const float totalW = btnW * 3 + spacing * 2;
-         const float avail = ImGui::GetContentRegionAvail().x;
-         if (avail > totalW)
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - totalW);
-         // Right-aligned, cancel-to-primary reading order (platform
-         // convention: the recommended default action is rightmost and
-         // the only one drawn with emphasis - matching the fix in the
-         // Recover Autosave modal below, which had the identical defect).
-         if (ImGui::Button(L("Cancel"), ImVec2(btnW, 0)))
+         DialogParts::Title(T("Unsaved changes"));
+         DialogParts::Message(T("This patch has unsaved changes."));
+         DialogParts::Message(T("Save before closing?"));
+         const int pick = DialogParts::Buttons({ L("Cancel"), L("Don't Save"), L("Save") });
+         if (pick == 0)
          {
             gPendingUnsavedAction = nullptr;
             ImGui::CloseCurrentPopup();
          }
-         ImGui::SameLine();
-         if (ImGui::Button(L("Don't Save"), ImVec2(btnW, 0)))
+         else if (pick == 1)
          {
             if (gPendingUnsavedAction)
                gPendingUnsavedAction();
             gPendingUnsavedAction = nullptr;
             ImGui::CloseCurrentPopup();
          }
-         ImGui::SameLine();
-         PushPrimaryButtonStyle();
-         const bool doSave = ImGui::Button(L("Save"), ImVec2(btnW, 0));
-         PopPrimaryButtonStyle();
-         if (doSave)
+         else if (pick == 2)
          {
             SavePatchInteractive(false);
-            // Only proceed if the save actually went through - a cancelled
-            // Save As dialog or a write failure leaves gPatchDirty set, and
-            // the modal should stay up so the user can try again.
+            // Only proceed if the save went through; a cancelled Save As or a write failure keeps the dialog up.
             if (!gPatchDirty)
             {
                if (gPendingUnsavedAction)
@@ -146,7 +130,7 @@ int DrawFloating(FrameCtx& fc)
                ImGui::CloseCurrentPopup();
             }
          }
-         ImGui::EndPopup();
+         DialogParts::End();
       }
 
       // ---- check for updates modal ----
@@ -229,28 +213,20 @@ int DrawFloating(FrameCtx& fc)
          ImGui::OpenPopup(L("Recover Autosave"));
          gShowAutosaveRecoveryModal = false;
       }
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      if (ImGui::BeginPopupModal(L("Recover Autosave"), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+      if (DialogParts::Begin(L("Recover Autosave")))
       {
-         ImGui::Text("%s", T("Infinite closed unexpectedly."));
+         DialogParts::Title(T("Infinite closed unexpectedly."));
          if (!gAutosaveRecoveryTimestamp.empty())
-            ImGui::Text(T("A recovered version of your work from %s is available."),
-                        gAutosaveRecoveryTimestamp.c_str());
-         else
-            ImGui::Text("%s", T("A recovered version of your work is available."));
-         ImGui::Separator();
          {
-            const float btnW = 100.0f;
-            const float spacing = ImGui::GetStyle().ItemSpacing.x;
-            const float totalW = btnW * 2 + spacing;
-            const float avail = ImGui::GetContentRegionAvail().x;
-            if (avail > totalW)
-               ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - totalW);
+            char msg[256];
+            snprintf(msg, sizeof(msg), T("A recovered version of your work from %s is available."),
+                     gAutosaveRecoveryTimestamp.c_str());
+            DialogParts::Message(msg);
          }
-         // Discard (destructive, plain) on the left, Recover (recommended,
-         // emphasized) rightmost - same right-aligned/primary-emphasis
-         // convention as the Unsaved Changes modal above.
-         if (ImGui::Button(L("Discard"), ImVec2(100, 0)))
+         else
+            DialogParts::Message(T("A recovered version of your work is available."));
+         const int pick = DialogParts::Buttons({ L("Discard"), L("Recover") });
+         if (pick == 0)
          {
             DiscardAutosave();
             const std::string marker = AutosaveMarkerPath();
@@ -261,11 +237,7 @@ int DrawFloating(FrameCtx& fc)
             }
             ImGui::CloseCurrentPopup();
          }
-         ImGui::SameLine();
-         PushPrimaryButtonStyle();
-         const bool doRecover = ImGui::Button(L("Recover"), ImVec2(100, 0));
-         PopPrimaryButtonStyle();
-         if (doRecover)
+         else if (pick == 1)
          {
             ApplyPatchData(gPendingRecoveryData);
             gArrangePatchGeneration++; // a new document, same as File > Open
@@ -274,12 +246,10 @@ int DrawFloating(FrameCtx& fc)
             gPatchPath.clear();          // it is not the user's file - force Save As
             gPatchDirty = true;          // it is unsaved work, and should say so
             gPatchStatus = T("Recovered autosave. Save the project to keep it.");
-            // A recovery that leaves the file behind offers itself again on
-            // the next launch.
-            DiscardAutosave();
+            DiscardAutosave(); // a recovery that leaves the file behind offers itself again next launch
             ImGui::CloseCurrentPopup();
          }
-         ImGui::EndPopup();
+         DialogParts::End();
       }
 
       // Keep the title bar in sync with the open document. GLFW has no

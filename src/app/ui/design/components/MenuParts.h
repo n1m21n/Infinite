@@ -4,6 +4,8 @@
 // fill is ours, so hover reads the same as the top bar tiles.
 #pragma once
 #include <algorithm>
+#include <cstring>
+#include <string>
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiAnim.h"
@@ -59,22 +61,25 @@ namespace MenuParts
       return r;
    }
 
-   // Toggle row: label left, the app checkbox at the right edge; the menu stays open.
+   // Toggle row: the app checkbox at the left edge, label after it; the menu stays open.
    inline bool Check(const char* label, bool* v)
    {
-      // Wide enough for the label, a gap and the box, so the box never sits on the text.
-      const float rowW = std::max(ImGui::GetContentRegionAvail().x, ImGui::CalcTextSize(label, nullptr, true).x + tok::space_5 + CheckBox::kSize);
-      const bool r = ImGui::Selectable(label, false, ImGuiSelectableFlags_DontClosePopups, ImVec2(rowW, 0));
+      const float boxW = CheckBox::kSize + tok::space_2;
+      const float rowW = std::max(ImGui::GetContentRegionAvail().x, ImGui::CalcTextSize(label, nullptr, true).x + boxW + tok::space_4);
+      const std::string id = std::string("##chk") + label;
+      const bool r = ImGui::Selectable(id.c_str(), false, ImGuiSelectableFlags_DontClosePopups, ImVec2(rowW, 0));
       if (r)
          *v = !*v;
-      const ImGuiID id = ImGui::GetItemID();
+      const ImGuiID gid = ImGui::GetItemID();
       Wash(ImGui::IsItemHovered(), ImGui::IsItemActive(), false);
       ImGuiWindow* w = ImGui::GetCurrentWindow();
       const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
-      const float hv = UiAnim::Hover(id, ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
-      const float onv = UiAnim::Hover(id ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);
-      CheckBox::Draw(w->DrawList, ImVec2(w->Pos.x + w->Size.x - kInset - kTextInset - CheckBox::kSize,
-                                         std::floor((mn.y + mx.y - CheckBox::kSize) * 0.5f)), onv, hv);
+      const float hv = UiAnim::Hover(gid, ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+      const float onv = UiAnim::Hover(gid ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);
+      CheckBox::Draw(w->DrawList, ImVec2(mn.x, std::floor((mn.y + mx.y - CheckBox::kSize) * 0.5f)), onv, hv);
+      const char* end = std::strstr(label, "##");
+      w->DrawList->AddText(ImVec2(mn.x + boxW, std::floor((mn.y + mx.y - ImGui::GetTextLineHeight()) * 0.5f)),
+                           ImGui::GetColorU32(ImGuiCol_Text), label, end);
       return r;
    }
 

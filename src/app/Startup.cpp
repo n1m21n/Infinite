@@ -3735,6 +3735,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             gPerfMidiLearnIdx = 2;
          }
       }
+      // "dialogdemo": the Unsaved Changes dialog open (design review shots).
+      if (o.find("dialogdemo") != std::string::npos)
+         gShowUnsavedChangesModal = true;
       // "arrangedemo": video and audio tracks with clips, one selected, Clip Settings open (design review shots).
       if (o.find("arrangedemo") != std::string::npos)
       {

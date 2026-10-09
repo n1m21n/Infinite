@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/StateRing.h"
 #include "imgui_internal.h"
 #include "app/ui/design/components/LibraryParts.h"
@@ -188,7 +189,7 @@ void DrawPopupsB(FrameCtx& fc)
                                       gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
          ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       }
-      if (ImGui::BeginPopup("search"))
+      if (MenuParts::BeginPopup("search"))
       {
          searchPopupCentered = false;
          searchPopupOpen = true;
@@ -212,7 +213,7 @@ void DrawPopupsB(FrameCtx& fc)
             searchJustOpened = false;
          }
          LibraryParts::SearchField("nodepicker", T("search nodes..."), searchBuf, sizeof(searchBuf));
-         ImGui::Separator();
+         MenuParts::Separator();
 
          std::string q(searchBuf);
          std::transform(q.begin(), q.end(), q.begin(), ::tolower);
@@ -228,19 +229,19 @@ void DrawPopupsB(FrameCtx& fc)
             // rather than making the user scroll every category to find one.
             if (!gLinkDragSuggestions.empty())
             {
-               ImGui::SeparatorText(T("Suggested"));
+               ImGui::TextDisabled("%s", T("Suggested"));
                for (const auto& t : gLinkDragSuggestions)
                {
                   ++shown;
                   const std::string title = DisplayName(t.first);
                   const std::string category = DisplayName(t.second);
-                  if (ImGui::MenuItem(title.c_str(), category.c_str()))
+                  if (MenuParts::Item(title.c_str(), category.c_str()))
                   {
                      spawnName = t.first;
                      spawnCategory = t.second;
                   }
                }
-               ImGui::Separator();
+               MenuParts::Separator();
             }
 
             // no query yet: browse by category submenu
@@ -252,14 +253,14 @@ void DrawPopupsB(FrameCtx& fc)
             for (const std::string& category : cats)
             {
                ImGui::SetNextWindowSizeConstraints(ImVec2(180, 0), ImVec2(320, 440));
-               if (ImGui::BeginMenu(DisplayName(category).c_str()))
+               if (MenuParts::SubMenu(DisplayName(category).c_str()))
                {
                   for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                   {
                      if (!IsUserSpawnable(name))
                         continue;
                      ++shown;
-                     if (ImGui::MenuItem(DisplayName(name).c_str()))
+                     if (MenuParts::Item(DisplayName(name).c_str()))
                      {
                         spawnName = name;
                         spawnCategory = category;
@@ -281,7 +282,7 @@ void DrawPopupsB(FrameCtx& fc)
                ++shown;
                const std::string title = DisplayName(t.first);
                const std::string category = DisplayName(t.second);
-               bool activate = ImGui::MenuItem(title.c_str(), category.c_str());
+               bool activate = MenuParts::Item(title.c_str(), category.c_str());
                if (shown == 1 && pickFirst)
                   activate = true;
                if (activate)
@@ -348,7 +349,7 @@ void DrawPopupsB(FrameCtx& fc)
             ImGui::CloseCurrentPopup();
          }
          ImGui::PopStyleColor();
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
       else
       {
