@@ -2175,6 +2175,14 @@ void RunClipboardTest()
    src.depth = 0.5f;
    Modulation::Instance().RestoreLink(shapeIdx, 0, src);
    Modulation::Instance().SetExpression(blurIdx, 0, "0.25 + 0.5");
+   {
+      GestureRecorder::Playback gp;
+      gp.samples = { { 0.1f, 0.0, true }, { 0.9f, 1.0, false }, { 0.4f, 2.0, false } };
+      gp.speed = 2.0f;
+      gp.recordedMin = 0.1f;
+      gp.recordedMax = 0.9f;
+      GestureRecorder::Instance().SetPlayback(shapeIdx, 1, gp);
+   }
    std::vector<std::pair<std::string, std::string>> before;
    Patch::SaveParams(shape->node.get(), before);
 
@@ -2230,6 +2238,16 @@ void RunClipboardTest()
          modKept = modKept || (l.first.first == pShape->index && l.second.nodeIndex == pLfo->index);
    Check("a binding between copied nodes is kept", modKept);
    Check("an expression is kept", pBlur != nullptr && Modulation::Instance().HasExpression(pBlur->index, 0));
+   {
+      bool gestureKept = false;
+      if (pShape != nullptr)
+      {
+         const auto& pbs = GestureRecorder::Instance().Playbacks();
+         auto it = pbs.find(GestureRecorder::Key(pShape->index, 1));
+         gestureKept = it != pbs.end() && it->second.samples.size() == 3 && it->second.speed == 2.0f;
+      }
+      Check("a gesture recording is kept", gestureKept);
+   }
 
    // The cable into the Output was to an uncopied node: nothing should be wired to it.
    bool strayCable = false;

@@ -66,6 +66,9 @@ std::string NodeClipboardSerialize(const std::set<int>& indices)
    for (const Patch::ExprRecord& e : all.expressions)
       if (keep.count(e.dstIndex))
          d.expressions.push_back(e);
+   for (const Patch::GestureRecord& g : all.gestures)
+      if (keep.count(g.dstIndex))
+         d.gestures.push_back(g);
 
    std::string body;
    if (!Patch::WriteText(d, body))
@@ -224,6 +227,28 @@ NodePasteResult NodeClipboardPaste(const std::string& text, const ImVec2& at)
       Modulation::Instance().SetExpression(dst->index, e.dstParam, e.text);
       if (std::abs(e.curve) > 0.0001f)
          Modulation::Instance().SetExpressionCurve(dst->index, e.dstParam, e.curve);
+   }
+   for (const Patch::GestureRecord& g : data.gestures)
+   {
+      GraphNode* dst = resolve(g.dstIndex);
+      if (dst == nullptr || g.samples.size() < 2)
+         continue;
+      GestureRecorder::Playback pb;
+      pb.speed = g.speed;
+      pb.hasRangeOverride = g.hasRangeOverride;
+      pb.rangeLo = g.rangeLo;
+      pb.rangeHi = g.rangeHi;
+      pb.curve = g.curve;
+      for (const Patch::GestureSample& s : g.samples)
+         pb.samples.push_back({ s.value, s.timeSec, s.startsNewGrab });
+      pb.recordedMin = pb.recordedMax = pb.samples.front().value;
+      for (const GestureRecorder::Sample& s : pb.samples)
+      {
+         pb.recordedMin = std::min(pb.recordedMin, s.value);
+         pb.recordedMax = std::max(pb.recordedMax, s.value);
+      }
+      pb.startTime = GestureRecorder::Instance().ClockNow();
+      GestureRecorder::Instance().SetPlayback(dst->index, g.dstParam, std::move(pb));
    }
    RebuildAudioTopology();
    gSuppressUndoCheckpoints = false;
