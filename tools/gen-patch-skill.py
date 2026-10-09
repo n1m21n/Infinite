@@ -21,12 +21,30 @@ CHUNK = 12000  # MSVC rejects a single string literal over ~16 KB; adjacent raw 
 DEFAULT_BIN = os.path.join(ROOT, "build/Infinite.app/Contents/MacOS/Infinite")
 
 
-def describe(binary):
+def describe(binary, extra=()):
     with tempfile.TemporaryDirectory() as d:
         out = os.path.join(d, "all.json")
-        subprocess.run([binary, "--describe", "--json", out], check=True, stdout=subprocess.DEVNULL)
-        with open(out) as f:
-            return json.load(f)
+        try:
+            subprocess.run([binary, "--describe", "--json", out], check=True, stdout=subprocess.DEVNULL)
+            with open(out) as f:
+                return json.load(f)
+        except subprocess.CalledProcessError:
+            pass
+        # The all-types describe probes every node action; "head: AirPods" starts CoreMotion and macOS
+        # aborts the process when the host app has no motion permission. Describe type by type instead,
+        # from the types already in the skill plus any new ones named with --add.
+        import re
+        with open(SKILL) as f:
+            names = re.findall(r"^\| `([^`]+)` \|", f.read().split(BEGIN)[1], re.M)
+        types = []
+        for name in sorted(set(names) | set(extra)):
+            one = os.path.join(d, "one.json")
+            r = subprocess.run([binary, "--describe", name, "--json", one], capture_output=True)
+            if r.returncode == 0:
+                types += json.load(open(one))["types"]
+            else:
+                print(f"skipped {name}: exit {r.returncode}", file=sys.stderr)
+        return {"types": types}
 
 
 def sig(slots, key):
@@ -79,10 +97,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bin", default=DEFAULT_BIN)
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--add", action="append", default=[], help="type missing from the skill table (used when the all-types describe aborts)")
     a = ap.parse_args()
 
     with open(SKILL) as f:
-        skill = splice(f.read(), generate(describe(a.bin)))
+        skill = splice(f.read(), generate(describe(a.bin, a.add)))
     assert ")AISKILL" not in skill
     with open(HEADER) as f:
         header = f.read()
