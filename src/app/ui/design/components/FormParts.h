@@ -108,9 +108,6 @@ namespace FormParts
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
       const bool open = ImGui::BeginCombo(Id(label).c_str(), preview, ImGuiComboFlags_NoArrowButton);
       ImGui::PopStyleVar(2);
-      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
-                             ImGui::GetColorU32(ImGuiCol_TextDisabled));
       FieldWell::PopStyle();
       if (open)
          MenuParts::BeginContent();
@@ -133,9 +130,6 @@ namespace FormParts
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
       const bool open = ImGui::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
       ImGui::PopStyleVar(2);
-      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
-      glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
-                             ImGui::GetColorU32(ImGuiCol_TextDisabled));
       FieldWell::PopStyle();
       bool changed = false;
       if (open)

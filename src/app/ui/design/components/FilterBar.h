@@ -41,11 +41,6 @@ namespace FilterBar
       }
 
       // Icons are drawn as lines on one shared centre line, so they cannot drift off-centre like font glyphs.
-      inline void Chevron(ImDrawList* dl, ImVec2 c, ImU32 col)
-      {
-         dl->AddLine(ImVec2(c.x - 4.0f, c.y - 2.0f), ImVec2(c.x, c.y + 2.0f), col, 1.5f);
-         dl->AddLine(ImVec2(c.x, c.y + 2.0f), ImVec2(c.x + 4.0f, c.y - 2.0f), col, 1.5f);
-      }
       inline void Cross(ImDrawList* dl, ImVec2 c, ImU32 col)
       {
          dl->AddLine(ImVec2(c.x - 3.5f, c.y - 3.5f), ImVec2(c.x + 3.5f, c.y + 3.5f), col, 1.5f);
@@ -95,8 +90,6 @@ namespace FilterBar
             detail::Cross(dl, c, ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, hov ? 1.0f : 0.8f)));
             cleared = s.clicked && hov;
          }
-         else
-            detail::Chevron(dl, ImVec2(trail, r.CenterY()), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.6f)));
          if (clearClicked)
             *clearClicked = cleared;
          return s.clicked && !cleared;
