@@ -2270,10 +2270,10 @@ namespace app
 
       {
          AudioKnobRow row(2);
-         row.Knob("gain", &n->gain, 0.0f, 5.0f, "%.2fx", kKnobSmall);
          static const std::vector<std::string> kModes = { "Peak", "RMS" };
          row.Dropdown("mode", kModes, n->mode,
                       [n](int i) { PushUndoCheckpoint(); n->mode = i; });
+         row.Knob("gain", &n->gain, 0.0f, 5.0f, "%.2fx", kKnobSmall);
          row.End();
       }
       {

@@ -337,7 +337,7 @@ namespace app
       else if (!n->LoadedPath().empty())
          status = "from file";
       else
-         status = "choose a photo, or cable one to 'ref'";
+         status = "choose a photo or cable 'ref'";
       dl->AddText(ImVec2(origin.x + pad, origin.y + h - 18.0f),
                   tok::U32(tok::pal::c_7E8498FF), status);
 
