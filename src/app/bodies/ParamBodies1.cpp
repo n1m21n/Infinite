@@ -3,6 +3,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/components/StepCell.h"
 
 namespace app
 {
@@ -1597,24 +1598,17 @@ namespace app
       const ImVec2 bTL(origin.x + 4.0f, origin.y);
       const ImVec2 bBR(bTL.x + boxW, bTL.y + boxH);
 
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const bool isLight = IsThemeLight();
-      dl->AddRectFilled(bTL, bBR, isLight ? tok::U32(tok::pal::c_E4E9F3FF) : tok::U32(tok::pal::c_10121AFF), 4.0f);
-      dl->AddRect(bTL, bBR, isLight ? tok::U32(tok::pal::c_AFB9C8FF) : tok::U32(tok::pal::c_303646FF), 4.0f);
-
-      // The DragFloat's own frame is invisible so the hand-drawn box above is
-      // the only border - two nested frames read as a mistake.
+      (void)bBR;
+      // The shared field well (DragFloat frame in the FieldWell style), same as every numeric field.
       ImGui::SetCursorScreenPos(ImVec2(bTL.x, bTL.y + (boxH - ImGui::GetFrameHeight()) * 0.5f));
       // Unbounded: no min/max params, so drag speed scales with the value's
       // own magnitude and the DragFloat gets no clamp (v_min >= v_max).
       float speed = std::max(0.01f, std::abs(n->value) * 0.01f);
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0, 0, 0, 0));
+      FieldWell::PushStyle(ImGui::GetID("##macronumboxdrag"));
       ImGui::SetNextItemWidth(boxW);
       ImGui::DragFloat("##macronumboxdrag", &n->value, speed, 0.0f, 0.0f,
                        (std::abs(n->value) >= 10.0f) ? "%.1f" : "%.3f");
-      ImGui::PopStyleColor(3);
+      FieldWell::PopStyle();
 
       MacroBodyEnd(origin, kMacroCell, boxH, n->label.empty() ? std::string("value") : n->label);
    }
@@ -1686,6 +1680,7 @@ namespace app
          ImGui::SetCursorScreenPos(sTL);
          ImGui::PushID(s + 800);
          ImGui::InvisibleButton("##stepgatebtn", ImVec2(stepW, stepH));
+         const bool hovered = ImGui::IsItemHovered();
          if (ImGui::IsItemClicked())
          {
             PushUndoCheckpoint();
@@ -1694,23 +1689,7 @@ namespace app
          ImGui::PopID();
 
          const bool isOn = (n->pattern & (1 << s)) != 0;
-         const bool isCurrent = (s == playStep);
-
-         const ImU32 stepBg = isOn
-            ? (isLight ? tok::U32(tok::pal::c_22C55EFF) : tok::U32(tok::pal::c_4ADE80FF))
-            : (isLight ? tok::U32(tok::pal::c_D2D8E4FF) : tok::U32(tok::pal::c_1C1F28FF));
-
-         dl->AddRectFilled(sTL, sBR, stepBg, 2.5f);
-
-         if (isCurrent && Transport::Instance().IsPlaying())
-         {
-            dl->AddRect(sTL, sBR, tok::U32(tok::pal::c_FFE650FF), 2.5f, 0, 2.0f);
-            dl->AddCircleFilled(ImVec2(sx + stepW * 0.5f, origin.y + 3.5f), 2.0f, tok::U32(tok::pal::c_FFF064FF));
-         }
-         else
-         {
-            dl->AddRect(sTL, sBR, isLight ? tok::U32(tok::pal::c_B4BECDC8) : tok::U32(tok::pal::c_303441C8), 2.5f);
-         }
+         StepCell::Draw(dl, sTL, sBR, isOn, s == playStep && Transport::Instance().IsPlaying(), hovered);
       }
 
       MacroBodyEnd(origin, kMacroWideCell, stepH, n->label.empty() ? std::string("step gate") : n->label);
