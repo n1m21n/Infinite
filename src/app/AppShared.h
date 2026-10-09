@@ -714,7 +714,6 @@ extern int gModBindingMenuNode;
 extern int gModBindingMenuParam;
 
 extern bool gOpenModBindingMenu;
-extern float gModBindingMenuZoom;
 
 extern int gModRangeTypedField;
 
@@ -1299,7 +1298,6 @@ std::string FoldForSearch(const std::string& in);
       int current = 0;
       bool justOpened = false;
       bool focusSearch = false;
-      float zoom = 1.0f; // canvas zoom when opened from a node control (1 from panels)
       char filterBuf[64] = "";
    };
 
@@ -1312,13 +1310,6 @@ extern std::pair<int, int> gDropdownTestOpenKey;
 bool DropdownTestWantsOpen(bool registered, int nodeIndex, int paramIndex);
 
 extern bool gInsideNodeCanvas;
-
-// Zoom a popup opened from here should follow: the canvas zoom for a node control (floored at 0.5 so it
-// stays readable), 1 for panels and chrome.
-inline float PopupZoomNow()
-{
-   return gInsideNodeCanvas ? std::clamp(ed::GetCurrentZoom(), 0.5f, 1.0f) : 1.0f;
-}
 
 
 
@@ -2676,7 +2667,6 @@ void DrawShapeParams(ShapeNode* n);
                n2->LoadDeviceFile(device);
          };
          gDropdown.justOpened = true;
-         gDropdown.zoom = PopupZoomNow();
          gDropdown.focusSearch = focusSearch;
          gDropdown.filterBuf[0] = '\0';
       };
@@ -3109,7 +3099,6 @@ void EndAudioSection();
                gDropdown.onSelect = std::move(onSelect);
                gDropdown.current = safe;
                gDropdown.justOpened = true;
-               gDropdown.zoom = PopupZoomNow();
                gDropdown.focusSearch = false;
             }
             if (h.registered)
@@ -3207,7 +3196,6 @@ void EndAudioSection();
                      gDropdown.onSelect = std::move(onSelect);
                      gDropdown.current = safe;
                      gDropdown.justOpened = true;
-                     gDropdown.zoom = PopupZoomNow();
                      gDropdown.focusSearch = false;
                   }
                   if (h.registered)

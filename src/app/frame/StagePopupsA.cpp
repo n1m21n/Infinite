@@ -12,6 +12,7 @@ void DrawPopupsA(FrameCtx& fc)
    auto& searchBuf = fc.searchBuf;
    auto& searchJustOpened = fc.searchJustOpened;
 
+      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(320.0f, ImMax(120.0f, ImGui::GetMainViewport()->Size.y - 40.0f))); // popups: capped width, scroll past the window
       if (MenuParts::BeginPopup("##nodecontext"))
       {
          GraphNode* gn = FindNodeByIndex(gContextMenuNodeIndex);
@@ -341,11 +342,8 @@ void DrawPopupsA(FrameCtx& fc)
          gModRangeTypedPendingInit = false;
          gModRangeTypedNoAutoSelect = false;
       }
-      bool modbindOpen;
-      {
-         MenuParts::ZoomScope modbindZoom(gModBindingMenuZoom);
-         modbindOpen = MenuParts::BeginPopup("##modbind");
-      }
+      ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(320.0f, ImMax(120.0f, ImGui::GetMainViewport()->Size.y - 40.0f))); // popups: capped width, scroll past the window
+      const bool modbindOpen = MenuParts::BeginPopup("##modbind");
       if (modbindOpen)
       {
          Modulation& mod = Modulation::Instance();

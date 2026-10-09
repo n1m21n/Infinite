@@ -20,26 +20,18 @@ namespace MenuParts
    constexpr float kRow = 24.0f;              // row pitch of every menu / dropdown / list popup (was tok::tile, 28)
    constexpr float kPadY = kInset + 4.0f;     // popup padding: the row wash starts 4 pt above its text
 
-   // A popup born from a control inside a zoomed-out node canvas shrinks with it (clamped, so it stays readable):
-   // font, padding and row pitch all follow. Set by ZoomScope around the Begin call; 1 everywhere else.
-   inline float& Zoom() { static float z = 1.0f; return z; }
-   struct ZoomScope
-   {
-      float prev;
-      explicit ZoomScope(float z) : prev(Zoom()) { Zoom() = z; }
-      ~ZoomScope() { Zoom() = prev; }
-   };
+   // Popups are chrome, not canvas content: constant on-screen size at any canvas zoom (infinite-design-system).
 
    // Pushed around a BeginMenu / BeginPopup call: the popup's padding is read when it opens.
    inline void PushPopupPad()
    {
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2((kInset + kTextInset) * Zoom(), kPadY * Zoom()));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kInset + kTextInset, kPadY));
    }
 
    // Inside a popup body, after BeginMenu returned true: row pitch 24, ImGui's own fills hidden.
    inline void BeginContent()
    {
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, kRow * Zoom() - ImGui::GetTextLineHeight()));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, kRow - ImGui::GetTextLineHeight()));
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
@@ -137,8 +129,6 @@ namespace MenuParts
       ImGui::PopStyleVar();
       if (open)
       {
-         if (Zoom() != 1.0f)
-            ImGui::SetWindowFontScale(Zoom());
          BeginContent();
       }
       return open;

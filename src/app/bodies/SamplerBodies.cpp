@@ -1707,7 +1707,6 @@ namespace app
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = current;
          gDropdown.justOpened = true;
-         gDropdown.zoom = PopupZoomNow();
          gDropdown.focusSearch = focusSearch;
          gDropdown.filterBuf[0] = '\0';
       }

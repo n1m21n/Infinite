@@ -391,7 +391,6 @@ bool gHeadlessNeedProbe = false;
    int gModBindingMenuParam = -1;
 
    bool gOpenModBindingMenu = false;
-   float gModBindingMenuZoom = 1.0f;
 
    // Hover-and-type for the ##modbind popup's lo/hi fields, matching the
    // hover+type convention every other param field in this file uses (see

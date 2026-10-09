@@ -112,7 +112,6 @@ namespace app
             };
             gDropdown.current = currentIdx;
             gDropdown.justOpened = true;
-            gDropdown.zoom = PopupZoomNow();
             gDropdown.focusSearch = false;
          }
          PopDropdownStyle();

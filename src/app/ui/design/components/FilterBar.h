@@ -54,7 +54,6 @@ namespace FilterBar
          app::gDropdown.onSelect = std::move(onSelect);
          app::gDropdown.current = current;
          app::gDropdown.justOpened = true;
-         app::gDropdown.zoom = 1.0f;
          app::gDropdown.focusSearch = false;
       }
 

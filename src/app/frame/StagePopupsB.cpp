@@ -371,20 +371,15 @@ void DrawPopupsB(FrameCtx& fc)
       const float dropdownTextPadX = 8.0f;
       float dropdownMaxTextW = 0.0f;
       for (const std::string& opt : gDropdown.options)
-         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(opt.c_str()).x * gDropdown.zoom);
+         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(opt.c_str()).x);
       for (const std::string& cat : gDropdown.categories)
-         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(cat.c_str()).x * gDropdown.zoom);
-      const float ddZoom = gDropdown.zoom;
-      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * 2.0f * ddZoom
-                                                 + dropdownTextPadX * 2.0f * ddZoom
+         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(cat.c_str()).x);
+      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * 2.0f
+                                                 + dropdownTextPadX * 2.0f
                                                  + ImGui::GetStyle().ScrollbarSize,
-                                              160.0f * ddZoom, 400.0f * ddZoom);
-      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(520 * ddZoom, 480 * ddZoom));
-      bool ddOpen;
-      {
-         MenuParts::ZoomScope ddZoomScope(ddZoom);
-         ddOpen = MenuParts::BeginPopup("##dropdown");
-      }
+                                              160.0f, 280.0f);
+      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(280.0f, ImMin(480.0f, ImGui::GetMainViewport()->Size.y - 40.0f)));
+      const bool ddOpen = MenuParts::BeginPopup("##dropdown");
       if (ddOpen)
       {
          const bool showSearch = gDropdown.focusSearch || gDropdown.options.size() >= kDropdownAutoSearchMin;
@@ -637,7 +632,43 @@ void DrawPopupsB(FrameCtx& fc)
          ImVec2 canvasMid;
          if (sTrashLink != 0 && FindLink(sTrashLink) != nullptr && now - sTrashSeen < 0.12 && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
          {
-            const ImVec2 c = ed::CanvasToScreen(canvasMid);
+            ImVec2 c = ed::CanvasToScreen(canvasMid);
+            // Drawn on the foreground list, so it must be hidden by hand wherever something else is in front of the
+            // cable's midpoint: a floating window / popup over it, or a node that covers it.
+            bool covered = false;
+            {
+               ImGuiContext& g = *ImGui::GetCurrentContext();
+               const ImGuiWindow* canvasRoot = ImGui::GetCurrentWindow()->RootWindow;
+               bool above = false;
+               for (ImGuiWindow* w : g.Windows)
+               {
+                  if (w->RootWindow == canvasRoot)
+                  {
+                     above = true;
+                     continue;
+                  }
+                  if (above && w->WasActive && !w->Hidden && (w->Flags & (ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_Tooltip)) == 0 &&
+                      w->Rect().Contains(c))
+                  {
+                     covered = true;
+                     break;
+                  }
+               }
+               for (const GraphNode& gn : gNodes)
+               {
+                  if (covered)
+                     break;
+                  const ImVec2 np = ed::CanvasToScreen(ed::GetNodePosition(gn.NodeId()));
+                  const ImVec2 ns = ed::CanvasToScreen(ed::GetNodePosition(gn.NodeId()) + ed::GetNodeSize(gn.NodeId()));
+                  if (c.x >= np.x && c.x <= ns.x && c.y >= np.y && c.y <= ns.y)
+                     covered = true;
+               }
+            }
+            if (covered)
+            {
+               sTrashLink = 0;
+               goto trashDone;
+            }
             // Scales with the canvas zoom so it stays proportionate to the cable when zoomed out.
             const float zoom = ed::CanvasToScreen(ImVec2(1.0f, 0.0f)).x - ed::CanvasToScreen(ImVec2(0.0f, 0.0f)).x;
             const float k = std::min(1.0f, std::max(0.4f, zoom));
@@ -670,6 +701,7 @@ void DrawPopupsB(FrameCtx& fc)
          }
          else
             sTrashLink = 0;
+      trashDone:;
       }
 
       gHoveringItem = ed::GetHoveredNode() || ed::GetHoveredPin() || ed::GetHoveredLink();
@@ -731,8 +763,6 @@ void DrawPopupsB(FrameCtx& fc)
                gDropdown.onSelect = [](int) {};
                gDropdown.current = 12;
                gDropdown.justOpened = true;
-               const char* z = getenv("INFINITE_GALLERYZOOM");
-               gDropdown.zoom = std::clamp(z ? (float)atof(z) : 1.0f, 0.5f, 1.0f);
                gDropdown.focusSearch = false;
                gDropdown.filterBuf[0] = '\0';
             }

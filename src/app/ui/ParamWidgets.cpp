@@ -423,7 +423,6 @@ namespace app
          gModBindingMenuNode = nodeIndex;
          gModBindingMenuParam = paramIndex;
          gOpenModBindingMenu = true;
-         gModBindingMenuZoom = PopupZoomNow();
          gParamRightClickConsumedThisFrame = true;
       }
    }
@@ -655,7 +654,6 @@ namespace app
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
-         gDropdown.zoom = PopupZoomNow();
          gDropdown.focusSearch = false;
       }
       if (h.registered && h.draw)
