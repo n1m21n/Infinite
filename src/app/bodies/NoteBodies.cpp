@@ -764,8 +764,9 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
       {
-         // Selectors on their own row so the scale name is never clipped; knobs below on a 3-cell grid.
-         AudioKnobRow sel(2);
+         // Selectors on their own row, left-aligned on the same 3-cell grid as the knobs below (P1, P3): a dropdown
+         // is at most 112 wide in any cell, so the scale name is no more clipped here than in a 2-cell row.
+         AudioKnobRow sel(3);
          if (n->useGlobalScale)
             ImGui::BeginDisabled();
          sel.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
@@ -774,6 +775,7 @@ namespace app
                       [n](int i) { PushUndoCheckpoint(); n->root = i; });
          if (n->useGlobalScale)
             ImGui::EndDisabled();
+         sel.Skip();
          sel.End();
       }
       {
@@ -1779,9 +1781,10 @@ namespace app
       }
 
       {
+         ImGui::Dummy(ImVec2(0.0f, 4.0f));
          AudioKnobRow row(4);
-         row.KnobInt("steps", &n->steps, 1, NoteSequencerNode::kMaxSteps);
          DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
+         row.KnobInt("steps", &n->steps, 1, NoteSequencerNode::kMaxSteps);
          row.Knob("gate", &n->gatePercent, 1.0f, 100.0f, "%.0f%%", kKnobSmall);
          row.End();
       }
@@ -1865,6 +1868,8 @@ namespace app
             }
             dl->PopClipRect();
          }
+         else
+            AudioViz::IdleLabel(AudioViz::Frame{dl, origin, br}, "no file");
          ImGui::Dummy(ImVec2(w, h));
       }
 
