@@ -1,6 +1,7 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/StateRing.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -160,12 +161,11 @@ namespace app
       // The ring hugs the control itself: the slider's own box, the knob's
       // circle, the fader's track. Never the pin dot or the caption.
       ImDrawList* kdl = ImGui::GetWindowDrawList();
-      const ImU32 ringCol = ImGui::GetColorU32(ImGuiCol_NavHighlight);
       if (circle)
-         kdl->AddCircle(ImVec2((rmin.x + rmax.x) * 0.5f, (rmin.y + rmax.y) * 0.5f), (rmax.x - rmin.x) * 0.5f + 1.0f,
-                        ringCol, 48, 2.0f);
+         StateRing::DrawCircle(kdl, ImVec2((rmin.x + rmax.x) * 0.5f, (rmin.y + rmax.y) * 0.5f), (rmax.x - rmin.x) * 0.5f,
+                               StateRing::Kind::Select, IsThemeLight());
       else
-         kdl->AddRect(ImVec2(rmin.x - 2.0f, rmin.y - 2.0f), ImVec2(rmax.x + 2.0f, rmax.y + 2.0f), ringCol, 4.0f, 0, 2.0f);
+         StateRing::Draw(kdl, rmin, rmax, StateRing::Kind::Select, IsThemeLight(), tok::radius_field);
       bool changed = false;
       if (gKbNudge != 0 && !Modulation::Instance().IsModulated(nodeIndex, paramIndex))
       {
@@ -473,8 +473,7 @@ namespace app
          return 0;
       const ImVec2 rmin = ImGui::GetItemRectMin();
       const ImVec2 rmax = ImGui::GetItemRectMax();
-      ImGui::GetWindowDrawList()->AddRect(ImVec2(rmin.x - 2.0f, rmin.y - 2.0f), ImVec2(rmax.x + 2.0f, rmax.y + 2.0f),
-                                          ImGui::GetColorU32(ImGuiCol_NavHighlight), 4.0f, 0, 2.0f);
+      StateRing::Draw(ImGui::GetWindowDrawList(), rmin, rmax, StateRing::Kind::Select, IsThemeLight(), tok::radius_field);
       const int step = gKbNudge > 0 ? 1 : (gKbNudge < 0 ? -1 : 0);
       gKbNudge = 0;
       return step;

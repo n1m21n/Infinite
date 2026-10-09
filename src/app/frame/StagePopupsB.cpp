@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/StateRing.h"
 #include "imgui_internal.h"
 #include "app/ui/design/components/LibraryParts.h"
 #include "app/ui/design/TokenColors.h"
@@ -734,18 +735,10 @@ void DrawPopupsB(FrameCtx& fc)
             // would land in the wrong spot at any pan/zoom.
             {
                ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-               const ImU32 glowCol = tok::U32(tok::pal::c_00E6FF1C);
-               const ImU32 ringCol = tok::U32(tok::pal::c_00E6FFA0);
                if (pInfo.isCircle)
-               {
-                  hoverDl->AddCircleFilled(pInfo.shapeCenter, pInfo.shapeRadius, glowCol, 24);
-                  hoverDl->AddCircle(pInfo.shapeCenter, pInfo.shapeRadius, ringCol, 24, 1.0f);
-               }
+                  StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
                else
-               {
-                  hoverDl->AddRectFilled(pInfo.rowMin, pInfo.rowMax, glowCol, 4.0f);
-                  hoverDl->AddRect(pInfo.rowMin, pInfo.rowMax, ringCol, 4.0f, 0, 1.0f);
-               }
+                  StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_field);
             }
             ed::Suspend();
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);

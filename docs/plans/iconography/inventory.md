@@ -7,62 +7,32 @@ Counts are call sites, not on-screen instances. Test/bench files are excluded.
 
 | Class | Top bar + menus | Modulation matrix | Performance mode | Viewport panel | Timeline / Arrange | Browser / Library | Canvas (nodes shell, cables, minimap) | Node bodies | Shared widgets | Popups + context menus | Side panels + docking | Settings + help windows | Keyboard navigation | Total |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Icon (Tabler, drawn) | 10 | 3 | · | 1 | 26 | 9 | · | 1 | · | · | · | 2 | · | **52** |
-| Icon (font glyph) | · | · | · | · | · | · | · | · | · | 2 | · | · | · | **2** |
-| Button | 13 | 14 | 13 | 6 | 54 | 10 | 32 | 181 | 6 | 1 | 29 | 15 | · | **374** |
+| Icon (Tabler, drawn) | · | · | · | · | · | · | · | · | · | · | · | · | · | **0** |
+| Icon (font glyph) | · | · | · | · | · | · | · | · | · | · | · | · | · | **0** |
+| Button | 7 | 12 | 8 | 6 | 25 | 9 | 32 | 181 | 6 | 1 | 29 | 2 | · | **318** |
 | Toggle (bypass/eye/viewport/scale) | · | 4 | · | · | · | · | 5 | · | · | · | · | · | 1 | **10** |
-| Checkbox | 5 | 5 | · | · | 5 | · | 1 | 113 | · | · | · | 9 | · | **138** |
-| Dropdown | 1 | · | 1 | 2 | 5 | 3 | · | 133 | 1 | · | · | 14 | · | **160** |
+| Checkbox | · | 2 | · | · | 1 | · | 1 | 113 | 1 | · | · | · | · | **118** |
+| Dropdown | 1 | · | 1 | 2 | 2 | 1 | · | 133 | 1 | · | · | 13 | · | **154** |
 | Knob | · | 7 | 2 | · | 2 | · | 4 | 324 | · | · | · | · | · | **339** |
-| Slider / fader / drag | 8 | 14 | 3 | · | 3 | · | 2 | 609 | 3 | 1 | · | 9 | · | **652** |
-| Text / number field | 3 | 4 | 2 | · | 15 | 1 | 6 | 11 | · | 5 | 7 | 4 | · | **58** |
-| Colour swatch / picker | · | 2 | 1 | · | 4 | · | 1 | 44 | · | 1 | · | 2 | · | **55** |
-| List row / tree | 3 | 4 | 1 | 2 | 5 | 7 | · | 2 | · | 1 | 7 | 23 | · | **55** |
+| Slider / fader / drag | · | 14 | 2 | · | 2 | · | 2 | 609 | 3 | 1 | · | 9 | · | **642** |
+| Text / number field | 1 | 4 | 2 | · | 15 | · | 6 | 11 | · | 4 | 7 | 2 | · | **52** |
+| Colour swatch / picker | · | 2 | 1 | · | 3 | · | 1 | 44 | · | 1 | · | · | · | **52** |
+| List row / tree | 3 | 4 | 1 | 2 | 6 | 4 | · | 2 | · | 1 | · | 8 | · | **31** |
 | Table | · | 1 | · | · | · | · | · | · | · | · | · | 7 | · | **8** |
 | Tabs | · | · | · | · | · | · | · | · | · | · | · | 7 | · | **7** |
-| Menu / menu item | 37 | 8 | 60 | 3 | 56 | 6 | · | · | · | 58 | 4 | 1 | · | **233** |
-| Popup / context menu | 6 | 3 | 5 | 2 | 31 | 3 | 7 | · | · | 18 | 2 | 2 | 3 | **82** |
-| Tooltip | 8 | 1 | 4 | · | 19 | 2 | 4 | 1 | 3 | 3 | 3 | 10 | 1 | **59** |
-| Mouse cursor | 3 | 1 | 1 | 1 | 21 | · | · | 15 | · | 2 | 1 | · | · | **45** |
+| Menu / menu item | · | 8 | 60 | 3 | 56 | 6 | · | · | · | 58 | 4 | 1 | · | **196** |
+| Popup / context menu | 5 | 3 | 5 | 2 | 32 | 3 | 7 | · | · | 18 | 2 | 2 | 3 | **82** |
+| Tooltip | 7 | 1 | 4 | · | 18 | 2 | 4 | 1 | 3 | 3 | 3 | 10 | 1 | **57** |
+| Mouse cursor | 1 | 1 | 1 | 1 | 21 | · | · | 15 | · | 2 | 1 | · | · | **43** |
 | Drag and drop | · | · | 3 | · | 4 | · | · | · | · | · | · | · | · | **7** |
 | Mod dot / pin | · | 3 | · | · | · | · | 6 | 4 | 2 | · | · | · | · | **15** |
-| Separator | 14 | 3 | 8 | 1 | 30 | 3 | 4 | 62 | · | 24 | 10 | 29 | · | **188** |
-| Hand-drawn shape | 1 | 92 | 39 | 4 | 79 | 1 | 12 | 496 | 12 | 8 | 3 | 2 | · | **749** |
-| Hand-drawn text | 2 | 7 | 3 | 3 | 7 | 3 | 7 | 85 | 1 | 2 | · | · | · | **120** |
-| Literal colour | 21 | 235 | 82 | 8 | 158 | 3 | 29 | 862 | 83 | 24 | 5 | 41 | · | **1551** |
-| Close / cross control | · | 3 | · | 1 | 1 | 1 | · | 1 | · | · | · | 2 | · | **9** |
+| Separator | 10 | 3 | 8 | 1 | 13 | · | 4 | 62 | · | 24 | 7 | 2 | · | **134** |
+| Hand-drawn shape | 1 | 80 | 43 | 6 | 78 | 1 | 12 | 496 | 14 | 8 | 2 | 2 | · | **743** |
+| Hand-drawn text | 1 | 7 | 6 | 4 | 9 | 3 | 7 | 85 | 1 | 2 | · | · | · | **125** |
+| Literal colour | · | 2 | 4 | · | 9 | · | 2 | 57 | 1 | · | · | · | · | **75** |
+| Close / cross control | · | · | · | · | · | · | · | · | · | · | · | · | · | **0** |
 
 ## Drawn icons in use (each must get an Infinite Glyph)
 
 | Tabler icon | Uses | Surfaces |
 |---|---|---|
-| X | 9 | Browser / Library, Modulation matrix, Node bodies, Settings + help windows, Timeline / Arrange, Viewport panel |
-| PlayerPause | 3 | Browser / Library, Timeline / Arrange, Top bar + menus |
-| PlayerPlay | 3 | Browser / Library, Timeline / Arrange, Top bar + menus |
-| Scissors | 3 | Timeline / Arrange |
-| Zoom | 3 | Timeline / Arrange |
-| Pencil | 3 | Timeline / Arrange |
-| ChevronDown | 3 | Browser / Library, Timeline / Arrange |
-| PlayerRewind | 2 | Timeline / Arrange, Top bar + menus |
-| Refresh | 2 | Browser / Library |
-| Metronome | 1 | Top bar + menus |
-| Search | 1 | Top bar + menus |
-| Placeholder | 1 | Top bar + menus |
-| Box3D | 1 | Top bar + menus |
-| Disc | 1 | Top bar + menus |
-| GridDots | 1 | Top bar + menus |
-| LayoutSidebar | 1 | Top bar + menus |
-| Magnet | 1 | Timeline / Arrange |
-| Repeat | 1 | Timeline / Arrange |
-| Pointer | 1 | Timeline / Arrange |
-| Trim | 1 | Timeline / Arrange |
-| Range | 1 | Timeline / Arrange |
-| Hand | 1 | Timeline / Arrange |
-| Flag | 1 | Timeline / Arrange |
-| LineHeight | 1 | Timeline / Arrange |
-| Edit | 1 | Timeline / Arrange |
-| ChevronRight | 1 | Timeline / Arrange |
-| Folder | 1 | Timeline / Arrange |
-| Plus | 1 | Browser / Library |
-| ChevronUp | 1 | Browser / Library |
-| Star | 1 | Browser / Library |

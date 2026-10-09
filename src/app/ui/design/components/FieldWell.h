@@ -67,13 +67,15 @@ namespace FieldWell
       edge.w = 0.6f;
       ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_Border, edge);
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, ImGui::GetStyleColorVec4(ImGuiCol_PopupBg));
+      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
    }
 
    inline void PopTypedEditStyle()
    {
       ImGui::PopStyleVar();
-      ImGui::PopStyleColor(2);
+      ImGui::PopStyleColor(4);
    }
 
    // Slider in the well: accent fill drawn behind the value text; double-click or Ctrl+click types a number.

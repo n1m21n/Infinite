@@ -110,4 +110,41 @@ namespace MenuParts
                            ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.12f)), 1.0f);
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 8.0f);
    }
+
+   // Popups opened from the canvas / panels: same padding, row pitch and wash as the menu bar's popups.
+   inline bool BeginPopup(const char* id, ImGuiWindowFlags flags = 0)
+   {
+      PushPopupPad();
+      const bool open = ImGui::BeginPopup(id, flags);
+      ImGui::PopStyleVar();
+      if (open)
+         BeginContent();
+      return open;
+   }
+
+   inline bool BeginContextItem(const char* id, ImGuiPopupFlags flags = ImGuiPopupFlags_MouseButtonRight)
+   {
+      PushPopupPad();
+      const bool open = ImGui::BeginPopupContextItem(id, flags);
+      ImGui::PopStyleVar();
+      if (open)
+         BeginContent();
+      return open;
+   }
+
+   inline bool BeginContextWindow(const char* id, ImGuiPopupFlags flags)
+   {
+      PushPopupPad();
+      const bool open = ImGui::BeginPopupContextWindow(id, flags);
+      ImGui::PopStyleVar();
+      if (open)
+         BeginContent();
+      return open;
+   }
+
+   inline void EndPopup()
+   {
+      EndContent();
+      ImGui::EndPopup();
+   }
 }

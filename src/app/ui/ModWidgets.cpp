@@ -476,7 +476,7 @@ namespace app
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
-         if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
+         if (ImGui::IsItemActive() && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().RecordClockNow());
@@ -556,7 +556,7 @@ namespace app
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
-         if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
+         if (ImGui::IsItemActive() && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().RecordClockNow());
@@ -701,7 +701,7 @@ namespace app
             changed = true;
          }
       }
-      if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
+      if (active && gestureNodeIndex >= 0 && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
          GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
          GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().RecordClockNow());
@@ -1094,7 +1094,7 @@ namespace app
             changed = true;
          }
       }
-      if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
+      if (active && gestureNodeIndex >= 0 && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
          GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
          GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().RecordClockNow());
@@ -1401,7 +1401,9 @@ namespace app
          char buf[256];
          snprintf(buf, sizeof(buf), "%s", gTypedParamText[editKey].c_str());
          const std::string typedId = std::string("##typed") + label;
+         FieldWell::PushTypedEditStyle();
          const bool entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
+         FieldWell::PopTypedEditStyle();
          gTypedParamText[editKey] = buf;
          if (gTypedParamPendingInit.count(editKey) && ImGui::IsItemActive())
          {
@@ -1529,7 +1531,7 @@ namespace app
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
-         if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
+         if (ImGui::IsItemActive() && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().RecordClockNow());

@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/components/LibraryParts.h"
@@ -64,10 +65,7 @@ void DrawSidePanels(FrameCtx& fc)
          if (hoveredCompatible != nullptr)
          {
             ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-            const ImU32 glowCol = tok::U32(tok::pal::c_00E6FF28);
-            const ImU32 ringCol = tok::U32(tok::pal::c_00E6FFC8);
-            hoverDl->AddRectFilled(hoveredP, ImVec2(hoveredP.x + hoveredS.x, hoveredP.y + hoveredS.y), glowCol, 6.0f);
-            hoverDl->AddRect(hoveredP, ImVec2(hoveredP.x + hoveredS.x, hoveredP.y + hoveredS.y), ringCol, 6.0f, 0, 2.0f);
+            StateRing::Draw(hoverDl, hoveredP, ImVec2(hoveredP.x + hoveredS.x, hoveredP.y + hoveredS.y), StateRing::Kind::Target, IsThemeLight());
 
             ed::Suspend();
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
