@@ -87,7 +87,11 @@ void DrawMenuBar(FrameCtx& fc)
       if (menuBarOpen)
       {
          auto& MenuTile = TopBarParts::MenuTile;
-         if (MenuTile(L("File")))
+         // One compact tile, closed by default: File and Edit are submenus, then the former Menu items.
+         if (MenuTile(L("Menu")))
+         {
+            MenuParts::BeginContent();
+            if (MenuParts::SubMenu(L("File")))
          {
             MenuParts::BeginContent();
             if (MenuParts::Item(L("New"), MODKEY "+N"))
@@ -138,7 +142,7 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndMenu();
          }
 
-         if (MenuTile(L("Edit")))
+            if (MenuParts::SubMenu(L("Edit")))
          {
             MenuParts::BeginContent();
             if (MenuParts::Item(L("Undo"), MODKEY "+Z", false, !gUndoStack.empty()))
@@ -173,9 +177,8 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndMenu();
          }
 
-         if (MenuTile(L("Menu")))
+            MenuParts::Separator();
          {
-            MenuParts::BeginContent();
             if (MenuParts::Item(L("Settings..."), MODKEY "+0"))
                gSettingsOpen = true;
 
@@ -340,6 +343,7 @@ void DrawMenuBar(FrameCtx& fc)
             MenuParts::Separator();
             if (MenuParts::Item(L("Quit")))
                RequestClose(window);
+         }
             MenuParts::EndContent();
             ImGui::EndMenu();
          }
