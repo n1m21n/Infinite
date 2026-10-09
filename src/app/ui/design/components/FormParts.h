@@ -12,6 +12,7 @@
 #include "core/TablerIcons.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/CheckBox.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/SectionCard.h"
@@ -90,14 +91,22 @@ namespace FormParts
       Label(label);
       ImGui::SetNextItemWidth(kControlW);
       FieldWell::PushStyle();
+      MenuParts::PushPopupPad();
       const bool open = ImGui::BeginCombo(Id(label).c_str(), preview, ImGuiComboFlags_NoArrowButton);
+      ImGui::PopStyleVar();
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
       glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
                              ImGui::GetColorU32(ImGuiCol_TextDisabled));
       FieldWell::PopStyle();
+      if (open)
+         MenuParts::BeginContent();
       return open;
    }
-   inline void EndCombo() { ImGui::EndCombo(); }
+   inline void EndCombo()
+   {
+      MenuParts::EndContent();
+      ImGui::EndCombo();
+   }
 
    // Unlabelled well combo for toolbars: `w` wide, items as a zero-separated list.
    inline bool BareCombo(const char* id, int* current, const char* const* arr, int n, float w)
@@ -106,7 +115,9 @@ namespace FormParts
       const char* cur = (*current >= 0 && *current < (int)list.size()) ? list[*current] : "";
       ImGui::SetNextItemWidth(w);
       FieldWell::PushStyle();
+      MenuParts::PushPopupPad();
       const bool open = ImGui::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
+      ImGui::PopStyleVar();
       const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
       glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
                              ImGui::GetColorU32(ImGuiCol_TextDisabled));
@@ -114,12 +125,14 @@ namespace FormParts
       bool changed = false;
       if (open)
       {
+         MenuParts::BeginContent();
          for (int i = 0; i < (int)list.size(); ++i)
-            if (ImGui::Selectable(list[i], *current == i))
+            if (MenuParts::Choice(list[i], *current == i))
             {
                *current = i;
                changed = true;
             }
+         MenuParts::EndContent();
          ImGui::EndCombo();
       }
       return changed;
@@ -136,12 +149,12 @@ namespace FormParts
       if (BeginCombo(label, cur))
       {
          for (int i = 0; i < (int)list.size(); ++i)
-            if (ImGui::Selectable(list[i], *current == i))
+            if (MenuParts::Choice(list[i], *current == i))
             {
                *current = i;
                changed = true;
             }
-         ImGui::EndCombo();
+         EndCombo();
       }
       return changed;
    }

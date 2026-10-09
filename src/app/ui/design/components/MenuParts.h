@@ -7,6 +7,7 @@
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiAnim.h"
+#include "app/AppShared.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -74,6 +75,18 @@ namespace MenuParts
       const float onv = UiAnim::Hover(id ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);
       CheckBox::Draw(w->DrawList, ImVec2(w->Pos.x + w->Size.x - kInset - kTextInset - CheckBox::kSize,
                                          std::floor((mn.y + mx.y - CheckBox::kSize) * 0.5f)), onv, hv);
+      return r;
+   }
+
+   // Dropdown-list row: same 28 pt row and wash as a menu item; the current choice reads in the accent colour.
+   inline bool Choice(const char* label, bool selected)
+   {
+      if (selected)
+         ImGui::PushStyleColor(ImGuiCol_Text, app::AccentEmphasisSelected());
+      const bool r = ImGui::Selectable(label, false);
+      if (selected)
+         ImGui::PopStyleColor();
+      Wash(ImGui::IsItemHovered(), ImGui::IsItemActive(), false);
       return r;
    }
 

@@ -75,7 +75,7 @@ namespace app
                for (int i = 0; i < (int)presets.size(); i++)
                {
                   const bool selected = (currentPreset == i);
-                  if (ImGui::Selectable(presets[i].c_str(), selected))
+                  if (MenuParts::Choice(presets[i].c_str(), selected))
                   {
                      CategoryColors::SetPreset(i);
                      ApplyTheme();
@@ -86,7 +86,7 @@ namespace app
                   const float x = rMax.x - 8.0f - kSwatchStripW;
                   drawThemeSwatches(ImVec2(x, y), kSwatchSz, kSwatchGap, CategoryColors::UiThemeForPreset(i));
                }
-               ImGui::EndCombo();
+               FormParts::EndCombo();
             }
             ImGui::SameLine();
             // Fingerprint swatch for the currently-selected preset, so the
@@ -229,13 +229,13 @@ namespace app
                {
                   for (const InterfaceFont& f : kInterfaceFonts)
                   {
-                     if (ImGui::Selectable(f.label, currentFont == f.id) && currentFont != f.id)
+                     if (MenuParts::Choice(f.label, currentFont == f.id) && currentFont != f.id)
                      {
                         CategoryColors::SetUiFont(f.id); // saves
                         UiScale::RequestRescale();       // rebakes the atlas with the new face
                      }
                   }
-                  ImGui::EndCombo();
+                  FormParts::EndCombo();
                }
             }
 
@@ -258,14 +258,14 @@ namespace app
                   for (const I18n::Language& l : I18n::Languages())
                   {
                      const std::string label = labelOf(l) + "##lang_" + l.code;
-                     if (ImGui::Selectable(label.c_str(), current == l.code) && current != l.code)
+                     if (MenuParts::Choice(label.c_str(), current == l.code) && current != l.code)
                      {
                         CategoryColors::SetLanguage(l.code); // saves
                         I18n::RequestLanguage(l.code);
                         UiScale::RequestRescale(); // applies the table and rebakes glyphs
                      }
                   }
-                  ImGui::EndCombo();
+                  FormParts::EndCombo();
                }
             }
 
@@ -277,12 +277,12 @@ namespace app
             if (FormParts::BeginCombo(L("Preview Background"), kBackdropStyles[backdropStyle]))
             {
                for (int bi = 0; bi < 2; ++bi)
-                  if (ImGui::Selectable(kBackdropStyles[bi], backdropStyle == bi))
+                  if (MenuParts::Choice(kBackdropStyles[bi], backdropStyle == bi))
                   {
                      gCheckerboardBackdrop = (bi == 0);
                      SaveGeneralSettings();
                   }
-               ImGui::EndCombo();
+               FormParts::EndCombo();
             }
 
             SectionCard::End();
@@ -320,12 +320,12 @@ namespace app
                if (FormParts::BeginCombo(L("Position"), kCorners[gMinimapCorner]))
                {
                   for (int i = 0; i < 4; i++)
-                     if (ImGui::Selectable(kCorners[i], i == gMinimapCorner))
+                     if (MenuParts::Choice(kCorners[i], i == gMinimapCorner))
                      {
                         gMinimapCorner = i;
                         SaveWorkspaceSettings();
                      }
-                  ImGui::EndCombo();
+                  FormParts::EndCombo();
                }
                FormParts::SliderFloat(L("Size"), &gMinimapSize, 120.0f, 360.0f, "%.0f px");
                if (ImGui::IsItemDeactivatedAfterEdit())
@@ -389,16 +389,16 @@ namespace app
                   outputLabel = d.name;
             if (FormParts::BeginCombo(L("Output device"), outputLabel.c_str()))
             {
-               if (ImGui::Selectable(L("System default"), gAudioOutputDeviceId == 0))
+               if (MenuParts::Choice(L("System default"), gAudioOutputDeviceId == 0))
                   gAudioOutputDeviceId = 0;
                for (const Platform::AudioDeviceInfo& d : devices)
                {
                   if (!d.isOutput)
                      continue;
-                  if (ImGui::Selectable(d.name.c_str(), d.deviceId == gAudioOutputDeviceId))
+                  if (MenuParts::Choice(d.name.c_str(), d.deviceId == gAudioOutputDeviceId))
                      gAudioOutputDeviceId = d.deviceId;
                }
-               ImGui::EndCombo();
+               FormParts::EndCombo();
             }
 
             std::string inputLabel = (gAudioInputDeviceId == 0) ? T("System default") : T("Unknown device");
@@ -407,7 +407,7 @@ namespace app
                   inputLabel = d.name;
             if (FormParts::BeginCombo(L("Input device"), inputLabel.c_str()))
             {
-               if (ImGui::Selectable(L("System default"), gAudioInputDeviceId == 0))
+               if (MenuParts::Choice(L("System default"), gAudioInputDeviceId == 0))
                {
                   gAudioInputDeviceId = 0;
                   Platform::AudioInputCaptureSetDevice(0);
@@ -416,13 +416,13 @@ namespace app
                {
                   if (!d.isInput)
                      continue;
-                  if (ImGui::Selectable(d.name.c_str(), d.deviceId == gAudioInputDeviceId))
+                  if (MenuParts::Choice(d.name.c_str(), d.deviceId == gAudioInputDeviceId))
                   {
                      gAudioInputDeviceId = d.deviceId;
                      Platform::AudioInputCaptureSetDevice(d.deviceId);
                   }
                }
-               ImGui::EndCombo();
+               FormParts::EndCombo();
             }
 
             static const double kSampleRates[] = { 44100.0, 48000.0, 88200.0, 96000.0 };
@@ -438,16 +438,16 @@ namespace app
 #endif
             if (FormParts::BeginCombo(L("Sample rate"), rateLabel.c_str()))
             {
-               if (ImGui::Selectable(L("Device default"), gAudioSampleRate == 0.0))
+               if (MenuParts::Choice(L("Device default"), gAudioSampleRate == 0.0))
                   gAudioSampleRate = 0.0;
                for (double rate : kSampleRates)
                {
                   char label[32];
                   snprintf(label, sizeof(label), "%.0f Hz", rate);
-                  if (ImGui::Selectable(label, gAudioSampleRate == rate))
+                  if (MenuParts::Choice(label, gAudioSampleRate == rate))
                      gAudioSampleRate = rate;
                }
-               ImGui::EndCombo();
+               FormParts::EndCombo();
             }
 #if defined(_WIN32)
             ImGui::EndDisabled();
@@ -467,10 +467,10 @@ namespace app
                {
                   char label[16];
                   snprintf(label, sizeof(label), "%d", frames);
-                  if (ImGui::Selectable(label, gAudioBufferFrames == frames))
+                  if (MenuParts::Choice(label, gAudioBufferFrames == frames))
                      gAudioBufferFrames = frames;
                }
-               ImGui::EndCombo();
+               FormParts::EndCombo();
             }
 #if defined(_WIN32)
             ImGui::EndDisabled();
@@ -489,12 +489,12 @@ namespace app
                if (FormParts::BeginCombo(L("Output mode"), kOutputModeLabels[gAudioOutputMode]))
                {
                   for (int i = 0; i < 3; i++)
-                     if (ImGui::Selectable(kOutputModeLabels[i], gAudioOutputMode == i))
+                     if (MenuParts::Choice(kOutputModeLabels[i], gAudioOutputMode == i))
                      {
                         gAudioOutputMode = i;
                         SaveAudioSettings();
                      }
-                  ImGui::EndCombo();
+                  FormParts::EndCombo();
                }
                if (ImGui::IsItemHovered())
                   HelpTip("%s", T("Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it."));
@@ -510,12 +510,12 @@ namespace app
             if (FormParts::BeginCombo(L("Oversampling"), kOversampleLabels[oversampleIdx]))
             {
                for (int i = 0; i < 3; i++)
-                  if (ImGui::Selectable(kOversampleLabels[i], oversampleIdx == i))
+                  if (MenuParts::Choice(kOversampleLabels[i], oversampleIdx == i))
                   {
                      gAudioOversample = kOversampleValues[i];
                      SaveAudioSettings();
                   }
-               ImGui::EndCombo();
+               FormParts::EndCombo();
             }
 
             if (audioRunning)
@@ -615,13 +615,13 @@ namespace app
             {
                for (int i = 0; i < 4; i++)
                {
-                  if (ImGui::Selectable(kFpsLabels[i], current == i))
+                  if (MenuParts::Choice(kFpsLabels[i], current == i))
                   {
                      gTargetFps = kFpsValues[i];
                      SaveGeneralSettings();
                   }
                }
-               ImGui::EndCombo();
+               FormParts::EndCombo();
             }
             ImGui::EndDisabled();
             if (gVsync && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -665,12 +665,12 @@ namespace app
             {
                for (int i = 0; i < 3; i++)
                {
-                  if (ImGui::Selectable(kCapLabels[i], capIdx == i))
+                  if (MenuParts::Choice(kCapLabels[i], capIdx == i))
                   {
                      MovementLog::SetRetentionCapBytes(kCapValues[i]);
                   }
                }
-               ImGui::EndCombo();
+               FormParts::EndCombo();
             }
 
             ImGui::Spacing();
