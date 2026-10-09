@@ -1414,7 +1414,7 @@ namespace app
          const bool isPlayhead = (playStep == s);
 
          const bool isLight = IsThemeLight();
-         dl->AddRectFilled(cellMin, cellMax, isLight ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_0B0C10FF), 4.0f);
+         dl->AddRectFilled(cellMin, cellMax, isLight ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_0B0C10FF), 2.0f);
          if (on)
             dl->AddRectFilled(cellMin, cellMax,
                                isPlayhead ? (isLight ? tok::U32(tok::pal::c_FFFFFFFF) : tok::U32(tok::pal::c_E1F2FFFF))

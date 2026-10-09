@@ -696,7 +696,7 @@ namespace app
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 tl(x, y), br(x + w, y + h);
-      dl->AddRectFilled(tl, br, ScopeBgCol(), 2.0f);
+      dl->AddRectFilled(tl, br, ScopeBgCol(), tok::radius_field);
 
       // Calibrated to a fixed -60..0 dBFS window rather than linear
       // amplitude - a linear meter crushes the bottom 40 dB of useful range
@@ -723,9 +723,9 @@ namespace app
                            : db > -6.0f ? tok::U32(tok::pal::c_FFBE5AF0)
                                         : tok::U32(tok::pal::c_78D2A0EB);
          dl->AddRectFilled(ImVec2(x + 1.0f, br.y - 1.0f - (h - 2.0f) * lvl),
-                           ImVec2(br.x - 1.0f, br.y - 1.0f), col, 1.0f);
+                           ImVec2(br.x - 1.0f, br.y - 1.0f), col, 2.0f);
       }
-      dl->AddRect(tl, br, ScopeBorderCol(), 2.0f);
+      dl->AddRect(tl, br, ScopeBorderCol(), tok::radius_field);
    }
 
 

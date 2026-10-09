@@ -285,7 +285,7 @@ namespace app
             float y = pos.y + padY + (1.0f - val) * plotH;
             ImVec2 pt(x, y);
             if (i > 0)
-               dl->AddLine(prevPt, pt, lineCol, 1.5f);
+               dl->AddLine(prevPt, pt, lineCol, 1.0f);
             prevPt = pt;
          }
          dl->AddCircleFilled(prevPt, 2.0f, lineCol);
