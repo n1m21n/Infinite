@@ -1227,6 +1227,8 @@ void DrawNodeBodies(FrameCtx& fc)
             // aggregates (cx/cy/cz/spread) go through the generic row here.
             // Drawing the same pin id through ed::BeginPin() twice in one
             // frame is not something imgui-node-editor supports.
+            // Section gap: the out pins are their own group, never flush against the last param row.
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
             auto* geoTable = dynamic_cast<GeometryTableNode*>(gn.node.get());
             auto* drumSeq = dynamic_cast<DrumSequencerNode*>(gn.node.get());
             const int outputs = geoTable != nullptr ? 4 : (drumSeq != nullptr ? 1 : std::max(1, gn.node->OutputCount()));

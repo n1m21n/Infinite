@@ -1,4 +1,4 @@
-// MenuParts: rows for the File / Edit / Menu popups. Every row is 28 pt tall (tok::tile) with a rounded
+// MenuParts: rows for the File / Edit / Menu popups. Every row is 24 pt tall (kRow) with a rounded
 // wash inset 4 pt from the popup edge and text inset 8 pt from the wash; separators are a hairline in a
 // 8 pt gap. ImGui still lays out and activates the rows (shortcut column, arrows, keyboard nav); only the
 // fill is ours, so hover reads the same as the top bar tiles.
@@ -17,7 +17,8 @@ namespace MenuParts
 {
    constexpr float kInset = tok::space_1;   // wash distance from the popup edge
    constexpr float kTextInset = tok::space_2; // text distance from the wash edge
-   constexpr float kPadY = kInset + 6.0f;     // popup padding: the row wash starts 6 pt above its text
+   constexpr float kRow = 24.0f;              // row pitch of every menu / dropdown / list popup (was tok::tile, 28)
+   constexpr float kPadY = kInset + 4.0f;     // popup padding: the row wash starts 4 pt above its text
 
    // Pushed around a BeginMenu / BeginPopup call: the popup's padding is read when it opens.
    inline void PushPopupPad()
@@ -25,10 +26,10 @@ namespace MenuParts
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kInset + kTextInset, kPadY));
    }
 
-   // Inside a popup body, after BeginMenu returned true: row pitch 28, ImGui's own fills hidden.
+   // Inside a popup body, after BeginMenu returned true: row pitch 24, ImGui's own fills hidden.
    inline void BeginContent()
    {
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, tok::tile - ImGui::GetTextLineHeight()));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, kRow - ImGui::GetTextLineHeight()));
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
@@ -84,7 +85,7 @@ namespace MenuParts
       return r;
    }
 
-   // Dropdown-list row: same 28 pt row and wash as a menu item; the current choice reads in the accent colour.
+   // Dropdown-list row: same 24 pt row and wash as a menu item; the current choice reads in the accent colour.
    inline bool Choice(const char* label, bool selected)
    {
       if (selected)
@@ -110,7 +111,7 @@ namespace MenuParts
    inline void Separator()
    {
       ImGuiWindow* w = ImGui::GetCurrentWindow();
-      const float y = ImGui::GetCursorScreenPos().y - (tok::tile - ImGui::GetTextLineHeight()) * 0.5f + 4.0f;
+      const float y = ImGui::GetCursorScreenPos().y - (kRow - ImGui::GetTextLineHeight()) * 0.5f + 4.0f;
       const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       w->DrawList->AddLine(ImVec2(w->Pos.x + kInset + kTextInset, std::floor(y)),
                            ImVec2(w->Pos.x + w->Size.x - kInset - kTextInset, std::floor(y)),

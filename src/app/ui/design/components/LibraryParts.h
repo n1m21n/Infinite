@@ -14,8 +14,8 @@
 
 namespace LibraryParts
 {
-   constexpr float kFieldH = 32.0f;
-   constexpr float kRowH = 26.0f;
+   constexpr float kFieldH = 28.0f;
+   constexpr float kRowH = 24.0f;
    constexpr float kHeaderH = 28.0f;
 
    // Search field: rounded well, magnifier at the left, clear (x) at the right while there is text.
