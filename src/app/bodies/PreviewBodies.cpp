@@ -519,6 +519,8 @@ namespace app
 
    void DrawDrawParams(DrawNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the canvas and the buttons
+      const float halfW = (kPreviewSize - tok::space_1) * 0.5f;
       DropdownButton("brush", DrawNode::BrushNames(), n->brush, [n](int i) { n->brush = i; });
       ModSlider("size", &n->brushSize, 0.002f, 0.5f);
       ModSlider("opacity", &n->opacity, 0.02f, 1.0f);
@@ -533,20 +535,20 @@ namespace app
       NodeSeparator("animation");
       if (n->IsRecordingStrokes())
       {
-         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.48f, 0), ActionButton::Kind::Record))
+         if (ActionButton::Draw("Stop rec", ImVec2(halfW, 0), ActionButton::Kind::Record))
             n->StopRecording();
       }
-      else if (ActionButton::Draw("Rec strokes", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Rec strokes", ImVec2(halfW, 0)))
       {
          n->StartRecording();
       }
-      ImGui::SameLine();
+      ImGui::SameLine(0.0f, tok::space_1);
       if (n->IsPlayingBack())
       {
-         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(halfW, 0)))
             n->StopPlayback();
       }
-      else if (ActionButton::Draw("Replay", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Replay", ImVec2(halfW, 0)))
       {
          n->PlayRecording();
       }
@@ -561,7 +563,7 @@ namespace app
       }
       ModCheckbox("loop replay", &n->loopPlayback);
       ModSlider("replay speed", &n->playSpeed, 0.1f, 4.0f);
-      if (ActionButton::Draw("clear recording"))
+      if (ActionButton::Draw("clear recording", ImVec2(kPreviewSize, 0)))
          n->ClearRecording();
       ModSlider("canvas w", &n->canvasWidth, 64.0f, 4096.0f, "%.0f");
       ModSlider("canvas h", &n->canvasHeight, 64.0f, 4096.0f, "%.0f");
