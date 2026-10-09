@@ -3,6 +3,7 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/UiType.h"
+#include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/AppShared.h"
@@ -941,6 +942,8 @@ namespace app
             const float visibleH = ImGui::GetWindowHeight() - scrollbarH;
             float rowH = ImGui::GetTextLineHeightWithSpacing() +
                          ImGui::GetStyle().CellPadding.y * 2.0f;
+            // Row 0 is the header: nothing after it means no bindings at all, and the ruled filler gets a message.
+            const bool noBindings = ImGui::TableGetRowIndex() <= 0;
             int guard = 0;
             while (ImGui::GetCursorPosY() + rowH <= visibleH && guard++ < 500)
             {
@@ -967,6 +970,8 @@ namespace app
                ImGui::SetScrollY(ImGui::GetScrollMaxY()); // pin to the bottom
             }
 
+            if (noBindings)
+               EmptyState::DrawInWindow(T("No modulation yet"), T("Drag from a modulator's output onto a parameter pin"));
             ImGui::EndTable();
             ImGui::PopStyleColor(3);
             ImGui::PopStyleVar();

@@ -1,6 +1,7 @@
 // Library / plugin / field search panels (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/LibraryParts.h"
@@ -279,6 +280,8 @@ namespace app
       const ImVec2 savedItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(savedItemSpacing.x, 2.0f));
       LibraryParts::BeginWell("##librarypanellist");
+      if (filtered.empty())
+         EmptyState::DrawInWindow(T("Nothing to show"), T("Try clearing the search or filter"));
       // A scanned library folder can hold tens of thousands of files -
       // submitting a Selectable (now a button too) for every one of them
       // regardless of scroll position is what tanked this panel's frame
@@ -781,6 +784,8 @@ namespace app
       }
 
       LibraryParts::BeginWell("##pluginpanellist");
+      if (sCache.filtered.empty())
+         EmptyState::DrawInWindow(T("No plugins found"), T("Try clearing the search or filter"));
       // INFINITE_PLUGINDRAGTEST captures the FIRST matching row, not the last:
       // this list is every installed effect, and the rows past the visible
       // height are drawn but clipped, so a synthetic press aimed at the last
