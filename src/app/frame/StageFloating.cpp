@@ -96,6 +96,15 @@ int DrawFloating(FrameCtx& fc)
          ImGui::End();
       }
 
+      {
+         static const char* sDlg = getenv("INFINITE_OPENDIALOG");
+         if (sDlg && ImGui::GetFrameCount() > 20)
+         {
+            if (!strcmp(sDlg, "unsaved")) gShowUnsavedChangesModal = true;
+            else if (!strcmp(sDlg, "recover")) { gShowAutosaveRecoveryModal = true; gAutosaveRecoveryTimestamp = "14:32"; }
+            sDlg = nullptr;
+         }
+      }
       if (gShowUnsavedChangesModal)
       {
          ImGui::OpenPopup(L("Unsaved Changes"));

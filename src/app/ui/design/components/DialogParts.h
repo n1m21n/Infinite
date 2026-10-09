@@ -75,7 +75,13 @@ namespace DialogParts
 
    inline void End()
    {
-      FormParts::WindowEdge();
+      // A modal floats over a same-coloured canvas, so its edge is stronger than a docked surface's hairline.
+      {
+         const ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
+         const ImVec4 e = CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.16f) : ImVec4(1, 1, 1, 0.08f);
+         ImGui::GetWindowDrawList()->AddRect(ImVec2(wp.x + 0.5f, wp.y + 0.5f), ImVec2(wp.x + ws.x - 0.5f, wp.y + ws.y - 0.5f),
+                                             ImGui::GetColorU32(e), 12.0f);
+      }
       ImGui::EndPopup();
       app::PopElevatedPanelStyle();
    }
