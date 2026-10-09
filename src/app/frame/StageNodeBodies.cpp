@@ -1078,7 +1078,7 @@ void DrawNodeBodies(FrameCtx& fc)
                // reads it, so say plainly that the take owns them.
                ImGui::BeginDisabled(n->IsRecording());
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::SliderInt(L("fps"), &n->recordFps, 1, 60);
+               ImGui::SliderInt("##recfps", &n->recordFps, 1, 60, "%d fps");
 
                ModCheckbox(L("include audio"), &n->includeAudio);
                ImGui::EndDisabled();
@@ -1169,9 +1169,21 @@ void DrawNodeBodies(FrameCtx& fc)
                const bool thisNodeRendering = gOfflineRender.node == n;
                const bool otherSessionActive = gOfflineRender.active && !thisNodeRendering;
 
+               // Unit/caption lives inside the field's right edge (R1), not outside the node.
+               auto fieldUnit = [](const char* unit)
+               {
+                  const ImVec2 mn = ImGui::GetItemRectMin();
+                  const ImVec2 mx = ImGui::GetItemRectMax();
+                  const ImVec2 ts = ImGui::CalcTextSize(unit);
+                  ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                  dim.w *= 0.55f;
+                  ImGui::GetWindowDrawList()->AddText(ImVec2(mx.x - ts.x - 8.0f, mn.y + (mx.y - mn.y - ts.y) * 0.5f),
+                                                      ImGui::GetColorU32(dim), unit);
+               };
                ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || gOfflineRender.active);
                ImGui::SetNextItemWidth(kParamWidth);
-               FieldWell::InputInt(L("render fps"), &n->offlineFps);
+               FieldWell::InputInt("##renderfps", &n->offlineFps);
+               fieldUnit(T("render fps"));
                n->offlineFps = std::clamp(n->offlineFps, 1, 240);
 
                // Duration is typed, not dragged: a render queue's length is a
@@ -1179,7 +1191,8 @@ void DrawNodeBodies(FrameCtx& fc)
                // exact value on a 1..600 slider is fiddly. The presets are
                // the common takes; the field takes anything up to an hour.
                ImGui::SetNextItemWidth(kParamWidth);
-               FieldWell::InputInt(L("duration (s)"), &n->offlineDurationSeconds);
+               FieldWell::InputInt("##renderdur", &n->offlineDurationSeconds);
+               fieldUnit(T("duration (s)"));
                n->offlineDurationSeconds = std::clamp(n->offlineDurationSeconds, 1, 3600);
                for (int preset : { 15, 30, 45, 60 })
                {
@@ -1194,7 +1207,8 @@ void DrawNodeBodies(FrameCtx& fc)
                }
 
                ImGui::SetNextItemWidth(kParamWidth);
-               FieldWell::InputInt(L("preroll frames"), &n->offlinePrerollFrames);
+               FieldWell::InputInt("##renderpre", &n->offlinePrerollFrames);
+               fieldUnit(T("preroll frames"));
                n->offlinePrerollFrames = std::clamp(n->offlinePrerollFrames, 0, 600);
                ImGui::EndDisabled();
 

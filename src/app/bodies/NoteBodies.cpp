@@ -148,10 +148,14 @@ namespace app
       const float bodyW = std::max(280.0f, (float)count * 80.0f);
       char stat[64];
       if (count > 0)
-         snprintf(stat, sizeof(stat), "%d in -> 1 out   sum %+.1f dB",
-                  count, DspMath::LinearToDb(std::max(n->Level(), 1e-5f)));
+      {
+         if (n->Level() > 1e-4f)
+            snprintf(stat, sizeof(stat), "%d in \xe2\x86\x92 1 out \xc2\xb7 sum %+.1f dB", count, DspMath::LinearToDb(n->Level()));
+         else
+            snprintf(stat, sizeof(stat), "%d in \xe2\x86\x92 1 out \xc2\xb7 silent", count);
+      }
       else
-         snprintf(stat, sizeof(stat), "0 in -> 0 out (idle)");
+         snprintf(stat, sizeof(stat), "0 in \xe2\x86\x92 0 out \xc2\xb7 idle");
 
       BeginAudioBody(gn.index, gn.category, bodyW, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));

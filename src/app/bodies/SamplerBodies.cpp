@@ -250,8 +250,8 @@ namespace app
       // levels as a balance at a glance" benefit a fader row earns, so it
       // reverts to the app's default control.
       char stat[48];
-      snprintf(stat, sizeof(stat), "%+.1f dB   %s", n->gainDb,
-               n->Level() > 0.0005f ? "\xe2\x96\xb8" : "-");
+      snprintf(stat, sizeof(stat), "%+.1f dB \xc2\xb7 %s", n->gainDb,
+               n->Level() > 0.0005f ? "passing" : "silent");
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
