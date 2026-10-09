@@ -69,9 +69,9 @@ namespace app
 
       ImDrawList* dl = ImGui::GetForegroundDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h),
-                        IM_COL32((int)(t.panelBg.r * 255), (int)(t.panelBg.g * 255), (int)(t.panelBg.b * 255), (int)(gMinimapOpacity * 255)), 6.0f);
+                        IM_COL32((int)(t.panelBg.r * 255), (int)(t.panelBg.g * 255), (int)(t.panelBg.b * 255), (int)(gMinimapOpacity * 255)), tok::radius_tile);
       dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h),
-                  IM_COL32((int)(t.border.r * 255), (int)(t.border.g * 255), (int)(t.border.b * 255), 200), 6.0f, 0, 1.5f);
+                  IM_COL32((int)(t.border.r * 255), (int)(t.border.g * 255), (int)(t.border.b * 255), 200), tok::radius_tile, 0, 1.0f);
 
       for (const GraphNode& gn : gNodes)
       {
