@@ -80,6 +80,7 @@ namespace tok
    constexpr Pair8 action_learn = { {217, 140, 26, 255}, {200, 120, 10, 255} };
    constexpr Pair8 action_go = { {46, 170, 74, 255}, {38, 140, 62, 255} };
    constexpr Pair8 action_solo = { {217, 166, 38, 255}, {215, 160, 25, 255} };
+   constexpr Pair8 badge_favorite = { {255, 205, 45, 255}, {225, 165, 10, 255} };
    constexpr Rgba8 transparent = {0, 0, 0, 0};
    constexpr Rgba8 record = {239, 68, 68, 255};
    constexpr Rgba8 danger_hover = {230, 60, 60, 255};

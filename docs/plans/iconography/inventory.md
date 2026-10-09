@@ -16,7 +16,7 @@ Counts are call sites, not on-screen instances. Test/bench files are excluded.
 | Knob | · | 7 | 2 | · | 2 | · | 4 | 324 | · | · | · | · | · | **339** |
 | Slider / fader / drag | · | 14 | 2 | · | 2 | · | 2 | 609 | 3 | 1 | · | 9 | · | **642** |
 | Text / number field | 1 | 4 | 2 | · | 15 | · | 6 | 11 | · | 3 | 7 | 2 | · | **51** |
-| Colour swatch / picker | · | 2 | 1 | · | 3 | · | 1 | 44 | · | 1 | · | · | · | **52** |
+| Colour swatch / picker | · | 1 | 1 | · | 3 | · | 1 | 44 | · | 1 | · | · | · | **51** |
 | List row / tree | · | 4 | · | · | 2 | 4 | · | 2 | · | · | · | 8 | · | **20** |
 | Table | · | 1 | · | · | · | · | · | · | · | · | · | 7 | · | **8** |
 | Tabs | · | · | · | · | · | · | · | · | · | · | · | 7 | · | **7** |

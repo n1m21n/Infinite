@@ -4,6 +4,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/GlyphToggle.h"
 #include "app/ui/design/components/VFader.h"
+#include "app/ui/design/components/ColourChip.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -1610,8 +1611,7 @@ namespace app
       ed::EndPin();
       ImGui::SameLine(0.0f, 4.0f);
 
-      if (ImGui::ColorButton(label, ImVec4(col[0], col[1], col[2], 1.0f),
-                             ImGuiColorEditFlags_NoTooltip, ImVec2(38, 0)))
+      if (ColourChip::Draw(label, col))
       {
          if (isBound)
          {
@@ -1640,7 +1640,7 @@ namespace app
       }
       ImGui::SameLine();
       if (isBound)
-         ImGui::TextColored(tok::V4(tok::palf::v_500_860_740_1000), "%s  #%d",
+         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pin_colour_bound, IsThemeLight())), "%s  #%d",
                             label, bound.swatchIndex + 1);
       else
          ImGui::TextDisabled("%s", label);

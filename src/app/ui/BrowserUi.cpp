@@ -296,7 +296,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float starSize = 11.0f;
       const ImVec2 center(itemMax.x - 12.0f, (itemMin.y + itemMax.y) * 0.5f);
-      const ImU32 starCol = tok::U32(tok::pal::c_FFCD2DFF);
+      const ImU32 starCol = tok::U32(tok::badge_favorite, app::IsThemeLight());
       glyph::DrawStar(dl, center, starSize, starCol, /*filled=*/true);
    }
 

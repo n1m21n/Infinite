@@ -34,7 +34,7 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | C5 switch | done (2026-10-09): `Switch.h`, `FormParts::Switch`; Settings only (decision: node bodies keep CheckBox) |
 | C8 toggle icons | done (2026-10-09): `GlyphToggle.h` (eye, viewport, scale snap, bypass) |
 | C9 text entry | done (2026-10-09): `FieldWell::InputText/WithHint/Multiline/InputInt`; typed-value edit of controls keeps `PushTypedEditStyle` |
-| C10 swatch, C12 badges | not started |
+| C10 swatch, C12 badges | done (2026-10-09): `ColourChip.h` rounded colour field; favourite star on token `badge.favorite`; palette pin stays the square `PinDot::Swatch` (decision: square = palette-cable target, dot = cable) |
 | C11 pin/dot | **done 2026-10-09**: `PinDot` component (Cable r7 / small r5, Param ring r4.5 -> r4 + centre dot when driven, Swatch square r4), one 12 pt box, sizes in `tokens.json` `pin`, colours in `pin.*` role pairs (idle grey, modulation amber, expression violet, prediction green), 0.72-1.0 slow pulse while driven (off under reduce-motion). Slider, knob, discrete, patch, lane, colour pins all draw through it. Decision: the idle ring stays grey, never accent |
 | N1 node header | title Title/Medium, category same size dimmed; single-row header open |
 | N1 frame | 1 px hairline border done |
