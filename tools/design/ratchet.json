@@ -16,7 +16,7 @@
   "src/app/frame/StageLayout.cpp": 4,
   "src/app/frame/StageMenuBar.cpp": 21,
   "src/app/frame/StageNodeBodies.cpp": 13,
-  "src/app/frame/StagePopupsA.cpp": 13,
+  "src/app/frame/StagePopupsA.cpp": 12,
   "src/app/frame/StagePopupsB.cpp": 16,
   "src/app/frame/StageSidePanels.cpp": 24,
   "src/app/panels/ArrangePanel.cpp": 47,

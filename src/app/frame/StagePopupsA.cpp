@@ -305,7 +305,7 @@ void DrawPopupsA(FrameCtx& fc)
          gOpenNodeHelpPopup = false;
       }
       ImGui::SetNextWindowSizeConstraints(ImVec2(280, 0), ImVec2(420, FLT_MAX));
-      if (ImGui::BeginPopup("##nodehelp"))
+      if (MenuParts::BeginPopup("##nodehelp"))
       {
          gNodeHelpShown = true;
          GraphNode* gn = FindNodeByIndex(gHelpPopupNodeIndex);
@@ -321,12 +321,12 @@ void DrawPopupsA(FrameCtx& fc)
          else
          {
             ImGui::TextUnformatted(NodeTitle(*gn).c_str());
-            ImGui::Separator();
+            MenuParts::Separator();
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
             ImGui::TextWrapped("%s", HelpT(NodeHelpText(*gn)));
             ImGui::PopTextWrapPos();
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Modulation-binding popup (Absolute/Bipolar/depth/Unbind), requested by

@@ -162,7 +162,7 @@ void DrawPopupsB(FrameCtx& fc)
          }
       }
 
-      if (ImGui::BeginPopup("##colorpick"))
+      if (MenuParts::BeginPopup("##colorpick"))
       {
          if (gColor.target != nullptr)
          {
@@ -181,7 +181,7 @@ void DrawPopupsB(FrameCtx& fc)
          {
             ImGui::CloseCurrentPopup();
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(320, 440));
