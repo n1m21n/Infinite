@@ -580,6 +580,9 @@ void DrawFramePump(FrameCtx& fc)
          gNavOwnsKeys = navOn && nio.NavVisible;
       }
       ImGui::NewFrame();
+      // A focus ring belongs to keyboard navigation only; any mouse click hides one an earlier Enter left behind.
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         ImGui::GetCurrentContext()->NavCursorVisible = false;
       UiAnim::EndFrame();
       UiInteract::BeginFrame();
       if (Bench::Tail().active)

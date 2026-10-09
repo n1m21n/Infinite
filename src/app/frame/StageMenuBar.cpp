@@ -587,21 +587,29 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::SetCursorScreenPos(mn);
             if (sActiveField == which)
             {
-               ImGui::SetCursorScreenPos(ImVec2(x + 2.0f, wellMin.y + TD::kValueY - 1.0f));
-               ImGui::SetNextItemWidth(w - 4.0f);
+               // The field sits inside the cell with an even margin and its text centred, like the value it replaces.
+               const float fieldH = TD::kHeight - 2.0f * tok::space_2;
+               const float fieldW = w - 2.0f * tok::space_2;
+               ImGui::SetCursorScreenPos(ImVec2(x + tok::space_2, wellMin.y + tok::space_2));
+               ImGui::SetNextItemWidth(fieldW);
                if (sFieldJustOpened)
                {
                   ImGui::SetKeyboardFocusHere();
                   sFieldJustOpened = false;
                }
-               ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 1.0f));
+               const float textW = ImGui::CalcTextSize(sFieldText).x;
+               const float padX = std::max(4.0f, std::floor((fieldW - textW) * 0.5f));
+               ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padX, std::max(0.0f, std::floor((fieldH - ImGui::GetFontSize()) * 0.5f))));
+               FieldWell::PushTypedEditStyle();
                const bool entered = FieldWell::InputText(id, sFieldText, sizeof(sFieldText),
                                                          ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               FieldWell::PopTypedEditStyle();
                ImGui::PopStyleVar();
                if (entered || ImGui::IsItemDeactivated())
                {
                   onCommit(sFieldText);
                   sActiveField = TopBarField::None;
+                  ImGui::GetCurrentContext()->NavCursorVisible = false; // Enter must not leave a focus ring behind
                }
                return;
             }

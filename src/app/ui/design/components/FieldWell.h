@@ -74,6 +74,9 @@ namespace FieldWell
 
    inline void PopTypedEditStyle()
    {
+      // Enter / Esc / click-away must not leave a nav focus ring on the control the field replaced.
+      if (ImGui::IsItemDeactivated())
+         ImGui::GetCurrentContext()->NavCursorVisible = false;
       ImGui::PopStyleVar();
       ImGui::PopStyleColor(4);
    }
