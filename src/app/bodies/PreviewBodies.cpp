@@ -1,4 +1,7 @@
 // Comment, group, draw and preview node bodies (moved verbatim from main.cpp).
+#include "nodes/ImageSourceNode.h"
+#include "nodes/VideoSourceNode.h"
+#include "nodes/VideoInNode.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
@@ -621,6 +624,19 @@ namespace app
       else
       {
          EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(node, "no input"));
+      }
+
+      if (!node->bypassed)
+      {
+         const char* idle = nullptr;
+         if (auto* is = dynamic_cast<ImageSourceNode*>(node); is != nullptr && is->LoadedPath().empty())
+            idle = "drop an image";
+         else if (auto* vs = dynamic_cast<VideoSourceNode*>(node); vs != nullptr && vs->LoadedPath().empty())
+            idle = "drop a video";
+         else if (auto* vi = dynamic_cast<VideoInNode*>(node); vi != nullptr && !vi->IsRunning())
+            idle = "no camera yet";
+         if (idle != nullptr)
+            EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), idle);
       }
 
       if (render != nullptr && render->FlattenedGeometry().empty())

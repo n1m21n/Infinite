@@ -51,7 +51,7 @@ namespace app
          // wrap pos is window-relative; passing a bare width put it left of the
          // cursor and wrapped every single character onto its own line
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
       else if (!n->LoadedPath().empty())
@@ -89,7 +89,7 @@ namespace app
 
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       if (!n->LastError().empty())
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
       if (n->ImageCount() > 0)
       {
          const std::string file = n->CurrentFileName();
@@ -305,7 +305,7 @@ namespace app
       if (!n->LastError().empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
       else if (!n->LoadedPath().empty())
@@ -387,7 +387,7 @@ namespace app
       if (!n->LastError().empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
 
@@ -406,12 +406,22 @@ namespace app
       char buf[512];
       snprintf(buf, sizeof(buf), "%s", n->text.c_str());
       ImGui::SetNextItemWidth(kParamWidth);
-      if (FieldWell::InputText("text", buf, sizeof(buf)))
+      if (FieldWell::InputText("##text", buf, sizeof(buf)))
          n->text = buf;
 
       const std::vector<std::string>& fonts = TextNode::AvailableFonts();
       if (n->fontName.empty())
+      {
          n->fontName = fonts.front();
+         for (const char* sans : { "Helvetica Neue", "Helvetica", "Arial", "Segoe UI", "Inter" })
+         {
+            if (std::find(fonts.begin(), fonts.end(), sans) != fonts.end())
+            {
+               n->fontName = sans;
+               break;
+            }
+         }
+      }
       int fontIdx = 0;
       for (int i = 0; i < (int)fonts.size(); i++)
       {
@@ -457,7 +467,7 @@ namespace app
       if (!n->LastError().empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
       else if (!n->LoadedPath().empty())
@@ -538,7 +548,7 @@ namespace app
       if (!n->LastError().empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
       else if (n->IsRunning() && n->GetOutputWidth() > 0 && n->GetOutputHeight() > 0)

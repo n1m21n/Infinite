@@ -29,9 +29,10 @@ namespace DropdownField
       ImDrawList* dl = ImGui::GetWindowDrawList();
       FieldWell::Draw(dl, mn, mx, hovered, ImGui::IsItemActive());
       const float textRight = mx.x - pad;
-      const bool hasLabel = label != nullptr && label[0] != '\0';
-      const float labelW = hasLabel ? ImGui::CalcTextSize(label).x : 0.0f;
+      const float labelW = (label != nullptr && label[0] != '\0') ? ImGui::CalcTextSize(label).x : 0.0f;
       const float avail = textRight - (mn.x + pad);
+      // A caption that cannot show whole is dropped, never clipped to a sliver ("de", "for").
+      const bool hasLabel = labelW > 0.0f && labelW + pad + ts.x <= avail;
       // Value keeps up to everything but a 24px label sliver; right-aligned when a label shares the face.
       float valueX = mn.x + pad;
       if (hasLabel)
