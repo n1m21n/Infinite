@@ -1,4 +1,5 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
+#include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -198,8 +199,6 @@ namespace app
       const bool isLight = IsThemeLight();
       const ImU32 borderCol = isLight ? tok::U32(tok::pal::c_3C44558C) : tok::U32(tok::pal::c_D2DAEB46);
       const ImU32 textCol = isLight ? tok::U32(tok::pal::c_232834FF) : tok::U32(tok::pal::c_DEE4F0FF);
-      const ImU32 pinFill = isLight ? tok::U32(tok::pal::c_3278F0FF) : tok::U32(tok::pal::c_96BEFFFF);
-      const ImU32 pinRing = isLight ? tok::U32(tok::pal::c_283041FF) : tok::U32(tok::pal::c_14161EFF);
 
       dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, 8.0f, 0, 1.5f);
       for (int r = 1; r < rowCount; r++)
@@ -247,8 +246,7 @@ namespace app
             const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
             ed::PinRect(pinMin, pinMax);
-            dl->AddCircleFilled(pinCenter, kPinRadius * 0.75f, pinFill);
-            dl->AddCircle(pinCenter, kPinRadius * 0.75f, pinRing, 0, 1.5f);
+            PinDot::Cable(dl, pinCenter, /*prediction=*/false, isLight, /*small=*/true);
             ed::EndPin();
             ImGui::PopID();
          }

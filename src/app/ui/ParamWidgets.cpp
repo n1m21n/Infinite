@@ -1,6 +1,7 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/AppShared.h"
 
@@ -554,7 +555,7 @@ namespace app
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const float box = 12.0f;
+      const float box = tok::pin_box;
       const ImVec2 p = controlHeight > 0.0f
          ? ImVec2(origin.x, origin.y + (controlHeight - box) * 0.5f)
          : origin;
@@ -563,13 +564,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();
-      const ImU32 pinColor = h.modulated
-         ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF))
-         : (isLight ? tok::U32(tok::pal::c_A5AFC3FF) : tok::U32(tok::pal::c_788096FF));
-      dl->AddCircleFilled(c, 4.0f, isLight ? tok::U32(tok::pal::c_F0F3FAFF) : tok::U32(tok::pal::c_121319FF));
-      dl->AddCircle(c, h.modulated ? 4.0f : 4.5f, pinColor, 12, 2.0f);
-      if (h.modulated)
-         dl->AddCircleFilled(c, 2.0f, pinColor);
+      PinDot::Param(dl, c, h.modulated ? PinDot::State::Modulated : PinDot::State::Idle, isLight);
       ExpandPinHit(c, p.x + box);
       ed::EndPin();
 

@@ -5,6 +5,7 @@
 #include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/IconTile.h"
 #include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/Readout.h"
 #include "app/ui/design/components/TextButton.h"
 
@@ -37,7 +38,7 @@ namespace UiGallery
       const UiLayout::Rect page = UiLayout::Rect{ top.x, top.y, ds.x, ds.y }.Inset(pad);
       // Sections stacked in one column; each is a heading line then a row of samples.
       const std::vector<UiLayout::Rect> sec = UiLayout::Column(page, { UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(rowH),
-                                                   UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(100), UiLayout::Fixed(14), UiLayout::Fixed(36) },
+                                                   UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(rowH), UiLayout::Fixed(14), UiLayout::Fixed(100), UiLayout::Fixed(14), UiLayout::Fixed(36), UiLayout::Fixed(14), UiLayout::Fixed(44) },
                                            gap);
 
       Heading(sec[0], "TEXT BUTTON - quiet, primary, disabled");
@@ -141,6 +142,21 @@ namespace UiGallery
          tile("tb.perf2", c[18], IconsInfinite::Perform, nullptr, false);
          tile("tb.arrange", c[19], IconsInfinite::Cube, nullptr, false);
          TextButton::Draw("tb.search", c[20], "Search");
+      }
+      Heading(sec[14], "CONTROLS - pin: param idle / mod / expr / pred, cable, cable small, swatch idle / bound");
+      {
+         const bool light = ImGui::GetStyle().Colors[ImGuiCol_WindowBg].x > 0.5f;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const auto c = UiLayout::Row(sec[15], std::vector<UiLayout::Cell>(8, UiLayout::Fixed(32)), gap, UiLayout::Align::Center, 44.0f);
+         auto mid = [&](size_t i) { return ImVec2(c[i].x + c[i].w * 0.5f, c[i].y + c[i].h * 0.5f); };
+         PinDot::Param(dl, mid(0), PinDot::State::Idle, light);
+         PinDot::Param(dl, mid(1), PinDot::State::Modulated, light);
+         PinDot::Param(dl, mid(2), PinDot::State::Expression, light);
+         PinDot::Param(dl, mid(3), PinDot::State::Prediction, light);
+         PinDot::Cable(dl, mid(4), false, light);
+         PinDot::Cable(dl, mid(5), false, light, true);
+         PinDot::Swatch(dl, mid(6), false, light);
+         PinDot::Swatch(dl, mid(7), true, light);
       }
       ImGui::PopID();
       ImGui::End();

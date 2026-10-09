@@ -1,4 +1,5 @@
 // Modulatable sliders, knobs, faders, toggles, pins (moved verbatim from main.cpp).
+#include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -144,7 +145,7 @@ namespace app
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const float box = 14.0f;
+      const float box = tok::pin_box;
       // Centred on the slider track's frame height, same fix and same
       // restore-the-cursor-explicitly reasoning as DrawDiscreteParamPin - see
       // the comment there. The track itself is drawn later at `origin`'s Y.
@@ -156,15 +157,12 @@ namespace app
       ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();
       const bool predicted = modulated && IsPredictionBinding(nodeIndex, paramIndex);
-      const ImU32 pinColor = predicted
-         ? (isLight ? tok::U32(tok::pal::c_1E9646FF) : kPredictionPinCol)
-         : modulated
-         ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF))
-         : hasExpr && !exprErrored
-            ? (isLight ? tok::U32(tok::pal::c_8250E6FF) : tok::U32(tok::pal::c_AA82FFFF))
-            : isLight ? tok::U32(tok::pal::c_AAAFBEFF) : tok::U32(tok::pal::c_464B5AFF);
-      dl->AddCircleFilled(c, 4.0f, pinColor);
-      dl->AddCircle(c, 4.0f, isLight ? tok::U32(tok::pal::c_6E7382FF) : tok::U32(tok::pal::c_1E2028FF), 16, 1.0f);
+      PinDot::Param(dl, c,
+                    predicted ? PinDot::State::Prediction
+                    : modulated ? PinDot::State::Modulated
+                    : hasExpr && !exprErrored ? PinDot::State::Expression
+                    : PinDot::State::Idle,
+                    isLight);
       ExpandPinHit(c, p.x + box);
       ed::EndPin();
       GraphNode* curGn = FindNodeByIndex(nodeIndex);
@@ -1370,10 +1368,11 @@ namespace app
       // margin afterwards, so it costs no row width at all.
       const ImVec2 cellOrigin = ImGui::GetCursorScreenPos();
       const float cell = cellW > 0.0f ? cellW : diameter;
-      const ImU32 pinColor = modulated && IsPredictionBinding(nodeIndex, paramIndex) ? kPredictionPinCol
-                            : modulated              ? tok::U32(tok::pal::c_FFBE5AFF)
-                            : hasExpr && !exprErrored ? tok::U32(tok::pal::c_AA82FFFF)
-                                                      : tok::U32(tok::pal::c_828AA2FF);
+      const PinDot::State pinState = modulated && IsPredictionBinding(nodeIndex, paramIndex) ? PinDot::State::Prediction
+                                    : modulated               ? PinDot::State::Modulated
+                                    : hasExpr && !exprErrored ? PinDot::State::Expression
+                                                              : PinDot::State::Idle;
+      const ImU32 pinColor = PinDot::Colour(pinState, IsThemeLight());
 
       const std::pair<int, int> editKey(nodeIndex, paramIndex);
       bool typing = gTypedParam.count(editKey) > 0;
@@ -1553,7 +1552,7 @@ namespace app
       // Modulation registration as before: only where it is drawn changed.
       {
          const ImVec2 cursorAfter = ImGui::GetCursorScreenPos();
-         const float box = 12.0f;
+         const float box = tok::pin_box;
          // Immediately to the left of the knob, not at the far edge of the
          // cell: in a wide cell a pin parked at the cell boundary reads as
          // belonging to the gap between two knobs rather than to either one.
@@ -1568,12 +1567,7 @@ namespace app
          ImGui::Dummy(ImVec2(box, box));
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(pinTL.x + box * 0.5f, pinTL.y + box * 0.5f);
-         // A ring rather than a bare dot: at 4px a filled dot beside a 56px
-         // knob reads as a rendering artifact, not an affordance.
-         dl->AddCircleFilled(c, 4.0f, tok::U32(tok::pal::c_121319FF));
-         dl->AddCircle(c, modulated || hasExpr ? 4.0f : 4.5f, pinColor, 12, 2.0f);
-         if (modulated || hasExpr)
-            dl->AddCircleFilled(c, 2.0f, pinColor);
+         PinDot::Param(dl, c, pinState, IsThemeLight());
          ExpandPinHit(c, pinTL.x + box);
          ed::EndPin();
          gPinAnchors[pinId] = c;
@@ -1683,15 +1677,11 @@ namespace app
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float box = 14.0f;
+      const float box = tok::pin_box;
       ImGui::Dummy(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
-      // Square where a modulation pin is round: the two accept different cables
-      // and sit right next to each other, so they should not look alike.
-      dl->AddRectFilled(ImVec2(c.x - 4.0f, c.y - 4.0f), ImVec2(c.x + 4.0f, c.y + 4.0f),
-                        isBound ? tok::U32(tok::pal::c_82DCBEFF) : tok::U32(tok::pal::c_5F6478FF),
-                        1.0f);
+      PinDot::Swatch(dl, c, isBound, IsThemeLight());
       ExpandPinHit(c, p.x + box);
       ed::EndPin();
       ImGui::SameLine(0.0f, 4.0f);
@@ -1976,13 +1966,9 @@ namespace app
       const bool isLight = IsThemeLight();
       GraphNode* curGn = FindNodeByIndex(GraphNode::NodeIndexFromPin(pinId));
       const bool isPredPin = curGn != nullptr && (curGn->category == "Prediction" || dynamic_cast<IPredictor*>(curGn->node.get()) != nullptr);
-      const ImU32 pinFill = isPredPin
-         ? (isLight ? tok::U32(tok::pal::c_16A34AFF) : tok::U32(tok::pal::c_22C55EFF))
-         : (isLight ? tok::U32(tok::pal::c_3278F0FF) : tok::U32(tok::pal::c_96BEFFFF));
       if (kind == ed::PinKind::Output)
          gPinAnchors[pinId] = c;
-      dl->AddCircleFilled(c, kPinRadius, pinFill);
-      dl->AddCircle(c, kPinRadius, isLight ? tok::U32(tok::pal::c_283041FF) : tok::U32(tok::pal::c_14161EFF), 0, 1.5f);
+      PinDot::Cable(dl, c, isPredPin, isLight);
 
       if (!labelFirst && label != nullptr && label[0] != '\0')
       {

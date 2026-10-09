@@ -30,7 +30,7 @@ How we work: one surface at a time. Per surface: real-app before crop (`tools/de
 | C5 switch | not started (Settings/panels only) |
 | C6 dropdown | borderless recess, radius 4. Chevron tried and rejected by owner |
 | C7 button, C8 toggle icons, C9 text entry, C10 swatch, C12 badges | not started |
-| C11 pin/dot | pin centred on knob; sizes/pulse open |
+| C11 pin/dot | **done 2026-10-09**: `PinDot` component (Cable r7 / small r5, Param ring r4.5 -> r4 + centre dot when driven, Swatch square r4), one 12 pt box, sizes in `tokens.json` `pin`, colours in `pin.*` role pairs (idle grey, modulation amber, expression violet, prediction green), 0.72-1.0 slow pulse while driven (off under reduce-motion). Slider, knob, discrete, patch, lane, colour pins all draw through it. Decision: the idle ring stays grey, never accent |
 | N1 node header | title Title/Medium, category same size dimmed; single-row header open |
 | N1 frame | 1 px hairline border done |
 | N2 sections, N3 cables (draw order over nodes), N4 groups, N5 grid/marquee | not started |

@@ -1,4 +1,5 @@
 // Sampler, slicer, molder, granular, drum sequencer, looper and MPC bodies (moved verbatim from main.cpp).
+#include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -2015,8 +2016,7 @@ namespace app
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
             ed::PinRect(pinMin, pinMax);
 
-            dl->AddCircleFilled(pinCenter, kPinRadius, isLight ? tok::U32(tok::pal::c_3278F0FF) : tok::U32(tok::pal::c_96BEFFFF));
-            dl->AddCircle(pinCenter, kPinRadius, isLight ? tok::U32(tok::pal::c_283041FF) : tok::U32(tok::pal::c_14161EFF), 0, 1.5f);
+            PinDot::Cable(dl, pinCenter, /*prediction=*/false, isLight);
             ed::EndPin();
 
             ImGui::PopID();
