@@ -3,6 +3,7 @@
 // 8 pt gap. ImGui still lays out and activates the rows (shortcut column, arrows, keyboard nav); only the
 // fill is ours, so hover reads the same as the top bar tiles.
 #pragma once
+#include <algorithm>
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiAnim.h"
@@ -60,7 +61,9 @@ namespace MenuParts
    // Toggle row: label left, the app checkbox at the right edge; the menu stays open.
    inline bool Check(const char* label, bool* v)
    {
-      const bool r = ImGui::Selectable(label, false, ImGuiSelectableFlags_DontClosePopups);
+      // Wide enough for the label, a gap and the box, so the box never sits on the text.
+      const float rowW = std::max(ImGui::GetContentRegionAvail().x, ImGui::CalcTextSize(label, nullptr, true).x + tok::space_5 + CheckBox::kSize);
+      const bool r = ImGui::Selectable(label, false, ImGuiSelectableFlags_DontClosePopups, ImVec2(rowW, 0));
       if (r)
          *v = !*v;
       const ImGuiID id = ImGui::GetItemID();
