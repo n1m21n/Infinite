@@ -1635,13 +1635,8 @@ namespace app
             const float capTop = std::clamp(noteTopY - (capH - noteH) * 0.5f, origin.y, origin.y + pitchH - capH);
             const float capBot = capTop + capH;
 
-            // Playhead column wash or hover highlight
-            if (isCurrent)
-            {
-               dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, origin.y + pitchH),
-                                 isLight ? tok::U32(tok::pal::c_FFC85032) : tok::U32(tok::pal::c_FFBE5023), 2.0f);
-            }
-            else if (pitchHovered)
+            // Hover highlight (the playhead is the outline + pill + number, not a wash)
+            if (pitchHovered)
             {
                dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, origin.y + pitchH),
                                  isLight ? tok::U32(tok::pal::c_0000000A) : tok::U32(tok::pal::c_FFFFFF0C), 2.0f);
@@ -1651,9 +1646,7 @@ namespace app
             if (capBot < origin.y + pitchH)
             {
                const ImU32 stemCol = n->stepEnabled[i]
-                  ? (isCurrent
-                        ? (isLight ? tok::U32(tok::pal::c_EB911EA0) : tok::U32(tok::pal::c_E1AA3296))
-                        : (isLight ? tok::U32(tok::pal::c_2D7DE696) : tok::U32(tok::pal::c_3C8CEB8C)))
+                  ? (isLight ? tok::U32(tok::pal::c_2D7DE696) : tok::U32(tok::pal::c_3C8CEB8C))
                   : (isLight ? tok::U32(tok::pal::c_C3C8D25A) : tok::U32(tok::pal::c_262A365A));
                dl->AddRectFilled(ImVec2(x0 + 1.0f, capBot), ImVec2(x1 - 1.0f, origin.y + pitchH),
                                  stemCol, 2.0f);
@@ -1732,13 +1725,13 @@ namespace app
             {
                const float vFillTop = vy1 - n->stepVelocity[i] * (velH - 2.0f) - 1.0f;
                const ImU32 vCol = isCurrent
-                  ? (isLight ? tok::U32(tok::pal::c_EB911EF0) : tok::U32(tok::pal::c_FFCD5AFF))
-                  : (isLight ? tok::U32(tok::pal::c_28A564E6) : tok::U32(tok::pal::c_41CD87F0));
+                  ? (isLight ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC850FF))
+                  : (isLight ? tok::U32(tok::pal::c_2378EBFF) : tok::U32(tok::pal::c_50AAFFFF));
                dl->AddRectFilled(ImVec2(x0 + 1.0f, vFillTop), ImVec2(x1 - 1.0f, vy1 - 1.0f), vCol, 2.0f);
 
                char vStr[16];
                snprintf(vStr, sizeof(vStr), "%.0f", n->stepVelocity[i] * 100.0f);
-               const ImU32 txtVCol = isLight ? tok::U32(tok::pal::c_0A190FE6) : tok::U32(tok::pal::c_0A190FE6);
+               const ImU32 txtVCol = (isLight && !isCurrent) ? tok::U32(tok::pal::c_FFFFFFFF) : tok::U32(tok::pal::c_0A1423FF);
                DrawTextCentered(ImVec2(x0 + 1.0f, vy0), ImVec2(x1 - 1.0f, vy1), txtVCol, vStr, fontVelSz);
             }
             else

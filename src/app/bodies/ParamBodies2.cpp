@@ -623,8 +623,8 @@ namespace app
       ImGui::ColorButton("##ImageAnalyzeSwatch", col, ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoDragDrop, ImVec2(24, 24));
       ImGui::SameLine();
       ImGui::BeginGroup();
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
       ImGui::Text("Result: %.3f", res);
-      ImGui::ProgressBar(std::clamp(res, 0.0f, 1.0f), ImVec2(kPreviewSize * 0.55f, 0), "");
       ImGui::EndGroup();
 
       // --- Left Column ---
@@ -667,13 +667,6 @@ namespace app
          }
       }
 
-      NodeSeparator("shaping", colW);
-      ModSlider("gain", &n->gain, 0.0f, 8.0f, "%.3f", colW);
-      ModSlider("offset", &n->offset, -1.0f, 1.0f, "%.3f", colW);
-      ModSlider("power", &n->power, 0.1f, 5.0f, "%.3f", colW);
-      ModCheckbox("invert", &n->invert);
-      ModCheckbox("clamp 0..1", &n->clamp01);
-
       NodeSeparator("sampling", colW);
       ModSlider("smoothing", &n->smoothing, 0.0f, 0.99f, "%.3f", colW);
       ModSlider("samples / sec", &n->sampleRate, 1.0f, 60.0f, "%.0f", colW);
@@ -685,16 +678,12 @@ namespace app
       ImGui::SameLine(0.0f, gutter);
       ImGui::BeginGroup();
 
-      NodeSeparator("outputs", colW);
-      const float labelW = 60.0f;
-      const float barW = colW - labelW;
-      for (int i = 0; i < ImageAnalyzeNode::kOutputCount; i++)
-      {
-         const float v = n->Value(i);
-         ImGui::Text("%-9s", n->OutputLabel(i));
-         ImGui::SameLine(labelW);
-         ImGui::ProgressBar(std::clamp(v, 0.0f, 1.0f), ImVec2(barW, 0), "");
-      }
+      NodeSeparator("shaping", colW);
+      ModSlider("gain", &n->gain, 0.0f, 8.0f, "%.3f", colW);
+      ModSlider("offset", &n->offset, -1.0f, 1.0f, "%.3f", colW);
+      ModSlider("power", &n->power, 0.1f, 5.0f, "%.3f", colW);
+      ModCheckbox("invert", &n->invert);
+      ModCheckbox("clamp 0..1", &n->clamp01);
 
       ImGui::EndGroup();
    }

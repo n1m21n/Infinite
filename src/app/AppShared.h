@@ -4098,6 +4098,12 @@ INode* DisplayNode(INode* node);
 
 const char* EmptyPreviewLabel(INode* node, const char* fallback);
 
+// Horizontal offset that centres a body block of width `contentW` in its node. A node's pin header can make it wider
+// than kWideNodeWidth, so this reads the width the node had last frame (cached after ed::EndNode) and falls back
+// to kWideNodeWidth on the first frame.
+float WideNodeCentreOffset(const INode* node, float contentW);
+void CacheNodeWidth(const INode* node, float width);
+
 void DrawPreview(INode* node);
 
 void DrawFieldGraphWaveform(FieldGraphNode* fgn, INode* audioTerminal);

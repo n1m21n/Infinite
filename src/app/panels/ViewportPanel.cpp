@@ -25,7 +25,7 @@ namespace app
 
       if (isMaterial)
       {
-         const float offset = std::max(0.0f, (kWideNodeWidth - size) * 0.5f);
+         const float offset = WideNodeCentreOffset(gn.node.get(), size);
          if (offset > 0.0f)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
       }

@@ -591,7 +591,7 @@ void DrawNodeBodies(FrameCtx& fc)
                                  dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr);
             if (isWide)
             {
-               const float offset = std::max(0.0f, (kWideNodeWidth - kViewportSize) * 0.5f);
+               const float offset = WideNodeCentreOffset(gn.node.get(), kViewportSize);
                if (offset > 0.0f)
                   ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
             }
@@ -1242,27 +1242,37 @@ void DrawNodeBodies(FrameCtx& fc)
             }
             else
             {
-               // Too many pins to fit one row: wrap greedily, rows left-aligned.
-               float rowW = 0.0f;
-               bool firstInRow = true;
+               // Too many pins for one row: an equal-width cell grid (label, pin at the cell's right edge) so the
+               // columns line up, with a live level bar under every modulator output (Audio/Image Analyze).
+               float cellW0 = 0.0f;
+               for (int o = 0; o < outputs; o++)
+                  cellW0 = std::max(cellW0, pinW[o]);
+               const float gap = 10.0f;
+               const int cols = std::clamp((int)((contentW + gap) / (cellW0 + gap)), 1, outputs);
+               const float cellW = (contentW - gap * (float)(cols - 1)) / (float)cols;
+               const float rowH = kPinHit + 8.0f;
+               const ImVec2 gridOrigin = ImGui::GetCursorScreenPos();
+               ImDrawList* gdl = ImGui::GetWindowDrawList();
+               const bool gridLight = IsThemeLight();
                for (int o = 0; o < outputs; o++)
                {
-                  float w = pinW[o];
-                  bool wouldOverflow = !firstInRow && (rowW + 10.0f + w > contentW);
-                  if (wouldOverflow)
-                  {
-                     firstInRow = true;
-                     rowW = 0.0f;
-                  }
-                  if (!firstInRow)
-                  {
-                     ImGui::SameLine(0.0f, 10.0f);
-                     rowW += 10.0f;
-                  }
+                  const float x = gridOrigin.x + (float)(o % cols) * (cellW + gap);
+                  const float y = gridOrigin.y + (float)(o / cols) * rowH;
+                  ImGui::SetCursorScreenPos(ImVec2(x + cellW - pinW[o], y));
                   DrawPin(gn.OutputPinId(o), ed::PinKind::Output, gn.node->OutputLabel(o), true);
-                  rowW += w;
-                  firstInRow = false;
+                  if (IModulator* mod = gn.node->ModulatorOutput(o))
+                  {
+                     const float by = y + kPinHit + 1.0f;
+                     const float v = std::clamp(mod->Value01(), 0.0f, 1.0f);
+                     gdl->AddRectFilled(ImVec2(x, by), ImVec2(x + cellW, by + 3.0f),
+                                        gridLight ? tok::U32(tok::pal::c_D6DCE8FF) : tok::U32(tok::pal::c_20232EFF), 1.5f);
+                     if (v > 0.0f)
+                        gdl->AddRectFilled(ImVec2(x, by), ImVec2(x + cellW * v, by + 3.0f),
+                                           gridLight ? tok::U32(tok::pal::c_2378EBFF) : tok::U32(tok::pal::c_50AAFFFF), 1.5f);
+                  }
                }
+               ImGui::SetCursorScreenPos(ImVec2(gridOrigin.x, gridOrigin.y + (float)((outputs + cols - 1) / cols) * rowH));
+               ImGui::Dummy(ImVec2(contentW, 1.0f));
             }
          }
 
@@ -1271,6 +1281,7 @@ void DrawNodeBodies(FrameCtx& fc)
          ImGui::PopID();
          gInsideNodeCanvas = false;
          ed::EndNode();
+         CacheNodeWidth(gn.node.get(), ed::GetNodeSize(gn.NodeId()).x);
          if (hasCookWarning && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
             ImGui::SetTooltip("%s", warnSrc->CookWarning().c_str());
          else if (hasLiveIssue && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))

@@ -597,7 +597,7 @@ namespace app
 
       if (render != nullptr)
       {
-         const float offset = std::max(0.0f, (kWideNodeWidth - size) * 0.5f);
+         const float offset = WideNodeCentreOffset(node, size);
          if (offset > 0.0f)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
       }
@@ -623,6 +623,9 @@ namespace app
          dl->AddText(ImVec2(origin.x + 10, origin.y + size * 0.5f - 8),
                      tok::U32(tok::pal::c_787887FF), EmptyPreviewLabel(node, "no input"));
       }
+
+      if (render != nullptr && render->FlattenedGeometry().empty())
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + size, origin.y + size)}, "patch geometry in");
 
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                   ScopeBorderCol(), 4.0f);

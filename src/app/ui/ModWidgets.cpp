@@ -1811,6 +1811,18 @@ namespace app
    }
 
 
+   static std::unordered_map<const INode*, float> gNodeWidthCache;
+   void CacheNodeWidth(const INode* node, float width) { gNodeWidthCache[node] = width; }
+   float WideNodeCentreOffset(const INode* node, float contentW)
+   {
+      float nodeW = kWideNodeWidth;
+      auto it = gNodeWidthCache.find(node);
+      if (it != gNodeWidthCache.end())
+         nodeW = std::max(nodeW, it->second - 16.0f);   // 16 = node padding left + right
+      return std::max(0.0f, (nodeW - contentW) * 0.5f);
+   }
+
+
    // ---- pins --------------------------------------------------------------
    // Drawn inside a kPinHit-wide box so the clickable area is far larger than
    // the visible dot; connecting used to require pixel-perfect aim.

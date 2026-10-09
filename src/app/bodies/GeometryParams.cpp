@@ -1,4 +1,5 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
+#include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/PinDot.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/TokenColors.h"
@@ -104,15 +105,15 @@ namespace app
                            ImVec2(origin.x + (i + 1) * bw - 1, origin.y + h),
                            tok::U32(tok::pal::c_78C8FFEB));
       }
+      if (!n->input.IsConnected() && !Platform::AudioIsRunning())
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + bodyW, origin.y + h)}, "idle");
       dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::U32(tok::pal::c_464A5AFF), 3.0f);
 
       // --- Left Column ---
       ImGui::BeginGroup();
 
-      NodeSeparator("response", colW);
+      NodeSeparator("input", colW);
       ModSlider("gain", &n->gain, 0.1f, 16.0f, "%.3f", colW);
-      ModSlider("attack", &n->attack, 0.02f, 1.0f, "%.3f", colW);
-      ModSlider("release", &n->release, 0.005f, 1.0f, "%.3f", colW);
       ModSlider("onset hold", &n->onsetHold, 0.02f, 1.0f, "%.3f", colW);
 
       ImGui::EndGroup();
@@ -121,15 +122,9 @@ namespace app
       ImGui::SameLine(0.0f, gutter);
       ImGui::BeginGroup();
 
-      NodeSeparator("outputs", colW);
-      const float labelW = 50.0f;
-      const float barW = colW - labelW;
-      for (int i = 0; i < 5; i++)
-      {
-         ImGui::Text("%-6s", n->OutputLabel(i));
-         ImGui::SameLine(labelW);
-         ImGui::ProgressBar(n->Value(i), ImVec2(barW, 0), "");
-      }
+      NodeSeparator("envelope", colW);
+      ModSlider("attack", &n->attack, 0.02f, 1.0f, "%.3f", colW);
+      ModSlider("release", &n->release, 0.005f, 1.0f, "%.3f", colW);
 
       ImGui::EndGroup();
    }
@@ -519,15 +514,15 @@ namespace app
       if (n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha)
          ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f, "%.3f", colW);
 
-      NodeSeparator("emission", colW);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f, "%.3f", colW);
-
       ImGui::EndGroup();
 
       // --- Right Column ---
       ImGui::SameLine(0.0f, gutter);
       ImGui::BeginGroup();
+
+      NodeSeparator("emission", colW);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f, "%.3f", colW);
 
       NodeSeparator("coat & sheen", colW);
       ModSlider("clearcoat", &n->clearcoat, 0.0f, 1.0f, "%.3f", colW);
@@ -1673,10 +1668,6 @@ namespace app
          ModSlider("target z", &n->targetZ, -3.0f, 3.0f, "%.3f", colW);
       }
 
-      NodeSeparator("raster", colW);
-      ModCheckbox("depth test", &n->depthTest);
-      ModCheckbox("cull backfaces", &n->backfaceCull);
-
       ImGui::EndGroup();
 
       // --- Right Column ---
@@ -1731,6 +1722,10 @@ namespace app
                      [n](int i) { n->spriteShape = i; }, colW);
       DropdownButton("sprite size", Render3DNode::SpriteSizeModeNames(), n->spriteSizeMode,
                      [n](int i) { n->spriteSizeMode = i; }, colW);
+
+      NodeSeparator("raster", colW);
+      ModCheckbox("depth test", &n->depthTest);
+      ModCheckbox("cull backfaces", &n->backfaceCull);
 
       ImGui::EndGroup();
    }
