@@ -582,7 +582,7 @@ void DrawNodeBodies(FrameCtx& fc)
          const bool isMacroNode =
             dynamic_cast<MacroKnobNode*>(gn.node.get()) || dynamic_cast<MacroSliderNode*>(gn.node.get()) ||
             dynamic_cast<MacroBipolarKnobNode*>(gn.node.get()) || dynamic_cast<MacroTriggerNode*>(gn.node.get()) ||
-            dynamic_cast<MacroNumBoxNode*>(gn.node.get());
+            dynamic_cast<MacroToggleNode*>(gn.node.get()) || dynamic_cast<MacroNumBoxNode*>(gn.node.get());
          if (isMacroNode && !isComment)
             gn.showParams = false;
          const auto drawBypassToggle = [&]()
