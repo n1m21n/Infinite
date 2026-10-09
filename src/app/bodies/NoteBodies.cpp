@@ -811,7 +811,7 @@ namespace app
    void DrawRateModeControls(AudioKnobRow& row, int* rateMode, float* rateBeats, float* rateSeconds)
    {
       static const std::vector<std::string> kRateModes = { "Synced", "Free" };
-      row.Dropdown("mode", kRateModes, *rateMode, [rateMode](int i) { PushUndoCheckpoint(); *rateMode = i; });
+      row.Dropdown("sync", kRateModes, *rateMode, [rateMode](int i) { PushUndoCheckpoint(); *rateMode = i; });
       if (*rateMode == 0)
       {
          int div = NearestRateDivision(*rateBeats);
