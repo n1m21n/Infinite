@@ -579,7 +579,12 @@ namespace app
          }
 
          // 4. General & Performance Tab
-         if (ImGui::BeginTabItem(L("General & Performance"), nullptr, 0))
+         // Review hook: INFINITE_OPENPANELS=...settingsgeneral opens this tab first (design review shots).
+         static const bool sGeneralFirst = [] { const char* o = getenv("INFINITE_OPENPANELS"); return o && strstr(o, "settingsgeneral"); }();
+         static bool sGeneralPicked = false;
+         const ImGuiTabItemFlags generalFlags = (sGeneralFirst && !sGeneralPicked) ? ImGuiTabItemFlags_SetSelected : 0;
+         sGeneralPicked = true;
+         if (ImGui::BeginTabItem(L("General & Performance"), nullptr, generalFlags))
          {
             ImGui::Spacing();
             FormParts::Section(T("Autosave"));
@@ -686,9 +691,9 @@ namespace app
             ImGui::Text(T("Version: %s"), INFINITE_VERSION_STRING);
             {
                bool autoCheck = UpdateCheck::AutoCheckEnabled();
-               if (FormParts::Switch(L("Check for updates when Infinite starts"), &autoCheck))
+               if (FormParts::Switch(L("Check on launch"), &autoCheck))
                   UpdateCheck::SetAutoCheckEnabled(autoCheck);
-               ImGui::TextDisabled("%s", T("One request to GitHub Releases, nothing else is sent."));
+               ImGui::TextDisabled("%s", T("Asks GitHub Releases once when Infinite starts. Nothing else is sent."));
             }
             if (FormParts::Button(L("Check for updates...")))
             {
