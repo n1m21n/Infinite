@@ -63,7 +63,7 @@ namespace app
                   const ImVec2 mid((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f);   // filled circle, like the Clip Settings Color Tint
                   dl->AddCircleFilled(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), 48);
                   // Hairline: a preset's background colour can match the panel it sits on.
-                  dl->AddCircle(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(0.5f, 0.5f, 0.5f, 0.35f)), 48, 1.0f);
+                  dl->AddCircle(mid, sz * 0.5f, ImGui::GetColorU32(ImGuiCol_Border), 48, 1.0f);
                }
             };
 
