@@ -127,13 +127,30 @@ void DrawMenuBar(FrameCtx& fc)
             if (hov)
                HelpTip("%s", T("About Infinite"));
             ImGui::SameLine(0.0f, 8.0f);
-            ImGui::GetCurrentWindow()->DC.CursorPosPrevLine.y = p0.y;
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, p0.y));
          }
-         // One compact tile, closed by default: File and Edit are submenus, then the former Menu items.
-         if (MenuTile(L("Menu")))
+         // File, Edit and Menu are three closed tiles that read as one section: a shared well sits behind them.
+         ImDrawList* menuDl = ImGui::GetWindowDrawList();
+         const ImVec2 menuGroupP = ImGui::GetCursorScreenPos();
+         float menuGroupMaxX = menuGroupP.x, menuGroupY0 = 0.0f, menuGroupY1 = 0.0f;
+         auto GroupTile = [&](const char* label) -> bool
          {
-            MenuParts::BeginContent();
-            if (MenuParts::SubMenu(L("File")))
+            // Menu-bar items do not share a y after the first; pin each tile to the group's line.
+            if (menuGroupY1 > 0.0f)
+               ImGui::SetCursorScreenPos(ImVec2(menuGroupMaxX + 16.0f, menuGroupP.y));
+            const bool open = MenuTile(label);
+            menuGroupMaxX = std::max(menuGroupMaxX, ImGui::GetItemRectMax().x);
+            if (menuGroupY1 <= 0.0f)
+            {
+               menuGroupY0 = ImGui::GetItemRectMin().y;
+               menuGroupY1 = ImGui::GetItemRectMax().y;
+            }
+            return open;
+         };
+         menuDl->ChannelsSplit(2);
+         menuDl->ChannelsSetCurrent(1);
+         {
+            if (GroupTile(L("File")))
          {
             MenuParts::BeginContent();
             if (MenuParts::Item(L("New"), MODKEY "+N"))
@@ -184,7 +201,7 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndMenu();
          }
 
-            if (MenuParts::SubMenu(L("Edit")))
+            if (GroupTile(L("Edit")))
          {
             MenuParts::BeginContent();
             if (MenuParts::Item(L("Undo"), MODKEY "+Z", false, !gUndoStack.empty()))
@@ -219,7 +236,9 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndMenu();
          }
 
-            MenuParts::Separator();
+            if (GroupTile(L("Menu")))
+            {
+            MenuParts::BeginContent();
          {
             if (MenuParts::Item(L("Settings..."), MODKEY "+0"))
                gSettingsOpen = true;
@@ -391,6 +410,15 @@ void DrawMenuBar(FrameCtx& fc)
             MenuParts::EndContent();
             ImGui::EndMenu();
          }
+         }
+         // The shared well behind the three tiles.
+         menuDl->ChannelsSetCurrent(0);
+         {
+            const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            menuDl->AddRectFilled(ImVec2(menuGroupP.x - 2.0f, menuGroupY0), ImVec2(menuGroupMaxX + 2.0f, menuGroupY1),
+               ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.06f)), tok::radius_tile);
+         }
+         menuDl->ChannelsMerge();
 
          Transport& transport = Transport::Instance();
          const bool isTransportPlaying = transport.IsPlaying();
@@ -489,7 +517,11 @@ void DrawMenuBar(FrameCtx& fc)
          {
             const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             const bool audioOn = engineOn;
-            if (ChipButton::Draw(audioOn ? L("Stop Audio") : L("Start Audio"), audioOn, tok::tile, 0.0f, true))
+            // One fixed width for both labels so the centred group never changes size.
+            static float sAudioW = 0.0f;
+            if (sAudioW <= 0.0f)
+               sAudioW = std::max(ImGui::CalcTextSize(L("Start Audio")).x, ImGui::CalcTextSize(L("Stop Audio")).x) + 2.0f * tok::space_2;
+            if (ChipButton::Draw(audioOn ? L("Stop Audio") : L("Start Audio"), audioOn, tok::tile, sAudioW, true))
             {
                if (audioOn)
                {
@@ -507,6 +539,13 @@ void DrawMenuBar(FrameCtx& fc)
             if (!audioOn && !gAudioStartError.empty() && ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
 
+         }
+         };
+
+         // The Timeline badge sits outside the centred group, so enabling Timeline Audio never shifts the bar.
+         auto drawTimelineBadge = [&]()
+         {
+            const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             if (gAudioMode == AudioMode::Timeline)
             {
                TopBarSameLine(4.0f);
@@ -517,7 +556,6 @@ void DrawMenuBar(FrameCtx& fc)
                      ? T("The Arrangement Timeline is driving audio. Click to hand it back to the canvas.")
                      : T("The Arrangement Timeline will drive audio once the engine is started."));
             }
-         }
          };
 
          // Left cluster ends here: menus, transport, audio. Tempo, meter, click and key sit centred in the
@@ -527,6 +565,7 @@ void DrawMenuBar(FrameCtx& fc)
          const float centreX = std::max(leftClusterEndX + tok::space_5,
                                         std::round((ImGui::GetWindowWidth() - sCentreW) * 0.5f));
          ImGui::SameLine(centreX);
+         ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX(), (tok::bar_h - tok::tile) * 0.5f));
          const float centreStartScreenX = ImGui::GetCursorScreenPos().x;
          // Transport sits just left of the tempo, audio power just right of it.
          drawTransport();
@@ -846,7 +885,12 @@ void DrawMenuBar(FrameCtx& fc)
 
          // Width of the centred group, measured for next frame's placement.
          sCentreW = ImGui::GetItemRectMax().x - centreStartScreenX;
-         const float centreEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
+         float centreEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
+         if (gAudioMode == AudioMode::Timeline)
+         {
+            drawTimelineBadge();
+            centreEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
+         }
 
          // 4. Telemetry (frame cost, CPU load) at the right edge, with Update beside it when a newer
          // version exists. The panel toggles live on the rail down the window's right edge.
