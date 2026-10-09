@@ -61,13 +61,14 @@ namespace app
                   ImVec2 p0(pos.x + s * (sz + gap), pos.y);
                   ImVec2 p1(p0.x + sz, p0.y + sz);
                   const CategoryColors::Color& c = swatchCols[s];
-                  dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), 2.0f);
-                  dl->AddRect(p0, p1, borderCol, 2.0f, 0, 1.0f);
+                  const ImVec2 mid((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f);
+                  dl->AddCircleFilled(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)));
+                  dl->AddCircle(mid, sz * 0.5f, borderCol, 0, 1.0f);
                }
             };
 
-            const float kSwatchSz = 10.0f;
-            const float kSwatchGap = 3.0f;
+            const float kSwatchSz = 12.0f;
+            const float kSwatchGap = 4.0f;
             const float kSwatchStripW = 3 * kSwatchSz + 2 * kSwatchGap;
 
             if (FormParts::BeginCombo(L("Preset"), presets[currentPreset].c_str()))
