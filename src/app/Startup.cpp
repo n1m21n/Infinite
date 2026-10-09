@@ -487,6 +487,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    if (getenv("INFINITE_NDITEST") != nullptr)
       return RunNdiTest();
+   if (getenv("INFINITE_EXTENSIONSTEST") != nullptr)
+      return RunExtensionsTest();
    if (getenv("INFINITE_MIDICC14TEST") != nullptr)
       return RunMidiCC14Test();
    if (getenv("INFINITE_CVRECTEST") != nullptr)

@@ -1215,6 +1215,131 @@ namespace app
             ImGui::EndTabItem();
          }
 
+         // 7. Extensions Tab: optional packs (docs/plans/extensions/README.md)
+         if (ImGui::BeginTabItem(L("Extensions")))
+         {
+            static bool sFetched = false;
+            if (!sFetched)
+            {
+               sFetched = true;
+               Extensions::RefreshCatalog();
+            }
+            const Extensions::State& ex = Extensions::GetState();
+            const bool busy = !ex.busyId.empty() || ex.catalogLoading;
+
+            ImGui::Spacing();
+            ImGui::TextWrapped("%s", T("Optional packs add heavy features without growing the app. Nodes that use a pack are always available; they show an Install hint until the pack is here."));
+            ImGui::Spacing();
+            ImGui::BeginDisabled(busy);
+            if (ImGui::Button(T("Refresh")))
+               Extensions::RefreshCatalog();
+            ImGui::SameLine();
+            if (ImGui::Button(T("Install from file...")))
+            {
+               const std::string file = Platform::OpenExtensionPackDialog();
+               if (!file.empty())
+                  Extensions::InstallFileAsync(file);
+            }
+            ImGui::EndDisabled();
+            if (ex.catalogLoading)
+            {
+               ImGui::SameLine();
+               ImGui::TextDisabled("%s", T("Checking for packs..."));
+            }
+            ImGui::Spacing();
+
+            auto installedVersion = [&](const std::string& id) -> const std::string*
+            {
+               for (const auto& kv : ex.installed)
+                  if (kv.first == id)
+                     return &kv.second;
+               return nullptr;
+            };
+
+            if (ImGui::BeginTable("ExtensionsTable", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+            {
+               ImGui::TableSetupColumn(T("Pack"), ImGuiTableColumnFlags_WidthStretch, 3.0f);
+               ImGui::TableSetupColumn(T("Status"), ImGuiTableColumnFlags_WidthStretch, 1.6f);
+               ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, 110.0f);
+               ImGui::TableHeadersRow();
+
+               auto row = [&](const std::string& id, const std::string& name, const std::string& purpose,
+                              uint64_t size, const Extensions::Pack* offer)
+               {
+                  ImGui::PushID(id.c_str());
+                  ImGui::TableNextRow();
+                  ImGui::TableSetColumnIndex(0);
+                  ImGui::TextUnformatted(name.c_str());
+                  if (!purpose.empty())
+                     ImGui::TextDisabled("%s%s", purpose.c_str(),
+                                         size ? (std::string("  (") + std::to_string((size + 524288) / 1048576) + " MB)").c_str() : "");
+                  const std::string* have = installedVersion(id);
+                  const bool update = have && offer && *have != offer->version;
+                  ImGui::TableSetColumnIndex(1);
+                  if (ex.busyId == id)
+                     ImGui::Text("%s...", T(ex.busyLabel.c_str()));
+                  else if (!have)
+                     ImGui::TextDisabled("%s", T("Not installed"));
+                  else if (update)
+                     ImGui::Text(T("Update available (v%s)"), offer->version.c_str());
+                  else
+                     ImGui::Text(T("Installed v%s"), have->c_str());
+                  ImGui::TableSetColumnIndex(2);
+                  ImGui::BeginDisabled(busy);
+                  if ((!have || update) && offer)
+                  {
+                     if (ImGui::Button(have ? T("Update") : T("Install"), ImVec2(100, 0)))
+                        Extensions::InstallAsync(*offer);
+                  }
+                  else if (have)
+                  {
+                     if (ImGui::Button(T("Remove"), ImVec2(100, 0)))
+                        Extensions::RemoveAsync(id);
+                  }
+                  ImGui::EndDisabled();
+                  ImGui::PopID();
+               };
+
+               for (const Extensions::Pack& pk : ex.catalog)
+                  row(pk.id, pk.name, pk.purpose, pk.size, &pk);
+               for (const auto& kv : ex.installed) // installed from a file, not in the catalog
+               {
+                  bool listed = false;
+                  for (const Extensions::Pack& pk : ex.catalog)
+                     listed = listed || pk.id == kv.first;
+                  if (!listed)
+                     row(kv.first, kv.first, T("Installed from file"), 0, nullptr);
+               }
+               ImGui::EndTable();
+            }
+
+            if (!ex.catalogLoaded && !ex.catalogLoading && !ex.catalogError.empty())
+            {
+               ImGui::Spacing();
+               ImGui::TextDisabled(T("Could not load the pack list (%s). Use Install from file... when offline."),
+                                   ex.catalogError.c_str());
+            }
+            else if (ex.catalogLoaded && ex.catalog.empty())
+            {
+               ImGui::Spacing();
+               ImGui::TextDisabled("%s", T("No packs are published for this version yet."));
+            }
+            if (!ex.message.empty())
+            {
+               ImGui::Spacing();
+               if (ex.messageIsError)
+               {
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.35f, 1.0f));
+                  ImGui::TextWrapped("%s", ex.message.c_str());
+                  ImGui::PopStyleColor();
+               }
+               else
+                  ImGui::TextWrapped("%s", ex.message.c_str());
+            }
+
+            ImGui::EndTabItem();
+         }
+
          ImGui::EndTabBar();
       }
 

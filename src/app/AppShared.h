@@ -5794,6 +5794,7 @@ int RunCVRecorderTest();
 
 int RunMidiCC14Test();
 int RunNdiTest();
+int RunExtensionsTest();
 
 int RunAudioParamSweepTest();
 

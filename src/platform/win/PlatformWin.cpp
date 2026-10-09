@@ -489,6 +489,17 @@ namespace Platform
                            false, std::string(), err);
    }
 
+   std::string OpenExtensionPackDialog()
+   {
+      std::string err;
+      return RunOpenDialog(L"Install Extension Pack",
+                           {
+                              { L"Extension pack (*.infpack; *.zip)", L"*.infpack;*.zip" },
+                              { L"All files", L"*.*" },
+                           },
+                           false, std::string(), err);
+   }
+
    std::string SaveDeviceDialog(const std::string& suggestedName)
    {
       std::string err;

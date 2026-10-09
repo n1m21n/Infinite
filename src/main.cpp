@@ -71,6 +71,7 @@ int main(int argc, char** argv)
    CloseAllProjectorWindows();
    Platform::StopDisplayRefreshClock();
    AudioEngine::Instance().Stop();
+   Extensions::Shutdown();
    UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
    MovementLog::Stop();
    if (ColorStats::Engine::Instance().HasLearnedData())

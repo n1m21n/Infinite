@@ -1,5 +1,8 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "miniz.h"
+#include <filesystem>
+#include <fstream>
 
 namespace app
 {
@@ -2062,5 +2065,98 @@ bool RunPerfPanelSelfTest()
 
    printf("[PERF MATRIX TEST] PASS\n");
    return true;
+}
+
+// ============================================== INFINITE_EXTENSIONSTEST
+// Headless check of the extension-pack framework: SHA-256, catalog parsing,
+// install/replace/remove, checksum and zip-slip rejection. Uses a temp root via
+// INFINITE_EXTENSIONS_DIR and never touches the network.
+int RunExtensionsTest()
+{
+   int fails = 0;
+   auto check = [&](bool ok, const char* what)
+   {
+      printf("EXTENSIONSTEST %s: %s\n", ok ? "PASS" : "FAIL", what);
+      if (!ok) fails++;
+   };
+
+   const std::string root = AppPaths::TempDir() + "/infinite-exttest";
+   std::error_code ec;
+   std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+#if defined(_WIN32)
+   _putenv_s("INFINITE_EXTENSIONS_DIR", root.c_str());
+#else
+   setenv("INFINITE_EXTENSIONS_DIR", root.c_str(), 1);
+#endif
+
+   check(Extensions::Sha256Hex("abc", 3) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "sha256 abc");
+   check(Extensions::Sha256Hex("", 0) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "sha256 empty");
+   {
+      std::string big(1000, 'a'); // crosses a block boundary
+      check(Extensions::Sha256Hex(big.data(), big.size()) == "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3", "sha256 1000 x 'a'");
+   }
+
+   auto makeZip = [](const std::vector<std::pair<std::string, std::string>>& files)
+   {
+      mz_zip_archive z;
+      memset(&z, 0, sizeof(z));
+      mz_zip_writer_init_heap(&z, 0, 0);
+      for (const auto& f : files)
+         mz_zip_writer_add_mem(&z, f.first.c_str(), f.second.data(), f.second.size(), MZ_DEFAULT_COMPRESSION);
+      void* buf = nullptr;
+      size_t n = 0;
+      mz_zip_writer_finalize_heap_archive(&z, &buf, &n);
+      std::string out((const char*)buf, n);
+      mz_zip_writer_end(&z);
+      mz_free(buf);
+      return out;
+   };
+
+   {
+      std::vector<Extensions::Pack> packs;
+      std::string err;
+      const std::string sha(64, 'a');
+      const std::string good = "{\"schema\":1,\"packs\":[{\"id\":\"tracking\",\"name\":\"Tracking\",\"version\":\"1.0\",\"size\":5,"
+         "\"files\":{\"macos\":{\"url\":\"https://x/y.zip\",\"sha256\":\"" + sha + "\"}}},"
+         "{\"id\":\"bad id\",\"version\":\"1\",\"files\":{\"macos\":{\"url\":\"https://x\",\"sha256\":\"" + sha + "\"}}},"
+         "{\"id\":\"nohash\",\"version\":\"1\",\"files\":{\"macos\":{\"url\":\"https://x\",\"sha256\":\"zz\"}}},"
+         "{\"id\":\"other-os\",\"version\":\"1\",\"files\":{\"linux-x64\":{\"url\":\"https://x\",\"sha256\":\"" + sha + "\"}}}]}";
+      check(Extensions::ParseManifest(good, "macos", packs, err) && packs.size() == 1 && packs[0].id == "tracking",
+            "catalog keeps only verifiable packs for this OS");
+      check(!Extensions::ParseManifest("{\"schema\":2,\"packs\":[]}", "macos", packs, err), "catalog rejects unknown schema");
+      check(!Extensions::ParseManifest("not json", "macos", packs, err), "catalog rejects garbage");
+   }
+
+   const std::string zip1 = makeZip({ { "pack.json", "{\"id\":\"demo\",\"version\":\"1\"}" }, { "models/a.bin", "hello" } });
+   std::string id, err;
+   check(Extensions::PackDir("demo").empty(), "not installed at first");
+   check(!Extensions::InstallZip(zip1, std::string(64, '0'), "demo", id, err), "wrong checksum is rejected");
+   check(Extensions::PackDir("demo").empty(), "rejected install leaves nothing behind");
+   check(!Extensions::InstallZip(zip1, "", "other", id, err), "id mismatch is rejected");
+   check(Extensions::InstallZip(zip1, Extensions::Sha256Hex(zip1.data(), zip1.size()), "demo", id, err) && id == "demo", "install with checksum");
+   check(Extensions::InstalledVersion("demo") == "1", "installed version read back");
+   {
+      std::ifstream f(AppPaths::FsPath(Extensions::PackDir("demo") + "/models/a.bin"), std::ios::binary);
+      std::string s((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+      check(s == "hello", "nested file unpacked intact");
+   }
+   const std::string zip2 = makeZip({ { "pack.json", "{\"id\":\"demo\",\"version\":\"2\"}" } });
+   check(Extensions::InstallZip(zip2, "", "", id, err) && Extensions::InstalledVersion("demo") == "2", "update replaces the pack");
+   check(!std::filesystem::exists(AppPaths::FsPath(Extensions::PackDir("demo") + "/models/a.bin")), "update drops files from the old version");
+
+   const std::string slip = makeZip({ { "pack.json", "{\"id\":\"evil\",\"version\":\"1\"}" }, { "../escape.txt", "x" } });
+   check(!Extensions::InstallZip(slip, "", "", id, err), "zip-slip entry is rejected");
+   check(!std::filesystem::exists(AppPaths::FsPath(root + "/../escape.txt")), "nothing written outside the pack");
+   check(Extensions::PackDir("evil").empty(), "hostile pack not installed");
+   check(!Extensions::InstallZip(makeZip({ { "a.txt", "x" } }), "", "", id, err), "zip without pack.json is rejected");
+   check(!Extensions::InstallZip("garbage", "", "", id, err), "non-zip is rejected");
+   check(Extensions::InstalledVersion("demo") == "2", "failed installs leave the installed pack alone");
+
+   check(Extensions::Remove("demo") && Extensions::PackDir("demo").empty(), "remove");
+   check(!Extensions::Remove("../x"), "remove refuses a bad id");
+
+   std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+   printf("EXTENSIONSTEST %s\n", fails == 0 ? "ALL PASS" : "FAILED");
+   return fails == 0 ? 0 : 1;
 }
 }

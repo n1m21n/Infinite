@@ -1278,6 +1278,32 @@ namespace Platform
       }
    }
 
+   std::string OpenExtensionPackDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Install extension pack"];
+         if (@available(macOS 11.0, *))
+         {
+            NSMutableArray<UTType*>* types = [NSMutableArray array];
+            UTType* tPack = [UTType typeWithFilenameExtension:@"infpack"];
+            if (tPack != nil) [types addObject:tPack];
+            UTType* tZip = [UTType typeWithFilenameExtension:@"zip"];
+            if (tZip != nil) [types addObject:tZip];
+            if ([types count] > 0)
+               [panel setAllowedContentTypes:types];
+         }
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
    std::string OpenDeviceDialog()
    {
       @autoreleasepool

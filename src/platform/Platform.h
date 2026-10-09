@@ -178,6 +178,9 @@ namespace Platform
    std::string OpenDeviceDialog();
    std::string SaveDeviceDialog(const std::string& suggestedName = "Untitled.field");
 
+   // Extension pack files (.infpack, a zip). Returns the chosen path, or "" if cancelled.
+   std::string OpenExtensionPackDialog();
+
    // ---- text outlines -----------------------------------------------------
    // Glyph outlines for a laid-out string, flattened to polygons in font units
    // normalised so cap height is roughly 1. Curves are subdivided here because

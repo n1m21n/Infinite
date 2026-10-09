@@ -533,6 +533,7 @@ set(COMMON_SOURCES
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
     src/core/UpdateCheck.cpp
+    src/core/Extensions.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
     src/audio/AudioEngine.cpp

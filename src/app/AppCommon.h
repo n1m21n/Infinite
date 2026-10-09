@@ -155,6 +155,7 @@ inline std::string TmpPath(const std::string& name)
 #include "core/RemoteControl.h"
 #include "core/PatchJson.h"
 #include "core/UpdateCheck.h"
+#include "core/Extensions.h"
 
 #ifndef INFINITE_VERSION_STRING
 #define INFINITE_VERSION_STRING "0.0.0"

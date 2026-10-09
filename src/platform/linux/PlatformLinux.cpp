@@ -399,6 +399,23 @@ namespace Platform
       return res ? std::string(res) : std::string();
    }
 
+   std::string OpenExtensionPackDialog()
+   {
+      if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
+      EnsureDialogBackendChecked();
+      const char* const filterPatterns[] = { "*.infpack", "*.zip" };
+      const char* res = tinyfd_openFileDialog(
+         "Install Extension Pack",
+         "",
+         (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
+         filterPatterns,
+         "Extension pack (*.infpack, *.zip)",
+         0
+      );
+      return res ? std::string(res) : std::string();
+   }
+
    std::string SaveDeviceDialog(const std::string& suggestedName)
    {
       if (IsHeadlessOrExitAfter()) return "";
