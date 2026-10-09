@@ -161,15 +161,13 @@ namespace app
 
       // Channels param control
       {
-         ImGui::PushItemWidth(140.0f);
          int ch = n->numChannels;
-         if (ImGui::SliderInt("channels", &ch, 0, MixerNode::kMaxSlots))
+         if (AudioSliderInt("channels", &ch, 0, MixerNode::kMaxSlots, AudioHalfWidth()))
          {
             PushUndoCheckpoint();
             n->numChannels = std::clamp(ch, 0, (int)MixerNode::kMaxSlots);
             RebuildAudioTopology();
          }
-         ImGui::PopItemWidth();
          ImGui::Dummy(ImVec2(0.0f, 4.0f));
       }
 
