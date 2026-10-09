@@ -58,6 +58,9 @@ namespace SectionCard
          const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
          dl->AddRectFilled(ImVec2(x0, s.top - kPad), ImVec2(x1, y1), ImGui::GetColorU32(ImVec4(t.x, t.y, t.z, 0.05f)),
                            tok::radius_group);
+         dl->AddRect(ImVec2(x0, s.top - kPad), ImVec2(x1, y1),
+                     ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)),
+                     tok::radius_group);
          s.split.SetCurrentChannel(dl, 1);
       }
       ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, y1 - ImGui::GetStyle().ItemSpacing.y));

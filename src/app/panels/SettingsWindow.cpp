@@ -65,7 +65,6 @@ namespace app
             const float kSwatchGap = 3.0f;
             const float kSwatchStripW = 3 * kSwatchSz + 2 * kSwatchGap;
 
-            ImGui::SetNextItemWidth(220.0f);
             if (FormParts::BeginCombo(L("Preset"), presets[currentPreset].c_str()))
             {
                for (int i = 0; i < (int)presets.size(); i++)
@@ -94,7 +93,7 @@ namespace app
                drawThemeSwatches(ImVec2(cursor.x, y), kSwatchSz, kSwatchGap, CategoryColors::UiThemeForPreset(currentPreset));
                ImGui::Dummy(ImVec2(kSwatchStripW, rowH));
             }
-            ImGui::SameLine();
+            ImGui::SetCursorPosX(FormParts::kLabelW);
             if (FormParts::Button(L("Reset to Defaults")))
             {
                CategoryColors::ResetAllAppearanceBoth();
@@ -117,8 +116,7 @@ namespace app
                   float c[3] = { col.r, col.g, col.b };
                   char pickerId[64];
                   snprintf(pickerId, sizeof(pickerId), "##catcol_%s", cat.c_str());
-                  ImGui::SetNextItemWidth(120.0f);
-                  if (ImGui::ColorEdit3(pickerId, c, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+                  if (FormParts::ColorDot(pickerId, c))
                   {
                      CategoryColors::SetCategoryColor(cat, { c[0], c[1], c[2] }, isLight, false);
                   }
@@ -148,8 +146,7 @@ namespace app
                   float c[3] = { col.r, col.g, col.b };
                   char pickerId[64];
                   snprintf(pickerId, sizeof(pickerId), "##cablecol_%d", i);
-                  ImGui::SetNextItemWidth(120.0f);
-                  if (ImGui::ColorEdit3(pickerId, c, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+                  if (FormParts::ColorDot(pickerId, c))
                   {
                      CategoryColors::SetCableColor(type, { c[0], c[1], c[2] }, isLight, false);
                   }
@@ -1218,6 +1215,10 @@ namespace app
       }
 
       SectionCard::EndWindow();
+      ImGui::GetWindowDrawList()->AddRect(ImVec2(ImGui::GetWindowPos().x + 0.5f, ImGui::GetWindowPos().y + 0.5f),
+                                          ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - 0.5f,
+                                                 ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - 0.5f),
+                                          FormParts::EdgeCol(), 12.0f);
       ImGui::End();
       PopElevatedPanelStyle();
    }

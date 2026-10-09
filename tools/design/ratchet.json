@@ -27,7 +27,7 @@
   "src/app/panels/LibraryPanels.cpp": 15,
   "src/app/panels/ModMatrixPanel.cpp": 16,
   "src/app/panels/PerfPanel.cpp": 33,
-  "src/app/panels/SettingsWindow.cpp": 37,
+  "src/app/panels/SettingsWindow.cpp": 36,
   "src/app/panels/ViewportPanel.cpp": 4,
   "src/app/ui/ModWidgets.cpp": 47,
   "src/app/ui/ParamWidgets.cpp": 30,

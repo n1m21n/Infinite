@@ -7,6 +7,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include "app/AppShared.h"
 #include "core/TablerIcons.h"
 #include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/components/ChipButton.h"
@@ -18,6 +19,33 @@ namespace FormParts
    constexpr float kLabelW = 200.0f;
    constexpr float kControlW = 220.0f;
    constexpr float kRowH = 28.0f;
+
+   // The hairline edge every surface carries (same value the Library wells use).
+   inline ImU32 EdgeCol()
+   {
+      return ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f));
+   }
+
+   // Round colour dot (same shape as the Clip Settings swatches); a click opens a picker. True when edited.
+   inline bool ColorDot(const char* id, float* rgb, float d = 18.0f)
+   {
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const bool click = ImGui::InvisibleButton(id, ImVec2(d, d));
+      const bool hov = ImGui::IsItemHovered();
+      const ImVec2 c(p.x + d * 0.5f, p.y + d * 0.5f);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)));
+      dl->AddCircle(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(0, 0, 0, 0.18f)), 0, 1.0f);
+      if (click)
+         ImGui::OpenPopup(id);
+      bool changed = false;
+      if (ImGui::BeginPopup(id))
+      {
+         changed = ImGui::ColorPicker3("##pick", rgb, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview);
+         ImGui::EndPopup();
+      }
+      return changed;
+   }
 
    inline std::string Visible(const char* label)
    {
