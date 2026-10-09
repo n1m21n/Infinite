@@ -1017,15 +1017,15 @@ namespace app
             PopToolbarChip();
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Snap Grid Division"));
-            if (ImGui::BeginPopup("##arrgridpopup"))
+            if (MenuParts::BeginPopup("##arrgridpopup"))
             {
                for (const GridChoice& c : kGridChoices)
                {
                   const bool sel = c.division == st.snapDivision && (c.division <= 1 || c.triplet == st.snapTriplet);
-                  if (ImGui::Selectable(choiceName(c), sel))
+                  if (MenuParts::Choice(choiceName(c), sel))
                      ArrangeSetSnap(c.division, c.triplet);
                }
-               ImGui::EndPopup();
+               MenuParts::EndPopup();
             }
          }
 

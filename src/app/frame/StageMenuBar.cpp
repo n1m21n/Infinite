@@ -4,6 +4,7 @@
 #include "app/ui/design/components/Readout.h"
 #include "app/ui/design/components/TopBarParts.h"
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/Divider.h"
 #include "app/ui/design/components/PanelRail.h"
 #include "app/ui/design/components/TransportDisplay.h"
@@ -434,14 +435,7 @@ void DrawMenuBar(FrameCtx& fc)
          {
             const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             const bool audioOn = engineOn;
-            const bool audioIsLight = isLight;
-            ImGui::PushStyleColor(ImGuiCol_Button, audioOn
-                                                       ? (audioIsLight ? tok::V4(tok::palf::v_200_620_340_1000) : tok::V4(tok::palf::v_160_520_280_1000))
-                                                       : (audioIsLight ? tok::V4(tok::palf::v_800_820_870_1000) : tok::V4(tok::palf::v_300_300_340_1000)));
-            ImGui::PushStyleColor(ImGuiCol_Text, audioOn
-                                                     ? tok::V4(tok::palf::v_1000_1000_1000_1000)
-                                                     : (audioIsLight ? tok::V4(tok::palf::v_120_140_200_1000) : tok::V4(tok::palf::v_920_940_980_1000)));
-            if (ImGui::Button(audioOn ? L("Stop Audio") : L("Start Audio")))
+            if (ChipButton::Draw(audioOn ? L("Stop Audio") : L("Start Audio"), audioOn, tok::tile, 0.0f, true))
             {
                if (audioOn)
                {
@@ -454,26 +448,17 @@ void DrawMenuBar(FrameCtx& fc)
                      fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
                }
             }
-            ImGui::PopStyleColor(2);
             if (!audioOn && !gAudioStartError.empty() && ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
 
             if (gAudioMode == AudioMode::Timeline)
             {
                TopBarSameLine(4.0f);
-               const char* badge = T("Timeline");
-               const ImVec2 textSize = ImGui::CalcTextSize(badge);
-               const ImVec2 pad(6.0f, ImGui::GetStyle().FramePadding.y);
-               const ImVec2 bmin = ImGui::GetCursorScreenPos();
-               const ImVec2 bmax(bmin.x + textSize.x + pad.x * 2.0f, bmin.y + ImGui::GetFrameHeight());
-               ImGui::InvisibleButton("##timelineAudioBadge", ImVec2(bmax.x - bmin.x, bmax.y - bmin.y));
-               ImDrawList* dl = ImGui::GetWindowDrawList();
-               const ImU32 edge = audioIsLight ? tok::U32(tok::pal::c_288248FF) : tok::U32(tok::pal::c_60C884FF);
-               dl->AddRect(bmin, bmax, edge, 3.0f, 0, 1.0f);
-               dl->AddText(ImVec2(bmin.x + pad.x, bmin.y + pad.y), edge, badge);
+               if (ChipButton::Draw(T("Timeline"), true, tok::tile, 0.0f, true))
+                  gAudioMode = AudioMode::Canvas;
                if (ImGui::IsItemHovered())
                   HelpTip(engineOn
-                     ? T("The Arrangement Timeline is driving audio. Hand it back to the canvas from the timeline panel.")
+                     ? T("The Arrangement Timeline is driving audio. Click to hand it back to the canvas.")
                      : T("The Arrangement Timeline will drive audio once the engine is started."));
             }
          }
