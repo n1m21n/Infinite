@@ -599,14 +599,14 @@ void DrawSidePanels(FrameCtx& fc)
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFormulaEditor->formula = editBuf;
                gFormulaEditor->Apply();
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
 
             if (!gFormulaEditor->LastError().empty())
@@ -669,7 +669,7 @@ void DrawSidePanels(FrameCtx& fc)
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldElementEditor->code = editBuf;
                gFieldElementEditor->Apply();
@@ -677,7 +677,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
 
             if (!gFieldElementEditor->LastError().empty())
@@ -733,7 +733,7 @@ void DrawSidePanels(FrameCtx& fc)
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldPrimitiveEditor->code = editBuf;
                gFieldPrimitiveEditor->Apply();
@@ -741,7 +741,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPrimitiveEditor->code.c_str());
 
             if (!gFieldPrimitiveEditor->LastError().empty())
@@ -782,7 +782,7 @@ void DrawSidePanels(FrameCtx& fc)
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldPixelEditor->code = editBuf;
                gFieldPixelEditor->Apply();
@@ -790,7 +790,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
 
             if (!gFieldPixelEditor->LastError().empty())
@@ -846,7 +846,7 @@ void DrawSidePanels(FrameCtx& fc)
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldSampleEditor->code = editBuf;
                gFieldSampleEditor->Apply();
@@ -854,7 +854,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSampleEditor->code.c_str());
 
             if (!gFieldSampleEditor->LastError().empty())
@@ -910,7 +910,7 @@ void DrawSidePanels(FrameCtx& fc)
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldSynthEditor->code = editBuf;
                gFieldSynthEditor->Apply();
@@ -918,7 +918,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSynthEditor->code.c_str());
 
             if (!gFieldSynthEditor->LastError().empty())
@@ -974,7 +974,7 @@ void DrawSidePanels(FrameCtx& fc)
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                // Compile-only (T11): never mutates the real graph on its own -
                // see FieldGraphNode::Apply()'s doc comment. Regenerate (below)
@@ -985,10 +985,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
             ImGui::SameLine();
-            if (ImGui::Button(L("Regenerate"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Regenerate"), ImVec2(120, 0)))
             {
                // Safe to call directly (not deferred) here: this window draws
                // after ed::End() has already returned for the frame, unlike

@@ -30,6 +30,7 @@ art/icons/src/*.svg ──build_glyphs.py──▶ font + Glyphs.gen.h ──▶
 | `src/app/ui/design/components/` | One file per component class (ids C*, V*, N*, A*, G* in the plan's section 0/0b) |
 | `art/icons/src/` | Icon SVG masters, 20 px grid (and 16 px redraws) |
 | `src/app/ui/design/components/PinDot.h` | Every pin: `Cable`, `Param` (idle/modulated/expression/prediction), `Swatch`; sizes `tok::pin_r_*`, colours `tok::pin_*` |
+| `src/app/ui/design/components/ActionButton.h` | Text buttons: `Draw(label,size,Kind)`; kinds Plain, Primary, Selected, Record, Learn, Go, Solo. `PushSelectedButtonColors`/`PushPrimaryButtonStyle` set the scoped kind |
 | `tools/design/` | `build_tokens.py`, `build_glyphs.py`, `lint_icons.py`, `inventory.py`, `ratchet.json` |
 
 ## Recipes

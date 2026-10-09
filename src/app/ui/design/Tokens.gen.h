@@ -76,6 +76,10 @@ namespace tok
    constexpr Pair8 pin_well = { {18, 19, 25, 255}, {240, 243, 250, 255} };
    constexpr Pair8 pin_colour = { {95, 100, 120, 255}, {95, 100, 120, 255} };
    constexpr Pair8 pin_colour_bound = { {130, 220, 190, 255}, {130, 220, 190, 255} };
+   constexpr Pair8 action_record = { {190, 52, 52, 255}, {190, 52, 52, 255} };
+   constexpr Pair8 action_learn = { {217, 140, 26, 255}, {200, 120, 10, 255} };
+   constexpr Pair8 action_go = { {46, 170, 74, 255}, {38, 140, 62, 255} };
+   constexpr Pair8 action_solo = { {217, 166, 38, 255}, {215, 160, 25, 255} };
    constexpr Rgba8 transparent = {0, 0, 0, 0};
    constexpr Rgba8 record = {239, 68, 68, 255};
    constexpr Rgba8 danger_hover = {230, 60, 60, 255};

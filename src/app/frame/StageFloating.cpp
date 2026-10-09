@@ -83,13 +83,13 @@ int DrawFloating(FrameCtx& fc)
          {
             ImGui::TextUnformatted(T("File changed on disk."));
             ImGui::SameLine();
-            if (ImGui::Button(L("Reload")))
+            if (ActionButton::Draw(L("Reload")))
             {
                if (LoadPatchFromImpl(gPatchWatchPath, true))
                   gPatchChangedOnDisk = false;
             }
             ImGui::SameLine();
-            if (ImGui::Button(L("Keep mine")))
+            if (ActionButton::Draw(L("Keep mine")))
                gPatchChangedOnDisk = false;
          }
          ImGui::End();

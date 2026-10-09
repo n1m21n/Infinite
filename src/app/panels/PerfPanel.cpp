@@ -980,21 +980,8 @@ namespace app
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f - btnSize) * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(centerX, centerY));
 
-         ImVec4 btnCol = curVal ? ImVec4((themeTint & 0xFF) / 255.0f,
-                                         ((themeTint >> 8) & 0xFF) / 255.0f,
-                                         ((themeTint >> 16) & 0xFF) / 255.0f, 1.0f)
-                                : ImGui::ColorConvertU32ToFloat4(wellCol(0.08f));
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
-         ImGui::PushStyleColor(ImGuiCol_Button, btnCol);
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, curVal ? btnCol : ImGui::ColorConvertU32ToFloat4(wellCol(0.13f)));
-         ImGui::PushStyleColor(ImGuiCol_ButtonActive, curVal ? btnCol : ImGui::ColorConvertU32ToFloat4(wellCol(0.18f)));
-         if (curVal)
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-         const bool toggleClicked = ImGui::Button(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize));
-         if (curVal)
-            ImGui::PopStyleColor();
-         ImGui::PopStyleColor(3);
-         ImGui::PopStyleVar();
+         const bool toggleClicked = ActionButton::Draw(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize),
+                                                       curVal ? ActionButton::Kind::Selected : ActionButton::Kind::Plain);
          if (toggleClicked)
          {
             bool newVal = !curVal;
@@ -1301,20 +1288,6 @@ namespace app
             ImGui::PushID(b + 300);
 
             const bool isSelected = (b == curIndex);
-            if (isSelected)
-            {
-               ImVec4 activeCol((themeTint & 0xFF) / 255.0f,
-                                ((themeTint >> 8) & 0xFF) / 255.0f,
-                                ((themeTint >> 16) & 0xFF) / 255.0f, 1.0f);
-               ImGui::PushStyleColor(ImGuiCol_Button, activeCol);
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-            }
-            else
-            {
-               ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(wellCol(0.08f)));
-               ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(wellCol(0.8f)));
-            }
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tok::radius_tile);
 
             // Either every button shows its option name or none of them do.
             // The old rule was per-button ("use the name if it is <= 4 chars"),
@@ -1323,7 +1296,8 @@ namespace app
             // reading as a broken 1..8 row. useNames is decided once, above
             // the loop.
             std::string btnText = useNames ? kp.enumOptions[b] : std::to_string(b + 1);
-            if (ImGui::Button(btnText.c_str(), ImVec2(btnW, btnH)))
+            if (ActionButton::Draw(btnText.c_str(), ImVec2(btnW, btnH),
+                                   isSelected ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
             {
                float newVal = 0.0f;
                if (isDiscreteEnum)
@@ -1338,8 +1312,6 @@ namespace app
                   if (t.dstIndex >= 0 && t.dstParam >= 0)
                      gPerfPendingWrites[{t.dstIndex, t.dstParam}] = newVal;
             }
-            ImGui::PopStyleVar();
-            ImGui::PopStyleColor(2);
             ImGui::PopID();
          }
       }

@@ -477,7 +477,7 @@ namespace app
       const bool learning = n->IsLearning();
       const float w = kPreviewSize;
       const float h = ImGui::GetFrameHeight();
-      if (ImGui::Button(learning ? "Stop##predModLearn" : "Learn##predModLearn", ImVec2(w * 0.3f, h)))
+      if (ActionButton::Draw(learning ? "Stop##predModLearn" : "Learn##predModLearn", ImVec2(w * 0.3f, h)))
       {
          PushUndoCheckpoint();
          n->SetLearning(!learning);
@@ -572,28 +572,9 @@ namespace app
    // and adds a real border stroke - a guaranteed-visible backstop the way
    // the waveform box and slider fields already draw their own explicit
    // AddRect borders instead of trusting a themed background.
-   bool AudioToggleButtonEx(const char* label, bool* value, const ImVec2& size,
-                            ImU32 activeBgLight, ImU32 activeBgDark,
-                            ImU32 activeHoverLight, ImU32 activeHoverDark,
-                            ImU32 activeHitLight, ImU32 activeHitDark,
-                            ImU32 activeTextLight, ImU32 activeTextDark)
+   bool AudioToggleButtonEx(const char* label, bool* value, const ImVec2& size, ActionButton::Kind onKind)
    {
-      const bool isLight = IsThemeLight();
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::U32(tok::pal::c_AAB2C3FF) : tok::U32(tok::pal::c_828AA0C8));
-      ImGui::PushStyleColor(ImGuiCol_Button, *value ? (isLight ? activeBgLight : activeBgDark)
-                                                    : (isLight ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_21242EFF)));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                            *value ? (isLight ? activeHoverLight : activeHoverDark)
-                                   : (isLight ? tok::U32(tok::pal::c_D0D6E1FF) : tok::U32(tok::pal::c_333847FF)));
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                            *value ? (isLight ? activeHitLight : activeHitDark)
-                                   : (isLight ? tok::U32(tok::pal::c_C3CAD7FF) : tok::U32(tok::pal::c_404659FF)));
-      ImGui::PushStyleColor(ImGuiCol_Text, *value ? (isLight ? activeTextLight : activeTextDark)
-                                                  : (isLight ? tok::U32(tok::pal::c_282D3CFF) : tok::U32(tok::pal::c_D2D7E6FF)));
-      const bool clicked = ImGui::Button(label, size);
-      ImGui::PopStyleColor(5);
-      ImGui::PopStyleVar();
+      const bool clicked = ActionButton::Draw(label, size, *value ? onKind : ActionButton::Kind::Plain);
       if (clicked)
          *value = !*value;
       return clicked;
@@ -602,11 +583,7 @@ namespace app
 
    bool AudioToggleButton(const char* label, bool* value, float width, float height)
    {
-      return AudioToggleButtonEx(label, value, ImVec2(width, height),
-                                 tok::U32(tok::pal::c_3773EBFF), tok::U32(tok::pal::c_5A73CDFF),
-                                 tok::U32(tok::pal::c_4B87F5FF), tok::U32(tok::pal::c_6C84DCFF),
-                                 tok::U32(tok::pal::c_285FD7FF), tok::U32(tok::pal::c_7890E6FF),
-                                 tok::U32(tok::pal::c_FFFFFFFF), tok::U32(tok::pal::c_FFFFFFFF));
+      return AudioToggleButtonEx(label, value, ImVec2(width, height), ActionButton::Kind::Selected);
    }
 
    bool DrawGateButton(const char* id, float totalW, float height, const GatePainter& paint,
@@ -678,11 +655,7 @@ namespace app
       }
       else
       {
-         if (style == 1)
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-         ImGui::Button(label, ImVec2(btnW, 0));
-         if (style == 1)
-            ImGui::PopStyleColor();
+         ActionButton::Draw(label, ImVec2(btnW, 0), (style == 1) ? ActionButton::Kind::Record : ActionButton::Kind::Plain);
       }
       const bool held = ImGui::IsItemActive();
       const ImVec2 mn = ImGui::GetItemRectMin();
@@ -698,37 +671,19 @@ namespace app
 
    bool AudioSoloButton(const char* label, bool* value, float width, float height)
    {
-      return AudioToggleButtonEx(label, value, ImVec2(width, height),
-                                 tok::U32(tok::pal::c_D7A019FF), tok::U32(tok::pal::c_D9A626FF),
-                                 tok::U32(tok::pal::c_EBB42DFF), tok::U32(tok::pal::c_EBB838FF),
-                                 tok::U32(tok::pal::c_C38C0FFF), tok::U32(tok::pal::c_C7941AFF),
-                                 tok::U32(tok::pal::c_19191EFF), tok::U32(tok::pal::c_19191EFF));
+      return AudioToggleButtonEx(label, value, ImVec2(width, height), ActionButton::Kind::Solo);
    }
 
 
    bool AudioMuteButton(const char* label, bool* value, float width, float height)
    {
-      return AudioToggleButtonEx(label, value, ImVec2(width, height),
-                                 tok::U32(tok::pal::c_C82D2DFF), tok::U32(tok::pal::c_A62929FF),
-                                 tok::U32(tok::pal::c_DC4141FF), tok::U32(tok::pal::c_BF3838FF),
-                                 tok::U32(tok::pal::c_AF2323FF), tok::U32(tok::pal::c_8C1F1FFF),
-                                 tok::U32(tok::pal::c_FFFFFFFF), tok::U32(tok::pal::c_FFFFFFFF));
+      return AudioToggleButtonEx(label, value, ImVec2(width, height), ActionButton::Kind::Record);
    }
 
 
    bool AudioSmallButton(const char* label, float width, float height)
    {
-      const bool isLight = IsThemeLight();
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::U32(tok::pal::c_AAB2C3FF) : tok::U32(tok::pal::c_828AA0C8));
-      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_21242EFF));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? tok::U32(tok::pal::c_D0D6E1FF) : tok::U32(tok::pal::c_333847FF));
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? tok::U32(tok::pal::c_C3CAD7FF) : tok::U32(tok::pal::c_404659FF));
-      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::U32(tok::pal::c_282D3CFF) : tok::U32(tok::pal::c_D2D7E6FF));
-      const bool clicked = ImGui::Button(label, ImVec2(width, height));
-      ImGui::PopStyleColor(5);
-      ImGui::PopStyleVar();
-      return clicked;
+      return ActionButton::Draw(label, ImVec2(width, height));
    }
 
 

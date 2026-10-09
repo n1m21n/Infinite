@@ -627,7 +627,7 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                              : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         ImGui::Button(caption.c_str(), ImVec2(width, 0));
+         ActionButton::Draw(caption.c_str(), ImVec2(width, 0));
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          // BeginDisabled swallows hover, so ask the rect directly - otherwise
@@ -636,7 +636,7 @@ namespace app
                                    ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
                                                               ImGui::GetItemRectMax()));
       }
-      else if (ImGui::Button(caption.c_str(), ImVec2(width, 0)))
+      else if (ActionButton::Draw(caption.c_str(), ImVec2(width, 0)))
       {
          gDropdown.options = options;
          gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind

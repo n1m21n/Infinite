@@ -7,7 +7,7 @@ namespace app
 {
    void DrawAudioFileParams(AudioFileNode* n)
    {
-      if (ImGui::Button("Choose audio...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose audio...", ImVec2(kPreviewSize, 0)))
          n->OpenViaDialog();
 
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -24,15 +24,15 @@ namespace app
 
          if (n->IsPlaying())
          {
-            if (ImGui::Button("Pause", ImVec2(kPreviewSize * 0.48f, 0)))
+            if (ActionButton::Draw("Pause", ImVec2(kPreviewSize * 0.48f, 0)))
                n->Pause();
          }
-         else if (ImGui::Button("Play", ImVec2(kPreviewSize * 0.48f, 0)))
+         else if (ActionButton::Draw("Play", ImVec2(kPreviewSize * 0.48f, 0)))
          {
             n->Play();
          }
          ImGui::SameLine();
-         if (ImGui::Button("Restart", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Restart", ImVec2(kPreviewSize * 0.48f, 0)))
             n->Restart();
 
          ModCheckbox("follow transport", &n->followTransport);
@@ -76,12 +76,10 @@ namespace app
       {
          if (Platform::AudioIsRunning())
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_650_150_150_1000));
-            if (ImGui::Button("Stop listening", ImVec2(bodyW, 0)))
+            if (ActionButton::Draw("Stop listening", ImVec2(bodyW, 0), ActionButton::Kind::Record))
                n->Stop();
-            ImGui::PopStyleColor();
          }
-         else if (ImGui::Button("Start listening", ImVec2(bodyW, 0)))
+         else if (ActionButton::Draw("Start listening", ImVec2(bodyW, 0)))
          {
             n->Start();
          }
@@ -421,7 +419,7 @@ namespace app
    void DrawClothParams(ClothNode* n)
    {
       ImGui::TextDisabled("%zu triangles, %zu links", n->TriangleCount(), n->ConstraintCount());
-      if (ImGui::Button("Reset", ImVec2(kParamWidth, 0)))
+      if (ActionButton::Draw("Reset", ImVec2(kParamWidth, 0)))
          n->Reset();
 
       NodeSeparator("solver");
@@ -455,7 +453,7 @@ namespace app
    void DrawParticleSystemParams(ParticleSystemNode* n)
    {
       ImGui::TextDisabled("%zu alive", n->AliveCount());
-      if (ImGui::Button("Reset", ImVec2(kParamWidth, 0)))
+      if (ActionButton::Draw("Reset", ImVec2(kParamWidth, 0)))
          n->Reset();
 
       NodeSeparator("emitter");
@@ -604,11 +602,11 @@ namespace app
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
       ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());
-      if (ImGui::Button("step")) n->StepOnce();
+      if (ActionButton::Draw("step")) n->StepOnce();
       ImGui::SameLine();
-      if (ImGui::Button("reset")) n->Reset();
+      if (ActionButton::Draw("reset")) n->Reset();
       ImGui::SameLine();
-      if (ImGui::Button("randomise")) n->Randomise();
+      if (ActionButton::Draw("randomise")) n->Randomise();
 
       NodeSeparator("evolve");
       ModSlider("chaos", &n->chaos, 0.0f, 1.5f);
@@ -789,7 +787,7 @@ namespace app
 
    void DrawModelParams(ModelSourceNode* n)
    {
-      if (ImGui::Button("Open model...", ImVec2(kParamWidth, 0)))
+      if (ActionButton::Draw("Open model...", ImVec2(kParamWidth, 0)))
       {
          const std::string path = Platform::OpenModelDialog();
          if (!path.empty())
@@ -1620,7 +1618,7 @@ namespace app
       const float colW = kParamWidth;
       const float gutter = 16.0f;
 
-      if (ImGui::Button("Frame scene", ImVec2(colW, 0)))
+      if (ActionButton::Draw("Frame scene", ImVec2(colW, 0)))
          FrameSceneInView(n);
 
       // --- Left Column ---

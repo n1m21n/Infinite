@@ -2,6 +2,7 @@
 // Shared declarations for the code split out of main.cpp.
 #include "app/ui/design/TokenColors.h"
 #include "app/AppCommon.h"
+#include "app/ui/design/components/ActionButton.h"
 
 namespace app
 {
@@ -2659,18 +2660,18 @@ void DrawShapeParams(ShapeNode* n);
       if (options.empty())
       {
          ImGui::BeginDisabled();
-         ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0));
+         ActionButton::Draw(dropdownId.c_str(), ImVec2(kPreviewSize, 0));
          ImGui::EndDisabled();
       }
       else
       {
-         if (ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
             openDropdownAction(true);
       }
       PopDropdownStyle();
 
       const float btnW = (kPreviewSize - 2.0f * spacing) / 3.0f;
-      if (ImGui::Button(("Save##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      if (ActionButton::Draw(("Save##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
          snprintf(gFieldDeviceSave.nameBuf, sizeof(gFieldDeviceSave.nameBuf), "Untitled");
          gFieldDeviceSave.domain = domain;
@@ -2686,14 +2687,14 @@ void DrawShapeParams(ShapeNode* n);
          gFieldDeviceSave.justOpened = true;
       }
       ImGui::SameLine();
-      if (ImGui::Button(("Export##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      if (ActionButton::Draw(("Export##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
          const std::string path = Platform::SaveDeviceDialog("Untitled.field");
          if (!path.empty())
             Field::SaveToFieldFile(path, n->ToDeviceFile());
       }
       ImGui::SameLine();
-      if (ImGui::Button(("Import##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      if (ActionButton::Draw(("Import##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
          const std::string path = Platform::OpenDeviceDialog();
          if (!path.empty())
@@ -2975,7 +2976,7 @@ void EndAudioSection();
          const float btnW = std::min(cellW - 8.0f, 96.0f);
          const float btnX = cellX0 + (cellW - btnW) * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
-         const bool clicked = ImGui::Button(label, ImVec2(btnW, 0));
+         const bool clicked = ActionButton::Draw(label, ImVec2(btnW, 0));
          index++;
          return clicked;
       }
@@ -3060,7 +3061,7 @@ void EndAudioSection();
             ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                                 : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
-            ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
+            ActionButton::Draw(caption.c_str(), ImVec2(btnW, 0));
             ImGui::EndDisabled();
             ImGui::PopStyleColor();
             DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3069,7 +3070,7 @@ void EndAudioSection();
          }
          else
          {
-            if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)) ||
+            if (ActionButton::Draw(caption.c_str(), ImVec2(btnW, 0)) ||
                 DropdownTestWantsOpen(h.registered, h.nodeIndex, h.paramIndex))
             {
                gDropdown.options = options;
@@ -3156,7 +3157,7 @@ void EndAudioSection();
                   ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                                       : tok::V4(tok::palf::v_1000_750_350_1000));
                   ImGui::BeginDisabled();
-                  ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
+                  ActionButton::Draw(caption.c_str(), ImVec2(btnW, 0));
                   ImGui::EndDisabled();
                   ImGui::PopStyleColor();
                   DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3165,7 +3166,7 @@ void EndAudioSection();
                }
                else
                {
-                  if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)))
+                  if (ActionButton::Draw(caption.c_str(), ImVec2(btnW, 0)))
                   {
                      gDropdown.options = options;
                      gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind

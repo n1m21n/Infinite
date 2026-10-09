@@ -519,28 +519,26 @@ namespace app
       ModSlider("jitter", &n->jitter, 0.0f, 2.0f);
       ColorSwatch("colour", n->color, n);
       ModCheckbox("eraser", &n->eraser);
-      if (ImGui::Button("Clear canvas", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Clear canvas", ImVec2(kPreviewSize, 0)))
          n->ClearCanvas();
 
       NodeSeparator("animation");
       if (n->IsRecordingStrokes())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_650_150_150_1000));
-         if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.48f, 0), ActionButton::Kind::Record))
             n->StopRecording();
-         ImGui::PopStyleColor();
       }
-      else if (ImGui::Button("Rec strokes", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Rec strokes", ImVec2(kPreviewSize * 0.48f, 0)))
       {
          n->StartRecording();
       }
       ImGui::SameLine();
       if (n->IsPlayingBack())
       {
-         if (ImGui::Button("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
             n->StopPlayback();
       }
-      else if (ImGui::Button("Replay", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Replay", ImVec2(kPreviewSize * 0.48f, 0)))
       {
          n->PlayRecording();
       }
@@ -555,7 +553,7 @@ namespace app
       }
       ModCheckbox("loop replay", &n->loopPlayback);
       ModSlider("replay speed", &n->playSpeed, 0.1f, 4.0f);
-      if (ImGui::SmallButton("clear recording"))
+      if (ActionButton::Draw("clear recording"))
          n->ClearRecording();
       ModSlider("canvas w", &n->canvasWidth, 64.0f, 4096.0f, "%.0f");
       ModSlider("canvas h", &n->canvasHeight, 64.0f, 4096.0f, "%.0f");

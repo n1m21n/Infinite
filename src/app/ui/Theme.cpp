@@ -1,5 +1,6 @@
 // Theme: colours, scope palette, panel/button/dropdown styles, ApplyTheme (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/TokenColors.h"
 
 namespace app
@@ -137,15 +138,8 @@ namespace app
 
    // A button that is already on keeps its accent when hovered: same hue, ~4% brighter (a hint of life, no colour
    // change). Press darkens; release returns to the selected look. Pair with PopSelectedButtonColors.
-   void PushSelectedButtonColors()
-   {
-      const ImVec4 sel = AccentEmphasisSelected();
-      const auto up = [](float c) { return std::min(1.0f, c * 1.04f + 0.01f); };
-      ImGui::PushStyleColor(ImGuiCol_Button, sel);
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(up(sel.x), up(sel.y), up(sel.z), sel.w));
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, AccentEmphasisPressed());
-   }
-   void PopSelectedButtonColors() { ImGui::PopStyleColor(3); }
+   void PushSelectedButtonColors() { ActionButton::Scoped() = ActionButton::Kind::Selected; }
+   void PopSelectedButtonColors() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
 
 
    // Shared "this is the recommended action" emphasis for a modal dialog's
@@ -166,11 +160,13 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_ButtonActive,
                              ImVec4(accent.x * 0.82f, accent.y * 0.82f, accent.z * 0.82f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_1000_1000_1000_1000));
+      ActionButton::Scoped() = ActionButton::Kind::Primary;
    }
 
 
    void PopPrimaryButtonStyle()
    {
+      ActionButton::Scoped() = ActionButton::Kind::Plain;
       ImGui::PopStyleColor(4);
    }
 

@@ -751,7 +751,7 @@ namespace app
                      ArrangeEdit([&]() { ArrangeSetSampleBpm(clipId, sampleBpm); });
                   if (const Arrange::Clip* cr = Arrange::FindClip(gArrange, clipId))
                      if (cr->origBpm > 0.0f && cr->origBpm != cr->sampleBpm &&
-                         ImGui::SmallButton(L("Reset to Detected##clipbpmreset")))
+                         ActionButton::Draw(L("Reset to Detected##clipbpmreset")))
                      {
                         const float detected = cr->origBpm;
                         ArrangeEdit([&]() { ArrangeSetSampleBpm(clipId, detected); });

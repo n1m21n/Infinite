@@ -93,7 +93,7 @@ namespace app
          PushDropdownStyle();
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + 4.0f, ImGui::GetCursorScreenPos().y));
          const std::string caption = options[currentIdx] + "##audioin_input";
-         if (ImGui::Button(caption.c_str(), ImVec2(gAudioContentW - 8.0f, 0)))
+         if (ActionButton::Draw(caption.c_str(), ImVec2(gAudioContentW - 8.0f, 0)))
          {
             gDropdown.options = options;
             gDropdown.categories = categories;
@@ -365,7 +365,7 @@ namespace app
       BeginAudioSection("input");
       if (!Platform::MidiIsRunning())
       {
-         if (ImGui::Button("MIDI Learn", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("MIDI Learn", ImVec2(kPreviewSize, 0)))
             n->StartListening();
          ImGui::TextDisabled("click to start listening for a connected controller");
       }
@@ -655,9 +655,7 @@ namespace app
          snprintf(label, sizeof(label), "stop  (%.1f beats)###cvRec", n->LengthBeats());
       else
          snprintf(label, sizeof(label), "record###cvRec");
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_650_150_150_1000));
-      if (ImGui::Button(label, ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw(label, ImVec2(kPreviewSize, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (recording)
             n->StopRecording();
@@ -671,8 +669,6 @@ namespace app
             n->StartRecording();
          }
       }
-      if (recording)
-         ImGui::PopStyleColor();
 
       ImGui::BeginDisabled(n->input != nullptr);
       ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
@@ -1107,7 +1103,7 @@ namespace app
          const float w = gAudioContentW;
          const float h = ImGui::GetFrameHeight();
          const bool learning = n->IsLearning();
-         if (ImGui::Button(learning ? "Stop##prLearn" : "Learn##prLearn", ImVec2(w, h)))
+         if (ActionButton::Draw(learning ? "Stop##prLearn" : "Learn##prLearn", ImVec2(w, h)))
          {
             PushUndoCheckpoint();
             n->SetLearning(!learning);
@@ -1191,7 +1187,7 @@ namespace app
          const float w = gAudioContentW;
          const float h = ImGui::GetFrameHeight();
          const bool learning = n->IsLearning();
-         if (ImGui::Button(learning ? "Stop##predLearn" : "Learn##predLearn", ImVec2(w * 0.3f, h)))
+         if (ActionButton::Draw(learning ? "Stop##predLearn" : "Learn##predLearn", ImVec2(w * 0.3f, h)))
          {
             PushUndoCheckpoint();
             n->SetLearning(!learning);
@@ -1806,7 +1802,7 @@ namespace app
          snprintf(stat, sizeof(stat), "no file");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ImGui::Button("Load...", ImVec2(90, 0)))
+      if (ActionButton::Draw("Load...", ImVec2(90, 0)))
       {
          const std::string path = Platform::OpenMidiDialog();
          if (!path.empty())
@@ -2103,38 +2099,30 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 3.0f) / 4.0f;
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_650_150_150_1000));
-      if (ImGui::Button("Record", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Record", ImVec2(btnW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (recording) n->StopRecording();
          else n->StartRecording();
       }
-      if (recording)
-         ImGui::PopStyleColor();
       ImGui::SameLine();
 
-      if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_150_500_200_1000));
       ImGui::BeginDisabled(n->RecordedCount() == 0 && !playing);
-      if (ImGui::Button("Play", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Play", ImVec2(btnW, 0), (playing) ? ActionButton::Kind::Go : ActionButton::Kind::Plain))
       {
          if (playing) n->StopPlayback();
          else n->StartPlayback();
       }
       ImGui::EndDisabled();
-      if (playing)
-         ImGui::PopStyleColor();
       ImGui::SameLine();
 
-      if (ImGui::Button("Stop", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Stop", ImVec2(btnW, 0)))
       {
          n->StopRecording();
          n->StopPlayback();
       }
       ImGui::SameLine();
 
-      if (ImGui::Button("Clear", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Clear", ImVec2(btnW, 0)))
          n->ClearRecording();
 
       ImGui::Dummy(ImVec2(0.0f, 2.0f));

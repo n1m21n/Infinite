@@ -144,7 +144,7 @@ namespace app
       if (n->activeChannel == CurvesNode::kGreen) lineCol = isLight ? tok::U32(tok::pal::c_19A03CFF) : tok::U32(tok::pal::c_78E682FF);
       if (n->activeChannel == CurvesNode::kBlue)  lineCol = isLight ? tok::U32(tok::pal::c_1E64E6FF) : tok::U32(tok::pal::c_78AAFFFF);
       DrawCurveEditor(n->Shape(n->activeChannel), lineCol);
-      if (ImGui::Button("Reset channel", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Reset channel", ImVec2(kPreviewSize, 0)))
          n->ResetChannel(n->activeChannel);
       ModSlider("mix", &n->mix, 0.0f, 1.0f);
    }
@@ -169,7 +169,7 @@ namespace app
       ImGui::TextDisabled("%s", statusBuf);
 
       const char* learnLabel = learning ? "Stop Learning" : (hasLearned ? "Learn Again" : "Learn");
-      if (ImGui::Button(learnLabel, ImVec2(hasLearned && !learning ? 95 : 120, 0)))
+      if (ActionButton::Draw(learnLabel, ImVec2(hasLearned && !learning ? 95 : 120, 0)))
       {
          PushUndoCheckpoint();
          n->SetLearning(!learning);
@@ -177,7 +177,7 @@ namespace app
       if (hasLearned && !learning)
       {
          ImGui::SameLine();
-         if (ImGui::Button("Reset", ImVec2(50, 0)))
+         if (ActionButton::Draw("Reset", ImVec2(50, 0)))
          {
             PushUndoCheckpoint();
             n->ResetProfile();
@@ -227,7 +227,7 @@ namespace app
       DropdownButton("output", RemoveBgNode::OutputModeNames(), n->outputMode,
                      [n](int i) { n->outputMode = i; });
 
-      if (ImGui::Button("Remove Background", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Remove Background", ImVec2(kPreviewSize, 0)))
          n->RequestMask();
 
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -264,7 +264,7 @@ namespace app
       ModSlider("drift x", &n->driftX, -0.02f, 0.02f);
       ModSlider("drift y", &n->driftY, -0.02f, 0.02f);
       ModSlider("hue shift", &n->hueShift, -0.05f, 0.05f);
-      if (ImGui::Button("Clear", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Clear", ImVec2(kPreviewSize, 0)))
          n->Clear();
    }
 
@@ -284,7 +284,7 @@ namespace app
       ModSlider("height", &n->height, 64.0f, 2048.0f, "%.0f");
       ColorSwatch("low", n->lowColor, n);
       ColorSwatch("high", n->highColor, n);
-      if (ImGui::Button("Reseed", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Reseed", ImVec2(kPreviewSize, 0)))
          n->Reseed();
    }
 
@@ -347,7 +347,7 @@ namespace app
 
    void DrawPaletteParams(PaletteNode* n)
    {
-      if (ImGui::Button("Choose reference...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose reference...", ImVec2(kPreviewSize, 0)))
          n->LoadViaDialog();
 
       if (!n->LastError().empty())
@@ -380,7 +380,7 @@ namespace app
       // checkbox renumbers every pin after it, which silently repoints this
       // node's modulation the moment the box is ticked.
       ModSlider("rate", &n->sampleRate, 1.0f, 60.0f, "%.0f");
-      if (ImGui::Button("Re-extract", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Re-extract", ImVec2(kPreviewSize, 0)))
          n->RequestExtract();
 
       // Shaping runs on the stored cluster centres, so these are live: they
@@ -572,7 +572,7 @@ namespace app
          ColorSwatch(label, n->stopColor[idx], n);
          ImGui::SameLine(size - 18.0f);
          ImGui::BeginDisabled(n->stopCount <= 2);
-         if (ImGui::SmallButton("x"))
+         if (ActionButton::Draw("x"))
          {
             PushUndoCheckpoint();
             n->RemoveStop(idx);
@@ -585,7 +585,7 @@ namespace app
       n->MarkDirty();
 
       ImGui::BeginDisabled(n->stopCount >= ColorRampNode::kMaxStops);
-      if (ImGui::Button("+ stop", ImVec2(size, 0)))
+      if (ActionButton::Draw("+ stop", ImVec2(size, 0)))
       {
          PushUndoCheckpoint();
          float x = n->stopCount > 0 ? std::min(1.0f, n->stopPos[order[n->stopCount - 1]] + 0.1f) : 0.5f;

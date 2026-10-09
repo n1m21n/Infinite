@@ -988,7 +988,7 @@ namespace app
             char gridBtn[48];
             snprintf(gridBtn, sizeof(gridBtn), "%s##arrgriddiv", curName);
             PushToolbarChip(false);
-            if (ImGui::Button(gridBtn, ImVec2(58.0f, tok::tile)))
+            if (ActionButton::Draw(gridBtn, ImVec2(58.0f, tok::tile)))
                ImGui::OpenPopup("##arrgridpopup");
             PopToolbarChip();
             if (ImGui::IsItemHovered())
@@ -2488,7 +2488,7 @@ namespace app
       if (gArrange.lanes.empty())
       {
          ImGui::SetCursorScreenPos(ImVec2(scrollTL.x + 4.0f, pinnedTopY + kRulerHeight + 10.0f));
-         if (ImGui::Button(L("+ Add Track"), ImVec2(120, 0)))
+         if (ActionButton::Draw(L("+ Add Track"), ImVec2(120, 0)))
          {
             gArrangeAddTrackInsertAfter = -1;
             ImGui::OpenPopup("##arrangeaddtrackpopup");

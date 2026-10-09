@@ -190,7 +190,7 @@ namespace app
          DrawFieldDeviceControls<FieldElementNode>(n, "element", &FieldElementNode::PresetNames(),
                                                    [](FieldElementNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldElementEditor = n;
             gFieldElementEditorOpen = true;
@@ -264,7 +264,7 @@ namespace app
          DrawFieldDeviceControls<FieldPrimitiveNode>(n, "primitive", &FieldPrimitiveNode::PresetNames(),
                                                      [](FieldPrimitiveNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldPrimitiveEditor = n;
             gFieldPrimitiveEditorOpen = true;
@@ -342,7 +342,7 @@ namespace app
          DrawFieldDeviceControls<FieldSampleNode>(n, "sample", &FieldSampleNode::PresetNames(),
                                                   [](FieldSampleNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldSampleEditor = n;
             gFieldSampleEditorOpen = true;
@@ -406,7 +406,7 @@ namespace app
          DrawFieldDeviceControls<FieldSynthNode>(n, "synth", &FieldSynthNode::PresetNames(),
                                                  [](FieldSynthNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldSynthEditor = n;
             gFieldSynthEditorOpen = true;
@@ -478,7 +478,7 @@ namespace app
          DrawFieldDeviceControls<FieldGraphNode>(n, "graph", &FieldGraphNode::PresetNames(),
                                                  [](FieldGraphNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldGraphEditor = n;
             gFieldGraphEditorOpen = true;
@@ -488,7 +488,7 @@ namespace app
          // nested inside ed::Begin()/ed::End(), and Regenerate() spawns/
          // removes/reconnects real nodes - see gFieldGraphPendingRegenerate's
          // drain after ed::End() (trap T14).
-         if (ImGui::Button("Regenerate", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Regenerate", ImVec2(kPreviewSize, 0)))
             gFieldGraphPendingRegenerate = n;
 
          // Build step 16: only meaningful once there is something
@@ -500,7 +500,7 @@ namespace app
          const bool canUnpack = n->encapsulated && !n->MountedIndices().empty();
          if (!canUnpack)
             ImGui::BeginDisabled();
-         if (ImGui::Button("Unpack to Canvas", ImVec2(kPreviewSize, 0)) && canUnpack)
+         if (ActionButton::Draw("Unpack to Canvas", ImVec2(kPreviewSize, 0)) && canUnpack)
             gFieldGraphPendingUnpack = n;
          if (!canUnpack)
             ImGui::EndDisabled();
@@ -555,7 +555,7 @@ namespace app
          DrawFieldDeviceControls<FieldPixelNode>(n, "pixel", &FieldPixelNode::PresetNames(),
                                                  [](FieldPixelNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
-         if (ImGui::Button("Edit Field...", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Edit Field...", ImVec2(kPreviewSize, 0)))
          {
             gFieldPixelEditor = n;
             gFieldPixelEditorOpen = true;

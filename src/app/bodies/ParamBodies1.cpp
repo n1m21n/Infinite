@@ -39,7 +39,7 @@ namespace app
 
    void DrawImageSourceParams(ImageSourceNode* n)
    {
-      if (ImGui::Button("Choose image...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose image...", ImVec2(kPreviewSize, 0)))
          n->LoadViaDialog();
 
       if (!n->LastError().empty())
@@ -65,12 +65,12 @@ namespace app
 
    void DrawSlideshowParams(SlideshowNode* n)
    {
-      if (ImGui::Button("Choose folder...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose folder...", ImVec2(kPreviewSize, 0)))
          n->LoadViaDialog();
 
       if (!n->FolderPath().empty())
       {
-         if (ImGui::Button("Refresh", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Refresh", ImVec2(kPreviewSize, 0)))
             n->ReloadFromFolder();
       }
 
@@ -143,7 +143,7 @@ namespace app
       ImGui::PopTextWrapPos();
       return;
 #else
-      if (ImGui::Button("Refresh Servers", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Refresh Servers", ImVec2(kPreviewSize, 0)))
       {
          n->RefreshServers();
       }
@@ -295,7 +295,7 @@ namespace app
 
    void DrawEnvironmentParams(EnvironmentNode* n)
    {
-      if (ImGui::Button("Choose HDRI...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose HDRI...", ImVec2(kPreviewSize, 0)))
          n->LoadViaDialog();
 
       if (!n->LastError().empty())
@@ -373,7 +373,7 @@ namespace app
       DrawFieldDeviceControls<FormulaNode>(n, "formula", &FormulaNode::PresetNames(),
                                           [](FormulaNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
-      if (ImGui::Button("Edit GLSL...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Edit GLSL...", ImVec2(kPreviewSize, 0)))
       {
          gFormulaEditor = n;
          gFormulaEditorOpen = true;
@@ -446,7 +446,7 @@ namespace app
 
    void DrawVideoParams(VideoSourceNode* n)
    {
-      if (ImGui::Button("Choose video...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose video...", ImVec2(kPreviewSize, 0)))
          n->OpenViaDialog();
 
       if (!n->LastError().empty())
@@ -745,25 +745,25 @@ namespace app
       }
 
       const float btnW = (colW - 12.0f) * 0.25f;
-      if (ImGui::Button("Reset Corners", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Reset Corners", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->ResetCorners();
       }
       ImGui::SameLine(0.0f, 4.0f);
-      if (ImGui::Button("Reset All", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Reset All", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->ResetAllPoints();
       }
       ImGui::SameLine(0.0f, 4.0f);
-      if (ImGui::Button("Flip H", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Flip H", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->FlipH();
       }
       ImGui::SameLine(0.0f, 4.0f);
-      if (ImGui::Button("Flip V", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Flip V", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->FlipV();
@@ -1300,30 +1300,28 @@ namespace app
 
       if (n->IsRecordingPath())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_650_150_150_1000));
-         if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.48f, 0), ActionButton::Kind::Record))
             n->StopRecording();
-         ImGui::PopStyleColor();
       }
       else
       {
-         if (ImGui::Button("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
             n->StartRecording();
       }
       ImGui::SameLine();
       if (n->IsPlayingPath())
       {
-         if (ImGui::Button("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
             n->StopPath();
       }
       else
       {
-         if (ImGui::Button("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
             n->PlayPath();
       }
       ModCheckbox("loop path", &n->loopPath);
       ImGui::SameLine();
-      if (ImGui::SmallButton("clear"))
+      if (ActionButton::Draw("clear"))
          n->ClearPath();
 
       NodeSeparator();
@@ -1335,12 +1333,12 @@ namespace app
 
       NodeSeparator();
       ImGui::TextDisabled("generation %d", n->Generation());
-      if (ImGui::Button("Iterate", ImVec2(kPreviewSize * 0.48f, 0)))
+      if (ActionButton::Draw("Iterate", ImVec2(kPreviewSize * 0.48f, 0)))
          n->StepOnce();
       ImGui::SameLine();
-      if (ImGui::Button("Reset", ImVec2(kPreviewSize * 0.48f, 0)))
+      if (ActionButton::Draw("Reset", ImVec2(kPreviewSize * 0.48f, 0)))
          n->Reset();
-      if (ImGui::Button("Randomise FX", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Randomise FX", ImVec2(kPreviewSize, 0)))
          n->Randomise();
 
       if (ImGui::TreeNode("pad corners"))
@@ -1643,27 +1641,13 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(origin.x + b * (btnW + gap), origin.y));
          ImGui::PushID(b + 700);
 
-         const bool isSelected = (b == n->selected);
-         if (isSelected)
-         {
-            PushSelectedButtonColors();
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-         }
-         else
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, isLight ? tok::V4(tok::palf::v_880_900_940_1000) : tok::V4(tok::palf::v_180_200_260_1000));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-            ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_300_350_450_1000) : tok::V4(tok::palf::v_700_750_850_1000));
-         }
-
          const std::string btnText = std::to_string(b + 1);
-         if (ImGui::Button(btnText.c_str(), ImVec2(btnW, btnH)))
+         if (ActionButton::Draw(btnText.c_str(), ImVec2(btnW, btnH),
+                                b == n->selected ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
          {
             PushUndoCheckpoint();
             n->selected = b;
          }
-         ImGui::PopStyleColor(4);
          ImGui::PopID();
       }
 
@@ -1742,12 +1726,10 @@ namespace app
    {
       if (n->IsLearning())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_850_550_100_1000));
-         if (ImGui::Button("Listening... move a control", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Listening... move a control", ImVec2(kPreviewSize, 0), ActionButton::Kind::Learn))
             n->CancelLearn();
-         ImGui::PopStyleColor();
       }
-      else if (ImGui::Button(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
+      else if (ActionButton::Draw(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
       {
          MidiLearnCancelAll();
          n->StartLearn();
@@ -1771,23 +1753,17 @@ namespace app
 
       if (n->IsLearning())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_850_550_100_1000));
-         if (ImGui::Button("Listening... hit a pad", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Listening... hit a pad", ImVec2(kPreviewSize, 0), ActionButton::Kind::Learn))
             n->CancelLearn();
-         ImGui::PopStyleColor();
       }
       else
       {
          const bool lit = n->Value01() > 0.01f;
-         if (lit)
-            ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_250_850_350_1000));
-         if (ImGui::Button(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0), (lit) ? ActionButton::Kind::Go : ActionButton::Kind::Plain))
          {
             MidiLearnCancelAll();
             n->StartLearn();
          }
-         if (lit)
-            ImGui::PopStyleColor();
       }
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       ImGui::TextDisabled("%s", n->Status().c_str());
@@ -1853,28 +1829,26 @@ namespace app
 
       if (n->IsRecordingPath())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_650_150_150_1000));
-         if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.48f, 0), ActionButton::Kind::Record))
             n->StopRecording();
-         ImGui::PopStyleColor();
       }
-      else if (ImGui::Button("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
       {
          n->StartRecording();
       }
       ImGui::SameLine();
       if (n->IsPlayingPath())
       {
-         if (ImGui::Button("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
             n->StopPath();
       }
-      else if (ImGui::Button("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
       {
          n->PlayPath();
       }
       ModCheckbox("loop", &n->loopPath);
       ImGui::SameLine();
-      if (ImGui::SmallButton("clear"))
+      if (ActionButton::Draw("clear"))
          n->ClearPath();
       ModSlider("speed", &n->speed, 0.05f, 4.0f);
    }

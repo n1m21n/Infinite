@@ -29,7 +29,7 @@ namespace app
       {
          if (on)
             PushSelectedButtonColors();
-         const bool clicked = ImGui::Button(label, ImVec2(w, 0.0f));
+         const bool clicked = ActionButton::Draw(label, ImVec2(w, 0.0f));
          if (on)
             PopSelectedButtonColors();
          return clicked;
@@ -325,7 +325,7 @@ namespace app
                            half);
          ImGui::SameLine();
          ImGui::BeginDisabled(n->trackMode == 0);
-         if (ImGui::Button("recenter##spatialRecenter", ImVec2(half, 0)))
+         if (ActionButton::Draw("recenter##spatialRecenter", ImVec2(half, 0)))
             n->RecenterHead();
          ImGui::EndDisabled();
          if (n->trackMode != 0 && ImGui::IsItemHovered())

@@ -6,6 +6,7 @@
 #include "app/ui/design/components/IconTile.h"
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/components/PinDot.h"
+#include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/Readout.h"
 #include "app/ui/design/components/TextButton.h"
 
@@ -143,11 +144,11 @@ namespace UiGallery
          tile("tb.arrange", c[19], IconsInfinite::Cube, nullptr, false);
          TextButton::Draw("tb.search", c[20], "Search");
       }
-      Heading(sec[14], "CONTROLS - pin: param idle / mod / expr / pred, cable, cable small, swatch idle / bound");
+      Heading(sec[14], "CONTROLS - pin: param idle / mod / expr / pred, cable, cable small, swatch idle / bound, then buttons: plain / primary / selected / record / learn / go / solo");
       {
          const bool light = ImGui::GetStyle().Colors[ImGuiCol_WindowBg].x > 0.5f;
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         const auto c = UiLayout::Row(sec[15], std::vector<UiLayout::Cell>(8, UiLayout::Fixed(32)), gap, UiLayout::Align::Center, 44.0f);
+         const auto c = UiLayout::Row(sec[15], [] { std::vector<UiLayout::Cell> v(8, UiLayout::Fixed(32)); v.insert(v.end(), 7, UiLayout::Fixed(78)); return v; }(), gap, UiLayout::Align::Center, 44.0f);
          auto mid = [&](size_t i) { return ImVec2(c[i].x + c[i].w * 0.5f, c[i].y + c[i].h * 0.5f); };
          PinDot::Param(dl, mid(0), PinDot::State::Idle, light);
          PinDot::Param(dl, mid(1), PinDot::State::Modulated, light);
@@ -157,6 +158,14 @@ namespace UiGallery
          PinDot::Cable(dl, mid(5), false, light, true);
          PinDot::Swatch(dl, mid(6), false, light);
          PinDot::Swatch(dl, mid(7), true, light);
+         using AK = ActionButton::Kind;
+         const char* names[] = { "Plain", "Primary", "Selected", "Record", "Learn", "Go", "Solo" };
+         const AK kinds[] = { AK::Plain, AK::Primary, AK::Selected, AK::Record, AK::Learn, AK::Go, AK::Solo };
+         for (int i = 0; i < 7; ++i)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(c[8 + i].x, c[8 + i].y + (c[8 + i].h - ImGui::GetFrameHeight()) * 0.5f));
+            ActionButton::Draw((std::string(names[i]) + "##gal").c_str(), ImVec2(c[8 + i].w, 0), kinds[i]);
+         }
       }
       ImGui::PopID();
       ImGui::End();

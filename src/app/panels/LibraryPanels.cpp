@@ -591,7 +591,7 @@ namespace app
       const bool scanning = gPluginScanner.IsScanning();
       if (scanning)
          ImGui::BeginDisabled();
-      if (ImGui::Button(L("Rescan plugins"), ImVec2(-1.0f, 0)))
+      if (ActionButton::Draw(L("Rescan plugins"), ImVec2(-1.0f, 0)))
          gPluginScanner.StartScan();
       if (scanning)
          ImGui::EndDisabled();
@@ -616,13 +616,13 @@ namespace app
             // Button first, path wrapped after it: a long folder path used to
             // push Remove past the right edge of the panel, out of reach.
             ImGui::PushID(folder.c_str());
-            if (ImGui::SmallButton(L("Remove")))
+            if (ActionButton::Draw(L("Remove")))
                gPluginScanner.RemoveFolder(folder);
             ImGui::PopID();
             ImGui::SameLine();
             ImGui::TextWrapped("%s", folder.c_str());
          }
-         if (ImGui::Button(L("Add VST3 folder..."), ImVec2(-1.0f, 0)))
+         if (ActionButton::Draw(L("Add VST3 folder..."), ImVec2(-1.0f, 0)))
          {
             const std::string folder = Platform::OpenFolderDialog(T("Add VST3 folder"));
             if (!folder.empty())
@@ -641,7 +641,7 @@ namespace app
             ImGui::PopStyleColor();
             for (const std::string& path : blocklist)
                ImGui::TextWrapped("%s", path.c_str());
-            if (ImGui::Button(L("Clear blocklist and retry"), ImVec2(-1.0f, 0)))
+            if (ActionButton::Draw(L("Clear blocklist and retry"), ImVec2(-1.0f, 0)))
                Platform::ClearVST3Blocklist();
             ImGui::TreePop();
          }

@@ -297,7 +297,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ImGui::Button("Load...", ImVec2(90, 0)))
+      if (ActionButton::Draw("Load...", ImVec2(90, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -315,9 +315,7 @@ namespace app
       // rather than duplicated as a per-node-type accept.
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
+      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -325,8 +323,6 @@ namespace app
          else
             n->StartRecording();
       }
-      if (recording)
-         ImGui::PopStyleColor();
 
       // Audition control, independent of the transport and any note cable -
       // it only ever touches the self lane's dedicated voice (see
@@ -337,17 +333,13 @@ namespace app
       // there needs to be a dedicated way to stop it.
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(playing ? "Stop" : "Audition", ImVec2(90, 0)))
+      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(90, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
          else
             n->TriggerPreview(n->start);
       }
-      if (playing)
-         ImGui::PopStyleColor();
       // A plain ImGui tooltip here would land offset from the cursor, proportional
       // to the node editor's zoom/pan - see gAudioReadout's comment for why every
       // hover explanation in this file goes through the fixed readout strip instead.
@@ -520,7 +512,7 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       // Button strip - the one deliberate full-width row (P1's exception).
-      if (ImGui::Button("Load...", ImVec2(90, 0)))
+      if (ActionButton::Draw("Load...", ImVec2(90, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -531,9 +523,7 @@ namespace app
       }
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
+      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -541,28 +531,22 @@ namespace app
          else
             n->StartRecording();
       }
-      if (recording)
-         ImGui::PopStyleColor();
 
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(playing ? "Stop" : "Audition", ImVec2(90, 0)))
+      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(90, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
          else
             n->TriggerSlicePreview(-1);
       }
-      if (playing)
-         ImGui::PopStyleColor();
       if (ImGui::IsItemHovered())
          SetAudioReadout("#", "plays the whole sample on this node's own voice");
 
       ImGui::SameLine();
       ImGui::BeginDisabled(n->FileName().empty() || n->sliceBy != 0);
-      if (ImGui::Button("re-slice", ImVec2(90, 0)))
+      if (ActionButton::Draw("re-slice", ImVec2(90, 0)))
       {
          PushUndoCheckpoint();
          n->ReSlice();
@@ -673,7 +657,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ImGui::Button("Load...", ImVec2(90, 0)))
+      if (ActionButton::Draw("Load...", ImVec2(90, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -684,9 +668,7 @@ namespace app
       }
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
+      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -694,22 +676,16 @@ namespace app
          else
             n->StartRecording();
       }
-      if (recording)
-         ImGui::PopStyleColor();
 
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(playing ? "Stop" : "Audition", ImVec2(90, 0)))
+      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(90, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
          else
             n->TriggerPreview(n->start);
       }
-      if (playing)
-         ImGui::PopStyleColor();
 
       ImGui::SameLine();
       const float toggleW = 44.0f;
@@ -940,7 +916,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ImGui::Button("Load...", ImVec2(80, 0)))
+      if (ActionButton::Draw("Load...", ImVec2(80, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -951,9 +927,7 @@ namespace app
       }
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(recording ? "Stop##molderRec" : "Record##molderRec", ImVec2(70, 0)))
+      if (ActionButton::Draw(recording ? "Stop##molderRec" : "Record##molderRec", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -961,23 +935,21 @@ namespace app
          else
             n->StartRecording();
       }
-      if (recording)
-         ImGui::PopStyleColor();
 
       ImGui::SameLine();
-      if (ImGui::Button("Roll", ImVec2(60, 0)))
+      if (ActionButton::Draw("Roll", ImVec2(60, 0)))
       {
          PushUndoCheckpoint();
          n->Roll();
       }
       ImGui::SameLine();
-      if (ImGui::Button("Iterate", ImVec2(70, 0)))
+      if (ActionButton::Draw("Iterate", ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
          n->Iterate();
       }
       ImGui::SameLine();
-      if (ImGui::Button("Reset##molder", ImVec2(60, 0)))
+      if (ActionButton::Draw("Reset##molder", ImVec2(60, 0)))
       {
          PushUndoCheckpoint();
          n->Reset();
@@ -1181,7 +1153,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ImGui::Button("Load...##grainMolder", ImVec2(80, 0)))
+      if (ActionButton::Draw("Load...##grainMolder", ImVec2(80, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -1192,9 +1164,7 @@ namespace app
       }
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(recording ? "Stop##gmRec" : "Record##gmRec", ImVec2(70, 0)))
+      if (ActionButton::Draw(recording ? "Stop##gmRec" : "Record##gmRec", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -1202,22 +1172,16 @@ namespace app
          else
             n->StartRecording();
       }
-      if (recording)
-         ImGui::PopStyleColor();
 
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(playing ? "Stop##gmAud" : "Audition##gmAud", ImVec2(80, 0)))
+      if (ActionButton::Draw(playing ? "Stop##gmAud" : "Audition##gmAud", ImVec2(80, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
          else
             n->TriggerPreview(n->start);
       }
-      if (playing)
-         ImGui::PopStyleColor();
 
       // loop/rev/p-p toggles right-aligned on header row
       ImGui::SameLine();
@@ -1346,7 +1310,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ImGui::Button("Load...", ImVec2(80, 0)))
+      if (ActionButton::Draw("Load...", ImVec2(80, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -1357,9 +1321,7 @@ namespace app
       }
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::pal::c_BE3C3CFF));
-      if (ImGui::Button(recording ? "Stop##granRec" : "Record##granRec", ImVec2(70, 0)))
+      if (ActionButton::Draw(recording ? "Stop##granRec" : "Record##granRec", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -1367,8 +1329,6 @@ namespace app
          else
             n->StartRecording();
       }
-      if (recording)
-         ImGui::PopStyleColor();
 
       ImGui::SameLine();
       bool freezeBool = n->freeze;
@@ -1623,7 +1583,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
          char chokeLabel[8];
          snprintf(chokeLabel, sizeof(chokeLabel), n->laneChoke[lane] == 0 ? "choke -" : "choke %d", n->laneChoke[lane]);
-         if (ImGui::Button(chokeLabel, ImVec2(70.0f, 0)))
+         if (ActionButton::Draw(chokeLabel, ImVec2(70.0f, 0)))
          {
             PushUndoCheckpoint();
             n->laneChoke[lane] = (n->laneChoke[lane] + 1) % 4;
@@ -1742,7 +1702,7 @@ namespace app
                            std::function<void(int)> onSelect, bool focusSearch)
    {
       const std::string label = std::string(caption) + "##" + id;
-      if (ImGui::Button(label.c_str(), ImVec2(width, 0)))
+      if (ActionButton::Draw(label.c_str(), ImVec2(width, 0)))
       {
          gDropdown.options = options;
          gDropdown.categories = categories;
@@ -1865,9 +1825,9 @@ namespace app
          DrumPickerDropdown("drumgroove", grooveIdx >= 0 ? gl.names[(size_t)grooveIdx].c_str() : "pick a groove", gl.names, gl.cats,
                             grooveIdx, grvW, [n, part](int i) { ApplyDrumGroove(n, i, part); }, /*focusSearch=*/true);
          ImGui::SameLine();
-         const bool prev = ImGui::Button("<##drumgrvprev", ImVec2(navW, 0));
+         const bool prev = ActionButton::Draw("<##drumgrvprev", ImVec2(navW, 0));
          ImGui::SameLine();
-         const bool next = ImGui::Button(">##drumgrvnext", ImVec2(navW, 0));
+         const bool next = ActionButton::Draw(">##drumgrvnext", ImVec2(navW, 0));
          if ((prev || next) && gl.count > 0)
          {
             const int target = grooveIdx < 0 ? (next ? 0 : gl.count - 1)
@@ -2086,13 +2046,13 @@ namespace app
          const float btnW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
          AudioToggleButton(n->run ? "Stop##drumrun" : "Run##drumrun", &n->run, btnW);
          ImGui::SameLine();
-         if (ImGui::Button("Randomise", ImVec2(btnW, 0)))
+         if (ActionButton::Draw("Randomise", ImVec2(btnW, 0)))
          {
             PushUndoCheckpoint();
             n->Randomize();
          }
          ImGui::SameLine();
-         if (ImGui::Button("Clear", ImVec2(btnW, 0)))
+         if (ActionButton::Draw("Clear", ImVec2(btnW, 0)))
          {
             PushUndoCheckpoint();
             n->ClearPattern();
@@ -2706,10 +2666,10 @@ namespace app
          }
          ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
-         if (ImGui::Button("Load...", ImVec2(90, 0)))
+         if (ActionButton::Draw("Load...", ImVec2(90, 0)))
             openLoadPad = cur;
          ImGui::SameLine();
-         if (ImGui::Button("Folder...", ImVec2(90, 0)))
+         if (ActionButton::Draw("Folder...", ImVec2(90, 0)))
          {
             const std::string folder = Platform::OpenFolderDialog("Load a folder into the 16 pads");
             if (!folder.empty())
@@ -2720,7 +2680,7 @@ namespace app
          }
          ImGui::SameLine();
          ImGui::BeginDisabled(!n->PadLoaded(cur));
-         if (ImGui::Button("Clear", ImVec2(70, 0)))
+         if (ActionButton::Draw("Clear", ImVec2(70, 0)))
          {
             PushUndoCheckpoint();
             n->ClearPad(cur);

@@ -918,7 +918,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const bool pngActive = (n->imageFormat == 0);
                if (pngActive)
                   PushSelectedButtonColors();
-               if (ImGui::Button(L(".png##imgPng"), ImVec2(halfBtnW, 0)))
+               if (ActionButton::Draw(L(".png##imgPng"), ImVec2(halfBtnW, 0)))
                {
                   n->imageFormat = 0;
                   size_t dot = n->exportImagePath.rfind('.');
@@ -935,7 +935,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const bool jpgActive = (n->imageFormat == 1);
                if (jpgActive)
                   PushSelectedButtonColors();
-               if (ImGui::Button(L(".jpg##imgJpg"), ImVec2(halfBtnW, 0)))
+               if (ActionButton::Draw(L(".jpg##imgJpg"), ImVec2(halfBtnW, 0)))
                {
                   n->imageFormat = 1;
                   size_t dot = n->exportImagePath.rfind('.');
@@ -948,7 +948,7 @@ void DrawNodeBodies(FrameCtx& fc)
                if (jpgActive)
                   PopSelectedButtonColors();
 
-               if (ImGui::Button(L("Export Image"), ImVec2(kPreviewSize, 0)))
+               if (ActionButton::Draw(L("Export Image"), ImVec2(kPreviewSize, 0)))
                   ExportImage(n, n->exportImagePath);
 
                ImGui::Dummy(ImVec2(0, 4));
@@ -972,7 +972,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const bool mp4Active = (n->videoFormat == 0);
                if (mp4Active)
                   PushSelectedButtonColors();
-               if (ImGui::Button(L(".mp4##vidMp4"), ImVec2(halfBtnW, 0)))
+               if (ActionButton::Draw(L(".mp4##vidMp4"), ImVec2(halfBtnW, 0)))
                {
                   n->videoFormat = 0;
                   size_t dot = n->recordVideoPath.rfind('.');
@@ -989,7 +989,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const bool movActive = (n->videoFormat == 1);
                if (movActive)
                   PushSelectedButtonColors();
-               if (ImGui::Button(L(".mov##vidMov"), ImVec2(halfBtnW, 0)))
+               if (ActionButton::Draw(L(".mov##vidMov"), ImVec2(halfBtnW, 0)))
                {
                   n->videoFormat = 1;
                   size_t dot = n->recordVideoPath.rfind('.');
@@ -1049,7 +1049,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   // here (the button stays disabled) since StartRecording()
                   // would otherwise briefly block on WaitForFinalize().
                   ImGui::BeginDisabled();
-                  ImGui::Button(L("Finalizing..."), ImVec2(kPreviewSize, 0));
+                  ActionButton::Draw(L("Finalizing..."), ImVec2(kPreviewSize, 0));
                   ImGui::EndDisabled();
                   // PendingFrames() reads the live handle, which has already
                   // been handed off to the background thread once
@@ -1060,10 +1060,8 @@ void DrawNodeBodies(FrameCtx& fc)
                }
                else if (n->IsRecording())
                {
-                  ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_650_150_150_1000));
-                  if (ImGui::Button(L("Stop recording"), ImVec2(kPreviewSize, 0)))
+                  if (ActionButton::Draw(L("Stop recording"), ImVec2(kPreviewSize, 0), ActionButton::Kind::Record))
                      n->RequestStopRecording();
-                  ImGui::PopStyleColor();
                   ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), T("REC  %d frames"), n->RecordedFrames());
                   const int pending = n->PendingFrames();
                   const int dropped = n->DroppedFrames();
@@ -1082,7 +1080,7 @@ void DrawNodeBodies(FrameCtx& fc)
                }
                else
                {
-                  if (ImGui::Button(L("Record video"), ImVec2(kPreviewSize, 0)))
+                  if (ActionButton::Draw(L("Record video"), ImVec2(kPreviewSize, 0)))
                      n->StartRecording(n->recordVideoPath);
                }
                if (!n->RecordStatus().empty())
@@ -1120,12 +1118,9 @@ void DrawNodeBodies(FrameCtx& fc)
                {
                   ImGui::PushID(preset);
                   const bool selected = n->offlineDurationSeconds == preset;
-                  if (selected)
-                     ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-                  if (ImGui::Button((std::to_string(preset) + "s").c_str(), ImVec2(kParamWidth * 0.22f, 0)))
+                  if (ActionButton::Draw((std::to_string(preset) + "s").c_str(), ImVec2(kParamWidth * 0.22f, 0),
+                                         selected ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
                      n->offlineDurationSeconds = preset;
-                  if (selected)
-                     ImGui::PopStyleColor();
                   ImGui::PopID();
                   if (preset != 60)
                      ImGui::SameLine();
@@ -1144,13 +1139,13 @@ void DrawNodeBodies(FrameCtx& fc)
                   // live progress/Cancel button; this is just a disabled
                   // placeholder so the button doesn't visually disappear.
                   ImGui::BeginDisabled();
-                  ImGui::Button(L("Rendering..."), ImVec2(kPreviewSize, 0));
+                  ActionButton::Draw(L("Rendering..."), ImVec2(kPreviewSize, 0));
                   ImGui::EndDisabled();
                }
                else
                {
                   ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || otherSessionActive);
-                  if (ImGui::Button(L("Render"), ImVec2(kPreviewSize, 0)))
+                  if (ActionButton::Draw(L("Render"), ImVec2(kPreviewSize, 0)))
                      StartOfflineRenderSession(n);
                   ImGui::EndDisabled();
                }

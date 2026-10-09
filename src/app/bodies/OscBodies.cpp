@@ -1290,7 +1290,7 @@ namespace app
          ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
                                                              : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         ImGui::Button(caption.c_str(), ImVec2(width, 0));
+         ActionButton::Draw(caption.c_str(), ImVec2(width, 0));
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -1298,7 +1298,7 @@ namespace app
                                                               ImGui::GetItemRectMax()));
          return;
       }
-      if (ImGui::Button(caption.c_str(), ImVec2(width, 0)))
+      if (ActionButton::Draw(caption.c_str(), ImVec2(width, 0)))
       {
          gDropdown.options = options;
          gDropdown.categories = categories;
@@ -1883,7 +1883,7 @@ namespace app
          DrawMetallicScope(n, scopeH, scopeW);
 
          ImGui::SetCursorScreenPos(ImVec2(pos.x + scopeW + 6.0f, pos.y));
-         if (ImGui::Button("Strike", ImVec2(strikeBtnW, scopeH)))
+         if (ActionButton::Draw("Strike", ImVec2(strikeBtnW, scopeH)))
          {
             n->TriggerStrike();
          }
@@ -2627,7 +2627,7 @@ namespace app
          if (isOneShot)
          {
             ImGui::SetCursorScreenPos(ImVec2(x0 + w - dirW - gap - trigW, y));
-            if (ImGui::Button("Trig", ImVec2(trigW, ImGui::GetFrameHeight())))
+            if (ActionButton::Draw("Trig", ImVec2(trigW, ImGui::GetFrameHeight())))
             {
                n->TriggerScan();
             }
@@ -2637,7 +2637,7 @@ namespace app
          {
             ImGui::SetCursorScreenPos(ImVec2(x0 + w - dirW, y));
             const char* dirLabel = (n->direction == 0) ? "Fwd" : "Rev";
-            if (ImGui::Button(dirLabel, ImVec2(dirW, ImGui::GetFrameHeight())))
+            if (ActionButton::Draw(dirLabel, ImVec2(dirW, ImGui::GetFrameHeight())))
             {
                PushUndoCheckpoint();
                n->direction = 1 - n->direction;
@@ -2701,7 +2701,7 @@ namespace app
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + colW + gap, y));
          const char* invLabel = n->invert ? "Invert: ON" : "Invert: OFF";
-         if (ImGui::Button(invLabel, ImVec2(invW, ImGui::GetFrameHeight())))
+         if (ActionButton::Draw(invLabel, ImVec2(invW, ImGui::GetFrameHeight())))
          {
             PushUndoCheckpoint();
             n->invert = 1 - n->invert;
