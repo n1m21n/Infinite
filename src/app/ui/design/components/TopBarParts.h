@@ -16,10 +16,11 @@ namespace TopBarParts
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(16.0f, tok::tile - ImGui::GetFontSize()));
       ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));   // the press flash is the tile wash below, never the accent
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, 10.0f));
       const bool open = ImGui::BeginMenu(label);
       ImGui::PopStyleVar();
-      ImGui::PopStyleColor(2);
+      ImGui::PopStyleColor(3);
       ImGui::PopStyleVar();
       const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
       const ImGuiID aid = ImGui::GetItemID();
