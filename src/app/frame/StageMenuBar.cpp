@@ -181,18 +181,22 @@ void DrawMenuBar(FrameCtx& fc)
 
             if (MenuParts::SubMenu(L("Viewport panel")))
             {
-               ImGui::Checkbox(L("Show viewport panel"), &gViewportPanelOpen);
+               MenuParts::Check(L("Show viewport panel"), &gViewportPanelOpen);
                if (gViewportPanelOpen)
                {
                   ImGui::SetNextItemWidth(150);
-                  ViewportPanelDockCombo();
+                  FieldWell::PushStyle(); ViewportPanelDockCombo(); FieldWell::PopStyle();
                   ImGui::SetNextItemWidth(150);
                   if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
-                     ImGui::SliderFloat(L("Width"), &gViewportPanelWidth,
-                                        kViewportPanelMinWidth, 900.0f, "%.0f px");
+                  {
+                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Width"), &gViewportPanelWidth,
+                                        kViewportPanelMinWidth, 900.0f, "%.0f px"); FieldWell::PopStyle();
+                  }
                   else
-                     ImGui::SliderFloat(L("Height"), &gViewportPanelHeight,
-                                        kViewportPanelMinHeight, 800.0f, "%.0f px");
+                  {
+                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Height"), &gViewportPanelHeight,
+                                        kViewportPanelMinHeight, 800.0f, "%.0f px"); FieldWell::PopStyle();
+                  }
                   MenuParts::Separator();
                   if (!gViewportPanelNodes.empty() && MenuParts::Item(L("Clear cards")))
                      gViewportPanelNodes.clear();
@@ -210,18 +214,22 @@ void DrawMenuBar(FrameCtx& fc)
                // dark-contrast-budget style meant for controls inside a node.
                // The two styles side by side in one menu (one purple/clean,
                // one flat blue) is what read as inconsistent.
-               ImGui::Checkbox(L("Show modulation matrix"), &gModMatrixOpen);
+               MenuParts::Check(L("Show modulation matrix"), &gModMatrixOpen);
                if (gModMatrixOpen)
                {
                   ImGui::SetNextItemWidth(150);
-                  ModMatrixDockCombo();
+                  FieldWell::PushStyle(); ModMatrixDockCombo(); FieldWell::PopStyle();
                   ImGui::SetNextItemWidth(150);
                   if (gModMatrixDock == 1 || gModMatrixDock == 2)
-                     ImGui::SliderFloat(L("Width"), &gModMatrixWidth,
-                                        kModMatrixMinWidth, 900.0f, "%.0f px");
+                  {
+                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Width"), &gModMatrixWidth,
+                                        kModMatrixMinWidth, 900.0f, "%.0f px"); FieldWell::PopStyle();
+                  }
                   else
-                     ImGui::SliderFloat(L("Height"), &gModMatrixHeight,
-                                        kModMatrixMinHeight, 800.0f, "%.0f px");
+                  {
+                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Height"), &gModMatrixHeight,
+                                        kModMatrixMinHeight, 800.0f, "%.0f px"); FieldWell::PopStyle();
+                  }
                }
                ImGui::EndMenu();
             }
@@ -230,26 +238,30 @@ void DrawMenuBar(FrameCtx& fc)
             {
                // Same reasoning as "Modulation matrix" above: plain themed
                // widgets, not the node-body P10 style.
-               ImGui::Checkbox(L("Show Performance Matrix"), &gPerfPanelOpen);
+               MenuParts::Check(L("Show Performance Matrix"), &gPerfPanelOpen);
                if (gPerfPanelOpen)
                {
                   ImGui::SetNextItemWidth(150);
-                  PerfPanelDockCombo();
+                  FieldWell::PushStyle(); PerfPanelDockCombo(); FieldWell::PopStyle();
                   ImGui::SetNextItemWidth(150);
                   if (gPerfPanelDock == 1 || gPerfPanelDock == 2)
-                     ImGui::SliderFloat(L("Width"), &gPerfPanelWidth,
-                                        kPerfPanelMinWidth, 900.0f, "%.0f px");
+                  {
+                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Width"), &gPerfPanelWidth,
+                                        kPerfPanelMinWidth, 900.0f, "%.0f px"); FieldWell::PopStyle();
+                  }
                   else
-                     ImGui::SliderFloat(L("Height"), &gPerfPanelHeight,
-                                        kPerfPanelMinHeight, 800.0f, "%.0f px");
-                  ImGui::Checkbox(L("Edit Mode"), &gPerfEditMode);
+                  {
+                     FieldWell::PushStyle(); ImGui::SliderFloat(L("Height"), &gPerfPanelHeight,
+                                        kPerfPanelMinHeight, 800.0f, "%.0f px"); FieldWell::PopStyle();
+                  }
+                  MenuParts::Check(L("Edit Mode"), &gPerfEditMode);
                }
                ImGui::EndMenu();
             }
 
             if (MenuParts::SubMenu(L("Arrangement Timeline")))
             {
-               ImGui::Checkbox(L("Show Arrangement Timeline"), &gArrangePanelOpen);
+               MenuParts::Check(L("Show Arrangement Timeline"), &gArrangePanelOpen);
                if (gArrangePanelOpen)
                {
                   // Bottom or top only - a timeline reads left-to-right, so a
@@ -257,15 +269,18 @@ void DrawMenuBar(FrameCtx& fc)
                   // Saved with the document (Settings.dockSide); not undoable.
                   int dockSide = gArrange.settings.dockSide == 1 ? 1 : 0;
                   ImGui::SetNextItemWidth(150);
-                  if (ImGui::Combo(L("Dock"), &dockSide, I18n::TList("Bottom\0Top\0")) && dockSide != gArrange.settings.dockSide)
+                  FieldWell::PushStyle();
+                  const bool dockChanged = ImGui::Combo(L("Dock"), &dockSide, I18n::TList("Bottom\0Top\0"));
+                  FieldWell::PopStyle();
+                  if (dockChanged && dockSide != gArrange.settings.dockSide)
                   {
                      gArrange.settings.dockSide = dockSide;
                      gArrange.revision++; // a model field like any other (WP5b)
                      gPatchDirty = true;
                   }
                   ImGui::SetNextItemWidth(150);
-                  ImGui::SliderFloat(L("Height"), &gArrangePanelHeight,
-                                     kArrangePanelMinHeight, 800.0f, "%.0f px");
+                  FieldWell::PushStyle(); ImGui::SliderFloat(L("Height"), &gArrangePanelHeight,
+                                     kArrangePanelMinHeight, 800.0f, "%.0f px"); FieldWell::PopStyle();
                }
                ImGui::EndMenu();
             }

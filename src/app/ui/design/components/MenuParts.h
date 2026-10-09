@@ -3,6 +3,7 @@
 // 8 pt gap. ImGui still lays out and activates the rows (shortcut column, arrows, keyboard nav); only the
 // fill is ours, so hover reads the same as the top bar tiles.
 #pragma once
+#include "app/ui/design/components/CheckBox.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/UiAnim.h"
 #include "imgui.h"
@@ -53,6 +54,23 @@ namespace MenuParts
    {
       const bool r = ImGui::MenuItem(label, shortcut, selected, enabled);
       Wash(enabled && ImGui::IsItemHovered(), enabled && ImGui::IsItemActive(), false);
+      return r;
+   }
+
+   // Toggle row: label left, the app checkbox at the right edge; the menu stays open.
+   inline bool Check(const char* label, bool* v)
+   {
+      const bool r = ImGui::Selectable(label, false, ImGuiSelectableFlags_DontClosePopups);
+      if (r)
+         *v = !*v;
+      const ImGuiID id = ImGui::GetItemID();
+      Wash(ImGui::IsItemHovered(), ImGui::IsItemActive(), false);
+      ImGuiWindow* w = ImGui::GetCurrentWindow();
+      const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+      const float hv = UiAnim::Hover(id, ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+      const float onv = UiAnim::Hover(id ^ 0x5bd1e995u, *v, tok::motion_on, tok::motion_off);
+      CheckBox::Draw(w->DrawList, ImVec2(w->Pos.x + w->Size.x - kInset - kTextInset - CheckBox::kSize,
+                                         std::floor((mn.y + mx.y - CheckBox::kSize) * 0.5f)), onv, hv);
       return r;
    }
 
