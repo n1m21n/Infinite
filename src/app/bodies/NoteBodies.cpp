@@ -3,6 +3,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/components/StepCell.h"
 
 namespace app
 {
@@ -1414,15 +1415,7 @@ namespace app
          const bool on = ((n->stepGates >> s) & 1) != 0;
          const bool isPlayhead = (playStep == s);
 
-         const bool isLight = IsThemeLight();
-         dl->AddRectFilled(cellMin, cellMax, isLight ? tok::U32(tok::pal::c_DCE1EBFF) : tok::U32(tok::pal::c_0B0C10FF), 2.0f);
-         if (on)
-            dl->AddRectFilled(cellMin, cellMax,
-                               isPlayhead ? (isLight ? tok::U32(tok::pal::c_FFFFFFFF) : tok::U32(tok::pal::c_E1F2FFFF))
-                                          : (isLight ? tok::U32(tok::pal::c_2878EBF0) : tok::U32(tok::pal::c_96D6FFC8)), 4.0f);
-         dl->AddRect(cellMin, cellMax, isPlayhead ? (isLight ? tok::U32(tok::pal::c_1E64E6FF) : tok::U32(tok::pal::c_FFFFFFFF))
-                                                  : (isLight ? tok::U32(tok::pal::c_B4BCCCFF) : tok::U32(tok::pal::c_404454FF)), 4.0f,
-                     0, isPlayhead ? 2.0f : 1.0f);
+         StepCell::Draw(dl, cellMin, cellMax, on, isPlayhead, ImGui::IsItemHovered());
 
          ImGui::PopID();
       }

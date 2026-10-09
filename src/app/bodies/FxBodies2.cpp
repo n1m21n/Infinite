@@ -2,6 +2,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/components/StepCell.h"
 
 namespace app
 {
@@ -706,12 +707,7 @@ namespace app
             *n->ParamPtr("gateMask") = (float)(mask ^ (1 << i));
          }
          const bool on = (mask & (1 << i)) != 0;
-         const bool hovered = ImGui::IsItemHovered();
-         const bool isLight = IsThemeLight();
-         const ImU32 col = on ? (isLight ? IM_COL32(30, 110, 230, hovered ? 255 : 220) : IM_COL32(120, 200, 255, hovered ? 255 : 215))
-                               : (isLight ? IM_COL32(220, 225, 235, hovered ? 245 : 215) : IM_COL32(56, 60, 74, hovered ? 210 : 160));
-         dl->AddRectFilled(p0, p1, col, 2.0f);
-         dl->AddRect(p0, p1, ScopeBorderCol(), 2.0f, 0, 1.0f);
+         StepCell::Draw(dl, p0, p1, on, false, ImGui::IsItemHovered());
          ImGui::PopID();
       }
 
