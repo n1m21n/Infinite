@@ -1,6 +1,7 @@
 // Viewport panel cards and mini viewports (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -462,24 +463,7 @@ namespace app
 
       if (nodes.empty())
       {
-         const char* msg = T("No active viewport cards");
-         const char* hint = T("Select nodes & press Shift+V or right-click to add");
-         float h1, h2, w1, w2;
-         {
-            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
-            h1 = ImGui::GetTextLineHeight();
-            w1 = ImGui::CalcTextSize(msg).x;
-         }
-         h2 = ImGui::GetTextLineHeight();
-         w2 = ImGui::CalcTextSize(hint).x;
-         const float y = std::max(4.0f, (strip.y - h1 - h2 - tok::space_1) * 0.5f);
-         ImGui::SetCursorPos(ImVec2(std::max(8.0f, (strip.x - w1) * 0.5f), y));
-         {
-            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
-            ImGui::TextUnformatted(msg);
-         }
-         ImGui::SetCursorPos(ImVec2(std::max(8.0f, (strip.x - w2) * 0.5f), y + h1 + tok::space_1));
-         ImGui::TextDisabled("%s", hint);
+         EmptyState::DrawInWindow(T("No active viewport cards"), T("Select nodes & press Shift+V or right-click to add"));
       }
 
       ImGui::EndChild();

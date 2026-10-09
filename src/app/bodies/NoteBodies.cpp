@@ -2008,6 +2008,7 @@ namespace app
       }
       ImGui::SetWindowFontScale(1.0f);
       ImGui::SetCursorScreenPos(ImVec2(x0, y0 + btnH + 6.0f));
+      ImGui::Dummy(ImVec2(0.0f, 0.0f)); // the moved cursor must end on an item or ImGui flags the window growing
    }
 
 

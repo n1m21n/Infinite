@@ -24,8 +24,9 @@ References (the look everything is compared against):
   - Nodes: a finished Wavetable node (audio-node-ui spec, section 8).
 
 Part A: chrome sweep. For every row in the A table of the tracker:
-  1. Screenshot dark, then light (INFINITE_FORCELIGHT=1), headless:
-     INFINITE_AUDIOUITEST=1 INFINITE_OPENPANELS=<tokens> IMAGERESYNTH_SCREENSHOT=/tmp/x.png INFINITE_SCREENSHOT_FRAME=40
+  1. Screenshot dark, then light, headless:
+     INFINITE_AUDIOUITEST=1 INFINITE_OPENPANELS=<tokens>,light|dark IMAGERESYNTH_SCREENSHOT=/abs/x.png INFINITE_SCREENSHOT_FRAME=40
+     (INFINITE_FORCELIGHT is compiled out of the Release build; use the light/dark token. Use an absolute screenshot path: the app chdirs.)
      Add an OPENPANELS token in src/app/Startup.cpp when a surface has none. For panels also take every dock side.
   2. Read the PNG. Compare against the reference on: card/frame, window padding, title row, header style, scrollbar,
      empty state, hover/press, text sizes, overlap or clipping, anything still using the old look.
@@ -64,16 +65,16 @@ Status: `todo`, `ok` (checked, matches), `fixed <sha>`, `decision` (needs owner)
 
 | Surface | Dark | Light | Notes |
 |---|---|---|---|
-| Settings window (all 6 tabs) | todo | todo | reference |
-| All Shortcuts | fixed | todo | cards + pad, filter gap |
-| Help / module reference | fixed | todo | cards, header fill off |
+| Settings window (all 6 tabs) | ok (Appearance tab) | ok | reference; other 5 tabs not shot |
+| All Shortcuts | ok | ok | cards + pad, filter gap |
+| Help / module reference | ok | ok | cards, header fill off |
 | Colour picker | todo | todo | |
 | Node help popups | todo | todo | |
-| Unsaved changes / Recover dialogs | ok | todo | |
+| Unsaved changes / Recover dialogs | ok | decision | light: card edge barely separates from the scrim; Recover dialog not shot |
 | Export / render dialogs | todo | todo | |
 | Field editor | todo | todo | |
 | Library panel | todo | todo | |
-| Viewport panel: bottom, right, left, top | fixed (bottom, right) | todo | left/top not seen |
+| Viewport panel: bottom, right, left, top | fixed (all 4 docks) | todo | empty state was hand-rolled and clipped in the left dock; now EmptyState (wraps) |
 | Modulations panel: 4 docks | ok (bottom, right) | todo | reference |
 | Perf panel: 4 docks, edit mode | todo | todo | |
 | Arrange panel: 4 docks, inspector | todo | todo | |
