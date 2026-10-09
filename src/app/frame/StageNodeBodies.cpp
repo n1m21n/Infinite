@@ -653,13 +653,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   gn.showParams = !gn.showParams;
                ImGui::SameLine();
             }
-            if (!CanBypass(gn))
-            {
-               // Same footprint as BypassToggle, so the toggles to its right
-               // sit where they do on every other node.
-               ImGui::Dummy(ImVec2(22.0f, 18.0f));
-            }
-            else
+            // R8: a node that cannot bypass (2+ inputs) has no hole where the power icon would be; the icons pack left.
+            if (CanBypass(gn))
                drawBypassToggle();
             // Mini viewport toggle, only for nodes that actually have a mesh to
             // show - excludes CameraNode/LightNode, which appear in the stat-box
