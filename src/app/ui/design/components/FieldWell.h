@@ -60,6 +60,22 @@ namespace FieldWell
       ImGui::PopStyleColor(6);
    }
 
+   // Quiet look for the text field a slider turns into while a value is typed: no nav ring, 60% accent edge.
+   inline void PushTypedEditStyle()
+   {
+      ImVec4 edge = ImGui::GetStyleColorVec4(ImGuiCol_SliderGrab);
+      edge.w = 0.6f;
+      ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleColor(ImGuiCol_Border, edge);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+   }
+
+   inline void PopTypedEditStyle()
+   {
+      ImGui::PopStyleVar();
+      ImGui::PopStyleColor(2);
+   }
+
    // Slider in the well: accent fill drawn behind the value text; double-click or Ctrl+click types a number.
    // The first click of a double-click would otherwise snap the value to the click position, so it is undone
    // when the second click opens the text field (Esc then leaves the original value).

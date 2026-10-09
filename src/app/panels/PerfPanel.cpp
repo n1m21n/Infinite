@@ -1,4 +1,5 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
+#include "app/ui/design/components/StateRing.h"
 #include "app/ui/design/UiType.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/PanelFrame.h"
@@ -367,8 +368,7 @@ namespace app
          // Draw live snap grid highlight at the non-overlapping target cell
          ImVec2 snapTL(gridOrigin.x + snapX * (cellSize + gap) + gap * 0.5f, gridOrigin.y + snapY * (cellSize + gap) + gap * 0.5f);
          ImVec2 snapBR(snapTL.x + cardSize.x, snapTL.y + cardSize.y);
-         dl->AddRectFilled(snapTL, snapBR, tok::U32(tok::pal::c_468CFF2D), 6.0f);
-         dl->AddRect(snapTL, snapBR, tok::U32(tok::pal::c_5AB4FFDC), 6.0f, 0, 2.0f);
+         StateRing::Draw(dl, snapTL, snapBR, StateRing::Kind::Target, isLight, tok::radius_pill);
 
          // Floating live card position
          cellPos = ImVec2(gridOrigin.x + gPerfDragOriginCellX * (cellSize + gap) + gap * 0.5f + (m.x - gPerfDragMouseStart.x),
@@ -398,16 +398,9 @@ namespace app
       if (gPerfEditMode)
          dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.22f)), kCardR, 0, 1.2f);
       if (gPerfMidiLearnIdx == (int)elemIdx)
-      {
-         float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 8.0f);
-         dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
-                     (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) & 0x00FFFFFF
-                        | ((ImU32)((0.55f + 0.45f * pulse) * 255.0f) << 24),
-                     kCardR + 1.0f, 0, 2.5f);
-      }
+         StateRing::Draw(dl, cellPos, cardBR, StateRing::Kind::Learn, isLight, kCardR);
       else if (gPerfEditMode && gPerfSelection.count(elemIdx) > 0)
-         dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
-                     isLight ? tok::U32(tok::pal::c_1E6EDCFF) : tok::U32(tok::pal::c_5FA5FFFF), kCardR + 1.0f, 0, 2.0f);
+         StateRing::Draw(dl, cellPos, cardBR, StateRing::Kind::Select, isLight, kCardR);
       else
          dl->AddRect(cellPos, cardBR, cardHair, kCardR, 0, 1.0f);
 
@@ -2093,14 +2086,17 @@ namespace app
       snprintf(text, sizeof(text), "MIDI learn: %s > %s - move a knob, fader or pad (Esc to cancel)",
                dest->typeName.c_str(), (known != nullptr && !known->name.empty()) ? known->name.c_str() : "parameter");
       ImDrawList* dl = ImGui::GetForegroundDrawList();
-      const ImVec2 ts = ImGui::CalcTextSize(text);
+      const bool isLightT = CategoryColors::IsThemeLight();
+      const ImVec4 uiTxt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      UiType::Scope ts(UiType::Size::Title);
+      const ImVec2 tsz = ImGui::CalcTextSize(text);
       const ImGuiViewport* vp = ImGui::GetMainViewport();
-      const float pulse = 0.75f + 0.25f * sinf((float)ImGui::GetTime() * 5.0f);
-      const ImVec2 a(vp->Pos.x + (vp->Size.x - ts.x) * 0.5f - 12.0f, vp->Pos.y + 44.0f);
-      const ImVec2 b(a.x + ts.x + 24.0f, a.y + ts.y + 12.0f);
-      dl->AddRectFilled(a, b, IM_COL32(60, 40, 8, (int)(230 * pulse)), 6.0f);
-      dl->AddRect(a, b, IM_COL32(255, 185, 45, (int)(255 * pulse)), 6.0f, 0, 1.5f);
-      dl->AddText(ImVec2(a.x + 12.0f, a.y + 6.0f), tok::U32(tok::pal::c_FFB92DFF), text);
+      // Same neutral strip as the performance panel's listening banner: recessed well, hairline, plain text.
+      const ImVec2 a(vp->Pos.x + (vp->Size.x - tsz.x) * 0.5f - tok::space_3, vp->Pos.y + 44.0f);
+      const ImVec2 b(a.x + tsz.x + 2.0f * tok::space_3, a.y + 30.0f);
+      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_pill);
+      dl->AddRect(a, b, ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
+      dl->AddText(ImVec2(a.x + tok::space_3, std::round(a.y + (30.0f - tsz.y) * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.9f)), text);
    }
 
 

@@ -1,4 +1,6 @@
 // Modulatable sliders, knobs, faders, toggles, pins (moved verbatim from main.cpp).
+#include "app/ui/design/components/StateRing.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -212,16 +214,10 @@ namespace app
          // over the neighbouring engine. This is the same defect the knob path
          // fixed; the slider path never got it.
          const std::string typedId = std::string("##typed") + label;
-         // Quiet edit field: no bright nav ring, a 60% accent edge instead (same as FieldWell::Slider).
-         ImVec4 accentEdge = ImGui::GetStyleColorVec4(ImGuiCol_SliderGrab);
-         accentEdge.w = 0.6f;
-         ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
-         ImGui::PushStyleColor(ImGuiCol_Border, accentEdge);
-         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+         FieldWell::PushTypedEditStyle();
          const bool entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf),
                                                ImGuiInputTextFlags_EnterReturnsTrue);
-         ImGui::PopStyleVar();
-         ImGui::PopStyleColor(2);
+         FieldWell::PopTypedEditStyle();
          gTypedParamText[editKey] = buf;
          if (gTypedParamPendingInit.count(editKey) && ImGui::IsItemActive())
          {
@@ -587,6 +583,8 @@ namespace app
             HandleParamTypeHotkeys(editKey, value);
       }
 
+      if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
+         StateRing::Draw(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), StateRing::Kind::Learn, isLight, tok::radius_field);
       changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, ImGui::GetItemRectMin(),
                           ImVec2(std::min(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().x + (width - box - 4.0f)), ImGui::GetItemRectMax().y),
                           false) || changed;
@@ -1597,6 +1595,13 @@ namespace app
          const ImVec2 kmin = kbCircle ? ImVec2(kcx - diameter * 0.5f, cellOrigin.y) : ImVec2(kcx - 7.0f, cellOrigin.y);
          const ImVec2 kmax = kbCircle ? ImVec2(kcx + diameter * 0.5f, cellOrigin.y + diameter)
                                       : ImVec2(kcx + 7.0f, cellOrigin.y + diameter);
+         if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
+         {
+            if (kbCircle)
+               StateRing::DrawCircle(ImGui::GetWindowDrawList(), ImVec2((kmin.x + kmax.x) * 0.5f, (kmin.y + kmax.y) * 0.5f), diameter * 0.5f, StateRing::Kind::Learn, IsThemeLight());
+            else
+               StateRing::Draw(ImGui::GetWindowDrawList(), kmin, kmax, StateRing::Kind::Learn, IsThemeLight(), tok::radius_field);
+         }
          changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, kmin, kmax, kbCircle) || changed;
       }
       ImGui::PopID();
