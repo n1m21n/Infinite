@@ -494,14 +494,15 @@ namespace app
          ModSlider("end", &n->trimEnd, 0.0f, sliderMax);
       }
 
-      NodeSeparator();
       if (n->HasAudio())
       {
+         NodeSeparator();
          ModCheckbox("audioEnabled", &n->audioEnabled);
          ModSlider("volume", &n->volume, 0.0f, 1.0f);
       }
       else if (!n->AudioError().empty())
       {
+         NodeSeparator();
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
          ImGui::TextDisabled("audio: %s", n->AudioError().c_str());
          ImGui::PopTextWrapPos();
@@ -511,8 +512,8 @@ namespace app
 
    void DrawVideoInParams(VideoInNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // dropdowns as wide as the preview above them
       ModCheckbox("active", &n->active);
-      ImGui::SameLine();
       ModCheckbox("mirror", &n->mirror);
 
       n->RefreshDevices();

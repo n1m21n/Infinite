@@ -1074,7 +1074,8 @@ namespace app
       // back down exactly on the kernel's own timing, not an idealized one.
       const float liveInDb = std::clamp(live.inDb, kDynVizMinDb, kDynVizMaxDb);
       const float liveGrDb = std::clamp(live.grDb, 0.0f, 40.0f);
-      const bool hasSignal = liveInDb > kDynVizMinDb + 0.5f;
+      // The meters rest at 0 dB while audio is stopped, which is a dot with nothing behind it.
+      const bool hasSignal = Platform::AudioIsRunning() && liveInDb > kDynVizMinDb + 0.5f;
       if (hasSignal)
       {
          const float liveOutDb = liveInDb + inGainDb - liveGrDb + makeupDb;
