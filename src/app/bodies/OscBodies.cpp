@@ -1160,8 +1160,11 @@ namespace app
          else
             snprintf(timeText, sizeof(timeText), "%.0f ms", totalMs);
          const ImVec2 tsz = ImGui::CalcTextSize(timeText);
-         // Top-right: the release segment always ends at the bottom-right, so a label there sat on the curve and the end handle.
-         dl->AddText(ImVec2(br.x - 6.0f - tsz.x, origin.y + 4.0f),
+         // Top-right normally; bottom-centre (under the plateau) when a high sustain puts the plateau along the top. The release always ends at the bottom-right corner and the attack starts bottom-left, so neither bottom corner is free.
+         const bool highSustain = *sustain > 0.6f;
+         const ImVec2 labelPos = highSustain ? ImVec2(origin.x + (br.x - origin.x - tsz.x) * 0.45f, br.y - 4.0f - tsz.y)
+                                             : ImVec2(br.x - 6.0f - tsz.x, origin.y + 4.0f);
+         dl->AddText(labelPos,
                      isLight ? tok::U32(tok::pal::c_3C4455A0) : tok::U32(tok::pal::c_8C96AC8C), timeText);
       }
 
@@ -2522,12 +2525,7 @@ namespace app
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = 4.0f;
          const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
-         const float remW = std::max(120.0f, w - octW - semiW - fineW - gap * 3.0f);
-
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         ImGui::TextColored(tok::V4(tok::palf::v_0_900_850_1000), "SPECTROGRAM SYNTH");
-
-         ImGui::SetCursorScreenPos(ImVec2(x0 + remW, y));
          AudioSlider("fine", &n->fine, -50.0f, 50.0f, "%.1f c", fineW);
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
