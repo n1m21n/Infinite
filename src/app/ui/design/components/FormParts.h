@@ -31,12 +31,15 @@ namespace FormParts
       return ImGui::GetColorU32(CategoryColors::IsThemeLight() ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f));
    }
 
-   // Colour tile: the same rounded 24 px ColorButton the Clip Settings Color Tint menu uses; a click opens a picker.
-   // True when edited.
-   inline bool ColorDot(const char* id, float* rgb, float d = 24.0f)
+   // Round colour dot (same shape as the Clip Settings swatches); a click opens a picker. True when edited.
+   inline bool ColorDot(const char* id, float* rgb, float d = 15.0f)
    {
-      const bool click = ImGui::ColorButton(id, ImVec4(rgb[0], rgb[1], rgb[2], 1.0f),
-                                            ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoDragDrop, ImVec2(d, d));
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const bool click = ImGui::InvisibleButton(id, ImVec2(d, d));
+      const bool hov = ImGui::IsItemHovered();
+      const ImVec2 c(p.x + d * 0.5f, p.y + d * 0.5f);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddCircleFilled(c, d * 0.5f - (hov ? 0.0f : 1.0f), ImGui::GetColorU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f)), 48);   // 48 segments: the auto count facets a 9 px circle
       if (click)
          ImGui::OpenPopup(id);
       bool changed = false;

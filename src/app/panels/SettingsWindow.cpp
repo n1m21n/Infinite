@@ -55,21 +55,19 @@ namespace app
             auto drawThemeSwatches = [&](ImVec2 pos, float sz, float gap, const CategoryColors::UiTheme& t) {
                ImDrawList* dl = ImGui::GetWindowDrawList();
                const CategoryColors::Color swatchCols[3] = { t.panelBg, t.text, t.accent };
-               const ImU32 borderCol = isLight
-                  ? ImGui::GetColorU32(tok::V4(tok::palf::v_0_0_0_450))
-                  : ImGui::GetColorU32(tok::V4(tok::palf::v_1000_1000_1000_450));
                for (int s = 0; s < 3; s++)
                {
                   ImVec2 p0(pos.x + s * (sz + gap), pos.y);
                   ImVec2 p1(p0.x + sz, p0.y + sz);
                   const CategoryColors::Color& c = swatchCols[s];
-                  const float rr = ImGui::GetStyle().FrameRounding * 0.75f;   // same tile as the Color Tint menu
-                  dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), rr);
-                  dl->AddRect(p0, p1, borderCol, rr, 0, 1.0f);
+                  const ImVec2 mid((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f);   // filled circle, like the Clip Settings Color Tint
+                  dl->AddCircleFilled(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), 48);
+                  // Hairline: a preset's background colour can match the panel it sits on.
+                  dl->AddCircle(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(0.5f, 0.5f, 0.5f, 0.35f)), 48, 1.0f);
                }
             };
 
-            const float kSwatchSz = 16.0f;
+            const float kSwatchSz = 15.0f;
             const float kSwatchGap = 4.0f;
             const float kSwatchStripW = 3 * kSwatchSz + 2 * kSwatchGap;
 
@@ -1169,10 +1167,17 @@ namespace app
                ImGui::OpenPopup("ExprPresetsMenuSettings");
             }
 
+            {
+               // Anchored under the Presets button, fixed width, scrolls past 320 pt: never covers the globals list.
+               const ImVec2 bmin = ImGui::GetItemRectMin();
+               ImGui::SetNextWindowPos(ImVec2(bmin.x, ImGui::GetItemRectMax().y + tok::space_1));
+               const ImGuiViewport* vp = ImGui::GetMainViewport();
+               const float room = vp->Pos.y + vp->Size.y - ImGui::GetItemRectMax().y - 16.0f;
+               ImGui::SetNextWindowSizeConstraints(ImVec2(400.0f, 0.0f), ImVec2(400.0f, std::clamp(room, 160.0f, 320.0f)));
+            }
             if (MenuParts::BeginPopup("ExprPresetsMenuSettings"))
             {
-               ImGui::TextDisabled("%s", T("Click to insert preset global:"));
-               MenuParts::Separator();
+               constexpr float kNameW = 110.0f;   // name column; the formula follows, dimmed and clipped
                std::string currentCategory;
                for (const ExprGlobals::Preset& p : ExprGlobals::Presets())
                {
@@ -1184,9 +1189,22 @@ namespace app
                      ImGui::TextDisabled("%s", currentCategory.c_str());
                   }
 
-                  char itemLabel[256];
-                  snprintf(itemLabel, sizeof(itemLabel), "%s = %s", p.name.c_str(), p.expr.c_str());
-                  if (MenuParts::Item(itemLabel))
+                  char itemId[256];
+                  snprintf(itemId, sizeof(itemId), "##preset_%s", p.name.c_str());
+                  const bool picked = ImGui::Selectable(itemId, false);
+                  MenuParts::Wash(ImGui::IsItemHovered(), ImGui::IsItemActive(), false);
+                  {
+                     ImDrawList* dl = ImGui::GetWindowDrawList();
+                     const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+                     const float ty = std::floor((mn.y + mx.y - ImGui::GetTextLineHeight()) * 0.5f);
+                     const ImVec4 tc = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                     const float right = mx.x - MenuParts::kTextInset;
+                     dl->AddText(ImVec2(mn.x + 4.0f, ty), ImGui::GetColorU32(tc), p.name.c_str());
+                     dl->PushClipRect(ImVec2(mn.x + kNameW, mn.y), ImVec2(right, mx.y), true);
+                     dl->AddText(ImVec2(mn.x + kNameW, ty), ImGui::GetColorU32(ImVec4(tc.x, tc.y, tc.z, 0.5f)), p.expr.c_str());
+                     dl->PopClipRect();
+                  }
+                  if (picked)
                   {
                      PushUndoCheckpoint();
                      bool found = false;

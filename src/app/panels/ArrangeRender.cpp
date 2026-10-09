@@ -449,7 +449,7 @@ namespace app
          ImU32 cols[n];
          const char* names[n];
          for (int i = 0; i < n; ++i) { cols[i] = kArrangePalette[i].col; names[i] = kArrangePalette[i].name; }
-         const int hit = FieldWell::SwatchRow(cols, names, n, -1);
+         const int hit = FieldWell::SwatchRow(cols, names, n, -1, 15.0f);
          if (hit >= 0) onSelect(ArrangeMarkerRGBA(kArrangePalette[hit].col));
       };
 
