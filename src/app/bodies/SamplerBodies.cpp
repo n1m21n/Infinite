@@ -299,7 +299,9 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ActionButton::Draw("Load...", ImVec2(90, 0)))
+      // Load / Record / Audition share the row with the three 44 pt mode toggles at its right edge.
+      const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 5.0f - 44.0f * 3.0f) / 3.0f;
+      if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -317,7 +319,7 @@ namespace app
       // rather than duplicated as a per-node-type accept.
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -335,7 +337,7 @@ namespace app
       // there needs to be a dedicated way to stop it.
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(90, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
@@ -514,7 +516,9 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       // Button strip - the one deliberate full-width row (P1's exception).
-      if (ActionButton::Draw("Load...", ImVec2(90, 0)))
+      // Load / Record / Audition share the row with the three 44 pt mode toggles at its right edge.
+      const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 5.0f - 44.0f * 3.0f) / 3.0f;
+      if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -525,7 +529,7 @@ namespace app
       }
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -536,7 +540,7 @@ namespace app
 
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(90, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
@@ -659,7 +663,9 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      if (ActionButton::Draw("Load...", ImVec2(90, 0)))
+      // Load / Record / Audition share the row with the three 44 pt mode toggles at its right edge.
+      const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 5.0f - 44.0f * 3.0f) / 3.0f;
+      if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
       {
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
@@ -670,7 +676,7 @@ namespace app
       }
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(70, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -681,7 +687,7 @@ namespace app
 
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(90, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
@@ -2668,10 +2674,11 @@ namespace app
          }
          ImGui::Dummy(ImVec2(0.0f, 6.0f));
 
-         if (ActionButton::Draw("Load...", ImVec2(90, 0)))
+         const float thirdW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+         if (ActionButton::Draw("Load...", ImVec2(thirdW, 0)))
             openLoadPad = cur;
          ImGui::SameLine();
-         if (ActionButton::Draw("Folder...", ImVec2(90, 0)))
+         if (ActionButton::Draw("Folder...", ImVec2(thirdW, 0)))
          {
             const std::string folder = Platform::OpenFolderDialog("Load a folder into the 16 pads");
             if (!folder.empty())
@@ -2682,7 +2689,7 @@ namespace app
          }
          ImGui::SameLine();
          ImGui::BeginDisabled(!n->PadLoaded(cur));
-         if (ActionButton::Draw("Clear", ImVec2(70, 0)))
+         if (ActionButton::Draw("Clear", ImVec2(thirdW, 0)))
          {
             PushUndoCheckpoint();
             n->ClearPad(cur);
