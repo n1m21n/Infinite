@@ -629,6 +629,7 @@ set(COMMON_SOURCES
     src/nodes/NoiseNode.cpp
     src/nodes/SketchNode.cpp
     src/core/sketch/SketchEngine.cpp
+    src/core/sketch/Sketch3DEngine.cpp
     src/app/bodies/SketchParams.cpp
     src/nodes/TextureNode.cpp
     src/nodes/ResynthNode.cpp
@@ -896,6 +897,10 @@ target_include_directories(field-preset-check PRIVATE src src/core)
 add_executable(sketch-check src/core/sketch/SketchCheck.cpp src/core/sketch/SketchEngine.cpp)
 target_include_directories(sketch-check PRIVATE src/core/sketch)
 target_link_libraries(sketch-check PRIVATE sketch_deps lunasvg_lib)
+
+add_executable(sketch3d-check src/core/sketch/Sketch3DCheck.cpp src/core/sketch/Sketch3DEngine.cpp src/core/sketch/SketchEngine.cpp)
+target_include_directories(sketch3d-check PRIVATE src/core/sketch src/core)
+target_link_libraries(sketch3d-check PRIVATE sketch_deps lunasvg_lib)
 
 # Sketch node dependencies (docs/plans/sketch/README.md): quickjs-ng (JS engine,
 # no quickjs-libc so a patch cannot reach files or network) and plutovg (CPU
