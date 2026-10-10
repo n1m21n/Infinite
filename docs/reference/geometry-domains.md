@@ -119,15 +119,15 @@ FieldPrimitive resolved: not mode-dependent across domains. `GetPointCloud()`/
 | MeshResynth.input | surface | `GenerativeNodes.cpp:190` warn; `ApplyGeneration` returns on `vertices.empty()` (`:72`) | runs; Smooth/Extrude/RecalculateNormals see no faces, normals zeroed (`Mesh.cpp:1782`) | mesh copy empty, nothing | kMeshSurface (`:190`) |
 | MetaBall.cloudSource | cloud, reads `px/py/pz/scale` only, not colour | `UtilityNodes.cpp:755` | n/a | curve: nothing | yes (per earlier read) |
 | InstanceOnPoints.cloudSource | cloud; **wins over pointSource** | `GeometryOpNodes.cpp:802-820` | n/a | - | yes (cloud) |
-| InstanceOnPoints.pointSource | mesh; **mode 0 needs only vertices, modes 1/2 need faces** | gate `!HasGeometry()` (`:830`); `ToPoints` mode 0 `Mesh.cpp:2470-2540`, edges `:2541-2652`, faces `:2653-2693` | mode 0 works; modes 1/2 yield 0 instances, silently | 0 instances | **none** |
+| InstanceOnPoints.pointSource | mesh; **mode 0 needs only vertices, modes 1/2 need faces** | gate `!HasGeometry()` (`:830`); `ToPoints` mode 0 `Mesh.cpp:2470-2540`, edges `:2541-2652`, faces `:2653-2693` | mode 0 works; modes 1/2 yield 0 instances, silently | 0 instances | kMeshVertices / kMeshSurface by mode (added; only when no cloud pin) |
 | InstanceOnPoints.instanceShape | any mesh | `GeometryOpNodes.cpp:730-746` | draws verts-only stamp as nothing (Render needs faces) | empty stamp | none |
 | Cloth.input | **surface** | `SimulationNodes.cpp:294` `srcLocal.Empty()` returns, no output; constraints from `src.indices` | **no output at all** (old doc said "unconstrained particles": wrong) | no mesh output (cloud/curve forwarded) | kMeshSurface (added) |
 | Displacement.input | surface (no gate) | `GeometryOpNodes.cpp:620-624` -> `MeshOps::Displace` (`Mesh.cpp:2369-2426`) always ends in `RecalculateNormals` | smooth: all normals zeroed (`Mesh.cpp:1782`); **flatShade: result is an empty mesh** (`:1704-1749` builds from indices) | mesh empty | kMeshSurface (added) |
 | AudioDisplacement.input | surface | `.cpp:268` warn, `:275` gate on `vertices.empty()` | runs, ends in `RecalculateNormals` (`:470`): normals zeroed / flat = empty | empty | kMeshSurface (`:268`) |
 | Wrap.sourceInput | surface | `Mesh.cpp:3043-3045` `worldSource.Empty()` returns source unchanged | **returned un-wrapped** (but world-baked) | empty | none on source |
 | Wrap.targetInput | surface (nearest); optional in bend modes | `Mesh.cpp:3048` `target.Empty()` -> unchanged unless bend + `radiusOverride>0`; nearest loop uses `FaceCount()` (`:3133`) | treated as absent (`:3061` `worldTarget.Empty()` -> uses override) | treated as absent | source + target kMeshSurface (source added); **misclassifies verts-only as "nothing"** |
-| Join inputs 1-4 | surface to contribute | `UtilityNodes.cpp:266,316` `Empty()` skip | **silently skipped** | skipped | none |
-| GeometryOp.input | any (no gate at `:200-211`); kTransform/kArray are pure vertex ops | no per-op gate at pin | kTransform keeps verts-only intact | mesh empty; cloud handled `:523` | none |
+| Join inputs 1-4 | surface to contribute | `UtilityNodes.cpp:266,316` `Empty()` skip | **silently skipped** | skipped | kMeshSurface per input (added) |
+| GeometryOp.input | any (no gate at `:200-211`); kTransform/kArray are pure vertex ops | no per-op gate at pin | kTransform keeps verts-only intact | mesh empty; cloud handled `:523` | non-Transform ops: kMeshVertices (added); Transform takes any domain |
 | MergeByDistance.input | surface per warning, but op body only needs vertices | `Mesh.cpp:612-663` (`vertices.empty()` gate; faces loop optional) | works (welds verts) but node warns anyway | mesh empty | kMeshSurface |
 | MeshToPoints.input | mode 0 vertices; modes 1/2 faces | `UtilityNodes.cpp:550-573`, `ToPoints` as above | mode 0 works, 1/2 emit 0 points | 0 points | kMeshVertices / kMeshSurface by mode (added) |
 | DistributeOnFaces.input | surface | `Mesh.cpp:2760` `faceCount==0` returns empty | 0 points | 0 points | kMeshSurface |
@@ -135,7 +135,7 @@ FieldPrimitive resolved: not mode-dependent across domains. `GetPointCloud()`/
 | Path.curve | curve | `PathNode.cpp:25-37` | - | - | kCurve |
 | Delaunay/Voronoi.points | cloud only | `DelaunayNodes.cpp` RebuildIfNeeded | nothing | cloud | kCloud |
 | CurveOps.curve | curve only | `CurveOpsNode.cpp` RebuildIfNeeded | nothing | nothing | kCurve |
-| Path.geometry (mesh-follow) | surface | `BoundaryLoops`/`SliceContours` over indices (`PathNode.cpp:96-101`) | no loops, no follow | no follow | none |
+| Path.geometry (mesh-follow) | surface | `BoundaryLoops`/`SliceContours` over indices (`PathNode.cpp:96-101`) | no loops, no follow | no follow | kMeshSurface (added) |
 | GeometryTable.geo | any | cloud `:56,82`, curve `:64,170`, mesh `:103-109,190-196` | mesh mode reads `FaceCount()` (`:132`) | supported | n/a |
 | SetColor.input | any | `GeometryOpNodes.cpp:1226-1227` | passes | cloud recoloured; curve **dropped** | none |
 | Material / Mapping / Null3D | any | passthrough | passes | passes (fixed) | n/a |
@@ -193,7 +193,7 @@ GeometryOp, Path.geometry, Wrap.source.
 |---|---|---|---|
 | 1 | Join `keepInputColours` (`UtilityNodes.h:576,615`, `.cpp:233,293,382`, `main.cpp:26360`) | The doc, D4 and commit df55bf1 said it was removed; merge 906acfa put it back. Default true. | Regression of a decided design |
 | 2 | Join `anyAuthoredColour` (`.cpp:274-276`) | Counts any instancer input as authored colour, but `InstanceOnPoints` always fills `mColors` (white default), so instancer -> Join bakes colour and neutralises albedo: the original manufactured-colour bug via a new door | High, confirm against `RealizeInstances` (`Mesh.cpp:499-523`, it only multiplies/creates colour when `instanceColors` given) |
-| 3 | GeometryOp kTransform (`.h:108-113`, `.cpp:229-269`) | Mesh and cloud are transformed, **curve is forwarded untransformed**. Also `selectionOnly` transforms the whole cloud (`.cpp:530-564` has no mask) | High |
+| 3 | (FIXED, R481: Transform now transforms the curve) GeometryOp kTransform (`.h:108-113`, `.cpp:229-269`) | Mesh and cloud are transformed, **curve is forwarded untransformed**. Also `selectionOnly` transforms the whole cloud (`.cpp:530-564` has no mask) | High |
 | 4 | DistributeOnFaces (`PointDistributionNodes.cpp:56-62,149`) | Bakes inherited material tint into particle colour but dirty check omits `MaterialRevision`; goes stale on upstream colour change. MeshToPoints does include it | Medium |
 | 5 | `DescribeGeometryMismatch` (`Geometry3DNodes.h:296-297`) | `hasVerts = !Empty()` == "has surface". mesh:verts reports "got nothing" for kMeshSurface, and would falsely fail kMeshVertices. `kMeshVertices` is unused so latent | Medium |
 | 6 | Displacement/AudioDisplacement on verts-only | Normals zeroed; with flatShade the mesh vanishes. No warning on Displacement | Medium |

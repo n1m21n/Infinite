@@ -864,6 +864,12 @@ void FrameTest_POINTCLOUDSWEEPTEST(int frameId, GLFWwindow* window)
             cn.input = &curve;
             cn.GetCurve();
             report("Curve Ops accepts a curve without warning", cn.CookWarning().empty());
+            GeometryOpNode arr; arr.op = GeometryOpNode::kArray; arr.input = &pts; arr.CookIfNeeded(1001);
+            report("Array flags a point cloud", !arr.CookWarning().empty());
+            GeometryOpNode xf; xf.op = GeometryOpNode::kTransform; xf.input = &pts; xf.CookIfNeeded(1002);
+            report("Transform accepts a point cloud", xf.CookWarning().empty());
+            JoinGeometryNode jn; jn.inputs[0] = &pts; jn.GetMesh();
+            report("Join flags a non-surface input", !jn.CookWarning().empty());
          }
 
          // R484: Switcher 3D and Set Color forward cloud / curve.

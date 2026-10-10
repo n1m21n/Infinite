@@ -543,6 +543,7 @@ public:
    }
 
    int mode = kMerge;
+   const std::string& CookWarning() const override { return mCookWarning; }
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
@@ -630,6 +631,7 @@ public:
    }
 
 private:
+   std::string mCookWarning;
    void RebuildIfNeeded();
 
    Mesh mCache;

@@ -193,6 +193,12 @@ int JoinGeometryNode::ConnectedCount() const
 
 void JoinGeometryNode::RebuildIfNeeded()
 {
+   // Inputs that are not surfaces contribute nothing; say so instead of
+   // skipping them silently.
+   mCookWarning.clear();
+   for (int i = 0; i < kSlots && mCookWarning.empty(); i++)
+      mCookWarning = DescribeGeometryMismatch(inputs[i], GeometryRequirement::kMeshSurface);
+
    auto sameMatrix = [](const Mat4& a, const Mat4& b)
    {
       for (int k = 0; k < 16; k++)

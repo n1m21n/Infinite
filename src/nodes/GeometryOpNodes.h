@@ -26,6 +26,7 @@ const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* sour
 class GeometryOpNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    enum Op
    {
       kTransform = 0, kArray, kSubdivide, kSolidify, kExtrude,
@@ -307,6 +308,7 @@ public:
    }
 
 private:
+   std::string mCookWarning;
    struct Signature
    {
       int op = -1, count = 0, levels = 0, axis = 0, explodeBy = 0;

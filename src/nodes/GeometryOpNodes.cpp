@@ -635,6 +635,12 @@ void GeometryOpNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
+   // Transform moves a mesh, cloud or curve; every other op reshapes a mesh and
+   // would otherwise hand a cloud or curve through unchanged without saying so.
+   if (bypassed || op == kTransform)
+      mCookWarning.clear();
+   else
+      mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshVertices);
 }
 
 // ======================================================== Displacement
@@ -847,6 +853,9 @@ void InstanceOnPointsNode::Rebuild()
    mColors.clear();
 
    mCookWarning = DescribeGeometryMismatch(cloudSource, GeometryRequirement::kCloud);
+   if (mCookWarning.empty() && cloudSource == nullptr)
+      mCookWarning = DescribeGeometryMismatch(
+         pointSource, pointMode == 0 ? GeometryRequirement::kMeshVertices : GeometryRequirement::kMeshSurface);
 
    // The stamp's own transform is baked into every instance as a baseline -
    // move/scale/rotate the shape source and all copies follow, same as
