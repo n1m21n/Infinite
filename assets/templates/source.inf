@@ -1,0 +1,49 @@
+infinite-patch 1
+# Source: pictures from nothing
+node 1 Source Noise
+  id noise
+  pos 0 318
+  f scale 4
+  c lowColor 0.05 0.1 0.3
+end
+node 2 Source Ring
+  id ring
+  pos 0 890
+  f size 0.3
+  c fillColor 1 0.75 0.3
+end
+node 3 Compositing Blend
+  id mix
+  pos 460 302
+end
+node 4 Utility Output
+  id out
+  pos 920 156
+end
+node 5 Compositing Comment
+  pos 0 0
+  s text Sources make a picture out of nothing. Add any Source node and wire it to Output.
+  f width 340
+  f height 120
+end
+node 6 Compositing Comment
+  pos 0 156
+  s text Noise makes cloudy texture. Try Scale for bigger or smaller clouds, and Speed for how fast it drifts.
+  f width 300
+  f height 126
+end
+node 7 Compositing Comment
+  pos 0 728
+  s text Source nodes need no input. Circle, Star, Text, Ramp and the rest all work like this one. Try Size.
+  f width 300
+  f height 126
+end
+node 8 Compositing Comment
+  pos 460 156
+  s text Blend puts two pictures together.
+  f width 300
+  f height 110
+end
+cable mix 0 noise
+cable mix 1 ring
+cable out 0 mix

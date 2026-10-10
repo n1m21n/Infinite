@@ -112,6 +112,7 @@ Show minimap	Minimap anzeigen
 Show modulation matrix	Modulationsmatrix anzeigen
 Show viewport panel	Viewport-Panel anzeigen
 Size	Größe
+Show canvas grid	Canvas-Raster anzeigen
 Snap to grid	Am Raster ausrichten
 Solid Color	Einfarbig
 Standard (shared)	Standard (geteilt)
@@ -1171,3 +1172,9 @@ Zoom in and out	Hinein- und herauszoomen
 Zoom the view into the selected node; Enter zooms back out to where you were	Die Ansicht auf den ausgewählten Node zoomen; Enter zoomt zurück dorthin, wo du warst
 transform  ->  back into Feedback's input   <- this closes the loop	transform  ->  zurück in den Eingang von Feedback   <- das schließt die Schleife
 {mod}+C / {mod}+V, or Shift+D / {mod}+D to duplicate in place	{mod}+C / {mod}+V, oder Shift+D / {mod}+D zum Duplizieren an Ort und Stelle
+Library - search modules, samples, media and plugins	Bibliothek: Module, Samples, Medien und Plugins durchsuchen
+Library	Bibliothek
+Sort	SORTIEREN
+Filter	FILTER
+Descending	Absteigend
+Ascending	Aufsteigend

@@ -1,16 +1,16 @@
 {
  "merges": [
-  317,
-  352
+  321,
+  356
  ],
  "direct": [
-  421,
-  465
+  487,
+  489
  ],
- "notes_total": 367,
+ "notes_total": 347,
  "evidence": [
-  503,
-  584
+  513,
+  600
  ],
  "per_release": {
   "v0.1": {
@@ -91,10 +91,10 @@
   },
   "v0.4.2": {
    "quests": 24,
-   "notes": 24
+   "notes": 13
   },
   "v0.4.25": {
-   "quests": 5,
+   "quests": 6,
    "notes": 7
   },
   "v0.4.3": {
@@ -102,63 +102,25 @@
    "notes": 9
   },
   "v0.4.4": {
-   "quests": 58,
-   "notes": 29
+   "quests": 62,
+   "notes": 17
   },
   "v0.4.5": {
    "quests": 6,
    "notes": 5
   },
   "v0.4.6": {
-   "quests": 71,
-   "notes": 31
+   "quests": 72,
+   "notes": 16
+  },
+  "v0.4.7": {
+   "quests": 76,
+   "notes": 18
   }
  },
  "loose": [
-  "2026-10-07 4ff013a NDI plan: closed, parked",
-  "2026-10-07 292692a Roadmap: trim board to release-bound work, close R635 MPE, park the rest",
-  "2026-10-07 9315838 Launcher: no ghost logo on exit, faster fade, shown once per installed version",
-  "2026-10-07 4efecda Roadmap: close R604 Spectrum Slide",
-  "2026-10-07 beb298a Node search: treat hyphen/underscore as space and match with spaces dropped (key snap / ke",
-  "2026-10-07 b84d7f9 Roadmap: close R605 Key-Snap",
-  "2026-10-07 b27fa34 Key-Snap: knob row on top, selectors below; teal in-scale / amber root / grey off-scale no",
-  "2026-10-07 9f41328 Roadmap: add Key-Snap follow-ups and the AUDIOUITEST crash",
-  "2026-10-07 686d10d Regenerate patch-authoring node facts (adds Key-Snap, refreshes stale param counts)",
-  "2026-10-07 1a2fffc Roadmap: close R606, drop duplicate R610, add sweep follow-ups",
-  "2026-10-07 8d37a86 Roadmap: refresh metrics",
-  "2026-10-07 bfb0381 Roadmap: close R607",
-  "2026-10-07 e44cc97 Roadmap: close R551",
-  "2026-10-07 be1da03 Roadmap: close R576, add screen-reader quest",
-  "2026-10-07 4fe7cb0 Roadmap: close R575",
-  "2026-10-07 64162fe Roadmap: close R573",
-  "2026-10-07 e86e033 Roadmap: close R571",
-  "2026-10-07 5f5f7e5 Roadmap: close R506",
-  "2026-10-07 76af476 Roadmap: close R601",
-  "2026-10-07 370d6ba Roadmap: close R274",
-  "2026-10-07 aa231a3 Roadmap: close R273",
-  "2026-10-07 03d98a6 Roadmap: close R587, log the Shift+U/F test gap",
-  "2026-10-07 f5a9994 Roadmap: close R596",
-  "2026-10-07 dbeef25 Roadmap: close R593",
-  "2026-10-06 e81d974 Roadmap: log and close R589-R591, close R282",
-  "2026-10-06 e0b13f1 Keyboard: H again closes the node help popup (KBCURSORTEST covers it)",
-  "2026-10-06 4b9445d Keyboard focus ring: stop at the slider box, do not enclose the label",
-  "2026-10-06 9c5a976 Keyboard v2 polish (R571): focus ring hugs the control, groups move with arrows, Cmd/Ctrl+",
-  "2026-10-06 619918e Roadmap: R571 keyboard v2 merged, add follow-up gaps quest",
-  "2026-10-06 31f5376 Keyboard model v2 (R571): Tab walks the active node's params, arrows move, Shift+arrow sel",
-  "2026-10-06 1705195 Plan: R571 keyboard-only use (slices, keymap, owner questions)",
-  "2026-10-06 2944e6c Roadmap: defer R568 (contract change for ~4 ms at 4K)",
-  "2026-10-06 b99ea38 Roadmap: close R553",
-  "2026-10-06 18ab432 Roadmap: close R578",
-  "2026-10-06 6409d02 Roadmap: close R569, log CI findings",
-  "2026-10-06 9650547 Roadmap: close R570",
-  "2026-10-06 874169c Roadmap: log R560 audit findings as quests",
-  "2026-10-06 3f4ff7b Roadmap: close R560, log its findings",
-  "2026-10-06 216f5cd Roadmap: close R554, log R568 R569",
-  "2026-10-06 687bb00 Roadmap: close R566",
-  "2026-10-06 06e9bd4 Roadmap: close R559",
-  "2026-10-06 197c334 Roadmap: drop R565 (Reddit post)",
-  "2026-10-06 657ea4b Roadmap: log tech-audit quests (TSan/tidy, UX audit, CLAP, NDI, Link/MPE, ML nodes, Reddit",
-  "2026-10-01 2a7c3d5 Roadmap: close R527/R529 as shipped in v0.4.6, milestone -> v0.4.7"
+  "2026-10-08 2bed065 Add Field Pixel image coordinate reads and camera FX presets",
+  "2026-10-08 cff222b Launcher card: play before the ImGui GLFW backend exists (Windows 0xc000041d at startup)"
  ],
  "no_evidence": [
   "R1 v0.1: 80+ realtime 2D/3D nodes, synthesis, DSP, AU/VST3 hosting, MIDI",
@@ -241,7 +203,13 @@
   "R603 Shape Resonator: ring the vibration modes of any geometry input (audio effect no",
   "R614 INFINITE_AUDIOUITEST screenshot fixture segfaults in AudioEffectNode::ParamIndex",
   "R616 Shape Resonator: accept point clouds and curves, not only meshes",
-  "R618 Launcher screen: animated Infinite logo, vertical credits (authors, contributors"
+  "R618 Launcher screen: animated Infinite logo, vertical credits (authors, contributors",
+  "R649 Fixed Predictive Modulator bindings showing amber like a regular modulator; they",
+  "R651 Lower audio CPU on heavy patches: faster Reverb, worst case 53-61% down to 40-45",
+  "R652 Fix stuck notes when rewiring note cables during playback, and a Drum Sequencer ",
+  "R653 Exported movies get exact frames from video clips (0 dropped frames, sub-millise",
+  "R654 Add `--frames-dir`, `--node` and `--codec prores4444` (macOS) for frame sequence",
+  "R655 Add full keyboard-only navigation of the canvas and node parameters"
  ],
  "first_commit": "2026-08-10"
 }

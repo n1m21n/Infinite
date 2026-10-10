@@ -1,5 +1,8 @@
 // Node help text tables, shortcuts and help windows (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/SectionCard.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/FormParts.h"
 
 namespace app
 {
@@ -81,6 +84,7 @@ namespace app
          { "Null Modulator", I18N_KEY("Pass-through modulation node that accepts an incoming modulator and forwards it to its output. Useful for monitoring, signal routing, or placeholders.") },
          { "Palette", I18N_KEY("Samples colours from a reference image, loaded here or patched in - a patched cable overrides the loaded file, but the file is kept so unplugging falls back to it. Drag its 'out' onto the square dot beside any colour swatch to bind it - each new cable takes the next swatch, and clicking a bound swatch steps it. Its image output is a gradient of the palette.") },
          { "Audio File", I18N_KEY("Loads an audio file for playback and Audio Analyze to read. Keeps analysing even while muted - the 'audible' checkbox only controls monitoring.") },
+         { "Hand Track", I18N_KEY("Tracks one hand from an image or camera wire and turns it into modulators: palm and fingertip position, pinch, open, roll and size. Needs the Tracking pack (Settings > Extensions).") },
          { "Image Analyze", I18N_KEY("Turns an image or video into control values and modulation channels. Supports UV point probes, ROI boxes, 22 math/color operations, custom algebraic formulas, and multiple modulation output taps.") },
           { "Audio Analyze", I18N_KEY("Extracts level, band and onset values from audio for modulation - patch any audio source into it (Audio In, Audio File, a Filter, a Mixer, an Oscillator) and every output can drive any slider in the graph. With nothing patched in it falls back to its own Start listening button, a live tap on the system's default input device. It passes its input straight through, so it can sit inline in a chain as well as hang off one as a tap. Outputs: level, low/mid/high, onset, and b1-b8, eight raw frequency bands running low to high.") },
          { "Plugin", I18N_KEY("Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged.") },
@@ -203,7 +207,7 @@ namespace app
          { "Render 3D", I18N_KEY("Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. An HDRI node patched into the env input replaces the procedural sky gradient for background, reflections and ambient light.") },
          { "Model 3D", I18N_KEY("Loads a 3D model file - obj, ply, stl, usd or usdz.") },
          { "Null 3D", I18N_KEY("A pass-through node for geometry: its output is exactly its input mesh, unchanged. Useful as a stable junction point to branch geometry to several destinations.") },
-         { "Group 3D", I18N_KEY("Carries up to eight geometry inputs through one pin into Render 3D (or into another Group 3D), so a scene is not limited to Render 3D's four geometry pins. Nothing is merged: each input keeps its own material, texture, mapping and transform. It only means something to Render 3D - use Join Geometry to combine meshes into one.") },
+         { "Group 3D", I18N_KEY("Carries up to eight geometry inputs through one pin into Render 3D (or into another Group 3D), so a scene is not limited to Render 3D's four geometry pins. Nothing is merged: each input keeps its own material, texture, mapping and transform. It only means something to Render 3D (or another Group 3D): anything else downstream, like Transform, sees no mesh and shows an empty preview. To move or edit several shapes as one, use Join Geometry instead.") },
          { "Switcher 3D", I18N_KEY("Cycles between up to four connected geometry inputs every N beats or seconds, forwarding whichever one is active. Can be pinned to one input with 'manual'. Unlike the 2D Switcher, there is no crossfade - it always hard-cuts, since interpolating between two arbitrary meshes' topology isn't generally well-defined.") },
 
          // ---------------- Join Geometry boolean modes (also spawnable directly) ----------------
@@ -301,6 +305,7 @@ namespace app
 #endif
          { "NDI In", I18N_KEY("Receives any NDI video source on the network as an image - pick it from the list, which rescans in the background. Video only, no audio. Needs the free NDI runtime from ndi.video. NDI(R) is a registered trademark of Vizrt NDI AB.") },
          { "FieldPixel", I18N_KEY("Runs a Field kernel once per output pixel, on the GPU - write your own image generator or effect in Field instead of GLSL. `state` declares persistent per-pixel memory that survives to the next frame (which is what makes reaction-diffusion and trail effects expressible here), `param` exposes a modulatable knob, and extra input/output image pins can be declared by the kernel. width/height set the output resolution; presets are complete starting kernels.") },
+         { "Sketch", I18N_KEY("Draws an image from a JavaScript sketch you write in the node - loops, arrays and recursion with a p5.js-style API (rect, circle, line, beginShape, push/pop, translate, rotate, text). param(\"name\", default, lo, hi) in the script becomes a knob you can modulate. A mistake shows its line number and the last working picture stays up. Drop an .svg on the canvas (or onto a Sketch) to animate it by id with svgSet, svgText, svgBox and svgDraw. No file or network access.") },
       };
       auto it = kText.find(typeName);
       return it != kText.end() ? it->second : nullptr;
@@ -505,20 +510,25 @@ namespace app
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
-      if (!ImGui::Begin("All Shortcuts", open))
+      FormParts::PushWindowPad();   // same 16 pt inset as Settings; cards reach 8 pt into it
+      const bool shortcutsVisible = ImGui::Begin("All Shortcuts", open, ImGuiWindowFlags_NoCollapse);
+      FormParts::PopWindowPad();
+      if (!shortcutsVisible)
       {
          ImGui::End();
          PopElevatedPanelStyle();
          return;
       }
 
+      SectionCard::BeginWindow();
+      FormParts::PushReferenceStyle();
       static char filterBuf[128] = "";
-      ImGui::SetNextItemWidth(250);
-      ImGui::InputTextWithHint("##filter", "Filter shortcuts...", filterBuf, sizeof(filterBuf));
+      FormParts::SearchInput("##filter", "Filter shortcuts...", filterBuf, sizeof(filterBuf), 250.0f);
       ImGui::SameLine();
-      if (filterBuf[0] != '\0' && ImGui::SmallButton(L("Clear")))
+      if (filterBuf[0] != '\0' && FormParts::Button(L("Clear")))
          filterBuf[0] = '\0';
 
+      ImGui::Dummy(ImVec2(0.0f, SectionCard::kPad));   // the first card reaches kPad above its cursor
       std::string filter = filterBuf;
       for (char& c : filter)
          c = (char)tolower((unsigned char)c);
@@ -566,10 +576,12 @@ namespace app
          { I18N_KEY("Canvas & View"), I18N_KEY("Rubber-band Select"), "Shift + Drag", I18N_KEY("Select multiple nodes in box") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Toggle Params"), "Shift+H", I18N_KEY("Show / hide parameter knobs & sliders") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Viewport Panel"), "Shift+V", I18N_KEY("Toggle viewport panel (or dock selected nodes)") },
+         { I18N_KEY("Edit & Canvas"), I18N_KEY("Edit History"), "Shift+U", I18N_KEY("Toggle the docked list of edits; click one to jump to it") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Modulation Matrix"), "Shift+M", I18N_KEY("Toggle docked modulation matrix") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Performance Matrix"), "Shift+P", I18N_KEY("Toggle docked performance matrix") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Arrangement Timeline"), "Shift+T", I18N_KEY("Toggle docked arrangement timeline") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Fit View to Content"), "F / Shift+Y", I18N_KEY("Frame the whole patch in the canvas view") },
+         { I18N_KEY("Canvas & View"), I18N_KEY("Find"), MODKEY "+F", I18N_KEY("Find a node by title, type, comment text or param name. Up / Down step, Enter jumps to it, Esc closes") },
          { I18N_KEY("Canvas & View"), I18N_KEY("Pan Canvas (keys)"), "W / A / S / D", I18N_KEY("Hold to pan the canvas up / left / down / right. Not while a hovered audio keyboard node is using the letters") },
 
          // Transport & Audio
@@ -622,14 +634,14 @@ namespace app
                inTable = false;
             }
             lastCat = s.category;
-            ImGui::SeparatorText(T(s.category));
+            SectionCard::Begin(T(s.category));
          }
 
          if (!inTable)
          {
             char tableId[64];
             snprintf(tableId, sizeof(tableId), "tbl_%s", s.category);
-            if (ImGui::BeginTable(tableId, 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+            if (ImGui::BeginTable(tableId, 3, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
             {
                ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, 150.0f);
                ImGui::TableSetupColumn(T("Shortcut"), ImGuiTableColumnFlags_WidthFixed, 180.0f);
@@ -650,8 +662,7 @@ namespace app
             // washes out against light mode's light row background - branch
             // it the same way every other themed accent-text spot in the
             // app does rather than leave it a fixed dark-mode-only colour.
-            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.05f, 0.35f, 0.68f, 1.0f)
-                                                                : ImVec4(0.45f, 0.82f, 1.0f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, app::AccentEmphasisSelected());
             ImGui::TextUnformatted(s.key);
             ImGui::PopStyleColor();
 
@@ -663,6 +674,9 @@ namespace app
       if (inTable)
          ImGui::EndTable();
 
+      SectionCard::EndWindow();
+      FormParts::PopReferenceStyle();
+      FormParts::WindowEdge();
       ImGui::End();
       PopElevatedPanelStyle();
    }
@@ -678,13 +692,19 @@ namespace app
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(720, 620), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
-      if (!ImGui::Begin("Infinite - help & module reference", open))
+      FormParts::PushWindowPad();   // same 16 pt inset as Settings
+      const bool helpVisible = ImGui::Begin("Infinite - help & module reference", open, ImGuiWindowFlags_NoCollapse);
+      FormParts::PopWindowPad();
+      if (!helpVisible)
       {
          ImGui::End();
          PopElevatedPanelStyle();
          return;
       }
 
+      SectionCard::BeginWindow();
+      FormParts::PushReferenceStyle(/*headerFill=*/false);   // each section is a card; the header is its title
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Getting started"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          ImGui::TextWrapped("%s", T("Infinite is a node graph. Every node renders an image and passes it down a cable to the next one. A typical patch reads left to right:"));
@@ -696,9 +716,10 @@ namespace app
          ImGui::TextWrapped("%s", T("Nothing enforces that order - any output can feed any input, including back into effects for feedback-style chains."));
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Controls"), ImGuiTreeNodeFlags_DefaultOpen))
       {
-         if (ImGui::BeginTable("controls", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+         if (ImGui::BeginTable("controls", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg))
          {
             ImGui::TableSetupColumn(T("Action"));
             ImGui::TableSetupColumn(T("How"));
@@ -735,6 +756,7 @@ namespace app
          }
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Transport and modulation"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          ImGui::TextWrapped("%s", T("The top bar holds a global clock: Play/Pause, Rewind and BPM. Everything time-based reads from it - modulators, video playback and animated shaders - so pausing freezes the whole patch and changing the tempo retimes all of it at once."));
@@ -744,6 +766,7 @@ namespace app
          ImGui::TextWrapped("%s", T("Every slider has a small dot to its left. Patch a modulator into that dot and the slider turns amber and becomes read-only - the value is now being driven. Delete the cable to take manual control back."));
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Arrangement timeline"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          ImGui::TextWrapped("%s", T("Shift+T opens a timeline docked beside the canvas. It does not replace the patch - it schedules it. A track ('lane') is video or audio, and every clip on it points at a node that already exists in your graph; the clip decides WHEN that node is heard or seen, not what it does."));
@@ -765,6 +788,7 @@ namespace app
          ImGui::TextWrapped("%s", T("Right-click a track or group header to render or export just that track or group; the full patch export is still in the top bar."));
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Using Feedback"), ImGuiTreeNodeFlags_DefaultOpen))
       {
          ImGui::TextWrapped("%s", T("A Feedback node outputs what its input produced on the PREVIOUS frame. That one-frame delay is the whole point: it lets you wire a cycle without the graph chasing its own tail forever."));
@@ -782,6 +806,7 @@ namespace app
          ImGui::TextWrapped("%s", T("If you just want trails, use the Trails node instead - it is that same loop wrapped into one node, with decay, drift, zoom and rotation built in. Reaction Diffusion is the other pre-wired feedback node: it needs no input at all and simulates a chemical system frame over frame."));
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Module reference")))
       {
          struct Entry { const char* name; const char* text; };
@@ -813,6 +838,7 @@ namespace app
 #endif
                { "Audio Texture", I18N_KEY("Turns live audio into an image - scrolling spectrogram, waveform or level field - so any image effect downstream becomes an audio visualiser.") },
                { "FieldPixel", I18N_KEY("An image generated by a Field kernel you write yourself: the per-pixel counterpart of Field Effect, compiled rather than interpreted.") },
+               { "Sketch", I18N_KEY("An image drawn by a JavaScript sketch you write: the loop-and-recursion counterpart of Field Pixel. Its param() calls become modulatable knobs, and it can load and animate an SVG.") },
             } },
             { "3D", {
                { "Render 3D", I18N_KEY("Rasterizes the geometry / camera / light / material graph into an image, with shadow mapping, ambient occlusion and HDR environment reflections (patch an HDRI node into its env input to replace the procedural sky). Antialiasing steps down automatically at large output sizes to stay inside GPU limits.") },
@@ -963,7 +989,7 @@ namespace app
 
          for (const Group& group : groups)
          {
-            ImGui::SeparatorText(group.category);
+            FormParts::Heading(group.category);
             for (const Entry& entry : group.entries)
             {
                ImGui::Bullet();
@@ -977,6 +1003,7 @@ namespace app
          }
       }
 
+      SectionCard::Begin();
       if (ImGui::CollapsingHeader(L("Tips")))
       {
          ImGui::Bullet(); ImGui::TextWrapped("%s", T("Put a Fit node before a Blend or Layer Stack when your sources are different sizes."));
@@ -992,6 +1019,9 @@ namespace app
 #endif
       }
 
+      SectionCard::EndWindow();
+      FormParts::PopReferenceStyle();
+      FormParts::WindowEdge();
       ImGui::End();
       PopElevatedPanelStyle();
    }

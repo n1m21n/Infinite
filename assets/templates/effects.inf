@@ -1,0 +1,50 @@
+infinite-patch 1
+# Effects: change a picture
+node 1 Source Noise
+  id noise
+  pos 0 156
+end
+node 2 Effects kaleidoscope
+  id kal
+  pos 920 318
+end
+node 3 Effects bloom
+  id glow
+  pos 1380 318
+end
+node 4 Compositing Color Ramp
+  id cr
+  pos 460 318
+end
+node 5 Utility Output
+  id out
+  pos 1840 156
+end
+node 6 Compositing Comment
+  pos 0 0
+  s text Effects take a picture in and give a changed one out. Chain as many as you like.
+  f width 340
+  f height 120
+end
+node 7 Compositing Comment
+  pos 460 156
+  s text Color Ramp paints the picture using a few colours. Click a colour stop to change it.
+  f width 300
+  f height 126
+end
+node 8 Compositing Comment
+  pos 920 156
+  s text Kaleidoscope mirrors the picture into segments. Try Segments and Rotation.
+  f width 300
+  f height 126
+end
+node 9 Compositing Comment
+  pos 1380 156
+  s text Bloom adds a soft glow. Effects chain left to right; try removing one to see what it did.
+  f width 300
+  f height 126
+end
+cable cr 0 noise
+cable kal 0 cr
+cable glow 0 kal
+cable out 0 glow

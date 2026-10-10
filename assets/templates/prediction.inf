@@ -1,0 +1,60 @@
+infinite-patch 1
+# Prediction: notes that keep going on their own
+node 1 Prediction Predictive Notes
+  id pred
+  pos 0 2434
+  i sourceMode 1
+end
+node 2 Synths Analog
+  id synth
+  pos 0 1024
+  f volume 0.5
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 860 878
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 520 2184
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1 0.45 0.3
+  f size 0.2
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Green nodes learn from what you play and carry on in your style.
+  f width 340
+  f height 120
+end
+node 8 Compositing Comment
+  pos 0 2184
+  s text Predictive Notes can play on its own (Movement mode, as here). Switch Source to Notes, wire a note chain in and press Learn, and it learns your pattern and keeps playing in your style. Stray sets how far it wanders.
+  f width 300
+  f height 214
+end
+node 9 Compositing Comment
+  pos 0 878
+  s text Plays what Prediction makes.
+  f width 300
+  f height 110
+end
+node 10 Compositing Comment
+  pos 0 0
+  s text A small picture that follows the sound, so you can see it as well as hear it.
+  f width 300
+  f height 126
+end
+note synth 0 pred
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.12 0.4
+mod pic sizeY ana 0 0 1 0.5 0.12 0.4

@@ -1,4 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/UiType.h"
+#include "app/ui/design/Glyphs.gen.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -23,12 +25,16 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    ImGui_ImplGlfw_SetPointScale(r.pointScale);
 
    ImGuiIO& io = ImGui::GetIO();
-   if (rendererReady)
-      ImGui_ImplOpenGL3_DestroyFontsTexture();
+   // ImGui 1.92: the backend owns the atlas texture and glyphs rasterize on demand at the size
+   // and framebuffer scale they are drawn at, so there is no bake size and no global font scale.
+   (void)rendererReady;
    io.Fonts->Clear();
-
-   const float bakedPx = UiScale::BakedFontPx(r.bakeScale);
+   ImGuiStyle& uiStyle = ImGui::GetStyle();
+   uiStyle.FontSizeBase = UiScale::kBaseFontSize;
+   uiStyle.FontScaleMain = 1.0f;
+   const float bakedPx = 0.0f; // 0 = style.FontSizeBase
    const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
+   SketchNode::SetFontPath(bundledInter);   // text() in Sketch
    std::string chosenFontPath;
    {
       const std::string wanted = CategoryColors::GetUiFont();
@@ -50,7 +56,7 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
    // not baked (thousands of glyphs, and no bundled face has them).
    static const ImWchar kUiGlyphRanges[] = {
       0x0020, 0x00FF, 0x0100, 0x024F, 0x0370, 0x03FF, 0x0400, 0x04FF,
-      0x1E00, 0x1EFF, 0x2000, 0x206F, 0x20A0, 0x20CF, 0
+      0x1E00, 0x1EFF, 0x2000, 0x206F, 0x2190, 0x21FF, 0x20A0, 0x20CF, 0
    };
    ImFont* uiFont = nullptr;
    const char* uiFontPath = nullptr;
@@ -73,68 +79,95 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
       fallbackCfg.MergeMode = true;
       io.Fonts->AddFontFromFileTTF(bundledInter.c_str(), bakedPx, &fallbackCfg, kUiGlyphRanges);
    }
-   // CJK: Inter has no Han/kana, so a subsetted Noto face is merged for exactly the glyphs the
-   // active language table needs. Every language also gets the picker's native names (日本語,
-   // 中文简体) so the Language list never shows '?'. Noto SC for zh and for names, JP for ja:
-   // the two draw the same Han code points with different shapes. Absent file => '?' only.
-   if (uiFont != nullptr)
-   {
-      const bool ja = I18n::CurrentLanguage() == "ja";
-      const bool cjk = I18n::CurrentLanguageNeedsCjk();
-      const std::string notoPath =
-         BundledResourcePath(ja ? "fonts/NotoSansJP-Subset.otf" : "fonts/NotoSansSC-Subset.otf");
-      if (!notoPath.empty())
-      {
-         static ImVector<ImWchar> notoRanges; // must outlive the atlas build
-         ImFontGlyphRangesBuilder builder;
-         const std::vector<uint32_t> glyphs = cjk ? I18n::GlyphsForCurrentLanguage() : I18n::NativeNameGlyphs();
-         for (uint32_t cp : glyphs)
-            if (cp >= 0x2E00 && cp <= 0xFFFF)
-               builder.AddChar(static_cast<ImWchar>(cp));
-         if (cjk)
-         {
-            for (uint32_t cp = 0x3000; cp <= 0x30FF; cp++) // CJK punctuation, hiragana, katakana
-               builder.AddChar(static_cast<ImWchar>(cp));
-            for (uint32_t cp = 0xFF00; cp <= 0xFFEF; cp++) // fullwidth forms
-               builder.AddChar(static_cast<ImWchar>(cp));
-         }
-         notoRanges.clear();
-         builder.BuildRanges(&notoRanges);
-         ImFontConfig cjkCfg;
-         cjkCfg.MergeMode = true;
-         io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg, notoRanges.Data);
-      }
-   }
-   // Only a real TTF is baked at bakedPx; ImGui's bitmap fallback is 13 px at 1x and must
-   // not be shrunk.
-   io.FontGlobalScale = uiFont != nullptr ? r.fontGlobalScale : 1.0f;
    if (uiFont == nullptr)
       io.Fonts->AddFontDefault();
-
-   // Merge a small slice of the Lucide icon font (external/icons/Lucide,
-   // ISC license) into the same atlas at PUA codepoints, so icon glyphs
-   // can be dropped into ordinary ImGui::Text/Button calls alongside UI
-   // text (see IconsLucide.h). MergeMode=true means it rides the same
-   // baseline/line-height as the font just loaded rather than becoming a
-   // separate selectable font - the standard ImGui icon-font idiom.
-   // Restricted to one explicit range (currently just the "search" glyph,
-   // U+E151) rather than Lucide's full 1000+ icon set - the atlas only
-   // pays texture memory for glyphs actually in use.
-   if (uiFont != nullptr)
+   // Every weight is its own ImFont, so each carries the same merged stack: CJK, Lucide, Infinite Glyphs.
+   auto mergeExtras = [&]()
    {
-      const std::string bundledLucide = BundledResourcePath("icons/lucide.ttf");
-      if (!bundledLucide.empty())
+      // CJK: Inter has no Han/kana, so a subsetted Noto face is merged for exactly the glyphs the
+      // active language table needs. Every language also gets the picker's native names (日本語,
+      // 中文简体) so the Language list never shows '?'. Noto SC for zh and for names, JP for ja:
+      // the two draw the same Han code points with different shapes. Absent file => '?' only.
+      if (true)
       {
-         static const ImWchar iconRanges[] = { 0xE151, 0xE151, 0 };
-         ImFontConfig iconCfg;
-         iconCfg.MergeMode = true;
-         iconCfg.PixelSnapH = true;
-         iconCfg.GlyphMinAdvanceX = bakedPx;
-         io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
+         const bool ja = I18n::CurrentLanguage() == "ja";
+         const std::string notoPath =
+            BundledResourcePath(ja ? "fonts/NotoSansJP-Subset.otf" : "fonts/NotoSansSC-Subset.otf");
+         if (!notoPath.empty())
+         {
+            // Dynamic atlas: only glyphs that are drawn are rasterized, so the whole subset face is merged.
+            ImFontConfig cjkCfg;
+            cjkCfg.MergeMode = true;
+            io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg);
+         }
+      }
+      // Merge a small slice of the Lucide icon font (external/icons/Lucide,
+      // ISC license) into the same atlas at PUA codepoints, so icon glyphs
+      // can be dropped into ordinary ImGui::Text/Button calls alongside UI
+      // text (see IconsLucide.h). MergeMode=true means it rides the same
+      // baseline/line-height as the font just loaded rather than becoming a
+      // separate selectable font - the standard ImGui icon-font idiom.
+      // Restricted to one explicit range (currently just the "search" glyph,
+      // U+E151) rather than Lucide's full 1000+ icon set - the atlas only
+      // pays texture memory for glyphs actually in use.
+      if (true)
+      {
+         const std::string bundledLucide = BundledResourcePath("icons/lucide.ttf");
+         if (!bundledLucide.empty())
+         {
+            static const ImWchar iconRanges[] = { 0xE151, 0xE151, 0 };
+            ImFontConfig iconCfg;
+            iconCfg.MergeMode = true;
+            iconCfg.PixelSnapH = true;
+            iconCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
+#ifndef NDEBUG
+            iconCfg.SizePixels = UiScale::kBaseFontSize; // Debug ImGui asserts a reference size beside GlyphMinAdvanceX
+#endif
+            io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
+         }
+      }
+      // Infinite Glyphs (art/icons/src -> tools/design/build_glyphs.py): our own icon set, merged the
+      // same way as Lucide above. Codepoints come from the generated Glyphs.gen.h.
+      if (true)
+      {
+         const std::string bundledGlyphs = BundledResourcePath("icons/infinite-glyphs.ttf");
+         if (!bundledGlyphs.empty())
+         {
+            static const ImWchar glyphRanges[] = { (ImWchar)IconsInfinite::kFirst, (ImWchar)IconsInfinite::kLast, 0 };
+            ImFontConfig glyphCfg;
+            glyphCfg.MergeMode = true;
+            glyphCfg.PixelSnapH = true;
+            glyphCfg.GlyphMinAdvanceX = UiScale::kBaseFontSize;
+#ifndef NDEBUG
+            glyphCfg.SizePixels = UiScale::kBaseFontSize; // Debug ImGui asserts a reference size beside GlyphMinAdvanceX
+#endif
+            io.Fonts->AddFontFromFileTTF(bundledGlyphs.c_str(), bakedPx, &glyphCfg, glyphRanges);
+         }
+      }
+   };
+   mergeExtras();
+   UiType::Reset();
+   UiType::Register(UiType::Weight::Regular, uiFont != nullptr ? uiFont : io.Fonts->Fonts[0]);
+   // Medium and SemiBold are Inter's own weights; a user-chosen face (Atkinson) has no weights to
+   // give, so it keeps one weight and the hierarchy comes from size alone.
+   const bool interIsPrimary = uiFont != nullptr && uiFontPath != nullptr && std::strcmp(uiFontPath, bundledInter.c_str()) == 0;
+   if (interIsPrimary)
+   {
+      const struct { UiType::Weight w; const char* file; } kWeights[] = {
+         { UiType::Weight::Medium, "fonts/Inter-Medium.ttf" },
+         { UiType::Weight::Semibold, "fonts/Inter-SemiBold.ttf" },
+      };
+      for (const auto& wf : kWeights)
+      {
+         const std::string path = BundledResourcePath(wf.file);
+         ImFont* f = path.empty() ? nullptr : io.Fonts->AddFontFromFileTTF(path.c_str(), bakedPx, nullptr, kUiGlyphRanges);
+         if (f != nullptr)
+         {
+            mergeExtras();
+            UiType::Register(wf.w, f);
+         }
       }
    }
-   if (rendererReady)
-      ImGui_ImplOpenGL3_CreateFontsTexture();
 }
 
 int InitApp(FrameCtx& fc, int argc, char** argv)
@@ -326,6 +359,76 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return 0;
    }
 
+   if (getenv("INFINITE_LIBREFRESHTEST") != nullptr)
+   {
+      // The Library panel's Refresh buttons call StartScan(folder) / StartScan() on the mode's scanner and the
+      // frame loop polls it; this drives the same calls headless for Samples, Media and Plugins.
+      namespace fs = std::filesystem;
+      const fs::path dir = fs::temp_directory_path() / "infinite_librefresh";
+      std::error_code ec;
+      fs::remove_all(dir, ec);
+      fs::create_directories(dir, ec);
+      const auto touch = [&](const char* name) { std::ofstream(dir / name) << "x"; };
+      const auto wait = [](auto& sc)
+      {
+         for (int i = 0; i < 1200; ++i)
+         {
+            sc.PollResults();
+            if (!sc.IsScanning())
+               return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+         }
+         return false;
+      };
+      const auto countIn = [&](SampleScanner& sc)
+      {
+         int n = 0;
+         for (const auto& e : sc.Index())
+            if (e.folderRoot == dir.string())
+               ++n;
+         return n;
+      };
+      const auto runMode = [&](const char* mode, SampleScanner& sc, const char* a, const char* b)
+      {
+         bool ok = true;
+         const auto check = [&](const char* what, bool c) { if (!c) { ok = false; printf("  [FAIL] %s: %s\n", mode, what); } };
+         touch(a);
+         sc.AddFolder(dir.string());
+         sc.StartScan(dir.string());
+         check("per-folder scan finishes", wait(sc));
+         check("per-folder scan finds the file", countIn(sc) == 1);
+         touch(b);
+         sc.StartScan(dir.string());
+         check("per-folder refresh finishes", wait(sc));
+         check("per-folder refresh picks up the new file", countIn(sc) == 2);
+         fs::remove(dir / a, ec);
+         const uint64_t v = sc.IndexVersion();
+         sc.StartScan();
+         check("refresh all finishes", wait(sc));
+         check("refresh all drops the deleted file", countIn(sc) == 1);
+         check("index version moved", sc.IndexVersion() != v);
+         sc.RemoveFolder(dir.string());
+         check("removing the folder drops its entries", countIn(sc) == 0);
+         printf("LIBREFRESH %s %s\n", mode, ok ? "OK" : "FAIL");
+         fs::remove(dir / b, ec);
+         return ok;
+      };
+      bool all = true;
+      all &= runMode("samples", gSampleScanner, "a.wav", "b.wav");
+      all &= runMode("media", gMediaScanner, "a.png", "b.png");
+      {
+         const uint64_t v = gPluginScanner.IndexVersion();
+         gPluginScanner.StartScan(dir.string());
+         const bool done = wait(gPluginScanner);
+         const bool ok = done && gPluginScanner.IndexVersion() != v;
+         printf("LIBREFRESH plugins %s\n", ok ? "OK" : "FAIL");
+         all &= ok;
+      }
+      fs::remove_all(dir, ec);
+      printf("LIBREFRESH TEST %s\n", all ? "OK" : "FAIL");
+      return 0;
+   }
+
    if (getenv("INFINITE_BROWSERSORTTEST") != nullptr)
       return RunBrowserSortTest() ? 0 : 1;
 
@@ -487,6 +590,10 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    if (getenv("INFINITE_NDITEST") != nullptr)
       return RunNdiTest();
+   if (getenv("INFINITE_EXTENSIONSTEST") != nullptr)
+      return RunExtensionsTest();
+   if (getenv("INFINITE_TRACKINGTEST") != nullptr)
+      return RunTrackingTest();
    if (getenv("INFINITE_MIDICC14TEST") != nullptr)
       return RunMidiCC14Test();
    if (getenv("INFINITE_CVRECTEST") != nullptr)
@@ -696,7 +803,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
    {
-      if (HeadlessJobActive())
+   if (HeadlessJobActive())
       {
          Headless::Status st;
          st.mode = "startup";
@@ -889,6 +996,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // Interface language: an explicit choice wins, otherwise the first OS preference that is one of
    // our six, otherwise English. The first ApplyUiScale() below applies it before the font bake.
    I18n::SetResourceDir(BundledResourcePath("lang"));
+   // Review hook: INFINITE_UISCALE=1.5 forces the UI scale for this run only (nothing is saved).
+   if (const char* us = getenv("INFINITE_UISCALE"); us != nullptr && atof(us) > 0.0)
+      CategoryColors::SetUiScale((float)atof(us), false);
    {
       std::string lang = CategoryColors::GetLanguage();
       if (!I18n::IsSupported(lang))
@@ -918,6 +1028,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    ImGuiStyle& style = ImGui::GetStyle();
    style.FrameRounding = 3.0f;
+   style.SelectableRounding = style.FrameRounding; // was a vendored ImGui patch before 1.92
    style.GrabRounding = 3.0f;
    style.WindowRounding = 4.0f;
    style.ItemSpacing = ImVec2(6, 5);
@@ -927,6 +1038,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // knob row. Left unset before this, which meant they inherited 0.
    style.PopupRounding = 12.0f;
    style.ScrollbarRounding = 10.0f;
+   // 12 pt track with a 3 pt inset: a 6 pt pill with an even gutter on both sides.
+   style.ScrollbarSize = 12.0f;
+   style.ScrollbarPadding = 3.0f;
    // No ScaleAllSizes: style metrics are in points, and the point scale (ApplyUiScale above)
    // grows them together with every other size on screen.
 
@@ -952,7 +1066,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // One GitHub Releases request, once per launch - see src/core/UpdateCheck.h.
    // No-ops under the self-test env vars, so headless/CI runs never touch
    // the network.
-   UpdateCheck::Start();
+   if (UpdateCheck::AutoCheckEnabled())
+      UpdateCheck::Start();
 
    static std::string iniPath = settingsDir.empty() ? std::string("imgui.ini")
                                                     : settingsDir + "/imgui.ini";
@@ -989,6 +1104,13 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    {
       graphPath = settingsDir.empty() ? std::string("InfiniteEqDragTest.json")
                                        : settingsDir + "/InfiniteEqDragTest.json";
+      remove(graphPath.c_str());
+   }
+   else if (getenv("INFINITE_EXITAFTER") != nullptr && getenv("IMAGERESYNTH_SCREENSHOT") == nullptr)
+   {
+      // Any other headless fixture: start from the default view and never leave a pan/zoom behind for the next one
+      // (FINDTEST and the drag tests move the camera; later fixtures read FrameParams, which needs their nodes on screen).
+      graphPath = settingsDir.empty() ? std::string("InfiniteSelfTest.json") : settingsDir + "/InfiniteSelfTest.json";
       remove(graphPath.c_str());
    }
    else if (!graphPath.empty())
@@ -1077,7 +1199,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // crash marker/autosave left by the real app - see UsingAutosaveTestPaths
    // for the two tests that deliberately exercise this function directly
    // against their own redirected files instead.
-   if (getenv("INFINITE_EXITAFTER") == nullptr && !HeadlessJobActive())
+   if (!IsHeadlessProcess())   // also screenshot runs (IMAGERESYNTH_SCREENSHOT), which have no EXITAFTER
       CheckAutosaveRecovery();
 
    // Embedded local control server (see docs/plans - RemoteControl) - lets an
@@ -1143,6 +1265,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_MODTEST") != nullptr ||
          getenv("INFINITE_RECTEARDOWNTEST") != nullptr ||
          getenv("INFINITE_SIZETEST") != nullptr || getenv("INFINITE_INPUTTEST") != nullptr ||
+         getenv("INFINITE_NODEDRAGWIDTHTEST") != nullptr ||
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr || getenv("INFINITE_OSCTEST") != nullptr ||
          getenv("INFINITE_MODBOUNDSTEST") != nullptr || getenv("INFINITE_MODMATRIXTEST") != nullptr ||
@@ -1158,6 +1281,49 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          getenv("INFINITE_KBDISCRETETEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
+      if (const char* ng = getenv("INFINITE_NODEGALLERY"); ng != nullptr)
+      {
+         // Review fixture for any family: INFINITE_NODEGALLERY="Category|Type A,Type B,..." lays the nodes out on a
+         // grid (INFINITE_GALLERYGRID="cols,dx,dy", default 5,480,620) and frames them at frame 3.
+         std::string spec = ng;
+         const size_t bar = spec.find('|');
+         const std::string cat = bar == std::string::npos ? "Utility" : spec.substr(0, bar);
+         std::string rest = bar == std::string::npos ? spec : spec.substr(bar + 1);
+         int cols = 5;
+         float dx = 480.0f, dy = 620.0f;
+         if (const char* g = getenv("INFINITE_GALLERYGRID"))
+            sscanf(g, "%d,%f,%f", &cols, &dx, &dy);
+         int i = 0;
+         size_t pos = 0;
+         while (pos <= rest.size())
+         {
+            size_t comma = rest.find(',', pos);
+            if (comma == std::string::npos)
+               comma = rest.size();
+            const std::string name = rest.substr(pos, comma - pos);
+            if (!name.empty())
+            {
+               GraphNode* spawned = SpawnNode(name.c_str(), cat.c_str(), (float)(i % cols) * dx, (float)(i / cols) * dy);
+               if (spawned != nullptr && getenv("INFINITE_GALLERYPARAMS") != nullptr)
+                  spawned->showParams = true;   // review shots of the "show params" panel
+               i++;
+            }
+            pos = comma + 1;
+         }
+      }
+      if (const char* gallery = getenv("INFINITE_FXGALLERY"); gallery != nullptr)
+      {
+         // Review fixture: every AudioEffects node on a non-overlapping grid, 13 per page
+         // (INFINITE_FXGALLERY=1 or 2), framed at frame 3 so a 3200x2000 shot reads at ~1:1.
+         static const char* kFx[] = { "Audio Filter", "EQ", "Dynamics", "Limiter", "Delay", "Reverb", "Drive",
+                                      "Stereo", "Pitch Shifter", "Chorus", "Flanger", "Phaser", "Bitcrush",
+                                      "Transient Shaper", "Stutter", "Ring Mod", "Frequency Shifter", "Tremolo",
+                                      "Formant Filter", "Wavetable Shaper", "Resonator Bank", "Cycle Shaper",
+                                      "Spec Blur", "Key-Snap", "Spectrum Slide", "Shape Resonator" };
+         const int page = atoi(gallery) == 2 ? 1 : 0;
+         for (int i = 0; i < 13; i++)
+            SpawnNode(kFx[page * 13 + i], "AudioEffects", (float)(i % 5) * 480.0f, (float)(i / 5) * 620.0f);
+      }
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
       {
          // Visual fixture for the audio node UI (audio-node-ui-system.md
@@ -3481,6 +3647,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          sBenchB6Variant = "n=" + std::to_string(nodeCount) + ",mode=" + sBenchB6Mode;
          if (sBenchB6Collapsed)
             sBenchB6Variant += ",collapsed=1";
+         if (const char* z = getenv("INFINITE_BENCH_B6ZOOM"))
+            sBenchB6Variant += std::string(",zoom=") + z;
          if (!sBenchB6Vsync)
             sBenchB6Variant += ",vsync=0";
          if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
@@ -3679,6 +3847,119 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    char recordPath[512] = "";
    snprintf(recordPath, sizeof(recordPath), "%s/infinite_output.mp4", desktopDir.c_str());
+
+   // Design previews: open docked panels for a screenshot (INFINITE_OPENPANELS=arrange,modmatrix,perf,viewport,library).
+   if (const char* op = getenv("INFINITE_OPENPANELS"))
+   {
+      const std::string o(op);
+      gArrangePanelOpen = o.find("arrange") != std::string::npos;
+      gModMatrixOpen = o.find("modmatrix") != std::string::npos;
+      gPerfPanelOpen = o.find("perf") != std::string::npos;
+      gViewportPanelOpen = o.find("viewport") != std::string::npos;
+      gNodePanelOpen = o.find("library") != std::string::npos;
+      gHistoryOpen = o.find("history") != std::string::npos;
+      // "historydemo": a few named edits so the History panel has rows for a review shot.
+      if (o.find("historydemo") != std::string::npos)
+         for (const char* l : {"Add Shape", "Move node", "Connect cable", "amount 0.20 \xE2\x86\x92 0.55", "Bypass"})
+            PushUndoCheckpoint(l);
+      // "dock=N" (0 bottom, 1 right, 2 left, 3 top): put every docked panel on that side for review shots.
+      if (const size_t dk = o.find("dock="); dk != std::string::npos)
+      {
+         const int d = atoi(o.c_str() + dk + 5);
+         gModMatrixDock = gPerfPanelDock = gViewportPanelDock = d;
+      }
+      // "perfdemo": one of each Performance control, for design review screenshots.
+      // "perfedit" is the same in Edit Mode with the first two cards selected and the third in MIDI learn.
+      if (o.find("perfdemo") != std::string::npos || o.find("perfedit") != std::string::npos)
+      {
+         gPerfPanelOpen = true;
+         gPerfEditMode = o.find("perfedit") != std::string::npos;
+         gPerfPanelHeight = 620.0f;
+         for (int k = 0; k < 10; ++k)
+            AddPerfElementToCurrentPage(k);
+         if (gPerfEditMode)
+         {
+            gPerfSelection.insert(0);
+            gPerfSelection.insert(1);
+            gPerfMidiLearnIdx = 2;
+         }
+      }
+      // "settingswin" / "shortcutswin" / "helpwin": that floating window open (design review shots).
+      if (o.find("settingswin") != std::string::npos) gSettingsOpen = true;
+      if (o.find("shortcutswin") != std::string::npos) gShortcutsOpen = true;
+      if (o.find("helpwin") != std::string::npos) gHelpOpen = true;
+      // "dialogdemo": the Unsaved Changes dialog open (design review shots).
+      if (o.find("dialogdemo") != std::string::npos)
+         gShowUnsavedChangesModal = true;
+      // "arrangedemo": video and audio tracks with clips, one selected, Clip Settings open (design review shots).
+      if (o.find("arrangedemo") != std::string::npos)
+      {
+         gArrangePanelOpen = true;
+         gArrangePanelHeight = 900.0f;
+         size_t firstAudio = 0;
+         while (firstAudio < gArrange.lanes.size() && gArrange.lanes[firstAudio].type != Arrange::kLaneAudio) ++firstAudio;
+         if (firstAudio + 1 < gArrange.lanes.size()) gArrange.lanes[firstAudio + 1].solo = true;
+         // Active clips need a source node (a clip without one draws as the hatched offline placeholder).
+         GraphNode* demoSrc = SpawnNode("Wavetable", "Synths", 0.0f, 0.0f);
+         auto addClip = [demoSrc](size_t lane, int bar, int bars, const char* name)
+         {
+            Arrange::Clip c;
+            c.start = (Arrange::Tick)bar * Arrange::kTicksPerBar;
+            c.length = (Arrange::Tick)bars * Arrange::kTicksPerBar;
+            c.name = name;
+            // Active clips need a source: cycle through the loaded patch's nodes (none loaded = offline hatch).
+            if (demoSrc != nullptr) c.srcUid = demoSrc->uid;
+            uint64_t id = 0;
+            Arrange::PlaceOverwrite(gArrange, gArrange.lanes[lane].id, c, &id);
+            return id;
+         };
+         const uint64_t intro = addClip(0, 0, 2, "Intro");
+         const uint64_t sel = addClip(0, 3, 3, "Clip B");
+         const uint64_t overlay = addClip(1, 1, 4, "Overlay");
+         const uint64_t drums = addClip(firstAudio, 0, 3, "Drums");
+         const uint64_t bass = addClip(firstAudio + 1, 2, 4, "Bass");
+         // Variants: arrgroup (clip group + track group), arrtrack / arrtgroup (track / track-group inspector),
+         // arrmulti (several clips selected), arrzoom (zoomed in so clips are wide), arrwide (wider panel).
+         uint64_t tgroup = 0;
+         if (o.find("arrgroup") != std::string::npos || o.find("arrtgroup") != std::string::npos)
+         {
+            Arrange::Group(gArrange, {intro, overlay});
+            Arrange::Group(gArrange, {drums, bass});
+            tgroup = Arrange::GroupSelectedLanes(gArrange, {gArrange.lanes[firstAudio].id, gArrange.lanes[firstAudio + 1].id});
+         }
+         if (o.find("arrzoom") != std::string::npos) gArrangePixelsPerBeat *= 2.5f;
+         if (o.find("arrwide") != std::string::npos) gArrangePanelWidth = 900.0f;
+         if (o.find("arrmulti") != std::string::npos)
+         {
+            gArrangeSel.insert(intro); gArrangeSel.insert(overlay); gArrangeSel.insert(sel);
+            gArrangeSelAnchor = sel;
+         }
+         else if (o.find("arrtgroup") != std::string::npos && tgroup != 0)
+            gArrangeRowSel.insert(tgroup);
+         else if (o.find("arrtrack") != std::string::npos)
+            gArrangeRowSel.insert(gArrange.lanes[firstAudio].id);
+         else
+         {
+            gArrangeSel.insert(sel);
+            gArrangeSelAnchor = sel;
+         }
+         gArrangeClipSettingsPanelOpen = true;
+      }
+      // "library:field|samples|media|plugins" picks the mode shown (default Modules).
+      if (o.find("field") != std::string::npos) gSearchPanelMode = 4;
+      else if (o.find("samples") != std::string::npos) gSearchPanelMode = 1;
+      else if (o.find("media") != std::string::npos) gSearchPanelMode = 2;
+      else if (o.find("plugins") != std::string::npos) gSearchPanelMode = 3;
+      // ",light" / ",dark" picks the first theme preset of that brightness for the screenshot (not saved).
+      const bool wantLight = o.find("light") != std::string::npos;
+      if (wantLight || o.find("dark") != std::string::npos)
+         for (int i = 0, n = static_cast<int>(CategoryColors::PresetNames().size()); i < n; ++i)
+         {
+            CategoryColors::SetPresetTransient(i);
+            if (CategoryColors::IsThemeLight() == wantLight)
+               break;
+         }
+   }
 
    if (HeadlessJobActive())
    {

@@ -1,4 +1,11 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/StateRing.h"
+#include "imgui_internal.h"
+#include "app/ui/design/components/LibraryParts.h"
+#include "app/ui/design/TokenColors.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -68,8 +75,8 @@ void DrawPopupsB(FrameCtx& fc)
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-      ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_PopupBg, tok::V4(tok::palf::v_0_0_0_0));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
 
       if (ImGui::BeginPopup("##commentedit", ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
                                              ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar))
@@ -92,18 +99,18 @@ void DrawPopupsB(FrameCtx& fc)
 
             const float fontScale = CommentFontScale(c->fontSize);
             ImGui::PushStyleColor(ImGuiCol_Text, textCol);
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, isLight ? ImVec4(0.0f, 0.0f, 0.0f, 0.15f) : ImVec4(1.0f, 1.0f, 1.0f, 0.18f));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, isLight ? ImVec4(0.0f, 0.0f, 0.0f, 0.30f) : ImVec4(1.0f, 1.0f, 1.0f, 0.35f));
-            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, isLight ? ImVec4(0.0f, 0.0f, 0.0f, 0.45f) : ImVec4(1.0f, 1.0f, 1.0f, 0.50f));
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_0_0_0_0));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, tok::V4(tok::palf::v_0_0_0_0));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, isLight ? tok::V4(tok::palf::v_0_0_0_150) : tok::V4(tok::palf::v_1000_1000_1000_180));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, isLight ? tok::V4(tok::palf::v_0_0_0_300) : tok::V4(tok::palf::v_1000_1000_1000_350));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, isLight ? tok::V4(tok::palf::v_0_0_0_450) : tok::V4(tok::palf::v_1000_1000_1000_500));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * commentZoom, 8.0f * commentZoom));
             ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f * commentZoom);
             ImGui::SetWindowFontScale(commentZoom * fontScale);
 
             // Filling the whole popup cleanly at 1:1 scale with the canvas card
-            ImGui::InputTextMultiline("##commenttext", &c->text, ImVec2(gCommentEditRect.z, gCommentEditRect.w));
+            FieldWell::InputTextMultiline("##commenttext", &c->text, ImVec2(gCommentEditRect.z, gCommentEditRect.w));
 
             ImGui::SetWindowFontScale(1.0f);
             ImGui::PopStyleVar(3);
@@ -155,7 +162,7 @@ void DrawPopupsB(FrameCtx& fc)
          }
       }
 
-      if (ImGui::BeginPopup("##colorpick"))
+      if (MenuParts::BeginPopup("##colorpick"))
       {
          if (gColor.target != nullptr)
          {
@@ -174,7 +181,7 @@ void DrawPopupsB(FrameCtx& fc)
          {
             ImGui::CloseCurrentPopup();
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(320, 440));
@@ -184,7 +191,7 @@ void DrawPopupsB(FrameCtx& fc)
                                       gGraphScreenTL.y + gGraphScreenSize.y * 0.5f);
          ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       }
-      if (ImGui::BeginPopup("search"))
+      if (MenuParts::BeginPopup("search"))
       {
          searchPopupCentered = false;
          searchPopupOpen = true;
@@ -196,26 +203,19 @@ void DrawPopupsB(FrameCtx& fc)
             searchJustOpened = false;
             ImGui::CloseCurrentPopup();
          }
-         // Search glyph from the merged Lucide icon font (see main()'s font
-         // setup / IconsLucide.h) ahead of the input box - the one obviously
-         // net-positive icon spot from the Stage 5 iconography audit: this
-         // is the app's most-used search field (Shift+N node picker), it was
-         // plain text with no visual affordance before, and a leading icon
-         // is exactly the ImGui idiom for it. SetKeyboardFocusHere() still
-         // has to land on the InputText itself, so it moves down next to it
-         // rather than firing on the icon Text widget in between.
-         const float searchIconW = ImGui::CalcTextSize(IconsLucide::Search).x;
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextUnformatted(IconsLucide::Search);
-         ImGui::SameLine();
+         // The accent ring ImGui draws on the nav-focused row (the first item of each opened category)
+         // is dropped here; the row keeps its quiet header wash, which only shows while the keyboard drives.
+         ImGui::PushStyleColor(ImGuiCol_NavCursor, ImVec4(0, 0, 0, 0));
+         // Same search field as the Library panel (rounded well, our own magnifier glyph, clear button).
+         // SetKeyboardFocusHere() targets the next item, which is its InputText.
          if (searchJustOpened)
          {
             ImGui::SetKeyboardFocusHere();
+            ImGui::GetCurrentContext()->NavCursorVisible = false;  // no focus ring until the keyboard navigates
             searchJustOpened = false;
          }
-         ImGui::SetNextItemWidth(-FLT_MIN);
-         ImGui::InputTextWithHint("##q", T("search nodes..."), searchBuf, sizeof(searchBuf));
-         ImGui::Separator();
+         LibraryParts::SearchField("nodepicker", T("search nodes..."), searchBuf, sizeof(searchBuf));
+         MenuParts::Separator();
 
          std::string q(searchBuf);
          std::transform(q.begin(), q.end(), q.begin(), ::tolower);
@@ -231,19 +231,19 @@ void DrawPopupsB(FrameCtx& fc)
             // rather than making the user scroll every category to find one.
             if (!gLinkDragSuggestions.empty())
             {
-               ImGui::SeparatorText(T("Suggested"));
+               ImGui::TextDisabled("%s", T("Suggested"));
                for (const auto& t : gLinkDragSuggestions)
                {
                   ++shown;
                   const std::string title = DisplayName(t.first);
                   const std::string category = DisplayName(t.second);
-                  if (ImGui::MenuItem(title.c_str(), category.c_str()))
+                  if (MenuParts::Item(title.c_str(), category.c_str()))
                   {
                      spawnName = t.first;
                      spawnCategory = t.second;
                   }
                }
-               ImGui::Separator();
+               MenuParts::Separator();
             }
 
             // no query yet: browse by category submenu
@@ -255,14 +255,14 @@ void DrawPopupsB(FrameCtx& fc)
             for (const std::string& category : cats)
             {
                ImGui::SetNextWindowSizeConstraints(ImVec2(180, 0), ImVec2(320, 440));
-               if (ImGui::BeginMenu(DisplayName(category).c_str()))
+               if (MenuParts::SubMenu(DisplayName(category).c_str()))
                {
                   for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                   {
                      if (!IsUserSpawnable(name))
                         continue;
                      ++shown;
-                     if (ImGui::MenuItem(DisplayName(name).c_str()))
+                     if (MenuParts::Item(DisplayName(name).c_str()))
                      {
                         spawnName = name;
                         spawnCategory = category;
@@ -284,7 +284,7 @@ void DrawPopupsB(FrameCtx& fc)
                ++shown;
                const std::string title = DisplayName(t.first);
                const std::string category = DisplayName(t.second);
-               bool activate = ImGui::MenuItem(title.c_str(), category.c_str());
+               bool activate = MenuParts::Item(title.c_str(), category.c_str());
                if (shown == 1 && pickFirst)
                   activate = true;
                if (activate)
@@ -350,7 +350,8 @@ void DrawPopupsB(FrameCtx& fc)
             gLinkDragSuggestions.clear();
             ImGui::CloseCurrentPopup();
          }
-         ImGui::EndPopup();
+         ImGui::PopStyleColor();
+         MenuParts::EndPopup();
       }
       else
       {
@@ -373,34 +374,28 @@ void DrawPopupsB(FrameCtx& fc)
          dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(opt.c_str()).x);
       for (const std::string& cat : gDropdown.categories)
          dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(cat.c_str()).x);
-      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + ImGui::GetStyle().WindowPadding.x * 2.0f
+      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + (MenuParts::kInset + MenuParts::kTextInset) * 2.0f
                                                  + dropdownTextPadX * 2.0f
                                                  + ImGui::GetStyle().ScrollbarSize,
-                                              120.0f, 400.0f);
-      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(520, 480));
-      if (ImGui::BeginPopup("##dropdown"))
+                                              160.0f, 280.0f);
+      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(280.0f, ImMin(480.0f, ImGui::GetMainViewport()->Size.y - 40.0f)));
+      const bool ddOpen = MenuParts::BeginPopup("##dropdown");
+      if (ddOpen)
       {
          const bool showSearch = gDropdown.focusSearch || gDropdown.options.size() >= kDropdownAutoSearchMin;
          if (showSearch)
          {
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 3.0f));
             if (ImGui::IsWindowAppearing())
+            {
                ImGui::SetKeyboardFocusHere();
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::InputTextWithHint("##ddsearch", "Search...", gDropdown.filterBuf, sizeof(gDropdown.filterBuf));
-            ImGui::PopStyleVar();
-            ImGui::Separator();
+               ImGui::GetCurrentContext()->NavCursorVisible = false; // no focus ring until the keyboard navigates
+            }
+            LibraryParts::SearchField("ddsearch", T("search..."), gDropdown.filterBuf, sizeof(gDropdown.filterBuf));
+            MenuParts::Separator();
          }
 
          const std::string q = showSearch ? FoldForSearch(gDropdown.filterBuf) : std::string();
 
-         // The pill still spans the full row (NoPadWithHalfSpacing below
-         // keeps the gap between rows real, and item spacing is tightened
-         // slightly so that gap isn't oversized), but the label is drawn
-         // with its own left inset instead of starting flush with the
-         // pill's edge - otherwise the text reads as glued to the window
-         // border with no breathing room.
-         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, ImMax(2.0f, ImGui::GetStyle().ItemSpacing.y - 2.0f)));
          std::string lastCategory;
          for (int i = 0; i < (int)gDropdown.options.size(); i++)
          {
@@ -419,30 +414,14 @@ void DrawPopupsB(FrameCtx& fc)
                if (gDropdown.categories[i] != lastCategory)
                {
                   if (i > 0)
-                     ImGui::Separator();
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
-                  ImGui::TextUnformatted(gDropdown.categories[i].c_str());
-                  ImGui::PopStyleColor();
+                     MenuParts::Separator();
+                  ImGui::TextDisabled("%s", gDropdown.categories[i].c_str());
                   lastCategory = gDropdown.categories[i];
                }
             }
-            bool selected = (i == gDropdown.current);
+            const bool selected = (i == gDropdown.current);
             ImGui::PushID(i);
-            const ImVec2 rowMin = ImGui::GetCursorScreenPos();
-            const float rowWidth = ImGui::GetContentRegionAvail().x;
-            // NoPadWithHalfSpacing: Selectable pads its hit/fill rect into
-            // half of ItemSpacing on each side by default so a stack of rows
-            // reads as one continuous menu - which is exactly what erased
-            // the gap between the selected row's pill and a hovered
-            // neighbour's pill (e.g. "oct +0" selected, "oct +1" hovered).
-            // Opting out restores a real gap between rows, so the two
-            // highlight states stay visually distinct.
-            const bool clicked = ImGui::Selectable("##ddrow", selected,
-                                                    ImGuiSelectableFlags_NoPadWithHalfSpacing, ImVec2(rowWidth, 0.0f));
-            const float rowH = ImGui::GetItemRectSize().y;
-            ImGui::GetWindowDrawList()->AddText(
-               ImVec2(rowMin.x + dropdownTextPadX, rowMin.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f),
-               ImGui::GetColorU32(ImGuiCol_Text), gDropdown.options[i].c_str());
+            const bool clicked = MenuParts::Choice(gDropdown.options[i].c_str(), selected);
             ImGui::PopID();
             if (clicked)
             {
@@ -453,8 +432,7 @@ void DrawPopupsB(FrameCtx& fc)
                ImGui::SetScrollHereY(0.5f);
          }
 
-         ImGui::PopStyleVar();
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Field build step 17: .infdev device Save name-prompt - same
@@ -468,13 +446,13 @@ void DrawPopupsB(FrameCtx& fc)
       }
       if (ImGui::BeginPopup("##fielddevicesave"))
       {
-         ImGui::TextUnformatted(T("Save device as:"));
+         ImGui::TextDisabled("%s", T("Save device as:"));
          ImGui::SetNextItemWidth(220.0f);
-         bool enterPressed = ImGui::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
-                                              sizeof(gFieldDeviceSave.nameBuf),
-                                              ImGuiInputTextFlags_EnterReturnsTrue);
-         ImGui::SameLine();
-         bool doSave = enterPressed || ImGui::Button(L("Save##fielddevicesaveconfirm"));
+         bool enterPressed = FieldWell::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
+                                                  sizeof(gFieldDeviceSave.nameBuf),
+                                                  ImGuiInputTextFlags_EnterReturnsTrue);
+         ImGui::SameLine(0.0f, tok::space_2);
+         bool doSave = enterPressed || ChipButton::Draw(L("Save##fielddevicesaveconfirm"), true, ImGui::GetFrameHeight());
          if (doSave && gFieldDeviceSave.nameBuf[0] != '\0')
          {
             Field::DeviceFile device;
@@ -509,7 +487,7 @@ void DrawPopupsB(FrameCtx& fc)
          ImGui::SetNextWindowPos(popupPos, ImGuiCond_Appearing);
       }
       ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(360, 480));
-      if (ImGui::BeginPopup("##audiodroppicker"))
+      if (MenuParts::BeginPopup("##audiodroppicker"))
       {
          if (gAudioDropPicker.paths.empty())
          {
@@ -529,7 +507,7 @@ void DrawPopupsB(FrameCtx& fc)
             {
                ImGui::TextDisabled(T("Load %d samples into:"), (int)gAudioDropPicker.paths.size());
             }
-            ImGui::Separator();
+            MenuParts::Separator();
 
             struct PickerOption
             {
@@ -551,7 +529,7 @@ void DrawPopupsB(FrameCtx& fc)
 
             for (const auto& opt : kOptions)
             {
-               if (ImGui::MenuItem(opt.name, opt.category))
+               if (MenuParts::Item(opt.name, opt.category))
                {
                   if (std::string(opt.name) == "MPC")
                   {
@@ -627,12 +605,105 @@ void DrawPopupsB(FrameCtx& fc)
                }
             }
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
       else
       {
          if (!gAudioDropPicker.paths.empty() && !gAudioDropPicker.justOpened)
             gAudioDropPicker.paths.clear();
+      }
+
+      // ---- trash button on a hovered cable ----
+      // Sits at the middle of the cable while it is hovered and stays while the cursor is on the cable or the
+      // button; a click disconnects that one cable (same path as selecting it and pressing Delete).
+      {
+         static int sTrashLink = 0;
+         static double sTrashSeen = -1.0;
+         static int sTrashGone = 0; // a cable just deleted: ignore it until the cursor leaves it
+         const double now = ImGui::GetTime();
+         const ed::LinkId hovered = ed::GetHoveredLink();
+         if (!hovered || (int)hovered.Get() != sTrashGone)
+            sTrashGone = 0;
+         if (hovered && (int)hovered.Get() != sTrashGone && FindLink((int)hovered.Get()) != nullptr)
+         {
+            sTrashLink = (int)hovered.Get();
+            sTrashSeen = now;
+         }
+         ImVec2 canvasMid;
+         if (sTrashLink != 0 && FindLink(sTrashLink) != nullptr && now - sTrashSeen < 0.12 && ed::GetLinkMidpoint(ed::LinkId(sTrashLink), &canvasMid))
+         {
+            ImVec2 c = ed::CanvasToScreen(canvasMid);
+            // Drawn on the foreground list, so it must be hidden by hand wherever something else is in front of the
+            // cable's midpoint: a floating window / popup over it, or a node that covers it.
+            // Docked panels (viewport, timeline) sit outside the graph rect: a midpoint under one is hidden too.
+            bool covered = c.x < gGraphScreenTL.x || c.y < gGraphScreenTL.y || c.x > gGraphScreenTL.x + gGraphScreenSize.x ||
+                           c.y > gGraphScreenTL.y + gGraphScreenSize.y;
+            {
+               ImGuiContext& g = *ImGui::GetCurrentContext();
+               const ImGuiWindow* canvasRoot = ImGui::GetCurrentWindow()->RootWindow;
+               bool above = false;
+               for (ImGuiWindow* w : g.Windows)
+               {
+                  if (w->RootWindow == canvasRoot)
+                  {
+                     above = true;
+                     continue;
+                  }
+                  if (above && w->WasActive && !w->Hidden && (w->Flags & (ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_Tooltip)) == 0 &&
+                      w->Rect().Contains(c))
+                  {
+                     covered = true;
+                     break;
+                  }
+               }
+               for (const GraphNode& gn : gNodes)
+               {
+                  if (covered)
+                     break;
+                  const ImVec2 np = ed::CanvasToScreen(ed::GetNodePosition(gn.NodeId()));
+                  const ImVec2 ns = ed::CanvasToScreen(ed::GetNodePosition(gn.NodeId()) + ed::GetNodeSize(gn.NodeId()));
+                  if (c.x >= np.x && c.x <= ns.x && c.y >= np.y && c.y <= ns.y)
+                     covered = true;
+               }
+            }
+            if (covered)
+            {
+               sTrashLink = 0;
+               goto trashDone;
+            }
+            // Scales with the canvas zoom so it stays proportionate to the cable when zoomed out.
+            const float zoom = ed::CanvasToScreen(ImVec2(1.0f, 0.0f)).x - ed::CanvasToScreen(ImVec2(0.0f, 0.0f)).x;
+            const float k = std::min(1.0f, std::max(0.4f, zoom));
+            const float r = 11.0f * k;
+            const ImVec2 m = ImGui::GetMousePos();
+            const bool over = (m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= (r + 2.0f) * (r + 2.0f);
+            // Stays while the cursor is on the button (or just beside it); gone ~0.1 s after the cursor leaves both.
+            if ((m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= 20.0f * 20.0f)
+               sTrashSeen = now;
+            ImDrawList* dl = ImGui::GetForegroundDrawList();
+            const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            const ImU32 fg = ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.95f));
+            dl->AddCircleFilled(c, r, ImGui::GetColorU32(over ? ImGuiCol_ButtonHovered : ImGuiCol_PopupBg), 24);
+            dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_Border), 24, 1.0f);
+            dl->AddLine(ImVec2(c.x - 5.0f * k, c.y - 3.5f * k), ImVec2(c.x + 5.0f * k, c.y - 3.5f * k), fg, std::max(1.0f, 1.5f * k)); // lid
+            dl->AddLine(ImVec2(c.x - 1.6f * k, c.y - 5.5f * k), ImVec2(c.x + 1.6f * k, c.y - 5.5f * k), fg, std::max(1.0f, 1.5f * k)); // handle
+            dl->AddLine(ImVec2(c.x - 3.6f * k, c.y - 3.5f * k), ImVec2(c.x - 3.0f * k, c.y + 5.0f * k), fg, std::max(1.0f, 1.5f * k)); // body
+            dl->AddLine(ImVec2(c.x + 3.6f * k, c.y - 3.5f * k), ImVec2(c.x + 3.0f * k, c.y + 5.0f * k), fg, std::max(1.0f, 1.5f * k));
+            dl->AddLine(ImVec2(c.x - 3.0f * k, c.y + 5.0f * k), ImVec2(c.x + 3.0f * k, c.y + 5.0f * k), fg, std::max(1.0f, 1.5f * k));
+            if (over && ImGui::IsMouseClicked(0))
+            {
+               PushUndoCheckpoint();
+               DisconnectLinkById(sTrashLink);
+               sTrashGone = sTrashLink;
+               sTrashLink = 0;
+               sTrashSeen = -1.0;
+            }
+            if (over)
+               ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         }
+         else
+            sTrashLink = 0;
+      trashDone:;
       }
 
       gHoveringItem = ed::GetHoveredNode() || ed::GetHoveredPin() || ed::GetHoveredLink();
@@ -667,10 +738,88 @@ void DrawPopupsB(FrameCtx& fc)
       }
       if (getenv("INFINITE_PALETTETEST") != nullptr && frameId == 3)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
-      if (getenv("INFINITE_AUDIOUITEST") != nullptr && frameId == 3)
+      if ((getenv("INFINITE_AUDIOUITEST") != nullptr || getenv("INFINITE_FXGALLERY") != nullptr || getenv("INFINITE_NODEGALLERY") != nullptr) && frameId == 3)
          gRequestFitView = true; // same, for the audio node UI fixture
+      if ((getenv("INFINITE_NODEGALLERY") != nullptr || getenv("INFINITE_LOADPATCH") != nullptr) && frameId == 12)
+      {
+         // Review aid: INFINITE_GALLERYZOOM=<z> zooms the canvas, INFINITE_GALLERYOPENDD=<param index> opens that
+         // dropdown on the first node, so a popup can be judged at any zoom (screenshot at a later frame).
+         if (const char* z = getenv("INFINITE_GALLERYZOOM"))
+         {
+            gKbSavedZoom = (float)atof(z);
+            gKbSavedScroll = ImVec2(-60.0f, -40.0f);
+            gKbViewRestore = true; // applied inside the editor scope next frame
+         }
+      }
+      if (getenv("INFINITE_NODEGALLERY") != nullptr && frameId == 24)
+      {
+         if (const char* d = getenv("INFINITE_GALLERYOPENDD"))
+         {
+            gDropdownTestOpenKey = std::pair<int, int>(0, atoi(d));
+            if (atoi(d) < 0) // synthetic list, opened as a node control would at the canvas zoom
+            {
+               gDropdown.options.clear();
+               for (int i = -12; i <= 12; ++i)
+                  gDropdown.options.push_back("semi " + std::string(i > 0 ? "+" : "") + std::to_string(i));
+               gDropdown.categories.clear();
+               gDropdown.onSelect = [](int) {};
+               gDropdown.current = 12;
+               gDropdown.justOpened = true;
+               gDropdown.focusSearch = false;
+               gDropdown.filterBuf[0] = '\0';
+            }
+         }
+      }
+      if (const char* live = getenv("INFINITE_LIVESTATE"); live != nullptr && frameId == 6)
+      {
+         // Review aid: INFINITE_LIVESTATE=<dir with sample.wav and live.mid> loads that sample into every Sampler,
+         // Slicer and Granular and the MIDI into every MIDI File, then starts the transport so a shot shows
+         // waveforms, playheads and visualisers with real data.
+         const std::string dir = live;
+         for (GraphNode& gn : gNodes)
+         {
+            if (auto* n = dynamic_cast<SamplerNode*>(gn.node.get()))
+               n->LoadFile(dir + "/sample.wav");
+            else if (auto* n2 = dynamic_cast<SlicerNode*>(gn.node.get()))
+               n2->LoadFile(dir + "/sample.wav");
+            else if (auto* n3 = dynamic_cast<GranularNode*>(gn.node.get()))
+               n3->LoadFile(dir + "/sample.wav");
+            else if (auto* n4 = dynamic_cast<MidiFileNode*>(gn.node.get()))
+               n4->LoadFile(dir + "/live.mid");
+         }
+         Transport::Instance().SetPlaying(true);
+      }
+      if (getenv("INFINITE_NODELIST") != nullptr && frameId == 1)
+      {
+         // Review aid: every registered type by category, one line each ("NODELIST <category>|<type>").
+         for (const std::string& cat : NodeFactory::Instance().GetCategories())
+            for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(cat))
+               printf("NODELIST %s|%s\n", cat.c_str(), name.c_str());
+         fflush(stdout);
+      }
+      if (getenv("INFINITE_GALLERYSIZES") != nullptr && frameId == 30)
+      {
+         // Review aid for the gallery: canvas size of every node, to compare params closed vs open.
+         for (const GraphNode& gn : gNodes)
+         {
+            const ImVec2 s = ed::GetNodeSize(gn.NodeId());
+            printf("NODESIZE %s|%.0f|%.0f\n", gn.typeName.c_str(), s.x, s.y);
+         }
+         fflush(stdout);
+      }
       if (getenv("INFINITE_LOADPATCH") != nullptr && (frameId == 2 || frameId == 4))
          gRequestFitView = true;
+      if (const char* fitNode = getenv("INFINITE_FITNODE"); fitNode != nullptr && frameId == 8)
+      {
+         // dev screenshot: close-up on one node (zoomed in, unlike gRequestFitViewNodeIndex)
+         if (GraphNode* n = FindNodeByIndex(atoi(fitNode)))
+         {
+            ed::ClearSelection();
+            ed::SelectNode(n->NodeId());
+            ed::NavigateToSelection(true, 0.0f);
+            ed::ClearSelection();
+         }
+      }
       FrameTest_AUDIOUITEST_2(frameId, window);
       if (getenv("INFINITE_HIDETEST") != nullptr && frameId == 3)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
@@ -726,18 +875,10 @@ void DrawPopupsB(FrameCtx& fc)
             // would land in the wrong spot at any pan/zoom.
             {
                ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-               const ImU32 glowCol = IM_COL32(0, 230, 255, 28);
-               const ImU32 ringCol = IM_COL32(0, 230, 255, 160);
                if (pInfo.isCircle)
-               {
-                  hoverDl->AddCircleFilled(pInfo.shapeCenter, pInfo.shapeRadius, glowCol, 24);
-                  hoverDl->AddCircle(pInfo.shapeCenter, pInfo.shapeRadius, ringCol, 24, 1.0f);
-               }
+                  StateRing::DrawCircle(hoverDl, pInfo.shapeCenter, pInfo.shapeRadius, StateRing::Kind::Target, IsThemeLight());
                else
-               {
-                  hoverDl->AddRectFilled(pInfo.rowMin, pInfo.rowMax, glowCol, 4.0f);
-                  hoverDl->AddRect(pInfo.rowMin, pInfo.rowMax, ringCol, 4.0f, 0, 1.0f);
-               }
+                  StateRing::Draw(hoverDl, pInfo.rowMin, pInfo.rowMax, StateRing::Kind::Target, IsThemeLight(), tok::radius_field);
             }
             ed::Suspend();
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -823,8 +964,8 @@ void DrawPopupsB(FrameCtx& fc)
                const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
                {
                   ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-                  const ImU32 glowCol = IM_COL32(120, 200, 255, 28);
-                  const ImU32 ringCol = IM_COL32(120, 200, 255, 170);
+                  const ImU32 glowCol = tok::U32(tok::pal::c_78C8FF1C);
+                  const ImU32 ringCol = tok::U32(tok::pal::c_78C8FFAA);
                   if (pInfo.isCircle)
                   {
                      hoverDl->AddCircleFilled(pInfo.shapeCenter, pInfo.shapeRadius, glowCol, 24);

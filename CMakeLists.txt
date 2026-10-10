@@ -193,6 +193,20 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
+# macOS: only the ORT C API headers are needed at build time. The runtime
+# library itself is loaded from the Tracking extension pack (src/core/tracking),
+# never linked or bundled.
+if(APPLE)
+    include(FetchContent)
+    FetchContent_Declare(
+        onnxruntime_mac_headers
+        URL "https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-osx-universal2-1.20.1.tgz"
+        URL_HASH SHA256=da4349e01a7e997f5034563183c7183d069caadc1d95f499b560961787813efd
+    )
+    FetchContent_MakeAvailable(onnxruntime_mac_headers)
+    set(ORT_MAC_INCLUDE_DIR "${onnxruntime_mac_headers_SOURCE_DIR}/include")
+endif()
+
 # FFmpeg, for Platform::VideoOpen/RecorderStart/CameraOpen's decode/encode/mux
 # surface on Linux (src/platform/linux/MediaLinux.cpp) - macOS uses
 # AVFoundation and Windows uses Media Foundation, both OS-supplied; Linux has
@@ -445,6 +459,7 @@ set(COMMON_SOURCES
     src/app/graph/PatchFiles.cpp
     src/app/graph/PatchIO.cpp
     src/app/graph/PatchLoad.cpp
+    src/app/graph/NodeClipboard.cpp
     src/app/graph/Projector.cpp
     src/app/graph/Rpc.cpp
     src/app/graph/Wiring.cpp
@@ -455,6 +470,12 @@ set(COMMON_SOURCES
     src/app/panels/HelpWindows.cpp
     src/app/panels/LibraryPanels.cpp
     src/app/panels/Minimap.cpp
+    src/app/panels/FindOverlay.cpp
+    src/app/panels/CookOverlay.cpp
+    src/app/panels/NoticeStack.cpp
+    src/app/panels/HistoryPanel.cpp
+    src/app/panels/TemplatesWindow.cpp
+    src/app/panels/Diagnostics.cpp
     src/app/panels/ModMatrixPanel.cpp
     src/app/panels/PerfPanel.cpp
     src/app/panels/SettingsWindow.cpp
@@ -476,10 +497,17 @@ set(COMMON_SOURCES
     src/app/ui/ModWidgets.cpp
     src/app/ui/ParamWidgets.cpp
     src/app/ui/Theme.cpp
+    src/app/ui/design/UiAnim.cpp
+    src/app/ui/design/UiType.cpp
+    src/app/ui/design/UiInteract.cpp
+    src/app/ui/design/UiGallery.cpp
     src/core/GLUtil.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
     src/core/CategoryColors.cpp
+    src/core/CookProbe.cpp
+    src/core/Notices.cpp
+    src/core/UndoDescribe.cpp
     src/core/I18n.cpp
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
@@ -533,6 +561,10 @@ set(COMMON_SOURCES
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
     src/core/UpdateCheck.cpp
+    src/core/Extensions.cpp
+    src/core/tracking/OrtRuntime.cpp
+    src/core/tracking/HandTracker.cpp
+    src/nodes/HandTrackNode.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
     src/audio/AudioEngine.cpp
@@ -595,6 +627,9 @@ set(COMMON_SOURCES
     src/audio/NoteModel.cpp
     src/nodes/OscNodes.cpp
     src/nodes/NoiseNode.cpp
+    src/nodes/SketchNode.cpp
+    src/core/sketch/SketchEngine.cpp
+    src/app/bodies/SketchParams.cpp
     src/nodes/TextureNode.cpp
     src/nodes/ResynthNode.cpp
     src/nodes/MacroNodes.cpp
@@ -856,6 +891,73 @@ add_executable(field-preset-check
 )
 target_include_directories(field-preset-check PRIVATE src src/core)
 
+# Headless checks for the Sketch engine (docs/plans/sketch/README.md exit criteria
+# that need no window): compile, params, determinism, abort, memory, errors.
+add_executable(sketch-check src/core/sketch/SketchCheck.cpp src/core/sketch/SketchEngine.cpp)
+target_include_directories(sketch-check PRIVATE src/core/sketch)
+target_link_libraries(sketch-check PRIVATE sketch_deps lunasvg_lib)
+
+# Sketch node dependencies (docs/plans/sketch/README.md): quickjs-ng (JS engine,
+# no quickjs-libc so a patch cannot reach files or network) and plutovg (CPU
+# Canvas-2D rasteriser, same pixels on all three OSes). Vendored as plain
+# source, built as one static C library; see each VENDORED_COMMIT.txt.
+add_library(sketch_deps STATIC
+    external/quickjs-ng/quickjs.c
+    external/quickjs-ng/libregexp.c
+    external/quickjs-ng/libunicode.c
+    external/quickjs-ng/dtoa.c
+    external/plutovg/source/plutovg-blend.c
+    external/plutovg/source/plutovg-canvas.c
+    external/plutovg/source/plutovg-font.c
+    external/plutovg/source/plutovg-matrix.c
+    external/plutovg/source/plutovg-paint.c
+    external/plutovg/source/plutovg-path.c
+    external/plutovg/source/plutovg-rasterize.c
+    external/plutovg/source/plutovg-surface.c
+    external/plutovg/source/plutovg-ft-math.c
+    external/plutovg/source/plutovg-ft-raster.c
+    external/plutovg/source/plutovg-ft-stroker.c
+)
+set_target_properties(sketch_deps PROPERTIES C_STANDARD 11 C_EXTENSIONS ON POSITION_INDEPENDENT_CODE ON)
+target_include_directories(sketch_deps PUBLIC external/quickjs-ng external/plutovg/include)
+target_compile_definitions(sketch_deps PRIVATE PLUTOVG_BUILD PLUTOVG_BUILD_STATIC _GNU_SOURCE)
+target_compile_definitions(sketch_deps PUBLIC PLUTOVG_BUILD_STATIC)
+if(MSVC)
+    # quickjs-ng uses C11 atomics (MSVC 17.5+).
+    target_compile_options(sketch_deps PRIVATE /w /std:c11 /experimental:c11atomics)
+else()
+    target_compile_options(sketch_deps PRIVATE -w)
+endif()
+if(NOT WIN32)
+    target_link_libraries(sketch_deps PUBLIC m)
+endif()
+
+# SVG for Sketch (svgSet/svgDraw): lunasvg renders through the plutovg above, so
+# an SVG and a sketch share one rasteriser. System fonts are off so text in an
+# SVG draws the same on every OS (the app registers the bundled Inter instead).
+add_library(lunasvg_lib STATIC
+    external/lunasvg/source/graphics.cpp
+    external/lunasvg/source/lunasvg.cpp
+    external/lunasvg/source/svgelement.cpp
+    external/lunasvg/source/svggeometryelement.cpp
+    external/lunasvg/source/svglayoutstate.cpp
+    external/lunasvg/source/svgpaintelement.cpp
+    external/lunasvg/source/svgparser.cpp
+    external/lunasvg/source/svgproperty.cpp
+    external/lunasvg/source/svgrenderstate.cpp
+    external/lunasvg/source/svgtextelement.cpp
+)
+set_target_properties(lunasvg_lib PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON POSITION_INDEPENDENT_CODE ON)
+target_include_directories(lunasvg_lib PUBLIC external/lunasvg/include)
+target_compile_definitions(lunasvg_lib PRIVATE LUNASVG_BUILD LUNASVG_DISABLE_LOAD_SYSTEM_FONTS)
+target_compile_definitions(lunasvg_lib PUBLIC LUNASVG_BUILD_STATIC)
+target_link_libraries(lunasvg_lib PUBLIC sketch_deps)
+if(MSVC)
+    target_compile_options(lunasvg_lib PRIVATE /w)
+else()
+    target_compile_options(lunasvg_lib PRIVATE -w)
+endif()
+
 add_executable(Infinite ${COMMON_SOURCES})
 
 # Exposes INFINITE_VERSION to C++ as a string literal (UpdateCheck.cpp,
@@ -908,7 +1010,7 @@ target_include_directories(Infinite PRIVATE
     src/platform/ndi
 )
 
-target_link_libraries(Infinite PRIVATE glfw)
+target_link_libraries(Infinite PRIVATE glfw sketch_deps lunasvg_lib)
 
 if(WIN32)
     # SpoutGL's own headers (Spout.h chain) plus sse2neon.h, which its
@@ -1091,11 +1193,19 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
         COMMAND ${CMAKE_COMMAND} -E make_directory
                 "$<TARGET_FILE_DIR:Infinite>/Resources/drumkits/infinite-basic"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/drumkits/infinite-basic"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
         COMMENT "Copying bundled fonts and drum kit next to Infinite.exe")
     target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
 elseif(APPLE)
@@ -1143,6 +1253,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
         COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
+        COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon_1024.png"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/icon_1024.png"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -1161,6 +1274,11 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/drumkits/infinite-basic"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
         COMMENT "Copying bundled fonts, icon, drum kit, ONNX Runtime libraries and model next to Infinite")
     # THIRD_PARTY_NOTICES condition 3 / GPL source-offer condition 2: the
     # FFmpeg and x264 licence texts ship inside the bundle wherever the
@@ -1282,6 +1400,7 @@ if(NOT WIN32)
 endif()
 
 if(APPLE)
+    target_include_directories(Infinite PRIVATE "${ORT_MAC_INCLUDE_DIR}")
     set_source_files_properties(src/platform/Platform.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${SYPHON_SOURCES}
@@ -1440,7 +1559,8 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf")
     list(APPEND INFINITE_FONT_FILES ${INFINITE_NOTO_FILES})
     set(INFINITE_ICON_FONT_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf")
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf")
     target_sources(Infinite PRIVATE ${INFINITE_FONT_FILES} ${INFINITE_ICON_FONT_FILES} ${INFINITE_LANG_FILES})
     set_source_files_properties(${INFINITE_LANG_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/lang")
     set_source_files_properties(${INFINITE_FONT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/fonts")
@@ -1457,6 +1577,11 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/06-low-tom.wav"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/07-high-tom.wav"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/08-bell.wav")
+    file(GLOB INFINITE_TEMPLATE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/*.inf" "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/index.txt")
+    file(GLOB INFINITE_TEMPLATE_THUMBS "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/thumbs/*.png")
+    target_sources(Infinite PRIVATE ${INFINITE_TEMPLATE_FILES} ${INFINITE_TEMPLATE_THUMBS})
+    set_source_files_properties(${INFINITE_TEMPLATE_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates")
+    set_source_files_properties(${INFINITE_TEMPLATE_THUMBS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/thumbs")
     target_sources(Infinite PRIVATE ${INFINITE_DRUMKIT_FILES})
     set_source_files_properties(${INFINITE_DRUMKIT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/drumkits/infinite-basic")
 endif()

@@ -8,7 +8,14 @@ hasn't been notarized through a paid Apple Developer Program membership
 and built straight from the public source on GitHub — it's just missing
 the certificate Apple charges for to skip that warning.
 
-How to open it (pick one):
+The short version, two steps:
+   1. Drag Infinite.app into Applications.
+   2. Double-click "Fix & Open Infinite.command", press y, and Infinite opens.
+Newer macOS (15 and later) may instead say Apple "could not verify" Infinite;
+the same script fixes that, or use System Settings > Privacy & Security >
+"Open Anyway" after trying to open it once.
+
+The details, if you want them. How to open it (pick one):
 
 1. Easiest — the included script
    - Drag Infinite.app into your Applications folder.

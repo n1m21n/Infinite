@@ -20,6 +20,7 @@ namespace app
       }
       REGISTER_NODE(FormulaNode, Formula, "Source");
       REGISTER_NODE(FieldPixelNode, FieldPixel, "Source");
+      REGISTER_NODE(SketchNode, Sketch, "Source");
       REGISTER_NODE(TextNode, Text, "Source");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");
@@ -163,6 +164,7 @@ namespace app
       REGISTER_NODE(ConstantNode, Constant, "Modulators");
       REGISTER_NODE(NullModulatorNode, Null Modulator, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
+      REGISTER_NODE(HandTrackNode, Hand Track, "Modulators");
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");

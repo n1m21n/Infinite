@@ -1,5 +1,16 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
+#include "core/Extensions.h"
+#include "core/tracking/HandTracker.h"
+#include "nodes/HandTrackNode.h"
+#include "stb_image.h"
+#include "stb_image_write.h"
+#include <chrono>
+#include <algorithm>
 #include "app/AppShared.h"
+#include "app/graph/NodeClipboard.h"
+#include "miniz.h"
+#include <filesystem>
+#include <fstream>
 
 namespace app
 {
@@ -1422,6 +1433,83 @@ int RunVST3BlocklistTest()
 // is one of the two that triggers the redirect) rather than reimplementing
 // the check, so a regression in the real function is what this catches.
 // Headless like PLUGINSCANTEST above - no GL/ImGui needed.
+// ====================================================== INFINITE_HISTORYTEST
+//
+// Block I1: undo entries carry names (explicit or derived from the before/after patches), a jump through history lands
+// on the right state, redo entries survive until a new edit, and no label is ever written into a patch.
+void RunHistoryTest()
+{
+   using json = nlohmann::json;
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+   auto Call = [&](const char* m, const json& p, json& r, std::string& e) { return HandleRpcCommand(m, p, r, e); };
+   json r;
+   std::string e;
+
+   NewPatch();
+   // Five different edits.
+   Call("create_node", { {"typeName", "Shape"}, {"category", "Source"} }, r, e);                 // 1 add Shape
+   const int shapeIdx = r.value("index", -1);
+   Call("create_node", { {"typeName", "Output"}, {"category", "Utility"} }, r, e);               // 2 add Output
+   const int outIdx = r.value("index", -1);
+   json prm;
+   Call("get_params", { {"index", shapeIdx} }, prm, e);
+   std::string floatName;
+   for (auto it = prm.begin(); it != prm.end() && floatName.empty(); ++it)
+      if (it.key().rfind("f ", 0) == 0)
+         floatName = it.key().substr(2);
+   Call("set_param", { {"index", shapeIdx}, {"name", floatName}, {"value", 0.37} }, r, e);        // 3 param edit
+   if (GraphNode* gn = FindNodeByIndex(shapeIdx))
+   {
+      PushUndoCheckpoint("Bypass");                                                              // 4 bypass
+      gn->node->bypassed = true;
+   }
+   RemoveNodeByIndex(outIdx);                                                                     // 5 delete Output (pushes its own checkpoint)
+
+   Check("five edits are on the undo stack", gUndoStack.size() == 5);
+   const std::string l0 = UndoLabelAt(0), l1 = UndoLabelAt(1), l2 = UndoLabelAt(2), l3 = UndoLabelAt(3), l4 = UndoLabelAt(4);
+   printf("  labels newest first: %s | %s | %s | %s | %s\n", l0.c_str(), l1.c_str(), l2.c_str(), l3.c_str(), l4.c_str());
+   Check("explicit labels are kept", l0.find("Delete") == 0 && l1 == "Bypass");
+   Check("a param edit is named by what changed", l2.find(floatName) == 0 && l2.find("0.37") != std::string::npos);
+   Check("an added node is named by its type", l3 == "Add Output" && l4 == "Add Shape");
+
+   // Save and load: labels are not in the file, and loading clears the history.
+   const std::string path = "/tmp/infinite_history_test.inf";
+   SavePatchTo(path);
+   std::string text;
+   {
+      std::ifstream in(path);
+      text.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+   }
+   Check("labels are not serialised", text.find("Bypass") == std::string::npos && text.find("Delete") == std::string::npos &&
+                                         text.find("Add Output") == std::string::npos);
+
+   // Jump to the state right after edit 3 (two undos): Output is back, Shape is not bypassed.
+   JumpInHistory(2, 0);
+   Check("jump back applies two undos", gUndoStack.size() == 3 && gRedoStack.size() == 2);
+   Check("jump back landed on the right state", gNodes.size() == 2 && FindNodeByIndex(shapeIdx) != nullptr && !FindNodeByIndex(shapeIdx)->node->bypassed);
+   Check("redo entries keep their names", RedoLabelAt(0) == "Bypass" && RedoLabelAt(1).find("Delete") == 0);
+   Check("undo entry names survive the jump", UndoLabelAt(0).find(floatName) == 0);
+
+   // Jump forward one: the bypass is back.
+   JumpInHistory(0, 1);
+   Check("jump forward re-applies the redo", FindNodeByIndex(shapeIdx) != nullptr && FindNodeByIndex(shapeIdx)->node->bypassed && gRedoStack.size() == 1);
+
+   // A new edit drops the redo side.
+   PushUndoCheckpoint("Edit");
+   Check("a new edit clears redo", gRedoStack.empty());
+
+   SavePatchTo(path);
+   Check("loading clears history", LoadPatchFrom(path) && gUndoStack.empty() && gRedoStack.empty());
+   remove(path.c_str());
+   printf("HISTORYTEST %s\n", ok ? "OK" : "FAIL");
+}
+
 // ====================================================== INFINITE_RPCBATCHTEST
 //
 // R495: the live RPC methods, driven through the real HandleRpcCommand.
@@ -2062,5 +2150,406 @@ bool RunPerfPanelSelfTest()
 
    printf("[PERF MATRIX TEST] PASS\n");
    return true;
+}
+
+void RunClipboardTest()
+{
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+
+   NewPatch();
+   const int shapeIdx = SpawnNode("Shape", "Source", 100.0f, 100.0f)->index;
+   const int blurIdx = SpawnNode("gaussianblur", "Effects", 300.0f, 100.0f)->index;
+   const int lfoIdx = SpawnNode("LFO", "Modulators", 100.0f, 300.0f)->index;
+   const int outIdx = SpawnNode("Output", "Utility", 500.0f, 100.0f)->index;
+   const int noteIdx = SpawnNode("Comment", "Compositing", 100.0f, 500.0f)->index;
+   const int groupIdx = SpawnNode("Group", "Compositing", 50.0f, 450.0f)->index;
+   const int fieldIdx = SpawnNode("Field Graph", "Compositing", 300.0f, 300.0f)->index;
+   // Every spawn can move gNodes, so the pointers are taken only now.
+   GraphNode* shape = FindNodeByIndex(shapeIdx);
+   GraphNode* blur = FindNodeByIndex(blurIdx);
+   GraphNode* outside = FindNodeByIndex(outIdx);
+   const uint64_t shapeUid = shape->uid;
+   ImageCable* in0 = CableFor(*blur, 0);
+   if (in0 != nullptr)
+      in0->Connect(shape->node.get(), 0);
+   if (ImageCable* toOut = CableFor(*outside, 0))
+      toOut->Connect(blur->node.get(), 0);
+   Modulation::Source src;
+   src.nodeIndex = lfoIdx;
+   src.depth = 0.5f;
+   Modulation::Instance().RestoreLink(shapeIdx, 0, src);
+   Modulation::Instance().SetExpression(blurIdx, 0, "0.25 + 0.5");
+   {
+      GestureRecorder::Playback gp;
+      gp.samples = { { 0.1f, 0.0, true }, { 0.9f, 1.0, false }, { 0.4f, 2.0, false } };
+      gp.speed = 2.0f;
+      gp.recordedMin = 0.1f;
+      gp.recordedMax = 0.9f;
+      GestureRecorder::Instance().SetPlayback(shapeIdx, 1, gp);
+   }
+   if (GraphNode* fg = FindNodeByIndex(fieldIdx))
+      if (auto* fgn = dynamic_cast<FieldGraphNode*>(fg->node.get()))
+      {
+         fgn->Ownership().Set("child", shapeIdx);
+         fgn->Ownership().Set("gone", outIdx); // owned but never copied
+         fgn->ownershipText = fgn->Ownership().ToText();
+      }
+   std::vector<std::pair<std::string, std::string>> before;
+   Patch::SaveParams(shape->node.get(), before);
+
+   // Copy everything except the Output.
+   const std::string text = NodeClipboardSerialize({ shapeIdx, blurIdx, lfoIdx, noteIdx, groupIdx, fieldIdx });
+   Check("selection serialises with the header", text.rfind("infinite-nodes v", 0) == 0);
+   Check("a node that was not copied is not in the text", text.find("Output") == std::string::npos);
+   Check("the text is recognised as nodes", LooksLikeNodeClipboard(text));
+
+   // Into another patch: only the pasted nodes exist, so nothing can collide by luck.
+   NewPatch();
+   SpawnNode("Noise", "Source", 0.0f, 0.0f);
+   const size_t baseCount = gNodes.size();
+   const size_t undoBefore = gUndoStack.size();
+   const NodePasteResult r = NodeClipboardPaste(text, ImVec2(1000.0f, 1000.0f));
+   Check("paste succeeds", r.ok && r.pasted == 6 && r.skipped == 0);
+   Check("six nodes added", gNodes.size() == baseCount + 6);
+   Check("one undo step", gUndoStack.size() == undoBefore + 1);
+
+   std::set<uint64_t> uids;
+   bool uniqueUids = true;
+   for (const GraphNode& gn : gNodes)
+      uniqueUids = uniqueUids && uids.insert(gn.uid).second;
+   Check("uids are unique", uniqueUids);
+   GraphNode* pShape = nullptr; GraphNode* pBlur = nullptr; GraphNode* pLfo = nullptr;
+   bool hasNote = false, hasGroup = false, hasField = false;
+   for (int idx : r.newIndices)
+      if (GraphNode* gn = FindNodeByIndex(idx))
+      {
+         if (gn->typeName == "Shape") pShape = gn;
+         if (gn->typeName == "gaussianblur") pBlur = gn;
+         if (gn->typeName == "LFO") pLfo = gn;
+         hasField = hasField || gn->typeName == "Field Graph";
+         hasNote = hasNote || gn->typeName == "Comment";
+         hasGroup = hasGroup || gn->typeName == "Group";
+      }
+   Check("comment, group and Field graph nodes came across", hasNote && hasGroup && hasField);
+   {
+      bool ownsPasted = false, droppedUncopied = false;
+      for (int idx : r.newIndices)
+         if (GraphNode* gn = FindNodeByIndex(idx))
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(gn->node.get()))
+            {
+               ownsPasted = pShape != nullptr && fgn->Ownership().Get("child") == pShape->index;
+               droppedUncopied = !fgn->Ownership().Has("gone");
+            }
+      Check("a Field graph owns the pasted copy of its child, not the original", ownsPasted);
+      Check("a child that was not copied is dropped from ownership", droppedUncopied);
+   }
+   Check("pasted nodes got new uids", pShape != nullptr && pShape->uid != shapeUid);
+   if (pShape != nullptr)
+   {
+      std::vector<std::pair<std::string, std::string>> after;
+      Patch::SaveParams(pShape->node.get(), after);
+      Check("params survive", after == before);
+   }
+   bool cabled = false;
+   if (pBlur != nullptr && pShape != nullptr)
+      if (ImageCable* c = CableFor(*pBlur, 0))
+         cabled = c->Resolved() == pShape->node.get();
+   Check("a cable between copied nodes is kept", cabled);
+   bool modKept = false;
+   if (pShape != nullptr && pLfo != nullptr)
+      for (const auto& l : Modulation::Instance().Links())
+         modKept = modKept || (l.first.first == pShape->index && l.second.nodeIndex == pLfo->index);
+   Check("a binding between copied nodes is kept", modKept);
+   Check("an expression is kept", pBlur != nullptr && Modulation::Instance().HasExpression(pBlur->index, 0));
+   {
+      bool gestureKept = false;
+      if (pShape != nullptr)
+      {
+         const auto& pbs = GestureRecorder::Instance().Playbacks();
+         auto it = pbs.find(GestureRecorder::Key(pShape->index, 1));
+         gestureKept = it != pbs.end() && it->second.samples.size() == 3 && it->second.speed == 2.0f;
+      }
+      Check("a gesture recording is kept", gestureKept);
+   }
+
+   // The cable into the Output was to an uncopied node: nothing should be wired to it.
+   bool strayCable = false;
+   for (int idx : r.newIndices)
+      if (GraphNode* gn = FindNodeByIndex(idx))
+         if (gn->typeName == "Output")
+            strayCable = true;
+   Check("no uncopied node came along", !strayCable);
+
+   // Refusals leave the patch alone.
+   const size_t nNow = gNodes.size();
+   const std::string newer = "infinite-nodes v" + std::to_string(Patch::FormatVersion() + 1) + "\ninfinite-patch 99\n";
+   const NodePasteResult rn = NodeClipboardPaste(newer, ImVec2(0, 0));
+   Check("a newer format is refused calmly", !rn.ok && !rn.message.empty() && gNodes.size() == nNow);
+   const NodePasteResult rg = NodeClipboardPaste("infinite-nodes v1\nnot a patch", ImVec2(0, 0));
+   Check("garbage after the header is refused", !rg.ok && gNodes.size() == nNow);
+   Check("plain text is not nodes", !LooksLikeNodeClipboard("hello") && !LooksLikeNodeClipboard(""));
+
+   // A node type this build lacks is left out, the rest still pastes.
+   std::string withUnknown = text;
+   const size_t at = withUnknown.find("node ");
+   if (at != std::string::npos)
+      withUnknown += "node 99 Source NoSuchNodeType\n  pos 0 0\n  flags 1 0 0 0\nend\n";
+   const NodePasteResult ru = NodeClipboardPaste(withUnknown, ImVec2(0, 0));
+   Check("an unknown node type is skipped, the rest pastes", ru.ok && ru.skipped == 1 && ru.pasted == 6);
+
+   printf("CLIPBOARDTEST %s\n", ok ? "OK" : "FAIL");
+}
+
+// INFINITE_TRACKINGTEST=1 INFINITE_TRACKINGTEST_ZIP=<tracking pack zip>
+// INFINITE_TRACKINGTEST_IMAGE=<jpg/png> [INFINITE_TRACKINGTEST_OUT=<png>]
+// Installs the pack the same way Settings does, loads ONNX Runtime from the
+// pack folder, runs the hand pipeline on a still image and prints timings.
+int RunTrackingTest()
+{
+   int fails = 0;
+   auto check = [&](bool ok, const char* what)
+   {
+      printf("TRACKINGTEST %s: %s\n", ok ? "PASS" : "FAIL", what);
+      if (!ok) fails++;
+   };
+   const char* zipPath = getenv("INFINITE_TRACKINGTEST_ZIP");
+   const char* imgPath = getenv("INFINITE_TRACKINGTEST_IMAGE");
+   if (!zipPath || !imgPath) { printf("TRACKINGTEST needs _ZIP and _IMAGE\n"); return 1; }
+
+   const std::string root = AppPaths::TempDir() + "/infinite-trackingtest";
+   std::error_code ec;
+   std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+   setenv("INFINITE_EXTENSIONS_DIR", root.c_str(), 1);
+
+   std::string bytes, err, id;
+   {
+      std::ifstream f(zipPath, std::ios::binary);
+      bytes.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+   }
+   check(!bytes.empty(), "pack zip read");
+   check(Extensions::InstallZip(bytes, "", "tracking", id, err), "pack installs through the Settings path");
+   if (!err.empty()) printf("  %s\n", err.c_str());
+   const std::string dir = Extensions::PackDir("tracking");
+   check(!dir.empty(), "PackDir resolves after install");
+
+   Tracking::OrtRuntime rt;
+#if defined(__APPLE__)
+   const std::string lib = dir + "/lib/libonnxruntime.dylib";
+#elif defined(_WIN32)
+   const std::string lib = dir + "/lib/onnxruntime.dll";
+#else
+   const std::string lib = dir + "/lib/libonnxruntime.so";
+#endif
+   check(rt.Load(lib, err), "ONNX Runtime loads from the pack folder");
+   if (!rt.Loaded()) { printf("  %s\n", err.c_str()); return 1; }
+
+   Tracking::HandTracker ht;
+   check(ht.Open(rt, dir, true, err), "hand models open");
+   if (!err.empty()) printf("  %s\n", err.c_str());
+   printf("TRACKINGTEST info: core ml  detector=%d landmark=%d\n", ht.UsedGpuDetector(), ht.UsedGpuLandmark());
+
+   int w = 0, h = 0, n = 0;
+   std::string imgBytes;
+   {
+      std::ifstream f(imgPath, std::ios::binary);
+      imgBytes.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+   }
+   unsigned char* px = stbi_load_from_memory((const unsigned char*)imgBytes.data(), (int)imgBytes.size(), &w, &h, &n, 3);
+   check(px != nullptr, "image decodes");
+   if (!px) return 1;
+
+   Tracking::HandResult r;
+   auto now = []() { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count(); };
+   // first frame includes model warm-up
+   double t0 = now();
+   bool ok = ht.Process(px, w, h, r, err);
+   printf("TRACKINGTEST info: first frame %.1f ms\n", now() - t0);
+   check(ok && r.found, "hand found on the still image");
+   if (r.found)
+   {
+      bool inside = true;
+      for (auto& p : r.lm) if (p[0] < -w * 0.2f || p[0] > w * 1.2f || p[1] < -h * 0.2f || p[1] > h * 1.2f) inside = false;
+      check(inside, "landmarks lie near the image");
+      printf("TRACKINGTEST info: score %.2f wrist (%.0f,%.0f) index tip (%.0f,%.0f)\n", r.score, r.lm[0][0], r.lm[0][1], r.lm[8][0], r.lm[8][1]);
+   }
+
+   std::vector<double> det, trk;
+   for (int i = 0; i < 40; ++i)
+   {
+      ht.Reset();
+      t0 = now();
+      ht.Process(px, w, h, r, err);
+      det.push_back(now() - t0);
+      t0 = now();
+      ht.Process(px, w, h, r, err);   // tracking frame: ROI reused, detector skipped
+      trk.push_back(now() - t0);
+   }
+   auto pct = [](std::vector<double> v, double q) { std::sort(v.begin(), v.end()); return v[(size_t)(q * (v.size() - 1))]; };
+   printf("TRACKINGTEST info: detection frame p50 %.1f p95 %.1f ms | tracking frame p50 %.1f p95 %.1f ms (image %dx%d)\n",
+          pct(det, .5), pct(det, .95), pct(trk, .5), pct(trk, .95), w, h);
+   check(r.found && !r.redetected, "tracking frame reuses the ROI");
+
+   if (const char* outPng = getenv("INFINITE_TRACKINGTEST_OUT"))
+   {
+      ht.Reset();
+      ht.Process(px, w, h, r, err);
+      auto dot = [&](int cx, int cy, int rad)
+      {
+         for (int dy = -rad; dy <= rad; ++dy)
+            for (int dx = -rad; dx <= rad; ++dx)
+            {
+               int x = cx + dx, y = cy + dy;
+               if (x < 0 || y < 0 || x >= w || y >= h) continue;
+               unsigned char* q = px + (y * w + x) * 3;
+               q[0] = 255; q[1] = 0; q[2] = 0;
+            }
+      };
+      if (r.found)
+         for (int i = 0; i < 21; ++i) dot((int)r.lm[i][0], (int)r.lm[i][1], std::max(2, w / 200));
+      stbi_write_png(outPng, w, h, 3, px, w * 3);
+   }
+   // The node itself, fed pixels directly (no GL): outputs must come alive.
+   {
+      HandTrackNode node;
+      node.smoothing = 0.f;
+      check(node.Value(HandTrackNode::kPresent) == 0.f, "Hand Track reads 0 before any frame");
+      node.SubmitFrame(px, w, h);
+      node.WaitIdle();
+      check(node.Value(HandTrackNode::kPresent) == 1.f, "Hand Track sees the hand");
+      printf("TRACKINGTEST info: node palm (%.2f,%.2f) index (%.2f,%.2f) pinch %.2f open %.2f roll %.2f size %.2f | %s\n",
+             node.Value(HandTrackNode::kPalmX), node.Value(HandTrackNode::kPalmY),
+             node.Value(HandTrackNode::kIndexX), node.Value(HandTrackNode::kIndexY),
+             node.Value(HandTrackNode::kPinch), node.Value(HandTrackNode::kOpen),
+             node.Value(HandTrackNode::kRoll), node.Value(HandTrackNode::kSize), node.Status().c_str());
+      check(node.Value(HandTrackNode::kPalmX) > 0.f && node.Value(HandTrackNode::kPalmY) > 0.f, "palm lands inside the frame");
+      std::vector<unsigned char> blank((size_t)w * h * 3, 0);
+      node.holdMs = 0.f;
+      node.SubmitFrame(blank.data(), w, h);
+      node.WaitIdle();
+      check(node.Value(HandTrackNode::kPresent) == 0.f && node.Value(HandTrackNode::kIndexX) == 0.f, "outputs drop to 0 when the hand leaves");
+   }
+   stbi_image_free(px);
+   return fails ? 1 : 0;
+}
+
+// ============================================== INFINITE_EXTENSIONSTEST
+// Headless check of the extension-pack framework: SHA-256, catalog parsing,
+// install/replace/remove, checksum and zip-slip rejection. Uses a temp root via
+// INFINITE_EXTENSIONS_DIR and never touches the network.
+int RunExtensionsTest()
+{
+   int fails = 0;
+   auto check = [&](bool ok, const char* what)
+   {
+      printf("EXTENSIONSTEST %s: %s\n", ok ? "PASS" : "FAIL", what);
+      if (!ok) fails++;
+   };
+
+   const std::string root = AppPaths::TempDir() + "/infinite-exttest";
+   std::error_code ec;
+   std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+#if defined(_WIN32)
+   _putenv_s("INFINITE_EXTENSIONS_DIR", root.c_str());
+#else
+   setenv("INFINITE_EXTENSIONS_DIR", root.c_str(), 1);
+#endif
+
+   check(Extensions::Sha256Hex("abc", 3) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "sha256 abc");
+   check(Extensions::Sha256Hex("", 0) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "sha256 empty");
+   {
+      std::string big(1000, 'a'); // crosses a block boundary
+      check(Extensions::Sha256Hex(big.data(), big.size()) == "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3", "sha256 1000 x 'a'");
+   }
+
+   auto makeZip = [](const std::vector<std::pair<std::string, std::string>>& files)
+   {
+      mz_zip_archive z;
+      memset(&z, 0, sizeof(z));
+      mz_zip_writer_init_heap(&z, 0, 0);
+      for (const auto& f : files)
+         mz_zip_writer_add_mem(&z, f.first.c_str(), f.second.data(), f.second.size(), MZ_DEFAULT_COMPRESSION);
+      void* buf = nullptr;
+      size_t n = 0;
+      mz_zip_writer_finalize_heap_archive(&z, &buf, &n);
+      std::string out((const char*)buf, n);
+      mz_zip_writer_end(&z);
+      mz_free(buf);
+      return out;
+   };
+
+   {
+      std::vector<Extensions::Pack> packs;
+      std::string err;
+      const std::string sha(64, 'a');
+      const std::string good = "{\"schema\":1,\"packs\":[{\"id\":\"tracking\",\"name\":\"Tracking\",\"version\":\"1.0\",\"size\":5,"
+         "\"files\":{\"macos\":{\"url\":\"https://x/y.zip\",\"sha256\":\"" + sha + "\"}}},"
+         "{\"id\":\"bad id\",\"version\":\"1\",\"files\":{\"macos\":{\"url\":\"https://x\",\"sha256\":\"" + sha + "\"}}},"
+         "{\"id\":\"nohash\",\"version\":\"1\",\"files\":{\"macos\":{\"url\":\"https://x\",\"sha256\":\"zz\"}}},"
+         "{\"id\":\"other-os\",\"version\":\"1\",\"files\":{\"linux-x64\":{\"url\":\"https://x\",\"sha256\":\"" + sha + "\"}}}]}";
+      check(Extensions::ParseManifest(good, "macos", packs, err) && packs.size() == 1 && packs[0].id == "tracking",
+            "catalog keeps only verifiable packs for this OS");
+      check(!Extensions::ParseManifest("{\"schema\":2,\"packs\":[]}", "macos", packs, err), "catalog rejects unknown schema");
+      check(!Extensions::ParseManifest("not json", "macos", packs, err), "catalog rejects garbage");
+   }
+
+   const std::string zip1 = makeZip({ { "pack.json", "{\"id\":\"demo\",\"version\":\"1\"}" }, { "models/a.bin", "hello" } });
+   std::string id, err;
+   check(Extensions::PackDir("demo").empty(), "not installed at first");
+   check(!Extensions::InstallZip(zip1, std::string(64, '0'), "demo", id, err), "wrong checksum is rejected");
+   check(Extensions::PackDir("demo").empty(), "rejected install leaves nothing behind");
+   check(!Extensions::InstallZip(zip1, "", "other", id, err), "id mismatch is rejected");
+   check(Extensions::InstallZip(zip1, Extensions::Sha256Hex(zip1.data(), zip1.size()), "demo", id, err) && id == "demo", "install with checksum");
+   check(Extensions::InstalledVersion("demo") == "1", "installed version read back");
+   {
+      std::ifstream f(AppPaths::FsPath(Extensions::PackDir("demo") + "/models/a.bin"), std::ios::binary);
+      std::string s((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+      check(s == "hello", "nested file unpacked intact");
+   }
+   const std::string zip2 = makeZip({ { "pack.json", "{\"id\":\"demo\",\"version\":\"2\"}" } });
+   check(Extensions::InstallZip(zip2, "", "", id, err) && Extensions::InstalledVersion("demo") == "2", "update replaces the pack");
+   check(!std::filesystem::exists(AppPaths::FsPath(Extensions::PackDir("demo") + "/models/a.bin")), "update drops files from the old version");
+
+   const std::string slip = makeZip({ { "pack.json", "{\"id\":\"evil\",\"version\":\"1\"}" }, { "../escape.txt", "x" } });
+   check(!Extensions::InstallZip(slip, "", "", id, err), "zip-slip entry is rejected");
+   check(!std::filesystem::exists(AppPaths::FsPath(root + "/../escape.txt")), "nothing written outside the pack");
+   check(Extensions::PackDir("evil").empty(), "hostile pack not installed");
+   check(!Extensions::InstallZip(makeZip({ { "a.txt", "x" } }), "", "", id, err), "zip without pack.json is rejected");
+   check(!Extensions::InstallZip("garbage", "", "", id, err), "non-zip is rejected");
+   check(Extensions::InstalledVersion("demo") == "2", "failed installs leave the installed pack alone");
+
+   check(Extensions::Remove("demo") && Extensions::PackDir("demo").empty(), "remove");
+   check(!Extensions::Remove("../x"), "remove refuses a bad id");
+
+   // Streaming download, only when a local server URL is supplied (no network in CI).
+   if (const char* url = getenv("INFINITE_EXTENSIONSTEST_URL"))
+   {
+      const std::string dest = root + "/dl.bin";
+      uint64_t lastDone = 0, lastTotal = 0;
+      std::string derr;
+      bool ok = Platform::HttpDownload(url, "Infinite-test", dest,
+         [&](uint64_t d, uint64_t t) { lastDone = d; lastTotal = t; return true; }, derr, 60);
+      check(ok, "download completes");
+      std::error_code sec;
+      const auto sz = std::filesystem::file_size(AppPaths::FsPath(dest), sec);
+      check(!sec && sz > 1048576, "download is larger than the old 1 MB HttpGet cap");
+      check(lastDone == sz, "progress ends at the file size");
+      check(lastTotal == 0 || lastTotal == sz, "progress total matches when known");
+      bool cancelled = !Platform::HttpDownload(url, "Infinite-test", root + "/dl2.bin",
+         [](uint64_t, uint64_t) { return false; }, derr, 60);
+      check(cancelled && derr == "cancelled", "cancel stops the download");
+      check(!std::filesystem::exists(AppPaths::FsPath(root + "/dl2.bin")), "cancel leaves no partial file");
+      check(!Platform::HttpDownload("http://127.0.0.1:9/none", "Infinite-test", root + "/dl3.bin", nullptr, derr, 5)
+            && !derr.empty(), "unreachable server reports an error");
+   }
+
+   std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+   printf("EXTENSIONSTEST %s\n", fails == 0 ? "ALL PASS" : "FAILED");
+   return fails == 0 ? 0 : 1;
 }
 }

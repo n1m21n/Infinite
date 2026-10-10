@@ -14,6 +14,16 @@
       "args": [
         "tools/semi-brain/l0/mcp_server.py"
       ]
+    },
+    "repowise": {
+      "type": "stdio",
+      "command": "repowise",
+      "args": [
+        "mcp",
+        "/Users/namansoni/infinte",
+        "--transport",
+        "stdio"
+      ]
     }
   }
 }

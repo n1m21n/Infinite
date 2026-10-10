@@ -49,6 +49,7 @@
 #include "core/SysInfo.h"
 #include "core/BenchReport.h"
 #include "core/BenchFrameTail.h"
+#include "core/CookProbe.h"
 
 #if defined(_WIN32)
 #include <fcntl.h>
@@ -155,6 +156,7 @@ inline std::string TmpPath(const std::string& name)
 #include "core/RemoteControl.h"
 #include "core/PatchJson.h"
 #include "core/UpdateCheck.h"
+#include "core/Extensions.h"
 
 #ifndef INFINITE_VERSION_STRING
 #define INFINITE_VERSION_STRING "0.0.0"
@@ -171,6 +173,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/VideoSourceNode.h"
 #include "nodes/VideoInNode.h"
 #include "nodes/NoiseNode.h"
+#include "nodes/SketchNode.h"
 #include "nodes/TextureNode.h"
 #include "nodes/ResynthNode.h"
 #include "nodes/MacroNodes.h"
@@ -180,6 +183,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/ColorRampNode.h"
 #include "nodes/PaletteNode.h"
 #include "nodes/AnalyzeNodes.h"
+#include "nodes/HandTrackNode.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/FieldElementNode.h"

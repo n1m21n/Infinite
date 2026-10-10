@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "core/NodeIssue.h"
+
 // The base interface every Infinite node implements. An image node renders into
 // a GL texture that downstream nodes read through GetOutputTexture(); audio,
 // note, geometry and modulator capabilities are layered on through the mix-ins
@@ -181,6 +183,12 @@ public:
    // one simply removes it from the chain.
    bool bypassed = false;
    virtual INode* BypassSource() { return nullptr; }
+
+   // The node's current problem, if any (missing file, plugin that would not load, compile error, no input
+   // device). Polled while the node is drawn, so it must be cheap and must not touch the disk or the GPU.
+   virtual NodeIssue Issue() const { return {}; }
+   // What the badge's click does for Fix::Relink: ask for a replacement file. Returns true if the node changed.
+   virtual bool Relink() { return false; }
 
    // Label shown next to an input pin. Defaults to A, B, C... in the editor.
    virtual const char* InputLabel(int /*slot*/) const { return nullptr; }

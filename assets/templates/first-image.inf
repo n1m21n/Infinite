@@ -1,0 +1,55 @@
+infinite-patch 1
+# First image: a shape on a colour wash
+node 1 Source Ramp
+  id wash
+  pos 0 318
+  c stopColor0 0.05 0.1 0.35
+  c stopColor1 0.55 0.2 0.6
+end
+node 2 Source Shape
+  id shape
+  pos 0 890
+  c fillColor 1 0.45 0.3
+  f size 0.3
+end
+node 3 Compositing Layer Stack
+  id mix
+  pos 460 318
+end
+node 4 Utility Output
+  id out
+  pos 920 302
+end
+node 5 Compositing Comment
+  pos 0 0
+  s text First image. Two pictures are stacked, then shown. Click a node and change any slider.
+  f width 340
+  f height 120
+end
+node 6 Compositing Comment
+  pos 0 156
+  s text A Ramp makes a smooth blend between colours. Try changing Angle or the stop colours.
+  f width 300
+  f height 126
+end
+node 7 Compositing Comment
+  pos 0 728
+  s text A Shape draws a simple form. Try changing Size, Rotation or the Shape Type.
+  f width 300
+  f height 126
+end
+node 8 Compositing Comment
+  pos 460 156
+  s text Layer Stack puts one picture on top of another. The top input sits over the bottom one.
+  f width 300
+  f height 126
+end
+node 9 Compositing Comment
+  pos 920 156
+  s text Output is what you see in the big preview and what gets exported.
+  f width 300
+  f height 110
+end
+cable mix 0 wash
+cable mix 1 shape
+cable out 0 mix

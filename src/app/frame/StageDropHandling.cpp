@@ -52,6 +52,7 @@ void DrawDropHandling(FrameCtx& fc)
          FieldElementNode* dropTargetFieldElement = FindNodeUnderCanvasPoint<FieldElementNode>(canvasPos);
          FieldPrimitiveNode* dropTargetFieldPrimitive = FindNodeUnderCanvasPoint<FieldPrimitiveNode>(canvasPos);
          FieldPixelNode* dropTargetFieldPixel = FindNodeUnderCanvasPoint<FieldPixelNode>(canvasPos);
+         SketchNode* dropTargetSketch = FindNodeUnderCanvasPoint<SketchNode>(canvasPos);
          FieldSampleNode* dropTargetFieldSample = FindNodeUnderCanvasPoint<FieldSampleNode>(canvasPos);
          FieldSynthNode* dropTargetFieldSynth = FindNodeUnderCanvasPoint<FieldSynthNode>(canvasPos);
          FieldGraphNode* dropTargetFieldGraph = FindNodeUnderCanvasPoint<FieldGraphNode>(canvasPos);
@@ -175,6 +176,28 @@ void DrawDropHandling(FrameCtx& fc)
                      continue;
                   }
                // Unreadable file or unspawnable domain: fall through silently.
+               continue;
+            }
+
+            // SVG: onto an existing Sketch it replaces that node's SVG; on empty canvas it
+            // spawns a Sketch that draws it (animate by id from the script).
+            if (HasExtension(path, std::vector<std::string> { "svg" }))
+            {
+               ensureDroppedCheckpoint();
+               if (dropTargetSketch != nullptr)
+               {
+                  dropTargetSketch->LoadSvgFile(path);
+                  gPatchDirty = true;
+                  continue;
+               }
+               GraphNode* spawned = SpawnNode("Sketch", "Source", canvasPos.x + offset, canvasPos.y);
+               if (spawned != nullptr)
+               {
+                  if (auto* sk = dynamic_cast<SketchNode*>(spawned->node.get())) sk->LoadSvgFile(path);
+                  spawned->showParams = true;
+                  offset += 240.0f;
+                  gPatchDirty = true;
+               }
                continue;
             }
 

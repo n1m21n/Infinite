@@ -1,4 +1,12 @@
 // Modulatable sliders, knobs, faders, toggles, pins (moved verbatim from main.cpp).
+#include "app/ui/design/components/PinDot.h"
+#include "app/ui/design/components/StateRing.h"
+#include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/GlyphToggle.h"
+#include "app/ui/design/components/VFader.h"
+#include "app/ui/design/components/ColourChip.h"
+#include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -21,7 +29,7 @@ namespace app
       if (!h.registered)
       {
          PushCheckboxStyle();
-         bool changed = ImGui::Checkbox(label, value);
+         bool changed = NodeCheckbox(label, value);
          PopCheckboxStyle();
          if (outUserChanged)
             *outUserChanged = changed;
@@ -48,10 +56,10 @@ namespace app
       if (h.modulated)
       {
          bool shown = *value;
-         ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? ImVec4(0.84f, 0.49f, 0.08f, 1.0f)
-                                                                  : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000)
+                                                                  : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         ImGui::Checkbox(label, &shown);
+         NodeCheckbox(label, &shown, true);
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -60,7 +68,7 @@ namespace app
       }
       else
       {
-         bool clicked = ImGui::Checkbox(label, value);
+         bool clicked = NodeCheckbox(label, value);
          const bool hovered = ImGui::IsItemHovered();
          // Tab + Left/Right on a focused checkbox: right = on, left = off.
          const int step = KbDiscreteHook(h.nodeIndex, h.paramIndex, false);
@@ -88,6 +96,9 @@ namespace app
                   FaderPosToValueFn posToValue, FaderValueToPosFn valueToPos,
                   int explicitParamIndex, const char* nameOverride)
    {
+      // One slider look everywhere: accent fill behind the value, no grab square. The plain ImGui
+      // branches below are kept only until they are deleted; nothing reaches them.
+      audioStyle = true;
       const int nodeIndex = gCurrentNodeIndex;
       const int paramIndex = (explicitParamIndex >= 0) ? explicitParamIndex : gParamCounter++;
       // nameOverride: what the matrix / binding menu / perf picker call the
@@ -137,7 +148,7 @@ namespace app
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const float box = 14.0f;
+      const float box = tok::pin_box;
       // Centred on the slider track's frame height, same fix and same
       // restore-the-cursor-explicitly reasoning as DrawDiscreteParamPin - see
       // the comment there. The track itself is drawn later at `origin`'s Y.
@@ -149,15 +160,12 @@ namespace app
       ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();
       const bool predicted = modulated && IsPredictionBinding(nodeIndex, paramIndex);
-      const ImU32 pinColor = predicted
-         ? (isLight ? IM_COL32(30, 150, 70, 255) : kPredictionPinCol)
-         : modulated
-         ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
-         : hasExpr && !exprErrored
-            ? (isLight ? IM_COL32(130, 80, 230, 255) : IM_COL32(170, 130, 255, 255))
-            : isLight ? IM_COL32(170, 175, 190, 255) : IM_COL32(70, 75, 90, 255);
-      dl->AddCircleFilled(c, 4.0f, pinColor);
-      dl->AddCircle(c, 4.0f, isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(30, 32, 40, 255), 16, 1.0f);
+      PinDot::Param(dl, c,
+                    predicted ? PinDot::State::Prediction
+                    : modulated ? PinDot::State::Modulated
+                    : hasExpr && !exprErrored ? PinDot::State::Expression
+                    : PinDot::State::Idle,
+                    isLight);
       ExpandPinHit(c, p.x + box);
       ed::EndPin();
       GraphNode* curGn = FindNodeByIndex(nodeIndex);
@@ -207,8 +215,10 @@ namespace app
          // over the neighbouring engine. This is the same defect the knob path
          // fixed; the slider path never got it.
          const std::string typedId = std::string("##typed") + label;
+         FieldWell::PushTypedEditStyle();
          const bool entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf),
                                                ImGuiInputTextFlags_EnterReturnsTrue);
+         FieldWell::PopTypedEditStyle();
          gTypedParamText[editKey] = buf;
          if (gTypedParamPendingInit.count(editKey) && ImGui::IsItemActive())
          {
@@ -216,7 +226,7 @@ namespace app
             {
                if (gTypedParamNoAutoSelect.count(editKey))
                {
-                  state->Stb.cursor = state->CurLenW;
+                  state->ReloadUserBufAndMoveToEnd();
                   state->ClearSelection();
                }
                else
@@ -297,8 +307,8 @@ namespace app
             // full-bright ring color - the user tried the bright version
             // here and asked for this darker tone back, same as the Color
             // Adjustments node's params already use.
-            const ImU32 trackCol = predicted ? (isLight ? IM_COL32(176, 232, 194, 255) : IM_COL32(20, 74, 40, 255))
-                                             : (isLight ? IM_COL32(250, 219, 148, 255) : IM_COL32(82, 61, 20, 255));
+            const ImU32 trackCol = predicted ? (isLight ? tok::U32(tok::pal::c_B0E8C2FF) : tok::U32(tok::pal::c_144A28FF))
+                                             : (isLight ? tok::U32(tok::pal::c_FADB94FF) : tok::U32(tok::pal::c_523D14FF));
             const bool moved = AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
                              trackCol, /*readOnly=*/ro, posToValue, valueToPos, /*vividState=*/true);
             if (grab.editable && moved)
@@ -320,28 +330,28 @@ namespace app
             {
                if (isLight)
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.69f, 0.91f, 0.76f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.10f, 0.55f, 0.25f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_690_910_760_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_100_550_250_1000));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
                }
                else
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.08f, 0.29f, 0.16f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.35f, 0.85f, 0.50f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.98f, 0.94f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_80_290_160_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_350_850_500_1000));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_920_980_940_1000));
                }
             }
             else if (isLight)
             {
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.98f, 0.86f, 0.58f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.80f, 0.52f, 0.10f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_980_860_580_1000));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_800_520_100_1000));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
             }
             else
             {
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.32f, 0.24f, 0.08f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.95f, 0.72f, 0.32f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.97f, 0.95f, 0.90f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_320_240_80_1000));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_950_720_320_1000));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_970_950_900_1000));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             const bool moved = ImGui::SliderFloat(label, &shown, minV, maxV, fmt,
@@ -376,7 +386,7 @@ namespace app
          {
             // Same muted purple as the plain-slider branch's FrameBg below.
             AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
-                             isLight ? IM_COL32(224, 209, 250, 255) : IM_COL32(51, 38, 82, 255),
+                             isLight ? tok::U32(tok::pal::c_E0D1FAFF) : tok::U32(tok::pal::c_332652FF),
                              /*readOnly=*/false, posToValue, valueToPos, /*vividState=*/true);
          }
          else
@@ -385,15 +395,15 @@ namespace app
             // state above - see that comment.
             if (isLight)
             {
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.88f, 0.82f, 0.98f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.48f, 0.28f, 0.85f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_880_820_980_1000));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_480_280_850_1000));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
             }
             else
             {
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.20f, 0.15f, 0.32f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.66f, 0.51f, 0.98f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.93f, 0.99f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_200_150_320_1000));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_660_510_980_1000));
+               ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_950_930_990_1000));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             ImGui::SliderFloat(label, &shown, minV, maxV, fmt);
@@ -420,8 +430,8 @@ namespace app
          // Recording uses the same muted red as the plain-slider branch's
          // FrameBg a few lines down, not the knob's bright ring - see the
          // modulated/expression branches above for why.
-         const ImU32 activeCol = recording ? (isLight ? IM_COL32(252, 204, 204, 255) : IM_COL32(87, 26, 26, 255))
-                                            : IM_COL32(120, 200, 255, 235);
+         const ImU32 activeCol = recording ? (isLight ? tok::U32(tok::pal::c_FCCCCCFF) : tok::U32(tok::pal::c_571A1AFF))
+                                            : tok::U32(tok::pal::c_78C8FFEB);
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
@@ -439,21 +449,21 @@ namespace app
                // both flip with the theme, same as the other colored states.
                if (isLight)
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.99f, 0.80f, 0.80f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.99f, 0.72f, 0.72f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.99f, 0.66f, 0.66f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.80f, 0.14f, 0.14f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.80f, 0.14f, 0.14f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_990_800_800_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_990_720_720_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_990_660_660_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_800_140_140_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_800_140_140_1000));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
                }
                else
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.99f, 0.93f, 0.93f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_340_100_100_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_400_120_120_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_460_140_140_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_920_300_300_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_920_300_300_1000));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_990_930_930_1000));
                }
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
@@ -467,7 +477,7 @@ namespace app
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
-         if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
+         if (ImGui::IsItemActive() && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().RecordClockNow());
@@ -483,8 +493,8 @@ namespace app
          // Recording uses the same muted red as the plain-slider branch's
          // FrameBg a few lines down, not the knob's bright ring - see the
          // modulated/expression branches above for why.
-         const ImU32 activeCol = recording ? (isLight ? IM_COL32(252, 204, 204, 255) : IM_COL32(87, 26, 26, 255))
-                                            : IM_COL32(120, 200, 255, 235);
+         const ImU32 activeCol = recording ? (isLight ? tok::U32(tok::pal::c_FCCCCCFF) : tok::U32(tok::pal::c_571A1AFF))
+                                            : tok::U32(tok::pal::c_78C8FFEB);
          // A finished, looping recording is locked against direct grabs, the
          // same way modulated/expression params are - only Shift (re-record
          // via a session) or an explicit "Record Again" arm may drive it
@@ -513,21 +523,21 @@ namespace app
                // both flip with the theme, same as the other colored states.
                if (isLight)
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.99f, 0.80f, 0.80f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.99f, 0.72f, 0.72f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.99f, 0.66f, 0.66f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.80f, 0.14f, 0.14f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.80f, 0.14f, 0.14f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_990_800_800_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_990_720_720_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_990_660_660_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_800_140_140_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_800_140_140_1000));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_50_50_50_1000));
                }
                else
                {
-                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.99f, 0.93f, 0.93f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, tok::V4(tok::palf::v_340_100_100_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, tok::V4(tok::palf::v_400_120_120_1000));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, tok::V4(tok::palf::v_460_140_140_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_920_300_300_1000));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_920_300_300_1000));
+                  ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_990_930_930_1000));
                }
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
@@ -547,7 +557,7 @@ namespace app
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
-         if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
+         if (ImGui::IsItemActive() && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().RecordClockNow());
@@ -574,6 +584,8 @@ namespace app
             HandleParamTypeHotkeys(editKey, value);
       }
 
+      if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
+         StateRing::Draw(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), StateRing::Kind::Learn, isLight, tok::radius_field);
       changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, ImGui::GetItemRectMin(),
                           ImVec2(std::min(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().x + (width - box - 4.0f)), ImGui::GetItemRectMax().y),
                           false) || changed;
@@ -633,7 +645,7 @@ namespace app
    // Visual width the fader occupies inside its cell (track plus the cap's
    // overhang). The interactive rect matches, for the same reason KnobFloat's
    // does: the cell's side margins belong to ModKnob's modulation pin.
-   const float kFaderWidth = 22.0f;
+   const float kFaderWidth = kFaderW;
 
 
    // Vertical fader with KnobFloat's exact contract - draws at the cursor,
@@ -649,7 +661,7 @@ namespace app
       const float cell = cellW > 0.0f ? cellW : kFaderWidth;
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const float textH = ImGui::GetTextLineHeight();
-      const float rowH = height + 4.0f + textH;
+      const float rowH = height + kKnobCaptionGap + textH;
 
       auto ValueToPos01 = [&](float v) -> float
       {
@@ -690,12 +702,12 @@ namespace app
             changed = true;
          }
       }
-      if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
+      if (active && gestureNodeIndex >= 0 && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
          GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
          GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().RecordClockNow());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
-         fillColor = IM_COL32(235, 70, 70, 255);
+         fillColor = tok::U32(tok::pal::c_EB4646FF);
 
       const float cx = p.x + cell * 0.5f;
       const float top = p.y + 4.0f;
@@ -707,101 +719,23 @@ namespace app
 
       const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      if (isLight)
-      {
-         dl->AddRectFilled(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                           IM_COL32(215, 218, 228, 255), 3.0f);
-         dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                     IM_COL32(190, 195, 208, 255), 3.0f);
-         if (hasRange)
-            dl->AddRectFilled(ImVec2(cx - 5.0f, std::min(capYLo, capYHi)), ImVec2(cx + 5.0f, std::max(capYLo, capYHi)),
-                              IM_COL32(255, 190, 90, 110));
-         if (t > 0.0f)
-            dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
-
-         if (valueToPos == nullptr)
-         {
-            for (int i = 0; i <= 4; i++)
-            {
-               const float y = bottom - (float)i * 0.25f * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(170, 175, 190, 255), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(170, 175, 190, 255), 1.0f);
-            }
-         }
-         else
-         {
-            for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
-            {
-               const float dpos = std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f);
-               const float y = bottom - dpos * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(170, 175, 190, 255), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(170, 175, 190, 255), 1.0f);
-            }
-         }
-         const ImU32 capCol = readOnly ? IM_COL32(200, 204, 214, 255) : IM_COL32(236, 240, 248, 255);
-         dl->AddRectFilled(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f), capCol, 3.0f);
-         dl->AddRect(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f),
-                     IM_COL32(180, 185, 200, 255), 3.0f);
-         dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
-                     readOnly ? IM_COL32(140, 145, 160, 255) : IM_COL32(40, 45, 60, 255), 1.6f);
-         if (active && !readOnly)
-            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
-                        IM_COL32(50, 110, 220, 160), 4.0f, 0, 2.0f);
-         else if (hovered && !readOnly)
-            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
-                        IM_COL32(0, 0, 0, 30), 4.0f, 0, 2.0f);
-      }
+      float tickY[ConsoleFaderTaper::kNumDetents > 5 ? ConsoleFaderTaper::kNumDetents : 5];
+      int nTicks = 0;
+      if (valueToPos == nullptr)
+         for (int i = 0; i <= 4; i++)
+            tickY[nTicks++] = bottom - (float)i * 0.25f * (bottom - top);
       else
-      {
-         dl->AddRectFilled(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                           IM_COL32(14, 15, 20, 255), 3.0f);
-         dl->AddRect(ImVec2(cx - 3.0f, top - 4.0f), ImVec2(cx + 3.0f, bottom + 4.0f),
-                     IM_COL32(58, 62, 76, 255), 3.0f);
-         if (hasRange)
-            dl->AddRectFilled(ImVec2(cx - 5.0f, std::min(capYLo, capYHi)), ImVec2(cx + 5.0f, std::max(capYLo, capYHi)),
-                              IM_COL32(255, 190, 90, 120));
-         if (t > 0.0f)
-            dl->AddRectFilled(ImVec2(cx - 2.0f, capY), ImVec2(cx + 2.0f, bottom + 4.0f), fillColor, 2.0f);
-
-         if (valueToPos == nullptr)
-         {
-            for (int i = 0; i <= 4; i++)
-            {
-               const float y = bottom - (float)i * 0.25f * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
-            }
-         }
-         else
-         {
-            for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
-            {
-               const float dpos = std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f);
-               const float y = bottom - dpos * (bottom - top);
-               dl->AddLine(ImVec2(cx + 6.0f, y), ImVec2(cx + 9.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
-               dl->AddLine(ImVec2(cx - 9.0f, y), ImVec2(cx - 6.0f, y), IM_COL32(255, 255, 255, 34), 1.0f);
-            }
-         }
-         const ImU32 capCol = readOnly ? IM_COL32(96, 99, 114, 255) : IM_COL32(72, 77, 94, 255);
-         dl->AddRectFilled(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f), capCol, 3.0f);
-         dl->AddRect(ImVec2(cx - 9.0f, capY - 6.0f), ImVec2(cx + 9.0f, capY + 6.0f),
-                     IM_COL32(18, 19, 25, 200), 3.0f);
-         dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
-                     readOnly ? IM_COL32(200, 202, 212, 255) : IM_COL32(238, 240, 248, 255), 1.6f);
-         if (active && !readOnly)
-            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
-                        IM_COL32(110, 180, 255, 180), 4.0f, 0, 2.0f);
-         else if (hovered && !readOnly)
-            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
-                        IM_COL32(255, 255, 255, 60), 4.0f, 0, 2.0f);
-      }
+         for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
+            tickY[nTicks++] = bottom - std::clamp(valueToPos(ConsoleFaderTaper::kDetentsDb[i], minV, maxV), 0.0f, 1.0f) * (bottom - top);
+      VFader::Draw(dl, cx, top, bottom, capY, t > 0.0f, fillColor, tickY, nTicks, hasRange, capYLo, capYHi,
+                   hovered, active, readOnly, isLight);
 
       // Caption below, same baseline rule as the knob's.
       const char* caption = label[0] == '#' ? "" : label;
       const ImVec2 textSize = ImGui::CalcTextSize(caption);
       const ImU32 capTextCol = isLight
-         ? (readOnly ? IM_COL32(125, 130, 145, 255) : IM_COL32(50, 55, 70, 255))
-         : (readOnly ? IM_COL32(140, 140, 150, 255) : IM_COL32(176, 182, 198, 255));
+         ? (readOnly ? tok::U32(tok::pal::c_7D8291FF) : tok::U32(tok::pal::c_323746FF))
+         : (readOnly ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_B0B6C6FF));
       const float capTextY = p.y + height + 4.0f;
       dl->PushClipRect(ImVec2(p.x, capTextY), ImVec2(p.x + cell, capTextY + textH), true);
       dl->AddText(ImVec2(cx - textSize.x * 0.5f, capTextY), capTextCol, caption);
@@ -847,7 +781,7 @@ namespace app
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const char* caption = label[0] == '#' ? "" : label;
       const float textH = (caption[0] == '\0') ? 0.0f : ImGui::GetTextLineHeight();
-      const float rowH = (caption[0] == '\0') ? diameter : (diameter + 4.0f + textH);
+      const float rowH = (caption[0] == '\0') ? diameter : (diameter + kKnobCaptionGap + textH);
 
       auto ValueToPos01 = [&](float v) -> float
       {
@@ -911,17 +845,17 @@ namespace app
          // Kept dark even in light mode so it still reads as a shadow, not
          // a glow.
          const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, IM_COL32(30, 32, 40, 16), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, IM_COL32(30, 32, 40, 22), 32);
-         dl->AddCircleFilled(center, radius, IM_COL32(220, 224, 234, 255), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(242, 245, 250, 255), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_1E202810), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_1E202816), 32);
+         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_DCE0EAFF), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_F2F5FAFF), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
          // The guide ring covers the knob's whole travel, not just the
          // value-proportional fill arc below - tinting it when recording is
          // what makes the state readable at a glance regardless of where the
          // value happens to sit (a knob near its low end barely shows any
          // fill arc at all otherwise).
-         dl->PathStroke(activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(195, 200, 212, 255), 0, 3.0f);
+         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_C3C8D4FF), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
@@ -935,10 +869,10 @@ namespace app
          }
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(140, 145, 160, 255) : IM_COL32(40, 45, 60, 255), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(175, 180, 195, 255), 32, 1.0f);
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_8C91A0FF) : tok::U32(tok::pal::c_282D3CFF), 2.0f);
+         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_AFB4C3FF), 32, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, IM_COL32(0, 0, 0, 30), 32, 3.0f);
+            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_0000001E), 32, 3.0f);
       }
       else
       {
@@ -947,12 +881,12 @@ namespace app
          // still separate the bezel from the body - same two-layer fake-blur
          // idiom, tuned darker/stronger for this background.
          const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, IM_COL32(0, 0, 0, 45), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, IM_COL32(0, 0, 0, 60), 32);
-         dl->AddCircleFilled(center, radius, IM_COL32(36, 38, 48, 255), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(22, 23, 30, 255), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_0000002D), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_0000003C), 32);
+         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_242630FF), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_16171EFF), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(58, 62, 76, 255), 0, 3.0f);
+         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_3A3E4CFF), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
@@ -966,10 +900,10 @@ namespace app
          }
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(200, 202, 212, 255) : IM_COL32(238, 240, 248, 255), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(74, 78, 94, 255), 32, 1.0f);
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_C8CAD4FF) : tok::U32(tok::pal::c_EEF0F8FF), 2.0f);
+         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_4A4E5EFF), 32, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, IM_COL32(255, 255, 255, 40), 32, 3.0f);
+            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_FFFFFF28), 32, 3.0f);
       }
 
       // The knob's permanent caption is the param *name*, not its value - a
@@ -983,8 +917,8 @@ namespace app
          // row's fit-to-body-width guarantee.
          ImVec2 textSize = ImGui::CalcTextSize(caption);
          const ImU32 capCol = isLight
-            ? (readOnly ? IM_COL32(125, 130, 145, 255) : IM_COL32(50, 55, 70, 255))
-            : (readOnly ? IM_COL32(140, 140, 150, 255) : IM_COL32(176, 182, 198, 255));
+            ? (readOnly ? tok::U32(tok::pal::c_7D8291FF) : tok::U32(tok::pal::c_323746FF))
+            : (readOnly ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_B0B6C6FF));
          const float capY = p.y + diameter + 4.0f;
          if (textSize.x <= cell)
          {
@@ -1043,7 +977,7 @@ namespace app
       const ImVec2 p = ImGui::GetCursorScreenPos();
       const char* caption = label[0] == '#' ? "" : label;
       const float textH = (caption[0] == '\0') ? 0.0f : ImGui::GetTextLineHeight();
-      const float rowH = (caption[0] == '\0') ? diameter : (diameter + 4.0f + textH);
+      const float rowH = (caption[0] == '\0') ? diameter : (diameter + kKnobCaptionGap + textH);
 
       auto ValueToPos01 = [&](float v) -> float {
          return (maxV > minV) ? std::clamp((v - minV) / (maxV - minV), 0.0f, 1.0f) : 0.5f;
@@ -1083,12 +1017,12 @@ namespace app
             changed = true;
          }
       }
-      if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
+      if (active && gestureNodeIndex >= 0 && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
          GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
          GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().RecordClockNow());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
-         fillColor = IM_COL32(235, 70, 70, 255);
+         fillColor = tok::U32(tok::pal::c_EB4646FF);
 
       const ImVec2 center(p.x + cell * 0.5f, p.y + diameter * 0.5f);
       const float radius = diameter * 0.5f - 2.0f;
@@ -1105,12 +1039,12 @@ namespace app
          // above for the rationale (fake-blur via layered low-alpha circles,
          // offset down so the bezel reads as sitting above the panel).
          const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, IM_COL32(30, 32, 40, 16), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, IM_COL32(30, 32, 40, 22), 32);
-         dl->AddCircleFilled(center, radius, IM_COL32(220, 224, 234, 255), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(242, 245, 250, 255), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_1E202810), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_1E202816), 32);
+         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_DCE0EAFF), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_F2F5FAFF), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(195, 200, 212, 255), 0, 3.0f);
+         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_C3C8D4FF), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x70000000;
@@ -1119,7 +1053,7 @@ namespace app
          }
 
          // Center tick
-         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), IM_COL32(150, 155, 170, 255), 1.5f);
+         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::U32(tok::pal::c_969BAAFF), 1.5f);
 
          // Arc from center (12 o'clock) to current angle
          if (angle < aMid)
@@ -1135,22 +1069,22 @@ namespace app
 
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(140, 145, 160, 255) : IM_COL32(40, 45, 60, 255), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(175, 180, 195, 255), 32, 1.0f);
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_8C91A0FF) : tok::U32(tok::pal::c_282D3CFF), 2.0f);
+         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_AFB4C3FF), 32, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, IM_COL32(0, 0, 0, 30), 32, 3.0f);
+            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_0000001E), 32, 3.0f);
       }
       else
       {
          // Dark theme: slightly stronger alpha than the light version, same
          // rationale as KnobFloat's dark branch above.
          const ImVec2 shadowCenter(center.x, center.y + 1.5f);
-         dl->AddCircleFilled(shadowCenter, radius + 2.0f, IM_COL32(0, 0, 0, 45), 32);
-         dl->AddCircleFilled(shadowCenter, radius + 0.75f, IM_COL32(0, 0, 0, 60), 32);
-         dl->AddCircleFilled(center, radius, IM_COL32(36, 38, 48, 255), 32);
-         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(22, 23, 30, 255), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 2.0f, tok::U32(tok::pal::c_0000002D), 32);
+         dl->AddCircleFilled(shadowCenter, radius + 0.75f, tok::U32(tok::pal::c_0000003C), 32);
+         dl->AddCircleFilled(center, radius, tok::U32(tok::pal::c_242630FF), 32);
+         dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, tok::U32(tok::pal::c_16171EFF), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(58, 62, 76, 255), 0, 3.0f);
+         dl->PathStroke(activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_3A3E4CFF), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             const ImU32 rangeCol = (fillColor & 0x00FFFFFF) | 0x82000000;
@@ -1159,7 +1093,7 @@ namespace app
          }
 
          // Center tick
-         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), IM_COL32(100, 105, 120, 255), 1.5f);
+         dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), tok::U32(tok::pal::c_646978FF), 1.5f);
 
          // Arc from center (12 o'clock) to current angle
          if (angle < aMid)
@@ -1175,10 +1109,10 @@ namespace app
 
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
-         dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(120, 125, 140, 255) : IM_COL32(230, 235, 245, 255), 2.0f);
-         dl->AddCircle(center, radius, activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(74, 78, 94, 255), 32, 1.0f);
+         dl->AddLine(tipIn, tipOut, readOnly ? tok::U32(tok::pal::c_787D8CFF) : tok::U32(tok::pal::c_E6EBF5FF), 2.0f);
+         dl->AddCircle(center, radius, activeTint ? tok::U32(tok::pal::c_DC5A5AFF) : tok::U32(tok::pal::c_4A4E5EFF), 32, 1.0f);
          if (hovered && !readOnly)
-            dl->AddCircle(center, radius + 2.5f, IM_COL32(255, 255, 255, 40), 32, 3.0f);
+            dl->AddCircle(center, radius + 2.5f, tok::U32(tok::pal::c_FFFFFF28), 32, 3.0f);
       }
 
       // rowH has always reserved room for a caption here; nothing ever drew
@@ -1188,8 +1122,8 @@ namespace app
       {
          const ImVec2 textSize = ImGui::CalcTextSize(caption);
          const ImU32 capCol = isLight
-            ? (readOnly ? IM_COL32(125, 130, 145, 255) : IM_COL32(50, 55, 70, 255))
-            : (readOnly ? IM_COL32(140, 140, 150, 255) : IM_COL32(176, 182, 198, 255));
+            ? (readOnly ? tok::U32(tok::pal::c_7D8291FF) : tok::U32(tok::pal::c_323746FF))
+            : (readOnly ? tok::U32(tok::pal::c_8C8C96FF) : tok::U32(tok::pal::c_B0B6C6FF));
          const float capY = p.y + diameter + 4.0f;
          if (textSize.x <= cell)
          {
@@ -1359,10 +1293,11 @@ namespace app
       // margin afterwards, so it costs no row width at all.
       const ImVec2 cellOrigin = ImGui::GetCursorScreenPos();
       const float cell = cellW > 0.0f ? cellW : diameter;
-      const ImU32 pinColor = modulated && IsPredictionBinding(nodeIndex, paramIndex) ? kPredictionPinCol
-                            : modulated              ? IM_COL32(255, 190, 90, 255)
-                            : hasExpr && !exprErrored ? IM_COL32(170, 130, 255, 255)
-                                                      : IM_COL32(130, 138, 162, 255);
+      const PinDot::State pinState = modulated && IsPredictionBinding(nodeIndex, paramIndex) ? PinDot::State::Prediction
+                                    : modulated               ? PinDot::State::Modulated
+                                    : hasExpr && !exprErrored ? PinDot::State::Expression
+                                                              : PinDot::State::Idle;
+      const ImU32 pinColor = PinDot::Colour(pinState, IsThemeLight());
 
       const std::pair<int, int> editKey(nodeIndex, paramIndex);
       bool typing = gTypedParam.count(editKey) > 0;
@@ -1390,7 +1325,9 @@ namespace app
          char buf[256];
          snprintf(buf, sizeof(buf), "%s", gTypedParamText[editKey].c_str());
          const std::string typedId = std::string("##typed") + label;
+         FieldWell::PushTypedEditStyle();
          const bool entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
+         FieldWell::PopTypedEditStyle();
          gTypedParamText[editKey] = buf;
          if (gTypedParamPendingInit.count(editKey) && ImGui::IsItemActive())
          {
@@ -1398,7 +1335,7 @@ namespace app
             {
                if (gTypedParamNoAutoSelect.count(editKey))
                {
-                  state->Stb.cursor = state->CurLenW;
+                  state->ReloadUserBufAndMoveToEnd();
                   state->ClearSelection();
                }
                else
@@ -1458,7 +1395,7 @@ namespace app
          // Same footprint the widget would have had, so the row is identical
          // whether or not one of its cells is being typed into.
          ImGui::SetCursorScreenPos(cellOrigin);
-         ImGui::Dummy(ImVec2(cell, diameter + 4.0f + ImGui::GetTextLineHeight()));
+         ImGui::Dummy(ImVec2(cell, diameter + kKnobCaptionGap + ImGui::GetTextLineHeight()));
       }
       else if (modulated)
       {
@@ -1466,7 +1403,7 @@ namespace app
          const Modulation::Source src = Modulation::Instance().ResolvedSourceFor(ref);
          // Green (prediction) binding: read-only unless Shift is held - see BeginPredictorGrab.
          const PredictorGrabCtx grab = BeginPredictorGrab(ref);
-         const bool moved = DrawWidget(&shown, grab.pred != nullptr ? pinColor : IM_COL32(255, 190, 90, 255),
+         const bool moved = DrawWidget(&shown, grab.pred != nullptr ? pinColor : tok::U32(tok::pal::c_FFBE5AFF),
                                        /*readOnly=*/!grab.editable, /*hasRange=*/true, src.lo, src.hi);
          if (grab.editable && moved)
          {
@@ -1486,7 +1423,7 @@ namespace app
          // right-click menu's Unbind, so an accidental drag can't destroy a
          // formula someone typed on purpose.
          float shown = *value;
-         DrawWidget(&shown, IM_COL32(170, 130, 255, 255), /*readOnly=*/false);
+         DrawWidget(&shown, tok::U32(tok::pal::c_AA82FFFF), /*readOnly=*/false);
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
@@ -1505,7 +1442,7 @@ namespace app
          const bool hasPlayback = GestureRecorder::Instance().Playbacks().count(GestureRecorder::Key(nodeIndex, paramIndex)) > 0;
          const bool locked = hasPlayback && !ImGui::GetIO().KeyShift && !GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex);
          float shown = *value;
-         const bool widgetChanged = DrawWidget(&shown, recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235),
+         const bool widgetChanged = DrawWidget(&shown, recording ? tok::U32(tok::pal::c_EB4646FF) : tok::U32(tok::pal::c_78C8FFEB),
                               /*readOnly=*/false, /*hasRange=*/false, 0.0f, 0.0f, /*activeTint=*/recording);
          if (!locked)
          {
@@ -1518,7 +1455,7 @@ namespace app
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
-         if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
+         if (ImGui::IsItemActive() && ((ImGui::GetIO().KeyShift && ImGui::IsMouseDown(0)) || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().RecordClockNow());
@@ -1540,7 +1477,7 @@ namespace app
       // Modulation registration as before: only where it is drawn changed.
       {
          const ImVec2 cursorAfter = ImGui::GetCursorScreenPos();
-         const float box = 12.0f;
+         const float box = tok::pin_box;
          // Immediately to the left of the knob, not at the far edge of the
          // cell: in a wide cell a pin parked at the cell boundary reads as
          // belonging to the gap between two knobs rather than to either one.
@@ -1548,19 +1485,14 @@ namespace app
          // arc. At the old 2px the two visually touched and read as one
          // control with a wart on it rather than as a knob and its pin.
          const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - 8.0f);
-         const ImVec2 pinTL(pinX, cellOrigin.y + diameter - box);
+         const ImVec2 pinTL(pinX, cellOrigin.y + (diameter - box) * 0.5f);  // centred on the knob (node-ui-pillars P2)
          ImGui::SetCursorScreenPos(pinTL);
          ed::BeginPin(pinId, ed::PinKind::Input);
          ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
          ImGui::Dummy(ImVec2(box, box));
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 c(pinTL.x + box * 0.5f, pinTL.y + box * 0.5f);
-         // A ring rather than a bare dot: at 4px a filled dot beside a 56px
-         // knob reads as a rendering artifact, not an affordance.
-         dl->AddCircleFilled(c, 4.0f, IM_COL32(18, 19, 25, 255));
-         dl->AddCircle(c, modulated || hasExpr ? 4.0f : 4.5f, pinColor, 12, 2.0f);
-         if (modulated || hasExpr)
-            dl->AddCircleFilled(c, 2.0f, pinColor);
+         PinDot::Param(dl, c, pinState, IsThemeLight());
          ExpandPinHit(c, pinTL.x + box);
          ed::EndPin();
          gPinAnchors[pinId] = c;
@@ -1575,7 +1507,9 @@ namespace app
             pinInfo.shapeRadius = diameter * 0.5f + 2.0f;
          }
          gParamPinScreenList.push_back(pinInfo);
-         ImGui::SetCursorScreenPos(cursorAfter);
+         // Put the cursor back without SetCursorScreenPos: as the last call before EndGroup it counts as
+         // "extending the parent's boundaries without an item" and ImGui flags it (Compare's last slider).
+         ImGui::GetCurrentWindow()->DC.CursorPos = cursorAfter;
       }
 
       {
@@ -1584,6 +1518,13 @@ namespace app
          const ImVec2 kmin = kbCircle ? ImVec2(kcx - diameter * 0.5f, cellOrigin.y) : ImVec2(kcx - 7.0f, cellOrigin.y);
          const ImVec2 kmax = kbCircle ? ImVec2(kcx + diameter * 0.5f, cellOrigin.y + diameter)
                                       : ImVec2(kcx + 7.0f, cellOrigin.y + diameter);
+         if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
+         {
+            if (kbCircle)
+               StateRing::DrawCircle(ImGui::GetWindowDrawList(), ImVec2((kmin.x + kmax.x) * 0.5f, (kmin.y + kmax.y) * 0.5f), diameter * 0.5f, StateRing::Kind::Learn, IsThemeLight());
+            else
+               StateRing::Draw(ImGui::GetWindowDrawList(), kmin, kmax, StateRing::Kind::Learn, IsThemeLight(), tok::radius_field);
+         }
          changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, kmin, kmax, kbCircle) || changed;
       }
       ImGui::PopID();
@@ -1662,22 +1603,24 @@ namespace app
 
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+      const ImVec2 rowStart = ImGui::GetCursorScreenPos();
+      const float box = tok::pin_box;
+      // centred on the face, like every param pin (P2)
+      ImGui::SetCursorScreenPos(ImVec2(rowStart.x, rowStart.y + (ImGui::GetFrameHeight() - box) * 0.5f));
       const ImVec2 p = ImGui::GetCursorScreenPos();
-      const float box = 14.0f;
       ImGui::Dummy(ImVec2(box, box));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
-      // Square where a modulation pin is round: the two accept different cables
-      // and sit right next to each other, so they should not look alike.
-      dl->AddRectFilled(ImVec2(c.x - 4.0f, c.y - 4.0f), ImVec2(c.x + 4.0f, c.y + 4.0f),
-                        isBound ? IM_COL32(130, 220, 190, 255) : IM_COL32(95, 100, 120, 255),
-                        1.0f);
+      PinDot::Swatch(dl, c, isBound, IsThemeLight());
       ExpandPinHit(c, p.x + box);
       ed::EndPin();
-      ImGui::SameLine(0.0f, 4.0f);
+      ImGui::SetCursorScreenPos(ImVec2(rowStart.x + box + 4.0f, rowStart.y));
 
-      if (ImGui::ColorButton(label, ImVec4(col[0], col[1], col[2], 1.0f),
-                             ImGuiColorEditFlags_NoTooltip, ImVec2(38, 0)))
+      char boundCaption[96];
+      snprintf(boundCaption, sizeof(boundCaption), "%s  #%d", label, bound.swatchIndex + 1);
+      const ImVec4 boundTint = ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pin_colour_bound, IsThemeLight()));
+      if (ColourChip::DrawRow(label, isBound ? boundCaption : label, col, std::max(24.0f, kParamWidth - (tok::pin_box + 4.0f)),
+                              isBound ? &boundTint : nullptr))
       {
          if (isBound)
          {
@@ -1704,12 +1647,6 @@ namespace app
             gColor.justOpened = true;
          }
       }
-      ImGui::SameLine();
-      if (isBound)
-         ImGui::TextColored(ImVec4(0.5f, 0.86f, 0.74f, 1.0f), "%s  #%d",
-                            label, bound.swatchIndex + 1);
-      else
-         ImGui::TextDisabled("%s", label);
 
       ImGui::PopID();
       ImGui::PopID();
@@ -1788,13 +1725,13 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float y = origin.y + 6.0f;
-      const ImU32 col = IM_COL32(78, 82, 100, 255);
+      const ImU32 col = ImGui::GetColorU32(ImGuiCol_Border, 0.6f);   // themed hairline: reads in light and dark
 
       if (label != nullptr && label[0] != '\0')
       {
          const ImVec2 textSize = ImGui::CalcTextSize(label);
          dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + 10.0f, y), col);
-         dl->AddText(ImVec2(origin.x + 16.0f, origin.y), IM_COL32(150, 156, 180, 255), label);
+         dl->AddText(ImVec2(origin.x + 16.0f, origin.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), label);
          const float lineStart = origin.x + 22.0f + textSize.x;
          if (lineStart < origin.x + width)
             dl->AddLine(ImVec2(lineStart, y), ImVec2(origin.x + width, y), col);
@@ -1820,42 +1757,7 @@ namespace app
    // and an emoji would not render in a non-emoji face.
    bool EyeToggle(bool shown)
    {
-      const float w = 26.0f;
-      const float h = 18.0f;
-      ImVec2 origin = ImGui::GetCursorScreenPos();
-      const bool pressed = ImGui::InvisibleButton("##eye", ImVec2(w, h));
-      const bool hovered = ImGui::IsItemHovered();
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      ImU32 col = hovered ? IM_COL32(235, 240, 255, 255)
-                          : (shown ? IM_COL32(150, 190, 255, 255) : IM_COL32(120, 124, 140, 255));
-
-      // almond outline: two arcs meeting at the corners
-      const float rx = 9.0f, ry = 5.5f;
-      dl->PathClear();
-      for (int i = 0; i <= 16; i++)
-      {
-         float t = (float)i / 16.0f;
-         float x = -rx + 2.0f * rx * t;
-         float y = -ry * (float)sin(3.14159f * t);
-         dl->PathLineTo(ImVec2(c.x + x, c.y + y));
-      }
-      for (int i = 0; i <= 16; i++)
-      {
-         float t = (float)i / 16.0f;
-         float x = rx - 2.0f * rx * t;
-         float y = ry * (float)sin(3.14159f * t);
-         dl->PathLineTo(ImVec2(c.x + x, c.y + y));
-      }
-      dl->PathStroke(col, ImDrawFlags_Closed, 1.6f);
-
-      if (shown)
-         dl->AddCircleFilled(c, 2.6f, col);
-      else
-         dl->AddLine(ImVec2(c.x - rx, c.y + ry * 0.9f), ImVec2(c.x + rx, c.y - ry * 0.9f), col, 1.6f);
-
-      return pressed;
+      return GlyphToggle::Draw("##eye", IconsInfinite::EyeOff, IconsInfinite::Eye, shown, 26.0f);
    }
 
 
@@ -1865,30 +1767,7 @@ namespace app
    // than overloading the eye icon.
    bool ViewportToggle(bool shown)
    {
-      const float w = 22.0f;
-      const float h = 18.0f;
-      ImVec2 origin = ImGui::GetCursorScreenPos();
-      const bool pressed = ImGui::InvisibleButton("##miniviewport", ImVec2(w, h));
-      const bool hovered = ImGui::IsItemHovered();
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      ImU32 col = hovered ? IM_COL32(235, 240, 255, 255)
-                          : (shown ? IM_COL32(150, 190, 255, 255) : IM_COL32(120, 124, 140, 255));
-
-      // A little screen/monitor glyph: rounded rect body plus a stand, filled
-      // when the viewport is on so it reads at a glance in a busy graph.
-      const float bw = 13.0f, bh = 9.0f;
-      ImVec2 tl(c.x - bw * 0.5f, c.y - bh * 0.5f - 1.0f);
-      ImVec2 br(c.x + bw * 0.5f, c.y + bh * 0.5f - 1.0f);
-      if (shown)
-         dl->AddRectFilled(tl, br, col, 1.5f);
-      else
-         dl->AddRect(tl, br, col, 1.5f, 0, 1.4f);
-      dl->AddLine(ImVec2(c.x, br.y), ImVec2(c.x, br.y + 2.5f), col, 1.4f);
-      dl->AddLine(ImVec2(c.x - 3.5f, br.y + 2.5f), ImVec2(c.x + 3.5f, br.y + 2.5f), col, 1.4f);
-
-      return pressed;
+      return GlyphToggle::Draw("##miniviewport", IconsInfinite::Viewport, IconsInfinite::ViewportFill, shown);
    }
 
 
@@ -1896,59 +1775,8 @@ namespace app
    // rendering a high-precision beamed musical note (♫) symbol.
    bool GlobalScaleToggle(bool enabled)
    {
-      const float w = 22.0f;
-      const float h = 18.0f;
-      ImVec2 origin = ImGui::GetCursorScreenPos();
-      const bool pressed = ImGui::InvisibleButton("##globalscale", ImVec2(w, h));
+      const bool pressed = GlyphToggle::Draw("##globalscale", IconsInfinite::NoteSnap, IconsInfinite::NoteSnapFill, enabled);
       const bool hovered = ImGui::IsItemHovered();
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      ImU32 col = hovered ? IM_COL32(245, 248, 255, 255)
-                          : (enabled ? IM_COL32(185, 145, 255, 255) : IM_COL32(120, 124, 140, 255));
-
-      // Draw slanted note head helper with high segment count for smooth curves
-      auto DrawNoteHead = [&](ImVec2 center, float rx, float ry, float angleRad, bool filled)
-      {
-         const float cosA = cosf(angleRad);
-         const float sinA = sinf(angleRad);
-         const int kSegs = 24;
-         dl->PathClear();
-         for (int i = 0; i < kSegs; i++)
-         {
-            const float t = (float)i / (float)kSegs * 6.2831853f;
-            const float ex = rx * cosf(t);
-            const float ey = ry * sinf(t);
-            const float px = center.x + ex * cosA - ey * sinA;
-            const float py = center.y + ex * sinA + ey * cosA;
-            dl->PathLineTo(ImVec2(px, py));
-         }
-         if (filled)
-            dl->PathFillConvex(col);
-         else
-            dl->PathStroke(col, ImDrawFlags_Closed, 1.4f);
-      };
-
-      const float angle = -0.38f; // ~ -22 degrees slant
-      const ImVec2 head1(c.x - 3.8f, c.y + 3.0f);
-      const ImVec2 head2(c.x + 2.8f, c.y + 1.2f);
-      const float rx = 2.4f, ry = 1.7f;
-
-      DrawNoteHead(head1, rx, ry, angle, enabled);
-      DrawNoteHead(head2, rx, ry, angle, enabled);
-
-      const float stem1X = head1.x + 1.5f;
-      const float stem2X = head2.x + 1.5f;
-      const float top1Y = c.y - 4.5f;
-      const float top2Y = c.y - 6.3f;
-      const float stemThickness = 1.4f;
-
-      // Stems
-      dl->AddLine(ImVec2(stem1X, head1.y + 0.5f), ImVec2(stem1X, top1Y), col, stemThickness);
-      dl->AddLine(ImVec2(stem2X, head2.y + 0.5f), ImVec2(stem2X, top2Y), col, stemThickness);
-
-      // Connecting top beam
-      dl->AddLine(ImVec2(stem1X - 0.4f, top1Y + 0.3f), ImVec2(stem2X + 0.4f, top2Y + 0.3f), col, 2.2f);
 
       if (hovered)
       {
@@ -1988,40 +1816,26 @@ namespace app
    // rendering an IEC 60417-5009 power symbol.
    bool BypassToggle(bool bypassed)
    {
-      const float w = 22.0f;
-      const float h = 18.0f;
-      ImVec2 origin = ImGui::GetCursorScreenPos();
-      const bool pressed = ImGui::InvisibleButton("##bypass", ImVec2(w, h));
-      const bool hovered = ImGui::IsItemHovered();
+      return GlyphToggle::Draw("##bypass", IconsInfinite::Power, IconsInfinite::PowerFill, !bypassed, 22.0f, true);
+   }
 
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(origin.x + w * 0.5f, origin.y + h * 0.5f);
-      ImU32 col = hovered ? IM_COL32(235, 240, 255, 255)
-                          : (bypassed ? IM_COL32(245, 140, 60, 255) : IM_COL32(120, 124, 140, 255));
 
-      // IEC 60417-5009 Power symbol: an open arc (from 45 deg to 315 deg) plus a vertical line
-      const float r = 5.0f;
-      const float startAngle = 0.785398f; // ~45 deg
-      const float endAngle = 5.497787f;   // ~315 deg
-      dl->PathClear();
-      const int arcSegments = 16;
-      for (int i = 0; i <= arcSegments; i++)
-      {
-         float t = (float)i / (float)arcSegments;
-         float angle = startAngle + (endAngle - startAngle) * t;
-         dl->PathLineTo(ImVec2(c.x + sinf(angle) * r, c.y - cosf(angle) * r));
-      }
-      dl->PathStroke(col, 0, 1.6f);
-      // Vertical power stroke at top center
-      dl->AddLine(ImVec2(c.x, c.y - r - 2.0f), ImVec2(c.x, c.y + 0.5f), col, 1.6f);
-
-      if (bypassed)
-      {
-         // Diagonal strike through
-         dl->AddLine(ImVec2(c.x - r - 1.0f, c.y + r + 1.0f), ImVec2(c.x + r + 1.0f, c.y - r - 1.0f), IM_COL32(245, 100, 50, 255), 1.5f);
-      }
-
-      return pressed;
+   static std::unordered_map<const INode*, float> gNodeWidthCache;
+   void CacheNodeWidth(const INode* node, float width) { gNodeWidthCache[node] = width; }
+   // Like WideNodeCentreOffset but with no first-frame fallback: 0 until the node has been laid out once, so a
+   // small node never opens wide.
+   float CachedCentreOffset(const INode* node, float contentW)
+   {
+      auto it = gNodeWidthCache.find(node);
+      return it == gNodeWidthCache.end() ? 0.0f : std::max(0.0f, (it->second - 16.0f - contentW) * 0.5f);
+   }
+   float WideNodeCentreOffset(const INode* node, float contentW)
+   {
+      float nodeW = kWideNodeWidth;
+      auto it = gNodeWidthCache.find(node);
+      if (it != gNodeWidthCache.end())
+         nodeW = it->second - 16.0f;   // 16 = node padding left + right; the real width, not a floor, or a narrow node centres off to the right
+      return std::max(0.0f, (nodeW - contentW) * 0.5f);
    }
 
 
@@ -2046,13 +1860,9 @@ namespace app
       const bool isLight = IsThemeLight();
       GraphNode* curGn = FindNodeByIndex(GraphNode::NodeIndexFromPin(pinId));
       const bool isPredPin = curGn != nullptr && (curGn->category == "Prediction" || dynamic_cast<IPredictor*>(curGn->node.get()) != nullptr);
-      const ImU32 pinFill = isPredPin
-         ? (isLight ? IM_COL32(22, 163, 74, 255) : IM_COL32(34, 197, 94, 255))
-         : (isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255));
       if (kind == ed::PinKind::Output)
          gPinAnchors[pinId] = c;
-      dl->AddCircleFilled(c, kPinRadius, pinFill);
-      dl->AddCircle(c, kPinRadius, isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255), 0, 1.5f);
+      PinDot::Cable(dl, c, isPredPin, isLight);
 
       if (!labelFirst && label != nullptr && label[0] != '\0')
       {

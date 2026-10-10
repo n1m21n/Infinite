@@ -195,6 +195,7 @@ namespace app
    std::vector<LinkInfo> gLinks;
 
    bool gSnapToGrid = true;
+   bool gShowCanvasGrid = false;   // the faint line grid behind the nodes; off by default, Settings > Canvas & Workspace
 
    float gGridSnap = 20.0f;
 
@@ -431,6 +432,8 @@ bool gHeadlessNeedProbe = false;
    // active modulation binding. Session UI state only, like gNodePanelOpen
    // above - not serialized to patch data or tracked by undo.
    bool  gModMatrixOpen = false;
+   bool  gHistoryOpen = false;
+   float gHistoryWidth = 300.0f;
 
    int   gModMatrixDock = 0;
               // 0 = bottom, 1 = right, 2 = left, 3 = top
@@ -688,6 +691,7 @@ bool gHeadlessNeedProbe = false;
    bool     gArrangeRenameJustStarted = false;
  // one-shot: focus the rename field the frame it opens
    bool     gArrangeClipSettingsPanelOpen = false;
+   ImVec2   gArrangeInspectorMin(0, 0), gArrangeInspectorMax(0, 0);   // last drawn Clip Settings rect (wheel/pinch must not reach the timeline)
  // docked per-clip inspector panel, toggled from the toolbar
    // Id (clip, lane or group) the inspector was last opened for via a
    // double-click, so a second double-click on the SAME row/clip closes it
@@ -908,6 +912,8 @@ bool gHeadlessNeedProbe = false;
    bool gFieldPrimitiveEditorOpen = false;
 
    FieldPixelNode* gFieldPixelEditor = nullptr;
+   SketchNode* gSketchEditor = nullptr;
+   bool gSketchEditorOpen = false;
 
    bool gFieldPixelEditorOpen = false;
 
@@ -966,8 +972,10 @@ bool gHeadlessNeedProbe = false;
 #endif
 
    bool gSettingsOpen = false;
+   bool gTemplatesOpen = false;
 
    bool gShowUpdateCheckModal = false;
+   bool gShowAboutModal = false;
 
 
    // Files dropped on the window, consumed on the next frame so the spawn can

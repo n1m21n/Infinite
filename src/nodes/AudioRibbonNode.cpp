@@ -199,13 +199,15 @@ void AudioRibbonNode::RebuildRibbon()
       const unsigned int i2 = (unsigned int)((i + 1) * 2);
       const unsigned int i3 = (unsigned int)((i + 1) * 2 + 1);
 
+      // Wound counter-clockwise seen from +Y so the face matches the +Y normals above (it used to face down and
+      // was culled from above, leaving the preview empty).
       mMesh.indices.push_back(i0);
-      mMesh.indices.push_back(i2);
       mMesh.indices.push_back(i1);
+      mMesh.indices.push_back(i2);
 
       mMesh.indices.push_back(i1);
-      mMesh.indices.push_back(i2);
       mMesh.indices.push_back(i3);
+      mMesh.indices.push_back(i2);
    }
 }
 

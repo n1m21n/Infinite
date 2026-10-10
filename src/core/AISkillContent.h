@@ -685,7 +685,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-306 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+307 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -730,7 +730,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Klein Bottle` | texture:image | out:geometry | 50 | bypass |
 | `Light` | none | out:light | 10 | bypass |
 | `Mapping` | geo:geometry | out:geometry | 11 | bypass |
-| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 29 |  |
+| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 30 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
 | `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
@@ -909,6 +909,7 @@ R"AISKILL(| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Constant` | none | out:modulator | 1 | bypass |
 | `Envelope` | in:modulator | out:modulator | 6 | bypass |
 | `Geometry Table` | geo:geometry | cx:modulator, cy:modulator, cz:modulator, spread:modulator, x1:modulator, y1:modulator, z1:modulator, x2:modulator, y2:modulator, z2:modulator, x3:modulator, y3:modulator, z3:modulator, x4:modulator, y4:modulator, z4:modulator | 10 | bypass |
+| `Hand Track` | input:image | present:modulator, palm x:modulator, palm y:modulator, index x:modulator, index y:modulator, thumb x:modulator, thumb y:modulator, pinch:modulator, open:modulator, roll:modulator, size:modulator | 3 | bypass |
 | `Image Analyze` | input:image | result:modulator, bright:modulator, contrast:modulator, red:modulator, green:modulator, blue:modulator, sat:modulator, hue:modulator, motion:modulator, cx:modulator, cy:modulator | 14 | bypass |
 | `Invert` | in:modulator | out:modulator | 3 | bypass |
 | `LFO` | none | out:modulator | 5 | bypass |
@@ -998,6 +999,7 @@ R"AISKILL(| `FieldPixel` | none | out:image | 9 | bypass |
 | `Ring` | none | out:image | 20 | bypass |
 | `Rounded Rect` | none | out:image | 20 | bypass |
 | `Shape` | none | out:image | 20 | bypass |
+| `Sketch` | none | out:image | 8 | bypass |
 | `Slideshow` | none | out:image | 7 | bypass |
 | `Star` | none | out:image | 20 | bypass |
 | `Superellipse` | none | out:image | 20 | bypass |

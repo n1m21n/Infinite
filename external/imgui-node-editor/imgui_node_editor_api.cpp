@@ -713,6 +713,17 @@ ax::NodeEditor::LinkId ax::NodeEditor::GetHoveredLink()
     return s_Editor->GetHoveredLink();
 }
 
+bool ax::NodeEditor::GetLinkMidpoint(LinkId linkId, ImVec2* outCanvasPos)
+{
+    auto link = s_Editor->FindLink(linkId);
+    if (link == nullptr || outCanvasPos == nullptr)
+        return false;
+    const auto c = link->GetCurve();
+    const ImVec2 mid = (c.P0 + c.P1 * 3.0f + c.P2 * 3.0f + c.P3) * 0.125f;
+    *outCanvasPos = mid;
+    return true;
+}
+
 ax::NodeEditor::NodeId ax::NodeEditor::GetDoubleClickedNode()
 {
     return s_Editor->GetDoubleClickedNode();

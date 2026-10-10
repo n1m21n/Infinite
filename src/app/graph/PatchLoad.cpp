@@ -1,15 +1,60 @@
 // Patch load, auto layout, field graph regenerate, undo/redo, copy/paste (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/UndoDescribe.h"
+#include "core/Notices.h"
 
 namespace app
 {
  // R30, defined with the live-issue state below
+
+   // Node types a patch named that this build does not have, collected by ApplyPatchData and reported once by
+   // the open that asked for them (undo and paste go through ApplyPatchData too and stay quiet).
+   std::vector<std::string> gSkippedNodeTypes;
+
+   std::string PatchFileName(const std::string& path)
+   {
+      const size_t slash = path.find_last_of("/\\");
+      return slash == std::string::npos ? path : path.substr(slash + 1);
+   }
+
+   // Opening failed before anything was replaced: say so, say the open patch is untouched, say what to try.
+   void PostOpenFailed(const std::string& path, const std::string& error)
+   {
+      const std::string name = path.empty() ? std::string("the patch") : PatchFileName(path);
+      if (error.find("newer version") != std::string::npos)
+         Notices::Post(Notices::Level::Error, "patch.open", name + " was made with a newer Infinite",
+                       "Your current patch is untouched. Update Infinite to open this one.");
+      else if (error.find("not an Infinite patch") != std::string::npos || error.find("file is empty") != std::string::npos)
+         Notices::Post(Notices::Level::Error, "patch.open", name + " isn't a patch Infinite can read",
+                       "Your current patch is untouched. If you expected a patch, the file may be damaged - try a backup or the autosave.");
+      else
+         Notices::Post(Notices::Level::Error, "patch.open", "Couldn't open " + name,
+                       error + ". Your current patch is untouched.");
+   }
+
+   // Opened, but some nodes could not be created. The rest is intact; saving over the file would drop them.
+   void PostSkippedTypes(const std::string& path)
+   {
+      if (gSkippedNodeTypes.empty())
+         return;
+      std::string names;
+      for (size_t i = 0; i < gSkippedNodeTypes.size() && i < 4; ++i)
+         names += (i ? ", " : "") + gSkippedNodeTypes[i];
+      if (gSkippedNodeTypes.size() > 4)
+         names += ", ...";
+      Notices::Post(Notices::Level::Warning, "patch.skipped",
+                    "Opened " + PatchFileName(path) + " without " + std::to_string(gSkippedNodeTypes.size()) +
+                       (gSkippedNodeTypes.size() == 1 ? " node" : " nodes"),
+                    "This version doesn't have: " + names + ". The rest of the patch is intact. Use Save As if you want to keep the original file whole.");
+      gSkippedNodeTypes.clear();
+   }
 
    void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap, bool keepIndices)
    {
       NoteGraphEditedForLiveIssues();
       ScopedPerfTimer perfTimer("ApplyPatchData");
       gSuppressUndoCheckpoints = true;
+      gSkippedNodeTypes.clear();
       NewPatch();
 
       // Saved indices are remapped rather than reused: they only have to be
@@ -38,6 +83,8 @@ namespace app
             // A patch naming a node type this build does not have still opens;
             // it just comes back missing that node.
             fprintf(stderr, "patch: unknown node type '%s', skipped\n", rec.typeName.c_str());
+            if (std::find(gSkippedNodeTypes.begin(), gSkippedNodeTypes.end(), rec.typeName) == gSkippedNodeTypes.end())
+               gSkippedNodeTypes.push_back(rec.typeName);
             continue;
          }
          remap[rec.index] = spawned->index;
@@ -397,6 +444,10 @@ namespace app
    bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload);
 
 
+   // A template is read from the app bundle but opened as an untitled document: no path, no recents entry, no
+   // file watch, so Save asks where to put it and the shipped file can't be overwritten.
+   static bool gOpeningTemplate = false;
+
    bool LoadPatchFromImpl(const std::string& path, bool reload)
    {
       Patch::Data data;
@@ -404,6 +455,7 @@ namespace app
       if (!Patch::Read(path, data, error))
       {
          gPatchStatus = std::string(T("Open failed: ")) + error;
+         PostOpenFailed(path, error);
          return false;
       }
       return LoadPatchDataImpl(data, path, reload);
@@ -544,6 +596,7 @@ namespace app
          if (!resolveErrors.empty())
          {
             gPatchStatus = std::string(T("Open failed: line "))  + std::to_string(resolveErrors.front().line) + ": " + resolveErrors.front().message;
+            PostOpenFailed(path, "line " + std::to_string(resolveErrors.front().line) + ": " + resolveErrors.front().message);
             return false;
          }
       }
@@ -590,6 +643,7 @@ namespace app
          PushUndoCheckpoint(); // Cmd+Z returns to the graph as it was before the reload
          const std::string keptPath = gPatchPath;
          ApplyPatchData(data, &pending.remap, HeadlessJobActive());
+         PostSkippedTypes(path);
          ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
          StashPendingKeyed(pending);
          gArrangePatchGeneration++;
@@ -607,6 +661,7 @@ namespace app
          return true;
       }
       ApplyPatchData(data, &pending.remap, HeadlessJobActive());
+      PostSkippedTypes(path);
       ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
       StashPendingKeyed(pending);
       // New document: drop the old one's clip clipboard and selection.
@@ -622,12 +677,13 @@ namespace app
       gUndoStack.clear();
       gRedoStack.clear();
 
-      gPatchPath = path;
+      gPatchPath = gOpeningTemplate ? std::string() : path;
       gPatchDirty = false;
-      gPatchStatus = openNote.empty() ? "Opened" : openNote;
+      gPatchStatus = gOpeningTemplate ? "Opened from a template" : (openNote.empty() ? "Opened" : openNote);
       gRequestFitView = true;
-      NotePatchFileStamp(path);
-      if (HeadlessJobActive())
+      if (!gOpeningTemplate)
+         NotePatchFileStamp(path);
+      if (HeadlessJobActive() || gOpeningTemplate)
          return true; // a batch job leaves recents and the real autosave alone
       Patch::NoteRecent(path);
       // The autosave from whatever was open before is no longer relevant
@@ -639,6 +695,14 @@ namespace app
 
 
    bool LoadPatchFrom(const std::string& path) { return LoadPatchFromImpl(path, false); }
+
+   bool OpenTemplate(const std::string& path)
+   {
+      gOpeningTemplate = true;
+      const bool ok = LoadPatchFromImpl(path, false);
+      gOpeningTemplate = false;
+      return ok;
+   }
 
 
    // `Infinite --canonicalize in out`: data-level Read -> Write, so an authored
@@ -723,7 +787,7 @@ namespace app
    }
 
 
-   void PushUndoSnapshot(Patch::Data snapshot)
+   void PushUndoSnapshot(Patch::Data snapshot, const char* label)
    {
       if (gSuppressUndoCheckpoints)
          return;
@@ -732,6 +796,8 @@ namespace app
       // one that captures its Patch::Data early (the node drag) cannot change
       // a recording in between, so "now" is the pre-mutation state either way.
       gUndoStack.push_back({ std::move(snapshot), GestureRecorder::Instance().Playbacks() });
+      if (label != nullptr)
+         gUndoStack.back().label = label;
       if (gUndoStack.size() > kMaxUndoDepth)
          gUndoStack.pop_front();
       // A fresh action invalidates whatever redo history pointed at a future
@@ -749,6 +815,48 @@ namespace app
       if (gSuppressUndoCheckpoints)
          return;
       PushUndoSnapshot(BuildPatchData());
+   }
+
+
+   void PushUndoCheckpoint(const char* label)
+   {
+      if (gSuppressUndoCheckpoints)
+         return;
+      PushUndoSnapshot(BuildPatchData(), label);
+   }
+
+
+   // Label of the i-th undo entry from the top (0 = the edit Undo would undo now). A call site that gave no label
+   // gets one from comparing this entry's state with the next one (or the live graph, for the top), then keeps it.
+   std::string UndoLabelAt(size_t i)
+   {
+      if (i >= gUndoStack.size())
+         return std::string();
+      UndoEntry& e = gUndoStack[gUndoStack.size() - 1 - i];
+      if (e.label.empty())
+      {
+         if (e.arrangeOnly)
+            return "Edit timeline";
+         // The top entry's "after" is the live graph, which keeps changing: derive but do not cache it.
+         const bool top = (i == 0);
+         const std::string derived =
+            top ? UndoDescribe::Change(e.patch, BuildPatchData())
+                : (gUndoStack[gUndoStack.size() - i].arrangeOnly ? std::string("Edit")
+                                                                 : UndoDescribe::Change(e.patch, gUndoStack[gUndoStack.size() - i].patch));
+         if (!top)
+            e.label = derived;
+         return derived;
+      }
+      return e.label;
+   }
+
+
+   std::string RedoLabelAt(size_t i)
+   {
+      if (i >= gRedoStack.size())
+         return std::string();
+      const UndoEntry& e = gRedoStack[gRedoStack.size() - 1 - i];
+      return e.label.empty() ? std::string("Edit") : e.label;
    }
 
 
@@ -1358,18 +1466,21 @@ namespace app
    {
       if (gUndoStack.empty())
          return;
+      const std::string what = UndoLabelAt(0);
       if (gUndoStack.back().arrangeOnly)
       {
          UndoEntry prev = std::move(gUndoStack.back());
          gUndoStack.pop_back();
          ApplyArrangeOnlyEntry(prev);
+         prev.label = what;
          gRedoStack.push_back(std::move(prev));
          gPatchDirty = true;
-         gPatchStatus = "Undo";
+         gPatchStatus = "Undo " + what;
          return;
       }
       MovementLog::NoteMark(MovementLog::Mark::Undo);
       gRedoStack.push_back({ BuildPatchData(), GestureRecorder::Instance().Playbacks() });
+      gRedoStack.back().label = what;
       UndoEntry prev = std::move(gUndoStack.back());
       gUndoStack.pop_back();
       std::map<int, int> remap;
@@ -1383,7 +1494,7 @@ namespace app
       // the recorder, so restoring earlier would just be wiped.
       GestureRecorder::Instance().Restore(RemapGestures(prev.gestures, remap), GestureClockNow());
       gPatchDirty = true;
-      gPatchStatus = "Undo";
+      gPatchStatus = "Undo " + what;
    }
 
 
@@ -1391,18 +1502,21 @@ namespace app
    {
       if (gRedoStack.empty())
          return;
+      const std::string what = RedoLabelAt(0);
       if (gRedoStack.back().arrangeOnly)
       {
          UndoEntry next = std::move(gRedoStack.back());
          gRedoStack.pop_back();
          ApplyArrangeOnlyEntry(next);
+         next.label = what;
          gUndoStack.push_back(std::move(next));
          gPatchDirty = true;
-         gPatchStatus = "Redo";
+         gPatchStatus = "Redo " + what;
          return;
       }
       MovementLog::NoteMark(MovementLog::Mark::Redo);
       gUndoStack.push_back({ BuildPatchData(), GestureRecorder::Instance().Playbacks() });
+      gUndoStack.back().label = what;
       UndoEntry next = std::move(gRedoStack.back());
       gRedoStack.pop_back();
       std::map<int, int> remap;
@@ -1414,6 +1528,16 @@ namespace app
       gArrangeMarkerDragId = 0; // a flag drag's gesture just closed too
       GestureRecorder::Instance().Restore(RemapGestures(next.gestures, remap), GestureClockNow());
       gPatchDirty = true;
-      gPatchStatus = "Redo";
+      gPatchStatus = "Redo " + what;
+   }
+
+
+   void JumpInHistory(int undos, int redos)
+   {
+      for (int i = 0; i < undos && !gUndoStack.empty(); i++)
+         Undo();
+      for (int i = 0; i < redos && !gRedoStack.empty(); i++)
+         Redo();
+      gPatchStatus = "History: jumped " + std::to_string(undos > 0 ? undos : redos) + (undos > 0 ? " back" : " forward");
    }
 }

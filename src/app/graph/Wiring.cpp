@@ -286,7 +286,8 @@ namespace app
          return 1;
       if (dynamic_cast<DrawNode*>(gn.node.get()) != nullptr)
          return 1;
-      if (dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr)
+      if (dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
+          dynamic_cast<HandTrackNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
@@ -466,6 +467,8 @@ namespace app
          return slot == 0 ? &draw->Input() : nullptr;
       if (auto* an = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
          return slot == 0 ? &an->Input() : nullptr;
+      if (auto* ht = dynamic_cast<HandTrackNode*>(gn.node.get()))
+         return slot == 0 ? &ht->Input() : nullptr;
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
@@ -652,7 +655,8 @@ namespace app
       auto* dstMaterial = dynamic_cast<MaterialNode*>(dstNode->node.get());
       auto* dstDisplacement = dynamic_cast<DisplacementNode*>(dstNode->node.get());
       auto* dstSetColor = dynamic_cast<SetColorNode*>(dstNode->node.get());
-      const bool dstWantsImage = dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) != nullptr;
+      const bool dstWantsImage = dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) != nullptr ||
+                                 dynamic_cast<HandTrackNode*>(dstNode->node.get()) != nullptr;
 
       const bool srcIsImage = !srcIsModulator && srcPalette == nullptr &&
                               srcGeometry == nullptr && srcCamera == nullptr &&
@@ -956,7 +960,7 @@ namespace app
          return false;
       }
 
-      PushUndoCheckpoint();
+      PushUndoCheckpoint("Connect cable");
       WireInputSlot(*srcNode, *dstNode, dstSlot, srcOutputIndex);
       if (srcIsAudioNode || srcIsNoteSource ||
           dstNode->node->AudioInputSlot(dstSlot) != nullptr ||
@@ -1448,6 +1452,12 @@ namespace app
       gn.uid = gNextNodeUid++;
       gn.spawnX = x;
       gn.spawnY = y;
+      // The analysers are their params and live output readout; collapsed they show nothing. Load, paste and
+      // undo restore the saved flag over this, so only a fresh spawn opens.
+      gn.showParams = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
+                      dynamic_cast<HandTrackNode*>(gn.node.get()) != nullptr ||
+                      dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr ||
+                      dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr;
       gNodes.push_back(std::move(gn));
       NoteNodeAppended();
       return &gNodes.back();

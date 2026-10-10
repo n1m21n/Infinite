@@ -1,4 +1,10 @@
 // Param widget plumbing, audio sliders, taper maths, dropdown button, checkbox/slider styles (moved verbatim from main.cpp).
+#include "app/ui/design/UiAnim.h"
+#include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/CheckBox.h"
+#include "app/ui/design/components/DropdownField.h"
+#include "app/ui/design/components/PinDot.h"
+#include "app/ui/design/components/StateRing.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -32,12 +38,36 @@ namespace app
    {
       if (!CategoryColors::GetTooltips())
          return;
+      // One delay for every help tip (tok::motion_tooltip_delay), counted from when the pointer comes to rest on
+      // the item, and one maximum width. Callers keep their own IsItemHovered() gate; this adds the delay.
+      // The rest timer is ours (not ImGui's per-item one) because some callers gate on a rect, not the last item.
+      static ImVec2 sRestPos(-1.0f, -1.0f);
+      static double sRestSince = 0.0;
+      static int sLastFrame = -10;
+      const ImVec2 mp = ImGui::GetIO().MousePos;
+      const int frame = ImGui::GetFrameCount();
+      if (frame != sLastFrame + 1 && frame != sLastFrame)
+         sRestSince = ImGui::GetTime();
+      if (std::fabs(mp.x - sRestPos.x) > 2.0f || std::fabs(mp.y - sRestPos.y) > 2.0f)
+      {
+         sRestPos = mp;
+         sRestSince = ImGui::GetTime();
+      }
+      sLastFrame = frame;
+      if ((ImGui::GetTime() - sRestSince) * 1000.0 < tok::motion_tooltip_delay)
+         return;
       // Inside a node the editor's canvas transform is live and would offset the tooltip from the cursor.
       if (gInsideNodeCanvas)
          ed::Suspend();
       va_list args;
       va_start(args, fmt);
-      ImGui::SetTooltipV(fmt, args);
+      if (ImGui::BeginTooltip())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);   // one max width: about 24 em
+         ImGui::TextV(fmt, args);
+         ImGui::PopTextWrapPos();
+         ImGui::EndTooltip();
+      }
       va_end(args);
       if (gInsideNodeCanvas)
          ed::Resume();
@@ -158,12 +188,11 @@ namespace app
       // The ring hugs the control itself: the slider's own box, the knob's
       // circle, the fader's track. Never the pin dot or the caption.
       ImDrawList* kdl = ImGui::GetWindowDrawList();
-      const ImU32 ringCol = ImGui::GetColorU32(ImGuiCol_NavHighlight);
       if (circle)
-         kdl->AddCircle(ImVec2((rmin.x + rmax.x) * 0.5f, (rmin.y + rmax.y) * 0.5f), (rmax.x - rmin.x) * 0.5f + 1.0f,
-                        ringCol, 48, 2.0f);
+         StateRing::DrawCircle(kdl, ImVec2((rmin.x + rmax.x) * 0.5f, (rmin.y + rmax.y) * 0.5f), (rmax.x - rmin.x) * 0.5f,
+                               StateRing::Kind::Select, IsThemeLight());
       else
-         kdl->AddRect(ImVec2(rmin.x - 2.0f, rmin.y - 2.0f), ImVec2(rmax.x + 2.0f, rmax.y + 2.0f), ringCol, 4.0f, 0, 2.0f);
+         StateRing::Draw(kdl, rmin, rmax, StateRing::Kind::Select, IsThemeLight(), tok::radius_field);
       bool changed = false;
       if (gKbNudge != 0 && !Modulation::Instance().IsModulated(nodeIndex, paramIndex))
       {
@@ -287,21 +316,10 @@ namespace app
                          bool vividState)
    {
       const bool isLight = IsThemeLight();
-      if (isLight)
-      {
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.88f, 0.89f, 0.92f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.83f, 0.85f, 0.89f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.78f, 0.81f, 0.86f, 1.0f));
-      }
-      else
-      {
-         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.055f, 0.060f, 0.080f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.085f, 0.092f, 0.118f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.100f, 0.108f, 0.138f, 1.0f));
-      }
-      ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+      // The same recessed well as every other field (FieldWell): tint, hover, border and rounding come from there.
+      FieldWell::PushStyle(ImGui::GetID(label));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrab, tok::V4(tok::palf::v_0_0_0_0));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, tok::V4(tok::palf::v_0_0_0_0));
 
       auto ValueToPos01 = [&](float v) -> float
       {
@@ -337,8 +355,8 @@ namespace app
                                       readOnly ? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None);
          pos01 = ValueToPos01(*value);
       }
-      ImGui::PopStyleVar();
-      ImGui::PopStyleColor(5);
+      ImGui::PopStyleColor(2);
+      FieldWell::PopStyle();
 
       const ImVec2 r0 = ImGui::GetItemRectMin();
       const ImVec2 r1 = ImGui::GetItemRectMax();
@@ -356,9 +374,10 @@ namespace app
          // the same RGB read as a different, washed-out color next to it.
          const ImU32 alpha = vividState ? (isLight ? 225 : 205) : (isLight ? 110 : 86);
          const ImU32 soft = (fillColor & 0x00FFFFFF) | (alpha << 24);
-         dl->AddRectFilled(r0, ImVec2(fillX, r1.y), soft, 3.0f);
+         dl->PushClipRect(r0, ImVec2(fillX, r1.y), true);
+         dl->AddRectFilled(r0, r1, soft, tok::radius_tile);
+         dl->PopClipRect();
       }
-      dl->AddRect(r0, r1, isLight ? IM_COL32(180, 185, 200, 255) : IM_COL32(72, 76, 92, 255), 3.0f);
 
       std::string name(label);
       const size_t hash = name.find("##");
@@ -381,8 +400,8 @@ namespace app
          // white-on-dark/black-on-light rule as every other themed text in
          // the app, just forced to full strength since it now sits over a
          // near-opaque accent once the fill does cover it.
-         valCol = isLight ? IM_COL32(15, 15, 18, 255) : IM_COL32(245, 246, 250, 255);
-         nameCol = isLight ? IM_COL32(35, 35, 40, 220) : IM_COL32(226, 228, 236, 220);
+         valCol = isLight ? tok::U32(tok::pal::c_0F0F12FF) : tok::U32(tok::pal::c_F5F6FAFF);
+         nameCol = isLight ? tok::U32(tok::pal::c_232328DC) : tok::U32(tok::pal::c_E2E4ECDC);
       }
       else
       {
@@ -393,11 +412,11 @@ namespace app
          // board in both themes per feedback that every one of these read too
          // faint.
          valCol = isLight
-            ? (readOnly ? IM_COL32(78, 84, 100, 255) : IM_COL32(20, 24, 36, 255))
-            : (readOnly ? IM_COL32(205, 208, 220, 255) : IM_COL32(238, 241, 250, 255));
+            ? (readOnly ? tok::U32(tok::pal::c_4E5464FF) : tok::U32(tok::pal::c_141824FF))
+            : (readOnly ? tok::U32(tok::pal::c_CDD0DCFF) : tok::U32(tok::pal::c_EEF1FAFF));
          nameCol = isLight
-            ? (readOnly ? IM_COL32(100, 106, 122, 255) : IM_COL32(80, 86, 102, 255))
-            : (readOnly ? IM_COL32(178, 181, 196, 255) : IM_COL32(198, 202, 216, 255));
+            ? (readOnly ? tok::U32(tok::pal::c_646A7AFF) : tok::U32(tok::pal::c_505666FF))
+            : (readOnly ? tok::U32(tok::pal::c_B2B5C4FF) : tok::U32(tok::pal::c_C6CAD8FF));
       }
       AudioLabelText(dl, ImVec2(valX, textY), valCol, valBuf);
 
@@ -409,6 +428,69 @@ namespace app
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          SetAudioReadout(name.c_str(), valBuf);
       return changed;
+   }
+
+
+   // A live output as a slider-shaped row: the same recessed well, name left, value right, but read-only and
+   // filled in the modulation amber (the colour a modulated slider and its pin use). `inset` leaves the
+   // slider's pin gutter blank so the row's edges line up with the sliders above it.
+   void OutputMeterRow(const char* label, float v, float width)
+   {
+      const float inset = tok::pin_box + 4.0f;
+      const float w = std::max(24.0f, width - inset);
+      const bool isLight = IsThemeLight();
+      const ImVec2 p0 = ImGui::GetCursorScreenPos();
+      const float h = ImGui::GetFrameHeight();
+      const ImVec2 r0(p0.x + inset, p0.y);
+      const ImVec2 r1(r0.x + w, p0.y + h);
+      ImGui::Dummy(ImVec2(width, h));
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      FieldWell::Draw(dl, r0, r1, false, false);
+      const float t = std::clamp(v, 0.0f, 1.0f);
+      if (t > 0.0f)
+      {
+         const ImU32 amber = tok::U32(tok::pin_mod, isLight);
+         const ImU32 soft = (amber & 0x00FFFFFF) | ((ImU32)(isLight ? 110 : 86) << 24);
+         dl->PushClipRect(r0, ImVec2(r0.x + w * t, r1.y), true);
+         dl->AddRectFilled(r0, r1, soft, tok::radius_tile);
+         dl->PopClipRect();
+      }
+
+      char valBuf[16];
+      snprintf(valBuf, sizeof(valBuf), "%.2f", v);
+      const float textY = r0.y + (h - ImGui::GetTextLineHeight()) * 0.5f;
+      const float valX = r1.x - 7.0f - AudioLabelSize(valBuf).x;
+      const ImU32 valCol = isLight ? tok::U32(tok::pal::c_4E5464FF) : tok::U32(tok::pal::c_CDD0DCFF);
+      const ImU32 nameCol = isLight ? tok::U32(tok::pal::c_646A7AFF) : tok::U32(tok::pal::c_B2B5C4FF);
+      dl->PushClipRect(r0, r1, true);
+      AudioLabelText(dl, ImVec2(valX, textY), valCol, valBuf);
+      dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - 6.0f), r1.y), true);
+      AudioLabelText(dl, ImVec2(r0.x + 7.0f, textY), nameCol, label);
+      dl->PopClipRect();
+      dl->PopClipRect();
+   }
+
+
+   // Every modulator output of a node as OutputMeterRow rows, in `cols` columns of `colW`. The cable pins stay in
+   // the node's bottom row; these are the readout, so the pins carry no bars of their own.
+   void DrawOutputMeters(INode* node, float colW, int cols, float gutter)
+   {
+      const int count = node->OutputCount();
+      cols = std::max(1, cols);
+      const int rows = (count + cols - 1) / cols;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const float rowH = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y;
+      for (int o = 0; o < count; o++)
+      {
+         const int c = o / rows;
+         const int r = o % rows;
+         ImGui::SetCursorScreenPos(ImVec2(origin.x + (float)c * (colW + gutter), origin.y + (float)r * rowH));
+         IModulator* mod = node->ModulatorOutput(o);
+         OutputMeterRow(node->OutputLabel(o), mod != nullptr ? mod->Value01() : 0.0f, colW);
+      }
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + (float)rows * rowH));
+      ImGui::Dummy(ImVec2(1.0f, 0.0f));
    }
 
 
@@ -472,8 +554,7 @@ namespace app
          return 0;
       const ImVec2 rmin = ImGui::GetItemRectMin();
       const ImVec2 rmax = ImGui::GetItemRectMax();
-      ImGui::GetWindowDrawList()->AddRect(ImVec2(rmin.x - 2.0f, rmin.y - 2.0f), ImVec2(rmax.x + 2.0f, rmax.y + 2.0f),
-                                          ImGui::GetColorU32(ImGuiCol_NavHighlight), 4.0f, 0, 2.0f);
+      StateRing::Draw(ImGui::GetWindowDrawList(), rmin, rmax, StateRing::Kind::Select, IsThemeLight(), tok::radius_field);
       const int step = gKbNudge > 0 ? 1 : (gKbNudge < 0 ? -1 : 0);
       gKbNudge = 0;
       return step;
@@ -554,7 +635,7 @@ namespace app
       ed::BeginPin(pinId, ed::PinKind::Input);
       ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const float box = 12.0f;
+      const float box = tok::pin_box;
       const ImVec2 p = controlHeight > 0.0f
          ? ImVec2(origin.x, origin.y + (controlHeight - box) * 0.5f)
          : origin;
@@ -563,13 +644,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();
-      const ImU32 pinColor = h.modulated
-         ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
-         : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(120, 128, 150, 255));
-      dl->AddCircleFilled(c, 4.0f, isLight ? IM_COL32(240, 243, 250, 255) : IM_COL32(18, 19, 25, 255));
-      dl->AddCircle(c, h.modulated ? 4.0f : 4.5f, pinColor, 12, 2.0f);
-      if (h.modulated)
-         dl->AddCircleFilled(c, 2.0f, pinColor);
+      PinDot::Param(dl, c, h.modulated ? PinDot::State::Modulated : PinDot::State::Idle, isLight);
       ExpandPinHit(c, p.x + box);
       ed::EndPin();
 
@@ -585,9 +660,15 @@ namespace app
    }
 
 
+   bool NodeDropdownField(const char* caption, ImVec2 size, const char* label)
+   {
+      return DropdownField::Draw(caption, size, label);
+   }
+
+
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
-                       bool showCaption)
+                       bool showCaption, bool segmented)
    {
       if (options.empty())
          return;
@@ -624,15 +705,20 @@ namespace app
       }
 
       const std::string caption = options[safeCurrent] + "##" + label;
+      // R1: the parameter name lives inside the face, not beside it.
+      const std::string inner = showCaption ? StripParamLabel(label) : std::string();
       PushDropdownStyle();
       if (h.modulated)
       {
          // Read-only look, matching a modulated slider: the value still reads
          // live, the control just stops taking input.
-         ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
-                                                             : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
+                                                             : tok::V4(tok::palf::v_1000_750_350_1000));
          ImGui::BeginDisabled();
-         ImGui::Button(caption.c_str(), ImVec2(width, 0));
+         if (segmented)
+            DropdownField::DrawSegments(caption.c_str(), options, safeCurrent, width, inner.c_str());
+         else
+            NodeDropdownField(caption.c_str(), ImVec2(width, 0), inner.c_str());
          ImGui::EndDisabled();
          ImGui::PopStyleColor();
          // BeginDisabled swallows hover, so ask the rect directly - otherwise
@@ -641,7 +727,14 @@ namespace app
                                    ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
                                                               ImGui::GetItemRectMax()));
       }
-      else if (ImGui::Button(caption.c_str(), ImVec2(width, 0)))
+      else if (segmented)
+      {
+         // Short choices: a click selects directly (no popup); everything else is the dropdown's contract.
+         const int picked = DropdownField::DrawSegments(caption.c_str(), options, safeCurrent, width, inner.c_str());
+         if (picked >= 0 && picked != safeCurrent && onSelect)
+            onSelect(picked);
+      }
+      else if (NodeDropdownField(caption.c_str(), ImVec2(width, 0), inner.c_str()))
       {
          gDropdown.options = options;
          gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind
@@ -659,10 +752,6 @@ namespace app
             onSelect(stepped);
       }
       PopDropdownStyle();
-      if (!showCaption)
-         return;
-      ImGui::SameLine();
-      ImGui::TextDisabled("%s", StripParamLabel(label).c_str());
    }
 
 
@@ -675,14 +764,46 @@ namespace app
       // accent brightness (bumped here vs. the old value): once the frame
       // stops competing with it, the checked state can and should be the
       // loudest thing in an unchecked row of quiet frames. See P10.
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.25f, 0.28f, 0.38f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.32f, 0.36f, 0.48f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_CheckMark, isLight ? ImVec4(0.20f, 0.55f, 0.95f, 1.0f) : ImVec4(0.55f, 0.82f, 1.0f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.70f, 0.74f, 0.84f, 1.0f) : ImVec4(0.22f, 0.235f, 0.278f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.88f, 0.92f, 0.98f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? tok::V4(tok::palf::v_860_880_940_1000) : tok::V4(tok::palf::v_160_180_240_1000));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? tok::V4(tok::palf::v_800_840_920_1000) : tok::V4(tok::palf::v_250_280_380_1000));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? tok::V4(tok::palf::v_740_780_880_1000) : tok::V4(tok::palf::v_320_360_480_1000));
+      ImGui::PushStyleColor(ImGuiCol_CheckMark, isLight ? tok::V4(tok::palf::v_200_550_950_1000) : tok::V4(tok::palf::v_550_820_1000_1000));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::V4(tok::palf::v_700_740_840_1000) : tok::V4(tok::palf::v_220_235_278_1000));
+      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_150_180_240_1000) : tok::V4(tok::palf::v_880_920_980_1000));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+   }
+
+
+   // The node checkbox: the design-system box (CheckBox::Draw: rounded field-well tint, accent fill, self-drawing
+   // tick) with ImGui::Checkbox's footprint (frame-height square, inner spacing, label), so rows keep their grid.
+   // `modulated` swaps the accent for the modulation amber. Returns true when a click flipped the value.
+   bool NodeCheckbox(const char* label, bool* value, bool modulated)
+   {
+      const ImGuiStyle& st = ImGui::GetStyle();
+      const float box = ImGui::GetFrameHeight();
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const float textW = ImGui::CalcTextSize(label, nullptr, true).x;
+      const bool clicked = ImGui::InvisibleButton(label, ImVec2(box + (textW > 0.0f ? st.ItemInnerSpacing.x + textW : 0.0f), box));
+      const bool hovered = ImGui::IsItemHovered();
+      const ImGuiID iid = ImGui::GetItemID();
+      if (clicked)
+         *value = !*value;
+      const float hv = UiAnim::Hover(iid, hovered, tok::motion_hover_in, tok::motion_hover_out);
+      const float onv = UiAnim::Hover(iid ^ 0x5bd1e995u, *value, tok::motion_on, tok::motion_off);
+      const ImVec4 amber = IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000) : tok::V4(tok::palf::v_1000_750_350_1000);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 bp(p.x + (box - CheckBox::kSize) * 0.5f, p.y + (box - CheckBox::kSize) * 0.5f);
+      CheckBox::Draw(dl, bp, onv, hv, modulated ? &amber : nullptr);
+      if (textW > 0.0f)
+      {
+         const char* end = ImGui::FindRenderedTextEnd(label);
+         dl->AddText(ImVec2(p.x + box + st.ItemInnerSpacing.x, p.y + st.FramePadding.y), ImGui::GetColorU32(ImGuiCol_Text), label, end);
+      }
+      if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible)
+         dl->AddRect(ImVec2(bp.x - 2, bp.y - 2), ImVec2(bp.x + CheckBox::kSize + 2, bp.y + CheckBox::kSize + 2),
+                     ImGui::GetColorU32(ImGuiCol_NavHighlight), tok::radius_field + 2.0f, 0, 1.5f);
+      return clicked;
    }
 
 
@@ -705,15 +826,15 @@ namespace app
    void PushSliderStyle()
    {
       const bool isLight = IsThemeLight();
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.25f, 0.28f, 0.38f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.32f, 0.36f, 0.48f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrab, isLight ? ImVec4(0.20f, 0.55f, 0.95f, 1.0f) : ImVec4(0.55f, 0.82f, 1.0f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, isLight ? ImVec4(0.14f, 0.45f, 0.85f, 1.0f) : ImVec4(0.70f, 0.90f, 1.0f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.70f, 0.74f, 0.84f, 1.0f) : ImVec4(0.22f, 0.235f, 0.278f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.88f, 0.92f, 0.98f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? tok::V4(tok::palf::v_860_880_940_1000) : tok::V4(tok::palf::v_160_180_240_1000));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? tok::V4(tok::palf::v_800_840_920_1000) : tok::V4(tok::palf::v_250_280_380_1000));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? tok::V4(tok::palf::v_740_780_880_1000) : tok::V4(tok::palf::v_320_360_480_1000));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrab, isLight ? tok::V4(tok::palf::v_200_550_950_1000) : tok::V4(tok::palf::v_550_820_1000_1000));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, isLight ? tok::V4(tok::palf::v_140_450_850_1000) : tok::V4(tok::palf::v_700_900_1000_1000));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? tok::V4(tok::palf::v_700_740_840_1000) : tok::V4(tok::palf::v_220_235_278_1000));
+      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? tok::V4(tok::palf::v_150_180_240_1000) : tok::V4(tok::palf::v_880_920_980_1000));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
 
 

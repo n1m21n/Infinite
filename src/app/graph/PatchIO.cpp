@@ -1,5 +1,6 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/Notices.h"
 
 namespace app
 {
@@ -313,6 +314,8 @@ namespace app
          const std::string val = line.substr(eq + 1);
          if (key == "snapToGrid")
             gSnapToGrid = (val != "0");
+         else if (key == "showCanvasGrid")
+            gShowCanvasGrid = (val != "0");
          else if (key == "gridSnap")
             gGridSnap = std::strtof(val.c_str(), nullptr);
          else if (key == "zoomSensitivity")
@@ -327,6 +330,36 @@ namespace app
             gMinimapOpacity = std::strtof(val.c_str(), nullptr);
          else if (key == "cableVisibilityMask")
             gCableVisibilityMask = atoi(val.c_str());
+         else if (key == "panelNodeOpen")
+            gNodePanelOpen = (val != "0");
+         else if (key == "panelViewportOpen")
+            gViewportPanelOpen = (val != "0");
+         else if (key == "panelViewportDock")
+            gViewportPanelDock = std::clamp(atoi(val.c_str()), 0, 3);
+         else if (key == "panelViewportW")
+            gViewportPanelWidth = std::max(kViewportPanelMinWidth, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelViewportH")
+            gViewportPanelHeight = std::max(kViewportPanelMinHeight, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelMatrixOpen")
+            gModMatrixOpen = (val != "0");
+         else if (key == "panelMatrixDock")
+            gModMatrixDock = std::clamp(atoi(val.c_str()), 0, 3);
+         else if (key == "panelMatrixW")
+            gModMatrixWidth = std::max(kModMatrixMinWidth, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelMatrixH")
+            gModMatrixHeight = std::max(kModMatrixMinHeight, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelPerfOpen")
+            gPerfPanelOpen = (val != "0");
+         else if (key == "panelPerfDock")
+            gPerfPanelDock = std::clamp(atoi(val.c_str()), 0, 3);
+         else if (key == "panelPerfW")
+            gPerfPanelWidth = std::max(kPerfPanelMinWidth, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelPerfH")
+            gPerfPanelHeight = std::max(kPerfPanelMinHeight, std::strtof(val.c_str(), nullptr));
+         else if (key == "panelHistoryOpen")
+            gHistoryOpen = (val != "0");
+         else if (key == "panelHistoryW")
+            gHistoryWidth = std::max(220.0f, std::strtof(val.c_str(), nullptr));
       }
    }
 
@@ -338,6 +371,7 @@ namespace app
          return;
       std::ofstream file(path);
       file << "snapToGrid=" << (gSnapToGrid ? 1 : 0) << "\n";
+      file << "showCanvasGrid=" << (gShowCanvasGrid ? 1 : 0) << "\n";
       file << "gridSnap=" << gGridSnap << "\n";
       file << "zoomSensitivity=" << gZoomSensitivity << "\n";
       file << "minimapEnabled=" << (gMinimapEnabled ? 1 : 0) << "\n";
@@ -345,6 +379,51 @@ namespace app
       file << "minimapSize=" << gMinimapSize << "\n";
       file << "minimapOpacity=" << gMinimapOpacity << "\n";
       file << "cableVisibilityMask=" << gCableVisibilityMask << "\n";
+      file << "panelNodeOpen=" << (gNodePanelOpen ? 1 : 0) << "\n";
+      file << "panelViewportOpen=" << (gViewportPanelOpen ? 1 : 0) << "\n";
+      file << "panelViewportDock=" << gViewportPanelDock << "\n";
+      file << "panelViewportW=" << gViewportPanelWidth << "\n";
+      file << "panelViewportH=" << gViewportPanelHeight << "\n";
+      file << "panelMatrixOpen=" << (gModMatrixOpen ? 1 : 0) << "\n";
+      file << "panelMatrixDock=" << gModMatrixDock << "\n";
+      file << "panelMatrixW=" << gModMatrixWidth << "\n";
+      file << "panelMatrixH=" << gModMatrixHeight << "\n";
+      file << "panelPerfOpen=" << (gPerfPanelOpen ? 1 : 0) << "\n";
+      file << "panelPerfDock=" << gPerfPanelDock << "\n";
+      file << "panelPerfW=" << gPerfPanelWidth << "\n";
+      file << "panelPerfH=" << gPerfPanelHeight << "\n";
+      file << "panelHistoryOpen=" << (gHistoryOpen ? 1 : 0) << "\n";
+      file << "panelHistoryW=" << gHistoryWidth << "\n";
+   }
+
+
+   // Docks, sizes and which panels are open survive a restart: saved a moment after the layout stops changing, so a
+   // resize drag writes once. Skipped in self-test runs, which open panels on purpose and must not rewrite the
+   // user's real preferences.
+   void PersistPanelLayoutIfChanged()
+   {
+      static const bool sTestRun = getenv("INFINITE_EXITAFTER") != nullptr || getenv("INFINITE_OPENPANELS") != nullptr;
+      if (sTestRun)
+         return;
+      char buf[256];
+      std::snprintf(buf, sizeof buf, "%d%d%d%d%d|%d%d%d|%.0f %.0f %.0f %.0f %.0f %.0f %.0f", gNodePanelOpen, gViewportPanelOpen,
+                    gModMatrixOpen, gPerfPanelOpen, gHistoryOpen, gViewportPanelDock, gModMatrixDock, gPerfPanelDock,
+                    gViewportPanelWidth, gViewportPanelHeight, gModMatrixWidth, gModMatrixHeight, gPerfPanelWidth,
+                    gPerfPanelHeight, gHistoryWidth);
+      static std::string sSaved = buf;   // what is on disk (or was loaded) at startup
+      static std::string sSeen = buf;
+      static double sSeenAt = 0.0;
+      const double now = ImGui::GetTime();
+      if (sSeen != buf)
+      {
+         sSeen = buf;
+         sSeenAt = now;
+      }
+      else if (sSeen != sSaved && now - sSeenAt > 1.0)
+      {
+         sSaved = sSeen;
+         SaveWorkspaceSettings();
+      }
    }
 
 
@@ -555,7 +634,8 @@ namespace app
 
    void PollAutosave()
    {
-      if (!gAutosaveEnabled || gNodes.empty())
+      // A harness or screenshot run must never overwrite the real user's crash-recovery file.
+      if (!gAutosaveEnabled || gNodes.empty() || (IsHeadlessProcess() && !UsingAutosaveTestPaths()))
          return;
       const double now = glfwGetTime();
       if (gLastAutosaveTime > 0.0 && now - gLastAutosaveTime < (double)gAutosaveSeconds)
@@ -664,6 +744,8 @@ namespace app
                // and inspect beats one silently erased.
                gAutosaveRecoveryError = error;
                gPatchStatus = std::string(T("Autosave found but could not be read: ")) + error;
+               Notices::Post(Notices::Level::Warning, "autosave.unreadable", "Last session's autosave couldn't be read",
+                             "It is left on disk, not deleted. Your saved patches are unaffected.");
             }
          }
          // Marker present, no autosave: nothing to offer, not an error.
@@ -686,6 +768,8 @@ namespace app
       if (!Patch::Write(path, data, error))
       {
          gPatchStatus = std::string(T("Save failed: ")) + error;
+         Notices::Post(Notices::Level::Error, "patch.save", "Couldn't save the patch",
+                       error + ". Your patch is still open and unchanged. Check the disk has space and the folder can be written to, or use Save As to pick another place.");
          return false;
       }
 

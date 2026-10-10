@@ -1,4 +1,6 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/UiAnim.h"
+#include "app/ui/design/UiInteract.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -377,6 +379,7 @@ void DrawFramePump(FrameCtx& fc)
 
       // Update-checker worker handoff - once a frame, main thread only.
       UpdateCheck::Poll();
+      Extensions::Poll();
 
       // Per-frame audio housekeeping off the audio thread (currently just
       // freeing sample-preview buffers the audio thread has retired) - see
@@ -486,7 +489,7 @@ void DrawFramePump(FrameCtx& fc)
          rmin = ImVec2(gPredTestSliderScreen.x, gPredTestSliderScreen.y);
          rmax = ImVec2(gPredTestSliderScreen.z, gPredTestSliderScreen.w);
          const float cy = (rmin.y + rmax.y) * 0.5f;
-         const float x30 = rmin.x + (rmax.x - rmin.x) * 0.3f, x70 = rmin.x + (rmax.x - rmin.x) * 0.7f;
+         const float x30 = rmin.x + (rmax.x - rmin.x) * 0.3f, x45 = rmin.x + (rmax.x - rmin.x) * 0.45f, x70 = rmin.x + (rmax.x - rmin.x) * 0.7f;
          auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
          switch (frameId)
          {
@@ -494,7 +497,9 @@ void DrawFramePump(FrameCtx& fc)
             case 62: btn(true); break;
             case 64: gTestMouse = ImVec2(x70, cy); break;
             case 66: btn(false); break;
-            case 72: gTestMouse = ImVec2(x30, cy); break;
+            // The second press starts away from the first: two presses on one spot inside the double-click time
+            // (a headless run is fast) open the slider's typed-entry field instead of dragging.
+            case 72: gTestMouse = ImVec2(x45, cy); break;
             case 74: btn(true); break;
             case 76: gTestMouse = ImVec2(x70, cy); break;
             case 80: btn(false); break;
@@ -561,8 +566,6 @@ void DrawFramePump(FrameCtx& fc)
 
       // R571: while a node is the active node Tab belongs to the param walker,
       // not to ImGui's own tab navigation (which drops a slider into text edit).
-      if (gKbOwnTab)
-         ImGui::SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, ImGuiInputFlags_LockUntilRelease);
       // R571 slice 4: ImGui keyboard nav (Tab / arrows / Enter / Space) only while a popup or a window other than
       // the canvas host has focus. The canvas shares the "Infinite" window with the menu bar and panels, so it
       // can't be opted out per window; toggling per frame keeps the node keyboard model in charge of the canvas.
@@ -570,14 +573,28 @@ void DrawFramePump(FrameCtx& fc)
          ImGuiContext& navCtx = *ImGui::GetCurrentContext();
          const bool navPopup = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
          const bool navPanel = navCtx.NavWindow != nullptr && navCtx.NavWindow->RootWindow != nullptr &&
-                               std::strcmp(navCtx.NavWindow->RootWindow->Name, "Infinite") != 0;
+                               std::strcmp(navCtx.NavWindow->RootWindow->Name, "Infinite") != 0 &&
+                               !(navCtx.NavWindow->RootWindow->Flags & ImGuiWindowFlags_NoNav);   // the panel rail is a NoNav strip, not a panel
          const bool navOn = navPopup || navPanel;
          ImGuiIO& nio = ImGui::GetIO();
          if (navOn) nio.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
          else nio.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
          gNavOwnsKeys = navOn && nio.NavVisible;
+         // With no active node and no popup/panel owning the keys, Tab does nothing: it must not wander through params.
+         if (gKbOwnTab || (!navOn && !nio.WantTextInput))
+            ImGui::SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, ImGuiInputFlags_LockUntilRelease);
       }
       ImGui::NewFrame();
+      // A focus ring belongs to keyboard navigation only; any mouse click hides one an earlier Enter left behind.
+      if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         ImGui::GetCurrentContext()->NavCursorVisible = false;
+      static const bool sEnvReduce = std::getenv("INFINITE_REDUCEMOTION") != nullptr;
+      UiAnim::SetReduceMotion(sEnvReduce || CategoryColors::GetReduceMotion());
+      ImGui::GetStyle().HoverDelayNormal = tok::motion_tooltip_delay * 0.001f;   // the one tooltip delay
+      if (CookProbe::gOn.load(std::memory_order_relaxed))
+         CookProbe::EndFrame();
+      UiAnim::EndFrame();
+      UiInteract::BeginFrame();
       if (Bench::Tail().active)
          Bench::Tail().MarkAt(Bench::FrameTail::kMarkNewFrame, Bench::ScopedStageTimer::NowMs());
 

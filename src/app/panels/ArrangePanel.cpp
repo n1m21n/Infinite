@@ -1,8 +1,72 @@
 // Arrange panel content and docking (moved verbatim from main.cpp).
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/DialogParts.h"
+#include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/UiType.h"
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/SectionCard.h"
+#include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
 {
+   namespace
+   {
+      // One toolbar chip look: a 6% text-tinted well, accent when on (the play button turns green while playing),
+      // hover/press stepping up from there. Pair with PopToolbarChip.
+      // Track-header toggle (S / M): a text-tinted well like ChipButton; `onCol` fills it when on (solo amber, mute accent).
+      bool MixToggle(const char* id, const char* letter, bool* v, float sz, const ImVec4& onCol)
+      {
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         const bool clicked = ImGui::InvisibleButton(id, ImVec2(sz, sz));
+         if (clicked) *v = !*v;
+         const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+         const ImVec4 t = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         const ImVec4 bg = *v ? onCol : ImVec4(t.x, t.y, t.z, 0.06f + 0.05f * hv);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(p, ImVec2(p.x + sz, p.y + sz), ImGui::GetColorU32(bg), tok::radius_tile);
+         const ImVec2 ts = ImGui::CalcTextSize(letter);
+         dl->AddText(ImVec2(std::round(p.x + (sz - ts.x) * 0.5f), std::round(p.y + (sz - ts.y) * 0.5f) - 1.0f),
+                     ImGui::GetColorU32(*v ? ImVec4(1, 1, 1, 1) : ImVec4(t.x, t.y, t.z, 0.8f)), letter);
+         return clicked;
+      }
+
+      void PushToolbarChip(bool on, bool green = false)
+      {
+         ActionButton::Scoped() = !on ? ActionButton::Kind::Plain : green ? ActionButton::Kind::Go : ActionButton::Kind::Selected;
+      }
+      void PopToolbarChip() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
+   }
+
+   // Combo in the field-well style with the inspector's small chevron (no ImGui arrow button).
+   // `items` is the zero-separated list ImGui::Combo takes.
+   static bool WellCombo(const char* id, int* current, const char* items)
+   {
+      std::vector<const char*> list;
+      for (const char* it = items; *it != '\0'; it += std::strlen(it) + 1)
+         list.push_back(it);
+      const char* cur = (*current >= 0 && *current < (int)list.size()) ? list[*current] : "";
+      bool changed = false;
+      const bool open = MenuParts::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
+      const ImVec2 bmin = ImGui::GetItemRectMin(), bmax = ImGui::GetItemRectMax();
+      glyph::DrawChevronDown(ImGui::GetWindowDrawList(), ImVec2(bmax.x - 12.0f, (bmin.y + bmax.y) * 0.5f), 9.0f,
+                             ImGui::GetColorU32(ImGuiCol_TextDisabled));
+      if (open)
+      {
+         for (int i = 0; i < (int)list.size(); ++i)
+            if (MenuParts::Choice(list[i], *current == i))
+            {
+               *current = i;
+               changed = true;
+            }
+         MenuParts::EndCombo();
+      }
+      return changed;
+   }
+
    void DrawArrangePanelContent()
    {
       // Every id this panel holds (selection, anchor, rename/context/assign
@@ -46,7 +110,11 @@ namespace app
 
       // Mouse wheel horizontal zoom / pan across the timeline area
       const ImVec2 mouse = ImGui::GetIO().MousePos;
-      const bool overPanel = mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
+      // The open Clip Settings card is not timeline: wheel, pinch and Cmd+wheel over it must not move the lanes.
+      const bool overInspector = gArrangeClipSettingsPanelOpen && mouse.x >= gArrangeInspectorMin.x &&
+                                 mouse.x < gArrangeInspectorMax.x && mouse.y >= gArrangeInspectorMin.y &&
+                                 mouse.y < gArrangeInspectorMax.y;
+      const bool overPanel = !overInspector && mouse.x >= panelOrigin.x && mouse.x < panelOrigin.x + panelSize.x &&
                              mouse.y >= panelOrigin.y && mouse.y < panelOrigin.y + panelSize.y;
 
       // Trackpad pinch: GLFW's Cocoa backend never forwards magnifyWithEvent:
@@ -336,17 +404,11 @@ namespace app
             const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             const bool timelineMode = gAudioMode == AudioMode::Timeline;
             const char* audioLabel = timelineMode ? T("Timeline Audio On") : T("Enable Timeline Audio");
-            const float audioBtnW = ImGui::CalcTextSize(audioLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f + 12.0f;
-            const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - audioBtnW - 6.0f, panelOrigin.y + 2.0f);
+            const float audioBtnW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
+            const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - audioBtnW, panelOrigin.y);
             const ImVec2 savedCursor = ImGui::GetCursorScreenPos();
             ImGui::SetCursorScreenPos(audioBtnPos);
-            ImGui::PushStyleColor(ImGuiCol_Button, timelineMode
-               ? (arrangeToolbarLight ? ImVec4(0.20f, 0.62f, 0.34f, 1.0f) : ImVec4(0.16f, 0.52f, 0.28f, 1.0f))
-               : (arrangeToolbarLight ? ImVec4(0.80f, 0.82f, 0.87f, 1.0f) : ImVec4(0.30f, 0.30f, 0.34f, 1.0f)));
-            ImGui::PushStyleColor(ImGuiCol_Text, timelineMode
-               ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
-               : (arrangeToolbarLight ? ImVec4(0.12f, 0.14f, 0.20f, 1.0f) : ImVec4(0.92f, 0.94f, 0.98f, 1.0f)));
-            if (ImGui::Button(audioLabel, ImVec2(audioBtnW, 0.0f)))
+            if (ChipButton::Draw(audioLabel, timelineMode, tok::tile))
             {
                if (timelineMode)
                {
@@ -363,7 +425,6 @@ namespace app
                   }
                }
             }
-            ImGui::PopStyleColor(2);
             // Only a failure explains itself on hover; the label says the rest.
             if (ImGui::IsItemHovered() && !gAudioStartError.empty() && !engineOn)
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
@@ -436,11 +497,11 @@ namespace app
             };
 
             const char* renderLabel = ArrangeRenderBusy() ? "Rendering..." : "Render";
-            const float renderBtnW = ImGui::CalcTextSize(renderLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f + 12.0f;
-            const ImVec2 renderBtnPos(audioBtnPos.x - renderBtnW - 8.0f, panelOrigin.y + 2.0f);
+            const float renderBtnW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
+            const ImVec2 renderBtnPos(audioBtnPos.x - renderBtnW - tok::space_2, panelOrigin.y);
             ImGui::SetCursorScreenPos(renderBtnPos);
             ImGui::BeginDisabled(ArrangeRenderBusy());
-            if (ImGui::Button(renderLabel, ImVec2(renderBtnW, 0.0f)))
+            if (ChipButton::Draw(renderLabel, false, tok::tile))
             {
                if (rset.renderRangeKind == kArrangeRangeCustom && rset.renderRangeEnd <= rset.renderRangeStart)
                {
@@ -456,16 +517,29 @@ namespace app
             ImGui::EndDisabled();
             ImGui::SetCursorScreenPos(savedCursor);
 
-            if (ImGui::BeginPopup("##arrangeRenderPopup"))
+            if (ImGui::GetFrameCount() == 30 && getenv("INFINITE_RENDERPOPUPTEST") != nullptr)   // design review shot
             {
-               ImGui::Text("%s", T("Timeline Render Settings"));
-               ImGui::Separator();
+               ImGui::OpenPopup("##arrangeRenderPopup");
+               ImGui::SetNextWindowPos(ImVec2(24.0f, 120.0f));
+            }
+            ImGui::SetNextWindowSize(ImVec2(344.0f, 0.0f));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));
+            const bool renderPopupOpen = ImGui::BeginPopup("##arrangeRenderPopup");
+            ImGui::PopStyleVar();
+            if (renderPopupOpen)
+            {
+               ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
+               FieldWell::PushStyle();
+               SectionCard::BeginWindow();
+               const float fieldW = ImGui::GetContentRegionAvail().x - SectionCard::kLabelW;
+               SectionCard::Title(T("Render Timeline"));
 
                // ---- Time range ----
-               ImGui::TextDisabled("%s", T("Range:"));
-               ImGui::SetNextItemWidth(150.0f);
+               SectionCard::Begin(T("Range"));
+               SectionCard::RowLabel(T("Span"));
+               ImGui::SetNextItemWidth(fieldW);
                int rangeKind = std::clamp(rset.renderRangeKind, 0, 3);
-               if (ImGui::Combo("##arrRangeKind", &rangeKind, I18n::TList("Whole arrangement\0Loop\0Marker A -> B\0Custom\0")))
+               if (WellCombo("##arrRangeKind", &rangeKind, I18n::TList("Whole arrangement\0Loop\0Marker A -> B\0Custom\0")))
                {
                   rset.renderRangeKind = rangeKind;
                   gPatchDirty = true;
@@ -489,13 +563,14 @@ namespace app
                      markerItems.push_back('\0');
                      sArrangeRenderMarkerA = std::clamp(sArrangeRenderMarkerA, 0, markerCount - 1);
                      sArrangeRenderMarkerB = std::clamp(sArrangeRenderMarkerB, 0, markerCount - 1);
-                     ImGui::SetNextItemWidth(110.0f);
-                     ImGui::Combo("##arrMarkA", &sArrangeRenderMarkerA, markerItems.c_str());
-                     ImGui::SameLine(0.0f, 6.0f);
+                     SectionCard::RowLabel(T("Markers"));
+                     ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
+                     WellCombo("##arrMarkA", &sArrangeRenderMarkerA, markerItems.c_str());
+                     ImGui::SameLine(0.0f, tok::space_1);
                      ImGui::TextDisabled("->");
-                     ImGui::SameLine(0.0f, 6.0f);
-                     ImGui::SetNextItemWidth(110.0f);
-                     ImGui::Combo("##arrMarkB", &sArrangeRenderMarkerB, markerItems.c_str());
+                     ImGui::SameLine(0.0f, tok::space_1);
+                     ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
+                     WellCombo("##arrMarkB", &sArrangeRenderMarkerB, markerItems.c_str());
                   }
                }
                else if (rset.renderRangeKind == kArrangeRangeCustom)
@@ -506,8 +581,8 @@ namespace app
                   auto tickField = [&](const char* id, Arrange::Tick& t) {
                      char buf[48];
                      snprintf(buf, sizeof(buf), "%s", ArrangeFormatPos(t).c_str());
-                     ImGui::SetNextItemWidth(90.0f);
-                     if (ImGui::InputText(id, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
+                     ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
+                     if (FieldWell::InputText(id, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
                      {
                         const Arrange::Tick parsed = ArrangeParsePos(buf);
                         if (parsed >= 0)
@@ -517,28 +592,35 @@ namespace app
                         }
                      }
                   };
+                  SectionCard::RowLabel(T("Custom"));
                   tickField("##arrRangeStart", rset.renderRangeStart);
-                  ImGui::SameLine(0.0f, 6.0f);
+                  ImGui::SameLine(0.0f, tok::space_1);
                   ImGui::TextDisabled("->");
-                  ImGui::SameLine(0.0f, 6.0f);
+                  ImGui::SameLine(0.0f, tok::space_1);
                   tickField("##arrRangeEnd", rset.renderRangeEnd);
                }
                currentRange(rangeA, rangeB);
-
-               ImGui::Separator();
 
                const bool audioOnly = effectiveVideoSource() == kArrangeVideoNone;
 
                // ---- Resolution / fps (video jobs only) ----
                if (!audioOnly)
                {
-                  ImGui::TextDisabled("%s", T("Resolution:"));
+                  SectionCard::Begin(T("Video"));
+                  SectionCard::RowLabel(T("Size"));
                   static int sArrangeRenderResPreset = 0; // 0=Match Clips, 1..4 fixed, 5=Custom
                   int detectedClipW = 0, detectedClipH = 0;
                   ArrangeRenderDetectClipSize(detectedClipW, detectedClipH);
                   const char* kResPresets[] = { T("Match Clips"), "1080p", "4K", "720p", T("Vertical"), T("Custom") };
-                  ImGui::SetNextItemWidth(120.0f);
-                  if (ImGui::Combo("##arrResPreset", &sArrangeRenderResPreset, kResPresets, IM_ARRAYSIZE(kResPresets)))
+                  ImGui::SetNextItemWidth(fieldW);
+                  std::string resItems;
+                  for (const char* r : kResPresets)
+                  {
+                     resItems += r;
+                     resItems.push_back('\0');
+                  }
+                  resItems.push_back('\0');
+                  if (WellCombo("##arrResPreset", &sArrangeRenderResPreset, resItems.c_str()))
                   {
                      if (sArrangeRenderResPreset == 0) { rset.renderWidth = detectedClipW; rset.renderHeight = detectedClipH; }
                      else if (sArrangeRenderResPreset == 1) { rset.renderWidth = 1920; rset.renderHeight = 1080; }
@@ -547,43 +629,42 @@ namespace app
                      else if (sArrangeRenderResPreset == 4) { rset.renderWidth = 1080; rset.renderHeight = 1920; }
                      gPatchDirty = true;
                   }
-                  ImGui::SameLine();
-                  ImGui::SetNextItemWidth(60.0f);
-                  if (ImGui::InputInt("##arrResW", &rset.renderWidth, 0, 0))
+                  SectionCard::RowLabel("");
+                  ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
+                  if (FieldWell::InputInt("##arrResW", &rset.renderWidth, 0, 0))
                      gPatchDirty = true;
-                  ImGui::SameLine(0.0f, 4.0f);
+                  ImGui::SameLine(0.0f, tok::space_1);
                   ImGui::TextDisabled("%s", T("x"));
-                  ImGui::SameLine(0.0f, 4.0f);
-                  ImGui::SetNextItemWidth(60.0f);
-                  if (ImGui::InputInt("##arrResH", &rset.renderHeight, 0, 0))
+                  ImGui::SameLine(0.0f, tok::space_1);
+                  ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
+                  if (FieldWell::InputInt("##arrResH", &rset.renderHeight, 0, 0))
                      gPatchDirty = true;
                   rset.renderWidth = std::clamp(rset.renderWidth, 16, 7680);
                   rset.renderHeight = std::clamp(rset.renderHeight, 16, 4320);
 
-                  ImGui::SetNextItemWidth(90.0f);
-                  if (ImGui::InputInt(L("fps##arrRenderFps"), &rset.renderFps))
+                  SectionCard::RowLabel(T("Rate"));
+                  ImGui::SetNextItemWidth(fieldW);
+                  if (FieldWell::InputInt("##arrRenderFps", &rset.renderFps, 0, 0))
                      gPatchDirty = true;
                   rset.renderFps = std::clamp(rset.renderFps, 1, 240);
-
-                  ImGui::Separator();
                }
 
-               ImGui::Separator();
-
                // ---- Output file ----
-               ImGui::TextDisabled("%s", T("Output File:"));
+               SectionCard::Begin(T("Output"));
+               SectionCard::RowLabel(T("Name"));
                char renderNameBuf[256];
                snprintf(renderNameBuf, sizeof(renderNameBuf), "%s", sArrangeRenderFileName.c_str());
-               ImGui::SetNextItemWidth(200.0f);
-               if (ImGui::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
+               ImGui::SetNextItemWidth(fieldW - 36.0f);
+               if (FieldWell::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
                   sArrangeRenderFileName = renderNameBuf;
-               ImGui::SameLine();
+               ImGui::SameLine(0.0f, tok::space_1);
                ImGui::TextDisabled("%s", renderExtension());
 
                char renderFolderBuf[512];
                snprintf(renderFolderBuf, sizeof(renderFolderBuf), "%s", rset.renderFolder.c_str());
-               ImGui::SetNextItemWidth(260.0f);
-               if (ImGui::InputText("##arrangeRenderFolder", renderFolderBuf, sizeof(renderFolderBuf)))
+               SectionCard::RowLabel(T("Folder"));
+               ImGui::SetNextItemWidth(fieldW);
+               if (FieldWell::InputText("##arrangeRenderFolder", renderFolderBuf, sizeof(renderFolderBuf)))
                {
                   rset.renderFolder = renderFolderBuf;
                   gPatchDirty = true;
@@ -596,24 +677,21 @@ namespace app
                if (!audioOnly)
                {
                   const int fmtActive = rset.renderFormat == 1 ? 1 : 0;
-                  if (fmtActive == 0) ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-                  if (ImGui::Button(L(".mp4##arrRenderMp4"), ImVec2(56, 0)))
+                  SectionCard::RowLabel(T("Format"));
+                  if (ChipButton::Draw(".mp4##arrRenderMp4", fmtActive == 0, 24.0f, 56.0f))
                   {
                      rset.renderFormat = 0;
                      gPatchDirty = true;
                   }
-                  if (fmtActive == 0) ImGui::PopStyleColor();
-                  ImGui::SameLine();
-                  if (fmtActive == 1) ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-                  if (ImGui::Button(L(".mov##arrRenderMov"), ImVec2(56, 0)))
+                  ImGui::SameLine(0.0f, tok::space_1);
+                  if (ChipButton::Draw(".mov##arrRenderMov", fmtActive == 1, 24.0f, 56.0f))
                   {
                      rset.renderFormat = 1;
                      gPatchDirty = true;
                   }
-                  if (fmtActive == 1) ImGui::PopStyleColor();
                }
-
-               ImGui::Separator();
+               SectionCard::End();
+               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
 
                // Builds the job the two submit buttons share, so "Render Now"
                // and "Add to Queue" can never disagree about what was asked
@@ -682,15 +760,18 @@ namespace app
                // missing.
                const bool canRender = !sArrangeRenderFileName.empty();
                ImGui::BeginDisabled(!canRender || ArrangeRenderBusy());
-               if (ImGui::Button(L("Render Now"), ImVec2(110, 0)))
+               if (ChipButton::Draw(L("Render Now"), true, 28.0f, 140.0f))
                {
                   submitJob(true);
                   ImGui::CloseCurrentPopup();
                }
                ImGui::EndDisabled();
-               ImGui::SameLine();
-               if (ImGui::Button(L("Cancel"), ImVec2(70, 0)))
+               ImGui::SameLine(0.0f, tok::space_2);
+               if (ChipButton::Draw(L("Cancel"), false, 28.0f, 88.0f))
                   ImGui::CloseCurrentPopup();
+               SectionCard::EndWindow();
+               FieldWell::PopStyle();
+               ImGui::PopStyleVar();
                ImGui::EndPopup();
             }
 
@@ -703,16 +784,20 @@ namespace app
                ImGui::OpenPopup(L("Overwrite file?##arrangeOverwrite"));
                sArrangeOpenOverwrite = false;
             }
-            if (ImGui::BeginPopupModal(L("Overwrite file?##arrangeOverwrite"), nullptr,
-                                       ImGuiWindowFlags_AlwaysAutoResize))
+            if (DialogParts::Begin(L("Overwrite file?##arrangeOverwrite")))
             {
+               DialogParts::Title(T("Overwrite file?"));
                const bool queuedClash = ArrangeRenderPathQueued(sArrangePendingJob.path, 0);
-               ImGui::TextUnformatted(queuedClash ? T("Another queued job already writes:") : T("This file already exists:"));
-               ImGui::TextDisabled("%s", sArrangePendingJob.path.c_str());
-               ImGui::Dummy(ImVec2(0, 4));
-               if (ImGui::Button(L("Overwrite"), ImVec2(100, 0)))
+               DialogParts::Message(queuedClash ? T("Another queued job already writes:") : T("This file already exists:"));
+               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
+               DialogParts::Message(sArrangePendingJob.path.c_str());
+               ImGui::PopTextWrapPos();
+               const int pick = DialogParts::Buttons({ L("Cancel"), L("Auto-rename"), L("Overwrite") });
+               if (pick == 1 || pick == 2)
                {
                   ArrangeRenderJob job = sArrangePendingJob;
+                  if (pick == 1)
+                     job.path = ArrangeRenderUniquePath(job.path);
                   job.id = gArrangeRenderNextJobId++;
                   job.status = kArrangeJobQueued;
                   if (sArrangePendingStartNow)
@@ -724,30 +809,10 @@ namespace app
                   {
                      gArrangeRenderQueue.push_back(job);
                   }
-                  ImGui::CloseCurrentPopup();
                }
-               ImGui::SameLine();
-               if (ImGui::Button(L("Auto-rename"), ImVec2(100, 0)))
-               {
-                  ArrangeRenderJob job = sArrangePendingJob;
-                  job.path = ArrangeRenderUniquePath(job.path);
-                  job.id = gArrangeRenderNextJobId++;
-                  job.status = kArrangeJobQueued;
-                  if (sArrangePendingStartNow)
-                  {
-                     gArrangeRenderQueue.insert(gArrangeRenderQueue.begin(), job);
-                     gArrangeRenderQueueRunning = true;
-                  }
-                  else
-                  {
-                     gArrangeRenderQueue.push_back(job);
-                  }
+               if (pick >= 0)
                   ImGui::CloseCurrentPopup();
-               }
-               ImGui::SameLine();
-               if (ImGui::Button(L("Cancel"), ImVec2(80, 0)))
-                  ImGui::CloseCurrentPopup();
-               ImGui::EndPopup();
+               DialogParts::End();
             }
          }
 
@@ -769,24 +834,19 @@ namespace app
          // Rewind, Bars/Time) over there too.
          {
             const bool viewportWasOn = gArrangeShowViewport;
-            if (viewportWasOn)
-            {
-               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
-            }
-            if (ImGui::Button("##arrangeshowviewport", ImVec2(30, 0)))
+            PushToolbarChip(viewportWasOn);
+            if (ActionButton::Draw("##arrangeshowviewport", ImVec2(30, tok::tile)))
                gArrangeShowViewport = !gArrangeShowViewport;
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangeviewportctx"))
                ImGui::OpenPopup("##arrangeviewportctx");
-            if (viewportWasOn)
-               ImGui::PopStyleColor(2);
+            PopToolbarChip();
             if (ImGui::IsItemHovered())
                HelpTip(viewportWasOn ? T("Viewport Monitor: Visible (Right-click for Dock Position)") : T("Toggle Viewport Monitor (Right-click for Dock Position)"));
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = viewportWasOn ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
+            const ImU32 icol = viewportWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             const float bw = 13.0f, bh = 9.0f;
             ImVec2 tl(center.x - bw * 0.5f, center.y - bh * 0.5f - 1.0f);
@@ -803,34 +863,32 @@ namespace app
          // Infinite toolbar's own transport controls (see the top toolbar's
          // "##transportrewind" a bit further down in this file) rather than
          // plain text labels.
-         ImGui::SameLine(0.0f, 14.0f);
+         ImGui::SameLine(0.0f, tok::space_4);
          const bool arrangeIsPlaying = tr.IsPlaying();
-         if (arrangeIsPlaying)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(16, 185, 129, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(5, 150, 105, 255));
-         }
-         if (ImGui::Button("##arrangeplaybtn", ImVec2(30, 0)))
+         PushToolbarChip(arrangeIsPlaying, /*green=*/true);
+         if (ActionButton::Draw("##arrangeplaybtn", ImVec2(30, tok::tile)))
             tr.TogglePlay();
-         if (arrangeIsPlaying)
-            ImGui::PopStyleColor(2);
+         PopToolbarChip();
          if (ImGui::IsItemHovered())
             HelpTip(arrangeIsPlaying ? T("Pause (Space)") : T("Play (Space)"));
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.6f;
+            const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = arrangeIsPlaying ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
+            const ImU32 icol = arrangeIsPlaying ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             if (arrangeIsPlaying)
-               Tabler::DrawPlayerPause(ImGui::GetWindowDrawList(), center, iconSize, icol);
+               glyph::DrawPlayerPause(ImGui::GetWindowDrawList(), center, iconSize, icol);
             else
-               Tabler::DrawPlayerPlay(ImGui::GetWindowDrawList(), center, iconSize, icol);
+               glyph::DrawPlayerPlay(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
-         ImGui::SameLine();
-         if (ImGui::Button("##arrangerewindbtn", ImVec2(30, 0)))
+         ImGui::SameLine(0.0f, tok::space_1);
+         PushToolbarChip(false);
+         const bool rewindClicked = ActionButton::Draw("##arrangerewindbtn", ImVec2(30, tok::tile));
+         PopToolbarChip();
+         if (rewindClicked)
             tr.Rewind();
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Return to Start (Enter)"));
@@ -838,39 +896,30 @@ namespace app
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.72f;
+            const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol;
-            Tabler::DrawPlayerRewind(ImGui::GetWindowDrawList(), center, iconSize, icol);
+            const ImU32 icol = arrangeIconCol;
+            glyph::DrawPlayerRewind(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
          // Bars | Time: which unit the ruler, the clip popup and the loop
          // fields speak (Settings::timeDisplay, saved with the patch). A view
          // change only - every position stays in ticks. The selected half
          // takes the shared "selected" accent tint; the other stays quiet.
-         ImGui::SameLine(0.0f, 14.0f);
+         ImGui::SameLine(0.0f, tok::space_4);
          {
-            const int shownUnit = gArrange.settings.timeDisplay; // pre-click, for the push/pop pairs
-            const char* kUnitLabels[2] = { "Bars##arrunitbars", "Time##arrunittime" };
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, ImGui::GetStyle().ItemSpacing.y));
-            for (int u = 0; u < 2; u++)
-            {
-               if (u == 1)
-                  ImGui::SameLine();
-               const bool on = shownUnit == u;
-               if (on)
-               {
-                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-                  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
-               }
-               if (ImGui::Button(kUnitLabels[u], ImVec2(44.0f, 0.0f)))
-                  ArrangeSetTimeDisplay(u);
-               if (on)
-                  ImGui::PopStyleColor(2);
-               if (ImGui::IsItemHovered())
-                  HelpTip(u == 0 ? T("Switch display to Bars / Beats (BBT)") : T("Switch display to Time (Minutes:Seconds)"));
-            }
-            ImGui::PopStyleVar();
+            const int shownUnit = gArrange.settings.timeDisplay;
+            static const PillGroup::Segment kUnitSegs[2] = { { "arrange.unit.bars", "Bars" }, { "arrange.unit.time", "Time" } };
+            const ImVec2 up = ImGui::GetCursorScreenPos();
+            const UiLayout::Rect ur{ up.x, up.y, 104.0f, tok::tile };
+            const int pickedUnit = PillGroup::Draw("arrangeunit", ur, kUnitSegs, 2, shownUnit);
+            if (ImGui::IsMouseHoveringRect(ImVec2(ur.x, ur.y), ImVec2(ur.Right(), ur.Bottom())))
+               HelpTip(ImGui::GetIO().MousePos.x < ur.CenterX() ? T("Switch display to Bars / Beats (BBT)")
+                                                                 : T("Switch display to Time (Minutes:Seconds)"));
+            ImGui::SetCursorScreenPos(up);
+            ImGui::Dummy(ImVec2(ur.w, ur.h));
+            if (pickedUnit >= 0)
+               ArrangeSetTimeDisplay(pickedUnit);
          }
 
          // Snap: the magnet toggles the grid off <-> the last division that
@@ -879,39 +928,34 @@ namespace app
          // the same musical grid at any zoom and any tempo. It covers clip
          // move/trim, marker drags, the ruler scrub, the loop drag and the
          // arrow-key nudge.
-         ImGui::SameLine(0.0f, 14.0f);
+         ImGui::SameLine(0.0f, tok::space_4);
          const bool snapWasOn = gArrange.settings.snapDivision > 0;
-         if (snapWasOn)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(16, 185, 129, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(5, 150, 105, 255));
-         }
-         if (ImGui::Button("##arrangesnapbtn", ImVec2(30, 0)))
+         PushToolbarChip(snapWasOn);
+         if (ActionButton::Draw("##arrangesnapbtn", ImVec2(30, tok::tile)))
          {
             if (snapWasOn)
                ArrangeSetSnap(0, false);
             else
                ArrangeSetSnap(std::max(1, gArrangeLastSnapDivision), gArrange.settings.snapTriplet);
          }
-         if (snapWasOn)
-            ImGui::PopStyleColor(2);
+         PopToolbarChip();
          if (ImGui::IsItemHovered())
             HelpTip(snapWasOn ? T("Snap to Grid: On") : T("Snap to Grid: Off"));
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.62f;
+            const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = snapWasOn ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
-            Tabler::DrawMagnet(ImGui::GetWindowDrawList(), center, iconSize, icol);
+            const ImU32 icol = snapWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
+            glyph::DrawMagnet(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
          // Grid division dropdown. The divisions are MusicTime's own
          // RateDivision entries (names and lengths from that one table -
          // rhythmic-quantization-standard); this list only says which of
          // them a timeline grid offers, mapped onto snapDivision/snapTriplet.
-         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::SameLine(0.0f, tok::space_1);
          {
             using GridChoice = ArrangeGridChoice;
             const auto& kGridChoices = kArrangeGridChoices;
@@ -923,65 +967,55 @@ namespace app
                   curName = choiceName(c);
             char gridBtn[48];
             snprintf(gridBtn, sizeof(gridBtn), "%s##arrgriddiv", curName);
-            PushDropdownStyle();
-            if (ImGui::Button(gridBtn, ImVec2(58.0f, 0.0f)))
+            PushToolbarChip(false);
+            if (ActionButton::Draw(gridBtn, ImVec2(58.0f, tok::tile)))
                ImGui::OpenPopup("##arrgridpopup");
-            PopDropdownStyle();
+            PopToolbarChip();
             if (ImGui::IsItemHovered())
                HelpTip("%s", T("Snap Grid Division"));
-            if (ImGui::BeginPopup("##arrgridpopup"))
+            if (MenuParts::BeginPopup("##arrgridpopup"))
             {
                for (const GridChoice& c : kGridChoices)
                {
                   const bool sel = c.division == st.snapDivision && (c.division <= 1 || c.triplet == st.snapTriplet);
-                  if (ImGui::Selectable(choiceName(c), sel))
+                  if (MenuParts::Choice(choiceName(c), sel))
                      ArrangeSetSnap(c.division, c.triplet);
                }
-               ImGui::EndPopup();
+               MenuParts::EndPopup();
             }
          }
 
          // Loop region toggle. The region itself is a Shift+drag on the
          // ruler; right-clicking the ruler disarms it.
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tok::space_1);
          const Arrange::LoopRange loopNow = gArrange.settings.loop; // the loop as of this frame
          const bool loopWasOn = loopNow.enabled; // see snapWasOn above
-         if (loopWasOn)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(16, 185, 129, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(5, 150, 105, 255));
-         }
-         if (ImGui::Button("##arrangeloopbtn", ImVec2(30, 0)))
+         PushToolbarChip(loopWasOn);
+         if (ActionButton::Draw("##arrangeloopbtn", ImVec2(30, tok::tile)))
             ArrangeSetLoop(!loopNow.enabled, loopNow.start, loopNow.end);
-         if (loopWasOn)
-            ImGui::PopStyleColor(2);
+         PopToolbarChip();
          if (ImGui::IsItemHovered())
             HelpTip(loopWasOn ? T("Loop Region: Enabled") : T("Toggle Loop Region (Shift+drag on ruler)"));
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.65f;
+            const float iconSize = tok::icon_md;
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = loopWasOn ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
-            Tabler::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
+            const ImU32 icol = loopWasOn ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
+            glyph::DrawRepeat(ImGui::GetWindowDrawList(), center, iconSize, icol);
          }
 
          // Tool Selector (Select A, Trim T, Range R, Blade B, Zoom Z, Hand H)
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tok::space_1);
          const bool toolNonDefault = (gArrangeTool != ArrangeTool::Select);
-         if (toolNonDefault)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(16, 185, 129, 255));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(5, 150, 105, 255));
-         }
+         PushToolbarChip(toolNonDefault);
          const float toolBtnW = 34.0f;
-         if (ImGui::Button("##arrangetoolmodepicker", ImVec2(toolBtnW, 0)))
+         if (ActionButton::Draw("##arrangetoolmodepicker", ImVec2(toolBtnW, tok::tile)))
          {
             ImGui::OpenPopup("##arrangetoolpopup");
          }
-         if (toolNonDefault)
-            ImGui::PopStyleColor(2);
+         PopToolbarChip();
 
          const char* toolTooltip = T("Tool: Select (A)");
          switch (gArrangeTool)
@@ -1001,69 +1035,72 @@ namespace app
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
-            const float iconSize = (bmax.y - bmin.y) * 0.65f;
+            const float iconSize = tok::icon_md;
             const ImVec2 center(bmin.x + 12.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = toolNonDefault ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
+            const ImU32 icol = toolNonDefault ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
             ImDrawList* tdl = ImGui::GetWindowDrawList();
             switch (gArrangeTool)
             {
-               case ArrangeTool::Select: Tabler::DrawPointer(tdl, center, iconSize, icol, true); break;
-               case ArrangeTool::Trim:   Tabler::DrawTrim(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Range:  Tabler::DrawRange(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Blade:  Tabler::DrawScissors(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Zoom:   Tabler::DrawZoom(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Hand:   Tabler::DrawHand(tdl, center, iconSize, icol); break;
-               case ArrangeTool::Pencil: Tabler::DrawPencil(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Select: glyph::DrawPointer(tdl, center, iconSize, icol, true); break;
+               case ArrangeTool::Trim:   glyph::DrawTrim(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Range:  glyph::DrawRange(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Blade:  glyph::DrawScissors(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Zoom:   glyph::DrawZoom(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Hand:   glyph::DrawHand(tdl, center, iconSize, icol); break;
+               case ArrangeTool::Pencil: glyph::DrawPencil(tdl, center, iconSize, icol); break;
             }
             // Small chevron down on the right edge
             const ImVec2 chevCenter(bmax.x - 6.5f, (bmin.y + bmax.y) * 0.5f);
-            Tabler::DrawChevronDown(tdl, chevCenter, 8.0f, icol, 1.3f);
+            glyph::DrawChevronDown(tdl, chevCenter, 8.0f, icol, 1.3f);
          }
 
-         if (ImGui::BeginPopup("##arrangetoolpopup"))
+         if (MenuParts::BeginPopup("##arrangetoolpopup"))
          {
-            if (ImGui::MenuItem(L("Select"), "A", gArrangeTool == ArrangeTool::Select))
+            if (MenuParts::Item(L("Select"), "A", gArrangeTool == ArrangeTool::Select))
             {
                gArrangeTool = ArrangeTool::Select;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Trim"), "T", gArrangeTool == ArrangeTool::Trim))
+            if (MenuParts::Item(L("Trim"), "T", gArrangeTool == ArrangeTool::Trim))
             {
                gArrangeTool = ArrangeTool::Trim;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Range Selection"), "R", gArrangeTool == ArrangeTool::Range))
+            if (MenuParts::Item(L("Range Selection"), "R", gArrangeTool == ArrangeTool::Range))
             {
                gArrangeTool = ArrangeTool::Range;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Blade"), "B", gArrangeTool == ArrangeTool::Blade))
+            if (MenuParts::Item(L("Blade"), "B", gArrangeTool == ArrangeTool::Blade))
             {
                gArrangeTool = ArrangeTool::Blade;
                gArrangeBladeOn = true;
             }
-            if (ImGui::MenuItem(L("Zoom"), "Z", gArrangeTool == ArrangeTool::Zoom))
+            if (MenuParts::Item(L("Zoom"), "Z", gArrangeTool == ArrangeTool::Zoom))
             {
                gArrangeTool = ArrangeTool::Zoom;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Hand"), "H", gArrangeTool == ArrangeTool::Hand))
+            if (MenuParts::Item(L("Hand"), "H", gArrangeTool == ArrangeTool::Hand))
             {
                gArrangeTool = ArrangeTool::Hand;
                gArrangeBladeOn = false;
             }
-            if (ImGui::MenuItem(L("Pencil (Draw Clip)"), "P", gArrangeTool == ArrangeTool::Pencil))
+            if (MenuParts::Item(L("Pencil (Draw Clip)"), "P", gArrangeTool == ArrangeTool::Pencil))
             {
                gArrangeTool = ArrangeTool::Pencil;
                gArrangeBladeOn = false;
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
 
          // Add Marker (M): drops one at the playhead, on the snap grid.
-         ImGui::SameLine();
-         if (ImGui::Button("##arrangemarkerbtn", ImVec2(30, 0)))
+         ImGui::SameLine(0.0f, tok::space_1);
+         PushToolbarChip(false);
+         const bool markerClicked = ActionButton::Draw("##arrangemarkerbtn", ImVec2(30, tok::tile));
+         PopToolbarChip();
+         if (markerClicked)
             ArrangeAddMarkerAtPlayhead();
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Add Marker at Playhead (M)"));
@@ -1072,8 +1109,8 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol;
-            Tabler::DrawFlag(ImGui::GetWindowDrawList(), center, (bmax.y - bmin.y) * 0.65f, icol);
+            const ImU32 icol = arrangeIconCol;
+            glyph::DrawFlag(ImGui::GetWindowDrawList(), center, tok::icon_md, icol);
          }
 
          // Reset Row Heights: any track drag-resized off the default row
@@ -1081,14 +1118,17 @@ namespace app
          // to the Inspector toggle below - both act on the header column/row
          // layout, and are the two icons most likely to be reached for
          // together.
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tok::space_1);
          {
             bool anyResized = false;
             for (const Arrange::Lane& lane : gArrange.lanes)
                if (lane.rowHeight > 0.0f) { anyResized = true; break; }
 
             ImGui::BeginDisabled(!anyResized);
-            if (ImGui::Button("##arrangeresetrowh", ImVec2(30, 0)))
+            PushToolbarChip(false);
+            const bool resetClicked = ActionButton::Draw("##arrangeresetrowh", ImVec2(30, tok::tile));
+            PopToolbarChip();
+            if (resetClicked)
             {
                ArrangeEdit([&]() {
                   for (Arrange::Lane& lane : gArrange.lanes)
@@ -1101,26 +1141,21 @@ namespace app
             const ImVec2 rcenter((rbmin.x + rbmax.x) * 0.5f, (rbmin.y + rbmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
             const ImU32 barCol = anyResized
-               ? (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol)
+               ? arrangeIconCol
                : (arrangeIconCol & 0x60FFFFFFu);
-            Tabler::DrawLineHeight(ImGui::GetWindowDrawList(), rcenter, (rbmax.y - rbmin.y) * 0.65f, barCol);
+            glyph::DrawLineHeight(ImGui::GetWindowDrawList(), rcenter, tok::icon_md, barCol);
             if (hovered)
                HelpTip(anyResized ? T("Reset all track heights to default") : T("All tracks already at default height"));
          }
 
          // Inspector / Clip Settings toggle. Icon is the edit/pencil
          // glyph for clip/track settings.
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tok::space_1);
          const bool inspectorWasOpen = gArrangeClipSettingsPanelOpen;
-         if (inspectorWasOpen)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
-         }
-         if (ImGui::Button("##clipsettingstoggle", ImVec2(30, 0)))
+         PushToolbarChip(inspectorWasOpen);
+         if (ActionButton::Draw("##clipsettingstoggle", ImVec2(30, tok::tile)))
             gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
-         if (inspectorWasOpen)
-            ImGui::PopStyleColor(2);
+         PopToolbarChip();
          if (ImGui::IsItemHovered())
             HelpTip(inspectorWasOpen ? T("Clip / Track Inspector: Open") : T("Toggle Clip / Track Inspector"));
          {
@@ -1128,8 +1163,8 @@ namespace app
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const bool hovered = ImGui::IsItemHovered();
-            const ImU32 icol = inspectorWasOpen ? IM_COL32(255, 255, 255, 255) : (hovered ? IM_COL32(255, 255, 255, 255) : arrangeIconCol);
-            Tabler::DrawEdit(ImGui::GetWindowDrawList(), center, (bmax.y - bmin.y) * 0.65f, icol);
+            const ImU32 icol = inspectorWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : arrangeIconCol;
+            glyph::DrawEdit(ImGui::GetWindowDrawList(), center, tok::icon_md, icol);
          }
 
          // The routing mode (gAudioMode) is owned by the "Enable Timeline
@@ -1149,18 +1184,18 @@ namespace app
              ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !ImGui::IsPopupOpen("##arrangedockctx"))
             ImGui::OpenPopup("##arrangedockctx");
       }
-      if (ImGui::BeginPopup("##arrangedockctx"))
+      if (MenuParts::BeginPopup("##arrangedockctx"))
       {
-         if (ImGui::BeginMenu(L("Dock Position")))
+         if (MenuParts::SubMenu(L("Dock Position")))
          {
             const bool panelTop = gArrange.settings.dockSide == 1;
-            if (ImGui::MenuItem(L("Timeline at Bottom"), nullptr, !panelTop) && panelTop)
+            if (MenuParts::Item(L("Timeline at Bottom"), nullptr, !panelTop) && panelTop)
             {
                gArrange.settings.dockSide = 0;
                gArrange.revision++; // a model field like any other (WP5b)
                gPatchDirty = true;
             }
-            if (ImGui::MenuItem(L("Timeline at Top"), nullptr, panelTop) && !panelTop)
+            if (MenuParts::Item(L("Timeline at Top"), nullptr, panelTop) && !panelTop)
             {
                gArrange.settings.dockSide = 1;
                gArrange.revision++;
@@ -1168,24 +1203,24 @@ namespace app
             }
             ImGui::EndMenu();
          }
-         ImGui::Separator();
-         if (ImGui::MenuItem(L("Close Arrangement Timeline")))
+         ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         if (MenuParts::Item(L("Close Arrangement Timeline")))
          {
             gArrangePanelOpen = false;
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
-      if (ImGui::BeginPopup("##arrangeviewportctx"))
+      if (MenuParts::BeginPopup("##arrangeviewportctx"))
       {
-         if (ImGui::BeginMenu(L("Viewport Position")))
+         if (MenuParts::SubMenu(L("Viewport Position")))
          {
-            if (ImGui::MenuItem(L("Dock Left"), nullptr, !gArrangeViewportOnRight))
+            if (MenuParts::Item(L("Dock Left"), nullptr, !gArrangeViewportOnRight))
                gArrangeViewportOnRight = false;
-            if (ImGui::MenuItem(L("Dock Right"), nullptr, gArrangeViewportOnRight))
+            if (MenuParts::Item(L("Dock Right"), nullptr, gArrangeViewportOnRight))
                gArrangeViewportOnRight = true;
             ImGui::EndMenu();
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       ImGui::Separator();
@@ -1193,7 +1228,7 @@ namespace app
       // Layout: Global Viewport Monitor alongside / above timeline lanes
       const bool isWide = panelSize.x >= 720.0f;
       const bool showVp = isWide && gArrangeShowViewport;
-      const float kSettingsW = 210.0f;
+      const float kSettingsW = 244.0f;
       const float kViewportW = isWide ? std::clamp(panelSize.x * 0.28f, 180.0f, 320.0f) : panelSize.x;
       const float kViewportH = isWide ? std::max(120.0f, panelSize.y - 40.0f) : 140.0f;
 
@@ -1302,17 +1337,17 @@ namespace app
              !ImGui::IsPopupOpen("##arrangeviewportctx"))
             ImGui::OpenPopup("##arrangeviewportctx");
 
-         if (ImGui::BeginPopup("##arrangeviewportctx"))
+         if (MenuParts::BeginPopup("##arrangeviewportctx"))
          {
-            if (ImGui::BeginMenu(L("Viewport Position")))
+            if (MenuParts::SubMenu(L("Viewport Position")))
             {
-               if (ImGui::MenuItem(L("Dock Left"), nullptr, !gArrangeViewportOnRight))
+               if (MenuParts::Item(L("Dock Left"), nullptr, !gArrangeViewportOnRight))
                   gArrangeViewportOnRight = false;
-               if (ImGui::MenuItem(L("Dock Right"), nullptr, gArrangeViewportOnRight))
+               if (MenuParts::Item(L("Dock Right"), nullptr, gArrangeViewportOnRight))
                   gArrangeViewportOnRight = true;
                ImGui::EndMenu();
             }
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
 
          ImGui::EndChild();
@@ -1334,11 +1369,25 @@ namespace app
       const float reservedRight = (showVp && gArrangeViewportOnRight ? (kViewportW + ImGui::GetStyle().ItemSpacing.x) : 0.0f)
                                 + (gArrangeClipSettingsPanelOpen ? (kSettingsW + ImGui::GetStyle().ItemSpacing.x) : 0.0f);
       const float timelineChildWidth = reservedRight > 0.0f ? -reservedRight : 0.0f;
+      {
+         // The lanes sit in a recessed well (same surface as the Library list), not on a panel-coloured child.
+         const ImVec2 w0 = ImGui::GetCursorScreenPos();
+         const ImVec2 wa = ImGui::GetContentRegionAvail();
+         const ImVec2 w1(w0.x + (timelineChildWidth < 0.0f ? wa.x + timelineChildWidth : wa.x), w0.y + wa.y);
+         const bool wellLight = IsThemeLight();
+         ImDrawList* wdl = ImGui::GetWindowDrawList();
+         wdl->AddRectFilled(w0, w1, ImGui::GetColorU32(ImVec4(0, 0, 0, wellLight ? 0.04f : 0.27f)), tok::radius_pill);
+         wdl->AddRect(w0, w1, ImGui::GetColorU32(wellLight ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
+      }
       PushDockedPanelStyle(/*isChild=*/true);
+      ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
       // Cmd/Ctrl+wheel zooms (above); it must not also scroll the lanes.
-      ImGui::BeginChild("##arrangetimelinescroll", ImVec2(timelineChildWidth, 0), false,
-                        ImGuiWindowFlags_AlwaysUseWindowPadding |
+      ImGui::BeginChild("##arrangetimelinescroll", ImVec2(timelineChildWidth, 0), ImGuiChildFlags_AlwaysUseWindowPadding,
+                        0 |
                         (arrangeWheelZoomMod ? ImGuiWindowFlags_NoScrollWithMouse : 0));
+      ImGui::PopStyleVar();
+      ImGui::PopStyleColor();
       PopDockedPanelStyle();
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -1437,11 +1486,13 @@ namespace app
       const ImVec2 rulerPos(rulerStartX, pinnedTopY);
       const ImVec2 rulerSize(rulerWidth, kRulerHeight);
       const bool isLight = IsThemeLight();
-      const ImU32 rulerBg = isLight ? IM_COL32(238, 238, 242, 255) : IM_COL32(32, 32, 36, 255);
-      const ImU32 markerStripBg = isLight ? IM_COL32(229, 229, 235, 255) : IM_COL32(26, 26, 30, 255);
-      const ImU32 tickCol = isLight ? IM_COL32(140, 140, 150, 255) : IM_COL32(100, 100, 110, 255);
-      const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text, 0.80f);
-      const ImU32 subTextCol = ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.80f);
+      // The ruler and lanes share the well: no fills of their own, hairlines and ticks derived from the text colour.
+      const ImU32 rulerBg = 0;
+      const ImU32 markerStripBg = 0;
+      const ImU32 tickCol = ImGui::GetColorU32(ImGuiCol_Text, 0.38f);
+      const ImU32 hairCol = ImGui::GetColorU32(ImGuiCol_Text, 0.08f);
+      const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text, 0.85f);
+      const ImU32 subTextCol = ImGui::GetColorU32(ImGuiCol_Text, 0.38f);
 
       // Header-column corner, level with the ruler (above the first track
       // row) - otherwise blank/unstyled, reading as a hole next to the
@@ -1451,16 +1502,16 @@ namespace app
 
       dl->AddRectFilled(rulerPos, ImVec2(rulerPos.x + rulerSize.x, kTickStripTop), markerStripBg);
       dl->AddRectFilled(ImVec2(rulerPos.x, kTickStripTop), ImVec2(rulerPos.x + rulerSize.x, rulerPos.y + rulerSize.y), rulerBg);
-      dl->AddLine(ImVec2(headerStartX, kTickStripTop), ImVec2(rulerPos.x + rulerSize.x, kTickStripTop), tickCol, 0.5f);
       dl->AddLine(ImVec2(headerStartX, rulerPos.y + rulerSize.y), ImVec2(rulerPos.x + rulerSize.x, rulerPos.y + rulerSize.y),
-                  tickCol, 1.0f);
+                  hairCol, 1.0f);
 
       // ---- ruler ticks and labels ----
       // Primary label in the chosen unit; the other unit follows it, dimmer,
       // only where it fits before the next label.
       {
          const float rulerBottom = rulerPos.y + rulerSize.y;
-         const float labelY = kTickStripTop + 2.0f;
+         UiType::Scope labelScope(UiType::Size::Caption, UiType::Weight::Medium);
+         const float labelY = kTickStripTop + 4.0f;
          dl->PushClipRect(rulerPos, ImVec2(rulerPos.x + rulerSize.x, rulerBottom), true);
          auto drawLabelPair = [&](float x, float nextX, const std::string& primary, const std::string& secondary)
          {
@@ -1567,7 +1618,7 @@ namespace app
             const bool dragged = gArrangeMarkerDragId == mk.id;
             dl->AddRectFilled(f0, f1, fcol, 3.0f, ImDrawFlags_RoundCornersRight);
             // A hairline edge so a pale flag still reads on the light ruler.
-            dl->AddRect(f0, f1, dragged ? IM_COL32(255, 255, 255, 230) : IM_COL32(0, 0, 0, isLight ? 110 : 150),
+            dl->AddRect(f0, f1, dragged ? tok::U32(tok::pal::c_FFFFFFE6) : IM_COL32(0, 0, 0, isLight ? 110 : 150),
                         3.0f, ImDrawFlags_RoundCornersRight, dragged ? 1.5f : 1.0f);
             dl->AddLine(ImVec2(fx, pinnedTopY), ImVec2(fx, rulerPos.y + rulerSize.y), fcol, 1.5f);
 
@@ -1582,7 +1633,7 @@ namespace app
                   ImGui::SetKeyboardFocusHere();
                   sMarkerRenameFocusedId = mk.id;
                }
-               const bool commit = ImGui::InputText("##renamingmarker", gArrangeRenameMarkerBuffer,
+               const bool commit = FieldWell::InputText("##renamingmarker", gArrangeRenameMarkerBuffer,
                                                     sizeof(gArrangeRenameMarkerBuffer),
                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
                if (commit || ImGui::IsItemDeactivated())
@@ -1598,7 +1649,7 @@ namespace app
             else
             {
                dl->AddText(ImVec2(fx + 5.0f, pinnedTopY + (kMarkerStripH - ImGui::GetFontSize()) * 0.5f),
-                           lum > 150.0f ? IM_COL32(20, 20, 24, 255) : IM_COL32(255, 255, 255, 255), nm);
+                           lum > 150.0f ? tok::U32(tok::pal::c_141418FF) : tok::U32(tok::pal::c_FFFFFFFF), nm);
             }
 
             const float hitX0 = std::max(rulerStartX, fx - 3.0f);
@@ -1818,7 +1869,7 @@ namespace app
 
       if (openMarkerCtx)
          ImGui::OpenPopup("##arrangemarkerctx");
-      if (ImGui::BeginPopup("##arrangemarkerctx"))
+      if (MenuParts::BeginPopup("##arrangemarkerctx"))
       {
          const Arrange::Marker* cm = nullptr;
          for (const Arrange::Marker& mk : gArrange.markers)
@@ -1833,13 +1884,13 @@ namespace app
             const uint32_t curColor = cm->color;
             ImGui::TextDisabled(T("Marker: %s"), cm->name.c_str());
             ImGui::TextDisabled("%s  |  %s", ArrangeFormatBBT(cm->pos).c_str(), ArrangeFormatTickSeconds(cm->pos).c_str());
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Rename")))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Rename")))
             {
                gArrangeRenamingMarkerId = mid;
                snprintf(gArrangeRenameMarkerBuffer, sizeof(gArrangeRenameMarkerBuffer), "%s", cm->name.c_str());
             }
-            ImGui::Separator();
+            MenuParts::Separator();
             ImGui::TextDisabled("%s", T("Colour"));
             for (int pi = 0; pi < 10; pi++)
             {
@@ -1855,11 +1906,11 @@ namespace app
                   ImGui::PopStyleVar();
                ImGui::PopID();
             }
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Delete Marker")))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Delete Marker")))
                ArrangeEdit([&]() { Arrange::DeleteMarker(gArrange, mid); });
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Lane grid lines (every lane stripes its body with these): the snap
@@ -2132,14 +2183,14 @@ namespace app
                                                 : (relY < 0.30f ? 0 : relY > 0.70f ? 2 : 1);
                if (zone == 1)
                {
-                  dl->AddRect(rowMin, rowMax, IM_COL32(59, 130, 246, 255), 3.0f, 0, 2.0f);
+                  dl->AddRect(rowMin, rowMax, tok::U32(tok::pal::c_3B82F6FF), 3.0f, 0, 2.0f);
                }
                else
                {
                   const float lineY = (zone == 0) ? rowMin.y : rowMax.y;
-                  dl->AddLine(ImVec2(rowMin.x, lineY), ImVec2(rowMax.x, lineY), IM_COL32(59, 130, 246, 255), 2.5f);
-                  dl->AddCircleFilled(ImVec2(rowMin.x + 3.0f, lineY), 4.0f, IM_COL32(59, 130, 246, 255));
-                  dl->AddCircleFilled(ImVec2(rowMax.x - 3.0f, lineY), 4.0f, IM_COL32(59, 130, 246, 255));
+                  dl->AddLine(ImVec2(rowMin.x, lineY), ImVec2(rowMax.x, lineY), tok::U32(tok::pal::c_3B82F6FF), 2.5f);
+                  dl->AddCircleFilled(ImVec2(rowMin.x + 3.0f, lineY), 4.0f, tok::U32(tok::pal::c_3B82F6FF));
+                  dl->AddCircleFilled(ImVec2(rowMax.x - 3.0f, lineY), 4.0f, tok::U32(tok::pal::c_3B82F6FF));
                }
                if (payload->IsDelivery())
                {
@@ -2234,8 +2285,12 @@ namespace app
          ImGui::PushID((int)(groupId & 0x7fffffff) | (1 << 30));
 
          const ImU32 tint = ArrangeMarkerColU32(grp->color);
-         dl->AddRectFilled(ImVec2(headerStartX, rowTop), ImVec2(rulerStartX + rulerWidth, rowTop + kLaneHeight),
-                            (tint & 0x00FFFFFFu) | 0x28000000u);
+         // Neutral band (the group colour stays on the chevron, folder and clip edges, not a tinted banner).
+         {
+            const ImVec4 gt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+            dl->AddRectFilled(ImVec2(headerStartX, rowTop), ImVec2(rulerStartX + rulerWidth, rowTop + kLaneHeight),
+                              ImGui::GetColorU32(ImVec4(gt.x, gt.y, gt.z, 0.05f)));
+         }
          dl->AddLine(ImVec2(headerStartX, rowTop + kLaneHeight), ImVec2(rulerStartX + rulerWidth, rowTop + kLaneHeight),
                      tickCol, 1.0f);
          dl->AddLine(ImVec2(rulerStartX, rowTop), ImVec2(rulerStartX, rowTop + kLaneHeight), tickCol, 1.0f);
@@ -2252,10 +2307,10 @@ namespace app
          const bool grpRowSelected = gArrangeRowSel.count(groupId) != 0;
          if (grpRowSelected)
          {
-            const ImU32 selFill = isLight ? IM_COL32(139, 92, 246, 35) : IM_COL32(139, 92, 246, 45);
-            const ImU32 selBorder = IM_COL32(167, 139, 250, 180);
-            dl->AddRectFilled(ImVec2(headerStartX + 1.0f, rowTop + 1.0f), ImVec2(rulerStartX - 1.0f, rowTop + kLaneHeight - 1.0f), selFill, 2.0f);
-            dl->AddRect(ImVec2(headerStartX + 1.0f, rowTop + 1.0f), ImVec2(rulerStartX - 1.0f, rowTop + kLaneHeight - 1.0f), selBorder, 2.0f, 0, 1.5f);
+            ImVec4 selAcc = app::AccentEmphasisSelected();
+            selAcc.w = 0.28f;
+            dl->AddRectFilled(ImVec2(headerStartX + 1.0f, rowTop + 1.0f), ImVec2(rulerStartX - 1.0f, rowTop + kLaneHeight - 1.0f),
+                              ImGui::GetColorU32(selAcc), tok::radius_tile);
          }
 
          ImGui::SetCursorScreenPos(ImVec2(indentX, rowTop + 4.0f));
@@ -2266,14 +2321,14 @@ namespace app
             });
          }
          const bool foldHovered = ImGui::IsItemHovered();
-         const ImU32 chevronCol = foldHovered ? (isLight ? IM_COL32(50, 50, 60, 255) : IM_COL32(240, 240, 240, 255)) : (tint | 0xE0000000u);
+         const ImU32 chevronCol = foldHovered ? (isLight ? tok::U32(tok::pal::c_32323CFF) : tok::U32(tok::pal::c_F0F0F0FF)) : (tint | 0xE0000000u);
          const ImVec2 chevCenter(indentX + 6.0f, rowTop + kLaneHeight * 0.5f);
          if (grp->collapsed)
-            Tabler::DrawChevronRight(dl, chevCenter, 11.0f, chevronCol);
+            glyph::DrawChevronRight(dl, chevCenter, 11.0f, chevronCol);
          else
-            Tabler::DrawChevronDown(dl, chevCenter, 11.0f, chevronCol);
+            glyph::DrawChevronDown(dl, chevCenter, 11.0f, chevronCol);
 
-         Tabler::DrawFolder(dl, ImVec2(indentX + 20.0f, rowTop + kLaneHeight * 0.5f), 13.0f, tint);
+         glyph::DrawFolder(dl, ImVec2(indentX + 20.0f, rowTop + kLaneHeight * 0.5f), 13.0f, tint);
 
          ImGui::SameLine(0.0f, 6.0f);
 
@@ -2288,7 +2343,7 @@ namespace app
                ImGui::SetKeyboardFocusHere();
                gArrangeRenameJustStarted = false;
             }
-            const bool grpNameEdited = ImGui::InputText("##groupname", grpNameBuf, sizeof(grpNameBuf),
+            const bool grpNameEdited = FieldWell::InputText("##groupname", grpNameBuf, sizeof(grpNameBuf),
                                                         ImGuiInputTextFlags_AutoSelectAll);
             if (ImGui::IsItemActivated())
                ArrangeGestureBegin();
@@ -2306,9 +2361,9 @@ namespace app
          }
          else
          {
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, IM_COL32(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::U32(tok::pal::c_00000000));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::U32(tok::pal::c_00000000));
+            ImGui::PushStyleColor(ImGuiCol_Header, tok::U32(tok::pal::c_00000000));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 4.0f));
             ImGui::Selectable(ArrangeGroupDisplayName(*grp).c_str(), false, ImGuiSelectableFlags_None,
                               ImVec2(grpNameW, kLaneHeight - 8.0f));
@@ -2413,19 +2468,19 @@ namespace app
       if (gArrange.lanes.empty())
       {
          ImGui::SetCursorScreenPos(ImVec2(scrollTL.x + 4.0f, pinnedTopY + kRulerHeight + 10.0f));
-         if (ImGui::Button(L("+ Add Track"), ImVec2(120, 0)))
+         if (ActionButton::Draw(L("+ Add Track"), ImVec2(120, 0)))
          {
             gArrangeAddTrackInsertAfter = -1;
             ImGui::OpenPopup("##arrangeaddtrackpopup");
          }
       }
-      if (ImGui::BeginPopup("##arrangeaddtrackpopup"))
+      if (MenuParts::BeginPopup("##arrangeaddtrackpopup"))
       {
-         if (ImGui::MenuItem(L("Video Track")))
+         if (MenuParts::Item(L("Video Track")))
             InsertArrangeTrack(true);
-         if (ImGui::MenuItem(L("Audio Track")))
+         if (MenuParts::Item(L("Audio Track")))
             InsertArrangeTrack(false);
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Clip lane drawing to below the (now pinned) ruler strip, so a track
@@ -2513,14 +2568,9 @@ namespace app
          const float rowH = laneRowH[i];
 
          // Lane background
-         const ImU32 laneBg = (i % 2 == 0)
-            ? (isLight ? IM_COL32(245, 245, 248, 255) : IM_COL32(24, 24, 28, 255))
-            : (isLight ? IM_COL32(250, 250, 252, 255) : IM_COL32(28, 28, 32, 255));
-         dl->AddRectFilled(ImVec2(headerStartX, curY),
-                           ImVec2(rulerStartX + rulerWidth, curY + rowH), laneBg);
          dl->AddLine(ImVec2(headerStartX, curY + rowH),
                      ImVec2(rulerStartX + rulerWidth, curY + rowH),
-                     tickCol, 0.5f);
+                     hairCol, 1.0f);
 
          // Header-column background drop target & selection click-catcher.
          // Submitted before the name box and mix strip below, so it MUST
@@ -2554,35 +2604,35 @@ namespace app
 
          if (gArrangeRowSel.count(laneId))
          {
-            const ImU32 selFill = isLight ? IM_COL32(139, 92, 246, 35) : IM_COL32(139, 92, 246, 45);
-            const ImU32 selBorder = IM_COL32(167, 139, 250, 180);
-            dl->AddRectFilled(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f), selFill, 2.0f);
-            dl->AddRect(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f), selBorder, 2.0f, 0, 1.5f);
+            const ImVec4 selA = AccentEmphasisSelected();
+            dl->AddRectFilled(ImVec2(headerStartX + 1.0f, curY + 1.0f), ImVec2(rulerStartX - 1.0f, curY + rowH - 1.0f),
+                              ImGui::GetColorU32(ImVec4(selA.x, selA.y, selA.z, 0.28f)), tok::radius_tile);
          }
 
          // Beat/bar grid lines through the lane body
          for (const ArrangeGridLine& gl : arrangeGridLines)
          {
             const ImU32 gridCol = isLight
-               ? IM_COL32(0, 0, 0, gl.isMajor ? 60 : 22)
-               : IM_COL32(255, 255, 255, gl.isMajor ? 55 : 18);
+               ? IM_COL32(0, 0, 0, gl.isMajor ? 34 : 12)
+               : IM_COL32(255, 255, 255, gl.isMajor ? 32 : 10);
             dl->AddLine(ImVec2(gl.x, curY), ImVec2(gl.x, curY + rowH), gridCol, 1.0f);
          }
 
          // Header separator vertical line
-         dl->AddLine(ImVec2(rulerStartX, curY), ImVec2(rulerStartX, curY + rowH), tickCol, 1.0f);
+         dl->AddLine(ImVec2(rulerStartX, curY), ImVec2(rulerStartX, curY + rowH), hairCol, 1.0f);
 
          // ---- Header content ----
          const int laneDepth = (i < arrangeLaneDepth.size()) ? arrangeLaneDepth[i] : 0;
          for (int d = 0; d < laneDepth; d++)
          {
             const float lineX = headerStartX + 6.0f + (float)d * kGroupIndent;
-            dl->AddLine(ImVec2(lineX, curY), ImVec2(lineX, curY + rowH), IM_COL32(255, 255, 255, 24), 1.0f);
+            dl->AddLine(ImVec2(lineX, curY), ImVec2(lineX, curY + rowH), tok::U32(tok::pal::c_FFFFFF18), 1.0f);
          }
 
          // Old full sizes for mixer controls
          const float kMixCtl = 18.0f, kMixGap = 3.0f;
-         const float kMixStripW = kMixCtl * 4.0f + kMixGap * 3.0f; // 81px
+         const float kMixKnobGap = 9.0f; // knob arcs reach past their 18px box
+         const float kMixStripW = kMixCtl * 4.0f + kMixGap + 6.0f + kMixKnobGap; // 90px
          const bool isVideoForName = lane.type == Arrange::kLaneVideo;
 
          const float contentStartX = headerStartX + 4.0f + (float)laneDepth * kGroupIndent;
@@ -2602,7 +2652,7 @@ namespace app
                ImGui::SetKeyboardFocusHere();
                gArrangeRenameJustStarted = false;
             }
-            const bool nameEdited = ImGui::InputText("##streamname", nameBuf, sizeof(nameBuf),
+            const bool nameEdited = FieldWell::InputText("##streamname", nameBuf, sizeof(nameBuf),
                                                      ImGuiInputTextFlags_AutoSelectAll);
             if (ImGui::IsItemActivated())
                ArrangeGestureBegin();
@@ -2621,9 +2671,9 @@ namespace app
          }
          else
          {
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, IM_COL32(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, tok::U32(tok::pal::c_00000000));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, tok::U32(tok::pal::c_00000000));
+            ImGui::PushStyleColor(ImGuiCol_Header, tok::U32(tok::pal::c_00000000));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 2.0f));
             ImGui::Selectable(lane.name.c_str(), false, ImGuiSelectableFlags_None, nameBoxSize);
             ImGui::PopStyleVar();
@@ -2661,7 +2711,7 @@ namespace app
          const bool laneSilenced = !isVideo && (lane.mute || (anyLaneSolo && !lane.solo));
          if (rowH >= kMixCtl + 4.0f)
          {
-            const ImU32 mixFill = IM_COL32(16, 185, 129, 255);
+            const ImU32 mixFill = tok::U32(tok::pal::c_10B981FF);
             auto mixGesture = [&](bool changed, const std::function<void()>& apply)
             {
                if (ImGui::IsItemActivated())
@@ -2686,11 +2736,11 @@ namespace app
             if (!isVideo)
             {
                bool solo = lane.solo;
-               mixGesture(AudioSoloButton("S##lanesolo", &solo, kMixCtl, kMixCtl), [&] { lane.solo = solo; });
+               mixGesture(MixToggle("##lanesolo", "S", &solo, kMixCtl, ImGui::ColorConvertU32ToFloat4(tok::U32(tok::pal::c_F59E0BFF))), [&] { lane.solo = solo; });
                ImGui::SameLine(0.0f, kMixGap);
                bool mute = lane.mute;
-               mixGesture(AudioMuteButton("M##lanemute", &mute, kMixCtl, kMixCtl), [&] { lane.mute = mute; });
-               ImGui::SameLine(0.0f, kMixGap);
+               mixGesture(MixToggle("##lanemute", "M", &mute, kMixCtl, app::AccentEmphasisSelected()), [&] { lane.mute = mute; });
+               ImGui::SameLine(0.0f, 6.0f);
                float pan = lane.pan;
                const bool panChanged = BipolarKnobFloat("##lanepan", &pan, -1.0f, 1.0f, "%.2f", kMixCtl, mixFill,
                                                         false, 0.0f, -1, -1, false, 0.0f, 0.0f, false,
@@ -2703,7 +2753,7 @@ namespace app
                   else
                      ImGui::SetTooltip("%s %d", lane.pan < 0.0f ? "L" : "R", (int)std::lround(std::fabs(lane.pan) * 100.0f));
                }
-               ImGui::SameLine(0.0f, kMixGap);
+               ImGui::SameLine(0.0f, kMixKnobGap);
                float gainDb = lane.gainDb;
                bool gainChanged = KnobFloat("##lanegain", &gainDb, -60.0f, 12.0f, "%.1f dB", kMixCtl, mixFill, false);
                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && gainDb != 0.0f)
@@ -2718,16 +2768,40 @@ namespace app
             else
             {
                float pct = lane.opacity * 100.0f;
-               ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, (kMixCtl - ImGui::GetFontSize()) * 0.5f));
-               ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
-               ImGui::PushStyleVar(ImGuiStyleVar_GrabMinSize, 6.0f);
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, IM_COL32(139, 92, 246, 255));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, IM_COL32(160, 120, 250, 255));
-               ImGui::SetNextItemWidth(kMixStripW);
-               const bool opChanged = ImGui::SliderFloat("##laneopacity", &pct, 0.0f, 100.0f, "%.0f%%",
-                                                         ImGuiSliderFlags_AlwaysClamp);
-               ImGui::PopStyleColor(2);
-               ImGui::PopStyleVar(3);
+               // A readout well that fills left to right (no grab stub): drag to set, double-click for 100%.
+               const ImVec2 op = ImGui::GetCursorScreenPos();
+               ImGui::InvisibleButton("##laneopacity", ImVec2(kMixStripW, kMixCtl));
+               bool opChanged = false;
+               if (ImGui::IsItemActive())
+               {
+                  const float np = std::clamp((ImGui::GetIO().MousePos.x - op.x) / kMixStripW, 0.0f, 1.0f) * 100.0f;
+                  opChanged = std::fabs(np - pct) > 0.01f;
+                  pct = np;
+               }
+               if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && pct != 100.0f)
+               {
+                  pct = 100.0f;
+                  opChanged = true;
+               }
+               {
+                  const ImVec4 ot = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                  const float hot = ImGui::IsItemHovered() || ImGui::IsItemActive() ? 0.04f : 0.0f;
+                  const ImVec2 oe(op.x + kMixStripW, op.y + kMixCtl);
+                  dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.06f + hot)), tok::radius_tile);
+                  const float fx = op.x + kMixStripW * std::clamp(pct / 100.0f, 0.0f, 1.0f);
+                  if (fx > op.x + 1.0f)
+                  {
+                     dl->PushClipRect(op, ImVec2(fx, oe.y), true);
+                     dl->AddRectFilled(op, oe, ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.12f)), tok::radius_tile);
+                     dl->PopClipRect();
+                  }
+                  char opTxt[16];
+                  snprintf(opTxt, sizeof(opTxt), "%.0f%%", pct);
+                  UiType::Scope opScope(UiType::Size::Caption, UiType::Weight::Medium);
+                  const ImVec2 otz = ImGui::CalcTextSize(opTxt);
+                  dl->AddText(ImVec2(std::round(op.x + (kMixStripW - otz.x) * 0.5f), std::round(op.y + (kMixCtl - otz.y) * 0.5f)),
+                              ImGui::GetColorU32(ImVec4(ot.x, ot.y, ot.z, 0.85f)), opTxt);
+               }
                mixGesture(opChanged, [&] { lane.opacity = std::clamp(pct / 100.0f, 0.0f, 1.0f); });
             }
             ImGui::PopStyleVar();
@@ -2974,31 +3048,31 @@ namespace app
             // shows exactly the palette swatch the user picked, not a blended-down shade.
             ImU32 clipBaseCol = hasTint
                ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), 255)
-               : (isVideo ? IM_COL32(109, 40, 217, 210) : IM_COL32(5, 150, 105, 210));
+               : (isVideo ? tok::U32(tok::pal::c_6D28D9D2) : tok::U32(tok::pal::c_059669D2));
             ImU32 clipActiveCol = hasTint
                ? IM_COL32((int)std::lround(clip.colorR * 255.0f), (int)std::lround(clip.colorG * 255.0f), (int)std::lround(clip.colorB * 255.0f), 255)
-               : (isVideo ? IM_COL32(139, 92, 246, 255) : IM_COL32(16, 185, 129, 255));
+               : (isVideo ? tok::U32(tok::pal::c_8B5CF6FF) : tok::U32(tok::pal::c_10B981FF));
             const bool muted = !clip.enabled || offline || laneSilenced;
             if (muted)
             {
-               clipBaseCol = isLight ? IM_COL32(176, 178, 186, 220) : IM_COL32(72, 72, 80, 220);
-               clipActiveCol = isLight ? IM_COL32(160, 162, 170, 255) : IM_COL32(88, 88, 96, 255);
+               clipBaseCol = isLight ? tok::U32(tok::pal::c_B0B2BADC) : tok::U32(tok::pal::c_484850DC);
+               clipActiveCol = isLight ? tok::U32(tok::pal::c_A0A2AAFF) : tok::U32(tok::pal::c_585860FF);
             }
             // A grouped clip is edged in its group's colour (brighter when
             // the group is selected - the group frame drawn after the lanes
-            // carries the selection); a loose selected clip stays gold.
+            // carries the selection); a loose selected clip takes the accent.
             const bool grouped = clip.groupId != 0;
             const ImU32 clipBorderCol = grouped
                ? ArrangeGroupColor(clip.groupId, isSelected ? 255 : (clipHovered ? 235 : 190))
                : isSelected
-               ? IM_COL32(250, 204, 21, 255) // gold for selected
-               : (clipActive ? IM_COL32(255, 255, 255, 240) : (clipHovered ? IM_COL32(230, 230, 240, 220) : IM_COL32(20, 20, 24, 180)));
+               ? ImGui::GetColorU32(app::AccentEmphasisSelected())
+               : (clipActive ? tok::U32(tok::pal::c_FFFFFFF0) : (clipHovered ? tok::U32(tok::pal::c_E6E6F0DC) : tok::U32(tok::pal::c_141418B4)));
 
             dl->AddRectFilled(ImVec2(cLeft, cTop), ImVec2(cRight, cBottom),
                               clipActive ? clipActiveCol : clipBaseCol, 4.0f);
             if (muted)
                DrawArrangeHatch(dl, ImVec2(cLeft, cTop), ImVec2(cRight, cBottom),
-                                isLight ? IM_COL32(0, 0, 0, 45) : IM_COL32(255, 255, 255, 38));
+                                isLight ? tok::U32(tok::pal::c_0000002D) : tok::U32(tok::pal::c_FFFFFF26));
             if (grouped)
                dl->AddRectFilled(ImVec2(cLeft, cTop), ImVec2(cRight, cTop + 4.0f), ArrangeGroupColor(clip.groupId),
                                  4.0f, ImDrawFlags_RoundCornersTop);
@@ -3012,10 +3086,10 @@ namespace app
             {
                const float midY = (cTop + cBottom) * 0.5f;
                const float halfH = std::max(2.0f, (cBottom - cTop) * 0.5f - 5.0f);
-               const ImU32 waveCol = muted ? IM_COL32(255, 255, 255, 60) : IM_COL32(255, 255, 255, 115);
+               const ImU32 waveCol = muted ? tok::U32(tok::pal::c_FFFFFF3C) : tok::U32(tok::pal::c_FFFFFF73);
                dl->PushClipRect(ImVec2(cLeft + 1.0f, cTop + 1.0f), ImVec2(cRight - 1.0f, cBottom - 1.0f), true);
                dl->AddLine(ImVec2(cLeft + 1.0f, midY), ImVec2(cRight - 1.0f, midY),
-                           IM_COL32(255, 255, 255, 45), 1.0f);
+                           tok::U32(tok::pal::c_FFFFFF2D), 1.0f);
                // Audio Sample: a static peak array computed once at import
                // from the fully-decoded source file - see
                // ArrangePollMediaImports. Audio Clip: unchanged, the
@@ -3094,7 +3168,7 @@ namespace app
                   // convention every other AddImage of a node texture uses.
                   dl->AddImage((ImTextureID)(intptr_t)thumbIt->second.fbo.tex, tl, br,
                                ImVec2(0, 1), ImVec2(1, 0));
-                  dl->AddRect(tl, br, IM_COL32(0, 0, 0, 140), 2.0f);
+                  dl->AddRect(tl, br, tok::U32(tok::pal::c_0000008C), 2.0f);
                   dl->PopClipRect();
                   thumbRight = br.x;
                }
@@ -3108,15 +3182,15 @@ namespace app
                {
                   const float fInX = tickToX(clip.start + clip.fadeIn);
                   dl->AddTriangleFilled(ImVec2(clipX0, cTop), ImVec2(clipX0, cBottom), ImVec2(fInX, cTop),
-                                        IM_COL32(0, 0, 0, 50));
-                  dl->AddLine(ImVec2(clipX0, cBottom), ImVec2(fInX, cTop), IM_COL32(255, 255, 255, 150), 1.5f);
+                                        tok::U32(tok::pal::c_00000032));
+                  dl->AddLine(ImVec2(clipX0, cBottom), ImVec2(fInX, cTop), tok::U32(tok::pal::c_FFFFFF96), 1.5f);
                }
                if (clip.fadeOut > 0)
                {
                   const float fOutX = tickToX(clip.End() - clip.fadeOut);
                   dl->AddTriangleFilled(ImVec2(fOutX, cTop), ImVec2(clipX1, cBottom), ImVec2(clipX1, cTop),
-                                        IM_COL32(0, 0, 0, 50));
-                  dl->AddLine(ImVec2(fOutX, cTop), ImVec2(clipX1, cBottom), IM_COL32(255, 255, 255, 150), 1.5f);
+                                        tok::U32(tok::pal::c_00000032));
+                  dl->AddLine(ImVec2(fOutX, cTop), ImVec2(clipX1, cBottom), tok::U32(tok::pal::c_FFFFFF96), 1.5f);
                }
                dl->PopClipRect();
             }
@@ -3135,7 +3209,7 @@ namespace app
                {
                   const float midY = (cTop + cBottom) * 0.5f;
                   dl->AddText(ImVec2(cLeft + (cWidth - ts.x) * 0.5f, midY - ts.y * 0.5f),
-                              IM_COL32(255, 255, 255, 200), loadingLabel);
+                              tok::U32(tok::pal::c_FFFFFFC8), loadingLabel);
                }
             }
 
@@ -3158,14 +3232,14 @@ namespace app
             if (clipHovered && bladeCuts)
             {
                const float bx = tickToX(bladeTick);
-               dl->AddLine(ImVec2(bx, cTop), ImVec2(bx, cBottom), IM_COL32(255, 255, 255, 235), 1.5f);
+               dl->AddLine(ImVec2(bx, cTop), ImVec2(bx, cBottom), tok::U32(tok::pal::c_FFFFFFEB), 1.5f);
             }
 
             // Trim handle marks
             if (cWidth > 20.0f)
             {
-               const ImU32 handleCol = onLeftEdge ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 255, 255, 80);
-               const ImU32 handleRCol = onRightEdge ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 255, 255, 80);
+               const ImU32 handleCol = onLeftEdge ? tok::U32(tok::pal::c_FFFFFFDC) : tok::U32(tok::pal::c_FFFFFF50);
+               const ImU32 handleRCol = onRightEdge ? tok::U32(tok::pal::c_FFFFFFDC) : tok::U32(tok::pal::c_FFFFFF50);
                dl->AddLine(ImVec2(cLeft + 3.0f, cTop + 6.0f), ImVec2(cLeft + 3.0f, cBottom - 6.0f), handleCol, 2.0f);
                dl->AddLine(ImVec2(cRight - 3.0f, cTop + 6.0f), ImVec2(cRight - 3.0f, cBottom - 6.0f), handleRCol, 2.0f);
             }
@@ -3183,7 +3257,7 @@ namespace app
                   ImGui::SetKeyboardFocusHere();
                   sArrangeRenameFocusedId = clip.id;
                }
-               const bool commit = ImGui::InputText("##renamingclipfield", gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer),
+               const bool commit = FieldWell::InputText("##renamingclipfield", gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer),
                                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
                if (commit || ImGui::IsItemDeactivated())
                {
@@ -3214,8 +3288,8 @@ namespace app
             else
             {
                const std::string fullLabel = clipLabel + " [" + ArrangeFormatLength(clip.length) + "]";
-               const ImU32 labelCol = muted ? (isLight ? IM_COL32(60, 60, 70, 255) : IM_COL32(190, 190, 200, 255))
-                                            : IM_COL32(255, 255, 255, 255);
+               const ImU32 labelCol = muted ? (isLight ? tok::U32(tok::pal::c_3C3C46FF) : tok::U32(tok::pal::c_BEBEC8FF))
+                                            : tok::U32(tok::pal::c_FFFFFFFF);
                // Starts after the thumbnail when there is one, so the two
                // never overlap.
                const float labelX = (thumbRight > cLeft ? thumbRight + 6.0f : cLeft + 8.0f);
@@ -3261,9 +3335,9 @@ namespace app
                if (gx1 > gx0)
                {
                   dl->AddRectFilled(ImVec2(gx0, curY + 2.0f), ImVec2(gx1, curY + rowH - 2.0f),
-                                    IM_COL32(16, 185, 129, 50), 3.0f);
+                                    tok::U32(tok::pal::c_10B98132), 3.0f);
                   dl->AddRect(ImVec2(gx0, curY + 2.0f), ImVec2(gx1, curY + rowH - 2.0f),
-                              IM_COL32(16, 185, 129, 200), 3.0f, 0, 1.5f);
+                              tok::U32(tok::pal::c_10B981C8), 3.0f, 0, 1.5f);
                }
                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && gArrangeDrag.mode == kArrangeDragNone)
                {
@@ -3437,11 +3511,11 @@ namespace app
             {
                const ImVec2 r0(rMinX, rMinY);
                const ImVec2 r1(rMaxX, rMaxY);
-               dl->AddRectFilled(r0, r1, IM_COL32(59, 130, 246, 22));
-               dl->AddRect(r0, r1, IM_COL32(96, 165, 250, 110), 0.0f, 0, 1.0f);
+               dl->AddRectFilled(r0, r1, tok::U32(tok::pal::c_3B82F616));
+               dl->AddRect(r0, r1, tok::U32(tok::pal::c_60A5FA6E), 0.0f, 0, 1.0f);
                // Subtle vertical boundary lines at x0 and x1
-               dl->AddLine(ImVec2(r0.x, r0.y), ImVec2(r0.x, r1.y), IM_COL32(255, 255, 255, 120), 1.0f);
-               dl->AddLine(ImVec2(r1.x, r0.y), ImVec2(r1.x, r1.y), IM_COL32(255, 255, 255, 120), 1.0f);
+               dl->AddLine(ImVec2(r0.x, r0.y), ImVec2(r0.x, r1.y), tok::U32(tok::pal::c_FFFFFF78), 1.0f);
+               dl->AddLine(ImVec2(r1.x, r0.y), ImVec2(r1.x, r1.y), tok::U32(tok::pal::c_FFFFFF78), 1.0f);
             }
          }
       }
@@ -3472,8 +3546,8 @@ namespace app
                const float x1 = std::min(rulerStartX + rulerWidth, tickToX(b));
                if (x1 <= x0)
                   continue;
-               dl->AddRectFilled(ImVec2(x0, y + 3.0f), ImVec2(x1, y + rowH - 3.0f), IM_COL32(239, 68, 68, 105), 3.0f);
-               dl->AddRect(ImVec2(x0, y + 3.0f), ImVec2(x1, y + rowH - 3.0f), IM_COL32(239, 68, 68, 235), 3.0f, 0, 1.5f);
+               dl->AddRectFilled(ImVec2(x0, y + 3.0f), ImVec2(x1, y + rowH - 3.0f), tok::U32(tok::pal::c_EF444469), 3.0f);
+               dl->AddRect(ImVec2(x0, y + 3.0f), ImVec2(x1, y + rowH - 3.0f), tok::U32(tok::pal::c_EF4444EB), 3.0f, 0, 1.5f);
             }
          }
       }
@@ -3514,28 +3588,28 @@ namespace app
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
-            Tabler::DrawScissors(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, IM_COL32(0, 0, 0, 200), 3.2f);
-            Tabler::DrawScissors(fg, mouse, 20.0f, IM_COL32(255, 255, 255, 255), 1.8f);
+            glyph::DrawScissors(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
+            glyph::DrawScissors(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
          }
          else if (gArrangeTool == ArrangeTool::Pencil)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
-            Tabler::DrawPencil(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, IM_COL32(0, 0, 0, 200), 3.2f);
-            Tabler::DrawPencil(fg, mouse, 20.0f, IM_COL32(255, 255, 255, 255), 1.8f);
+            glyph::DrawPencil(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
+            glyph::DrawPencil(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
          }
          else if (gArrangeTool == ArrangeTool::Zoom)
          {
             ImGui::SetMouseCursor(ImGuiMouseCursor_None);
             ImDrawList* fg = ImGui::GetForegroundDrawList();
             const bool zoomOut = ImGui::GetIO().KeyAlt || ImGui::IsMouseDown(ImGuiMouseButton_Right);
-            Tabler::DrawZoom(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, IM_COL32(0, 0, 0, 200), 3.2f);
-            Tabler::DrawZoom(fg, mouse, 20.0f, IM_COL32(255, 255, 255, 255), 1.8f);
+            glyph::DrawZoom(fg, ImVec2(mouse.x + 1.0f, mouse.y + 1.0f), 20.0f, tok::U32(tok::pal::c_000000C8), 3.2f);
+            glyph::DrawZoom(fg, mouse, 20.0f, tok::U32(tok::pal::c_FFFFFFFF), 1.8f);
             // Draw + or - indicator inside the magnifying glass center
             const ImVec2 zc(mouse.x - 2.0f, mouse.y - 2.0f);
-            fg->AddLine(ImVec2(zc.x - 2.5f, zc.y), ImVec2(zc.x + 2.5f, zc.y), IM_COL32(255, 255, 255, 255), 1.6f);
+            fg->AddLine(ImVec2(zc.x - 2.5f, zc.y), ImVec2(zc.x + 2.5f, zc.y), tok::U32(tok::pal::c_FFFFFFFF), 1.6f);
             if (!zoomOut)
-               fg->AddLine(ImVec2(zc.x, zc.y - 2.5f), ImVec2(zc.x, zc.y + 2.5f), IM_COL32(255, 255, 255, 255), 1.6f);
+               fg->AddLine(ImVec2(zc.x, zc.y - 2.5f), ImVec2(zc.x, zc.y + 2.5f), tok::U32(tok::pal::c_FFFFFFFF), 1.6f);
          }
          else if (gArrangeTool == ArrangeTool::Hand)
          {
@@ -3555,7 +3629,7 @@ namespace app
       // ---- clip context menu (acts on the selection; ids only) ----
       if (openClipCtx)
          ImGui::OpenPopup("##arrangeclipctx");
-      if (ImGui::BeginPopup("##arrangeclipctx"))
+      if (MenuParts::BeginPopup("##arrangeclipctx"))
       {
          Arrange::Clip* cp = Arrange::FindClip(gArrange, gArrangeCtxClipId);
          if (cp == nullptr)
@@ -3593,7 +3667,7 @@ namespace app
                // would either apply nonsensically or silently do nothing to
                // the rest of the batch - only offer what unambiguously means
                // the same thing across every selected clip.
-               if (ImGui::MenuItem(L("Rename"), MODKEY "+R"))
+               if (MenuParts::Item(L("Rename"), MODKEY "+R"))
                {
                   const std::string label = !cp->name.empty() ? cp->name
                      : (ctxNode != nullptr ? NodeTitle(*ctxNode) : std::string("Unassigned"));
@@ -3604,7 +3678,7 @@ namespace app
                         gArrangeRenameTargetIds.push_back(id);
                   snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
                }
-               if (ImGui::BeginMenu(L("Color Tint")))
+               if (MenuParts::SubMenu(L("Color Tint")))
                {
                   const auto& kPaletteColors = kArrangePalette;
                   for (int ci2 = 0; ci2 < 10; ci2++)
@@ -3641,7 +3715,7 @@ namespace app
                // rejects any Sample clip in the batch (see its own comment),
                // so a mixed Sample/Clip selection just leaves the Samples
                // untouched rather than needing a separate check here.
-               if (ctxSelectionSingleType && ImGui::MenuItem(L("Assign Node...")))
+               if (ctxSelectionSingleType && MenuParts::Item(L("Assign Node...")))
                {
                   gArrangeAssigningClipId = cid;
                   gArrangeAssignTargetIds.clear();
@@ -3656,7 +3730,7 @@ namespace app
             // Rename and Active/Bypass: apply to every clip type, mirroring
             // the double-click-to-rename and '0'-key shortcuts this menu
             // just gives an explicit, discoverable entry point for.
-            if (ImGui::MenuItem(L("Rename"), MODKEY "+R"))
+            if (MenuParts::Item(L("Rename"), MODKEY "+R"))
             {
                const std::string label = !cp->name.empty() ? cp->name
                   : (ctxNode != nullptr ? NodeTitle(*ctxNode) : std::string("Unassigned"));
@@ -3664,9 +3738,9 @@ namespace app
                gArrangeRenameTargetIds.clear();
                snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
             }
-            if (ImGui::MenuItem(L("Active"), nullptr, cp->enabled))
+            if (MenuParts::Item(L("Active"), nullptr, cp->enabled))
                ArrangeToggleEnabledSelection();
-            ImGui::Separator();
+            MenuParts::Separator();
             // Fade fields: live on the model, one undo entry per drag of a
             // field (opened on the first change, pushed on deactivate, and
             // only if something changed).
@@ -3762,7 +3836,7 @@ namespace app
                if (cp->sampleDropped)
                {
                   bool syncToTempo = cp->syncToTempo;
-                  if (ImGui::Checkbox(L("Sync to Tempo"), &syncToTempo))
+                  if (MenuParts::Check(L("Sync to Tempo"), &syncToTempo))
                      ArrangeEdit([&]() { ArrangeSetSampleSync(cid, syncToTempo); });
 
                   // Sample BPM only means something while synced (unsynced
@@ -3779,7 +3853,7 @@ namespace app
                   if (const Arrange::Clip* ci = Arrange::FindClip(gArrange, cid))
                   {
                      if (ci->origBpm > 0.0f && ci->origBpm != ci->sampleBpm &&
-                         ImGui::Selectable(L("Reset Sample BPM to Detected")))
+                         MenuParts::Item(L("Reset Sample BPM to Detected")))
                      {
                         const float detected = ci->origBpm;
                         ArrangeEdit([&]() { ArrangeSetSampleBpm(cid, detected); });
@@ -3790,7 +3864,7 @@ namespace app
                      ArrangeDrawSampleTempoInfo(*ci);
                }
 
-               ImGui::Separator();
+               MenuParts::Separator();
             }
             else if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneVideo)
             {
@@ -3825,10 +3899,10 @@ namespace app
                }
                fieldGestureEnd();
 
-               ImGui::Separator();
+               MenuParts::Separator();
             }
 
-            if (ctxSelectionSingleType && ctxLaneType != Arrange::kLaneAudio && ImGui::BeginMenu(L("Compositing")))
+            if (ctxSelectionSingleType && ctxLaneType != Arrange::kLaneAudio && MenuParts::SubMenu(L("Compositing")))
             {
                // How this clip lays over the lanes below it. Applies to every
                // selected video clip, like Color Tint.
@@ -3837,7 +3911,7 @@ namespace app
                for (int m = 0; m < (int)modes.size(); m++)
                {
                   ImGui::PushID(m + 900);
-                  if (ImGui::MenuItem(modes[m].c_str(), nullptr, curMode == m))
+                  if (MenuParts::Item(modes[m].c_str(), nullptr, curMode == m))
                   {
                      ArrangeEdit([&]()
                      {
@@ -3859,7 +3933,7 @@ namespace app
                ImGui::EndMenu();
             }
 
-            if (ctxLaneType == Arrange::kLaneVideo && ImGui::BeginMenu(L("Color Grade")))
+            if (ctxLaneType == Arrange::kLaneVideo && MenuParts::SubMenu(L("Color Grade")))
             {
                // Basic grade only: brightness/contrast/saturation, consumed
                // by the compositor as a per-clip shader pass. Defaults are a
@@ -3903,7 +3977,7 @@ namespace app
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu(L("Color Tint")))
+            if (MenuParts::SubMenu(L("Color Tint")))
             {
                const auto& kPaletteColors = kArrangePalette; // shared with the marker colours
                for (int ci2 = 0; ci2 < 10; ci2++)
@@ -3941,7 +4015,7 @@ namespace app
             // doc comment in ArrangeModel.h). Only Audio/Video Clip can be
             // reassigned.
             cp = Arrange::FindClip(gArrange, cid);
-            if (cp != nullptr && !cp->sampleDropped && ImGui::MenuItem(L("Assign Node...")))
+            if (cp != nullptr && !cp->sampleDropped && MenuParts::Item(L("Assign Node...")))
             {
                gArrangeAssigningClipId = cid;
                gArrangeAssignTargetIds.clear();
@@ -3953,7 +4027,7 @@ namespace app
             if (ctxNode != nullptr)
             {
                const std::vector<int> outs = ArrangeOutputsOfType(*ctxNode, ctxLaneType);
-               if (outs.size() > 1 && ImGui::BeginMenu(L("Output")))
+               if (outs.size() > 1 && MenuParts::SubMenu(L("Output")))
                {
                   const int curOut = Arrange::FindClip(gArrange, cid)->srcOutput;
                   for (int o : outs)
@@ -3961,7 +4035,7 @@ namespace app
                      const char* outName = ctxNode->node->OutputLabel(o);
                      char outItem[96];
                      snprintf(outItem, sizeof(outItem), "%s##arrout%d", outName != nullptr ? outName : "out", o);
-                     if (ImGui::MenuItem(outItem, nullptr, curOut == o) && curOut != o)
+                     if (MenuParts::Item(outItem, nullptr, curOut == o) && curOut != o)
                      {
                         ArrangeEdit([&]()
                         {
@@ -3980,15 +4054,15 @@ namespace app
             } // end else (single-clip specific properties)
 
             // Group, Ungroup, and Delete: available for both multi-selection and single-clip / group-selection
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Group"), MODKEY "+G", false, ArrangeCanGroupSelection()))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Group"), MODKEY "+G", false, ArrangeCanGroupSelection()))
                ArrangeGroupSelection();
-            if (ImGui::MenuItem(L("Ungroup"), MODKEY "+Shift+G", false, ArrangeCanUngroupSelection()))
+            if (MenuParts::Item(L("Ungroup"), MODKEY "+Shift+G", false, ArrangeCanUngroupSelection()))
                ArrangeUngroupSelection();
-            if (ImGui::MenuItem(L("Delete"), "Backspace", false, !ctxSelIds.empty()))
+            if (MenuParts::Item(L("Delete"), "Backspace", false, !ctxSelIds.empty()))
                ArrangeDeleteSelection();
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
       else if (gArrangeMixGestureLaneId != 0 && !ImGui::IsAnyItemActive())
       {
@@ -4011,19 +4085,19 @@ namespace app
       // click-to-assign flow.
       if (openAddClip)
          ImGui::OpenPopup("##arrangeaddclip");
-      if (ImGui::BeginPopup("##arrangeaddclip"))
+      if (MenuParts::BeginPopup("##arrangeaddclip"))
       {
          ImGui::TextDisabled(T("Add Clip at %s"), ArrangeFormatPos(addClipAtTick).c_str());
-         ImGui::Separator();
-         if (ImGui::MenuItem(L("Add Clip")))
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Add Clip")))
             AddUnassignedClipAt(addClipToLaneId, addClipAtTick);
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // ---- lane group-membership context menu (from the drag-handle) ----
       if (openLaneCtx)
          ImGui::OpenPopup("##arrangelanectx");
-      if (ImGui::BeginPopup("##arrangelanectx"))
+      if (MenuParts::BeginPopup("##arrangelanectx"))
       {
          Arrange::Lane* ctxLane = Arrange::FindLane(gArrange, ctxLaneId);
          if (ctxLane == nullptr)
@@ -4036,33 +4110,33 @@ namespace app
             for (size_t k = 0; k < gArrange.lanes.size(); k++)
                if (gArrange.lanes[k].id == ctxLaneId) { laneIdx = (int)k; break; }
 
-            if (ImGui::MenuItem(L("Add Video Track")))
+            if (MenuParts::Item(L("Add Video Track")))
             {
                gArrangeAddTrackInsertAfter = laneIdx;
                InsertArrangeTrack(true);
             }
-            if (ImGui::MenuItem(L("Add Audio Track")))
+            if (MenuParts::Item(L("Add Audio Track")))
             {
                gArrangeAddTrackInsertAfter = laneIdx;
                InsertArrangeTrack(false);
             }
-            if (ImGui::MenuItem(L("Rename Track"), MODKEY "+R"))
+            if (MenuParts::Item(L("Rename Track"), MODKEY "+R"))
             {
                gArrangeRenamingLaneId = ctxLaneId;
                gArrangeRenameJustStarted = true;
             }
-            if (ImGui::MenuItem(L("Delete Track")))
+            if (MenuParts::Item(L("Delete Track")))
                laneToDelete = ctxLaneId;
-            ImGui::Separator();
+            MenuParts::Separator();
 
             const uint64_t curGroupId = ctxLane->groupId;
-            if (curGroupId != 0 && ImGui::MenuItem(L("Remove from Group")))
+            if (curGroupId != 0 && MenuParts::Item(L("Remove from Group")))
                ArrangeEdit([&]() { Arrange::SetLaneTrackGroup(gArrange, ctxLaneId, 0); });
 
             // Wraps this one track as the sole child of a brand-new group at
             // the track's current position (same parent it already had) -
             // reversible via the group's own Ungroup.
-            if (ImGui::MenuItem(L("Convert to Group")))
+            if (MenuParts::Item(L("Convert to Group")))
                ArrangeEdit([&]() { Arrange::AddTrackGroup(gArrange, { ctxLaneId }, std::string(), curGroupId); });
 
             // Right-clicked a track that's part of a larger multi-row
@@ -4077,7 +4151,7 @@ namespace app
                for (uint64_t rowId : gArrangeRowSel)
                   if (Arrange::FindLane(gArrange, rowId) != nullptr)
                      selLaneIds.push_back(rowId);
-               if (selLaneIds.size() > 1 && ImGui::MenuItem(L("Group Selected")))
+               if (selLaneIds.size() > 1 && MenuParts::Item(L("Group Selected")))
                {
                   ArrangeEdit([&]()
                   {
@@ -4106,21 +4180,21 @@ namespace app
             }
 
 
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Render Track")) && !ArrangeRenderBusy())
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Render Track")) && !ArrangeRenderBusy())
             {
                ArrangeRenderJob job = ArrangeBuildLaneScopedRenderJob(
                   { ctxLaneId }, ctxLane->name.empty() ? ("Track " + std::to_string(ctxLaneId)) : ctxLane->name);
                ArrangeCommitLaneScopedRenderJob(job);
             }
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // ---- track-group header context menu ----
       if (openGroupCtx)
          ImGui::OpenPopup("##arrangegroupctx");
-      if (ImGui::BeginPopup("##arrangegroupctx"))
+      if (MenuParts::BeginPopup("##arrangegroupctx"))
       {
          const Arrange::TrackGroup* ctxGrp = Arrange::FindTrackGroup(gArrange, ctxGroupId);
          if (ctxGrp == nullptr)
@@ -4143,30 +4217,30 @@ namespace app
                for (size_t k = 0; k < gArrange.lanes.size(); k++)
                   if (gArrange.lanes[k].id == subtreeLanes.back()) { lastLaneIdx = (int)k; break; }
             }
-            if (ImGui::MenuItem(L("Add Video Track")))
+            if (MenuParts::Item(L("Add Video Track")))
             {
                gArrangeAddTrackInsertAfter = lastLaneIdx;
                InsertArrangeTrack(true, ctxGroupId);
             }
-            if (ImGui::MenuItem(L("Add Audio Track")))
+            if (MenuParts::Item(L("Add Audio Track")))
             {
                gArrangeAddTrackInsertAfter = lastLaneIdx;
                InsertArrangeTrack(false, ctxGroupId);
             }
-            if (ImGui::MenuItem(L("Rename Group"), MODKEY "+R"))
+            if (MenuParts::Item(L("Rename Group"), MODKEY "+R"))
             {
                gArrangeRenamingLaneId = ctxGroupId;
                gArrangeRenameJustStarted = true;
             }
-            ImGui::Separator();
+            MenuParts::Separator();
 
-            if (ImGui::MenuItem(L("Duplicate Group")))
+            if (MenuParts::Item(L("Duplicate Group")))
                ArrangeEdit([&]() { Arrange::DuplicateTrackGroup(gArrange, ctxGroupId); });
-            if (ImGui::MenuItem(L("Toggle Enabled"), nullptr, grpWasEnabled))
+            if (MenuParts::Item(L("Toggle Enabled"), nullptr, grpWasEnabled))
                ArrangeEdit([&]() { Arrange::SetTrackGroupEnabled(gArrange, ctxGroupId, grpWasEnabled ? 0 : 1); });
 
 
-            if (ImGui::MenuItem(L("Render Group")) && !ArrangeRenderBusy())
+            if (MenuParts::Item(L("Render Group")) && !ArrangeRenderBusy())
             {
                const std::vector<uint64_t> subtreeLanes = Arrange::LanesInTrackGroupRecursive(gArrange, ctxGroupId);
                if (!subtreeLanes.empty())
@@ -4176,13 +4250,13 @@ namespace app
                }
             }
 
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Ungroup (Keep Tracks)")))
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Ungroup (Keep Tracks)")))
                ArrangeEdit([&]() { Arrange::RemoveTrackGroup(gArrange, ctxGroupId, /*deleteLanes=*/false); });
-            if (ImGui::MenuItem(L("Delete Group + Tracks")))
+            if (MenuParts::Item(L("Delete Group + Tracks")))
                ArrangeEdit([&]() { Arrange::RemoveTrackGroup(gArrange, ctxGroupId, /*deleteLanes=*/true); });
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Row drag-and-drop reorder/regroup, and lane delete - after the loop
@@ -4286,31 +4360,18 @@ namespace app
          if (emptyGridBottom > lanesContentBottom)
          {
             dl->PushClipRect(ImVec2(headerStartX, lanesContentBottom), ImVec2(rulerStartX + rulerWidth, emptyGridBottom), true);
-            // Continue the same alternating row-background stripes the real
-            // lanes use (main.cpp laneBg above) so this region reads as more
-            // of the same timeline instead of a visually distinct flat-black
-            // void - it's still empty, but no longer looks "cut off".
-            {
-               size_t rowIdx = gArrange.lanes.size();
-               for (float gy = lanesContentBottom; gy < emptyGridBottom; gy += kLaneHeight, rowIdx++)
-               {
-                  const ImU32 stripeBg = (rowIdx % 2 == 0)
-                     ? (isLight ? IM_COL32(245, 245, 248, 255) : IM_COL32(24, 24, 28, 255))
-                     : (isLight ? IM_COL32(250, 250, 252, 255) : IM_COL32(28, 28, 32, 255));
-                  dl->AddRectFilled(ImVec2(headerStartX, gy), ImVec2(rulerStartX + rulerWidth, std::min(gy + kLaneHeight, emptyGridBottom)), stripeBg);
-               }
-            }
+            // No zebra: the well is one surface, rows are told apart by hairlines.
             // Vertical beat/bar lines: the same ones drawn through every track
             // row above, continued down so the timeline still reads as a grid
             // instead of stopping dead at the last track.
             for (const ArrangeGridLine& gl : arrangeGridLines)
             {
                const ImU32 gridCol = isLight
-                  ? IM_COL32(0, 0, 0, gl.isMajor ? 60 : 22)
-                  : IM_COL32(255, 255, 255, gl.isMajor ? 55 : 18);
+                  ? IM_COL32(0, 0, 0, gl.isMajor ? 34 : 12)
+                  : IM_COL32(255, 255, 255, gl.isMajor ? 32 : 10);
                dl->AddLine(ImVec2(gl.x, lanesContentBottom), ImVec2(gl.x, emptyGridBottom), gridCol, 1.0f);
             }
-            const ImU32 emptyGridLine = isLight ? IM_COL32(0, 0, 0, 22) : IM_COL32(255, 255, 255, 18);
+            const ImU32 emptyGridLine = hairCol;
             for (float gy = lanesContentBottom + kLaneHeight; gy < emptyGridBottom; gy += kLaneHeight)
                dl->AddLine(ImVec2(rulerStartX, gy), ImVec2(rulerStartX + rulerWidth, gy), emptyGridLine, 1.0f);
             dl->PopClipRect();
@@ -4330,8 +4391,8 @@ namespace app
             const float bx0 = std::max(rulerStartX, tickToX(bl.start));
             const float bx1 = std::min(rulerStartX + rulerWidth, tickToX(bl.end));
             const float bandBottom = fullTimelineBottom;
-            const ImU32 bandCol = gArrangeShiftDraggingLoop ? IM_COL32(250, 204, 21, 45) : IM_COL32(250, 204, 21, 30);
-            const ImU32 bandBorder = IM_COL32(250, 204, 21, 180);
+            const ImU32 bandCol = gArrangeShiftDraggingLoop ? tok::U32(tok::pal::c_FACC152D) : tok::U32(tok::pal::c_FACC151E);
+            const ImU32 bandBorder = tok::U32(tok::pal::c_FACC15B4);
             const bool isDraggingLeft = (gArrangeLoopDragMode == kArrangeLoopDragStart);
             const bool isDraggingRight = (gArrangeLoopDragMode == kArrangeLoopDragEnd);
             const bool isDraggingHeader = (gArrangeLoopDragMode == kArrangeLoopDragMove);
@@ -4340,18 +4401,18 @@ namespace app
             dl->AddRectFilled(ImVec2(bx0, kTickStripTop), ImVec2(bx1, bandBottom), bandCol);
 
             // Loop brace header bar in ruler
-            const ImU32 headerBarCol = isDraggingHeader ? IM_COL32(255, 235, 59, 255) : IM_COL32(250, 204, 21, 230);
+            const ImU32 headerBarCol = isDraggingHeader ? tok::U32(tok::pal::c_FFEB3BFF) : tok::U32(tok::pal::c_FACC15E6);
             dl->AddRectFilled(ImVec2(bx0, kTickStripTop), ImVec2(bx1, kTickStripTop + 4.0f), headerBarCol, 2.0f);
 
             // Left boundary line & bracket handle [
-            const ImU32 leftCol = isDraggingLeft ? IM_COL32(255, 255, 255, 255) : bandBorder;
+            const ImU32 leftCol = isDraggingLeft ? tok::U32(tok::pal::c_FFFFFFFF) : bandBorder;
             const float leftStroke = isDraggingLeft ? 2.5f : 1.5f;
             dl->AddLine(ImVec2(bx0, kTickStripTop), ImVec2(bx0, bandBottom), leftCol, leftStroke);
             dl->AddLine(ImVec2(bx0, kTickStripTop), ImVec2(bx0, kTickStripTop + 8.0f), leftCol, 3.0f);
             dl->AddLine(ImVec2(bx0, kTickStripTop + 8.0f), ImVec2(bx0 + 5.0f, kTickStripTop + 8.0f), leftCol, 2.0f);
 
             // Right boundary line & bracket handle ]
-            const ImU32 rightCol = isDraggingRight ? IM_COL32(255, 255, 255, 255) : bandBorder;
+            const ImU32 rightCol = isDraggingRight ? tok::U32(tok::pal::c_FFFFFFFF) : bandBorder;
             const float rightStroke = isDraggingRight ? 2.5f : 1.5f;
             dl->AddLine(ImVec2(bx1, kTickStripTop), ImVec2(bx1, bandBottom), rightCol, rightStroke);
             dl->AddLine(ImVec2(bx1, kTickStripTop), ImVec2(bx1, kTickStripTop + 8.0f), rightCol, 3.0f);
@@ -4369,18 +4430,18 @@ namespace app
          if (playBeats >= startBeat && playBeats <= endBeat)
          {
             const float playheadX = beatToX(playBeats);
-            const ImU32 playheadCol = IM_COL32(239, 68, 68, 255);
-            dl->AddLine(ImVec2(playheadX, kTickStripTop), ImVec2(playheadX, lineBottom), playheadCol, 1.5f);
-            const float triSize = 7.0f;
+            const ImU32 playheadCol = tok::U32(tok::pal::c_EF4444FF);
+            dl->AddLine(ImVec2(playheadX, kTickStripTop), ImVec2(playheadX, lineBottom), playheadCol, 1.25f);
+            const float triSize = 5.0f;
             dl->AddTriangleFilled(ImVec2(playheadX - triSize, kTickStripTop), ImVec2(playheadX + triSize, kTickStripTop),
                                   ImVec2(playheadX, kTickStripTop + triSize * 1.6f), playheadCol);
          }
          if (gArrangeScrubbing && gArrangeScrubTick >= startTick && gArrangeScrubTick <= endTick)
          {
             const float gx = tickToX(gArrangeScrubTick);
-            const ImU32 ghostCol = IM_COL32(239, 68, 68, 120);
+            const ImU32 ghostCol = tok::U32(tok::pal::c_EF444478);
             dl->AddLine(ImVec2(gx, kTickStripTop), ImVec2(gx, lineBottom), ghostCol, 1.5f);
-            const float triSize = 7.0f;
+            const float triSize = 5.0f;
             dl->AddTriangleFilled(ImVec2(gx - triSize, kTickStripTop), ImVec2(gx + triSize, kTickStripTop),
                                   ImVec2(gx, kTickStripTop + triSize * 1.6f), ghostCol);
             const std::string ghostLabel = ArrangeFormatBBT(gArrangeScrubTick) + "  |  " + ArrangeFormatTickSeconds(gArrangeScrubTick);
@@ -4390,7 +4451,7 @@ namespace app
                lx = gx - 6.0f - ts.x;
             const ImVec2 l0(lx - 3.0f, kTickStripTop + kRulerHeight - kMarkerStripH + 2.0f);
             dl->AddRectFilled(l0, ImVec2(l0.x + ts.x + 6.0f, l0.y + ts.y + 2.0f),
-                              isLight ? IM_COL32(255, 255, 255, 230) : IM_COL32(20, 20, 24, 230), 3.0f);
+                              isLight ? tok::U32(tok::pal::c_FFFFFFE6) : tok::U32(tok::pal::c_141418E6), 3.0f);
             dl->AddText(ImVec2(lx, l0.y + 1.0f), ImGui::GetColorU32(ImGuiCol_Text), ghostLabel.c_str());
          }
       }
@@ -4399,7 +4460,7 @@ namespace app
       if (!gArrange.lanes.empty())
       {
          ImGui::SetCursorScreenPos(ImVec2(headerStartX + 4.0f, lanesContentBottom + 4.0f));
-         if (ImGui::Button(L("+ Add Track"), ImVec2(kHeaderWidth - 8.0f, 22.0f)))
+         if (ChipButton::Draw(L("+ Add Track"), false, 24.0f, kHeaderWidth - 8.0f))
          {
             gArrangeAddTrackInsertAfter = -1;
             ImGui::OpenPopup("##arrangeaddtrackpopup");
@@ -4426,15 +4487,15 @@ namespace app
             ImGui::OpenPopup("##arrangeemptyspacectx");
          }
       }
-      if (ImGui::BeginPopup("##arrangeemptyspacectx"))
+      if (MenuParts::BeginPopup("##arrangeemptyspacectx"))
       {
-         if (ImGui::MenuItem(L("Add Video Track")))
+         if (MenuParts::Item(L("Add Video Track")))
             ArrangeEdit([&]() { Arrange::AddLane(gArrange, Arrange::kLaneVideo); });
-         if (ImGui::MenuItem(L("Add Audio Track")))
+         if (MenuParts::Item(L("Add Audio Track")))
             ArrangeEdit([&]() { Arrange::AddLane(gArrange, Arrange::kLaneAudio); });
-         if (ImGui::MenuItem(L("Add Track Group")))
+         if (MenuParts::Item(L("Add Track Group")))
             ArrangeEdit([&]() { Arrange::AddTrackGroup(gArrange, {}, "New Group"); });
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       ImGui::SetCursorScreenPos(scrollTL);
@@ -4453,14 +4514,14 @@ namespace app
          ImDrawList* odl = ImGui::GetWindowDrawList();
          const ImVec2 a = gArrangePanelRectMin, b = gArrangePanelRectMax;
          odl->PushClipRect(a, b, true);
-         odl->AddRectFilled(a, b, IM_COL32(0, 0, 0, 110));
+         odl->AddRectFilled(a, b, tok::U32(tok::pal::c_0000006E));
          const char* lockText = T("Rendering - timeline locked");
          const ImVec2 ts = ImGui::CalcTextSize(lockText);
          const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
          const ImVec2 t0(c.x - ts.x * 0.5f, c.y - ts.y * 0.5f);
          odl->AddRectFilled(ImVec2(t0.x - 12.0f, t0.y - 7.0f), ImVec2(t0.x + ts.x + 12.0f, t0.y + ts.y + 7.0f),
-                            IM_COL32(18, 18, 22, 225), 5.0f);
-         odl->AddText(t0, IM_COL32(235, 235, 240, 255), lockText);
+                            tok::U32(tok::pal::c_121216E1), 5.0f);
+         odl->AddText(t0, tok::U32(tok::pal::c_EBEBF0FF), lockText);
          odl->PopClipRect();
       }
 
@@ -4480,14 +4541,13 @@ namespace app
 
    void DrawArrangePanelDocked(const char* id, const ImVec2& size)
    {
-      const float kGrip = 6.0f;
+      const float kGrip = PanelFrame::kGap;   // the grip strip is the gap on the canvas-facing side
       const int dock = ArrangePanelDock();
       const bool vertical = (dock == 1 || dock == 2);
       const bool gripFirst = (dock == 0 || dock == 1);
 
-      PushDockedPanelStyle(/*isChild=*/true);
+      // Outer child is transparent: the panel floats as a card on the canvas colour (PanelFrame).
       ImGui::BeginChild(id, size, false);
-      PopDockedPanelStyle();
 
       gArrangePanelRectMin = ImGui::GetWindowPos();
       gArrangePanelRectMax = ImVec2(gArrangePanelRectMin.x + ImGui::GetWindowSize().x,
@@ -4526,14 +4586,19 @@ namespace app
       }
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
-      PushDockedPanelStyle(/*isChild=*/true);
-      ImGui::BeginChild("##arrangepanelinnercontent",
-                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
-                                 : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
+      const ImVec2 cardSize = vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
+                                       : ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+      PanelFrame::Insets in;
+      switch (dock)   // the grip side needs no inset of its own
+      {
+         case 0: in.t = 0.0f; break;
+         case 1: in.l = 0.0f; break;
+         case 2: in.r = 0.0f; break;
+         default: in.b = 0.0f; break;
+      }
+      PanelFrame::BeginCard("##arrangepanelinnercontent", cardSize, in);
       DrawArrangePanelContent();
-      ImGui::EndChild();
-      PopDockedPanelStyle();
+      PanelFrame::EndCard();
 
       if (!gripFirst)
       {
@@ -4542,8 +4607,10 @@ namespace app
          grip();
       }
 
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+      // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
+      const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
+      ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
       ImGui::EndChild();
-      ImGui::PopStyleVar();
+      ImGui::GetStyle().ItemSpacing = savedSpacing;
    }
 }

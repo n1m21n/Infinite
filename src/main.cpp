@@ -58,7 +58,7 @@ int main(int argc, char** argv)
    // delete the marker. Same INFINITE_EXITAFTER carve-out as the startup
    // check: a harness run never created the real marker, so it must not
    // delete it either - see UsingAutosaveTestPaths.
-   if (getenv("INFINITE_EXITAFTER") == nullptr && !HeadlessJobActive())
+   if (!IsHeadlessProcess())
    {
       const std::string marker = AutosaveMarkerPath();
       if (!marker.empty())
@@ -71,6 +71,7 @@ int main(int argc, char** argv)
    CloseAllProjectorWindows();
    Platform::StopDisplayRefreshClock();
    AudioEngine::Instance().Stop();
+   Extensions::Shutdown();
    UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
    MovementLog::Stop();
    if (ColorStats::Engine::Instance().HasLearnedData())

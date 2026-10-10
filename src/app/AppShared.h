@@ -1,6 +1,8 @@
 #pragma once
 // Shared declarations for the code split out of main.cpp.
+#include "app/ui/design/TokenColors.h"
 #include "app/AppCommon.h"
+#include "app/ui/design/components/ActionButton.h"
 
 namespace app
 {
@@ -27,7 +29,11 @@ extern float gViewportPanelHeight;
    inline const float kViewportPanelMinHeight = 190.0f;
 
 
-   inline const float kParamWidth = 168.0f;
+   // Param column width. 168 by default; a node whose pin header is wider stretches it to the header
+   // (StageNodeBodies, R3) so the body fills the node. kParamWidth reads the live value.
+   inline constexpr float kParamWidthBase = 168.0f;
+   inline float gParamWidthLive = kParamWidthBase;
+   inline const float& kParamWidth = gParamWidthLive;
 
 
    // Horizontal audio-node layout (docs/plans/audio/audio-node-ui-system.md
@@ -85,16 +91,25 @@ extern float gViewportPanelHeight;
    // 8-segment ones (radio selector, step gate) that genuinely need it, and
    // one row height every flat control shares so a toggle, a number box, a
    // selector and a step grid all read as the same family.
-   inline const float kMacroCell = 112.0f;
+   inline const float kMacroCell = 184.0f;
 
 
-   inline const float kMacroWideCell = 176.0f;
+   inline const float kMacroWideCell = 200.0f;
 
 
    inline const float kMacroRowH = 26.0f;
 
 
-   inline const float kMacroFaderH = 96.0f;
+   // ---- element-size table (docs/plans/ui-system/element-sizes.md) ----
+   // One number per control, read by every node. A fader is the Mixer / Gain
+   // fader everywhere (Macro Slider included); a knob caption always sits
+   // kKnobCaptionGap under the cap. Do not write these as literals in a body.
+   inline const float kFaderH = 138.0f;          // vertical fader travel box (Mixer, Gain, Macro Slider)
+   inline const float kFaderW = 22.0f;           // fader hit width; handle drawn 18 x 12 (VFader.h)
+   inline const float kFaderMeterW = 8.0f;       // level meter beside a fader (signal faders only)
+   inline const float kFaderMeterDx = 14.0f;     // meter left edge, from the fader's cell centre
+   inline const float kFaderMeterPad = 6.0f;     // meter inset top/bottom of the fader box
+   inline const float kKnobCaptionGap = 4.0f;    // cap bottom to caption top
 
 
    inline const float kKnobLarge = kKnobStd;
@@ -163,6 +178,9 @@ bool IsUserSpawnable(const std::string& name);
 std::string NodeTitle(const GraphNode& gn);
 
 void PushUndoCheckpoint();
+
+// Same, with a name for the history panel and the Edit menu ("Move node"). A null or empty label is derived later.
+void PushUndoCheckpoint(const char* label);
 
 extern bool gSuppressUndoCheckpoints;
 
@@ -397,6 +415,7 @@ void DisconnectLinkById(int id);
 void DisconnectFieldPinBridge(int nodeIndex, int slot, bool isOutput);
 
 extern bool gSnapToGrid;
+extern bool gShowCanvasGrid;
 
 extern float gGridSnap;
 
@@ -1079,6 +1098,7 @@ extern uint64_t gArrangeRenamingLaneId;
 extern bool     gArrangeRenameJustStarted;
 
 extern bool     gArrangeClipSettingsPanelOpen;
+extern ImVec2   gArrangeInspectorMin, gArrangeInspectorMax;
 
 extern uint64_t gArrangeSettingsPanelTarget;
 
@@ -1184,6 +1204,8 @@ extern bool gMinimapEnabled;
       int nodeIndex = -1; // GraphNode::index this window shows
       bool fullscreen = false;
       int monitorIndex = -1;   // display it was last placed on by us
+      std::string monitorName; // that display's name, to find it again after a hot-plug
+      std::string returnToMonitor; // set when its fullscreen display vanished: go fullscreen there again when it is back
       int windowedX = 100, windowedY = 100, windowedW = 1280, windowedH = 720; // restore box
    };
 
@@ -1395,6 +1417,10 @@ extern bool gFieldPrimitiveEditorOpen;
 
 extern FieldPixelNode* gFieldPixelEditor;
 
+extern SketchNode* gSketchEditor;
+
+extern bool gSketchEditorOpen;
+
 extern bool gFieldPixelEditorOpen;
 
 extern FieldSampleNode* gFieldSampleEditor;
@@ -1453,8 +1479,12 @@ extern bool gUiStyleEditorOpen;
 #endif
 
 extern bool gSettingsOpen;
+extern bool gTemplatesOpen;
 
 extern bool gShowUpdateCheckModal;
+extern bool gShowAboutModal;
+// The app icon as a GL texture (created on first call); 0 if it could not be decoded.
+ImTextureID BrandLogoTexture();
 
 extern std::vector<std::string> gDroppedFiles;
 
@@ -1495,7 +1525,7 @@ void OnFilesDropped(GLFWwindow* window, int count, const char** paths);
 
 void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width = kParamWidth,
-                       bool showCaption = true);
+                       bool showCaption = true, bool segmented = false);
 
 bool DrawBrowserFilterStrip(BrowserFilterState& state,
                                const char* searchHint,
@@ -2003,6 +2033,10 @@ bool AudioSliderFloat(const char* label, float* value, float minV, float maxV, c
                          FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
                          bool vividState = false);
 
+void OutputMeterRow(const char* label, float v, float width);
+
+void DrawOutputMeters(INode* node, float colW, int cols = 1, float gutter = 16.0f);
+
 void DrawModulationBindingMenu(int nodeIndex, int paramIndex, bool hovered);
 
 extern std::map<std::pair<int, int>, float> gDiscreteParamStore;
@@ -2040,11 +2074,18 @@ ImVec4 AccentEmphasisSelected();
 
 ImVec4 AccentEmphasisPressed();
 
+// Selected/on button look that survives hover (accent kept, ~4% brighter). Push and Pop are a pair (3 colours).
+void AddPerfElementToCurrentPage(int kind);
+void PushSelectedButtonColors();
+void PopSelectedButtonColors();
+
 void PushPrimaryButtonStyle();
 
 void PopPrimaryButtonStyle();
 
 void PushDropdownStyle();
+// Closed face of a node dropdown (field well + value + chevron); returns true when clicked.
+bool NodeDropdownField(const char* caption, ImVec2 size, const char* label = nullptr);
 
 void PopDropdownStyle();
 
@@ -2067,9 +2108,10 @@ void DrawDiscreteParamPin(const DiscreteParamHandle& h, const char* label, float
 
 void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
-                       bool showCaption);
+                       bool showCaption, bool segmented);
 
 void PushCheckboxStyle();
+bool NodeCheckbox(const char* label, bool* value, bool modulated = false);
 
 void PopCheckboxStyle();
 
@@ -2113,7 +2155,7 @@ void EndPredictorGrab(const PredictorGrabCtx& c, const ParamRef& ref);
 
 
    // Prediction green: pin ring, and the track/fill colours of a green-bound slider.
-   inline constexpr ImU32 kPredictionPinCol = IM_COL32(110, 215, 140, 255);
+   inline constexpr ImU32 kPredictionPinCol = tok::U32(tok::pal::c_6ED78CFF);
 
 bool ModCheckbox(const char* label, bool* value, bool* outUserChanged = nullptr);
 
@@ -2333,16 +2375,16 @@ uint32_t ArrangeMarkerRGBA(ImU32 col);
 
 
    inline const ArrangePaletteEntry kArrangePalette[10] = {
-      { "Default", IM_COL32(110, 120, 140, 255) },
-      { "Crimson", IM_COL32(239, 68, 68, 255) },
-      { "Orange",  IM_COL32(249, 115, 22, 255) },
-      { "Amber",   IM_COL32(245, 158, 11, 255) },
-      { "Emerald", IM_COL32(16, 185, 129, 255) },
-      { "Cyan",    IM_COL32(6, 182, 212, 255) },
-      { "Blue",    IM_COL32(59, 130, 246, 255) },
-      { "Purple",  IM_COL32(139, 92, 246, 255) },
-      { "Magenta", IM_COL32(217, 70, 239, 255) },
-      { "Rose",    IM_COL32(244, 63, 94, 255) }
+      { "Default", tok::U32(tok::pal::c_6E788CFF) },
+      { "Crimson", tok::U32(tok::pal::c_EF4444FF) },
+      { "Orange",  tok::U32(tok::pal::c_F97316FF) },
+      { "Amber",   tok::U32(tok::pal::c_F59E0BFF) },
+      { "Emerald", tok::U32(tok::pal::c_10B981FF) },
+      { "Cyan",    tok::U32(tok::pal::c_06B6D4FF) },
+      { "Blue",    tok::U32(tok::pal::c_3B82F6FF) },
+      { "Purple",  tok::U32(tok::pal::c_8B5CF6FF) },
+      { "Magenta", tok::U32(tok::pal::c_D946EFFF) },
+      { "Rose",    tok::U32(tok::pal::c_F43F5EFF) }
    };
 
 
@@ -2650,18 +2692,18 @@ void DrawShapeParams(ShapeNode* n);
       if (options.empty())
       {
          ImGui::BeginDisabled();
-         ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0));
+         ActionButton::Draw(dropdownId.c_str(), ImVec2(kPreviewSize, 0));
          ImGui::EndDisabled();
       }
       else
       {
-         if (ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
             openDropdownAction(true);
       }
       PopDropdownStyle();
 
       const float btnW = (kPreviewSize - 2.0f * spacing) / 3.0f;
-      if (ImGui::Button(("Save##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      if (ActionButton::Draw(("Save##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
          snprintf(gFieldDeviceSave.nameBuf, sizeof(gFieldDeviceSave.nameBuf), "Untitled");
          gFieldDeviceSave.domain = domain;
@@ -2677,14 +2719,14 @@ void DrawShapeParams(ShapeNode* n);
          gFieldDeviceSave.justOpened = true;
       }
       ImGui::SameLine();
-      if (ImGui::Button(("Export##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      if (ActionButton::Draw(("Export##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
          const std::string path = Platform::SaveDeviceDialog("Untitled.field");
          if (!path.empty())
             Field::SaveToFieldFile(path, n->ToDeviceFile());
       }
       ImGui::SameLine();
-      if (ImGui::Button(("Import##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      if (ActionButton::Draw(("Import##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
          const std::string path = Platform::OpenDeviceDialog();
          if (!path.empty())
@@ -2816,6 +2858,7 @@ void DrawRampParams(RampNode* n);
 void DrawColorRampParams(ColorRampNode* n);
 
 void DrawImageAnalyzeParams(ImageAnalyzeNode* n);
+void DrawHandTrackParams(HandTrackNode* n);
 
 void DrawNullModulatorParams(NullModulatorNode* n);
 
@@ -2906,7 +2949,7 @@ void EndAudioSection();
          y0 = gParamRegisterOnly ? 0.0f : ImGui::GetCursorScreenPos().y;
          cellW = gAudioContentW / (float)count;
          index = 0;
-         rowH = headerH + maxDia + (hasCaptions && !gParamRegisterOnly ? (4.0f + ImGui::GetTextLineHeight()) : 0.0f);
+         rowH = headerH + maxDia + (hasCaptions && !gParamRegisterOnly ? (kKnobCaptionGap + ImGui::GetTextLineHeight()) : 0.0f);
       }
 
       void Place(float dia) const
@@ -2966,7 +3009,7 @@ void EndAudioSection();
          const float btnW = std::min(cellW - 8.0f, 96.0f);
          const float btnX = cellX0 + (cellW - btnW) * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
-         const bool clicked = ImGui::Button(label, ImVec2(btnW, 0));
+         const bool clicked = ActionButton::Draw(label, ImVec2(btnW, 0));
          index++;
          return clicked;
       }
@@ -3011,7 +3054,7 @@ void EndAudioSection();
          const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
          const float pinW = 16.0f;
          float btnX = cellX0 + 4.0f;
-         float btnW = std::min(cellW - 8.0f, 118.0f);
+         float btnW = std::min(cellW - 8.0f, 112.0f);
 
          if (h.registered)
          {
@@ -3039,19 +3082,26 @@ void EndAudioSection();
             DrawDiscreteParamPin(h, label, cellW - (pinX - cellX0) - pinW);
             btnX = pinX + pinW;
             const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
-            btnW = std::max(20.0f, std::min(btnRight - btnX, 118.0f));
+            btnW = std::max(20.0f, std::min(btnRight - btnX, 112.0f));
+            // Never clip the value: grow toward the cell's right edge when the text needs more than the symmetric width.
+            btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - 4.0f - btnX, 112.0f)));
          }
 
          ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
 
          const std::string caption = options[safe] + "##" + label;
+         // The parameter name sits inside the face (dim, left) whenever it fits beside the value.
+         const std::string inName = StripParamLabel(label);
+         const char* inLabel = (!inName.empty() &&
+                                btnW >= ImGui::CalcTextSize(options[safe].c_str()).x + ImGui::CalcTextSize(inName.c_str()).x + 3.0f * tok::space_2)
+                                  ? inName.c_str() : nullptr;
          PushDropdownStyle();
          if (h.modulated)
          {
-            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
-                                                                : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
+                                                                : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
-            ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
+            NodeDropdownField(caption.c_str(), ImVec2(btnW, 0), inLabel);
             ImGui::EndDisabled();
             ImGui::PopStyleColor();
             DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3060,7 +3110,7 @@ void EndAudioSection();
          }
          else
          {
-            if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)) ||
+            if (NodeDropdownField(caption.c_str(), ImVec2(btnW, 0), inLabel) ||
                 DropdownTestWantsOpen(h.registered, h.nodeIndex, h.paramIndex))
             {
                gDropdown.options = options;
@@ -3136,6 +3186,8 @@ void EndAudioSection();
                   btnX = pinX + pinW;
                   const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
                   btnW = std::max(20.0f, std::min(btnRight - btnX, 112.0f));
+                  // Never clip the value: grow toward the cell's right edge when the text needs more than the symmetric width.
+                  btnW = std::max(btnW, std::min(ImGui::CalcTextSize(options[safe].c_str()).x + 2.0f * tok::space_2, std::min(cellX0 + cellW - 4.0f - btnX, 112.0f)));
                }
 
                ImGui::SetCursorScreenPos(ImVec2(btnX, y0));
@@ -3144,10 +3196,10 @@ void EndAudioSection();
                PushDropdownStyle();
                if (h.modulated)
                {
-                  ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
-                                                                      : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? tok::V4(tok::palf::v_550_380_100_1000)
+                                                                      : tok::V4(tok::palf::v_1000_750_350_1000));
                   ImGui::BeginDisabled();
-                  ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
+                  NodeDropdownField(caption.c_str(), ImVec2(btnW, 0));
                   ImGui::EndDisabled();
                   ImGui::PopStyleColor();
                   DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3156,7 +3208,7 @@ void EndAudioSection();
                }
                else
                {
-                  if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)))
+                  if (NodeDropdownField(caption.c_str(), ImVec2(btnW, 0)))
                   {
                      gDropdown.options = options;
                      gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind
@@ -3239,10 +3291,10 @@ void EndAudioSection();
          if (h.modulated)
          {
             bool shown = *value;
-            ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? ImVec4(0.84f, 0.49f, 0.08f, 1.0f)
-                                                                     : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? tok::V4(tok::palf::v_840_490_80_1000)
+                                                                     : tok::V4(tok::palf::v_1000_750_350_1000));
             ImGui::BeginDisabled();
-            ImGui::Checkbox(label, &shown);
+            NodeCheckbox(label, &shown, true);
             ImGui::EndDisabled();
             ImGui::PopStyleColor();
             DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
@@ -3251,7 +3303,7 @@ void EndAudioSection();
          }
          else
          {
-            const bool clicked = ImGui::Checkbox(label, value);
+            const bool clicked = NodeCheckbox(label, value);
             if (outUserChanged)
                *outUserChanged = clicked;
             changed = clicked || changed;
@@ -3271,7 +3323,7 @@ void EndAudioSection();
          if (gParamRegisterOnly)
             return;
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
-         ImGui::Dummy(ImVec2(gAudioContentW, rowH));
+         ImGui::Dummy(ImVec2(gAudioContentW, rowH + tok::space_1 + 2.0f));  // row gap: a caption never touches the next row's knob
       }
    };
 
@@ -3333,7 +3385,17 @@ void DrawPredictiveModulatorParams(PredictiveModulatorNode* n);
          if (p.isDeclared)
          {
             const int paramIndex = kFieldDeclaredParamBase + p.id;
-            ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, paramIndex);
+            // Units from the declared name; wide ranges drop the meaningless decimals.
+            const std::string& nm = p.name;
+            auto has = [&](const char* sub) { return nm.find(sub) != std::string::npos; };
+            const char* fmt = (p.maxValue - p.minValue) >= 100.0f ? "%.0f" : "%.3f";
+            if (has("cutoff") || has("freq") || has("hz"))
+               fmt = "%.0f Hz";
+            else if (has("_ms") || has(" ms") || has("ms_"))
+               fmt = "%.0f ms";
+            else if (has("db"))
+               fmt = "%.1f dB";
+            ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, fmt, kParamWidth, false, 0.0f, nullptr, nullptr, paramIndex);
          }
       }
    }
@@ -3406,6 +3468,8 @@ void DrawFieldGraphParams(FieldGraphNode* n);
 
 void DrawFieldPixelParams(FieldPixelNode* n);
 
+void DrawSketchParams(SketchNode* n);
+
 void DrawSamplerWaveform(SamplerNode* n, float h, float width);
 
 void DrawSlicerWaveform(SlicerNode* n, float h, float width);
@@ -3444,6 +3508,9 @@ ADSRLayout ComputeADSRLayout(ImVec2 origin, float w, float h, float attackMs, fl
 const std::vector<std::string>& WavetableNames();
 
 const std::vector<std::string>& OctaveNames();
+
+// One size for the header tuning selectors (oct / semi / fine) in every synth, so the headers line up node to node.
+constexpr float kTuneOctW = 74.0f, kTuneSemiW = 82.0f, kTuneFineW = 104.0f;
 
 void AudioBareDropdown(const char* id, const std::vector<std::string>& options, int current,
                           std::function<void(int)> onSelect, float width,
@@ -4069,6 +4136,13 @@ void DrawDrawParams(DrawNode* n);
 INode* DisplayNode(INode* node);
 
 const char* EmptyPreviewLabel(INode* node, const char* fallback);
+
+// Horizontal offset that centres a body block of width `contentW` in its node. A node's pin header can make it wider
+// than kWideNodeWidth, so this reads the width the node had last frame (cached after ed::EndNode) and falls back
+// to kWideNodeWidth on the first frame.
+float WideNodeCentreOffset(const INode* node, float contentW);
+float CachedCentreOffset(const INode* node, float contentW);
+void CacheNodeWidth(const INode* node, float width);
 
 void DrawPreview(INode* node);
 
@@ -5221,6 +5295,8 @@ void LoadWorkspaceSettings();
 
 void SaveWorkspaceSettings();
 
+void PersistPanelLayoutIfChanged();
+
 void LoadAudioSettings();
 
 void SaveAudioSettings();
@@ -5271,6 +5347,9 @@ extern bool gSuppressUndoCheckpoints;
       // here, so the two entry kinds coexist with no remapping.
       bool arrangeOnly = false;
       Arrange::Model arrange;
+      // What the edit this entry undoes was called ("Move node"). Empty until named: a call site that passed no label
+      // gets one derived from the before/after patches the first time something shows it. Never written to a patch.
+      std::string label;
    };
 
 extern std::deque<UndoEntry> gUndoStack;
@@ -5368,9 +5447,20 @@ void NoteGraphEditedForLiveIssues();
 
 void RefreshLiveIssues();
 
-void PushUndoSnapshot(Patch::Data snapshot);
+void PushUndoSnapshot(Patch::Data snapshot, const char* label = nullptr);
 
 void PushUndoCheckpoint();
+
+void PushUndoCheckpoint(const char* label);
+
+// History panel and menu. Labels of the undo stack, newest first / the redo stack, nearest first.
+std::string UndoLabelAt(size_t indexFromTop);
+std::string RedoLabelAt(size_t indexFromNearest);
+// Moves the document `undos` steps back (positive) or `redos` forward by repeating Undo/Redo, one status line at the end.
+void JumpInHistory(int undos, int redos);
+extern bool gHistoryOpen;
+extern float gHistoryWidth;
+void DrawHistoryDocked(const char* id, const ImVec2& size);
 
 extern Patch::Data gDragStartSnapshot;
 
@@ -5403,11 +5493,27 @@ bool HandleRpcCommand(const std::string& method, const nlohmann::json& params,
 
 void DrawMinimap();
 
+// Find on the canvas (Cmd/Ctrl+F), src/app/panels/FindOverlay.cpp.
+void DrawFind();
+void DrawCookOverlay();   // View > Cook times; see CookOverlay.cpp
+std::string BuildSystemInfo();   // Help > Copy system info; see Diagnostics.cpp
+void CopySystemInfo();
+void DrawNotices();       // Notices::Active() as cards, bottom-right; see NoticeStack.cpp
+bool FindIsOpen();
+int FindMatchCount();
+int FindMatchNodeIndex(int i);   // GraphNode::index of the i-th match, -1 out of range
+int FindCurrentMatch();
+bool FindIsMatch(int nodeIndex);
+
 std::string BundledResourcePath(const char* relPath);
 
 void SetWindowIcon(GLFWwindow* window);
 
 void SavePatchInteractive(bool forceDialog);
+
+// Templates (TemplatesWindow.cpp): the window, the empty-canvas invitation, and the open-as-untitled-copy.
+void DrawTemplatesWindow(bool* open);
+bool OpenTemplate(const std::string& path);
 
 
 
@@ -5592,6 +5698,8 @@ void PaceProjectorPresent(GLFWwindow* canvas);
 void MoveProjectorToMonitor(ProjectorWindow& pw, int monitorIndex);
 
 void ToggleProjectorFullscreen(ProjectorWindow& pw);
+
+void UpdateProjectorsForMonitors();
 
 void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn);
 
@@ -5794,6 +5902,8 @@ int RunCVRecorderTest();
 
 int RunMidiCC14Test();
 int RunNdiTest();
+int RunExtensionsTest();
+int RunTrackingTest();
 
 int RunAudioParamSweepTest();
 
@@ -5828,6 +5938,8 @@ int RunVST3BlocklistTest();
 #endif
 
 void RunRpcBatchTest();
+void RunHistoryTest();
+void RunClipboardTest();
 
 void RunPatchWatchTest();
 

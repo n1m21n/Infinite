@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -138,9 +139,13 @@ namespace Platform
    // AppPaths::AppSupportDir() + "/log.txt", so a user who hits a startup
    // failure they can't see (see above) has something to attach to a report.
    // Best-effort: never throws, silently does nothing if the file can't be
-   // opened. No-op on macOS - stderr already reaches a visible terminal or
-   // Console.app there.
+   // opened. macOS and Linux also echo to stderr; Windows redirects stderr into
+   // the same file.
    void AppendLogLine(const std::string& line);
+
+   // Help > Reveal logs: shows AppPaths::AppSupportDir() + "/log.txt" selected in the OS file manager (the file is
+   // created empty first so there is always something to select). Same file AppendLogLine writes on every platform.
+   void RevealLogs();
 
    // Reports a fatal startup failure through every channel a user might
    // actually see: stderr (unconditionally, matches prior behavior) and,
@@ -177,6 +182,9 @@ namespace Platform
    // dialogs above - Save returns the chosen path, or "" if cancelled.
    std::string OpenDeviceDialog();
    std::string SaveDeviceDialog(const std::string& suggestedName = "Untitled.field");
+
+   // Extension pack files (.infpack, a zip). Returns the chosen path, or "" if cancelled.
+   std::string OpenExtensionPackDialog();
 
    // ---- text outlines -----------------------------------------------------
    // Glyph outlines for a laid-out string, flattened to polygons in font units
@@ -1260,6 +1268,17 @@ namespace Platform
    bool HttpGet(const std::string& url, const std::string& userAgent,
                 std::string& outBody, std::string& outError,
                 int timeoutSeconds = 10);
+
+   // Streams an HTTPS GET to `destPath` (no size cap, nothing held in memory).
+   // Call from a worker thread. `progress(done, total)` runs on the calling
+   // thread as bytes arrive (total is 0 when the server does not say); return
+   // false from it to cancel. Returns false on any failure, cancel or non-2xx and
+   // fills outError; a partial destPath is deleted. timeoutSeconds bounds the
+   // whole transfer.
+   using HttpProgress = std::function<bool(uint64_t done, uint64_t total)>;
+   bool HttpDownload(const std::string& url, const std::string& userAgent,
+                     const std::string& destPath, const HttpProgress& progress,
+                     std::string& outError, int timeoutSeconds = 600);
 
    // ---- output/projector window (Windows only) ----------------------------
    // Windows has no OS-level "make this app window fullscreen" affordance -

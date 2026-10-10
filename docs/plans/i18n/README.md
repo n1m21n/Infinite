@@ -1,7 +1,7 @@
 # Language switch — execution brief
 
 **Languages:** English (en, source) · Español (es) · Deutsch (de) · 中文简体 (zh) · 日本語 (ja) · Русский (ru)
-**Status:** not started · **Branches:** one per block (see §6) · **Date:** 2026-10-07
+**Status:** done (2026-10-09, owner: language switch is pushed) · **Branches:** `feature/i18n-core`, `feature/i18n-help`, `feature/i18n-sweep` (merged into `main`) · **Date:** 2026-10-07
 
 ---
 

@@ -1,0 +1,47 @@
+infinite-patch 1
+# Modulators: numbers that move other controls
+node 1 Source Shape
+  id shape
+  pos 0 162
+  c fillColor 1 0.45 0.3
+end
+node 2 Modulators LFO
+  id lfo
+  pos 0 1040
+  f rateBeats 4
+end
+node 3 Modulators Random
+  id rnd
+  pos 460 1040
+end
+node 4 Utility Output
+  id out
+  pos 460 0
+end
+node 5 Compositing Comment
+  pos 0 722
+  s text Modulators produce numbers over time. Wire them to controls to make anything move.
+  f width 340
+  f height 120
+end
+node 6 Compositing Comment
+  pos 0 878
+  s text An LFO is a steady wave. Here it makes the shape breathe. Try Rate, or a different wave shape.
+  f width 300
+  f height 126
+end
+node 7 Compositing Comment
+  pos 460 878
+  s text Random wanders between values. Here it turns the shape. Try Smooth for gentler movement.
+  f width 300
+  f height 126
+end
+node 8 Compositing Comment
+  pos 0 0
+  s text Controls with an orange dot are being moved. Drag a modulator onto any control to do the same.
+  f width 300
+  f height 126
+end
+cable out 0 shape
+mod shape sizeX lfo 0 0 0.25 0.5
+mod shape rotation rnd 0 0 90 0.5

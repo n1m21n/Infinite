@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -338,6 +339,25 @@ bool UpdateAvailable()
 const std::string& LatestVersion()
 {
    return gLatestVersion;
+}
+
+static std::string AutoOffPath()
+{
+   return AppPaths::AppSupportDir() + "/update-check-off";
+}
+
+bool AutoCheckEnabled()
+{
+   std::ifstream f(AutoOffPath());
+   return !f.good();
+}
+
+void SetAutoCheckEnabled(bool on)
+{
+   if (on)
+      std::remove(AutoOffPath().c_str());
+   else
+      std::ofstream(AutoOffPath()) << "off\n";
 }
 
 void Dismiss()

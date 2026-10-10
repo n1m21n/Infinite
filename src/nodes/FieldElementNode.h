@@ -55,7 +55,7 @@ public:
    int OutputCount() const override { return NativeOutputCount() + DeclaredOutputCount(); }
    const char* OutputLabel(int index) const override
    {
-      if (index == 0) return "geo";
+      if (index == 0) return "out";
       if (publishScalarOutput && index == 1) return "publish";
       int declIdx = index - NativeOutputCount();
       int seen = 0;
@@ -177,6 +177,7 @@ public:
    // Field compilation & UI
    bool Apply();
    const std::string& LastError() const { return mLastError; }
+   NodeIssue Issue() const override { return NodeIssues::FieldCompile(mLastError); }
    const std::string& Notice() const { return mNotice; }
    bool WasTruncated() const { return mWasTruncated; }
    int ActualElementCount() const { return mActualElementCount; }

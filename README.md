@@ -97,17 +97,15 @@ Any element/pixel/sample kernel can also declare **dynamic pins** right in its c
 ### Pre-built App (macOS, Windows & Linux)
 Download the latest build for your platform from [GitHub Releases](https://github.com/n1m21n/Infinite/releases): `Infinite.dmg` for macOS, `Infinite-windows-x64.zip` / `Infinite-windows-ARM64.zip` for Windows, or `Infinite-x86_64.AppImage` for Linux.
 
-**macOS**
+**macOS** (Infinite is not notarized by Apple, so the first launch needs one extra step)
 1. Open the DMG and drag `Infinite.app` to Applications.
-2. Right-click `Infinite.app` → **Open** → Click **Open** (ad-hoc signed).
-3. If blocked by Gatekeeper quarantine, run in Terminal:
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/Infinite.app
-   ```
+2. Double-click `Fix & Open Infinite.command` in the DMG and press `y`. It clears the download flag on Infinite only, then opens it.
+   - Or do it by hand: try to open Infinite once, then **System Settings → Privacy & Security → Open Anyway** (macOS 15 and later), or right-click `Infinite.app` → **Open** (older macOS).
+   - Or in Terminal: `xattr -dr com.apple.quarantine /Applications/Infinite.app`
 
 **Windows**
 1. Unzip the `x64` or `ARM64` build for your CPU.
-2. Run `Infinite.exe`. If SmartScreen blocks it, click **More info** → **Run anyway**.
+2. Run `Infinite.exe`. The build is not code-signed, so Windows SmartScreen may say "Windows protected your PC": click **More info**, then **Run anyway**. It asks once per download.
 
 **Linux**
 1. `chmod +x Infinite-x86_64.AppImage`

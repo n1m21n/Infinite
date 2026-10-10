@@ -269,6 +269,17 @@ namespace Platform
       }
    }
 
+   void RevealLogs()
+   {
+      const std::string dir = AppPaths::AppSupportDir();
+      if (dir.empty())
+         return;
+      const std::string file = dir + "/log.txt";
+      if (FILE* f = std::fopen(file.c_str(), "a"))
+         std::fclose(f);
+      RevealInFileManager(file);
+   }
+
    void ShowFatalError(const std::string& title, const std::string& message)
    {
       std::fprintf(stderr, "[FATAL] %s: %s\n", title.c_str(), message.c_str());
@@ -394,6 +405,23 @@ namespace Platform
          (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
          filterPatterns,
          "Field device (*.field, *.infdev)",
+         0
+      );
+      return res ? std::string(res) : std::string();
+   }
+
+   std::string OpenExtensionPackDialog()
+   {
+      if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
+      EnsureDialogBackendChecked();
+      const char* const filterPatterns[] = { "*.infpack", "*.zip" };
+      const char* res = tinyfd_openFileDialog(
+         "Install Extension Pack",
+         "",
+         (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
+         filterPatterns,
+         "Extension pack (*.infpack, *.zip)",
          0
       );
       return res ? std::string(res) : std::string();
@@ -664,6 +692,105 @@ namespace Platform
          return false;
       }
 
+      return true;
+   }
+
+   struct CurlDownloadCtx
+   {
+      FILE* file = nullptr;
+      const Platform::HttpProgress* progress = nullptr;
+      bool cancelled = false;
+   };
+
+   static size_t CurlFileWrite(char* ptr, size_t size, size_t nmemb, void* userdata)
+   {
+      auto* ctx = static_cast<CurlDownloadCtx*>(userdata);
+      return fwrite(ptr, size, nmemb, ctx->file) == nmemb ? size * nmemb : 0;
+   }
+
+   static int CurlXferInfo(void* userdata, long long dltotal, long long dlnow, long long, long long)
+   {
+      auto* ctx = static_cast<CurlDownloadCtx*>(userdata);
+      if (ctx->progress && *ctx->progress && !(*ctx->progress)((uint64_t)dlnow, (uint64_t)dltotal))
+      {
+         ctx->cancelled = true;
+         return 1; // non-zero aborts the transfer
+      }
+      return 0;
+   }
+
+   bool HttpDownload(const std::string& url, const std::string& userAgent,
+                     const std::string& destPath, const HttpProgress& progress,
+                     std::string& outError, int timeoutSeconds)
+   {
+      outError.clear();
+      if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
+      {
+         outError = "url must be http(s)";
+         return false;
+      }
+      static CurlApi curl;
+      if (!curl.Load())
+      {
+         outError = "libcurl could not be loaded via dlopen";
+         return false;
+      }
+      CURL* ch = curl.easy_init();
+      if (!ch)
+      {
+         outError = "curl_easy_init failed";
+         return false;
+      }
+      CurlDownloadCtx ctx;
+      ctx.file = fopen(destPath.c_str(), "wb");
+      ctx.progress = &progress;
+      if (!ctx.file)
+      {
+         curl.easy_cleanup(ch);
+         outError = "cannot write the download";
+         return false;
+      }
+      constexpr CURLoption kNoProgress = 43;
+      constexpr CURLoption kXferInfoFn = 20219;
+      constexpr CURLoption kXferInfoData = 10057;
+      curl.easy_setopt(ch, CURLOPT_URL, url.c_str());
+      curl.easy_setopt(ch, CURLOPT_USERAGENT, userAgent.c_str());
+      curl.easy_setopt(ch, CURLOPT_WRITEFUNCTION, CurlFileWrite);
+      curl.easy_setopt(ch, CURLOPT_WRITEDATA, &ctx);
+      curl.easy_setopt(ch, kNoProgress, 0L);
+      curl.easy_setopt(ch, kXferInfoFn, CurlXferInfo);
+      curl.easy_setopt(ch, kXferInfoData, &ctx);
+      curl.easy_setopt(ch, CURLOPT_TIMEOUT, (long)timeoutSeconds);
+      curl.easy_setopt(ch, CURLOPT_FOLLOWLOCATION, 1L);
+      curl.easy_setopt(ch, CURLOPT_FAILONERROR, 1L);
+      curl.easy_setopt(ch, CURLOPT_NOSIGNAL, 1L);
+      CURLcode res = curl.easy_perform(ch);
+      long statusCode = 0;
+      curl.easy_getinfo(ch, CURLINFO_RESPONSE_CODE, &statusCode);
+      curl.easy_cleanup(ch);
+      const bool closed = fclose(ctx.file) == 0;
+      if (res != CURLE_OK || !closed)
+      {
+         remove(destPath.c_str());
+         if (ctx.cancelled)
+            outError = "cancelled";
+         else
+         {
+            const char* errStr = curl.easy_strerror ? curl.easy_strerror(res) : nullptr;
+            outError = res != CURLE_OK ? (errStr ? errStr : ("curl error " + std::to_string(res)))
+                                       : "cannot write the download";
+         }
+         return false;
+      }
+      // Same contract as the other platforms: one final report, cancel honoured.
+      std::error_code sizeEc;
+      const uint64_t finalSize = (uint64_t)std::filesystem::file_size(destPath, sizeEc);
+      if (progress && !progress(finalSize, finalSize))
+      {
+         remove(destPath.c_str());
+         outError = "cancelled";
+         return false;
+      }
       return true;
    }
 

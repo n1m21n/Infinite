@@ -148,6 +148,7 @@ bool ImageSourceNode::LoadFromDecoded(const std::vector<unsigned char>& pixels, 
 
 bool ImageSourceNode::Load(const std::string& path)
 {
+   mLastError.clear();
    if (path.empty())
    {
       mLastError = "no file chosen";
