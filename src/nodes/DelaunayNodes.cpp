@@ -39,11 +39,15 @@ void DelaunayMeshNode::RebuildIfNeeded()
          mMeshRevision = NextMeshRevision();
       }
       mBuiltInput = nullptr;
+      mCookWarning.clear();
       return;
    }
 
+   // Points only: a mesh on this pin is reported (CookWarning) and produces
+   // nothing, rather than silently triangulating its vertices.
    const std::vector<Particle>* cloud = input->GetPointCloud();
-   const unsigned long long upstream = cloud ? input->PointCloudRevision() : input->MeshRevision();
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kCloud);
+   const unsigned long long upstream = cloud ? input->PointCloudRevision() : 0;
    if (mBuiltInput == input && mBuiltUpstream == upstream && mBuiltPlane == plane &&
        mBuiltAliveOnly == aliveOnly && mBuiltMaxPoints == maxPoints && mBuiltInset == inset)
       return;
@@ -57,11 +61,6 @@ void DelaunayMeshNode::RebuildIfNeeded()
          if (aliveOnly && !p.alive) continue;
          sites.push_back({ p.px, p.py, p.pz });
       }
-   }
-   else
-   {
-      for (const Vertex& v : input->GetMesh().vertices)
-         sites.push_back({ v.px, v.py, v.pz });
    }
    const size_t cap = (size_t)std::max(3, maxPoints);
    if (sites.size() > cap)

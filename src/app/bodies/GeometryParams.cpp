@@ -991,10 +991,10 @@ namespace app
          if (n->ActsOnInstanceStamp())
          {
             if (n->op == GeometryOpNode::kTransform)
-               ImGui::TextDisabled("moving the whole instanced group (%zu copies)",
+               ImGui::TextDisabled("whole group, %zu copies",
                                     n->UpstreamInstanceCount());
             else
-               ImGui::TextDisabled("%zu triangles out - applied to the instanced shape, %zu copies",
+               ImGui::TextDisabled("%zu tris, per shape x%zu",
                                     n->TriangleCount(), n->UpstreamInstanceCount());
          }
          else

@@ -418,6 +418,7 @@ private:
 class DisplacementNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    enum Mode { kScalar = 0, kVector };
 
    static INode* Create() { return new DisplacementNode(); }
@@ -548,6 +549,7 @@ public:
    }
 
 private:
+   std::string mCookWarning;
    struct Signature
    {
       int mode = -1;

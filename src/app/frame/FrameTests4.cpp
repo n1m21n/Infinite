@@ -838,6 +838,34 @@ void FrameTest_POINTCLOUDSWEEPTEST(int frameId, GLFWwindow* window)
          report("vertices-only input satisfies kMeshVertices",
                 DescribeGeometryMismatch(&verts, GeometryRequirement::kMeshVertices).empty());
 
+         // Pin contract: points-only and curve-only nodes flag the wrong
+         // domain and make nothing from it.
+         {
+            DelaunayMeshNode dn;
+            dn.input = &verts;
+            const bool meshEmpty = dn.GetMesh().vertices.empty();
+            report("Delaunay Mesh flags a mesh and ignores it",
+                   meshEmpty && dn.CookWarning().find("point cloud") != std::string::npos);
+            dn.input = &pts;
+            dn.GetMesh();
+            report("Delaunay Mesh accepts a point cloud without warning", dn.CookWarning().empty());
+            VoronoiCellsNode vn;
+            vn.input = &verts;
+            vn.GetMesh();
+            report("Voronoi Cells flags a mesh", !vn.CookWarning().empty());
+            CurveOpsNode cn;
+            cn.input = &verts;
+            const bool curveEmpty = cn.GetCurve() == nullptr;
+            report("Curve Ops flags a mesh and emits no curve",
+                   curveEmpty && cn.CookWarning().find("curve") != std::string::npos);
+            cn.input = &pts;
+            cn.GetCurve();
+            report("Curve Ops flags a point cloud", !cn.CookWarning().empty());
+            cn.input = &curve;
+            cn.GetCurve();
+            report("Curve Ops accepts a curve without warning", cn.CookWarning().empty());
+         }
+
          // R484: Switcher 3D and Set Color forward cloud / curve.
          Switcher3DNode sw;
          sw.manual = true; sw.manualSlot = 1;

@@ -528,6 +528,9 @@ const std::vector<std::string>& MeshToPointsNode::ModeNames() { return kModeName
 
 void MeshToPointsNode::RebuildIfNeeded()
 {
+   // Vertices mode only needs positions; edges/faces need real topology.
+   mCookWarning = DescribeGeometryMismatch(
+      input, mode == 0 ? GeometryRequirement::kMeshVertices : GeometryRequirement::kMeshSurface);
    if (input == nullptr)
    {
       if (!mPoints.empty())

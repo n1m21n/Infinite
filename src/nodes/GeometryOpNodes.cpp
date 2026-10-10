@@ -663,7 +663,11 @@ DisplacementNode::Signature DisplacementNode::CurrentSignature() const
 const Mesh& DisplacementNode::GetMesh()
 {
    if (input == nullptr)
+   {
+      mCookWarning.clear();
       return kEmptyMesh;
+   }
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    const Signature sig = CurrentSignature();
    if (mHasBuilt && sig == mBuilt)
@@ -1052,7 +1056,9 @@ const Mesh& WrapNode::GetMesh()
       return kEmptyMesh;
    }
 
-   mCookWarning = DescribeGeometryMismatch(targetInput, GeometryRequirement::kMeshSurface);
+   mCookWarning = DescribeGeometryMismatch(sourceInput, GeometryRequirement::kMeshSurface);
+   if (mCookWarning.empty())
+      mCookWarning = DescribeGeometryMismatch(targetInput, GeometryRequirement::kMeshSurface);
 
    const Signature sig = CurrentSignature();
    if (mHasBuilt && sig == mBuilt)

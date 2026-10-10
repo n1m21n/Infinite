@@ -49,6 +49,7 @@ public:
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "curve"; }
+   const std::string& CookWarning() const override { return mCookWarning; }
    size_t PointCount() const { return mLine.Count(); }
 
    int mode = kResample;
@@ -73,6 +74,7 @@ private:
    void RebuildIfNeeded();
 
    Mesh mMesh;
+   std::string mCookWarning;
    Polyline mLine;
    unsigned long long mRevision = 0;
    mutable unsigned long long mMaterialRevision = 0;

@@ -20,6 +20,26 @@ Warning channel: `ICookWarningSource::CookWarning()` + `DescribeGeometryMismatch
 (`:51`); `FaceCount()` = `indices.size()/3` (`:52`). So a **verts-only mesh is
 `Empty()`**.
 
+## 0. The pin contract (stable identity - what connects to what)
+
+All geometry pins share one cable kind, so the cable always connects. The
+**domain** is checked at cook time instead: a pin that gets the wrong domain
+turns the node's border red (message on hover, `DescribeGeometryMismatch`) and
+the node makes nothing from it. Never silently reinterpret another domain.
+
+| Domain | Made by | Consumed by (strict: flagged if wrong) |
+|---|---|---|
+| `cloud` | Particle System, Distribute Points (Faces/Grid), Image to Points, Mesh to Points, Depth Projection (cloud mode) | Delaunay Mesh, Voronoi Cells, Metaballs, Instance on Points `cloud` pin |
+| `curve` | Curve, Curve Ops | Path `curve` pin, Curve Ops |
+| `mesh:surface` | primitives, Model, operators, Delaunay, Voronoi, Curve (tube) | Cloth, Displacement, Resynthesize, Audio Displacement, Merge by Distance, Distribute on Faces, Wrap, Mesh to Points (edges/faces modes) |
+| `mesh:verts` | Points to Vertices, Field Primitive (points) | Mesh to Points (vertices mode), Points to Vertices |
+| any | - | Null 3D, Material, Mapping, Switcher 3D, Set Color, Group, Join, Geometry Op, Render 3D (these forward or draw whatever domain arrives) |
+
+Rules for new nodes: declare the pin's required domain in one
+`GeometryRequirement`, set `mCookWarning` from `DescribeGeometryMismatch` on
+every cook, and emit nothing (not a guess) for the wrong domain. Pinned by
+POINTCLOUDSWEEPTEST (`Delaunay Mesh flags...`, `Curve Ops flags...`).
+
 ## Tags and channels
 
 | tag | meaning |
@@ -101,18 +121,20 @@ FieldPrimitive resolved: not mode-dependent across domains. `GetPointCloud()`/
 | InstanceOnPoints.cloudSource | cloud; **wins over pointSource** | `GeometryOpNodes.cpp:802-820` | n/a | - | yes (cloud) |
 | InstanceOnPoints.pointSource | mesh; **mode 0 needs only vertices, modes 1/2 need faces** | gate `!HasGeometry()` (`:830`); `ToPoints` mode 0 `Mesh.cpp:2470-2540`, edges `:2541-2652`, faces `:2653-2693` | mode 0 works; modes 1/2 yield 0 instances, silently | 0 instances | **none** |
 | InstanceOnPoints.instanceShape | any mesh | `GeometryOpNodes.cpp:730-746` | draws verts-only stamp as nothing (Render needs faces) | empty stamp | none |
-| Cloth.input | **surface** | `SimulationNodes.cpp:294` `srcLocal.Empty()` returns, no output; constraints from `src.indices` | **no output at all** (old doc said "unconstrained particles": wrong) | no mesh output (cloud/curve forwarded) | **none** |
-| Displacement.input | surface (no gate) | `GeometryOpNodes.cpp:620-624` -> `MeshOps::Displace` (`Mesh.cpp:2369-2426`) always ends in `RecalculateNormals` | smooth: all normals zeroed (`Mesh.cpp:1782`); **flatShade: result is an empty mesh** (`:1704-1749` builds from indices) | mesh empty | **none** |
+| Cloth.input | **surface** | `SimulationNodes.cpp:294` `srcLocal.Empty()` returns, no output; constraints from `src.indices` | **no output at all** (old doc said "unconstrained particles": wrong) | no mesh output (cloud/curve forwarded) | kMeshSurface (added) |
+| Displacement.input | surface (no gate) | `GeometryOpNodes.cpp:620-624` -> `MeshOps::Displace` (`Mesh.cpp:2369-2426`) always ends in `RecalculateNormals` | smooth: all normals zeroed (`Mesh.cpp:1782`); **flatShade: result is an empty mesh** (`:1704-1749` builds from indices) | mesh empty | kMeshSurface (added) |
 | AudioDisplacement.input | surface | `.cpp:268` warn, `:275` gate on `vertices.empty()` | runs, ends in `RecalculateNormals` (`:470`): normals zeroed / flat = empty | empty | kMeshSurface (`:268`) |
 | Wrap.sourceInput | surface | `Mesh.cpp:3043-3045` `worldSource.Empty()` returns source unchanged | **returned un-wrapped** (but world-baked) | empty | none on source |
-| Wrap.targetInput | surface (nearest); optional in bend modes | `Mesh.cpp:3048` `target.Empty()` -> unchanged unless bend + `radiusOverride>0`; nearest loop uses `FaceCount()` (`:3133`) | treated as absent (`:3061` `worldTarget.Empty()` -> uses override) | treated as absent | kMeshSurface (`.cpp:1003`); **misclassifies verts-only as "nothing"** |
+| Wrap.targetInput | surface (nearest); optional in bend modes | `Mesh.cpp:3048` `target.Empty()` -> unchanged unless bend + `radiusOverride>0`; nearest loop uses `FaceCount()` (`:3133`) | treated as absent (`:3061` `worldTarget.Empty()` -> uses override) | treated as absent | source + target kMeshSurface (source added); **misclassifies verts-only as "nothing"** |
 | Join inputs 1-4 | surface to contribute | `UtilityNodes.cpp:266,316` `Empty()` skip | **silently skipped** | skipped | none |
 | GeometryOp.input | any (no gate at `:200-211`); kTransform/kArray are pure vertex ops | no per-op gate at pin | kTransform keeps verts-only intact | mesh empty; cloud handled `:523` | none |
 | MergeByDistance.input | surface per warning, but op body only needs vertices | `Mesh.cpp:612-663` (`vertices.empty()` gate; faces loop optional) | works (welds verts) but node warns anyway | mesh empty | kMeshSurface |
-| MeshToPoints.input | mode 0 vertices; modes 1/2 faces | `UtilityNodes.cpp:550-573`, `ToPoints` as above | mode 0 works, 1/2 emit 0 points | 0 points | **none** |
+| MeshToPoints.input | mode 0 vertices; modes 1/2 faces | `UtilityNodes.cpp:550-573`, `ToPoints` as above | mode 0 works, 1/2 emit 0 points | 0 points | kMeshVertices / kMeshSurface by mode (added) |
 | DistributeOnFaces.input | surface | `Mesh.cpp:2760` `faceCount==0` returns empty | 0 points | 0 points | kMeshSurface |
 | PointsToVertices.input | cloud preferred, else mesh vertices | `PointDistributionNodes.cpp:268-305` | works (copies verts) | cloud path | none |
 | Path.curve | curve | `PathNode.cpp:25-37` | - | - | kCurve |
+| Delaunay/Voronoi.points | cloud only | `DelaunayNodes.cpp` RebuildIfNeeded | nothing | cloud | kCloud |
+| CurveOps.curve | curve only | `CurveOpsNode.cpp` RebuildIfNeeded | nothing | nothing | kCurve |
 | Path.geometry (mesh-follow) | surface | `BoundaryLoops`/`SliceContours` over indices (`PathNode.cpp:96-101`) | no loops, no follow | no follow | none |
 | GeometryTable.geo | any | cloud `:56,82`, curve `:64,170`, mesh `:103-109,190-196` | mesh mode reads `FaceCount()` (`:132`) | supported | n/a |
 | SetColor.input | any | `GeometryOpNodes.cpp:1226-1227` | passes | cloud recoloured; curve **dropped** | none |

@@ -2,7 +2,8 @@
 
 #include "GeometryOpNodes.h"
 
-// Delaunay Mesh: a point cloud in, a triangulated surface out. The points are
+// Delaunay Mesh: a point cloud in (only - a mesh on the pin is flagged and ignored),
+// a triangulated surface out. The points are
 // projected onto the plane picked by `plane`, triangulated there, and the
 // triangles are lifted back onto the original 3D positions (a terrain-style
 // height field when the cloud has depth).
@@ -46,6 +47,7 @@ public:
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "points"; }
+   const std::string& CookWarning() const override { return mCookWarning; }
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
 
    int plane = 0;            // 0 XY, 1 XZ, 2 YZ
@@ -66,6 +68,7 @@ private:
    void RebuildIfNeeded();
 
    Mesh mCache;
+   std::string mCookWarning;
    const void* mBuiltInput = nullptr;
    unsigned long long mBuiltUpstream = 0;
    int mBuiltPlane = -1;

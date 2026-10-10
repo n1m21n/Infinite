@@ -588,7 +588,11 @@ void ClothNode::CookIfNeeded(int frameId)
    // reading, and kMaxCatchUp already bounds the dt jump on resume the same
    // way a long-paused transport does.
    if (bypassed)
+   {
+      mCookWarning.clear();
       return;
+   }
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    // The rest state is rebuilt when the incoming *topology* changes: a
    // different vertex/index count invalidates every constraint index. A mesh

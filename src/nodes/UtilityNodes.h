@@ -784,6 +784,7 @@ class MeshToPointsNode : public INode, public IGeometrySource
 {
 public:
    static INode* Create() { return new MeshToPointsNode(); }
+   const std::string& CookWarning() const override { return mCookWarning; }
    // Registered three times under Points/Edges/Faces names sharing one class,
    // the same way the geometry operators are.
    static INode* CreateFor(int sampleMode)
@@ -904,6 +905,7 @@ public:
       v.Float("subsurfaceRadius", subsurfaceRadius);
    }
 private:
+   std::string mCookWarning;
    void RebuildIfNeeded();
 
    std::vector<Particle> mPoints;

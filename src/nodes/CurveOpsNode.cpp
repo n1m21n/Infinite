@@ -16,6 +16,7 @@ const std::vector<std::string>& CurveOpsNode::ModeNames()
 void CurveOpsNode::RebuildIfNeeded()
 {
    const Polyline* src = input ? input->GetCurve() : nullptr;
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kCurve);
    const unsigned long long upstream = src ? input->CurveStamp() : 0;
    if (mBuilt && mBuiltInput == input && mBuiltUpstream == upstream && mBuiltMode == mode &&
        mBuiltCount == count && mBuiltIterations == iterations && mBuiltArc == arcSteps &&
