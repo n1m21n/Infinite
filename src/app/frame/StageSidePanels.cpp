@@ -742,7 +742,7 @@ void DrawSidePanels(FrameCtx& fc)
                gFormulaEditor->Apply();
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
 
@@ -813,7 +813,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldElementEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
 
@@ -877,7 +877,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldPrimitiveEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPrimitiveEditor->code.c_str());
 
@@ -926,7 +926,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldPixelEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
 
@@ -965,7 +965,7 @@ void DrawSidePanels(FrameCtx& fc)
             SketchPresetDropdown(gSketchEditor, "sketchPreset");
 
             // SVG: dropped on the canvas, or pasted here (no file dialog needed).
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Paste SVG"), ImVec2(100, 0)))
             {
                const char* clip = ImGui::GetClipboardText();
@@ -978,7 +978,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             if (!gSketchEditor->svg.empty())
             {
-               ImGui::SameLine();
+               FormParts::Inline();
                if (ActionButton::Draw(L("Clear SVG"), ImVec2(100, 0)))
                {
                   gSketchEditor->svg.clear();
@@ -1014,7 +1014,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gSketchEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gSketchEditor->code.c_str());
 
@@ -1071,7 +1071,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gSketch3DEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gSketch3DEditor->code.c_str());
 
@@ -1149,7 +1149,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldSampleEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSampleEditor->code.c_str());
 
@@ -1213,7 +1213,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldSynthEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSynthEditor->code.c_str());
 
@@ -1277,7 +1277,7 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldNotesEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldNotesEditor->code.c_str());
 
@@ -1344,10 +1344,10 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldGraphEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Regenerate"), ImVec2(120, 0)))
             {
                // Safe to call directly (not deferred) here: this window draws
