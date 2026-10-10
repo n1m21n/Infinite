@@ -249,7 +249,7 @@ namespace app
          snprintf(stat, sizeof(stat), "%s", audioOn ? "device output - running" : "device output");
       }
 
-      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       // Format selector: WAV | FLAC | MP3

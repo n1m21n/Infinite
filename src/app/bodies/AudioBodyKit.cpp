@@ -814,7 +814,8 @@ namespace app
           dynamic_cast<NoteSwitcherNode*>(node) != nullptr ||
           dynamic_cast<NoteRouterNode*>(node) != nullptr ||
           dynamic_cast<NoteStrumNode*>(node) != nullptr ||
-          dynamic_cast<AudioToCVNode*>(node) != nullptr)
+          dynamic_cast<AudioToCVNode*>(node) != nullptr ||
+          dynamic_cast<AudioOutputNode*>(node) != nullptr)
          return kAudioNarrowWidth;
       return kAudioNodeWidth;
    }
