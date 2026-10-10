@@ -85,14 +85,14 @@ What each node type does: math, state, per-node parameter UI.
 ### Field node system
 
 `Field` is a small embedded expression language with its own compiler
-(lexer → typed IR → three backends), hosted by six node types rather than
+(lexer → typed IR → three backends), hosted by seven node types rather than
 one — see the `field-language`, `field-compiler`, `field-domains`,
 `field-integration` and `field-state` skills for the language itself; this
 row is only the code-location map.
 
 **Files:** `src/nodes/FieldElementNode.h`/`.cpp`, `FieldPrimitiveNode.h`/`.cpp`,
 `FieldSampleNode.h`/`.cpp`, `FieldSynthNode.h`/`.cpp`, `FieldGraphNode.h`/`.cpp`,
-`FieldPixelNode.h`/`.cpp` (the shared compiler lives behind
+`FieldPixelNode.h`/`.cpp`, `FieldNotesNode.h`/`.cpp` (note kernel: `note()`, `tick()`, `deg()`, `rand()`, `beat`, `noteNum`) (the shared compiler lives behind
 `src/core/Expression.cpp`, see `field-compiler`).
 
 **File:** `src/main.cpp` — anchors: `DrawFieldElementParams`,
@@ -100,6 +100,18 @@ row is only the code-location map.
 `DrawFieldGraphParams`, `DrawFieldPixelParams` (one per node type's param
 panel), `DrawFieldDeviceControls` (shared preset-device chrome templated
 across the Field node types).
+
+### Sketch, Tracking and the other v0.5 nodes (code-location map)
+
+- **Sketch / Sketch 3D:** `src/nodes/SketchNode.*`, `Sketch3DNode.*`; the JavaScript engine, presets and the
+  headless checks are in `src/core/sketch/` (`SketchEngine`, `Sketch3DEngine`, `*Check.cpp`).
+- **Hand / Face / Pose Track:** `src/nodes/HandTrackNode.*`, `FaceTrackNode.*`, `PoseTrackNode.*` over
+  `TrackNodeBase`; the models run through `src/core/tracking/` (`OrtRuntime` and one tracker per node). The
+  runtime and models come from the Tracking pack installed via `src/core/Extensions.*`, not from the app bundle.
+- **MIDI Out:** `src/nodes/MidiOutNode.*`; **MIDI File:** in `src/nodes/NoteNodes.h`; **Spatial Mixer:**
+  `src/nodes/SpatialMixerNode.*`.
+- **Delaunay Mesh / Voronoi Cells:** `src/nodes/DelaunayNodes.*` over `src/core/Delaunay.*`; **Curve Ops:**
+  `src/nodes/CurveOpsNode.*` over `src/core/CurveOps.*`; **Decimate:** `src/core/MeshDecimate.cpp`.
 
 ### Audio / note node system
 
