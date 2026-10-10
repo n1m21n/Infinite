@@ -1,260 +1,441 @@
-# Infinite brand book
+# Infinite brand book v2
 
-Status: v1, 2026-10-10. This is the one place that says how Infinite looks, moves and sounds. When a film brief, a skill, a stylesheet or a memory note disagrees with this file, this file wins and the other one gets fixed.
+The rules for every brand surface: website, films, thumbnails, social, docs, installers, press, 3D.
 
-Values live in [`brand.json`](brand.json) (brand surfaces) and in `src/app/ui/design/tokens.json` + `src/core/CategoryColors.cpp` (the app). The visual version is [`brand-book.html`](brand-book.html), generated from `brand.json` by `tools/brand/build_brand_book.py` so the swatches can never drift from the numbers.
-
-## 0. The one-page version
-
-| | |
+| File | What it is |
 |---|---|
-| Feeling | calm, premium, a little playful. Confident, never hype. References: Anthropic, Nothing, Apple, 1X NEO |
-| Two grounds | **Midnight** `#151930` (dark) and **Paper** `#FBFAF6` (light). Never pure black, never pure white |
-| One accent | **Coral** `#F5866B` on Midnight, **Terracotta** `#C2593F` on Paper. One accent thing per frame |
-| One glow | **Violet** `#8B6CFF`, on Midnight only, for hero objects |
-| Type | Geist for words, Geist Mono for machine text, Caveat for one human word, Instrument Serif rarely |
-| Shape | everything rounded. Cards 24, media inside 16, controls pill. No outlines on cards |
-| Depth | on dark, raised = lighter. Soft stacked shadows. A lit top edge, never a border |
-| Motion | springs and ease-out, a small overshoot only on the signature slabs, nothing linear |
-| Voice | plain, specific, lowercase on slabs, no em dashes, no "world's first" |
-| Mark | the lemniscate, drawn from its formula, coral to sky, never approximated |
+| `brand.json` | Every value. Edit here only. |
+| `brand-book.html` | The visual book with computed figures. Generated; open it next to this file. |
+| `brand.css` | CSS custom properties per mode (`data-mode="midnight|mist|paper"`). Generated. |
+| `brand.tokens.json` | The same tokens in DTCG 2025.10 format, for Figma or Style Dictionary. Generated. |
+| `img/` | The 3D renders used by the book. Generated. |
+| `../../art/brand/3d/` | 3D kit: `.glb` files (metres), `kit.blend`, full-size renders. |
+| `../../art/brand/fonts/` | Static Geist, Geist Mono and Caveat instances (OFL) for 3D labels. |
 
-## 1. Three surfaces, one identity
+Rebuild after any edit:
 
-Infinite shows up in three places. They share a spine but are not the same thing, and mixing them is how things went out of line.
+```bash
+python3 tools/brand/build_brand_book.py
+```
 
-| Surface | What | Ground | Governed by |
-|---|---|---|---|
-| **Product** | the app: canvas, nodes, panels, menus | app dark `#0A0B0F` / panel `#181B23`, accent `#6FB4FF`, 11 category colours | `tokens.json`, `CategoryColors.cpp`, skill `infinite-design-system` |
-| **Brand** | website, films, thumbnails, social, docs, installers | Midnight or Paper, coral accent | this book + `brand.json` |
-| **Bridge** | anything that shows the product inside a brand surface (node cards, screenshots) | node cards keep the app's category colours and layout, placed on Midnight surfaces | section 6 |
+```bash
+python3 tools/brand/build_3d.py
+```
 
-Rules of the bridge:
+The book build fails if any colour pair in the contrast gate misses its WCAG ratio. The app's own UI is not covered here: it follows `src/app/ui/design/tokens.json` and the `infinite-design-system` skill. Where the two disagree on a brand surface, this book wins.
 
-1. The product is never restyled to look like a brand surface, and a brand surface never borrows the app's neutral greys (`#181B23`, `#262A35`) for its cards. On the brand surfaces, cards are Midnight surfaces.
-2. A node card on a brand surface keeps what makes it a node: category colour on the title bar and pins, the family glyph, ports. Nothing else about it is category-tinted.
-3. The 11 category colours appear **only** inside node UI and in the node matrix. They are never used as page, button or heading colours.
+---
+
+## 0. One page
+
+| | Rule |
+|---|---|
+| Idea | **Two ends, one loop.** The mark's warm end (Ember) is the human act; its cool end (Signal) is the structure; Midnight is the space they connect across. |
+| Belief | Connection. Anything patches into anything. |
+| Line | **A DAW for you.** |
+| Grounds | Midnight (show), Mist (explain), Paper (read). One mode per scene or section. |
+| Accent | Ember, one look-here per frame, under 10% of its area. |
+| Structure | Signal: lines, diagrams, data, focus. |
+| Type | Geist, Geist Mono, one Caveat word. Pixel 5x7 only when the machine speaks. |
+| Shape | Card 24, media 16, controls are pills. No outlines anywhere. |
+| Motion | Four measured springs, three eases. Everything that shows a value stays live. |
+| 3D | The node is an instrument: real slab, recessed wells, raised controls, printed type, one key light. |
+
+## 1. What changed from v1, and why
+
+| v1 | v2 | Why |
+|---|---|---|
+| Coral `#F5866B` accent on dark, terracotta `#C2593F` on paper, violet `#8B6CFF` glow | One warm family **Ember** (H 38) and one cool family **Signal** (H 276) | The owner approved periwinkle + orange across the v0.5 films (r5 to r7). v1 had two warm hues and two cool hues competing. |
+| Warm inks `#1F1D1A` / `#5A534C` on Paper | Cool inks `#12152A` / `#404660` / `#5A6180` on every light mode | Every neutral now sits on the Midnight hue (274), so modes swap without a colour shift. |
+| Two grounds (Midnight, Paper) | Three modes (Midnight, Mist, Paper) with named roles | Mist is the film's diagram mode; roles let a design swap modes without new hexes. |
+| Contrast listed by hand | Contrast gate in the build, 36 pairs, fails loudly | White on `#FF6B35` measured 2.84:1 (fails). Text on orange is now Midnight (6.1) or white on Ember 600 (5.98). |
+| Type sizes per surface | Fluid scale (major third, display × 1.5), tracking curve, film scale | One scale for web, a separate one for the 4K stage. |
+| Easing names only | Springs with ζ and ω, overshoot and settle computed, CSS `linear()` emitted | Motion can be checked, not described. |
+| Two knob sizes (56/40) | One knob size, 56 | Matches the app since v0.5 (`kKnobStd`; `kKnobLarge == kKnobSmall`). |
+| 3D nodes improvised per film | `node3d` spec plus a generator (`build_3d.py`) | The r7 film's 3D nodes looked warped and floating (section 9). |
+| No channel list | 23 channel specs with sizes and modes | Every distribution surface named. |
 
 ## 2. Colour
 
-### 2a. Palette
+### 2.1 Families
 
-| Role | Name | Hex | Use |
+All values are set and checked in OKLCH (Ottosson 2020) with `tools/brand/colour.py`. Ramps are generated at one hue with a sine-bell chroma, then gamut-mapped by chroma reduction. Anchors are the owner-approved values.
+
+| Family | Hue | Anchors | Role |
 |---|---|---|---|
-| Ground (dark) | Midnight | `#151930` | page, frame, canvas |
-| Surface 1 | Midnight 1 | `#20263F` | cards, slabs, panels |
-| Surface 2 | Midnight 2 | `#2A3052` | hover, nested card, popover |
-| Surface 3 | Midnight 3 | `#343B5E` | highest surface, hairlines on dark |
-| Text on dark | Moon | `#EEF1FA` | primary text |
-| Text 2 on dark | Moon 2 | `#A3AACB` | secondary text |
-| Ground (light) | Paper | `#FBFAF6` | page, frame |
-| Surface (light) | Card | `#FFFFFF` | raised card |
-| Well (light) | Inner | `#F3F0E7` | media backing, code chips |
-| Text on light | Ink | `#1F1D1A` | primary text |
-| Text 2 on light | Ink 2 | `#5A534C` | secondary text |
-| Text 3 on light | Ink 3 | `#6E6760` | tertiary text (was `#857C74`, which failed contrast) |
-| Accent on dark | Coral | `#F5866B` | the accent |
-| Accent on light | Terracotta | `#C2593F` | the accent: fills, large type, marks |
-| Accent text on light | Terracotta ink | `#A8472F` | accent as small text or a link |
-| Glow | Violet | `#8B6CFF` | hero objects on Midnight |
-| Gradient | Coral to Sky | `#F57F66 #D99A9C #C7AFC0 #A9CDF1` | logo, ball, end card only |
+| Midnight | 274 | 900 `#151930`, 950 `#0D1020` | Grounds, surfaces, inks |
+| Signal | 276 | 300 `#A7B1FF` (dark modes), 600 `#4A54D6` (light modes) | Structure: lines, diagrams, data, focus, selection |
+| Ember | 38 | 400 `#FF6B35`, 500 `#D9430E`, 600 `#B53700` | The accent |
 
-### 2b. Rules
+### 2.2 Modes
+
+Use roles, never raw hexes. `brand.css` sets them per `data-mode`.
+
+| Role | Midnight | Mist | Paper |
+|---|---|---|---|
+| ground | `#151930` | `#E4E2EF` | `#FBFAF6` |
+| deep (wells) | `#0D1020` | `#D8D5E5` | `#EFF0F4` |
+| surface-1 | `#20263F` | `#F7F5FB` | `#FFFFFF` |
+| surface-2 | `#2A3052` | `#FFFFFF` | `#FFFFFF` |
+| surface-3 | `#343B5E` | `#EEEDF6` | `#F5F5F8` |
+| line | `#343B5E` | `#C4C1D9` | `#DAD8E6` |
+| ink | `#EEF1FA` (Moon) | `#12152A` | `#12152A` |
+| ink-2 | `#A3AACB` | `#404660` | `#404660` |
+| ink-3 | `#8890B1` | `#5A6180` | `#5A6180` |
+| signal | `#A7B1FF` | `#4A54D6` | `#4A54D6` |
+| accent (marks, large) | `#FF6B35` | `#D9430E` | `#D9430E` |
+| accent-ink (text, fills) | `#FF6B35` | `#B53700` | `#B53700` |
+| on-accent | `#151930` | `#FFFFFF` | `#FFFFFF` |
+
+| Mode | Use for |
+|---|---|
+| Midnight | Films, social, thumbnails, showcase sections, the logo tile, 3D |
+| Mist | Diagrams, science plates, explainer stills, docs headers |
+| Paper | Reading: website body, docs, PDFs, manuals, release notes, email |
+
+### 2.3 Rules
 
 | Rule | Detail |
 |---|---|
-| 60 / 30 / 10 | 60 percent ground, 30 percent surfaces and ink, 10 percent accent |
-| One accent | coral or terracotta, never both in one frame, never a second brand accent. Category colours are inside node UI only |
-| One theme per piece | a light master (Paper) and a dark variant (Midnight) are each whole. No dark scenes in a light film and no dark panels in a light page, except the node cards, which are always dark glass |
-| Elevation | on Midnight, raised means lighter (`Midnight 1` to `3`). Shadows are stacked and soft, tinted `#04050E` |
-| Glow | glow and iridescence belong to dark scenes. Paper has none |
-| Not empty | a dark ground can carry 3 to 4 glossy spheres at the edges. Big glowing shapes that overpower content are out |
-| Gradient | exact four stops, horizontal. It is the logo's colour; do not use it as a decorative fill |
-| Real colours | when a film shows a real ring or a real UI, sample the colour from the screenshot, never guess |
+| 60 / 30 / 10 | Ground 60, surfaces and ink 30, Ember under 10 of any frame |
+| One Ember per frame | The key cable, the call to action, or the hand word. Not two. |
+| Text on Ember | Midnight on `#FF6B35`; white only on the `#B53700` fill. Never white on `#FF6B35`. |
+| Signal is not an accent | It draws structure. It never fills a button. |
+| Category colours | Owned by the app (`src/core/CategoryColors.cpp`). On brand surfaces they appear only where a node appears: title strip, pins, cables. |
+| Gradient | Logo, brand ball and end-card lockup only. Exact stops `#F57F66 #D99A9C #C7AFC0 #A9CDF1` at 0 / .35 / .65 / 1, horizontal. |
+| Iridescence | One hero object per frame (ball, sphere, glass ring). Never on type or UI. |
+| Glass | Only behind short labels, 72 to 78% opacity, never behind body text. Respect Reduce Transparency. |
 
-### 2c. Contrast (measured, WCAG)
+### 2.4 Findings from the audit
 
-| Pair | Ratio | Verdict |
+| Finding | Number | Action |
 |---|---|---|
-| Coral on Midnight | 7.0 | AA, AAA large |
-| Moon on Midnight | 15.3 | AAA |
-| Moon 2 on Midnight | 7.6 | AAA |
-| Coral on Midnight 1 | 6.0 | AA |
-| Violet on Midnight | 4.7 | AA, use for objects and large type |
-| Ink on Paper | 16.1 | AAA |
-| Ink 2 on Paper | 7.2 | AAA |
-| Ink 3 on Paper | 5.3 | AA |
-| Terracotta on Paper | 4.2 | large text and marks only |
-| Terracotta ink on Paper | 5.6 | AA for small text and links |
-| White on Terracotta | 4.4 | large or bold labels only (buttons are 16 px bold and up) |
-| old muted `#857C74` on Paper | 3.9 | retired |
+| White on `#FF6B35` | 2.84:1, fails | Midnight on Ember 400; white only on Ember 600 |
+| Ember vs Signal under colour-vision deficiency | ΔE OK 25 to 34 for protan, deutan, tritan | The two-ends split works without hue |
+| Compositing `#818CF8` vs Synths `#6992F6` | ΔE 3.1 with normal vision | App report for `infinite-design-system`, not a brand change |
+| Source `#4ADE80` vs Notes `#4CD964` | ΔE 3.0 | App report |
+| 3D vs Audio Effects (tritan) | ΔE 1.2 | App report |
+| Effects vs Modulators (deutan) | ΔE 2.5 | App report |
 
-Colour is never the only cue. Record, solo, learn, modulation, favourite and the others already have close colours; each is paired with a glyph or label.
+The book prints the full collision table and the contrast gate with WCAG and APCA Lc for each pair.
 
-### 2d. Product role colours (from the app, for reference)
+### 2.5 Retired
 
-Record, solo, learn, modulation, expression, prediction, go and favourite keep one fixed meaning each, defined in `tokens.json` (`action.*`, `pin.*`, `badge.favorite`) and listed in `brand.json`. Brand surfaces that show them (a tutorial, a diagram) use the same values.
+| Was | Now |
+|---|---|
+| Coral `#F5866B` as accent | Ember 400 `#FF6B35`; coral survives only as the gradient's first stop `#F57F66` |
+| Terracotta `#C2593F`, terracotta ink `#A8472F` | Ember 500 `#D9430E` (marks), Ember 600 `#B53700` (text, fills) |
+| Violet `#8B6CFF` glow | Signal or iridescence |
+| Warm inks `#1F1D1A` `#5A534C` `#6E6760`, inner `#F3F0E7` | Cool inks and Paper deep `#EFF0F4` |
+| Bone `#F1ECE2` (film r5) | Moon `#EEF1FA` |
+| Ember ground, Cobalt ground `#2A33A8` | Not grounds (owner r6b) |
+| Instrument Serif | Not used |
 
 ## 3. Typography
 
-| Family | Role | Rule |
+| Family | Weights | Role |
 |---|---|---|
-| Geist | headlines, UI, body | display 700 to 800, tracking -0.02 to -0.035 em |
-| Geist Mono | values, labels, code, coordinates | tabular figures, ASCII only |
-| Caveat | the human word | 700, accent colour, hand underline, at most **1.5x** its neighbours, **one per scene or section** |
-| Instrument Serif | editorial accent | italic, rare, never in the same line as Caveat |
+| Geist | 400 to 800 | Everything people read |
+| Geist Mono | 400, 500 | Values with units, code, node types, folios, coordinates |
+| Caveat | 700 | One human word per scene or section, in Ember, about 1.5× its neighbours, with a hand underline |
+| Pixel 5x7 | drawn | Only when the machine itself speaks (prediction, learning). Not a font file. |
 
-No fourth face, ever. The website loads Geist, Geist Mono and Caveat from Google Fonts; each film ships its own `fonts/` folder.
+Web scale (fluid from 375 to 1440 px; text steps × 1.25, display × 1.5):
 
-| Step (web) | Size | Weight | Tracking |
-|---|---|---|---|
-| Display | clamp(2.4rem, 7vw, 5rem) | 800 | -0.04em |
-| Heading | clamp(1.6rem, 3.4vw, 2.4rem) | 700 | -0.03em |
-| Subheading | 1.1rem | 700 | -0.02em |
-| Body | 1rem | 400 | 0 |
-| Caption | 0.85rem | 500 | 0 |
-| Micro (mono) | 0.72rem | 500 | +0.04em |
-
-App sizes are 11 / 13 / 15 / 22 px (`tokens.json` `type`); do not copy the web scale into the app.
-
-Type rules that hold everywhere:
+| Step | Size px | Weight | Leading | Tracking |
+|---|---|---|---|---|
+| Display | 40 → 96 | 800 | 0.98 | -0.04 em |
+| H1 | 32 → 61 | 750 | 1.04 | -0.035 em |
+| H2 | 25 → 39 | 700 | 1.1 | -0.025 em |
+| H3 | 20 → 25 | 650 | 1.2 | -0.015 em |
+| Lead | 18 → 20 | 450 | 1.45 | -0.005 em |
+| Body | 16 | 400 | 1.55 | 0 |
+| Caption | 13.5 | 500 | 1.45 | +0.005 em |
+| Micro mono | 11.5 | 500 | 1.35 | +0.04 em |
+| Folio mono caps | 11 | 500 | 1.2 | +0.12 em |
 
 | Rule | Detail |
 |---|---|
-| One treatment per idea | if words are handwritten and underlined, every such word is |
-| A job for every treatment | a type effect is chosen for what it communicates; if it has no job it is decoration and is cut |
-| Slab headlines | lowercase, Geist 800, on a node-card slab with port dots, tracking -0.03 |
-| Machine text | Geist Mono; the 8-bit pixel face only when the machine is speaking |
-| Loud but calm | loudness comes from scale and weight (type up to 60 to 100 percent of a film frame), never from colour noise |
-| 9:16 | nothing above 14 percent or below 78 percent of the height; right 14 percent clear between 40 and 85 percent |
+| Measure | Body 60 to 72 characters, captions 30 to 45 |
+| Film | 4K stage: poster 60 to 100% of height, display 300, headline 196, title 128, line 96, caption 64, machine 44, folio 32 |
+| Kinetic type | At most 15 characters per second on screen |
+| Folio | Mono caps, left "INSIDE INFINITE / 03 THE PATCH", right "BAR 05 / 160 BPM" |
+| Slabs | Patch Type slabs are lowercase, tracking -0.03 em |
+| Figures | Tabular figures for any value that changes |
 
-## 4. Shape, space, depth
+## 4. Mark
 
-### 4a. Radius
-
-| Token | Brand surfaces | Use |
-|---|---|---|
-| Card | **24** (20 on phones) | every card without exception: node card, white panel, film frame, steps, modals |
-| Media | **16** (12 on phones) | anything inside a card; always card radius minus the card's 8 px padding (concentric) |
-| Chip | 10 | code chips, tags |
-| Control | pill (999) | buttons, filter chips, toggles, inputs |
-
-App radii are small by design (2, 4, 6, 8, 10: `tokens.json` `radius`) because the canvas is dense. Do not use app radii on brand surfaces or the reverse.
-
-### 4b. Space
-
-4 / 8 / 12 / 16 / 24 / 32 / 48 / 64. One page uses one gutter (16 on phones, 24 or 32 on desktop) and one card gap. A control row uses one control height (32 px in cards, 40 px for page-level, 44 minimum hit area on touch).
-
-### 4c. Depth and edges
-
-| Rule | Detail |
+| Measure | Value |
 |---|---|
-| No card outlines | cards are separated by surface value, a lit 1 px top highlight (`inset 0 1px 0 rgba(255,255,255,0.16)`) and a soft shadow. No 1 px ring, no divider line under a title, no rule above a footer |
-| Hairlines | allowed only as table row separators and a scrolled header edge |
-| Glass | brand cards are frosted: translucent Midnight 1, `backdrop-filter: blur(20px) saturate(1.6)`; Paper panels are translucent white. Always with a solid fallback when blur is unavailable or reduced transparency is on |
-| Shadow | three stacked soft layers; never a single hard drop shadow |
-| Real details | small live UI (knobs, curves, counters, meters) is what makes the product feel real; show them, do not draw generic boxes |
+| Curve | Lemniscate of Bernoulli: x = A sin p / (1 + cos² p), y = A sin p cos p / (1 + cos² p) |
+| Stroke s | 87/338 A = 0.2574 A, round joins |
+| Bounds with stroke | 2.2574 A × 0.9645 A (2.341 : 1) |
+| Arc length | 5.2441 A |
+| Crossing | Branches cross at 90°, each at 45° to the axis |
+| Clear space | 2 s on every side |
+| Minimum | Mark 20 px wide; tile icon 16 px |
+| Tile | Midnight `#151930` rounded square (22.5% corner), mark at 0.70 of its width |
+| 3D | One tube, diameter s; the two passes through the crossing separate by 1.24 s so it reads over and under (`logo_3d.glb`) |
 
-## 5. Node cards on brand surfaces (the bridge)
+Draw it from the formula and compare with `assets/Infinite.iconset` before shipping. Never recolour, rotate, outline, add glow or shadow to the flat mark, place it on a busy photo without the tile, or approximate the curve.
 
-```
-┌──────────────────────────┐   surface  Midnight 1 (frosted), radius 24, no outline
-│ Name              Family │   header   title Geist 600, family in mono, no divider
-│ ┌──────────────────────┐ │   media    radius 16, 8 px inset, the thing itself
-│ └──────────────────────┘ │
-│ one calm sentence        │   body     Moon 2 on Midnight 1
-│ [ Free ]       [ ⧉ ][ ⤓ ]│   foot     controls pill, one height, no rule above
-└──────────────────────────┘
-```
+Recurring characters:
 
-- Port dots sit on the card edge in the category colour; the title bar tint is the only other category colour.
-- A hand-written caption (Caveat, category-dark colour) sits above the card, never inside it.
-- The same card is used for Library items, the homepage "what if" chain, and film nodes. It is one component.
-
-## 6. Iconography
-
-| Token | Value |
+| Character | Rule |
 |---|---|
-| Grid | 20 x 20, 2 px padding, 16 x 16 live area |
-| Stroke | 1.5 px at 20; 1.25 at 16 (own master); 1.75 at 24 |
-| Caps and joins | round |
-| Corners | 2 outer, 1 inner |
-| Fill state | solid shape with inner details knocked out |
-| Gap | at least 2 px between strokes |
-| Colour | one colour (`currentColor`); state colour comes from the theme |
-| Motif | the dot: signal, routing and modulation icons end a stroke in a 3 px dot, the same dot as a pin, a cable end and a slider handle |
-| Families | 11 category glyphs (`family-*-20.svg`), shown before the category name |
+| Brand ball | The one iridescent hero object; a film can fold back into it |
+| Ember key cable | The one key connection in any patch shown |
+| Digit bird | The 0/1 sparrow; between hero moments, never near the logo |
+| Pointer | The film cursor: swaps tools with a tick, eased arcs, pauses one beat before a click |
 
-Masters are in `art/icons/src`; the built font is generated by `tools/design/build_glyphs.py`. Never use stock icon sets on brand surfaces; draw on the grid.
+## 5. Grid
 
-## 7. Motion
+| Format | Grid |
+|---|---|
+| Web | 12 columns, max 1200, gutters 16 / 24 / 32, margins 16 / 24 / 48 at 375 / 768 / 1440, 8 px base |
+| Film 16:9 | 3840 × 2160 stage, graphics safe 5%, action safe 3.5% (EBU R95), 12 columns of 288 |
+| 9:16 | Keep the top 14% and the bottom 22% clear, and the right 14% clear from 40 to 85% of the height (platform UI) |
+| 4:5 and 1:1 | 6% margins, 6 columns; check the 3:4 crop on Instagram grids |
+| Docs | A4 and US Letter, 18 mm margins, 12 columns, 4 pt baseline |
+
+## 6. Shape, space, depth
 
 | Token | Value | Use |
 |---|---|---|
-| ease-out | `cubic-bezier(0.16, 1, 0.3, 1)` | entrances, most movement |
-| ease-in-out | `cubic-bezier(0.65, 0, 0.35, 1)` | camera, large travel |
-| ease-in | exits |  |
-| signature spring | zeta 0.55 to 0.6, omega 20 to 22 | Patch Type letters and slabs only; 9 to 13 percent overshoot |
-| soft spring | zeta 0.9 and up | everything else that lands |
-| letter stagger | 1/90 s (about 11 ms) | slab text |
-| reveal stagger | 40 ms | web lists |
+| Card radius | 24 (20 on phones) | Every card: node card, panel, frame, modal |
+| Media radius | 16 (12 on phones) | Inside a card: outer radius minus 8 padding |
+| Chip radius | 10 | Code chips, tags, keycaps |
+| Control | pill | Buttons, chips, toggles, inputs |
+| Space | 4 8 12 16 24 32 48 64 96 128 | |
+| Elevation | 0 to 3 | Surface step + three stacked soft shadows; never an outline |
 
-App timings (ms) are in `tokens.json`: hover in 120, hover out 180, on 160, off 140, focus 100, tooltip 500 delay / 100 fade, accent fade 200. Press is instant. Nothing in the app animates a value, only state. Reduced motion turns eases off.
+Node cards on 2D brand surfaces keep the v1 card: Midnight 1 frosted surface, radius 24, title in Geist 600 with the family in mono, media at radius 16 with an 8 px inset, one calm sentence, pill controls of one height, no dividers. A Caveat caption sits above the card, never inside it.
 
-Rules: no linear position or scale. Cuts land on the grid and something always carries over a cut (an object, a shape, a match cut). Speed stays continuous across a cut. A hold follows the key message; an aside gets its own blank beat. Rejected: ink floods, a camera that whips to follow the pointer, scattered tilted cards, a sudden style change mid-piece.
+## 7. Iconography
 
-## 8. Mark and recurring characters
-
-| Element | Rule |
+| Rule | Value |
 |---|---|
-| Logo | the lemniscate (Bernoulli, `x = A sin p / (1 + cos² p)`, `y = A sin p cos p / (1 + cos² p)`), stroke 87/338 of A, round joins, the brand gradient across its full width. Draw it from the formula; compare side by side with `assets/Infinite.iconset` before shipping |
-| Clear space | at least the stroke width x 2 on every side |
-| App icon | the lemniscate on the Midnight tile (`assets/Infinite.icns`) |
-| Brand ball | the glossy coral-to-sky sphere; it becomes the logo, and a film folds back into it |
-| Digit bird | the 0/1 sparrow. Appears between hero moments, never on or near the logo |
-| Pointer | the film cursor: swaps tools with a tick, eased arcs, pauses one beat before a click |
-| Coral cable | the one key connection in a patch |
+| Grid | 20, 2 px padding, 16 live |
+| Stroke | 1.5 at 20, 1.25 at 16, 1.75 at 24, round caps and joins |
+| Corners | 2 outside, 1 inside |
+| Keylines | Circle 16, square 14, portrait 12 × 16, landscape 16 × 12 |
+| Dot | 3 px; a signal icon ends in the same dot as a pin |
+| Fill | The `-fill` variant shows the on state only |
+| Labels | Icons stand alone only for universal actions (play, stop, record, close). Elsewhere a label sits beside the icon (Wiedenbeck 1999). |
 
-Never: recolour the logo, add effects to it, put it on a busy photo, stretch it, or approximate the curve with a hand-drawn path.
+The set is in `art/icons/src` (73 glyphs). The book renders all of them.
 
-## 9. Voice
+## 8. Motion
 
-| Rule | Detail |
-|---|---|
-| Plain and specific | say what it does and what the person can do; real node names and real values |
-| Calm | no hype, no exclamation marks, no "world's first", no "revolutionary" |
-| Lowercase slabs | slab headlines and captions are lowercase; sentences elsewhere are normal case |
-| No em dashes | use a comma, a colon or a new sentence |
-| The line | **A DAW for you.** The end card cycles the words (designers, artists, musicians, VJs, scientists) and lands on a coral "you" |
-| Library copy | one short sentence; what it does, then what it needs |
-| Free means Free | the word is "Free", nothing qualifying it |
+| Spring | ζ | ω | Overshoot | Settle (2%) | SwiftUI response / damping | Use |
+|---|---|---|---|---|---|---|
+| slab | 0.55 | 20 | 12.6% | 292 ms | 0.314 / 0.55 | Patch Type slabs, key cable snap. The signature. |
+| letter | 0.60 | 22 | 9.5% | 271 ms | 0.286 / 0.60 | Patch Type letters |
+| soft | 0.90 | 18 | 0.2% | 262 ms | 0.349 / 0.90 | Everything else that lands |
+| press | 1.00 | 28 | 0 | 209 ms | 0.224 / 1.00 | Buttons, keycaps, knob detents |
 
-Sound (films): no narration unless the owner supplies it; music is synthesised or owner-supplied and varies by film; every SFX attaches to a visible event, quantised to the grid.
+Overshoot = exp(-πζ / √(1 - ζ²)). Settle is measured by the build; CSS `linear()` curves are in `brand.css` (`--spring-slab` and so on).
 
-## 10. Applying it
-
-| Surface | Use | Where the values are enforced |
+| Ease | Value | Use |
 |---|---|---|
-| Website | Paper + Midnight node cards, terracotta accent, glass | `website/style.css`, `website/glass.css` (variables mirror `brand.json`) |
-| Film | Midnight ground + coral (light master on Paper), one theme per film, house eases and springs | each film's `lib/core.py` palette; skill `motion-film` `infinite-house-style.md` |
-| Thumbnail / social | big Geist headline left, real product screenshot right on Midnight with a soft brand aura, logo top left | see `motion-film/references/design.md` |
-| Docs / PDFs | Paper, Geist, terracotta headings, mono code | |
-| App | untouched by this book; follows `tokens.json` | `infinite-design-system` |
+| ease-out | `cubic-bezier(0.16, 1, 0.3, 1)` | Entrances, most movement |
+| ease-in-out | `cubic-bezier(0.65, 0, 0.35, 1)` | Camera, large travel |
+| ease-in | `cubic-bezier(0.7, 0, 0.84, 0)` | Exits only |
 
-Before shipping anything on a brand surface:
+Durations: micro 120, small 200, medium 320, large 480, page 640 ms. Stagger: letter 11, list 40, card 60 ms.
 
-1. Colours come from `brand.json`. No new hex values.
-2. One accent, one Caveat word, one theme.
-3. Every card is radius 24 with media at 16 and no outline.
-4. Contrast: small text passes 4.5; large text and marks pass 3.
-5. Reduced motion and reduced transparency are handled.
-6. Copy: no em dashes, no hype.
-
-## 11. Known gaps (decide when they come up)
-
-| Gap | Note |
+| Verb | Meaning |
 |---|---|
-| inside-infinite `r5` colour system | the film's draft uses Midnight `#0D1020`, a periwinkle `#A7B1FF` and an orange `#FF6B35` with three modes (Midnight, Mist, Ember). It is a film draft, not adopted: its orange and periwinkle compete with Coral and Violet. Until the owner signs it off, films use this book's palette |
-| Light film variant | Paper is defined; a Midnight-on-Paper hybrid for stills is not |
-| Icon set | 73 glyphs exist; Prediction family glyph is the weakest at 14 px |
-| Product vs brand greys | app panels (`#181B23`) and Midnight 1 (`#20263F`) are different on purpose; a unifying pass would need the owner |
+| Land | An object arrives and settles: soft spring, 4 to 8 u of travel |
+| Patch | A cable draws pin to pin with ease-out over 320 to 480 ms; the plug seats with the slab spring; the destination answers within 100 ms |
+| Carry | Between scenes an object travels and becomes the next frame: iris, zoom into a rect, zoom out of a rect, carried object |
+| Live | Anything that shows a value keeps moving: knobs breathe ±2°, waveforms scroll, meters fall |
+| Breathe | One slow loop under everything (4 to 8 s); never on type |
+
+App motion stays at or under 200 ms and values never animate. All brand motion stops under `prefers-reduced-motion`.
+
+## 9. The node in 3D
+
+A node in 3D is a physical instrument panel built from the app's own measurements, not a screenshot tilted in space. Reference build: **Audio Filter** (`src/app/bodies/FxBodies1.cpp`, `docs/plans/ui-system/element-sizes.md`). Units: 1 u = 1 app px at 100% UI scale; glTF exports in metres at 1 px = 1 mm.
+
+### 9.1 Process
+
+| Step | Do |
+|---|---|
+| 1 Capture | Read the node body in code and take a 100% screenshot. Note the live values a user would set. |
+| 2 Lay out flat | Rebuild the panel in app pixels: cells, wells, captions, pins. The top view must match the app before anything gets depth (`node_top.png`). |
+| 3 Assign z | Each component takes its height from the z table. Wells go down, prints stay flush, controls come up, caps sit highest. |
+| 4 Material | Matte body, satin knobs, glossy coated display well, printed type. Colour comes from the mode roles; category colour only on the title strip, jacks and cables. |
+| 5 Light once | Key, rim and fill as below. Shadows always on. |
+| 6 Frame | 3/4 view from one angle family; the camera sweeps sideways, it does not orbit. |
+| 7 Make it live | Knobs, keys, cables and the viewer animate with the brand springs. |
+| 8 Check side by side | Render next to the app screenshot: same order, same labels, same values. |
+
+### 9.2 Construction
+
+| Part | Spec |
+|---|---|
+| Body | 464 × body height (440 content + 2 × 12 padding), 18 thick, radius 24, 3 fillet, no outline |
+| Title strip | Flush print in the category colour at 18% over surface-1; title Geist 600 15, family in mono caps on the right |
+| Readout strip | 21 tall, recessed 1.5, mono values in ink-2 |
+| Display well | 190 tall, recessed 3, radius 12, glossy coated floor; graticule in line, response curve in Signal with a dim Signal fill |
+| Knob | One size, 56. Skirt +5, knurled cap (36 ridges) to +14 at 0.78 r, engraved Moon pointer from 0.25 to 0.86 of the cap. Value arc printed on the panel at 1.12 r, 270°, in Signal (bipolar knobs start at the top). Modulation arc outside it in the Modulation colour `#FFBE5A`. |
+| Caption | Geist 500 13 in ink-2, 4 under the knob; value in Geist Mono 10.5, ink-3 |
+| Dropdown | Flush well 92 × 21, radius 4, value only, no chevron |
+| Checkbox | 16 keycap raised 4 with an LED dot (Signal, emissive when on) |
+| Switch | 30 × 16 recessed track (Signal when on), thumb raised 4 |
+| Keycap | Pill on a shallow well; rest +6, pressed +2.5 with a Signal tint, LED at the left |
+| Fader | 6 rail recessed, 18 × 12 handle raised 7 with a Moon centre line, Signal fill along the rail |
+| Jacks | In the side walls at the pin row, like a pedal: input left, output right. Ring 14 in the category colour, hole 8. |
+| Cables | Matte tubes, 5 diameter; plug 12 × 18 with a metal sleeve, seated in the jack; the cable sags to the floor and runs off frame. The key cable is Ember; others take the source category colour. No glow. |
+
+| Light / camera | Rule |
+|---|---|
+| Key | Azimuth 135°, elevation 50°, soft (5° sun) |
+| Rim | Azimuth 45°, elevation 35°, 0.6 of key |
+| Fill | From the camera, 0.35 of key |
+| Shadows | Always on, contact 0.25, floor in the mode colour |
+| Camera | Yaw 20 to 30°, pitch 25 to 35°, 50 mm; spec views orthographic (top, true isometric 30° / 35.264°) |
+| Colour | Standard view transform so brand hexes stay true (AgX desaturates them) |
+
+| Part | Animation |
+|---|---|
+| Knob | Turns with the soft spring; idle breath ±2° |
+| Keycap | Down 80 ms with press, up 140 ms; LED fades 160 ms |
+| Switch | Thumb slides with soft; track tints over 160 ms |
+| Cable | Draws with ease-out; plug seats with the slab spring |
+| Viewer | Always live |
+
+### 9.3 What went wrong in the r7 film
+
+| r7 film | v2 rule |
+|---|---|
+| Flat textures skewed in 2.5D, so cards looked warped | Real geometry: 18 u slab, fillet, recessed wells, raised controls |
+| Outlines on cards and controls | No outlines; edges come from the fillet catching the key light |
+| Win95 bevel blocks for buttons | Pill keycaps on a shallow well, LED for state |
+| Dark cylinders for knobs, value arcs floating | Skirt + knurled cap + engraved pointer; the arc is printed on the panel |
+| Labels baked tiny into a texture | Printed Geist geometry at the app's caption sizes |
+| No shadows, objects floated, no key light | One key light, soft shadows, contact shadow |
+| Glossy neon cables with big ball ends and glow | Matte tubes, real plugs in side-wall jacks, sag to the floor |
+
+### 9.4 The 3D kit
+
+| File | Contents |
+|---|---|
+| `node_audio_filter.glb` | The hero node with both cables |
+| `controls_kit.glb` | Knob, modulated knob, keycap off and on, switch, checkbox, dropdown, fader |
+| `logo_3d.glb` | The mark as a loop |
+| `logo_tile.glb` | The app tile |
+| `brand_ball.glb` | The iridescent hero object |
+| `kit.blend` | Everything, with lights and cameras |
+| `renders/*.png` | node_hero, node_top, node_exploded, knob_macro, kit_components, logo_3d, logo_tile, brand_ball |
+
+To build another node, add a `build_<node>()` next to `build_node()` in `tools/brand/build_3d.py` using the same helpers (`knob`, `keycap`, `checkbox`, `switch`, `dropdown`, `fader`, `plug_and_cable`) and that node's body code as the layout source.
+
+## 10. Channels
+
+| Channel | Asset | Size | Mode |
+|---|---|---|---|
+| Website | Open Graph | 1200 × 630 | Midnight |
+| Website | Favicon | SVG + 32 + 180 touch | Tile |
+| YouTube | Video master | 2560 × 1440 at 60 fps, plus 1920 × 1080 | Midnight |
+| YouTube | Thumbnail | 1280 × 720, under 2 MB | Midnight |
+| YouTube | Channel banner | 2560 × 1440, safe 1546 × 423 | Midnight |
+| Shorts / Reels / TikTok | Vertical video | 1080 × 1920 | Midnight |
+| Instagram | Feed post | 1080 × 1350 | Midnight or Paper |
+| X | Post | 1600 × 900 or 1920 × 1080 video | Midnight |
+| X | Header | 1500 × 500 | Midnight |
+| LinkedIn | Post | 1200 × 627 or 1080 × 1350 | Paper or Midnight |
+| LinkedIn | Banner | 1584 × 396, left 25% clear | Midnight |
+| GitHub | Social preview | 1280 × 640 | Midnight |
+| GitHub | README hero | 1280 × 640 @2x, light and dark via `<picture>` | Both |
+| Release | Release notes | Markdown, sentence case | n/a |
+| macOS | App icon | 1024 master, iconset 16 to 512 @2x | Tile |
+| macOS | DMG background | 660 × 400 @2x | Paper |
+| Windows | ICO | 16, 24, 32, 48, 64, 256 | Tile |
+| Linux | Desktop icon | SVG + 256 + 512 | Tile |
+| Docs / PDF | Manual page | A4 and US Letter | Paper |
+| Press kit | Logo set | SVG, PNG 1024, mark + tile, light and dark | All |
+| Email | Newsletter | 600 wide, live text, images @2x | Paper |
+| Slides | Deck | 1920 × 1080 | Midnight or Paper |
+| Discord | Icon / banner | 512 × 512 / 960 × 540 | Tile / Midnight |
+
+Thumbnails: one Geist headline of 2 to 4 words at the left, the real product or a 3D node at the right, Midnight ground, one Ember element, the mark top left at 6% margin.
+
+## 11. Formatting and voice
+
+| Topic | Rule |
+|---|---|
+| Units | Number, space, unit: 120 BPM, 4.00 ms, 1.20 kHz, -6.0 dB, 48 kHz / 24-bit |
+| Dates | ISO in data and filenames (2026-10-10); 10 October 2026 in prose |
+| Versions | v0.5.0 |
+| Node names | Exactly as the app spells them, Title Case: Audio Filter, Color Ramp, Liquid Glass |
+| Keys | Cmd/Ctrl + K as mono keycap chips; macOS first |
+| Files and code | Geist Mono |
+| Case | Sentence case for headings and buttons; lowercase slabs; mono caps only for folios |
+| Punctuation | No em dashes, no exclamation marks |
+| Spelling | British in prose (colour, centre); node and API names keep the app's spelling |
+
+| Voice | Rule |
+|---|---|
+| Plain and specific | Say what it does and what the person can do, with real node names and values |
+| Calm | No hype, no "world's first", no "revolutionary" |
+| The line | **A DAW for you.** The end card cycles designers, artists, musicians, VJs, scientists and lands on an Ember "you". |
+| Library copy | One short sentence: what it does, then what it needs |
+| Free | The word is "Free", nothing qualifying it |
+| Sound | No narration unless the owner supplies it; owner music only; every SFX attaches to a visible event, quantised to the grid |
+
+## 12. Distinctive assets
+
+Audit after Romaniuk, *Building Distinctive Brand Assets* (2018): spend where an asset is both recognised and unique to Infinite.
+
+| Action | Assets |
+|---|---|
+| Invest | Lemniscate mark, Ember key cable, digit bird, mono folio system |
+| Keep, one per frame | Brand gradient (logo only), Caveat hand word, Patch Type slabs, iridescent ball |
+| Restrain | Dot grid (texture only, at most 6% opacity), frosted glass |
+| Retire | Violet glow, Instrument Serif, coral as accent, terracotta |
+
+## 13. Research basis
+
+| Topic | Source | Rule here |
+|---|---|---|
+| Perceptual colour | Ottosson, OKLab (2020); CSS Color 4 | Ramps and gamut mapping in OKLCH |
+| Contrast | WCAG 2.2 (W3C 2023) | The build gate |
+| Perceptual contrast | APCA was removed from the WCAG 3 draft in 2023; the March 2026 WCAG 3 working draft still has no contrast method | APCA printed as a guide only |
+| Colour vision | Machado, Oliveira, Fernandes (2009) | CVD checks in the book |
+| Polarity | Piepenbrock et al. (2013): positive polarity reads faster | Paper for reading |
+| Translucency | NN/g, Budiu, "Liquid Glass Is Cracked" (Oct 2025) | Glass only behind short labels |
+| Expressive UI | Google, Material 3 Expressive: 46 studies, 18,000+ participants (2025) | One accent action per view, springs for state |
+| Tokens | Design Tokens Community Group format 2025.10, first stable (28 Oct 2025) | `brand.tokens.json` |
+| Aesthetics | Kurosu and Kashimura (1995), aesthetic-usability | Polish carries trust |
+| Animation | Chang and Ungar (1993); Thomas and Johnston (1981) | Measured springs, no linear moves |
+| Response | Nielsen 0.1 / 1 / 10 s; Doherty threshold 400 ms | App motion at most 200 ms |
+| Icons | Wiedenbeck (1999); McDougall et al. (2000) | Icons with labels |
+| Measure | Bringhurst; Dyson (2004) | 60 to 72 characters |
+| Reading speed | Netflix and BBC subtitle guidance (about 17 cps) | Kinetic type at most 15 cps |
+| Safe areas | EBU R95 | Film grid |
+
+## 14. Migration (not applied yet)
+
+These surfaces still carry v1 values. Move them when each is next touched; the book is the target.
+
+| Surface | Today | v2 target |
+|---|---|---|
+| `website/style.css` | Terracotta `#C2593F` buttons, warm inks, hand-copied variables | Link or inline `docs/brand/brand.css`; buttons Ember 600 `#B53700` with white text; inks from the Paper mode |
+| `website/glass.css` | Glass behind body copy in places | Glass only behind short labels, 72 to 78% opacity |
+| motion-film `infinite-house-style.md` | Coral/violet house palette | Read `brand.json` modes; springs by name |
+| `~/films/inside-infinite` palette | r5 modes with Bone ink | Moon `#EEF1FA` ink; already on Midnight / Mist / Paper |
+| 3D nodes in films | Skewed textures (r7) | Import `node_audio_filter.glb` or build with `build_3d.py` |
+| Press kit | v1 PNGs | Add `logo_3d` and `logo_tile` renders; mark SVG from the formula |
+
+## 15. Before shipping anything on a brand surface
+
+1. Colours come from `brand.json` roles. No new hex values.
+2. One mode, one Ember, one Caveat word per frame or section.
+3. Cards 24, media 16, no outlines.
+4. The contrast gate passes (the build checks it).
+5. Reduced motion and reduced transparency are handled.
+6. Type follows the scale; values are in mono with units.
+7. A 3D node matches its app screenshot side by side.
+8. Copy: plain, specific, no em dashes, no hype.
