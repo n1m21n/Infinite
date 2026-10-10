@@ -43,10 +43,12 @@
   display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: calc(3 * 1.5em + 8px);
 }
 .lib-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--pad); border-top: 1px solid #262A35; margin-top: 8px; }
-.lib-price { font-family: var(--font-mono); font-size: 0.78rem; color: var(--app-dim); }
-.lib-dl { background: var(--app-text); color: #12162B; min-height: 36px; padding: 0 14px; font-size: 0.82rem; }
+/* one control size for the price and the download button */
+.ctl { --ctl: 32px; height: var(--ctl); min-height: var(--ctl); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-family: var(--font-sans); font-size: 0.78rem; font-weight: 600; line-height: 1; border-radius: var(--r-pill); }
+.lib-price { padding: 0 12px; color: var(--app-text); box-shadow: 0 0 0 1px var(--app-border); }
+.lib-dl { background: var(--app-text); color: #12162B; padding: 0 14px; }
 .lib-dl:hover { background: #fff; }
-.lib-dl svg { width: 16px; height: 16px; }
+.lib-dl svg { width: 15px; height: 15px; }
 .lib-empty { text-align: center; color: var(--muted); padding: 48px 0; }
 
 /* 8 per row: a compact tile (preview, name, icon) */
@@ -55,8 +57,9 @@
 .lib-grid[data-cols="8"] { --pad: 8px; }
 .lib-grid[data-cols="8"] .node-head { font-size: 0.72rem; gap: 6px; }
 .lib-grid[data-cols="8"] .lib-foot { margin-top: 8px; }
-.lib-grid[data-cols="8"] .lib-price { font-size: 0.66rem; }
-.lib-grid[data-cols="8"] .lib-dl { width: 32px; min-height: 32px; padding: 0; border-radius: 50%; }
+.lib-grid[data-cols="8"] .ctl { --ctl: 28px; font-size: 0.7rem; }
+.lib-grid[data-cols="8"] .lib-price { padding: 0 8px; }
+.lib-grid[data-cols="8"] .lib-dl { width: var(--ctl); padding: 0; }
 .lib-grid[data-cols="8"] .lib-dl-text { display: none; }
 
 .lib-how { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 32px; max-width: 900px; margin: 0 auto; }
@@ -76,8 +79,8 @@
   .lib-bar-end { justify-content: space-between; }
   .lib-card .node-head { font-size: 0.78rem; }
   .lib-desc { display: none; }
-  .lib-dl, .lib-bar-end .btn { width: 40px; min-height: 40px; padding: 0; border-radius: 50%; }
-  .lib-dl { width: 36px; min-height: 36px; }
+  .lib-bar-end .btn { width: 40px; min-height: 40px; padding: 0; border-radius: 50%; }
+  .lib-dl { width: var(--ctl); padding: 0; }
   .lib-dl-text { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .lib-card .node-view img { transition: none; } }

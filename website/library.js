@@ -17,12 +17,11 @@
     return '<article class="lib-card reveal in" style="--cat:' + (COLOUR[cat] || '#F5866B') + '; --hand:' + (HAND[cat] || '#C2593F') + '; --i:' + Math.min(i, 8) + '">' +
       '<p class="hand-cap">' + esc(it.kind === 'Filter' ? 'filters a picture' : 'makes its own') + '</p>' +
       '<div class="node">' +
-      (it.kind === 'Filter' ? '<span class="port port-in"></span>' : '') + '<span class="port port-out"></span>' +
-      '<header class="node-head"><span class="cat-dot"></span><h2 class="node-name">' + esc(it.name) + '</h2><span class="node-cat">' + esc(cat) + '</span></header>' +
+      '<header class="node-head"><h2 class="node-name">' + esc(it.name) + '</h2><span class="node-cat">' + esc(cat) + '</span></header>' +
       '<div class="node-view"><img src="' + esc(it.preview) + '" alt="' + esc(it.name) + ' preview" loading="lazy" width="900" height="600"></div>' +
       '<p class="lib-desc">' + esc(it.description) + '</p>' +
-      '<footer class="lib-foot"><span class="lib-price">' + (it.price > 0 ? '$' + it.price : 'Free') + '</span>' +
-      '<a class="btn btn-sm lib-dl" href="' + esc(it.file) + '" download aria-label="Download ' + esc(it.name) + '">' + DL + '<span class="lib-dl-text">Download</span></a></footer>' +
+      '<footer class="lib-foot"><span class="lib-price ctl">' + (it.price > 0 ? '$' + it.price : 'Free') + '</span>' +
+      '<a class="btn lib-dl ctl" href="' + esc(it.file) + '" download aria-label="Download ' + esc(it.name) + '">' + DL + '<span class="lib-dl-text">Download</span></a></footer>' +
       '</div></article>';
   }
 
