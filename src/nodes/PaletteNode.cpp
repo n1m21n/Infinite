@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "ColorSpace.h"
 #include "Platform.h"
 #include "Transport.h"
 
@@ -22,56 +23,18 @@ namespace
       "uniform sampler2D uSrc;\n"
       "void main() { fragColor = texture(uSrc, vUv); }\n";
 
-   // sRGB transfer function. The rest of the app stores colours the way the
-   // picker shows them, so clustering has to linearise on the way in and
-   // re-encode on the way out - averaging sRGB values directly pulls every
-   // cluster centre towards the dark end.
-   inline float SrgbToLinear(float c)
+   // Colour-space helpers live in ColorSpace.h. Clustering linearises on the
+   // way in and re-encodes on the way out - averaging sRGB values directly
+   // pulls every cluster centre towards the dark end. Oklab is used over
+   // CIELAB because its hue lines stay straight under lightness changes,
+   // which is exactly what the shaping controls do to the extracted centres.
+   using ColorSpace::SrgbToLinear;
+   using ColorSpace::LinearToOklab;
+
+   // Out-of-gamut shaped centres lose chroma, not hue (see ColorSpace.h).
+   inline void LabToDisplay(const float lab[3], float outRgb[3])
    {
-      return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
-   }
-
-   inline float LinearToSrgb(float c)
-   {
-      c = std::max(0.0f, std::min(c, 1.0f));
-      return c <= 0.0031308f ? c * 12.92f : 1.055f * std::pow(c, 1.0f / 2.4f) - 0.055f;
-   }
-
-   // Oklab (Björn Ottosson). Chosen over CIELAB because its hue lines stay
-   // straight under lightness changes, which is exactly what the shaping
-   // controls below do to the extracted centres.
-   void LinearToOklab(const float rgb[3], float outLab[3])
-   {
-      const float l = 0.4122214708f * rgb[0] + 0.5363325363f * rgb[1] + 0.0514459929f * rgb[2];
-      const float m = 0.2119034982f * rgb[0] + 0.6806995451f * rgb[1] + 0.1073969566f * rgb[2];
-      const float s = 0.0883024619f * rgb[0] + 0.2817188376f * rgb[1] + 0.6299787005f * rgb[2];
-
-      const float l_ = std::cbrt(l), m_ = std::cbrt(m), s_ = std::cbrt(s);
-
-      outLab[0] = 0.2104542553f * l_ + 0.7936177850f * m_ - 0.0040720468f * s_;
-      outLab[1] = 1.9779984951f * l_ - 2.4285922050f * m_ + 0.4505937099f * s_;
-      outLab[2] = 0.0259040371f * l_ + 0.7827717662f * m_ - 0.8086757660f * s_;
-   }
-
-   void OklabToLinear(const float lab[3], float outRgb[3])
-   {
-      const float l_ = lab[0] + 0.3963377774f * lab[1] + 0.2158037573f * lab[2];
-      const float m_ = lab[0] - 0.1055613458f * lab[1] - 0.0638541728f * lab[2];
-      const float s_ = lab[0] - 0.0894841775f * lab[1] - 1.2914855480f * lab[2];
-
-      const float l = l_ * l_ * l_, m = m_ * m_ * m_, s = s_ * s_ * s_;
-
-      outRgb[0] = 4.0767416621f * l - 3.3077115913f * m + 0.2309699292f * s;
-      outRgb[1] = -1.2684380046f * l + 2.6097574011f * m - 0.3413193965f * s;
-      outRgb[2] = -0.0041960863f * l - 0.7034186147f * m + 1.7076147010f * s;
-   }
-
-   void LabToDisplay(const float lab[3], float outRgb[3])
-   {
-      float linear[3];
-      OklabToLinear(lab, linear);
-      for (int i = 0; i < 3; i++)
-         outRgb[i] = LinearToSrgb(linear[i]);
+      ColorSpace::OklabToDisplay(lab, outRgb);
    }
 
    inline float LabDistance2(const float a[3], const float b[3])

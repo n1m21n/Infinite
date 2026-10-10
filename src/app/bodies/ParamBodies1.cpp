@@ -1093,7 +1093,17 @@ namespace app
          ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
       else
          ImGui::TextDisabled("in: patched");
-      ModSlider("amount", &n->amount, 0.0f, 0.99f);
+      static const std::vector<std::string> kModes = { "per frame", "time", "spring" };
+      DropdownButton("mode", kModes, n->mode, [n](int i) { PushUndoCheckpoint(); n->mode = i; });
+      if (n->mode == SmoothNode::kTime)
+         ModSlider("time (s)", &n->timeConstant, 0.001f, 5.0f);
+      else if (n->mode == SmoothNode::kSpring)
+      {
+         ModSlider("frequency (Hz)", &n->frequency, 0.1f, 20.0f);
+         ModSlider("damping", &n->damping, 0.0f, 2.0f);
+      }
+      else
+         ModSlider("amount", &n->amount, 0.0f, 0.99f);
    }
 
 

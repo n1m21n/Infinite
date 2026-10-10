@@ -228,13 +228,52 @@ float SmoothNode::Value01()
    if (bypassed)
       return input ? input->Value01() : constantIn;
    const float target = input ? input->Value01() : constantIn;
-   const double beats = Transport::Instance().Beats();
-   if (mLast >= 0.0f && beats == mLastBeats)
-      return mLast; // already advanced this tick - don't double-apply the filter
+   if (mode == kPerFrame)
+   {
+      const double beats = Transport::Instance().Beats();
+      if (mInit && beats == mLastBeats)
+         return mLast; // already advanced this tick - don't double-apply the filter
 
-   const float k = std::min(1.0f, std::max(0.0f, amount));
-   mLast = (mLast < 0.0f) ? target : mLast + (target - mLast) * (1.0f - k);
-   mLastBeats = beats;
+      const float k = std::min(1.0f, std::max(0.0f, amount));
+      mLast = !mInit ? target : mLast + (target - mLast) * (1.0f - k);
+      mInit = true;
+      mLastBeats = beats;
+      return mLast;
+   }
+
+   const double now = Transport::Instance().Seconds();
+   if (mInit && now == mLastSeconds)
+      return mLast; // fan-out: already advanced for this instant
+
+   const double dt = now - mLastSeconds;
+   mLastSeconds = now;
+   // First call, a seek backwards or a long gap: snap rather than glide across it.
+   if (!mInit || dt < 0.0 || dt > 1.0)
+   {
+      mInit = true;
+      mLast = target;
+      mVel = 0.0f;
+      return mLast;
+   }
+
+   if (mode == kTime)
+   {
+      const float tc = std::max(0.001f, timeConstant);
+      mLast += (target - mLast) * (1.0f - std::exp(-(float)dt / tc));
+      return mLast;
+   }
+
+   // Spring: x'' = w^2 (target - x) - 2 z w v, semi-implicit Euler in substeps
+   // small enough to stay stable at any stiffness the knob allows.
+   const float w = 6.2831853f * std::max(0.05f, frequency);
+   const float z = std::max(0.0f, damping);
+   const int steps = std::min(64, std::max(1, (int)std::ceil(dt * w * 8.0)));
+   const float h = (float)dt / (float)steps;
+   for (int i = 0; i < steps; ++i)
+   {
+      mVel += (w * w * (target - mLast) - 2.0f * z * w * mVel) * h;
+      mLast += mVel * h;
+   }
    return mLast;
 }
 
