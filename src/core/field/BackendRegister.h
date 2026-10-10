@@ -17,5 +17,6 @@ namespace Field
    bool CompileSampleProgram(const std::string& code,
                               const SampleProgram* previous,
                               SampleProgram& outProgram,
-                              FieldError& outError);
+                              FieldError& outError,
+                              bool notesHost = false);
 }

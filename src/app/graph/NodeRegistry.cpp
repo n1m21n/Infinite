@@ -193,6 +193,7 @@ namespace app
       REGISTER_NODE(GrainMolderNode, Grain Molder, "Synths");
       REGISTER_NODE(GranularNode, Granular, "Synths");
       REGISTER_NODE(FieldSynthNode, Field Synth, "Synths");
+      REGISTER_NODE(FieldNotesNode, Field Notes, "Notes");
       REGISTER_NODE(FieldSampleNode, Field Effect, "AudioEffects");
       // Field Graph: registered so NodeFactory::MakeNode still resolves it
       // for loading a patch saved before this pass, but excluded from every

@@ -664,6 +664,7 @@ set(COMMON_SOURCES
     src/nodes/FieldPrimitiveNode.cpp
     src/nodes/FieldSampleNode.cpp
     src/nodes/FieldSynthNode.cpp
+    src/nodes/FieldNotesNode.cpp
     src/nodes/FieldPixelNode.cpp
     src/nodes/FieldGraphNode.cpp
     src/nodes/PointDistributionNodes.cpp

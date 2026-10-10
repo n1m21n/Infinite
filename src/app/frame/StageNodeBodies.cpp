@@ -987,6 +987,8 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawFieldSampleParams(n);
             else if (auto* n = dynamic_cast<FieldSynthNode*>(gn.node.get()))
                DrawFieldSynthParams(n);
+            else if (auto* n = dynamic_cast<FieldNotesNode*>(gn.node.get()))
+               DrawFieldNotesParams(n);
             else if (auto* n = dynamic_cast<FieldGraphNode*>(gn.node.get()))
                DrawFieldGraphParams(n);
             else if (auto* n = dynamic_cast<TextNode*>(gn.node.get()))

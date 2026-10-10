@@ -474,6 +474,57 @@ namespace app
    }
 
 
+   void DrawFieldNotesParams(FieldNotesNode* n)
+   {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);
+      n->SetNodeIndex(gCurrentNodeIndex);
+
+      if (!gParamRegisterOnly)
+      {
+         DrawFieldDeviceControls<FieldNotesNode>(n, "notes", &FieldNotesNode::PresetNames(),
+                                                 [](FieldNotesNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+
+         if (ActionButton::Draw("Edit Field...", ImVec2(kPreviewSize, 0)))
+         {
+            gFieldNotesEditor = n;
+            gFieldNotesEditorOpen = true;
+         }
+
+         if (!n->LastError().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (!n->Notice().empty())
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", n->Notice().c_str());
+            ImGui::PopTextWrapPos();
+         }
+
+         if (n->DroppedTotal() > 0)
+         {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%llu note(s) dropped", (unsigned long long)n->DroppedTotal());
+            ImGui::PopTextWrapPos();
+         }
+      }
+
+      {
+         int root = n->root;
+         if (ModSliderInt("root", &root, 0, 11))
+            n->root = root;
+         int scale = n->scale;
+         if (ModSliderInt("scale", &scale, 0, MusicTime::kNumScaleTypes - 1))
+            n->scale = scale;
+      }
+
+      DrawFieldParamSliders(n);
+   }
+
+
    void DrawFieldGraphParams(FieldGraphNode* n)
    {
       gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them

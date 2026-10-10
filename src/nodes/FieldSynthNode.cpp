@@ -190,6 +190,13 @@ public:
       float paramVals[Field::kSampleMaxParams] = {};
       bool sawFault = false;
 
+      // beat / noteNum: same meaning as in Field Notes (sample-accurate
+      // transport position; the last note-on's MIDI number).
+      const bool transportPlaying = Transport::Instance().IsPlaying();
+      const double beatBase = Transport::Instance().BlockStartBeats();
+      const double beatsPerSample = transportPlaying
+         ? (double)Transport::Instance().Tempo() / (60.0 * mSampleRate) : 0.0;
+
       for (int i = 0; i < buffer.numFrames; i++)
       {
          // Step 26 (OPEN-D note history): noteOn is an edge, not a held
@@ -209,6 +216,7 @@ public:
                noteOnEdge = true;
                mLastNotePitchHz = MidiNoteToHz(evts[evtIdx].note);
                mLastNoteVel = evts[evtIdx].velocity;
+               mLastNoteNum = (float)evts[evtIdx].note;
                const int n = (int)mActiveProgram->state.size();
                for (int c = 0; c < n; c++)
                {
@@ -262,6 +270,9 @@ public:
             rin.noteOn = noteOnEdge ? 1.0f : 0.0f;
             rin.notePitch = mLastNotePitchHz;
             rin.noteVel = mLastNoteVel;
+            rin.noteNum = mLastNoteNum;
+            rin.beat = beatBase + beatsPerSample * (double)i;
+            rin.beatPrev = rin.beat - beatsPerSample;
             rin.declaredIns = declaredInVals;
             rin.paramVals = paramVals;
             rin.stateCur = mStateCur[v];
@@ -404,6 +415,7 @@ private:
    // from the main thread.
    float mLastNotePitchHz = 0.0f;
    float mLastNoteVel = 0.0f;
+   float mLastNoteNum = 0.0f;
 
    double mSampleRate = 44100.0;
    uint64_t mAbsSampleCounter = 0;

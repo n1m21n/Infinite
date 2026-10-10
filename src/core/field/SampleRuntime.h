@@ -2,6 +2,7 @@
 
 #include "SampleProgram.h"
 #include "../../audio/DspMath.h"
+#include "../../audio/MusicTime.h"
 
 #include <cassert>
 #include <cmath>
@@ -35,6 +36,27 @@ namespace Field
    // audio source (design-prompt-sample-generator-mode.md).
    // `stateCur`/`stateNext` are per-voice: the caller passes that voice's
    // own state banks.
+   // One note() call's arguments, as the kernel computed them. pitch is a
+   // MIDI number (unrounded), vel 0..1, len in beats (0 = follow the input).
+   struct NoteEmit
+   {
+      float pitch = 0.0f;
+      float vel = 0.0f;
+      float len = 0.0f;
+   };
+
+   static constexpr int kMaxEmitsPerSample = 16;
+
+   // Per-sample emit buffer owned by the Field Notes audio node: fixed array,
+   // no allocation. The node drains and resets it after every kernel run;
+   // `dropped` counts note() calls past kMaxEmitsPerSample.
+   struct NoteEmitSink
+   {
+      NoteEmit items[kMaxEmitsPerSample];
+      int count = 0;
+      int dropped = 0;
+   };
+
    struct SampleRuntimeInput
    {
       float in = 0.0f;
@@ -45,6 +67,18 @@ namespace Field
       float noteOn = 0.0f;
       float notePitch = 0.0f;
       float noteVel = 0.0f;
+      // Field Notes: MIDI number of the same note noteVel/notePitch describe.
+      float noteNum = 0.0f;
+      // Beat clock for beat/tick(): doubles, because a float beat counter
+      // cannot resolve one sample (1/96000 beat at 120 BPM) past ~100 beats.
+      // beatPrev is the position one sample earlier; tick() fires when a
+      // multiple of div lies in (beatPrev, beat]. Stopped transport = equal.
+      double beat = 0.0;
+      double beatPrev = 0.0;
+      int root = 0;   // pitch class 0..11 for deg()
+      int scale = 0;  // MusicTime::ScaleType for deg()
+      uint32_t* rng = nullptr;     // xorshift32 state for rand(); null = 0.5
+      NoteEmitSink* emit = nullptr; // null outside Field Notes
       // Step 25: per-sample values of this kernel's declared 'input sample
       // audio <name>' pins, indexed by declared-audio-input ordinal (the
       // order BackendRegister.cpp's DeclInput case saw 'audio'-typed
@@ -81,6 +115,46 @@ namespace Field
             case SampleOp::LoadNoteOn: regs[ins.dst] = in.noteOn; break;
             case SampleOp::LoadNotePitch: regs[ins.dst] = in.notePitch; break;
             case SampleOp::LoadNoteVel: regs[ins.dst] = in.noteVel; break;
+            case SampleOp::LoadNoteNum: regs[ins.dst] = in.noteNum; break;
+            case SampleOp::LoadBeat: regs[ins.dst] = (float)in.beat; break;
+            case SampleOp::Tick:
+            {
+               const double div = (double)regs[ins.a];
+               float fire = 0.0f;
+               if (div > 1e-6 && in.beat > in.beatPrev)
+                  fire = (std::floor(in.beat / div) > std::floor(in.beatPrev / div)) ? 1.0f : 0.0f;
+               regs[ins.dst] = fire;
+               break;
+            }
+            case SampleOp::Deg:
+            {
+               const int d = (int)std::floor(regs[ins.a]);
+               // Octave index 5 puts root C at MIDI 60 (middle C), the same
+               // note Field Synth's MidiNoteToHz calls C4.
+               regs[ins.dst] = (float)MusicTime::DegreeToNote(d, 5, in.root, in.scale);
+               break;
+            }
+            case SampleOp::Rand:
+            {
+               if (in.rng == nullptr) { regs[ins.dst] = 0.5f; break; }
+               uint32_t x = *in.rng;
+               if (x == 0) x = 0x9E3779B9u;
+               x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+               *in.rng = x;
+               regs[ins.dst] = (float)(x >> 8) * (1.0f / 16777216.0f);
+               break;
+            }
+            case SampleOp::EmitNote:
+            {
+               if (in.emit != nullptr && regs[ins.a] != 0.0f)
+               {
+                  if (in.emit->count < kMaxEmitsPerSample)
+                     in.emit->items[in.emit->count++] = { regs[ins.b], regs[ins.c], regs[ins.dst] };
+                  else
+                     in.emit->dropped++;
+               }
+               break;
+            }
             case SampleOp::LoadDeclaredIn:
                regs[ins.dst] = (in.declaredIns != nullptr) ? in.declaredIns[ins.a] : 0.0f;
                break;

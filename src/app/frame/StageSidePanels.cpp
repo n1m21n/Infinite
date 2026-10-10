@@ -1162,6 +1162,70 @@ void DrawSidePanels(FrameCtx& fc)
          EndEditorWindow(editorVisible);
       }
 
+      if (gFieldNotesEditorOpen && gFieldNotesEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+         {
+            if (gn.node.get() == gFieldNotesEditor)
+               alive = true;
+         }
+         if (!alive)
+         {
+            gFieldNotesEditor = nullptr;
+            gFieldNotesEditorOpen = false;
+         }
+      }
+
+      if (gFieldNotesEditorOpen && gFieldNotesEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         const bool editorVisible = BeginEditorWindow(L("Field notes editor"), &gFieldNotesEditorOpen);
+         if (editorVisible)
+         {
+            SectionCard::Begin(T("Kernel"));
+            EditorHint(T("Field notes kernel (per-sample, audio thread). Reserved: noteOn, noteNum, noteVel, beat, sr, n. Emit notes with note(pitch, vel, len) inside an if."));
+            EditorHint(T("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob."));
+            SectionCard::Begin(T("Code"));
+
+            gCurrentNodeIndex = gFieldNotesEditor->NodeIndex();
+            DrawFieldDeviceControls<FieldNotesNode>(gFieldNotesEditor, "notes", &FieldNotesNode::PresetNames(),
+                                                    [](FieldNotesNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+            gCurrentNodeIndex = -1;
+
+            static char editBuf[8192];
+            static FieldNotesNode* lastEdited = nullptr;
+            static std::string lastKnownCode;
+            if (lastEdited != gFieldNotesEditor || gFieldNotesEditor->code != lastKnownCode)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldNotesEditor->code.c_str());
+               lastEdited = gFieldNotesEditor;
+               lastKnownCode = gFieldNotesEditor->code;
+            }
+
+            FieldWell::InputTextMultiline("##fieldNotesCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+
+            PushPrimaryButtonStyle();
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            {
+               gFieldNotesEditor->code = editBuf;
+               gFieldNotesEditor->Apply();
+               lastKnownCode = gFieldNotesEditor->code;
+            }
+            PopPrimaryButtonStyle();
+            ImGui::SameLine();
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gFieldNotesEditor->code.c_str());
+
+            if (!gFieldNotesEditor->LastError().empty())
+            {
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldNotesEditor->LastError().c_str());
+            }
+         }
+         EndEditorWindow(editorVisible);
+      }
+
       if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
       {
          bool alive = false;

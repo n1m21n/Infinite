@@ -524,6 +524,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_FIELDSAMPLETEST") != nullptr)
       return RunFieldSampleTest();
 
+   if (getenv("INFINITE_FIELDNOTESTEST") != nullptr)
+      return RunFieldNotesTest();
+
    if (getenv("INFINITE_FIELDPINDECLTEST") != nullptr)
       return RunFieldPinDeclTest();
 

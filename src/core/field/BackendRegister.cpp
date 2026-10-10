@@ -27,13 +27,15 @@ namespace Field
       {
          return name == "in" || name == "out" || name == "sr" || name == "n" ||
                 name == "freq" || name == "gate" ||
-                name == "noteOn" || name == "notePitch" || name == "noteVel";
+                name == "noteOn" || name == "notePitch" || name == "noteVel" ||
+                name == "noteNum" || name == "beat";
       }
 
       struct Ctx
       {
          SampleProgram& prog;
          FieldError& err;
+         bool notesHost = false; // true only when compiling for a Field Notes node
 
          bool Failed() const { return !err.Empty(); }
 
@@ -241,6 +243,53 @@ namespace Field
             ctx.Emit(SampleOp::Delay, dst, (uint8_t)delayIdx, srcReg, 0, 0.0f, call.span);
             return dst;
          }
+         if (c == "tick")
+         {
+            if (call.args.size() != 1)
+            {
+               ctx.Fail("'tick' takes exactly 1 argument (division in beats, e.g. 1/16)", call.span);
+               return 0;
+            }
+            uint8_t a = arg(0);
+            uint8_t dst = ctx.AllocReg(call.span);
+            ctx.Emit(SampleOp::Tick, dst, a, 0, 0, 0.0f, call.span);
+            return dst;
+         }
+         if (c == "deg")
+         {
+            if (call.args.size() != 1)
+            {
+               ctx.Fail("'deg' takes exactly 1 argument (scale degree)", call.span);
+               return 0;
+            }
+            uint8_t a = arg(0);
+            uint8_t dst = ctx.AllocReg(call.span);
+            ctx.Emit(SampleOp::Deg, dst, a, 0, 0, 0.0f, call.span);
+            return dst;
+         }
+         if (c == "rand")
+         {
+            if (!ctx.notesHost)
+            {
+               ctx.Fail("rand() needs a Field Notes node", call.span,
+                        "the sample domain has no random source outside Field Notes");
+               return 0;
+            }
+            if (!call.args.empty())
+            {
+               ctx.Fail("'rand' takes no arguments", call.span);
+               return 0;
+            }
+            uint8_t dst = ctx.AllocReg(call.span);
+            ctx.Emit(SampleOp::Rand, dst, 0, 0, 0, 0.0f, call.span);
+            return dst;
+         }
+         if (c == "note")
+         {
+            ctx.Fail("note() is a statement, not a value", call.span,
+                     "write it on its own line inside an if: if (tick(1/16) > 0.5) { note(60, 0.8, 1/16) }");
+            return 0;
+         }
          if (c == "reduce.rms")
          {
             ctx.Fail("reduce.rms publishes to the frame domain and has no per-sample value",
@@ -325,6 +374,18 @@ namespace Field
                {
                   uint8_t dst = ctx.AllocReg(node->span);
                   ctx.Emit(SampleOp::LoadNoteVel, dst, 0, 0, 0, 0.0f, node->span);
+                  return dst;
+               }
+               if (id->name == "noteNum")
+               {
+                  uint8_t dst = ctx.AllocReg(node->span);
+                  ctx.Emit(SampleOp::LoadNoteNum, dst, 0, 0, 0, 0.0f, node->span);
+                  return dst;
+               }
+               if (id->name == "beat")
+               {
+                  uint8_t dst = ctx.AllocReg(node->span);
+                  ctx.Emit(SampleOp::LoadBeat, dst, 0, 0, 0, 0.0f, node->span);
                   return dst;
                }
                if (tableScope.count(id->name))
@@ -817,7 +878,8 @@ namespace Field
                   return;
                }
                if (name == "in" || name == "sr" || name == "n" || name == "freq" || name == "gate" ||
-                   name == "noteOn" || name == "notePitch" || name == "noteVel")
+                   name == "noteOn" || name == "notePitch" || name == "noteVel" ||
+                   name == "noteNum" || name == "beat")
                {
                   ctx.Fail("cannot assign to '" + name + "' (reserved, read-only)", stmt->span);
                   return;
@@ -1002,6 +1064,33 @@ namespace Field
                   CompileCall(ctx, *call, scope, tableScope);
                   return;
                }
+               if (call->callee == "note")
+               {
+                  if (!ctx.notesHost)
+                  {
+                     ctx.Fail("note() needs a Field Notes node", stmt->span,
+                              "only Field Notes can play notes; Field Synth/Effect read them with noteOn/noteNum");
+                     return;
+                  }
+                  if (call->args.size() != 3)
+                  {
+                     ctx.Fail("'note' takes exactly 3 arguments (pitch, vel, len)", stmt->span);
+                     return;
+                  }
+                  if (!ctx.HasActiveCond())
+                  {
+                     ctx.Fail("note() outside an if plays 48000 notes a second; guard it", stmt->span,
+                              "e.g. if (tick(1/16) > 0.5) { note(...) }");
+                     return;
+                  }
+                  uint8_t pitch = CompileExpr(ctx, call->args[0], scope, tableScope);
+                  uint8_t vel = CompileExpr(ctx, call->args[1], scope, tableScope);
+                  uint8_t len = CompileExpr(ctx, call->args[2], scope, tableScope);
+                  if (ctx.Failed()) return;
+                  ctx.Emit(SampleOp::EmitNote, len, ctx.ActiveCond(), pitch, vel, 0.0f, stmt->span);
+                  ctx.prog.hasNoteEmit = true;
+                  return;
+               }
                if (call->callee != "reduce.rms")
                {
                   ctx.Fail("'" + call->callee + "' is not supported inside a sample-domain kernel in v1", stmt->span);
@@ -1048,7 +1137,8 @@ namespace Field
    bool CompileSampleProgram(const std::string& code,
                               const SampleProgram* previous,
                               SampleProgram& outProgram,
-                              FieldError& outError)
+                              FieldError& outError,
+                              bool notesHost)
    {
       outProgram = SampleProgram{};
       outError.Clear();
@@ -1068,6 +1158,7 @@ namespace Field
       }
 
       Ctx ctx { outProgram, outError };
+      ctx.notesHost = notesHost;
       Scope scope;
       TableScope tableScope;
 
