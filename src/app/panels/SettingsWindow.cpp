@@ -1,5 +1,7 @@
 // Settings window (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/BusyLine.h"
+#include "app/ui/design/components/StatusDot.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -1284,13 +1286,15 @@ namespace app
             const bool busy = !ex.busyId.empty() || ex.catalogLoading;
 
             ImGui::Spacing();
-            ImGui::TextWrapped("%s", T("Optional packs add heavy features without growing the app. Nodes that use a pack are always available; they show an Install hint until the pack is here."));
-            ImGui::Spacing();
+            FormParts::Section(T("Extensions"));
+            ImGui::TextDisabled("%s", T("Optional packs add heavy features without growing the app."));
+            ImGui::TextDisabled("%s", T("Nodes that use a pack are always available; they show an Install hint until the pack is here."));
+            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
             ImGui::BeginDisabled(busy);
-            if (ImGui::Button(T("Refresh")))
+            if (FormParts::Button(L("Refresh##extRefresh")))
                Extensions::RefreshCatalog();
-            ImGui::SameLine();
-            if (ImGui::Button(T("Install from file...")))
+            ImGui::SameLine(0.0f, tok::space_1);
+            if (FormParts::Button(L("Install from file...##extFile")))
             {
                const std::string file = Platform::OpenExtensionPackDialog();
                if (!file.empty())
@@ -1299,10 +1303,13 @@ namespace app
             ImGui::EndDisabled();
             if (ex.catalogLoading)
             {
-               ImGui::SameLine();
+               ImGui::SameLine(0.0f, tok::space_2);
+               BusyLine::Spinner();
+               ImGui::SameLine(0.0f, tok::space_1);
                ImGui::TextDisabled("%s", T("Checking for packs..."));
             }
-            ImGui::Spacing();
+
+            FormParts::Section(T("Packs"));
 
             auto installedVersion = [&](const std::string& id) -> const std::string*
             {
@@ -1312,98 +1319,133 @@ namespace app
                return nullptr;
             };
 
-            if (ImGui::BeginTable("ExtensionsTable", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+            // One row per pack: name and a status line on the left, the one action on the right. Positions are
+            // pinned (like Expression Globals) so a status change never moves the button.
+            bool anyRow = false;
+            auto row = [&](const std::string& id, const std::string& name, const std::string& purpose,
+                           uint64_t size, const Extensions::Pack* offer)
             {
-               ImGui::TableSetupColumn(T("Pack"), ImGuiTableColumnFlags_WidthStretch, 3.0f);
-               ImGui::TableSetupColumn(T("Status"), ImGuiTableColumnFlags_WidthStretch, 1.6f);
-               ImGui::TableSetupColumn(T("Action"), ImGuiTableColumnFlags_WidthFixed, 110.0f);
-               ImGui::TableHeadersRow();
+               if (anyRow)
+                  ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+               anyRow = true;
+               ImGui::PushID(id.c_str());
+               const std::string* have = installedVersion(id);
+               const bool update = have && offer && *have != offer->version;
+               const bool working = ex.busyId == id;
+               const float btnW = 96.0f;
+               const float btnX = ImGui::GetWindowContentRegionMax().x - btnW;
+               const float y0 = ImGui::GetCursorPosY();
 
-               auto row = [&](const std::string& id, const std::string& name, const std::string& purpose,
-                              uint64_t size, const Extensions::Pack* offer)
                {
-                  ImGui::PushID(id.c_str());
-                  ImGui::TableNextRow();
-                  ImGui::TableSetColumnIndex(0);
+                  UiType::Scope t(UiType::Size::Body, UiType::Weight::Medium);
                   ImGui::TextUnformatted(name.c_str());
-                  if (!purpose.empty())
-                     ImGui::TextDisabled("%s%s", purpose.c_str(),
-                                         size ? (std::string("  (") + std::to_string((size + 524288) / 1048576) + " MB)").c_str() : "");
-                  const std::string* have = installedVersion(id);
-                  const bool update = have && offer && *have != offer->version;
-                  ImGui::TableSetColumnIndex(1);
-                  if (ex.busyId == id)
+               }
+
+               // status line: a dot (never the only cue: the words are beside it) and what is true now
+               std::string status;
+               StatusDot::State dot = StatusDot::State::Ok;
+               bool showDot = true;
+               if (working)
+               {
+                  status = ex.progress >= 0.0f ? std::string(T(ex.busyLabel.c_str())) + " " + std::to_string((int)(ex.progress * 100.0f)) + "%"
+                                               : std::string(T(ex.busyLabel.c_str())) + "...";
+                  dot = StatusDot::State::Warn;
+               }
+               else if (!have)
+               {
+                  status = T("Not installed");
+                  showDot = false;
+               }
+               else if (update)
+               {
+                  status = std::string(T("Update available")) + "  v" + *have + " > v" + offer->version;
+                  dot = StatusDot::State::Warn;
+               }
+               else
+                  status = std::string(T("Installed")) + "  v" + *have;
+               {
+                  const ImVec2 p = ImGui::GetCursorScreenPos();
+                  const float h = ImGui::GetTextLineHeight();
+                  float x = 0.0f;
+                  if (showDot)
                   {
-                     if (ex.progress >= 0.0f)
-                        ImGui::ProgressBar(ex.progress, ImVec2(-FLT_MIN, 0), (std::string(T(ex.busyLabel.c_str())) + " " + std::to_string((int)(ex.progress * 100.0f)) + "%").c_str());
-                     else
-                        ImGui::Text("%s...", T(ex.busyLabel.c_str()));
+                     const tok::Pair8& pair = dot == StatusDot::State::Ok ? tok::action_go : tok::action_learn;
+                     ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(p.x + 3.0f, p.y + h * 0.5f), 3.0f,
+                                                                 tok::U32(pair, CategoryColors::IsThemeLight()), 12);
+                     x = 12.0f;
                   }
-                  else if (!have)
-                     ImGui::TextDisabled("%s", T("Not installed"));
-                  else if (update)
-                     ImGui::Text(T("Update available (v%s)"), offer->version.c_str());
-                  else
-                     ImGui::Text(T("Installed v%s"), have->c_str());
-                  ImGui::TableSetColumnIndex(2);
-                  if (ex.busyId == id && ex.busyLabel == "Downloading")
-                  {
-                     if (ImGui::Button(T("Cancel"), ImVec2(100, 0)))
-                        Extensions::CancelInstall();
-                     ImGui::PopID();
-                     return;
-                  }
+                  ImGui::SetCursorScreenPos(ImVec2(p.x + x, p.y));
+                  ImGui::TextDisabled("%s", status.c_str());
+               }
+               if (!purpose.empty())
+                  ImGui::TextDisabled("%s%s", purpose.c_str(),
+                                      size ? (std::string("  (") + std::to_string((size + 524288) / 1048576) + " MB)").c_str() : "");
+               if (working && ex.progress >= 0.0f)
+               {
+                  ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+                  SectionCard::Progress(ex.progress, btnX - ImGui::GetCursorPosX() - tok::space_2);
+               }
+
+               const float y1 = ImGui::GetCursorPosY();
+               ImGui::SetCursorPos(ImVec2(btnX, y0));
+               if (working && ex.busyLabel == "Downloading")
+               {
+                  if (ActionButton::Draw(L("Cancel##extCancel"), ImVec2(btnW, 0)))
+                     Extensions::CancelInstall();
+               }
+               else
+               {
                   ImGui::BeginDisabled(busy);
                   if ((!have || update) && offer)
                   {
-                     if (ImGui::Button(have ? T("Update") : T("Install"), ImVec2(100, 0)))
+                     if (ActionButton::Draw(have ? L("Update##extAct") : L("Install##extAct"), ImVec2(btnW, 0), ActionButton::Kind::Primary))
                         Extensions::InstallAsync(*offer);
                   }
                   else if (have)
                   {
-                     if (ImGui::Button(T("Remove"), ImVec2(100, 0)))
+                     if (ActionButton::Draw(L("Remove##extAct"), ImVec2(btnW, 0)))
                         Extensions::RemoveAsync(id);
                   }
                   ImGui::EndDisabled();
-                  ImGui::PopID();
-               };
-
-               for (const Extensions::Pack& pk : ex.catalog)
-                  row(pk.id, pk.name, pk.purpose, pk.size, &pk);
-               for (const auto& kv : ex.installed) // installed from a file, not in the catalog
-               {
-                  bool listed = false;
-                  for (const Extensions::Pack& pk : ex.catalog)
-                     listed = listed || pk.id == kv.first;
-                  if (!listed)
-                     row(kv.first, kv.first, T("Installed from file"), 0, nullptr);
                }
-               ImGui::EndTable();
-            }
+               ImGui::SetCursorPosY(std::max(y1, ImGui::GetCursorPosY()));
+               ImGui::PopID();
+            };
 
+            for (const Extensions::Pack& pk : ex.catalog)
+               row(pk.id, pk.name, pk.purpose, pk.size, &pk);
+            for (const auto& kv : ex.installed) // installed from a file, not in the catalog
+            {
+               bool listed = false;
+               for (const Extensions::Pack& pk : ex.catalog)
+                  listed = listed || pk.id == kv.first;
+               if (!listed)
+                  row(kv.first, kv.first, T("Installed from file"), 0, nullptr);
+            }
+            if (!anyRow)
+               ImGui::TextDisabled("%s", ex.catalogLoading ? T("Checking for packs...") : T("No packs yet."));
+
+            // catalog trouble is a quiet note (offline is normal); a failed install is an error and says so
             if (!ex.catalogLoaded && !ex.catalogLoading && !ex.catalogError.empty())
             {
-               ImGui::Spacing();
+               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                ImGui::TextDisabled(T("Could not load the pack list (%s). Use Install from file... when offline."),
                                    ex.catalogError.c_str());
             }
             else if (ex.catalogLoaded && ex.catalog.empty())
             {
-               ImGui::Spacing();
+               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                ImGui::TextDisabled("%s", T("No packs are published for this version yet."));
             }
             if (!ex.message.empty())
             {
-               ImGui::Spacing();
+               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                if (ex.messageIsError)
-               {
-                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.35f, 1.0f));
-                  ImGui::TextWrapped("%s", ex.message.c_str());
-                  ImGui::PopStyleColor();
-               }
+                  ImGui::TextColored(tok::V4(tok::palf::v_1000_550_500_1000), "%s", ex.message.c_str());
                else
-                  ImGui::TextWrapped("%s", ex.message.c_str());
+                  ImGui::TextDisabled("%s", ex.message.c_str());
             }
+            SectionCard::End();
 
             ImGui::EndTabItem();
          }
