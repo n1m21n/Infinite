@@ -220,7 +220,9 @@ namespace app
          // fixed-width buttons ending on the content edge. Window-relative
          // SameLine offsets drift inside the node canvas and widen the node.
          {
-            const float bw = 22.0f, gap = 3.0f;
+            // ActionButton widens a button to its label plus 2 x space_2, so size the slot from the widest label
+            // (M) or the three tiles overlap at larger UI scales.
+            const float bw = std::max(22.0f, ImGui::CalcTextSize("M").x + 2.0f * tok::space_2), gap = 3.0f;
             const float right = gAudioContentX + gAudioContentW;
             const float x0 = right - 3.0f * bw - 2.0f * gap;
             const float y = rp.y;

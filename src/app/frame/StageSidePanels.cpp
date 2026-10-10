@@ -48,6 +48,40 @@ namespace
 
 namespace app
 {
+namespace
+{
+   // Preset picker shared by the Sketch editors: the design system's dropdown face + deferred gDropdown list.
+   template <typename NodeT>
+   void SketchPresetDropdown(NodeT* n, const char* id)
+   {
+      const auto& names = NodeT::PresetNames();
+      const int nodeIndex = n->NodeIndex();
+      const std::string label = ((n->presetIndex >= 0 && n->presetIndex < (int)names.size())
+                                    ? names[n->presetIndex] : std::string("Preset")) + "##" + id;
+      PushDropdownStyle();
+      if (ActionButton::Draw(label.c_str(), ImVec2(220.0f, 0)))
+      {
+         gDropdown.options = names;
+         gDropdown.categories.assign(names.size(), "Presets");
+         gDropdown.current = n->presetIndex;
+         gDropdown.onSelect = [nodeIndex](int idx)
+         {
+            GraphNode* gn = FindNodeByIndex(nodeIndex);
+            NodeT* n2 = gn ? dynamic_cast<NodeT*>(gn->node.get()) : nullptr;
+            if (n2 == nullptr)
+               return;
+            gCurrentNodeIndex = nodeIndex;
+            n2->presetIndex = idx;
+            n2->LoadPreset(idx);
+            gCurrentNodeIndex = -1;
+         };
+         gDropdown.justOpened = true;
+         gDropdown.focusSearch = false;
+         gDropdown.filterBuf[0] = '\0';
+      }
+      PopDropdownStyle();
+   }
+}
 void DrawSidePanels(FrameCtx& fc)
 {
    ImGuiIO& io = ImGui::GetIO();
@@ -863,33 +897,19 @@ void DrawSidePanels(FrameCtx& fc)
       if (gSketchEditorOpen && gSketchEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 520), ImGuiCond_FirstUseEver);
-         PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin(L("Sketch editor"), &gSketchEditorOpen))
+         const bool editorVisible = BeginEditorWindow(L("Sketch editor"), &gSketchEditorOpen);
+         if (editorVisible)
          {
-            ImGui::TextDisabled("%s", T("JavaScript, p5-style: define draw(t). Globals: width, height, t, beat, frame."));
-            ImGui::TextDisabled("%s", T("param(\"name\", default, lo, hi) makes a modulatable knob. Colours are 0..1; hsl(h,s,l) returns one."));
-            ImGui::Separator();
+            SectionCard::Begin(T("Script"));
+            EditorHint(T("JavaScript, p5-style: define draw(t). Globals: width, height, t, beat, frame."));
+            EditorHint(T("param(\"name\", default, lo, hi) makes a modulatable knob. Colours are 0..1; hsl(h,s,l) returns one."));
+            SectionCard::Begin(T("Code"));
 
-            const auto& names = SketchNode::PresetNames();
-            const char* cur = (gSketchEditor->presetIndex >= 0 && gSketchEditor->presetIndex < (int)names.size())
-                                 ? names[gSketchEditor->presetIndex].c_str() : "Preset";
-            ImGui::SetNextItemWidth(220.0f);
-            if (ImGui::BeginCombo("##sketchPreset", cur))
-            {
-               for (int i = 0; i < (int)names.size(); i++)
-                  if (ImGui::Selectable(names[i].c_str(), i == gSketchEditor->presetIndex))
-                  {
-                     gCurrentNodeIndex = gSketchEditor->NodeIndex();
-                     gSketchEditor->presetIndex = i;
-                     gSketchEditor->LoadPreset(i);
-                     gCurrentNodeIndex = -1;
-                  }
-               ImGui::EndCombo();
-            }
+            SketchPresetDropdown(gSketchEditor, "sketchPreset");
 
             // SVG: dropped on the canvas, or pasted here (no file dialog needed).
             ImGui::SameLine();
-            if (ImGui::Button(L("Paste SVG"), ImVec2(100, 0)))
+            if (ActionButton::Draw(L("Paste SVG"), ImVec2(100, 0)))
             {
                const char* clip = ImGui::GetClipboardText();
                if (clip && std::strstr(clip, "<svg"))
@@ -902,17 +922,19 @@ void DrawSidePanels(FrameCtx& fc)
             if (!gSketchEditor->svg.empty())
             {
                ImGui::SameLine();
-               if (ImGui::Button(L("Clear SVG"), ImVec2(100, 0)))
+               if (ActionButton::Draw(L("Clear SVG"), ImVec2(100, 0)))
                {
                   gSketchEditor->svg.clear();
                   gSketchEditor->svgName.clear();
                   gSketchEditor->Apply();
                }
-               ImGui::TextDisabled(T("SVG: %s (%d KB). svgSet(\"#id\", \"attr\", value), svgText, svgBox, svgDraw(x, y, w, h)"),
-                                   gSketchEditor->svgName.c_str(), (int)(gSketchEditor->svg.size() / 1024));
+               char svgInfo[512];
+               snprintf(svgInfo, sizeof(svgInfo), T("SVG: %s (%d KB). svgSet(\"#id\", \"attr\", value), svgText, svgBox, svgDraw(x, y, w, h)"),
+                        gSketchEditor->svgName.c_str(), (int)(gSketchEditor->svg.size() / 1024));
+               EditorHint(svgInfo);
             }
             else
-               ImGui::TextDisabled("%s", T("No SVG yet: drop an .svg on the canvas, or copy SVG text and press Paste SVG."));
+               EditorHint(T("No SVG yet: drop an .svg on the canvas, or copy SVG text and press Paste SVG."));
 
             static char editBuf[32768];
             static SketchNode* lastEdited = nullptr;
@@ -924,11 +946,11 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gSketchEditor->code;
             }
 
-            ImGui::InputTextMultiline("##sketchCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##sketchCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gSketchEditor->code = editBuf;
                gSketchEditor->Apply();
@@ -936,14 +958,13 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gSketchEditor->code.c_str());
 
             if (!gSketchEditor->LastError().empty())
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gSketchEditor->LastError().c_str());
          }
-         ImGui::End();
-         PopElevatedPanelStyle();
+         EndEditorWindow(editorVisible);
       }
 
       if (gSketch3DEditorOpen && gSketch3DEditor != nullptr)
@@ -962,29 +983,15 @@ void DrawSidePanels(FrameCtx& fc)
       if (gSketch3DEditorOpen && gSketch3DEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 520), ImGuiCond_FirstUseEver);
-         PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin(L("Sketch 3D editor"), &gSketch3DEditorOpen))
+         const bool editorVisible = BeginEditorWindow(L("Sketch 3D editor"), &gSketch3DEditorOpen);
+         if (editorVisible)
          {
-            ImGui::TextDisabled("%s", T("JavaScript: define draw(t) that builds geometry. Globals: t, beat, frame."));
-            ImGui::TextDisabled("%s", T("box, sphere, cylinder, cone, torus, plane, tube, beginShape/vertex/endShape; translate, rotate, scale, push/pop; fill(r,g,b) 0..1."));
-            ImGui::Separator();
+            SectionCard::Begin(T("Script"));
+            EditorHint(T("JavaScript: define draw(t) that builds geometry. Globals: t, beat, frame."));
+            EditorHint(T("box, sphere, cylinder, cone, torus, plane, tube, beginShape/vertex/endShape; translate, rotate, scale, push/pop; fill(r,g,b) 0..1."));
+            SectionCard::Begin(T("Code"));
 
-            const auto& names = Sketch3DNode::PresetNames();
-            const char* cur = (gSketch3DEditor->presetIndex >= 0 && gSketch3DEditor->presetIndex < (int)names.size())
-                                 ? names[gSketch3DEditor->presetIndex].c_str() : "Preset";
-            ImGui::SetNextItemWidth(220.0f);
-            if (ImGui::BeginCombo("##sketch3dPreset", cur))
-            {
-               for (int i = 0; i < (int)names.size(); i++)
-                  if (ImGui::Selectable(names[i].c_str(), i == gSketch3DEditor->presetIndex))
-                  {
-                     gCurrentNodeIndex = gSketch3DEditor->NodeIndex();
-                     gSketch3DEditor->presetIndex = i;
-                     gSketch3DEditor->LoadPreset(i);
-                     gCurrentNodeIndex = -1;
-                  }
-               ImGui::EndCombo();
-            }
+            SketchPresetDropdown(gSketch3DEditor, "sketch3dPreset");
 
             static char editBuf[32768];
             static Sketch3DNode* lastEdited = nullptr;
@@ -996,11 +1003,11 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gSketch3DEditor->code;
             }
 
-            ImGui::InputTextMultiline("##sketch3dCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##sketch3dCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gSketch3DEditor->code = editBuf;
                gSketch3DEditor->Apply();
@@ -1008,14 +1015,13 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gSketch3DEditor->code.c_str());
 
             if (!gSketch3DEditor->LastError().empty())
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gSketch3DEditor->LastError().c_str());
          }
-         ImGui::End();
-         PopElevatedPanelStyle();
+         EndEditorWindow(editorVisible);
       }
 
       // Design-review shot: INFINITE_OPENPANELS "fieldfxwin" opens the Field effect editor on the first Field Effect node.

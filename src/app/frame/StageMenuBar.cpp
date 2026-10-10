@@ -42,6 +42,9 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railHistory", groupTop + 4.0f * step, IconsInfinite::History, nullptr, gHistoryOpen,
                        T("Edit history - jump back to any earlier edit")))
       gHistoryOpen = !gHistoryOpen;
+   if (PanelRail::Item("##railSettings", groupTop + 5.0f * step + tok::space_2, IconsInfinite::Settings, nullptr, gSettingsOpen,
+                       T("Settings")))
+      gSettingsOpen = !gSettingsOpen;
    PanelRail::End();
 }
 
