@@ -250,6 +250,7 @@ inline std::string TmpPath(const std::string& name)
 #include "audio/Wavetable.h"
 #include "audio/AudioFileWriter.h"
 #include "nodes/NoteNodes.h"
+#include "nodes/MidiOutNode.h"
 #include "nodes/SamplerNode.h"
 #include "nodes/SlicerNode.h"
 #include "nodes/PaulStretchNode.h"

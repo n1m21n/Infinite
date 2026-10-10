@@ -68,8 +68,11 @@ namespace app
 
       if (AudioNode* audioNode = AudioNodeOfAny(node))
       {
-         if (!node->bypassed)
+         const bool keepWhenBypassed = node->bypassed && node->KeepsAudioHalfWhenBypassed();
+         if (keepWhenBypassed || !node->bypassed)
          {
+            if (node->KeepsAudioHalfWhenBypassed())
+               audioNode->SetBypassed(node->bypassed);
             entry.node = audioNode;
             entry.noteOnly = dynamic_cast<INoteSource*>(node) != nullptr || node->AudioNodeForNotePorts() != nullptr;
             if (auto* aen = dynamic_cast<AudioEffectNode*>(node))

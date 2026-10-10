@@ -230,6 +230,7 @@ namespace app
       // docs/plans/audio/P3a-notes-prompt.md; Part 2 adds Note Filter/
       // Modify/Echo/Router/Display and the Arpeggiator.
       REGISTER_NODE(MidiNotesNode, MIDI Notes, "Notes");
+      REGISTER_NODE(MidiOutNode, MIDI Out, "Utility");
       // The hardware-free note source: on-screen piano plus a QWERTY typing
       // mapping, for playing/testing a patch with no MIDI controller at all.
       REGISTER_NODE(KeyboardNode, Keyboard, "Notes");

@@ -826,6 +826,8 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawNoteToCVParams(n);
             else if (auto* n = dynamic_cast<VelocityToCVNode*>(gn.node.get()))
                DrawVelocityToCVParams(n);
+            else if (auto* n = dynamic_cast<MidiOutNode*>(gn.node.get()))
+               DrawMidiOutParams(n);
             else if (auto* n = dynamic_cast<CVRecorderNode*>(gn.node.get()))
                DrawCVRecorderParams(n);
             else if (auto* n = dynamic_cast<MacroKnobNode*>(gn.node.get()))

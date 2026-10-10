@@ -482,6 +482,7 @@ set(COMMON_SOURCES
     src/app/panels/ViewportPanel.cpp
     src/app/selftest/AudioSweepTests.cpp
     src/app/selftest/AvRecTests.cpp
+    src/app/selftest/MidiOutTests.cpp
     src/app/selftest/BenchScenes.cpp
     src/app/selftest/DspFixtures1.cpp
     src/app/selftest/DspFixtures2.cpp
@@ -576,6 +577,7 @@ set(COMMON_SOURCES
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp
     src/audio/MidiFile.cpp
+    src/platform/common/MidiOutSink.cpp
     src/audio/AudioCaptureRing.cpp
     external/miniz.c
     external/shine/shine_mp3.c
@@ -649,6 +651,7 @@ set(COMMON_SOURCES
     src/nodes/PaletteNode.cpp
     src/nodes/AnalyzeNodes.cpp
     src/nodes/MidiNodes.cpp
+    src/nodes/MidiOutNode.cpp
     src/nodes/Geometry3DNodes.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
@@ -772,6 +775,7 @@ file(GLOB INFINITE_NOTO_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ext
 
 set(APPLE_SOURCES
     src/platform/Platform.mm
+    src/platform/MidiOutMac.mm
     src/platform/HeadTracker.mm
     src/audio/AudioFileWriter.mm
     ${SYPHON_SOURCES}
@@ -816,6 +820,7 @@ set(WIN32_SOURCES
     src/platform/win/SpoutGLBridge.cpp
     src/platform/win/AudioDeviceWin.cpp
     src/platform/win/MidiWin.cpp
+    src/platform/win/MidiOutWin.cpp
     src/platform/win/MediaWin.cpp
     src/platform/common/MediaDecodePortable.cpp
     src/platform/common/SubjectMaskOnnx.cpp
@@ -845,6 +850,7 @@ set(LINUX_SOURCES
     src/platform/linux/AudioDeviceLinux.cpp
     src/platform/linux/MiniaudioImpl.cpp
     src/platform/linux/MidiLinux.cpp
+    src/platform/linux/MidiOutLinux.cpp
     src/platform/linux/MediaLinux.cpp
     src/platform/linux/CameraLinux.cpp
     src/platform/linux/PluginHostLinux.cpp
@@ -1414,7 +1420,7 @@ endif()
 
 if(APPLE)
     target_include_directories(Infinite PRIVATE "${ORT_MAC_INCLUDE_DIR}")
-    set_source_files_properties(src/platform/Platform.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
+    set_source_files_properties(src/platform/Platform.mm src/platform/MidiOutMac.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${SYPHON_SOURCES}
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc;-include;${CMAKE_CURRENT_SOURCE_DIR}/${SYPHON_DIR}/src/Syphon_Prefix.pch")

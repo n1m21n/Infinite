@@ -2079,12 +2079,6 @@
 {"ts": "2026-10-01T16:31:59+00:00", "event": "edit", "id": "R525", "opened": "2026-10-01T18:20:10+05:30", "commits": ["381269b"], "closed": "2026-10-01T18:20:30+05:30", "release": "v0.4.6"}
 {"ts": "2026-10-01T16:31:59+00:00", "event": "edit", "id": "R526", "opened": "2026-10-01T18:49:58+05:30", "commits": ["b47fbc8"], "closed": "2026-10-01T19:07:32+05:30", "release": "v0.4.6"}
 {"ts": "2026-10-01T16:32:00+00:00", "event": "edit", "id": "R529", "opened": "2026-10-01T19:17:36+05:30", "commits": ["d84b25e"], "closed": "2026-10-01T20:08:52+05:30", "release": "v0.4.6"}
-{"ts": "2026-10-01T20:08:59+05:30", "event": "add", "id": "R530", "after": [], "user": false, "src": "note:v0.4.6:18", "track": "platform", "kind": "feature", "horizon": "later", "title": "Interface scaling on high-resolution monitors: the whole interface (text, nodes, pins, min", "why": "v0.4.6 release notes, no single matching commit", "origin": "merge"}
-{"ts": "2026-10-01T20:08:59+05:30", "event": "done", "id": "R530", "why": "v0.4.6 release notes, no single matching commit", "release": "v0.4.6"}
-{"ts": "2026-10-01T20:08:59+05:30", "event": "edit", "id": "R530", "opened": "2026-10-01T20:08:59+05:30", "closed": "2026-10-01T20:08:59+05:30", "release": "v0.4.6", "commits": []}
-{"ts": "2026-10-01T20:08:59+05:30", "event": "add", "id": "R531", "after": [], "user": false, "src": "note:v0.4.6:30", "track": "field", "kind": "feature", "horizon": "later", "title": "Field Language Manual gains a \"What's new since v1\" addendum: offset reads of pixel state,", "why": "v0.4.6 release notes, no single matching commit", "origin": "merge"}
-{"ts": "2026-10-01T20:08:59+05:30", "event": "done", "id": "R531", "why": "v0.4.6 release notes, no single matching commit", "release": "v0.4.6"}
-{"ts": "2026-10-01T20:08:59+05:30", "event": "edit", "id": "R531", "opened": "2026-10-01T20:08:59+05:30", "closed": "2026-10-01T20:08:59+05:30", "release": "v0.4.6", "commits": []}
 {"ts": "2026-10-01T16:32:15+00:00", "event": "edit", "id": "R501", "commits": ["3628381", "eec4962"]}
 {"ts": "2026-10-01T16:32:16+00:00", "event": "edit", "id": "R501", "opened": "2026-10-01T07:39:54+05:30", "commits": ["3628381", "eec4962"], "closed": "2026-10-01T14:20:19+05:30", "release": "v0.4.6"}
 {"ts": "2026-10-01T16:32:16+00:00", "event": "edit", "id": "R527", "opened": "2026-10-01T18:12:15+05:30", "commits": ["7b13390"], "closed": "2026-10-01T20:08:49+05:30", "release": "v0.4.6"}

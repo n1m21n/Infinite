@@ -232,6 +232,12 @@ public:
    // need it.
    virtual AudioNode* AudioNodeForNotePorts() { return nullptr; }
 
+   // A bypassed node normally drops out of the audio topology. A node that holds state in the
+   // outside world (MIDI Out's sounding notes) overrides this to stay in it: the topology then
+   // tells its audio half about the bypass through AudioNode::SetBypassed, and that half
+   // releases what it holds and goes quiet instead of vanishing mid-note.
+   virtual bool KeepsAudioHalfWhenBypassed() const { return false; }
+
    // A node that must be processed every block even when nothing downstream
    // pulls it - e.g. a Sampler that is currently capturing its audio input.
    // Without this, a node with no path to an Audio Out and no note input

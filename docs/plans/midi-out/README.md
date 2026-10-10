@@ -1,6 +1,6 @@
 # MIDI Out: drive hardware synths from Infinite
 
-Status: planned (2026-10-08). Origin: cables.gl vetting. The owner reports users with hardware synths who need Infinite to play them.
+Status: built on `feature/midi-out` (2026-10-09), all three phases, macOS verified (MIDIOUTTEST, hygiene fast + audio). Windows and Linux files are uncompiled until CI; manual real-synth check per OS still owed. Bypass keeps the audio half in the topology (`KeepsAudioHalfWhenBypassed`) so held notes release. Virtual port = the first dropdown entry "Infinite (virtual)". Original plan date: 2026-10-08. Origin: cables.gl vetting. The owner reports users with hardware synths who need Infinite to play them.
 Skills to load before building: `new-audio-node`, `audio-node-ui`, `node-ui-pillars`, `windows-parity`, `linux-parity`, `audio-pipeline-sweep`, `rhythmic-quantization-standard`.
 
 ## What exists today (input only)

@@ -650,6 +650,63 @@ namespace app
    }
 
 
+   void DrawMidiOutParams(MidiOutNode* n)
+   {
+      // The device list is a live OS query, so it is refreshed on a slow timer, not every frame.
+      if (ImGui::GetTime() - n->devicesListedAt > 2.0)
+      {
+         n->RefreshDeviceList();
+         n->devicesListedAt = ImGui::GetTime();
+      }
+
+      std::vector<std::string> options { "none" };
+      int current = 0;
+      for (const std::string& d : n->Devices())
+      {
+         options.push_back(d);
+         if (d == n->device) current = (int)options.size() - 1;
+      }
+      // A saved device that is not plugged in stays selectable so the choice survives a restart.
+      if (!n->device.empty() && current == 0)
+      {
+         options.push_back(n->device + " (not connected)");
+         current = (int)options.size() - 1;
+      }
+      DropdownButton("device", options, current, [n](int i) {
+         PushUndoCheckpoint();
+         if (i <= 0)
+            n->device.clear();
+         else if ((size_t)i <= n->Devices().size()) // the "(not connected)" row keeps the saved name
+            n->device = n->Devices()[i - 1];
+      });
+
+      ModSliderInt("channel", &n->channel, 1, 16);
+      ModSlider("offset (ms)", &n->offsetMs, -50.0f, 50.0f, "%.1f");
+      NodeCheckbox("clock##midiOutClock", &n->clock);
+
+      // Stable labels, so a modulation cable stays bound when the cc number changes.
+      static const char* const kOnLbl[MidiOutNode::kCcRows] = { "cc1##midiOutCc1", "cc2##midiOutCc2", "cc3##midiOutCc3", "cc4##midiOutCc4" };
+      static const char* const kNumLbl[MidiOutNode::kCcRows] = { "cc1 #", "cc2 #", "cc3 #", "cc4 #" };
+      static const char* const kValLbl[MidiOutNode::kCcRows] = { "cc1 value", "cc2 value", "cc3 value", "cc4 value" };
+      for (int i = 0; i < MidiOutNode::kCcRows; i++)
+      {
+         NodeCheckbox(kOnLbl[i], &n->ccOn[i]);
+         ModSliderInt(kNumLbl[i], &n->ccNum[i], 0, 127);
+         ModSlider(kValLbl[i], &n->ccVal[i], 0.0f, 1.0f);
+      }
+
+      if (ActionButton::Draw("panic##midiOutPanic", ImVec2(kPreviewSize, 0)))
+         n->Panic();
+
+      if (!n->DeviceError().empty())
+         ImGui::TextDisabled("%s", n->DeviceError().c_str());
+      else if (n->DeviceOpen())
+         ImGui::TextDisabled("sent: %llu", n->SentCount());
+      else
+         ImGui::TextDisabled("no device");
+   }
+
+
    void DrawCVRecorderParams(CVRecorderNode* n)
    {
       // One button: rec -> stop, and stopping starts the loop immediately.
