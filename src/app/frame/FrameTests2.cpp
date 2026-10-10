@@ -2542,9 +2542,14 @@ void FrameTest_FIELDPIXELTEST(int frameId, GLFWwindow* window)
             auto disconnected = render("img(uv)", 12006);
             effect.DeclaredImageInput(0)->Disconnect(); effect.CookIfNeeded(12007);
             disconnected = read(effect, 192, 108);
-            pass = pass && !disconnected.empty();
-            for (float v : disconnected) pass = pass && v == 0.0f;
-            pass = pass && effect.EmitResult().offsetReadCount == 1 && !effect.EmitResult().usesOffsetReads;
+            float maxDisconnected = 0.0f;
+            for (float v : disconnected) maxDisconnected = std::max(maxDisconnected, std::abs(v));
+            const bool disconnectedOk = !disconnected.empty() && maxDisconnected == 0.0f;
+            const bool countsOk = effect.EmitResult().offsetReadCount == 1 && !effect.EmitResult().usesOffsetReads;
+            if (pass && (!disconnectedOk || !countsOk))
+               printf("[FIELDPIXELTEST] image sampling disconnect: empty %d, max %.5f; offsetReadCount %d, usesOffsetReads %d\n",
+                      (int)disconnected.empty(), maxDisconnected, (int)effect.EmitResult().offsetReadCount, (int)effect.EmitResult().usesOffsetReads);
+            pass = pass && disconnectedOk && countsOk;
             if (scratch) glDeleteFramebuffers(1, &scratch);
             printf("[FIELDPIXELTEST] Assertion 29 (Image Sampling GPU): %s\n", pass ? "OK" : "FAIL");
          }
