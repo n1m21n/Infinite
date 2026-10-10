@@ -356,6 +356,8 @@ namespace app
          return 1;
       if (dynamic_cast<PointsToVerticesNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<DelaunayMeshNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<MergeByDistanceNode*>(gn.node.get()) != nullptr)
          return 1;
       // DistributePointsInGridNode has no inputs - falls through to 0 below.

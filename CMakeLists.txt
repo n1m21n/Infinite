@@ -513,6 +513,7 @@ set(COMMON_SOURCES
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
+    src/core/Delaunay.cpp
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
@@ -671,6 +672,7 @@ set(COMMON_SOURCES
     src/nodes/FieldPixelNode.cpp
     src/nodes/FieldGraphNode.cpp
     src/nodes/PointDistributionNodes.cpp
+    src/nodes/DelaunayNodes.cpp
     src/nodes/DepthProjectionNode.cpp
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp

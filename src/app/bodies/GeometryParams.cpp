@@ -733,6 +733,18 @@ namespace app
    }
 
 
+   void DrawDelaunayParams(DelaunayMeshNode* n)
+   {
+      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      DropdownButton("plane", DelaunayMeshNode::PlaneNames(), n->plane,
+                     [n](int i) { n->plane = i; });
+      ModCheckbox("alive only", &n->aliveOnly);
+      ModSliderInt("max points", &n->maxPoints, 3, 5000);
+      if (dynamic_cast<VoronoiCellsNode*>(n) != nullptr)
+         ModSlider("inset", &n->inset, 0.0f, 0.95f);
+   }
+
+
    void DrawDistributePointsInGridParams(DistributePointsInGridNode* n)
    {
       ImGui::TextDisabled("%zu points", n->PointCount());
