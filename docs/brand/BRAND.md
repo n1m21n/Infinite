@@ -19,8 +19,22 @@ python3 tools/brand/build_brand_book.py
 ```
 
 ```bash
-python3 tools/brand/build_3d.py
+python3 tools/brand/build_3d.py            # all 3D; --only node_hero_cutout,logo_3d_cutout for a few renders
 ```
+
+Every brand file is made by a tool in `tools/brand/`. Run the tool; do not hand-edit its output.
+
+| Tool | Makes | Check mode |
+|---|---|---|
+| `build_brand_book.py` | `brand-book.html`, `brand.css` (also `website/brand.css`), `brand.tokens.json` | Contrast gate fails the build |
+| `build_3d.py` | `.glb` kit, `kit.blend`, renders, Cycles cutouts with transparent ground | `--only` |
+| `build_logo.py` | `art/brand/logo/`: SVG, PNG, favicons, `.icns`, `.ico`, Linux icons from the lemniscate formula | `--check` against the shipped icon |
+| `channels.py` | One message at all 14 `render.targets` sizes (OG, YouTube, X, LinkedIn, GitHub, README light/dark, Instagram, story, slide, Discord) | Fails on a wrong size |
+| `templates.py` | `templates/`: slide deck (+PDF), release email (+PNG), press fact sheet (+PDF), facts read live | Fails on a failed render |
+| `frame_shot.py` | Screenshots on the standard frame (section 10.1) into `img/screenshots/` | Warns below 2x |
+| `press_kit.py` | `dist/press/Infinite-press-kit-<version>.zip` | Fails on missing logo or fact sheet |
+| `brand_lint.py` | Report of off-brand and retired colours (ratchet in `lint_baseline.json`) | Exit 1 if a file got worse |
+| `migrate_colours.py` | Applies `colour.retired` / `colour.migrate` swaps; dry run unless `--apply` | |
 
 The book build fails if any colour pair in the contrast gate misses its WCAG ratio. The app's own UI is not covered here: it follows `src/app/ui/design/tokens.json` and the `infinite-design-system` skill. Where the two disagree on a brand surface, this book wins.
 
@@ -362,6 +376,32 @@ To build another node, add a `build_<node>()` next to `build_node()` in `tools/b
 
 Thumbnails: one Geist headline of 2 to 4 words at the left, the real product or a 3D node at the right, Midnight ground, one Ember element, the mark top left at 6% margin.
 
+Make them with `python3 tools/brand/channels.py --headline "A DAW for you" --hand you --kicker "Infinite 0.5" --line "..."`. Sizes and safe boxes live in `brand.json` `render.targets`.
+
+### 10.1 Screenshot standard
+
+| Rule | Value |
+|---|---|
+| Capture | 2x (Retina), default dark theme, a real patch with signal flowing, no debug panels, cursor hidden |
+| Window | Whole window with macOS Cmd+Shift+4 then Space (no desktop), or one node with `scripts/node_screenshot.py "<Node>"` |
+| Content | Real names and values; no lorem, no "test", no personal paths in title bars |
+| Frame | `python3 tools/brand/frame_shot.py shot.png [--mode paper] [--ratio 4:5]`: brand ground, 6% margin, 20 pt corners, two-layer shadow |
+| Ratio | 16:9 for site, slides, YouTube; 4:5 for Instagram and LinkedIn; 1:1 for avatars and grids |
+| Never | Upscale, recolour the UI, add device mockups, blur or crop through a control |
+| Where | `docs/brand/img/screenshots/`; the press kit picks them up |
+
+### 10.2 Templates
+
+`python3 tools/brand/templates.py` writes `docs/brand/templates/`:
+
+| Template | Use |
+|---|---|
+| `slides.html` | 1920 × 1080 deck on `brand.css`: title, statement, image, two-up, end. Arrow keys step; `?print` lays out every slide for PDF |
+| `email.html` | 600 px release email, tables and inline styles only, Paper mode, one Ember button; fill the `{{ }}` fields |
+| `fact-sheet.html` | A4 press sheet; version, licence and links read from `gh`, `LICENSE` and `README.md` |
+
+`python3 tools/brand/press_kit.py` zips logo, renders, cutouts, channel cards, screenshots and the fact sheet.
+
 ## 11. Formatting and voice
 
 | Topic | Rule |
@@ -416,18 +456,17 @@ Audit after Romaniuk, *Building Distinctive Brand Assets* (2018): spend where an
 | Reading speed | Netflix and BBC subtitle guidance (about 17 cps) | Kinetic type at most 15 cps |
 | Safe areas | EBU R95 | Film grid |
 
-## 14. Migration (not applied yet)
+## 14. Migration
 
-These surfaces still carry v1 values. Move them when each is next touched; the book is the target.
-
-| Surface | Today | v2 target |
-|---|---|---|
-| `website/style.css` | Terracotta `#C2593F` buttons, warm inks, hand-copied variables | Link or inline `docs/brand/brand.css`; buttons Ember 600 `#B53700` with white text; inks from the Paper mode |
-| `website/glass.css` | Glass behind body copy in places | Glass only behind short labels, 72 to 78% opacity |
-| motion-film `infinite-house-style.md` | Coral/violet house palette | Read `brand.json` modes; springs by name |
-| `~/films/inside-infinite` palette | r5 modes with Bone ink | Moon `#EEF1FA` ink; already on Midnight / Mist / Paper |
-| 3D nodes in films | Skewed textures (r7) | Import `node_audio_filter.glb` or build with `build_3d.py` |
-| Press kit | v1 PNGs | Add `logo_3d` and `logo_tile` renders; mark SVG from the formula |
+| Surface | State (2026-10-10) |
+|---|---|
+| `website/` | Done: links `brand.css`, palette aliases brand roles, springs by name, no retired colours (`brand_lint.py` guards it; illustration colours are baselined) |
+| `website/glass.css` | Open: glass only behind short labels, 72 to 78% opacity |
+| motion-film skills | Done: colours migrated, house style points at `brand.json` and the 3D kit |
+| `~/films/inside-infinite` palette | Open: Moon `#EEF1FA` ink |
+| 3D nodes in films | Done: import the `.glb` files or build with `build_3d.py` |
+| Press kit | Done: `press_kit.py` |
+| App icon (`assets/Infinite.iconset`) | Open: ground is `#1D223B`, brand tile is `#151930`; `build_logo.py --check` reports it |
 
 ## 15. Before shipping anything on a brand surface
 
@@ -439,3 +478,4 @@ These surfaces still carry v1 values. Move them when each is next touched; the b
 6. Type follows the scale; values are in mono with units.
 7. A 3D node matches its app screenshot side by side.
 8. Copy: plain, specific, no em dashes, no hype.
+9. `python3 tools/brand/brand_lint.py <path>` passes.
