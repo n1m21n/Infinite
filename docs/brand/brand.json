@@ -802,16 +802,16 @@
   ],
   "durations_ms": {
    "instant": 0,
-   "micro": 120,
-   "small": 200,
-   "medium": 320,
-   "large": 480,
-   "page": 640
+   "micro": 125,
+   "small": 188,
+   "medium": 333,
+   "large": 500,
+   "page": 667
   },
   "stagger_ms": {
-   "letter": 11,
-   "list": 40,
-   "card": 60
+   "letter": 10,
+   "list": 42,
+   "card": 62
   },
   "app_ms": {
    "hover_in": 120,

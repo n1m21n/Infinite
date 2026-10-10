@@ -256,7 +256,7 @@ Overshoot = exp(-πζ / √(1 - ζ²)). Settle is measured by the build; CSS `li
 | ease-in-out | `cubic-bezier(0.65, 0, 0.35, 1)` | Camera, large travel |
 | ease-in | `cubic-bezier(0.7, 0, 0.84, 0)` | Exits only |
 
-Durations: micro 120, small 200, medium 320, large 480, page 640 ms. Stagger: letter 11, list 40, card 60 ms.
+Durations are note values at 120 BPM (the transport default): micro 125 (1/16), small 188 (1/16 dotted), medium 333 (1/4 triplet), large 500 (1/4), page 667 (1/2 triplet) ms. Stagger: letter 10 (1/128 triplet), list 42 (1/32 triplet), card 62 (1/32) ms. The laws behind every move (clock, mass, spring, path, phase, perception) live in `tools/brand/motion.py`; `--check` keeps tokens on the grid.
 
 | Verb | Meaning |
 |---|---|

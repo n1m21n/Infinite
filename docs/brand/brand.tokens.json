@@ -887,35 +887,35 @@
     "micro": {
       "$type": "duration",
       "$value": {
-        "value": 120,
+        "value": 125,
         "unit": "ms"
       }
     },
     "small": {
       "$type": "duration",
       "$value": {
-        "value": 200,
+        "value": 188,
         "unit": "ms"
       }
     },
     "medium": {
       "$type": "duration",
       "$value": {
-        "value": 320,
+        "value": 333,
         "unit": "ms"
       }
     },
     "large": {
       "$type": "duration",
       "$value": {
-        "value": 480,
+        "value": 500,
         "unit": "ms"
       }
     },
     "page": {
       "$type": "duration",
       "$value": {
-        "value": 640,
+        "value": 667,
         "unit": "ms"
       }
     }
