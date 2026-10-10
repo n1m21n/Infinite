@@ -1,5 +1,7 @@
 // Theme: colours, scope palette, panel/button/dropdown styles, ApplyTheme (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/ui/design/components/ActionButton.h"
+#include "app/ui/design/TokenColors.h"
 
 namespace app
 {
@@ -30,38 +32,38 @@ namespace app
 
    ImU32 ScopeBgCol()
    {
-      return IsThemeLight() ? IM_COL32(236, 240, 248, 255) : IM_COL32(11, 12, 16, 255);
+      return tok::U32(tok::scope_bg, IsThemeLight());
    }
 
 
    ImU32 ScopeBorderCol()
    {
-      return IsThemeLight() ? IM_COL32(185, 192, 208, 255) : IM_COL32(64, 68, 84, 255);
+      return tok::U32(tok::scope_border, IsThemeLight());
    }
 
 
    ImU32 ScopeGridCol()
    {
-      return IsThemeLight() ? IM_COL32(208, 215, 228, 255) : IM_COL32(255, 255, 255, 26);
+      return tok::U32(tok::scope_grid, IsThemeLight());
    }
 
 
    ImU32 ScopeMidLineCol()
    {
-      return IsThemeLight() ? IM_COL32(178, 186, 204, 255) : IM_COL32(255, 255, 255, 46);
+      return tok::U32(tok::scope_midline, IsThemeLight());
    }
 
 
    ImU32 ScopeTextCol()
    {
-      return IsThemeLight() ? IM_COL32(70, 78, 96, 255) : IM_COL32(120, 128, 150, 255);
+      return tok::U32(tok::scope_text, IsThemeLight());
    }
  // settings file written once the drag ends
 
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding)
    {
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, isLight ? IM_COL32(238, 240, 246, 255) : IM_COL32(18, 18, 24, 255), rounding);
+      dl->AddRectFilled(origin, br, tok::U32(tok::backdrop_base, isLight), rounding);
       if (!gCheckerboardBackdrop)
          return;
       const float cell = 12.0f;
@@ -75,7 +77,7 @@ namespace app
                continue;
             const ImVec2 tl(origin.x + x * cell, origin.y + y * cell);
             const ImVec2 cbr(std::min(br.x, tl.x + cell), std::min(br.y, tl.y + cell));
-            dl->AddRectFilled(tl, cbr, isLight ? IM_COL32(220, 224, 232, 255) : IM_COL32(30, 30, 38, 255));
+            dl->AddRectFilled(tl, cbr, tok::U32(tok::backdrop_check, isLight));
          }
       }
    }
@@ -128,11 +130,16 @@ namespace app
    // on the theme - the exact class of drift this ladder exists to end - and
    // both values landed too weak to read as a selection at a glance. Selected
    // is 0.60 accent, everywhere, in every theme; hover and pressed bracket it.
-   ImVec4 AccentEmphasisHover() { return AccentTint(0.36f); }
+   ImVec4 AccentEmphasisHover() { return AccentTint(tok::accent_hover); }
 
-   ImVec4 AccentEmphasisSelected() { return AccentTint(0.60f); }
+   ImVec4 AccentEmphasisSelected() { return AccentTint(tok::accent_selected); }
 
-   ImVec4 AccentEmphasisPressed() { return AccentTint(0.78f); }
+   ImVec4 AccentEmphasisPressed() { return AccentTint(tok::accent_pressed); }
+
+   // A button that is already on keeps its accent when hovered: same hue, ~4% brighter (a hint of life, no colour
+   // change). Press darkens; release returns to the selected look. Pair with PopSelectedButtonColors.
+   void PushSelectedButtonColors() { ActionButton::Scoped() = ActionButton::Kind::Selected; }
+   void PopSelectedButtonColors() { ActionButton::Scoped() = ActionButton::Kind::Plain; }
 
 
    // Shared "this is the recommended action" emphasis for a modal dialog's
@@ -152,12 +159,14 @@ namespace app
                                     std::min(accent.z * 1.1f, 1.0f), 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive,
                              ImVec4(accent.x * 0.82f, accent.y * 0.82f, accent.z * 0.82f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::palf::v_1000_1000_1000_1000));
+      ActionButton::Scoped() = ActionButton::Kind::Primary;
    }
 
 
    void PopPrimaryButtonStyle()
    {
+      ActionButton::Scoped() = ActionButton::Kind::Plain;
       ImGui::PopStyleColor(4);
    }
 
@@ -174,11 +183,11 @@ namespace app
       // brighter panel needed a real edge), but that was the one dropdown
       // border left standing after every other border in the app was
       // deleted rather than recolored - same fix applies here.
-      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.28f, 0.31f, 0.42f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.35f, 0.39f, 0.52f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.90f, 0.93f, 0.98f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::dropdown_fill, isLight));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::dropdown_hover, isLight));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::dropdown_active, isLight));
+      ImGui::PushStyleColor(ImGuiCol_Text, tok::V4(tok::dropdown_text, isLight));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
@@ -222,7 +231,7 @@ namespace app
       // Border size is zeroed here too (not just the colour) so no outline is
       // rasterized at all - a transparent 1px border still antialiases against
       // the rounded corner and was itself the corner-bleed users saw.
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
       ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, isLight ? 0.06f : 0.22f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
@@ -270,7 +279,7 @@ namespace app
       const ImVec4 bg = isLight ? ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.99f)
                                  : ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.97f);
       ImGui::PushStyleColor(isChild ? ImGuiCol_ChildBg : ImGuiCol_WindowBg, bg);
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
    }
@@ -397,7 +406,25 @@ namespace app
 
       ImGuiStyle& style = ImGui::GetStyle();
       style.Colors[ImGuiCol_Text] = vec(t.text);
-      style.Colors[ImGuiCol_TextDisabled] = vec(t.textDim);
+      // G15: dim text keeps 4.5:1 against the panel in every theme, ported presets included. The dim colour
+      // is pulled toward full text colour only as far as needed, so themes that already pass are unchanged.
+      {
+         auto lum = [](float r, float g, float b) {
+            auto f = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
+            return 0.2126f * f(r) + 0.7152f * f(g) + 0.0722f * f(b);
+         };
+         auto ratio = [](float a, float b) { return (std::max(a, b) + 0.05f) / (std::min(a, b) + 0.05f); };
+         const float panelL = lum(t.panelBg.r, t.panelBg.g, t.panelBg.b);
+         float k = 0.0f;
+         ImVec4 dim = vec(t.textDim);
+         for (; k < 1.0f; k += 0.05f)
+         {
+            dim = ImVec4(t.textDim.r + (t.text.r - t.textDim.r) * k, t.textDim.g + (t.text.g - t.textDim.g) * k,
+                         t.textDim.b + (t.text.b - t.textDim.b) * k, 1.0f);
+            if (ratio(lum(dim.x, dim.y, dim.z), panelL) >= 4.5f) break;
+         }
+         style.Colors[ImGuiCol_TextDisabled] = dim;
+      }
       style.Colors[ImGuiCol_WindowBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_ChildBg] = vec(t.panelBg, 0.0f);
       style.Colors[ImGuiCol_PopupBg] = vec(t.panelBg, 0.98f);
@@ -419,12 +446,30 @@ namespace app
       // applied to the seam above bottom-docked panels.
       style.Colors[ImGuiCol_MenuBarBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_ScrollbarBg] = vec(t.windowBg);
-      style.Colors[ImGuiCol_ScrollbarGrab] = vec(t.border);
-      style.Colors[ImGuiCol_ScrollbarGrabHovered] = shade(t.border, 0.25f);
-      style.Colors[ImGuiCol_ScrollbarGrabActive] = vec(t.accent);
-      style.Colors[ImGuiCol_CheckMark] = vec(t.accent);
-      style.Colors[ImGuiCol_SliderGrab] = vec(t.accent, 0.85f);
-      style.Colors[ImGuiCol_SliderGrabActive] = vec(t.accent);
+      // Quiet text-tinted pill that deepens on hover/drag; the track stays flat.
+      style.Colors[ImGuiCol_ScrollbarGrab] = vec(t.text, 0.22f);
+      style.Colors[ImGuiCol_ScrollbarGrabHovered] = vec(t.text, 0.40f);
+      style.Colors[ImGuiCol_ScrollbarGrabActive] = vec(t.text, 0.55f);
+      // G15: the checked / active control colour keeps 3:1 against the panel. Pulled toward the text colour only
+      // as far as needed, so themes whose accent already passes are unchanged.
+      ImVec4 ctrlAccent = vec(t.accent);
+      {
+         auto lum = [](float r, float g, float b) {
+            auto f = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
+            return 0.2126f * f(r) + 0.7152f * f(g) + 0.0722f * f(b);
+         };
+         const float panelL = lum(t.panelBg.r, t.panelBg.g, t.panelBg.b);
+         for (float k = 0.0f; k < 1.0f; k += 0.05f)
+         {
+            ctrlAccent = ImVec4(t.accent.r + (t.text.r - t.accent.r) * k, t.accent.g + (t.text.g - t.accent.g) * k,
+                                t.accent.b + (t.text.b - t.accent.b) * k, 1.0f);
+            const float l = lum(ctrlAccent.x, ctrlAccent.y, ctrlAccent.z);
+            if ((std::max(l, panelL) + 0.05f) / (std::min(l, panelL) + 0.05f) >= 3.0f) break;
+         }
+      }
+      style.Colors[ImGuiCol_CheckMark] = ctrlAccent;
+      style.Colors[ImGuiCol_SliderGrab] = ImVec4(ctrlAccent.x, ctrlAccent.y, ctrlAccent.z, 0.85f);
+      style.Colors[ImGuiCol_SliderGrabActive] = ctrlAccent;
       // Idle Button was pinned to the exact same color as the panel it sits
       // on (panelBg, no offset) - a button was distinguishable from plain
       // text only once hovered, so buttons like "Show all cables" or
@@ -485,7 +530,7 @@ namespace app
       // matrix" and Menu > "Performance Matrix" still drew an outline after
       // the dialog/popup borders were removed - they were never going through
       // PopupBorderSize at all. BeginChild zeroes ChildBorderSize itself
-      // unless ImGuiChildFlags_Border is passed, so this only reaches
+      // unless ImGuiChildFlags_Borders is passed, so this only reaches
       // submenus and the handful of deliberately-bordered children, which
       // push their own size back locally (the Field reference code boxes).
       style.ChildBorderSize = 0.0f;
@@ -515,11 +560,18 @@ namespace app
       ed::SetCurrentEditor(gEditor);
       ed::Style& edStyle = ed::GetStyle();
       edStyle.Colors[ed::StyleColor_Bg] = vec(t.windowBg, isLight ? 1.0f : 0.784f);
-      edStyle.Colors[ed::StyleColor_Grid] = vec(t.border, isLight ? 0.50f : 0.35f);
+      edStyle.Colors[ed::StyleColor_Grid] = vec(t.border, !gShowCanvasGrid ? 0.0f : (isLight ? 0.16f : 0.12f));
       edStyle.Colors[ed::StyleColor_NodeBg] = vec(t.panelBg, isLight ? 0.95f : 0.80f);
       edStyle.Colors[ed::StyleColor_NodeBorder] = vec(t.border, isLight ? 0.70f : 0.40f);
       edStyle.NodeRounding = CategoryColors::GetNodeRounding();
-      edStyle.GroupRounding = CategoryColors::GetNodeRounding() * 0.5f;
+      // N4: backdrops use the group radius token; N3/N5: hover, selection and marquee all speak accent.
+      edStyle.GroupRounding = tok::radius_group;
+      edStyle.Colors[ed::StyleColor_HovLinkBorder] = vec(t.accent, 0.90f);
+      edStyle.Colors[ed::StyleColor_SelLinkBorder] = vec(t.accent, 1.0f);
+      edStyle.Colors[ed::StyleColor_NodeSelRect] = vec(t.accent, 0.08f);
+      edStyle.Colors[ed::StyleColor_NodeSelRectBorder] = vec(t.accent, 0.60f);
+      edStyle.Colors[ed::StyleColor_LinkSelRect] = vec(t.accent, 0.08f);
+      edStyle.Colors[ed::StyleColor_LinkSelRectBorder] = vec(t.accent, 0.60f);
       edStyle.GridSpacing = gGridSnap;
       ed::SetCurrentEditor(prevEditor);
    }

@@ -118,6 +118,14 @@ public:
    bool IsReady() const { return mReady; }
    bool IsLoading() const { return mHandle != nullptr && !mReady && mLoadFailed == false; }
    bool HasPlugin() const { return !pluginId.empty(); }
+   NodeIssue Issue() const override
+   {
+      if (!mLoadFailed || pluginId.empty())
+         return {};
+      return NodeIssue::Err((pluginName.empty() ? std::string("This plugin") : pluginName) + " did not load: " +
+                               NodeIssues::FirstLine(mStatus) + ". The patch keeps its settings. Click to open the plugin list.",
+                            NodeIssue::Fix::Plugins);
+   }
 
    // The plugin's own editor window. Toggling is the node's "open" button;
    // EditorIsOpen reads the real window state, so a window the user closed

@@ -112,6 +112,7 @@ Show minimap	显示小地图
 Show modulation matrix	显示调制矩阵
 Show viewport panel	显示视口面板
 Size	大小
+Show canvas grid	显示画布网格
 Snap to grid	吸附到网格
 Solid Color	纯色
 Standard (shared)	标准（共享）
@@ -1171,3 +1172,9 @@ Zoom in and out	放大和缩小
 Zoom the view into the selected node; Enter zooms back out to where you were	将视图缩放到所选节点；按 Enter 缩回原来的位置
 transform  ->  back into Feedback's input   <- this closes the loop	transform  ->  回到 Feedback 的输入   <- 这样就闭合了循环
 {mod}+C / {mod}+V, or Shift+D / {mod}+D to duplicate in place	{mod}+C / {mod}+V，或 Shift+D / {mod}+D 原位复制
+Library - search modules, samples, media and plugins	资源库：搜索模块、采样、媒体和插件
+Library	资源库
+Sort	排序
+Filter	筛选
+Descending	降序
+Ascending	升序

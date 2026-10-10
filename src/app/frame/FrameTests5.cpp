@@ -1,4 +1,13 @@
 // Per-frame self-test blocks moved verbatim out of the main loop in main.cpp.
+#include "app/ui/design/UiType.h"
+#include "app/ui/design/UiLayout.h"
+#include "app/ui/design/UiInteract.h"
+#include "app/ui/design/UiGallery.h"
+#include "app/ui/design/components/Divider.h"
+#include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/Readout.h"
+#include "app/ui/design/components/TextButton.h"
+#include "app/ui/design/Glyphs.gen.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -1855,7 +1864,7 @@ void FrameTest_UISCALETEST(int frameId, GLFWwindow* window)
          // Phases, 8 frames each so the rebake and two node-editor layout passes settle:
          // scale 1.0 (reference), 1.5, 2.0, 1.25, then the user's own value is restored.
          // 1.25 asks for a fractional font size even on Retina (37.5 px); 1.5 does on
-         // Windows/X11 (22.5 px). ImGui truncates font sizes, see UiScale::BakedFontPx.
+         // Windows/X11 (22.5 px). (pre-1.92 note: ImGui truncated baked font sizes.)
          static const float kScales[] = { 1.0f, 1.5f, 2.0f, 1.25f };
          const int kPhases = 4;
          static float sUserScale = 1.0f;
@@ -1967,6 +1976,183 @@ void FrameTest_SIZETEST(int frameId, GLFWwindow* window)
          if (frameId == 15)
             glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
+}
+
+// INFINITE_NODEDRAGWIDTHTEST: every registered node type, one at a time, spawned with both param sections open and
+// dragged by its left padding with a real (synthetic) mouse gesture. A node's width must not change while it rests or
+// while it is dragged: a width that feeds on screen position or on last frame's width grows every frame of a drag.
+// INFINITE_NODEDRAGWIDTHTEST=<type name> runs just that type.
+void FrameTest_NODEDRAGWIDTHTEST(int frameId, GLFWwindow* window)
+{
+   const char* only = getenv("INFINITE_NODEDRAGWIDTHTEST");
+   if (only == nullptr || frameId < 2)
+      return;
+   static bool sUnbuffered = false;
+   if (!sUnbuffered) { setvbuf(stdout, nullptr, _IONBF, 0); sUnbuffered = true; }
+   ImGuiIO& tio = ImGui::GetIO();
+   tio.ConfigInputTrickleEventQueue = false;
+
+   // INFINITE_NODEDRAGWIDTHZOOM=<notches>: scroll the canvas first (negative zooms out) so the drag runs off zoom 1.
+   if (const char* z = getenv("INFINITE_NODEDRAGWIDTHZOOM"); z != nullptr && frameId >= 2 && frameId < 2 + std::abs(atoi(z)))
+   {
+      tio.AddMousePosEvent(tio.DisplaySize.x * 0.5f, tio.DisplaySize.y * 0.5f);
+      tio.AddMouseWheelEvent(0.0f, atoi(z) < 0 ? -1.0f : 1.0f);
+      return;
+   }
+   if (const char* z = getenv("INFINITE_NODEDRAGWIDTHZOOM"); z != nullptr && frameId < 4 + std::abs(atoi(z)))
+      return;
+
+   // With INFINITE_LOADPATCH the nodes already in the patch are the ones dragged, each lifted to the top and moved under
+   // the pointer first, so a real patch's state (cables, bindings, zoom, bound params) is what gets tested.
+   const bool patchMode = getenv("INFINITE_LOADPATCH") != nullptr;
+   struct Item { std::string name, category; };
+   static std::vector<Item> sItems;
+   static size_t sNext = 0;
+   static int sIndex = -1, sStart = 0, sFailures = 0, sSkipped = 0, sChecked = 0;
+   static float sRestW = 0.0f, sMaxW = 0.0f;
+   static ImVec2 sGrab(0, 0), sRestPos(0, 0);
+   static bool sGrabbed = false;
+   static std::vector<int> sPatchIdx;
+   static bool sPatchSnap = false;
+   if (patchMode && !sPatchSnap && frameId >= 40)
+   {
+      sPatchSnap = true;
+      for (const GraphNode& n : gNodes)
+         sPatchIdx.push_back(n.index);
+      sItems.resize(sPatchIdx.size());
+      printf("NODEDRAGWIDTHTEST %zu patch node(s)\n", sItems.size());
+      return;
+   }
+   if (patchMode && !sPatchSnap)
+      return;
+   if (!patchMode && sItems.empty() && sNext == 0)
+   {
+      for (const std::string& category : NodeFactory::Instance().GetCategories())
+         for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+            if (only[0] == '\0' || only[0] == '1' || name == only)
+               sItems.push_back({ name, category });
+      printf("NODEDRAGWIDTHTEST %zu node type(s)\n", sItems.size());
+      while (!gNodes.empty())   // the generic fixture graph (Shape + Output) would sit under the nodes under test
+         RemoveNodeByIndex(gNodes.back().index);
+      return;
+   }
+
+   auto finish = [&]() {
+      if (sFailures == 0)
+         printf("NODEDRAGWIDTHTEST %d nodes dragged, width held  OK (%d skipped: grab point off-screen)\n", sChecked, sSkipped);
+      else
+         printf("NODEDRAGWIDTHTEST FAIL: %d of %d node(s) changed width\n", sFailures, sChecked);
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+   };
+
+   if (sIndex < 0)
+   {
+      if (sNext >= sItems.size())
+      {
+         finish();
+         return;
+      }
+      const Item& it = sItems[sNext];
+      GraphNode* gn = patchMode ? FindNodeByIndex(sPatchIdx[sNext]) : SpawnNode(it.name, it.category, 20.0f, 20.0f);
+      sNext++;
+      if (gn == nullptr)
+         return;
+      if (patchMode)
+      {
+         ed::SetNodeZPosition(gn->NodeId(), 1000.0f);
+         ed::SetNodePosition(gn->NodeId(), ed::ScreenToCanvas(ImVec2(150.0f, 120.0f)));
+      }
+      else
+      {
+         gn->showParams = true;
+         gn->showAdvancedParams = true;
+      }
+      sIndex = gn->index;
+      sStart = frameId;
+      sMaxW = 0.0f;
+      sGrabbed = false;
+      return;
+   }
+
+   GraphNode* gn = FindNodeByIndex(sIndex);
+   if (gn == nullptr)
+   {
+      sIndex = -1;
+      return;
+   }
+   const int r = frameId - sStart;
+   const ImVec2 pos = ed::GetNodePosition(gn->NodeId());
+   const ImVec2 size = ed::GetNodeSize(gn->NodeId());
+   const char* typeName = gn->typeName.c_str();
+   auto fail = [&](const char* when) {
+      printf("NODEDRAGWIDTHTEST FAIL: %s is %.1f wide %s, %.1f at rest\n", typeName, size.x, when, sRestW);
+      sFailures++;
+   };
+
+   if (r < 6)
+   {
+      // Rest: the width must settle and then hold with no input at all.
+      if (r == 4)
+         sRestW = size.x;
+      else if (r == 5 && std::fabs(size.x - sRestW) > 0.5f)
+         fail("after settling without any drag");
+      return;
+   }
+   if (r == 6)
+   {
+      sRestPos = pos;
+      // Left padding strip: inside the node, between its edge and the first control.
+      sGrab = ed::CanvasToScreen(ImVec2(pos.x + 3.0f, pos.y + std::min(size.y * 0.5f, 60.0f)));
+      const ImVec2 d = tio.DisplaySize;
+      sGrabbed = sGrab.x > 2.0f && sGrab.y > 2.0f && sGrab.x < d.x - 90.0f && sGrab.y < d.y - 60.0f;
+      if (!sGrabbed)
+         sSkipped++;
+      else
+         tio.AddMousePosEvent(sGrab.x, sGrab.y);
+      return;
+   }
+   if (sGrabbed && r >= 7 && r <= 13)
+   {
+      if (r == 7)
+         tio.AddMouseButtonEvent(0, true);
+      else if (r <= 12)
+         tio.AddMousePosEvent(sGrab.x + (float)(r - 7) * 12.0f, sGrab.y + (float)(r - 7) * 8.0f);
+      else
+         tio.AddMouseButtonEvent(0, false);
+      if (r >= 8)
+      {
+         sMaxW = std::max(sMaxW, size.x);
+         if (std::fabs(size.x - sRestW) > 0.5f)
+         {
+            fail("during the drag");
+            tio.AddMouseButtonEvent(0, false);
+            sIndex = -1;
+            if (!patchMode)
+               RemoveNodeByIndex(gn->index);
+            else
+               ed::SetNodeZPosition(gn->NodeId(), 0.0f);
+            return;
+         }
+      }
+      return;
+   }
+   if (r >= 16)
+   {
+      if (sGrabbed)
+      {
+         sChecked++;
+         const bool moved = std::fabs(pos.x - sRestPos.x) > 10.0f || std::fabs(pos.y - sRestPos.y) > 10.0f;
+         if (!moved)
+            printf("NODEDRAGWIDTHTEST note: %s did not move; the grab point hit a control, not the node\n", typeName);
+         if (std::fabs(size.x - sRestW) > 0.5f)
+            fail("after the drag");
+      }
+      sIndex = -1;
+      if (!patchMode)
+         RemoveNodeByIndex(gn->index);
+      else
+         ed::SetNodeZPosition(gn->NodeId(), 0.0f);
+   }
 }
 
 void FrameTest_SAMPLERDRAGTEST_2(int frameId, GLFWwindow* window)
@@ -2926,4 +3112,176 @@ void FrameTest_LOOPERTRIGTEST(int frameId, GLFWwindow* window)
          }
       }
 }
+
+void FrameTest_UITYPETEST(int frameId, GLFWwindow*)
+{
+   if (getenv("INFINITE_UITYPETEST") == nullptr || frameId != 4)
+      return;
+   bool ok = true;
+   auto bad = [&](const char* why) { printf("UITYPETEST FAIL: %s\n", why); ok = false; };
+   // The default face is Inter, so all three weights must be real fonts.
+   if (UiType::Registered() != 3)
+      bad("expected Regular, Medium and Semibold registered");
+   if (UiType::Font(UiType::Weight::Semibold) == UiType::Font(UiType::Weight::Regular))
+      bad("Semibold is the same font as Regular");
+   // Sizes come from the tokens, one step apart in the scale.
+   const UiType::Size order[] = { UiType::Size::Caption, UiType::Size::Body, UiType::Size::Title, UiType::Size::Display };
+   float prevH = 0.0f;
+   for (UiType::Size sz : order)
+   {
+      UiType::Push(sz);
+      if (std::fabs(ImGui::GetFontSize() - UiType::Px(sz)) > 0.01f)
+         bad("pushed size is not the token size");
+      const float h = ImGui::GetTextLineHeight();
+      if (!(h > prevH))
+         bad("line height does not grow with the type scale");
+      prevH = h;
+      UiType::Pop();
+   }
+   // Heavier weight is wider for the same text and size, and glyph icons still resolve in it.
+   const char* sample = "Hamburgefonstiv 120.0 BPM";
+   UiType::Push(UiType::Size::Title, UiType::Weight::Regular);
+   const float wr = ImGui::CalcTextSize(sample).x;
+   UiType::Pop();
+   UiType::Push(UiType::Size::Title, UiType::Weight::Semibold);
+   const float ws = ImGui::CalcTextSize(sample).x;
+   const float wicon = ImGui::CalcTextSize(IconsInfinite::Close).x;
+   UiType::Pop();
+   if (!(ws > wr))
+      bad("Semibold text is not wider than Regular");
+   if (!(wicon >= UiScale::kBaseFontSize - 0.5f))
+      bad("glyph icon missing from the Semibold stack");
+   printf("UITYPETEST regular %.1f semibold %.1f icon %.1f\n", wr, ws, wicon);
+   printf("%s\n", ok ? "UITYPETEST OK" : "UITYPETEST FAIL");
+}
+
+void FrameTest_UILAYOUTTEST(int frameId, GLFWwindow*)
+{
+   if (getenv("INFINITE_UILAYOUTTEST") == nullptr || frameId != 4)
+      return;
+   const char* first = "";
+   const int failures = UiLayout::SelfCheck(&first);
+   if (failures != 0)
+      printf("UILAYOUTTEST FAIL: %d case(s) wrong, first: %s\n", failures, first);
+   printf("%s\n", failures == 0 ? "UILAYOUTTEST OK" : "UILAYOUTTEST FAIL");
+}
+
+
+void FrameTest_UIINTERACTTEST(int frameId, GLFWwindow*)
+{
+   if (getenv("INFINITE_UIINTERACTTEST") == nullptr || (frameId != 5 && frameId != 6 && frameId != 7))
+      return;
+   static ImGuiID idEn = 0;
+   static bool ok = true;
+   auto bad = [&](const char* why) { printf("UIINTERACTTEST FAIL: %s\n", why); ok = false; };
+   if (frameId == 5 || frameId == 6)
+   {
+      ImGui::SetNextWindowPos(ImVec2(40, 40));
+      ImGui::SetNextWindowSize(ImVec2(300, 120));
+      ImGui::Begin("##uiinteracttest", nullptr, ImGuiWindowFlags_NoSavedSettings);
+      const bool en = frameId == 5;   // same key, label "translated" on the second frame
+      UiInteract::Item("test.play", { 50, 70, 28, 28 }, UiInteract::Role::Toggle, en ? "Play" : "Reproducir", true, "off");
+      UiInteract::Item("test.stop", { 90, 70, 28, 28 }, UiInteract::Role::Button, "Stop", false);
+      if (frameId == 5)
+         UiInteract::Item("test.stop", { 130, 70, 28, 28 }, UiInteract::Role::Button, "Stop again");
+      ImGui::End();
+   }
+   if (frameId == 6)
+   {
+      const UiInteract::Node* n = UiInteract::Find("test.play");
+      if (n == nullptr) { bad("frame 5 node missing from the tree"); return; }
+      idEn = n->id;
+      if (n->label != "Play" || n->value != "off" || n->role != UiInteract::Role::Toggle || !n->enabled)
+         bad("node fields wrong");
+      const UiInteract::Node* st = UiInteract::Find("test.stop");
+      if (st == nullptr || st->enabled)
+         bad("disabled node not recorded as disabled");
+      if (UiInteract::DuplicateKeys() != 1)
+         bad("duplicate key not counted");
+   }
+   if (frameId == 7)
+   {
+      const UiInteract::Node* n = UiInteract::Find("test.play");
+      if (n == nullptr || n->id != idEn)
+         bad("id changed when only the label changed");
+      else if (n->label != "Reproducir")
+         bad("label not updated");
+      if (UiInteract::DuplicateKeys() != 0)
+         bad("duplicate count did not reset");
+      printf("%s\n", ok ? "UIINTERACTTEST OK" : "UIINTERACTTEST FAIL");
+   }
+}
+
+
+void FrameTest_UICOMPTEST(int frameId, GLFWwindow*)
+{
+   if (getenv("INFINITE_UICOMPTEST") == nullptr || (frameId != 5 && frameId != 6))
+      return;
+   ImGui::SetNextWindowPos(ImVec2(40, 40));
+   ImGui::SetNextWindowSize(ImVec2(420, 120));
+   ImGui::Begin("##uicomptest", nullptr, ImGuiWindowFlags_NoSavedSettings);
+   const std::vector<UiLayout::Rect> cells = UiLayout::Row({ 50, 70, 380, 28 },
+      { UiLayout::Fixed(TextButton::WidthFor("Export")), UiLayout::Fixed(1), UiLayout::Fixed(160), UiLayout::Flex() });
+   TextButton::Draw("comp.export", cells[0], "Export", TextButton::Kind::Primary);
+   Divider::Vertical(cells[1]);
+   static const PillGroup::Segment segs[] = { { "comp.a", "Live" }, { "comp.b", "Arrange" }, { "comp.c", "Mix" } };
+   PillGroup::Draw("comp.mode", cells[2], segs, 3, 1);
+   Readout::Draw("comp.bpm", cells[3], "120.0", "Tempo", UiType::Size::Body, UiType::Weight::Regular, Readout::Align::Right);
+   ImGui::End();
+   if (frameId == 6)
+   {
+      bool ok = true;
+      auto bad = [&](const char* why) { printf("UICOMPTEST FAIL: %s\n", why); ok = false; };
+      const UiInteract::Node* e = UiInteract::Find("comp.export");
+      const UiInteract::Node* m = UiInteract::Find("comp.b");
+      const UiInteract::Node* b = UiInteract::Find("comp.bpm");
+      if (e == nullptr || e->role != UiInteract::Role::Button || e->label != "Export") bad("TextButton node");
+      if (m == nullptr || m->role != UiInteract::Role::Tab || m->value != "selected") bad("PillGroup selected segment");
+      if (b == nullptr || b->role != UiInteract::Role::Readout || b->value != "120.0") bad("Readout node");
+      if (UiInteract::Find("comp.a") == nullptr || UiInteract::Find("comp.a")->value != "") bad("unselected segment has a value");
+      if (UiInteract::DuplicateKeys() != 0) bad("duplicate keys");
+      // Tabular digits: "1111" and "0000" measure the same.
+      UiType::Push(UiType::Size::Body);
+      if (std::fabs(Readout::Measure("1111") - Readout::Measure("0000")) > 0.01f) bad("digits are not tabular");
+      UiType::Pop();
+      printf("%s\n", ok ? "UICOMPTEST OK" : "UICOMPTEST FAIL");
+   }
+}
+
+
+void FrameTest_UIGALLERY(int frameId, GLFWwindow*)
+{
+#ifndef NDEBUG
+   // Review shots of the real canvas in the light theme (INFINITE_AUDIOUITEST + this): no gallery drawn.
+   if (frameId == 3 && getenv("INFINITE_FORCELIGHT") != nullptr)
+   {
+      const int n = static_cast<int>(CategoryColors::PresetNames().size());
+      for (int i = 0; i < n; ++i)
+      {
+         CategoryColors::SetPresetTransient(i);
+         if (CategoryColors::IsThemeLight())
+            break;
+      }
+      ApplyTheme();
+   }
+#endif
+   const char* mode = getenv("INFINITE_UIGALLERY");   // "light" or "dark"
+   if (mode == nullptr || frameId < 3)
+      return;
+   if (frameId == 3)
+   {
+      const bool wantLight = std::string(mode) == "light";
+      const int n = static_cast<int>(CategoryColors::PresetNames().size());
+      for (int i = 0; i < n; ++i)
+      {
+         CategoryColors::SetPresetTransient(i);
+         if (CategoryColors::IsThemeLight() == wantLight)
+            break;
+      }
+      ApplyTheme();
+      return;
+   }
+   UiGallery::Draw();
+}
+
 }

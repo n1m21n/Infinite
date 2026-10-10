@@ -1,6 +1,6 @@
 # Infinite launch video: production brief (v2)
 
-Status: v2 brief written 2026-09-26 after owner notes. Execution starts next session.
+Status: done (2026-10-09, owner). v2 brief written 2026-09-26; the film is finished.
 Owner-locked: 145 BPM · dynamic palette (Claude's call) · tool-switching pointer · real equations,
 code and probabilities · ending "A DAW for **you**" · owner's artworks + screenshots, shown premium.
 

@@ -49,6 +49,7 @@
 #include "core/SysInfo.h"
 #include "core/BenchReport.h"
 #include "core/BenchFrameTail.h"
+#include "core/CookProbe.h"
 
 #if defined(_WIN32)
 #include <fcntl.h>

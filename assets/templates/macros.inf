@@ -1,0 +1,37 @@
+infinite-patch 1
+# Macros: one knob that moves several things
+node 1 Source Shape
+  id shape
+  pos 0 162
+  c fillColor 1 0.45 0.3
+end
+node 2 Macros Macro Knob
+  id knob
+  pos 0 1062
+  s label Energy
+end
+node 3 Utility Output
+  id out
+  pos 460 0
+end
+node 4 Compositing Comment
+  pos 0 722
+  s text Macros are knobs, sliders and buttons you can play live.
+  f width 340
+  f height 120
+end
+node 5 Compositing Comment
+  pos 0 878
+  s text A Macro Knob is a control you make yourself. Turn it, and everything wired to it moves together. Rename it with Label.
+  f width 300
+  f height 148
+end
+node 6 Compositing Comment
+  pos 0 0
+  s text Both Size X and Rotation follow the one knob. Add more wires to give it more to do.
+  f width 300
+  f height 126
+end
+cable out 0 shape
+mod shape sizeX knob 0 0 0.3 0.3
+mod shape rotation knob 0 0 180 0

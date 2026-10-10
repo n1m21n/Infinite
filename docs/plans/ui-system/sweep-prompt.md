@@ -1,0 +1,121 @@
+# UI + node consistency sweep: prompt and tracker
+
+Paste the prompt below into a fresh session on `feature/ui-canvas`. The tracker underneath is the single place
+status lives; update it in the same commit as each fix.
+
+## Why this exists
+
+The design pass closed every plan row, yet review still found surfaces nobody had looked at: the Viewport panel
+frame, the Shortcuts and Help windows, the filter field overlapping a card. Tests and the ratchet cannot see
+"looks different". Only a screenshot of every surface, compared against the reference surface, can. Nodes are the
+biggest surface and have had the least of this pass.
+
+## Prompt
+
+```
+Sweep Infinite's whole UI for visual consistency with the new design language, one surface at a time, with a
+screenshot as proof for every one. Branch: feature/ui-canvas. Tracker: docs/plans/ui-system/sweep-prompt.md.
+
+Load first: infinite-design-system, node-ui-pillars, audio-node-ui, run-infinite-hygiene (headless screenshots).
+
+References (the look everything is compared against):
+  - Windows/dialogs: Settings (16 pt window pad, SectionCard groups, FormParts controls, one title row).
+  - Docked panels: Modulations / Perf / Arrange (PanelFrame card, inset gap, grip strip, DrawPanelSeam).
+  - Nodes: a finished Wavetable node (audio-node-ui spec, section 8).
+
+Part A: chrome sweep. For every row in the A table of the tracker:
+  1. Screenshot dark, then light, headless:
+     INFINITE_AUDIOUITEST=1 INFINITE_OPENPANELS=<tokens>,light|dark IMAGERESYNTH_SCREENSHOT=/abs/x.png INFINITE_SCREENSHOT_FRAME=40
+     (INFINITE_FORCELIGHT is compiled out of the Release build; use the light/dark token. Use an absolute screenshot path: the app chdirs.)
+     Add an OPENPANELS token in src/app/Startup.cpp when a surface has none. For panels also take every dock side.
+  2. Read the PNG. Compare against the reference on: card/frame, window padding, title row, header style, scrollbar,
+     empty state, hover/press, text sizes, overlap or clipping, anything still using the old look.
+  3. Fix by editing the component, never the call site. Then re-shoot. Nothing is "done" without the after shot.
+  4. Record the verdict in the tracker (ok / fixed in <sha> / needs decision) and note anything not visually checked.
+
+Part B: node redesign sweep. Every node type on the canvas, thought through, not skimmed:
+  - Group by family (Source, 3D, Compositing, Effects, Modulators, Prediction, Macros, Utility, Notes, Synths,
+    AudioEffects). Do one family per commit, in the order of the B table.
+  - Audio effects first: all 16 AudioEffects share ONE visualizer grammar. For each, check: visualizer is full body
+    width, never blank at rest, same frame/graticule/colour roles, readout strip never empty, knob rows on the grid,
+    selector left / knobs right, mix bottom-right (P1 to P6), same caption and value formatting, same
+    hover/modulated state, same idle state. Where two effects show the same kind of thing (a response curve, a
+    meter, a time display), they must be drawn by one shared component, not two look-alikes.
+  - Every node: screenshot expanded, collapsed and modulated, dark and light, plus one high-contrast theme once per
+    family. Run the node-ui-pillars acceptance checklist on each.
+  - A visualizer or widget that differs from its siblings is fixed in the shared component; if no shared component
+    exists, create one in src/app/ui/design/components and move the siblings onto it.
+  - Never add a control to fill a hole. Do not restyle the visual/image/geometry node library beyond what the
+    pillars require.
+
+Rules: components only; ratchet must not rise (python3 tools/design/inventory.py, then ratchet.py); colours stay 0;
+three platforms; debug-only tools under #ifndef NDEBUG; one commit per surface or per node family, staged by explicit
+path (the repo has unrelated uncommitted files); no Claude attribution lines in commits; after each build copy
+build/Infinite.app to ~/Desktop/Infinite.app; run driver.sh --group ui before each commit and --auto before the last.
+
+Keep the screenshots: /tmp/sweep/<surface>-<dark|light>-before|after.png, and list them in the tracker row.
+Finish with a short summary: rows fixed, rows ok, decisions taken, what was not visually verified, what remains.
+```
+
+## Tracker
+
+Status: `todo`, `ok` (checked, matches), `fixed <sha>`, `decision` (needs owner), `n/a`.
+
+### A. Chrome
+
+| Surface | Dark | Light | Notes |
+|---|---|---|---|
+| Settings window (all 6 tabs) | ok (Appearance tab) | ok | reference; other 5 tabs not shot |
+| All Shortcuts | ok | ok | cards + pad, filter gap |
+| Help / module reference | ok | ok | cards, header fill off |
+| Colour picker | closed | closed | closed by owner 2026-10-09 |
+| Node help popups | todo | todo | |
+| Unsaved changes / Recover dialogs | ok | fixed (B11) | modal edge 0.055 -> 0.16 alpha in light via DialogParts.End; both dialogs shot dark+light; hook INFINITE_OPENDIALOG=unsaved|recover |
+| Export / render dialogs | todo | todo | |
+| Field editor | todo | todo | |
+| Library panel | ok | ok | B15 shot dark+light, Modules mode; refresh verified headless by LIBREFRESHTEST (Samples, Media, Plugins) |
+| Viewport panel: bottom, right, left, top | fixed (all 4 docks) | todo | empty state was hand-rolled and clipped in the left dock; now EmptyState (wraps) |
+| Modulations panel: 4 docks | ok (bottom, right) | ok (bottom) | B15 empty state centred, same card as Perf |
+| Perf panel: 4 docks, edit mode | ok (bottom, perfdemo) | ok (bottom) | B15; other docks and edit mode not shot this round |
+| Arrange panel: 4 docks, inspector | ok (bottom, inspector) | ok (bottom, inspector) | B15; other docks not shot this round |
+| Top bar, menus (File/Edit/Menu) | fixed | todo | flash fix not seen on screen |
+| Context menus (canvas, node, cable) | todo | todo | |
+| Toasts, tooltips, empty states | todo | todo | |
+| Minimap, canvas, cables, grid | todo | todo | |
+| Right rail (panel toggles) | ok | ok | B15: active toggle accent, spacing even in every shot |
+
+### B. Nodes
+
+| Family | Nodes | Dark | Light | Notes |
+|---|---|---|---|---|
+| AudioEffects (26 effect bodies) | one shared visualizer grammar | fixed | fixed | frame on `AudioViz` (new); Limiter rebuilt on the Dynamics gain-computer view; idle label on Spec Blur / Spectrum Slide; shots `fx{1,2}-{dark,light}-after2.png` (gallery: `INFINITE_FXGALLERY=1|2`); collapsed/modulated/high-contrast not shot |
+| Synths | all 17 checked (Oscillator, Wavetable via shared envelope, Analog, Wave Terrain, Equation, Spectral, Metallic, Sampler, Slicer, PaulStretch, Molder, Grain Molder, Granular, Field Synth, Drum Seq, MPC, Looper) | fixed | Osc/Analog light ok | envelope total-time label off the curve (top-right; bottom-centre when sustain > 0.6); `AudioBareDropdown` fills its cell (pin + field) so dropdown rows line up with slider rows (PaulStretch, Grain Molder, Granular, Slicer); Grain Molder placeholder indent removed; Spectral Synth duplicate caps header removed; Molder partials strip idle label; Drum Seq R/M/S gutter 70 to 82 so S clears the first step cell; Equation axis labels can sit under the curve at the frame edge (decision: left); Sampler/Slicer/PaulStretch/Granular are deliberate slider grids (ok); collapsed/modulated/high-contrast not shot; shots /tmp/sweep/syn*.png |
+| Notes | 23 (all checked dark; Note Filter + Arpeggiator also light) | fixed | ok | Fixed: Note Filter selectors onto the 3-cell knob grid; Note Sequencer rate dropdowns now lead the row (P3) with a 4 pt gap under the step label; MIDI File piano roll shows "no file" at rest. Rest ok. Collapsed/modulated/high-contrast not shot. |
+| Modulators | 28 (all dark; Audio to CV, Palette, LFO also light) | fixed | ok | Fixed: Palette hint no longer overruns the node edge; Audio to CV mode dropdown moves to the left cell (P3). 2-input nodes (Math, Compare) show no bypass, per rule. Collapsed/modulated/high-contrast not shot. |
+| Prediction | 8 (dark only) | fixed | todo | Fixed: Predictive LFO scope shows "no targets" at rest; "NN% conf" badge no longer overprints the stat on 200 pt nodes (stat shortens, shared FitStatBesideConf); Predictive Notes Learn button = one grid cell, idle "learning meter" label, 4 pt gap above knobs. Light/collapsed/modulated/high-contrast not shot. |
+| Macros | XY pad now uses the wide macro cell (XY, Step Gate, Radio share one width); other 8 ok, dark + light shot. Left: Toggle/Trigger onto Switch/ActionButton, rename on caption double-click | done | done | dark+light |
+| Effects (image) | 24 shot dark (blurs, distortions, glow, crop); share one frame/preview | fixed | todo | Fixed: filter titles spaced via DisplayName (gaussian blur, add noise...); patch keys unchanged. Displace (2 inputs) has no bypass, per rule. Params panel not shot |
+| Compositing | 16 shot dark (Fit..Audio Color Ramp + invert/opacity/drop shadow) | ok | todo | Same frame/preview as Effects; multi-input nodes have no bypass per rule; node width follows title length (reaction diffusion, remove background slightly wider) - left |
+| Source | 13 (all dark; Draw, Text, Shape, Noise light) | fixed | ok | Fixed: Draw canvas shows "draw here" until the first stroke (was a blank black square). Decision left: Text default string renders very small in its preview |
+| 3D / geometry | 32 shot dark (all but Render 3D) | ok | todo | Nodes with a wide pin header (Material, Audio Ribbon, Join Geometry, Switcher 3D, Group 3D) are wider than their preview, which sits left/off-centre - decision needed. Ocean preview is faint (dark water on dark checker); Audio Ribbon preview is empty at silence (mesh invisible). Render 3D params panel not shot |
+| Utility | 15 shot dark (Output..Blend Audio) | ok | todo | No chrome defects at gallery zoom; audio ones covered by the Audio sweeps. Syphon In/Out not shot (macOS-only labels) |
+
+### Audio effects visualizer matrix
+
+Fill one row per effect while sweeping. A column that differs from the majority is a defect, or a documented decision.
+
+| Effect | Visualizer kind | Full width | Idle state | Frame / graticule | Readout idle text | mix last | Shared component |
+|---|---|---|---|---|---|---|---|
+| Audio Filter, EQ | response curve + spectrum | yes | graticule + curve | AudioViz, 190 tall (interactive) | band/filter text | yes (EQ has no mix) | AudioViz |
+| Dynamics, Limiter | gain-computer curve + GR meter | yes | curve + ceiling/threshold | AudioViz x2 (curve, meter) | "ceiling / ratio" text | yes (Limiter has no mix) | `DrawGainComputerVisualizer` (Limiter was a 64 px side meter; fixed) |
+| Delay, Reverb, Drive, Stereo, Pitch Shifter, Chorus, Flanger, Phaser, Bitcrush, Transient Shaper, Ring Mod, Freq Shifter, Tremolo, Formant, Wavetable Shaper, Resonator Bank, Cycle Shaper, Key-Snap, Shape Resonator | params-derived shape | yes | shape drawn from params | AudioViz (border radius was 3 vs fill 4; fixed) | stat strip | yes where a mix exists | AudioViz |
+| Spec Blur, Spectrum Slide | live spectrum | yes | was a flat line; now "no input" label | AudioViz | stat strip | yes | AudioViz.IdleLabel |
+| Stutter | gate grid | yes | steps lit | none (decision: a grid, not a scope) | stat strip | no mix param | none |
+| Macro Toggle, Trigger | shared Switch / ActionButton, caption rename | yes | on/off, bang flash | none | caption | n/a | no params panel (name-only like other macros) |
+| Note Sequencer, step bars | bar columns | yes | playhead | StepCell.PlayheadOutline | step line | yes | StepCell |
+| Scope boxes (Render 3D preview, Sampler, stage previews) | AudioViz.Fill/Border | yes | idle labels | AudioViz | n/a | n/a | AudioViz |
+| Out-pin groups, menus/dropdown/list rows | section gap above out pins; rows 24 pt, search 28 | yes | n/a | none | n/a | n/a | MenuParts, LibraryParts |
+| Ocean, Audio Ribbon (mesh winding) | previews were culled/faint: faces now wind +Y; Audio Ribbon carved out of the audio-body gate so params + eye/power/screen row draw | yes | visible at silence | none | triangles | n/a | MeshOps::Ocean, AudioRibbonNode, IsAudioBodyNode |
+| Perf Color Tint submenu | round swatches via FieldWell::SwatchRow with selected ring | yes | n/a | none | n/a | n/a | FieldWell |
+| Top bar bottom edge; cable trash button | 1 px border under the bar; hover a cable for a small trash that disconnects it | yes | hover | none | n/a | n/a | StageMenuBar, StageLinks |
+| Top bar: brand logo + About, transport/audio around BPM, update icon | app-icon tile opens About (logo, author, contributors, agent); transport left of BPM, Start Audio right; update is a download icon with a red dot, right side | yes | n/a | none | n/a | n/a | StageMenuBar, StageFloating, BrandLogo.gen.h |

@@ -1,5 +1,12 @@
 // Comment, group, draw and preview node bodies (moved verbatim from main.cpp).
+#include "nodes/ImageSourceNode.h"
+#include "nodes/VideoSourceNode.h"
+#include "nodes/VideoInNode.h"
+#include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
 
 namespace app
 {
@@ -41,8 +48,10 @@ namespace app
       if (node->GetOutputTexture() != 0)
          dl->AddImage((ImTextureID)(intptr_t)node->GetOutputTexture(), tl,
                       ImVec2(tl.x + dw, tl.y + dh), ImVec2(0, 1), ImVec2(1, 0));
+      if (!node->HasStrokes())
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize)}, "draw here");
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + kPreviewSize),
-                  IM_COL32(90, 130, 190, 255), 4.0f, 0, 2.0f);
+                  tok::U32(tok::pal::c_5A82BEFF), 4.0f, 0, 2.0f);
    }
 
 
@@ -117,7 +126,7 @@ namespace app
       dl->AddRect(origin, br, borderCol, 6.0f, 0, 1.2f);
 
       const ImU32 textCol = isLight
-         ? IM_COL32(30, 36, 48, 255)
+         ? tok::U32(tok::pal::c_1E2430FF)
          : IM_COL32((int)((n->color[0] * 0.5f + 0.5f) * 255),
                     (int)((n->color[1] * 0.5f + 0.5f) * 255),
                     (int)((n->color[2] * 0.5f + 0.5f) * 255), 255);
@@ -133,7 +142,7 @@ namespace app
       {
          dl->AddText(ImGui::GetFont(), drawFontSize,
                      ImVec2(origin.x + 8, origin.y + 8),
-                     isLight ? IM_COL32(140, 146, 160, 255) : IM_COL32(150, 150, 160, 255),
+                     isLight ? tok::U32(tok::pal::c_8C92A0FF) : tok::U32(tok::pal::c_9696A0FF),
                      "double-click or type to write", nullptr, w - 16.0f);
       }
       else
@@ -477,7 +486,7 @@ namespace app
          }
          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0.35f));
          ImGui::SetNextItemWidth(std::max(60.0f, n->width - 40.0f));
-         if (ImGui::InputText("##grouprename", &n->label, ImGuiInputTextFlags_EnterReturnsTrue) ||
+         if (FieldWell::InputText("##grouprename", &n->label, ImGuiInputTextFlags_EnterReturnsTrue) ||
              ImGui::IsItemDeactivated())
             n->renaming = false;
          ImGui::PopStyleColor();
@@ -510,6 +519,8 @@ namespace app
 
    void DrawDrawParams(DrawNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the canvas and the buttons
+      const float halfW = (kPreviewSize - tok::space_1) * 0.5f;
       DropdownButton("brush", DrawNode::BrushNames(), n->brush, [n](int i) { n->brush = i; });
       ModSlider("size", &n->brushSize, 0.002f, 0.5f);
       ModSlider("opacity", &n->opacity, 0.02f, 1.0f);
@@ -518,28 +529,26 @@ namespace app
       ModSlider("jitter", &n->jitter, 0.0f, 2.0f);
       ColorSwatch("colour", n->color, n);
       ModCheckbox("eraser", &n->eraser);
-      if (ImGui::Button("Clear canvas", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Clear canvas", ImVec2(kPreviewSize, 0)))
          n->ClearCanvas();
 
       NodeSeparator("animation");
       if (n->IsRecordingStrokes())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-         if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop rec", ImVec2(halfW, 0), ActionButton::Kind::Record))
             n->StopRecording();
-         ImGui::PopStyleColor();
       }
-      else if (ImGui::Button("Rec strokes", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Rec strokes", ImVec2(halfW, 0)))
       {
          n->StartRecording();
       }
-      ImGui::SameLine();
+      ImGui::SameLine(0.0f, tok::space_1);
       if (n->IsPlayingBack())
       {
-         if (ImGui::Button("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(halfW, 0)))
             n->StopPlayback();
       }
-      else if (ImGui::Button("Replay", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Replay", ImVec2(halfW, 0)))
       {
          n->PlayRecording();
       }
@@ -548,13 +557,13 @@ namespace app
       {
          ImGui::TextDisabled("%zu marks over %.1f beats", n->RecordedStamps(), n->RecordedLength());
          if (n->IsPlayingBack())
-            ImGui::TextColored(ImVec4(0.5f, 0.95f, 0.6f, 1.0f), "playhead %.1f", n->PlayheadBeats());
+            ImGui::TextColored(tok::V4(tok::palf::v_500_950_600_1000), "playhead %.1f", n->PlayheadBeats());
          if (n->RecordingCapped())
             ImGui::TextDisabled("recording capped - further strokes won't be recorded");
       }
       ModCheckbox("loop replay", &n->loopPlayback);
       ModSlider("replay speed", &n->playSpeed, 0.1f, 4.0f);
-      if (ImGui::SmallButton("clear recording"))
+      if (ActionButton::Draw("clear recording", ImVec2(kPreviewSize, 0)))
          n->ClearRecording();
       ModSlider("canvas w", &n->canvasWidth, 64.0f, 4096.0f, "%.0f");
       ModSlider("canvas h", &n->canvasHeight, 64.0f, 4096.0f, "%.0f");
@@ -578,7 +587,20 @@ namespace app
    // Placeholder text for an empty preview: says *why* it's empty.
    const char* EmptyPreviewLabel(INode* node, const char* fallback)
    {
-      return node->bypassed ? "bypassed" : fallback;
+      if (node->bypassed)
+         return "bypassed";
+      // A Group 3D feeding anything but Render 3D / another group hands over no single mesh: say so, not just "no geometry".
+      if (auto* src = dynamic_cast<IGeometrySource*>(node);
+          src != nullptr && dynamic_cast<Group3DNode*>(node) == nullptr && std::strcmp(fallback, "no geometry") == 0)
+      {
+         for (int slot = 0; slot < 8; slot++)
+         {
+            IGeometrySource** in = node->GeometryInputSlot(slot);
+            if (in != nullptr && *in != nullptr && dynamic_cast<Group3DNode*>(*in) != nullptr)
+               return "group has no single mesh - use Join Geometry";
+         }
+      }
+      return fallback;
    }
 
 
@@ -592,9 +614,8 @@ namespace app
          render != nullptr || dynamic_cast<ViewportNode*>(node) != nullptr;
       const float size = wantsBigCanvas ? kViewportSize : kPreviewSize;
 
-      if (render != nullptr)
       {
-         const float offset = std::max(0.0f, (kWideNodeWidth - size) * 0.5f);
+         const float offset = render != nullptr ? WideNodeCentreOffset(node, size) : CachedCentreOffset(node, size);
          if (offset > 0.0f)
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
       }
@@ -617,12 +638,26 @@ namespace app
       }
       else
       {
-         dl->AddText(ImVec2(origin.x + 10, origin.y + size * 0.5f - 8),
-                     IM_COL32(120, 120, 135, 255), EmptyPreviewLabel(node, "no input"));
+         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(node, "no input"));
       }
 
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                  ScopeBorderCol(), 4.0f);
+      if (!node->bypassed)
+      {
+         const char* idle = nullptr;
+         if (auto* is = dynamic_cast<ImageSourceNode*>(node); is != nullptr && is->LoadedPath().empty())
+            idle = "drop an image";
+         else if (auto* vs = dynamic_cast<VideoSourceNode*>(node); vs != nullptr && vs->LoadedPath().empty())
+            idle = "drop a video";
+         else if (auto* vi = dynamic_cast<VideoInNode*>(node); vi != nullptr && !vi->IsRunning())
+            idle = "no camera yet";
+         if (idle != nullptr)
+            EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), idle);
+      }
+
+      if (render != nullptr && render->FlattenedGeometry().empty())
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + size, origin.y + size)}, "patch geometry in");
+
+      AudioViz::Border(dl, origin, ImVec2(origin.x + size, origin.y + size));
 
       // A Render 3D preview is a viewport, not a picture: drag to orbit, scroll
       // to zoom. An InvisibleButton is what makes this safe inside the node
@@ -678,7 +713,7 @@ namespace app
 
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                     IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
+                     tok::U32(tok::pal::c_78C8FFC8), 4.0f, 0, 2.0f);
    }
 
 
@@ -765,7 +800,7 @@ namespace app
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      AudioViz::Fill(dl, origin, br);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
@@ -782,7 +817,7 @@ namespace app
             const float top = midY - fgn->waveformMax[i] * h * 0.45f;
             const float bottom = midY - fgn->waveformMin[i] * h * 0.45f;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(40, 90, 200, 200) : IM_COL32(140, 160, 220, 175));
+                              isLight ? tok::U32(tok::pal::c_285AC8C8) : tok::U32(tok::pal::c_8CA0DCAF));
          }
       }
       else
@@ -791,7 +826,7 @@ namespace app
       }
 
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, br);
       ImGui::Dummy(ImVec2(w, h));
    }
 }

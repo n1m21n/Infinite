@@ -1,4 +1,14 @@
 // Performance matrix panel, MIDI learn, modulator meter (moved verbatim from main.cpp).
+#include <cmath>
+#include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/StateRing.h"
+#include "app/ui/design/UiType.h"
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -7,12 +17,12 @@ namespace app
    void PerfPanelDockCombo()
    {
       static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
-      if (ImGui::BeginCombo("##perfpaneldock", T(kDockLabels[gPerfPanelDock])))
+      if (MenuParts::BeginCombo("##perfpaneldock", T(kDockLabels[gPerfPanelDock])))
       {
          for (int i = 0; i < 4; i++)
-            if (ImGui::Selectable(L(kDockLabels[i]), i == gPerfPanelDock))
+            if (MenuParts::Choice(L(kDockLabels[i]), i == gPerfPanelDock))
                gPerfPanelDock = i;
-         ImGui::EndCombo();
+         MenuParts::EndCombo();
       }
    }
 
@@ -123,7 +133,7 @@ namespace app
          const CategoryColors::Color& c = CategoryColors::ColorFor(dstNode->category);
          return IM_COL32((int)(c.r * 255.0f), (int)(c.g * 255.0f), (int)(c.b * 255.0f), 255);
       }
-      return isLight ? IM_COL32(80, 90, 110, 255) : IM_COL32(140, 150, 175, 255);
+      return isLight ? tok::U32(tok::pal::c_505A6EFF) : tok::U32(tok::pal::c_8C96AFFF);
    }
 
 
@@ -363,8 +373,7 @@ namespace app
          // Draw live snap grid highlight at the non-overlapping target cell
          ImVec2 snapTL(gridOrigin.x + snapX * (cellSize + gap) + gap * 0.5f, gridOrigin.y + snapY * (cellSize + gap) + gap * 0.5f);
          ImVec2 snapBR(snapTL.x + cardSize.x, snapTL.y + cardSize.y);
-         dl->AddRectFilled(snapTL, snapBR, IM_COL32(70, 140, 255, 45), 6.0f);
-         dl->AddRect(snapTL, snapBR, IM_COL32(90, 180, 255, 220), 6.0f, 0, 2.0f);
+         StateRing::Draw(dl, snapTL, snapBR, StateRing::Kind::Target, isLight, tok::radius_pill);
 
          // Floating live card position
          cellPos = ImVec2(gridOrigin.x + gPerfDragOriginCellX * (cellSize + gap) + gap * 0.5f + (m.x - gPerfDragMouseStart.x),
@@ -380,22 +389,25 @@ namespace app
 
       // Card background & theme tint
       ImU32 themeTint = GetPerfElementColor(elem, dstNode, isLight);
-      ImU32 cardBg = isLight ? IM_COL32(245, 247, 252, 235) : IM_COL32(22, 25, 33, 240);
+      const float kCardR = tok::radius_pill;
+      const ImVec4 uiText = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const ImU32 cardBg = isLight ? ImGui::GetColorU32(ImVec4(1, 1, 1, 0.62f))
+                                   : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.06f));
+      const ImU32 cardHair = isLight ? ImGui::GetColorU32(ImVec4(0, 0, 0, 0.07f))
+                                     : ImGui::GetColorU32(ImVec4(1, 1, 1, 0.08f));
 
-      dl->AddRectFilled(cellPos, cardBR, cardBg, 6.0f);
+      // One recessed-well fill for every field-like control (NumBox, XY pad, step off, selector off, toggle off).
+      auto wellCol = [&](float a) { return ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, a)); };
+
+      dl->AddRectFilled(cellPos, cardBR, cardBg, kCardR);
       if (gPerfEditMode)
-         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : (isLight ? IM_COL32(180, 190, 205, 200) : IM_COL32(65, 72, 88, 200)), 6.0f, 0, 1.2f);
+         dl->AddRect(cellPos, cardBR, dstNode != nullptr ? themeTint : ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.22f)), kCardR, 0, 1.2f);
       if (gPerfMidiLearnIdx == (int)elemIdx)
-      {
-         float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 8.0f);
-         dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
-                     IM_COL32(255, (int)(160 + 50 * pulse), 30, 255), 7.0f, 0, 2.5f);
-      }
+         StateRing::Draw(dl, cellPos, cardBR, StateRing::Kind::Learn, isLight, kCardR);
       else if (gPerfEditMode && gPerfSelection.count(elemIdx) > 0)
-         dl->AddRect(ImVec2(cellPos.x - 2.0f, cellPos.y - 2.0f), ImVec2(cardBR.x + 2.0f, cardBR.y + 2.0f),
-                     isLight ? IM_COL32(30, 110, 220, 255) : IM_COL32(95, 165, 255, 255), 7.0f, 0, 2.0f);
+         StateRing::Draw(dl, cellPos, cardBR, StateRing::Kind::Select, isLight, kCardR);
       else
-         dl->AddRect(cellPos, cardBR, isLight ? IM_COL32(215, 222, 235, 180) : IM_COL32(42, 46, 58, 180), 6.0f, 0, 1.0f);
+         dl->AddRect(cellPos, cardBR, cardHair, kCardR, 0, 1.0f);
 
       // Title/Label Header
       std::string displayLabel = elem.label;
@@ -423,10 +435,10 @@ namespace app
       }
 
       // Header background badge
-      dl->AddRectFilled(cellPos, ImVec2(cardBR.x, cellPos.y + 18.0f),
-                        (themeTint & 0x00FFFFFF) | 0x28000000, 6.0f, ImDrawFlags_RoundCornersTop);
-      ImVec2 titlePos(cellPos.x + 6.0f, cellPos.y + 2.0f);
-      ImU32 textCol = isLight ? IM_COL32(30, 35, 48, 255) : IM_COL32(225, 230, 245, 255);
+      // No bar and no dot: a quiet caption, like the Library section headers.
+      const float titleX = cellPos.x + tok::space_2;
+      ImVec2 titlePos(titleX, cellPos.y + 3.0f);
+      ImU32 textCol = ImGui::GetColorU32(ImVec4(uiText.x, uiText.y, uiText.z, 0.65f));
 
       // In Edit Mode, full card invisible button handles right-click popup and dragging
       if (gPerfEditMode)
@@ -479,33 +491,33 @@ namespace app
          }
 
          ImGui::SetNextWindowSizeConstraints(ImVec2(180.0f, 0.0f), ImVec2(240.0f, 480.0f));
-         if (ImGui::BeginPopupContextItem("##elemcontext", ImGuiPopupFlags_MouseButtonRight))
+         if (MenuParts::BeginContextItem("##elemcontext", ImGuiPopupFlags_MouseButtonRight))
          {
-            if (ImGui::MenuItem(L("Rename")))
+            if (MenuParts::Item(L("Rename")))
             {
                gPerfRenamingElementIdx = (int)elemIdx;
                snprintf(gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer), "%s", displayLabel.c_str());
             }
 
-            if (ImGui::BeginMenu(L("Type")))
+            if (MenuParts::SubMenu(L("Type")))
             {
-               if (ImGui::MenuItem(L("Knob (1x1)"), nullptr, elem.kind == 0)) { PushUndoCheckpoint(); elem.kind = 0; }
-               if (ImGui::MenuItem(L("Vertical Fader (1x2)"), nullptr, elem.kind == 1)) { PushUndoCheckpoint(); elem.kind = 1; }
-               if (ImGui::MenuItem(L("Horizontal Slider (2x1)"), nullptr, elem.kind == 2)) { PushUndoCheckpoint(); elem.kind = 2; }
-               if (ImGui::MenuItem(L("Toggle (1x1)"), nullptr, elem.kind == 3)) { PushUndoCheckpoint(); elem.kind = 3; }
-               if (ImGui::MenuItem(L("XY Pad (2x2)"), nullptr, elem.kind == 4)) { PushUndoCheckpoint(); elem.kind = 4; }
-               if (ImGui::MenuItem(L("Trigger / Bang (1x1)"), nullptr, elem.kind == 5)) { PushUndoCheckpoint(); elem.kind = 5; }
-               if (ImGui::MenuItem(L("Number Box (1x1)"), nullptr, elem.kind == 6)) { PushUndoCheckpoint(); elem.kind = 6; }
-               if (ImGui::MenuItem(L("Radio Selector (2x1)"), nullptr, elem.kind == 7)) { PushUndoCheckpoint(); elem.kind = 7; }
-               if (ImGui::MenuItem(L("Bipolar Knob (1x1)"), nullptr, elem.kind == 8)) { PushUndoCheckpoint(); elem.kind = 8; }
-               if (ImGui::MenuItem(L("Step Gate (3x1)"), nullptr, elem.kind == 9)) { PushUndoCheckpoint(); elem.kind = 9; }
+               if (MenuParts::Item(L("Knob (1x1)"), nullptr, elem.kind == 0)) { PushUndoCheckpoint(); elem.kind = 0; }
+               if (MenuParts::Item(L("Vertical Fader (1x2)"), nullptr, elem.kind == 1)) { PushUndoCheckpoint(); elem.kind = 1; }
+               if (MenuParts::Item(L("Horizontal Slider (2x1)"), nullptr, elem.kind == 2)) { PushUndoCheckpoint(); elem.kind = 2; }
+               if (MenuParts::Item(L("Toggle (1x1)"), nullptr, elem.kind == 3)) { PushUndoCheckpoint(); elem.kind = 3; }
+               if (MenuParts::Item(L("XY Pad (2x2)"), nullptr, elem.kind == 4)) { PushUndoCheckpoint(); elem.kind = 4; }
+               if (MenuParts::Item(L("Trigger / Bang (1x1)"), nullptr, elem.kind == 5)) { PushUndoCheckpoint(); elem.kind = 5; }
+               if (MenuParts::Item(L("Number Box (1x1)"), nullptr, elem.kind == 6)) { PushUndoCheckpoint(); elem.kind = 6; }
+               if (MenuParts::Item(L("Radio Selector (2x1)"), nullptr, elem.kind == 7)) { PushUndoCheckpoint(); elem.kind = 7; }
+               if (MenuParts::Item(L("Bipolar Knob (1x1)"), nullptr, elem.kind == 8)) { PushUndoCheckpoint(); elem.kind = 8; }
+               if (MenuParts::Item(L("Step Gate (3x1)"), nullptr, elem.kind == 9)) { PushUndoCheckpoint(); elem.kind = 9; }
                ImGui::EndMenu();
             }
 
-            ImGui::Separator();
+            MenuParts::Separator();
             if (elem.kind == 4) // XY Pad
             {
-               if (ImGui::MenuItem(L("Assign X Axis...")))
+               if (MenuParts::Item(L("Assign X Axis...")))
                {
                   gPerfAssigningElemIdx = (int)elemIdx;
                   gPerfAssigningAxis = 0;
@@ -519,7 +531,7 @@ namespace app
                   ImGui::TextDisabled("%s", xStr.c_str());
                }
 
-               if (ImGui::MenuItem(L("Assign Y Axis...")))
+               if (MenuParts::Item(L("Assign Y Axis...")))
                {
                   gPerfAssigningElemIdx = (int)elemIdx;
                   gPerfAssigningAxis = 1;
@@ -534,7 +546,7 @@ namespace app
                   ImGui::TextDisabled("%s", yStr.c_str());
                }
 
-               if (elem.dstIndex >= 0 && ImGui::MenuItem(L("Clear Destinations")))
+               if (elem.dstIndex >= 0 && MenuParts::Item(L("Clear Destinations")))
                {
                   PushUndoCheckpoint();
                   elem.dstIndex = -1;
@@ -544,19 +556,19 @@ namespace app
                   elem.targetsY.clear();
                }
 
-               ImGui::Separator();
+               MenuParts::Separator();
                // MIDI Learn for XY Pad (X Axis and Y Axis)
                const bool isLearningX = (gPerfMidiLearnIdx == (int)elemIdx && gPerfMidiLearnAxis == 0);
                const bool isLearningY = (gPerfMidiLearnIdx == (int)elemIdx && gPerfMidiLearnAxis == 1);
                if (isLearningX)
                {
-                  if (ImGui::MenuItem(L("Listening X... (Move MIDI CC)")))
+                  if (MenuParts::Item(L("Listening X... (Move MIDI CC)")))
                      gPerfMidiLearnIdx = -1;
                }
                else
                {
                   std::string xLabel = (elem.midiDevice != 0) ? "Re-learn MIDI X Axis..." : "MIDI Learn X Axis...";
-                  if (ImGui::MenuItem(xLabel.c_str()))
+                  if (MenuParts::Item(xLabel.c_str()))
                   {
                      std::string err;
                      Platform::MidiStart(err);
@@ -577,13 +589,13 @@ namespace app
 
                if (isLearningY)
                {
-                  if (ImGui::MenuItem(L("Listening Y... (Move MIDI CC)")))
+                  if (MenuParts::Item(L("Listening Y... (Move MIDI CC)")))
                      gPerfMidiLearnIdx = -1;
                }
                else
                {
                   std::string yLabel = (elem.midiDeviceY != 0) ? "Re-learn MIDI Y Axis..." : "MIDI Learn Y Axis...";
-                  if (ImGui::MenuItem(yLabel.c_str()))
+                  if (MenuParts::Item(yLabel.c_str()))
                   {
                      std::string err;
                      Platform::MidiStart(err);
@@ -602,7 +614,7 @@ namespace app
                   ImGui::TextDisabled("%s", bindStr.c_str());
                }
 
-               if ((elem.midiDevice != 0 || elem.midiDeviceY != 0) && ImGui::MenuItem(L("Clear MIDI Bindings")))
+               if ((elem.midiDevice != 0 || elem.midiDeviceY != 0) && MenuParts::Item(L("Clear MIDI Bindings")))
                {
                   PushUndoCheckpoint();
                   elem.midiDevice = 0; elem.midiChannel = -1; elem.midiController = -1; elem.midiIsNote = false;
@@ -612,7 +624,7 @@ namespace app
             }
             else // Regular single-axis control
             {
-               if (ImGui::MenuItem(L("Assign Parameter...")))
+               if (MenuParts::Item(L("Assign Parameter...")))
                {
                   gPerfAssigningElemIdx = (int)elemIdx;
                   gPerfAssigningAxis = 0;
@@ -626,7 +638,7 @@ namespace app
                   ImGui::TextDisabled("%s", dStr.c_str());
                }
 
-               if (elem.dstIndex >= 0 && ImGui::MenuItem(L("Clear Destination")))
+               if (elem.dstIndex >= 0 && MenuParts::Item(L("Clear Destination")))
                {
                   PushUndoCheckpoint();
                   elem.dstIndex = -1;
@@ -637,14 +649,14 @@ namespace app
 
                if (elem.kind != 9) // Step Gate does not use MIDI Learn
                {
-                  ImGui::Separator();
+                  MenuParts::Separator();
                   const bool isLearning = (gPerfMidiLearnIdx == (int)elemIdx && gPerfMidiLearnAxis == 0);
                   if (isLearning)
                   {
                      std::string learnPrompt = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7)
                         ? "Listening... (Move CC or Hit Pad)"
                         : "Listening... (Move MIDI CC)";
-                     if (ImGui::MenuItem(learnPrompt.c_str()))
+                     if (MenuParts::Item(learnPrompt.c_str()))
                         gPerfMidiLearnIdx = -1;
                   }
                   else
@@ -652,7 +664,7 @@ namespace app
                      std::string midiLabel = (elem.midiDevice != 0) ? "Re-learn MIDI CC" : "MIDI CC Learn";
                      if (elem.kind == 3 || elem.kind == 5 || elem.kind == 7)
                         midiLabel = (elem.midiDevice != 0) ? "Re-learn MIDI (CC / Trigger)" : "MIDI Learn (CC / Trigger)";
-                     if (ImGui::MenuItem(midiLabel.c_str()))
+                     if (MenuParts::Item(midiLabel.c_str()))
                      {
                         std::string err;
                         Platform::MidiStart(err);
@@ -671,7 +683,7 @@ namespace app
                      std::string bindStr = "MIDI: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannel + 1) + " \xC2\xB7 " + Platform::MidiBindingName(elem.midiIsNote, elem.midiController);
                      ImGui::TextDisabled("%s", bindStr.c_str());
 
-                     if (ImGui::MenuItem(L("Clear MIDI Binding")))
+                     if (MenuParts::Item(L("Clear MIDI Binding")))
                      {
                         PushUndoCheckpoint();
                         elem.midiDevice = 0;
@@ -684,47 +696,55 @@ namespace app
                }
             }
 
-            ImGui::Separator();
-            if (ImGui::BeginMenu(L("Color Tint")))
+            MenuParts::Separator();
+            if (MenuParts::SubMenu(L("Color Tint")))
             {
                static const struct { const char* name; ImU32 col; } kPaletteColors[10] = {
-                  { "Default", IM_COL32(110, 120, 140, 255) },
-                  { "Crimson", IM_COL32(239, 68, 68, 255) },
-                  { "Orange",  IM_COL32(249, 115, 22, 255) },
-                  { "Amber",   IM_COL32(245, 158, 11, 255) },
-                  { "Emerald", IM_COL32(16, 185, 129, 255) },
-                  { "Cyan",    IM_COL32(6, 182, 212, 255) },
-                  { "Blue",    IM_COL32(59, 130, 246, 255) },
-                  { "Purple",  IM_COL32(139, 92, 246, 255) },
-                  { "Magenta", IM_COL32(217, 70, 239, 255) },
-                  { "Rose",    IM_COL32(244, 63, 94, 255) }
+                  { "Default", tok::U32(tok::pal::c_6E788CFF) },
+                  { "Crimson", tok::U32(tok::pal::c_EF4444FF) },
+                  { "Orange",  tok::U32(tok::pal::c_F97316FF) },
+                  { "Amber",   tok::U32(tok::pal::c_F59E0BFF) },
+                  { "Emerald", tok::U32(tok::pal::c_10B981FF) },
+                  { "Cyan",    tok::U32(tok::pal::c_06B6D4FF) },
+                  { "Blue",    tok::U32(tok::pal::c_3B82F6FF) },
+                  { "Purple",  tok::U32(tok::pal::c_8B5CF6FF) },
+                  { "Magenta", tok::U32(tok::pal::c_D946EFFF) },
+                  { "Rose",    tok::U32(tok::pal::c_F43F5EFF) }
                };
 
+               ImU32 cols[10];
+               const char* names[10];
+               int selected = -1;
                for (int ci = 0; ci < 10; ci++)
                {
-                  if (ci % 5 != 0) ImGui::SameLine();
-                  ImGui::PushID(ci + 500);
-                  ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kPaletteColors[ci].col);
-                  if (ImGui::ColorButton(kPaletteColors[ci].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(24, 24)))
+                  cols[ci] = kPaletteColors[ci].col;
+                  names[ci] = kPaletteColors[ci].name;
+                  const ImVec4 c = ImGui::ColorConvertU32ToFloat4(cols[ci]);
+                  const bool isDefault = ci == 0 && elem.colorR == 0.0f && elem.colorG == 0.0f && elem.colorB == 0.0f;
+                  if (isDefault || (ci > 0 && std::fabs(elem.colorR - c.x) < 0.01f && std::fabs(elem.colorG - c.y) < 0.01f &&
+                                    std::fabs(elem.colorB - c.z) < 0.01f))
+                     selected = ci;
+               }
+               for (int row = 0; row < 2; row++)
+               {
+                  const int hit = FieldWell::SwatchRow(cols + row * 5, names + row * 5, 5, selected - row * 5, 18.0f);
+                  if (hit >= 0)
                   {
+                     const int ci = row * 5 + hit;
                      PushUndoCheckpoint();
                      if (ci == 0)
-                     {
                         elem.colorR = elem.colorG = elem.colorB = 0.0f;
-                     }
                      else
                      {
-                        elem.colorR = cVec.x; elem.colorG = cVec.y; elem.colorB = cVec.z;
+                        const ImVec4 c = ImGui::ColorConvertU32ToFloat4(cols[ci]);
+                        elem.colorR = c.x; elem.colorG = c.y; elem.colorB = c.z;
                      }
                   }
-                  if (ImGui::IsItemHovered())
-                     ImGui::SetTooltip("%s", kPaletteColors[ci].name);
-                  ImGui::PopID();
                }
                ImGui::EndMenu();
             }
 
-            ImGui::EndPopup();
+            MenuParts::EndPopup();
          }
       }
 
@@ -734,7 +754,7 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(cellPos.x + 4.0f, cellPos.y + 1.0f));
          ImGui::SetNextItemWidth(cardSize.x - 8.0f);
          ImGui::SetKeyboardFocusHere();
-         if (ImGui::InputText("##renamingelemfield", gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer),
+         if (FieldWell::InputText("##renamingelemfield", gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer),
                               ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
          {
             PushUndoCheckpoint();
@@ -750,7 +770,10 @@ namespace app
       else
       {
          dl->PushClipRect(ImVec2(cellPos.x + 4.0f, cellPos.y), ImVec2(cardBR.x - 4.0f, cellPos.y + 18.0f), true);
-         dl->AddText(titlePos, textCol, displayLabel.c_str());
+         {
+            UiType::Scope ts(UiType::Size::Caption, UiType::Weight::Semibold);
+            dl->AddText(titlePos, textCol, displayLabel.c_str());
+         }
          dl->PopClipRect();
       }
 
@@ -834,7 +857,7 @@ namespace app
 
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
-         ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
 
          float v = dragSeed(val);
          const bool knobMoved = KnobFloat("##knob", &v, minV, maxV, "%.2f", diameter, fillCol, isModulated, diameter, p2v, v2p);
@@ -861,7 +884,7 @@ namespace app
          const bool isDb = (minV < 0.0f && maxV <= 12.0f && kp.posToValue == ConsoleFaderTaper::PosToValue);
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
-         ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
 
          float v = dragSeed(val);
          const bool faderMoved = VFaderFloat("##vfader", &v, minV, maxV, isDb ? "%.1f dB" : "%.2f", faderH, fillCol, isModulated,
@@ -885,11 +908,47 @@ namespace app
          float sliderW = cardSize.x - 18.0f;
          ImGui::SetCursorScreenPos(ImVec2(cellPos.x + 9.0f, cellPos.y + 20.0f + (cardSize.y - 38.0f) * 0.5f));
 
-         ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
          float v = dragSeed(val);
          FaderPosToValueFn p2v = kp.posToValue;
          FaderValueToPosFn v2p = kp.valueToPos;
-         const bool sliderMoved = AudioSliderFloat("##hslider", &v, minV, maxV, "%.2f", sliderW, fillCol, isModulated, p2v, v2p);
+         // Same anatomy as the vertical fader, turned on its side: a thin recessed track, a fill in the
+         // control's colour, tick marks above and below, and a rectangular cap with a centre line.
+         auto toPos = [&](float x) { return v2p ? std::clamp(v2p(x, minV, maxV), 0.0f, 1.0f) : std::clamp((x - minV) / (maxV - minV), 0.0f, 1.0f); };
+         const ImVec2 sTL = ImGui::GetCursorScreenPos();
+         const float sH = 30.0f;
+         ImGui::InvisibleButton("##hslider", ImVec2(sliderW, sH));
+         const bool sActive = !isModulated && ImGui::IsItemActive();
+         const bool sHover = ImGui::IsItemHovered();
+         bool sliderMoved = false;
+         const float left = sTL.x + 10.0f, right = sTL.x + sliderW - 10.0f, cy = sTL.y + sH * 0.5f;
+         if (sActive)
+         {
+            const float pos = std::clamp((ImGui::GetIO().MousePos.x - left) / (right - left), 0.0f, 1.0f);
+            const float next = p2v ? std::clamp(p2v(pos, minV, maxV), minV, maxV) : std::clamp(minV + (maxV - minV) * pos, minV, maxV);
+            if (next != v) { v = next; sliderMoved = true; }
+         }
+         const float capX = left + toPos(v) * (right - left);
+         const ImU32 tickCol = wellCol(0.2f);
+         for (int i = 0; i <= 4; i++)
+         {
+            const float x = left + (float)i * 0.25f * (right - left);
+            dl->AddLine(ImVec2(x, cy - 12.0f), ImVec2(x, cy - 9.0f), tickCol, 1.0f);
+            dl->AddLine(ImVec2(x, cy + 9.0f), ImVec2(x, cy + 12.0f), tickCol, 1.0f);
+         }
+         dl->AddRectFilled(ImVec2(left - 4.0f, cy - 3.0f), ImVec2(right + 4.0f, cy + 3.0f), wellCol(0.12f), 3.0f);
+         if (capX > left)
+            dl->AddRectFilled(ImVec2(left - 4.0f, cy - 2.0f), ImVec2(capX, cy + 2.0f), fillCol, 2.0f);
+         const ImVec2 cTL(capX - 6.0f, cy - 9.0f), cBR(capX + 6.0f, cy + 9.0f);
+         dl->AddRectFilled(cTL, cBR, isLight ? ImGui::GetColorU32(ImVec4(1, 1, 1, 0.95f)) : wellCol(0.28f), 3.0f);
+         dl->AddRect(cTL, cBR, wellCol(sActive ? 0.5f : (sHover ? 0.3f : 0.15f)), 3.0f);
+         dl->AddLine(ImVec2(capX, cy - 7.0f), ImVec2(capX, cy + 7.0f), wellCol(0.8f), 1.6f);
+         if (sHover || sActive)
+         {
+            char valBuf[48];
+            FormatAudioParam(valBuf, sizeof(valBuf), "%.2f", v);
+            SetAudioReadout(displayLabel.c_str(), valBuf);
+         }
          dragHold(v);
          if (sliderMoved)
          {
@@ -928,12 +987,9 @@ namespace app
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f - btnSize) * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(centerX, centerY));
 
-         ImVec4 btnCol = curVal ? ImVec4((themeTint & 0xFF) / 255.0f,
-                                         ((themeTint >> 8) & 0xFF) / 255.0f,
-                                         ((themeTint >> 16) & 0xFF) / 255.0f, 1.0f)
-                                : (isLight ? ImVec4(0.85f, 0.88f, 0.92f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_Button, btnCol);
-         if (ImGui::Button(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize)))
+         const bool toggleClicked = ActionButton::Draw(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize),
+                                                       curVal ? ActionButton::Kind::Selected : ActionButton::Kind::Plain);
+         if (toggleClicked)
          {
             bool newVal = !curVal;
             elem.value = newVal ? 1.0f : 0.0f;
@@ -953,7 +1009,6 @@ namespace app
                }
             }
          }
-         ImGui::PopStyleColor();
       }
       else if (elem.kind == 4) // XY Pad (2x2)
       {
@@ -1009,16 +1064,15 @@ namespace app
             valY = newY;
          }
 
-         dl->AddRectFilled(origin, padBR, ScopeBgCol(), 4.0f);
-         dl->AddLine(ImVec2(origin.x + padSize * 0.5f, origin.y), ImVec2(origin.x + padSize * 0.5f, padBR.y), ScopeGridCol());
-         dl->AddLine(ImVec2(origin.x, origin.y + padSize * 0.5f), ImVec2(padBR.x, origin.y + padSize * 0.5f), ScopeGridCol());
-         dl->AddRect(origin, padBR, ScopeBorderCol(), 4.0f);
+         dl->AddRectFilled(origin, padBR, wellCol(0.07f), tok::radius_tile);
+         dl->AddLine(ImVec2(origin.x + padSize * 0.5f, origin.y + 4.0f), ImVec2(origin.x + padSize * 0.5f, padBR.y - 4.0f), wellCol(0.10f));
+         dl->AddLine(ImVec2(origin.x + 4.0f, origin.y + padSize * 0.5f), ImVec2(padBR.x - 4.0f, origin.y + padSize * 0.5f), wellCol(0.10f));
 
          float normX = kpX.valueToPos ? kpX.valueToPos(valX, minX, maxX) : ((maxX > minX) ? std::clamp((valX - minX) / (maxX - minX), 0.0f, 1.0f) : 0.0f);
          float normY = kpY.valueToPos ? kpY.valueToPos(valY, minY, maxY) : ((maxY > minY) ? std::clamp((valY - minY) / (maxY - minY), 0.0f, 1.0f) : 0.0f);
          ImVec2 orbPos(origin.x + normX * padSize, origin.y + (1.0f - normY) * padSize);
-         dl->AddCircleFilled(orbPos, 6.0f, themeTint);
-         dl->AddCircle(orbPos, 6.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 1.5f);
+         dl->AddCircleFilled(orbPos, 9.0f, (themeTint & 0x00FFFFFF) | 0x33000000);
+         dl->AddCircleFilled(orbPos, 5.5f, themeTint);
       }
       else if (elem.kind == 5) // Momentary Trigger / Bang (1x1)
       {
@@ -1137,22 +1191,21 @@ namespace app
          }
 
          float r = padSize * 0.44f;
-         ImU32 baseCol = isLight ? IM_COL32(215, 222, 235, 255) : IM_COL32(32, 36, 48, 255);
+         ImU32 baseCol = wellCol(0.08f);
          dl->AddCircleFilled(center, r, baseCol, 32);
 
          if (flash > 0.0f)
          {
             ImU32 flashCol = (themeTint & 0x00FFFFFF) | ((ImU32)(flash * 220.0f) << 24);
             dl->AddCircleFilled(center, r * (0.6f + 0.4f * flash), flashCol, 32);
-            dl->AddCircle(center, r + 2.0f * (1.0f - flash), IM_COL32(255, 225, 80, (int)(flash * 255.0f)), 32, 2.0f);
+            dl->AddCircle(center, r + 2.0f * (1.0f - flash), (themeTint & 0x00FFFFFF) | ((ImU32)(flash * 255.0f) << 24), 32, 2.0f);
          }
          else
          {
             dl->AddCircleFilled(center, r * 0.55f, (themeTint & 0x00FFFFFF) | 0x88000000, 32);
          }
-         dl->AddCircle(center, r, isLight ? IM_COL32(170, 180, 195, 255) : IM_COL32(60, 66, 82, 255), 32, 1.5f);
          if (hovered)
-            dl->AddCircle(center, r + 2.0f, IM_COL32(255, 255, 255, 80), 32, 1.2f);
+            dl->AddCircle(center, r + 2.0f, wellCol(0.25f), 32, 1.2f);
       }
       else if (elem.kind == 6) // Digital Number Box (1x1)
       {
@@ -1168,8 +1221,7 @@ namespace app
          ImVec2 bTL(centerX, centerY);
          ImVec2 bBR(centerX + boxW, centerY + boxH);
 
-         dl->AddRectFilled(bTL, bBR, isLight ? IM_COL32(230, 235, 245, 255) : IM_COL32(15, 17, 24, 255), 4.0f);
-         dl->AddRect(bTL, bBR, isLight ? IM_COL32(180, 190, 205, 255) : IM_COL32(50, 56, 72, 255), 4.0f);
+         dl->AddRectFilled(bTL, bBR, wellCol(0.07f), tok::radius_tile);
 
          ImGui::SetCursorScreenPos(bTL);
          float v = dragSeed(val);
@@ -1243,19 +1295,6 @@ namespace app
             ImGui::PushID(b + 300);
 
             const bool isSelected = (b == curIndex);
-            if (isSelected)
-            {
-               ImVec4 activeCol((themeTint & 0xFF) / 255.0f,
-                                ((themeTint >> 8) & 0xFF) / 255.0f,
-                                ((themeTint >> 16) & 0xFF) / 255.0f, 1.0f);
-               ImGui::PushStyleColor(ImGuiCol_Button, activeCol);
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-            }
-            else
-            {
-               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.88f, 0.90f, 0.94f, 1.0f) : ImVec4(0.18f, 0.20f, 0.26f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.3f, 0.35f, 0.45f, 1.0f) : ImVec4(0.7f, 0.75f, 0.85f, 1.0f));
-            }
 
             // Either every button shows its option name or none of them do.
             // The old rule was per-button ("use the name if it is <= 4 chars"),
@@ -1264,7 +1303,8 @@ namespace app
             // reading as a broken 1..8 row. useNames is decided once, above
             // the loop.
             std::string btnText = useNames ? kp.enumOptions[b] : std::to_string(b + 1);
-            if (ImGui::Button(btnText.c_str(), ImVec2(btnW, btnH)))
+            if (ActionButton::Draw(btnText.c_str(), ImVec2(btnW, btnH),
+                                   isSelected ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
             {
                float newVal = 0.0f;
                if (isDiscreteEnum)
@@ -1279,7 +1319,6 @@ namespace app
                   if (t.dstIndex >= 0 && t.dstParam >= 0)
                      gPerfPendingWrites[{t.dstIndex, t.dstParam}] = newVal;
             }
-            ImGui::PopStyleColor(2);
             ImGui::PopID();
          }
       }
@@ -1299,7 +1338,7 @@ namespace app
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f) * 0.44f;
          ImGui::SetCursorScreenPos(ImVec2(centerX - diameter * 0.5f, centerY - diameter * 0.5f));
 
-         ImU32 fillCol = isModulated ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255)) : themeTint;
+         ImU32 fillCol = isModulated ? (isLight ? tok::U32(tok::pal::c_D77D14FF) : tok::U32(tok::pal::c_FFBE5AFF)) : themeTint;
          float v = dragSeed(bipVal);
          const bool bipMoved = BipolarKnobFloat("##bipolarknob", &v, -1.0f, 1.0f, "%.2f", diameter, fillCol, isModulated, diameter);
          dragHold(v);
@@ -1372,19 +1411,12 @@ namespace app
 
             ImU32 stepBg = isOn
                ? themeTint
-               : (isLight ? IM_COL32(210, 216, 228, 255) : IM_COL32(28, 31, 40, 255));
+               : wellCol(0.08f);
 
-            dl->AddRectFilled(sTL, sBR, stepBg, 3.0f);
+            dl->AddRectFilled(sTL, sBR, stepBg, tok::radius_tile);
 
             if (isCurrent && Transport::Instance().IsPlaying())
-            {
-               dl->AddRect(sTL, sBR, IM_COL32(255, 230, 80, 255), 3.0f, 0, 2.0f);
-               dl->AddCircleFilled(ImVec2(sx + stepW * 0.5f, startY + 4.0f), 2.5f, IM_COL32(255, 240, 100, 255));
-            }
-            else
-            {
-               dl->AddRect(sTL, sBR, isLight ? IM_COL32(180, 190, 205, 200) : IM_COL32(48, 52, 65, 200), 3.0f);
-            }
+               dl->AddRectFilled(ImVec2(sx + 2.0f, sBR.y + 3.0f), ImVec2(sx + stepW - 2.0f, sBR.y + 5.0f), wellCol(0.85f), 1.0f);
          }
       }
 
@@ -1415,14 +1447,14 @@ namespace app
          if (anyTarget && allBypassed)
          {
             const ImVec2 bodyTL(cellPos.x, cellPos.y + 18.0f);
-            dl->AddRectFilled(bodyTL, cardBR, isLight ? IM_COL32(245, 247, 252, 150) : IM_COL32(22, 25, 33, 160),
-                              6.0f, ImDrawFlags_RoundCornersBottom);
+            dl->AddRectFilled(bodyTL, cardBR, isLight ? tok::U32(tok::pal::c_F5F7FC96) : tok::U32(tok::pal::c_161921A0),
+                              kCardR, ImDrawFlags_RoundCornersBottom);
             const char* tag = "bypassed";
             const ImVec2 tagSize = ImGui::CalcTextSize(tag);
             const ImVec2 tagTL(cardBR.x - tagSize.x - 10.0f, cellPos.y + 2.0f);
             const ImVec2 tagBR(cardBR.x - 4.0f, cellPos.y + 2.0f + tagSize.y);
             dl->AddRectFilled(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR, cardBg, 3.0f);
-            dl->AddText(tagTL, isLight ? IM_COL32(190, 110, 30, 255) : IM_COL32(240, 170, 70, 255), tag);
+            dl->AddText(tagTL, isLight ? tok::U32(tok::pal::c_BE6E1EFF) : tok::U32(tok::pal::c_F0AA46FF), tag);
             if (ImGui::IsMouseHoveringRect(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR))
                ImGui::SetTooltip("%s", T("This node is bypassed - the control still stores its value, which applies when the node is back in the chain"));
          }
@@ -2036,14 +2068,17 @@ namespace app
       snprintf(text, sizeof(text), "MIDI learn: %s > %s - move a knob, fader or pad (Esc to cancel)",
                dest->typeName.c_str(), (known != nullptr && !known->name.empty()) ? known->name.c_str() : "parameter");
       ImDrawList* dl = ImGui::GetForegroundDrawList();
-      const ImVec2 ts = ImGui::CalcTextSize(text);
+      const bool isLightT = CategoryColors::IsThemeLight();
+      const ImVec4 uiTxt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      UiType::Scope ts(UiType::Size::Title);
+      const ImVec2 tsz = ImGui::CalcTextSize(text);
       const ImGuiViewport* vp = ImGui::GetMainViewport();
-      const float pulse = 0.75f + 0.25f * sinf((float)ImGui::GetTime() * 5.0f);
-      const ImVec2 a(vp->Pos.x + (vp->Size.x - ts.x) * 0.5f - 12.0f, vp->Pos.y + 44.0f);
-      const ImVec2 b(a.x + ts.x + 24.0f, a.y + ts.y + 12.0f);
-      dl->AddRectFilled(a, b, IM_COL32(60, 40, 8, (int)(230 * pulse)), 6.0f);
-      dl->AddRect(a, b, IM_COL32(255, 185, 45, (int)(255 * pulse)), 6.0f, 0, 1.5f);
-      dl->AddText(ImVec2(a.x + 12.0f, a.y + 6.0f), IM_COL32(255, 185, 45, 255), text);
+      // Same neutral strip as the performance panel's listening banner: recessed well, hairline, plain text.
+      const ImVec2 a(vp->Pos.x + (vp->Size.x - tsz.x) * 0.5f - tok::space_3, vp->Pos.y + 44.0f);
+      const ImVec2 b(a.x + tsz.x + 2.0f * tok::space_3, a.y + 30.0f);
+      dl->AddRectFilled(a, b, ImGui::GetColorU32(ImGuiCol_PopupBg), tok::radius_pill);
+      dl->AddRect(a, b, ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
+      dl->AddText(ImVec2(a.x + tok::space_3, std::round(a.y + (30.0f - tsz.y) * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.9f)), text);
    }
 
 
@@ -2052,22 +2087,28 @@ namespace app
    {
       if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
       {
-         if (ImGui::MenuItem(L("Listening... (click or Esc to cancel)")))
+         if (MenuParts::Item(L("Listening...")))
             MidiLearnCancelAll();
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", L("Click or press Esc to cancel"));
          return;
       }
       if (!ParamMidiLearnable(nodeIndex, paramIndex))
       {
          ImGui::BeginDisabled();
-         ImGui::MenuItem(L("MIDI learn (already driven by something else)"));
+         MenuParts::Item(L("MIDI learn"));
          ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", L("Already driven by something else"));
          return;
       }
       const Modulation::Source cur = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
-      if (ImGui::MenuItem(cur.nodeIndex >= 0 ? "Re-learn MIDI" : "MIDI learn"))
+      if (MenuParts::Item(cur.nodeIndex >= 0 ? "Re-learn MIDI" : "MIDI learn"))
          StartParamMidiLearn(nodeIndex, paramIndex);
    }
 
+
+   constexpr float kPerfChipH = 28.0f;   // toolbar chips: one tile high
 
    void DrawPerfPanelContent()
    {
@@ -2082,18 +2123,47 @@ namespace app
       // MIDI Learn Alert Banner
       if (gPerfMidiLearnIdx >= 0 && gPerfMidiLearnIdx < (int)gPerfElements.size())
       {
-         ImGui::Spacing();
-         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 185, 45, 255));
+         // A slim status strip: what is being learned, what to do, and Cancel as a chip. One text size throughout.
          const auto& elem = gPerfElements[gPerfMidiLearnIdx];
-         std::string axisStr = (gPerfMidiLearnAxis == 1) ? " (Y Axis)" : (elem.kind == 4 ? " (X Axis)" : "");
-         std::string prompt = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7)
-            ? "MIDI Learn for '" + elem.label + "'" + axisStr + ": Move any CC knob/fader or hit a pad on your MIDI controller (Esc to cancel)..."
-            : "MIDI CC Learn for '" + elem.label + "'" + axisStr + ": Move any CC knob, fader, or wheel on your MIDI controller (Esc to cancel)...";
-         ImGui::Text("%s", prompt.c_str());
-         ImGui::SameLine();
-         if (ImGui::SmallButton(L("Cancel##cancelmidilearn")))
+         const bool isLightT = CategoryColors::IsThemeLight();
+         const ImVec4 uiTxt = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         const float stripH = 30.0f;
+         const ImVec2 sp = ImGui::GetCursorScreenPos();
+         const float stripW = ImGui::GetContentRegionAvail().x;
+         ImDrawList* sdl = ImGui::GetWindowDrawList();
+         // Same recessed well as the Library list: neutral, no accent colour.
+         sdl->AddRectFilled(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(ImVec4(0, 0, 0, isLightT ? 0.04f : 0.27f)), tok::radius_pill);
+         sdl->AddRect(sp, ImVec2(sp.x + stripW, sp.y + stripH), ImGui::GetColorU32(isLightT ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
+         const float cy = sp.y + stripH * 0.5f;
+         const std::string axisStr = (gPerfMidiLearnAxis == 1) ? " \xC2\xB7 Y axis" : (elem.kind == 4 ? " \xC2\xB7 X axis" : "");
+         const bool pad = (elem.kind == 3 || elem.kind == 5 || elem.kind == 7);
+         const std::string head = "Listening for MIDI";
+         const std::string target = (elem.label.empty() ? std::string() : elem.label) + axisStr;
+         const char* hint = pad ? "Move a control or hit a pad on your controller. Esc cancels."
+                                : "Move a knob, fader or wheel on your controller. Esc cancels.";
+         float tx = sp.x + tok::space_3;
+         {
+            UiType::Scope ts(UiType::Size::Title, UiType::Weight::Semibold);
+            sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.6f)), head.c_str());
+            tx += ImGui::CalcTextSize(head.c_str()).x + tok::space_2;
+            if (!target.empty())
+            {
+               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.9f)), target.c_str());
+               tx += ImGui::CalcTextSize(target.c_str()).x;
+            }
+            tx += tok::space_3;
+         }
+         {
+            UiType::Scope ts(UiType::Size::Title);
+            const float room = sp.x + stripW - 84.0f - tx;
+            if (ImGui::CalcTextSize(hint).x <= room)
+               sdl->AddText(ImVec2(tx, std::round(cy - ImGui::GetFontSize() * 0.5f)), ImGui::GetColorU32(ImVec4(uiTxt.x, uiTxt.y, uiTxt.z, 0.4f)), hint);
+         }
+         ImGui::SetCursorScreenPos(ImVec2(sp.x + stripW - 76.0f, sp.y + (stripH - ChipButton::kHeight) * 0.5f));
+         if (ChipButton::Draw(L("Cancel##cancelmidilearn"), false, ChipButton::kHeight, 68.0f))
             gPerfMidiLearnIdx = -1;
-         ImGui::PopStyleColor();
+         ImGui::SetCursorScreenPos(ImVec2(sp.x, sp.y));
+         ImGui::Dummy(ImVec2(stripW, stripH + tok::space_2));
       }
 
       // ---- Sticky Header Toolbar ----
@@ -2105,49 +2175,35 @@ namespace app
       // WindowPadding with no added Spacing(), which is the gap this now
       // matches.
       // Mode Switch Button (Edit / Perform)
-      if (gPerfEditMode)
-      {
-         ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
-         if (ImGui::Button(L("Edit Mode"), ImVec2(86, 24)))
-            gPerfEditMode = false;
-         ImGui::PopStyleColor(2);
-      }
-      else
-      {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.58f, 0.32f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.68f, 0.38f, 1.0f));
-         if (ImGui::Button(L("Perform"), ImVec2(86, 24)))
-            gPerfEditMode = true;
-         ImGui::PopStyleColor(2);
-      }
+      if (ChipButton::Draw(gPerfEditMode ? L("Edit Mode") : L("Perform"), gPerfEditMode, kPerfChipH, 86.0f))
+         gPerfEditMode = !gPerfEditMode;
 
       // Add Control button in Edit Mode
       if (gPerfEditMode)
       {
          ImGui::SameLine();
-         if (ImGui::Button(L("+ Add Control"), ImVec2(100, 24)))
+         if (ChipButton::Draw(L("+ Add Control"), false, kPerfChipH, 100.0f))
             ImGui::OpenPopup("##perfaddcontrolmenu");
 
-         if (ImGui::BeginPopup("##perfaddcontrolmenu"))
+         if (MenuParts::BeginPopup("##perfaddcontrolmenu"))
          {
-            if (ImGui::MenuItem(L("Knob (1x1)"))) AddPerfElementToCurrentPage(0);
-            if (ImGui::MenuItem(L("Vertical Fader (1x2)"))) AddPerfElementToCurrentPage(1);
-            if (ImGui::MenuItem(L("Horizontal Slider (2x1)"))) AddPerfElementToCurrentPage(2);
-            if (ImGui::MenuItem(L("Toggle (1x1)"))) AddPerfElementToCurrentPage(3);
-            if (ImGui::MenuItem(L("XY Pad (2x2)"))) AddPerfElementToCurrentPage(4);
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Momentary Trigger / Bang (1x1)"))) AddPerfElementToCurrentPage(5);
-            if (ImGui::MenuItem(L("Digital Number Box (1x1)"))) AddPerfElementToCurrentPage(6);
-            if (ImGui::MenuItem(L("Radio Selector (2x1)"))) AddPerfElementToCurrentPage(7);
-            if (ImGui::MenuItem(L("Bipolar Pan Knob (1x1)"))) AddPerfElementToCurrentPage(8);
-            if (ImGui::MenuItem(L("Step Gate Ribbon (3x1)"))) AddPerfElementToCurrentPage(9);
-            ImGui::EndPopup();
+            if (MenuParts::Item(L("Knob (1x1)"))) AddPerfElementToCurrentPage(0);
+            if (MenuParts::Item(L("Vertical Fader (1x2)"))) AddPerfElementToCurrentPage(1);
+            if (MenuParts::Item(L("Horizontal Slider (2x1)"))) AddPerfElementToCurrentPage(2);
+            if (MenuParts::Item(L("Toggle (1x1)"))) AddPerfElementToCurrentPage(3);
+            if (MenuParts::Item(L("XY Pad (2x2)"))) AddPerfElementToCurrentPage(4);
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Momentary Trigger / Bang (1x1)"))) AddPerfElementToCurrentPage(5);
+            if (MenuParts::Item(L("Digital Number Box (1x1)"))) AddPerfElementToCurrentPage(6);
+            if (MenuParts::Item(L("Radio Selector (2x1)"))) AddPerfElementToCurrentPage(7);
+            if (MenuParts::Item(L("Bipolar Pan Knob (1x1)"))) AddPerfElementToCurrentPage(8);
+            if (MenuParts::Item(L("Step Gate Ribbon (3x1)"))) AddPerfElementToCurrentPage(9);
+            MenuParts::EndPopup();
          }
       }
 
-      // Page Tabs
-      ImGui::SameLine();
+      // Page Tabs (a wider gap separates them from the mode controls)
+      ImGui::SameLine(0.0f, tok::space_4);
       // No cursor-Y fudge: the page-tab and "+" buttons below now take an
       // explicit 24px height, matching "Edit Mode"/"Perform"/"+ Add
       // Control" exactly, so they already share the same baseline without
@@ -2169,7 +2225,7 @@ namespace app
          {
             ImGui::SetNextItemWidth(90.0f);
             ImGui::SetKeyboardFocusHere();
-            if (ImGui::InputText("##renamingpagetab", gPerfRenamePageBuffer, sizeof(gPerfRenamePageBuffer),
+            if (FieldWell::InputText("##renamingpagetab", gPerfRenamePageBuffer, sizeof(gPerfRenamePageBuffer),
                                  ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
             {
                PushUndoCheckpoint();
@@ -2187,33 +2243,8 @@ namespace app
          else
          {
             const bool isSelected = (gPerfActivePage == p);
-            if (isSelected)
-            {
-               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.80f, 0.85f, 0.94f, 1.0f) : ImVec4(0.25f, 0.28f, 0.38f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.1f, 0.15f, 0.3f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-            }
-            else
-            {
-               ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.92f, 0.94f, 0.96f, 0.7f) : ImVec4(0.14f, 0.16f, 0.22f, 0.7f));
-               ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.35f, 0.40f, 0.50f, 1.0f) : ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
-            }
-
-            // Explicit height matches "Edit Mode"/"Perform"/"+ Add Control"
-            // (all 24px) - this used to auto-fit to ImGui's default frame
-            // height, a few px shorter, which is what the -2.0f cursor nudge
-            // above the loop was trying (and failing) to paper over. Width
-            // gets its own explicit floor too: a plain auto-fit button is
-            // only text-width + 2*FramePadding.x (8px total) wide, so the
-            // selected page's highlight fill hugged its own label tighter
-            // than every other chip-style control in the app (page tab or
-            // not) - moving between pages by clicking through the highlight
-            // is what made that cramped fit visible.
-            const float tabW = std::max(60.0f, ImGui::CalcTextSize(pageTitle.c_str()).x + 24.0f);
-            if (ImGui::Button(pageTitle.c_str(), ImVec2(tabW, 24)))
-            {
+            if (ChipButton::Draw(pageTitle.c_str(), isSelected, kPerfChipH, 60.0f, /*soft=*/true))
                gPerfActivePage = p;
-            }
-            ImGui::PopStyleColor(2);
 
             // Double click to rename page
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -2240,14 +2271,14 @@ namespace app
             }
 
             // Right click context menu on page tab
-            if (ImGui::BeginPopupContextItem("##pagetabcontext"))
+            if (MenuParts::BeginContextItem("##pagetabcontext"))
             {
-               if (ImGui::MenuItem(L("Rename Page")))
+               if (MenuParts::Item(L("Rename Page")))
                {
                   gPerfRenamingPage = p;
                   snprintf(gPerfRenamePageBuffer, sizeof(gPerfRenamePageBuffer), "%s", pageTitle.c_str());
                }
-               if (ImGui::MenuItem(L("Duplicate Page")))
+               if (MenuParts::Item(L("Duplicate Page")))
                {
                   PushUndoCheckpoint();
                   int newP = gPerfLayout.pageCount++;
@@ -2263,7 +2294,7 @@ namespace app
                   }
                   gPerfActivePage = newP;
                }
-               if (gPerfLayout.pageCount > 1 && ImGui::MenuItem(L("Delete Page")))
+               if (gPerfLayout.pageCount > 1 && MenuParts::Item(L("Delete Page")))
                {
                   PushUndoCheckpoint();
                   gPerfElements.erase(std::remove_if(gPerfElements.begin(), gPerfElements.end(),
@@ -2277,7 +2308,7 @@ namespace app
                   if (gPerfActivePage >= gPerfLayout.pageCount)
                      gPerfActivePage = gPerfLayout.pageCount - 1;
                }
-               ImGui::EndPopup();
+               MenuParts::EndPopup();
             }
          }
          ImGui::PopID();
@@ -2287,7 +2318,7 @@ namespace app
       if (gPerfLayout.pageCount < 12)
       {
          ImGui::SameLine();
-         if (ImGui::Button(L("+##addpagebtn"), ImVec2(24, 24)))
+         if (ChipButton::Draw(L("+##addpagebtn"), false, kPerfChipH, kPerfChipH))
          {
             PushUndoCheckpoint();
             int newP = gPerfLayout.pageCount++;
@@ -2321,7 +2352,7 @@ namespace app
       if (gPerfEditMode)
       {
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         ImU32 gridCol = isLight ? IM_COL32(215, 220, 230, 80) : IM_COL32(48, 52, 65, 80);
+         ImU32 gridCol = isLight ? tok::U32(tok::pal::c_D7DCE650) : tok::U32(tok::pal::c_30344150);
          float gridMaxX = std::max(maxElemX + 200.0f, ImGui::GetWindowWidth());
          float gridMaxY = std::max(maxElemY + 200.0f, ImGui::GetWindowHeight());
          int numCols = (int)std::ceil(gridMaxX / (cellSize + gap)) + 1;
@@ -2344,6 +2375,15 @@ namespace app
       {
          if (gPerfElements[i].page == gPerfActivePage)
             DrawPerfElement(i, gridOrigin, cellSize, mouseOverAnyElement);
+      }
+      {
+         bool pageHasElements = false;
+         for (const auto& el : gPerfElements)
+            pageHasElements = pageHasElements || el.page == gPerfActivePage;
+         if (!pageHasElements)
+            EmptyState::DrawInWindow(T("Nothing on this page"),
+                                     gPerfEditMode ? T("Use + Add Control to place a knob, pad or switch")
+                                                   : T("Switch to Edit Mode to add controls"));
       }
 
       // ---- Edit-mode selection shortcuts ----
@@ -2390,33 +2430,33 @@ namespace app
       }
 
       // Context menu anywhere on blank canvas background (only if not hovering any control)
-      if (!mouseOverAnyElement && ImGui::BeginPopupContextWindow("##perfcanvascontext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+      if (!mouseOverAnyElement && MenuParts::BeginContextWindow("##perfcanvascontext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
       {
-         if (ImGui::BeginMenu(L("Dock Position")))
+         if (MenuParts::SubMenu(L("Dock Position")))
          {
-            if (ImGui::MenuItem(L("Bottom"), nullptr, gPerfPanelDock == 0)) gPerfPanelDock = 0;
-            if (ImGui::MenuItem(L("Right"), nullptr, gPerfPanelDock == 1)) gPerfPanelDock = 1;
-            if (ImGui::MenuItem(L("Left"), nullptr, gPerfPanelDock == 2)) gPerfPanelDock = 2;
-            if (ImGui::MenuItem(L("Top"), nullptr, gPerfPanelDock == 3)) gPerfPanelDock = 3;
+            if (MenuParts::Item(L("Bottom"), nullptr, gPerfPanelDock == 0)) gPerfPanelDock = 0;
+            if (MenuParts::Item(L("Right"), nullptr, gPerfPanelDock == 1)) gPerfPanelDock = 1;
+            if (MenuParts::Item(L("Left"), nullptr, gPerfPanelDock == 2)) gPerfPanelDock = 2;
+            if (MenuParts::Item(L("Top"), nullptr, gPerfPanelDock == 3)) gPerfPanelDock = 3;
             ImGui::EndMenu();
          }
-         ImGui::Separator();
-         if (ImGui::BeginMenu(L("+ Add Control")))
+         MenuParts::Separator();
+         if (MenuParts::SubMenu(L("+ Add Control")))
          {
-            if (ImGui::MenuItem(L("Knob (1x1)"))) AddPerfElementToCurrentPage(0);
-            if (ImGui::MenuItem(L("Vertical Fader (1x2)"))) AddPerfElementToCurrentPage(1);
-            if (ImGui::MenuItem(L("Horizontal Slider (2x1)"))) AddPerfElementToCurrentPage(2);
-            if (ImGui::MenuItem(L("Toggle (1x1)"))) AddPerfElementToCurrentPage(3);
-            if (ImGui::MenuItem(L("XY Pad (2x2)"))) AddPerfElementToCurrentPage(4);
-            ImGui::Separator();
-            if (ImGui::MenuItem(L("Momentary Trigger / Bang (1x1)"))) AddPerfElementToCurrentPage(5);
-            if (ImGui::MenuItem(L("Digital Number Box (1x1)"))) AddPerfElementToCurrentPage(6);
-            if (ImGui::MenuItem(L("Radio Selector (2x1)"))) AddPerfElementToCurrentPage(7);
-            if (ImGui::MenuItem(L("Bipolar Pan Knob (1x1)"))) AddPerfElementToCurrentPage(8);
-            if (ImGui::MenuItem(L("Step Gate Ribbon (3x1)"))) AddPerfElementToCurrentPage(9);
+            if (MenuParts::Item(L("Knob (1x1)"))) AddPerfElementToCurrentPage(0);
+            if (MenuParts::Item(L("Vertical Fader (1x2)"))) AddPerfElementToCurrentPage(1);
+            if (MenuParts::Item(L("Horizontal Slider (2x1)"))) AddPerfElementToCurrentPage(2);
+            if (MenuParts::Item(L("Toggle (1x1)"))) AddPerfElementToCurrentPage(3);
+            if (MenuParts::Item(L("XY Pad (2x2)"))) AddPerfElementToCurrentPage(4);
+            MenuParts::Separator();
+            if (MenuParts::Item(L("Momentary Trigger / Bang (1x1)"))) AddPerfElementToCurrentPage(5);
+            if (MenuParts::Item(L("Digital Number Box (1x1)"))) AddPerfElementToCurrentPage(6);
+            if (MenuParts::Item(L("Radio Selector (2x1)"))) AddPerfElementToCurrentPage(7);
+            if (MenuParts::Item(L("Bipolar Pan Knob (1x1)"))) AddPerfElementToCurrentPage(8);
+            if (MenuParts::Item(L("Step Gate Ribbon (3x1)"))) AddPerfElementToCurrentPage(9);
             ImGui::EndMenu();
          }
-         if (ImGui::MenuItem(L("Clear Page Controls")))
+         if (MenuParts::Item(L("Clear Page Controls")))
          {
             PushUndoCheckpoint();
             gPerfElements.erase(std::remove_if(gPerfElements.begin(), gPerfElements.end(),
@@ -2424,12 +2464,12 @@ namespace app
                                 gPerfElements.end());
             gPerfSelection.clear();
          }
-         ImGui::Separator();
-         if (ImGui::MenuItem(L("Close Performance Matrix")))
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Close Performance Matrix")))
          {
             gPerfPanelOpen = false;
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       // Dynamic canvas dummy that only expands if elements actually overflow window
@@ -2443,7 +2483,7 @@ namespace app
 
    void DrawPerfPanelDocked(const char* id, const ImVec2& size)
    {
-      const float kGrip = 6.0f;
+      const float kGrip = PanelFrame::kGap;   // the grip strip is the gap on the canvas-facing side
       const int dock = gPerfPanelDock;
       const bool vertical = (dock == 1 || dock == 2);
       const bool gripFirst = (dock == 0 || dock == 1);
@@ -2456,9 +2496,8 @@ namespace app
       // viewports: it was never a coloured divider, it was a hole. Give the
       // outer child the same opaque panelBg fill the content child already
       // has so the panel is solid edge to edge.
-      PushDockedPanelStyle(/*isChild=*/true);
+      // Outer child is transparent: the panel floats as a card on the canvas colour (PanelFrame).
       ImGui::BeginChild(id, size, false);
-      PopDockedPanelStyle();
       gPerfPanelRectMin = ImGui::GetWindowPos();
       gPerfPanelRectMax = ImVec2(gPerfPanelRectMin.x + ImGui::GetWindowSize().x,
                                  gPerfPanelRectMin.y + ImGui::GetWindowSize().y);
@@ -2498,17 +2537,21 @@ namespace app
       }
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+      const ImVec2 cardSize = vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
+                                       : ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+      PanelFrame::Insets in;
+      switch (dock)   // the grip side needs no inset of its own
+      {
+         case 0: in.t = 0.0f; break;
+         case 1: in.l = 0.0f; break;
+         case 2: in.r = 0.0f; break;
+         default: in.b = 0.0f; break;
+      }
       PushDockedPanelStyle(/*isChild=*/true);
-      // Same padding-loss trap as ModMatrix's content child above - this is
-      // the exact cause of "Edit Mode / Perform" sitting flush against the
-      // panel edge with no breathing room.
-      ImGui::BeginChild("##perfpanelinnercontent",
-                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
-                                 : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
-      DrawPerfPanelContent();
-      ImGui::EndChild();
+      PanelFrame::BeginCard("##perfpanelinnercontent", cardSize, in);
       PopDockedPanelStyle();
+      DrawPerfPanelContent();
+      PanelFrame::EndCard();
 
       if (!gripFirst)
       {
@@ -2521,9 +2564,11 @@ namespace app
       // spacing. Without this, the ItemSpacing between the panel and whatever
       // is laid out next shows a strip of the shell window's windowBg, which
       // reads as a bar separating the two viewports.
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+      // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
+      const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
+      ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
       ImGui::EndChild();
-      ImGui::PopStyleVar();
+      ImGui::GetStyle().ItemSpacing = savedSpacing;
 
       // No divider line along the canvas-facing edge, in either theme. This
       // hairline was a fixed dark constant, then a theme-derived one, and was
@@ -2557,26 +2602,29 @@ namespace app
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
       const float h = 90.0f;
+      const float pad = 6.0f; // R12: plotted values stay inside the frame by this inset
+      const float innerW = kPreviewSize - 2.0f * pad;
+      const float innerH = h - 2.0f * pad;
+      auto yOf = [&](float v) { return origin.y + pad + innerH - (v - lo) / range * innerH; };
       ImDrawList* dl = ImGui::GetWindowDrawList();
       // Was a hardcoded near-black fill regardless of theme - on a light
       // preset (e.g. GitHub Light) this read as a solid black box in every
       // modulator node's (LFO, Pattern, ...) header. Reuse the same
       // theme-aware scope palette DrawCurveEditor already uses.
-      dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                        ScopeBgCol(), 4.0f);
+      AudioViz::Fill(dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + h));
 
       const bool isPredictor = dynamic_cast<IPredictor*>(mod) != nullptr ||
                                dynamic_cast<PredictiveModulatorNode*>(mod) != nullptr;
-      const ImU32 lineCol = isPredictor ? IM_COL32(34, 197, 94, 255)
-                                        : (isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(255, 190, 90, 255));
+      const ImU32 lineCol = isPredictor ? tok::U32(tok::pal::c_22C55EFF)
+                                        : (isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_FFBE5AFF));
 
       dl->PushClipRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), true); // backstop, not the primary fix
       for (size_t i = 1; i < history.size(); i++)
       {
-         float x0 = origin.x + kPreviewSize * (float)(i - 1) / 160.0f;
-         float x1 = origin.x + kPreviewSize * (float)i / 160.0f;
-         float y0 = origin.y + h - (history[i - 1] - lo) / range * h;
-         float y1 = origin.y + h - (history[i] - lo) / range * h;
+         float x0 = origin.x + pad + innerW * (float)(i - 1) / 160.0f;
+         float x1 = origin.x + pad + innerW * (float)i / 160.0f;
+         float y0 = yOf(history[i - 1]);
+         float y1 = yOf(history[i]);
          dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), lineCol, 1.6f);
       }
       dl->PopClipRect();
@@ -2593,29 +2641,28 @@ namespace app
          // faint quarter guides so the axis reads as a scale, not a blank box
          for (int q = 1; q < 4; q++)
          {
-            const float gy = origin.y + h - ((q * 0.25f) - lo) / range * h;
+            const float gy = yOf(q * 0.25f);
             dl->AddLine(ImVec2(origin.x, gy), ImVec2(origin.x + kPreviewSize, gy),
                         ScopeMidLineCol(), q == 2 ? 1.0f : 0.5f);
          }
          if (!history.empty())
          {
-            const float cy = origin.y + h - (history.back() - lo) / range * h;
-            dl->AddCircleFilled(ImVec2(origin.x + kPreviewSize * (float)(history.size() - 1) / 160.0f, cy),
+            const float cy = yOf(history.back());
+            dl->AddCircleFilled(ImVec2(origin.x + pad + innerW * (float)(history.size() - 1) / 160.0f, cy),
                                 3.0f, lineCol);
          }
       }
       if (outOfContract)
       {
-         const float y0line = origin.y + h - (0.0f - lo) / range * h;
-         const float y1line = origin.y + h - (1.0f - lo) / range * h;
+         const float y0line = yOf(0.0f);
+         const float y1line = yOf(1.0f);
          const ImU32 hairlineCol = ScopeMidLineCol();
          if (y0line >= origin.y && y0line <= origin.y + h)
             dl->AddLine(ImVec2(origin.x, y0line), ImVec2(origin.x + kPreviewSize, y0line), hairlineCol, 1.0f);
          if (y1line >= origin.y && y1line <= origin.y + h)
             dl->AddLine(ImVec2(origin.x, y1line), ImVec2(origin.x + kPreviewSize, y1line), hairlineCol, 1.0f);
       }
-      dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                  outOfContract ? lineCol : ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, ImVec2(origin.x + kPreviewSize, origin.y + h), outOfContract ? lineCol : 0);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
       ImGui::Text("%.3f", value);
    }

@@ -32,3 +32,8 @@ graphify-out/
 artifacts-linux/
 bench/results/
 bench/media/
+
+# repowise index (local, regenerable)
+.repowise/
+.repowise-workspace/
+.repowise-workspace.yaml

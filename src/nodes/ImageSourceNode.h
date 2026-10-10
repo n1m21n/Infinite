@@ -44,6 +44,8 @@ public:
    bool LoadViaDialog();
    const std::string& LastError() const { return mLastError; }
    const std::string& LoadedPath() const { return mLoadedPath; }
+   NodeIssue Issue() const override { return NodeIssues::MediaFile(mLoadedPath, mLastError); }
+   bool Relink() override { return LoadViaDialog(); }
 
    std::string pathInput; // bound to the ImGui text field
 

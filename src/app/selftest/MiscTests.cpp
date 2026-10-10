@@ -1,5 +1,6 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/graph/NodeClipboard.h"
 
 namespace app
 {
@@ -1422,6 +1423,83 @@ int RunVST3BlocklistTest()
 // is one of the two that triggers the redirect) rather than reimplementing
 // the check, so a regression in the real function is what this catches.
 // Headless like PLUGINSCANTEST above - no GL/ImGui needed.
+// ====================================================== INFINITE_HISTORYTEST
+//
+// Block I1: undo entries carry names (explicit or derived from the before/after patches), a jump through history lands
+// on the right state, redo entries survive until a new edit, and no label is ever written into a patch.
+void RunHistoryTest()
+{
+   using json = nlohmann::json;
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+   auto Call = [&](const char* m, const json& p, json& r, std::string& e) { return HandleRpcCommand(m, p, r, e); };
+   json r;
+   std::string e;
+
+   NewPatch();
+   // Five different edits.
+   Call("create_node", { {"typeName", "Shape"}, {"category", "Source"} }, r, e);                 // 1 add Shape
+   const int shapeIdx = r.value("index", -1);
+   Call("create_node", { {"typeName", "Output"}, {"category", "Utility"} }, r, e);               // 2 add Output
+   const int outIdx = r.value("index", -1);
+   json prm;
+   Call("get_params", { {"index", shapeIdx} }, prm, e);
+   std::string floatName;
+   for (auto it = prm.begin(); it != prm.end() && floatName.empty(); ++it)
+      if (it.key().rfind("f ", 0) == 0)
+         floatName = it.key().substr(2);
+   Call("set_param", { {"index", shapeIdx}, {"name", floatName}, {"value", 0.37} }, r, e);        // 3 param edit
+   if (GraphNode* gn = FindNodeByIndex(shapeIdx))
+   {
+      PushUndoCheckpoint("Bypass");                                                              // 4 bypass
+      gn->node->bypassed = true;
+   }
+   RemoveNodeByIndex(outIdx);                                                                     // 5 delete Output (pushes its own checkpoint)
+
+   Check("five edits are on the undo stack", gUndoStack.size() == 5);
+   const std::string l0 = UndoLabelAt(0), l1 = UndoLabelAt(1), l2 = UndoLabelAt(2), l3 = UndoLabelAt(3), l4 = UndoLabelAt(4);
+   printf("  labels newest first: %s | %s | %s | %s | %s\n", l0.c_str(), l1.c_str(), l2.c_str(), l3.c_str(), l4.c_str());
+   Check("explicit labels are kept", l0.find("Delete") == 0 && l1 == "Bypass");
+   Check("a param edit is named by what changed", l2.find(floatName) == 0 && l2.find("0.37") != std::string::npos);
+   Check("an added node is named by its type", l3 == "Add Output" && l4 == "Add Shape");
+
+   // Save and load: labels are not in the file, and loading clears the history.
+   const std::string path = "/tmp/infinite_history_test.inf";
+   SavePatchTo(path);
+   std::string text;
+   {
+      std::ifstream in(path);
+      text.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+   }
+   Check("labels are not serialised", text.find("Bypass") == std::string::npos && text.find("Delete") == std::string::npos &&
+                                         text.find("Add Output") == std::string::npos);
+
+   // Jump to the state right after edit 3 (two undos): Output is back, Shape is not bypassed.
+   JumpInHistory(2, 0);
+   Check("jump back applies two undos", gUndoStack.size() == 3 && gRedoStack.size() == 2);
+   Check("jump back landed on the right state", gNodes.size() == 2 && FindNodeByIndex(shapeIdx) != nullptr && !FindNodeByIndex(shapeIdx)->node->bypassed);
+   Check("redo entries keep their names", RedoLabelAt(0) == "Bypass" && RedoLabelAt(1).find("Delete") == 0);
+   Check("undo entry names survive the jump", UndoLabelAt(0).find(floatName) == 0);
+
+   // Jump forward one: the bypass is back.
+   JumpInHistory(0, 1);
+   Check("jump forward re-applies the redo", FindNodeByIndex(shapeIdx) != nullptr && FindNodeByIndex(shapeIdx)->node->bypassed && gRedoStack.size() == 1);
+
+   // A new edit drops the redo side.
+   PushUndoCheckpoint("Edit");
+   Check("a new edit clears redo", gRedoStack.empty());
+
+   SavePatchTo(path);
+   Check("loading clears history", LoadPatchFrom(path) && gUndoStack.empty() && gRedoStack.empty());
+   remove(path.c_str());
+   printf("HISTORYTEST %s\n", ok ? "OK" : "FAIL");
+}
+
 // ====================================================== INFINITE_RPCBATCHTEST
 //
 // R495: the live RPC methods, driven through the real HandleRpcCommand.
@@ -2063,4 +2141,159 @@ bool RunPerfPanelSelfTest()
    printf("[PERF MATRIX TEST] PASS\n");
    return true;
 }
+
+void RunClipboardTest()
+{
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+
+   NewPatch();
+   const int shapeIdx = SpawnNode("Shape", "Source", 100.0f, 100.0f)->index;
+   const int blurIdx = SpawnNode("gaussianblur", "Effects", 300.0f, 100.0f)->index;
+   const int lfoIdx = SpawnNode("LFO", "Modulators", 100.0f, 300.0f)->index;
+   const int outIdx = SpawnNode("Output", "Utility", 500.0f, 100.0f)->index;
+   const int noteIdx = SpawnNode("Comment", "Compositing", 100.0f, 500.0f)->index;
+   const int groupIdx = SpawnNode("Group", "Compositing", 50.0f, 450.0f)->index;
+   const int fieldIdx = SpawnNode("Field Graph", "Compositing", 300.0f, 300.0f)->index;
+   // Every spawn can move gNodes, so the pointers are taken only now.
+   GraphNode* shape = FindNodeByIndex(shapeIdx);
+   GraphNode* blur = FindNodeByIndex(blurIdx);
+   GraphNode* outside = FindNodeByIndex(outIdx);
+   const uint64_t shapeUid = shape->uid;
+   ImageCable* in0 = CableFor(*blur, 0);
+   if (in0 != nullptr)
+      in0->Connect(shape->node.get(), 0);
+   if (ImageCable* toOut = CableFor(*outside, 0))
+      toOut->Connect(blur->node.get(), 0);
+   Modulation::Source src;
+   src.nodeIndex = lfoIdx;
+   src.depth = 0.5f;
+   Modulation::Instance().RestoreLink(shapeIdx, 0, src);
+   Modulation::Instance().SetExpression(blurIdx, 0, "0.25 + 0.5");
+   {
+      GestureRecorder::Playback gp;
+      gp.samples = { { 0.1f, 0.0, true }, { 0.9f, 1.0, false }, { 0.4f, 2.0, false } };
+      gp.speed = 2.0f;
+      gp.recordedMin = 0.1f;
+      gp.recordedMax = 0.9f;
+      GestureRecorder::Instance().SetPlayback(shapeIdx, 1, gp);
+   }
+   if (GraphNode* fg = FindNodeByIndex(fieldIdx))
+      if (auto* fgn = dynamic_cast<FieldGraphNode*>(fg->node.get()))
+      {
+         fgn->Ownership().Set("child", shapeIdx);
+         fgn->Ownership().Set("gone", outIdx); // owned but never copied
+         fgn->ownershipText = fgn->Ownership().ToText();
+      }
+   std::vector<std::pair<std::string, std::string>> before;
+   Patch::SaveParams(shape->node.get(), before);
+
+   // Copy everything except the Output.
+   const std::string text = NodeClipboardSerialize({ shapeIdx, blurIdx, lfoIdx, noteIdx, groupIdx, fieldIdx });
+   Check("selection serialises with the header", text.rfind("infinite-nodes v", 0) == 0);
+   Check("a node that was not copied is not in the text", text.find("Output") == std::string::npos);
+   Check("the text is recognised as nodes", LooksLikeNodeClipboard(text));
+
+   // Into another patch: only the pasted nodes exist, so nothing can collide by luck.
+   NewPatch();
+   SpawnNode("Noise", "Source", 0.0f, 0.0f);
+   const size_t baseCount = gNodes.size();
+   const size_t undoBefore = gUndoStack.size();
+   const NodePasteResult r = NodeClipboardPaste(text, ImVec2(1000.0f, 1000.0f));
+   Check("paste succeeds", r.ok && r.pasted == 6 && r.skipped == 0);
+   Check("six nodes added", gNodes.size() == baseCount + 6);
+   Check("one undo step", gUndoStack.size() == undoBefore + 1);
+
+   std::set<uint64_t> uids;
+   bool uniqueUids = true;
+   for (const GraphNode& gn : gNodes)
+      uniqueUids = uniqueUids && uids.insert(gn.uid).second;
+   Check("uids are unique", uniqueUids);
+   GraphNode* pShape = nullptr; GraphNode* pBlur = nullptr; GraphNode* pLfo = nullptr;
+   bool hasNote = false, hasGroup = false, hasField = false;
+   for (int idx : r.newIndices)
+      if (GraphNode* gn = FindNodeByIndex(idx))
+      {
+         if (gn->typeName == "Shape") pShape = gn;
+         if (gn->typeName == "gaussianblur") pBlur = gn;
+         if (gn->typeName == "LFO") pLfo = gn;
+         hasField = hasField || gn->typeName == "Field Graph";
+         hasNote = hasNote || gn->typeName == "Comment";
+         hasGroup = hasGroup || gn->typeName == "Group";
+      }
+   Check("comment, group and Field graph nodes came across", hasNote && hasGroup && hasField);
+   {
+      bool ownsPasted = false, droppedUncopied = false;
+      for (int idx : r.newIndices)
+         if (GraphNode* gn = FindNodeByIndex(idx))
+            if (auto* fgn = dynamic_cast<FieldGraphNode*>(gn->node.get()))
+            {
+               ownsPasted = pShape != nullptr && fgn->Ownership().Get("child") == pShape->index;
+               droppedUncopied = !fgn->Ownership().Has("gone");
+            }
+      Check("a Field graph owns the pasted copy of its child, not the original", ownsPasted);
+      Check("a child that was not copied is dropped from ownership", droppedUncopied);
+   }
+   Check("pasted nodes got new uids", pShape != nullptr && pShape->uid != shapeUid);
+   if (pShape != nullptr)
+   {
+      std::vector<std::pair<std::string, std::string>> after;
+      Patch::SaveParams(pShape->node.get(), after);
+      Check("params survive", after == before);
+   }
+   bool cabled = false;
+   if (pBlur != nullptr && pShape != nullptr)
+      if (ImageCable* c = CableFor(*pBlur, 0))
+         cabled = c->Resolved() == pShape->node.get();
+   Check("a cable between copied nodes is kept", cabled);
+   bool modKept = false;
+   if (pShape != nullptr && pLfo != nullptr)
+      for (const auto& l : Modulation::Instance().Links())
+         modKept = modKept || (l.first.first == pShape->index && l.second.nodeIndex == pLfo->index);
+   Check("a binding between copied nodes is kept", modKept);
+   Check("an expression is kept", pBlur != nullptr && Modulation::Instance().HasExpression(pBlur->index, 0));
+   {
+      bool gestureKept = false;
+      if (pShape != nullptr)
+      {
+         const auto& pbs = GestureRecorder::Instance().Playbacks();
+         auto it = pbs.find(GestureRecorder::Key(pShape->index, 1));
+         gestureKept = it != pbs.end() && it->second.samples.size() == 3 && it->second.speed == 2.0f;
+      }
+      Check("a gesture recording is kept", gestureKept);
+   }
+
+   // The cable into the Output was to an uncopied node: nothing should be wired to it.
+   bool strayCable = false;
+   for (int idx : r.newIndices)
+      if (GraphNode* gn = FindNodeByIndex(idx))
+         if (gn->typeName == "Output")
+            strayCable = true;
+   Check("no uncopied node came along", !strayCable);
+
+   // Refusals leave the patch alone.
+   const size_t nNow = gNodes.size();
+   const std::string newer = "infinite-nodes v" + std::to_string(Patch::FormatVersion() + 1) + "\ninfinite-patch 99\n";
+   const NodePasteResult rn = NodeClipboardPaste(newer, ImVec2(0, 0));
+   Check("a newer format is refused calmly", !rn.ok && !rn.message.empty() && gNodes.size() == nNow);
+   const NodePasteResult rg = NodeClipboardPaste("infinite-nodes v1\nnot a patch", ImVec2(0, 0));
+   Check("garbage after the header is refused", !rg.ok && gNodes.size() == nNow);
+   Check("plain text is not nodes", !LooksLikeNodeClipboard("hello") && !LooksLikeNodeClipboard(""));
+
+   // A node type this build lacks is left out, the rest still pastes.
+   std::string withUnknown = text;
+   const size_t at = withUnknown.find("node ");
+   if (at != std::string::npos)
+      withUnknown += "node 99 Source NoSuchNodeType\n  pos 0 0\n  flags 1 0 0 0\nend\n";
+   const NodePasteResult ru = NodeClipboardPaste(withUnknown, ImVec2(0, 0));
+   Check("an unknown node type is skipped, the rest pastes", ru.ok && ru.skipped == 1 && ru.pasted == 6);
+
+   printf("CLIPBOARDTEST %s\n", ok ? "OK" : "FAIL");
+}
+
 }

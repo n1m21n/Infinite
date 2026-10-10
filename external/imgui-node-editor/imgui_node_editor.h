@@ -425,6 +425,8 @@ IMGUI_NODE_EDITOR_API float GetCurrentZoom();
 IMGUI_NODE_EDITOR_API NodeId GetHoveredNode();
 IMGUI_NODE_EDITOR_API PinId GetHoveredPin();
 IMGUI_NODE_EDITOR_API LinkId GetHoveredLink();
+// Canvas-space midpoint of a link's curve (pass through CanvasToScreen for screen space); false if the link is unknown.
+IMGUI_NODE_EDITOR_API bool GetLinkMidpoint(LinkId linkId, ImVec2* outCanvasPos);
 IMGUI_NODE_EDITOR_API NodeId GetDoubleClickedNode();
 IMGUI_NODE_EDITOR_API PinId GetDoubleClickedPin();
 IMGUI_NODE_EDITOR_API LinkId GetDoubleClickedLink();

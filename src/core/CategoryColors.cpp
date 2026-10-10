@@ -308,6 +308,8 @@ float gUiScale = -1.0f;
 std::string gUiFont;
 std::string gLanguage;
 bool gTooltips = false; // help tooltips are opt-in
+bool gCookTimes = false;   // canvas Cook times overlay (View menu), off by default
+bool gReduceMotion = false; // chrome eases become instant (UiAnim)
 
 std::string ThemePath()
 {
@@ -423,6 +425,14 @@ void LoadAppearanceOverrides()
       {
          gUiScale = std::strtof(val.c_str(), nullptr);
       }
+      else if (key == "ui.cooktimes")
+      {
+         gCookTimes = (val == "1");
+      }
+      else if (key == "ui.reducemotion")
+      {
+         gReduceMotion = (val == "1");
+      }
       else if (key == "ui.tooltips")
       {
          gTooltips = (val == "1");
@@ -464,6 +474,13 @@ void SetPreset(int index)
       std::ofstream file(path);
       file << Presets()[gCurrent].name << "\n";
    }
+}
+
+void SetPresetTransient(int index)
+{
+   const int count = (int)Presets().size();
+   if (count != 0)
+      gCurrent = std::max(0, std::min(index, count - 1));
 }
 
 const UiTheme& CurrentUiTheme()
@@ -740,6 +757,30 @@ void SetTooltips(bool on, bool saveToFile)
       SaveAppearanceOverrides();
 }
 
+bool GetCookTimes()
+{
+   return gCookTimes;
+}
+
+void SetCookTimes(bool on, bool saveToFile)
+{
+   gCookTimes = on;
+   if (saveToFile)
+      SaveAppearanceOverrides();
+}
+
+bool GetReduceMotion()
+{
+   return gReduceMotion;
+}
+
+void SetReduceMotion(bool on, bool saveToFile)
+{
+   gReduceMotion = on;
+   if (saveToFile)
+      SaveAppearanceOverrides();
+}
+
 std::string GetUiFont()
 {
    return gUiFont;
@@ -836,6 +877,10 @@ void SaveAppearanceOverrides()
       file << "ui.lang=" << gLanguage << "\n";
    if (gTooltips)
       file << "ui.tooltips=1\n";
+   if (gReduceMotion)
+      file << "ui.reducemotion=1\n";
+   if (gCookTimes)
+      file << "ui.cooktimes=1\n";
 }
 
 int SemanticRank(const std::string& category)

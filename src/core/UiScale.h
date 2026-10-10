@@ -14,8 +14,8 @@
 //     is a larger pixel buffer. The OS scales the picture; only the manual slider is ours.
 //   - Windows and X11: window and framebuffer are both physical pixels and xscale is the
 //     real DPI factor. We divide the window by xscale ourselves.
-// The font is baked at (about) its final physical pixel size, so it is sharp, and
-// FontGlobalScale brings it back to exactly 15 units.
+// ImGui 1.92 rasterizes glyphs on demand at size x DisplayFramebufferScale, so text is sharp at any
+// scale with no bake size; the font is always kBaseFontSize units.
 namespace UiScale
 {
    constexpr float kBaseFontSize = 15.0f;
@@ -24,16 +24,7 @@ namespace UiScale
    {
       float pointScale;      // window units per ImGui unit (backend divides DisplaySize/mouse)
       float bakeScale;       // physical pixels per ImGui unit
-      float fontGlobalScale; // io.FontGlobalScale = kBaseFontSize / BakedFontPx(bakeScale)
    };
-
-   // ImGui 1.90 truncates font sizes when it builds the atlas, so 150% (22.5 px) would bake
-   // at 22 and every text-sized node would come out short. Bake at the next whole pixel up
-   // instead; FontGlobalScale absorbs the difference. Whole-pixel sizes are unchanged.
-   inline float BakedFontPx(float bakeScale)
-   {
-      return std::ceil(kBaseFontSize * bakeScale - 1.0e-3f);
-   }
 
    inline Result Resolve(float xscale, int windowW, int framebufferW, float manualScale)
    {
@@ -45,14 +36,13 @@ namespace UiScale
       Result r;
       r.pointScale = (platformScalesPicture ? 1.0f : xscale) * manualScale;
       r.bakeScale = xscale * manualScale;
-      r.fontGlobalScale = kBaseFontSize / BakedFontPx(r.bakeScale);
       return r;
    }
 
    // The resolved value for the main window, updated on startup and on every rescale.
    inline Result& Current()
    {
-      static Result sCurrent { 1.0f, 1.0f, 1.0f };
+      static Result sCurrent { 1.0f, 1.0f };
       return sCurrent;
    }
 
@@ -99,9 +89,7 @@ namespace UiScale
       for (const Case& c : kCases)
       {
          const Result r = Resolve(c.xscale, c.winW, c.fbW, c.manual);
-         const bool ok = Near(r.pointScale, c.wantPoint) && Near(r.bakeScale, c.wantBake) &&
-                         Near(r.fontGlobalScale * BakedFontPx(r.bakeScale), kBaseFontSize) &&
-                         BakedFontPx(r.bakeScale) == std::floor(BakedFontPx(r.bakeScale));
+         const bool ok = Near(r.pointScale, c.wantPoint) && Near(r.bakeScale, c.wantBake);
          if (!ok)
          {
             if (failures == 0 && firstFailure != nullptr)

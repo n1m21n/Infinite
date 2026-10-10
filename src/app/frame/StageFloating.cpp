@@ -1,5 +1,8 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/frame/FrameCtx.h"
+#include "app/ui/design/components/DialogParts.h"
 
 namespace app
 {
@@ -45,7 +48,7 @@ int DrawFloating(FrameCtx& fc)
             ImGuiStyle& style = ImGui::GetStyle();
             ImGui::TextDisabled("%s", T("Live-editing this ImGuiStyle for inspection only - not saved."));
             static char colorFilter[64] = "";
-            ImGui::InputTextWithHint("##colorfilter", "filter colors...", colorFilter, sizeof(colorFilter));
+            FieldWell::InputTextWithHint("##colorfilter", "filter colors...", colorFilter, sizeof(colorFilter));
             if (ImGui::BeginChild("##colorlist"))
             {
                for (int i = 0; i < ImGuiCol_COUNT; i++)
@@ -68,6 +71,8 @@ int DrawFloating(FrameCtx& fc)
 
       if (gSettingsOpen)
          DrawSettingsWindow(&gSettingsOpen);
+      if (gTemplatesOpen)
+         DrawTemplatesWindow(&gTemplatesOpen);
 
       PollPatchFileWatch();
       if (gPatchChangedOnDisk)
@@ -81,62 +86,55 @@ int DrawFloating(FrameCtx& fc)
          {
             ImGui::TextUnformatted(T("File changed on disk."));
             ImGui::SameLine();
-            if (ImGui::Button(L("Reload")))
+            if (ActionButton::Draw(L("Reload")))
             {
                if (LoadPatchFromImpl(gPatchWatchPath, true))
                   gPatchChangedOnDisk = false;
             }
             ImGui::SameLine();
-            if (ImGui::Button(L("Keep mine")))
+            if (ActionButton::Draw(L("Keep mine")))
                gPatchChangedOnDisk = false;
          }
          ImGui::End();
       }
 
+      {
+         static const char* sDlg = getenv("INFINITE_OPENDIALOG");
+         if (sDlg && ImGui::GetFrameCount() > 20)
+         {
+            if (!strcmp(sDlg, "unsaved")) gShowUnsavedChangesModal = true;
+            else if (!strcmp(sDlg, "about")) gShowAboutModal = true;
+            else if (!strcmp(sDlg, "recover")) { gShowAutosaveRecoveryModal = true; gAutosaveRecoveryTimestamp = "14:32"; }
+            sDlg = nullptr;
+         }
+      }
       if (gShowUnsavedChangesModal)
       {
          ImGui::OpenPopup(L("Unsaved Changes"));
          gShowUnsavedChangesModal = false;
       }
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      if (ImGui::BeginPopupModal(L("Unsaved Changes"), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+      if (DialogParts::Begin(L("Unsaved Changes")))
       {
-         ImGui::Text("%s", T("This patch has unsaved changes."));
-         ImGui::Text("%s", T("Save before closing?"));
-         ImGui::Separator();
-         const float btnW = 100.0f;
-         const float spacing = ImGui::GetStyle().ItemSpacing.x;
-         const float totalW = btnW * 3 + spacing * 2;
-         const float avail = ImGui::GetContentRegionAvail().x;
-         if (avail > totalW)
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - totalW);
-         // Right-aligned, cancel-to-primary reading order (platform
-         // convention: the recommended default action is rightmost and
-         // the only one drawn with emphasis - matching the fix in the
-         // Recover Autosave modal below, which had the identical defect).
-         if (ImGui::Button(L("Cancel"), ImVec2(btnW, 0)))
+         DialogParts::Title(T("Unsaved changes"));
+         DialogParts::Message(T("This patch has unsaved changes."));
+         DialogParts::Message(T("Save before closing?"));
+         const int pick = DialogParts::Buttons({ L("Cancel"), L("Don't Save"), L("Save") });
+         if (pick == 0)
          {
             gPendingUnsavedAction = nullptr;
             ImGui::CloseCurrentPopup();
          }
-         ImGui::SameLine();
-         if (ImGui::Button(L("Don't Save"), ImVec2(btnW, 0)))
+         else if (pick == 1)
          {
             if (gPendingUnsavedAction)
                gPendingUnsavedAction();
             gPendingUnsavedAction = nullptr;
             ImGui::CloseCurrentPopup();
          }
-         ImGui::SameLine();
-         PushPrimaryButtonStyle();
-         const bool doSave = ImGui::Button(L("Save"), ImVec2(btnW, 0));
-         PopPrimaryButtonStyle();
-         if (doSave)
+         else if (pick == 2)
          {
             SavePatchInteractive(false);
-            // Only proceed if the save actually went through - a cancelled
-            // Save As dialog or a write failure leaves gPatchDirty set, and
-            // the modal should stay up so the user can try again.
+            // Only proceed if the save went through; a cancelled Save As or a write failure keeps the dialog up.
             if (!gPatchDirty)
             {
                if (gPendingUnsavedAction)
@@ -145,7 +143,108 @@ int DrawFloating(FrameCtx& fc)
                ImGui::CloseCurrentPopup();
             }
          }
-         ImGui::EndPopup();
+         DialogParts::End();
+      }
+
+      // ---- about modal: brand mark between the title and the credits ----
+#ifndef NDEBUG
+      {
+         static bool sAboutShot = getenv("INFINITE_OPENABOUT") != nullptr;
+         if (sAboutShot && ImGui::GetFrameCount() > 20) { gShowAboutModal = true; sAboutShot = false; }
+      }
+#endif
+      if (gShowAboutModal)
+      {
+         ImGui::OpenPopup(L("About Infinite"));
+         gShowAboutModal = false;
+      }
+      if (DialogParts::Begin(L("About Infinite")))
+      {
+         const float w = 400.0f;
+         ImGui::Dummy(ImVec2(w, 0.0f));
+         const auto Centered = [&](const char* text, bool dim)
+         {
+            const float tw = ImGui::CalcTextSize(text).x;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (w - tw) * 0.5f));
+            if (dim) DialogParts::Message(text); else ImGui::TextUnformatted(text);
+         };
+         if (const ImTextureID tex = BrandLogoTexture())
+         {
+            const float s = 96.0f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - s) * 0.5f);
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            ImGui::Dummy(ImVec2(s, s));
+            ImGui::GetWindowDrawList()->AddImageRounded(tex, p, ImVec2(p.x + s, p.y + s), ImVec2(0, 0), ImVec2(1, 1),
+                                                        IM_COL32_WHITE, 20.0f);
+         }
+         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         {
+            UiType::Scope s(UiType::Size::Title, UiType::Weight::Medium);
+            Centered("Infinite", false);
+         }
+         char ver[64];
+         snprintf(ver, sizeof(ver), T("version %s"), INFINITE_VERSION_STRING);
+         Centered(ver, true);
+         {
+            // Which build this is: the day it was compiled and whether it is a shipped (Release) or a Debug one.
+#ifdef NDEBUG
+            const char* kind = "release";
+#else
+            const char* kind = "debug";
+#endif
+            char build[96];
+            snprintf(build, sizeof(build), T("build %s, %s"), __DATE__, kind);
+            Centered(build, true);
+         }
+         ImGui::Dummy(ImVec2(0.0f, tok::space_3));
+         const auto Credit = [&](const char* role, const char* names)
+         {
+            DialogParts::Message(role);
+            ImGui::TextUnformatted(names);
+            ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         };
+         Credit(T("Author"), "Naman Soni");
+         Credit(T("Contributors"), "Ricardo Palmieri");
+         Credit(T("Agent"), "Claude (Anthropic)");
+         DialogParts::Message(T("MIT licensed"));
+         {
+            struct L { const char* label; const char* url; };
+            const L links[] = { { T("Source code"), "https://github.com/n1m21n/Infinite" },
+                                { T("Licence"), "https://github.com/n1m21n/Infinite/blob/main/LICENSE" },
+                                { T("Third-party notices"), "https://github.com/n1m21n/Infinite/blob/main/THIRD_PARTY_NOTICES" },
+                                { T("Releases"), "https://github.com/n1m21n/Infinite/releases" } };
+            // Laid out by hand so they wrap with the dialog instead of overflowing it.
+            const float x0 = ImGui::GetCursorPosX(), maxX = x0 + ImGui::GetContentRegionAvail().x;
+            const float lineH = ImGui::GetTextLineHeight() + tok::space_1;
+            float x = x0, y = ImGui::GetCursorPosY();
+            for (const L& l : links)
+            {
+               const float w = ImGui::CalcTextSize(l.label).x;
+               if (x > x0 && x + w > maxX)
+               {
+                  x = x0;
+                  y += lineH;
+               }
+               ImGui::SetCursorPos(ImVec2(x, y));
+               if (ImGui::TextLink(l.label))
+                  Platform::OpenExternalUrl(l.url);
+               x += w + tok::space_4;
+            }
+            ImGui::SetCursorPos(ImVec2(x0, y + lineH));
+            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+         }
+         const int pick = DialogParts::Buttons({ L("Check for updates"), L("Website"), L("Close") });
+         if (pick == 0)
+         {
+            UpdateCheck::Start();
+            gShowUpdateCheckModal = true;
+            ImGui::CloseCurrentPopup();
+         }
+         if (pick == 1)
+            Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/");
+         if (pick == 2 || ImGui::IsKeyPressed(ImGuiKey_Escape))
+            ImGui::CloseCurrentPopup();
+         DialogParts::End();
       }
 
       // ---- check for updates modal ----
@@ -154,73 +253,58 @@ int DrawFloating(FrameCtx& fc)
          ImGui::OpenPopup(L("Check for updates"));
          gShowUpdateCheckModal = false;
       }
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowSize(ImVec2(380, 0), ImGuiCond_Appearing);
-      bool isUpdateCheckOpen = true;
-      if (ImGui::BeginPopupModal(L("Check for updates"), &isUpdateCheckOpen, ImGuiWindowFlags_AlwaysAutoResize))
+      if (DialogParts::Begin(L("Check for updates")))
       {
-         if (!isUpdateCheckOpen)
-            ImGui::CloseCurrentPopup();
-
-         UpdateCheck::Status status = UpdateCheck::GetStatus();
+         DialogParts::Title(T("Check for updates"));
+         const UpdateCheck::Status status = UpdateCheck::GetStatus();
+         char msg[256];
          switch (status)
          {
             case UpdateCheck::Status::Idle:
             case UpdateCheck::Status::Checking:
-            {
-               // Text-only "spinner" - a handful of dots cycling off the
-               // clock, so the modal never looks frozen while the request
-               // is in flight.
-               int dots = ((int)(ImGui::GetTime() * 2.0) % 4);
-               ImGui::Text(T("Checking for updates%.*s"), dots, "...");
+               // A few dots cycling off the clock so the dialog never looks frozen while the request is in flight.
+               snprintf(msg, sizeof(msg), T("Checking for updates%.*s"), (int)(ImGui::GetTime() * 2.0) % 4, "...");
+               DialogParts::Message(msg);
                break;
-            }
             case UpdateCheck::Status::UpToDate:
-               ImGui::Text(T("You're running the latest version (%s)."), INFINITE_VERSION_STRING);
+               snprintf(msg, sizeof(msg), T("You're running the latest version (%s)."), INFINITE_VERSION_STRING);
+               DialogParts::Message(msg);
                break;
             case UpdateCheck::Status::UpdateAvailable:
-               ImGui::Text(T("Version %s is available (you have %s)."),
-                           UpdateCheck::ResultVersion().c_str(), INFINITE_VERSION_STRING);
+               snprintf(msg, sizeof(msg), T("Version %s is available (you have %s)."),
+                        UpdateCheck::ResultVersion().c_str(), INFINITE_VERSION_STRING);
+               DialogParts::Message(msg);
                break;
             case UpdateCheck::Status::Failed:
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.45f, 0.4f, 1.0f));
-               ImGui::TextWrapped("%s", UpdateCheck::LastError().c_str());
-               ImGui::PopStyleColor();
+               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
+               DialogParts::Message(UpdateCheck::LastError().c_str());
+               ImGui::PopTextWrapPos();
                break;
          }
 
-         ImGui::Separator();
-
          if (status == UpdateCheck::Status::UpdateAvailable)
          {
-            PushPrimaryButtonStyle();
-            const bool doDownload = ImGui::Button(L("Download latest version"));
-            PopPrimaryButtonStyle();
-            if (doDownload)
+            const int pick = DialogParts::Buttons({ L("Later"), L("Download") });
+            if (pick == 1)
                Platform::OpenExternalUrl(UpdateCheck::DownloadUrl());
-            ImGui::SameLine();
-            if (ImGui::Button(L("Later")))
+            if (pick >= 0)
                ImGui::CloseCurrentPopup();
          }
          else if (status == UpdateCheck::Status::Failed)
          {
-            PushPrimaryButtonStyle();
-            const bool doRetry = ImGui::Button(L("Retry"));
-            PopPrimaryButtonStyle();
-            if (doRetry)
+            const int pick = DialogParts::Buttons({ L("Close"), L("Retry") });
+            if (pick == 1)
                UpdateCheck::Start();
-            ImGui::SameLine();
-            if (ImGui::Button(L("Close")))
+            else if (pick == 0)
                ImGui::CloseCurrentPopup();
          }
          else if (status == UpdateCheck::Status::UpToDate)
          {
-            if (ImGui::Button(L("Close")))
+            if (DialogParts::Buttons({ L("Close") }) == 0)
                ImGui::CloseCurrentPopup();
          }
          // Idle/Checking: no buttons yet, just wait for Poll() to land a result.
-
-         ImGui::EndPopup();
+         DialogParts::End();
       }
 
       if (gShowAutosaveRecoveryModal)
@@ -228,28 +312,20 @@ int DrawFloating(FrameCtx& fc)
          ImGui::OpenPopup(L("Recover Autosave"));
          gShowAutosaveRecoveryModal = false;
       }
-      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      if (ImGui::BeginPopupModal(L("Recover Autosave"), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+      if (DialogParts::Begin(L("Recover Autosave")))
       {
-         ImGui::Text("%s", T("Infinite closed unexpectedly."));
+         DialogParts::Title(T("Infinite didn't close properly last time."));
          if (!gAutosaveRecoveryTimestamp.empty())
-            ImGui::Text(T("A recovered version of your work from %s is available."),
-                        gAutosaveRecoveryTimestamp.c_str());
-         else
-            ImGui::Text("%s", T("A recovered version of your work is available."));
-         ImGui::Separator();
          {
-            const float btnW = 100.0f;
-            const float spacing = ImGui::GetStyle().ItemSpacing.x;
-            const float totalW = btnW * 2 + spacing;
-            const float avail = ImGui::GetContentRegionAvail().x;
-            if (avail > totalW)
-               ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - totalW);
+            char msg[256];
+            snprintf(msg, sizeof(msg), T("Your work from %s was saved automatically. Recover it to carry on, or discard it; your saved patch files are untouched."),
+                     gAutosaveRecoveryTimestamp.c_str());
+            DialogParts::Message(msg);
          }
-         // Discard (destructive, plain) on the left, Recover (recommended,
-         // emphasized) rightmost - same right-aligned/primary-emphasis
-         // convention as the Unsaved Changes modal above.
-         if (ImGui::Button(L("Discard"), ImVec2(100, 0)))
+         else
+            DialogParts::Message(T("Your work was saved automatically. Recover it to carry on, or discard it; your saved patch files are untouched."));
+         const int pick = DialogParts::Buttons({ L("Discard"), L("Recover") });
+         if (pick == 0)
          {
             DiscardAutosave();
             const std::string marker = AutosaveMarkerPath();
@@ -260,11 +336,7 @@ int DrawFloating(FrameCtx& fc)
             }
             ImGui::CloseCurrentPopup();
          }
-         ImGui::SameLine();
-         PushPrimaryButtonStyle();
-         const bool doRecover = ImGui::Button(L("Recover"), ImVec2(100, 0));
-         PopPrimaryButtonStyle();
-         if (doRecover)
+         else if (pick == 1)
          {
             ApplyPatchData(gPendingRecoveryData);
             gArrangePatchGeneration++; // a new document, same as File > Open
@@ -273,12 +345,10 @@ int DrawFloating(FrameCtx& fc)
             gPatchPath.clear();          // it is not the user's file - force Save As
             gPatchDirty = true;          // it is unsaved work, and should say so
             gPatchStatus = T("Recovered autosave. Save the project to keep it.");
-            // A recovery that leaves the file behind offers itself again on
-            // the next launch.
-            DiscardAutosave();
+            DiscardAutosave(); // a recovery that leaves the file behind offers itself again next launch
             ImGui::CloseCurrentPopup();
          }
-         ImGui::EndPopup();
+         DialogParts::End();
       }
 
       // Keep the title bar in sync with the open document. GLFW has no
@@ -361,7 +431,10 @@ int DrawFloating(FrameCtx& fc)
                 dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<NdiOutNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
+            {
+               CookProbe::Scope probe(gn.node.get());
                gn.node->CookIfNeeded(frameId);
+            }
          }
          Bench::NodeGpuRing() = nullptr;
       }

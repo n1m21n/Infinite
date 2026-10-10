@@ -1,5 +1,50 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/components/SectionCard.h"
+#include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/StateRing.h"
+#include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/LibraryParts.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
+
+namespace
+{
+   // The shared chrome for the Field / Formula editor windows: Settings' recipe (elevated panel, 16 pt window pad,
+   // no collapse arrow, SectionCard surface) so they read as the same family as every other floating window.
+   bool BeginEditorWindow(const char* name, bool* open)
+   {
+      app::PushElevatedPanelStyle(/*isChild=*/false);
+      FormParts::PushWindowPad();
+      const bool visible = ImGui::Begin(name, open, ImGuiWindowFlags_NoCollapse);
+      FormParts::PopWindowPad();
+      if (visible)
+      {
+         SectionCard::BeginWindow();
+         FormParts::PushReferenceStyle(false);
+      }
+      return visible;
+   }
+   void EndEditorWindow(bool visible)
+   {
+      if (visible)
+      {
+         FormParts::PopReferenceStyle();
+         SectionCard::EndWindow();
+      }
+      ImGui::End();
+      app::PopElevatedPanelStyle();
+   }
+   // Dim, wrapped help line (the old TextDisabled lines ran off the window edge).
+   void EditorHint(const char* text)
+   {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+      ImGui::TextWrapped("%s", text);
+      ImGui::PopStyleColor();
+   }
+}
 
 namespace app
 {
@@ -60,10 +105,7 @@ void DrawSidePanels(FrameCtx& fc)
          if (hoveredCompatible != nullptr)
          {
             ImDrawList* hoverDl = ImGui::GetWindowDrawList();
-            const ImU32 glowCol = IM_COL32(0, 230, 255, 40);
-            const ImU32 ringCol = IM_COL32(0, 230, 255, 200);
-            hoverDl->AddRectFilled(hoveredP, ImVec2(hoveredP.x + hoveredS.x, hoveredP.y + hoveredS.y), glowCol, 6.0f);
-            hoverDl->AddRect(hoveredP, ImVec2(hoveredP.x + hoveredS.x, hoveredP.y + hoveredS.y), ringCol, 6.0f, 0, 2.0f);
+            StateRing::Draw(hoverDl, hoveredP, ImVec2(hoveredP.x + hoveredS.x, hoveredP.y + hoveredS.y), StateRing::Kind::Target, IsThemeLight());
 
             ed::Suspend();
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -116,8 +158,8 @@ void DrawSidePanels(FrameCtx& fc)
          // clearly visible dark line in light mode. Suppressed the same way the
          // menu-bar/canvas seam was: make the two colors it reads transparent
          // for just this call.
-         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-         ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+         ImGui::PushStyleColor(ImGuiCol_Border, tok::V4(tok::palf::v_0_0_0_0));
+         ImGui::PushStyleColor(ImGuiCol_BorderShadow, tok::V4(tok::palf::v_0_0_0_0));
          ed::End();
          ImGui::PopStyleColor(2);
          ImGui::PopStyleVar();
@@ -263,60 +305,41 @@ void DrawSidePanels(FrameCtx& fc)
          DrawArrangePanelDocked("##arrangepanel_right", ImVec2(gArrangePanelWidth, graphHeight));
       }
 
+      // Right-docked edit history (always right; Edit > History or Shift+U)
+      if (gHistoryOpen)
+      {
+         DrawHistoryDocked("##historypanel_right", ImVec2(gHistoryWidth, graphHeight));
+      }
+
       // ---- node browser / search panel ----
       // Always sticks to the rightmost edge of the window
       if (gNodePanelOpen)
       {
          ImGui::SameLine(0.0f, 0.0f);
          PushDockedPanelStyle(/*isChild=*/true);
-         // See DrawModMatrixDocked's inner-content child for why
-         // AlwaysUseWindowPadding is needed alongside Border now.
-         ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight),
-                           ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
+         PanelFrame::BeginCard("##nodepanel", ImVec2(kNodePanelWidth, graphHeight));
          PopDockedPanelStyle();
-         // Same hairline as every other panel boundary. This panel has no
-         // resize grip to hang it off, so it draws the seam on its own left
-         // edge - the side that faces the canvas, since it is always the
-         // rightmost panel.
+
+         // The five modes as one segmented control (the accent pill slides between them). No title: the top bar
+         // button already names the panel.
          {
-            const ImVec2 wp = ImGui::GetWindowPos();
-            const ImVec2 ws = ImGui::GetWindowSize();
-            ImGui::GetWindowDrawList()->AddLine(ImVec2(wp.x + 0.5f, wp.y),
-                                                ImVec2(wp.x + 0.5f, wp.y + ws.y),
-                                                PanelSeamColor(), 1.0f);
+            static const int kModes[5] = { 0, 4, 1, 2, 3 };   // gSearchPanelMode value per segment
+            const PillGroup::Segment segs[5] = { { "lib.modules", T("Modules") }, { "lib.field", T("Field") },
+                                                 { "lib.samples", T("Samples") }, { "lib.media", T("Media") },
+                                                 { "lib.plugins", T("Plugins") } };
+            int sel = 0;
+            for (int i = 0; i < 5; ++i)
+               if (kModes[i] == gSearchPanelMode)
+                  sel = i;
+            const ImVec2 cp = ImGui::GetCursorScreenPos();
+            const UiLayout::Rect r{ cp.x, cp.y, ImGui::GetContentRegionAvail().x, 32.0f };
+            const int hit = PillGroup::Draw("lib.tabs", r, segs, 5, sel, UiType::Size::Title);
+            if (hit >= 0)
+               gSearchPanelMode = kModes[hit];
+            ImGui::SetCursorScreenPos(cp);
+            ImGui::Dummy(ImVec2(r.w, r.h));
          }
-
-         // Mode switcher: Modules is the original, always-present catalogue;
-         // Samples and Media extend it per docs/plans/audio/README.md P3e.
-         // Kept as plain selectable-style buttons rather than an ImGui tab
-         // bar so the active mode reads clearly against the panel's own
-         // dark background.
-         // Sized dynamically across the 5 browser modes (Modules, Field, Samples, Media, Plugins).
-         // Styled with centered alignment and dedicated gaps so labels never collide or clip.
-         // Selectable's highlight is rounded app-wide (see the FrameRounding
-         // patch in imgui_widgets.cpp), so anything tighter than ~8px reads
-         // as one unbroken block between adjacent tabs with no visible seam.
-         const float tabGap = 8.0f;
-         const float totalAvailW = ImGui::GetContentRegionAvail().x;
-         const float tabW = std::max(40.0f, std::floor((totalAvailW - tabGap * 4.0f) / 5.0f));
-
-         ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));
-         if (ImGui::Selectable(L("Modules"), gSearchPanelMode == 0, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 0;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable(L("Field"), gSearchPanelMode == 4, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 4;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable(L("Samples"), gSearchPanelMode == 1, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 1;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable(L("Media"), gSearchPanelMode == 2, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 2;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable(L("Plugins"), gSearchPanelMode == 3, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 3;
-         ImGui::PopStyleVar();
-         ImGui::Separator();
+         ImGui::Dummy(ImVec2(0, tok::space_3));
 
          if (gSearchPanelMode == 0)
          {
@@ -359,8 +382,7 @@ void DrawSidePanels(FrameCtx& fc)
                   ? categoryIds[gModulesFilter.typeFilter] : std::string();
 
             std::string spawnName, spawnCategory;
-            ImGui::Separator();
-            ImGui::BeginChild("##nodepanellist", ImVec2(0, 0), false);
+            LibraryParts::BeginWell("##nodepanellist");
 
             // No cache: at ~170 entries, filtering+sorting this list from
             // NodeFactory every frame is well under the cost that made
@@ -422,29 +444,26 @@ void DrawSidePanels(FrameCtx& fc)
                   ImGui::PushID(match.first.c_str());
                   const bool isFav = gBrowserFavorites.IsFavoriteModule(match.first);
                   const float availW = ImGui::GetContentRegionAvail().x;
-                  const float badgeReserve = 20.0f;
                   const std::string rowLabel =
-                     TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - badgeReserve));
-                  if (ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0)))
+                     TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - 64.0f));
+                  const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
+                  if (row.clicked)
                   {
                      spawnName = match.first;
                      spawnCategory = match.second;
                   }
-                  if (ImGui::IsItemHovered() && rowLabel != DisplayName(match.first))
+                  if (row.hovered && rowLabel != DisplayName(match.first))
                      ImGui::SetTooltip("%s", DisplayName(match.first).c_str());
-                  const ImVec2 selMin = ImGui::GetItemRectMin();
-                  const ImVec2 selMax = ImGui::GetItemRectMax();
-                  DrawFavoriteBadge(selMin, selMax, isFav);
-                  if (ImGui::BeginPopupContextItem("##mod_ctx"))
+                  if (MenuParts::BeginContextItem("##mod_ctx"))
                   {
-                     if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
+                     if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                         gBrowserFavorites.ToggleModule(match.first);
-                     if (ImGui::MenuItem(L("Add to canvas")))
+                     if (MenuParts::Item(L("Add to canvas")))
                      {
                         spawnName = match.first;
                         spawnCategory = match.second;
                      }
-                     ImGui::EndPopup();
+                     MenuParts::EndPopup();
                   }
                   ImGui::PopID();
                }
@@ -454,6 +473,7 @@ void DrawSidePanels(FrameCtx& fc)
                // Category view (default - today's behaviour, unchanged for
                // people who don't touch the sort control): grouped
                // headings in NodeFactory's own registration order.
+               bool firstSection = true;
                for (const std::string& category : NodeFactory::Instance().GetCategories())
                {
                   if (!categoryFilter.empty() && category != categoryFilter)
@@ -479,35 +499,33 @@ void DrawSidePanels(FrameCtx& fc)
                   if (gModulesFilter.descending)
                      std::reverse(matches.begin(), matches.end());
 
-                  ImGui::SeparatorText(DisplayName(category).c_str());
+                  LibraryParts::SectionHeader(DisplayName(category).c_str(), (int)matches.size(), firstSection);
+                  firstSection = false;
                   for (const std::string& name : matches)
                   {
                      ImGui::PushID(name.c_str());
                      const bool isFav = gBrowserFavorites.IsFavoriteModule(name);
                      const float availW = ImGui::GetContentRegionAvail().x;
-                     const float badgeReserve = 20.0f;
                      const std::string rowLabel =
-                        TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - badgeReserve));
-                     if (ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0)))
+                        TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - 64.0f));
+                     const LibraryParts::RowResult row = LibraryParts::Row("row", rowLabel, nullptr, isFav);
+                     if (row.clicked)
                      {
                         spawnName = name;
                         spawnCategory = category;
                      }
-                     if (ImGui::IsItemHovered() && rowLabel != DisplayName(name))
+                     if (row.hovered && rowLabel != DisplayName(name))
                         ImGui::SetTooltip("%s", DisplayName(name).c_str());
-                     const ImVec2 selMin = ImGui::GetItemRectMin();
-                     const ImVec2 selMax = ImGui::GetItemRectMax();
-                     DrawFavoriteBadge(selMin, selMax, isFav);
-                     if (ImGui::BeginPopupContextItem("##mod_cat_ctx"))
+                     if (MenuParts::BeginContextItem("##mod_cat_ctx"))
                      {
-                        if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
+                        if (MenuParts::Item(isFav ? L("Remove from favourites") : L("Add to favourites")))
                            gBrowserFavorites.ToggleModule(name);
-                        if (ImGui::MenuItem(L("Add to canvas")))
+                        if (MenuParts::Item(L("Add to canvas")))
                         {
                            spawnName = name;
                            spawnCategory = category;
                         }
-                        ImGui::EndPopup();
+                        MenuParts::EndPopup();
                      }
                      ImGui::PopID();
                   }
@@ -607,12 +625,13 @@ void DrawSidePanels(FrameCtx& fc)
       if (gFormulaEditorOpen && gFormulaEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(620, 460), ImGuiCond_FirstUseEver);
-         PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin(L("Formula editor"), &gFormulaEditorOpen))
+         const bool editorVisible = BeginEditorWindow(L("Formula editor"), &gFormulaEditorOpen);
+         if (editorVisible)
          {
-            ImGui::TextDisabled("%s", T("body of  vec4 shape(vec2 uv, vec2 p, float t)"));
-            ImGui::TextDisabled("%s", T("p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs"));
-            ImGui::Separator();
+            SectionCard::Begin(T("Kernel"));
+            EditorHint(T("body of  vec4 shape(vec2 uv, vec2 p, float t)"));
+            EditorHint(T("p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs"));
+            SectionCard::Begin(T("Code"));
 
             static char editBuf[8192];
             static FormulaNode* lastEdited = nullptr;
@@ -622,18 +641,18 @@ void DrawSidePanels(FrameCtx& fc)
                lastEdited = gFormulaEditor;
             }
 
-            ImGui::InputTextMultiline("##glsl", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##glsl", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFormulaEditor->formula = editBuf;
                gFormulaEditor->Apply();
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
 
             if (!gFormulaEditor->LastError().empty())
@@ -641,8 +660,7 @@ void DrawSidePanels(FrameCtx& fc)
                ImGui::TextWrapped("%s", gFormulaEditor->LastError().c_str());
             }
          }
-         ImGui::End();
-         PopElevatedPanelStyle();
+         EndEditorWindow(editorVisible);
       }
 
       if (gFieldElementEditorOpen && gFieldElementEditor != nullptr)
@@ -663,12 +681,13 @@ void DrawSidePanels(FrameCtx& fc)
       if (gFieldElementEditorOpen && gFieldElementEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
-         PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin(L("Field element editor"), &gFieldElementEditorOpen))
+         const bool editorVisible = BeginEditorWindow(L("Field element editor"), &gFieldElementEditorOpen);
+         if (editorVisible)
          {
-            ImGui::TextDisabled("%s", T("Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t"));
-            ImGui::TextDisabled("%s", T("User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted."));
-            ImGui::Separator();
+            SectionCard::Begin(T("Kernel"));
+            EditorHint(T("Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t"));
+            EditorHint(T("User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted."));
+            SectionCard::Begin(T("Code"));
 
             // gCurrentNodeIndex is -1 here (EndNodeParams() reset it once the
             // node canvas finished drawing for this frame - this window draws
@@ -692,11 +711,11 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldElementEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldElementEditor->code = editBuf;
                gFieldElementEditor->Apply();
@@ -704,7 +723,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
 
             if (!gFieldElementEditor->LastError().empty())
@@ -712,8 +731,7 @@ void DrawSidePanels(FrameCtx& fc)
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldElementEditor->LastError().c_str());
             }
          }
-         ImGui::End();
-         PopElevatedPanelStyle();
+         EndEditorWindow(editorVisible);
       }
 
       if (gFieldPrimitiveEditorOpen && gFieldPrimitiveEditor != nullptr)
@@ -734,12 +752,13 @@ void DrawSidePanels(FrameCtx& fc)
       if (gFieldPrimitiveEditorOpen && gFieldPrimitiveEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
-         PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin(L("Field primitive editor"), &gFieldPrimitiveEditorOpen))
+         const bool editorVisible = BeginEditorWindow(L("Field primitive editor"), &gFieldPrimitiveEditorOpen);
+         if (editorVisible)
          {
-            ImGui::TextDisabled("%s", T("Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t"));
-            ImGui::TextDisabled("%s", T("Pure 3D geometry generator. Frame rate expressions are automatically hoisted."));
-            ImGui::Separator();
+            SectionCard::Begin(T("Kernel"));
+            EditorHint(T("Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t"));
+            EditorHint(T("Pure 3D geometry generator. Frame rate expressions are automatically hoisted."));
+            SectionCard::Begin(T("Code"));
 
             gCurrentNodeIndex = gFieldPrimitiveEditor->NodeIndex();
             DrawFieldDeviceControls<FieldPrimitiveNode>(gFieldPrimitiveEditor, "primitive", &FieldPrimitiveNode::PresetNames(),
@@ -756,11 +775,11 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldPrimitiveEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldPrimitiveCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldPrimitiveCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldPrimitiveEditor->code = editBuf;
                gFieldPrimitiveEditor->Apply();
@@ -768,7 +787,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPrimitiveEditor->code.c_str());
 
             if (!gFieldPrimitiveEditor->LastError().empty())
@@ -776,19 +795,19 @@ void DrawSidePanels(FrameCtx& fc)
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPrimitiveEditor->LastError().c_str());
             }
          }
-         ImGui::End();
-         PopElevatedPanelStyle();
+         EndEditorWindow(editorVisible);
       }
 
       if (gFieldPixelEditorOpen && gFieldPixelEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
-         PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin(L("Field pixel editor"), &gFieldPixelEditorOpen))
+         const bool editorVisible = BeginEditorWindow(L("Field pixel editor"), &gFieldPixelEditorOpen);
+         if (editorVisible)
          {
-            ImGui::TextDisabled("%s", T("Field pixel-domain kernel (per-pixel fragment shader)."));
-            ImGui::TextDisabled("%s", T("Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame"));
-            ImGui::Separator();
+            SectionCard::Begin(T("Kernel"));
+            EditorHint(T("Field pixel-domain kernel (per-pixel fragment shader)."));
+            EditorHint(T("Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame"));
+            SectionCard::Begin(T("Code"));
 
             gCurrentNodeIndex = gFieldPixelEditor->NodeIndex();
             DrawFieldDeviceControls<FieldPixelNode>(gFieldPixelEditor, "pixel", &FieldPixelNode::PresetNames(),
@@ -805,11 +824,11 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldPixelEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldPixelEditor->code = editBuf;
                gFieldPixelEditor->Apply();
@@ -817,7 +836,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
 
             if (!gFieldPixelEditor->LastError().empty())
@@ -825,8 +844,7 @@ void DrawSidePanels(FrameCtx& fc)
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPixelEditor->LastError().c_str());
             }
          }
-         ImGui::End();
-         PopElevatedPanelStyle();
+         EndEditorWindow(editorVisible);
       }
 
       if (gSketchEditorOpen && gSketchEditor != nullptr)
@@ -928,6 +946,22 @@ void DrawSidePanels(FrameCtx& fc)
          PopElevatedPanelStyle();
       }
 
+      // Design-review shot: INFINITE_OPENPANELS "fieldfxwin" opens the Field effect editor on the first Field Effect node.
+      {
+         static bool sShotDone = false;
+         const char* op = getenv("INFINITE_OPENPANELS");
+         if (!sShotDone && op != nullptr && strstr(op, "fieldfxwin") != nullptr && ImGui::GetFrameCount() > 12)
+         {
+            for (const GraphNode& gn : gNodes)
+               if (auto* fx = dynamic_cast<FieldSampleNode*>(gn.node.get()))
+               {
+                  gFieldSampleEditor = fx;
+                  gFieldSampleEditorOpen = true;
+                  sShotDone = true;
+                  break;
+               }
+         }
+      }
       if (gFieldSampleEditorOpen && gFieldSampleEditor != nullptr)
       {
          bool alive = false;
@@ -946,12 +980,13 @@ void DrawSidePanels(FrameCtx& fc)
       if (gFieldSampleEditorOpen && gFieldSampleEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
-         PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin(L("Field effect editor"), &gFieldSampleEditorOpen))
+         const bool editorVisible = BeginEditorWindow(L("Field effect editor"), &gFieldSampleEditorOpen);
+         if (editorVisible)
          {
-            ImGui::TextDisabled("%s", T("Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out"));
-            ImGui::TextDisabled("%s", T("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob."));
-            ImGui::Separator();
+            SectionCard::Begin(T("Kernel"));
+            EditorHint(T("Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out"));
+            EditorHint(T("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob."));
+            SectionCard::Begin(T("Code"));
 
             gCurrentNodeIndex = gFieldSampleEditor->NodeIndex();
             DrawFieldDeviceControls<FieldSampleNode>(gFieldSampleEditor, "sample", &FieldSampleNode::PresetNames(),
@@ -968,11 +1003,11 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldSampleEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldSampleEditor->code = editBuf;
                gFieldSampleEditor->Apply();
@@ -980,7 +1015,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSampleEditor->code.c_str());
 
             if (!gFieldSampleEditor->LastError().empty())
@@ -988,8 +1023,7 @@ void DrawSidePanels(FrameCtx& fc)
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSampleEditor->LastError().c_str());
             }
          }
-         ImGui::End();
-         PopElevatedPanelStyle();
+         EndEditorWindow(editorVisible);
       }
 
       if (gFieldSynthEditorOpen && gFieldSynthEditor != nullptr)
@@ -1010,12 +1044,13 @@ void DrawSidePanels(FrameCtx& fc)
       if (gFieldSynthEditorOpen && gFieldSynthEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
-         PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin(L("Field synth editor"), &gFieldSynthEditorOpen))
+         const bool editorVisible = BeginEditorWindow(L("Field synth editor"), &gFieldSynthEditorOpen);
+         if (editorVisible)
          {
-            ImGui::TextDisabled("%s", T("Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out"));
-            ImGui::TextDisabled("%s", T("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob."));
-            ImGui::Separator();
+            SectionCard::Begin(T("Kernel"));
+            EditorHint(T("Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out"));
+            EditorHint(T("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob."));
+            SectionCard::Begin(T("Code"));
 
             gCurrentNodeIndex = gFieldSynthEditor->NodeIndex();
             DrawFieldDeviceControls<FieldSynthNode>(gFieldSynthEditor, "synth", &FieldSynthNode::PresetNames(),
@@ -1032,11 +1067,11 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldSynthEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldSynthCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldSynthCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                gFieldSynthEditor->code = editBuf;
                gFieldSynthEditor->Apply();
@@ -1044,7 +1079,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSynthEditor->code.c_str());
 
             if (!gFieldSynthEditor->LastError().empty())
@@ -1052,8 +1087,7 @@ void DrawSidePanels(FrameCtx& fc)
                ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSynthEditor->LastError().c_str());
             }
          }
-         ImGui::End();
-         PopElevatedPanelStyle();
+         EndEditorWindow(editorVisible);
       }
 
       if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
@@ -1074,12 +1108,13 @@ void DrawSidePanels(FrameCtx& fc)
       if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
-         PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin(L("Field graph editor"), &gFieldGraphEditorOpen))
+         const bool editorVisible = BeginEditorWindow(L("Field graph editor"), &gFieldGraphEditorOpen);
+         if (editorVisible)
          {
-            ImGui::TextDisabled("%s", T("Field graph-domain kernel (edit-time, runs once). emit(\"Type Name\", k0, k1, ...) -> handle"));
-            ImGui::TextDisabled("%s", T("connect(src, srcSlot, dst, dstSlot)   set(handle, \"paramName\", value)   place(handle, x, y)"));
-            ImGui::Separator();
+            SectionCard::Begin(T("Kernel"));
+            EditorHint(T("Field graph-domain kernel (edit-time, runs once). emit(\"Type Name\", k0, k1, ...) -> handle"));
+            EditorHint(T("connect(src, srcSlot, dst, dstSlot)   set(handle, \"paramName\", value)   place(handle, x, y)"));
+            SectionCard::Begin(T("Code"));
 
             gCurrentNodeIndex = gFieldGraphEditor->NodeIndex();
             DrawFieldDeviceControls<FieldGraphNode>(gFieldGraphEditor, "graph", &FieldGraphNode::PresetNames(),
@@ -1096,11 +1131,11 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldGraphEditor->code;
             }
 
-            ImGui::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
+            FieldWell::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
             PushPrimaryButtonStyle();
-            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
             {
                // Compile-only (T11): never mutates the real graph on its own -
                // see FieldGraphNode::Apply()'s doc comment. Regenerate (below)
@@ -1111,10 +1146,10 @@ void DrawSidePanels(FrameCtx& fc)
             }
             PopPrimaryButtonStyle();
             ImGui::SameLine();
-            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
             ImGui::SameLine();
-            if (ImGui::Button(L("Regenerate"), ImVec2(120, 0)))
+            if (ActionButton::Draw(L("Regenerate"), ImVec2(120, 0)))
             {
                // Safe to call directly (not deferred) here: this window draws
                // after ed::End() has already returned for the frame, unlike
@@ -1129,10 +1164,9 @@ void DrawSidePanels(FrameCtx& fc)
             }
             if (!gFieldGraphEditor->Notice().empty())
             {
-               ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", gFieldGraphEditor->Notice().c_str());
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_700_200_1000), "%s", gFieldGraphEditor->Notice().c_str());
             }
          }
-         ImGui::End();
-         PopElevatedPanelStyle();
+         EndEditorWindow(editorVisible);
       }}
 }

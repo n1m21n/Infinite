@@ -359,6 +359,11 @@ public:
 
    double SampleRate() const;
 
+   // Per-node ProcessBlock timing for the Cook times overlay. Off: the audio thread does nothing extra.
+   void SetNodeCostMeasure(bool on) { mNodeCostOn.store(on, std::memory_order_relaxed); }
+   // The time one callback block has to finish in (frames / rate), ms; 0 before the first callback.
+   float BlockBudgetMs() const { return mBlockBudgetMs.load(std::memory_order_relaxed); }
+
    // Xruns, split by where the evidence comes from. XrunCount() is the one
    // number to gate on: deadline misses + OS-reported overloads. Callback
    // gaps are the old wall-clock heuristic, kept for information only - a
@@ -637,6 +642,8 @@ private:
    std::atomic<uint64_t> mCallbackGaps { 0 };
    std::atomic<double> mLastCallbackMs { -1.0 };
    std::atomic<double> mLastBlockLoad { 0.0 };
+   std::atomic<bool> mNodeCostOn { false };
+   std::atomic<float> mBlockBudgetMs { 0.0f };
    Bench::AudioLoadRing mRawLoadHistory;
    std::array<Bench::AudioLoadRing, kAudioStageCount> mStageLoadHistory;
    // Set in Start(), read by IsAlive() as the "no callback yet" baseline -

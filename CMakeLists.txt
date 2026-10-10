@@ -445,6 +445,7 @@ set(COMMON_SOURCES
     src/app/graph/PatchFiles.cpp
     src/app/graph/PatchIO.cpp
     src/app/graph/PatchLoad.cpp
+    src/app/graph/NodeClipboard.cpp
     src/app/graph/Projector.cpp
     src/app/graph/Rpc.cpp
     src/app/graph/Wiring.cpp
@@ -455,6 +456,12 @@ set(COMMON_SOURCES
     src/app/panels/HelpWindows.cpp
     src/app/panels/LibraryPanels.cpp
     src/app/panels/Minimap.cpp
+    src/app/panels/FindOverlay.cpp
+    src/app/panels/CookOverlay.cpp
+    src/app/panels/NoticeStack.cpp
+    src/app/panels/HistoryPanel.cpp
+    src/app/panels/TemplatesWindow.cpp
+    src/app/panels/Diagnostics.cpp
     src/app/panels/ModMatrixPanel.cpp
     src/app/panels/PerfPanel.cpp
     src/app/panels/SettingsWindow.cpp
@@ -476,10 +483,17 @@ set(COMMON_SOURCES
     src/app/ui/ModWidgets.cpp
     src/app/ui/ParamWidgets.cpp
     src/app/ui/Theme.cpp
+    src/app/ui/design/UiAnim.cpp
+    src/app/ui/design/UiType.cpp
+    src/app/ui/design/UiInteract.cpp
+    src/app/ui/design/UiGallery.cpp
     src/core/GLUtil.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
     src/core/CategoryColors.cpp
+    src/core/CookProbe.cpp
+    src/core/Notices.cpp
+    src/core/UndoDescribe.cpp
     src/core/I18n.cpp
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
@@ -1161,11 +1175,19 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
         COMMAND ${CMAKE_COMMAND} -E make_directory
                 "$<TARGET_FILE_DIR:Infinite>/Resources/drumkits/infinite-basic"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/drumkits/infinite-basic"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
         COMMENT "Copying bundled fonts and drum kit next to Infinite.exe")
     target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
 elseif(APPLE)
@@ -1213,6 +1235,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
         COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
+        COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon_1024.png"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/icon_1024.png"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -1231,6 +1256,11 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/drumkits/infinite-basic"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/templates"
         COMMENT "Copying bundled fonts, icon, drum kit, ONNX Runtime libraries and model next to Infinite")
     # THIRD_PARTY_NOTICES condition 3 / GPL source-offer condition 2: the
     # FFmpeg and x264 licence texts ship inside the bundle wherever the
@@ -1510,7 +1540,8 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf")
     list(APPEND INFINITE_FONT_FILES ${INFINITE_NOTO_FILES})
     set(INFINITE_ICON_FONT_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf")
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Infinite/infinite-glyphs.ttf")
     target_sources(Infinite PRIVATE ${INFINITE_FONT_FILES} ${INFINITE_ICON_FONT_FILES} ${INFINITE_LANG_FILES})
     set_source_files_properties(${INFINITE_LANG_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/lang")
     set_source_files_properties(${INFINITE_FONT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/fonts")
@@ -1527,6 +1558,11 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/06-low-tom.wav"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/07-high-tom.wav"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits/infinite-basic/08-bell.wav")
+    file(GLOB INFINITE_TEMPLATE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/*.inf" "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/index.txt")
+    file(GLOB INFINITE_TEMPLATE_THUMBS "${CMAKE_CURRENT_SOURCE_DIR}/assets/templates/thumbs/*.png")
+    target_sources(Infinite PRIVATE ${INFINITE_TEMPLATE_FILES} ${INFINITE_TEMPLATE_THUMBS})
+    set_source_files_properties(${INFINITE_TEMPLATE_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates")
+    set_source_files_properties(${INFINITE_TEMPLATE_THUMBS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/templates/thumbs")
     target_sources(Infinite PRIVATE ${INFINITE_DRUMKIT_FILES})
     set_source_files_properties(${INFINITE_DRUMKIT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/drumkits/infinite-basic")
 endif()

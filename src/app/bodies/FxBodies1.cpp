@@ -1,5 +1,7 @@
 // Filter, EQ, dynamics, delay, reverb and drive bodies + visualizers (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
 
 namespace app
 {
@@ -103,7 +105,9 @@ namespace app
          const float y = FilterVizDbToY(db, origin.y, h);
          dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + w, y),
                      db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
-         if (kDbLabeled[i])
+         // a dB label never lands on the frequency row
+         const float labelY = y - (db == 0.0f ? 14.0f : 1.0f);
+         if (kDbLabeled[i] && labelY + ImGui::GetTextLineHeight() < textY)
          {
             char buf[8];
             if (db == 0.0f)
@@ -179,8 +183,8 @@ namespace app
    {
       const float binWidth = (float)(sampleRate > 0.0 ? sampleRate : 44100.0) / 1024.0f;
       const float baselineY = origin.y + h;
-      const ImU32 fillCol = isLight ? IM_COL32(70, 90, 120, 40) : IM_COL32(210, 220, 235, 40);
-      const ImU32 lineCol = isLight ? IM_COL32(70, 90, 120, 130) : IM_COL32(210, 220, 235, 130);
+      const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_465A7828) : tok::U32(tok::pal::c_D2DCEB28);
+      const ImU32 lineCol = isLight ? tok::U32(tok::pal::c_465A7882) : tok::U32(tok::pal::c_D2DCEB82);
 
       float prevX = FilterVizFreqToX(binWidth, origin.x, w);
       float prevY = AudioSpectrumDbToY(20.0f * log10f(std::max(st.smoothed[1], 1.0e-6f)), origin.y, h);
@@ -235,8 +239,7 @@ namespace app
          PushUndoCheckpoint();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       // Graticule that keeps this from reading as blank at rest (§3f).
       DrawFilterGraticule(dl, origin, w, h);
@@ -315,7 +318,7 @@ namespace app
       if (cachedPoints > 1)
       {
          const float yBottom = origin.y + h;
-         const ImU32 fillCol = isLight ? IM_COL32(30, 110, 230, 32) : IM_COL32(100, 180, 255, 36);
+         const ImU32 fillCol = isLight ? tok::U32(tok::pal::c_1E6EE620) : tok::U32(tok::pal::c_64B4FF24);
          for (int i = 0; i < cachedPoints - 1; i++)
          {
             const float x0 = origin.x + (float)i * (w / (float)(cachedPoints - 1));
@@ -332,7 +335,7 @@ namespace app
          const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
       // Live LFO sweep indicator (envAmount != 0): a second curve, in yellow,
       // overlaid on top of the static base curve above - it never replaces
@@ -362,7 +365,7 @@ namespace app
             const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(IM_COL32(255, 205, 60, 210), 0, 1.5f);
+         dl->PathStroke(tok::U32(tok::pal::c_FFCD3CD2), 0, 1.5f);
       }
 
       const float hx = FilterVizFreqToX(freq, origin.x, w);
@@ -394,12 +397,10 @@ namespace app
       // Handle stays at the real (non-LFO-shifted) freq/gain - it's the
       // knob-set value, and only the yellow overlay above should visually
       // sweep. Shift-drag on the handle adjusts Q / resonance.
-      dl->AddCircleFilled(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, IM_COL32(235, 245, 255, 255), 12);
-      dl->AddCircle(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, IM_COL32(20, 24, 32, 220), 12, 1.5f);
+      dl->AddCircleFilled(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, tok::U32(tok::pal::c_EBF5FFFF), 12);
+      dl->AddCircle(ImVec2(hx, hy), isNear ? 5.0f : 3.6f, tok::U32(tok::pal::c_141820DC), 12, 1.5f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? (isLight ? IM_COL32(50, 120, 220, 255) : IM_COL32(110, 140, 180, 255))
-                                      : ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame, hovered ? (isLight ? tok::U32(tok::pal::c_3278DCFF) : tok::U32(tok::pal::c_6E8CB4FF)) : 0);
 
       if (isNear)
       {
@@ -571,8 +572,7 @@ namespace app
          PushUndoCheckpoint();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       DrawFilterGraticule(dl, origin, w, h);
 
@@ -641,7 +641,7 @@ namespace app
             const float y = FilterVizDbToY(cache.bandCurveDb[b][i], origin.y, h);
             dl->PathLineTo(ImVec2(x, y));
          }
-         dl->PathStroke(IM_COL32(150, 214, 255, 60), 0, 1.0f);
+         dl->PathStroke(tok::U32(tok::pal::c_96D6FF3C), 0, 1.0f);
       }
 
       // Composite curve, bright, with a soft fill down to the 0 dB baseline -
@@ -655,7 +655,7 @@ namespace app
          const float y0 = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          const float y1 = FilterVizDbToY(cache.curveDb[i + 1], origin.y, h);
          dl->AddQuadFilled(ImVec2(x0, baselineY), ImVec2(x1, baselineY), ImVec2(x1, y1), ImVec2(x0, y0),
-                           isLight ? IM_COL32(30, 110, 230, 30) : IM_COL32(150, 214, 255, 22));
+                           isLight ? tok::U32(tok::pal::c_1E6EE61E) : tok::U32(tok::pal::c_96D6FF16));
       }
 
       // Persistent selected-band caption - unlike the hover readout below,
@@ -679,7 +679,7 @@ namespace app
          const float y = FilterVizDbToY(cache.curveDb[i], origin.y, h);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
       // Handle positions for every band - one white dot each on the curve.
       float hx[5], hy[5];
@@ -818,13 +818,11 @@ namespace app
                dl->AddCircle(ImVec2(hx[b], hy[b]), dotR,
                              dotRec ? recCol : IM_COL32(235, 245, 255, isSelected ? 220 : 120), 12, 1.5f);
             }
-            dl->AddCircle(ImVec2(hx[b], hy[b]), dotR, IM_COL32(20, 24, 32, 220), 12, 1.2f);
+            dl->AddCircle(ImVec2(hx[b], hy[b]), dotR, tok::U32(tok::pal::c_141820DC), 12, 1.2f);
          }
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, hovered ? (isLight ? IM_COL32(50, 120, 220, 255) : IM_COL32(110, 140, 180, 255))
-                                      : ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame, hovered ? (isLight ? tok::U32(tok::pal::c_3278DCFF) : tok::U32(tok::pal::c_6E8CB4FF)) : 0);
 
       if (hovered || active)
       {
@@ -1001,7 +999,18 @@ namespace app
    }
 
 
-   void DrawDynamicsVisualizer(AudioEffectNode* n, float threshold, float ratio, float makeupDb)
+   constexpr float kLimiterVizRatio = 1000.0f; // a brick-wall: slope past threshold is 1/1000
+
+   struct GainVizLive
+   {
+      float inDb;  // raw input level, dB
+      float grDb;  // gain reduction, dB (>= 0)
+   };
+
+   // The gain-computer picture shared by Dynamics and Limiter (a limiter is the same curve with an
+   // infinite ratio): transfer curve + threshold marker + live operating point + slim GR meter.
+   void DrawGainComputerVisualizer(const char* readoutKey, float threshold, float ratio, float makeupDb,
+                                   float inGainDb, const GainVizLive& live)
    {
       const float w = gAudioBodyW;
       const float h = kAudioTimeVizH;
@@ -1014,8 +1023,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, ImVec2(curveBr.x, br.y), ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, curveBr, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, curveW, h);
 
       static const float kDbTicks[] = { -48.0f, -36.0f, -24.0f, -12.0f, 0.0f };
       for (float db : kDbTicks)
@@ -1033,13 +1041,13 @@ namespace app
       // 1:1 reference diagonal (unprocessed signal), dim.
       dl->AddLine(ImVec2(DynVizDbToX(kDynVizMinDb, origin.x, curveW), DynVizDbToY(kDynVizMinDb, origin.y, h)),
                   ImVec2(DynVizDbToX(kDynVizMaxDb, origin.x, curveW), DynVizDbToY(kDynVizMaxDb, origin.y, h)),
-                  IM_COL32(255, 255, 255, 24), 1.0f);
+                  tok::U32(tok::pal::c_FFFFFF18), 1.0f);
 
       // Threshold marker - a vertical line at the knee so the point the
       // curve bends at reads as a control, not just an inflection the eye
       // has to find. Amber to stay distinct from the curve (blue) and the
       // live operating point (white) drawn below.
-      const ImU32 thresholdCol = isLight ? IM_COL32(210, 130, 20, 200) : IM_COL32(255, 180, 70, 190);
+      const ImU32 thresholdCol = isLight ? tok::U32(tok::pal::c_D28214C8) : tok::U32(tok::pal::c_FFB446BE);
       const float threshX = DynVizDbToX(threshold, origin.x, curveW);
       dl->AddLine(ImVec2(threshX, origin.y), ImVec2(threshX, curveBr.y), thresholdCol, 1.5f);
 
@@ -1054,22 +1062,23 @@ namespace app
       {
          const float x = origin.x + (float)i * (curveW / (float)(kNumPoints - 1));
          const float xDb = DynVizXToDb(x, origin.x, curveW);
-         const float yDb = DynamicsDsp::GainComputerDb(xDb, threshold, ratio) + makeupDb;
+         const float yDb = DynamicsDsp::GainComputerDb(xDb + inGainDb, threshold, ratio) + makeupDb;
          dl->PathLineTo(ImVec2(x, DynVizDbToY(yDb, origin.y, h)));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
       // Live operating point - where the signal actually is right now, read
       // straight off the kernel's own smoothed envelope (ExtraMeterValue),
       // never recomputed from the static curve. That's what makes attack and
       // release visible: the dot lags behind a sudden input jump and eases
       // back down exactly on the kernel's own timing, not an idealized one.
-      const float liveInDb = std::clamp(n->ExtraMeterValue(0), kDynVizMinDb, kDynVizMaxDb);
-      const float liveGrDb = std::clamp(n->ExtraMeterValue(1), 0.0f, 40.0f);
-      const bool hasSignal = liveInDb > kDynVizMinDb + 0.5f;
+      const float liveInDb = std::clamp(live.inDb, kDynVizMinDb, kDynVizMaxDb);
+      const float liveGrDb = std::clamp(live.grDb, 0.0f, 40.0f);
+      // The meters rest at 0 dB while audio is stopped, which is a dot with nothing behind it.
+      const bool hasSignal = Platform::AudioIsRunning() && liveInDb > kDynVizMinDb + 0.5f;
       if (hasSignal)
       {
-         const float liveOutDb = liveInDb - liveGrDb + makeupDb;
+         const float liveOutDb = liveInDb + inGainDb - liveGrDb + makeupDb;
          const float dotX = DynVizDbToX(liveInDb, origin.x, curveW);
          const float unprocessedY = DynVizDbToY(liveInDb, origin.y, h);
          const float dotY = DynVizDbToY(liveOutDb, origin.y, h);
@@ -1079,16 +1088,15 @@ namespace app
          if (liveGrDb > 0.05f)
          {
             dl->AddLine(ImVec2(dotX, unprocessedY), ImVec2(dotX, dotY),
-                        isLight ? IM_COL32(230, 120, 20, 150) : IM_COL32(255, 160, 60, 150), 2.5f);
+                        isLight ? tok::U32(tok::pal::c_E6781496) : tok::U32(tok::pal::c_FFA03C96), 2.5f);
          }
 
-         const ImU32 dotCol = isLight ? IM_COL32(20, 20, 20, 255) : IM_COL32(255, 255, 255, 255);
+         const ImU32 dotCol = isLight ? tok::U32(tok::pal::c_141414FF) : tok::U32(tok::pal::c_FFFFFFFF);
          dl->AddCircleFilled(ImVec2(dotX, dotY), 4.0f, dotCol);
          dl->AddCircle(ImVec2(dotX, dotY), 4.0f, ScopeBgCol(), 0, 1.5f);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, ImVec2(curveBr.x, br.y), ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       // Gain-reduction meter, a slim bar riding the curve's right edge -
       // release shows here as the bar's own fall time, since it reads the
@@ -1096,25 +1104,32 @@ namespace app
       {
          const ImVec2 meterOrigin(curveBr.x + grMeterGap, origin.y);
          const ImVec2 meterBr(br.x, br.y);
-         dl->AddRectFilled(meterOrigin, meterBr, ScopeBgCol(), 2.0f);
+         const AudioViz::Frame meterFrame = AudioViz::Begin(meterOrigin, grMeterW, h);
          const float grT = std::clamp(liveGrDb / 24.0f, 0.0f, 1.0f);
          const float barTop = meterOrigin.y + (meterBr.y - meterOrigin.y) * (1.0f - grT);
          if (grT > 0.005f)
          {
             dl->AddRectFilled(ImVec2(meterOrigin.x + 1.0f, barTop), ImVec2(meterBr.x - 1.0f, meterBr.y),
-                              isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 160, 60, 220), 1.5f);
+                              isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFA03CDC), 1.5f);
          }
-         dl->AddRect(meterOrigin, meterBr, ScopeBorderCol(), 2.0f);
+         AudioViz::End(meterFrame);
       }
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
          if (hasSignal)
-            snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, %.0f:1", liveInDb, liveGrDb, ratio);
+         {
+            if (ratio >= kLimiterVizRatio)
+               snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, limit", liveInDb, liveGrDb);
+            else
+               snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, %.0f:1", liveInDb, liveGrDb, ratio);
+         }
+         else if (ratio >= kLimiterVizRatio)
+            snprintf(buf, sizeof(buf), "ceiling %.0f dB", threshold + makeupDb);
          else
             snprintf(buf, sizeof(buf), "%.0f dB in -> %.0f dB out, %.0f:1", threshold, threshold + makeupDb, ratio);
-         SetAudioReadout("dynamics", buf);
+         SetAudioReadout(readoutKey, buf);
       }
 
       ImGui::Dummy(ImVec2(w, h));
@@ -1129,7 +1144,8 @@ namespace app
                analog ? " - analog" : "");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-      DrawDynamicsVisualizer(n, n->Param("threshold"), n->Param("ratio"), n->Param("makeup"));
+      DrawGainComputerVisualizer("dynamics", n->Param("threshold"), n->Param("ratio"), n->Param("makeup"), 0.0f,
+                                 { n->ExtraMeterValue(0), n->ExtraMeterValue(1) });
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       // KHS Audio Compressor's control surface: threshold, ratio, attack,
@@ -1189,45 +1205,6 @@ namespace app
    // the reference brief asked for, and distinct enough from
    // DrawStripMeter's plain level bar (no scale, grows up) to warrant its
    // own small ImDrawList routine rather than reusing that primitive.
-   void DrawLimiterVisualizer(AudioEffectNode* n, float x, float y, float w, float h)
-   {
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 origin(x, y);
-      const ImVec2 br(x + w, y + h);
-      const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
-      dl->PushClipRect(origin, br, true);
-
-      const float grDb = std::clamp(n->ExtraMeterValue(0), 0.0f, 20.0f);
-
-      static const float kTicks[] = { 0.0f, -10.0f, -20.0f };
-      for (float db : kTicks)
-      {
-         const float t = std::clamp(-db / 20.0f, 0.0f, 1.0f);
-         const float ty = y + t * h;
-         dl->AddLine(ImVec2(x, ty), ImVec2(br.x, ty), db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
-         char buf[8];
-         snprintf(buf, sizeof(buf), "%.0f", db);
-         dl->AddText(ImVec2(x + 3.0f, ty - (db == 0.0f ? 12.0f : 1.0f)), ScopeTextCol(), buf);
-      }
-
-      const float barBottom = y + std::clamp(grDb / 20.0f, 0.0f, 1.0f) * h;
-      if (barBottom > y + 1.0f)
-         dl->AddRectFilled(ImVec2(x + 4.0f, y), ImVec2(br.x - 4.0f, barBottom),
-                           isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 160, 60, 220), 2.0f);
-
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
-
-      if (ImGui::IsMouseHoveringRect(origin, br))
-      {
-         char buf[64];
-         snprintf(buf, sizeof(buf), "-%.1f dB GR, out %.1f dB", grDb, n->ExtraMeterValue(1));
-         SetAudioReadout("limiter", buf);
-      }
-   }
-
-
    void DrawLimiterBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[64];
@@ -1236,32 +1213,23 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      const float meterW = 64.0f;
-      const float meterGap = 12.0f;
-      const float meterRightPad = 12.0f;
-      const float savedContentW = gAudioContentW;
-      const float knobAreaW = savedContentW - meterW - meterGap - meterRightPad;
-      const float bodyTop = ImGui::GetCursorScreenPos().y;
+      // ExtraMeterValue(0) = GR, (1) = output level; the curve wants the raw input level back.
+      const float inGain = n->Param("inGain");
+      const float outGain = n->Param("outGain");
+      const float gr = std::clamp(n->ExtraMeterValue(0), 0.0f, 20.0f);
+      const float outDb = n->ExtraMeterValue(1);
+      const float inDb = outDb - inGain + gr - outGain;
+      DrawGainComputerVisualizer("limiter", n->Param("threshold"), kLimiterVizRatio, outGain, inGain, { inDb, gr });
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      // Two rows of two beside a full-height meter, per the reference
-      // layout: threshold/release above, in/out gain below.
-      gAudioContentW = knobAreaW;
       {
-         AudioKnobRow row(2, kKnobLarge);
+         AudioKnobRow row(4);
          row.Knob("threshold", n->ParamPtr("threshold"), -30.0f, 0.0f, "%.1f dB", kKnobLarge);
          row.Knob("release", n->ParamPtr("release"), 5.0f, 1000.0f, "%.0f ms", kKnobLarge);
+         row.Knob("in gain", n->ParamPtr("inGain"), -12.0f, 24.0f, "%.1f dB");
+         row.Knob("out gain", n->ParamPtr("outGain"), -24.0f, 12.0f, "%.1f dB");
          row.End();
       }
-      {
-         AudioKnobRow row(2, kKnobLarge);
-         row.Knob("in gain", n->ParamPtr("inGain"), -12.0f, 24.0f, "%.1f dB", kKnobLarge);
-         row.Knob("out gain", n->ParamPtr("outGain"), -24.0f, 12.0f, "%.1f dB", kKnobLarge);
-         row.End();
-      }
-      gAudioContentW = savedContentW;
-
-      const float bodyBottom = ImGui::GetCursorScreenPos().y;
-      DrawLimiterVisualizer(n, gAudioContentX + knobAreaW + meterGap, bodyTop, meterW, bodyBottom - bodyTop);
 
       EndAudioBody();
    }
@@ -1283,8 +1251,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       // Amplitude gridlines, same 25%-step reading aid Dynamics/Reverb use.
       for (int i = 1; i < 4; i++)
@@ -1312,9 +1279,9 @@ namespace app
       for (int tapIdx = 0; tapIdx < 24 && amp > 0.02f && t < windowSeconds; tapIdx++)
       {
          const float x = origin.x + std::clamp(t / windowSeconds, 0.0f, 1.0f) * w;
-         const float barTopY = origin.y + barsH - amp * barsH;
+         const float barTopY = origin.y + barsH - amp * (barsH - 6.0f); // inset: the first echo never touches the frame
          dl->AddRectFilled(ImVec2(x - barHalfW, barTopY), ImVec2(x + barHalfW, origin.y + barsH),
-                           isLight ? IM_COL32(30, 110, 230, 230) : IM_COL32(150, 214, 255, 220));
+                           isLight ? tok::U32(tok::pal::c_1E6EE6E6) : tok::U32(tok::pal::c_96D6FFDC));
          amp *= feedback;
          t += baseSeconds;
       }
@@ -1322,8 +1289,7 @@ namespace app
       dl->AddLine(ImVec2(origin.x, origin.y + barsH), ImVec2(br.x, origin.y + barsH), ScopeMidLineCol(),
                   1.0f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1441,8 +1407,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float predelaySeconds = n->Param("predelay") * 0.001f;
       const float decaySeconds = std::max(0.05f, n->Param("decay"));
@@ -1482,10 +1447,9 @@ namespace app
          const float y = br.y - amp * (h - 6.0f);
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1569,8 +1533,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       // Center gridlines (x=0, y=0) plus quarter-amplitude ticks, the same
       // reading aid Dynamics/Reverb give their curves.
@@ -1600,10 +1563,9 @@ namespace app
          const float y = origin.y + (0.5f - 0.5f * yOut) * h;
          dl->PathLineTo(ImVec2(x, y));
       }
-      dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_1E6EE6FF) : tok::U32(tok::pal::c_96D6FFF5), 0, 1.8f);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1665,8 +1627,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       for (int i = -2; i <= 2; i++)
       {
@@ -1732,10 +1693,9 @@ namespace app
       const float lastOut =
          std::clamp(WavetableShaperDsp::Shape(lastIn, table, position, driveDb, bias, smooth), -1.0f, 1.0f);
       const ImVec2 dot(origin.x + (0.5f + 0.5f * lastIn) * w, origin.y + (0.5f - 0.5f * lastOut) * h);
-      dl->AddCircleFilled(dot, 3.5f, isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 214, 120, 230));
+      dl->AddCircleFilled(dot, 3.5f, isLight ? tok::U32(tok::pal::c_E67814E6) : tok::U32(tok::pal::c_FFD678E6));
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1817,8 +1777,7 @@ namespace app
       const float radius = std::min(w * 0.48f, h - 26.0f);
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       // Concentric dB rings, apex-centered, sweeping only the upper half.
       const int kNumRings = 5;
@@ -1863,24 +1822,23 @@ namespace app
       dl->PathLineTo(apex);
       dl->PathLineTo(leftPt);
       dl->PathLineTo(rightPt);
-      dl->PathFillConvex(isLight ? IM_COL32(110, 90, 210, 80) : IM_COL32(150, 130, 230, 90));
+      dl->PathFillConvex(isLight ? tok::U32(tok::pal::c_6E5AD250) : tok::U32(tok::pal::c_9682E65A));
 
       dl->PathClear();
       dl->PathLineTo(leftPt);
       dl->PathLineTo(apex);
       dl->PathLineTo(rightPt);
-      dl->PathStroke(isLight ? IM_COL32(120, 80, 230, 235) : IM_COL32(190, 170, 255, 235), 0, 1.8f);
+      dl->PathStroke(isLight ? tok::U32(tok::pal::c_7850E6EB) : tok::U32(tok::pal::c_BEAAFFEB), 0, 1.8f);
 
       if (bassMonoHz > 0.0f)
       {
          char blo[24];
          snprintf(blo, sizeof(blo), "mono <%.0f Hz", bassMonoHz);
          dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f),
-                     isLight ? IM_COL32(210, 100, 20, 230) : IM_COL32(255, 196, 120, 210), blo);
+                     isLight ? tok::U32(tok::pal::c_D26414E6) : tok::U32(tok::pal::c_FFC478D2), blo);
       }
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
@@ -1926,8 +1884,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      const AudioViz::Frame vizFrame = AudioViz::Begin(origin, w, h);
 
       const float midY = origin.y + h * 0.5f;
       dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeGridCol(), 1.0f);
@@ -1937,14 +1894,13 @@ namespace app
       const float pitch = std::clamp(n->Param("pitch"), -24.0f, 24.0f);
       const float t = 0.5f + 0.5f * (pitch / 24.0f);
       const float markX = origin.x + t * w;
-      dl->AddCircleFilled(ImVec2(markX, midY), 6.0f, isLight ? IM_COL32(30, 110, 230, 245) : IM_COL32(150, 214, 255, 245));
+      dl->AddCircleFilled(ImVec2(markX, midY), 6.0f, isLight ? tok::U32(tok::pal::c_1E6EE6F5) : tok::U32(tok::pal::c_96D6FFF5));
 
       char buf[32];
       snprintf(buf, sizeof(buf), "%+.1f st", pitch);
       dl->AddText(ImVec2(origin.x + 6.0f, origin.y + 6.0f), ScopeTextCol(), buf);
 
-      dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      AudioViz::End(vizFrame);
 
       if (ImGui::IsMouseHoveringRect(origin, br))
          SetAudioReadout("pitch shifter", buf);

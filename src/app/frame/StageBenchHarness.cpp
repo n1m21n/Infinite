@@ -560,7 +560,8 @@ void DrawBenchHarness(FrameCtx& fc)
                const float targetScrollX = u * sBenchB6GridMaxX;
                const float targetScrollY = u * sBenchB6GridMaxY;
                ed::SetViewScroll(ImVec2(targetScrollX, targetScrollY));
-               ed::SetViewZoom(1.0f);
+               static const float sPanZoom = getenv("INFINITE_BENCH_B6ZOOM") ? std::clamp((float)atof(getenv("INFINITE_BENCH_B6ZOOM")), 0.1f, 2.0f) : 1.0f;
+               ed::SetViewZoom(sPanZoom);
             }
             else if (activeMode == "zoom")
             {
@@ -2220,8 +2221,15 @@ void DrawBenchHarness(FrameCtx& fc)
       FrameTest_3DTEST(frameId, window);
 
       FrameTest_UISCALETEST(frameId, window);
+      FrameTest_UITYPETEST(frameId, window);
+      FrameTest_UILAYOUTTEST(frameId, window);
+      FrameTest_UIINTERACTTEST(frameId, window);
+      FrameTest_UICOMPTEST(frameId, window);
+      FrameTest_UIGALLERY(frameId, window);
 
       FrameTest_SIZETEST(frameId, window);
+
+      FrameTest_NODEDRAGWIDTHTEST(frameId, window);
 
       FrameTest_SAMPLERDRAGTEST_2(frameId, window);
 

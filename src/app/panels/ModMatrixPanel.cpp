@@ -1,5 +1,13 @@
 // Modulation matrix panel (moved verbatim from main.cpp).
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/UiAnim.h"
+#include "app/ui/design/UiType.h"
+#include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/AppShared.h"
+#include "app/ui/design/TokenColors.h"
 
 namespace app
 {
@@ -39,7 +47,7 @@ namespace app
             {
                if (gTypedParamNoAutoSelect.count(editKey))
                {
-                  state->Stb.cursor = state->CurLenW;
+                  state->ReloadUserBufAndMoveToEnd();
                   state->ClearSelection();
                }
                else
@@ -141,58 +149,55 @@ namespace app
          changed = true;
       }
 
-      if (ImGui::BeginPopupContextItem("##curve_ctx"))
+      if (MenuParts::BeginContextItem("##curve_ctx"))
       {
          ImGui::TextDisabled("%s", T("Modulation Curve"));
-         ImGui::Separator();
-         if (ImGui::MenuItem(L("Linear (Reset)"), nullptr, std::abs(*curve) < 0.001f))
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Linear (Reset)"), nullptr, std::abs(*curve) < 0.001f))
          {
             PushUndoCheckpoint();
             *curve = 0.0f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Ease In (+0.50)"), nullptr, std::abs(*curve - 0.5f) < 0.05f))
+         if (MenuParts::Item(L("Ease In (+0.50)"), nullptr, std::abs(*curve - 0.5f) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = 0.5f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Ease Out (-0.50)"), nullptr, std::abs(*curve - (-0.5f)) < 0.05f))
+         if (MenuParts::Item(L("Ease Out (-0.50)"), nullptr, std::abs(*curve - (-0.5f)) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = -0.5f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Steep Exp (+0.85)"), nullptr, std::abs(*curve - 0.85f) < 0.05f))
+         if (MenuParts::Item(L("Steep Exp (+0.85)"), nullptr, std::abs(*curve - 0.85f) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = 0.85f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Steep Log (-0.85)"), nullptr, std::abs(*curve - (-0.85f)) < 0.05f))
+         if (MenuParts::Item(L("Steep Log (-0.85)"), nullptr, std::abs(*curve - (-0.85f)) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = -0.85f;
             changed = true;
          }
-         if (ImGui::MenuItem(L("Invert Curve"), nullptr, false, std::abs(*curve) > 0.001f))
+         if (MenuParts::Item(L("Invert Curve"), nullptr, false, std::abs(*curve) > 0.001f))
          {
             PushUndoCheckpoint();
             *curve = -*curve;
             changed = true;
          }
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
 
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
       const ImVec2 maxPos(pos.x + w, pos.y + h);
 
-      const ImU32 bgCol = isLight ? (hovered ? IM_COL32(225, 230, 240, 255) : IM_COL32(235, 238, 246, 255))
-                                  : (hovered ? IM_COL32(32, 35, 45, 255)   : IM_COL32(22, 24, 32, 255));
-      const ImU32 borderCol = active ? (isLight ? IM_COL32(60, 140, 240, 255) : IM_COL32(80, 160, 255, 255))
-                                     : (hovered ? (isLight ? IM_COL32(160, 175, 200, 255) : IM_COL32(70, 75, 95, 255))
-                                                : (isLight ? IM_COL32(195, 205, 220, 255) : IM_COL32(45, 48, 62, 255)));
+      const ImU32 bgCol = tok::U32(hovered ? tok::curvebox_bg_hover : tok::curvebox_bg, isLight);
+      const ImU32 borderCol = tok::U32(active ? tok::curvebox_border_active : hovered ? tok::curvebox_border_hover : tok::curvebox_border, isLight);
       dl->AddRectFilled(pos, maxPos, bgCol, 3.0f);
       dl->AddRect(pos, maxPos, borderCol, 3.0f, 0, 1.0f);
 
@@ -202,7 +207,7 @@ namespace app
       const float plotH = h - padY * 2.0f;
       const ImVec2 plotMin(pos.x + padX, pos.y + padY);
 
-      const ImU32 refCol = isLight ? IM_COL32(170, 180, 195, 120) : IM_COL32(70, 75, 95, 120);
+      const ImU32 refCol = tok::U32(tok::curvebox_ref, isLight);
       dl->AddLine(ImVec2(plotMin.x, plotMin.y + plotH), ImVec2(plotMin.x + plotW, plotMin.y), refCol, 1.0f);
 
       auto evalPt = [&](float xNorm) -> ImVec2 {
@@ -211,9 +216,7 @@ namespace app
       };
 
       const bool isCurved = std::abs(*curve) > 0.001f;
-      const ImU32 curveCol = active ? (isLight ? IM_COL32(20, 120, 240, 255) : IM_COL32(80, 180, 255, 255))
-                                    : (isCurved ? (isLight ? IM_COL32(30, 140, 210, 255) : IM_COL32(70, 200, 230, 255))
-                                                : (isLight ? IM_COL32(110, 120, 140, 200) : IM_COL32(150, 160, 180, 200)));
+      const ImU32 curveCol = tok::U32(active ? tok::curve_active : isCurved ? tok::curve_bent : tok::curve_idle, isLight);
       const float lineThickness = (active || hovered) ? 2.0f : 1.5f;
 
       const int kSegments = 20;
@@ -227,16 +230,15 @@ namespace app
       }
 
       const ImVec2 midPt = evalPt(0.5f);
-      const ImU32 dotCol = isCurved ? (isLight ? IM_COL32(20, 120, 240, 255) : IM_COL32(80, 200, 255, 255))
-                                    : (isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(140, 150, 170, 255));
+      const ImU32 dotCol = tok::U32(isCurved ? tok::curve_dot_bent : tok::curve_dot_idle, isLight);
       dl->AddCircleFilled(midPt, (hovered || active) ? 3.0f : 2.0f, dotCol);
 
       if (liveInput01 >= 0.0f && liveInput01 <= 1.0f)
       {
          const ImVec2 livePt = evalPt(liveInput01);
-         const ImU32 liveCol = isLight ? IM_COL32(235, 100, 30, 255) : IM_COL32(255, 180, 50, 255);
+         const ImU32 liveCol = tok::U32(tok::curve_live, isLight);
          dl->AddCircleFilled(livePt, 3.5f, liveCol);
-         dl->AddCircle(livePt, 3.5f, isLight ? IM_COL32(255, 255, 255, 255) : IM_COL32(20, 20, 26, 255), 0, 1.0f);
+         dl->AddCircle(livePt, 3.5f, tok::U32(tok::curve_live_ring, isLight), 0, 1.0f);
       }
 
       if (isCurved)
@@ -245,7 +247,7 @@ namespace app
          snprintf(valBuf, sizeof(valBuf), "%+.2f", *curve);
          ImFont* font = ImGui::GetFont();
          const float tinySize = ImGui::GetFontSize() * 0.62f;
-         const ImU32 valCol = isLight ? IM_COL32(90, 98, 115, 220) : IM_COL32(160, 168, 185, 220);
+         const ImU32 valCol = tok::U32(tok::curve_value_text, isLight);
          dl->AddText(font, tinySize, ImVec2(pos.x + 2.0f, pos.y + 1.0f), valCol, valBuf);
       }
 
@@ -259,8 +261,8 @@ namespace app
       const ImVec2 pos = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      const ImU32 bgCol = isLight ? IM_COL32(235, 238, 246, 200) : IM_COL32(20, 22, 28, 200);
-      const ImU32 borderCol = isLight ? IM_COL32(200, 205, 215, 255) : IM_COL32(40, 44, 56, 255);
+      const ImU32 bgCol = tok::U32(tok::sparkline_bg, isLight);
+      const ImU32 borderCol = tok::U32(tok::sparkline_border, isLight);
       dl->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), bgCol, 2.0f);
       dl->AddRect(pos, ImVec2(pos.x + width, pos.y + height), borderCol, 2.0f);
 
@@ -283,7 +285,7 @@ namespace app
             float y = pos.y + padY + (1.0f - val) * plotH;
             ImVec2 pt(x, y);
             if (i > 0)
-               dl->AddLine(prevPt, pt, lineCol, 1.5f);
+               dl->AddLine(prevPt, pt, lineCol, 1.0f);
             prevPt = pt;
          }
          dl->AddCircleFilled(prevPt, 2.0f, lineCol);
@@ -291,6 +293,21 @@ namespace app
       ImGui::Dummy(ImVec2(width, height));
    }
 
+
+   // Row kind marker: a short rounded rail (colour = modulation / expression / recording), not a dot.
+   void KindRail(ImVec2 cell, float cellH, ImU32 col)
+   {
+      const float cx = std::round(cell.x + cellH * 0.5f);
+      const float cy = cell.y + cellH * 0.5f;
+      ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(cx - 1.5f, cy - 8.0f), ImVec2(cx + 1.5f, cy + 8.0f), col, 1.5f);
+   }
+
+   // Next column with text baseline aligned to the frame-height controls (Lo/Hi wells, chips) in the same row.
+   void NextCell()
+   {
+      ImGui::TableNextColumn();
+      ImGui::AlignTextToFramePadding();
+   }
 
    void DrawModMatrixTable()
    {
@@ -302,8 +319,21 @@ namespace app
       GestureRecorder& rec = GestureRecorder::Instance();
       if (mod.Links().empty() && mod.Expressions().empty() && rec.Playbacks().empty())
       {
-         ImGui::TextDisabled("%s", T("No active modulations."));
-         ImGui::TextDisabled("%s", T("Patch a modulator, type a formula, or record a gesture to see it here."));
+         // Empty state: centred in the card, one size, weight carries the title.
+         const char* head = T("No active modulations.");
+         const char* hint = T("Patch a modulator, type a formula, or record a gesture to see it here.");
+         const ImVec4 dim = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         const float lineH = ImGui::GetTextLineHeight();
+         const float y0 = std::max(0.0f, (panelSize.y - lineH * 2.0f - tok::space_1) * 0.5f);
+         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y0);
+         auto centred = [&](const char* t, float a)
+         {
+            ImGui::SetCursorPosX(std::max(0.0f, (panelSize.x - ImGui::CalcTextSize(t).x) * 0.5f) + ImGui::GetCursorPosX());
+            ImGui::TextColored(ImVec4(dim.x, dim.y, dim.z, a), "%s", t);
+         };
+         { UiType::Scope ts(UiType::Size::Body, UiType::Weight::Semibold); centred(head, 0.7f); }
+         ImGui::Dummy(ImVec2(0, tok::space_1));
+         centred(hint, 0.45f);
       }
       else
       {
@@ -319,9 +349,14 @@ namespace app
          // the app (all of which are the single subtle PanelSeamColor
          // hairline). The inner rules stay: this is a dense multi-column
          // matrix and losing row/column separation would hurt readability.
-         const ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_BordersInnerV |
-                                       ImGuiTableFlags_RowBg |
+         const ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerH |
                                        ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+         // Library look: no grid, no zebra; only a hairline under the header. Rows breathe (5 pt cell padding).
+         const ImVec4 tcol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(tok::space_2, 5.0f));
+         ImGui::PushStyleColor(ImGuiCol_TableBorderLight, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImVec4(tcol.x, tcol.y, tcol.z, 0.10f));
+         ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, ImVec4(0, 0, 0, 0));
          // An explicit, fixed outer_size.y - with ScrollY and the default
          // (0,0), ImGui auto-extends the table's own height to fit its
          // content instead of clipping/scrolling at a fixed size (see the
@@ -363,7 +398,12 @@ namespace app
             ImGui::TableSetupColumn(L("Curve"), ImGuiTableColumnFlags_WidthFixed, wCurve);
             ImGui::TableSetupColumn(L("Signal"), ImGuiTableColumnFlags_WidthFixed, vertical ? 42.0f : 55.0f);
             ImGui::TableSetupColumn("##unbind", ImGuiTableColumnFlags_WidthFixed, 20.0f);
-            ImGui::TableHeadersRow();
+            {
+               UiType::Scope hs(UiType::Size::Title, UiType::Weight::Semibold);
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tcol.x, tcol.y, tcol.z, 0.6f));
+               ImGui::TableHeadersRow();
+               ImGui::PopStyleColor();
+            }
 
             // Row actions mutate mLinks. SetEnabled/SetRange only mutate a
             // Source in place, but Unbind erases it - break immediately
@@ -393,7 +433,7 @@ namespace app
                   gModMatrixScrollPending = false;
                }
                if (isHighlightTarget && ImGui::GetTime() < gModMatrixHighlightUntil)
-                  ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(234, 179, 8, 60));
+                  ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, tok::U32(tok::modulation_row));
 
                // Resolve against this frame's ParamRef when the destination
                // drew this frame (the same lazy legacy-conversion pass the
@@ -420,14 +460,14 @@ namespace app
                bool unbound = false;
 
                // Enable toggle
-               ImGui::TableNextColumn();
+               NextCell();
                // A predictor bound to a discrete param (only reachable via a patch file, paste or
                // undo - the cable drop refuses it) is inert: the apply loop never writes it.
                const bool inert = IsInertPredictorBinding(dstIndex, dstParam);
                const bool isPred = IsPredictionSourceNode(srcNode);
                const ImU32 dotColour = (src.enabled && !inert)
-                                          ? (isPred ? IM_COL32(34, 197, 94, 255) : IM_COL32(234, 179, 8, 255))
-                                          : IM_COL32(110, 110, 120, 255);
+                                          ? (isPred ? tok::U32(tok::prediction) : tok::U32(tok::modulation))
+                                          : tok::U32(tok::inert);
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
@@ -436,8 +476,7 @@ namespace app
                   PushUndoCheckpoint();
                   mod.SetEnabled(dstIndex, dstParam, !src.enabled);
                }
-               ImGui::GetWindowDrawList()->AddCircleFilled(
-                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, dotColour);
+               KindRail(dotCursor, dotH, dotColour);
                if (inert && ImGui::IsItemHovered())
                   ImGui::SetTooltip("%s", T("A predictor drives continuous parameters only - this binding is inactive."));
 
@@ -446,17 +485,17 @@ namespace app
                ImGui::PushStyleColor(ImGuiCol_Text, textColour);
 
                // Source
-               ImGui::TableNextColumn();
-               if (ImGui::Selectable(NodeTitleWithInstance(*srcNode).c_str(), false))
+               NextCell();
+               if (MenuParts::Choice(NodeTitleWithInstance(*srcNode).c_str(), false))
                   gPendingSelect.push_back(srcNode->NodeId());
 
                // Destination
-               ImGui::TableNextColumn();
-               if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
+               NextCell();
+               if (MenuParts::Choice(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                // Parameter
-               ImGui::TableNextColumn();
+               NextCell();
                if (known != nullptr)
                   ImGui::TextUnformatted(known->name.c_str());
                else
@@ -464,7 +503,7 @@ namespace app
 
                // Value - this frame's live value only; a collapsed node's
                // destination hasn't registered a float* to read this frame.
-               ImGui::TableNextColumn();
+               NextCell();
                if (frameRef != nullptr && frameRef->value != nullptr)
                   ImGui::Text(isInt ? "%.0f" : "%.3f", *frameRef->value);
                else
@@ -473,7 +512,7 @@ namespace app
                ImGui::PopStyleColor();
 
                // Confidence
-               ImGui::TableNextColumn();
+               NextCell();
                float conf = -1.0f;
                if (srcNode != nullptr && srcNode->node != nullptr)
                {
@@ -511,12 +550,12 @@ namespace app
                const std::pair<int, int> loKey(dstIndex, -(dstParam * 2 + 1));
                const std::pair<int, int> hiKey(dstIndex, -(dstParam * 2 + 2));
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChanged |= TypableRangeField("##lo", loKey, &lo, step, minV, maxV,
                                                  isInt ? "%.0f" : "%.3f", /*noBorder=*/true);
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChanged |= TypableRangeField("##hi", hiKey, &hi, step, minV, maxV,
                                                  isInt ? "%.0f" : "%.3f", /*noBorder=*/true);
@@ -536,12 +575,12 @@ namespace app
                // Invert - matches the ##modbind popup's own Invert, which
                // doesn't checkpoint either (a range edit, not a structural
                // change like Unbind or the enable toggle above).
-               ImGui::TableNextColumn();
-               if (ImGui::SmallButton(L("Inv")))
+               NextCell();
+               if (ChipButton::Draw(I18n::T("Inv"), src.lo > src.hi))
                   mod.SetRange(dstIndex, dstParam, src.hi, src.lo);
 
                // Curve
-               ImGui::TableNextColumn();
+               NextCell();
                float curveVal = src.curve;
                float liveIn01 = -1.0f;
                if (src.nodeIndex >= 0 && srcNode != nullptr && srcNode->node != nullptr)
@@ -553,17 +592,17 @@ namespace app
                   mod.SetCurve(dstIndex, dstParam, curveVal);
 
                // Real-time Sparkline
-               ImGui::TableNextColumn();
+               NextCell();
                float liveSig01 = (liveIn01 >= 0.0f) ? liveIn01 : 0.5f;
                if (liveIn01 < 0.0f && frameRef != nullptr && frameRef->value != nullptr && hi != lo)
                   liveSig01 = std::clamp((*frameRef->value - lo) / (hi - lo), 0.0f, 1.0f);
                auto& hist = gModMatrixSparklines[{dstIndex, dstParam}];
                hist.Push(liveSig01);
-               DrawSparklineMiniGraph("##sigspark", hist, isPred ? IM_COL32(34, 197, 94, 255) : IM_COL32(234, 179, 8, 255),
+               DrawSparklineMiniGraph("##sigspark", hist, isPred ? tok::U32(tok::prediction) : tok::U32(tok::modulation),
                                       vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
 
                // Unbind
-               ImGui::TableNextColumn();
+               NextCell();
                {
                   // At-rest fill is transparent rather than the theme's
                   // opaque Button colour (t.panelBg): this button sits inside
@@ -578,9 +617,9 @@ namespace app
                   // theme it's drawn over. Hover/active keep the theme's
                   // usual button colours (free per P10, and how every other
                   // icon-button in the app already behaves).
-                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+                  ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
-                  if (ImGui::Button("##unbindmod", ImVec2(btnW, 0)))
+                  if (ActionButton::Draw("##unbindmod", ImVec2(btnW, 0)))
                   {
                      PushUndoCheckpoint();
                      mod.Unbind(dstIndex, dstParam);
@@ -606,8 +645,8 @@ namespace app
                      (int)((disabled4.y * 0.6f + text4.y * 0.4f) * 255.0f),
                      (int)((disabled4.z * 0.6f + text4.z * 0.4f) * 255.0f),
                      255);
-                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : idleCol;
-                  Tabler::DrawX(dl, center, iconSize, col);
+                  const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover) : idleCol;
+                  glyph::DrawX(dl, center, iconSize, col);
                }
 
                ImGui::PopID();
@@ -635,23 +674,22 @@ namespace app
                ImGui::TableNextRow();
 
                // Enable dot: purple for expression
-               ImGui::TableNextColumn();
+               NextCell();
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
-               ImGui::GetWindowDrawList()->AddCircleFilled(
-                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, IM_COL32(168, 85, 247, 255));
+               KindRail(dotCursor, dotH, tok::U32(tok::expression));
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted("Expression");
 
-               ImGui::TableNextColumn();
-               if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
+               NextCell();
+               if (MenuParts::Choice(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
                const bool isIntE = known != nullptr && known->step > 0.0f;
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted(known != nullptr ? known->name.c_str() : "?");
 
                const ParamRef* frameRef = nullptr;
@@ -663,13 +701,13 @@ namespace app
                      break;
                   }
                }
-               ImGui::TableNextColumn();
+               NextCell();
                if (frameRef != nullptr && frameRef->value != nullptr)
                   ImGui::Text(isIntE ? "%.0f" : "%.3f", *frameRef->value);
                else
                   ImGui::TextUnformatted("--");
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted("--");
 
                const float minVE = known != nullptr ? known->minValue : 0.0f;
@@ -685,11 +723,11 @@ namespace app
                const std::pair<int, int> loKeyE(dstIndex, -(dstParam * 2 + 1) - 3000000);
                const std::pair<int, int> hiKeyE(dstIndex, -(dstParam * 2 + 2) - 3000000);
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChangedE |= TypableRangeField("##elo", loKeyE, &loE, stepE, minVE, maxVE,
                                                   isIntE ? "%.0f" : "%.3f", /*noBorder=*/true);
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChangedE |= TypableRangeField("##ehi", hiKeyE, &hiE, stepE, minVE, maxVE,
                                                   isIntE ? "%.0f" : "%.3f", /*noBorder=*/true);
@@ -700,10 +738,10 @@ namespace app
                   mod.SetExpressionRange(dstIndex, dstParam, loE, hiE);
                }
 
-               ImGui::TableNextColumn(); // invert - not meaningful for an expression's range
+               NextCell(); // invert - not meaningful for an expression's range
 
                // Curve
-               ImGui::TableNextColumn();
+               NextCell();
                float exprCurveVal = mod.ExpressionCurveFor(dstIndex, dstParam);
                float liveExpr01 = -1.0f;
                if (frameRef != nullptr && frameRef->value != nullptr && hiE != loE)
@@ -712,19 +750,19 @@ namespace app
                   mod.SetExpressionCurve(dstIndex, dstParam, exprCurveVal);
 
                // Real-time Sparkline
-               ImGui::TableNextColumn();
+               NextCell();
                float liveExprSig01 = (liveExpr01 >= 0.0f) ? liveExpr01 : 0.5f;
                auto& histE = gModMatrixSparklines[{dstIndex, dstParam + 2000000}];
                histE.Push(liveExprSig01);
-               DrawSparklineMiniGraph("##exprspark", histE, IM_COL32(168, 85, 247, 255),
+               DrawSparklineMiniGraph("##exprspark", histE, tok::U32(tok::expression),
                                       vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
 
                bool unboundExpr = false;
-               ImGui::TableNextColumn();
+               NextCell();
                {
-                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+                  ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
-                  if (ImGui::Button("##unbindexpr", ImVec2(btnW, 0)))
+                  if (ActionButton::Draw("##unbindexpr", ImVec2(btnW, 0)))
                   {
                      PushUndoCheckpoint();
                      mod.ClearExpression(dstIndex, dstParam);
@@ -736,9 +774,9 @@ namespace app
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
                   const float iconSize = (bmax.y - bmin.y) * 0.6f;
-                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255)
+                  const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover)
                                                             : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-                  Tabler::DrawX(dl, center, iconSize, col);
+                  glyph::DrawX(dl, center, iconSize, col);
                }
 
                ImGui::PopID();
@@ -766,23 +804,22 @@ namespace app
                ImGui::TableNextRow();
 
                // Enable dot: red for recording
-               ImGui::TableNextColumn();
+               NextCell();
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
-               ImGui::GetWindowDrawList()->AddCircleFilled(
-                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, IM_COL32(239, 68, 68, 255));
+               KindRail(dotCursor, dotH, tok::U32(tok::record));
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted("Recording");
 
-               ImGui::TableNextColumn();
-               if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
+               NextCell();
+               if (MenuParts::Choice(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
                const bool isIntR = known != nullptr && known->step > 0.0f;
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted(known != nullptr ? known->name.c_str() : "?");
 
                const ParamRef* frameRef = nullptr;
@@ -794,14 +831,14 @@ namespace app
                      break;
                   }
                }
-               ImGui::TableNextColumn();
+               NextCell();
                if (frameRef != nullptr && frameRef->value != nullptr)
                   ImGui::Text(isIntR ? T("%.0f (%.2fx)") : T("%.3f (%.2fx)"), *frameRef->value,
                               rec.PlaybackSpeedFor(dstIndex, dstParam));
                else
                   ImGui::TextUnformatted("--");
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::TextUnformatted("--");
 
                const float minVR = known != nullptr ? known->minValue : pbEntry.second.recordedMin;
@@ -817,11 +854,11 @@ namespace app
                const std::pair<int, int> loKeyR(dstIndex, -(dstParam * 2 + 1) - 5000000);
                const std::pair<int, int> hiKeyR(dstIndex, -(dstParam * 2 + 2) - 5000000);
 
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChangedR |= TypableRangeField("##rlo", loKeyR, &loR, stepR, minVR, maxVR,
                                                   isIntR ? "%.0f" : "%.3f", /*noBorder=*/true);
-               ImGui::TableNextColumn();
+               NextCell();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChangedR |= TypableRangeField("##rhi", hiKeyR, &hiR, stepR, minVR, maxVR,
                                                   isIntR ? "%.0f" : "%.3f", /*noBorder=*/true);
@@ -832,12 +869,12 @@ namespace app
                   rec.SetPlaybackRange(dstIndex, dstParam, loR, hiR);
                }
 
-               ImGui::TableNextColumn();
-               if (ImGui::SmallButton(L("Full")))
+               NextCell();
+               if (ChipButton::Draw(I18n::T("Full"), false))
                   rec.ClearPlaybackRange(dstIndex, dstParam);
 
                // Curve
-               ImGui::TableNextColumn();
+               NextCell();
                float recCurveVal = rec.PlaybackCurveFor(dstIndex, dstParam);
                float liveRec01 = -1.0f;
                if (frameRef != nullptr && frameRef->value != nullptr && hiR != loR)
@@ -846,19 +883,19 @@ namespace app
                   rec.SetPlaybackCurve(dstIndex, dstParam, recCurveVal);
 
                // Real-time Sparkline
-               ImGui::TableNextColumn();
+               NextCell();
                float liveRecSig01 = (liveRec01 >= 0.0f) ? liveRec01 : 0.5f;
                auto& histR = gModMatrixSparklines[{dstIndex, dstParam + 4000000}];
                histR.Push(liveRecSig01);
-               DrawSparklineMiniGraph("##recspark", histR, IM_COL32(239, 68, 68, 255),
+               DrawSparklineMiniGraph("##recspark", histR, tok::U32(tok::record),
                                       vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
 
                bool unboundRec = false;
-               ImGui::TableNextColumn();
+               NextCell();
                {
-                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+                  ImGui::PushStyleColor(ImGuiCol_Button, tok::U32(tok::transparent));
                   const float btnW = ImGui::GetFrameHeight();
-                  if (ImGui::Button("##unbindrec", ImVec2(btnW, 0)))
+                  if (ActionButton::Draw("##unbindrec", ImVec2(btnW, 0)))
                   {
                      rec.StopPlayback(dstIndex, dstParam);
                      unboundRec = true;
@@ -869,9 +906,9 @@ namespace app
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
                   const float iconSize = (bmax.y - bmin.y) * 0.6f;
-                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255)
+                  const ImU32 col = ImGui::IsItemHovered() ? tok::U32(tok::danger_hover)
                                                             : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-                  Tabler::DrawX(dl, center, iconSize, col);
+                  glyph::DrawX(dl, center, iconSize, col);
                }
 
                ImGui::PopID();
@@ -905,6 +942,8 @@ namespace app
             const float visibleH = ImGui::GetWindowHeight() - scrollbarH;
             float rowH = ImGui::GetTextLineHeightWithSpacing() +
                          ImGui::GetStyle().CellPadding.y * 2.0f;
+            // Row 0 is the header: nothing after it means no bindings at all, and the ruled filler gets a message.
+            const bool noBindings = ImGui::TableGetRowIndex() <= 0;
             int guard = 0;
             while (ImGui::GetCursorPosY() + rowH <= visibleH && guard++ < 500)
             {
@@ -912,7 +951,7 @@ namespace app
                ImGui::TableNextRow();
                for (int col = 0; col < 12; ++col)
                {
-                  ImGui::TableNextColumn();
+                  NextCell();
                   ImGui::Dummy(ImVec2(1.0f, ImGui::GetTextLineHeight()));
                }
                const float after = ImGui::GetCursorPosY();
@@ -931,7 +970,11 @@ namespace app
                ImGui::SetScrollY(ImGui::GetScrollMaxY()); // pin to the bottom
             }
 
+            if (noBindings)
+               EmptyState::DrawInWindow(T("No modulation yet"), T("Drag from a modulator's output onto a parameter pin"));
             ImGui::EndTable();
+            ImGui::PopStyleColor(3);
+            ImGui::PopStyleVar();
          }
       }
 
@@ -947,16 +990,16 @@ namespace app
       if (overPanel && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
          ImGui::OpenPopup("##modmatrixctx");
 
-      if (ImGui::BeginPopup("##modmatrixctx"))
+      if (MenuParts::BeginPopup("##modmatrixctx"))
       {
          static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
          for (int i = 0; i < 4; i++)
-            if (ImGui::MenuItem(L(kDockLabels[i]), nullptr, i == gModMatrixDock))
+            if (MenuParts::Item(L(kDockLabels[i]), nullptr, i == gModMatrixDock))
                gModMatrixDock = i;
-         ImGui::Separator();
-         if (ImGui::MenuItem(L("Close panel")))
+         MenuParts::Separator();
+         if (MenuParts::Item(L("Close panel")))
             gModMatrixOpen = false;
-         ImGui::EndPopup();
+         MenuParts::EndPopup();
       }
    }
 
@@ -966,7 +1009,7 @@ namespace app
    // dock/size globals and calling DrawModMatrixTable for its content.
    void DrawModMatrixDocked(const char* id, const ImVec2& size)
    {
-      const float kGrip = 6.0f;
+      const float kGrip = PanelFrame::kGap;   // the grip strip is the gap on the canvas-facing side
       const int dock = gModMatrixDock;
       const bool vertical = (dock == 1 || dock == 2);  // grip is a column, not a row
       const bool gripFirst = (dock == 0 || dock == 1); // canvas is above / to the left
@@ -979,9 +1022,8 @@ namespace app
       // viewports: it was never a coloured divider, it was a hole. Give the
       // outer child the same opaque panelBg fill the content child already
       // has so the panel is solid edge to edge.
-      PushDockedPanelStyle(/*isChild=*/true);
+      // Outer child is transparent: the panel floats as a card on the canvas colour (PanelFrame).
       ImGui::BeginChild(id, size, false);
-      PopDockedPanelStyle();
       const ImVec2 inner = ImGui::GetContentRegionAvail();
 
       auto grip = [&]()
@@ -1028,19 +1070,21 @@ namespace app
       // fixed height for both orientations keeps that loop's target
       // stable.
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+      const ImVec2 cardSize = vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
+                                       : ImVec2(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+      PanelFrame::Insets in;
+      switch (dock)   // the grip side needs no inset of its own
+      {
+         case 0: in.t = 0.0f; break;
+         case 1: in.l = 0.0f; break;
+         case 2: in.r = 0.0f; break;
+         default: in.b = 0.0f; break;
+      }
       PushDockedPanelStyle(/*isChild=*/true);
-      // ChildBorderSize is 0 app-wide now (submenus need it, see ApplyTheme),
-      // and ImGui auto-zeroes a bordered child's WindowPadding whenever its
-      // resolved border size is 0 - so plain `true` here silently lost this
-      // panel's inner padding along with the border it no longer draws.
-      // AlwaysUseWindowPadding opts back into the real padding regardless.
-      ImGui::BeginChild("##modmatrixpanelcontent",
-                        vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
-                                 : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
-      DrawModMatrixTable();
-      ImGui::EndChild();
+      PanelFrame::BeginCard("##modmatrixpanelcontent", cardSize, in);
       PopDockedPanelStyle();
+      DrawModMatrixTable();
+      PanelFrame::EndCard();
 
       if (!gripFirst)
       {
@@ -1053,9 +1097,11 @@ namespace app
       // spacing. Without this, the ItemSpacing between the panel and whatever
       // is laid out next shows a strip of the shell window's windowBg, which
       // reads as a bar separating the two viewports.
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+      // Set directly, not pushed: a push made in the child and popped in the parent unbalances both stacks.
+      const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
+      ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
       ImGui::EndChild();
-      ImGui::PopStyleVar();
+      ImGui::GetStyle().ItemSpacing = savedSpacing;
 
       // No divider line along the canvas-facing edge, in either theme. This
       // hairline was a fixed dark constant, then a theme-derived one, and was

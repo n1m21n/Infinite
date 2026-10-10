@@ -1,5 +1,7 @@
 // Audio node body building blocks: columns, sections, knob rows, drift meters, gates (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
 
 namespace app
 {
@@ -29,7 +31,7 @@ namespace app
       const float h = ImGui::GetTextLineHeight() + 6.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(p, ImVec2(p.x + width, p.y + h),
-                        isLight ? IM_COL32(0, 0, 0, 12) : IM_COL32(255, 255, 255, 10), 3.0f);
+                        isLight ? tok::U32(tok::pal::c_0000000C) : tok::U32(tok::pal::c_FFFFFF0A), 3.0f);
       const float textY = p.y + 3.0f;
       // Both texts are fitted to the strip: a long status string (a device
       // error, a file name) used to run out past the node's right edge. The
@@ -55,18 +57,38 @@ namespace app
          readoutFit = fitText(readout.c_str(), width - 16.0f);
          readoutW = ImGui::CalcTextSize(readoutFit.c_str()).x;
       }
+      // One status grammar (R10): "<what> · <state>". Legacy " - " / "  -  " separators become the middle dot,
+      // ASCII "->" becomes an arrow, and a trailing separator is dropped.
+      auto normaliseStat = [](const char* in) {
+         std::string s = in;
+         auto replaceAll = [&](const std::string& a, const std::string& b) {
+            for (size_t pos = 0; (pos = s.find(a, pos)) != std::string::npos; pos += b.size())
+               s.replace(pos, a.size(), b);
+         };
+         replaceAll("->", "\xE2\x86\x92");
+         replaceAll("  -  ", " \xC2\xB7 ");
+         replaceAll(" - ", " \xC2\xB7 ");
+         for (;;)
+         {
+            while (!s.empty() && s.back() == ' ') s.pop_back();
+            if (s.size() >= 2 && s.compare(s.size() - 2, 2, "\xC2\xB7") == 0) { s.resize(s.size() - 2); continue; }
+            break;
+         }
+         return s;
+      };
       if (idleStat != nullptr && idleStat[0] != '\0')
       {
+         const std::string idleNorm = normaliseStat(idleStat);
          const float idleMax = width - 14.0f - (readoutW > 0.0f ? readoutW + 14.0f : 0.0f);
-         const std::string idleFit = fitText(idleStat, idleMax);
+         const std::string idleFit = fitText(idleNorm.c_str(), idleMax);
          if (!idleFit.empty())
             dl->AddText(ImVec2(p.x + 7.0f, textY),
-                        isLight ? IM_COL32(80, 88, 108, 255) : IM_COL32(132, 138, 158, 255),
+                        isLight ? tok::U32(tok::pal::c_50586CFF) : tok::U32(tok::pal::c_848A9EFF),
                         idleFit.c_str());
       }
       if (!readoutFit.empty())
          dl->AddText(ImVec2(p.x + width - 8.0f - readoutW, textY),
-                     isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(226, 232, 244, 255),
+                     isLight ? tok::U32(tok::pal::c_1E2434FF) : tok::U32(tok::pal::c_E2E8F4FF),
                      readoutFit.c_str());
       ImGui::Dummy(ImVec2(width, h));
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
@@ -165,9 +187,9 @@ namespace app
       if (cached > 0.0f)
       {
          dl->AddRectFilled(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                           isLight ? IM_COL32(0, 0, 0, 10) : IM_COL32(255, 255, 255, 9), 5.0f);
+                           isLight ? tok::U32(tok::pal::c_0000000A) : tok::U32(tok::pal::c_FFFFFF09), 5.0f);
          dl->AddRect(ImVec2(gAudioBodyX, p.y), ImVec2(gAudioBodyX + gAudioBodyW, p.y + cached),
-                     isLight ? IM_COL32(0, 0, 0, 20) : IM_COL32(255, 255, 255, 16), 5.0f);
+                     isLight ? tok::U32(tok::pal::c_00000014) : tok::U32(tok::pal::c_FFFFFF10), 5.0f);
       }
 
       const float headerH = ImGui::GetTextLineHeight() + 4.0f;
@@ -180,7 +202,7 @@ namespace app
       const float ruleY = p.y + headerH + 2.0f;
       dl->AddLine(ImVec2(gAudioBodyX + kAudioSectionPad, ruleY),
                   ImVec2(gAudioBodyX + gAudioBodyW - kAudioSectionPad, ruleY),
-                  isLight ? IM_COL32(0, 0, 0, 22) : IM_COL32(255, 255, 255, 18), 1.0f);
+                  isLight ? tok::U32(tok::pal::c_00000016) : tok::U32(tok::pal::c_FFFFFF12), 1.0f);
       ImGui::Dummy(ImVec2(gAudioBodyW, headerH + 4.0f));
 
       ImGui::Indent(kAudioSectionPad);
@@ -230,14 +252,14 @@ namespace app
    ImU32 DriftLineColor(int i, int alpha)
    {
       static const ImU32 kRGB[] = {
-         IM_COL32(52, 211, 153, 0),  // green
-         IM_COL32(96, 165, 250, 0),  // blue
-         IM_COL32(251, 191, 36, 0),  // amber
-         IM_COL32(244, 114, 182, 0), // pink
-         IM_COL32(167, 139, 250, 0), // violet
-         IM_COL32(45, 212, 191, 0),  // teal
-         IM_COL32(248, 113, 113, 0), // red
-         IM_COL32(163, 230, 53, 0),  // lime
+         tok::U32(tok::pal::c_34D39900),  // green
+         tok::U32(tok::pal::c_60A5FA00),  // blue
+         tok::U32(tok::pal::c_FBBF2400),  // amber
+         tok::U32(tok::pal::c_F472B600), // pink
+         tok::U32(tok::pal::c_A78BFA00), // violet
+         tok::U32(tok::pal::c_2DD4BF00),  // teal
+         tok::U32(tok::pal::c_F8717100), // red
+         tok::U32(tok::pal::c_A3E63500),  // lime
       };
       const ImU32 c = kRGB[i % (int)(sizeof(kRGB) / sizeof(kRGB[0]))];
       return (c & 0x00FFFFFFu) | ((ImU32)std::clamp(alpha, 0, 255) << IM_COL32_A_SHIFT);
@@ -309,7 +331,7 @@ namespace app
       const float h = 90.0f; // same as DrawModulatorMeter, so the node header keeps its height
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h), ScopeBgCol(), 4.0f);
+      AudioViz::Fill(dl, origin, ImVec2(origin.x + w, origin.y + h));
       // Fixed 0..1 axis with quarter guides, exactly as the generic meter draws them: overlaid
       // destinations are only comparable at all because they share one scale.
       for (int q = 1; q < 4; q++)
@@ -322,7 +344,8 @@ namespace app
       const int count = n->SlotCount();
       if (count == 0)
       {
-         dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), ScopeBorderCol(), 4.0f);
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + w, origin.y + h)}, "no targets");
+         AudioViz::Border(dl, origin, ImVec2(origin.x + w, origin.y + h));
          ImGui::Dummy(ImVec2(w, h));
          return;
       }
@@ -350,7 +373,8 @@ namespace app
       }
       if (live.empty())
       {
-         dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), ScopeBorderCol(), 4.0f);
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + w, origin.y + h)}, "no targets");
+         AudioViz::Border(dl, origin, ImVec2(origin.x + w, origin.y + h));
          ImGui::Dummy(ImVec2(w, h));
          return;
       }
@@ -382,7 +406,7 @@ namespace app
          dl->AddCircleFilled(prev, 2.0f, col);
       }
       dl->PopClipRect();
-      dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), ScopeBorderCol(), 4.0f);
+      AudioViz::Border(dl, origin, ImVec2(origin.x + w, origin.y + h));
       ImGui::Dummy(ImVec2(w, h));
       DrawDriftLegend(n);
    }
@@ -476,7 +500,7 @@ namespace app
       const bool learning = n->IsLearning();
       const float w = kPreviewSize;
       const float h = ImGui::GetFrameHeight();
-      if (ImGui::Button(learning ? "Stop##predModLearn" : "Learn##predModLearn", ImVec2(w * 0.3f, h)))
+      if (ActionButton::Draw(learning ? "Stop##predModLearn" : "Learn##predModLearn", ImVec2(w * 0.3f, h)))
       {
          PushUndoCheckpoint();
          n->SetLearning(!learning);
@@ -491,7 +515,7 @@ namespace app
          const ImVec2 p0 = ImGui::GetCursorScreenPos();
          const float mw = w - w * 0.3f - ImGui::GetStyle().ItemSpacing.x;
          ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), IM_COL32(255, 255, 255, 14), 3.0f);
+         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), tok::U32(tok::pal::c_FFFFFF0E), 3.0f);
          char label[64];
          const int pct = n->LearningPercent();
          if (learning)
@@ -509,12 +533,12 @@ namespace app
          else if (n->HasFit())
             snprintf(label, sizeof(label), "fit - radius %.2f", n->SpectralRadius());
          else
-            snprintf(label, sizeof(label), "wire input in, press Learn");
+            snprintf(label, sizeof(label), "wire input, press Learn");
          // Clip to the meter's own box - AddText doesn't wrap or clip on its own, so a longer
          // label would otherwise draw straight past the node's edge instead of just past mw.
          dl->PushClipRect(p0, ImVec2(p0.x + mw, p0.y + h), true);
          const ImVec2 lsz = ImGui::CalcTextSize(label);
-         dl->AddText(ImVec2(p0.x + 6.0f, p0.y + (h - lsz.y) * 0.5f), IM_COL32(200, 200, 200, 200), label);
+         dl->AddText(ImVec2(p0.x + 6.0f, p0.y + (h - lsz.y) * 0.5f), tok::U32(tok::pal::c_C8C8C8C8), label);
          dl->PopClipRect();
          ImGui::Dummy(ImVec2(mw, h));
       }
@@ -527,7 +551,7 @@ namespace app
       ModSlider("low", &n->low, 0.0f, 1.0f, "%.2f");
       ModSlider("high", &n->high, 0.0f, 1.0f, "%.2f");
       if (n->input == nullptr)
-         ModSlider("constantIn", &n->constantIn, 0.0f, 1.0f, "%.2f");
+         ModSlider("constant", &n->constantIn, 0.0f, 1.0f, "%.2f");
    }
 
 
@@ -571,28 +595,9 @@ namespace app
    // and adds a real border stroke - a guaranteed-visible backstop the way
    // the waveform box and slider fields already draw their own explicit
    // AddRect borders instead of trusting a themed background.
-   bool AudioToggleButtonEx(const char* label, bool* value, const ImVec2& size,
-                            ImU32 activeBgLight, ImU32 activeBgDark,
-                            ImU32 activeHoverLight, ImU32 activeHoverDark,
-                            ImU32 activeHitLight, ImU32 activeHitDark,
-                            ImU32 activeTextLight, ImU32 activeTextDark)
+   bool AudioToggleButtonEx(const char* label, bool* value, const ImVec2& size, ActionButton::Kind onKind)
    {
-      const bool isLight = IsThemeLight();
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(130, 138, 160, 200));
-      ImGui::PushStyleColor(ImGuiCol_Button, *value ? (isLight ? activeBgLight : activeBgDark)
-                                                    : (isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(33, 36, 46, 255)));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                            *value ? (isLight ? activeHoverLight : activeHoverDark)
-                                   : (isLight ? IM_COL32(208, 214, 225, 255) : IM_COL32(51, 56, 71, 255)));
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                            *value ? (isLight ? activeHitLight : activeHitDark)
-                                   : (isLight ? IM_COL32(195, 202, 215, 255) : IM_COL32(64, 70, 89, 255)));
-      ImGui::PushStyleColor(ImGuiCol_Text, *value ? (isLight ? activeTextLight : activeTextDark)
-                                                  : (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255)));
-      const bool clicked = ImGui::Button(label, size);
-      ImGui::PopStyleColor(5);
-      ImGui::PopStyleVar();
+      const bool clicked = ActionButton::Draw(label, size, *value ? onKind : ActionButton::Kind::Plain);
       if (clicked)
          *value = !*value;
       return clicked;
@@ -601,11 +606,7 @@ namespace app
 
    bool AudioToggleButton(const char* label, bool* value, float width, float height)
    {
-      return AudioToggleButtonEx(label, value, ImVec2(width, height),
-                                 IM_COL32(55, 115, 235, 255), IM_COL32(90, 115, 205, 255),
-                                 IM_COL32(75, 135, 245, 255), IM_COL32(108, 132, 220, 255),
-                                 IM_COL32(40, 95, 215, 255), IM_COL32(120, 144, 230, 255),
-                                 IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
+      return AudioToggleButtonEx(label, value, ImVec2(width, height), ActionButton::Kind::Selected);
    }
 
    bool DrawGateButton(const char* id, float totalW, float height, const GatePainter& paint,
@@ -677,11 +678,7 @@ namespace app
       }
       else
       {
-         if (style == 1)
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
-         ImGui::Button(label, ImVec2(btnW, 0));
-         if (style == 1)
-            ImGui::PopStyleColor();
+         ActionButton::Draw(label, ImVec2(btnW, 0), (style == 1) ? ActionButton::Kind::Record : ActionButton::Kind::Plain);
       }
       const bool held = ImGui::IsItemActive();
       const ImVec2 mn = ImGui::GetItemRectMin();
@@ -697,37 +694,19 @@ namespace app
 
    bool AudioSoloButton(const char* label, bool* value, float width, float height)
    {
-      return AudioToggleButtonEx(label, value, ImVec2(width, height),
-                                 IM_COL32(215, 160, 25, 255), IM_COL32(217, 166, 38, 255),
-                                 IM_COL32(235, 180, 45, 255), IM_COL32(235, 184, 56, 255),
-                                 IM_COL32(195, 140, 15, 255), IM_COL32(199, 148, 26, 255),
-                                 IM_COL32(25, 25, 30, 255), IM_COL32(25, 25, 30, 255));
+      return AudioToggleButtonEx(label, value, ImVec2(width, height), ActionButton::Kind::Solo);
    }
 
 
    bool AudioMuteButton(const char* label, bool* value, float width, float height)
    {
-      return AudioToggleButtonEx(label, value, ImVec2(width, height),
-                                 IM_COL32(200, 45, 45, 255), IM_COL32(166, 41, 41, 255),
-                                 IM_COL32(220, 65, 65, 255), IM_COL32(191, 56, 56, 255),
-                                 IM_COL32(175, 35, 35, 255), IM_COL32(140, 31, 31, 255),
-                                 IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
+      return AudioToggleButtonEx(label, value, ImVec2(width, height), ActionButton::Kind::Record);
    }
 
 
    bool AudioSmallButton(const char* label, float width, float height)
    {
-      const bool isLight = IsThemeLight();
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(130, 138, 160, 200));
-      ImGui::PushStyleColor(ImGuiCol_Button, isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(33, 36, 46, 255));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? IM_COL32(208, 214, 225, 255) : IM_COL32(51, 56, 71, 255));
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? IM_COL32(195, 202, 215, 255) : IM_COL32(64, 70, 89, 255));
-      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255));
-      const bool clicked = ImGui::Button(label, ImVec2(width, height));
-      ImGui::PopStyleColor(5);
-      ImGui::PopStyleVar();
-      return clicked;
+      return ActionButton::Draw(label, ImVec2(width, height));
    }
 
 
@@ -782,6 +761,7 @@ namespace app
       // case for it either - it rendered as a bare pin column with no "Edit
       // Field..." button and no way to reach DrawFieldSampleParams at all.
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
+          dynamic_cast<AudioRibbonNode*>(node) != nullptr ||
           dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
           dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr ||
           dynamic_cast<FieldSampleNode*>(node) != nullptr ||

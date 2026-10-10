@@ -1,4 +1,5 @@
 // Plugin, audio-out, analog and audio-node dispatch bodies (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -44,7 +45,7 @@ namespace app
       if (!ready)
          ImGui::BeginDisabled();
       // "open" / "close", not a glyph - see the note above about the font.
-      if (ImGui::Button(editorOpen ? "close" : "open", ImVec2(64.0f, 0)))
+      if (ActionButton::Draw(editorOpen ? "close" : "open", ImVec2(64.0f, 0)))
          n->ToggleEditor();
       if (!ready)
          ImGui::EndDisabled();
@@ -79,7 +80,7 @@ namespace app
          ImGui::SameLine();
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - unloadW,
                                           ImGui::GetCursorScreenPos().y));
-         if (ImGui::Button("unload", ImVec2(unloadW, 0)))
+         if (ActionButton::Draw("unload", ImVec2(unloadW, 0)))
          {
             PushUndoCheckpoint();
             n->Unload();
@@ -110,7 +111,7 @@ namespace app
          AudioBareDropdown("##pluginparampick", names, sPickIndex, [](int i) { sPickIndex = i; },
                            gAudioContentW - 70.0f - ImGui::GetStyle().ItemSpacing.x);
          ImGui::SameLine();
-         if (ImGui::Button("map", ImVec2(70.0f, 0)))
+         if (ActionButton::Draw("map", ImVec2(70.0f, 0)))
          {
             PushUndoCheckpoint();
             n->MapParameter(params[sPickIndex].address);
@@ -157,10 +158,10 @@ namespace app
                ModSlider(label, &m.value, m.minValue, m.maxValue, "%.3f", cellW - unmapBtnW - 4.0f, /*audioStyle=*/true);
                ImGui::SameLine(0.0f, 2.0f);
                ImGui::PushID(i + 40000);
-               ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
-               if (ImGui::SmallButton("x"))
+               ImGui::PushStyleColor(ImGuiCol_Button, tok::V4(tok::palf::v_0_0_0_0));
+               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tok::V4(tok::palf::v_500_150_150_1000));
+               ImGui::PushStyleColor(ImGuiCol_ButtonActive, tok::V4(tok::palf::v_600_200_200_1000));
+               if (ActionButton::Draw("x"))
                {
                   PushUndoCheckpoint();
                   Modulation::Instance().Unbind(gn.index, i);
@@ -259,14 +260,14 @@ namespace app
       {
          const bool active = (n->formatIndex == i);
          if (active)
-            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-         if (ImGui::Button(fmtNames[i], ImVec2(fmtBtnW, 0)))
+            PushSelectedButtonColors();
+         if (ActionButton::Draw(fmtNames[i], ImVec2(fmtBtnW, 0)))
          {
             n->formatIndex = i;
             gPatchDirty = true;
          }
          if (active)
-            ImGui::PopStyleColor();
+            PopSelectedButtonColors();
          if (i < 2)
             ImGui::SameLine();
       }
@@ -277,8 +278,8 @@ namespace app
       {
          const bool wasLive = n->live;   // the click flips n->live between Push and Pop
          if (wasLive)
-            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-         if (ImGui::Button("live##audioOutLive", ImVec2(AudioFullWidth(), 0)))
+            PushSelectedButtonColors();
+         if (ActionButton::Draw("live##audioOutLive", ImVec2(AudioFullWidth(), 0)))
          {
             PushUndoCheckpoint();
             n->live = !n->live;
@@ -286,7 +287,7 @@ namespace app
             RebuildAudioTopology();
          }
          if (wasLive)
-            ImGui::PopStyleColor();
+            PopSelectedButtonColors();
          if (ImGui::IsItemHovered())
             SetAudioReadout("live", n->live ? "not delayed to match other outputs" : "aligned with other outputs");
       }
@@ -297,10 +298,8 @@ namespace app
       // recording will land, never triggers one itself, so picking a folder
       // can't be mistaken for pressing Record.
       const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.75f, 0.18f, 0.18f, 1.0f));
       ImGui::BeginDisabled(!recording && !audioOn);
-      if (ImGui::Button(recording ? "Stop##audioOutRec" : "Record##audioOutRec", ImVec2(btnW, 0)))
+      if (ActionButton::Draw(recording ? "Stop##audioOutRec" : "Record##audioOutRec", ImVec2(btnW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (recording)
          {
@@ -316,12 +315,10 @@ namespace app
       if (!recording && !audioOn && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
          ImGui::SetTooltip("press Start Audio in the toolbar first");
       ImGui::EndDisabled();
-      if (recording)
-         ImGui::PopStyleColor();
       ImGui::SameLine();
 
       ImGui::BeginDisabled(recording);
-      if (ImGui::Button("Choose...##audioOutChoose", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Choose...##audioOutChoose", ImVec2(btnW, 0)))
       {
          const std::string chosen = Platform::OpenFolderDialog("Choose recording folder", RecordingDirFor(n));
          if (!chosen.empty())
@@ -333,10 +330,10 @@ namespace app
       ImGui::EndDisabled();
 
       const std::string destLabel = n->recordDirectory.empty() ? std::string("~/Desktop") : n->recordDirectory;
-      ImGui::TextColored(ImVec4(0.6f, 0.62f, 0.68f, 1.0f), "%s", destLabel.c_str());
+      ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "%s", destLabel.c_str());
 
       if (n->DroppedSampleCount() > 0)
-         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "dropped samples - device can't keep up");
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "dropped samples - device can't keep up");
 
       EndAudioBody();
    }
@@ -357,34 +354,34 @@ namespace app
       {
          const bool active = (n->formatIndex == i);
          if (active)
-            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-         if (ImGui::Button(fmtNames[i], ImVec2(third, 0)))
+            PushSelectedButtonColors();
+         if (ActionButton::Draw(fmtNames[i], ImVec2(third, 0)))
          {
             n->formatIndex = i;
             gPatchDirty = true;
          }
          if (active)
-            ImGui::PopStyleColor();
+            PopSelectedButtonColors();
          ImGui::SameLine();
       }
       const bool wasBit24 = n->bit24;   // Push and Pop must read the same value: the click flips it between them
       if (wasBit24)
-         ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-      if (ImGui::Button("24 bit##spatialDepth", ImVec2(third, 0)))
+         PushSelectedButtonColors();
+      if (ActionButton::Draw("24 bit##spatialDepth", ImVec2(third, 0)))
       {
          n->bit24 = !n->bit24;
          gPatchDirty = true;
       }
       if (wasBit24)
-         ImGui::PopStyleColor();
+         PopSelectedButtonColors();
       if (ImGui::IsItemHovered())
          SetAudioReadout("depth", n->bit24 ? "24-bit file" : "16-bit file");
       ImGui::EndDisabled();
 
       const bool wasLive = n->live;
       if (wasLive)
-         ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-      if (ImGui::Button("live##spatialLive", ImVec2(half, 0)))
+         PushSelectedButtonColors();
+      if (ActionButton::Draw("live##spatialLive", ImVec2(half, 0)))
       {
          PushUndoCheckpoint();
          n->live = !n->live;
@@ -392,29 +389,27 @@ namespace app
          RebuildAudioTopology();
       }
       if (wasLive)
-         ImGui::PopStyleColor();
+         PopSelectedButtonColors();
       if (ImGui::IsItemHovered())
          SetAudioReadout("live", n->live ? "not delayed to match other outputs" : "aligned with other outputs");
       ImGui::SameLine();
       const bool wasStereo = (n->renderMode == 1);
       if (wasStereo)
-         ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-      if (ImGui::Button(wasStereo ? "stereo##spatialMode" : "binaural##spatialMode", ImVec2(half, 0)))
+         PushSelectedButtonColors();
+      if (ActionButton::Draw(wasStereo ? "stereo##spatialMode" : "binaural##spatialMode", ImVec2(half, 0)))
       {
          PushUndoCheckpoint();
          n->renderMode = 1 - n->renderMode;
          gPatchDirty = true;
       }
       if (wasStereo)
-         ImGui::PopStyleColor();
+         PopSelectedButtonColors();
       if (ImGui::IsItemHovered())
          SetAudioReadout("render", n->renderMode == 1 ? "speaker-safe pan, no ear filtering" : "headphones: ear filtering on");
 
       const float btnW = half;
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.75f, 0.18f, 0.18f, 1.0f));
       ImGui::BeginDisabled(!recording && !audioOn);
-      if (ImGui::Button(recording ? "Stop##spatialRec" : "Record##spatialRec", ImVec2(btnW, 0)))
+      if (ActionButton::Draw(recording ? "Stop##spatialRec" : "Record##spatialRec", ImVec2(btnW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (recording)
             n->StopRecording();
@@ -426,11 +421,9 @@ namespace app
          }
       }
       ImGui::EndDisabled();
-      if (recording)
-         ImGui::PopStyleColor();
       ImGui::SameLine();
       ImGui::BeginDisabled(recording);
-      if (ImGui::Button("Choose...##spatialChoose", ImVec2(btnW, 0)))
+      if (ActionButton::Draw("Choose...##spatialChoose", ImVec2(btnW, 0)))
       {
          const std::string chosen = Platform::OpenFolderDialog("Choose recording folder",
             n->recordDirectory.empty() ? AppPaths::DesktopDir() : n->recordDirectory);
@@ -442,13 +435,13 @@ namespace app
       }
       ImGui::EndDisabled();
       if (recording)
-         ImGui::TextColored(ImVec4(0.6f, 0.62f, 0.68f, 1.0f), "REC %.1fs  %.0f KB  (head facing front)",
+         ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "REC %.1fs  %.0f KB  (head facing front)",
                             n->ElapsedSeconds(), (double)n->FileSizeBytes() / 1024.0);
       else
-         ImGui::TextColored(ImVec4(0.6f, 0.62f, 0.68f, 1.0f), "%s",
+         ImGui::TextColored(tok::V4(tok::palf::v_600_620_680_1000), "%s",
                             n->recordDirectory.empty() ? "~/Desktop" : n->recordDirectory.c_str());
       if (n->DroppedSampleCount() > 0)
-         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.35f, 1.0f), "dropped samples - device can't keep up");
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_350_1000), "dropped samples - device can't keep up");
    }
 
 
@@ -496,7 +489,7 @@ namespace app
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = 5.0f;
-         const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
+         const float octW = kTuneOctW, semiW = kTuneSemiW, fineW = kTuneFineW;
          const float waveW = std::max(70.0f, w - octW - semiW - fineW - gap * 3.0f);
          ImGui::PushID(idBase);
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
@@ -568,7 +561,7 @@ namespace app
       ImGui::PushID("amp");
       DrawEnvelopePanel("amp envelope  -  drag the handles", "##analogAmpEnv", &n->attack,
                         &n->decay, &n->sustain, &n->release, nullptr, 0.0f, 0.0f, nullptr,
-                        IM_COL32(150, 214, 255, 245));
+                        tok::U32(tok::pal::c_96D6FFF5));
       ImGui::PopID();
 
       ImGui::Dummy(ImVec2(0.0f, 2.0f));

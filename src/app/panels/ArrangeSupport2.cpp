@@ -1,5 +1,6 @@
 // Arrange panel support: position formatting, typed edit, sliders, media import (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "app/ui/design/components/FieldWell.h"
 
 namespace app
 {
@@ -214,7 +215,7 @@ namespace app
       }
       char buf[128];
       snprintf(buf, sizeof(buf), "%s", gArrangeTypedEdit.text.c_str());
-      const bool entered = ImGui::InputText(strId, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
+      const bool entered = FieldWell::InputText(strId, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
       gArrangeTypedEdit.text = buf;
       // Selection is driven explicitly rather than by a flag, for the reason
       // spelled out at the canvas equivalent: focus arrives through
@@ -228,7 +229,7 @@ namespace app
          {
             if (gArrangeTypedEdit.noAutoSelect)
             {
-               st->Stb.cursor = st->CurLenW;
+               st->ReloadUserBufAndMoveToEnd();
                st->ClearSelection();
             }
             else
@@ -309,7 +310,7 @@ namespace app
       if (format == NULL)
          format = "%.3f";
 
-      const bool hovered = ImGui::ItemHoverable(frame_bb, id, g.LastItemData.InFlags);
+      const bool hovered = ImGui::ItemHoverable(frame_bb, id, g.LastItemData.ItemFlags);
       if (hovered)
          ArrangeMarkFieldHot();
       {
@@ -388,10 +389,9 @@ namespace app
          }
       }
 
-      // Draw frame
-      const ImU32 frame_col = ImGui::GetColorU32(g.ActiveId == id ? ImGuiCol_FrameBgActive : hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
+      // Well + fill: a text-tinted well (same family as ChipButton) with the value drawn as an accent fill from the left.
       ImGui::RenderNavHighlight(frame_bb, id);
-      ImGui::RenderFrame(frame_bb.Min, frame_bb.Max, frame_col, true, g.Style.FrameRounding);
+      FieldWell::Draw(window->DrawList, frame_bb.Min, frame_bb.Max, hovered, g.ActiveId == id);
 
       // Slider behavior
       ImRect grab_bb;
@@ -399,9 +399,8 @@ namespace app
       if (value_changed)
          ImGui::MarkItemEdited(id);
 
-      // Render grab
-      if (grab_bb.Max.x > grab_bb.Min.x)
-         window->DrawList->AddRectFilled(grab_bb.Min, grab_bb.Max, ImGui::GetColorU32(g.ActiveId == id ? ImGuiCol_SliderGrabActive : ImGuiCol_SliderGrab), style.GrabRounding);
+      // Fill up to the grab centre (the grab itself is not drawn)
+      FieldWell::Fill(window->DrawList, frame_bb.Min, frame_bb.Max, (grab_bb.Min.x + grab_bb.Max.x) * 0.5f);
 
       // Display value
       char value_buf[64];
@@ -485,8 +484,10 @@ namespace app
          shown = "%.2fs";
 
       ImGui::SetNextItemWidth(width);
+      FieldWell::PushStyle();
       const bool dragged = ImGui::DragFloat(label, &v, speed, vlo, vhi, shown.c_str(),
                                             ImGuiSliderFlags_NoInput);
+      FieldWell::PopStyle();
 
       if (ImGui::IsItemHovered())
       {

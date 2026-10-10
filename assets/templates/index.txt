@@ -1,0 +1,16 @@
+# slug|group|title|one line. Written by tools/templates/gen_templates.py; read by the Templates window.
+first-sound|First patches|First sound|press play and hear notes
+first-image|First patches|First image|a shape on a colour wash
+first-music-image|First patches|Moves with the music|the shape grows with the sound
+source|By node family|Source|pictures from nothing
+compositing|By node family|Compositing|layers, trails and feedback
+effects|By node family|Effects|change a picture
+3d|By node family|3D|a shape seen from any side
+modulators|By node family|Modulators|numbers that move other controls
+macros|By node family|Macros|one knob that moves several things
+notes|By node family|Notes|notes that make patterns
+synths|By node family|Synths|sounds from notes
+audio-effects|By node family|Audio Effects|shape the sound
+prediction|By node family|Prediction|notes that keep going on their own
+utility|By node family|Utility|mix and meter sound
+field|By node family|Field|write a picture as a formula

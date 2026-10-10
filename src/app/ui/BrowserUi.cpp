@@ -1,4 +1,9 @@
 // Dropdowns, drop handling, browser filter strip + favourites, discrete param slots (moved verbatim from main.cpp).
+#include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/UiType.h"
+#include "app/ui/design/components/LibraryParts.h"
+#include "app/ui/design/components/FilterBar.h"
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
@@ -192,7 +197,7 @@ namespace app
 
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
-                       bool showCaption);
+                       bool showCaption, bool segmented);
 
 
    // Search box + sort dropdown + type-filter dropdown for one mode of the
@@ -221,47 +226,11 @@ namespace app
    {
       const BrowserFilterState before = state;
 
-      ImGui::SetNextItemWidth(-1.0f);
-      ImGui::InputTextWithHint("##browserquery", searchHint, state.query, sizeof(state.query));
+      LibraryParts::SearchField("browserquery", searchHint, state.query, sizeof(state.query));
+      ImGui::Dummy(ImVec2(0, tok::space_3));
 
-      const float spacing = ImGui::GetStyle().ItemSpacing.x;
-      const float avail = ImGui::GetContentRegionAvail().x;
-      const float arrowW = ImGui::GetFrameHeight();
-      // No trailing "sort"/"type" caption on these two (showCaption=false
-      // below), so the remaining width just splits between the two
-      // dropdowns and the direction-arrow button.
-      const float remaining = avail - arrowW - 2.0f * spacing;
-      const float typeW = typeNames.empty() ? 0.0f : std::max(40.0f, remaining * 0.5f);
-      const float sortW = typeNames.empty() ? std::max(40.0f, remaining) : std::max(40.0f, remaining - typeW);
-
-      DropdownButton("sort", sortNames, state.sortMode, [&state](int i) { state.sortMode = i; }, sortW, false);
-
-      ImGui::SameLine();
-      // Drawn as a vector triangle on the button, not a Unicode arrow
-      // character - see the play/pause button's comment in
-      // DrawLibrarySearchPanel: the UI font has no glyph range beyond Basic
-      // Latin, so U+2191/U+2193 here rendered as a literal '?'.
-      const bool dirClicked = ImGui::Button("##sortdir", ImVec2(arrowW, 0));
-      {
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImVec2 bmin = ImGui::GetItemRectMin();
-         const ImVec2 bmax = ImGui::GetItemRectMax();
-         const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-         const float iconSize = (bmax.y - bmin.y) * 0.75f;
-         const ImU32 col = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-         if (state.descending)
-            Tabler::DrawChevronDown(dl, center, iconSize, col);
-         else
-            Tabler::DrawChevronUp(dl, center, iconSize, col);
-      }
-      if (dirClicked)
-         state.descending = !state.descending;
-
-      if (!typeNames.empty())
-      {
-         ImGui::SameLine();
-         DropdownButton("type", typeNames, state.typeFilter, [&state](int i) { state.typeFilter = i; }, typeW, false);
-      }
+      FilterBar::Draw("browserfilter", state, sortNames, typeNames, T("Sort"), T("Filter"));
+      ImGui::Dummy(ImVec2(0, tok::space_3));
 
       return strcmp(before.query, state.query) != 0 || before.sortMode != state.sortMode ||
              before.typeFilter != state.typeFilter || before.descending != state.descending;
@@ -327,8 +296,8 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const float starSize = 11.0f;
       const ImVec2 center(itemMax.x - 12.0f, (itemMin.y + itemMax.y) * 0.5f);
-      const ImU32 starCol = IM_COL32(255, 205, 45, 255);
-      Tabler::DrawStar(dl, center, starSize, starCol, /*filled=*/true);
+      const ImU32 starCol = tok::U32(tok::badge_favorite, app::IsThemeLight());
+      glyph::DrawStar(dl, center, starSize, starCol, /*filled=*/true);
    }
 
 

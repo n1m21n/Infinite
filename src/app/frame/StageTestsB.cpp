@@ -471,7 +471,10 @@ int DrawTestsB(FrameCtx& fc)
          ConditionalStageTimer timerCookAll((benchB6Stages && benchStagesCpuSample) ? &sStageCookAll : nullptr, Bench::FrameTail::kCookAll);
          for (GraphNode& gn : gNodes)
             if (!gn.node->bypassed)
+            {
+               CookProbe::Scope probe(gn.node.get());
                gn.node->CookIfNeeded(frameId);
+            }
       }
 
       // Arrangement monitor (overhaul WP4): after the cook, so the clips it
@@ -736,6 +739,7 @@ int DrawTestsB(FrameCtx& fc)
       // `projectors` (stage timer and Bench::Tail) is both passes; the wait
       // between them is idle time, not work.
       double projWorkMs = 0.0;
+      UpdateProjectorsForMonitors();
       const bool timeProjectors = benchStagesCpuSample || Bench::Tail().active;
       {
          const double projRenderStartMs = timeProjectors ? Bench::ScopedStageTimer::NowMs() : 0.0;

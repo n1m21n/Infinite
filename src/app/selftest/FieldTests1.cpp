@@ -1128,9 +1128,9 @@ int RunFieldElementTest()
          printf("FieldPrimitive: FAIL - PassthroughSource must be nullptr\n");
          secOk = false;
       }
-      if (prim.OutputCount() < 1 || std::string(prim.OutputLabel(0)) != "geo")
+      if (prim.OutputCount() < 1 || std::string(prim.OutputLabel(0)) != "out")
       {
-         printf("FieldPrimitive: FAIL - slot 0 output must be 'geo'\n");
+         printf("FieldPrimitive: FAIL - slot 0 output must be 'out'\n");
          secOk = false;
       }
 

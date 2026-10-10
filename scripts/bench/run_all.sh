@@ -246,6 +246,11 @@ for n in 200 400; do
    run_fixture "B6_canvas_nav n=$n,mode=pan" "$B6_EXIT" \
       INFINITE_BENCH_B6NODES="$n" INFINITE_BENCH_B6MODE=pan INFINITE_BENCH_B6FRAMES="$B6_FRAMES" INFINITE_BENCH_GPUTIMERS=0
 done
+# Zoomed-out pan (canvas level of detail): the whole grid at zoom 0.15, and a 400-node patch.
+run_fixture "B6_canvas_nav n=300,mode=pan,zoom=0.15" "$B6_EXIT" \
+   INFINITE_BENCH_B6NODES=300 INFINITE_BENCH_B6MODE=pan INFINITE_BENCH_B6ZOOM=0.15 INFINITE_BENCH_B6FRAMES="$B6_FRAMES" INFINITE_BENCH_GPUTIMERS=0
+run_fixture "B6_canvas_nav n=400,mode=pan,zoom=0.15" "$B6_EXIT" \
+   INFINITE_BENCH_B6NODES=400 INFINITE_BENCH_B6MODE=pan INFINITE_BENCH_B6ZOOM=0.15 INFINITE_BENCH_B6FRAMES="$B6_FRAMES" INFINITE_BENCH_GPUTIMERS=0
 # Unpaced ceiling: vsync off, so frame_ms is pure work. Targets report null.
 run_fixture "B6_canvas_nav n=300,mode=pan,vsync=0" "$B6_EXIT" \
    INFINITE_BENCH_B6NODES=300 INFINITE_BENCH_B6MODE=pan INFINITE_BENCH_B6VSYNC=0 INFINITE_BENCH_B6FRAMES="$B6_FRAMES" INFINITE_BENCH_GPUTIMERS=0

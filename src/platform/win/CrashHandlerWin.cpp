@@ -174,6 +174,18 @@ namespace Platform
       AppendToFileW(WinCommon::Utf8ToWide(logPath), TimestampPrefix() + line + "\r\n");
    }
 
+   void RevealLogs()
+   {
+      const std::string appDir = AppPaths::AppSupportDir();
+      if (appDir.empty())
+         return;
+      const std::string file = appDir + "/log.txt";
+      // Created empty first: Explorer's /select, on a missing file opens the wrong folder.
+      if (FILE* f = _wfopen(WinCommon::Utf8ToWide(file).c_str(), L"ab"))
+         fclose(f);
+      RevealInFileManager(file);
+   }
+
    void ShowFatalError(const std::string& title, const std::string& message)
    {
       // stderr first, unconditionally - matches every existing fatal-path

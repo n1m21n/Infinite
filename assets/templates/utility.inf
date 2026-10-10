@@ -1,0 +1,88 @@
+infinite-patch 1
+# Utility: mix and meter sound
+node 1 Notes Random Note Generator
+  id a
+  pos 0 878
+end
+node 2 Notes Random Note Generator
+  id b
+  pos 0 1434
+  i rangeLow 36
+  i rangeHigh 48
+end
+node 3 Synths Analog
+  id s1
+  pos 480 878
+  f volume 0.4
+end
+node 4 Synths Analog
+  id s2
+  pos 480 1888
+  f volume 0.4
+end
+node 5 Utility Mixer
+  id mixer
+  pos 1340 1040
+end
+node 6 Utility Audio Meter
+  id meter
+  pos 2240 1040
+end
+node 7 Utility Audio Out
+  id speakers
+  pos 2720 878
+end
+node 8 Modulators Audio Analyze
+  id ana
+  pos 0 3048
+end
+node 9 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1 0.45 0.3
+  f size 0.2
+end
+node 10 Utility Output
+  id out
+  pos 460 0
+end
+node 11 Compositing Comment
+  pos 0 722
+  s text Utility nodes route and check things: mixers, meters, outputs.
+  f width 340
+  f height 120
+end
+node 12 Compositing Comment
+  pos 1340 878
+  s text The Mixer blends several sounds. Each channel has a volume, a pan and mute/solo.
+  f width 300
+  f height 126
+end
+node 13 Compositing Comment
+  pos 2240 878
+  s text The Meter shows how loud the sound is. It passes sound through unchanged.
+  f width 300
+  f height 126
+end
+node 14 Compositing Comment
+  pos 0 1288
+  s text The second voice plays lower notes.
+  f width 300
+  f height 110
+end
+node 15 Compositing Comment
+  pos 0 0
+  s text A small picture that follows the sound, so you can see it as well as hear it.
+  f width 300
+  f height 126
+end
+note s1 0 a
+note s2 0 b
+aud mixer in_1 s1
+aud mixer in_2 s2
+aud meter 0 mixer
+aud speakers 0 meter
+aud ana 0 meter
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.12 0.4
+mod pic sizeY ana 0 0 1 0.5 0.12 0.4

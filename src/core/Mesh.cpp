@@ -1595,7 +1595,8 @@ namespace MeshOps
             const unsigned int b = (unsigned int)(z * stride + x + 1);
             const unsigned int c = (unsigned int)((z + 1) * stride + x + 1);
             const unsigned int d = (unsigned int)((z + 1) * stride + x);
-            PushQuad(out, a, b, c, d);
+            // wound so the surface faces +Y (up), matching the height-field's visible side
+            PushQuad(out, a, d, c, b);
          }
       }
 

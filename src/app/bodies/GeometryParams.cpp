@@ -1,11 +1,17 @@
 // Geometry / 3D / material / render parameter bodies (moved verbatim from main.cpp).
+#include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/components/PinDot.h"
+#include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
 {
+   inline const std::vector<std::string> kAxisXYZ = { "x", "y", "z" };
+
    void DrawAudioFileParams(AudioFileNode* n)
    {
-      if (ImGui::Button("Choose audio...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose audio...", ImVec2(kPreviewSize, 0)))
          n->OpenViaDialog();
 
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -22,15 +28,15 @@ namespace app
 
          if (n->IsPlaying())
          {
-            if (ImGui::Button("Pause", ImVec2(kPreviewSize * 0.48f, 0)))
+            if (ActionButton::Draw("Pause", ImVec2(kPreviewSize * 0.48f, 0)))
                n->Pause();
          }
-         else if (ImGui::Button("Play", ImVec2(kPreviewSize * 0.48f, 0)))
+         else if (ActionButton::Draw("Play", ImVec2(kPreviewSize * 0.48f, 0)))
          {
             n->Play();
          }
          ImGui::SameLine();
-         if (ImGui::Button("Restart", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Restart", ImVec2(kPreviewSize * 0.48f, 0)))
             n->Restart();
 
          ModCheckbox("follow transport", &n->followTransport);
@@ -49,6 +55,7 @@ namespace app
 
    void DrawAudioAnalyzeParams(AudioAnalyzeNode* n)
    {
+      gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
       const float gutter = 16.0f;
       const float bodyW = colW * 2 + gutter;
@@ -67,19 +74,17 @@ namespace app
             }
          }
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bodyW);
-         ImGui::TextColored(ImVec4(0.5f, 0.9f, 1.0f, 1.0f), "source: %s", srcName);
+         ImGui::TextColored(tok::V4(tok::palf::v_500_900_1000_1000), "source: %s", srcName);
          ImGui::PopTextWrapPos();
       }
       else
       {
          if (Platform::AudioIsRunning())
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-            if (ImGui::Button("Stop listening", ImVec2(bodyW, 0)))
+            if (ActionButton::Draw("Stop listening", ImVec2(bodyW, 0), ActionButton::Kind::Record))
                n->Stop();
-            ImGui::PopStyleColor();
          }
-         else if (ImGui::Button("Start listening", ImVec2(bodyW, 0)))
+         else if (ActionButton::Draw("Start listening", ImVec2(bodyW, 0)))
          {
             n->Start();
          }
@@ -94,24 +99,24 @@ namespace app
       const float h = 60.0f;
       ImGui::Dummy(ImVec2(bodyW, h));
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), IM_COL32(16, 16, 22, 255), 3.0f);
+      dl->AddRectFilled(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::U32(tok::pal::c_101016FF), 3.0f);
       const float bw = bodyW / (float)Platform::kAudioBands;
       for (int i = 0; i < Platform::kAudioBands; i++)
       {
          const float v = std::min(1.0f, levels.bands[i] * n->gain);
          dl->AddRectFilled(ImVec2(origin.x + i * bw + 1, origin.y + h - v * h),
                            ImVec2(origin.x + (i + 1) * bw - 1, origin.y + h),
-                           IM_COL32(120, 200, 255, 235));
+                           tok::U32(tok::pal::c_78C8FFEB));
       }
-      dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), IM_COL32(70, 74, 90, 255), 3.0f);
+      if (!n->input.IsConnected() && !Platform::AudioIsRunning())
+         AudioViz::IdleLabel(AudioViz::Frame{dl, origin, ImVec2(origin.x + bodyW, origin.y + h)}, "idle");
+      dl->AddRect(origin, ImVec2(origin.x + bodyW, origin.y + h), tok::U32(tok::pal::c_464A5AFF), 3.0f);
 
       // --- Left Column ---
       ImGui::BeginGroup();
 
-      NodeSeparator("response", colW);
+      NodeSeparator("input", colW);
       ModSlider("gain", &n->gain, 0.1f, 16.0f, "%.3f", colW);
-      ModSlider("attack", &n->attack, 0.02f, 1.0f, "%.3f", colW);
-      ModSlider("release", &n->release, 0.005f, 1.0f, "%.3f", colW);
       ModSlider("onset hold", &n->onsetHold, 0.02f, 1.0f, "%.3f", colW);
 
       ImGui::EndGroup();
@@ -120,15 +125,9 @@ namespace app
       ImGui::SameLine(0.0f, gutter);
       ImGui::BeginGroup();
 
-      NodeSeparator("outputs", colW);
-      const float labelW = 50.0f;
-      const float barW = colW - labelW;
-      for (int i = 0; i < 5; i++)
-      {
-         ImGui::Text("%-6s", n->OutputLabel(i));
-         ImGui::SameLine(labelW);
-         ImGui::ProgressBar(n->Value(i), ImVec2(barW, 0), "");
-      }
+      NodeSeparator("envelope", colW);
+      ModSlider("attack", &n->attack, 0.02f, 1.0f, "%.3f", colW);
+      ModSlider("release", &n->release, 0.005f, 1.0f, "%.3f", colW);
 
       ImGui::EndGroup();
    }
@@ -157,7 +156,7 @@ namespace app
                         [n](int i) { n->followMode = i; });
          if (n->followMode == PathNode::kFollowSlice)
          {
-            ModSliderInt("axis 0=X 1=Y 2=Z", &n->sliceAxis, 0, 2);
+            DropdownButton("axis", kAxisXYZ, n->sliceAxis, [n](int i) { PushUndoCheckpoint(); n->sliceAxis = i; }, kParamWidth, true, true);
             ModSlider("slice at", &n->slicePosition, -3.0f, 3.0f);
          }
          ModSliderInt("contour", &n->contourIndex, 0, 8);
@@ -195,10 +194,8 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const bool isLight = IsThemeLight();
-      const ImU32 borderCol = isLight ? IM_COL32(60, 68, 85, 140) : IM_COL32(210, 218, 235, 70);
-      const ImU32 textCol = isLight ? IM_COL32(35, 40, 52, 255) : IM_COL32(222, 228, 240, 255);
-      const ImU32 pinFill = isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255);
-      const ImU32 pinRing = isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255);
+      const ImU32 borderCol = isLight ? tok::U32(tok::pal::c_3C44558C) : tok::U32(tok::pal::c_D2DAEB46);
+      const ImU32 textCol = isLight ? tok::U32(tok::pal::c_232834FF) : tok::U32(tok::pal::c_DEE4F0FF);
 
       dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, 8.0f, 0, 1.5f);
       for (int r = 1; r < rowCount; r++)
@@ -246,8 +243,7 @@ namespace app
             const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
             ed::PinRect(pinMin, pinMax);
-            dl->AddCircleFilled(pinCenter, kPinRadius * 0.75f, pinFill);
-            dl->AddCircle(pinCenter, kPinRadius * 0.75f, pinRing, 0, 1.5f);
+            PinDot::Cable(dl, pinCenter, /*prediction=*/false, isLight, /*small=*/true);
             ed::EndPin();
             ImGui::PopID();
          }
@@ -275,11 +271,11 @@ namespace app
 
       if (n->sampleMode == GeometryTableNode::kContour)
       {
-         ModSliderInt("axis 0=X 1=Y 2=Z", &n->sliceAxis, 0, 2);
+         DropdownButton("axis", kAxisXYZ, n->sliceAxis, [n](int i) { PushUndoCheckpoint(); n->sliceAxis = i; }, kParamWidth, true, true);
          ModSlider("slice at", &n->slicePosition, -3.0f, 3.0f);
       }
       if (n->sampleMode == GeometryTableNode::kScatter)
-         ModSlider("seed", &n->seed, 0.0f, 32.0f);
+         ModSlider("seed", &n->seed, 0.0f, 32.0f, "%.0f", kParamWidth, false, 1.0f);
 
       NodeSeparator("range");
       DropdownButton("space", GeometryTableNode::SpaceNames(), n->space,
@@ -331,7 +327,7 @@ namespace app
       ModSlider("height", &n->height, -3.0f, 3.0f);
       ModSlider("twist", &n->twist, -180.0f, 180.0f, "%.1f\xC2\xB0");
       if (n->preset == 3)
-         ModSlider("seed", &n->seed, 0.0f, 100.0f);
+         ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
 
       NodeSeparator("tube");
       ModSlider("radius", &n->radius, 0.0f, 0.5f);
@@ -396,7 +392,7 @@ namespace app
       // parameterisation for them to act on.
       if (n->mode != MeshOps::kWrapNearest)
       {
-         ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+         DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
          // With a target the radius always follows the target's size, so the
          // only control is a multiplier - and the resolved value is shown so
          // that link stays visible. Without one there is nothing to follow,
@@ -422,7 +418,7 @@ namespace app
    void DrawClothParams(ClothNode* n)
    {
       ImGui::TextDisabled("%zu triangles, %zu links", n->TriangleCount(), n->ConstraintCount());
-      if (ImGui::Button("Reset", ImVec2(kParamWidth, 0)))
+      if (ActionButton::Column("Reset", kParamWidth))
          n->Reset();
 
       NodeSeparator("solver");
@@ -440,7 +436,7 @@ namespace app
       ModSlider("wind x", &n->windX, -20.0f, 20.0f);
       ModSlider("wind y", &n->windY, -20.0f, 20.0f);
       ModSlider("wind z", &n->windZ, -20.0f, 20.0f);
-      ModSlider("wind turbulence", &n->windTurbulence, 0.0f, 20.0f);
+      ModSlider("turbulence", &n->windTurbulence, 0.0f, 20.0f);
 
       NodeSeparator("ground");
       ModCheckbox("collide with ground", &n->groundEnabled);
@@ -456,7 +452,7 @@ namespace app
    void DrawParticleSystemParams(ParticleSystemNode* n)
    {
       ImGui::TextDisabled("%zu alive", n->AliveCount());
-      if (ImGui::Button("Reset", ImVec2(kParamWidth, 0)))
+      if (ActionButton::Column("Reset", kParamWidth))
          n->Reset();
 
       NodeSeparator("emitter");
@@ -489,7 +485,7 @@ namespace app
       ModSlider("end size", &n->endSize, 0.0f, 0.5f);
       ColorSwatch("start colour", n->startColor, n);
       ColorSwatch("end colour", n->endColor, n);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -502,6 +498,7 @@ namespace app
          ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f);
       }
 
+      gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
       const float gutter = 16.0f;
 
@@ -521,15 +518,15 @@ namespace app
       if (n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha)
          ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f, "%.3f", colW);
 
-      NodeSeparator("emission", colW);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f, "%.3f", colW);
-
       ImGui::EndGroup();
 
       // --- Right Column ---
       ImGui::SameLine(0.0f, gutter);
       ImGui::BeginGroup();
+
+      NodeSeparator("emission", colW);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f, "%.3f", colW);
 
       NodeSeparator("coat & sheen", colW);
       ModSlider("clearcoat", &n->clearcoat, 0.0f, 1.0f, "%.3f", colW);
@@ -605,18 +602,18 @@ namespace app
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
       ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());
-      if (ImGui::Button("step")) n->StepOnce();
+      if (ActionButton::Draw("step")) n->StepOnce();
       ImGui::SameLine();
-      if (ImGui::Button("reset")) n->Reset();
+      if (ActionButton::Draw("reset")) n->Reset();
       ImGui::SameLine();
-      if (ImGui::Button("randomise")) n->Randomise();
+      if (ActionButton::Draw("randomise")) n->Randomise();
 
       NodeSeparator("evolve");
       ModSlider("chaos", &n->chaos, 0.0f, 1.5f);
       ModCheckbox("auto step", &n->autoStep);
       if (n->autoStep)
          ModSlider("steps per beat", &n->stepsPerBeat, 0.05f, 8.0f);
-      ModSlider("seed", &n->seed, 0.0f, 1000.0f);
+      ModSlider("seed", &n->seed, 0.0f, 1000.0f, "%.0f", kParamWidth, false, 1.0f);
       ModSliderInt("triangle budget", &n->triangleBudget, 2000, 500000);
 
       NodeSeparator("operators");
@@ -722,7 +719,7 @@ namespace app
       if (n->method == MeshOps::kDistributePoisson)
          ModSlider("min distance", &n->minDistance, 0.005f, 1.0f);
       ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -742,7 +739,7 @@ namespace app
       ModSlider("spacing y", &n->spacingY, 0.01f, 2.0f);
       ModSlider("jitter", &n->jitter, 0.0f, 1.0f);
       ModSlider("point size", &n->pointSize, 0.002f, 0.3f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
       ColorSwatch("tint", n->tint, n);
    }
 
@@ -760,7 +757,7 @@ namespace app
       char buf[256];
       snprintf(buf, sizeof(buf), "%s", n->text.c_str());
       ImGui::SetNextItemWidth(kParamWidth);
-      if (ImGui::InputText("text", buf, sizeof(buf)))
+      if (FieldWell::InputText("text", buf, sizeof(buf)))
          n->text = buf;
 
       {
@@ -790,7 +787,7 @@ namespace app
 
    void DrawModelParams(ModelSourceNode* n)
    {
-      if (ImGui::Button("Open model...", ImVec2(kParamWidth, 0)))
+      if (ActionButton::Column("Open model...", kParamWidth))
       {
          const std::string path = Platform::OpenModelDialog();
          if (!path.empty())
@@ -1033,7 +1030,7 @@ namespace app
             static const std::vector<std::string> kExplodeByNames = { "Faces", "Loose Parts" };
             DropdownButton("by", kExplodeByNames, n->explodeBy, [n](int i) { n->explodeBy = i; });
             ModSlider("amount", &n->amount, 0.0f, 3.0f);
-            ModSlider("seed", &n->seed, 0.0f, 100.0f);
+            ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
             break;
          }
          case GeometryOpNode::kSmooth:
@@ -1042,7 +1039,7 @@ namespace app
             ModSlider("strength", &n->amount, 0.0f, 1.0f);
             break;
          case GeometryOpNode::kMirror:
-            ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+            DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
             ModSlider("plane offset", &n->mirrorOffset, -2.0f, 2.0f);
             ModCheckbox("keep original", &n->keepOriginal);
             ModCheckbox("weld seam", &n->weldSeam);
@@ -1062,12 +1059,12 @@ namespace app
                   ModSlider("every", &n->selectC, 1.0f, 32.0f, "%.0f");
                   break;
                case 2: // position along an axis
-                  ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+                  DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
                   ModSlider("min", &n->selectA, -3.0f, 3.0f);
                   ModSlider("max", &n->selectB, -3.0f, 3.0f);
                   break;
                case 3: // normal direction
-                  ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+                  DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
                   ModSlider("facing", &n->selectA, -1.0f, 1.0f);
                   ModSlider("sign", &n->selectC, -1.0f, 1.0f);
                   break;
@@ -1117,11 +1114,11 @@ namespace app
             ModSlider("turns", &n->turns, 0.05f, 6.0f);
             ModSlider("rise / turn", &n->rise, -2.0f, 2.0f);
             ModSlider("radius", &n->radiusOffset, 0.0f, 3.0f);
-            ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+            DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
             break;
          default:
             ModSlider("angle", &n->amount, -171.8873f, 171.8873f, "%.1f\xC2\xB0");
-            ModSliderInt("axis 0=X 1=Y 2=Z", &n->axis, 0, 2);
+            DropdownButton("axis", kAxisXYZ, n->axis, [n](int i) { PushUndoCheckpoint(); n->axis = i; }, kParamWidth, true, true);
             break;
       }
    }
@@ -1214,7 +1211,7 @@ namespace app
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
-      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(14, 14, 20, 255), 3.0f);
+      dl->AddRectFilled(origin, ImVec2(origin.x + size, origin.y + barH), tok::U32(tok::pal::c_0E0E14FF), 3.0f);
 
       const int count = std::clamp(n->bandCount, 2, AudioColorRampNode::kMaxBands);
       const float* energies = n->GetBandEnergies();
@@ -1257,10 +1254,10 @@ namespace app
             float mag = std::clamp(spec[bin] * 2.5f, 0.0f, 1.0f);
             pts.push_back(ImVec2(origin.x + t * size, origin.y + barH - mag * (barH - 4.0f)));
          }
-         dl->AddPolyline(pts.data(), (int)pts.size(), IM_COL32(255, 255, 255, 130), false, 1.2f);
+         dl->AddPolyline(pts.data(), (int)pts.size(), tok::U32(tok::pal::c_FFFFFF82), false, 1.5f);
       }
 
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), IM_COL32(70, 74, 90, 255), 3.0f);
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + barH), tok::U32(tok::pal::c_464A5AFF), 3.0f);
 
       // 3. Interactive band-boundary dividers, drawn directly on the spectrum.
       ImGui::SetCursorScreenPos(origin);
@@ -1316,7 +1313,7 @@ namespace app
       {
          float x = toScreenX(n->crossoverPos[i]);
          bool isHov = (nearest == i || (sDragNode == n && sDragIndex == i));
-         ImU32 lineCol = isHov ? IM_COL32(255, 220, 100, 230) : IM_COL32(255, 255, 255, 100);
+         ImU32 lineCol = isHov ? tok::U32(tok::pal::c_FFDC64E6) : tok::U32(tok::pal::c_FFFFFF64);
          dl->AddLine(ImVec2(x, origin.y + 2.0f), ImVec2(x, origin.y + barH - 2.0f), lineCol, isHov ? 2.5f : 1.5f);
 
          if (isHov)
@@ -1332,7 +1329,7 @@ namespace app
       }
 
       const float readoutH = ImGui::GetTextLineHeight();
-      dl->AddText(ImVec2(origin.x, origin.y + barH + gap), IM_COL32(160, 166, 186, 255), readout);
+      dl->AddText(ImVec2(origin.x, origin.y + barH + gap), tok::U32(tok::pal::c_A0A6BAFF), readout);
 
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + barH + gap + readoutH + gap));
    }
@@ -1424,7 +1421,7 @@ namespace app
          ColorSwatch("ramp end", n->rampB, n);
          break;
       case SetColorNode::kRandom:
-         ModSlider("seed", &n->seed, 0.0f, 100.0f);
+         ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
          break;
       case SetColorNode::kPalette:
          ModSliderInt("palette offset", &n->paletteOffset, 0, 32);
@@ -1456,7 +1453,7 @@ namespace app
       ModSlider("rotation random", &n->rotationRandom, 0.0f, 1.0f);
       ModSlider("normal offset", &n->normalOffset, -0.5f, 0.5f);
       ModCheckbox("align to normal", &n->alignToNormal);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -1618,10 +1615,11 @@ namespace app
       ImGui::SameLine(0.0f, 16.0f);
       ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
 
+      gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
       const float gutter = 16.0f;
 
-      if (ImGui::Button("Frame scene", ImVec2(colW, 0)))
+      if (ActionButton::Column("Frame scene", colW))
          FrameSceneInView(n);
 
       // --- Left Column ---
@@ -1642,7 +1640,7 @@ namespace app
          // budget, so show what actually happened when they disagree.
          const int wanted = (n->samples <= 0) ? 0 : (1 << n->samples);
          if (n->ActiveSamples() != wanted)
-            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.35f, 1.0f),
+            ImGui::TextColored(tok::V4(tok::palf::v_950_750_350_1000),
                                "antialias reduced to %dx at this size",
                                n->ActiveSamples());
       }
@@ -1674,10 +1672,6 @@ namespace app
          ModSlider("target y", &n->targetY, -3.0f, 3.0f, "%.3f", colW);
          ModSlider("target z", &n->targetZ, -3.0f, 3.0f, "%.3f", colW);
       }
-
-      NodeSeparator("raster", colW);
-      ModCheckbox("depth test", &n->depthTest);
-      ModCheckbox("cull backfaces", &n->backfaceCull);
 
       ImGui::EndGroup();
 
@@ -1734,6 +1728,10 @@ namespace app
       DropdownButton("sprite size", Render3DNode::SpriteSizeModeNames(), n->spriteSizeMode,
                      [n](int i) { n->spriteSizeMode = i; }, colW);
 
+      NodeSeparator("raster", colW);
+      ModCheckbox("depth test", &n->depthTest);
+      ModCheckbox("cull backfaces", &n->backfaceCull);
+
       ImGui::EndGroup();
    }
 
@@ -1775,15 +1773,15 @@ namespace app
          {
             dl->AddRectFilled(headerPos,
                               ImVec2(headerPos.x + kPreviewSize, headerPos.y + rowHeight),
-                              dragging ? IM_COL32(70, 90, 130, 200) : IM_COL32(50, 54, 68, 160), 3.0f);
+                              dragging ? tok::U32(tok::pal::c_465A82C8) : tok::U32(tok::pal::c_323644A0), 3.0f);
          }
          // grip dots, so the header reads as draggable
          for (int d = 0; d < 3; d++)
          {
             dl->AddCircleFilled(ImVec2(headerPos.x + 6, headerPos.y + 5 + d * 4.0f), 1.3f,
-                                IM_COL32(140, 146, 168, 255));
+                                tok::U32(tok::pal::c_8C92A8FF));
             dl->AddCircleFilled(ImVec2(headerPos.x + 11, headerPos.y + 5 + d * 4.0f), 1.3f,
-                                IM_COL32(140, 146, 168, 255));
+                                tok::U32(tok::pal::c_8C92A8FF));
          }
          // Name the layer after whatever is feeding it - far more useful than
          // "layer C" once a stack has four things in it.
@@ -1804,7 +1802,7 @@ namespace app
             snprintf(title, sizeof(title), "%c  (empty)", 'A' + slot);
          }
          dl->AddText(ImVec2(headerPos.x + 20, headerPos.y + 2),
-                     source ? IM_COL32(190, 196, 215, 255) : IM_COL32(120, 124, 142, 255), title);
+                     source ? tok::U32(tok::pal::c_BEC4D7FF) : tok::U32(tok::pal::c_787C8EFF), title);
 
          char modeLabel[32];
          snprintf(modeLabel, sizeof(modeLabel), "mode##%d", slot);
@@ -1852,6 +1850,27 @@ namespace app
          const FilterParamDef& p = def.params[i];
          if (!p.sectionLabel.empty())
             NodeSeparator(p.sectionLabel.c_str());
+         if (def.name == "convolve" && i < 9)
+         {
+            // The 3x3 kernel reads as the matrix it is: nine number cells, each a full slider (same pin, typing,
+            // menus, recording and binding as any other param), named k11..k33 for the modulation matrix.
+            if (i == 0)
+            {
+               const float gap = tok::space_1;
+               const float cellW = std::floor((kParamWidth - 2.0f * gap) / 3.0f);
+               for (size_t k = 0; k < 9; k++)
+               {
+                  const FilterParamDef& kp = def.params[k];
+                  ImGui::PushID((int)k);
+                  if (k % 3 != 0)
+                     ImGui::SameLine(0.0f, gap);
+                  ModSlider(("##" + kp.label).c_str(), n->ParamPtr(k), kp.minVal, kp.maxVal, "%.1f", cellW, false, 0.0f,
+                            nullptr, nullptr, -1, kp.label.c_str());
+                  ImGui::PopID();
+               }
+            }
+            continue;
+         }
          ImGui::PushID((int)i);
          if (p.type == FilterParamDef::Type::Color)
          {
@@ -1876,7 +1895,8 @@ namespace app
          }
          else
          {
-            ModSlider(p.label.c_str(), n->ParamPtr(i), p.minVal, p.maxVal);
+            ModSlider(p.label.c_str(), n->ParamPtr(i), p.minVal, p.maxVal,
+                      p.format.empty() ? "%.3f" : p.format.c_str(), kParamWidth, false, p.integer ? 1.0f : 0.0f);
          }
          ImGui::PopID();
       }

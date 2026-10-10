@@ -1,6 +1,7 @@
 #pragma once
 
 #include "INode.h"
+#include "CookProbe.h"
 
 // Typed patch cable carrying a texture handle between two nodes.
 //
@@ -35,7 +36,10 @@ public:
       INode* node = Resolved();
       if (node == nullptr)
          return 0;
-      node->CookIfNeeded(frameId);
+      {
+         CookProbe::Scope probe(node);
+         node->CookIfNeeded(frameId);
+      }
       return node->GetOutputTexture(ResolvedOutput(node));
    }
 

@@ -1,8 +1,23 @@
 // Generic node parameter bodies, part 1 (moved verbatim from main.cpp).
+#include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/AudioViz.h"
+#include "app/ui/design/components/StepCell.h"
+#include "app/ui/design/components/Switch.h"
+#include "app/ui/design/components/EmptyState.h"
 
 namespace app
 {
+   // R5: a node body's "nothing here yet" message, centred in a quiet block the width of the param column.
+   static void EmptyBlock(const char* message, const char* hint)
+   {
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      const ImVec2 sz(kPreviewSize, 52.0f);
+      ImGui::Dummy(sz);
+      EmptyState::Draw(p, ImVec2(p.x + sz.x, p.y + sz.y), message, hint);
+   }
+
    // Copies every parameter VisitParams declares, for any node type, by
    // routing through the same save/load format used for patch files: write src
    // to an in-memory param list, then read it back into dst. This used to be a
@@ -38,7 +53,7 @@ namespace app
 
    void DrawImageSourceParams(ImageSourceNode* n)
    {
-      if (ImGui::Button("Choose image...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose image...", ImVec2(kPreviewSize, 0)))
          n->LoadViaDialog();
 
       if (!n->LastError().empty())
@@ -46,7 +61,7 @@ namespace app
          // wrap pos is window-relative; passing a bare width put it left of the
          // cursor and wrapped every single character onto its own line
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
       else if (!n->LoadedPath().empty())
@@ -64,12 +79,12 @@ namespace app
 
    void DrawSlideshowParams(SlideshowNode* n)
    {
-      if (ImGui::Button("Choose folder...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose folder...", ImVec2(kPreviewSize, 0)))
          n->LoadViaDialog();
 
       if (!n->FolderPath().empty())
       {
-         if (ImGui::Button("Refresh", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Refresh", ImVec2(kPreviewSize, 0)))
             n->ReloadFromFolder();
       }
 
@@ -84,15 +99,15 @@ namespace app
 
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       if (!n->LastError().empty())
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
       if (n->ImageCount() > 0)
       {
          const std::string file = n->CurrentFileName();
          ImGui::TextDisabled("%d/%d  %s", n->CurrentImageNumber(), n->ImageCount(), file.c_str());
       }
-      else
-         ImGui::TextDisabled("Choose a folder containing images.");
       ImGui::PopTextWrapPos();
+      if (n->ImageCount() == 0)
+         EmptyBlock("No images", "Choose a folder containing images");
    }
 
 
@@ -105,7 +120,7 @@ namespace app
       return;
 #else
       ImGui::SetNextItemWidth(kPreviewSize);
-      if (ImGui::InputText("##syphon_name", &n->serverNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
+      if (FieldWell::InputText("##syphon_name", &n->serverNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
       {
          n->SetServerName(n->serverNameInput);
       }
@@ -117,11 +132,11 @@ namespace app
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       if (n->PublishedWidth() > 0 && n->PublishedHeight() > 0)
       {
-         ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
+         ImGui::TextColored(tok::V4(tok::palf::v_400_1000_500_1000), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
          if (!Platform::SyphonServerCanReportClients())
             ImGui::TextDisabled("Clients: not reported");
          else if (n->HasClients())
-            ImGui::TextColored(ImVec4(0.3f, 0.9f, 1.0f, 1.0f), "Clients: Active");
+            ImGui::TextColored(tok::V4(tok::palf::v_300_900_1000_1000), "Clients: Active");
          else
             ImGui::TextDisabled("Clients: Waiting for app...");
       }
@@ -142,7 +157,7 @@ namespace app
       ImGui::PopTextWrapPos();
       return;
 #else
-      if (ImGui::Button("Refresh Servers", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Refresh Servers", ImVec2(kPreviewSize, 0)))
       {
          n->RefreshServers();
       }
@@ -150,13 +165,11 @@ namespace app
       const auto& servers = n->AvailableServers();
       if (servers.empty())
       {
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
 #if defined(_WIN32)
-         ImGui::TextDisabled("No active Spout senders found.");
+         EmptyBlock("No active Spout senders", "Start a sender, then Refresh");
 #else
-         ImGui::TextDisabled("No active Syphon servers found.");
+         EmptyBlock("No active Syphon servers", "Start a server, then Refresh");
 #endif
-         ImGui::PopTextWrapPos();
       }
       else
       {
@@ -179,11 +192,11 @@ namespace app
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
          if (n->IsConnected())
          {
-            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
+            ImGui::TextColored(tok::V4(tok::palf::v_400_1000_500_1000), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
          }
          else
          {
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Connecting...");
+            ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "Connecting...");
          }
          ImGui::PopTextWrapPos();
       }
@@ -193,17 +206,14 @@ namespace app
 
    void DrawNdiOutParams(NdiOutNode* n)
    {
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       if (!Ndi::Available())
       {
-         ImGui::TextDisabled("NDI runtime not found (install from ndi.video)");
-         ImGui::PopTextWrapPos();
+         EmptyBlock("NDI runtime not found", "Install it from ndi.video");
          return;
       }
-      ImGui::PopTextWrapPos();
 
       ImGui::SetNextItemWidth(kPreviewSize);
-      if (ImGui::InputText("##ndi_name", &n->sourceNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
+      if (FieldWell::InputText("##ndi_name", &n->sourceNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
          n->SetSourceName(n->sourceNameInput);
       if (ImGui::IsItemDeactivatedAfterEdit())
          n->SetSourceName(n->sourceNameInput);
@@ -211,9 +221,9 @@ namespace app
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       if (n->IsPublishing())
       {
-         ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
+         ImGui::TextColored(tok::V4(tok::palf::v_400_1000_500_1000), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
          if (n->Connections() > 0)
-            ImGui::TextColored(ImVec4(0.3f, 0.9f, 1.0f, 1.0f), "Receivers: %d", n->Connections());
+            ImGui::TextColored(tok::V4(tok::palf::v_300_900_1000_1000), "Receivers: %d", n->Connections());
          else
             ImGui::TextDisabled("Receivers: waiting...");
       }
@@ -237,9 +247,7 @@ namespace app
       const std::vector<std::string> sources = n->AvailableSources();
       if (sources.empty())
       {
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextDisabled("No NDI sources found on the network.");
-         ImGui::PopTextWrapPos();
+         EmptyBlock("No NDI sources", "Sources on this network appear here");
          return;
       }
 
@@ -259,9 +267,9 @@ namespace app
       if (n->SourceName().empty())
          ImGui::TextDisabled("Pick a source");
       else if (n->IsReceiving())
-         ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
+         ImGui::TextColored(tok::V4(tok::palf::v_400_1000_500_1000), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
       else
-         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Waiting for frames...");
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "Waiting for frames...");
       ImGui::PopTextWrapPos();
    }
 
@@ -270,7 +278,7 @@ namespace app
    {
       ModSliderInt("port", &n->port, 1, 65535);
       ImGui::SetNextItemWidth(kParamWidth);
-      ImGui::InputText("address", &n->address);
+      FieldWell::InputText("address", &n->address);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
    }
@@ -279,10 +287,10 @@ namespace app
    void DrawOscSendParams(OscSendNode* n)
    {
       ImGui::SetNextItemWidth(kParamWidth);
-      ImGui::InputText("host", &n->host);
+      FieldWell::InputText("host", &n->host);
       ModSliderInt("port", &n->port, 1, 65535);
       ImGui::SetNextItemWidth(kParamWidth);
-      ImGui::InputText("address", &n->address);
+      FieldWell::InputText("address", &n->address);
       ModSlider("epsilon", &n->epsilon, 0.0f, 0.1f, "%.4f");
       ModSlider("interval (ms)", &n->intervalMs, 1.0f, 1000.0f, "%.0f");
       if (n->LastSent() < 0.0f)
@@ -294,13 +302,13 @@ namespace app
 
    void DrawEnvironmentParams(EnvironmentNode* n)
    {
-      if (ImGui::Button("Choose HDRI...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose HDRI...", ImVec2(kPreviewSize, 0)))
          n->LoadViaDialog();
 
       if (!n->LastError().empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
       else if (!n->LoadedPath().empty())
@@ -315,8 +323,9 @@ namespace app
       }
       else
       {
-         ImGui::TextDisabled("no image - patch into Render 3D's env pin anyway");
-         ImGui::TextDisabled("to use its procedural sky instead");
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("no image: Render 3D uses its procedural sky");
+         ImGui::PopTextWrapPos();
       }
 
       ModSlider("intensity", &n->intensity, 0.0f, 8.0f);
@@ -372,7 +381,7 @@ namespace app
       DrawFieldDeviceControls<FormulaNode>(n, "formula", &FormulaNode::PresetNames(),
                                           [](FormulaNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
-      if (ImGui::Button("Edit GLSL...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Edit GLSL...", ImVec2(kPreviewSize, 0)))
       {
          gFormulaEditor = n;
          gFormulaEditorOpen = true;
@@ -381,7 +390,7 @@ namespace app
       if (!n->LastError().empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
 
@@ -400,12 +409,22 @@ namespace app
       char buf[512];
       snprintf(buf, sizeof(buf), "%s", n->text.c_str());
       ImGui::SetNextItemWidth(kParamWidth);
-      if (ImGui::InputText("text", buf, sizeof(buf)))
+      if (FieldWell::InputText("##text", buf, sizeof(buf)))
          n->text = buf;
 
       const std::vector<std::string>& fonts = TextNode::AvailableFonts();
       if (n->fontName.empty())
+      {
          n->fontName = fonts.front();
+         for (const char* sans : { "Helvetica Neue", "Helvetica", "Arial", "Segoe UI", "Inter" })
+         {
+            if (std::find(fonts.begin(), fonts.end(), sans) != fonts.end())
+            {
+               n->fontName = sans;
+               break;
+            }
+         }
+      }
       int fontIdx = 0;
       for (int i = 0; i < (int)fonts.size(); i++)
       {
@@ -415,7 +434,7 @@ namespace app
       DropdownButton("font", fonts, fontIdx, [n, &fonts](int i) { n->fontName = fonts[i]; });
 
       ModSlider("size", &n->fontSize, 8.0f, 300.0f);
-      ColorSwatch("color", n->color, n);
+      ColorSwatch("colour", n->color, n);
       ModSlider("tracking", &n->tracking, -10.0f, 40.0f);
       ModSlider("pos x", &n->posX, 0.0f, 1.0f);
       ModSlider("pos y", &n->posY, 0.0f, 1.0f);
@@ -445,13 +464,13 @@ namespace app
 
    void DrawVideoParams(VideoSourceNode* n)
    {
-      if (ImGui::Button("Choose video...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Choose video...", ImVec2(kPreviewSize, 0)))
          n->OpenViaDialog();
 
       if (!n->LastError().empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
       else if (!n->LoadedPath().empty())
@@ -475,14 +494,15 @@ namespace app
          ModSlider("end", &n->trimEnd, 0.0f, sliderMax);
       }
 
-      NodeSeparator();
       if (n->HasAudio())
       {
+         NodeSeparator();
          ModCheckbox("audioEnabled", &n->audioEnabled);
          ModSlider("volume", &n->volume, 0.0f, 1.0f);
       }
       else if (!n->AudioError().empty())
       {
+         NodeSeparator();
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
          ImGui::TextDisabled("audio: %s", n->AudioError().c_str());
          ImGui::PopTextWrapPos();
@@ -492,8 +512,8 @@ namespace app
 
    void DrawVideoInParams(VideoInNode* n)
    {
+      gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // dropdowns as wide as the preview above them
       ModCheckbox("active", &n->active);
-      ImGui::SameLine();
       ModCheckbox("mirror", &n->mirror);
 
       n->RefreshDevices();
@@ -532,7 +552,7 @@ namespace app
       if (!n->LastError().empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", n->LastError().c_str());
          ImGui::PopTextWrapPos();
       }
       else if (n->IsRunning() && n->GetOutputWidth() > 0 && n->GetOutputHeight() > 0)
@@ -632,7 +652,7 @@ namespace app
          {
             ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
             ImVec2 pB = toScreen(node->points[r][c + 1].x, node->points[r][c + 1].y);
-            dl->AddLine(pA, pB, IM_COL32(255, 180, 50, 200), 1.5f);
+            dl->AddLine(pA, pB, tok::U32(tok::pal::c_FFB432C8), 1.5f);
          }
       }
       for (int c = 0; c < gw; ++c)
@@ -641,7 +661,7 @@ namespace app
          {
             ImVec2 pA = toScreen(node->points[r][c].x, node->points[r][c].y);
             ImVec2 pB = toScreen(node->points[r + 1][c].x, node->points[r + 1][c].y);
-            dl->AddLine(pA, pB, IM_COL32(255, 180, 50, 200), 1.5f);
+            dl->AddLine(pA, pB, tok::U32(tok::pal::c_FFB432C8), 1.5f);
          }
       }
 
@@ -652,8 +672,8 @@ namespace app
          ImVec2 pTR = toScreen(node->points[0][1].x, node->points[0][1].y);
          ImVec2 pBR = toScreen(node->points[1][1].x, node->points[1][1].y);
          ImVec2 pBL = toScreen(node->points[1][0].x, node->points[1][0].y);
-         dl->AddLine(pTL, pBR, IM_COL32(255, 180, 50, 70), 1.0f);
-         dl->AddLine(pTR, pBL, IM_COL32(255, 180, 50, 70), 1.0f);
+         dl->AddLine(pTL, pBR, tok::U32(tok::pal::c_FFB43246), 1.0f);
+         dl->AddLine(pTR, pBL, tok::U32(tok::pal::c_FFB43246), 1.0f);
       }
 
       // Draw circular pin handles
@@ -666,10 +686,10 @@ namespace app
             float distToMouse = std::hypot(mouse.x - pt.x, mouse.y - pt.y);
             const bool isHovered = (distToMouse < 18.0f);
 
-            dl->AddCircleFilled(pt, 6.0f, IM_COL32(255, 180, 50, 255));
-            dl->AddCircle(pt, 7.0f, IM_COL32(20, 20, 25, 255), 0, 1.5f);
+            dl->AddCircleFilled(pt, 6.0f, tok::U32(tok::pal::c_FFB432FF));
+            dl->AddCircle(pt, 7.0f, tok::U32(tok::pal::c_141419FF), 0, 1.5f);
             if (isDragged || isHovered)
-               dl->AddCircle(pt, 11.0f, IM_COL32(255, 255, 255, 240), 0, 2.0f);
+               dl->AddCircle(pt, 11.0f, tok::U32(tok::pal::c_FFFFFFF0), 0, 2.0f);
          }
       }
    }
@@ -693,7 +713,7 @@ namespace app
       char btnId[32];
       snprintf(btnId, sizeof(btnId), "##projinlinenode%p", (void*)node);
       DrawProjectionHandleOverlay(node, origin, ImVec2(size, size), btnId);
-      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), IM_COL32(90, 130, 190, 255), 4.0f, 0, 2.0f);
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size), tok::U32(tok::pal::c_5A82BEFF), 4.0f, 0, 2.0f);
 
       // Reserve space so the eye toggle and params below aren't drawn over the preview!
       ImGui::SetCursorScreenPos(origin);
@@ -743,37 +763,39 @@ namespace app
             n->SetGridSize(n->gridW, gh);
       }
 
-      const float btnW = (colW - 12.0f) * 0.25f;
-      if (ImGui::Button("Reset Corners", ImVec2(btnW, 0)))
+      const float btnW = ActionButton::RowWidth(4, kParamWidth);
+      ActionButton::RowBegin();
+      if (ActionButton::Draw("Reset Corners", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->ResetCorners();
       }
-      ImGui::SameLine(0.0f, 4.0f);
-      if (ImGui::Button("Reset All", ImVec2(btnW, 0)))
+      ActionButton::RowNext();
+      if (ActionButton::Draw("Reset All", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->ResetAllPoints();
       }
-      ImGui::SameLine(0.0f, 4.0f);
-      if (ImGui::Button("Flip H", ImVec2(btnW, 0)))
+      ActionButton::RowNext();
+      if (ActionButton::Draw("Flip H", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->FlipH();
       }
-      ImGui::SameLine(0.0f, 4.0f);
-      if (ImGui::Button("Flip V", ImVec2(btnW, 0)))
+      ActionButton::RowNext();
+      if (ActionButton::Draw("Flip V", ImVec2(btnW, 0)))
       {
          PushUndoCheckpoint();
          n->FlipV();
       }
+      ActionButton::RowEnd();
    }
 
 
    void DrawLFOParams(LFONode* n)
    {
       DropdownButton("shape", LFONode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
-      ModSlider("rate (beats)", &n->rateBeats, 0.05f, 32.0f);
+      ModSlider("rate", &n->rateBeats, 0.05f, 32.0f, "%.2f beats");
       ModSlider("phase", &n->phase, 0.0f, 1.0f);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
@@ -782,11 +804,11 @@ namespace app
 
    void DrawRandomParams(RandomNode* n)
    {
-      ModSlider("rate (beats)", &n->rateBeats, 0.05f, 32.0f);
+      ModSlider("rate", &n->rateBeats, 0.05f, 32.0f, "%.2f beats");
       ModSlider("smooth", &n->smooth, 0.0f, 1.0f);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
-      ModSlider("seed", &n->seed, 0.0f, 200.0f);
+      ModSlider("seed", &n->seed, 0.0f, 200.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -880,13 +902,13 @@ namespace app
       const bool isLight = IsThemeLight();
 
       // ---- 1) Container chassis background ----
-      dl->AddRectFilled(origin, br, isLight ? IM_COL32(236, 240, 248, 255) : IM_COL32(16, 16, 22, 255), 4.0f);
+      dl->AddRectFilled(origin, br, isLight ? tok::U32(tok::pal::c_ECF0F8FF) : tok::U32(tok::pal::c_101016FF), 4.0f);
 
       // ---- 2) Subtle horizontal guide lines (25%, 50%, 75%) ----
       const float y25 = origin.y + height * 0.25f;
       const float y50 = origin.y + height * 0.50f;
       const float y75 = origin.y + height * 0.75f;
-      const ImU32 subGuideCol = isLight ? IM_COL32(218, 223, 234, 150) : IM_COL32(32, 35, 46, 150);
+      const ImU32 subGuideCol = isLight ? tok::U32(tok::pal::c_DADFEA96) : tok::U32(tok::pal::c_20232E96);
       dl->AddLine(ImVec2(origin.x + 2.0f, y25), ImVec2(br.x - 2.0f, y25), subGuideCol, 1.0f);
       dl->AddLine(ImVec2(origin.x + 2.0f, y50), ImVec2(br.x - 2.0f, y50), subGuideCol, 1.0f);
       dl->AddLine(ImVec2(origin.x + 2.0f, y75), ImVec2(br.x - 2.0f, y75), subGuideCol, 1.0f);
@@ -909,20 +931,20 @@ namespace app
 
          // Track lane background
          const ImU32 gridCol = isLight
-            ? (isGroupStart ? IM_COL32(212, 218, 230, 255) : IM_COL32(224, 228, 238, 255))
-            : (isGroupStart ? IM_COL32(32, 35, 46, 255) : IM_COL32(22, 24, 32, 255));
+            ? (isGroupStart ? tok::U32(tok::pal::c_D4DAE6FF) : tok::U32(tok::pal::c_E0E4EEFF))
+            : (isGroupStart ? tok::U32(tok::pal::c_20232EFF) : tok::U32(tok::pal::c_161820FF));
          dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y), gridCol, 2.0f);
 
          // Column hover or playhead background wash
          if (isCurrent)
          {
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? IM_COL32(255, 200, 80, 50) : IM_COL32(255, 190, 80, 35), 2.0f);
+                              isLight ? tok::U32(tok::pal::c_FFC85032) : tok::U32(tok::pal::c_FFBE5023), 2.0f);
          }
          else if (isHoveredCol)
          {
             dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                              isLight ? IM_COL32(0, 0, 0, 10) : IM_COL32(255, 255, 255, 12), 2.0f);
+                              isLight ? tok::U32(tok::pal::c_0000000A) : tok::U32(tok::pal::c_FFFFFF0C), 2.0f);
          }
 
          const float v = std::clamp(n->steps[i], 0.0f, 1.0f);
@@ -931,8 +953,8 @@ namespace app
 
          // Bar stem fill
          const ImU32 fillCol = isCurrent
-            ? (isLight ? IM_COL32(235, 145, 30, 240) : IM_COL32(255, 190, 80, 240))
-            : (isLight ? IM_COL32(35, 120, 235, 230) : IM_COL32(75, 165, 255, 220));
+            ? (isLight ? tok::U32(tok::pal::c_EB911EF0) : tok::U32(tok::pal::c_FFBE50F0))
+            : (isLight ? tok::U32(tok::pal::c_2378EBE6) : tok::U32(tok::pal::c_4BA5FFDC));
 
          if (std::fabs(fillBottom - fillTop) > 1.0f)
          {
@@ -944,11 +966,11 @@ namespace app
          const float capY = std::clamp(fillTop, origin.y, br.y - capH);
 
          const ImU32 capCol = isCurrent
-            ? (isLight ? IM_COL32(245, 155, 25, 255) : IM_COL32(255, 200, 80, 255))
-            : (isLight ? IM_COL32(40, 130, 240, 255) : IM_COL32(95, 185, 255, 255));
+            ? (isLight ? tok::U32(tok::pal::c_F59B19FF) : tok::U32(tok::pal::c_FFC850FF))
+            : (isLight ? tok::U32(tok::pal::c_2882F0FF) : tok::U32(tok::pal::c_5FB9FFFF));
          const ImU32 capBorder = isCurrent
-            ? (isLight ? IM_COL32(255, 230, 140, 255) : IM_COL32(255, 245, 180, 255))
-            : (isLight ? IM_COL32(160, 205, 255, 200) : IM_COL32(180, 230, 255, 180));
+            ? (isLight ? tok::U32(tok::pal::c_FFE68CFF) : tok::U32(tok::pal::c_FFF5B4FF))
+            : (isLight ? tok::U32(tok::pal::c_A0CDFFC8) : tok::U32(tok::pal::c_B4E6FFB4));
 
          dl->AddRectFilled(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capCol, 2.5f);
          dl->AddRect(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), capBorder, 2.5f);
@@ -963,15 +985,14 @@ namespace app
                snprintf(valStr, sizeof(valStr), "%.1f", v);
 
             const float fontValSz = count <= 8 ? 9.5f : 8.5f;
-            const ImU32 txtCol = isCurrent ? IM_COL32(20, 15, 5, 255) : IM_COL32(10, 20, 35, 255);
+            const ImU32 txtCol = isCurrent ? tok::U32(tok::pal::c_140F05FF) : tok::U32(tok::pal::c_0A1423FF);
             DrawTextCentered(ImVec2(x0 + 1.0f, capY), ImVec2(x1 - 1.0f, capY + capH), txtCol, valStr, fontValSz);
          }
 
          // Playhead outline
          if (isCurrent)
          {
-            dl->AddRect(ImVec2(x0, origin.y), ImVec2(x1, br.y),
-                        isLight ? IM_COL32(225, 130, 20, 240) : IM_COL32(255, 210, 80, 230), 2.0f, 0, 1.5f);
+            StepCell::PlayheadOutline(dl, ImVec2(x0, origin.y), ImVec2(x1, br.y));
          }
 
          // Step number label below column
@@ -981,16 +1002,16 @@ namespace app
                                                  : std::clamp(cellW * 0.95f, 8.0f, ImGui::GetFontSize());
          const ImVec2 textSize = font->CalcTextSizeA(labelFontSize, FLT_MAX, 0.0f, label);
          const ImU32 stepNumCol = isCurrent
-            ? (isLight ? IM_COL32(225, 130, 20, 255) : IM_COL32(255, 200, 80, 255))
+            ? (isLight ? tok::U32(tok::pal::c_E18214FF) : tok::U32(tok::pal::c_FFC850FF))
             : (isLight
-                  ? (isGroupStart ? IM_COL32(40, 48, 65, 255) : IM_COL32(110, 116, 132, 255))
-                  : (isGroupStart ? IM_COL32(190, 194, 210, 255) : IM_COL32(110, 114, 130, 255)));
+                  ? (isGroupStart ? tok::U32(tok::pal::c_283041FF) : tok::U32(tok::pal::c_6E7484FF))
+                  : (isGroupStart ? tok::U32(tok::pal::c_BEC2D2FF) : tok::U32(tok::pal::c_6E7282FF)));
          dl->AddText(font, labelFontSize, ImVec2(x0 + (cellW - textSize.x) * 0.5f, br.y + 3.0f),
                      stepNumCol, label);
       }
 
       // Outer border
-      dl->AddRect(origin, br, isLight ? IM_COL32(185, 192, 208, 255) : IM_COL32(65, 70, 85, 255), 4.0f);
+      dl->AddRect(origin, br, isLight ? tok::U32(tok::pal::c_B9C0D0FF) : tok::U32(tok::pal::c_414655FF), 4.0f);
 
       const float labelRowH = ImGui::GetFontSize() + 5.0f;
       ImGui::SetCursorScreenPos(ImVec2(origin.x, br.y + labelRowH));
@@ -1110,7 +1131,7 @@ namespace app
       ModSlider("speed", &n->speed, -2.0f, 2.0f);
       ModSlider("contrast", &n->contrast, 0.1f, 4.0f);
       ModSlider("brightness", &n->brightness, -0.5f, 0.5f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
       ModCheckbox("rgb noise", &n->colorNoise);
       if (!n->colorNoise)
       {
@@ -1126,7 +1147,7 @@ namespace app
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModSlider("scale", &n->scale, 0.5f, 60.0f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
 
       if (n->textureType == 0) // Voronoi
       {
@@ -1249,7 +1270,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 br(origin.x + size, origin.y + size);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      AudioViz::Fill(dl, origin, br);
 
       for (int i = 1; i < 4; i++)
       {
@@ -1265,12 +1286,12 @@ namespace app
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, isLight ? IM_COL32(30, 120, 230, 220) : IM_COL32(120, 200, 255, 170), 1.6f);
+         dl->AddLine(a, b, isLight ? tok::U32(tok::pal::c_1E78E6DC) : tok::U32(tok::pal::c_78C8FFAA), 1.6f);
       }
 
       // Corner labels: the pad blends between these four named effects, so it is
       // obvious what is being swept rather than four anonymous weights.
-      const ImU32 labelCol = isLight ? IM_COL32(50, 58, 75, 255) : IM_COL32(150, 156, 180, 255);
+      const ImU32 labelCol = isLight ? tok::U32(tok::pal::c_323A4BFF) : tok::U32(tok::pal::c_969CB4FF);
       const char* bl = n->CornerLabel(0);
       const char* brName = n->CornerLabel(1);
       const char* tl = n->CornerLabel(2);
@@ -1284,12 +1305,12 @@ namespace app
       dl->AddText(ImVec2(br.x - brSize.x - 5, br.y - brSize.y - 4), labelCol, brName);
 
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
-      ImU32 orbColor = n->IsRecordingPath() ? IM_COL32(255, 90, 90, 255)
-                     : n->IsPlayingPath()   ? (isLight ? IM_COL32(30, 180, 80, 255) : IM_COL32(120, 235, 150, 255))
-                                            : (isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 190, 90, 255));
+      ImU32 orbColor = n->IsRecordingPath() ? tok::U32(tok::pal::c_FF5A5AFF)
+                     : n->IsPlayingPath()   ? (isLight ? tok::U32(tok::pal::c_1EB450FF) : tok::U32(tok::pal::c_78EB96FF))
+                                            : (isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFBE5AFF));
       dl->AddCircleFilled(orb, 9.0f, orbColor);
-      dl->AddCircle(orb, 9.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 2.0f);
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      dl->AddCircle(orb, 9.0f, isLight ? tok::U32(tok::pal::c_F0F0F0FF) : tok::U32(tok::pal::c_14141CFF), 0, 2.0f);
+      AudioViz::Border(dl, origin, br);
    }
 
 
@@ -1299,30 +1320,28 @@ namespace app
 
       if (n->IsRecordingPath())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-         if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.48f, 0), ActionButton::Kind::Record))
             n->StopRecording();
-         ImGui::PopStyleColor();
       }
       else
       {
-         if (ImGui::Button("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
             n->StartRecording();
       }
       ImGui::SameLine();
       if (n->IsPlayingPath())
       {
-         if (ImGui::Button("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
             n->StopPath();
       }
       else
       {
-         if (ImGui::Button("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
             n->PlayPath();
       }
       ModCheckbox("loop path", &n->loopPath);
       ImGui::SameLine();
-      if (ImGui::SmallButton("clear"))
+      if (ActionButton::Draw("clear"))
          n->ClearPath();
 
       NodeSeparator();
@@ -1334,12 +1353,12 @@ namespace app
 
       NodeSeparator();
       ImGui::TextDisabled("generation %d", n->Generation());
-      if (ImGui::Button("Iterate", ImVec2(kPreviewSize * 0.48f, 0)))
+      if (ActionButton::Draw("Iterate", ImVec2(kPreviewSize * 0.48f, 0)))
          n->StepOnce();
       ImGui::SameLine();
-      if (ImGui::Button("Reset", ImVec2(kPreviewSize * 0.48f, 0)))
+      if (ActionButton::Draw("Reset", ImVec2(kPreviewSize * 0.48f, 0)))
          n->Reset();
-      if (ImGui::Button("Randomise FX", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw("Randomise FX", ImVec2(kPreviewSize, 0)))
          n->Randomise();
 
       if (ImGui::TreeNode("pad corners"))
@@ -1360,7 +1379,7 @@ namespace app
       ModCheckbox("auto iterate", &n->autoIterate);
       if (n->autoIterate)
          ModSlider("steps / beat", &n->stepsPerBeat, 0.05f, 16.0f);
-      ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
    }
 
 
@@ -1371,14 +1390,46 @@ namespace app
    // to a 190px image preview that isn't there. MacroBodyEnd is the second
    // half of that contract for the hand-drawn controls; the knob and fader
    // widgets already do it themselves (see KnobFloat's tail).
-   void MacroBodyEnd(const ImVec2& origin, float cellW, float contentH, const std::string& caption)
+   void MacroBodyEnd(const ImVec2& origin, float cellW, float contentH, const std::string& caption,
+                     std::string* editLabel = nullptr)
    {
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const bool isLight = IsThemeLight();
-      const ImU32 capCol = isLight ? IM_COL32(50, 55, 70, 255) : IM_COL32(176, 182, 198, 255);
+      const ImU32 capCol = isLight ? tok::U32(tok::pal::c_323746FF) : tok::U32(tok::pal::c_B0B6C6FF);
       const float textH = ImGui::GetTextLineHeight();
       const float capY = origin.y + contentH + 4.0f;
-      if (!caption.empty())
+      bool renaming = false;
+      if (editLabel != nullptr)
+      {
+         // Double-click the caption to rename in place; Enter / click away commits.
+         static ImGuiID sRenaming = 0;
+         const ImGuiID rid = ImGui::GetID("##macrorename");
+         ImGui::SetCursorScreenPos(ImVec2(origin.x, capY));
+         ImGui::InvisibleButton("##macrocaptionhit", ImVec2(cellW, textH));
+         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            sRenaming = rid;
+         if (sRenaming == rid)
+         {
+            renaming = true;
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%s", editLabel->c_str());
+            ImGui::SetCursorScreenPos(ImVec2(origin.x, capY - 2.0f));
+            ImGui::SetNextItemWidth(cellW);
+            if (ImGui::IsWindowAppearing() || ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+               ImGui::SetKeyboardFocusHere();
+            if (FieldWell::InputTextWithHint("##macrorenamefield", "name", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+               *editLabel = buf;
+               sRenaming = 0;
+            }
+            else if (!ImGui::IsItemActive() && !ImGui::IsItemActivated() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            {
+               *editLabel = buf;
+               sRenaming = 0;
+            }
+         }
+      }
+      if (!caption.empty() && !renaming)
       {
          const ImVec2 ts = ImGui::CalcTextSize(caption.c_str());
          if (ts.x <= cellW)
@@ -1422,7 +1473,7 @@ namespace app
       char buf[64];
       snprintf(buf, sizeof(buf), "%s", label.c_str());
       ImGui::SetNextItemWidth(cellW);
-      if (ImGui::InputTextWithHint("##macroname", "name", buf, sizeof(buf)))
+      if (FieldWell::InputTextWithHint("##macroname", "name", buf, sizeof(buf)))
          label = buf;
    }
 
@@ -1435,11 +1486,11 @@ namespace app
 
    void DrawMacroSliderBody(MacroSliderNode* n)
    {
-      // kMacroFaderH, not kPreviewSize - 12: a 178px fader beside a 56px knob
-      // was the single worst size mismatch in the family, and nothing about a
-      // 0..1 macro needs that much travel.
+      // kFaderH (the Mixer / Gain fader), not kPreviewSize - 12 and not a private
+      // height: one fader size app-wide. No level meter: a macro value is a
+      // control, not a signal, and the accent fill already shows it.
       const std::string caption = n->label.empty() ? std::string("slider") : n->label;
-      ModKnob(caption.c_str(), &n->value, 0.0f, 1.0f, "%.2f", kMacroFaderH, kMacroCell, AudioWidgetStyle::VFader);
+      ModKnob(caption.c_str(), &n->value, 0.0f, 1.0f, "%.2f", kFaderH, kMacroCell, AudioWidgetStyle::VFader);
    }
 
 
@@ -1464,51 +1515,21 @@ namespace app
 
    void DrawMacroToggleBody(MacroToggleNode* n)
    {
-      const float btnH = kMacroRowH + 4.0f;   // a switch reads as a switch only if it has some body
-      const float btnW = 72.0f;
+      // The shared Switch, enlarged to read as a front-panel control.
+      constexpr float kScale = 1.7f;
+      const float btnW = Switch::kW * kScale, btnH = Switch::kH * kScale;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const ImVec2 bTL(origin.x + (kMacroCell - btnW) * 0.5f, origin.y);
-      const ImVec2 bBR(bTL.x + btnW, bTL.y + btnH);
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const bool isLight = IsThemeLight();
-
-      ImGui::SetCursorScreenPos(bTL);
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + (kMacroCell - btnW) * 0.5f, origin.y + 2.0f));
       ImGui::PushID(901);
-      if (ImGui::InvisibleButton("##macrotogglebtn", ImVec2(btnW, btnH)))
+      bool v = n->state;
+      if (Switch::Box("##macrotogglebtn", &v, kScale))
       {
-         PushUndoCheckpoint();
-         n->state = !n->state;
+         PushUndoCheckpoint();   // snapshot before the flip lands
+         n->state = v;
       }
-      const bool hovered = ImGui::IsItemHovered();
       ImGui::PopID();
-
-      const float rad = btnH * 0.5f;
-      const ImU32 bgCol = n->state
-         ? (isLight ? IM_COL32(34, 197, 94, 255) : IM_COL32(22, 163, 74, 255))
-         : (isLight ? IM_COL32(215, 222, 235, 255) : IM_COL32(36, 40, 52, 255));
-      dl->AddRectFilled(bTL, bBR, bgCol, rad);
-      dl->AddRect(bTL, bBR, hovered ? IM_COL32(255, 255, 255, 120)
-                                    : (isLight ? IM_COL32(180, 190, 205, 255) : IM_COL32(55, 62, 78, 255)),
-                  rad, 0, 1.2f);
-
-      const float thumbR = rad - 4.0f;
-      const float thumbX = n->state ? (bBR.x - rad) : (bTL.x + rad);
-      const float thumbY = bTL.y + rad;
-      dl->AddCircleFilled(ImVec2(thumbX, thumbY), thumbR, IM_COL32(255, 255, 255, 255));
-      dl->AddCircle(ImVec2(thumbX, thumbY), thumbR,
-                    isLight ? IM_COL32(180, 180, 180, 255) : IM_COL32(40, 40, 50, 255), 0, 1.0f);
-
-      const char* text = n->state ? "ON" : "OFF";
-      const ImVec2 tSize = ImGui::CalcTextSize(text);
-      const float textX = n->state ? (bTL.x + (rad * 2.0f - tSize.x) * 0.5f)
-                                   : (bBR.x - rad * 2.0f + (rad * 2.0f - tSize.x) * 0.5f);
-      dl->AddText(ImVec2(textX, bTL.y + (btnH - tSize.y) * 0.5f),
-                  n->state ? IM_COL32(255, 255, 255, 255)
-                           : (isLight ? IM_COL32(90, 100, 120, 255) : IM_COL32(160, 170, 190, 255)),
-                  text);
-
-      MacroBodyEnd(origin, kMacroCell, btnH, n->label.empty() ? std::string("toggle") : n->label);
+      ImGui::SetCursorScreenPos(origin);
+      MacroBodyEnd(origin, kMacroCell, btnH + 4.0f, n->label.empty() ? std::string("toggle") : n->label, &n->label);
    }
 
 
@@ -1521,25 +1542,20 @@ namespace app
 
    void DrawMacroTriggerBody(MacroTriggerNode* n)
    {
-      // Sized so the pad's overall footprint (2 * (r + bezel)) matches
-      // kKnobStd - a bang and a knob are peers on a front panel and must not
-      // differ in size for no reason.
-      const float r = 22.0f;
-      const float bezel = 3.0f;
-      const float contentH = (r + bezel) * 2.0f;
+      // The shared ActionButton; held or just fired it takes the Primary (accent) look.
+      constexpr float kBtnH = 30.0f;
+      const float btnW = 72.0f;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      const ImVec2 center(origin.x + kMacroCell * 0.5f, origin.y + contentH * 0.5f);
-
-      ImGui::SetCursorScreenPos(ImVec2(center.x - r - bezel, origin.y));
+      ImGui::SetCursorScreenPos(ImVec2(origin.x + (kMacroCell - btnW) * 0.5f, origin.y + 2.0f));
       ImGui::PushID(902);
-      ImGui::InvisibleButton("##macrotriggerbtn", ImVec2(contentH, contentH));
+      ActionButton::Draw("bang##macrotriggerbtn", ImVec2(btnW, kBtnH),
+                         n->flash > 0.0f ? ActionButton::Kind::Primary : ActionButton::Kind::Plain);
       n->pressed = ImGui::IsItemActive();
       if (ImGui::IsItemActivated())
       {
          n->justTriggered = true;
          n->flash = 1.0f;
       }
-      const bool hovered = ImGui::IsItemHovered();
       ImGui::PopID();
 
       if (n->pressed)
@@ -1549,36 +1565,8 @@ namespace app
          n->flash -= ImGui::GetIO().DeltaTime * 4.0f;
          if (n->flash < 0.0f) n->flash = 0.0f;
       }
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const bool isLight = IsThemeLight();
-
-      // Outer bezel ring
-      dl->AddCircleFilled(center, r + bezel, isLight ? IM_COL32(210, 218, 230, 255) : IM_COL32(30, 34, 44, 255), 32);
-      dl->AddCircle(center, r + bezel, isLight ? IM_COL32(175, 185, 200, 255) : IM_COL32(50, 56, 70, 255), 32, 1.2f);
-
-      // Inner pad
-      if (n->flash > 0.0f)
-      {
-         ImU32 flashCol = IM_COL32(245, 158, 11, (int)(n->flash * 255.0f));
-         dl->AddCircleFilled(center, r, flashCol, 32);
-         dl->AddCircle(center, r, IM_COL32(255, 230, 100, 255), 32, 2.0f);
-      }
-      else
-      {
-         ImU32 padCol = isLight ? IM_COL32(235, 240, 250, 255) : IM_COL32(42, 48, 62, 255);
-         dl->AddCircleFilled(center, r, padCol, 32);
-         dl->AddCircle(center, r, isLight ? IM_COL32(190, 200, 215, 255) : IM_COL32(60, 68, 85, 255), 32, 1.0f);
-      }
-      if (hovered)
-         dl->AddCircle(center, r + 2.0f, IM_COL32(255, 255, 255, 80), 32, 1.0f);
-
-      // Centred dot
-      dl->AddCircleFilled(center, 4.5f,
-                          n->flash > 0.0f ? IM_COL32(255, 255, 255, 255)
-                                          : (isLight ? IM_COL32(140, 150, 170, 255) : IM_COL32(80, 90, 110, 255)), 16);
-
-      MacroBodyEnd(origin, kMacroCell, contentH, n->label.empty() ? std::string("bang") : n->label);
+      ImGui::SetCursorScreenPos(origin);
+      MacroBodyEnd(origin, kMacroCell, kBtnH + 4.0f, n->label.empty() ? std::string("bang") : n->label, &n->label);
    }
 
 
@@ -1596,24 +1584,17 @@ namespace app
       const ImVec2 bTL(origin.x + 4.0f, origin.y);
       const ImVec2 bBR(bTL.x + boxW, bTL.y + boxH);
 
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const bool isLight = IsThemeLight();
-      dl->AddRectFilled(bTL, bBR, isLight ? IM_COL32(228, 233, 243, 255) : IM_COL32(16, 18, 26, 255), 4.0f);
-      dl->AddRect(bTL, bBR, isLight ? IM_COL32(175, 185, 200, 255) : IM_COL32(48, 54, 70, 255), 4.0f);
-
-      // The DragFloat's own frame is invisible so the hand-drawn box above is
-      // the only border - two nested frames read as a mistake.
+      (void)bBR;
+      // The shared field well (DragFloat frame in the FieldWell style), same as every numeric field.
       ImGui::SetCursorScreenPos(ImVec2(bTL.x, bTL.y + (boxH - ImGui::GetFrameHeight()) * 0.5f));
       // Unbounded: no min/max params, so drag speed scales with the value's
       // own magnitude and the DragFloat gets no clamp (v_min >= v_max).
       float speed = std::max(0.01f, std::abs(n->value) * 0.01f);
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0, 0, 0, 0));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0, 0, 0, 0));
+      FieldWell::PushStyle(ImGui::GetID("##macronumboxdrag"));
       ImGui::SetNextItemWidth(boxW);
       ImGui::DragFloat("##macronumboxdrag", &n->value, speed, 0.0f, 0.0f,
                        (std::abs(n->value) >= 10.0f) ? "%.1f" : "%.3f");
-      ImGui::PopStyleColor(3);
+      FieldWell::PopStyle();
 
       MacroBodyEnd(origin, kMacroCell, boxH, n->label.empty() ? std::string("value") : n->label);
    }
@@ -1642,25 +1623,13 @@ namespace app
          ImGui::SetCursorScreenPos(ImVec2(origin.x + b * (btnW + gap), origin.y));
          ImGui::PushID(b + 700);
 
-         const bool isSelected = (b == n->selected);
-         if (isSelected)
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-         }
-         else
-         {
-            ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.88f, 0.90f, 0.94f, 1.0f) : ImVec4(0.18f, 0.20f, 0.26f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.3f, 0.35f, 0.45f, 1.0f) : ImVec4(0.7f, 0.75f, 0.85f, 1.0f));
-         }
-
          const std::string btnText = std::to_string(b + 1);
-         if (ImGui::Button(btnText.c_str(), ImVec2(btnW, btnH)))
+         if (ActionButton::Draw(btnText.c_str(), ImVec2(btnW, btnH),
+                                b == n->selected ? ActionButton::Kind::Selected : ActionButton::Kind::Plain))
          {
             PushUndoCheckpoint();
             n->selected = b;
          }
-         ImGui::PopStyleColor(2);
          ImGui::PopID();
       }
 
@@ -1697,6 +1666,7 @@ namespace app
          ImGui::SetCursorScreenPos(sTL);
          ImGui::PushID(s + 800);
          ImGui::InvisibleButton("##stepgatebtn", ImVec2(stepW, stepH));
+         const bool hovered = ImGui::IsItemHovered();
          if (ImGui::IsItemClicked())
          {
             PushUndoCheckpoint();
@@ -1705,23 +1675,7 @@ namespace app
          ImGui::PopID();
 
          const bool isOn = (n->pattern & (1 << s)) != 0;
-         const bool isCurrent = (s == playStep);
-
-         const ImU32 stepBg = isOn
-            ? (isLight ? IM_COL32(34, 197, 94, 255) : IM_COL32(74, 222, 128, 255))
-            : (isLight ? IM_COL32(210, 216, 228, 255) : IM_COL32(28, 31, 40, 255));
-
-         dl->AddRectFilled(sTL, sBR, stepBg, 2.5f);
-
-         if (isCurrent && Transport::Instance().IsPlaying())
-         {
-            dl->AddRect(sTL, sBR, IM_COL32(255, 230, 80, 255), 2.5f, 0, 2.0f);
-            dl->AddCircleFilled(ImVec2(sx + stepW * 0.5f, origin.y + 3.5f), 2.0f, IM_COL32(255, 240, 100, 255));
-         }
-         else
-         {
-            dl->AddRect(sTL, sBR, isLight ? IM_COL32(180, 190, 205, 200) : IM_COL32(48, 52, 65, 200), 2.5f);
-         }
+         StepCell::Draw(dl, sTL, sBR, isOn, s == playStep && Transport::Instance().IsPlaying(), hovered);
       }
 
       MacroBodyEnd(origin, kMacroWideCell, stepH, n->label.empty() ? std::string("step gate") : n->label);
@@ -1731,7 +1685,7 @@ namespace app
    void DrawMacroStepGateParams(MacroStepGateNode* n)
    {
       MacroNameField(n->label, kMacroWideCell);
-      ModSlider("rate (beats)", &n->rateBeats, 0.05f, 4.0f);
+      ModSlider("rate", &n->rateBeats, 0.05f, 4.0f, "%.2f beats");
    }
 
 
@@ -1739,12 +1693,10 @@ namespace app
    {
       if (n->IsLearning())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.1f, 1.0f));
-         if (ImGui::Button("Listening... move a control", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Listening... move a control", ImVec2(kPreviewSize, 0), ActionButton::Kind::Learn))
             n->CancelLearn();
-         ImGui::PopStyleColor();
       }
-      else if (ImGui::Button(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
+      else if (ActionButton::Draw(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
       {
          MidiLearnCancelAll();
          n->StartLearn();
@@ -1753,8 +1705,9 @@ namespace app
       ImGui::TextDisabled("%s", n->Status().c_str());
       ImGui::PopTextWrapPos();
 
-      ImGui::Text("bound: %s", n->BindingLabel().c_str());
-      ImGui::ProgressBar(n->Value01(), ImVec2(kPreviewSize * 0.6f, 0), "");
+      if (n->IsBound())
+         ImGui::Text("bound: %s", n->BindingLabel().c_str());
+      ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
 
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
@@ -1768,30 +1721,25 @@ namespace app
 
       if (n->IsLearning())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.1f, 1.0f));
-         if (ImGui::Button("Listening... hit a pad", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Listening... hit a pad", ImVec2(kPreviewSize, 0), ActionButton::Kind::Learn))
             n->CancelLearn();
-         ImGui::PopStyleColor();
       }
       else
       {
          const bool lit = n->Value01() > 0.01f;
-         if (lit)
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.85f, 0.35f, 1.0f));
-         if (ImGui::Button(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0), (lit) ? ActionButton::Kind::Go : ActionButton::Kind::Plain))
          {
             MidiLearnCancelAll();
             n->StartLearn();
          }
-         if (lit)
-            ImGui::PopStyleColor();
       }
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       ImGui::TextDisabled("%s", n->Status().c_str());
       ImGui::PopTextWrapPos();
 
-      ImGui::Text("bound: %s", n->BindingLabel().c_str());
-      ImGui::ProgressBar(n->Value01(), ImVec2(kPreviewSize * 0.6f, 0), "");
+      if (n->IsBound())
+         ImGui::Text("bound: %s", n->BindingLabel().c_str());
+      ImGui::ProgressBar(n->Value01(), ImVec2(kParamWidth, 0), "");
 
       if (n->mode == MidiTriggerNode::kKeyboard)
       {
@@ -1807,7 +1755,7 @@ namespace app
 
    void DrawMacroXYBody(MacroXYNode* n)
    {
-      const float size = kPreviewSize;
+      const float size = kMacroWideCell;
       ImVec2 origin = ImGui::GetCursorScreenPos();
       ImGui::InvisibleButton("##macroxy", ImVec2(size, size));
       if (ImGui::IsItemActive())
@@ -1820,7 +1768,7 @@ namespace app
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 br(origin.x + size, origin.y + size);
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      AudioViz::Fill(dl, origin, br);
       for (int i = 1; i < 4; i++)
       {
          float f = (float)i / 4.0f;
@@ -1832,15 +1780,15 @@ namespace app
       {
          ImVec2 a(origin.x + path[i - 1].x * size, origin.y + (1.0f - path[i - 1].y) * size);
          ImVec2 b(origin.x + path[i].x * size, origin.y + (1.0f - path[i].y) * size);
-         dl->AddLine(a, b, isLight ? IM_COL32(30, 120, 230, 220) : IM_COL32(120, 200, 255, 170), 1.6f);
+         dl->AddLine(a, b, isLight ? tok::U32(tok::pal::c_1E78E6DC) : tok::U32(tok::pal::c_78C8FFAA), 1.6f);
       }
       ImVec2 orb(origin.x + n->padX * size, origin.y + (1.0f - n->padY) * size);
-      ImU32 orbColor = n->IsRecordingPath() ? IM_COL32(255, 90, 90, 255)
-                     : n->IsPlayingPath()   ? (isLight ? IM_COL32(30, 180, 80, 255) : IM_COL32(120, 235, 150, 255))
-                                            : (isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 190, 90, 255));
+      ImU32 orbColor = n->IsRecordingPath() ? tok::U32(tok::pal::c_FF5A5AFF)
+                     : n->IsPlayingPath()   ? (isLight ? tok::U32(tok::pal::c_1EB450FF) : tok::U32(tok::pal::c_78EB96FF))
+                                            : (isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFBE5AFF));
       dl->AddCircleFilled(orb, 9.0f, orbColor);
-      dl->AddCircle(orb, 9.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 2.0f);
-      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      dl->AddCircle(orb, 9.0f, isLight ? tok::U32(tok::pal::c_F0F0F0FF) : tok::U32(tok::pal::c_14141CFF), 0, 2.0f);
+      AudioViz::Border(dl, origin, br);
    }
 
 
@@ -1850,29 +1798,27 @@ namespace app
 
       if (n->IsRecordingPath())
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-         if (ImGui::Button("Stop rec", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop rec", ImVec2(kPreviewSize * 0.31f, 0), ActionButton::Kind::Record))
             n->StopRecording();
-         ImGui::PopStyleColor();
       }
-      else if (ImGui::Button("Rec path", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Rec path", ImVec2(kPreviewSize * 0.31f, 0)))
       {
          n->StartRecording();
       }
       ImGui::SameLine();
       if (n->IsPlayingPath())
       {
-         if (ImGui::Button("Stop", ImVec2(kPreviewSize * 0.48f, 0)))
+         if (ActionButton::Draw("Stop", ImVec2(kPreviewSize * 0.31f, 0)))
             n->StopPath();
       }
-      else if (ImGui::Button("Play path", ImVec2(kPreviewSize * 0.48f, 0)))
+      else if (ActionButton::Draw("Play path", ImVec2(kPreviewSize * 0.31f, 0)))
       {
          n->PlayPath();
       }
-      ModCheckbox("loop", &n->loopPath);
       ImGui::SameLine();
-      if (ImGui::SmallButton("clear"))
+      if (ActionButton::Draw("Clear", ImVec2(kPreviewSize * 0.31f, 0)))
          n->ClearPath();
+      ModCheckbox("loop", &n->loopPath);
       ModSlider("speed", &n->speed, 0.05f, 4.0f);
    }
 }

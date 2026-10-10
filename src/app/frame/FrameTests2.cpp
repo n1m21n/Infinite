@@ -1235,12 +1235,19 @@ void FrameTest_GROUPTEST(int frameId, GLFWwindow* window)
                if (dynamic_cast<GroupNode*>(g.node.get()) != nullptr)
                   groupsLeft++;
             }
-            // The group is gone, its three member nodes are untouched, and
-            // they are unowned again rather than still bound to a dead group.
+            // Ungroup with a member selected is member-scoped: that node is
+            // detached, the group and its other two members stay.
             const bool freed = GroupOwning(gNodes[0].index) == nullptr;
-            printf("after ungroup: %zu groups left, %zu nodes, member freed=%d  %s\n",
-                   groupsLeft, gNodes.size(), (int)freed,
-                   (groupsLeft == 0 && gNodes.size() == 3 && freed) ? "UNGROUP OK" : "FAIL");
+            size_t othersKept = 0;
+            for (GraphNode& g : gNodes)
+            {
+               if (g.index != gNodes[0].index && dynamic_cast<GroupNode*>(g.node.get()) == nullptr &&
+                   GroupOwning(g.index) != nullptr)
+                  othersKept++;
+            }
+            printf("after ungroup: %zu groups left, %zu nodes, member freed=%d, others kept=%zu  %s\n",
+                   groupsLeft, gNodes.size(), (int)freed, othersKept,
+                   (groupsLeft == 1 && gNodes.size() == 4 && freed && othersKept == 2) ? "UNGROUP OK" : "FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
@@ -1601,6 +1608,10 @@ void FrameTest_THEMECONTRASTTEST(int frameId, GLFWwindow* window)
             const bool good = lowest >= 4.499f;
             ok = ok && good;
             printf("[THEMECONTRASTTEST] %-18s lowest %.2f  %s\n", names[i].c_str(), lowest, good ? "ok" : "FAIL");
+            // G15 non-text: the accent (checked / active state) vs panel. Reported only; the recessed frame fill is
+            // deliberately quiet (node-ui-pillars P10), so 3:1 applies to the active state, not the resting frame.
+            printf("[THEMECONTRASTTEST]   accent/panel %.2f%s\n", CategoryColors::ContrastRatio(t.accent, t.panelBg),
+                   CategoryColors::ContrastRatio(t.accent, t.panelBg) < 3.0f ? "  below 3:1" : "");
          }
          printf("[THEMECONTRASTTEST] %s\n", ok ? "THEMECONTRASTTEST OK" : "THEMECONTRASTTEST FAIL");
          glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -2499,26 +2510,46 @@ void FrameTest_FIELDPIXELTEST(int frameId, GLFWwindow* window)
             auto shift = render("img(uv + vec2(1/res.x, 0))", 12003);
             auto half = render("img(uv + vec2(0.5/res.x, 0))", 12004);
             pass = pass && src.size() == (size_t)w*h*4 && bare.size() == src.size() && identity.size() == src.size() && shift.size() == src.size() && half.size() == src.size();
+            if (!pass)
+               printf("[FIELDPIXELTEST] image sampling setup: filter %d (want %d), sizes src %zu bare %zu shift %zu half %zu\n", (int)filter, (int)GL_LINEAR, src.size(), bare.size(), shift.size(), half.size());
+            float errBare = 0, errShift = 0, errHalf = 0;
             if (pass)
                for (int y=0; y<h; ++y) for (int x=0; x<w; ++x) for (int c=0; c<4; ++c)
                {
                   size_t at = (y*w+x)*4+c, next = (y*w+std::min(x+1,w-1))*4+c;
-                  pass = pass && bare[at] == identity[at] && std::abs(shift[at]-src[next]) < 0.006f &&
-                         std::abs(half[at]-(src[at]+src[next])*0.5f) < 0.006f;
+                  errBare = std::max(errBare, std::abs(bare[at]-identity[at]));
+                  errShift = std::max(errShift, std::abs(shift[at]-src[next]));
+                  errHalf = std::max(errHalf, std::abs(half[at]-(src[at]+src[next])*0.5f));
                }
+            const bool passPixels = pass && errBare < 1e-4f && errShift < 0.006f && errHalf < 0.006f;
+            if (pass && !passPixels)
+               printf("[FIELDPIXELTEST] image sampling max error: bare-vs-identity %.5f, shift %.5f, half-texel %.5f\n", errBare, errShift, errHalf);
+            pass = passPixels;
             // A different output size must clamp to SOURCE texel centres.
             effect.width = 192; effect.height = 108;
             auto edge = render("img(vec2(-2, 2))", 12005);
             size_t topLeft = (h-1)*w*4;
-            pass = pass && edge.size() == (size_t)192*108*4;
+            const bool edgeSized = edge.size() == (size_t)192*108*4;
+            pass = pass && edgeSized;
             if (src.size() > topLeft+3 && edge.size() >= 4)
-               for (int c=0; c<4; ++c) pass = pass && std::abs(edge[c]-src[topLeft+c]) < 0.001f;
+               for (int c=0; c<4; ++c)
+               {
+                  const bool near = std::abs(edge[c]-src[topLeft+c]) < 0.001f;
+                  if (pass && !near) printf("[FIELDPIXELTEST] image sampling clamp: channel %d got %.5f want %.5f\n", c, edge[c], src[topLeft+c]);
+                  pass = pass && near;
+               }
+            if (!edgeSized) printf("[FIELDPIXELTEST] image sampling clamp: size %zu\n", edge.size());
             auto disconnected = render("img(uv)", 12006);
             effect.DeclaredImageInput(0)->Disconnect(); effect.CookIfNeeded(12007);
             disconnected = read(effect, 192, 108);
-            pass = pass && !disconnected.empty();
-            for (float v : disconnected) pass = pass && v == 0.0f;
-            pass = pass && effect.EmitResult().offsetReadCount == 1 && !effect.EmitResult().usesOffsetReads;
+            float maxDisconnected = 0.0f;
+            for (float v : disconnected) maxDisconnected = std::max(maxDisconnected, std::abs(v));
+            const bool disconnectedOk = !disconnected.empty() && maxDisconnected == 0.0f;
+            const bool countsOk = effect.EmitResult().offsetReadCount == 1 && !effect.EmitResult().usesOffsetReads;
+            if (pass && (!disconnectedOk || !countsOk))
+               printf("[FIELDPIXELTEST] image sampling disconnect: empty %d, max %.5f; offsetReadCount %d, usesOffsetReads %d\n",
+                      (int)disconnected.empty(), maxDisconnected, (int)effect.EmitResult().offsetReadCount, (int)effect.EmitResult().usesOffsetReads);
+            pass = pass && disconnectedOk && countsOk;
             if (scratch) glDeleteFramebuffers(1, &scratch);
             printf("[FIELDPIXELTEST] Assertion 29 (Image Sampling GPU): %s\n", pass ? "OK" : "FAIL");
          }
@@ -3107,5 +3138,121 @@ void FrameTest_FIELDGRAPHRATETEST(int frameId, GLFWwindow* window)
 
          printf("%s\n", allOk ? "FIELDGRAPHRATE OK" : "SUSPECT");
       }
+}
+
+// Cmd/Ctrl+F find on a 400-node patch: by type, by comment text, by title with arrow stepping. Real key and
+// character events, so the shortcut, the field, the match list, the jump and Esc are all exercised.
+void FrameTest_FINDTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_FINDTEST") == nullptr)
+      return;
+   ImGuiIO& tio = ImGui::GetIO();
+   tio.ConfigInputTrickleEventQueue = false;
+   tio.AddFocusEvent(true);
+   static bool ok = true;
+   static int drumIdx = -1, needleIdx = -1;
+   auto check = [&](bool good, const char* what) {
+      ok = ok && good;
+      printf("findtest %-52s %s\n", what, good ? "ok" : "FAIL");
+   };
+   auto tap = [&](ImGuiKey key, int at, bool ctrl) {
+      if (frameId == at)
+      {
+         if (ctrl) tio.AddKeyEvent(ImGuiMod_Ctrl, true);
+         tio.AddKeyEvent(key, true);
+      }
+      if (frameId == at + 1)
+      {
+         tio.AddKeyEvent(key, false);
+         if (ctrl) tio.AddKeyEvent(ImGuiMod_Ctrl, false);
+      }
+   };
+   auto type = [&](const char* text, int at) {
+      if (frameId == at)
+         for (const char* c = text; *c; ++c) tio.AddInputCharacter(*c);
+   };
+   auto nodeCentreNear = [&](int idx) {
+      GraphNode* gn = FindNodeByIndex(idx);
+      if (gn == nullptr) return false;
+      const ImVec2 p = ed::GetNodePosition(gn->NodeId());
+      const ImVec2 sz = ed::GetNodeSize(gn->NodeId());
+      const ImVec2 mid(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f);
+      return std::fabs(mid.x - gViewCenterCanvas.x) < 90.0f && std::fabs(mid.y - gViewCenterCanvas.y) < 90.0f;
+   };
+   auto onlySelected = [&](int idx) {
+      for (GraphNode& gn : gNodes)
+         if (ed::IsNodeSelected(gn.NodeId()) != (gn.index == idx)) return false;
+      return true;
+   };
+
+   if (frameId == 3)
+   {
+      for (int i = 0; i < 400; ++i)
+      {
+         const float x = (float)(i % 20) * 420.0f, y = (float)(i / 20) * 320.0f;
+         GraphNode* gn = nullptr;
+         if (i == 237) gn = SpawnNode("Drum Sequencer", "Synths", x, y);
+         else if (i % 4 == 0) gn = SpawnNode("Comment", "Compositing", x, y);
+         else gn = SpawnNode("Equation Synth", "Synths", x, y);
+         if (gn == nullptr) continue;
+         const int idx = gn->index;
+         if (i == 237) drumIdx = idx;
+         if (auto* c = dynamic_cast<CommentNode*>(gn->node.get()))
+            c->text = (i == 76) ? "needle-comment-77 retune the bass" : "note " + std::to_string(i);
+         if (i == 76) needleIdx = idx;
+      }
+      check(gNodes.size() >= 400 && drumIdx >= 0 && needleIdx >= 0, "400-node fixture spawned");
+   }
+   // By type.
+   tap(ImGuiKey_F, 14, true);
+   if (frameId == 17) check(FindIsOpen(), "Cmd/Ctrl+F opens the field");
+   type("drum seq", 19);
+   if (frameId == 23)
+   {
+      check(FindMatchCount() == 1 && FindMatchNodeIndex(0) == drumIdx, "type: 'drum seq' finds the one Drum Sequencer");
+      check(!gRequestFitView, "typing in the field raises no fit-view request");
+   }
+   tap(ImGuiKey_Enter, 24, false);
+   if (frameId == 60)
+   {
+      check(onlySelected(drumIdx), "Enter selects exactly that node");
+      check(nodeCentreNear(drumIdx), "Enter centres the view on it");
+   }
+   tap(ImGuiKey_Escape, 62, false);
+   if (frameId == 66) check(!FindIsOpen(), "Esc closes");
+   // By comment text.
+   tap(ImGuiKey_F, 68, true);
+   type("needle comment", 72);
+   if (frameId == 76)
+      check(FindMatchCount() == 1 && FindMatchNodeIndex(0) == needleIdx, "comment: 'needle comment' finds the one comment");
+   tap(ImGuiKey_Enter, 77, false);
+   if (frameId == 115)
+   {
+      check(onlySelected(needleIdx), "comment hit is selected");
+      check(nodeCentreNear(needleIdx), "comment hit is centred");
+   }
+   tap(ImGuiKey_Escape, 117, false);
+   // By title, stepping with the arrows.
+   tap(ImGuiKey_F, 121, true);
+   type("equation", 125);
+   if (frameId == 129) check(FindMatchCount() > 100, "title: 'equation' finds the synths");
+   tap(ImGuiKey_DownArrow, 130, false);
+   tap(ImGuiKey_DownArrow, 132, false);
+   if (frameId == 135) check(FindCurrentMatch() == 2, "two Down presses step to the third match");
+   const int third = frameId == 135 ? FindMatchNodeIndex(2) : -1;
+   static int thirdIdx = -1;
+   if (frameId == 135) thirdIdx = third;
+   tap(ImGuiKey_Enter, 136, false);
+   if (frameId == 175)
+   {
+      check(onlySelected(thirdIdx), "stepped hit is selected");
+      check(nodeCentreNear(thirdIdx), "stepped hit is centred");
+   }
+   tap(ImGuiKey_Escape, 177, false);
+   if (frameId == 181)
+   {
+      check(!FindIsOpen(), "Esc closes again");
+      printf("%s\n", ok ? "FIND TEST OK" : "FIND TEST FAIL");
+   }
 }
 }

@@ -184,3 +184,11 @@ gh release edit <tag> --notes-file /tmp/<tag>-corrected.md
   status, version-string consistency, download-link health) — that's a
   separate concern from whether the prose is true. If asked to "vet the
   release" broadly, do both, but treat them as independent passes.
+
+## Shipped templates
+
+The starter templates are a user-visible claim, so check them like any feature. The list for a tag is
+`git show <tag>:assets/templates/index.txt` (one line each: slug, group, title, one line). A release note that
+names a template, or says "N templates", must match that list. Each one is also covered by `ROUNDTRIPTEST`
+(reads, node types exist, at least two Comment nodes, thumbnail present, write/read keeps the same counts), so a
+tag whose `driver.sh` run was green already shows `templates: N/N round trip  OK`.

@@ -741,7 +741,7 @@ namespace PatchSchema
                stack.push_back(it->second);
       }
       for (const Patch::NodeRecord& n : data.nodes)
-         if (!reaches.count(n.index) && env.schema(n.typeName) != nullptr)
+         if (!reaches.count(n.index) && n.typeName != "Comment" && env.schema(n.typeName) != nullptr)
             warnings.push_back(Make("W_UNUSED_NODE", n.typeName + " does not reach an Output or Audio Out", n.line, n.index));
 
       // Cables per destination, by slot, over every cable kind.

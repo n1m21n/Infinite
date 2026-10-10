@@ -40,6 +40,7 @@ namespace CategoryColors
    const std::vector<std::string>& PresetNames();
    int CurrentPreset();
    void SetPreset(int index); // clamps out-of-range, persists immediately
+   void SetPresetTransient(int index); // same, but never written to the user's theme file (tests, gallery)
 
    // All 10 node module categories
    const std::vector<std::string>& CategoryNames();
@@ -96,6 +97,10 @@ namespace CategoryColors
    // messages and rejection reasons always show.
    bool GetTooltips();
    void SetTooltips(bool on, bool saveToFile = true);
+   bool GetCookTimes();
+   void SetCookTimes(bool on, bool saveToFile = true);
+   bool GetReduceMotion();
+   void SetReduceMotion(bool on, bool saveToFile = true);
 
    // Interface font id: "" is the bundled default (Inter); anything else names an entry in
    // main.cpp's interface font table. Unknown ids fall back to the default there.

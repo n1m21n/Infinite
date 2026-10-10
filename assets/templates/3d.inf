@@ -1,0 +1,57 @@
+infinite-patch 1
+# 3D: a shape seen from any side
+node 1 3D Torus Knot
+  id knot
+  pos 0 318
+end
+node 2 3D Camera
+  id cam
+  pos 0 910
+  f orbitPerBeat 0.2
+end
+node 3 3D Light
+  id sun
+  pos 0 1486
+end
+node 4 3D Render 3D
+  id view
+  pos 460 302
+end
+node 5 Utility Output
+  id out
+  pos 980 156
+end
+node 6 Compositing Comment
+  pos 0 0
+  s text 3D patches have four parts: a shape, a camera, a light and Render 3D to draw them.
+  f width 340
+  f height 120
+end
+node 7 Compositing Comment
+  pos 0 156
+  s text A 3D shape. Try Knot P and Knot Q for different twists, or swap it for a Sphere or Cube.
+  f width 300
+  f height 126
+end
+node 8 Compositing Comment
+  pos 0 748
+  s text The Camera decides the view. Orbit Per Beat makes it circle the shape.
+  f width 300
+  f height 126
+end
+node 9 Compositing Comment
+  pos 0 1340
+  s text The Light shades the shape. Try moving its Azimuth.
+  f width 300
+  f height 110
+end
+node 10 Compositing Comment
+  pos 460 156
+  s text Render 3D turns shapes, camera and light into a picture.
+  f width 300
+  f height 110
+end
+geo view 0 knot
+geo view camera cam
+geo view light_1 sun
+cable out 0 view

@@ -1,5 +1,7 @@
 # R571 - Keyboard-only use
 
+> **Overall: done (2026-10-09, owner).** Keyboard navigation is complete; the notes below are the history.
+
 > **Status (2026-10-06): the owner's revised model replaced the Tab-cursor design below. Slices 1-3 of the old
 > design are superseded; the old text is kept underneath as history only. Slice 4 (popup/panel nav) is still open.**
 

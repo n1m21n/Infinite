@@ -1677,8 +1677,9 @@ void FrameTest_MODDROPDOWNUNDOTEST(int frameId, GLFWwindow* window)
             // (and so only registers its discrete slot) while expanded.
             if (gn != nullptr)
                gn->showParams = true;
-            gn = SpawnNode("Audio Filter", "AudioEffects", 1500.0f, 0.0f);
+            gn = SpawnNode("Audio Filter", "AudioEffects", 0.0f, 840.0f);
             sPickFilterIdx = gn != nullptr ? gn->index : -1;
+            gRequestFitView = true; // every fixture node on screen, so each body draws and registers
          }
          if (frameId == kBindFrame)
          {

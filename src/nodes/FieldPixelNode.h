@@ -162,6 +162,7 @@ public:
    // Compilation & UI
    bool Apply();
    const std::string& LastError() const { return mLastError; }
+   NodeIssue Issue() const override { return NodeIssues::FieldCompile(mLastError); }
    const std::string& Notice() const { return mNotice; }
    unsigned int Program() const { return mProgram; }
    const Field::GlslEmitResult& EmitResult() const { return mEmitResult; }

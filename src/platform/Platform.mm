@@ -2,6 +2,9 @@
 #include "BenchMediaIo.h"
 #include "PluginVST3.h"
 #include "common/MidiCC14.h"
+#include "AppPaths.h"
+#include <sys/stat.h>
+#include <ctime>
 #include <algorithm>
 #include <atomic>
 #include <memory>
@@ -260,12 +263,38 @@ namespace Platform
    {
    }
 
-   // No-op on macOS: stderr from an app launched from a terminal reaches that
-   // terminal, and Console.app captures the rest - there is no GUI-subsystem
-   // gap to work around here the way there is on Windows.
+   // stderr still reaches a terminal or Console.app; the same line also goes to the app-support log so
+   // "Reveal logs" and "Copy system info" have the same file to show on every platform. Rolls at 4 MB.
    void AppendLogLine(const std::string& line)
    {
-      (void)line;
+      fprintf(stderr, "%s\n", line.c_str());
+      const std::string dir = AppPaths::AppSupportDir();
+      if (dir.empty())
+         return;
+      const std::string file = dir + "/log.txt";
+      struct stat st;
+      const char* mode = (stat(file.c_str(), &st) == 0 && st.st_size > 4 * 1024 * 1024) ? "w" : "a";
+      FILE* f = fopen(file.c_str(), mode);
+      if (f == nullptr)
+         return;
+      char stamp[32] = "";
+      const time_t now = time(nullptr);
+      struct tm tmv;
+      localtime_r(&now, &tmv);
+      strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", &tmv);
+      fprintf(f, "[%s] %s\n", stamp, line.c_str());
+      fclose(f);
+   }
+
+   void RevealLogs()
+   {
+      const std::string dir = AppPaths::AppSupportDir();
+      if (dir.empty())
+         return;
+      const std::string file = dir + "/log.txt";
+      if (FILE* f = fopen(file.c_str(), "a"))
+         fclose(f);
+      RevealInFileManager(file);
    }
 
    void ShowFatalError(const std::string& title, const std::string& message)
