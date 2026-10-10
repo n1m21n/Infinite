@@ -9,8 +9,7 @@
 
   function card(it, i) {
     var k = KIND[it.kind] || KIND.Generator;
-    var tags = it.tags.map(function (t) { return '<span class="lib-tag">' + esc(t) + '</span>'; }).join('');
-    var price = it.price > 0 ? '$' + it.price : 'Free for now';
+    var price = it.price > 0 ? '$' + it.price : 'Free';
     return '<article class="lib-card reveal in" style="--cat:' + k.c + '; --hand:' + k.hand + '; --i:' + i + '">' +
       '<p class="hand-cap">' + k.cap + '</p>' +
       '<div class="node">' +
@@ -18,24 +17,22 @@
       '<header class="node-head"><span class="cat-dot"></span><h2 class="node-name">' + esc(it.name) + '</h2><span class="node-cat">' + esc(it.kind) + '</span></header>' +
       '<div class="node-view"><img src="' + esc(it.preview) + '" alt="' + esc(it.name) + ' preview" loading="lazy" width="900" height="600"></div>' +
       '<p class="lib-desc">' + esc(it.description) + '</p>' +
-      '<div class="lib-tags">' + tags + '</div>' +
       '<footer class="lib-foot"><div class="lib-price"><b>' + price + '</b><span>' + it.params + ' params · ' + (it.bytes / 1024).toFixed(1) + ' KB</span></div>' +
-      '<a class="btn btn-sm lib-dl" href="' + esc(it.file) + '" download aria-label="Download ' + esc(it.name) + '">' + DL + 'Download</a></footer>' +
+      '<a class="btn btn-sm lib-dl" href="' + esc(it.file) + '" download aria-label="Download ' + esc(it.name) + '">' + DL + '<span class="lib-dl-text">Download</span></a></footer>' +
       '</div></article>';
   }
 
   function chips() {
-    var set = ['All', 'Filter', 'Generator'], seen = {};
-    items.forEach(function (i) { i.tags.forEach(function (t) { if (!seen[t]) { seen[t] = 1; set.push(t); } }); });
-    chipsEl.innerHTML = set.map(function (s, n) {
-      return '<button class="lib-chip' + (n === 3 ? ' sep' : '') + '" type="button" aria-pressed="' + (s === active) + '" data-f="' + esc(s) + '">' + esc(s) + '</button>';
+    var set = [['All', 'All'], ['Filter', 'Filters'], ['Generator', 'Generators']];
+    chipsEl.innerHTML = set.map(function (s) {
+      return '<button class="lib-chip" type="button" aria-pressed="' + (s[0] === active) + '" data-f="' + s[0] + '">' + s[1] + '</button>';
     }).join('');
   }
 
   function apply() {
     var n = 0;
     Array.prototype.forEach.call(grid.children, function (el, i) {
-      var it = items[i], show = active === 'All' || it.kind === active || it.tags.indexOf(active) >= 0;
+      var it = items[i], show = active === 'All' || it.kind === active;
       el.hidden = !show; if (show) n++;
     });
     countEl.textContent = n + ' of ' + items.length;
