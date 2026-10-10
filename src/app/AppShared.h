@@ -1428,6 +1428,8 @@ extern FieldSampleNode* gFieldSampleEditor;
 extern bool gFieldSampleEditorOpen;
 
 extern FieldSynthNode* gFieldSynthEditor;
+extern FieldNotesNode* gFieldNotesEditor;
+extern bool gFieldNotesEditorOpen;
 
 extern bool gFieldSynthEditorOpen;
 
@@ -3463,6 +3465,7 @@ void DrawFieldPrimitiveParams(FieldPrimitiveNode* n);
 void DrawFieldSampleParams(FieldSampleNode* n);
 
 void DrawFieldSynthParams(FieldSynthNode* n);
+void DrawFieldNotesParams(FieldNotesNode* n);
 
 void DrawFieldGraphParams(FieldGraphNode* n);
 
@@ -5882,6 +5885,8 @@ int RunFieldTransferTest();
 int RunFieldSampleTest();
 
 int RunFieldPinDeclTest();
+
+int RunFieldNotesTest();
 
 void RunRecSyncTest();
 

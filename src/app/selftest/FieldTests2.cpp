@@ -3417,4 +3417,135 @@ int RunFieldPinDeclTest()
    fflush(stdout);
    return allOk ? 0 : 1;
 }
+
+// ============================================================ INFINITE_FIELDNOTESTEST
+namespace
+{
+   struct NotesRig
+   {
+      FieldNotesNode node;
+      NoteEventQueue inbox;
+      int outCursor = -1;
+      int sample = 0;
+      struct Ev { bool on; int note; int voice; long long at; float vel; };
+      std::vector<Ev> out;
+
+      explicit NotesRig(const char* code)
+      {
+         node.code = code;
+         node.Apply();
+         node.GetAudioNode()->PrepareToPlay(48000.0, 128);
+         outCursor = node.GetAudioNode()->NoteOutbox()->RegisterConsumer();
+         node.GetAudioNode()->SetNoteInbox(&inbox, inbox.RegisterConsumer());
+      }
+      void Block(int frame)
+      {
+         Transport::Instance().AdvanceAudioClock(128);
+         node.CookIfNeeded(frame);
+         std::vector<float> l(128), r(128);
+         float* ch[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = ch;
+         buf.numChannels = 2;
+         buf.numFrames = 128;
+         node.GetAudioNode()->ProcessBlock(nullptr, 0, buf);
+         NoteEvent e[128];
+         int n;
+         while ((n = node.GetAudioNode()->NoteOutbox()->Pop(outCursor, e, 128)) > 0)
+            for (int i = 0; i < n; i++)
+               out.push_back({ e[i].isNoteOn, e[i].note, e[i].voiceId, (long long)sample + e[i].frameOffset, e[i].velocity });
+         sample += 128;
+      }
+      int Count(bool on) const { int c = 0; for (const auto& e : out) c += (e.on == on); return c; }
+   };
+
+   void NotesTransport(bool playing)
+   {
+      Transport& t = Transport::Instance();
+      t.SetPlaying(false);
+      t.SetTempo(120.0f);
+      t.NotifyAudioEngineStarted(48000.0);
+      t.SeekBeats(0.0);
+      t.SetPlaying(playing);
+   }
+}
+
+int RunFieldNotesTest()
+{
+   printf("[FIELDNOTESTEST] Running Field Notes harness...\n");
+   bool allOk = true;
+   auto check = [&](bool cond, const char* what) { if (!cond) { printf("FAIL: %s\n", what); allOk = false; } };
+
+   // 1. Every preset compiles.
+   for (const auto& p : FieldNotesNode::Presets())
+   {
+      FieldNotesNode n;
+      n.code = p.code;
+      if (!n.Apply())
+      {
+         printf("FAIL: preset '%s' did not compile: %s\n", p.name, n.LastError().c_str());
+         allOk = false;
+      }
+   }
+
+   // 2. Language refusals.
+   {
+      FieldNotesNode n;
+      n.code = "note(60, 1, 1)\n";
+      check(!n.Apply(), "note() outside an if must be refused");
+      FieldSynthNode synth;
+      synth.code = "if (gate > 0.5) { note(60, 1, 1) }\nout = 0\n";
+      check(!synth.Apply(), "Field Synth must refuse note()");
+   }
+
+   // 3. Euclidean 5/16: 20 hits in 4 beats, each on a 1/16-beat grid, every on has its off.
+   {
+      NotesTransport(true);
+      NotesRig rig(FieldNotesNode::Presets()[3].code);
+      for (int b = 0; b < 750; b++) rig.Block(b + 1);
+      Transport::Instance().SetPlaying(false);
+      rig.Block(1000); // stop releases pending notes
+      check(rig.Count(true) == 20, "euclid: 20 note-ons in 4 beats");
+      check(rig.Count(false) == rig.Count(true), "euclid: every note-on has a note-off");
+      bool onGrid = true;
+      for (const auto& e : rig.out)
+         if (e.on)
+         {
+            const double steps = (double)e.at / 1500.0;
+            if (std::fabs(steps - std::round(steps)) * 1500.0 > 1.01) onGrid = false;
+         }
+      check(onGrid, "euclid: note-ons land within 1 sample of the 1/16-beat grid");
+   }
+
+   // 4. Followers: len 0 notes live exactly as long as the input note.
+   {
+      NotesTransport(false);
+      NotesRig rig(FieldNotesNode::Presets()[1].code); // Harmoniser
+      NoteEvent on; on.isNoteOn = true; on.note = 60; on.velocity = 0.8f; on.voiceId = 7; on.frameOffset = 5;
+      rig.inbox.Push(on);
+      rig.Block(1);
+      check(rig.Count(true) == 3, "harmoniser: 3 note-ons for one chord");
+      check(rig.Count(false) == 0, "harmoniser: no offs while the input is held");
+      NoteEvent off; off.isNoteOn = false; off.note = 60; off.voiceId = 7; off.frameOffset = 0;
+      rig.inbox.Push(off);
+      rig.Block(2);
+      check(rig.Count(false) == 3, "harmoniser: 3 offs on input release");
+   }
+   // 5. Unplugging the input releases followers.
+   {
+      NotesTransport(false);
+      NotesRig rig(FieldNotesNode::Presets()[0].code); // Transpose +7
+      NoteEvent on; on.isNoteOn = true; on.note = 60; on.velocity = 0.8f; on.voiceId = 9; on.frameOffset = 0;
+      rig.inbox.Push(on);
+      rig.Block(1);
+      check(rig.Count(true) == 1 && rig.out[0].note == 67, "transpose: 60 -> 67");
+      rig.node.GetAudioNode()->SetNoteInbox(nullptr, -1);
+      rig.Block(2);
+      check(rig.Count(false) == 1, "unplug: follower released");
+   }
+
+   printf("INFINITE_FIELDNOTESTEST: %s\n", allOk ? "OK" : "FAIL");
+   fflush(stdout);
+   return allOk ? 0 : 1;
+}
 }

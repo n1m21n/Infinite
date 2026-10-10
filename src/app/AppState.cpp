@@ -922,6 +922,8 @@ bool gHeadlessNeedProbe = false;
    bool gFieldSampleEditorOpen = false;
 
    FieldSynthNode* gFieldSynthEditor = nullptr;
+   FieldNotesNode* gFieldNotesEditor = nullptr;
+   bool gFieldNotesEditorOpen = false;
 
    bool gFieldSynthEditorOpen = false;
 

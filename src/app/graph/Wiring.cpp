@@ -1524,6 +1524,8 @@ namespace app
          fs->Apply();
       if (auto* fsn = dynamic_cast<FieldSynthNode*>(node))
          fsn->Apply();
+      if (auto* fnn = dynamic_cast<FieldNotesNode*>(node))
+         fnn->Apply();
       // Re-instantiates the plugin from the identity VisitParams just restored
       // and queues its saved fullState; the actual load finishes
       // asynchronously, a frame or two later, in CookIfNeeded.
