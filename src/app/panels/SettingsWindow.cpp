@@ -1,7 +1,5 @@
 // Settings window (moved verbatim from main.cpp).
 #include "app/ui/design/components/MenuParts.h"
-#include "app/ui/design/components/BusyLine.h"
-#include "app/ui/design/components/StatusDot.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
@@ -1287,29 +1285,6 @@ namespace app
 
             ImGui::Spacing();
             FormParts::Section(T("Extensions"));
-            ImGui::TextDisabled("%s", T("Optional packs add heavy features without growing the app."));
-            ImGui::TextDisabled("%s", T("Nodes that use a pack are always available; they show an Install hint until the pack is here."));
-            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-            ImGui::BeginDisabled(busy);
-            if (FormParts::Button(L("Refresh##extRefresh")))
-               Extensions::RefreshCatalog();
-            ImGui::SameLine(0.0f, tok::space_1);
-            if (FormParts::Button(L("Install from file...##extFile")))
-            {
-               const std::string file = Platform::OpenExtensionPackDialog();
-               if (!file.empty())
-                  Extensions::InstallFileAsync(file);
-            }
-            ImGui::EndDisabled();
-            if (ex.catalogLoading)
-            {
-               ImGui::SameLine(0.0f, tok::space_2);
-               BusyLine::Spinner();
-               ImGui::SameLine(0.0f, tok::space_1);
-               ImGui::TextDisabled("%s", T("Checking for packs..."));
-            }
-
-            FormParts::Section(T("Packs"));
 
             auto installedVersion = [&](const std::string& id) -> const std::string*
             {
@@ -1319,14 +1294,12 @@ namespace app
                return nullptr;
             };
 
-            // One row per pack: name and a status line on the left, the one action on the right. Positions are
-            // pinned (like Expression Globals) so a status change never moves the button.
+            // One line per pack: [on] name - what it does, and one action on the right only when there is
+            // something to do (Install or Update). Turning a pack off keeps it on disk; its nodes just idle.
             bool anyRow = false;
             auto row = [&](const std::string& id, const std::string& name, const std::string& purpose,
-                           uint64_t size, const Extensions::Pack* offer)
+                           const Extensions::Pack* offer)
             {
-               if (anyRow)
-                  ImGui::Dummy(ImVec2(0.0f, tok::space_2));
                anyRow = true;
                ImGui::PushID(id.c_str());
                const std::string* have = installedVersion(id);
@@ -1336,56 +1309,24 @@ namespace app
                const float btnX = ImGui::GetWindowContentRegionMax().x - btnW;
                const float y0 = ImGui::GetCursorPosY();
 
+               if (have)
                {
-                  UiType::Scope t(UiType::Size::Body, UiType::Weight::Medium);
-                  ImGui::TextUnformatted(name.c_str());
-               }
-
-               // status line: a dot (never the only cue: the words are beside it) and what is true now
-               std::string status;
-               StatusDot::State dot = StatusDot::State::Ok;
-               bool showDot = true;
-               if (working)
-               {
-                  status = ex.progress >= 0.0f ? std::string(T(ex.busyLabel.c_str())) + " " + std::to_string((int)(ex.progress * 100.0f)) + "%"
-                                               : std::string(T(ex.busyLabel.c_str())) + "...";
-                  dot = StatusDot::State::Warn;
-               }
-               else if (!have)
-               {
-                  status = T("Not installed");
-                  showDot = false;
-               }
-               else if (update)
-               {
-                  status = std::string(T("Update available")) + "  v" + *have + " > v" + offer->version;
-                  dot = StatusDot::State::Warn;
+                  bool on = Extensions::IsEnabled(id);
+                  if (FormParts::Checkbox(name.c_str(), &on))
+                     Extensions::SetEnabled(id, on);
                }
                else
-                  status = std::string(T("Installed")) + "  v" + *have;
-               {
-                  const ImVec2 p = ImGui::GetCursorScreenPos();
-                  const float h = ImGui::GetTextLineHeight();
-                  float x = 0.0f;
-                  if (showDot)
-                  {
-                     const tok::Pair8& pair = dot == StatusDot::State::Ok ? tok::action_go : tok::action_learn;
-                     ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(p.x + 3.0f, p.y + h * 0.5f), 3.0f,
-                                                                 tok::U32(pair, CategoryColors::IsThemeLight()), 12);
-                     x = 12.0f;
-                  }
-                  ImGui::SetCursorScreenPos(ImVec2(p.x + x, p.y));
-                  ImGui::TextDisabled("%s", status.c_str());
-               }
+                  ImGui::TextUnformatted(name.c_str());
                if (!purpose.empty())
-                  ImGui::TextDisabled("%s%s", purpose.c_str(),
-                                      size ? (std::string("  (") + std::to_string((size + 524288) / 1048576) + " MB)").c_str() : "");
-               if (working && ex.progress >= 0.0f)
+                  ImGui::TextDisabled("%s", purpose.c_str());
+               if (working)
                {
                   ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-                  SectionCard::Progress(ex.progress, btnX - ImGui::GetCursorPosX() - tok::space_2);
+                  if (ex.progress >= 0.0f)
+                     SectionCard::Progress(ex.progress, btnX - ImGui::GetCursorPosX() - tok::space_2);
+                  else
+                     ImGui::TextDisabled("%s...", T(ex.busyLabel.c_str()));
                }
-
                const float y1 = ImGui::GetCursorPosY();
                ImGui::SetCursorPos(ImVec2(btnX, y0));
                if (working && ex.busyLabel == "Downloading")
@@ -1393,57 +1334,45 @@ namespace app
                   if (ActionButton::Draw(L("Cancel##extCancel"), ImVec2(btnW, 0)))
                      Extensions::CancelInstall();
                }
-               else
+               else if ((!have || update) && offer)
                {
                   ImGui::BeginDisabled(busy);
-                  if ((!have || update) && offer)
-                  {
-                     if (ActionButton::Draw(have ? L("Update##extAct") : L("Install##extAct"), ImVec2(btnW, 0), ActionButton::Kind::Primary))
-                        Extensions::InstallAsync(*offer);
-                  }
-                  else if (have)
-                  {
-                     if (ActionButton::Draw(L("Remove##extAct"), ImVec2(btnW, 0)))
-                        Extensions::RemoveAsync(id);
-                  }
+                  if (ActionButton::Draw(have ? L("Update##extAct") : L("Install##extAct"), ImVec2(btnW, 0), ActionButton::Kind::Primary))
+                     Extensions::InstallAsync(*offer);
                   ImGui::EndDisabled();
                }
                ImGui::SetCursorPosY(std::max(y1, ImGui::GetCursorPosY()));
+               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
                ImGui::PopID();
             };
 
+            auto fallbackPurpose = [](const std::string& id) -> std::string
+            {
+               return id == "tracking" ? T("Hand tracking: your hand becomes modulators") : std::string();
+            };
             for (const Extensions::Pack& pk : ex.catalog)
-               row(pk.id, pk.name, pk.purpose, pk.size, &pk);
+               row(pk.id, pk.name, pk.purpose.empty() ? fallbackPurpose(pk.id) : pk.purpose, &pk);
             for (const auto& kv : ex.installed) // installed from a file, not in the catalog
             {
                bool listed = false;
                for (const Extensions::Pack& pk : ex.catalog)
                   listed = listed || pk.id == kv.first;
                if (!listed)
-                  row(kv.first, kv.first, T("Installed from file"), 0, nullptr);
+                  row(kv.first, kv.first, fallbackPurpose(kv.first), nullptr);
             }
-            if (!anyRow)
-               ImGui::TextDisabled("%s", ex.catalogLoading ? T("Checking for packs...") : T("No packs yet."));
+            if (!anyRow && ex.catalogLoading)
+               ImGui::TextDisabled("%s", T("Checking for packs..."));
+            else if (!anyRow)
+               ImGui::TextDisabled("%s", T("No packs to download right now. You can install one from a file."));
 
-            // catalog trouble is a quiet note (offline is normal); a failed install is an error and says so
-            if (!ex.catalogLoaded && !ex.catalogLoading && !ex.catalogError.empty())
+            if (!ex.message.empty() && ex.messageIsError)
+               ImGui::TextColored(tok::V4(tok::palf::v_1000_550_500_1000), "%s", ex.message.c_str());
+            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+            if (FormParts::Button(L("Install from file...##extFile")))
             {
-               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-               ImGui::TextDisabled(T("Could not load the pack list (%s). Use Install from file... when offline."),
-                                   ex.catalogError.c_str());
-            }
-            else if (ex.catalogLoaded && ex.catalog.empty())
-            {
-               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-               ImGui::TextDisabled("%s", T("No packs are published for this version yet."));
-            }
-            if (!ex.message.empty())
-            {
-               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-               if (ex.messageIsError)
-                  ImGui::TextColored(tok::V4(tok::palf::v_1000_550_500_1000), "%s", ex.message.c_str());
-               else
-                  ImGui::TextDisabled("%s", ex.message.c_str());
+               const std::string file = Platform::OpenExtensionPackDialog();
+               if (!file.empty())
+                  Extensions::InstallFileAsync(file);
             }
             SectionCard::End();
 

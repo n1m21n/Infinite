@@ -47,6 +47,9 @@ namespace Extensions
    // The install folder of a pack, or "" when not installed (or `id` is invalid).
    std::string PackDir(const std::string& id);
    std::string InstalledVersion(const std::string& id); // "" when not installed
+   // A disabled pack stays on disk but PackDir() returns "" so its nodes act as if it were absent.
+   bool IsEnabled(const std::string& id);
+   void SetEnabled(const std::string& id, bool on);
    bool IsValidId(const std::string& id);
 
    // Synchronous install from a zip in memory. Verifies the SHA-256 when

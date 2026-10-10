@@ -295,7 +295,7 @@ std::string RootDir()
    return AppPaths::EnsureDir(dir) ? dir : std::string();
 }
 
-std::string PackDir(const std::string& id)
+static std::string PackDirAny(const std::string& id)
 {
    if (!IsValidId(id))
       return {};
@@ -307,9 +307,34 @@ std::string PackDir(const std::string& id)
    return ReadPackJson(dir, pid, ver) && pid == id ? dir : std::string();
 }
 
+std::string PackDir(const std::string& id)
+{
+   const std::string dir = PackDirAny(id);
+   return !dir.empty() && IsEnabled(id) ? dir : std::string();
+}
+
+bool IsEnabled(const std::string& id)
+{
+   const std::string dir = PackDirAny(id);
+   return !dir.empty() && !fs::exists(AppPaths::FsPath(dir + "/.disabled"));
+}
+
+void SetEnabled(const std::string& id, bool on)
+{
+   const std::string dir = PackDirAny(id);
+   if (dir.empty())
+      return;
+   const auto f = AppPaths::FsPath(dir + "/.disabled");
+   std::error_code ec;
+   if (on)
+      fs::remove(f, ec);
+   else
+      std::ofstream(f).put('x');
+}
+
 std::string InstalledVersion(const std::string& id)
 {
-   const std::string dir = PackDir(id);
+   const std::string dir = PackDirAny(id);
    std::string pid, ver;
    return !dir.empty() && ReadPackJson(dir, pid, ver) ? ver : std::string();
 }
