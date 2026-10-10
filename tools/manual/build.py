@@ -25,9 +25,9 @@ BASE_PAGES = os.path.join(HERE, "base", "chapters_1_20.pdf")  # old pages 4..50,
 OUT = os.path.join(ROOT, "Infinite_Node_Reference_Manual.pdf")
 OUT_WEB = os.path.join(ROOT, "website", "assets", "Infinite_Node_Reference_Manual.pdf")
 
-# Counts come from `Infinite --describe` (299 registered) minus the five types the spawn menu hides
+# Counts come from `Infinite --describe` (308 registered) minus the five types the spawn menu hides
 # (Delete Selected, Transform Selected, Extrude Selected, Group, Field Graph).
-SPAWNABLE = 294
+SPAWNABLE = 303
 NEW_NODES = sum(len(c["cards"]) for c in CHAPTERS)
 
 OLD_CHAPTERS = [
@@ -57,9 +57,11 @@ NEW_BLURBS = {
     22: "keys, mattes, edges, seamless tiles",
     23: "platonic solids, mesh to points, wireframe, explode",
     24: "looper, resonators, meters, prediction",
+    25: "Sketch, Field Notes, MIDI file and out, spatial mixing, hand, face and pose tracking",
+    26: "Delaunay, Voronoi, decimate, curve ops, dither, NDI",
 }
 CHAPTER_COUNT = 20 + len(CHAPTERS)
-WORDS = {24: "Twenty-Four"}
+WORDS = {26: "Twenty-Six"}
 
 CSS = """
 @page { size: 8.5in 11in; margin: 0; }
@@ -174,7 +176,7 @@ def front_html():
   <div class="panel">
     <p>Infinite is a node-based studio for making sound and image at the same time. Instead of separate apps for music, visuals, and 3D, you drop blocks called <b>nodes</b> onto one canvas and connect them with cables — a synth feeding a filter, a shape feeding a kaleidoscope, a drumbeat feeding a bouncing particle field.</p>
     <p>Because everything lives on the same clock, sound and image can react to each other in real time: a kick drum can punch a shape, a camera's motion can bend a synth's pitch, a color can become a chord. There is no "render and wait" — you hear and see the result the instant you plug a cable in.</p>
-    <p>This guide skips the engineering manual entirely and walks through every node in Infinite's palette — {SPAWNABLE} spawnable node types, including the 34-filter image effects shelf and the 20-effect audio shelf. For every one you'll find what it does in plain English, why you'd actually use it, and (where it helps) a short recipe showing it wired up with a couple of friends. Two big shared-table shelves — image filters and audio effects — get a compact one-line-per-entry reference instead of a full card each, since dozens of them are close cousins of each other. Chapter Twenty covers the Field language — five nodes where you write the behavior yourself instead of picking a preset — and the newest four chapters ({NEW_NODES} nodes) cover the shapes, alpha tools, 3D solids, looper and Prediction family added since.</p>
+    <p>This guide skips the engineering manual entirely and walks through every node in Infinite's palette — {SPAWNABLE} spawnable node types, including the 34-filter image effects shelf and the 20-effect audio shelf. For every one you'll find what it does in plain English, why you'd actually use it, and (where it helps) a short recipe showing it wired up with a couple of friends. Two big shared-table shelves — image filters and audio effects — get a compact one-line-per-entry reference instead of a full card each, since dozens of them are close cousins of each other. Chapter Twenty covers the Field language — five nodes where you write the behavior yourself instead of picking a preset — and the newest six chapters ({NEW_NODES} nodes) cover the shapes, alpha tools, 3D solids, looper and Prediction family, then code-drawn Sketch nodes, Field Notes, MIDI file and out, the Tracking nodes and the newer mesh and curve operators added since.</p>
   </div>
   <div class="kick" style="margin-top:26px">Contents</div>
   <h1 style="font-size:28px;margin:8px 0 0">{CHAPTER_COUNT_WORD} Chapters</h1>
@@ -193,7 +195,7 @@ def closing_html():
     return doc(body, "Closing")
 
 
-CHAPTER_COUNT_WORD = {24: "Twenty-four"}.get(CHAPTER_COUNT, str(CHAPTER_COUNT))
+CHAPTER_COUNT_WORD = {26: "Twenty-six"}.get(CHAPTER_COUNT, str(CHAPTER_COUNT))
 
 
 def render(html_text, out_pdf, workdir):
