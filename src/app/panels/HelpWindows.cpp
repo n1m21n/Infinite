@@ -33,7 +33,7 @@ namespace app
          { "Image Source", I18N_KEY("Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more.") },
          { "Slideshow", I18N_KEY("Plays the supported images in one folder in alphabetical order. Hold and transition time follow the global transport; Native Size keeps source pixels 1:1, Best Fit stretches to fill, and Proportional Fit preserves aspect.") },
          { "Video", I18N_KEY("Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available. Also outputs the clip's own audio track, if it has one, on the same transport-driven clock as the picture (audioEnabled/volume).") },
-         { "Noise", I18N_KEY("Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included.") },
+         { "Noise", I18N_KEY("Procedural noise: value, fBm, ridged, Voronoi, Worley edges, white, plus gradient Perlin and Simplex (single and fBm) that are identical on every GPU. Domain warping, octaves and colour mapping included.") },
          { "Shape", I18N_KEY("The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape.") },
          { "Draw", I18N_KEY("Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in.") },
          { "Formula", I18N_KEY("A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation.") },
@@ -833,7 +833,7 @@ namespace app
 #endif
                { "Video", I18N_KEY("Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available. Also outputs the clip's own audio track, if it has one, on the same transport-driven clock as the picture (audioEnabled/volume).") },
                { "Shape", I18N_KEY("Twenty vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line, hexagon, heart, arrow, crescent, gear, superellipse, pie, teardrop, chevron and blob - with fill, stroke, feather and background. Each one is also directly spawnable as its own named node.") },
-               { "Noise", I18N_KEY("Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included.") },
+               { "Noise", I18N_KEY("Procedural noise: value, fBm, ridged, Voronoi, Worley edges, white, plus gradient Perlin and Simplex (single and fBm) that are identical on every GPU. Domain warping, octaves and colour mapping included.") },
                { "Draw", I18N_KEY("Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation.") },
                { "Formula", I18N_KEY("A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation.") },
                { "Texture", I18N_KEY("Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block.") },
