@@ -1,0 +1,29 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Metaball Lens",
+    "author": "Infinite",
+    "description": "Three liquid lobes drift over the picture, merging into one blob that refracts and magnifies what is under it.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "input pixel image img;\nparam float cx = 0.5 [0.0, 1.0];\nparam float cy = 0.5 [0.0, 1.0];\nparam float size = 0.22 [0.05, 0.5];\nparam float spread = 0.12 [0.0, 0.4];\nparam float speed = 1.0 [0.0, 4.0];\nparam float roam = 0.12 [0.0, 0.4];\nparam float bend = 0.06 [0.0, 0.3];\nparam float rimGlow = 0.8 [0.0, 2.0];\nparam float tint = 0.25 [0.0, 1.0];\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nc0 = vec2((cx - 0.5) * aspect, cy - 0.5) + roam * vec2(1.4 * sin(t * speed * 0.5), 0.7 * cos(t * speed * 0.37));\nph = t * speed * 1.8;\na0 = ph;\na1 = ph + 2.094395;\na2 = ph + 4.18879;\nd0 = spread * (1.0 + 0.27 * sin(2.2 * t * speed));\nd1 = spread * (1.0 + 0.27 * sin(2.2 * t * speed + 1.0));\nd2 = spread * (1.0 + 0.27 * sin(2.2 * t * speed + 2.0));\nl0 = c0 + vec2(cos(a0), 0.8 * sin(a0)) * d0;\nl1 = c0 + vec2(cos(a1), 0.8 * sin(a1)) * d1;\nl2 = c0 + vec2(cos(a2), 0.8 * sin(a2)) * d2;\nr0 = size * (0.6 + 0.1 * sin(3.1 * t * speed));\nr1 = size * (0.6 + 0.1 * sin(3.1 * t * speed + 2.0));\nr2 = size * (0.6 + 0.1 * sin(3.1 * t * speed + 4.0));\nva = p - l0;\nvb = p - l1;\nvc = p - l2;\nda = dot(va, va) + 0.00002;\ndb = dot(vb, vb) + 0.00002;\ndc = dot(vc, vc) + 0.00002;\nf = r0 * r0 / da + r1 * r1 / db + r2 * r2 / dc;\ng = -2.0 * (r0 * r0 * va / (da * da) + r1 * r1 * vb / (db * db) + r2 * r2 * vc / (dc * dc));\nglen = length(g) + 0.0001;\nsd = (f - 1.0) / glen;\nn = g / glen;\ndepth = (1.0 - smoothstep(0.0, 0.1, sd)) * (1.0 - smoothstep(1.15, 1.9, f));\nsh = n * bend * depth;\ninside = img(uv + vec2(sh.x / aspect, sh.y)).rgb;\nrgb = mix(inside, vec3(0.12, 0.145, 0.27), tint);\nrim = (1.0 - smoothstep(0.0, 0.0075, sd)) * (1.0 - smoothstep(1.08, 1.5, f));\nlit = clamp(dot(-n, normalize(vec2(-0.6, 0.8))) * 0.5 + 0.5, 0.0, 1.0);\nrgb = rgb + vec3(1.0, 0.8, 0.72) * rim * (0.25 + 0.75 * lit) * rimGlow;\naa = 1.5 / res.y;\ncover = smoothstep(-aa, aa, sd) * step(0.5, f);\nback = img(uv);\ncol = mix(back.rgb, rgb, cover);\nalpha = back.a;\n",
+    "params": {
+      "cx": 0.5,
+      "cy": 0.5,
+      "size": 0.22,
+      "spread": 0.12,
+      "speed": 1.0,
+      "roam": 0.12,
+      "bend": 0.06,
+      "rimGlow": 0.8,
+      "tint": 0.25
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ordered Dither",
+    "author": "Infinite",
+    "description": "A 4x4 Bayer dither: any picture becomes two inks on paper. The series look from the films.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "input pixel image img;\nparam float cell = 3.0 [1.0, 16.0];\nparam float contrast = 1.2 [0.2, 4.0];\nparam float bias = 0.0 [-0.5, 0.5];\nparam float inkR = 0.953 [0.0, 1.0];\nparam float inkG = 0.929 [0.0, 1.0];\nparam float inkB = 0.875 [0.0, 1.0];\nparam float paperR = 0.082 [0.0, 1.0];\nparam float paperG = 0.098 [0.0, 1.0];\nparam float paperB = 0.188 [0.0, 1.0];\ng = floor(uv * res / cell);\nc = img((g + 0.5) * cell / res);\ngray = clamp(dot(c.rgb, vec3(0.299, 0.587, 0.114)) * contrast + bias, 0.0, 1.0);\nx0 = fmod(g.x, 2.0);\nx1 = floor(fmod(g.x, 4.0) / 2.0);\ny0 = fmod(g.y, 2.0);\ny1 = floor(fmod(g.y, 4.0) / 2.0);\nthr = (8.0 * abs(y0 - x0) + 4.0 * y0 + 2.0 * abs(y1 - x1) + y1) / 16.0;\non = step(thr, gray);\ncol = mix(vec3(paperR, paperG, paperB), vec3(inkR, inkG, inkB), on);\nalpha = c.a;\n",
+    "params": {
+      "cell": 3.0,
+      "contrast": 1.2,
+      "bias": 0.0,
+      "inkR": 0.953,
+      "inkG": 0.929,
+      "inkB": 0.875,
+      "paperR": 0.082,
+      "paperG": 0.098,
+      "paperB": 0.188
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

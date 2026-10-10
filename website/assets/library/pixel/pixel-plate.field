@@ -1,0 +1,31 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Pixel Plate",
+    "author": "Infinite",
+    "description": "A plate of square cells with ragged, notched edges that grows outward cell by cell.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float cells = 36.0 [8.0, 120.0];\nparam float grow = 1.0 [0.0, 1.0];\nparam float seed = 2.0 [0.0, 50.0];\nparam float gap = 0.06 [0.0, 0.4];\nparam float margin = 4.0 [0.0, 20.0];\nparam float inkR = 0.953 [0.0, 1.0];\nparam float inkG = 0.929 [0.0, 1.0];\nparam float inkB = 0.875 [0.0, 1.0];\nparam float paperR = 0.082 [0.0, 1.0];\nparam float paperG = 0.098 [0.0, 1.0];\nparam float paperB = 0.188 [0.0, 1.0];\ncs = vec2(cells * aspect, cells);\ng = floor(uv * cs);\ncols = floor(cs.x);\nrows = floor(cs.y);\nhl = floor(3.0 * fract(sin(g.y * 12.9898 + seed * 78.233) * 43758.5453));\nhr = floor(3.0 * fract(sin(g.y * 39.346 + seed * 11.135 + 5.0) * 43758.5453));\nht = floor(3.0 * fract(sin(g.x * 27.619 + seed * 53.211 + 9.0) * 43758.5453));\nhb = floor(3.0 * fract(sin(g.x * 63.725 + seed * 31.337 + 3.0) * 43758.5453));\nokx = step(hl + margin, g.x) * step(g.x + 1.0, cols - hr - margin);\noky = step(ht + margin, g.y) * step(g.y + 1.0, rows - hb - margin);\ndist = length(vec2((g.x - cols * 0.5) / cols, (g.y - rows * 0.5) / rows));\ninside = 1.0 - step(grow * 0.75, dist);\nfc = fract(uv * cs);\ntile = step(gap, fc.x) * step(gap, fc.y);\non = okx * oky * inside * tile;\ncol = mix(vec3(paperR, paperG, paperB), vec3(inkR, inkG, inkB), on);\nalpha = 1.0;\n",
+    "params": {
+      "cells": 36.0,
+      "grow": 1.0,
+      "seed": 2.0,
+      "gap": 0.06,
+      "margin": 4.0,
+      "inkR": 0.953,
+      "inkG": 0.929,
+      "inkB": 0.875,
+      "paperR": 0.082,
+      "paperG": 0.098,
+      "paperB": 0.188
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

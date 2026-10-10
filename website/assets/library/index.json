@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "currency": "USD",
+  "items": [
+    {
+      "id": "ordered-dither",
+      "name": "Ordered Dither",
+      "kind": "Filter",
+      "tags": [
+        "Retro",
+        "Print",
+        "Colour"
+      ],
+      "description": "A 4x4 Bayer dither: any picture becomes two inks on paper. The series look from the films.",
+      "price": 0,
+      "domain": "pixel",
+      "params": 9,
+      "file": "assets/library/pixel/ordered-dither.field",
+      "preview": "assets/library/previews/ordered-dither.jpg",
+      "bytes": 1404,
+      "category": "Pixel"
+    },
+    {
+      "id": "liquid-glass",
+      "name": "Liquid Glass",
+      "kind": "Filter",
+      "tags": [
+        "Glass",
+        "Lens",
+        "UI"
+      ],
+      "description": "A frosted, refracting glass pane over whatever is behind it: bent edges, a colour split and a lit rim.",
+      "price": 0,
+      "domain": "pixel",
+      "params": 17,
+      "file": "assets/library/pixel/liquid-glass.field",
+      "preview": "assets/library/previews/liquid-glass.jpg",
+      "bytes": 3171,
+      "category": "Pixel"
+    },
+    {
+      "id": "metaball-lens",
+      "name": "Metaball Lens",
+      "kind": "Filter",
+      "tags": [
+        "Glass",
+        "Lens",
+        "Motion"
+      ],
+      "description": "Three liquid lobes drift over the picture, merging into one blob that refracts and magnifies what is under it.",
+      "price": 0,
+      "domain": "pixel",
+      "params": 9,
+      "file": "assets/library/pixel/metaball-lens.field",
+      "preview": "assets/library/previews/metaball-lens.jpg",
+      "bytes": 2556,
+      "category": "Pixel"
+    },
+    {
+      "id": "pixel-plate",
+      "name": "Pixel Plate",
+      "kind": "Generator",
+      "tags": [
+        "Retro",
+        "Pattern",
+        "Print"
+      ],
+      "description": "A plate of square cells with ragged, notched edges that grows outward cell by cell.",
+      "price": 0,
+      "domain": "pixel",
+      "params": 11,
+      "file": "assets/library/pixel/pixel-plate.field",
+      "preview": "assets/library/previews/pixel-plate.jpg",
+      "bytes": 1893,
+      "category": "Pixel"
+    },
+    {
+      "id": "iridescent-orb",
+      "name": "Iridescent Orb",
+      "kind": "Generator",
+      "tags": [
+        "Glass",
+        "Colour",
+        "Motion"
+      ],
+      "description": "A soft holographic pastel ball that slowly spins its colours, with a white sheen and a gloss spot.",
+      "price": 0,
+      "domain": "pixel",
+      "params": 8,
+      "file": "assets/library/pixel/iridescent-orb.field",
+      "preview": "assets/library/previews/iridescent-orb.jpg",
+      "bytes": 2031,
+      "category": "Pixel"
+    },
+    {
+      "id": "phyllotaxis-bloom",
+      "name": "Phyllotaxis Bloom",
+      "kind": "Generator",
+      "tags": [
+        "Nature",
+        "Pattern",
+        "Motion"
+      ],
+      "description": "A sunflower of golden-angle seeds, each dot coloured along the spiral. Seed count and turn are live.",
+      "price": 0,
+      "domain": "pixel",
+      "params": 7,
+      "file": "assets/library/pixel/phyllotaxis-bloom.field",
+      "preview": "assets/library/previews/phyllotaxis-bloom.jpg",
+      "bytes": 4065,
+      "category": "Pixel"
+    }
+  ]
+}
