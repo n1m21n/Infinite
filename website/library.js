@@ -2,6 +2,7 @@
   var grid = document.getElementById('grid'), chipsEl = document.getElementById('chips'),
       countEl = document.getElementById('count'), emptyEl = document.getElementById('empty'),
       viewEl = document.getElementById('view');
+  var CP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/></svg>';
   var DL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 20h16"/></svg>';
   // The library grows by category: every one is listed now, the empty ones say so.
   var CATS = ['Pixel', 'Audio FX', 'Synths', 'Notes', 'Sketch'];
@@ -21,7 +22,8 @@
       '<div class="node-view"><img src="' + esc(it.preview) + '" alt="' + esc(it.name) + ' preview" loading="lazy" width="900" height="600"></div>' +
       '<p class="lib-desc">' + esc(it.description) + '</p>' +
       '<footer class="lib-foot"><span class="lib-price ctl">' + (it.price > 0 ? '$' + it.price : 'Free') + '</span>' +
-      '<a class="btn lib-dl ctl" href="' + esc(it.file) + '" download aria-label="Download ' + esc(it.name) + '">' + DL + '<span class="lib-dl-text">Download</span></a></footer>' +
+      '<div class="lib-acts"><button class="lib-copy ctl" type="button" data-file="' + esc(it.file) + '" aria-label="Copy code for ' + esc(it.name) + '">' + CP + '<span class="lib-copy-text">Copy</span></button>' +
+      '<a class="btn lib-dl ctl" href="' + esc(it.file) + '" download aria-label="Download ' + esc(it.name) + '">' + DL + '<span class="lib-dl-text">Download</span></a></div></footer>' +
       '</div></article>';
   }
 
@@ -58,6 +60,16 @@
   setCols(store('lib-cols') === '8' ? 8 : 4);
 
   fetch('assets/library/index.json?v=4').then(function (r) { return r.json(); }).then(function (d) {
+    grid.addEventListener('click', function (e) {
+      var b = e.target.closest('.lib-copy'); if (!b) return;
+      fetch(b.getAttribute('data-file')).then(function (r) { return r.text(); }).then(function (txt) {
+        if (/\.field$/.test(b.getAttribute('data-file'))) { try { txt = JSON.parse(txt).device.code; } catch (x) { } }
+        return navigator.clipboard.writeText(txt);
+      }).then(function () {
+        var t = b.querySelector('.lib-copy-text'); b.classList.add('done'); if (t) t.textContent = 'Copied';
+        setTimeout(function () { b.classList.remove('done'); if (t) t.textContent = 'Copy'; }, 1500);
+      }).catch(function () { });
+    });
     items = d.items; grid.innerHTML = items.map(card).join(''); chips(); apply();
   }).catch(function () { emptyEl.hidden = false; emptyEl.textContent = 'Could not load the library.'; });
 

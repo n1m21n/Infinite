@@ -41,8 +41,8 @@
 
   /* Everything rounded */
   --r-sm: 10px;
-  --r-md: 16px;
-  --r-lg: 24px;
+  --r-md: 16px;   /* media inside a card */
+  --r-lg: 24px;   /* every card */
   --r-pill: 999px;
 
   /* Premium shadow: three stacked soft layers + contact */
@@ -341,7 +341,7 @@ strong { font-weight: 600; color: var(--ink); }
   background: var(--card); padding: 10px;
   box-shadow: 0 0 0 1px var(--line), var(--shadow-2);
 }
-.film-video { width: 100%; aspect-ratio: 16 / 9; border-radius: calc(var(--r-lg) - 8px); background: var(--inner); object-fit: cover; }
+.film-video { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--r-md); background: var(--inner); object-fit: cover; }
 .film-sound {
   position: absolute; right: 26px; bottom: 26px; z-index: 4;
   display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px;
@@ -377,8 +377,8 @@ strong { font-weight: 600; color: var(--ink); }
   color: var(--hand); margin: 0 0 10px 6px; transform: rotate(-2deg); transform-origin: left bottom;
 }
 .node {
-  position: relative; background: var(--app-panel); border-radius: var(--r-md);
-  box-shadow: 0 0 0 1px var(--app-border), 0 0 0 1px var(--cat) inset, var(--shadow-2);
+  position: relative; background: var(--app-panel); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
   padding: 0 0 2px;
   transition: transform 0.6s var(--spring), box-shadow 0.3s;
 }
@@ -386,13 +386,12 @@ strong { font-weight: 600; color: var(--ink); }
 .node-head {
   display: flex; align-items: center; gap: 8px; padding: 10px 12px;
   color: var(--app-text); font-size: 0.85rem; font-weight: 600;
-  border-bottom: 1px solid #262A35;
 }
 .cat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cat); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--cat) 22%, transparent); }
 .node-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node-cat { margin-left: auto; font-family: var(--font-mono); font-size: 0.66rem; color: var(--app-dim); font-weight: 500; letter-spacing: 0.03em; }
 .node-view {
-  margin: 8px; border-radius: 10px; overflow: hidden;
+  margin: 8px; border-radius: var(--r-md); overflow: hidden;
   aspect-ratio: 1 / 1; background: #0f1218; position: relative;
   touch-action: pan-y; user-select: none; -webkit-user-select: none;
 }
@@ -473,7 +472,7 @@ strong { font-weight: 600; color: var(--ink); }
    Recipes: node chains
    -------------------------------------------------------------------------- */
 .tutorial-frame { max-width: 920px; margin: 0 auto clamp(28px, 4vw, 44px); }
-.yt-embed { position: relative; aspect-ratio: 16 / 9; border-radius: calc(var(--r-lg) - 8px); overflow: hidden; background: #111; }
+.yt-embed { position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-md); overflow: hidden; background: #111; }
 .yt-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .yt-poster { position: absolute; inset: 0; width: 100%; height: 100%; }
 .yt-poster img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s var(--ease-out); }
@@ -590,7 +589,7 @@ strong { font-weight: 600; color: var(--ink); }
 .setup-intro { color: var(--ink2); max-width: 60em; margin-bottom: 18px; }
 .setup-intro a { color: var(--accent-ink); }
 .steps { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-.step { background: var(--paper); border-radius: var(--r-md); padding: 16px; box-shadow: 0 0 0 1px var(--line-soft); min-width: 0; }
+.step { background: var(--paper); border-radius: var(--r-lg); padding: 16px; min-width: 0; }
 .step-num {
   display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
   background: var(--ink); color: var(--paper); font-size: 0.8rem; margin-bottom: 10px;
@@ -745,6 +744,7 @@ html.over-bird body { cursor: pointer; }
 }
 
 @media (max-width: 640px) {
+  :root { --r-lg: 20px; --r-md: 12px; }
   :root { --header-h: 56px; }
   /* 2 x 2 on phones: compact node cards */
   .chain { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 14px; }
@@ -753,7 +753,7 @@ html.over-bird body { cursor: pointer; }
   .node-cat { display: none; }
   .node { flex: 1; display: flex; flex-direction: column; }
   .node-foot { margin-top: auto; }
-  .node-view { margin: 6px; border-radius: 8px; }
+  .node-view { margin: 6px; }
   .node-foot { padding: 0 9px 7px; font-size: 0.58rem; line-height: 1.3; }
   .app-bar { height: 30px; }
   .nature-canvas-wrapper { height: 380px; }
@@ -763,7 +763,6 @@ html.over-bird body { cursor: pointer; }
   .yt-play svg { width: 17px; height: 17px; }
   .yt-label { left: 10px; bottom: 10px; padding: 4px 8px; font-size: 0.6rem; }
   .film-frame { padding: 6px; border-radius: var(--r-md); }
-  .film-video { border-radius: 11px; }
   .film-sound { right: 14px; bottom: 14px; min-height: 36px; padding: 0 12px; }
   .hero-cta .btn { flex: 1 1 100%; }
   .btn-dl { flex: 1 1 100%; }

@@ -23,8 +23,9 @@ body::before {
 .slab, .recipe, .predict-card, .wave-card, .setup-card, .download-card, .modal-card, .film-frame, .platform-chip,
 .btn-ghost, .ticker-pill, .tab-pill, .lib-chip, .lib-view {
   -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-  box-shadow: var(--glass-hi), var(--glass-edge), var(--glass-shadow);
+  box-shadow: var(--glass-hi), var(--glass-shadow);
 }
+.lib-chip, .lib-view, .btn-ghost, .ticker-pill, .tab-pill, .platform-chip { box-shadow: var(--glass-hi), var(--glass-edge), var(--glass-shadow); }
 .btn-ghost:hover { box-shadow: var(--glass-hi), 0 0 0 1px rgba(45, 35, 25, 0.16), 0 14px 32px rgba(45, 35, 25, 0.12); }
 
 /* header: the same glass, edge to edge */
@@ -49,7 +50,7 @@ body::before {
 .node {
   background: var(--glass-dark);
   -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 1px var(--app-border), 0 0 0 1px var(--cat) inset, var(--shadow-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), var(--shadow-2);
 }
 
 /* chips and toggles: pressed state is dark glass */
@@ -71,3 +72,8 @@ body::before {
   .site-header { background: rgba(251, 250, 246, 0.95); }
 }
 @media (prefers-reduced-transparency: reduce) { :root { --card: #fff; } }
+
+/* cards carry no outline: depth comes from the glass, the lit top edge and the shadow */
+.step { box-shadow: none; }
+.lib-copy { background: rgba(255, 255, 255, 0.08); color: var(--app-text); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.lib-copy:hover { background: rgba(255, 255, 255, 0.16); }
