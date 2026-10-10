@@ -68,7 +68,7 @@ Known collisions are listed, not yet resolved; pair the colour with a glyph or l
 1. `python3 tools/design/inventory.py`: counts for literal colours and raw widgets went down or stayed the same (ratchet).
 2. Generated headers match their sources.
 3. Gallery goldens: changed only where you meant to change them, in light and dark.
-4. Motion: nothing over 200 ms, values never animate, reduce-motion turns eases off (plan section 4b).
+4. Motion: nothing over 200 ms, values never animate, reduce-motion turns eases off (plan section 4b). Every `motion_ms` token is a note value at 120 BPM (1/16 = 125, 1/16T = 83, 1/8T = 167, 1/16D = 188); `tools/design/motion_lint.py` enforces it, laws in BRAND.md §8 / `tools/brand/motion.py`.
 5. Three platforms: no `_WIN32` / `__APPLE__` in components (`windows-parity`, `linux-parity`).
 6. Node bodies touched: run the `node-ui-pillars` checklist too.
 

@@ -1,5 +1,10 @@
 # Infinite
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="art/brand/readme/readme-dark.png">
+  <img src="art/brand/readme/readme-light.png" alt="Infinite: a DAW for you. Visuals, music and code on one canvas." width="100%">
+</picture>
+
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/7cpQfCxnx)
 [![YouTube Tutorial](https://img.shields.io/badge/YouTube-Watch%20Tutorial-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=vXRjrDhSq24&t=1421s)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](https://github.com/n1m21n/Infinite)

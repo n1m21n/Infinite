@@ -1,7 +1,7 @@
 /* Infinite — Art Gallery museum. Tokens follow style.css (paper / ink / accent, Geist). */
 :root {
   --paper: #EEF0F6;
-  --bg: #12162B;
+  --bg: #12152A;
   --ink: #EEF0F6;
   --ink2: #A3A9BA;
   --muted: #8C93A8;
@@ -115,7 +115,7 @@ body.is-focus .counter { opacity: 1; transform: none; }
   -webkit-tap-highlight-color: transparent;
 }
 .modes button svg { width: 17px; height: 17px; }
-.modes button.on { color: #1F1D1A; }
+.modes button.on { color: #12152A; }
 .modes button:not(.on):hover { color: var(--ink); }
 .modes button:focus-visible, .round:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.is-focus .modes { opacity: 0; pointer-events: none; transform: translate(-50%, 14px); }
@@ -168,7 +168,7 @@ body.is-focus .focus-ui { opacity: 1; transform: none; pointer-events: auto; tra
 .round svg { width: 18px; height: 18px; }
 .round:hover { background: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
 .round:active { transform: scale(0.94); }
-.round.close { background: var(--brand-grad); color: #1F1D1A; border-color: transparent; }
+.round.close { background: var(--brand-grad); color: #12152A; border-color: transparent; }
 .round.close:hover { filter: brightness(1.08); }
 
 /* ---- plain gallery (crawlers, no-WebGL) ---- */

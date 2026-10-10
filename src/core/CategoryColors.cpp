@@ -42,7 +42,7 @@ const std::vector<Preset>& RawPresets()
          { "Compositing",  { 0.506f, 0.549f, 0.973f } }, // #818CF8
          { "Effects",      { 0.980f, 0.800f, 0.082f } }, // #FACC15
          { "Modulators",   { 0.639f, 0.902f, 0.208f } }, // #A3E635
-         { "Prediction",   { 0.133f, 0.827f, 0.533f } }, // #22C55E vivid emerald green
+         { "Prediction",   { 0.133f, 0.827f, 0.533f } }, // #22D388 vivid emerald green
          { "Macros",       { 0.988f, 0.588f, 0.235f } }, // #FC963C orange/amber
          { "Utility",      { 0.639f, 0.663f, 0.729f } }, // #A3A9BA muted grey-blue
          { "Notes",        { 0.298f, 0.851f, 0.392f } }, // #4CD964 green

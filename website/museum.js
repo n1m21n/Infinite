@@ -61,7 +61,7 @@ try {
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const BG = new THREE.Color('#161B33');
+const BG = new THREE.Color('#151930');
 const scene = new THREE.Scene();
 scene.background = BG;
 scene.fog = new THREE.Fog(BG, 9, 26);
@@ -130,7 +130,7 @@ const hallRight = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallEnd = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallStart = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#C9D0F0', map: gridMap(1, 1), transparent: true }));
-const panelMat = new THREE.MeshBasicMaterial({ color: '#FFFDF6', transparent: true, fog: false });
+const panelMat = new THREE.MeshBasicMaterial({ color: '#FBFAF6', transparent: true, fog: false });
 const hallPanels = Array.from({ length: 9 }, () => new THREE.Mesh(new THREE.PlaneGeometry(1, 1), panelMat));
 rooms.hall.add(hallLeft, hallRight, hallEnd, hallStart, hallCeil, ...hallPanels);
 
@@ -140,7 +140,7 @@ const rotWall = new THREE.Mesh(new THREE.CylinderGeometry(ROT_R + 0.55, ROT_R + 
 rotWall.position.y = 2.7;
 const rotCeil = new THREE.Mesh(new THREE.RingGeometry(1.5, ROT_R + 0.55, 96), new THREE.MeshLambertMaterial({ color: '#F1ECE0', side: THREE.DoubleSide, transparent: true }));
 rotCeil.rotation.x = Math.PI / 2; rotCeil.position.y = 5.4;
-const rotHalo = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.9, 96), new THREE.MeshBasicMaterial({ color: '#FFFDF6', side: THREE.DoubleSide, transparent: true, fog: false }));
+const rotHalo = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.9, 96), new THREE.MeshBasicMaterial({ color: '#FBFAF6', side: THREE.DoubleSide, transparent: true, fog: false }));
 rotHalo.rotation.x = Math.PI / 2; rotHalo.position.y = 5.39;
 rooms.rotunda.add(rotWall, rotCeil, rotHalo);
 
@@ -169,7 +169,7 @@ const shadowTex = canvasTex(256, 256, (g, w, h) => {
 const WASH_W = 1.95, WASH_H = 1.8;
 const washTex = canvasTex(256, 256, (g, w, h) => {
   const r = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
-  r.addColorStop(0, 'rgba(255,252,244,0.8)'); r.addColorStop(0.55, 'rgba(255,250,240,0.22)'); r.addColorStop(1, 'rgba(255,250,240,0)');
+  r.addColorStop(0, 'rgba(251,250,246,0.8)'); r.addColorStop(0.55, 'rgba(251,250,246,0.22)'); r.addColorStop(1, 'rgba(251,250,246,0)');
   g.fillStyle = r; g.fillRect(0, 0, w, h);
 });
 // canvas top = v 1 (art top, deepest under the floor) fades out; canvas bottom = v 0 (nearest the floor) is solid
@@ -182,11 +182,11 @@ const reflAlphaFixed = canvasTex(4, 128, (g, w, h) => {
 function plaqueTex(no, title, meta) {
   return canvasTex(640, 240, (g, w, h) => {
     g.fillStyle = '#FBFAF6'; g.fillRect(0, 0, w, h);
-    g.strokeStyle = 'rgba(45,35,25,0.14)'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
+    g.strokeStyle = 'rgba(26,31,54,0.14)'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
     g.textBaseline = 'alphabetic';
     g.fillStyle = '#F57F66'; g.font = '500 34px "Geist Mono", ui-monospace, monospace';
     g.fillText(`NO. ${no}`, 34, 62);
-    g.fillStyle = '#1F1D1A'; g.font = '700 92px "Caveat", cursive';
+    g.fillStyle = '#12152A'; g.font = '700 92px "Caveat", cursive';
     g.fillText(title, 34, 146);
     g.fillStyle = '#857C74'; g.font = '400 30px "Geist Mono", ui-monospace, monospace';
     g.fillText(meta, 34, 196);

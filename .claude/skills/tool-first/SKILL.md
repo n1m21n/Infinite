@@ -59,6 +59,16 @@ Tools must stay **MIT-clean** (no GPL code pasted in), **three-platform aware** 
 | Architecture recall | `tools/semi-brain/` (`semi-brain`) |
 | Quest board | `tools/roadmap/` |
 | Templates / drum kit / HRTF generation | `tools/templates/`, `tools/make-drumkit.py`, `tools/spatial/` |
+| Brand book, tokens, contrast gate | `tools/brand/build_brand_book.py` (values only in `docs/brand/brand.json`) |
+| Logo files (SVG/PNG/favicon/icns/ico) from the formula; icon drift | `tools/brand/build_logo.py [--check] [--install]` |
+| 3D nodes, kit, cutouts, baked loops, studio.blend | `tools/brand/build_3d.py [--quick] [--only render,...]` |
+| One message at every channel size (OG, YouTube, X, LinkedIn, README, story...) | `tools/brand/channels.py --headline ... --hand ...` |
+| Slide deck, release email, press fact sheet | `tools/brand/templates.py` |
+| Screenshots on the brand frame | `tools/brand/frame_shot.py shot.png [--mode paper] [--ratio 4:5]` |
+| Press kit zip | `tools/brand/press_kit.py` |
+| Off-brand / retired colours (ratchet); apply swaps | `tools/brand/brand_lint.py [PATH]`, `tools/brand/migrate_colours.py [--apply]` |
+| Confusable category colours per theme + brand.json drift | `tools/brand/category_audit.py` |
+| Motion laws (tempo clock, one mass, beat-locked springs, mark arcs, golden phase, log zoom); token grid check | `tools/brand/motion.py [--check]`; import it in films/3D/site |
 
 ## Exit check
 

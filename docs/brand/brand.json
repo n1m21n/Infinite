@@ -1,0 +1,1243 @@
+{
+ "_doc": "Infinite brand tokens v2 for brand surfaces (website, films, thumbnails, social, docs, installers, 3D). The app's own UI values live in src/app/ui/design/tokens.json and src/core/CategoryColors.cpp. Edit here, then run python3 tools/brand/build_brand_book.py (book, brand.css, DTCG tokens, contrast gate) and the Blender kit tools/brand/build_3d.py.",
+ "version": "2.0",
+ "updated": "2026-10-10",
+ "idea": {
+  "belief": "connection",
+  "line": "A DAW for you.",
+  "concept": "Two ends, one loop. The lemniscate's warm end (Ember) is the human act: the hand word, the key cable, the call to action. Its cool end (Signal, on the Midnight hue) is the structure: lines, diagrams, data. Midnight is the space they connect across.",
+  "personality": [
+   "calm",
+   "precise",
+   "a little playful",
+   "confident, never hype"
+  ],
+  "references": [
+   "Anthropic",
+   "Nothing",
+   "Apple",
+   "1X NEO"
+  ]
+ },
+ "colour": {
+  "_doc": "Every value is defined and checked in OKLCH (tools/brand/colour.py). The cool family sits on one hue (274), the warm family on one hue (38).",
+  "families": {
+   "midnight": {
+    "hue": 274,
+    "chroma": 0.045,
+    "role": "Neutrals: grounds, surfaces, inks. Never pure black or white."
+   },
+   "signal": {
+    "hue": 276,
+    "chroma": 0.16,
+    "role": "Structure: lines, diagrams, data, focus, selection."
+   },
+   "ember": {
+    "hue": 38,
+    "chroma": 0.19,
+    "role": "The accent: one look-here per frame."
+   }
+  },
+  "ramp_steps": {
+   "50": 0.97,
+   "100": 0.93,
+   "200": 0.86,
+   "300": 0.78,
+   "400": 0.7,
+   "500": 0.6,
+   "600": 0.52,
+   "700": 0.42,
+   "800": 0.32,
+   "900": 0.24,
+   "950": 0.18
+  },
+  "anchors": {
+   "midnight": {
+    "950": "#0D1020",
+    "900": "#151930"
+   },
+   "signal": {
+    "300": "#A7B1FF",
+    "600": "#4A54D6"
+   },
+   "ember": {
+    "400": "#FF6B35",
+    "500": "#D9430E",
+    "600": "#B53700"
+   }
+  },
+  "modes": {
+   "midnight": {
+    "_doc": "Dark. The default for films, social, thumbnails and showcase sections. The logo tile colour.",
+    "ground": "#151930",
+    "deep": "#0D1020",
+    "surface-1": "#20263F",
+    "surface-2": "#2A3052",
+    "surface-3": "#343B5E",
+    "line": "#343B5E",
+    "dot": "#232A4A",
+    "ink": "#EEF1FA",
+    "ink-2": "#A3AACB",
+    "ink-3": "#8890B1",
+    "signal": "#A7B1FF",
+    "accent": "#FF6B35",
+    "accent-ink": "#FF6B35",
+    "on-accent": "#151930",
+    "glass": "rgba(32, 38, 63, 0.72)",
+    "shadow": "#04050E"
+   },
+   "mist": {
+    "_doc": "Light, cool. Diagrams, science plates, panels shown on light, docs headers.",
+    "ground": "#E4E2EF",
+    "deep": "#D8D5E5",
+    "surface-1": "#F7F5FB",
+    "surface-2": "#FFFFFF",
+    "surface-3": "#EEEDF6",
+    "line": "#C4C1D9",
+    "dot": "#C4C1D9",
+    "ink": "#12152A",
+    "ink-2": "#404660",
+    "ink-3": "#5A6180",
+    "signal": "#4A54D6",
+    "accent": "#D9430E",
+    "accent-ink": "#B53700",
+    "on-accent": "#FFFFFF",
+    "glass": "rgba(247, 245, 251, 0.78)",
+    "shadow": "#1A1F36"
+   },
+   "paper": {
+    "_doc": "Light, neutral. Reading surfaces: website body, docs, PDFs, manuals, release notes.",
+    "ground": "#FBFAF6",
+    "deep": "#EFF0F4",
+    "surface-1": "#FFFFFF",
+    "surface-2": "#FFFFFF",
+    "surface-3": "#F5F5F8",
+    "line": "#DAD8E6",
+    "dot": "#DAD8E6",
+    "ink": "#12152A",
+    "ink-2": "#404660",
+    "ink-3": "#5A6180",
+    "signal": "#4A54D6",
+    "accent": "#D9430E",
+    "accent-ink": "#B53700",
+    "on-accent": "#FFFFFF",
+    "glass": "rgba(255, 255, 255, 0.78)",
+    "shadow": "#1A1F36"
+   }
+  },
+  "contrast_gate": {
+   "_doc": "The build fails if any pair is below its WCAG 2.2 ratio. APCA Lc is printed as a perceptual guide only.",
+   "pairs": [
+    [
+     "ink",
+     "ground",
+     12
+    ],
+    [
+     "ink",
+     "surface-1",
+     12
+    ],
+    [
+     "ink-2",
+     "ground",
+     7
+    ],
+    [
+     "ink-2",
+     "surface-1",
+     6
+    ],
+    [
+     "ink-3",
+     "ground",
+     4.5
+    ],
+    [
+     "ink-3",
+     "surface-1",
+     4.5
+    ],
+    [
+     "signal",
+     "ground",
+     4.5
+    ],
+    [
+     "signal",
+     "surface-1",
+     4.5
+    ],
+    [
+     "accent",
+     "ground",
+     3
+    ],
+    [
+     "accent-ink",
+     "ground",
+     4.5
+    ],
+    [
+     "accent-ink",
+     "surface-1",
+     4.5
+    ],
+    [
+     "on-accent",
+     "accent-ink",
+     4.5
+    ]
+   ]
+  },
+  "gradient": {
+   "name": "Brand gradient",
+   "stops": [
+    "#F57F66",
+    "#D99A9C",
+    "#C7AFC0",
+    "#A9CDF1"
+   ],
+   "positions": [
+    0,
+    0.35,
+    0.65,
+    1
+   ],
+   "role": "The logo's own colour: warm end to cool end. Horizontal, exact stops. Logo, brand ball and end-card lockup only."
+  },
+  "iridescence": {
+   "stops": [
+    "#A7B1FF",
+    "#8FE3D0",
+    "#F6B4C8",
+    "#FF8A5C",
+    "#A7B1FF"
+   ],
+   "role": "Thin-film sweep for one hero object per frame (ball, sphere, glass ring). Never on type or UI."
+  },
+  "role": [
+   {
+    "name": "Record",
+    "dark": "#BE3434",
+    "light": "#BE3434"
+   },
+   {
+    "name": "Solo",
+    "dark": "#D9A626",
+    "light": "#A57300"
+   },
+   {
+    "name": "Learn",
+    "dark": "#D98C1A",
+    "light": "#B96900"
+   },
+   {
+    "name": "Modulation",
+    "dark": "#FFBE5A",
+    "light": "#B96405"
+   },
+   {
+    "name": "Expression",
+    "dark": "#AA82FF",
+    "light": "#8250E6"
+   },
+   {
+    "name": "Prediction",
+    "dark": "#6ED78C",
+    "light": "#1E9646"
+   },
+   {
+    "name": "Go",
+    "dark": "#2EAA4A",
+    "light": "#268C3E"
+   },
+   {
+    "name": "Favourite",
+    "dark": "#FFCD2D",
+    "light": "#AA7600"
+   }
+  ],
+  "app": [
+   {
+    "name": "App window",
+    "hex": "#0A0B0F"
+   },
+   {
+    "name": "App panel",
+    "hex": "#181B23"
+   },
+   {
+    "name": "App text",
+    "hex": "#EEF0F6"
+   },
+   {
+    "name": "App dim",
+    "hex": "#9198AD"
+   },
+   {
+    "name": "App border",
+    "hex": "#383C47"
+   },
+   {
+    "name": "App accent",
+    "hex": "#6FB4FF"
+   }
+  ],
+  "retired": [
+   {
+    "hex": "#F5866B",
+    "name": "Coral (v1 accent on dark)",
+    "now": "#FF6B35 Ember 400",
+    "why": "owner-approved film palette r5/r6 moved the warm end to a cleaner orange; coral survives only as the gradient's first stop #F57F66",
+    "replace": "#FF6B35"
+   },
+   {
+    "hex": "#C2593F",
+    "name": "Terracotta",
+    "now": "#D9430E Ember 500 (marks) / #B53700 Ember 600 (text, fills)",
+    "why": "one warm hue on every mode; terracotta was a second warm family",
+    "replace": "#B53700"
+   },
+   {
+    "hex": "#A8472F",
+    "name": "Terracotta ink",
+    "now": "#B53700 Ember 600",
+    "why": "same hue as the accent, passes 4.5 on Paper and Mist",
+    "replace": "#B53700"
+   },
+   {
+    "hex": "#8B6CFF",
+    "name": "Violet glow",
+    "now": "#A7B1FF Signal 300 or iridescence",
+    "why": "owner r5: no violet on violet; two cool hues competed",
+    "replace": "#A7B1FF"
+   },
+   {
+    "hex": "#1F1D1A",
+    "name": "Warm ink",
+    "now": "#12152A",
+    "why": "one neutral family on the Midnight hue for every mode",
+    "replace": "#12152A"
+   },
+   {
+    "hex": "#5A534C",
+    "name": "Warm ink 2",
+    "now": "#404660",
+    "why": "one neutral family",
+    "replace": "#404660"
+   },
+   {
+    "hex": "#6E6760",
+    "name": "Warm ink 3",
+    "now": "#5A6180",
+    "why": "one neutral family",
+    "replace": "#5A6180"
+   },
+   {
+    "hex": "#F3F0E7",
+    "name": "Warm inner",
+    "now": "#EFF0F4 paper deep",
+    "why": "one neutral family",
+    "replace": "#EFF0F4"
+   },
+   {
+    "hex": "#F1ECE2",
+    "name": "Bone (film r5 ink)",
+    "now": "#EEF1FA Moon",
+    "why": "matches the app's own text colour; one neutral family",
+    "replace": "#EEF1FA"
+   },
+   {
+    "hex": "#FF6B35",
+    "name": "Ember as a ground",
+    "now": "accent only",
+    "why": "owner r6b: no orange ground"
+   },
+   {
+    "hex": "#2A33A8",
+    "name": "Cobalt ground",
+    "now": "Paper",
+    "why": "owner r6b picked Paper over Cobalt"
+   }
+  ],
+  "migrate": {
+   "_doc": "Extra one-to-one swaps for tools/brand/migrate_colours.py: v1 warm tints that were never named. Shadows move to the brand shadow #1A1F36.",
+   "#22C55E": "#22D388",
+   "#2D2319": "#1A1F36",
+   "#ECE8DC": "#E4E2EF",
+   "#2B2723": "#20263F",
+   "#E0654A": "#D9430E",
+   "#D97736": "#D9430E",
+   "#F9A58F": "#FF9878"
+  }
+ },
+ "type": {
+  "families": [
+   {
+    "name": "Geist",
+    "weights": [
+     400,
+     500,
+     600,
+     700,
+     800
+    ],
+    "role": "Everything people read: headlines, UI, body."
+   },
+   {
+    "name": "Geist Mono",
+    "weights": [
+     400,
+     500
+    ],
+    "role": "Machine text: values with units, code, node types, folios, coordinates."
+   },
+   {
+    "name": "Caveat",
+    "weights": [
+     700
+    ],
+    "role": "The one human word per scene or section. Ember, hand underline, 1.5x its neighbours."
+   },
+   {
+    "name": "Pixel 5x7",
+    "weights": [],
+    "role": "Drawn, not a font file. Only when the machine itself speaks (prediction, learning)."
+   }
+  ],
+  "ratio": 1.25,
+  "web_scale": [
+   {
+    "step": "Display",
+    "min": 40,
+    "max": 96,
+    "weight": 800,
+    "leading": 0.98,
+    "tracking": -0.04
+   },
+   {
+    "step": "H1",
+    "min": 32,
+    "max": 61,
+    "weight": 750,
+    "leading": 1.04,
+    "tracking": -0.035
+   },
+   {
+    "step": "H2",
+    "min": 25,
+    "max": 39,
+    "weight": 700,
+    "leading": 1.1,
+    "tracking": -0.025
+   },
+   {
+    "step": "H3",
+    "min": 20,
+    "max": 25,
+    "weight": 650,
+    "leading": 1.2,
+    "tracking": -0.015
+   },
+   {
+    "step": "Lead",
+    "min": 18,
+    "max": 20,
+    "weight": 450,
+    "leading": 1.45,
+    "tracking": -0.005
+   },
+   {
+    "step": "Body",
+    "min": 16,
+    "max": 16,
+    "weight": 400,
+    "leading": 1.55,
+    "tracking": 0
+   },
+   {
+    "step": "Caption",
+    "min": 13.5,
+    "max": 13.5,
+    "weight": 500,
+    "leading": 1.45,
+    "tracking": 0.005
+   },
+   {
+    "step": "Micro mono",
+    "min": 11.5,
+    "max": 11.5,
+    "weight": 500,
+    "leading": 1.35,
+    "tracking": 0.04
+   },
+   {
+    "step": "Folio mono caps",
+    "min": 11,
+    "max": 11,
+    "weight": 500,
+    "leading": 1.2,
+    "tracking": 0.12
+   }
+  ],
+  "film_scale_4k": [
+   {
+    "step": "Poster",
+    "px": "60-100% of frame height",
+    "weight": 800
+   },
+   {
+    "step": "Display",
+    "px": 300,
+    "weight": 800
+   },
+   {
+    "step": "Headline",
+    "px": 196,
+    "weight": 800
+   },
+   {
+    "step": "Title",
+    "px": 128,
+    "weight": 700
+   },
+   {
+    "step": "Line",
+    "px": 96,
+    "weight": 700
+   },
+   {
+    "step": "Caption",
+    "px": 64,
+    "weight": 500
+   },
+   {
+    "step": "Machine",
+    "px": 44,
+    "weight": 500
+   },
+   {
+    "step": "Folio",
+    "px": 32,
+    "weight": 500
+   }
+  ],
+  "app_scale": [
+   {
+    "step": "caption",
+    "px": 11
+   },
+   {
+    "step": "body",
+    "px": 13
+   },
+   {
+    "step": "title",
+    "px": 15
+   },
+   {
+    "step": "display",
+    "px": 22
+   }
+  ],
+  "measure": {
+   "body_ch": [
+    60,
+    72
+   ],
+   "caption_ch": [
+    30,
+    45
+   ],
+   "film_chars_per_second": 15
+  }
+ },
+ "logo": {
+  "curve": "Lemniscate of Bernoulli: x = A sin p / (1 + cos^2 p), y = A sin p cos p / (1 + cos^2 p), p in [0, 2 pi)",
+  "stroke": 0.2574,
+  "stroke_ratio": "87/338 of A",
+  "width": "2A + s = 2.2574 A",
+  "height": "A / sqrt(2) + s = 0.9645 A",
+  "aspect": "2.341 : 1 with stroke (2 sqrt 2 : 1 for the centre line)",
+  "arc_length": "5.2441 A (2 x lemniscate constant 2.62206)",
+  "crossing": "the branches cross at 90 degrees, each at 45 degrees to the axis",
+  "clear_space": "2 s on every side",
+  "min_size_px": {
+   "mark": 20,
+   "icon": 16
+  },
+  "tile": {
+   "ground": "#151930",
+   "corner": 0.185,
+   "mark_width": 0.74,
+   "_doc": "Measured from the shipped 1024 icon (assets/Infinite.iconset) by tools/brand/build_logo.py --check. The shipped tile is #1D223B; the next icon install moves it to Midnight #151930."
+  }
+ },
+ "shape": {
+  "brand_radius": [
+   {
+    "name": "Card",
+    "px": 24,
+    "role": "Every card: node card, panel, film frame, step, modal. 20 on phones."
+   },
+   {
+    "name": "Media",
+    "px": 16,
+    "role": "Inside a card: card radius minus its 8 px padding. 12 on phones."
+   },
+   {
+    "name": "Chip",
+    "px": 10,
+    "role": "Code chips, tags, keycaps."
+   },
+   {
+    "name": "Control",
+    "px": 999,
+    "role": "Buttons, chips, toggles, inputs: pill."
+   }
+  ],
+  "app_radius": [
+   {
+    "name": "cell",
+    "px": 2
+   },
+   {
+    "name": "field",
+    "px": 4
+   },
+   {
+    "name": "tile",
+    "px": 6
+   },
+   {
+    "name": "pill",
+    "px": 8
+   },
+   {
+    "name": "group",
+    "px": 10
+   }
+  ],
+  "space": [
+   4,
+   8,
+   12,
+   16,
+   24,
+   32,
+   48,
+   64,
+   96,
+   128
+  ],
+  "elevation": [
+   {
+    "level": 0,
+    "midnight": "ground",
+    "shadow": "none"
+   },
+   {
+    "level": 1,
+    "midnight": "surface-1",
+    "shadow": "0 1px 1px a.04, 0 4px 10px a.05, 0 14px 32px a.06"
+   },
+   {
+    "level": 2,
+    "midnight": "surface-2",
+    "shadow": "0 1px 2px a.06, 0 8px 20px a.08, 0 28px 60px a.10"
+   },
+   {
+    "level": 3,
+    "midnight": "surface-3",
+    "shadow": "0 2px 4px a.08, 0 16px 40px a.12, 0 48px 96px a.14"
+   }
+  ]
+ },
+ "grid": {
+  "web": {
+   "columns": 12,
+   "max": 1200,
+   "gutter": [
+    16,
+    24,
+    32
+   ],
+   "margin": [
+    16,
+    24,
+    48
+   ],
+   "breakpoints": [
+    375,
+    768,
+    1024,
+    1440
+   ],
+   "base": 8
+  },
+  "film_16x9": {
+   "stage": [
+    3840,
+    2160
+   ],
+   "graphics_safe": 0.05,
+   "action_safe": 0.035,
+   "columns": 12,
+   "column_px": 288
+  },
+  "film_9x16": {
+   "stage": [
+    2160,
+    3840
+   ],
+   "top": 0.14,
+   "bottom": 0.78,
+   "right_clear": [
+    0.4,
+    0.85,
+    0.14
+   ],
+   "columns": 6
+  },
+  "square_4x5": {
+   "margin": 0.06,
+   "columns": 6
+  },
+  "docs_a4": {
+   "margin_mm": 18,
+   "columns": 12,
+   "baseline_pt": 4
+  }
+ },
+ "motion": {
+  "eases": [
+   {
+    "name": "ease-out",
+    "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "role": "Entrances and most movement."
+   },
+   {
+    "name": "ease-in-out",
+    "value": "cubic-bezier(0.65, 0, 0.35, 1)",
+    "role": "Camera and large travel."
+   },
+   {
+    "name": "ease-in",
+    "value": "cubic-bezier(0.7, 0, 0.84, 0)",
+    "role": "Exits only."
+   }
+  ],
+  "springs": [
+   {
+    "name": "slab",
+    "zeta": 0.55,
+    "omega": 20,
+    "role": "Patch Type slabs, the key cable snap. The signature."
+   },
+   {
+    "name": "letter",
+    "zeta": 0.6,
+    "omega": 22,
+    "role": "Patch Type letters."
+   },
+   {
+    "name": "soft",
+    "zeta": 0.9,
+    "omega": 18,
+    "role": "Everything else that lands."
+   },
+   {
+    "name": "press",
+    "zeta": 1.0,
+    "omega": 28,
+    "role": "Buttons, keycaps, knob detents (no overshoot)."
+   }
+  ],
+  "durations_ms": {
+   "instant": 0,
+   "micro": 125,
+   "small": 188,
+   "medium": 333,
+   "large": 500,
+   "page": 667
+  },
+  "stagger_ms": {
+   "letter": 10,
+   "list": 42,
+   "card": 62
+  },
+  "app_ms": {
+   "hover_in": 125,
+   "hover_out": 188,
+   "press": 0,
+   "on": 167,
+   "off": 125,
+   "focus": 83,
+   "tooltip_delay": 500,
+   "tooltip_fade": 83,
+   "accent_fade": 188
+  }
+ },
+ "icon": {
+  "grid": 20,
+  "padding": 2,
+  "live": 16,
+  "stroke": 1.5,
+  "stroke_16": 1.25,
+  "stroke_24": 1.75,
+  "corner_outer": 2,
+  "corner_inner": 1,
+  "dot": 3,
+  "min_gap": 2,
+  "keylines": {
+   "circle": 16,
+   "square": 14,
+   "portrait": [
+    12,
+    16
+   ],
+   "landscape": [
+    16,
+    12
+   ]
+  },
+  "sizes": [
+   14,
+   16,
+   18,
+   20,
+   24
+  ]
+ },
+ "node3d": {
+  "_doc": "How a node card becomes a physical object. Units: 1 u = 1 app px at 100% UI scale. tools/brand/build_3d.py reads this block.",
+  "card": {
+   "width": 464,
+   "thickness": 18,
+   "radius": 24,
+   "fillet": 3,
+   "padding": 12,
+   "title_h": 30,
+   "_note": "440 content (the Audio Filter body width) + 2 x 12 padding. Jacks sit in the side walls like a pedal, so the card is 18 thick: a 14 jack ring (r_cable 7) fits with 2 to spare top and bottom."
+  },
+  "z": {
+   "display_well": -3,
+   "track": -2,
+   "printed": 0,
+   "jack_ring": 1,
+   "dropdown_well": -1.5,
+   "switch": 4,
+   "button_rest": 6,
+   "button_on": 2.5,
+   "slider_thumb": 7,
+   "knob_skirt": 4,
+   "knob_cap": 14
+  },
+  "knob": {
+   "diameter": 56,
+   "_note": "One knob size since v0.5 (kKnobStd 56; kKnobLarge = kKnobSmall). Hierarchy comes from grouping and order, never size.",
+   "cap_ratio": 0.78,
+   "ridges": 36,
+   "ridge_depth": 0.6,
+   "pointer": "engraved line from 0.25 to 0.9 of cap radius, Moon",
+   "arc": "printed on the card at 1.14 of the knob radius, 270 degrees, Signal; the modulation arc sits outside it in the Modulation role colour",
+   "caption_gap": 4
+  },
+  "jack": {
+   "outer": 14,
+   "inner": 8,
+   "depth": 3,
+   "where": "side walls at the pin row: input left, output right"
+  },
+  "cable": {
+   "diameter": 5,
+   "plug": 12,
+   "plug_length": 18,
+   "sag": 0.18
+  },
+  "materials": {
+   "body": {
+    "base": "surface-1",
+    "roughness": 0.55,
+    "clearcoat": 0.0
+   },
+   "title": {
+    "base": "category at 18% over surface-1",
+    "roughness": 0.5
+   },
+   "knob": {
+    "base": "#2A3052",
+    "roughness": 0.38,
+    "sheen": 0.2
+   },
+   "cap_top": {
+    "base": "#343B5E",
+    "roughness": 0.3
+   },
+   "keycap": {
+    "base": "#2A3052",
+    "roughness": 0.45
+   },
+   "display": {
+    "base": "#0D1020",
+    "roughness": 0.08,
+    "glass": true
+   },
+   "cable": {
+    "base": "source category colour; the key cable is Ember",
+    "roughness": 0.35
+   },
+   "metal": {
+    "base": "#B8BED6",
+    "metallic": 1.0,
+    "roughness": 0.28
+   }
+  },
+  "light": {
+   "key": {
+    "azimuth": 135,
+    "elevation": 50,
+    "size": 1.2
+   },
+   "fill": {
+    "from": "camera",
+    "ratio": 0.35
+   },
+   "rim": {
+    "azimuth": 45,
+    "elevation": 35,
+    "ratio": 0.6
+   },
+   "contact_shadow": 0.25,
+   "_doc": "Azimuth from +x counter-clockwise, card lying in XY with its title edge toward +Y and the camera on the -Y side. Key upper-left behind (135), rim upper-right behind (45), fill from the camera."
+  },
+  "camera": {
+   "yaw": [
+    20,
+    30
+   ],
+   "pitch": [
+    25,
+    35
+   ],
+   "lens_mm": 50,
+   "spec_view": "orthographic, yaw 30, pitch 35.264 (true isometric)"
+  },
+  "reference": "Audio Filter (src/app/bodies/FxBodies1.cpp, docs/plans/ui-system/element-sizes.md): body 440, readout strip 21, response viewer 190, row of 4 cells of 110 (type dropdown, freq, Q, gain), output row (mix, env)",
+  "controls": {
+   "fader": [
+    22,
+    138
+   ],
+   "fader_handle": [
+    18,
+    12
+   ],
+   "slider_h": 21,
+   "dropdown": [
+    112,
+    21
+   ],
+   "checkbox": 16,
+   "switch": [
+    30,
+    16
+   ],
+   "step_cell": 26,
+   "viewer_h": 190,
+   "readout_h": 21
+  },
+  "pins": {
+   "cable_r": 7,
+   "param_r": 4.5
+  }
+ },
+ "channels": [
+  {
+   "channel": "Website",
+   "asset": "Open Graph image",
+   "size": "1200x630",
+   "mode": "midnight"
+  },
+  {
+   "channel": "Website",
+   "asset": "Favicon",
+   "size": "SVG + 32x32 + 180x180 touch",
+   "mode": "tile"
+  },
+  {
+   "channel": "YouTube",
+   "asset": "Video master",
+   "size": "2560x1440 60 fps + 1920x1080",
+   "mode": "midnight"
+  },
+  {
+   "channel": "YouTube",
+   "asset": "Thumbnail",
+   "size": "1280x720, under 2 MB",
+   "mode": "midnight"
+  },
+  {
+   "channel": "YouTube",
+   "asset": "Channel banner",
+   "size": "2560x1440, safe 1546x423",
+   "mode": "midnight"
+  },
+  {
+   "channel": "YouTube Shorts / Reels / TikTok",
+   "asset": "Vertical video",
+   "size": "1080x1920",
+   "mode": "midnight"
+  },
+  {
+   "channel": "Instagram",
+   "asset": "Feed post",
+   "size": "1080x1350 (4:5), check the 3:4 grid crop",
+   "mode": "midnight or paper"
+  },
+  {
+   "channel": "X",
+   "asset": "Post image / video",
+   "size": "1600x900 / 1920x1080",
+   "mode": "midnight"
+  },
+  {
+   "channel": "X",
+   "asset": "Header",
+   "size": "1500x500",
+   "mode": "midnight"
+  },
+  {
+   "channel": "LinkedIn",
+   "asset": "Post image",
+   "size": "1200x627 or 1080x1350",
+   "mode": "paper or midnight"
+  },
+  {
+   "channel": "LinkedIn",
+   "asset": "Banner",
+   "size": "1584x396",
+   "mode": "midnight"
+  },
+  {
+   "channel": "GitHub",
+   "asset": "Social preview",
+   "size": "1280x640",
+   "mode": "midnight"
+  },
+  {
+   "channel": "GitHub",
+   "asset": "README hero",
+   "size": "1280x640 @2x, light and dark via <picture>",
+   "mode": "both"
+  },
+  {
+   "channel": "Release",
+   "asset": "Release notes",
+   "size": "Markdown, sentence case, no em dashes",
+   "mode": "n/a"
+  },
+  {
+   "channel": "macOS",
+   "asset": "App icon",
+   "size": "1024x1024 master, iconset 16 to 512 @2x",
+   "mode": "tile"
+  },
+  {
+   "channel": "macOS",
+   "asset": "DMG background",
+   "size": "600x400 pt @2x (tools/dmg/make_background.py)",
+   "mode": "paper"
+  },
+  {
+   "channel": "Windows",
+   "asset": "ICO",
+   "size": "16, 24, 32, 48, 64, 256",
+   "mode": "tile"
+  },
+  {
+   "channel": "Linux",
+   "asset": "AppImage / desktop icon",
+   "size": "SVG + 256 + 512 PNG",
+   "mode": "tile"
+  },
+  {
+   "channel": "Docs / PDF",
+   "asset": "Manual page",
+   "size": "A4 and US Letter",
+   "mode": "paper"
+  },
+  {
+   "channel": "Press kit",
+   "asset": "Logo set",
+   "size": "SVG, PNG 1024, mark + tile, light and dark",
+   "mode": "all"
+  },
+  {
+   "channel": "Email",
+   "asset": "Newsletter",
+   "size": "600 px wide, live text, images @2x",
+   "mode": "paper"
+  },
+  {
+   "channel": "Slides",
+   "asset": "Deck",
+   "size": "1920x1080",
+   "mode": "midnight or paper"
+  },
+  {
+   "channel": "Discord",
+   "asset": "Server icon / banner",
+   "size": "512x512 / 960x540",
+   "mode": "tile / midnight"
+  }
+ ],
+ "render": {
+  "_doc": "Targets for tools/brand/channels.py. safe = [x, y, w, h] in px where text and the mark must sit (platform UI and crops cover the rest); hero layouts use a 6% margin.",
+  "targets": [
+   {
+    "id": "og",
+    "name": "Website Open Graph",
+    "w": 1200,
+    "h": 630,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "yt-thumb",
+    "name": "YouTube thumbnail",
+    "w": 1280,
+    "h": 720,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "yt-banner",
+    "name": "YouTube channel banner",
+    "w": 2560,
+    "h": 1440,
+    "mode": "midnight",
+    "layout": "banner",
+    "safe": [
+     507,
+     508,
+     1546,
+     423
+    ]
+   },
+   {
+    "id": "x-post",
+    "name": "X post",
+    "w": 1600,
+    "h": 900,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "x-header",
+    "name": "X header",
+    "w": 1500,
+    "h": 500,
+    "mode": "midnight",
+    "layout": "banner",
+    "safe": [
+     300,
+     60,
+     1050,
+     380
+    ]
+   },
+   {
+    "id": "li-post",
+    "name": "LinkedIn post",
+    "w": 1200,
+    "h": 627,
+    "mode": "paper",
+    "layout": "hero"
+   },
+   {
+    "id": "li-banner",
+    "name": "LinkedIn banner",
+    "w": 1584,
+    "h": 396,
+    "mode": "midnight",
+    "layout": "banner",
+    "safe": [
+     420,
+     48,
+     1100,
+     300
+    ]
+   },
+   {
+    "id": "gh-social",
+    "name": "GitHub social preview",
+    "w": 1280,
+    "h": 640,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "readme-dark",
+    "name": "GitHub README hero (dark)",
+    "w": 2560,
+    "h": 1280,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "readme-light",
+    "name": "GitHub README hero (light)",
+    "w": 2560,
+    "h": 1280,
+    "mode": "paper",
+    "layout": "hero"
+   },
+   {
+    "id": "ig-post",
+    "name": "Instagram feed post",
+    "w": 1080,
+    "h": 1350,
+    "mode": "midnight",
+    "layout": "portrait",
+    "safe": [
+     65,
+     81,
+     950,
+     1188
+    ]
+   },
+   {
+    "id": "story",
+    "name": "Shorts / Reels / TikTok cover",
+    "w": 1080,
+    "h": 1920,
+    "mode": "midnight",
+    "layout": "portrait",
+    "safe": [
+     65,
+     269,
+     864,
+     1229
+    ]
+   },
+   {
+    "id": "slide-title",
+    "name": "Slide title",
+    "w": 1920,
+    "h": 1080,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "discord-banner",
+    "name": "Discord banner",
+    "w": 960,
+    "h": 540,
+    "mode": "midnight",
+    "layout": "hero"
+   }
+  ]
+ }
+}
