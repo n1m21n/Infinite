@@ -41,3 +41,11 @@ Against the plan's budget (processing <= 30 ms GPU, <= 50 ms CPU): met with marg
 2. Windows (DirectML) and Linux (CPU) numbers.
 3. Official macOS universal2 ONNX Runtime packaged in a test pack and loaded by the app.
 4. Then the tracking pipeline and `INFINITE_TRACKINGTEST`.
+
+## fp16 weights (checked in the app, M2)
+
+`tools/tracking-spike/to_fp16.py` stores weights as fp16 with a Cast back to fp32 (onnx only, no extra packages). Models drop from 15.5 MB to 7.8 MB. In `TRACKINGTEST` the landmarks are identical to the pixel (wrist 243,678; index tip 46,746) and timings are unchanged (tracking frame 1.3 ms, detection frame 16.5 ms). The pack zip is 20 MB either way because the ONNX Runtime dylib dominates.
+
+## macOS end-to-end slice (done)
+
+ONNX Runtime 1.20.1 loads from the pack folder under the app's existing hardened-runtime entitlements (`disable-library-validation`). Tracking frame 1.4 ms, detection frame 16-17 ms (p50), Core ML on the landmark model only.
