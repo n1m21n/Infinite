@@ -818,6 +818,54 @@ const std::vector<FieldPixelNode::Preset>& FieldPixelNode::Presets()
         "waterCol = mix(deepIndigo, cerulean, clamp((p.y + 0.5) / 0.8, 0.0, 1.0));\n"
         "skyCream = vec3(0.92, 0.90, 0.82);\n"
         "col = mix(skyCream, waterCol, isWater) + whiteFoam * isFoam;" },
+      // --- Wave 3: cellular automata. Both are one scalar state cell read
+      // at neighbouring pixels, so the cell size is one output pixel. ---
+      { "Game of Life",
+        "param float every = 4.0 [1.0, 30.0];\n"
+        "param float seed = 0.3 [0.05, 0.6];\n"
+        "state float L = 0 [wrap];\n"
+        "d = 1.0 / res;\n"
+        "n = L(uv + vec2(d.x, 0.0)) + L(uv - vec2(d.x, 0.0)) + L(uv + vec2(0.0, d.y)) + L(uv - vec2(0.0, d.y))"
+        " + L(uv + d) + L(uv - d) + L(uv + vec2(d.x, -d.y)) + L(uv + vec2(-d.x, d.y));\n"
+        "h = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);\n"
+        "first = 1.0 - step(0.5, age);\n"
+        // Born on 3, survives on 2 or 3. Neighbour counts are exact integers
+        // in the float cell, so the +-0.5 windows are safe.
+        "born = step(2.5, n) * (1.0 - step(3.5, n));\n"
+        "live = step(1.5, n) * (1.0 - step(3.5, n));\n"
+        "next = mix(born, live, L);\n"
+        // Advance only every `every` frames so the generations stay readable.
+        "tick = 1.0 - step(0.5 / every, fract(frame / every));\n"
+        "L = mix(L, next, tick);\n"
+        "L = mix(L, step(1.0 - seed, h), first);\n"
+        "col = vec3(L) * vec3(0.9, 1.0, 0.8) + (1.0 - L) * vec3(0.02, 0.03, 0.06);" },
+      { "Smooth Life (Lenia-lite)",
+        "param float mu = 0.22 [0.05, 0.4];\n"
+        "param float sigma = 0.06 [0.005, 0.15];\n"
+        "param float rate = 0.1 [0.01, 0.4];\n"
+        "param float radius = 8.0 [2.0, 14.0];\n"
+        "param float seed = 0.6 [0.1, 1.0];\n"
+        "state float A = 0 [wrap];\n"
+        "d = 1.0 / res;\n"
+        // 16-tap ring kernel: two rings of 8 at 0.5r and r, averaged. A cheap
+        // stand-in for Lenia's smooth ring so it stays inside the fetch budget.
+        "r1 = radius * 0.5;\n"
+        "r2 = radius;\n"
+        "k = vec2(0.7071, 0.7071);\n"
+        "u = A(uv + vec2(r1, 0.0) * d) + A(uv - vec2(r1, 0.0) * d) + A(uv + vec2(0.0, r1) * d) + A(uv - vec2(0.0, r1) * d)"
+        " + A(uv + k * r1 * d) + A(uv - k * r1 * d) + A(uv + vec2(k.x, -k.y) * r1 * d) + A(uv + vec2(-k.x, k.y) * r1 * d)"
+        " + A(uv + vec2(r2, 0.0) * d) + A(uv - vec2(r2, 0.0) * d) + A(uv + vec2(0.0, r2) * d) + A(uv - vec2(0.0, r2) * d)"
+        " + A(uv + k * r2 * d) + A(uv - k * r2 * d) + A(uv + vec2(k.x, -k.y) * r2 * d) + A(uv + vec2(-k.x, k.y) * r2 * d);\n"
+        "u = u / 16.0;\n"
+        // Gaussian growth: positive near mu, negative elsewhere.
+        "g = 2.0 * exp(-((u - mu) * (u - mu)) / (2.0 * sigma * sigma)) - 1.0;\n"
+        // Seed with soft blobs (low-frequency waves), not per-pixel noise:
+        // noise averages to a flat field under the ring kernel and never organises.
+        "h = 0.5 + 0.5 * sin(uv.x * 40.0 + 3.0 * sin(uv.y * 23.0)) * sin(uv.y * 37.0 + 2.0 * sin(uv.x * 29.0));\n"
+        "first = 1.0 - step(0.5, age);\n"
+        "A = clamp(A + rate * g, 0.0, 1.0);\n"
+        "A = mix(A, h * h * seed, first);\n"
+        "col = vec3(A * 1.4, A * A * 2.0 + 0.03, 0.3 + A * 0.6);" },
       { "Spiral Feedback Illusion",
         "param float speed = 1.0 [0.0, 5.0];\n"
         "param float freq = 10.0 [1.0, 30.0];\n"
