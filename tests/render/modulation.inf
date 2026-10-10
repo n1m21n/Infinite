@@ -1,8 +1,10 @@
 infinite-patch 1
 # Modulation: an LFO drives sizeX, an expression drives rotation; sampled over time.
+# Rectangle on purpose: a Star shows an extra "sides" control that shifts every later control index, and the
+# key join is probed on the default shape, so `rotation` would land on the wrong slider.
 node 1 Source Shape
   id shape
-  i shapeType Star
+  i shapeType Rectangle
 end
 node 2 Modulators LFO
   id lfo
