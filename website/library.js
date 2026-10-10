@@ -15,7 +15,7 @@
   function card(it, i) {
     var cat = it.category || 'Pixel';
     return '<article class="lib-card reveal in" style="--cat:' + (COLOUR[cat] || '#F5866B') + '; --hand:' + (HAND[cat] || '#C2593F') + '; --i:' + Math.min(i, 8) + '">' +
-      '<p class="hand-cap">' + esc(it.kind === 'Filter' ? 'filters a picture' : 'makes its own') + '</p>' +
+      '<p class="hand-cap">' + esc(it.kind === 'Filter' ? 'filters a picture' : it.category === 'Sketch' ? 'draws with code' : 'makes its own') + '</p>' +
       '<div class="node">' +
       '<header class="node-head"><h2 class="node-name">' + esc(it.name) + '</h2><span class="node-cat">' + esc(cat) + '</span></header>' +
       '<div class="node-view"><img src="' + esc(it.preview) + '" alt="' + esc(it.name) + ' preview" loading="lazy" width="900" height="600"></div>' +
@@ -57,7 +57,7 @@
   });
   setCols(store('lib-cols') === '8' ? 8 : 4);
 
-  fetch('assets/library/index.json?v=3').then(function (r) { return r.json(); }).then(function (d) {
+  fetch('assets/library/index.json?v=4').then(function (r) { return r.json(); }).then(function (d) {
     items = d.items; grid.innerHTML = items.map(card).join(''); chips(); apply();
   }).catch(function () { emptyEl.hidden = false; emptyEl.textContent = 'Could not load the library.'; });
 

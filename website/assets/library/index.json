@@ -14,11 +14,11 @@
       "description": "A 4x4 Bayer dither: any picture becomes two inks on paper. The series look from the films.",
       "price": 0,
       "domain": "pixel",
+      "category": "Pixel",
       "params": 9,
       "file": "assets/library/pixel/ordered-dither.field",
       "preview": "assets/library/previews/ordered-dither.jpg",
-      "bytes": 1404,
-      "category": "Pixel"
+      "bytes": 1404
     },
     {
       "id": "liquid-glass",
@@ -32,11 +32,11 @@
       "description": "A frosted, refracting glass pane over whatever is behind it: bent edges, a colour split and a lit rim.",
       "price": 0,
       "domain": "pixel",
+      "category": "Pixel",
       "params": 17,
       "file": "assets/library/pixel/liquid-glass.field",
       "preview": "assets/library/previews/liquid-glass.jpg",
-      "bytes": 3171,
-      "category": "Pixel"
+      "bytes": 3171
     },
     {
       "id": "metaball-lens",
@@ -50,11 +50,11 @@
       "description": "Three liquid lobes drift over the picture, merging into one blob that refracts and magnifies what is under it.",
       "price": 0,
       "domain": "pixel",
+      "category": "Pixel",
       "params": 9,
       "file": "assets/library/pixel/metaball-lens.field",
       "preview": "assets/library/previews/metaball-lens.jpg",
-      "bytes": 2556,
-      "category": "Pixel"
+      "bytes": 2556
     },
     {
       "id": "pixel-plate",
@@ -68,11 +68,11 @@
       "description": "A plate of square cells with ragged, notched edges that grows outward cell by cell.",
       "price": 0,
       "domain": "pixel",
+      "category": "Pixel",
       "params": 11,
       "file": "assets/library/pixel/pixel-plate.field",
       "preview": "assets/library/previews/pixel-plate.jpg",
-      "bytes": 1893,
-      "category": "Pixel"
+      "bytes": 1893
     },
     {
       "id": "iridescent-orb",
@@ -86,11 +86,11 @@
       "description": "A soft holographic pastel ball that slowly spins its colours, with a white sheen and a gloss spot.",
       "price": 0,
       "domain": "pixel",
+      "category": "Pixel",
       "params": 8,
       "file": "assets/library/pixel/iridescent-orb.field",
       "preview": "assets/library/previews/iridescent-orb.jpg",
-      "bytes": 2031,
-      "category": "Pixel"
+      "bytes": 2031
     },
     {
       "id": "phyllotaxis-bloom",
@@ -104,11 +104,101 @@
       "description": "A sunflower of golden-angle seeds, each dot coloured along the spiral. Seed count and turn are live.",
       "price": 0,
       "domain": "pixel",
+      "category": "Pixel",
       "params": 7,
       "file": "assets/library/pixel/phyllotaxis-bloom.field",
       "preview": "assets/library/previews/phyllotaxis-bloom.jpg",
-      "bytes": 4065,
-      "category": "Pixel"
+      "bytes": 4065
+    },
+    {
+      "id": "lorenz-attractor",
+      "name": "Lorenz Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math"
+      ],
+      "description": "The butterfly of chaos, integrated live. A glowing trail winds between two lobes and never repeats.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 3,
+      "file": "assets/library/sketch/lorenz-attractor.js",
+      "preview": "assets/library/previews/lorenz-attractor.jpg",
+      "bytes": 1039
+    },
+    {
+      "id": "lotka-volterra",
+      "name": "Lotka-Volterra",
+      "kind": "Generator",
+      "tags": [
+        "ecology",
+        "math",
+        "phase"
+      ],
+      "description": "Predators and prey chasing each other: the population curves on top, the phase loop they trace below.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 3,
+      "file": "assets/library/sketch/lotka-volterra.js",
+      "preview": "assets/library/previews/lotka-volterra.jpg",
+      "bytes": 1348
+    },
+    {
+      "id": "scale-free-network",
+      "name": "Scale-Free Network",
+      "kind": "Generator",
+      "tags": [
+        "network",
+        "graph",
+        "growth"
+      ],
+      "description": "A network that grows by preferential attachment: the rich get richer, hubs emerge, and the graph breathes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 3,
+      "file": "assets/library/sketch/scale-free-network.js",
+      "preview": "assets/library/previews/scale-free-network.jpg",
+      "bytes": 1430
+    },
+    {
+      "id": "rule-110",
+      "name": "Rule 110",
+      "kind": "Generator",
+      "tags": [
+        "cellular",
+        "automaton",
+        "math"
+      ],
+      "description": "A one-dimensional cellular automaton that is Turing-complete. Gliders scroll down the page, one generation at a time.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 3,
+      "file": "assets/library/sketch/rule-110.js",
+      "preview": "assets/library/previews/rule-110.jpg",
+      "bytes": 959
+    },
+    {
+      "id": "clifford-attractor",
+      "name": "Clifford Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "generative"
+      ],
+      "description": "A strange attractor drawn as a cloud of 20,000 points. Slowly drifting parameters keep reshaping the lace.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 3,
+      "file": "assets/library/sketch/clifford-attractor.js",
+      "preview": "assets/library/previews/clifford-attractor.jpg",
+      "bytes": 791
     }
   ]
 }

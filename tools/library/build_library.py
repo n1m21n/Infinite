@@ -23,6 +23,7 @@ import zipfile
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 from library_defs import ENTRIES  # noqa: E402
+from sketch_defs import SKETCHES  # noqa: E402
 
 BIN = os.path.join(ROOT, "build/Infinite.app/Contents/MacOS/Infinite")
 CHECK = os.path.join(ROOT, "build/field-preset-check")
@@ -143,6 +144,35 @@ def make_preview(entry, tmp):
     return dst
 
 
+def build_sketch(e, tmp, preview):
+    """A Sketch device is the node's JS: <id>.js, pasted into the Sketch code editor. Preview = headless app render."""
+    code = e["code"].strip() + "\n"
+    path = os.path.join(OUT, "sketch", e["id"] + ".js")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(f"// {e['name']} - Infinite Library (Sketch). Paste into a Sketch node's code editor.\n" + code)
+    if preview:
+        from PIL import Image
+        inf = os.path.join(tmp, e["id"] + ".inf")
+        esc = code.replace("\\", "\\\\").replace("\n", "\\n")
+        with open(inf, "w") as f:
+            f.write(f"infinite-patch 1\nnode 1 Source Sketch\n  id sk\n  f width {PW}\n  f height {PH}\n  s code {esc}\nend\n"
+                    "node 2 Utility Output\n  id out\nend\ncable out 0 sk\n")
+        od = os.path.join(tmp, e["id"])
+        run([BIN, "--frame", inf, str(e["t"]), od + "/"], timeout=180)
+        pngs = sorted(glob.glob(od + "/*.png"))
+        if not pngs:
+            raise RuntimeError(e["id"] + ": sketch render failed")
+        dst = os.path.join(OUT, "previews", e["id"] + ".jpg")
+        Image.open(pngs[0]).convert("RGB").resize((900, 600), Image.LANCZOS).save(dst, quality=86, optimize=True)
+    return {
+        "id": e["id"], "name": e["name"], "kind": e["kind"], "tags": e["tags"], "description": e["blurb"],
+        "price": 0, "domain": "sketch", "category": "Sketch", "params": len(re.findall(r'^param\(', code, re.M)),
+        "file": f"assets/library/sketch/{e['id']}.js", "preview": f"assets/library/previews/{e['id']}.jpg",
+        "bytes": os.path.getsize(path),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-preview", action="store_true")
@@ -171,6 +201,11 @@ def main():
         })
     if failed:
         sys.exit(1)
+    for e in SKETCHES:
+        if a.only and e["id"] != a.only:
+            continue
+        items.append(build_sketch(e, tmp, not a.no_preview))
+        print("ok   sketch", e["id"])
     if a.only:
         return
     with open(os.path.join(OUT, "index.json"), "w") as f:
@@ -178,7 +213,7 @@ def main():
         f.write("\n")
     with zipfile.ZipFile(os.path.join(OUT, "infinite-library.zip"), "w", zipfile.ZIP_DEFLATED) as z:
         for it in items:
-            z.write(os.path.join(ROOT, "website", it["file"]), f"pixel/{it['id']}.field")
+            z.write(os.path.join(ROOT, "website", it["file"]), f"{it['domain']}/{os.path.basename(it['file'])}")
     print(f"wrote {len(items)} devices, index.json and infinite-library.zip in {os.path.relpath(OUT, ROOT)}")
 
 
