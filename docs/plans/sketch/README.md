@@ -41,6 +41,18 @@ Why it isn't Field: Field runs one kernel per pixel or element with no loops ove
 | S11 | Text | Fonts from `external/fonts` through plutovg's font loader | Avoids per-OS text paths diverging |
 | S12 | Presets | Ship 6-8 sketches: radial burst, flow-field lines, L-system tree, kinetic type, grid poster, particle list with `state` | Every code node ships with something that looks good first try |
 
+## Sketch 3D (built, branch `feature/sketch-3d`)
+
+A second node, `Sketch 3D` (category `3D`, terminal geometry source): same quickjs sandbox, `param()` knobs and seeded `random()`, but `draw(t)` builds a triangle mesh instead of pixels. Patch it into Render 3D or any geometry operator.
+
+| Piece | Where |
+|---|---|
+| Engine | `src/core/sketch/Sketch3DEngine.*` (transform stack, primitives, beginShape, 400k-vertex / 2.4M-index caps) |
+| Node | `src/nodes/Sketch3DNode.*` (identity model matrix, default material, revision bumps only when t/params/code changed) |
+| API | `box sphere cylinder cone torus plane tube`, `beginShape(TRIANGLES/TRIANGLE_STRIP/TRIANGLE_FAN/QUADS) vertex endShape`, `translate rotate rotateX/Y/Z scale push pop`, `fill(r,g,b)` (sRGB in, vertex colour linear out), `hsl noise random param` |
+| Checks | `sketch3d-check` (winding vs normals incl. mirrored and non-uniform scale, determinism, caps, abort, every preset) |
+| Not built | Three.js (needs the CEF Web pack), materials/textures per shape, image input |
+
 ## Out of scope (later)
 - `svg` *output* (SVG import and animation is built, see Status).
 - GPU raster (only if profiling shows CPU raster > 4 ms at 1080p for typical sketches).

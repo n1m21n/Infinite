@@ -685,7 +685,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-307 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+308 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -715,8 +715,8 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Explode` | geo:geometry | out:geometry | 65 | bypass |
 | `Extrude` | geo:geometry | out:geometry | 65 | bypass |
 | `Extrude Selected` | geo:geometry | out:geometry | 65 | bypass |
-| `Field Modifier` | geo:geometry | geo:geometry | 11 | bypass |
-| `Field Primitive` | none | geo:geometry | 13 | bypass |
+| `Field Modifier` | geo:geometry | out:geometry | 11 | bypass |
+| `Field Primitive` | none | out:geometry | 13 | bypass |
 | `Gear 3D` | texture:image | out:geometry | 50 | bypass |
 | `Geometry` | texture:image | out:geometry | 50 | bypass |
 | `Group 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, geo_e:geometry, geo_f:geometry, geo_g:geometry, geo_h:geometry | out:geometry | 0 |  |
@@ -754,9 +754,10 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Screw` | geo:geometry | out:geometry | 65 | bypass |
 | `Select` | geo:geometry | out:geometry | 65 | bypass |
 | `Set Vertex Color` | geo:geometry, texture:image, palette:palette | out:geometry | 6 |  |
-| `Smooth` | geo:geometry | out:geometry | 65 | bypass |
+| `Sketch 3D` | none | out:geometry | 4 | bypass |
 )AISKILL"
-R"AISKILL(| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
+R"AISKILL(| `Smooth` | geo:geometry | out:geometry | 65 | bypass |
+| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Sphere` | texture:image | out:geometry | 50 | bypass |
 | `Star 3D` | texture:image | out:geometry | 50 | bypass |
 | `Subdivide` | geo:geometry | out:geometry | 65 | bypass |
@@ -909,7 +910,6 @@ R"AISKILL(| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Constant` | none | out:modulator | 1 | bypass |
 | `Envelope` | in:modulator | out:modulator | 6 | bypass |
 | `Geometry Table` | geo:geometry | cx:modulator, cy:modulator, cz:modulator, spread:modulator, x1:modulator, y1:modulator, z1:modulator, x2:modulator, y2:modulator, z2:modulator, x3:modulator, y3:modulator, z3:modulator, x4:modulator, y4:modulator, z4:modulator | 10 | bypass |
-| `Hand Track` | input:image | present:modulator, palm x:modulator, palm y:modulator, index x:modulator, index y:modulator, thumb x:modulator, thumb y:modulator, pinch:modulator, open:modulator, roll:modulator, size:modulator | 3 | bypass |
 | `Image Analyze` | input:image | result:modulator, bright:modulator, contrast:modulator, red:modulator, green:modulator, blue:modulator, sat:modulator, hue:modulator, motion:modulator, cx:modulator, cy:modulator | 14 | bypass |
 | `Invert` | in:modulator | out:modulator | 3 | bypass |
 | `LFO` | none | out:modulator | 5 | bypass |
@@ -981,10 +981,10 @@ R"AISKILL(| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Circle` | none | out:image | 20 | bypass |
 | `Crescent` | none | out:image | 20 | bypass |
 | `Cross` | none | out:image | 20 | bypass |
-| `Draw` | input:image | out:image | 13 | bypass |
-| `Ellipse` | none | out:image | 20 | bypass |
 )AISKILL"
-R"AISKILL(| `FieldPixel` | none | out:image | 9 | bypass |
+R"AISKILL(| `Draw` | input:image | out:image | 13 | bypass |
+| `Ellipse` | none | out:image | 20 | bypass |
+| `FieldPixel` | none | out:image | 9 | bypass |
 | `Formula` | none | out:image | 8 | bypass |
 | `Gear` | none | out:image | 20 | bypass |
 | `Heart` | none | out:image | 20 | bypass |

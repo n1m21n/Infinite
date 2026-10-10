@@ -116,7 +116,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-307 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+308 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -146,8 +146,8 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Explode` | geo:geometry | out:geometry | 65 | bypass |
 | `Extrude` | geo:geometry | out:geometry | 65 | bypass |
 | `Extrude Selected` | geo:geometry | out:geometry | 65 | bypass |
-| `Field Modifier` | geo:geometry | geo:geometry | 11 | bypass |
-| `Field Primitive` | none | geo:geometry | 13 | bypass |
+| `Field Modifier` | geo:geometry | out:geometry | 11 | bypass |
+| `Field Primitive` | none | out:geometry | 13 | bypass |
 | `Gear 3D` | texture:image | out:geometry | 50 | bypass |
 | `Geometry` | texture:image | out:geometry | 50 | bypass |
 | `Group 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, geo_e:geometry, geo_f:geometry, geo_g:geometry, geo_h:geometry | out:geometry | 0 |  |
@@ -185,6 +185,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Screw` | geo:geometry | out:geometry | 65 | bypass |
 | `Select` | geo:geometry | out:geometry | 65 | bypass |
 | `Set Vertex Color` | geo:geometry, texture:image, palette:palette | out:geometry | 6 |  |
+| `Sketch 3D` | none | out:geometry | 4 | bypass |
 | `Smooth` | geo:geometry | out:geometry | 65 | bypass |
 | `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Sphere` | texture:image | out:geometry | 50 | bypass |
