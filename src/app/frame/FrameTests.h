@@ -62,6 +62,8 @@ void FrameTest_FILTERCURVECACHETEST(int frameId, GLFWwindow* window);
 void FrameTest_BYPASSRULETEST(int frameId, GLFWwindow* window);
 void FrameTest_BYPASSSWEEPTEST(int frameId, GLFWwindow* window);
 void FrameTest_PATCHLAYOUTLIVETEST(int frameId, GLFWwindow* window);
+
+void FrameTest_KEYEDSTARTEST(int frameId, GLFWwindow* window);
 void FrameTest_ROUNDTRIPTEST(int frameId, GLFWwindow* window);
 void FrameTest_PHASEFTEST(int frameId, GLFWwindow* window);
 void FrameTest_PHASEETEST(int frameId, GLFWwindow* window);

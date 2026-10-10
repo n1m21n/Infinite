@@ -349,12 +349,23 @@ namespace app
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       ModSlider("size x", &n->sizeX, 0.01f, 1.0f);
       ModSlider("size y", &n->sizeY, 0.01f, 1.0f);
+      // The three shape-dependent controls take fixed ordinals above the always-drawn ones (0..10), so
+      // switching shape never moves rotation / pos / fill and the type-level key join stays true.
       if (usesCorner)
+      {
+         FixedParamOrdinal at(11);
          ModSlider("corner/thick", &n->cornerRadius, 0.0f, 0.3f);
+      }
       if (usesSides)
+      {
+         FixedParamOrdinal at(12);
          ModSliderInt("sides", &n->sides, 3, 20);
+      }
       if (usesInner)
+      {
+         FixedParamOrdinal at(13);
          ModSlider("inner ratio", &n->innerRatio, 0.05f, 1.0f);
+      }
       ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
       ModSlider("pos x", &n->posX, 0.0f, 1.0f);
       ModSlider("pos y", &n->posY, 0.0f, 1.0f);

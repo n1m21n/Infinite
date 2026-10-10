@@ -2389,6 +2389,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // no overlapping boxes, the picture chain ordered by wiring depth.
       FrameTest_PATCHLAYOUTLIVETEST(frameId, window);
 
+      // Keyed mod/expr on a Star: lands on the named control, survives a shape change.
+      FrameTest_KEYEDSTARTEST(frameId, window);
+
       FrameTest_ROUNDTRIPTEST(frameId, window);
 
       FrameTest_PHASEFTEST(frameId, window);

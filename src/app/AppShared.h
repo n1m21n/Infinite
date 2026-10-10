@@ -1699,6 +1699,18 @@ extern int gCurrentNodeIndex;
 
 extern int gParamCounter;
 
+// Pins the ordinal of the next Mod* control(s) drawn in scope, then restores the running count. A control
+// that a body draws only in some states takes a fixed ordinal from here instead of the running one, so it
+// no longer shifts every control drawn after it (a binding is keyed by ordinal, and the per-type key join
+// is probed once on a default-state node). Pick values above the body's running count and below
+// kDiscreteParamBase.
+struct FixedParamOrdinal
+{
+   int saved;
+   explicit FixedParamOrdinal(int ordinal) : saved(gParamCounter) { gParamCounter = ordinal; }
+   ~FixedParamOrdinal() { gParamCounter = saved; }
+};
+
 extern int gColorCounter;
 
 
@@ -5415,6 +5427,8 @@ void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap = null
 extern PendingAutoLayout gPendingAutoLayout;
 
 void RunAutoLayoutTick();
+
+int ParamIndexOfKeyOnNode(const GraphNode& gn, const std::string& key);
 
 bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload);
 
