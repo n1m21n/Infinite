@@ -24,6 +24,8 @@ namespace DropdownField
       const float w = size.x > 0.0f ? size.x : ts.x + 2.0f * pad;
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       const ImVec2 mx(mn.x + w, mn.y + h);
+      if (ImGui::ButtonLabelHook != nullptr)
+         ImGui::ButtonLabelHook(caption); // headless --describe lists the buttons a node draws, as ImGui::Button does
       const bool clicked = ImGui::InvisibleButton(caption, ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -62,6 +64,8 @@ namespace DropdownField
       const float w = width > 0.0f ? width : 168.0f;
       const ImVec2 mn = ImGui::GetCursorScreenPos();
       const ImVec2 mx(mn.x + w, mn.y + h);
+      if (ImGui::ButtonLabelHook != nullptr)
+         ImGui::ButtonLabelHook(id); // headless --describe lists the buttons a node draws, as ImGui::Button does
       const bool pressed = ImGui::InvisibleButton(id, ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
       ImDrawList* dl = ImGui::GetWindowDrawList();
