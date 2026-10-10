@@ -705,7 +705,7 @@ namespace app
    {
       const float colW = kParamWidth;
       if (n->PackMissing())
-         ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "%s", T("Install the Tracking pack: Settings > Extensions"));
+         ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", T("Install the Tracking pack: Settings > Extensions"));
       else
          ImGui::TextDisabled("%s", n->Status().c_str());
 
