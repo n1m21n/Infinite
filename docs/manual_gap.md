@@ -1,19 +1,7 @@
-# Node Reference Manual gap (R23)
+# Node Reference Manual gap
 
-Registered node types (`Infinite --describe`, 299 total) whose name does not appear anywhere in `Infinite_Node_Reference_Manual.pdf` (last revised in 2c12562, 2026-09-04). Names are compared with case, spaces and punctuation ignored, so a node the manual documents under a different title shows up here as a false positive: check by hand before writing a page.
+Status at v0.5.0: closed. The Node Field Guide (`Infinite_Node_Reference_Manual.pdf`, built by `tools/manual/build.py` from `tools/manual/cards.py`) now has a card or shelf entry for every spawnable node type, 303 in total, across 26 chapters. Chapters 25 and 26 cover Sketch, Sketch 3D, Field Notes, MIDI File, MIDI Out, Spatial Mixer, Hand/Face/Pose Track, Delaunay Mesh, Voronoi Cells, Decimate, Curve Ops, Dither and NDI In/Out.
 
-The PDF is hand-maintained and not generated from source, so this list is the work order, not a fix.
+The only registered types whose name is not in the PDF are the ones the spawn menu hides (Delete Selected, Transform Selected, Extrude Selected, Group) and Field Graph, which the Field Language Manual covers instead.
 
-| Category | Count | Missing types |
-|---|---|---|
-| 3D | 28 | Capsule, Pyramid, Prism, Supershape, Tetrahedron, Octahedron, Dodecahedron, Rounded Cube, Mobius Strip, Klein Bottle, Gear 3D, Star 3D, Arrow 3D, Depth Projection, Mesh to Points, Mesh to Edges, Mesh to Faces, Solidify, Wireframe, Triangulate, Normals, Explode, Screw, Delete Selected, Transform Selected, Extrude Selected, Delete, Set Vertex Color |
-| AudioEffects | 3 | Resonator Bank, Cycle Shaper, Spec Blur |
-| Compositing | 8 | show alpha, set alpha, alpha invert, alpha from luma, alpha levels, premultiply, chroma key, luma key |
-| Effects | 4 | mirror tile, normal map, edge sobel, edge outline |
-| Modulators | 2 | Velocity to CV, CV Recorder |
-| Prediction | 6 | Predictive Modulator, Predictive Coloring, Predictive Notes, Predictive Quantize, Predictive Velocity, Predictive Rhythm |
-| Source | 10 | Slideshow, Ellipse, Rectangle, Rounded Rect, Polygon, Hexagon, Crescent, Superellipse, Teardrop, Chevron |
-| Synths | 1 | Looper |
-| Utility | 2 | Field Graph, Audio Meter |
-
-**64 of 299 types.** Help text for each lives in the hand-kept tables in `src/main.cpp` (`SpecificNodeHelpText`); reuse it as the page's first paragraph.
+To re-check after adding a node: dump the registered types with `Infinite --describe --json out.json` (or `tools/gen-patch-skill.py`, which lists them in the patch-authoring skill), compare each name to `pdftotext Infinite_Node_Reference_Manual.pdf`, and add a card to `tools/manual/cards.py` for any that are missing. Reuse the node's text from `SpecificNodeHelpText` in `src/app/panels/HelpWindows.cpp` as the card description, then rerun `python3 tools/manual/build.py`.
