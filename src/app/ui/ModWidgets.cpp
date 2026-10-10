@@ -1702,7 +1702,13 @@ namespace app
       // The stubs are placed out of layout order, so hand the cursor back where
       // the tag row left it. Call this only once the whole row is drawn: nothing
       // after it may rely on SameLine().
-      ImGui::GetCurrentWindow()->DC.CursorPos = restoreCursor;   // not SetCursorScreenPos: see ModKnob's pin restore
+      // Assigned straight onto the window's DC rather than via SetCursorScreenPos:
+      // that flags a pending "extend boundaries" check, and no item follows this
+      // restore when the tag row ends the node, so ImGui logged "Code uses
+      // SetCursorPos()/SetCursorScreenPos() to extend window/parent boundaries"
+      // every frame for any collapsed node with a binding. This is a pure
+      // restore of a position the tag row's Dummy already accounted for.
+      ImGui::GetCurrentWindow()->DC.CursorPos = restoreCursor;
    }
 
 
