@@ -1,6 +1,6 @@
 ---
 name: output-projection-sweep
-description: "Sweep everything leaving Infinite's window: Syphon/Spout send/receive, Projection, Output/Viewport, projector windows and their per-context GL lifetime. Use after changing those nodes, projector code or src/platform/ windowing/sharing; when a receiver sees black/flipped/stale frames or a projector misbehaves; before a release."
+description: "Sweep everything leaving the window: Syphon/Spout, Projection, Output, projector windows. Use after touching those or platform windowing, on black/flipped/stale frames, or before a release."
 ---
 
 ## When to use (full scope)

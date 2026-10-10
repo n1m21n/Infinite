@@ -38,7 +38,8 @@ public:
    // Auto-growing pins: every connected pin plus one empty "+" pin, up to 12.
    AudioCable* AudioInputSlot(int slot) override
    {
-      return (slot >= 0 && slot < PinCount()) ? &inputs[slot] : nullptr;
+      // Every slot, so a patch saved with a gap (slots 0 and 2) reconnects on load; PinCount is UI only.
+      return (slot >= 0 && slot < kMaxSlots) ? &inputs[slot] : nullptr;
    }
    const char* InputLabel(int slot) const override;
 

@@ -1,6 +1,6 @@
 ---
 name: new-source-node
-description: "Procedure for adding a Source node (image from nothing: procedural, file, live device): INode/GLUtil::Fbo pattern, per-frame cook memo, resolution, Transport clock, TextureRevision, exit criterion. Use when implementing a generator/loader/capture node, or when one renders black, won't animate, animates while paused, or re-renders every frame."
+description: "Procedure for adding a Source node (procedural, file, live device). Use when implementing one, or when it renders black, won't animate, animates while paused, or re-renders every frame."
 ---
 
 ## When to use (full scope)

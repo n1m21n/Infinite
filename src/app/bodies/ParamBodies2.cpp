@@ -2,6 +2,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/AppShared.h"
+#include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/GlyphToggle.h"
 #include "app/ui/design/Glyphs.gen.h"
@@ -183,7 +184,7 @@ namespace app
       }
       if (hasLearned && !learning)
       {
-         ImGui::SameLine();
+         FormParts::Inline();
          if (ActionButton::Draw("Reset", ImVec2(50, 0)))
          {
             PushUndoCheckpoint();

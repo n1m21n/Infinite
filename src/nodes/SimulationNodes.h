@@ -128,6 +128,7 @@ public:
    enum PinMode { kPinNone = 0, kPinTop, kPinCorners, kPinEdges, kPinModeCount };
 
    static INode* Create() { return new ClothNode(); }
+   const std::string& CookWarning() const override { return mCookWarning; }
    static const std::vector<std::string>& PinModeNames();
 
    unsigned int GetOutputTexture() override { return 0; }
@@ -263,6 +264,7 @@ public:
    }
 
 private:
+   std::string mCookWarning;
    struct Constraint
    {
       unsigned int a = 0, b = 0;

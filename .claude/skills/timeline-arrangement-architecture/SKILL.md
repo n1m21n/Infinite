@@ -1,6 +1,6 @@
 ---
 name: timeline-arrangement-architecture
-description: "Map of the Timeline/Arrangement system: Clip/Lane/TrackGroup model, drawing/compositing, selection settings, sample vs clip, grouping, audio/video playback paths, retrigger, stretch/BPM, live-drawn waveform. Use before planning/reviewing src/arrange/ or the Arrange panel, or for \"how does the timeline work\"."
+description: "Map of the Timeline/Arrangement system (clips, lanes, playback, stretch). Read before planning or reviewing src/arrange/ or the Arrange panel, or for \"how does the timeline work\"."
 ---
 
 ## When to use (full scope)

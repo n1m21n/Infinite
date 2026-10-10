@@ -1,6 +1,6 @@
 ---
 name: compositing-pipeline-sweep
-description: "2D/compositing pipeline regression sweep: real textures, bypass pass-through, cook memo under fan-out, frame ids, palette, source-over alpha, idle caching. Use after changing a 2D node, when an image is black/stale/doubled/wrong-sized, alpha fringes dark, bypass leaks, or before a release."
+description: "2D pipeline regression sweep (textures, bypass, cook memo, alpha, caching). Use after changing a 2D node, when an image is black/stale/doubled or alpha fringes, or before a release."
 ---
 
 ## When to use (full scope)

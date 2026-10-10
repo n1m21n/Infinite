@@ -2327,7 +2327,11 @@ int RunTrackingTest()
    const std::string root = AppPaths::TempDir() + "/infinite-trackingtest";
    std::error_code ec;
    std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+#if defined(_WIN32)
+   _putenv_s("INFINITE_EXTENSIONS_DIR", root.c_str());
+#else
    setenv("INFINITE_EXTENSIONS_DIR", root.c_str(), 1);
+#endif
 
    std::string bytes, err, id;
    {

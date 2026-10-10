@@ -1,6 +1,6 @@
 ---
 name: new-utility-node
-description: "Procedure for adding a Utility/IO node (Output/export, Syphon/Spout, Projection, OSC, Video In): terminal identity-pass, three-sided Platform:: rule, cross-context resources, gated side effects, exit criterion. Use when implementing one, or when an IO node leaks, crashes on delete, or works on only one OS."
+description: "Procedure for adding a Utility/IO node (Output, Syphon/Spout, Projection, OSC, Video In). Use when implementing one, or when it leaks, crashes on delete, or works on only one OS."
 ---
 
 ## When to use (full scope)

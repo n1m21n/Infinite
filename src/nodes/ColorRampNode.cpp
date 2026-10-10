@@ -4,11 +4,13 @@
 #include <algorithm>
 #include <cmath>
 
+#include "ColorSpace.h"
+
 constexpr int ColorRampNode::kMaxStops;
 
 namespace
 {
-   const std::vector<std::string> kInterpNames = { "Linear", "Constant" };
+   const std::vector<std::string> kInterpNames = { "Linear", "Constant", "Oklab", "OKLCh" };
    const int kLutSize = 256;
 
    const char* kFragSrc =
@@ -120,6 +122,43 @@ void ColorRampNode::Evaluate(float t, float outRgb[3]) const
          if (interpMode == ColorRampNode::kConstant)
          {
             copyStop(a);
+         }
+         else if (interpMode == ColorRampNode::kOklab || interpMode == ColorRampNode::kOklch)
+         {
+            const float span = std::max(1e-5f, stopPos[b] - stopPos[a]);
+            const float f = (t - stopPos[a]) / span;
+            float labA[3], labB[3];
+            for (int k = 0; k < 2; k++)
+            {
+               const float* c = stopColor[k == 0 ? a : b];
+               const float lin[3] = { ColorSpace::SrgbToLinear(c[0]), ColorSpace::SrgbToLinear(c[1]),
+                                      ColorSpace::SrgbToLinear(c[2]) };
+               ColorSpace::LinearToOklab(lin, k == 0 ? labA : labB);
+            }
+            float lab[3];
+            lab[0] = labA[0] + (labB[0] - labA[0]) * f;
+            const float chromaA = std::sqrt(labA[1] * labA[1] + labA[2] * labA[2]);
+            const float chromaB = std::sqrt(labB[1] * labB[1] + labB[2] * labB[2]);
+            // A near-grey stop has no hue to speak of; Oklch would swing through
+            // an arbitrary one, so those pairs fall back to plain Oklab.
+            if (interpMode == ColorRampNode::kOklch && chromaA > 0.02f && chromaB > 0.02f)
+            {
+               const float hueA = std::atan2(labA[2], labA[1]);
+               float dh = std::atan2(labB[2], labB[1]) - hueA;
+               const float kPi = 3.14159265f;
+               if (dh > kPi) dh -= 2.0f * kPi;
+               if (dh < -kPi) dh += 2.0f * kPi;
+               const float chroma = chromaA + (chromaB - chromaA) * f;
+               const float hue = hueA + dh * f;
+               lab[1] = chroma * std::cos(hue);
+               lab[2] = chroma * std::sin(hue);
+            }
+            else
+            {
+               lab[1] = labA[1] + (labB[1] - labA[1]) * f;
+               lab[2] = labA[2] + (labB[2] - labA[2]) * f;
+            }
+            ColorSpace::OklabToDisplay(lab, outRgb);
          }
          else
          {

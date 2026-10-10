@@ -10,6 +10,63 @@
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
 
+// Field compile errors read "line N, col M: message". Show the message, then
+// the offending source line with the token at that column marked, so the user
+// sees where it went wrong without counting lines in the editor.
+static void DrawFieldError(const std::string& err, const std::string& code)
+{
+   const ImU32 red = tok::U32(tok::record);
+   {
+      // Wrapped, token-coloured message drawn directly (no style push).
+      const float wrap = std::max(40.0f, ImGui::GetContentRegionAvail().x);
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(), at, red, err.c_str(), nullptr, wrap);
+      ImGui::Dummy(ImGui::CalcTextSize(err.c_str(), nullptr, false, wrap));
+   }
+
+   int line = 0, col = 0;
+   if (sscanf(err.c_str(), "line %d, col %d:", &line, &col) != 2 || line < 1 || col < 1)
+      return;
+   size_t start = 0;
+   for (int l = 1; l < line; l++)
+   {
+      start = code.find('\n', start);
+      if (start == std::string::npos)
+         return;
+      start++;
+   }
+   size_t end = code.find('\n', start);
+   if (end == std::string::npos)
+      end = code.size();
+   const std::string text = code.substr(start, end - start);
+   size_t a = std::min((size_t)(col - 1), text.size());
+   size_t b = a;
+   auto isWord = [](char c) { return std::isalnum((unsigned char)c) || c == '_'; };
+   if (b < text.size())
+   {
+      if (isWord(text[b]))
+         while (b < text.size() && isWord(text[b])) b++;
+      else
+         b++;
+   }
+   const std::string before = text.substr(0, a), bad = text.substr(a, b - a), after = text.substr(b);
+   // One row drawn with the draw list so the bad token can take its own colour.
+   ImDrawList* dl = ImGui::GetWindowDrawList();
+   ImVec2 pos = ImGui::GetCursorScreenPos();
+   const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+   auto put = [&](const std::string& str, ImU32 c) {
+      dl->AddText(pos, c, str.c_str());
+      pos.x += ImGui::CalcTextSize(str.c_str()).x;
+   };
+   char num[24];
+   snprintf(num, sizeof(num), "%d | ", line);
+   put(num, dim);
+   put(before, dim);
+   put(bad.empty() ? "_" : bad, red);
+   put(after, dim);
+   ImGui::Dummy(ImVec2(pos.x - ImGui::GetCursorScreenPos().x, ImGui::GetTextLineHeight()));
+}
+
 namespace
 {
    // The shared chrome for the Field / Formula editor windows: Settings' recipe (elevated panel, 16 pt window pad,
@@ -685,7 +742,7 @@ void DrawSidePanels(FrameCtx& fc)
                gFormulaEditor->Apply();
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
 
@@ -756,13 +813,13 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldElementEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
 
             if (!gFieldElementEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldElementEditor->LastError().c_str());
+               DrawFieldError(gFieldElementEditor->LastError(), gFieldElementEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -820,13 +877,13 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldPrimitiveEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPrimitiveEditor->code.c_str());
 
             if (!gFieldPrimitiveEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPrimitiveEditor->LastError().c_str());
+               DrawFieldError(gFieldPrimitiveEditor->LastError(), gFieldPrimitiveEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -869,13 +926,13 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldPixelEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
 
             if (!gFieldPixelEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPixelEditor->LastError().c_str());
+               DrawFieldError(gFieldPixelEditor->LastError(), gFieldPixelEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -908,7 +965,7 @@ void DrawSidePanels(FrameCtx& fc)
             SketchPresetDropdown(gSketchEditor, "sketchPreset");
 
             // SVG: dropped on the canvas, or pasted here (no file dialog needed).
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Paste SVG"), ImVec2(100, 0)))
             {
                const char* clip = ImGui::GetClipboardText();
@@ -921,7 +978,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
             if (!gSketchEditor->svg.empty())
             {
-               ImGui::SameLine();
+               FormParts::Inline();
                if (ActionButton::Draw(L("Clear SVG"), ImVec2(100, 0)))
                {
                   gSketchEditor->svg.clear();
@@ -957,12 +1014,12 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gSketchEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gSketchEditor->code.c_str());
 
             if (!gSketchEditor->LastError().empty())
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gSketchEditor->LastError().c_str());
+               DrawFieldError(gSketchEditor->LastError(), gSketchEditor->code);
          }
          EndEditorWindow(editorVisible);
       }
@@ -1014,12 +1071,12 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gSketch3DEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gSketch3DEditor->code.c_str());
 
             if (!gSketch3DEditor->LastError().empty())
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gSketch3DEditor->LastError().c_str());
+               DrawFieldError(gSketch3DEditor->LastError(), gSketch3DEditor->code);
          }
          EndEditorWindow(editorVisible);
       }
@@ -1092,13 +1149,13 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldSampleEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSampleEditor->code.c_str());
 
             if (!gFieldSampleEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSampleEditor->LastError().c_str());
+               DrawFieldError(gFieldSampleEditor->LastError(), gFieldSampleEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -1156,13 +1213,13 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldSynthEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSynthEditor->code.c_str());
 
             if (!gFieldSynthEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSynthEditor->LastError().c_str());
+               DrawFieldError(gFieldSynthEditor->LastError(), gFieldSynthEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -1220,13 +1277,13 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldNotesEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldNotesEditor->code.c_str());
 
             if (!gFieldNotesEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldNotesEditor->LastError().c_str());
+               DrawFieldError(gFieldNotesEditor->LastError(), gFieldNotesEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -1287,10 +1344,10 @@ void DrawSidePanels(FrameCtx& fc)
                lastKnownCode = gFieldGraphEditor->code;
             }
             PopPrimaryButtonStyle();
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
-            ImGui::SameLine();
+            FormParts::Inline();
             if (ActionButton::Draw(L("Regenerate"), ImVec2(120, 0)))
             {
                // Safe to call directly (not deferred) here: this window draws
@@ -1302,7 +1359,7 @@ void DrawSidePanels(FrameCtx& fc)
 
             if (!gFieldGraphEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldGraphEditor->LastError().c_str());
+               DrawFieldError(gFieldGraphEditor->LastError(), gFieldGraphEditor->code);
             }
             if (!gFieldGraphEditor->Notice().empty())
             {

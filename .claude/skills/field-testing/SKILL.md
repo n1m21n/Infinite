@@ -1,6 +1,6 @@
 ---
 name: field-testing
-description: "Proving a Field change didn't regress: tests/field/corpus.txt golden harness (RunFieldTest), per-domain conformance, re-baselining, per-step exit criteria. Use before/after any Field compiler or language change, for \"did this break saved patches\", or when writing a prompt for Field work."
+description: "Proving a Field change didn't regress (tests/field/corpus.txt golden harness). Use before/after any Field compiler or language change, or for \"did this break saved patches\"."
 ---
 
 ## When to use (full scope)

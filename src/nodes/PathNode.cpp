@@ -42,6 +42,7 @@ void PathNode::RebuildFollowIfNeeded()
 
    if (geometrySource == nullptr)
    {
+      mCookWarning.clear();
       if (!mFollow.Empty())
          mFollow = Polyline();
       mBuiltCurve = nullptr;
@@ -49,6 +50,7 @@ void PathNode::RebuildFollowIfNeeded()
       return;
    }
 
+   mCookWarning = DescribeGeometryMismatch(geometrySource, GeometryRequirement::kMeshSurface);
    InstanceOnPointsNode* instancer = FindInstancer(geometrySource);
    unsigned long long revision = geometrySource->MeshRevision();
    if (instancer != nullptr)

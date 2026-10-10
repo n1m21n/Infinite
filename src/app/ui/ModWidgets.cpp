@@ -1312,9 +1312,16 @@ namespace app
          // OUTSIDE the box to the right, which both shrank the field and
          // spilled the caption across the neighbouring cell: exactly the
          // "entering a formula breaks the UI" failure.
-         const float fieldW = std::min(cell - 6.0f, 96.0f);
+         // The field is wider than the knob, so centred on the cell it slid under the
+         // modulation pin (drawn after it, at the knob's left) and the pin hid the first
+         // characters. It starts right of the pin instead - same pinX formula as below.
+         const float pinRight = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - tok::pin_box - 8.0f) +
+                                tok::pin_box + 4.0f;
+         const float fieldL = std::max(cellOrigin.x + 3.0f, pinRight);
+         const float fieldR = cellOrigin.x + cell - 3.0f;
+         const float fieldW = std::min(fieldR - fieldL, 96.0f);
          const float fieldH = ImGui::GetFrameHeight();
-         ImGui::SetCursorScreenPos(ImVec2(cellOrigin.x + (cell - fieldW) * 0.5f,
+         ImGui::SetCursorScreenPos(ImVec2(fieldL + (fieldR - fieldL - fieldW) * 0.5f,
                                           cellOrigin.y + (diameter - fieldH) * 0.5f));
          ImGui::SetNextItemWidth(fieldW);
          if (gTypedParamJustOpened == editKey)

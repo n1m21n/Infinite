@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cmath>
 #include <string>
+#include "imgui_internal.h"
 #include "app/AppShared.h"
 #include "core/CategoryColors.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -65,12 +66,13 @@ namespace LibraryParts
       if (hasText)
       {
          const ImVec2 c(p.x + w - tok::space_2 - 8.0f, p.y + kFieldH * 0.5f);
-         const ImVec2 saved = ImGui::GetCursorScreenPos();
-         ImGui::SetCursorScreenPos(ImVec2(c.x - 12.0f, c.y - 12.0f));
-         if (ImGui::InvisibleButton("##clear", ImVec2(24.0f, 24.0f)))
-            cleared = true;
-         const bool hov = ImGui::IsItemHovered();
-         ImGui::SetCursorScreenPos(saved);
+         // Submitted without moving the cursor: the cursor stays on the field's own advance, so a popup
+         // that ends here does not trip ImGui's "SetCursorPos extends window boundaries" check.
+         const ImGuiID clearId = ImGui::GetID("##clear");
+         const ImRect clearBb(ImVec2(c.x - 12.0f, c.y - 12.0f), ImVec2(c.x + 12.0f, c.y + 12.0f));
+         bool hov = false, held = false;
+         if (ImGui::ItemAdd(clearBb, clearId))
+            cleared = ImGui::ButtonBehavior(clearBb, clearId, &hov, &held);
          const ImU32 col = ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, hov ? 0.9f : 0.5f));
          const float r = 3.5f;
          dl->AddLine(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), col, 1.5f);

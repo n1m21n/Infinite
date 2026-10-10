@@ -1,6 +1,7 @@
 ---
 name: ship-infinite
-description: "Full release: verify, commit, push, tag with curated notes, build the macOS DMG, pull CI Windows zips and Linux AppImage, publish to the Release and GitHub Pages site, flag Node Reference Manual updates, clean junk files. Use for \"ship this\", \"cut a release\", \"build and publish the DMG\", \"push and deploy\"."
+description: "Full release: verify, tag with curated notes, build the DMG, pull CI Windows/Linux builds, publish the Release and Pages site. Manual only: the owner runs /ship-infinite."
+disable-model-invocation: true
 ---
 
 ## When to use (full scope)

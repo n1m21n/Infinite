@@ -1,6 +1,6 @@
 ---
 name: modulation-sweep
-description: "End-to-end modulation sweep: every source (LFO, Random, Pattern, Envelope, macros, MIDI CC, analyzers), every ParamRef destination, and bindings (range, polarity, save/load, unbind on delete). Use for \"does modulation still work\", \"why doesn't this cable move the knob\", after adding a modulator or control."
+description: "End-to-end modulation sweep: sources, ParamRef destinations, bindings. Use for \"does modulation still work\", \"why doesn't this cable move the knob\", or after adding a modulator or control."
 ---
 
 ## When to use (full scope)

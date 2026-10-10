@@ -48,6 +48,8 @@ namespace ActionButton
       const float w = size.x < 0.0f ? std::max(1.0f, ImGui::GetContentRegionAvail().x + size.x + 1.0f)
                                     : std::max(size.x, ts.x + 2.0f * tok::space_2);
       const ImVec2 p = ImGui::GetCursorScreenPos();
+      if (ImGui::ButtonLabelHook != nullptr)
+         ImGui::ButtonLabelHook(label); // headless --describe lists the buttons a node draws, as ImGui::Button does
       const bool clicked = ImGui::InvisibleButton(label, ImVec2(w, h));
       const bool held = ImGui::IsItemActive();
       const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);

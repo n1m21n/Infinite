@@ -346,6 +346,8 @@ void LoadAppearanceOverrides()
    gUiFont.clear();
    gLanguage.clear();
    gTooltips = false;
+   gReduceMotion = false;
+   gCookTimes = false;
 
    const std::string path = AppearancePath();
    if (path.empty())
@@ -840,7 +842,7 @@ void SaveAppearanceOverrides()
        gCableOverridesDark.empty() && gCableOverridesLight.empty() &&
        gNodeOpacityDark < 0.0f && gNodeOpacityLight < 0.0f &&
        gTintWeightDark < 0.0f && gTintWeightLight < 0.0f &&
-       gNodeRounding < 0.0f && gUiScale < 0.0f && gUiFont.empty() && gLanguage.empty() && !gTooltips)
+       gNodeRounding < 0.0f && gUiScale < 0.0f && gUiFont.empty() && gLanguage.empty() && !gTooltips && !gReduceMotion && !gCookTimes)
    {
       std::remove(path.c_str());
       return;

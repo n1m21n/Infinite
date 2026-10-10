@@ -19,12 +19,12 @@ project(Infinite LANGUAGES C CXX)
 # "am I current" comparison. Bump this (and INFINITE_VERSION_RC below it,
 # kept in sync by hand) when cutting a release; nothing else should hardcode
 # a version string.
-set(INFINITE_VERSION "0.4.7")
+set(INFINITE_VERSION "0.5.0")
 # VERSIONINFO (src/platform/win/Infinite.rc.in) wants four dot/comma-separated
 # numeric components but INFINITE_VERSION is three; kept as an explicit
 # second value rather than derived, so bump both together when cutting a
 # release.
-set(INFINITE_VERSION_RC "0,4,7,0")
+set(INFINITE_VERSION_RC "0,5,0,0")
 string(REPLACE "," "." INFINITE_VERSION_RC_STR "${INFINITE_VERSION_RC}")
 
 if(APPLE)
@@ -513,6 +513,9 @@ set(COMMON_SOURCES
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
+    src/core/Delaunay.cpp
+    src/core/CurveOps.cpp
+    src/core/MeshDecimate.cpp
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
@@ -671,6 +674,8 @@ set(COMMON_SOURCES
     src/nodes/FieldPixelNode.cpp
     src/nodes/FieldGraphNode.cpp
     src/nodes/PointDistributionNodes.cpp
+    src/nodes/DelaunayNodes.cpp
+    src/nodes/CurveOpsNode.cpp
     src/nodes/DepthProjectionNode.cpp
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp

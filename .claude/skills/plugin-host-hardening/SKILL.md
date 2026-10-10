@@ -1,6 +1,6 @@
 ---
 name: plugin-host-hardening
-description: "Strategy and diagnosis for third-party VST3/AU plugins crashing, hanging or silencing Infinite. Use when a user names a crashing plugin (Serum, Pigments, ...), pastes a macOS .ips crash report, asks \"why does AU work but VST3 doesn't\", or before touching PluginVST3.mm or Platform.mm plugin paths."
+description: "Diagnose third-party VST3/AU plugins crashing, hanging or silencing Infinite. Use when a user names a crashing plugin, pastes a .ips report, or before touching plugin host paths."
 ---
 
 ## When to use (full scope)

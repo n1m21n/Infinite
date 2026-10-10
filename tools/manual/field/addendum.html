@@ -71,6 +71,19 @@ out = in * (1.0 - abs(sidechain))   // duck by the second input</pre>
 <pre>state float env = 0.0
 env = if(noteOn > 0.5, noteVel, env * 0.999)   // jump to the velocity, then decay</pre></div>
 
+<div class="card"><h2>6 · Field Notes: <code>beat</code>, <code>noteNum</code>, <code>tick</code>, <code>deg</code>, <code>rand</code>, <code>note</code></h2>
+<table><tr><th>Name</th><th>Value</th></tr>
+<tr><td><code>beat</code></td><td>the transport position in beats</td></tr>
+<tr><td><code>noteNum</code></td><td>MIDI note number of the incoming note (reads 0.0 with no note input)</td></tr>
+<tr><td><code>tick(div)</code></td><td>1.0 for the one sample where the beat crosses a multiple of <code>div</code> (in beats, e.g. <code>1/16</code>), else 0.0</td></tr>
+<tr><td><code>deg(d)</code></td><td>MIDI note for scale degree <code>d</code> under the node's Root and Scale; degree 0 at root C is middle C (60)</td></tr>
+<tr><td><code>rand()</code></td><td>a random number from 0 to 1; only valid in a Field Notes node</td></tr>
+<tr><td><code>note(pitch, vel, len)</code></td><td>inside an <code>if</code>, sends a note out; <code>len</code> is in beats, 0 holds as long as the incoming note</td></tr></table>
+<p>These names are reserved, so you cannot declare a param, state cell or assignment with them.</p>
+<pre>if (tick(1/8) &gt; 0.5) {
+   note(deg(floor(rand() * 7)), 0.8, 1/8)   // a random scale degree on every eighth
+}</pre></div>
+
 <div class="card"><h2>Fixes that change what old kernels read</h2>
 <ul><li><code>reduce.&lt;op&gt;(x)</code> over a plain element-domain local used to return 0.0 always; it now returns the real reduction of this cook's values.</li>
 <li><code>length</code>, <code>normalize</code>, <code>distance</code>, <code>dot</code>, <code>cross</code> now work in <code>element</code> kernels (they read 0.0 before, so <code>length(P)</code> was zero for every vertex).</li>

@@ -1,6 +1,6 @@
 ---
 name: render-pipeline-sweep
-description: "3D pipeline sweep as a whole: source mesh, operators, instancing, materials/mapping, lights/environment, simulation, Render 3D's cached scene. Use for \"check the rendering\", \"why did my instances disappear\", \"did the viewport freeze\", or after touching anything between a geometry source and Render 3D."
+description: "3D pipeline sweep from source mesh to Render 3D (instancing, materials, lights, sim). Use for \"check the rendering\", \"instances disappeared\", \"viewport froze\", or after 3D pipeline changes."
 ---
 
 ## When to use (full scope)

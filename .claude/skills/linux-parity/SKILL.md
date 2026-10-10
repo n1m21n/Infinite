@@ -1,6 +1,6 @@
 ---
 name: linux-parity
-description: "Writing Linux-safe Infinite code: three-sided Platform:: obligation, the container+Xvfb rig, what llvmpipe proves, Linux trap catalogue (fontconfig, dlopen, XDG, ALSA/PipeWire, AppImage glibc). Use before changing src/platform/ or adding a Platform:: function, on docs/plans/linux/ phases, or a works-on-macOS-not-Linux bug."
+description: "Writing Linux-safe code: three-sided Platform:: rule, the container+Xvfb rig, Linux traps. Use before changing src/platform/, on docs/plans/linux/ phases, or a works-on-macOS-not-Linux bug."
 ---
 
 ## When to use (full scope)

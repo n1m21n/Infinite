@@ -285,14 +285,28 @@ public:
    float constantIn = 0.5f;
    float amount = 0.85f; // 0 = pass-through, close to 1 = heavy smoothing
 
+   // mode defaults to Per frame (0), the behaviour of every patch saved before
+   // the field existed; Time and Spring are opt-in. Time and Spring read the
+   // transport's seconds, so the response is the same at 30 and 144 fps.
+   enum Mode { kPerFrame = 0, kTime = 1, kSpring = 2 };
+   int mode = kPerFrame;
+   float timeConstant = 0.25f; // seconds to cover ~63% of a step (Time mode)
+   float frequency = 3.0f;     // Hz, spring stiffness (Spring mode)
+   float damping = 0.5f;       // 1 = critically damped, below 1 overshoots
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("constantIn", constantIn); v.Float("amount", amount);
+      v.Int("mode", mode); v.Float("timeConstant", timeConstant);
+      v.Float("frequency", frequency); v.Float("damping", damping);
    }
 
 private:
-   float mLast = -1.0f;      // sentinel: not yet initialized
-   double mLastBeats = -1.0; // beat at which mLast was last updated
+   bool mInit = false;
+   float mLast = 0.0f;
+   float mVel = 0.0f;
+   double mLastBeats = -1.0;   // beat at which mLast was last updated (Per frame)
+   double mLastSeconds = -1.0; // transport second at which mLast was last updated
 };
 
 // Records whatever modulator is patched into "in" (or its own `in` knob when

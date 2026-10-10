@@ -1,6 +1,7 @@
 #include "OrtRuntime.h"
 
 #include "onnxruntime_c_api.h"
+#include "platform/AppPaths.h"
 
 #if defined(_WIN32)
   #include <windows.h>
@@ -37,7 +38,8 @@ namespace Tracking
    {
       if (m_api) return true;
 #if defined(_WIN32)
-      m_lib = reinterpret_cast<void*>(LoadLibraryA(libPath.c_str()));
+      // Wide path (non-ASCII profile folders) and altered search so the DLL's neighbours resolve.
+      m_lib = reinterpret_cast<void*>(LoadLibraryExW(AppPaths::FsPath(libPath).c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH));
 #else
       m_lib = dlopen(libPath.c_str(), RTLD_NOW | RTLD_LOCAL);
 #endif
@@ -84,7 +86,12 @@ namespace Tracking
          if (st) api->ReleaseStatus(st); else usedGpu = true;
       }
       OrtModel* m = new OrtModel();
-      if (!Check(api, api->CreateSession(static_cast<OrtEnv*>(m_env), onnxPath.c_str(), so, &m->session), err))
+#if defined(_WIN32)
+      const std::wstring modelPath = AppPaths::FsPath(onnxPath).wstring(); // ORTCHAR_T is wchar_t on Windows
+#else
+      const std::string& modelPath = onnxPath;
+#endif
+      if (!Check(api, api->CreateSession(static_cast<OrtEnv*>(m_env), modelPath.c_str(), so, &m->session), err))
       {
          api->ReleaseSessionOptions(so);
          delete m;

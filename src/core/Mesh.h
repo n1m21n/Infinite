@@ -460,6 +460,12 @@ namespace MeshOps
    Mesh Solidify(const Mesh& in, float thickness, bool keepOriginal);
    Mesh Extrude(const Mesh& in, float distance, float inset);
    Mesh Wireframe(const Mesh& in, float thickness);
+   // Quadric-error edge collapse down to `ratio` of the input's triangle
+   // count (0.01..1). Vertices are welded by position for topology only, so UV
+   // seams and flat-shaded duplicates survive; per-vertex UVs, normals and
+   // colours are kept from the original vertices. lockBorder keeps open
+   // boundaries exactly where they are.
+   Mesh Decimate(const Mesh& in, float ratio, bool lockBorder);
    Mesh Triangulate(const Mesh& in, float jitter);
    Mesh RecalculateNormals(const Mesh& in, bool flat, bool flip);
    // looseParts selects which thing "explode" means: false (default) pushes

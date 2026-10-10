@@ -1,6 +1,6 @@
 ---
 name: pillar-parity-audit
-description: "Pillar-by-pillar coverage audit (nodes, shortcuts, settings, rendering, panels, modulation, AV/geometry, I/O, perf, save/recovery, platform contract, ...) reporting machine evidence per platform. Use for \"does X work on every OS\", \"what are we not testing\", \"audit the whole app\", or before a release."
+description: "Pillar-by-pillar cross-platform coverage audit with machine evidence per OS. Use for \"does X work on every OS\", \"what are we not testing\", or \"audit the whole app\"."
 ---
 
 ## When to use (full scope)

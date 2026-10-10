@@ -1211,6 +1211,29 @@ namespace MeshOps
          for (size_t i = 0; i < n; i++)
             remaining[i] = i;
 
+         // Uniform grid over the points, so "is any other vertex inside this
+         // candidate ear" only looks at the cells the ear's bounding box
+         // touches instead of every remaining vertex. A point strictly inside
+         // a triangle is always inside its bounding box, so the answers (and
+         // therefore the triangles, in the same order) match the plain scan.
+         float minX = poly[0].x, maxX = poly[0].x, minY = poly[0].y, maxY = poly[0].y;
+         for (const P2& p : poly)
+         {
+            minX = std::min(minX, p.x); maxX = std::max(maxX, p.x);
+            minY = std::min(minY, p.y); maxY = std::max(maxY, p.y);
+         }
+         const int gridSize = std::max(1, std::min(64, (int)std::sqrt((float)n)));
+         const float spanX = std::max(maxX - minX, 1e-9f), spanY = std::max(maxY - minY, 1e-9f);
+         auto cellOf = [&](float v, float lo, float span)
+         {
+            return std::max(0, std::min(gridSize - 1, (int)((v - lo) / span * (float)gridSize)));
+         };
+         std::vector<std::vector<size_t>> cells((size_t)gridSize * (size_t)gridSize);
+         for (size_t i = 0; i < n; i++)
+            cells[(size_t)cellOf(poly[i].y, minY, spanY) * (size_t)gridSize +
+                  (size_t)cellOf(poly[i].x, minX, spanX)].push_back(i);
+         std::vector<char> alive(n, 1);
+
          // Bounded so a self-intersecting contour cannot spin here forever;
          // a partially triangulated glyph beats a hung UI.
          size_t guard = n * n + 16;
@@ -1232,17 +1255,30 @@ namespace MeshOps
                if (cross <= 0.0f)
                   continue;
 
+               const float tx0 = std::min(a.x, std::min(b.x, c.x)), tx1 = std::max(a.x, std::max(b.x, c.x));
+               const float ty0 = std::min(a.y, std::min(b.y, c.y)), ty1 = std::max(a.y, std::max(b.y, c.y));
+               const int cx0 = cellOf(tx0, minX, spanX), cx1 = cellOf(tx1, minX, spanX);
+               const int cy0 = cellOf(ty0, minY, spanY), cy1 = cellOf(ty1, minY, spanY);
                bool contains = false;
-               for (size_t j = 0; j < count && !contains; j++)
-               {
-                  const size_t idx = remaining[j];
-                  if (idx == ia || idx == ib || idx == ic)
-                     continue;
-                  contains = PointInTriangle(poly[idx], a, b, c);
-               }
+               for (int cy = cy0; cy <= cy1 && !contains; cy++)
+                  for (int cx = cx0; cx <= cx1 && !contains; cx++)
+                     for (size_t idx : cells[(size_t)cy * (size_t)gridSize + (size_t)cx])
+                     {
+                        if (!alive[idx] || idx == ia || idx == ib || idx == ic)
+                           continue;
+                        const P2& p = poly[idx];
+                        if (p.x < tx0 || p.x > tx1 || p.y < ty0 || p.y > ty1)
+                           continue;
+                        if (PointInTriangle(p, a, b, c))
+                        {
+                           contains = true;
+                           break;
+                        }
+                     }
                if (contains)
                   continue;
 
+               alive[ib] = 0;
                outIndices.push_back(ids[ia]);
                outIndices.push_back(ids[ib]);
                outIndices.push_back(ids[ic]);

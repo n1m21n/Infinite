@@ -182,6 +182,72 @@ namespace app
    }
 
 
+   // Last two bars (8 beats) of what the script played: one bar per note,
+   // pitch on the y axis (auto-ranged to what is on screen, never narrower
+   // than an octave), brightness = velocity. Reads main-thread readouts only.
+   void DrawFieldNotesRoll(FieldNotesNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      AudioViz::Fill(dl, origin, br);
+      dl->PushClipRect(origin, br, true);
+
+      constexpr double kWindowBeats = 8.0;
+      const double nowBeat = Transport::Instance().Beats();
+      const double startBeat = nowBeat - kWindowBeats;
+
+      for (int i = 1; i < 8; i++)
+         dl->AddLine(ImVec2(origin.x + w * i / 8.0f, origin.y), ImVec2(origin.x + w * i / 8.0f, br.y),
+                     ScopeGridCol(), 1.0f);
+
+      float lo = 127.0f, hi = 0.0f;
+      int visible = 0;
+      for (int i = 0; i < n->RollCount(); i++)
+      {
+         const auto& r = n->RollAt(i);
+         if (r.beat < startBeat || r.beat > nowBeat + 0.01) continue;
+         lo = std::min(lo, r.note);
+         hi = std::max(hi, r.note);
+         visible++;
+      }
+
+      if (visible == 0)
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "idle");
+      }
+      else
+      {
+         if (hi - lo < 11.0f)
+         {
+            const float mid = 0.5f * (hi + lo);
+            lo = mid - 5.5f;
+            hi = mid + 5.5f;
+         }
+         const bool isLight = IsThemeLight();
+         const float barH = std::max(2.0f, h / (hi - lo + 2.0f));
+         const float barW = std::max(2.0f, w / (float)(kWindowBeats * 8.0));
+         for (int i = 0; i < n->RollCount(); i++)
+         {
+            const auto& r = n->RollAt(i);
+            if (r.beat < startBeat || r.beat > nowBeat + 0.01) continue;
+            const float x = origin.x + (float)((r.beat - startBeat) / kWindowBeats) * w;
+            const float y = br.y - barH - ((r.note - lo + 1.0f) / (hi - lo + 2.0f)) * (h - barH);
+            const float v = std::max(0.15f, std::min(1.0f, r.vel));
+            const ImU32 col = isLight ? tok::U32(tok::pal::c_1464E6FF) : tok::U32(tok::pal::c_96D6FFF5);
+            ImVec4 c = ImGui::ColorConvertU32ToFloat4(col);
+            c.w *= v;
+            dl->AddRectFilled(ImVec2(x, y), ImVec2(x + barW, y + barH), ImGui::ColorConvertFloat4ToU32(c), 1.0f);
+         }
+      }
+
+      dl->PopClipRect();
+      AudioViz::Border(dl, origin, br);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+
    void DrawFieldElementParams(FieldElementNode* n)
    {
       gParamWidthLive = std::max(gParamWidthLive, kPreviewSize);   // sliders as wide as the preview and buttons above them

@@ -1,6 +1,6 @@
 ---
 name: field-pixel-presets
-description: "Writing Field Pixel presets (FieldPixelNode::Presets()): reserved names, aspect correction, the metaball/SDF falloff trap, buildable shapes. Use BEFORE adding/editing/debugging a Field Pixel preset, or when one looks stretched, flat, or like a blob that won't blend."
+description: "Writing Field Pixel presets: reserved names, aspect correction, the SDF falloff trap. Use before adding or debugging one, or when it looks stretched, flat, or blobs won't blend."
 ---
 
 ## When to use (full scope)

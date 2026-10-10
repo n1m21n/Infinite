@@ -1,6 +1,6 @@
 ---
 name: geometry-transform-sweep
-description: "Sweep every IGeometrySource consumer for five invariants: upstream transform and Mapping propagate, revision stamps stay stable, pass-throughs keep Instances/group matrices, no invented vertex colour. Use after touching a geometry-input node, or for \"material ignored\", \"instances disappeared\", \"moving the source doesn't update\"."
+description: "Sweep geometry consumers for transform, Mapping, revision and Instances propagation. Use after touching a geometry-input node, or for \"material ignored\" / \"instances disappeared\"."
 ---
 
 ## When to use (full scope)

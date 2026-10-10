@@ -93,23 +93,49 @@ const std::vector<FilterDef>& GetFilterDefs()
       // pixel instead of N², same result up to 16F rounding. Bloom's
       // bright-pass is applied per sample before weighting, so it splits the
       // same way (exact at integer Radius, where every tap is a texel centre).
+      // quality: Classic keeps the original nine taps spaced `radius` px apart
+      // (saved looks unchanged). Smooth walks every pixel out to 4 sigma with
+      // the same gaussian, so a large radius blurs instead of ghosting.
       { "gaussianblur", "Effects",
         "uniform float uRadius;\n"
+        "uniform int uQuality;\n"
         "void main() {\n"
         "   vec4 sum = vec4(0.0); float total = 0.0;\n"
-        "   for (int y = -4; y <= 4; y++) {\n"
-        "      float w = exp(-float(y*y) / 8.0);\n"
-        "      sum += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius)) * w; total += w;\n"
+        "   if (uQuality == 0) {\n"
+        "      for (int y = -4; y <= 4; y++) {\n"
+        "         float w = exp(-float(y*y) / 8.0);\n"
+        "         sum += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius)) * w; total += w;\n"
+        "      }\n"
+        "   } else {\n"
+        "      float r = max(uRadius, 0.001);\n"
+        "      int n = min(int(ceil(4.0 * r)), 40);\n"
+        "      for (int y = -n; y <= n; y++) {\n"
+        "         float d = float(y) / r;\n"
+        "         float w = exp(-d * d / 8.0);\n"
+        "         sum += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y)) * w; total += w;\n"
+        "      }\n"
         "   }\n"
         "   fragColor = sum / total;\n"
         "}\n",
-        { F("%.1f px", P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f)) }, 1,
+        { F("%.1f px", P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f)),
+          E("Quality", "uQuality", { "Classic", "Smooth" }, 0) }, 1,
         "uniform float uRadius;\n"
+        "uniform int uQuality;\n"
         "void main() {\n"
         "   vec4 sum = vec4(0.0); float total = 0.0;\n"
-        "   for (int x = -4; x <= 4; x++) {\n"
-        "      float w = exp(-float(x*x) / 8.0);\n"
-        "      sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * uRadius, 0.0)) * w; total += w;\n"
+        "   if (uQuality == 0) {\n"
+        "      for (int x = -4; x <= 4; x++) {\n"
+        "         float w = exp(-float(x*x) / 8.0);\n"
+        "         sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * uRadius, 0.0)) * w; total += w;\n"
+        "      }\n"
+        "   } else {\n"
+        "      float r = max(uRadius, 0.001);\n"
+        "      int n = min(int(ceil(4.0 * r)), 40);\n"
+        "      for (int x = -n; x <= n; x++) {\n"
+        "         float d = float(x) / r;\n"
+        "         float w = exp(-d * d / 8.0);\n"
+        "         sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x, 0.0)) * w; total += w;\n"
+        "      }\n"
         "   }\n"
         "   fragColor = sum / total;\n"
         "}\n" },
@@ -338,6 +364,39 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   fragColor = vec4(clamp(col, 0.0, 1.0), c.a);\n"
         "}\n",
         { N("%.0f", P("Levels", "uLevels", T::Float, 2.0f, 32.0f, 6.0f)) } },
+
+      // Quantizes like posterize, but spends the rounding error as a fixed
+      // pattern keyed on the output pixel, so gradients keep their tone as
+      // texture instead of banding. Bayer thresholds are computed with bit
+      // ops (no tables); "noise" is interleaved gradient noise, a hash with no
+      // texture lookup that is identical on every GPU.
+      { "dither", "Compositing",
+        "uniform int uMode;\n"
+        "uniform float uLevels;\n"
+        "uniform float uMix;\n"
+        "float bayer(ivec2 p, int n) {\n"
+        "   int r = 0;\n"
+        "   for (int i = 0; i < n; i++) {\n"
+        "      int xi = (p.x >> i) & 1, yi = (p.y >> i) & 1;\n"
+        "      r = (r << 2) | ((xi ^ yi) << 1) | yi;\n"
+        "   }\n"
+        "   return (float(r) + 0.5) / float(1 << (2 * n));\n"
+        "}\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   ivec2 p = ivec2(gl_FragCoord.xy);\n"
+        "   float thr = uMode == 3\n"
+        "      ? fract(52.9829189 * fract(dot(vec2(p), vec2(0.06711056, 0.00583715))))\n"
+        "      : bayer(p, uMode + 1);\n"
+        "   float steps = max(floor(uLevels), 2.0) - 1.0;\n"
+        "   vec3 v = clamp(c.rgb, 0.0, 1.0) * steps;\n"
+        "   vec3 lo = floor(v);\n"
+        "   vec3 q = (lo + step(vec3(thr), v - lo)) / steps;\n"
+        "   fragColor = vec4(mix(c.rgb, q, uMix), c.a);\n"
+        "}\n",
+        { E("Mode", "uMode", { "bayer 2", "bayer 4", "bayer 8", "noise" }, 1),
+          N("%.0f", P("Levels", "uLevels", T::Float, 2.0f, 32.0f, 4.0f)),
+          P("Mix", "uMix", T::Float, 0.0f, 1.0f, 1.0f) } },
 
       { "threshold", "Compositing",
         "uniform float uThreshold;\n"

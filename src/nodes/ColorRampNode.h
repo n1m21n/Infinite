@@ -21,7 +21,9 @@ public:
    enum Interp
    {
       kLinear = 0,
-      kConstant = 1
+      kConstant = 1,
+      kOklab = 2, // mixed in Oklab: even lightness, no muddy midpoints
+      kOklch = 3  // Oklab lightness/chroma, hue along the shorter arc
    };
 
    static INode* Create() { return new ColorRampNode(); }

@@ -1,7 +1,11 @@
 ---
 name: infinite-patch-authoring
-description: Write, check and render Infinite patches (.inf text files) headless, without the UI. Use whenever the user asks you to build, change or debug an Infinite patch, wire nodes, add modulation, or render a frame, video or audio measurement from a patch file.
+description: "Write, check and render Infinite .inf patches headless. Use whenever the user asks to build, change or debug a patch, wire nodes, add modulation, or render from a patch file."
 ---
+
+## When to use (full scope)
+
+Write, check and render Infinite patches (.inf text files) headless, without the UI. Use whenever the user asks you to build, change or debug an Infinite patch, wire nodes, add modulation, or render a frame, video or audio measurement from a patch file.
 
 # Authoring Infinite patches headless
 
@@ -123,7 +127,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
-| `Array` | geo:geometry | out:geometry | 65 | bypass |
+| `Array` | geo:geometry | out:geometry | 67 | bypass |
 | `Arrow 3D` | texture:image | out:geometry | 50 | bypass |
 | `Audio Displacement` | geo:geometry, audio:audio | out:geometry | 32 |  |
 | `Audio Ribbon` | input:audio | out:geometry | 23 | bypass |
@@ -134,8 +138,8 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Cube` | texture:image | out:geometry | 50 | bypass |
 | `Curve` | none | out:geometry | 32 | bypass |
 | `Cylinder` | texture:image | out:geometry | 50 | bypass |
-| `Delete` | geo:geometry | out:geometry | 65 | bypass |
-| `Delete Selected` | geo:geometry | out:geometry | 65 | bypass |
+| `Delete` | geo:geometry | out:geometry | 67 | bypass |
+| `Delete Selected` | geo:geometry | out:geometry | 67 | bypass |
 | `Depth Projection` | depth:image, color:image | out:geometry | 35 |  |
 | `Difference` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Disc` | texture:image | out:geometry | 50 | bypass |
@@ -143,9 +147,9 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Distribute Points in Grid` | none | out:geometry | 8 | bypass |
 | `Distribute Points on Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Dodecahedron` | texture:image | out:geometry | 50 | bypass |
-| `Explode` | geo:geometry | out:geometry | 65 | bypass |
-| `Extrude` | geo:geometry | out:geometry | 65 | bypass |
-| `Extrude Selected` | geo:geometry | out:geometry | 65 | bypass |
+| `Explode` | geo:geometry | out:geometry | 67 | bypass |
+| `Extrude` | geo:geometry | out:geometry | 67 | bypass |
+| `Extrude Selected` | geo:geometry | out:geometry | 67 | bypass |
 | `Field Modifier` | geo:geometry | out:geometry | 11 | bypass |
 | `Field Primitive` | none | out:geometry | 13 | bypass |
 | `Gear 3D` | texture:image | out:geometry | 50 | bypass |
@@ -167,10 +171,10 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Points` | geo:geometry | out:geometry | 22 | bypass |
 | `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
-| `Mirror` | geo:geometry | out:geometry | 65 | bypass |
+| `Mirror` | geo:geometry | out:geometry | 67 | bypass |
 | `Mobius Strip` | texture:image | out:geometry | 50 | bypass |
 | `Model 3D` | texture:image | out:geometry | 27 | bypass |
-| `Normals` | geo:geometry | out:geometry | 65 | bypass |
+| `Normals` | geo:geometry | out:geometry | 67 | bypass |
 | `Null 3D` | geo:geometry | out:geometry | 0 | bypass |
 | `Ocean` | texture:image | out:geometry | 29 | bypass |
 | `Octahedron` | texture:image | out:geometry | 50 | bypass |
@@ -182,28 +186,28 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 39 |  |
 | `Resynthesize 3D` | geo:geometry | out:geometry | 13 | bypass |
 | `Rounded Cube` | texture:image | out:geometry | 50 | bypass |
-| `Screw` | geo:geometry | out:geometry | 65 | bypass |
-| `Select` | geo:geometry | out:geometry | 65 | bypass |
+| `Screw` | geo:geometry | out:geometry | 67 | bypass |
+| `Select` | geo:geometry | out:geometry | 67 | bypass |
 | `Set Vertex Color` | geo:geometry, texture:image, palette:palette | out:geometry | 6 |  |
 | `Sketch 3D` | none | out:geometry | 4 | bypass |
-| `Smooth` | geo:geometry | out:geometry | 65 | bypass |
-| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
+| `Smooth` | geo:geometry | out:geometry | 67 | bypass |
+| `Solidify` | geo:geometry | out:geometry | 67 | bypass |
 | `Sphere` | texture:image | out:geometry | 50 | bypass |
 | `Star 3D` | texture:image | out:geometry | 50 | bypass |
-| `Subdivide` | geo:geometry | out:geometry | 65 | bypass |
+| `Subdivide` | geo:geometry | out:geometry | 67 | bypass |
 | `Supershape` | texture:image | out:geometry | 50 | bypass |
 | `Switcher 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 5 |  |
 | `Tetrahedron` | texture:image | out:geometry | 50 | bypass |
 | `Text 3D` | texture:image | out:geometry | 29 | bypass |
 | `Torus` | texture:image | out:geometry | 50 | bypass |
 | `Torus Knot` | texture:image | out:geometry | 50 | bypass |
-| `Transform` | geo:geometry | out:geometry | 65 | bypass |
-| `Transform Selected` | geo:geometry | out:geometry | 65 | bypass |
-| `Triangulate` | geo:geometry | out:geometry | 65 | bypass |
+| `Transform` | geo:geometry | out:geometry | 67 | bypass |
+| `Transform Selected` | geo:geometry | out:geometry | 67 | bypass |
+| `Triangulate` | geo:geometry | out:geometry | 67 | bypass |
 | `Tube` | texture:image | out:geometry | 50 | bypass |
-| `Twist` | geo:geometry | out:geometry | 65 | bypass |
+| `Twist` | geo:geometry | out:geometry | 67 | bypass |
 | `Union` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
-| `Wireframe` | geo:geometry | out:geometry | 65 | bypass |
+| `Wireframe` | geo:geometry | out:geometry | 67 | bypass |
 | `Wrap` | source:geometry, target:geometry | out:geometry | 26 |  |
 
 ### AudioEffects
@@ -295,7 +299,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `edge outline` | input:image | out:image | 3 | bypass |
 | `edge sobel` | input:image | out:image | 2 | bypass |
 | `emboss` | input:image | out:image | 4 | bypass |
-| `gaussianblur` | input:image | out:image | 1 | bypass |
+| `gaussianblur` | input:image | out:image | 2 | bypass |
 | `glitch` | input:image | out:image | 5 | bypass |
 | `halftone` | input:image | out:image | 3 | bypass |
 | `kaleidoscope` | input:image | out:image | 5 | bypass |
@@ -355,7 +359,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Pattern` | none | out:modulator | 24 | bypass |
 | `Random` | none | out:modulator | 5 | bypass |
 | `Range to Range` | in:modulator | out:modulator | 6 | bypass |
-| `Smoothing` | in:modulator | out:modulator | 2 | bypass |
+| `Smoothing` | in:modulator | out:modulator | 6 | bypass |
 | `Velocity to CV` | notes:note | out:modulator | 2 | bypass |
 | `Vibrato` | none | out:modulator | 1 | bypass |
 

@@ -193,6 +193,12 @@ int JoinGeometryNode::ConnectedCount() const
 
 void JoinGeometryNode::RebuildIfNeeded()
 {
+   // Inputs that are not surfaces contribute nothing; say so instead of
+   // skipping them silently.
+   mCookWarning.clear();
+   for (int i = 0; i < kSlots && mCookWarning.empty(); i++)
+      mCookWarning = DescribeGeometryMismatch(inputs[i], GeometryRequirement::kMeshSurface);
+
    auto sameMatrix = [](const Mat4& a, const Mat4& b)
    {
       for (int k = 0; k < 16; k++)
@@ -528,6 +534,9 @@ const std::vector<std::string>& MeshToPointsNode::ModeNames() { return kModeName
 
 void MeshToPointsNode::RebuildIfNeeded()
 {
+   // Vertices mode only needs positions; edges/faces need real topology.
+   mCookWarning = DescribeGeometryMismatch(
+      input, mode == 0 ? GeometryRequirement::kMeshVertices : GeometryRequirement::kMeshSurface);
    if (input == nullptr)
    {
       if (!mPoints.empty())

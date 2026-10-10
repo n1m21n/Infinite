@@ -146,6 +146,8 @@ void DrawDropHandling(FrameCtx& fc)
                      spawned = SpawnNode("Field Effect", "AudioEffects", canvasPos.x + offset, canvasPos.y);
                   else if (device.domain == "synth")
                      spawned = SpawnNode("Field Synth", "Synths", canvasPos.x + offset, canvasPos.y);
+                  else if (device.domain == "notes")
+                     spawned = SpawnNode("Field Notes", "Notes", canvasPos.x + offset, canvasPos.y);
                   else if (device.domain == "graph")
                      spawned = SpawnNode("Field Graph", "Utility", canvasPos.x + offset, canvasPos.y);
                   else if (device.domain == "primitive")
@@ -166,6 +168,8 @@ void DrawDropHandling(FrameCtx& fc)
                         fs->LoadDeviceFile(device);
                      else if (auto* fsynth = dynamic_cast<FieldSynthNode*>(spawned->node.get()))
                         fsynth->LoadDeviceFile(device);
+                     else if (auto* fnotes = dynamic_cast<FieldNotesNode*>(spawned->node.get()))
+                        fnotes->LoadDeviceFile(device);
                      else if (auto* fg = dynamic_cast<FieldGraphNode*>(spawned->node.get()))
                         fg->LoadDeviceFile(device);
                      else if (auto* form = dynamic_cast<FormulaNode*>(spawned->node.get()))

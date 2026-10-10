@@ -1,6 +1,6 @@
 ---
 name: infinite-code-review
-description: "Review code (other AI, human, earlier session) against Infinite's standards: accuracy, experimentality, instrument-grade design, real-time/threading quality. Use for \"review this code/node/diff\", \"is this up to standard\", or before merging a node someone else wrote. Not the generic /code-review."
+description: "Review code against Infinite's four standards (accuracy, experimentality, instrument-grade design, real-time quality). Use for \"review this code/node/diff\". Not the generic /code-review."
 ---
 
 ## When to use (full scope)

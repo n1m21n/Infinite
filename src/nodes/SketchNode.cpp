@@ -1,6 +1,7 @@
 #include "SketchNode.h"
 
 #include "core/gl3.h"
+#include "platform/AppPaths.h"
 #include "core/sketch/SketchPresets.h"
 #include "Transport.h"
 
@@ -61,7 +62,7 @@ void SketchNode::LoadPreset(int index)
 
 bool SketchNode::LoadSvgFile(const std::string& path)
 {
-   std::ifstream in(path, std::ios::binary);
+   std::ifstream in(AppPaths::FsPath(path), std::ios::binary); // wide path on Windows
    if (!in) { mLastError = "could not open " + path; return false; }
    std::ostringstream ss;
    ss << in.rdbuf();

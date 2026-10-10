@@ -1,6 +1,6 @@
 ---
 name: release-notes-audit
-description: "Audit GitHub release notes against the code at each tag: features credited to the wrong release, technical claims that don't match the implementation. Use for \"vet the release\", \"is the changelog accurate\", \"audit past releases\", or before/after editing a published release body. Not artifact verification."
+description: "Check GitHub release notes against the code at each tag. Use for \"vet the release\", \"is the changelog accurate\", or before/after editing a published release body."
 ---
 
 ## When to use (full scope)

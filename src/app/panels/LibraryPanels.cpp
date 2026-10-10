@@ -899,6 +899,10 @@ namespace app
          const auto& pixels = FieldPixelNode::Presets();
          for (size_t i = 0; i < pixels.size(); i++)
             sEntries.push_back({ pixels[i].name, "2D Visuals", "FieldPixel", "Source", (int)i });
+
+         const auto& notes = FieldNotesNode::Presets();
+         for (size_t i = 0; i < notes.size(); i++)
+            sEntries.push_back({ notes[i].name, "Notes", "Field Notes", "Notes", (int)i });
       }
       return sEntries;
    }
@@ -934,6 +938,11 @@ namespace app
             px->presetIndex = entry.presetIndex;
             px->LoadPreset(entry.presetIndex);
          }
+         else if (auto* nn = dynamic_cast<FieldNotesNode*>(gn->node.get()))
+         {
+            nn->presetIndex = entry.presetIndex;
+            nn->LoadPreset(entry.presetIndex);
+         }
          gPatchDirty = true;
       }
    }
@@ -944,7 +953,7 @@ namespace app
       ImGui::PushID("##field_panel");
 
       static const std::vector<std::string> kFieldSortNames = { "Category", "Name", "Favourites" };
-      static const std::vector<std::string> kFieldCategories = { "All", "Synth", "Effects", "Modifiers", "3D Shapes", "2D Visuals" };
+      static const std::vector<std::string> kFieldCategories = { "All", "Synth", "Effects", "Modifiers", "3D Shapes", "2D Visuals", "Notes" };
 
       if (DrawBrowserFilterStrip(gFieldFilter, T("search field presets..."), kFieldSortNames, kFieldCategories))
          SaveBrowserFilterPrefs();

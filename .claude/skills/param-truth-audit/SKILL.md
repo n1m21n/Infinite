@@ -1,6 +1,6 @@
 ---
 name: param-truth-audit
-description: "Check that DSP does what the control says: declared range vs DSP clamp/formula, BeginDisabled gates vs real short-circuits, mailbox params actually read on every implied path. Use after adding/changing a node param, clamp or disabled gate, before claiming \"the knob does X\", or for \"does the UI match the DSP\"."
+description: "Check the DSP does what the control claims (range, disabled gates, mailbox reads). Use after adding or changing a param or clamp, or before claiming \"the knob does X\"."
 ---
 
 ## When to use (full scope)

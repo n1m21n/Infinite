@@ -19,7 +19,7 @@ namespace
       // still named here so a saved index still has a label, just not spawned
       // or offered in the operation dropdown (GeometryOpNode::IsSpawnable).
       "Select", "Delete Selected", "Transform Selected", "Extrude Selected",
-      "Delete"
+      "Delete", "Decimate"
    };
    const std::vector<std::string> kSourceNames = { "Vertices", "Edges", "Faces" };
    const std::vector<std::string> kWrapModeNames = { "Cylindrical", "Spherical", "Nearest Surface" };
@@ -187,6 +187,8 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.rise = rise;
    s.radiusOffset = radiusOffset;
    s.weldSeam = weldSeam;
+   s.decimateRatio = decimateRatio;
+   s.lockBorder = lockBorder;
    s.upstream = input;
    // The upstream's own revision stamp, not its triangle count: Select and
    // other mask-only operators leave the vertex/index count unchanged, so a
@@ -310,6 +312,10 @@ const Mesh& GeometryOpNode::GetMesh()
          // Duplicates the whole mesh - "only these faces" isn't meaningful.
          // selectionOnly hidden.
          mCache = MeshOps::Mirror(src, axis, mirrorOffset, weldSeam, keepOriginal);
+         break;
+      case kDecimate:
+         // Connectivity-dependent - see kSubdivide. selectionOnly hidden.
+         mCache = MeshOps::Decimate(src, decimateRatio, lockBorder);
          break;
       case kScrew:
          // Connectivity-dependent - see kSubdivide. selectionOnly hidden.
@@ -629,6 +635,12 @@ void GeometryOpNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
+   // Transform moves a mesh, cloud or curve; every other op reshapes a mesh and
+   // would otherwise hand a cloud or curve through unchanged without saying so.
+   if (bypassed || op == kTransform)
+      mCookWarning.clear();
+   else
+      mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshVertices);
 }
 
 // ======================================================== Displacement
@@ -657,7 +669,11 @@ DisplacementNode::Signature DisplacementNode::CurrentSignature() const
 const Mesh& DisplacementNode::GetMesh()
 {
    if (input == nullptr)
+   {
+      mCookWarning.clear();
       return kEmptyMesh;
+   }
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    const Signature sig = CurrentSignature();
    if (mHasBuilt && sig == mBuilt)
@@ -837,6 +853,9 @@ void InstanceOnPointsNode::Rebuild()
    mColors.clear();
 
    mCookWarning = DescribeGeometryMismatch(cloudSource, GeometryRequirement::kCloud);
+   if (mCookWarning.empty() && cloudSource == nullptr)
+      mCookWarning = DescribeGeometryMismatch(
+         pointSource, pointMode == 0 ? GeometryRequirement::kMeshVertices : GeometryRequirement::kMeshSurface);
 
    // The stamp's own transform is baked into every instance as a baseline -
    // move/scale/rotate the shape source and all copies follow, same as
@@ -1046,7 +1065,9 @@ const Mesh& WrapNode::GetMesh()
       return kEmptyMesh;
    }
 
-   mCookWarning = DescribeGeometryMismatch(targetInput, GeometryRequirement::kMeshSurface);
+   mCookWarning = DescribeGeometryMismatch(sourceInput, GeometryRequirement::kMeshSurface);
+   if (mCookWarning.empty())
+      mCookWarning = DescribeGeometryMismatch(targetInput, GeometryRequirement::kMeshSurface);
 
    const Signature sig = CurrentSignature();
    if (mHasBuilt && sig == mBuilt)

@@ -211,6 +211,9 @@ namespace FormParts
    // Window padding for form windows: cards reach SectionCard::kPad into it, so space_4 leaves an 8 pt margin.
    // Push before ImGui::Begin and PopWindowPad right after it: the window padding insets the content, and the
    // frame padding is what insets the title text (left edge on the content line, air above and below).
+   // Places the next widget on the same row. A component so surfaces never call ImGui::SameLine directly.
+   inline void Inline(float offset = 0.0f, float spacing = -1.0f) { ImGui::SameLine(offset, spacing); }
+
    inline void PushWindowPad()
    {
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_4, tok::space_4));

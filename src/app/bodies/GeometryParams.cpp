@@ -733,6 +733,45 @@ namespace app
    }
 
 
+   void DrawCurveOpsParams(CurveOpsNode* n)
+   {
+      if (n->input != nullptr)
+         ImGui::TextDisabled("%zu points out", n->PointCount());
+      DropdownButton("mode", CurveOpsNode::ModeNames(), n->mode,
+                     [n](int i) { PushUndoCheckpoint(); n->mode = i; });
+      switch (n->mode)
+      {
+         case CurveOpsNode::kSimplify:
+            ModSlider("tolerance", &n->tolerance, 0.0f, 0.5f, "%.3f");
+            break;
+         case CurveOpsNode::kSmooth:
+            ModSliderInt("iterations", &n->iterations, 0, 50);
+            ModSlider("strength", &n->strength, 0.0f, 1.0f);
+            break;
+         case CurveOpsNode::kOffset:
+            ModSlider("distance", &n->distance, -2.0f, 2.0f);
+            ModSliderInt("arc steps", &n->arcSteps, 1, 16);
+            break;
+         default:
+            ModSliderInt("count", &n->count, 2, 512);
+            break;
+      }
+      ModSlider("tube radius", &n->radius, 0.002f, 0.2f, "%.3f");
+   }
+
+
+   void DrawDelaunayParams(DelaunayMeshNode* n)
+   {
+      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      DropdownButton("plane", DelaunayMeshNode::PlaneNames(), n->plane,
+                     [n](int i) { PushUndoCheckpoint(); n->plane = i; });
+      ModCheckbox("alive only", &n->aliveOnly);
+      ModSliderInt("max points", &n->maxPoints, 3, 5000);
+      if (dynamic_cast<VoronoiCellsNode*>(n) != nullptr)
+         ModSlider("inset", &n->inset, 0.0f, 0.95f);
+   }
+
+
    void DrawDistributePointsInGridParams(DistributePointsInGridNode* n)
    {
       ImGui::TextDisabled("%zu points", n->PointCount());
@@ -952,10 +991,10 @@ namespace app
          if (n->ActsOnInstanceStamp())
          {
             if (n->op == GeometryOpNode::kTransform)
-               ImGui::TextDisabled("moving the whole instanced group (%zu copies)",
+               ImGui::TextDisabled("whole group, %zu copies",
                                     n->UpstreamInstanceCount());
             else
-               ImGui::TextDisabled("%zu triangles out - applied to the instanced shape, %zu copies",
+               ImGui::TextDisabled("%zu tris, per shape x%zu",
                                     n->TriangleCount(), n->UpstreamInstanceCount());
          }
          else
@@ -1111,6 +1150,10 @@ namespace app
          case GeometryOpNode::kExtrudeSelected:
             ModSlider("distance", &n->thickness, -1.0f, 1.0f);
             ModSlider("inset", &n->inset, 0.0f, 0.9f);
+            break;
+         case GeometryOpNode::kDecimate:
+            ModSlider("keep", &n->decimateRatio, 0.01f, 1.0f, "%.2f");
+            ModCheckbox("lock border", &n->lockBorder);
             break;
          case GeometryOpNode::kScrew:
             ModSliderInt("steps", &n->screwSteps, 3, 256);
