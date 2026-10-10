@@ -2510,20 +2510,35 @@ void FrameTest_FIELDPIXELTEST(int frameId, GLFWwindow* window)
             auto shift = render("img(uv + vec2(1/res.x, 0))", 12003);
             auto half = render("img(uv + vec2(0.5/res.x, 0))", 12004);
             pass = pass && src.size() == (size_t)w*h*4 && bare.size() == src.size() && identity.size() == src.size() && shift.size() == src.size() && half.size() == src.size();
+            if (!pass)
+               printf("[FIELDPIXELTEST] image sampling setup: filter %d (want %d), sizes src %zu bare %zu shift %zu half %zu\n", (int)filter, (int)GL_LINEAR, src.size(), bare.size(), shift.size(), half.size());
+            float errBare = 0, errShift = 0, errHalf = 0;
             if (pass)
                for (int y=0; y<h; ++y) for (int x=0; x<w; ++x) for (int c=0; c<4; ++c)
                {
                   size_t at = (y*w+x)*4+c, next = (y*w+std::min(x+1,w-1))*4+c;
-                  pass = pass && bare[at] == identity[at] && std::abs(shift[at]-src[next]) < 0.006f &&
-                         std::abs(half[at]-(src[at]+src[next])*0.5f) < 0.006f;
+                  errBare = std::max(errBare, std::abs(bare[at]-identity[at]));
+                  errShift = std::max(errShift, std::abs(shift[at]-src[next]));
+                  errHalf = std::max(errHalf, std::abs(half[at]-(src[at]+src[next])*0.5f));
                }
+            const bool passPixels = pass && errBare == 0.0f && errShift < 0.006f && errHalf < 0.006f;
+            if (pass && !passPixels)
+               printf("[FIELDPIXELTEST] image sampling max error: bare-vs-identity %.5f, shift %.5f, half-texel %.5f\n", errBare, errShift, errHalf);
+            pass = passPixels;
             // A different output size must clamp to SOURCE texel centres.
             effect.width = 192; effect.height = 108;
             auto edge = render("img(vec2(-2, 2))", 12005);
             size_t topLeft = (h-1)*w*4;
-            pass = pass && edge.size() == (size_t)192*108*4;
+            const bool edgeSized = edge.size() == (size_t)192*108*4;
+            pass = pass && edgeSized;
             if (src.size() > topLeft+3 && edge.size() >= 4)
-               for (int c=0; c<4; ++c) pass = pass && std::abs(edge[c]-src[topLeft+c]) < 0.001f;
+               for (int c=0; c<4; ++c)
+               {
+                  const bool near = std::abs(edge[c]-src[topLeft+c]) < 0.001f;
+                  if (pass && !near) printf("[FIELDPIXELTEST] image sampling clamp: channel %d got %.5f want %.5f\n", c, edge[c], src[topLeft+c]);
+                  pass = pass && near;
+               }
+            if (!edgeSized) printf("[FIELDPIXELTEST] image sampling clamp: size %zu\n", edge.size());
             auto disconnected = render("img(uv)", 12006);
             effect.DeclaredImageInput(0)->Disconnect(); effect.CookIfNeeded(12007);
             disconnected = read(effect, 192, 108);
