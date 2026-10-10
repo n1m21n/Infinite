@@ -778,6 +778,17 @@ void DrawPopupsA(FrameCtx& fc)
                      handled = true;
                   }
                }
+               else if (entry.nodeType == "Field Notes")
+               {
+                  if (FieldNotesNode* target = FindNodeUnderCanvasPoint<FieldNotesNode>(canvasMouse))
+                  {
+                     PushUndoCheckpoint();
+                     target->presetIndex = entry.presetIndex;
+                     target->LoadPreset(entry.presetIndex);
+                     gPatchDirty = true;
+                     handled = true;
+                  }
+               }
                else if (entry.nodeType == "Field Effect")
                {
                   if (FieldSampleNode* target = FindNodeUnderCanvasPoint<FieldSampleNode>(canvasMouse))

@@ -3544,6 +3544,43 @@ int RunFieldNotesTest()
       check(rig.Count(false) == 1, "unplug: follower released");
    }
 
+   // 6. Soak: every preset, with and without a held input note, never leaves a note hanging.
+   for (const auto& p : FieldNotesNode::Presets())
+   {
+      NotesTransport(true);
+      NotesRig rig(p.code);
+      // Eight notes, 80 blocks apart, each held 40 blocks; the first lands after the param smoothers settle.
+      for (int b = 0; b < 700; b++)
+      {
+         const int k = (b - 50) / 80;
+         if (b >= 50 && k < 8 && (b - 50) % 80 == 0)
+         {
+            NoteEvent on; on.isNoteOn = true; on.note = 60; on.velocity = 0.8f; on.voiceId = 100 + k; on.frameOffset = 0;
+            rig.inbox.Push(on);
+         }
+         if (b >= 90 && k < 8 && (b - 90) % 80 == 0)
+         {
+            NoteEvent off; off.isNoteOn = false; off.note = 60; off.voiceId = 100 + (b - 90) / 80; off.frameOffset = 0;
+            rig.inbox.Push(off);
+         }
+         rig.Block(b + 1);
+      }
+      Transport::Instance().SetPlaying(false);
+      rig.Block(2000);
+      rig.Block(2001);
+      if (rig.Count(true) != rig.Count(false))
+      {
+         printf("FAIL: preset '%s' left %d note(s) hanging (%d on, %d off)\n", p.name,
+                rig.Count(true) - rig.Count(false), rig.Count(true), rig.Count(false));
+         allOk = false;
+      }
+      if (rig.Count(true) == 0)
+      {
+         printf("FAIL: preset '%s' produced no notes\n", p.name);
+         allOk = false;
+      }
+   }
+
    printf("INFINITE_FIELDNOTESTEST: %s\n", allOk ? "OK" : "FAIL");
    fflush(stdout);
    return allOk ? 0 : 1;

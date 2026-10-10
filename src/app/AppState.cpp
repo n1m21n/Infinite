@@ -1204,6 +1204,11 @@ bool gHeadlessNeedProbe = false;
    // tooltips are already known to be safe.
    bool gGlobalScaleTooltipHovered = false;
 
+   // Cook-warning / live-issue text for the node under the cursor, set inside
+   // the node draw loop and shown once the editor is suspended (a SetTooltip
+   // inside ed::Begin/End lands offset by the canvas zoom and pan).
+   std::string gNodeHoverTip;
+
    bool gGlobalScaleTooltipEnabled = false;
 
 

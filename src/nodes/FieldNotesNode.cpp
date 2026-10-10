@@ -527,6 +527,224 @@ const std::vector<FieldNotesNode::Preset>& FieldNotesNode::Presets()
         "   play = if(rand() < density, 1, 0)\n"
         "   note(deg(d), (0.6 + 0.3 * rand()) * play, 1/8)\n"
         "}\n" },
+      { "Arp Up",
+        "param float steps = 4 [2, 8]\n"
+        "state float step = 0\n"
+        "if (tick(1/8) > 0.5) {\n"
+        "   cnt = floor(steps + 0.5)\n"
+        "   note(deg(step * 2), 0.8, 1/8)\n"
+        "   step = (step + 1) % cnt\n"
+        "}\n" },
+      { "Arp Up Down",
+        "param float span = 5 [2, 8]\n"
+        "state float step = 0\n"
+        "if (tick(1/8) > 0.5) {\n"
+        "   top = floor(span + 0.5) - 1\n"
+        "   idx = top - abs(top - (step % (2 * top)))\n"
+        "   note(deg(idx * 2), 0.8, 1/8)\n"
+        "   step = (step + 1) % (2 * top)\n"
+        "}\n" },
+      { "Root Pulse",
+        "param float rate = 0.25 [0.0625, 1]\n"
+        "if (tick(rate) > 0.5) {\n"
+        "   note(deg(0) - 12, 0.9, rate * 0.8)\n"
+        "}\n" },
+      { "Four On The Floor",
+        "if (tick(1) > 0.5) {\n"
+        "   note(deg(0) - 24, 1, 1/8)\n"
+        "}\n" },
+      { "Offbeat Chords",
+        "if (tick(1/2) > 0.5 && (floor(beat * 2 + 0.01) % 2) > 0.5) {\n"
+        "   note(deg(0), 0.7, 1/4)\n"
+        "   note(deg(2), 0.6, 1/4)\n"
+        "   note(deg(4), 0.6, 1/4)\n"
+        "}\n" },
+      { "Random Melody",
+        "param float density = 0.7 [0, 1]\n"
+        "param float range = 8 [2, 14]\n"
+        "if (tick(1/8) > 0.5) {\n"
+        "   play = if(rand() < density, 1, 0)\n"
+        "   note(deg(floor(rand() * range)), (0.55 + 0.35 * rand()) * play, 1/8)\n"
+        "}\n" },
+      { "Sparse Drift",
+        "param float chance = 0.35 [0, 1]\n"
+        "if (tick(1/2) > 0.5) {\n"
+        "   play = if(rand() < chance, 1, 0)\n"
+        "   note(deg(floor(rand() * 5) * 2), 0.6 * play, 1.5)\n"
+        "}\n" },
+      { "3 Against 4",
+        "if (tick(4/3) > 0.5) {\n"
+        "   note(deg(4), 0.8, 1/4)\n"
+        "}\n"
+        "if (tick(1) > 0.5) {\n"
+        "   note(deg(0) - 12, 0.9, 1/4)\n"
+        "}\n" },
+      { "Octave Bounce Bass",
+        "state float step = 0\n"
+        "if (tick(1/16) > 0.5) {\n"
+        "   up = if((step % 2) > 0.5, 12, 0)\n"
+        "   note(deg(0) - 12 + up, 0.7 + 0.25 * if((step % 4) < 0.5, 1, 0), 1/16)\n"
+        "   step = (step + 1) % 16\n"
+        "}\n" },
+      { "Acid Line",
+        "param float wander = 1.7 [0.5, 3]\n"
+        "state float step = 0\n"
+        "if (tick(1/16) > 0.5) {\n"
+        "   d = floor(abs(sin(step * wander)) * 6)\n"
+        "   acc = if((step % 4) < 0.5, 1, 0)\n"
+        "   rest = if(rand() < 0.85, 1, 0)\n"
+        "   note(deg(d) - 12, (0.55 + 0.4 * acc) * rest, 1/16)\n"
+        "   step = (step + 1) % 16\n"
+        "}\n" },
+      { "Cascade Down",
+        "param float length = 8 [3, 14]\n"
+        "state float step = 0\n"
+        "if (tick(1/16) > 0.5) {\n"
+        "   cnt = floor(length + 0.5)\n"
+        "   note(deg(cnt - 1 - step), 0.5 + 0.4 * (1 - step / cnt), 1/16)\n"
+        "   step = (step + 1) % cnt\n"
+        "}\n" },
+      { "Triplet Ostinato",
+        "state float step = 0\n"
+        "if (tick(1/3) > 0.5) {\n"
+        "   note(deg((step % 3) * 2 + 4), 0.75, 1/6)\n"
+        "   step = (step + 1) % 3\n"
+        "}\n" },
+      { "Slow Pad",
+        "if (tick(4) > 0.5) {\n"
+        "   note(deg(0), 0.6, 4)\n"
+        "   note(deg(2), 0.5, 4)\n"
+        "   note(deg(4), 0.5, 4)\n"
+        "   note(deg(6), 0.45, 4)\n"
+        "}\n" },
+      { "Chance Chords",
+        "param float chance = 0.6 [0, 1]\n"
+        "if (tick(2) > 0.5) {\n"
+        "   play = if(rand() < chance, 1, 0)\n"
+        "   r = floor(rand() * 4)\n"
+        "   note(deg(r), 0.7 * play, 2)\n"
+        "   note(deg(r + 2), 0.6 * play, 2)\n"
+        "   note(deg(r + 4), 0.6 * play, 2)\n"
+        "}\n" },
+      { "Chord Progression",
+        "if (tick(4) > 0.5) {\n"
+        "   bar = floor(beat / 4 + 0.01) % 4\n"
+        "   r = if(bar < 0.5, 0, if(bar < 1.5, 5, if(bar < 2.5, 3, 4)))\n"
+        "   note(deg(r) - 12, 0.8, 4)\n"
+        "   note(deg(r), 0.6, 4)\n"
+        "   note(deg(r + 2), 0.55, 4)\n"
+        "   note(deg(r + 4), 0.55, 4)\n"
+        "}\n" },
+      { "Octave Doubler",
+        "if (noteOn > 0.5) {\n"
+        "   note(noteNum, noteVel, 0)\n"
+        "   note(noteNum + 12, noteVel * 0.6, 0)\n"
+        "}\n" },
+      { "Power Chord",
+        "if (noteOn > 0.5) {\n"
+        "   note(noteNum, noteVel, 0)\n"
+        "   note(noteNum + 7, noteVel * 0.85, 0)\n"
+        "   note(noteNum + 12, noteVel * 0.7, 0)\n"
+        "}\n" },
+      { "Major Triad",
+        "if (noteOn > 0.5) {\n"
+        "   note(noteNum, noteVel, 0)\n"
+        "   note(noteNum + 4, noteVel * 0.8, 0)\n"
+        "   note(noteNum + 7, noteVel * 0.8, 0)\n"
+        "}\n" },
+      { "Minor Triad",
+        "if (noteOn > 0.5) {\n"
+        "   note(noteNum, noteVel, 0)\n"
+        "   note(noteNum + 3, noteVel * 0.8, 0)\n"
+        "   note(noteNum + 7, noteVel * 0.8, 0)\n"
+        "}\n" },
+      { "Humanise Velocity",
+        "param float amount = 0.25 [0, 0.6]\n"
+        "if (noteOn > 0.5) {\n"
+        "   note(noteNum, clamp(noteVel + (rand() - 0.5) * amount, 0.05, 1), 0)\n"
+        "}\n" },
+      { "Probability Gate",
+        "param float keep = 0.7 [0, 1]\n"
+        "if (noteOn > 0.5 && rand() < keep) {\n"
+        "   note(noteNum, noteVel, 0)\n"
+        "}\n" },
+      { "Octave Scatter",
+        "if (noteOn > 0.5) {\n"
+        "   shift = (floor(rand() * 3) - 1) * 12\n"
+        "   note(noteNum + shift, noteVel, 0)\n"
+        "}\n" },
+      { "Random Fifth",
+        "param float chance = 0.3 [0, 1]\n"
+        "if (noteOn > 0.5) {\n"
+        "   up = if(rand() < chance, 7, 0)\n"
+        "   note(noteNum + up, noteVel, 0)\n"
+        "}\n" },
+      { "Soft Compressor",
+        "if (noteOn > 0.5) {\n"
+        "   note(noteNum, 0.5 + noteVel * 0.5, 0)\n"
+        "}\n" },
+      { "Echo Tail",
+        "param float feedback = 0.6 [0.2, 0.9]\n"
+        "state float left = 0\n"
+        "state float pitch = 60\n"
+        "state float vel = 0\n"
+        "if (noteOn > 0.5) {\n"
+        "   note(noteNum, noteVel, 0)\n"
+        "   left = 4\n"
+        "   pitch = noteNum\n"
+        "   vel = noteVel\n"
+        "}\n"
+        "if (left > 0.5 && tick(1/4) > 0.5) {\n"
+        "   vel = vel * feedback\n"
+        "   note(pitch, vel, 1/8)\n"
+        "   left = left - 1\n"
+        "}\n" },
+      { "Shadow Octave",
+        "state float armed = 0\n"
+        "state float pitch = 60\n"
+        "state float vel = 0\n"
+        "if (noteOn > 0.5) {\n"
+        "   note(noteNum, noteVel, 0)\n"
+        "   armed = 1\n"
+        "   pitch = noteNum\n"
+        "   vel = noteVel\n"
+        "}\n"
+        "if (armed > 0.5 && tick(1/8) > 0.5) {\n"
+        "   note(pitch + 12, vel * 0.6, 1/8)\n"
+        "   armed = 0\n"
+        "}\n" },
+      { "Strum Triad",
+        "param float speed = 0.0625 [0.03125, 0.25]\n"
+        "state float k = 3\n"
+        "state float pitch = 60\n"
+        "state float vel = 0\n"
+        "if (noteOn > 0.5) {\n"
+        "   pitch = noteNum\n"
+        "   vel = noteVel\n"
+        "   k = 0\n"
+        "}\n"
+        "if (k < 2.5 && tick(speed) > 0.5) {\n"
+        "   off = if(k < 0.5, 0, if(k < 1.5, 4, 7))\n"
+        "   note(pitch + off, vel, 1/4)\n"
+        "   k = k + 1\n"
+        "}\n" },
+      { "Latch Arp",
+        "state float left = 0\n"
+        "state float step = 0\n"
+        "state float pitch = 60\n"
+        "state float vel = 0\n"
+        "if (noteOn > 0.5) {\n"
+        "   pitch = noteNum\n"
+        "   vel = noteVel\n"
+        "   left = 8\n"
+        "   step = 0\n"
+        "}\n"
+        "if (left > 0.5 && tick(1/8) > 0.5) {\n"
+        "   off = if((step % 4) < 0.5, 0, if((step % 4) < 1.5, 4, if((step % 4) < 2.5, 7, 12)))\n"
+        "   note(pitch + off, vel, 1/8)\n"
+        "   step = step + 1\n"
+        "   left = left - 1\n"
+        "}\n" },
    };
    return kPresets;
 }

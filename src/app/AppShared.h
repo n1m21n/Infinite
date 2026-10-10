@@ -2241,6 +2241,7 @@ bool EyeToggle(bool shown);
 bool ViewportToggle(bool shown);
 
 extern bool gGlobalScaleTooltipHovered;
+extern std::string gNodeHoverTip;
 
 extern bool gGlobalScaleTooltipEnabled;
 
@@ -3473,6 +3474,7 @@ void DrawWavetableScope(WavetableNode* n, float h, float width);
 void DrawFieldSampleScope(FieldSampleNode* n, float h, float width);
 
 void DrawFieldSynthScope(FieldSynthNode* n, float h, float width);
+void DrawFieldNotesRoll(FieldNotesNode* n, float h, float width);
 
 void DrawFieldElementParams(FieldElementNode* n);
 
