@@ -1,0 +1,173 @@
+infinite-patch 1
+node 1 Synths Wave Terrain
+  pos 7860 -1420
+  flags 0 0 1 0
+  i orbitType 1
+  i channel 3
+  f centerX 0.5
+  f centerY 0.5
+  f radiusX 0.5
+  f radiusY 0.5
+  f ratioA 1
+  f ratioB 1.07499897
+  f phaseOffset 0.25
+  f rotation 0
+  f scanSpeed 4
+  f position 0.445000082
+  f volume 0.800000012
+  f pan 0
+  f frequency 220
+  i octave -2
+  i semi 0
+  f fine 0
+  f glide 0.100000091
+  i unison 3
+  f detune 44
+  f stereoWidth 0.5
+  f ampAttack 8.58042145
+  f ampDecay 1.95880604
+  f ampSustain 0.574706078
+  f ampRelease 1561.67285
+  i filterType 1
+  f cutoff 432
+  f resonance 0.140000001
+  f filterAmount 0
+  f filterAttack 5
+  f filterDecay 300
+  f filterSustain 0.400000006
+  f filterRelease 250
+  f drive 0
+end
+node 2 Notes Random Note Generator
+  pos 7380 -1800
+  flags 0 0 1 0
+  i rangeLow 48
+  i rangeHigh 72
+  i scale 13
+  i root 0
+  i rateMode 0
+  f rateBeats 4
+  f rateSeconds 0.200000003
+  i maxStep 7
+  b useGlobalScale 1
+end
+node 3 AudioUtility Audio Out
+  pos 9560 -900
+  flags 0 0 1 0
+  s recordDirectory 
+end
+node 4 Source Formula
+  pos 6660 -1880
+  flags 1 0 1 0
+  s formula    vec2 w = p * (3.0 + uA * 5.0);\n   float acc = 0.0, amp = 0.5;\n   for (int i = 0; i < 5; i++) {\n      vec2 g = floor(w), f = fract(w);\n      f = f * f * (3.0 - 2.0 * f);\n      float n = mix(mix(rand(g), rand(g + vec2(1.0, 0.0)), f.x),\n                    mix(rand(g + vec2(0.0, 1.0)), rand(g + vec2(1.0, 1.0)), f.x), f.y);\n      acc += n * amp;\n      amp *= 0.5;\n      w = w * 2.0 + vec2(acc * uB * 3.0 + t * 0.1, acc * uB * 3.0);\n   }\n   return vec4(0.5 + 0.5 * cos(vec3(0.0, 1.8, 3.6) + acc * 4.0 + uC * 6.0), 1.0);
+  f width 1920
+  f height 1920
+  f knobA 0.549000025
+  f knobB 0.69599998
+  f knobC 0.418921143
+  f knobD 0.5
+  b animate 1
+end
+node 5 Effects kaleidoscope
+  pos 7500 -1400
+  flags 1 0 1 0
+  f uSegments 25.6291428
+  f uRotation 5.46375227
+  f uZoom 0.555999994
+  f uCenterX 0.5
+  f uCenterY 0.5
+end
+node 6 Modulators Random
+  pos 6480 -1400
+  flags 0 0 1 0
+  f rate 1
+  f smooth 0.5
+  f low 0
+  f high 1
+  f seed 7.30000019
+end
+node 7 AudioEffects Chorus
+  pos 8380 -1300
+  flags 0 0 1 0
+  f mix 0.3950001
+  f delay 7
+  f spread 0.599999905
+  f taps 2
+  f depth 5
+  f feedback 0.184499964
+  f sync 1
+  f rateDiv 6
+  f rate 0.549800575
+end
+node 8 AudioEffects Reverb
+  pos 8940 -1300
+  flags 0 0 1 0
+  f mix 0.494999975
+  f size 0.61499989
+  f decay 11.7509871
+  f damping 0.400000006
+  f predelay 20
+  f width 0.505000472
+end
+node 9 Output Output
+  pos 9560 -1740
+  flags 1 0 1 0
+  i recordFps 30
+  b includeAudio 1
+end
+node 10 Modulators LFO
+  pos 6760 -1340
+  flags 1 0 1 0
+  i shape 0
+  f rateBeats 4
+  f phase 0
+  f low 0
+  f high 1
+end
+node 11 Modulators Random
+  pos 6720 -920
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 36.5
+end
+node 12 Modulators Random
+  pos 7100 -860
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 51.1000023
+end
+node 13 Effects liquify
+  pos 7040 -1620
+  flags 1 0 1 0
+  f uAmount 1.28979158
+  f uScale 9.92800045
+  f uSpeed 0.400000006
+end
+node 16 Modulators Random
+  pos 6360 -1180
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 83.6139984
+end
+cable 1 0 5
+cable 5 0 13
+cable 9 0 5
+cable 13 0 4
+aud 3 0 8
+aud 7 0 1
+aud 8 0 7
+aud 9 1 8
+note 1 1 2 0
+mod 4 4 10 0 0 1 0.254999995
+mod 5 0 11 0 0 1 7.27799988
+mod 5 1 12 0 0 1 5.6382432
+mod 13 0 16 0 0 1 2

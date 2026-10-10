@@ -1,0 +1,1045 @@
+infinite-patch 1
+node 1 Notes Note Sequencer
+  uid 1
+  pos 17640 -3480
+  flags 0 0 1 0
+  i steps 8
+  i rateMode 0
+  f rateBeats 0.25
+  f rateSeconds 0.200000003
+  f gatePercent 70
+  b useGlobalScale 0
+  i note0 74
+  f vel0 0.800000012
+  b en0 1
+  i note1 60
+  f vel1 0.45257014
+  b en1 1
+  i note2 60
+  f vel2 0.41163218
+  b en2 1
+  i note3 60
+  f vel3 0.41163218
+  b en3 1
+  i note4 60
+  f vel4 0.800000012
+  b en4 1
+  i note5 60
+  f vel5 0.493496954
+  b en5 1
+  i note6 60
+  f vel6 0.41163218
+  b en6 1
+  i note7 60
+  f vel7 0.739102483
+  b en7 1
+  i note8 60
+  f vel8 0.800000012
+  b en8 1
+  i note9 60
+  f vel9 0.800000012
+  b en9 1
+  i note10 60
+  f vel10 0.800000012
+  b en10 1
+  i note11 60
+  f vel11 0.800000012
+  b en11 1
+  i note12 60
+  f vel12 0.800000012
+  b en12 1
+  i note13 60
+  f vel13 0.800000012
+  b en13 1
+  i note14 60
+  f vel14 0.800000012
+  b en14 1
+  i note15 60
+  f vel15 0.800000012
+  b en15 1
+end
+node 2 Synths Metallic
+  uid 2
+  pos 18760 -3360
+  flags 0 0 1 0
+  i material 6
+  f transient 2
+  f decay 0.144635275
+  f stiffness 0.204768211
+  f frequency 220
+  i octave 1
+  i semi 0
+  f fine 0
+  f glide 0
+  i filterType 0
+  f filterCutoff 3431.34424
+  f filterResonance 0
+  f drive 0
+  f width 0.00500001665
+  f volume 0.980000138
+end
+node 3 Utility Mixer
+  uid 3
+  pos 19440 -3240
+  flags 0 0 1 0
+  i channels 5
+  f gain0 -23.6714954
+  f pan0 0
+  b mute0 0
+  b solo0 0
+  f gain1 0
+  f pan1 0
+  b mute1 0
+  b solo1 0
+  f gain2 -8.2125597
+  f pan2 0
+  b mute2 0
+  b solo2 0
+  f gain3 0
+  f pan3 0
+  b mute3 0
+  b solo3 0
+  f gain4 0
+  f pan4 0
+  b mute4 0
+  b solo4 0
+  f gain5 0
+  f pan5 0
+  b mute5 0
+  b solo5 0
+  f gain6 0
+  f pan6 0
+  b mute6 0
+  b solo6 0
+  f gain7 0
+  f pan7 0
+  b mute7 0
+  b solo7 0
+  f gain8 0
+  f pan8 0
+  b mute8 0
+  b solo8 0
+  f gain9 0
+  f pan9 0
+  b mute9 0
+  b solo9 0
+  f gain10 0
+  f pan10 0
+  b mute10 0
+  b solo10 0
+  f gain11 0
+  f pan11 0
+  b mute11 0
+  b solo11 0
+end
+node 4 Utility Mixer
+  uid 4
+  pos 19980 -2200
+  flags 0 0 1 0
+  i channels 8
+  f gain0 0
+  f pan0 0
+  b mute0 0
+  b solo0 0
+  f gain1 -5.79710102
+  f pan1 0
+  b mute1 0
+  b solo1 0
+  f gain2 -22.2222176
+  f pan2 0
+  b mute2 0
+  b solo2 0
+  f gain3 -13.5265675
+  f pan3 0
+  b mute3 0
+  b solo3 0
+  f gain4 0
+  f pan4 0
+  b mute4 0
+  b solo4 0
+  f gain5 0
+  f pan5 0
+  b mute5 0
+  b solo5 0
+  f gain6 0
+  f pan6 0
+  b mute6 0
+  b solo6 0
+  f gain7 -7.72946835
+  f pan7 0
+  b mute7 0
+  b solo7 0
+  f gain8 0
+  f pan8 0
+  b mute8 0
+  b solo8 0
+  f gain9 0
+  f pan9 0
+  b mute9 0
+  b solo9 0
+  f gain10 0
+  f pan10 0
+  b mute10 0
+  b solo10 0
+  f gain11 0
+  f pan11 0
+  b mute11 0
+  b solo11 0
+end
+node 5 Utility Audio Out
+  uid 5
+  pos 21300 -1100
+  flags 0 0 1 0
+  i formatIndex 0
+  s recordDirectory 
+end
+node 6 Notes Humanizer
+  uid 6
+  pos 18140 -3260
+  flags 0 0 1 0
+  f timingMs 78
+  f velocityPct 100
+end
+node 7 Modulators Velocity to CV
+  uid 7
+  pos 18420 -3040
+  flags 1 0 1 0
+  f rangeLow 0
+  f rangeHigh 1
+end
+node 8 Notes Chorder
+  uid 8
+  pos 17380 -2060
+  flags 0 0 1 0
+  i scale 0
+  i root 7
+  i chordSize 4
+  f rateBeats 8
+  f strumMs 0.259383589
+  f humanizeTimingMs 40.4999924
+  f humanizeVelocity 55.4999962
+  f upperHarmonics 8
+  b useGlobalScale 1
+end
+node 9 Synths Oscillator
+  uid 9
+  pos 18000 -2200
+  flags 0 0 1 0
+  f frequency 220
+  f glide 0
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  i waveform 0
+  f fine 0
+  i octave -2
+  i semi 0
+  f volume 0.800000012
+  f phase 0.289999992
+  i unison 5
+  f detune 12.0000134
+  i filterType 1
+  f cutoff 1664.51172
+  f resonance 0
+  f sync 8.4250021
+  f pan 0
+  f ampAttack 281.262665
+  f ampDecay 1182.29004
+  f ampSustain 1
+  f ampRelease 2265.16431
+end
+node 10 Modulators Pattern
+  uid 10
+  pos 17380 -1760
+  flags 1 0 1 0
+  f step0 0
+  f step1 0.348712981
+  f step2 0.190749168
+  f step3 0.600000024
+  f step4 1
+  f step5 0.600000024
+  f step6 0.349999994
+  f step7 0.150000006
+  f step8 0.5
+  f step9 0.5
+  f step10 0.5
+  f step11 0.5
+  f step12 0.5
+  f step13 0.5
+  f step14 0.5
+  f step15 0.5
+  i length 4
+  f stepBeats 4
+  b smoothSteps 0
+  f low 0
+  f high 1
+  b bipolar 0
+  b fitToBar 0
+  i fitDivision 1
+end
+node 11 AudioEffects Reverb
+  uid 11
+  pos 18580 -2200
+  flags 0 0 1 0
+  f mix 0.764999807
+  f size 0.569999754
+  f decay 3.13773751
+  f damping 0.304999977
+  f predelay 20
+  f width 1
+  f analog 0
+end
+node 12 Modulators Random
+  uid 12
+  pos 18420 -2660
+  flags 1 0 1 0
+  f rate 0.721000016
+  f smooth 0
+  f low 0.064000003
+  f high 0.143999994
+  f seed 65.7000046
+end
+node 13 Synths Field Synth
+  uid 13
+  pos 18760 -3820
+  flags 1 0 1 0
+  s code param float decay = 1.2 [0.1, 4.0]\nparam float punch = 3.5 [1.0, 8.0]\nparam float punchDecay = 0.04 [0.005, 0.2]\nparam float drive = 1.8 [1.0, 5.0]\nparam float clickAmt = 0.35 [0.0, 1.0]\nstate float env = 0.0\nstate float pEnv = 0.0\nstate float phase = 0.0\nstate float click = 0.0\n\ndCoeff = clamp(1.0 - 1.0 / (sr * max(decay, 0.05)), 0.99, 0.99999)\npCoeff = clamp(1.0 - 1.0 / (sr * max(punchDecay, 0.002)), 0.9, 0.999)\n\nenv = if(noteOn > 0.5, noteVel, env * dCoeff)\npEnv = if(noteOn > 0.5, 1.0, pEnv * pCoeff)\nclick = if(noteOn > 0.5, noteVel * clickAmt, click * 0.90)\n\ncurFreq = notePitch * (1.0 + pEnv * (punch - 1.0))\nphase = (phase + curFreq / sr) % 1.0\n\nsine = sin(6.283185 * phase)\nsig = (sine + click) * env * drive\nsat = sig / (1.0 + abs(sig) * 0.5)\n\nout = sat\n
+  i maxVoices 8
+  b exposeRmsOutput 0
+  i field_nextParamId 12
+  s field_paramMap attack:6,clickAmt:11,cutoff:2,decay:7,detune:1,drive:10,punch:8,punchDecay:9,res:3,sub:4,warmth:5
+  f p.detune 1.00800002
+  f p.cutoff 2800
+  f p.res 0.349999994
+  f p.sub 0.300000012
+  f p.warmth 0.400000006
+  f p.attack 0.0500000007
+  f p.clickAmt 0.814999998
+  f p.decay 2.97399998
+  f p.drive 1.20000005
+  f p.punch 5.88000011
+  f p.punchDecay 0.140000001
+  s __outputPins 
+  s __inputPins 
+end
+node 14 Notes Note Sequencer
+  uid 14
+  pos 17640 -4000
+  flags 0 0 1 0
+  i steps 8
+  i rateMode 0
+  f rateBeats 0.25
+  f rateSeconds 0.200000003
+  f gatePercent 70
+  b useGlobalScale 0
+  i note0 36
+  f vel0 0.564885914
+  b en0 0
+  i note1 36
+  f vel1 0.45257014
+  b en1 0
+  i note2 36
+  f vel2 0.41163218
+  b en2 0
+  i note3 36
+  f vel3 0.470403492
+  b en3 1
+  i note4 36
+  f vel4 1
+  b en4 1
+  i note5 36
+  f vel5 0.493496954
+  b en5 0
+  i note6 36
+  f vel6 0.41163218
+  b en6 0
+  i note7 36
+  f vel7 0.739102483
+  b en7 0
+  i note8 60
+  f vel8 0.800000012
+  b en8 1
+  i note9 60
+  f vel9 0.800000012
+  b en9 1
+  i note10 60
+  f vel10 0.800000012
+  b en10 1
+  i note11 60
+  f vel11 0.800000012
+  b en11 1
+  i note12 60
+  f vel12 0.800000012
+  b en12 1
+  i note13 60
+  f vel13 0.800000012
+  b en13 1
+  i note14 60
+  f vel14 0.800000012
+  b en14 1
+  i note15 60
+  f vel15 0.800000012
+  b en15 1
+end
+node 15 AudioEffects Audio Filter
+  uid 19
+  pos 18860 -1620
+  flags 0 1 1 0
+  f mix 1
+  f type 1
+  f freq 575.441406
+  f q 0.796500027
+  f gain 0
+  f outputGainDb 0
+  f envAmount 0.519999743
+  f sync 0
+  f rateDiv 6
+  f rate 0.0394383036
+end
+node 16 AudioEffects Field Effect
+  uid 20
+  pos 19500 -4700
+  flags 1 0 1 0
+  s code param float loop = 0.12 [0.01, 0.33]\nparam float pitch = 1.0 [0.25, 2.0]\nparam float freeze = 0.0 [0.0, 1.0]\nparam float mix = 1.0 [0.0, 1.0]\nstate float buf[16384] = 0.0\nstate float wpos = 0.0\nstate float rpos = 0.0\n\nlen = clamp(floor(loop * sr), 64.0, 16384.0)\nold = buf[wpos % len]\nbuf[wpos % len] = old + (in - old) * (1.0 - clamp(freeze, 0.0, 1.0))\nwpos = (wpos + 1.0) % len\n\nrpos = (rpos + clamp(pitch, 0.05, 4.0)) % len\ni0 = floor(rpos)\nfrac = rpos - i0\na = buf[i0]\nb = buf[(i0 + 1.0) % len]\ngrain = a + (b - a) * frac\nwin = 0.5 - 0.5 * cos(6.283185 * (rpos / len))\nwet = grain * (0.35 + 0.65 * win)\n\nout = in * (1.0 - mix) + wet * mix\n
+  b exposeRmsOutput 0
+  i field_nextParamId 8
+  s field_paramMap bias:3,drive:1,freeze:7,loop:5,mix:4,pitch:6,tone:2
+  f p.drive 3
+  f p.tone 4000
+  f p.bias 0.200000003
+  f p.mix 0
+  f p.freeze 0.892846704
+  f p.loop 0.072653383
+  f p.pitch 2
+  s __outputPins 
+  s __inputPins 
+end
+node 17 Modulators Pattern
+  uid 21
+  pos 19160 -5200
+  flags 1 0 1 0
+  f step0 0
+  f step1 0
+  f step2 0
+  f step3 1
+  f step4 1
+  f step5 1
+  f step6 1
+  f step7 0
+  f step8 0.5
+  f step9 0.5
+  f step10 0.5
+  f step11 0.5
+  f step12 0.5
+  f step13 0.5
+  f step14 0.5
+  f step15 0.5
+  i length 5
+  f stepBeats 2
+  b smoothSteps 0
+  f low 0
+  f high 1
+  b bipolar 0
+  b fitToBar 0
+  i fitDivision 1
+end
+node 18 Modulators Random
+  uid 22
+  pos 19160 -4340
+  flags 1 0 1 0
+  f rate 2.26200008
+  f smooth 0
+  f low 0
+  f high 0.50999999
+  f seed 94.9000015
+end
+node 19 Modulators Random
+  uid 23
+  pos 19160 -4700
+  flags 1 0 1 0
+  f rate 0.97299999
+  f smooth 0
+  f low 0.330000013
+  f high 1
+  f seed 109.5
+end
+node 20 AudioEffects Dynamics
+  uid 24
+  pos 20080 -3300
+  flags 0 0 1 0
+  f mix 1
+  f threshold -18
+  f ratio 8.74999809
+  f attack 0.271083415
+  f release 100
+  f makeup 14.2199917
+  f detectorRms 0
+  f sidechainExternal 0
+  f analog 0
+end
+node 21 Source Noise
+  uid 25
+  pos 20460 -6120
+  flags 1 0 1 0
+  i noiseType 1
+  f width 1024
+  f height 1024
+  f scale 8.61800003
+  f octaves 4
+  f lacunarity 2
+  f gain 0.5
+  f warp 1.53100002
+  f speed 0.499000013
+  f contrast 1
+  f brightness 0
+  f seed 0
+  b colorNoise 0
+  c lowColor 0 0 0
+  c highColor 1 1 1
+end
+node 22 Effects symmetry
+  uid 26
+  pos 21200 -5400
+  flags 1 0 1 0
+  f uAxis 0
+  f uCenterX 0.5
+  f uCenterY 0.5
+  f uFlip 0
+end
+node 23 Compositing Blend
+  uid 28
+  pos 21540 -5080
+  flags 1 0 1 0
+  i mode 8
+  f mix 1
+end
+node 24 Source Ramp
+  uid 29
+  pos 20900 -4920
+  flags 1 0 1 0
+  i type 1
+  i repeat 0
+  f width 1024
+  f height 1024
+  f angle 0
+  f centerX 0.5
+  f centerY 0.5
+  f scale 1
+  f offset 0
+  f gamma 1
+  f dither 0
+  i stopCount 2
+  f stop0 0.30399999
+  c stopColor0 0 0 0
+  f stop1 1
+  c stopColor1 1 1 1
+  f stop2 0.5
+  c stopColor2 1 0.300000012 0.200000003
+  f stop3 0.75
+  c stopColor3 0.200000003 0.5 1
+  f stop4 0.899999976
+  c stopColor4 1 0.899999976 0.300000012
+end
+node 25 Compositing transform
+  uid 30
+  pos 21220 -4920
+  flags 0 0 1 0
+  f uTranslateX 0
+  f uTranslateY 0
+  f uScale 1
+  f uScaleX 1
+  f uScaleY 1
+  f uRotation 0
+  f uCropX 0
+  f uCropY 0
+  f uFlipH 0
+  f uFlipV 0
+end
+node 26 Compositing Color Ramp
+  uid 31
+  pos 23420 -3920
+  flags 1 0 1 0
+  i interpMode 0
+  f mix 1
+  i stopCount 4
+  f stop0 0.425884038
+  c stopColor0 0.108269602 0.107130185 0.211956501
+  f stop1 0.787057996
+  c stopColor1 0.222837359 0.350672334 0.90196079
+  f stop2 1
+  c stopColor2 1 1 0.850000024
+  f stop3 0.300256997
+  c stopColor3 0 0 0
+  f stop4 0
+  c stopColor4 0 0 0
+  f stop5 0
+  c stopColor5 0 0 0
+  f stop6 0
+  c stopColor6 0 0 0
+  f stop7 0
+  c stopColor7 0 0 0
+  f stop8 0
+  c stopColor8 0 0 0
+  f stop9 0
+  c stopColor9 0 0 0
+  f stop10 0
+  c stopColor10 0 0 0
+  f stop11 0
+  c stopColor11 0 0 0
+  f stop12 0
+  c stopColor12 0 0 0
+  f stop13 0
+  c stopColor13 0 0 0
+  f stop14 0
+  c stopColor14 0 0 0
+  f stop15 0
+  c stopColor15 0 0 0
+  f stop16 0
+  c stopColor16 0 0 0
+  f stop17 0
+  c stopColor17 0 0 0
+  f stop18 0
+  c stopColor18 0 0 0
+  f stop19 0
+  c stopColor19 0 0 0
+  f stop20 0
+  c stopColor20 0 0 0
+  f stop21 0
+  c stopColor21 0 0 0
+  f stop22 0
+  c stopColor22 0 0 0
+  f stop23 0
+  c stopColor23 0 0 0
+  f stop24 0
+  c stopColor24 0 0 0
+  f stop25 0
+  c stopColor25 0 0 0
+  f stop26 0
+  c stopColor26 0 0 0
+  f stop27 0
+  c stopColor27 0 0 0
+  f stop28 0
+  c stopColor28 0 0 0
+  f stop29 0
+  c stopColor29 0 0 0
+  f stop30 0
+  c stopColor30 0 0 0
+  f stop31 0
+  c stopColor31 0 0 0
+end
+node 27 Compositing Blend
+  uid 32
+  pos 20800 -5400
+  flags 1 0 1 0
+  i mode 13
+  f mix 1
+end
+node 28 Source Noise
+  uid 33
+  pos 20120 -5620
+  flags 1 0 1 0
+  i noiseType 3
+  f width 1024
+  f height 1024
+  f scale 3.12100005
+  f octaves 4
+  f lacunarity 2
+  f gain 0.5
+  f warp 0.596000016
+  f speed -0.575999975
+  f contrast 1
+  f brightness 0
+  f seed 0
+  b colorNoise 0
+  c lowColor 0 0 0
+  c highColor 1 1 1
+end
+node 29 Compositing transform
+  uid 34
+  pos 20440 -5300
+  flags 1 0 1 0
+  f uTranslateX 0
+  f uTranslateY 0
+  f uScale 1
+  f uScaleX 1
+  f uScaleY 1
+  f uRotation 90
+  f uCropX 0
+  f uCropY 0
+  f uFlipH 0
+  f uFlipV 0
+end
+node 30 Modulators Velocity to CV
+  uid 35
+  pos 20060 -3800
+  flags 1 0 1 0
+  f rangeLow 0
+  f rangeHigh 1
+end
+node 31 Modulators Range to Range
+  uid 36
+  pos 23160 -3340
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0.67900002
+  f outHigh -0.268999994
+  b clampOutput 1
+end
+node 32 Effects glitch
+  uid 37
+  pos 22520 -4100
+  flags 1 0 1 0
+  f uKind 0
+  f uAmount 1.83301334e-12
+  f uDetail 0.416000009
+  f uSpeed 0.783167303
+  f uSeed 0
+end
+node 33 Compositing transform
+  uid 38
+  pos 22240 -4100
+  flags 1 0 1 0
+  f uTranslateX 0
+  f uTranslateY 0
+  f uScale 1
+  f uScaleX 1
+  f uScaleY 1
+  f uRotation 90
+  f uCropX 0
+  f uCropY 0
+  f uFlipH 0
+  f uFlipV 0
+end
+node 34 Compositing transform
+  uid 39
+  pos 22780 -4100
+  flags 1 0 1 0
+  f uTranslateX 0
+  f uTranslateY 0
+  f uScale 1
+  f uScaleX 1
+  f uScaleY 1
+  f uRotation -90
+  f uCropX 0
+  f uCropY 0
+  f uFlipH 0
+  f uFlipV 0
+end
+node 35 Modulators Range to Range
+  uid 40
+  pos 22500 -4500
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0
+  f outHigh 0.129999995
+  b clampOutput 1
+end
+node 36 Modulators Smoothing
+  uid 41
+  pos 22240 -4800
+  flags 1 0 1 0
+  f constantIn 0.5
+  f amount 0.850000024
+end
+node 37 Modulators Range to Range
+  uid 42
+  pos 22240 -4500
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0
+  f outHigh 1
+  b clampOutput 1
+end
+node 38 Source Ring
+  uid 43
+  pos 21520 -3120
+  flags 1 0 1 0
+  i shapeType 0
+  f width 1024
+  f height 1024
+  f sizeX 0.467380017
+  f sizeY 0.467380017
+  f size 0.349999994
+  f aspect 1
+  f cornerRadius 0.0500000007
+  i sides 5
+  f innerRatio 0.5
+  f rotation 0
+  f posX 0.5
+  f posY 0.5
+  c fillColor 1 1 1
+  f fillOpacity 0
+  f strokeWidth 0.00899999961
+  c strokeColor 1 1 1
+  f feather 0
+  c bgColor 0 0 0
+  f bgOpacity 0
+end
+node 39 Compositing invert
+  uid 44
+  pos 21520 -3980
+  flags 0 0 1 0
+end
+node 40 Compositing set alpha
+  uid 46
+  pos 21940 -3140
+  flags 0 0 1 0
+end
+node 41 Compositing threshold
+  uid 47
+  pos 21940 -2760
+  flags 1 0 1 0
+  f uThreshold 0.412999988
+end
+node 42 Compositing Blend
+  uid 48
+  pos 23120 -3860
+  flags 1 0 1 0
+  i mode 18
+  f mix 1
+end
+node 43 Modulators Constant
+  uid 49
+  pos 21220 -2880
+  flags 1 0 1 0
+  f value 0.462000012
+end
+node 44 Effects glitch
+  uid 50
+  pos 23760 -3800
+  flags 1 0 1 0
+  f uKind 1
+  f uAmount 0
+  f uDetail 0.702217758
+  f uSpeed 0
+  f uSeed 0
+end
+node 45 Modulators Smoothing
+  uid 51
+  pos 23440 -3200
+  flags 1 0 1 0
+  f constantIn 0.5
+  f amount 0.99000001
+end
+node 46 Modulators Random
+  uid 52
+  pos 23720 -3240
+  flags 0 0 1 0
+  f rate 1
+  f smooth 0.5
+  f low 0
+  f high 1
+  f seed 146
+end
+node 47 Compositing Blend
+  uid 54
+  pos 22220 -2760
+  flags 0 0 1 0
+  i mode 0
+  f mix 1
+end
+node 48 Compositing Trails
+  uid 55
+  pos 22220 -3300
+  flags 1 0 1 0
+  f decay 0.811999977
+  f zoom 1.0009619
+  f rotate 0
+  f driftX 0
+  f driftY 0.00499999989
+  f hueShift 0
+  i blendMode 0
+end
+node 49 Compositing Blend
+  uid 56
+  pos 22800 -3280
+  flags 1 0 1 0
+  i mode 30
+  f mix 1
+end
+node 50 Source Ring
+  uid 57
+  pos 22500 -2780
+  flags 1 0 1 0
+  i shapeType 0
+  f width 1024
+  f height 1024
+  f sizeX 0.467380017
+  f sizeY 0.467380017
+  f size 0.349999994
+  f aspect 1
+  f cornerRadius 0.0500000007
+  i sides 5
+  f innerRatio 0.5
+  f rotation 0
+  f posX 0.5
+  f posY 0.507000029
+  c fillColor 1 1 1
+  f fillOpacity 1
+  f strokeWidth 0
+  c strokeColor 1 1 1
+  f feather 0
+  c bgColor 0 0 0
+  f bgOpacity 0
+end
+node 51 Modulators Range to Range
+  uid 59
+  pos 20860 -2640
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0.462000012
+  f outHigh 0.565999985
+  b clampOutput 1
+end
+node 52 Modulators Velocity to CV
+  uid 60
+  pos 18000 -2760
+  flags 0 0 1 0
+  f rangeLow 0
+  f rangeHigh 1
+end
+node 53 Notes Bouncing Balls
+  uid 61
+  pos 17540 -880
+  flags 0 0 1 0
+  i shape 2
+  i numBalls 3
+  f ballSize 0.0599999987
+  f ballSpeed 0.200250387
+  i rangeLow 61
+  i rangeHigh 84
+  i scale 0
+  i root 0
+  b useGlobalScale 1
+end
+node 54 Synths Oscillator
+  uid 62
+  pos 18040 -880
+  flags 0 0 1 0
+  f frequency 220
+  f glide 0
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  i waveform 0
+  f fine 0
+  i octave 0
+  i semi 0
+  f volume 0.800000012
+  f phase 0
+  i unison 2
+  f detune 12
+  i filterType 4
+  f cutoff 399.99646
+  f resonance 0.150000006
+  f sync 1
+  f pan 0
+  f ampAttack 0.150036708
+  f ampDecay 86.4232635
+  f ampSustain 0
+  f ampRelease 3473.83618
+end
+node 55 AudioEffects Reverb
+  uid 63
+  pos 18520 -880
+  flags 0 0 1 0
+  f mix 0.325000018
+  f size 0.889999688
+  f decay 5.92571354
+  f damping 0.379999995
+  f predelay 20
+  f width 1
+  f analog 0
+end
+cable 22 0 27 0
+cable 23 0 22 0
+cable 23 1 25 0
+cable 25 0 24 0
+cable 26 0 42 0
+cable 27 0 21 0
+cable 27 1 29 0
+cable 29 0 28 0
+cable 32 0 33 0
+cable 33 0 23 0
+cable 34 0 32 0
+cable 39 0 22 0
+cable 40 0 39 0
+cable 40 1 38 0
+cable 41 0 40 0
+cable 42 0 34 0
+cable 42 1 49 0
+cable 44 0 26 0
+cable 47 1 41 0
+cable 48 0 47 0
+cable 49 0 48 0
+cable 49 1 50 0
+geo 31 0 30 0
+geo 35 0 36 0
+geo 36 0 17 0
+geo 37 0 18 0
+geo 45 0 31 0
+geo 51 0 52 0
+aud 3 0 2
+aud 3 1 13
+aud 3 2 16
+aud 4 1 11
+aud 4 3 15
+aud 4 4 55
+aud 4 7 20
+aud 5 0 4
+aud 11 0 9
+aud 16 0 2
+aud 20 0 3
+aud 55 0 54
+note 2 0 6 0
+note 6 0 1 0
+note 7 0 6 0
+note 9 0 8 0
+note 13 0 14 0
+note 30 0 14 0
+note 52 0 1 0
+note 54 0 53 0
+mod 2 2 7 0 0 1 0.203584269 0.0500000007 0.34799999
+mod 2 3 12 0 0 1 1.48000002 0 2
+mod 2 5 7 0 0 1 1664.45374 919 8830.2002
+mod 8 773 10 0 0 1 0 0 11
+mod 16 54 17 0 0 1 1 0 1
+mod 16 55 18 0 0 1 0.0410000011 0.00999999978 0.330000013
+mod 16 57 19 0 0 1 0.796000004 0 1
+mod 32 0 35 0 0 1 0 0 2
+mod 32 2 37 0 0 1 1.676 0 4
+mod 38 2 43 0 0 1 0.349999994 0.00999999978 1
+mod 38 3 43 0 0 1 0.349999994 0.00999999978 1
+mod 44 0 45 0 0 1 0.692806423 0 2
+mod 44 1 46 0 0 1 0.386999995 0.0199999996 1
+mod 48 1 51 0 0 1 1.00600004 0.899999976 1.10000002
+mod 50 2 43 0 0 1 0.349999994 0.00999999978 1
+mod 50 3 43 0 0 1 0.349999994 0.00999999978 1
+glob g1 0
+transport 75 4 4 0 1
+stream 0 0 1 0 0 1 0 Video 1
+streamid 0 1
+stream 0 0 1 0 0 1 0 Video 2
+streamid 1 2
+stream 0 0 1 0 0 1 0 Video 3
+streamid 2 3
+stream 0 0 1 0 0 1 0 Video 4
+streamid 3 4
+stream 1 0 1 0 0 1 0 Audio 1
+streamid 4 5
+stream 1 0 1 0 0 1 0 Audio 2
+streamid 5 6
+stream 1 0 1 0 0 1 0 Audio 3
+streamid 6 7
+stream 1 0 1 0 0 1 0 Audio 4
+streamid 7 8
+arrange 9 0 4 0 1 0 0 0 0 0 1920 1080 60 48000 0 0 0 0 -1 -1 
+viewport 1 1 781 190 44

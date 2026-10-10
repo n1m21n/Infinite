@@ -1,0 +1,75 @@
+infinite-patch 1
+# Moves with the music: the shape grows with the sound
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1056
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1202
+  f volume 0.5
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1340 1056
+end
+node 4 Modulators Audio Analyze
+  id hear
+  pos 0 2546
+end
+node 5 Source Shape
+  id shape
+  pos 0 340
+  c fillColor 1 0.45 0.3
+end
+node 6 Effects bloom
+  id glow
+  pos 460 302
+end
+node 7 Utility Output
+  id out
+  pos 920 156
+end
+node 8 Compositing Comment
+  pos 0 0
+  s text A picture that moves with the music.
+  f width 340
+  f height 120
+end
+node 9 Compositing Comment
+  pos 0 900
+  s text The sound. Notes, synth, speakers.
+  f width 340
+  f height 120
+end
+node 10 Compositing Comment
+  pos 0 2362
+  s text Audio Analyze listens to the sound and turns it into moving numbers (level, low, mid, high). Try a different output as the source.
+  f width 300
+  f height 148
+end
+node 11 Compositing Comment
+  pos 0 156
+  s text The orange dots on Size X and Size Y means it is driven by the music. Change its Depth to make it move more or less.
+  f width 300
+  f height 148
+end
+node 12 Compositing Comment
+  pos 460 156
+  s text Bloom adds a glow to bright parts. Try raising Intensity.
+  f width 300
+  f height 110
+end
+node 13 Compositing Comment
+  pos 480 1056
+  s text This synth is the sound that the picture follows.
+  f width 300
+  f height 110
+end
+note synth 0 notes
+aud speakers 0 synth
+aud hear 0 synth
+cable glow 0 shape
+cable out 0 glow
+mod shape sizeX hear 0 0 1 0.5 0.12 0.4
+mod shape sizeY hear 0 0 1 0.5 0.12 0.4

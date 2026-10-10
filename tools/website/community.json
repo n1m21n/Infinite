@@ -1,0 +1,247 @@
+{
+ "items": [
+  {
+   "src": "/Users/namansoni/Downloads/aug16.inf",
+   "name": "Terrain Mandala",
+   "author": "",
+   "description": "A wave-terrain synth driving a slowly turning mandala.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/aug18.inf",
+   "name": "Glitch Feedback",
+   "author": "",
+   "description": "Transform, glitch and feedback loops with added noise.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/aug19.inf",
+   "name": "Shifted Blend",
+   "author": "",
+   "description": "Audio blends through a frequency shifter, with liquify on the picture.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/aug19_2.inf",
+   "name": "Lens Spectral",
+   "author": "",
+   "description": "Lens distortion over blended cubes, with a spectral synth underneath.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/aug20.inf",
+   "name": "Checker Cube",
+   "author": "",
+   "description": "A cube in a checkered room with bold type, blended from image sources.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/field_grainer.infinite",
+   "name": "field_grainer",
+   "author": "palm",
+   "description": "",
+   "ok": false,
+   "frame": 12,
+   "note": "palm: no permission given in the Discord log"
+  },
+  {
+   "src": "/Users/namansoni/Downloads/glsl_mandala.infinite",
+   "name": "glsl_mandala",
+   "author": "",
+   "description": "",
+   "ok": false,
+   "frame": 12,
+   "note": "origin unknown"
+  },
+  {
+   "src": "/Users/namansoni/Downloads/occult-mandala-industrial-noise-110bpm.infinite",
+   "name": "Occult Mandala",
+   "author": "dm4nd",
+   "description": "Image points, kaleidoscope and layers over industrial noise at 110 BPM.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/pad_audio_patch.inf",
+   "name": "Pad Wash",
+   "author": "",
+   "description": "Blended pads through delay and reverb, with random notes shifting the pitch.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/pads-ror-75bpm.infinite",
+   "name": "Pads, 75 BPM",
+   "author": "dm4nd",
+   "description": "Slow pads with trails, blends and glitch at 75 BPM.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/patch_1.inf",
+   "name": "Trail Glitch",
+   "author": "",
+   "description": "Trails, colour ramps and glitch blended, with reverbs on the sound.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/patch_2.inf",
+   "name": "Stretched Sampler",
+   "author": "",
+   "description": "A sampler into a spectral synth, reverb and PaulStretch.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/sep17.inf",
+   "name": "sep17",
+   "author": "",
+   "description": "",
+   "ok": false,
+   "frame": 12,
+   "note": "origin unknown"
+  },
+  {
+   "src": "/Users/namansoni/Downloads/simple_patch.inf",
+   "name": "Displaced Wavetable",
+   "author": "",
+   "description": "A note sequencer plays a wavetable that displaces a 3D shape.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Downloads/welcome-home-86bpm.infinite",
+   "name": "Welcome Home",
+   "author": "dm4nd",
+   "description": "A red room full of eyes over a steady 86 BPM groove.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/claire_de_lune.inf",
+   "name": "Soft Render",
+   "author": "",
+   "description": "A 3D render with a colour ramp and added noise.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/john lennon.inf",
+   "name": "Stretched Blend",
+   "author": "",
+   "description": "PaulStretch into blended audio with delay.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/oct1.inf",
+   "name": "Slice Room",
+   "author": "",
+   "description": "A slicer into blended audio, with delay and a mixer.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/oct2.inf",
+   "name": "Limited Stretch",
+   "author": "",
+   "description": "PaulStretch and mixers into a limiter.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/oct7.inf",
+   "name": "Spectrum Slide",
+   "author": "",
+   "description": "PaulStretch through a spectrum slide and key snap.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/sep23.inf",
+   "name": "Plugin Stretch",
+   "author": "",
+   "description": "A plugin and PaulStretch through a mixer.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/sep25.inf",
+   "name": "Blue Cube",
+   "author": "",
+   "description": "A flat-shaded cube in a blue-white room with a light-grid wall.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/Infinite Artworks/Patches/15_sep.inf",
+   "name": "Fairy Type",
+   "author": "",
+   "description": "Large type repeated across a kaleidoscope of pink shapes.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/Infinite Artworks/Patches/fri sep11.inf",
+   "name": "Cube Colour",
+   "author": "",
+   "description": "An audio colour ramp drives a cube, rendered in 3D.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/Infinite Artworks/Patches/sep15_test.inf",
+   "name": "Layered Blends",
+   "author": "",
+   "description": "Stacked blends with colour adjustments.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/Infinite Artworks/Patches/sep16.inf",
+   "name": "Drum Reverb",
+   "author": "",
+   "description": "Two note sequencers and oscillators into reverb, delay and EQ.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/Infinite Artworks/Patches/sep17.inf",
+   "name": "Delay Wash",
+   "author": "",
+   "description": "Delay, reverb and a mixer into a limiter.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/Infinite Artworks/Patches/sep6.inf",
+   "name": "Filtered Mixer",
+   "author": "",
+   "description": "Reverb and a mixer through an audio filter.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/Infinite Artworks/Patches/sep6_2.inf",
+   "name": "Merged Wavetable",
+   "author": "",
+   "description": "Merged notes play a wavetable into reverb.",
+   "ok": true,
+   "frame": 12
+  },
+  {
+   "src": "/Users/namansoni/Desktop/Infinite Artworks/Patches/test_patch_timeline.inf",
+   "name": "Oscillator Reverb",
+   "author": "",
+   "description": "A note sequencer into an oscillator and reverb.",
+   "ok": true,
+   "frame": 12
+  }
+ ]
+}

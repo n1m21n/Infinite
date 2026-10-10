@@ -1,0 +1,65 @@
+infinite-patch 1
+# First sound: press play and hear notes
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1062
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1062
+  f volume 0.5
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1340 1040
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2222
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1 0.45 0.3
+  f size 0.2
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text First sound. Notes go into a synth, the synth goes to the speakers. Follow the wires left to right.
+  f width 340
+  f height 120
+end
+node 8 Compositing Comment
+  pos 0 878
+  s text The Notes box plays a new random note every quarter beat. Try changing Rate, or the Low and High note range.
+  f width 300
+  f height 148
+end
+node 9 Compositing Comment
+  pos 480 878
+  s text The Analog synth turns each note into a sound. Try turning Volume down or changing the Wave of oscillator 1.
+  f width 300
+  f height 148
+end
+node 10 Compositing Comment
+  pos 1340 878
+  s text Audio Out sends the sound to your speakers. Every sound needs to reach one of these.
+  f width 300
+  f height 126
+end
+node 11 Compositing Comment
+  pos 0 0
+  s text A small picture that follows the sound, so you can see it as well as hear it.
+  f width 300
+  f height 126
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.12 0.4
+mod pic sizeY ana 0 0 1 0.5 0.12 0.4

@@ -1,0 +1,84 @@
+# Infinite
+
+> Infinite is a free, open-source DAW for visuals, music and code on one infinite canvas. Wire shaders, 3D geometry, synths and modulation together in real time. It runs on macOS, Windows and Linux.
+
+## Start here
+
+- [Home](https://n1m21n.github.io/Infinite/): what Infinite is, the node canvas, how to set it up
+- [Library](https://n1m21n.github.io/Infinite/library.html): free templates, community patches and Field devices to download
+- [Library catalog (JSON)](https://n1m21n.github.io/Infinite/assets/library/catalog.json): every library item with description, category and file URL
+- [Art Gallery](https://n1m21n.github.io/Infinite/artworks.html): visuals and motion made with Infinite
+- [Download](https://github.com/n1m21n/Infinite/releases/latest): installers for macOS, Windows and Linux
+- [Source code](https://github.com/n1m21n/Infinite): MIT licensed
+- [Discord](https://discord.gg/7cpQfCxnx): community and support
+- [YouTube](https://www.youtube.com/channel/UCpuCUMODr4utnpa162CkIug): tutorials and films
+
+## File formats
+
+- `.inf` and `.infinite`: a patch. A line-based text file listing nodes and cables. Open it with File, Open in Infinite.
+- `.field`: a Field device (a small program for a Field node). Import it into a Field Pixel node, or copy its code.
+
+## Library: Templates
+
+- [First sound](https://n1m21n.github.io/Infinite/assets/templates/first-sound.inf): Press play and hear notes.
+- [First image](https://n1m21n.github.io/Infinite/assets/templates/first-image.inf): A shape on a colour wash.
+- [Moves with the music](https://n1m21n.github.io/Infinite/assets/templates/first-music-image.inf): The shape grows with the sound.
+- [Source](https://n1m21n.github.io/Infinite/assets/templates/source.inf): Pictures from nothing.
+- [Compositing](https://n1m21n.github.io/Infinite/assets/templates/compositing.inf): Layers, trails and feedback.
+- [Effects](https://n1m21n.github.io/Infinite/assets/templates/effects.inf): Change a picture.
+- [3D](https://n1m21n.github.io/Infinite/assets/templates/3d.inf): A shape seen from any side.
+- [Modulators](https://n1m21n.github.io/Infinite/assets/templates/modulators.inf): Numbers that move other controls.
+- [Macros](https://n1m21n.github.io/Infinite/assets/templates/macros.inf): One knob that moves several things.
+- [Notes](https://n1m21n.github.io/Infinite/assets/templates/notes.inf): Notes that make patterns.
+- [Synths](https://n1m21n.github.io/Infinite/assets/templates/synths.inf): Sounds from notes.
+- [Audio Effects](https://n1m21n.github.io/Infinite/assets/templates/audio-effects.inf): Shape the sound.
+- [Prediction](https://n1m21n.github.io/Infinite/assets/templates/prediction.inf): Notes that keep going on their own.
+- [Utility](https://n1m21n.github.io/Infinite/assets/templates/utility.inf): Mix and meter sound.
+- [Field](https://n1m21n.github.io/Infinite/assets/templates/field.inf): Write a picture as a formula.
+
+## Library: Community
+
+- [Terrain Mandala](https://n1m21n.github.io/Infinite/assets/community/terrain-mandala.inf): A wave-terrain synth driving a slowly turning mandala.
+- [Glitch Feedback](https://n1m21n.github.io/Infinite/assets/community/glitch-feedback.inf): Transform, glitch and feedback loops with added noise.
+- [Shifted Blend](https://n1m21n.github.io/Infinite/assets/community/shifted-blend.inf): Audio blends through a frequency shifter, with liquify on the picture.
+- [Lens Spectral](https://n1m21n.github.io/Infinite/assets/community/lens-spectral.inf): Lens distortion over blended cubes, with a spectral synth underneath.
+- [Checker Cube](https://n1m21n.github.io/Infinite/assets/community/checker-cube.inf): A cube in a checkered room with bold type, blended from image sources.
+- [Occult Mandala](https://n1m21n.github.io/Infinite/assets/community/occult-mandala.infinite): Image points, kaleidoscope and layers over industrial noise at 110 BPM.
+- [Pad Wash](https://n1m21n.github.io/Infinite/assets/community/pad-wash.inf): Blended pads through delay and reverb, with random notes shifting the pitch.
+- [Pads, 75 BPM](https://n1m21n.github.io/Infinite/assets/community/pads-75-bpm.infinite): Slow pads with trails, blends and glitch at 75 BPM.
+- [Trail Glitch](https://n1m21n.github.io/Infinite/assets/community/trail-glitch.inf): Trails, colour ramps and glitch blended, with reverbs on the sound.
+- [Stretched Sampler](https://n1m21n.github.io/Infinite/assets/community/stretched-sampler.inf): A sampler into a spectral synth, reverb and PaulStretch.
+- [Displaced Wavetable](https://n1m21n.github.io/Infinite/assets/community/displaced-wavetable.inf): A note sequencer plays a wavetable that displaces a 3D shape.
+- [Welcome Home](https://n1m21n.github.io/Infinite/assets/community/welcome-home.infinite): A red room full of eyes over a steady 86 BPM groove.
+- [Soft Render](https://n1m21n.github.io/Infinite/assets/community/soft-render.inf): A 3D render with a colour ramp and added noise.
+- [Stretched Blend](https://n1m21n.github.io/Infinite/assets/community/stretched-blend.inf): PaulStretch into blended audio with delay.
+- [Slice Room](https://n1m21n.github.io/Infinite/assets/community/slice-room.inf): A slicer into blended audio, with delay and a mixer.
+- [Limited Stretch](https://n1m21n.github.io/Infinite/assets/community/limited-stretch.inf): PaulStretch and mixers into a limiter.
+- [Spectrum Slide](https://n1m21n.github.io/Infinite/assets/community/spectrum-slide.inf): PaulStretch through a spectrum slide and key snap.
+- [Plugin Stretch](https://n1m21n.github.io/Infinite/assets/community/plugin-stretch.inf): A plugin and PaulStretch through a mixer.
+- [Blue Cube](https://n1m21n.github.io/Infinite/assets/community/blue-cube.inf): A flat-shaded cube in a blue-white room with a light-grid wall.
+- [Fairy Type](https://n1m21n.github.io/Infinite/assets/community/fairy-type.inf): Large type repeated across a kaleidoscope of pink shapes.
+- [Cube Colour](https://n1m21n.github.io/Infinite/assets/community/cube-colour.inf): An audio colour ramp drives a cube, rendered in 3D.
+- [Layered Blends](https://n1m21n.github.io/Infinite/assets/community/layered-blends.inf): Stacked blends with colour adjustments.
+- [Drum Reverb](https://n1m21n.github.io/Infinite/assets/community/drum-reverb.inf): Two note sequencers and oscillators into reverb, delay and EQ.
+- [Delay Wash](https://n1m21n.github.io/Infinite/assets/community/delay-wash.inf): Delay, reverb and a mixer into a limiter.
+- [Filtered Mixer](https://n1m21n.github.io/Infinite/assets/community/filtered-mixer.inf): Reverb and a mixer through an audio filter.
+- [Merged Wavetable](https://n1m21n.github.io/Infinite/assets/community/merged-wavetable.inf): Merged notes play a wavetable into reverb.
+- [Oscillator Reverb](https://n1m21n.github.io/Infinite/assets/community/oscillator-reverb.inf): A note sequencer into an oscillator and reverb.
+
+## Library: Pixel
+
+- [Ordered Dither](https://n1m21n.github.io/Infinite/assets/library/pixel/ordered-dither.field): A 4x4 Bayer dither: any picture becomes two inks on paper. The series look from the films.
+- [Liquid Glass](https://n1m21n.github.io/Infinite/assets/library/pixel/liquid-glass.field): A frosted, refracting glass pane over whatever is behind it: bent edges, a colour split and a lit rim.
+- [Metaball Lens](https://n1m21n.github.io/Infinite/assets/library/pixel/metaball-lens.field): Three liquid lobes drift over the picture, merging into one blob that refracts and magnifies what is under it.
+- [Pixel Plate](https://n1m21n.github.io/Infinite/assets/library/pixel/pixel-plate.field): A plate of square cells with ragged, notched edges that grows outward cell by cell.
+- [Iridescent Orb](https://n1m21n.github.io/Infinite/assets/library/pixel/iridescent-orb.field): A soft holographic pastel ball that slowly spins its colours, with a white sheen and a gloss spot.
+- [Phyllotaxis Bloom](https://n1m21n.github.io/Infinite/assets/library/pixel/phyllotaxis-bloom.field): A sunflower of golden-angle seeds, each dot coloured along the spiral. Seed count and turn are live.
+
+## Library: Sketch
+
+- [Lorenz Attractor](https://n1m21n.github.io/Infinite/assets/library/sketch/lorenz-attractor.js): The butterfly of chaos, integrated live. A glowing trail winds between two lobes and never repeats.
+- [Lotka-Volterra](https://n1m21n.github.io/Infinite/assets/library/sketch/lotka-volterra.js): Predators and prey chasing each other: the population curves on top, the phase loop they trace below.
+- [Scale-Free Network](https://n1m21n.github.io/Infinite/assets/library/sketch/scale-free-network.js): A network that grows by preferential attachment: the rich get richer, hubs emerge, and the graph breathes.
+- [Rule 110](https://n1m21n.github.io/Infinite/assets/library/sketch/rule-110.js): A one-dimensional cellular automaton that is Turing-complete. Gliders scroll down the page, one generation at a time.
+- [Clifford Attractor](https://n1m21n.github.io/Infinite/assets/library/sketch/clifford-attractor.js): A strange attractor drawn as a cloud of 20,000 points. Slowly drifting parameters keep reshaping the lace.

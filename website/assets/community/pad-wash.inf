@@ -1,0 +1,397 @@
+infinite-patch 1
+node 4 Synths Wavetable
+  pos 220 420
+  flags 0 0 1 0
+  f mix 0.609999955
+  f volume 0.800000012
+  f frequency 220
+  f glide 0
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  b a.on 1
+  i a.table 0
+  f a.position 0.360707968
+  f a.volume 0.800000012
+  f a.pan 0
+  i a.unison 4
+  f a.detune 40
+  f a.stereoWidth 0.752172768
+  i a.octave 0
+  i a.semi 0
+  f a.fine -7.89461422
+  f a.phase 0
+  f a.phaseRandomize 0.705040932
+  i a.warpMode 0
+  f a.warpAmount 0
+  f a.warpRatio 1
+  i a.filterType 1
+  f a.cutoff 13265.4336
+  f a.resonance 0.24844186
+  f a.ampAttack 765.310608
+  f a.ampDecay 1000
+  f a.ampSustain 0.502788246
+  f a.ampRelease 2871.56421
+  f a.pitchAmount -3.31646633
+  f a.pitchAttack 0
+  f a.pitchDecay 120
+  f a.pitchSustain 0
+  f a.pitchRelease 120
+  f a.filterAmount 0
+  f a.filterAttack 4
+  f a.filterDecay 400
+  f a.filterSustain 0.400000006
+  f a.filterRelease 300
+  b b.on 1
+  i b.table 53
+  f b.position 0.736675978
+  f b.volume 0.800000012
+  f b.pan 0
+  i b.unison 4
+  f b.detune 52.4999847
+  f b.stereoWidth 0.642189682
+  i b.octave -1
+  i b.semi 0
+  f b.fine 0
+  f b.phase 0
+  f b.phaseRandomize 0
+  i b.warpMode 0
+  f b.warpAmount 0
+  f b.warpRatio 1
+  i b.filterType 1
+  f b.cutoff 6505.5293
+  f b.resonance 0.0833355561
+  f b.ampAttack 84.2413712
+  f b.ampDecay 1000
+  f b.ampSustain 0.491016239
+  f b.ampRelease 2360.58423
+  f b.pitchAmount 0
+  f b.pitchAttack 0
+  f b.pitchDecay 120
+  f b.pitchSustain 0
+  f b.pitchRelease 120
+  f b.filterAmount 0
+  f b.filterAttack 4
+  f b.filterDecay 400
+  f b.filterSustain 0.400000006
+  f b.filterRelease 300
+end
+node 6 AudioUtility Blend Audio
+  pos 1300 520
+  flags 0 0 1 0
+  f blend 0.5
+end
+node 7 AudioUtility Audio Out
+  pos 3760 380
+  flags 0 0 1 0
+  s recordDirectory 
+end
+node 8 AudioEffects Reverb
+  pos 2500 540
+  flags 0 0 1 0
+  f mix 0.534999907
+  f size 0.650000036
+  f decay 10.2584953
+  f damping 0.400000006
+  f predelay 20
+  f width 1
+end
+node 9 Modulators Macro XY
+  pos -200 640
+  flags 1 0 1 0
+  f padX 0.360707968
+  f padY 0.736675978
+  b loopPath 1
+  f speed 0.300000012
+  s path 
+end
+node 10 Modulators Random
+  pos 0 -140
+  flags 1 0 1 0
+  f rate 1
+  f smooth 1
+  f low 0.400000006
+  f high 0.600000024
+  f seed 21.9000015
+end
+node 11 Modulators Random
+  pos 320 -140
+  flags 1 0 1 0
+  f rate 1
+  f smooth 1
+  f low 0.400000006
+  f high 0.600000024
+  f seed 36.5
+end
+node 12 Notes Note Transpose
+  pos -340 280
+  flags 0 0 1 0
+  i semitones 6
+  b useGlobalScale 1
+end
+node 14 Notes Random Note Generator
+  pos -900 20
+  flags 0 0 1 0
+  i rangeLow 38
+  i rangeHigh 66
+  i scale 13
+  i root 0
+  i rateMode 0
+  f rateBeats 1
+  f rateSeconds 0.200000003
+  i maxStep 4
+  b useGlobalScale 1
+end
+node 15 AudioEffects Delay
+  pos 3060 540
+  flags 0 0 1 0
+  f mix 0.599999905
+  f bounce 0
+  f sync 1
+  f rateDiv 9
+  f timeMs 3
+  f feedback 35
+  f tone 0
+  f pan 0
+  f ducking 0.274999976
+end
+node 16 Synths Metallic
+  pos 760 -460
+  flags 0 0 1 0
+  i material 5
+  f transient 1.10850072
+  f decay 5.68749619
+  f stiffness 1.01999986
+  f frequency 220
+  i octave -2
+  i semi 0
+  f fine 0
+  f glide 0.736675978
+  i filterType 1
+  f filterCutoff 13265.4336
+  f filterResonance 0.259999901
+  f drive 0.120000072
+  f width 0.600000024
+  f volume 0.66471839
+end
+node 17 Notes Note Echo
+  pos -380 -420
+  flags 0 0 1 0
+  f delayMs 95.5498734
+  i repeats 3
+  f decay 28.5000076
+  i transposePerRepeat 4
+end
+node 18 Notes Quantizer
+  pos 120 -420
+  flags 0 0 1 0
+  i div 2
+end
+node 19 Notes Note Transpose
+  pos 380 -440
+  flags 0 0 1 0
+  i semitones 6
+  b useGlobalScale 1
+end
+node 20 AudioEffects Delay
+  pos 1460 -60
+  flags 0 0 1 0
+  f mix 0.584999919
+  f bounce 0
+  f sync 1
+  f rateDiv 9
+  f timeMs 3
+  f feedback 63.0499916
+  f tone 0.129999876
+  f pan 0
+  f ducking 0.284999907
+end
+node 21 Synths PaulStretch
+  pos 1520 -560
+  flags 0 0 1 0
+  s path 
+  f stretch 976.21405
+  i window_size 4
+  f phase_rand 1
+  f pitch_shift -1.65823317
+  f fine_tune 0
+  f freq_shift -132.850235
+  i unison 5
+  f detune 30
+  f volume 1.20000005
+  f start 0.483954966
+  f end 1
+  b loop 1
+end
+node 23 AudioUtility Blend Audio
+  pos 1260 -300
+  flags 0 0 1 0
+  f blend 0.5
+end
+node 24 AudioEffects Audio Filter
+  pos 1720 520
+  flags 0 0 1 0
+  f mix 1
+  f type 1
+  f freq 6477.64648
+  f q 1.06850088
+  f gain 0
+  f outputGainDb 0
+  f envAmount 0
+  f modAmount 0
+end
+node 25 Modulators Random
+  pos 1760 1100
+  flags 1 0 1 0
+  f rate 1
+  f smooth 1
+  f low 0
+  f high 0.375999987
+  f seed 43.8000031
+end
+node 27 AudioUtility Mixer
+  pos 2900 -60
+  flags 0 0 1 0
+  f gain0 0
+  f pan0 0
+  b mute0 0
+  f gain1 -3.70371389
+  f pan1 0
+  b mute1 0
+  f gain2 0
+  f pan2 0
+  b mute2 0
+  f gain3 0
+  f pan3 0
+  b mute3 0
+  f gain4 0
+  f pan4 0
+  b mute4 0
+  f gain5 0
+  f pan5 0
+  b mute5 0
+  f gain6 0
+  f pan6 0
+  b mute6 0
+  f gain7 0
+  f pan7 0
+  b mute7 0
+end
+node 28 Modulators Random
+  pos -1060 420
+  flags 1 0 1 0
+  f rate 8
+  f smooth 1
+  f low 0.5
+  f high 0.699999988
+  f seed 51.1000023
+end
+node 29 Modulators CV to Pitch
+  pos -720 400
+  flags 1 0 1 0
+  f constantIn 0.5
+  i rangeLow -48
+  i rangeHigh 48
+  i scale 13
+  i root 0
+  f glideMs 0
+end
+node 30 AudioEffects Chorus
+  pos 2020 -20
+  flags 0 0 1 0
+  f mix 0.634999871
+  f delay 7
+  f spread 0.5
+  f taps 2
+  f depth 5
+  f feedback 0
+  f sync 0
+  f rateDiv 6
+  f rate 1.67030048
+end
+node 32 AudioUtility Blend Audio
+  pos 2540 280
+  flags 0 0 1 0
+  f blend 0.5
+end
+node 34 Modulators Random
+  pos 1220 -900
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0.400000006
+  f high 0.600000024
+  f seed 80.3000031
+end
+node 35 Modulators Random
+  pos 1540 -940
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0.400000006
+  f high 0.600000024
+  f seed 94.9000015
+end
+node 36 Synths Sampler
+  pos 2360 -560
+  flags 0 0 1 0
+  s path 
+  f pitch 0
+  f finetune 0
+  f speed 1
+  f start 0
+  f end 1
+  f volume 0.400000006
+  b loop 0
+  b reverse 0
+  b pingpong 0
+end
+node 37 Modulators Range to Range
+  pos 1360 880
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0
+  f outHigh 0.150000006
+  b clampOutput 1
+end
+geo 29 0 28
+geo 37 0 9
+aud 6 0 4
+aud 6 1 20
+aud 7 0 27
+aud 8 0 32
+aud 15 0 8
+aud 20 0 23
+aud 23 0 21
+aud 23 1 16
+aud 24 0 6
+aud 27 0 36
+aud 27 1 15
+aud 30 0 6
+aud 32 0 30
+aud 32 1 24
+note 4 0 12 0
+note 12 0 14 0
+note 16 0 19 0
+note 17 0 14 0
+note 18 0 17 0
+note 19 0 18 0
+mod 4 0 10 0 0 1 0.76229167
+mod 4 2 9 0 0 1 0
+mod 4 5 9 1 0 1 12000
+mod 4 17 35 0 0 1 0
+mod 4 29 9 1 0 1 0.671976864
+mod 4 32 9 0 0 1 458.294098
+mod 4 43 11 0 0 1 1471.7157
+mod 12 0 29 0 0 1 -5.27995205
+mod 16 5 9 1 0 1 666.236511
+mod 16 10 9 1 0 1 0.234999821
+mod 21 3 35 0 0 1 0
+mod 21 5 34 0 0 1 0
+mod 24 0 25 0 0 1 1109.18018
+mod 24 1 37 0 0 1 2.67600107
+expr 4 0 slow_drift
+glob rand rand(0, 1, 2)
+glob slow_drift sin(t * 0.2) * 0.5 + 0.5

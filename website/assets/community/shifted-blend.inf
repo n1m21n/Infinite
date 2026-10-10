@@ -1,0 +1,798 @@
+infinite-patch 1
+node 1 Notes Note Sequencer
+  pos 2580 -820
+  flags 0 0 1 0
+  i steps 8
+  i rateMode 0
+  f rateBeats 0.25
+  f rateSeconds 0.200000003
+  f gatePercent 70
+  b useGlobalScale 0
+  i note0 60
+  f vel0 0.800000012
+  b en0 1
+  i note1 60
+  f vel1 0.800000012
+  b en1 1
+  i note2 60
+  f vel2 0.800000012
+  b en2 1
+  i note3 60
+  f vel3 0.800000012
+  b en3 1
+  i note4 60
+  f vel4 0.800000012
+  b en4 1
+  i note5 60
+  f vel5 0.800000012
+  b en5 1
+  i note6 60
+  f vel6 0.800000012
+  b en6 1
+  i note7 60
+  f vel7 0.800000012
+  b en7 1
+  i note8 60
+  f vel8 0.800000012
+  b en8 1
+  i note9 60
+  f vel9 0.800000012
+  b en9 1
+  i note10 60
+  f vel10 0.800000012
+  b en10 1
+  i note11 60
+  f vel11 0.800000012
+  b en11 1
+  i note12 60
+  f vel12 0.800000012
+  b en12 1
+  i note13 60
+  f vel13 0.800000012
+  b en13 1
+  i note14 60
+  f vel14 0.800000012
+  b en14 1
+  i note15 60
+  f vel15 0.800000012
+  b en15 1
+end
+node 2 Synths Wavetable
+  pos 3160 320
+  flags 0 0 1 0
+  f mix 0
+  f volume 0.800000012
+  f frequency 220
+  f glide 0
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  b a.on 1
+  i a.table 7
+  f a.position 0.812609017
+  f a.volume 0.800000012
+  f a.pan 0
+  i a.unison 3
+  f a.detune 12
+  f a.stereoWidth 0.400000006
+  i a.octave 0
+  i a.semi 0
+  f a.fine 0
+  f a.phase 0
+  f a.phaseRandomize 0
+  i a.warpMode 0
+  f a.warpAmount 0
+  f a.warpRatio 1
+  i a.filterType 1
+  f a.cutoff 14630.71
+  f a.resonance 0.150000006
+  f a.ampAttack 4
+  f a.ampDecay 171.10289
+  f a.ampSustain 0.255313694
+  f a.ampRelease 3151.46997
+  f a.pitchAmount -6.12195683
+  f a.pitchAttack 0
+  f a.pitchDecay 92.1077499
+  f a.pitchSustain 0.43285051
+  f a.pitchRelease 120
+  f a.filterAmount 0.404745102
+  f a.filterAttack 4
+  f a.filterDecay 892.352722
+  f a.filterSustain 0.64734298
+  f a.filterRelease 2085.29004
+  b b.on 1
+  i b.table 53
+  f b.position 0.812609017
+  f b.volume 0.800000012
+  f b.pan 0
+  i b.unison 8
+  f b.detune 39.4999847
+  f b.stereoWidth 0.400000006
+  i b.octave -1
+  i b.semi 0
+  f b.fine 0
+  f b.phase 0
+  f b.phaseRandomize 0
+  i b.warpMode 0
+  f b.warpAmount 0
+  f b.warpRatio 1
+  i b.filterType 0
+  f b.cutoff 5719.06689
+  f b.resonance 0.150000006
+  f b.ampAttack 4
+  f b.ampDecay 300
+  f b.ampSustain 0.75
+  f b.ampRelease 1469.45544
+  f b.pitchAmount 0
+  f b.pitchAttack 0
+  f b.pitchDecay 120
+  f b.pitchSustain 0
+  f b.pitchRelease 120
+  f b.filterAmount 0
+  f b.filterAttack 4
+  f b.filterDecay 400
+  f b.filterSustain 0.400000006
+  f b.filterRelease 300
+end
+node 3 3D Cube
+  pos 3200 -1440
+  flags 1 0 1 0
+  i shape 1
+  i detail 24
+  i sides 16
+  f tube 0.400000006
+  i knotP 2
+  i knotQ 3
+  f bevel 0
+  i bevelSegments 1
+  f superN2 1
+  f superN3 1
+  f discInner 0
+  f superP2 1
+  f superP3 1
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f scale 1
+  f spin 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+end
+node 4 3D Transform
+  pos 3680 -1580
+  flags 1 0 1 0
+  i op 0
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0.600000024
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 58.7667046
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 5 3D Audio Displacement
+  pos 4160 -1480
+  flags 1 0 1 0
+  i mode 0
+  f strength 1.14900005
+  f frequency 2
+  f speed 1
+  f damping 1
+  f attack 10
+  f decay 150
+  f midlevel 0
+  i axis 1
+  i subdivide 2
+  i chladniM 3
+  i chladniN 5
+  b flat 0
+  b flip 0
+  b inherit 1
+  b selectionOnly 0
+  c color 0.150000006 0.75 0.949999988
+  f metallic 0.200000003
+  f roughness 0.349999994
+  f opacity 1
+  i shading 0
+  c emissionColor 0 0.600000024 1
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 0.100000001 0.5 1
+  f subsurfaceRadius 0.5
+end
+node 6 3D Mesh to Points
+  pos 4440 -1320
+  flags 1 0 1 0
+  i mode 0
+  i maxPoints 4000
+  f pointSize 0.193000004
+  b weld 1
+  f dissolveAngleDegrees 1
+  b inherit 1
+  c color 0.949999988 0.800000012 0.449999988
+  f metallic 0.100000001
+  f roughness 0.5
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 7 3D Instance on Points
+  pos 4720 -1260
+  flags 1 0 1 0
+  i pointMode 2
+  i maxPoints 2000
+  f instanceScale 1
+  f scaleRandom 0.400000006
+  f rotationRandom 0.90200001
+  b alignToNormal 1
+  f normalOffset 0.123999998
+  f seed 0
+  b inheritMaterial 1
+  c color 0.899999976 0.75 0.5
+  f metallic 0.200000003
+  f roughness 0.400000006
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 8 3D Cube
+  pos 4480 -720
+  flags 1 0 1 0
+  i shape 13
+  i detail 24
+  i sides 16
+  f tube 0.400000006
+  i knotP 2
+  i knotQ 3
+  f bevel 0
+  i bevelSegments 1
+  f superN2 1
+  f superN3 1
+  f discInner 0
+  f superP2 1
+  f superP3 1
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f scale 1
+  f spin 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+end
+node 9 3D Render 3D
+  pos 5060 -1320
+  flags 1 0 1 0
+  f width 1024
+  f height 1024
+  i projection 0
+  f fov 45
+  f orthoHeight 1.5
+  f camDistance 6.36096096
+  f camAzimuth 15.8150024
+  f camElevation -24.5191994
+  f targetX 0
+  f targetY 0
+  f targetZ 0
+  f near 0.0500000007
+  f far 100
+  f lightAzimuth 51.5662003
+  f lightElevation 51.5662003
+  c lightColor 1 0.980000019 0.939999998
+  f lightIntensity 1.20000005
+  c ambient 0.280000001 0.319999993 0.419999987
+  f rim 0.349999994
+  c envSky 0.419999987 0.529999971 0.75
+  c envHorizon 0.550000012 0.560000002 0.600000024
+  c envGround 0.159999996 0.140000001 0.129999995
+  f envIntensity 1
+  b envAsBackground 1
+  c bg 0.0399999991 0.0399999991 0.0599999987
+  f bgOpacity 1
+  b depthTest 1
+  b cull 1
+  i spriteShape 0
+  i spriteSizeMode 0
+  i samples 2
+  i tonemap 1
+  f exposure 1
+  b shadows 0
+  i shadowQuality 1
+  f shadowBias 0.00249999994
+  f shadowSoftness 1
+  f shadowStrength 0.800000012
+end
+node 10 Compositing Null
+  pos 5920 -960
+  flags 0 0 1 0
+end
+node 11 Modulators Macro XY
+  pos 4140 1540
+  flags 1 0 1 0
+  f padX 0.812609017
+  f padY 0.31696701
+  b loopPath 1
+  f speed 0.300000012
+  s path 
+end
+node 12 Modulators Random
+  pos 2700 -1220
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 7.30000019
+end
+node 13 Modulators Random
+  pos 2780 200
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 21.9000015
+end
+node 15 Color Color Ramp
+  pos 6160 -960
+  flags 1 0 1 0
+  i interpMode 0
+  f mix 1
+  i stopCount 5
+  f stop0 0
+  c stopColor0 0.209637478 0.29937005 0.213353202
+  f stop1 0.428250939
+  c stopColor1 0.893344343 0.66616708 0.887943625
+  f stop2 0.365198404
+  c stopColor2 0.755640686 0.63992852 0.35069856
+  f stop3 0.147381276
+  c stopColor3 0.574025929 0.472380817 0.278996795
+  f stop4 0.565817714
+  c stopColor4 0.938005388 0.907654881 0.757352114
+  f stop5 0.147381276
+  c stopColor5 0.574025929 0.472380817 0.278996795
+  f stop6 0.565817714
+  c stopColor6 0.938005388 0.907654881 0.757352114
+  f stop7 0
+  c stopColor7 0 0 0
+  f stop8 0
+  c stopColor8 0 0 0
+  f stop9 0
+  c stopColor9 0 0 0
+  f stop10 0
+  c stopColor10 0 0 0
+  f stop11 0
+  c stopColor11 0 0 0
+  f stop12 0
+  c stopColor12 0 0 0
+  f stop13 0
+  c stopColor13 0 0 0
+  f stop14 0
+  c stopColor14 0 0 0
+  f stop15 0
+  c stopColor15 0 0 0
+  f stop16 0
+  c stopColor16 0 0 0
+  f stop17 0
+  c stopColor17 0 0 0
+  f stop18 0
+  c stopColor18 0 0 0
+  f stop19 0
+  c stopColor19 0 0 0
+  f stop20 0
+  c stopColor20 0 0 0
+  f stop21 0
+  c stopColor21 0 0 0
+  f stop22 0
+  c stopColor22 0 0 0
+  f stop23 0
+  c stopColor23 0 0 0
+  f stop24 0
+  c stopColor24 0 0 0
+  f stop25 0
+  c stopColor25 0 0 0
+  f stop26 0
+  c stopColor26 0 0 0
+  f stop27 0
+  c stopColor27 0 0 0
+  f stop28 0
+  c stopColor28 0 0 0
+  f stop29 0
+  c stopColor29 0 0 0
+  f stop30 0
+  c stopColor30 0 0 0
+  f stop31 0
+  c stopColor31 0 0 0
+end
+node 16 Modulators Palette
+  pos 5860 -480
+  flags 1 0 1 0
+  s path 
+  i swatchCount 5
+  i sortMode 0
+  i stripMode 0
+  f minChroma 0.0399999991
+  b includeNeutrals 1
+  f hueShift 0
+  f saturation 1
+  f brightness 0
+  f spread 1
+  b live 0
+  f sampleRate 8
+  i sampleSize 96
+  f seed 1
+end
+node 17 Source Formula
+  pos 5720 -2340
+  flags 1 0 1 0
+  s formula    float a = length(p - vec2(0.15 * sin(t * 0.4), 0.0)) * (40.0 + uA * 200.0);\n   float b = length(p + vec2(0.15 * sin(t * 0.4), 0.0)) * (40.0 + uA * 200.0);\n   float v = sin(a) * sin(b);\n   float mask = smoothstep(0.0, 0.02, v);\n   return vec4(mix(vec3(uB * 0.3), vec3(1.0, 1.0, uC), mask), 1.0);
+  f width 1024
+  f height 1024
+  f knobA 0.66324085
+  f knobB 0.66324085
+  f knobC 0.5
+  f knobD 0.5
+  b animate 1
+end
+node 19 AudioUtility Blend Audio
+  pos 4220 940
+  flags 0 0 1 0
+  f blend 0.5
+end
+node 20 AudioEffects Reverb
+  pos 4520 780
+  flags 0 0 1 0
+  f mix 0.812609017
+  f size 0.5
+  f decay 5.68149948
+  f damping 0.400000006
+  f predelay 20
+  f width 1
+end
+node 21 AudioEffects Delay
+  pos 5080 800
+  flags 0 0 1 0
+  f mix 0.349999964
+  f bounce 0
+  f sync 1
+  f rateDiv 9
+  f timeMs 3
+  f feedback 35
+  f tone 0.159999847
+  f pan 0
+  f ducking 0
+end
+node 22 AudioEffects Frequency Shifter
+  pos 4540 1340
+  flags 0 0 1 0
+  f mix 0.5
+  f shift 6252.18018
+  f feedback 0
+  f spread 0
+  f range 1
+end
+node 23 AudioEffects Formant Filter
+  pos 4560 1840
+  flags 0 0 1 0
+  f mix 0.31696701
+  f vowel 3.25043607
+  f q 10
+end
+node 25 AudioUtility Blend Audio
+  pos 5580 1380
+  flags 0 0 1 0
+  f blend 0.5
+end
+node 26 AudioUtility Blend Audio
+  pos 5140 1560
+  flags 0 0 1 0
+  f blend 0.5
+end
+node 28 Synths Granular
+  pos 4200 140
+  flags 0 0 1 0
+  s filePath 
+  f position 0.931819737
+  f scan 3.63971996
+  f grainLength 396.910828
+  f density 25
+  b freeze 0
+  f randomPos 0.954964995
+  f randomLength 0.100000001
+  f randomPitch 0
+  f randomPan 0.5
+  f reverseProb 0.328647971
+  f pitchShift 0
+  f fineTune 0
+  i windowShape 0
+  f pan 0
+  f width 1
+  f mix 1
+  f volume 0.800000012
+  f start 0
+  f end 1
+  b loop 1
+end
+node 29 Modulators Random
+  pos 3680 -160
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 51.1000023
+end
+node 30 Modulators Random
+  pos 4800 200
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 65.7000046
+end
+node 31 Color color adjustments
+  pos 6700 -1140
+  flags 1 0 1 0
+  f uBrightness -0.0410000011
+  f uContrast 1.61699998
+  f uBlackPoint 0.592999995
+  f uWhitePoint 0.813000023
+  f uGamma 2.45300007
+  f uCyanRed -0.476999998
+  f uMagentaGreen 0.331999987
+  f uYellowBlue 0.216999993
+  f uHueShift 0.240999997
+  f uSaturation 2.05900002
+  f uLightness 0.228
+  f uVibrance 1.05700004
+  f uShadows 0.228
+  f uMidtones 0.5
+  f uHighlights 0.228
+  f uContrastPivot 0
+  c uRedRow 1 0 0
+  c uGreenRow 0 1 0
+  c uBlueRow 0 0 1
+  f uBWEnabled 0
+  f uRedWeight 0.298999995
+  f uGreenWeight 0.587000012
+  f uBlueWeight 0.114
+end
+node 32 Compositing Blend
+  pos 6400 -1380
+  flags 1 0 1 0
+  i mode 11
+  f mix 1
+end
+node 33 Effects liquify
+  pos 7040 -1420
+  flags 1 0 1 0
+  f uAmount 0.774999976
+  f uScale 8.28100014
+  f uSpeed 1.51199996
+end
+node 34 Feedback Feedback
+  pos 7620 -800
+  flags 0 0 1 0
+  f delayFrames 1
+end
+node 35 Compositing Blend
+  pos 7340 -1400
+  flags 1 0 1 0
+  i mode 4
+  f mix 0.495000005
+end
+node 36 Effects liquify
+  pos 7820 -1380
+  flags 0 0 1 0
+  f uAmount 0.400000006
+  f uScale 4
+  f uSpeed 0.400000006
+end
+node 38 Effects transform
+  pos 7600 -1380
+  flags 1 0 1 0
+  f uTranslateX 0
+  f uTranslateY 0
+  f uScale 3
+  f uScaleX 3
+  f uScaleY 1
+  f uRotation 0
+end
+node 39 AudioUtility Audio Out
+  pos 5820 980
+  flags 0 0 1 0
+  i formatIndex 0
+  s recordDirectory 
+end
+cable 3 0 17
+cable 10 0 9
+cable 15 0 10
+cable 31 0 32
+cable 32 0 17
+cable 32 1 15
+cable 33 0 31
+cable 34 0 36
+cable 35 0 33
+cable 35 1 34
+cable 36 0 38
+cable 38 0 35
+geo 4 0 3
+geo 5 0 4
+geo 6 0 5
+geo 7 1 8
+geo 7 2 6
+geo 9 0 7
+geo 9 1 5
+aud 5 1 2
+aud 19 0 2
+aud 19 1 28
+aud 20 0 19
+aud 21 0 20
+aud 22 0 19
+aud 23 0 19
+aud 25 0 26
+aud 25 1 21
+aud 26 0 22
+aud 26 1 23
+aud 39 0 25
+note 2 0 1 0
+mod 2 2 11 0 0 1 0.240000024
+mod 2 3 11 1 0 1 1
+mod 2 5 11 0 0 1 1978.36572
+mod 2 29 11 0 0 1 0.400000006
+mod 2 30 13 0 0 1 1
+mod 2 32 11 1 0 1 12000
+mod 4 5 12 0 0 1 0
+mod 17 2 12 0 0 1 0.5
+mod 17 3 12 0 0 1 0.5
+mod 20 5 11 0 0 1 0.369999975
+mod 22 0 11 0 0 1 0
+mod 23 0 11 0 0 1 0
+mod 23 2 11 1 0 1 1
+mod 28 0 29 0 0 1 0.526054978
+mod 28 1 30 0 0 1 1.74417257
+mod 28 4 30 0 0 1 0.0500000007
+pal 15 0 16 0
+pal 15 1 16 1
+pal 15 2 16 2
+pal 15 3 16 3
+pal 15 4 16 4

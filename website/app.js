@@ -1658,11 +1658,11 @@ function initRecipesToggle() {
     if (isHidden) {
       extraRecipes.classList.remove('hidden');
       const span = btn.querySelector('span');
-      if (span) span.textContent = 'Show fewer recipes';
+      if (span) span.textContent = 'Show fewer templates';
     } else {
       extraRecipes.classList.add('hidden');
       const span = btn.querySelector('span');
-      if (span) span.textContent = 'Show 3 more recipes';
+      if (span) span.textContent = 'Show 9 more templates';
     }
   });
 }

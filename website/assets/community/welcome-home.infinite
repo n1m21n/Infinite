@@ -1,0 +1,2680 @@
+infinite-patch 1
+node 1 3D Plane
+  uid 1
+  pos 25260 -3740
+  flags 0 0 1 0
+  i shape 0
+  i detail 24
+  i sides 16
+  f tube 0.400000006
+  i knotP 2
+  i knotQ 3
+  f bevel 0
+  i bevelSegments 1
+  f superN2 1
+  f superN3 1
+  f discInner 0
+  f superP2 1
+  f superP3 1
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f scale 1
+  f spin 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+end
+node 2 Source Texture
+  uid 2
+  pos 24400 -3760
+  flags 1 0 1 0
+  i textureType 5
+  f width 1024
+  f height 1024
+  f scale 28.0489998
+  f seed 0
+  f contrast 0.38499999
+  f brightness 0
+  c lowColor 0 0 0
+  c highColor 1 1 1
+  i voronoiDistance 0
+  i voronoiFeature 0
+  f voronoiRandomness 1
+  f voronoiMinkowskiExponent 0.5
+  f voronoiSmoothness 0.200000003
+  b voronoiCellColor 0
+  f brickWidth 0.5
+  f brickHeight 0.25
+  f brickRowOffset 0.5
+  f brickMortarSize 0.0199999996
+  f brickMortarSmooth 0.100000001
+  f brickBias 0
+  c mortarColor 0.0500000007 0.0500000007 0.0500000007
+  f magicDepth 2
+  f magicDistortion 1.5
+  i waveType 0
+  i waveProfile 0
+  i waveBandsDirection 0
+  f waveDistortion 0
+  f waveDetail 2
+  f waveDetailScale 1
+  f wavePhaseOffset 0
+  i musgraveType 0
+  f musgraveDimension 2
+  f musgraveLacunarity 2
+  f musgraveOctaves 4
+  f musgraveGain 1
+  f musgraveOffset 1
+  i gradientType 0
+  f cloudsDepth 4
+  b cloudsHard 0
+  i marbleType 0
+  f marbleTurbulence 5
+  f marbleNoiseScale 1
+  f marbleNoiseDepth 2
+  i woodType 0
+  f woodTurbulence 5
+  f woodNoiseScale 1
+end
+node 3 3D Transform
+  uid 3
+  pos 25500 -3740
+  flags 1 0 1 0
+  i op 0
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0
+  f offsetY -0.43900001
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX -90
+  f rotY 0
+  f rotZ 0
+  f scaleX 4
+  f scaleY 4
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 4 3D Cube
+  uid 4
+  pos 22940 -5060
+  flags 1 0 1 0
+  i shape 1
+  i detail 33
+  i sides 3
+  f tube 0.400000006
+  i knotP 2
+  i knotQ 3
+  f bevel 0
+  i bevelSegments 1
+  f superN2 1
+  f superN3 1
+  f discInner 0
+  f superP2 1
+  f superP3 1
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f scale 1
+  f spin 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+end
+node 5 3D Transform
+  uid 5
+  pos 23200 -5060
+  flags 1 0 1 0
+  i op 0
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 4
+  f scaleY 1
+  f scaleZ 2.95099998
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 6 3D Render 3D
+  uid 6
+  pos 27800 -4820
+  flags 1 0 1 0
+  f width 1024
+  f height 1024
+  i renderPass 0
+  i projection 0
+  f fov 42.6769981
+  f orthoHeight 1.5
+  f camDistance 2.74900007
+  f camAzimuth 8.1816864
+  f camElevation -3.20000005
+  f targetX 0
+  f targetY 0
+  f targetZ 0
+  f near 0.0500000007
+  f far 100
+  f lightAzimuth 42.9000015
+  f lightElevation 26.7000008
+  c lightColor 1 0.980000019 0.939999998
+  f lightIntensity 2.52200007
+  c ambient 0.280000001 0.319999993 0.419999987
+  f rim 0.349999994
+  c envSky 0.419999987 0.529999971 0.75
+  c envHorizon 0.550000012 0.560000002 0.600000024
+  c envGround 0.159999996 0.140000001 0.129999995
+  f envIntensity 0
+  b envAsBackground 1
+  c bg 0.0399999991 0.0399999991 0.0599999987
+  f bgOpacity 1
+  b depthTest 1
+  b cull 1
+  i spriteShape 0
+  i spriteSizeMode 0
+  i samples 2
+  i tonemap 1
+  f exposure 1
+  b shadows 1
+  i shadowQuality 0
+  f shadowBias 0.00249999994
+  f shadowSoftness 1
+  f shadowStrength 1
+end
+node 7 3D Normals
+  uid 7
+  pos 23500 -5060
+  flags 1 0 1 0
+  i op 7
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0.600000024
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 1
+  b flip 1
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 8 3D Select
+  uid 8
+  pos 22820 -5700
+  flags 1 0 1 0
+  i op 13
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0.600000024
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 1
+  f selectB -1.83700001
+  f selectC 0
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 2.47099996
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 9 3D Delete
+  uid 9
+  pos 24220 -5500
+  flags 1 0 1 0
+  i op 17
+  b inherit 1
+  b selectionOnly 1
+  f amount 1
+  i count 5
+  f offsetX 0.600000024
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 10 3D Sphere
+  uid 10
+  pos 25880 -6800
+  flags 1 0 1 0
+  i shape 2
+  i detail 24
+  i sides 16
+  f tube 0.400000006
+  i knotP 2
+  i knotQ 3
+  f bevel 0
+  i bevelSegments 1
+  f superN2 1
+  f superN3 1
+  f discInner 0
+  f superP2 1
+  f superP3 1
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f scale 1
+  f spin 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+end
+node 11 Source Ramp
+  uid 11
+  pos 23980 -8140
+  flags 1 0 1 0
+  i type 0
+  i repeat 0
+  f width 1024
+  f height 1024
+  f angle 90
+  f centerX 0.5
+  f centerY 0.5
+  f scale 1
+  f offset 0
+  f gamma 1
+  f dither 0
+  i stopCount 5
+  f stop0 0.140000001
+  c stopColor0 0.0170723088 0.0535310693 0.184782624
+  f stop1 0.151999995
+  c stopColor1 0.272920579 0.896739125 0.510242879
+  f stop2 0.243000001
+  c stopColor2 0 0.619565248 0.0134687331
+  f stop3 0.243000001
+  c stopColor3 0.989130437 0.956876218 0.964238584
+  f stop4 0.899999976
+  c stopColor4 0.961956501 0.630090594 0.580310702
+end
+node 12 3D Mapping
+  uid 12
+  pos 26180 -6880
+  flags 1 0 1 0
+  i space 0
+  f translateX 0
+  f translateY 0
+  f translateZ 0
+  f rotateX 0
+  f rotateY 0
+  f rotateZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f triplanarBlend 0
+end
+node 13 3D Normals
+  uid 13
+  pos 25860 -6820
+  flags 1 0 1 0
+  i op 7
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0.600000024
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 14 3D Instance on Points
+  uid 14
+  pos 25780 -5840
+  flags 1 0 1 0
+  i pointMode 0
+  i maxPoints 12986
+  f instanceScale 0.146108955
+  f scaleRandom 0.810000002
+  f rotationRandom 0.0355579443
+  b alignToNormal 1
+  f normalOffset 0.0189999994
+  f seed 27.7840004
+  b inheritMaterial 1
+  c color 0.899999976 0.75 0.5
+  f metallic 0.200000003
+  f roughness 0.400000006
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 15 3D Select
+  uid 15
+  pos 23160 -5700
+  flags 1 0 1 0
+  i op 13
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0.600000024
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 0
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 1
+  f selectB -1.83700001
+  f selectC -0.745999992
+  b selectInvert 0
+  b selectAppend 1
+  f selectSeed 2.47099996
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 16 3D Transform
+  uid 16
+  pos 26500 -6060
+  flags 1 0 1 0
+  i op 0
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 180
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 17 3D Distribute Points on Faces
+  uid 17
+  pos 25200 -6020
+  flags 1 0 1 0
+  f density 2
+  i method 0
+  f minDistance 0.100000001
+  f pointSize 0.0209999997
+  f seed 34.8730011
+  b inheritMaterial 1
+  c color 0.899999976 0.75 0.5
+  f metallic 0.200000003
+  f roughness 0.400000006
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 18 3D Points to Vertices
+  uid 18
+  pos 25480 -6020
+  flags 1 0 1 0
+  b aliveOnly 1
+  b inheritMaterial 1
+  c color 0.899999976 0.899999976 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 19 Modulators LFO
+  uid 19
+  pos 27380 -4460
+  flags 1 0 1 0
+  i shape 0
+  f rateBeats 25.6560001
+  f phase 0
+  f low 0.444000006
+  f high 0.536000013
+end
+node 20 3D Instance on Points
+  uid 20
+  pos 25780 -5020
+  flags 1 0 1 0
+  i pointMode 0
+  i maxPoints 12986
+  f instanceScale 0.157000005
+  f scaleRandom 0.796999991
+  f rotationRandom 0.00645105122
+  b alignToNormal 1
+  f normalOffset 0.0189999994
+  f seed 38.4900017
+  b inheritMaterial 1
+  c color 0.899999976 0.75 0.5
+  f metallic 0.200000003
+  f roughness 0.400000006
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 21 3D Transform
+  uid 21
+  pos 26800 -6060
+  flags 1 0 1 0
+  i op 0
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 180
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 22 3D Distribute Points on Faces
+  uid 22
+  pos 25200 -5200
+  flags 1 0 1 0
+  f density 2
+  i method 0
+  f minDistance 0.100000001
+  f pointSize 0.0209999997
+  f seed 62.6500015
+  b inheritMaterial 1
+  c color 0.899999976 0.75 0.5
+  f metallic 0.200000003
+  f roughness 0.400000006
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 23 3D Points to Vertices
+  uid 23
+  pos 25480 -5200
+  flags 1 0 1 0
+  b aliveOnly 1
+  b inheritMaterial 1
+  c color 0.899999976 0.899999976 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 24 Modulators Random
+  uid 24
+  pos 25480 -4820
+  flags 1 0 1 0
+  f rate 0.819000006
+  f smooth 0.5
+  f low 0
+  f high 0.136999995
+  f seed 78.5910034
+end
+node 25 Modulators Random
+  uid 25
+  pos 25480 -5640
+  flags 1 0 1 0
+  f rate 0.361999989
+  f smooth 0.5
+  f low 0
+  f high 0.135000005
+  f seed 158.524002
+end
+node 26 3D Material
+  uid 26
+  pos 25880 -7720
+  flags 1 0 1 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  i wrapMode 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+  f normalStrength 1
+end
+node 27 3D Light
+  uid 27
+  pos 28080 -5600
+  flags 1 0 1 0
+  i type 1
+  f azimuth 39.5
+  f elevation -11.5
+  f distance 0.200000003
+  c color 0.59215641 0.82745111 0.913725317
+  f intensity 2.38499999
+  f falloff 1
+  f spotAngle 45
+  f spotPenumbra 0.200000003
+  f orbitPerBeat 0
+end
+node 28 3D Material
+  uid 28
+  pos 25800 -3740
+  flags 1 0 1 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0
+  f roughness 0.179000005
+  f opacity 1
+  i shading 0
+  i wrapMode 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0.676999986
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+  f normalStrength 1
+end
+node 29 Modulators Palette
+  uid 29
+  pos 27720 -6160
+  flags 1 0 1 0
+  s path 
+  i swatchCount 2
+  i sortMode 1
+  i stripMode 0
+  f minChroma 0
+  b includeNeutrals 0
+  f hueShift 0
+  f saturation 1
+  f brightness 0
+  f spread 1
+  b live 1
+  f sampleRate 1
+  i sampleSize 16
+  f seed 0
+end
+node 30 Source Ramp
+  uid 31
+  pos 27480 -7000
+  flags 1 0 1 0
+  i type 0
+  i repeat 0
+  f width 1024
+  f height 1024
+  f angle 0
+  f centerX 0.5
+  f centerY 0.5
+  f scale 1
+  f offset 0
+  f gamma 1
+  f dither 0
+  i stopCount 2
+  f stop0 0.792999983
+  c stopColor0 1 0 0
+  f stop1 0.80400002
+  c stopColor1 0.804347813 0 0
+  f stop2 0.5
+  c stopColor2 1 0.300000012 0.200000003
+  f stop3 0.75
+  c stopColor3 0.200000003 0.5 1
+  f stop4 0.899999976
+  c stopColor4 1 0.899999976 0.300000012
+end
+node 31 Compositing Switcher
+  uid 34
+  pos 27820 -6800
+  flags 1 0 1 0
+  i unit 0
+  f interval 2
+  f crossfade 0
+  b manual 1
+  i manualSlot 1
+end
+node 32 Source Ramp
+  uid 35
+  pos 27200 -7000
+  flags 1 0 1 0
+  i type 0
+  i repeat 0
+  f width 1024
+  f height 1024
+  f angle 0
+  f centerX 0.5
+  f centerY 0.5
+  f scale 1
+  f offset 0
+  f gamma 1
+  f dither 0
+  i stopCount 2
+  f stop0 0.757000029
+  c stopColor0 0.581285477 0.747359753 0.869565248
+  f stop1 0.722000003
+  c stopColor1 0.590500951 0.828902185 0.913043499
+  f stop2 0.5
+  c stopColor2 1 0.300000012 0.200000003
+  f stop3 0.75
+  c stopColor3 0.200000003 0.5 1
+  f stop4 0.899999976
+  c stopColor4 1 0.899999976 0.300000012
+end
+node 33 Modulators Random
+  uid 36
+  pos 25520 -8760
+  flags 0 0 1 0
+  f rate 1
+  f smooth 0.5
+  f low 0
+  f high 1
+  f seed 116.800003
+end
+node 34 Compositing Switcher
+  uid 37
+  pos 24640 -6920
+  flags 1 0 1 0
+  i unit 0
+  f interval 4
+  f crossfade 0
+  b manual 1
+  i manualSlot 1
+end
+node 35 Source Ramp
+  uid 38
+  pos 24240 -8140
+  flags 1 0 1 0
+  i type 0
+  i repeat 0
+  f width 1024
+  f height 1024
+  f angle 90
+  f centerX 0.5
+  f centerY 0.5
+  f scale 1
+  f offset 0
+  f gamma 1
+  f dither 0
+  i stopCount 5
+  f stop0 0.0289999992
+  c stopColor0 0.0170723088 0.0535310693 0.184782624
+  f stop1 0.064000003
+  c stopColor1 1 0.385869563 0.385869563
+  f stop2 0.317999989
+  c stopColor2 0.619565248 0 0
+  f stop3 0.35800001
+  c stopColor3 0.619565248 0.494978756 0.523416996
+  f stop4 0.899999976
+  c stopColor4 0.961956501 0.630090594 0.580310702
+end
+node 36 Compositing Blend
+  uid 39
+  pos 24620 -7620
+  flags 1 0 1 0
+  i mode 3
+  f mix 1
+end
+node 37 Source Noise
+  uid 40
+  pos 24520 -8540
+  flags 1 0 1 0
+  i noiseType 3
+  f width 1024
+  f height 1024
+  f scale 6
+  f octaves 4
+  f lacunarity 2
+  f gain 0.5
+  f warp 0.558000028
+  f speed 1.60899997
+  f contrast 1
+  f brightness 0
+  f seed 0
+  b colorNoise 0
+  c lowColor 0 0 0
+  c highColor 1 1 1
+end
+node 38 Compositing transform
+  uid 41
+  pos 24800 -8180
+  flags 1 0 1 0
+  f uTranslateX 0
+  f uTranslateY 0
+  f uScale 1
+  f uScaleX 2.95900011
+  f uScaleY 1.11699998
+  f uRotation -90
+  f uCropX 0
+  f uCropY 0
+  f uFlipH 0
+  f uFlipV 0
+end
+node 39 Source Ramp
+  uid 42
+  pos 23260 -4220
+  flags 1 0 1 0
+  i type 0
+  i repeat 0
+  f width 1024
+  f height 1024
+  f angle 90
+  f centerX 0.5
+  f centerY 0.196999997
+  f scale 0.939999998
+  f offset 0
+  f gamma 1
+  f dither 0
+  i stopCount 2
+  f stop0 0.172000006
+  c stopColor0 0 0 0
+  f stop1 1
+  c stopColor1 1 0.00543481112 0.00543481112
+  f stop2 0.5
+  c stopColor2 1 0.300000012 0.200000003
+  f stop3 0.75
+  c stopColor3 0.200000003 0.5 1
+  f stop4 0.899999976
+  c stopColor4 1 0.899999976 0.300000012
+end
+node 40 Compositing Blend
+  uid 43
+  pos 23660 -3840
+  flags 1 0 1 0
+  i mode 8
+  f mix 1
+end
+node 41 Source Noise
+  uid 44
+  pos 22980 -3500
+  flags 1 0 1 0
+  i noiseType 3
+  f width 1024
+  f height 1024
+  f scale 17.5960007
+  f octaves 4
+  f lacunarity 2
+  f gain 0.5
+  f warp 1.41600001
+  f speed 2
+  f contrast 1
+  f brightness 0
+  f seed 0
+  b colorNoise 0
+  c lowColor 0 0 0
+  c highColor 1 1 1
+end
+node 42 Compositing transform
+  uid 45
+  pos 23260 -3500
+  flags 1 0 1 0
+  f uTranslateX 0
+  f uTranslateY 0
+  f uScale 1.11699998
+  f uScaleX 2.87100005
+  f uScaleY 1
+  f uRotation -90
+  f uCropX 0
+  f uCropY 0
+  f uFlipH 0
+  f uFlipV 0
+end
+node 43 3D Material
+  uid 46
+  pos 24560 -4460
+  flags 0 0 1 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  i wrapMode 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+  f normalStrength 1
+end
+node 44 3D Switcher 3D
+  uid 47
+  pos 26700 -4820
+  flags 1 0 1 0
+  i unit 0
+  f interval 4
+  f crossfade 0
+  b manual 1
+  i manualSlot 1
+end
+node 45 Synths Wavetable
+  uid 108
+  pos 24100 -1920
+  flags 0 0 1 0
+  f mix 0
+  f volume 0.800000012
+  f frequency 220
+  f glide 0
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  b a.on 1
+  i a.table 0
+  f a.position 0.119598508
+  f a.volume 0.800000012
+  f a.pan 0
+  i a.unison 2
+  f a.detune 25
+  f a.stereoWidth 0.400000006
+  i a.octave -2
+  i a.semi 0
+  f a.fine 0
+  f a.phase 0
+  f a.phaseRandomize 0
+  i a.warpMode 0
+  f a.warpAmount 0
+  f a.warpRatio 1
+  i a.filterType 1
+  f a.cutoff 3295.13867
+  f a.resonance 0.150000006
+  f a.ampAttack 4
+  f a.ampDecay 1049.31799
+  f a.ampSustain 1
+  f a.ampRelease 1919.08826
+  f a.pitchAmount 18.0146103
+  f a.pitchAttack 0
+  f a.pitchDecay 15.9284754
+  f a.pitchSustain 0
+  f a.pitchRelease 120
+  f a.filterAmount 0
+  f a.filterAttack 4
+  f a.filterDecay 400
+  f a.filterSustain 0.400000006
+  f a.filterRelease 300
+  b b.on 0
+  i b.table 3
+  f b.position 0.400000006
+  f b.volume 0.800000012
+  f b.pan 0
+  i b.unison 1
+  f b.detune 12
+  f b.stereoWidth 0.400000006
+  i b.octave -1
+  i b.semi 0
+  f b.fine 0
+  f b.phase 0
+  f b.phaseRandomize 0
+  i b.warpMode 0
+  f b.warpAmount 0
+  f b.warpRatio 1
+  i b.filterType 0
+  f b.cutoff 12000
+  f b.resonance 0.150000006
+  f b.ampAttack 4
+  f b.ampDecay 300
+  f b.ampSustain 0.75
+  f b.ampRelease 260
+  f b.pitchAmount 0
+  f b.pitchAttack 0
+  f b.pitchDecay 120
+  f b.pitchSustain 0
+  f b.pitchRelease 120
+  f b.filterAmount 0
+  f b.filterAttack 4
+  f b.filterDecay 400
+  f b.filterSustain 0.400000006
+  f b.filterRelease 300
+end
+node 46 Notes Note Sequencer
+  uid 109
+  pos 22820 -1960
+  flags 0 0 1 0
+  i steps 4
+  i rateMode 0
+  f rateBeats 1
+  f rateSeconds 0.200000003
+  f gatePercent 60.1000137
+  b useGlobalScale 0
+  i note0 60
+  f vel0 0.800000012
+  b en0 1
+  i note1 60
+  f vel1 0.446760714
+  b en1 0
+  i note2 60
+  f vel2 0.800000012
+  b en2 0
+  i note3 84
+  f vel3 0.242564797
+  b en3 0
+  i note4 60
+  f vel4 0.800000012
+  b en4 1
+  i note5 60
+  f vel5 0.800000012
+  b en5 1
+  i note6 60
+  f vel6 0.800000012
+  b en6 1
+  i note7 60
+  f vel7 0.800000012
+  b en7 1
+  i note8 60
+  f vel8 0.800000012
+  b en8 1
+  i note9 60
+  f vel9 0.800000012
+  b en9 1
+  i note10 60
+  f vel10 0.800000012
+  b en10 1
+  i note11 60
+  f vel11 0.800000012
+  b en11 1
+  i note12 60
+  f vel12 0.800000012
+  b en12 1
+  i note13 60
+  f vel13 0.800000012
+  b en13 1
+  i note14 60
+  f vel14 0.800000012
+  b en14 1
+  i note15 60
+  f vel15 0.800000012
+  b en15 1
+end
+node 47 AudioEffects Drive
+  uid 110
+  pos 25640 -1180
+  flags 0 0 1 0
+  f mix 1
+  f drive 21.9999962
+  f bias 0.109999895
+  f tone 0
+  f color 0.294999957
+  f output 7.37999725
+end
+node 48 AudioEffects Dynamics
+  uid 111
+  pos 26220 -1740
+  flags 0 0 1 0
+  f mix 1
+  f threshold -16.2000008
+  f ratio 5.99499798
+  f attack 0.118275955
+  f release 143.259552
+  f makeup 4.68000031
+  f detectorRms 0
+  f sidechainExternal 0
+  f analog 0
+end
+node 49 Utility Mixer
+  uid 112
+  pos 26880 -2000
+  flags 0 0 1 0
+  i channels 5
+  f gain0 0
+  f pan0 0
+  b mute0 0
+  b solo0 0
+  f gain1 0
+  f pan1 0
+  b mute1 0
+  b solo1 0
+  f gain2 0
+  f pan2 0
+  b mute2 0
+  b solo2 0
+  f gain3 0
+  f pan3 0
+  b mute3 0
+  b solo3 0
+  f gain4 -34.8275757
+  f pan4 0
+  b mute4 0
+  b solo4 0
+  f gain5 0
+  f pan5 0
+  b mute5 0
+  b solo5 0
+  f gain6 0
+  f pan6 0
+  b mute6 0
+  b solo6 0
+  f gain7 0
+  f pan7 0
+  b mute7 0
+  b solo7 0
+  f gain8 0
+  f pan8 0
+  b mute8 0
+  b solo8 0
+  f gain9 0
+  f pan9 0
+  b mute9 0
+  b solo9 0
+  f gain10 0
+  f pan10 0
+  b mute10 0
+  b solo10 0
+  f gain11 0
+  f pan11 0
+  b mute11 0
+  b solo11 0
+end
+node 50 Utility Audio Out
+  uid 113
+  pos 27880 -1700
+  flags 0 0 1 0
+  i formatIndex 0
+  s recordDirectory 
+end
+node 51 Modulators LFO
+  uid 114
+  pos 23760 -1420
+  flags 1 0 1 0
+  i shape 0
+  f rateBeats 25.6809998
+  f phase 0
+  f low 0
+  f high 0.147
+end
+node 52 Modulators Audio to CV
+  uid 115
+  pos 25640 -2200
+  flags 0 0 1 0
+  f gain 2.14999986
+  f attackMs 0.280877531
+  f releaseMs 92.2570877
+  i mode 0
+  f minVal 0
+  f maxVal 1
+end
+node 53 Notes Humanizer
+  uid 116
+  pos 24460 -2380
+  flags 0 0 1 0
+  f timingMs 0
+  f velocityPct 92.9999924
+end
+node 54 Modulators Velocity to CV
+  uid 117
+  pos 25020 -2260
+  flags 0 0 1 0
+  f rangeLow 0
+  f rangeHigh 1
+end
+node 55 Modulators Range to Range
+  uid 118
+  pos 26360 -4300
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0
+  f outHigh 0.532000005
+  b clampOutput 1
+end
+node 56 Modulators Range to Range
+  uid 119
+  pos 25340 -2420
+  flags 0 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0
+  f outHigh 1
+  b clampOutput 1
+end
+node 57 Synths Oscillator
+  uid 120
+  pos 24000 -320
+  flags 0 0 1 0
+  f frequency 220
+  f glide 0
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  i waveform 1
+  f fine 0
+  i octave -3
+  i semi 0
+  f volume 0.800000012
+  f phase 0.639270186
+  i unison 7
+  f detune 39.5
+  i filterType 0
+  f cutoff 12000
+  f resonance 0.150000006
+  f sync 2.12499928
+  f pan 0
+  f ampAttack 16.3792648
+  f ampDecay 442.294983
+  f ampSustain 1
+  f ampRelease 1749.78784
+end
+node 58 Notes Note Echo
+  uid 121
+  pos 23500 -720
+  flags 0 0 1 0
+  i rateMode 0
+  f rateBeats 0.5
+  f rateSeconds 0.150000006
+  i repeats 1
+  f decay 60
+  i transposePerRepeat 0
+  b muteDry 1
+end
+node 59 AudioEffects Bitcrush
+  uid 122
+  pos 25300 -140
+  flags 0 0 1 0
+  f mix 1
+  f rate 4459.28809
+  f bits 6.03568316
+  f analog 0
+end
+node 60 AudioEffects Reverb
+  uid 123
+  pos 24760 -140
+  flags 0 0 1 0
+  f mix 0.349999934
+  f size 0.669999838
+  f decay 6.24814415
+  f damping 0.429999918
+  f predelay 3.25962901e-06
+  f width 1
+  f analog 0
+end
+node 61 Modulators Random
+  uid 124
+  pos 25300 300
+  flags 1 0 1 0
+  f rate 1
+  f smooth 0.5
+  f low 0
+  f high 1
+  f seed 408.800018
+end
+node 62 Notes Humanizer
+  uid 125
+  pos 23480 -260
+  flags 0 0 1 0
+  f timingMs 0
+  f velocityPct 100
+end
+node 63 Modulators Velocity to CV
+  uid 126
+  pos 23420 -20
+  flags 1 0 1 0
+  f rangeLow 0
+  f rangeHigh 1
+end
+node 64 Modulators Smoothing
+  uid 127
+  pos 23740 40
+  flags 0 0 1 0
+  f constantIn 0.5
+  f amount 0.850000024
+end
+node 65 Synths Field Synth
+  uid 128
+  pos 26620 -480
+  flags 1 0 1 0
+  s code param float decay = 0.25 [0.05, 0.8]\nparam float snap = 0.70 [0.0, 1.0]\nparam float toneFreq = 185.0 [100.0, 350.0]\nparam float bodyDecay = 0.12 [0.02, 0.4]\nstate float toneEnv = 0.0\nstate float noiseEnv = 0.0\nstate float phase = 0.0\nstate float nseed = 0.0\nstate float hp = 0.0\n\ntCoeff = clamp(1.0 - 1.0 / (sr * max(bodyDecay, 0.01)), 0.9, 0.9999)\nnCoeff = clamp(1.0 - 1.0 / (sr * max(decay, 0.02)), 0.9, 0.9999)\n\ntoneEnv = if(noteOn > 0.5, noteVel, toneEnv * tCoeff)\nnoiseEnv = if(noteOn > 0.5, noteVel, noiseEnv * nCoeff)\n\nphase = (phase + toneFreq / sr) % 1.0\nbody = sin(6.283185 * phase) * toneEnv * (1.0 - snap * 0.5)\n\nnseed = (nseed + 1.0) % 9973.0\nhsrc = sin(nseed * 12.9898) * 43758.5453\nwhite = 2.0 * (hsrc - floor(hsrc)) - 1.0\nhp = hp + 0.25 * (white - hp)\nnoiseSig = (white - hp) * noiseEnv * snap\n\nmix = body * 1.3 + noiseSig * 1.0\nout = mix / (1.0 + abs(mix) * 0.6)\n
+  i maxVoices 8
+  b exposeRmsOutput 0
+  i field_nextParamId 11
+  s field_paramMap attack:6,bodyDecay:10,cutoff:2,decay:7,detune:1,res:3,snap:8,sub:4,toneFreq:9,warmth:5
+  f p.detune 1.00800002
+  f p.cutoff 2800
+  f p.res 0.349999994
+  f p.sub 0.300000012
+  f p.warmth 0.400000006
+  f p.attack 0.0500000007
+  f p.bodyDecay 0.231999993
+  f p.decay 0.791999996
+  f p.snap 0.513999999
+  f p.toneFreq 196.001999
+  s __outputPins 
+  s __inputPins 
+end
+node 66 AudioEffects Reverb
+  uid 129
+  pos 27020 -600
+  flags 0 0 1 0
+  f mix 0.609999955
+  f size 0.759999871
+  f decay 20
+  f damping 0.494999856
+  f predelay 20
+  f width 0.564999998
+  f analog 0
+end
+node 67 Notes Note Echo
+  uid 130
+  pos 26320 -540
+  flags 0 0 1 0
+  i rateMode 0
+  f rateBeats 2
+  f rateSeconds 0.150000006
+  i repeats 1
+  f decay 60
+  i transposePerRepeat 0
+  b muteDry 1
+end
+node 68 Modulators Audio to CV
+  uid 131
+  pos 27580 -600
+  flags 0 0 1 0
+  f gain 0.724999964
+  f attackMs 0.24126564
+  f releaseMs 451.85553
+  i mode 0
+  f minVal 0
+  f maxVal 1
+end
+node 69 Effects liquify
+  uid 132
+  pos 24880 -3400
+  flags 1 0 1 0
+  f uAmount 0
+  f uScale 4
+  f uSpeed 0.400000006
+end
+node 70 Modulators Null Modulator
+  uid 133
+  pos 24920 -2860
+  flags 1 0 1 0
+  f constantIn 0.5
+end
+node 71 Modulators Range to Range
+  uid 134
+  pos 24620 -3020
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0.0780000016
+  f inHigh 0.370000005
+  f outLow 0
+  f outHigh 4
+  b clampOutput 1
+end
+node 72 Synths Metallic
+  uid 136
+  pos 27440 -3260
+  flags 0 0 1 0
+  i material 0
+  f transient 1.51574981
+  f decay 0.0500000007
+  f stiffness 2
+  f frequency 220
+  i octave 0
+  i semi 0
+  f fine 0
+  f glide 0
+  i filterType 1
+  f filterCutoff 18000
+  f filterResonance 0
+  f drive 0
+  f width 0.114999987
+  f volume 0.879999995
+end
+node 73 Notes Note Sequencer
+  uid 137
+  pos 26760 -3160
+  flags 0 0 1 0
+  i steps 8
+  i rateMode 0
+  f rateBeats 0.25
+  f rateSeconds 0.200000003
+  f gatePercent 3.9700098
+  b useGlobalScale 0
+  i note0 60
+  f vel0 0.800000012
+  b en0 1
+  i note1 60
+  f vel1 0.800000012
+  b en1 1
+  i note2 60
+  f vel2 0.800000012
+  b en2 1
+  i note3 60
+  f vel3 0.800000012
+  b en3 1
+  i note4 60
+  f vel4 0.800000012
+  b en4 1
+  i note5 60
+  f vel5 0.800000012
+  b en5 1
+  i note6 60
+  f vel6 0.800000012
+  b en6 1
+  i note7 60
+  f vel7 0.800000012
+  b en7 1
+  i note8 60
+  f vel8 0.800000012
+  b en8 1
+  i note9 60
+  f vel9 0.800000012
+  b en9 1
+  i note10 60
+  f vel10 0.800000012
+  b en10 1
+  i note11 60
+  f vel11 0.800000012
+  b en11 1
+  i note12 60
+  f vel12 0.800000012
+  b en12 1
+  i note13 60
+  f vel13 0.800000012
+  b en13 1
+  i note14 60
+  f vel14 0.800000012
+  b en14 1
+  i note15 60
+  f vel15 0.800000012
+  b en15 1
+end
+node 74 Notes Humanizer
+  uid 139
+  pos 26880 -2700
+  flags 0 0 1 0
+  f timingMs 0
+  f velocityPct 100
+end
+node 75 Modulators Velocity to CV
+  uid 140
+  pos 27140 -2700
+  flags 0 0 1 0
+  f rangeLow 0
+  f rangeHigh 1
+end
+node 76 Modulators Range to Range
+  uid 141
+  pos 26300 -2240
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0
+  f outHigh 1
+  b clampOutput 1
+end
+node 77 Modulators Random
+  uid 142
+  pos 26480 -2740
+  flags 1 0 1 0
+  f rate 1
+  f smooth 0.5
+  f low 0.527999997
+  f high 0.829999983
+  f seed 518.299988
+end
+node 78 Effects vignette
+  uid 144
+  pos 28900 -4320
+  flags 1 0 1 0
+  f uAmount 0.930000007
+  f uRadius 0.959445
+  f uSoftness 0.400000006
+  f uCenterX 0.5
+  f uCenterY 0.5
+end
+node 79 Modulators Audio to CV
+  uid 145
+  pos 28400 -3700
+  flags 0 0 1 0
+  f gain 1
+  f attackMs 0.215268284
+  f releaseMs 78.5237198
+  i mode 0
+  f minVal 0
+  f maxVal 1
+end
+node 80 Modulators Range to Range
+  uid 146
+  pos 28640 -3700
+  flags 0 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0
+  f outHigh 1
+  b clampOutput 1
+end
+node 81 3D Switcher 3D
+  uid 149
+  pos 23720 -5980
+  flags 1 0 1 0
+  i unit 0
+  f interval 2
+  f crossfade 0
+  b manual 0
+  i manualSlot 0
+end
+node 82 3D Text 3D
+  uid 151
+  pos 23240 -6780
+  flags 1 0 1 0
+  s text WELCOME
+  s font Impact
+  f depth 0.00700000022
+  f bevel 0
+  f tracking 0
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scale 1
+  f spin 0
+  c color 0.899999976 0.899999976 0.930000007
+  f metallic 0.200000003
+  f roughness 0.349999994
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 83 3D Text 3D
+  uid 152
+  pos 23820 -6860
+  flags 1 0 1 0
+  s text HOME
+  s font Impact
+  f depth 0
+  f bevel 0
+  f tracking 0.0510241762
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scale 1
+  f spin 0
+  c color 0.899999976 0.899999976 0.930000007
+  f metallic 0.200000003
+  f roughness 0.349999994
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 84 3D Transform
+  uid 153
+  pos 24080 -6240
+  flags 1 0 1 0
+  i op 0
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 85 Effects glitch
+  uid 154
+  pos 29240 -4320
+  flags 1 0 1 0
+  f uKind 0
+  f uAmount 0.0189999994
+  f uDetail 0.875999987
+  f uSpeed 1
+  f uSeed 0
+end
+node 86 Effects radialblur
+  uid 155
+  pos 29500 -3780
+  flags 1 0 1 0
+  f uAmount 0.065098688
+  f uCenterX 0.5
+  f uCenterY 0.324999988
+end
+node 87 Modulators Range to Range
+  uid 156
+  pos 29220 -3460
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0
+  f outHigh 0.0700000003
+  b clampOutput 1
+end
+node 88 Modulators Range to Range
+  uid 157
+  pos 25100 -5600
+  flags 1 0 1 0
+  f constantIn 0.5
+  f inLow 0
+  f inHigh 1
+  f outLow 0.0670000017
+  f outHigh 0.280999988
+  b clampOutput 1
+end
+node 89 Utility Output
+  uid 158
+  pos 29740 -2840
+  flags 1 0 1 0
+  i recordFps 30
+  b includeAudio 1
+  i imageFormat 1
+  i videoFormat 0
+  s exportImagePath 
+  s recordVideoPath 
+  i offlineFps 30
+  i offlineDurationSeconds 15
+  i offlinePrerollFrames 10
+end
+node 90 Compositing Blend
+  uid 159
+  pos 29880 -3520
+  flags 1 0 1 0
+  i mode 14
+  f mix 1
+end
+node 91 3D Render 3D
+  uid 160
+  pos 29900 -4980
+  flags 1 0 1 0
+  f width 1024
+  f height 1024
+  i renderPass 0
+  i projection 0
+  f fov 93.5840759
+  f orthoHeight 1.5
+  f camDistance 3.05599999
+  f camAzimuth 90
+  f camElevation 3.20000005
+  f targetX 2.63499999
+  f targetY 0.658999979
+  f targetZ 0
+  f near 0.0500000007
+  f far 100
+  f lightAzimuth 51.5662003
+  f lightElevation 51.5662003
+  c lightColor 1 0.980000019 0.939999998
+  f lightIntensity 4
+  c ambient 0.280000001 0.319999993 0.419999987
+  f rim 0.349999994
+  c envSky 0.419999987 0.529999971 0.75
+  c envHorizon 0.550000012 0.560000002 0.600000024
+  c envGround 0.159999996 0.140000001 0.129999995
+  f envIntensity 0
+  b envAsBackground 1
+  c bg 0.0399999991 0.0399999991 0.0599999987
+  f bgOpacity 0
+  b depthTest 0
+  b cull 0
+  i spriteShape 0
+  i spriteSizeMode 0
+  i samples 0
+  i tonemap 1
+  f exposure 1
+  b shadows 0
+  i shadowQuality 1
+  f shadowBias 0.00249999994
+  f shadowSoftness 1
+  f shadowStrength 0.800000012
+end
+node 92 3D Transform
+  uid 161
+  pos 23520 -6800
+  flags 1 0 1 0
+  i op 0
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 93 3D Transform
+  uid 162
+  pos 24100 -6860
+  flags 1 0 1 0
+  i op 0
+  b inherit 1
+  b selectionOnly 0
+  f amount 1
+  i count 5
+  f offsetX 0.578999996
+  f offsetY -0.254000008
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1.278
+  f scaleY 1.44500005
+  f scaleZ 1
+  f pivotX 0
+  f pivotY 0
+  f pivotZ 0
+  f spin 0
+  b radial 0
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i explodeBy 0
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 94 Modulators LFO
+  uid 163
+  pos 29500 -4280
+  flags 1 0 1 0
+  i shape 0
+  f rateBeats 7.26499987
+  f phase 0
+  f low 0.686999977
+  f high 0.781000018
+end
+node 95 Compositing outerglow
+  uid 165
+  pos 30620 -4240
+  flags 1 0 1 0
+  f uAmount 2
+  c uColor 1 0.868012369 0.0760869384
+end
+node 96 Modulators LFO
+  uid 167
+  pos 23580 -7240
+  flags 1 0 1 0
+  i shape 0
+  f rateBeats 4
+  f phase 0
+  f low 0.155000001
+  f high 0.286000013
+end
+node 97 Notes Note Router
+  uid 194
+  pos 23060 -2600
+  flags 0 0 1 0
+  i mode 0
+  f probability 50
+end
+node 98 Notes Note Merge
+  uid 195
+  pos 23860 -1920
+  flags 0 0 1 0
+end
+node 99 Notes Note Echo
+  uid 196
+  pos 23300 -2600
+  flags 0 0 1 0
+  i rateMode 0
+  f rateBeats 3
+  f rateSeconds 0.150000006
+  i repeats 2
+  f decay 100
+  i transposePerRepeat 12
+  b muteDry 1
+end
+node 100 Notes Note Transpose
+  uid 197
+  pos 23520 -2600
+  flags 0 0 1 0
+  i semitones 31
+  b useGlobalScale 0
+end
+node 101 Notes Velocity Curve
+  uid 198
+  pos 23760 -2600
+  flags 0 0 1 0
+  f curve 4
+end
+cable 1 0 69 0
+cable 10 0 34 0
+cable 29 0 31 0
+cable 31 0 30 0
+cable 31 1 32 0
+cable 34 0 11 0
+cable 34 1 36 0
+cable 36 0 35 0
+cable 36 1 38 0
+cable 38 0 37 0
+cable 40 0 39 0
+cable 40 1 42 0
+cable 42 0 41 0
+cable 43 1 40 0
+cable 69 0 2 0
+cable 78 0 6 0
+cable 85 0 78 0
+cable 86 0 85 0
+cable 89 0 90 0
+cable 90 0 86 0
+cable 90 1 95 0
+cable 95 0 91 0
+geo 3 0 1 0
+geo 5 0 4 0
+geo 6 5 27 0
+geo 6 0 44 0
+geo 6 1 28 0
+geo 6 2 14 0
+geo 6 3 20 0
+geo 7 0 5 0
+geo 8 0 7 0
+geo 9 0 15 0
+geo 12 0 26 0
+geo 13 0 12 0
+geo 14 0 18 0
+geo 14 1 16 0
+geo 15 0 8 0
+geo 16 0 13 0
+geo 17 0 9 0
+geo 18 0 17 0
+geo 20 0 23 0
+geo 20 1 21 0
+geo 21 0 13 0
+geo 22 0 9 0
+geo 23 0 22 0
+geo 26 0 10 0
+geo 28 0 3 0
+geo 43 0 9 0
+geo 44 0 9 0
+geo 44 1 43 0
+geo 55 0 52 0
+geo 56 0 54 0
+geo 64 0 63 0
+geo 70 0 68 0
+geo 71 0 70 0
+geo 76 0 52 0
+geo 80 0 79 0
+geo 81 0 92 0
+geo 81 1 93 0
+geo 84 0 81 0
+geo 87 0 55 0
+geo 88 0 52 0
+geo 91 0 84 0
+geo 92 0 82 0
+geo 93 0 83 0
+aud 47 0 45
+aud 48 0 47
+aud 49 0 48
+aud 49 1 59
+aud 49 2 66
+aud 49 4 72
+aud 52 0 45
+aud 59 0 60
+aud 60 0 57
+aud 66 0 65
+aud 68 0 66
+aud 79 0 48
+aud 89 1 49
+note 45 0 98 0
+note 53 0 46 0
+note 54 0 53 0
+note 57 0 58 0
+note 58 0 46 0
+note 62 0 58 0
+note 63 0 62 0
+note 65 0 67 0
+note 67 0 46 0
+note 72 0 73 0
+note 74 0 73 0
+note 75 0 74 0
+note 97 0 46 0
+note 98 0 46 0
+note 98 1 101 0
+note 99 0 97 0
+note 100 0 99 0
+note 101 0 100 0
+mod 6 6 19 0 0 1 15.8999996 -180 180
+mod 14 1 88 0 0 1 0.0799999982 0.00499999989 1
+mod 14 3 25 0 0 1 0.0329999998 0 1
+mod 20 3 24 0 0 1 0.057 0 1
+mod 31 2 55 0 0 1 0 0 3
+mod 34 2 55 0 0 1 0 0 3
+mod 44 1 55 0 0 1 0 0 3
+mod 45 2 51 0 0 1 0.0299999602 0 1
+mod 49 4 76 0 0 1 0 -60 12
+mod 57 3 64 0 0 1 1 1 8
+mod 59 1 61 0 0 1 10.2500048 5.94999981 11.3500004
+mod 69 0 71 0 0 1 0.400000006 0 2
+mod 72 3 75 0 0 1 1.44999981 0 2
+mod 78 1 80 0 0 1 1.06299996 1.5 0.100000001
+mod 83 2 96 0 0 1 0 -0.100000001 0.5
+mod 86 0 87 0 0 1 1 0 5
+mod 91 4 94 0 0 1 82.4100037 10 120
+pal 27 0 29 0
+glob g1 0
+transport 86 4 4 0 0
+stream 0 0 1 0 0 1 0 Video 1
+streamid 0 1
+stream 0 0 1 0 0 1 0 Video 2
+streamid 1 2
+stream 0 0 1 0 0 1 0 Video 3
+streamid 2 3
+stream 0 0 1 0 0 1 0 Video 4
+streamid 3 4
+stream 1 0 1 0 0 1 0 Audio 1
+streamid 4 5
+stream 1 0 1 0 0 1 0 Audio 2
+streamid 5 6
+stream 1 0 1 0 0 1 0 Audio 3
+streamid 6 7
+stream 1 0 1 0 0 1 0 Audio 4
+streamid 7 8
+arrange 9 0 4 0 1 0 0 0 0 0 1920 1080 60 48000 0 0 0 0 -1 -1 
+viewport 1 1 261 260 13 40 34 20

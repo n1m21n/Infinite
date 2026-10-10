@@ -1,0 +1,321 @@
+infinite-patch 1
+node 1 Notes Note Sequencer
+  pos -2054 -3445
+  flags 0 0 1 0
+  i steps 8
+  i rateMode 0
+  f rateBeats 0.25
+  f rateSeconds 0.200000003
+  f gatePercent 70
+  b useGlobalScale 1
+  i note0 69
+  f vel0 0.800000012
+  b en0 1
+  i note1 60
+  f vel1 0.800000012
+  b en1 1
+  i note2 71
+  f vel2 0.800000012
+  b en2 1
+  i note3 60
+  f vel3 0.800000012
+  b en3 1
+  i note4 60
+  f vel4 0.800000012
+  b en4 1
+  i note5 71
+  f vel5 0.800000012
+  b en5 1
+  i note6 67
+  f vel6 0.800000012
+  b en6 1
+  i note7 60
+  f vel7 0.800000012
+  b en7 1
+  i note8 60
+  f vel8 0.800000012
+  b en8 1
+  i note9 60
+  f vel9 0.800000012
+  b en9 1
+  i note10 60
+  f vel10 0.800000012
+  b en10 1
+  i note11 60
+  f vel11 0.800000012
+  b en11 1
+  i note12 60
+  f vel12 0.800000012
+  b en12 1
+  i note13 60
+  f vel13 0.800000012
+  b en13 1
+  i note14 60
+  f vel14 0.800000012
+  b en14 1
+  i note15 60
+  f vel15 0.800000012
+  b en15 1
+end
+node 2 Synths Oscillator
+  pos -1404 -3718
+  flags 0 0 1 0
+  f frequency 220
+  f glide 0
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  i waveform 2
+  f fine -14.3265219
+  i octave 0
+  i semi 0
+  f volume 0.800000012
+  f phase 0
+  i unison 4
+  f detune 12
+  i filterType 0
+  f cutoff 12000
+  f resonance 0.150000006
+  f sync 1
+  f pan 0
+  f ampAttack 4
+  f ampDecay 1503.57056
+  f ampSustain 0.265663743
+  f ampRelease 260
+end
+node 4 AudioEffects Reverb
+  pos -897 -2925
+  flags 0 0 1 0
+  f mix 0.674999952
+  f size 0.5
+  f decay 7.13307905
+  f damping 0.155000001
+  f predelay 20
+  f width 1
+  f analog 0
+end
+node 5 Synths Oscillator
+  pos -1404 -2977
+  flags 0 0 1 0
+  f frequency 220
+  f glide 0
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  i waveform 0
+  f fine -14.3265219
+  i octave 0
+  i semi 0
+  f volume 0.800000012
+  f phase 0
+  i unison 3
+  f detune 12
+  i filterType 0
+  f cutoff 12000
+  f resonance 0.150000006
+  f sync 4.2249999
+  f pan 0
+  f ampAttack 4
+  f ampDecay 1503.57056
+  f ampSustain 0.265663743
+  f ampRelease 260
+end
+node 6 Utility Audio Out
+  pos -351 -2860
+  flags 0 0 1 0
+  i formatIndex 0
+  s recordDirectory 
+end
+node 7 3D Cube
+  pos 325 -3562
+  flags 0 0 1 0
+  i shape 1
+  i detail 24
+  i sides 16
+  f tube 0.400000006
+  i knotP 2
+  i knotQ 3
+  f bevel 0
+  i bevelSegments 1
+  f superN2 1
+  f superN3 1
+  f discInner 0
+  f superP2 1
+  f superP3 1
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f scale 1
+  f spin 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+end
+node 8 3D Cube
+  pos 598 -3549
+  flags 1 0 1 0
+  i shape 3
+  i detail 24
+  i sides 16
+  f tube 0.400000006
+  i knotP 2
+  i knotQ 3
+  f bevel 0
+  i bevelSegments 1
+  f superN2 1
+  f superN3 1
+  f discInner 0
+  f superP2 1
+  f superP3 1
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f scale 1
+  f spin 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+end
+node 9 3D Cube
+  pos 910 -3588
+  flags 1 0 1 0
+  i shape 8
+  i detail 24
+  i sides 16
+  f tube 0.400000006
+  i knotP 2
+  i knotQ 3
+  f bevel 0
+  i bevelSegments 1
+  f superN2 1
+  f superN3 1
+  f discInner 0
+  f superP2 1
+  f superP3 1
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f scale 1
+  f spin 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+end
+aud 4 0 2
+aud 6 0 4
+note 2 0 1 0
+note 5 0 1 0
+glob rand rand(0, 1, 2)
+glob sh sh(0, 1, 4)
+glob fast_lfo sin(t * 8) * 0.5 + 0.5
+glob rand_glide lerp(sh(1, 0, 2), sh(1, 0, 2), smoothstep(0, 1, mod(t * 2, 1)))
+glob bounce abs(sin(t * 3))
+glob slow_drift sin(t * 0.2) * 0.5 + 0.5
+glob chaos abs(mod(sin(t * 1.7) * 43.12 + cos(t * 2.3) * 17.54, 1.0))
+transport 120 4 4 0 0
+stream 0 0 1 0 0 Video 1
+clip 0 0.85465686824082965 1.1686124524925632 7 0 0 0 0 0 1 0
+clip 0 2.1366421706020744 0.98114994837566183 8 0 0 0 0 0 1 0
+stream 0 0 1 0 0 Video 2
+clip 1 0 1.1686124524925632 8 0 0 0 0 0 1 0
+clip 1 1.1686124524925632 1.1686124524925632 8 0 0 0 0 0 1 0
+stream 0 0 1 0 0 Video 3
+clip 2 3.1003501420748627 1.1686124524925632 7 0 0 0 0 0 1 0
+stream 0 0 1 0 0 Video 4
+stream 1 0 1 0 0 Audio 1
+clip 4 0 1.7375000000000003 2 0 0 0 0 0 1 0
+clip 4 1.7375000000000003 1.7222732426303851 4 0 0 0 0 0 1 0
+clip 4 3.4597732426303853 0.54999999999999982 5 0 0 0 0 0 1 0
+clip 4 5.747273242630385 1.7222732426303851 4 0 0 0 0 0 1 0
+clip 4 4.0097732426303851 1.7375000000000003 2 0 0 0 0 0 1 0
+stream 1 0 1 0 0 Audio 2
+clip 5 0 4 5 0 0 0 0 0 1 0
+stream 1 0 1 0 0 Audio 3
+stream 1 0 1 0 0 Audio 4

@@ -197,3 +197,13 @@ body.nogl .plain img { width: 100%; height: auto; display: block; border-radius:
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.15s !important; transition-delay: 0s !important; }
 }
+
+/* site nav: the same four links as every page, as one glass pill */
+.sitenav { top: max(18px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); gap: 4px; padding: 5px; }
+.sitenav a { color: var(--ink); text-decoration: none; padding: 8px 13px; border-radius: 999px; transition: background 0.3s; }
+.sitenav a:hover, .sitenav a[aria-current] { background: rgba(255, 255, 255, 0.16); }
+.sitenav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .sitenav { top: calc(max(18px, env(safe-area-inset-top)) + 46px); font-size: 12px; }
+  .sitenav a { padding: 7px 10px; }
+}

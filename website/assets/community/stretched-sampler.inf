@@ -1,0 +1,93 @@
+infinite-patch 1
+node 1 Synths Sampler
+  pos 2460 -2300
+  flags 0 0 1 0
+  s path 
+  f pitch -11.3274212
+  f finetune 14.5224991
+  f speed 1.00469613
+  f start 0.792700171
+  f end 0.855805576
+  f volume 0.800000012
+  b loop 1
+  b reverse 0
+  b pingpong 0
+end
+node 2 AudioUtility Audio Out
+  pos 5440 -2520
+  flags 0 0 1 0
+  s recordDirectory 
+end
+node 5 Synths PaulStretch
+  pos 4720 -3240
+  flags 0 0 1 0
+  s path 
+  f stretch 745.185486
+  i window_size 4
+  f phase_rand 0.538475513
+  f pitch_shift 0
+  f fine_tune 57.4133377
+  f freq_shift 0
+  i unison 2
+  f detune 10
+  f volume 1.31370068
+  f start 0.398455262
+  f end 0.521539867
+  b loop 1
+end
+node 6 Synths Spectral Synth
+  pos 4180 -2880
+  flags 0 0 1 0
+  i scanMode 4
+  i rate 0
+  f scanSpeed 7.61199331
+  f position 0.549999833
+  i direction 1
+  b perVoiceScan 0
+  i partialsChoice 1
+  i freqScale 1
+  f minFreq 25.826149
+  f maxFreq 4162.72363
+  f rootFreq 261.630005
+  i octave 0
+  i semi 0
+  f fine 0
+  f glide 0.539999962
+  i colorMode 0
+  f threshold 0.227500111
+  f contrast 1.80799842
+  f brightness 1
+  i invert 0
+  f volume 0.800000012
+  f pan 0
+  f stereoWidth 1
+  i unison 5
+  f detune 33.4999924
+  i filterType 1
+  f cutoff 1906.66272
+  f resonance 0.394999951
+  f drive 0.109999992
+  f ampAttack 10
+  f ampDecay 200
+  f ampSustain 0.850000024
+  f ampRelease 250
+end
+node 7 Source Image Source
+  pos 3900 -2780
+  flags 1 0 1 0
+  s path 
+end
+node 8 AudioEffects Reverb
+  pos 4700 -2580
+  flags 0 0 1 0
+  f mix 0.290000051
+  f size 0.335000098
+  f decay 8.16899586
+  f damping 0.340000063
+  f predelay 20
+  f width 1
+end
+cable 6 0 7
+aud 2 0 5
+aud 5 0 8
+aud 8 0 6

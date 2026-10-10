@@ -1,0 +1,246 @@
+{
+ "version": 1,
+ "items": [
+  {
+   "id": "first-sound",
+   "name": "First sound",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "First patches",
+   "description": "Press play and hear notes.",
+   "price": 0,
+   "preview": "assets/templates/first-sound.webp",
+   "file": "assets/templates/first-sound.inf",
+   "nodes": [
+    "Random Note Generator",
+    "Analog",
+    "Audio Out"
+   ]
+  },
+  {
+   "id": "first-image",
+   "name": "First image",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "First patches",
+   "description": "A shape on a colour wash.",
+   "price": 0,
+   "preview": "assets/templates/first-image.webp",
+   "file": "assets/templates/first-image.inf",
+   "nodes": [
+    "Ramp",
+    "Layer Stack"
+   ]
+  },
+  {
+   "id": "first-music-image",
+   "name": "Moves with the music",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "First patches",
+   "description": "The shape grows with the sound.",
+   "price": 0,
+   "preview": "assets/templates/first-music-image.webp",
+   "file": "assets/templates/first-music-image.inf",
+   "nodes": [
+    "Random Note Generator",
+    "Analog",
+    "Audio Out",
+    "bloom"
+   ]
+  },
+  {
+   "id": "source",
+   "name": "Source",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Pictures from nothing.",
+   "price": 0,
+   "preview": "assets/templates/source.webp",
+   "file": "assets/templates/source.inf",
+   "nodes": [
+    "Noise",
+    "Ring",
+    "Blend"
+   ]
+  },
+  {
+   "id": "compositing",
+   "name": "Compositing",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Layers, trails and feedback.",
+   "price": 0,
+   "preview": "assets/templates/compositing.webp",
+   "file": "assets/templates/compositing.inf",
+   "nodes": [
+    "Trails",
+    "Layer Stack",
+    "Ramp",
+    "LFO"
+   ]
+  },
+  {
+   "id": "effects",
+   "name": "Effects",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Change a picture.",
+   "price": 0,
+   "preview": "assets/templates/effects.webp",
+   "file": "assets/templates/effects.inf",
+   "nodes": [
+    "Noise",
+    "kaleidoscope",
+    "bloom",
+    "Color Ramp"
+   ]
+  },
+  {
+   "id": "3d",
+   "name": "3D",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "A shape seen from any side.",
+   "price": 0,
+   "preview": "assets/templates/3d.webp",
+   "file": "assets/templates/3d.inf",
+   "nodes": [
+    "Torus Knot",
+    "Camera",
+    "Light",
+    "Render 3D"
+   ]
+  },
+  {
+   "id": "modulators",
+   "name": "Modulators",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Numbers that move other controls.",
+   "price": 0,
+   "preview": "assets/templates/modulators.webp",
+   "file": "assets/templates/modulators.inf",
+   "nodes": [
+    "LFO",
+    "Random"
+   ]
+  },
+  {
+   "id": "macros",
+   "name": "Macros",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "One knob that moves several things.",
+   "price": 0,
+   "preview": "assets/templates/macros.webp",
+   "file": "assets/templates/macros.inf",
+   "nodes": [
+    "Macro Knob"
+   ]
+  },
+  {
+   "id": "notes",
+   "name": "Notes",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Notes that make patterns.",
+   "price": 0,
+   "preview": "assets/templates/notes.webp",
+   "file": "assets/templates/notes.inf",
+   "nodes": [
+    "Note Sequencer",
+    "Arpeggiator",
+    "Analog",
+    "Audio Out"
+   ]
+  },
+  {
+   "id": "synths",
+   "name": "Synths",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Sounds from notes.",
+   "price": 0,
+   "preview": "assets/templates/synths.webp",
+   "file": "assets/templates/synths.inf",
+   "nodes": [
+    "Random Note Generator",
+    "Wavetable",
+    "Audio Out"
+   ]
+  },
+  {
+   "id": "audio-effects",
+   "name": "Audio Effects",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Shape the sound.",
+   "price": 0,
+   "preview": "assets/templates/audio-effects.webp",
+   "file": "assets/templates/audio-effects.inf",
+   "nodes": [
+    "Random Note Generator",
+    "Analog",
+    "Delay",
+    "Reverb"
+   ]
+  },
+  {
+   "id": "prediction",
+   "name": "Prediction",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Notes that keep going on their own.",
+   "price": 0,
+   "preview": "assets/templates/prediction.webp",
+   "file": "assets/templates/prediction.inf",
+   "nodes": [
+    "Predictive Notes",
+    "Analog",
+    "Audio Out"
+   ]
+  },
+  {
+   "id": "utility",
+   "name": "Utility",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Mix and meter sound.",
+   "price": 0,
+   "preview": "assets/templates/utility.webp",
+   "file": "assets/templates/utility.inf",
+   "nodes": [
+    "Random Note Generator",
+    "Analog",
+    "Mixer",
+    "Audio Meter"
+   ]
+  },
+  {
+   "id": "field",
+   "name": "Field",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "By node family",
+   "description": "Write a picture as a formula.",
+   "price": 0,
+   "preview": "assets/templates/field.webp",
+   "file": "assets/templates/field.inf",
+   "nodes": [
+    "FieldPixel"
+   ]
+  }
+ ]
+}

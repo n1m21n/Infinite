@@ -4,14 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#FBFAF6">
-  <title>Infinite — Library</title>
-  <meta name="description" content="Free downloadable Field devices for Infinite: dither, liquid glass, lenses and generators. Download a file, import it into a Field Pixel node.">
+  <title>Infinite Library: free templates, patches and Field devices</title>
+  <meta name="description" content="Free to download: starter templates, community patches and Field devices for Infinite, the open-source real-time audiovisual workstation. Open a .inf patch with File, Open, or import a .field device into a Field Pixel node.">
   <link rel="canonical" href="https://n1m21n.github.io/Infinite/library.html">
-  <meta property="og:title" content="Infinite — Library">
-  <meta property="og:description" content="Free downloadable Field devices for Infinite.">
+  <meta property="og:title" content="Infinite Library: free templates, patches and Field devices">
+  <meta property="og:description" content="Free templates, community patches and Field devices for Infinite. Download one and keep patching.">
   <meta property="og:image" content="https://n1m21n.github.io/Infinite/assets/library/previews/liquid-glass.jpg">
   <meta property="og:url" content="https://n1m21n.github.io/Infinite/library.html">
   <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Infinite Library: free templates, patches and Field devices">
+  <meta name="twitter:description" content="Free templates, community patches and Field devices for Infinite.">
+  <meta name="twitter:image" content="https://n1m21n.github.io/Infinite/assets/library/previews/liquid-glass.jpg">
+  <link rel="alternate" type="text/plain" href="llms.txt" title="Plain-text summary for language models">
+  <link rel="alternate" type="application/json" href="assets/library/catalog.json" title="Library catalog">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -19,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="brand.css?v=2">
-  <link rel="stylesheet" href="style.css?v=52">
+  <link rel="stylesheet" href="style.css?v=60">
   <link rel="stylesheet" href="library.css?v=11">
   <link rel="stylesheet" href="glass.css?v=9">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
@@ -42,17 +48,26 @@
       </a>
 
       <nav class="nav-links" id="nav-links" aria-label="Main">
+        <a href="index.html#learn">Learn</a>
+        <a href="artworks.html">Art Gallery</a>
         <a href="library.html" aria-current="page">Library</a>
         <a href="index.html#setup">Setup</a>
-        <a href="artworks.html">Art Gallery</a>
+        <div class="nav-sheet-social">
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>
+          <a href="https://www.youtube.com/channel/UCpuCUMODr4utnpa162CkIug" target="_blank" rel="noopener">YouTube</a>
+        </div>
       </nav>
 
       <div class="nav-actions">
         <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn hide-sm" aria-label="View on GitHub" title="GitHub">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
         </a>
-        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" class="icon-btn hide-sm" aria-label="Join the Discord server" title="Discord">
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/channel/UCpuCUMODr4utnpa162CkIug" target="_blank" rel="noopener" class="icon-btn sm-only" aria-label="Infinite on YouTube" title="YouTube">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
         </a>
         <a href="index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
       </div>
@@ -65,7 +80,7 @@
         <div class="section-head">
           <p class="lib-hand hand">yours to use</p>
           <h1 class="slab">Library</h1>
-          <p class="section-sub">Small Field devices lifted from the Infinite films. Download one, import it into a Field Pixel node, and keep patching.</p>
+          <p class="section-sub">Starter templates, community patches and small Field devices. Download one, open or import it, and keep patching.</p>
         </div>
 
         <div class="lib-bar">
@@ -76,7 +91,7 @@
               <button type="button" data-cols="4" aria-pressed="true" aria-label="4 cards per row">4</button>
               <button type="button" data-cols="8" aria-pressed="false" aria-label="8 cards per row">8</button>
             </div>
-            <a class="btn btn-ghost btn-sm" href="assets/library/infinite-library.zip" download aria-label="Download all">
+            <a class="btn btn-ghost btn-sm" href="assets/library/infinite-library.zip" download aria-label="Download all devices">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 20h16"/></svg>
               <span class="lib-dl-text">Download all</span>
             </a>
@@ -91,15 +106,849 @@
     <section class="section" id="install" aria-label="How to install">
       <div class="container">
         <div class="lib-how">
-          <div><p class="recipe-num mono">01</p><h3>Download</h3><p>Pick a device and press Download. You get one plain-text file: <code>.field</code> for Pixel, <code>.js</code> for Sketch.</p></div>
-          <div><p class="recipe-num mono">02</p><h3>Import</h3><p>Pixel: add a Field Pixel node and press <b>Import</b> in its Devices row. Sketch: open a Sketch node's editor and paste the file.</p></div>
+          <div><p class="recipe-num mono">01</p><h3>Download</h3><p>Pick an item and press Download. You get one plain-text file: <code>.inf</code> for a template, <code>.field</code> for Pixel, <code>.js</code> for Sketch.</p></div>
+          <div><p class="recipe-num mono">02</p><h3>Import</h3><p>Template: choose <b>File, Open</b> and pick the file. Pixel: add a Field Pixel node and press <b>Import</b> in its Devices row. Sketch: open a Sketch node's editor and paste the file.</p></div>
           <div><p class="recipe-num mono">03</p><h3>Patch</h3><p>Filters read an image you cable in. Generators draw on their own. Every knob can be modulated.</p></div>
         </div>
       </div>
     </section>
   </main>
 
+  <!-- seo:start -->
+  <script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "CollectionPage",
+ "name": "Infinite Library",
+ "description": "Free starter templates, community patches and Field devices for Infinite, the real-time audiovisual workstation.",
+ "url": "https://n1m21n.github.io/Infinite/library.html",
+ "isPartOf": {
+  "@type": "WebSite",
+  "url": "https://n1m21n.github.io/Infinite/"
+ },
+ "mainEntity": {
+  "@type": "ItemList",
+  "numberOfItems": 53,
+  "itemListElement": [
+   {
+    "@type": "ListItem",
+    "position": 1,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "First sound",
+     "description": "Press play and hear notes.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/first-sound.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/first-sound.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 2,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "First image",
+     "description": "A shape on a colour wash.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/first-image.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/first-image.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 3,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Moves with the music",
+     "description": "The shape grows with the sound.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/first-music-image.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/first-music-image.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 4,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Source",
+     "description": "Pictures from nothing.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/source.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/source.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 5,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Compositing",
+     "description": "Layers, trails and feedback.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/compositing.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/compositing.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 6,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Effects",
+     "description": "Change a picture.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/effects.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/effects.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 7,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "3D",
+     "description": "A shape seen from any side.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/3d.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/3d.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 8,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Modulators",
+     "description": "Numbers that move other controls.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/modulators.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/modulators.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 9,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Macros",
+     "description": "One knob that moves several things.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/macros.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/macros.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 10,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Notes",
+     "description": "Notes that make patterns.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/notes.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/notes.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 11,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Synths",
+     "description": "Sounds from notes.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/synths.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/synths.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 12,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Audio Effects",
+     "description": "Shape the sound.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/audio-effects.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/audio-effects.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 13,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Prediction",
+     "description": "Notes that keep going on their own.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/prediction.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/prediction.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 14,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Utility",
+     "description": "Mix and meter sound.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/utility.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/utility.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 15,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Field",
+     "description": "Write a picture as a formula.",
+     "genre": "Templates",
+     "image": "https://n1m21n.github.io/Infinite/assets/templates/field.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/templates/field.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 16,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Terrain Mandala",
+     "description": "A wave-terrain synth driving a slowly turning mandala.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/terrain-mandala.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/terrain-mandala.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 17,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Glitch Feedback",
+     "description": "Transform, glitch and feedback loops with added noise.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/glitch-feedback.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/glitch-feedback.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 18,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Shifted Blend",
+     "description": "Audio blends through a frequency shifter, with liquify on the picture.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/shifted-blend.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/shifted-blend.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 19,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Lens Spectral",
+     "description": "Lens distortion over blended cubes, with a spectral synth underneath.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/lens-spectral.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/lens-spectral.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 20,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Checker Cube",
+     "description": "A cube in a checkered room with bold type, blended from image sources.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/checker-cube.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/checker-cube.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 21,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Occult Mandala",
+     "description": "Image points, kaleidoscope and layers over industrial noise at 110 BPM.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/occult-mandala.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "infinite",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/occult-mandala.infinite",
+     "author": {
+      "@type": "Person",
+      "name": "dm4nd"
+     }
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 22,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Pad Wash",
+     "description": "Blended pads through delay and reverb, with random notes shifting the pitch.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/pad-wash.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/pad-wash.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 23,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Pads, 75 BPM",
+     "description": "Slow pads with trails, blends and glitch at 75 BPM.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/pads-75-bpm.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "infinite",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/pads-75-bpm.infinite",
+     "author": {
+      "@type": "Person",
+      "name": "dm4nd"
+     }
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 24,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Trail Glitch",
+     "description": "Trails, colour ramps and glitch blended, with reverbs on the sound.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/trail-glitch.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/trail-glitch.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 25,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Stretched Sampler",
+     "description": "A sampler into a spectral synth, reverb and PaulStretch.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/stretched-sampler.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/stretched-sampler.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 26,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Displaced Wavetable",
+     "description": "A note sequencer plays a wavetable that displaces a 3D shape.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/displaced-wavetable.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/displaced-wavetable.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 27,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Welcome Home",
+     "description": "A red room full of eyes over a steady 86 BPM groove.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/welcome-home.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "infinite",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/welcome-home.infinite",
+     "author": {
+      "@type": "Person",
+      "name": "dm4nd"
+     }
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 28,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Soft Render",
+     "description": "A 3D render with a colour ramp and added noise.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/soft-render.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/soft-render.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 29,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Stretched Blend",
+     "description": "PaulStretch into blended audio with delay.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/stretched-blend.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/stretched-blend.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 30,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Slice Room",
+     "description": "A slicer into blended audio, with delay and a mixer.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/slice-room.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/slice-room.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 31,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Limited Stretch",
+     "description": "PaulStretch and mixers into a limiter.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/limited-stretch.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/limited-stretch.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 32,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Spectrum Slide",
+     "description": "PaulStretch through a spectrum slide and key snap.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/spectrum-slide.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/spectrum-slide.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 33,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Plugin Stretch",
+     "description": "A plugin and PaulStretch through a mixer.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/plugin-stretch.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/plugin-stretch.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 34,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Blue Cube",
+     "description": "A flat-shaded cube in a blue-white room with a light-grid wall.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/blue-cube.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/blue-cube.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 35,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Fairy Type",
+     "description": "Large type repeated across a kaleidoscope of pink shapes.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/fairy-type.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/fairy-type.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 36,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Cube Colour",
+     "description": "An audio colour ramp drives a cube, rendered in 3D.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/cube-colour.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/cube-colour.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 37,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Layered Blends",
+     "description": "Stacked blends with colour adjustments.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/layered-blends.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/layered-blends.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 38,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Drum Reverb",
+     "description": "Two note sequencers and oscillators into reverb, delay and EQ.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/drum-reverb.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/drum-reverb.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 39,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Delay Wash",
+     "description": "Delay, reverb and a mixer into a limiter.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/delay-wash.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/delay-wash.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 40,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Filtered Mixer",
+     "description": "Reverb and a mixer through an audio filter.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/filtered-mixer.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/filtered-mixer.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 41,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Merged Wavetable",
+     "description": "Merged notes play a wavetable into reverb.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/merged-wavetable.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/merged-wavetable.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 42,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Oscillator Reverb",
+     "description": "A note sequencer into an oscillator and reverb.",
+     "genre": "Community",
+     "image": "https://n1m21n.github.io/Infinite/assets/community/oscillator-reverb.webp",
+     "isAccessibleForFree": true,
+     "encodingFormat": "inf",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/community/oscillator-reverb.inf"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 43,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Ordered Dither",
+     "description": "A 4x4 Bayer dither: any picture becomes two inks on paper. The series look from the films.",
+     "genre": "Pixel",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/ordered-dither.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "field",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/pixel/ordered-dither.field"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 44,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Liquid Glass",
+     "description": "A frosted, refracting glass pane over whatever is behind it: bent edges, a colour split and a lit rim.",
+     "genre": "Pixel",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/liquid-glass.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "field",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/pixel/liquid-glass.field"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 45,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Metaball Lens",
+     "description": "Three liquid lobes drift over the picture, merging into one blob that refracts and magnifies what is under it.",
+     "genre": "Pixel",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/metaball-lens.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "field",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/pixel/metaball-lens.field"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 46,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Pixel Plate",
+     "description": "A plate of square cells with ragged, notched edges that grows outward cell by cell.",
+     "genre": "Pixel",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/pixel-plate.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "field",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/pixel/pixel-plate.field"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 47,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Iridescent Orb",
+     "description": "A soft holographic pastel ball that slowly spins its colours, with a white sheen and a gloss spot.",
+     "genre": "Pixel",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/iridescent-orb.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "field",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/pixel/iridescent-orb.field"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 48,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Phyllotaxis Bloom",
+     "description": "A sunflower of golden-angle seeds, each dot coloured along the spiral. Seed count and turn are live.",
+     "genre": "Pixel",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/phyllotaxis-bloom.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "field",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/pixel/phyllotaxis-bloom.field"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 49,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Lorenz Attractor",
+     "description": "The butterfly of chaos, integrated live. A glowing trail winds between two lobes and never repeats.",
+     "genre": "Sketch",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/lorenz-attractor.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "js",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/sketch/lorenz-attractor.js"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 50,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Lotka-Volterra",
+     "description": "Predators and prey chasing each other: the population curves on top, the phase loop they trace below.",
+     "genre": "Sketch",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/lotka-volterra.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "js",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/sketch/lotka-volterra.js"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 51,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Scale-Free Network",
+     "description": "A network that grows by preferential attachment: the rich get richer, hubs emerge, and the graph breathes.",
+     "genre": "Sketch",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/scale-free-network.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "js",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/sketch/scale-free-network.js"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 52,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Rule 110",
+     "description": "A one-dimensional cellular automaton that is Turing-complete. Gliders scroll down the page, one generation at a time.",
+     "genre": "Sketch",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/rule-110.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "js",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/sketch/rule-110.js"
+    }
+   },
+   {
+    "@type": "ListItem",
+    "position": 53,
+    "item": {
+     "@type": "CreativeWork",
+     "name": "Clifford Attractor",
+     "description": "A strange attractor drawn as a cloud of 20,000 points. Slowly drifting parameters keep reshaping the lace.",
+     "genre": "Sketch",
+     "image": "https://n1m21n.github.io/Infinite/assets/library/previews/clifford-attractor.jpg",
+     "isAccessibleForFree": true,
+     "encodingFormat": "js",
+     "contentUrl": "https://n1m21n.github.io/Infinite/assets/library/sketch/clifford-attractor.js"
+    }
+   }
+  ]
+ }
+}
+  </script>
+  <noscript>
+    <h2>All library items</h2>
+    <ul>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/first-sound.inf" download>First sound</a> (Templates): Press play and hear notes.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/first-image.inf" download>First image</a> (Templates): A shape on a colour wash.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/first-music-image.inf" download>Moves with the music</a> (Templates): The shape grows with the sound.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/source.inf" download>Source</a> (Templates): Pictures from nothing.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/compositing.inf" download>Compositing</a> (Templates): Layers, trails and feedback.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/effects.inf" download>Effects</a> (Templates): Change a picture.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/3d.inf" download>3D</a> (Templates): A shape seen from any side.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/modulators.inf" download>Modulators</a> (Templates): Numbers that move other controls.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/macros.inf" download>Macros</a> (Templates): One knob that moves several things.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/notes.inf" download>Notes</a> (Templates): Notes that make patterns.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/synths.inf" download>Synths</a> (Templates): Sounds from notes.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/audio-effects.inf" download>Audio Effects</a> (Templates): Shape the sound.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/prediction.inf" download>Prediction</a> (Templates): Notes that keep going on their own.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/utility.inf" download>Utility</a> (Templates): Mix and meter sound.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/templates/field.inf" download>Field</a> (Templates): Write a picture as a formula.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/terrain-mandala.inf" download>Terrain Mandala</a> (Community): A wave-terrain synth driving a slowly turning mandala.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/glitch-feedback.inf" download>Glitch Feedback</a> (Community): Transform, glitch and feedback loops with added noise.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/shifted-blend.inf" download>Shifted Blend</a> (Community): Audio blends through a frequency shifter, with liquify on the picture.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/lens-spectral.inf" download>Lens Spectral</a> (Community): Lens distortion over blended cubes, with a spectral synth underneath.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/checker-cube.inf" download>Checker Cube</a> (Community): A cube in a checkered room with bold type, blended from image sources.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/occult-mandala.infinite" download>Occult Mandala</a> (Community): Image points, kaleidoscope and layers over industrial noise at 110 BPM.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/pad-wash.inf" download>Pad Wash</a> (Community): Blended pads through delay and reverb, with random notes shifting the pitch.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/pads-75-bpm.infinite" download>Pads, 75 BPM</a> (Community): Slow pads with trails, blends and glitch at 75 BPM.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/trail-glitch.inf" download>Trail Glitch</a> (Community): Trails, colour ramps and glitch blended, with reverbs on the sound.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/stretched-sampler.inf" download>Stretched Sampler</a> (Community): A sampler into a spectral synth, reverb and PaulStretch.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/displaced-wavetable.inf" download>Displaced Wavetable</a> (Community): A note sequencer plays a wavetable that displaces a 3D shape.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/welcome-home.infinite" download>Welcome Home</a> (Community): A red room full of eyes over a steady 86 BPM groove.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/soft-render.inf" download>Soft Render</a> (Community): A 3D render with a colour ramp and added noise.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/stretched-blend.inf" download>Stretched Blend</a> (Community): PaulStretch into blended audio with delay.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/slice-room.inf" download>Slice Room</a> (Community): A slicer into blended audio, with delay and a mixer.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/limited-stretch.inf" download>Limited Stretch</a> (Community): PaulStretch and mixers into a limiter.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/spectrum-slide.inf" download>Spectrum Slide</a> (Community): PaulStretch through a spectrum slide and key snap.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/plugin-stretch.inf" download>Plugin Stretch</a> (Community): A plugin and PaulStretch through a mixer.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/blue-cube.inf" download>Blue Cube</a> (Community): A flat-shaded cube in a blue-white room with a light-grid wall.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/fairy-type.inf" download>Fairy Type</a> (Community): Large type repeated across a kaleidoscope of pink shapes.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/cube-colour.inf" download>Cube Colour</a> (Community): An audio colour ramp drives a cube, rendered in 3D.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/layered-blends.inf" download>Layered Blends</a> (Community): Stacked blends with colour adjustments.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/drum-reverb.inf" download>Drum Reverb</a> (Community): Two note sequencers and oscillators into reverb, delay and EQ.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/delay-wash.inf" download>Delay Wash</a> (Community): Delay, reverb and a mixer into a limiter.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/filtered-mixer.inf" download>Filtered Mixer</a> (Community): Reverb and a mixer through an audio filter.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/merged-wavetable.inf" download>Merged Wavetable</a> (Community): Merged notes play a wavetable into reverb.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/community/oscillator-reverb.inf" download>Oscillator Reverb</a> (Community): A note sequencer into an oscillator and reverb.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/pixel/ordered-dither.field" download>Ordered Dither</a> (Pixel): A 4x4 Bayer dither: any picture becomes two inks on paper. The series look from the films.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/pixel/liquid-glass.field" download>Liquid Glass</a> (Pixel): A frosted, refracting glass pane over whatever is behind it: bent edges, a colour split and a lit rim.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/pixel/metaball-lens.field" download>Metaball Lens</a> (Pixel): Three liquid lobes drift over the picture, merging into one blob that refracts and magnifies what is under it.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/pixel/pixel-plate.field" download>Pixel Plate</a> (Pixel): A plate of square cells with ragged, notched edges that grows outward cell by cell.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/pixel/iridescent-orb.field" download>Iridescent Orb</a> (Pixel): A soft holographic pastel ball that slowly spins its colours, with a white sheen and a gloss spot.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/pixel/phyllotaxis-bloom.field" download>Phyllotaxis Bloom</a> (Pixel): A sunflower of golden-angle seeds, each dot coloured along the spiral. Seed count and turn are live.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/sketch/lorenz-attractor.js" download>Lorenz Attractor</a> (Sketch): The butterfly of chaos, integrated live. A glowing trail winds between two lobes and never repeats.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/sketch/lotka-volterra.js" download>Lotka-Volterra</a> (Sketch): Predators and prey chasing each other: the population curves on top, the phase loop they trace below.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/sketch/scale-free-network.js" download>Scale-Free Network</a> (Sketch): A network that grows by preferential attachment: the rich get richer, hubs emerge, and the graph breathes.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/sketch/rule-110.js" download>Rule 110</a> (Sketch): A one-dimensional cellular automaton that is Turing-complete. Gliders scroll down the page, one generation at a time.</li>
+      <li><a href="https://n1m21n.github.io/Infinite/assets/library/sketch/clifford-attractor.js" download>Clifford Attractor</a> (Sketch): A strange attractor drawn as a cloud of 20,000 points. Slowly drifting parameters keep reshaping the lace.</li>
+    </ul>
+  </noscript>
+  <!-- seo:end -->
+
   
-  <script src="library.js?v=7"></script>
+  <script src="library.js?v=11"></script>
 </body>
 </html>

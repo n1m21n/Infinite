@@ -1,84 +1,69 @@
-/* Infinite — glass layer. Loaded after style.css on every light page, so the whole site shares one material:
-   frosted white panels with a bright top edge, soft coloured light behind them, dark glass for node cards. */
+/* Infinite: glass layer (docs/brand/BRAND.md 2.3).
+   Glass only sits behind short labels (header, nav, chips, pills) at 72 to 78% opacity, never behind body text.
+   Cards are solid surfaces: depth comes from the surface step and the stacked shadows, never an outline. */
 :root {
-  --card: rgba(255, 255, 255, 0.62);
+  --glass: rgba(255, 255, 255, 0.76);
   --glass-blur: blur(20px) saturate(1.6);
-  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(255, 255, 255, 0.3);
-  --glass-edge: 0 0 0 1px rgba(255, 255, 255, 0.55), 0 0 0 1.5px rgba(26, 31, 54, 0.06);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.95);
   --glass-shadow: 0 1px 2px rgba(26, 31, 54, 0.05), 0 10px 28px rgba(26, 31, 54, 0.08);
-  --glass-dark: linear-gradient(180deg, rgba(42, 48, 82, 0.92), rgba(32, 38, 63, 0.94)); /* Midnight 2 to Midnight 1: docs/brand/BRAND.md */
 }
 
-/* soft coloured light behind the glass: coral, violet, blue (the brand gradient) */
-body::before {
-  content: ''; position: fixed; inset: -10% -10% auto -10%; height: 90vh; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(40% 50% at 12% 20%, rgba(245, 127, 102, 0.22), transparent 70%),
-    radial-gradient(38% 46% at 78% 12%, rgba(167, 177, 255, 0.16), transparent 70%),
-    radial-gradient(40% 50% at 92% 62%, rgba(169, 205, 241, 0.28), transparent 70%);
-  filter: blur(10px);
+/* cards, panels, frames: solid surface-1 */
+.slab, .predict-card, .wave-card, .setup-card, .download-card, .modal-card, .film-frame {
+  background: var(--surface-1); box-shadow: var(--shadow-1);
 }
+.download-card, .film-frame, .predict-card, .wave-card { box-shadow: var(--shadow-2); }
 
-/* panels */
-.slab, .recipe, .predict-card, .wave-card, .setup-card, .download-card, .modal-card, .film-frame, .platform-chip,
-.btn-ghost, .ticker-pill, .tab-pill, .lib-chip, .lib-view {
+/* short labels only: pills, chips, tabs */
+.btn-ghost, .ticker-pill, .tab-pill, .lib-chip, .lib-view, .platform-chip {
+  background: var(--glass);
   -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-hi), var(--glass-shadow);
 }
-.lib-chip, .lib-view, .btn-ghost, .ticker-pill, .tab-pill, .platform-chip { box-shadow: var(--glass-hi), var(--glass-edge), var(--glass-shadow); }
-.btn-ghost:hover { box-shadow: var(--glass-hi), 0 0 0 1px rgba(26, 31, 54, 0.16), 0 14px 32px rgba(26, 31, 54, 0.12); }
+.btn-ghost:hover { box-shadow: var(--glass-hi), 0 14px 32px rgba(26, 31, 54, 0.12); }
 
-/* header: the same glass, edge to edge */
+/* header: nav labels over glass at 78% */
 .site-header {
-  background: rgba(251, 250, 246, 0.55);
+  background: rgba(251, 250, 246, 0.78);
   -webkit-backdrop-filter: blur(24px) saturate(1.7); backdrop-filter: blur(24px) saturate(1.7);
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.6);
 }
-.site-header.scrolled { box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.6), 0 8px 24px rgba(26, 31, 54, 0.06); }
-.nav-links > a:hover, .nav-links > a[aria-current] { background: rgba(255, 255, 255, 0.7); box-shadow: var(--glass-hi), 0 0 0 1px rgba(26, 31, 54, 0.06); }
+.site-header.scrolled { box-shadow: 0 8px 24px rgba(26, 31, 54, 0.06); }
+.nav-links > a:hover, .nav-links > a[aria-current] { background: var(--glass); box-shadow: var(--glass-hi); }
 .nav-links > a[aria-current] { color: var(--ink); }
-.icon-btn:hover { background: rgba(255, 255, 255, 0.7); box-shadow: var(--glass-hi), 0 0 0 1px rgba(26, 31, 54, 0.06); }
+.icon-btn:hover { background: var(--glass); box-shadow: var(--glass-hi); }
 
-/* primary: dark glass with a lit top edge */
+/* primary: Midnight with a lit top edge */
 .btn-primary {
   background: linear-gradient(180deg, #2A3052, #151930);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.5), var(--glass-shadow);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), var(--glass-shadow);
 }
 .btn-primary:hover { background: linear-gradient(180deg, #343B5E, #20263F); }
 
-/* node cards: light glass (white Card on Paper); the app mock stays the app's dark */
-.node, .pnode {
-  --app-panel: #FFFFFF; --app-text: #12152A; --app-dim: #404660; --app-border: rgba(26, 31, 54, 0.10);
-}
-.node {
-  background: rgba(255, 255, 255, 0.82);
-  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--shadow-2);
-}
+/* node cards: solid white surface; the mock keeps its own light inks */
+.node, .pnode { --app-panel: #FFFFFF; --app-text: #12152A; --app-dim: #404660; --app-border: rgba(26, 31, 54, 0.10); }
+.node { background: var(--surface-1); box-shadow: var(--shadow-2); }
 
-/* chips and toggles: pressed state is dark glass */
+/* pressed chips and toggles: Midnight */
 .lib-chip[aria-pressed="true"], .lib-view button[aria-pressed="true"] {
   background: linear-gradient(180deg, #2A3052, #151930); color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
-.lib-view { box-shadow: var(--glass-hi), var(--glass-edge); }
 .lib-view button { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.lib-view button[aria-pressed="true"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.4); }
 .lib-dl { background: linear-gradient(180deg, #2A3052, #151930); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 4px 12px rgba(21, 25, 48, 0.25); }
 .lib-dl:hover { background: linear-gradient(180deg, #343B5E, #20263F); }
-.lib-price { background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.lib-price { background: var(--deep); box-shadow: none; }
+.lib-copy { background: var(--deep); color: var(--ink); }
+.lib-copy:hover { background: #E4E2EF; }
+.step { box-shadow: none; }
 
-.site-footer { background: rgba(255, 255, 255, 0.35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-top: 1px solid rgba(255, 255, 255, 0.7); }
+.site-footer { background: var(--surface-1); border-top: 0; }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root { --card: rgba(255, 255, 255, 0.92); }
+  :root { --glass: rgba(255, 255, 255, 0.94); }
   .site-header { background: rgba(251, 250, 246, 0.95); }
 }
-@media (prefers-reduced-transparency: reduce) { :root { --card: #fff; } }
-
-/* cards carry no outline: depth comes from the glass, the lit top edge and the shadow */
-.step { box-shadow: none; }
-.lib-copy { background: var(--inner); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8); }
-.lib-copy:hover { background: #E4E2EF; }
-
-.lib-price { background: var(--inner); box-shadow: none; }
+@media (prefers-reduced-transparency: reduce) {
+  :root { --glass: #FFFFFF; }
+  .site-header { background: #FBFAF6; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .btn-ghost, .ticker-pill, .tab-pill, .lib-chip, .lib-view, .platform-chip { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

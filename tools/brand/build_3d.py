@@ -51,6 +51,7 @@ os.makedirs(REN, exist_ok=True)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from category_audit import app_categories  # noqa: E402
 CAT = {c["name"]: c["hex"] for c in app_categories()}  # renders show the default theme preset
+CAT.setdefault("Audio Effects", CAT.get("AudioEffects"))  # the app spells it without the space
 ROLE = {r["name"]: r["dark"] for r in B["colour"]["role"]}
 EMBER = B["colour"]["anchors"]["ember"]["400"]
 SIGNAL = M["signal"]
@@ -421,8 +422,9 @@ def plug_and_cable(c, MT, jack_x, y, zc, direction, colour_mat, far):
 
 
 # ---------------------------------------------------------------- the node: Audio Filter as an instrument object
-def build_node(MT):
-    c = new_coll("node_audio_filter")
+def build_node(MT, reach=0, name="node_audio_filter"):
+    """reach: extra cable length in mm beyond the stock run (the website model has cables long enough to leave the viewport)."""
+    c = new_coll(name)
     cd = N3["card"]
     W, P, R, F = cd["width"], cd["padding"], cd["radius"], cd["fillet"]
     ctrl = N3["controls"]
@@ -519,8 +521,8 @@ def build_node(MT):
         ring.location = (sx + (0 if d > 0 else -1.2), jy, zc)
         hole = cylinder_x(f"hole_{side}", ji, 0, 1.3, 0, 0, MT["hole"], c, "jack")
         hole.location = (sx + (0.05 if d > 0 else -1.35), jy, zc)
-    plug_and_cable(c, MT, -W / 2 - 1.2, jy, zc, -1, MT["ember"], ((-W / 2 - 330, -120, 2.5), (-W / 2 - 520, -260, 2.5)))
-    plug_and_cable(c, MT, W / 2 + 1.2, jy, zc, 1, MT["cat_fx"], ((W / 2 + 330, 40, 2.5), (W / 2 + 560, 120, 2.5)))
+    plug_and_cable(c, MT, -W / 2 - 1.2, jy, zc, -1, MT["ember"], ((-W / 2 - 330 - reach * 0.6, -120, 2.5), (-W / 2 - 520 - reach, -260, 2.5)))
+    plug_and_cable(c, MT, W / 2 + 1.2, jy, zc, 1, MT["cat_fx"], ((W / 2 + 330 + reach * 0.6, 40, 2.5), (W / 2 + 560 + reach, 120, 2.5)))
     return c, (W, H)
 
 
@@ -1074,6 +1076,12 @@ def main():
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "kit.blend"), compress=True)
     # glTF last: exporting re-parents into a metre-scaled root
     export(node, "node_audio_filter", (0, 0))
+    # website: the same node with cables long enough to run off both sides of a wide viewport, built clear of the stage
+    wide, _ = build_node(MT, reach=3200, name="node_audio_filter_wide")
+    for o in wide.objects:
+        if o.parent is None:
+            o.location.y += 6000
+    export(wide, "node_audio_filter_wide", (0, 6000))
     export(lfo, "node_lfo", (LX, 0))
     export(fp, "node_field_pixel", (FX, 0))
     export([lfo, fp, pc], "patch_lfo_field_pixel", ((LX + FX) / 2, 0))

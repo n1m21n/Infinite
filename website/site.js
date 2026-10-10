@@ -148,14 +148,16 @@
     raf = requestAnimationFrame(tick);
   }
 
+
   /* ------------------------------------------------------------ hero word */
   function initHeroWord() {
     const word = $('#hero-word');
     const line = $('#hero-underline');
     if (!word) return;
+    const EMBER = '#B53700'; // one Ember hand word (brand book section 2.3)
     const WORDS = [
-      ['designers', '#3D6FE0'], ['artists', '#D6508C'], ['musicians', '#1F9E8E'],
-      ['VJs', '#7A5CE0'], ['scientists', '#3D6FE0'], ['creatives', '#D6508C'], ['you', '#B53700']
+      ['designers', EMBER], ['artists', EMBER], ['musicians', EMBER],
+      ['VJs', EMBER], ['scientists', EMBER], ['creatives', EMBER], ['you', EMBER]
     ];
     const show = (w, col) => {
       word.textContent = w;
@@ -192,7 +194,7 @@
     const coord = $('.hud-tl');
     const hero = $('.hero');
     if (clock) {
-      const BPM = 145, beat = 60 / BPM, t0 = performance.now();
+      const BPM = 120, beat = 60 / BPM, t0 = performance.now();
       const upd = () => {
         const b = Math.floor((performance.now() - t0) / 1000 / beat);
         clock.textContent = `bar ${String(Math.floor(b / 4) % 100 + 1).padStart(2, '0')}.${(b % 4) + 1}  ·  ${BPM} bpm`;
@@ -666,7 +668,7 @@
       }, { passive: true });
     }
 
-    const BEAT = 60 / 145 * 1000;
+    const BEAT = 60 / 120 * 1000;
     const frame = (now) => {
       raf = 0;
       let flap = null, squash = 0, tilt = 0, busy = false;

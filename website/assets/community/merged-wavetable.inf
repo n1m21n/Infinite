@@ -1,0 +1,638 @@
+infinite-patch 1
+node 1 Synths Drum Sequencer
+  pos 3580 -1180
+  flags 0 0 1 0
+  s lane0_path /Volumes/Wd-Black/Vengeance Samples/VEH3 Kicks/VEH3 Kicks 081.wav
+  f lane0_volume 0.800000012
+  f lane0_pan 0
+  f lane0_pitch 0
+  f lane0_finetune 0
+  f lane0_decay 0.29225412
+  f lane0_transient 0
+  b lane0_mute 0
+  b lane0_solo 0
+  i lane0_choke 0
+  f lane0_start 0
+  f lane0_end 1
+  f lane0_step0 0.800000012
+  f lane0_step1 0
+  f lane0_step2 0
+  f lane0_step3 0
+  f lane0_step4 0.800000012
+  f lane0_step5 0
+  f lane0_step6 0
+  f lane0_step7 0
+  s lane1_path /Volumes/Wd-Black/Samples/Samples/Zenhiser - Strike Tech House/one_shots/drums/kicks/ZEN_STH_kick_lilac.wav
+  f lane1_volume 0.947882354
+  f lane1_pan 0
+  f lane1_pitch 0
+  f lane1_finetune 0
+  f lane1_decay 1
+  f lane1_transient -0.178189576
+  b lane1_mute 0
+  b lane1_solo 0
+  i lane1_choke 0
+  f lane1_start 0
+  f lane1_end 1
+  f lane1_step0 0.800000012
+  f lane1_step1 0
+  f lane1_step2 0
+  f lane1_step3 0
+  f lane1_step4 0.800000012
+  f lane1_step5 0
+  f lane1_step6 0
+  f lane1_step7 0
+  s lane2_path /Volumes/Wd-Black/SM White Label - 90s Deep House & Garage/drum loops/128/dhg_drum_128_big_hat.wav
+  f lane2_volume 0.800000012
+  f lane2_pan 0
+  f lane2_pitch 0
+  f lane2_finetune 0
+  f lane2_decay 1
+  f lane2_transient 0
+  b lane2_mute 0
+  b lane2_solo 0
+  i lane2_choke 0
+  f lane2_start 0.0654328838
+  f lane2_end 0.122738764
+  f lane2_step0 0
+  f lane2_step1 0
+  f lane2_step2 0.800000012
+  f lane2_step3 0
+  f lane2_step4 0
+  f lane2_step5 0
+  f lane2_step6 0.800000012
+  f lane2_step7 0
+  s lane3_path 
+  f lane3_volume 0.800000012
+  f lane3_pan 0
+  f lane3_pitch 0
+  f lane3_finetune 0
+  f lane3_decay 1
+  f lane3_transient 0
+  b lane3_mute 0
+  b lane3_solo 0
+  i lane3_choke 0
+  f lane3_start 0
+  f lane3_end 1
+  f lane3_step0 0
+  f lane3_step1 0
+  f lane3_step2 0
+  f lane3_step3 0
+  f lane3_step4 0
+  f lane3_step5 0
+  f lane3_step6 0
+  f lane3_step7 0
+  s lane4_path 
+  f lane4_volume 0.800000012
+  f lane4_pan 0
+  f lane4_pitch 0
+  f lane4_finetune 0
+  f lane4_decay 1
+  f lane4_transient 0
+  b lane4_mute 0
+  b lane4_solo 0
+  i lane4_choke 0
+  f lane4_start 0
+  f lane4_end 1
+  f lane4_step0 0
+  f lane4_step1 0
+  f lane4_step2 0
+  f lane4_step3 0
+  f lane4_step4 0
+  f lane4_step5 0
+  f lane4_step6 0
+  f lane4_step7 0
+  s lane5_path 
+  f lane5_volume 0.800000012
+  f lane5_pan 0
+  f lane5_pitch 0
+  f lane5_finetune 0
+  f lane5_decay 1
+  f lane5_transient 0
+  b lane5_mute 0
+  b lane5_solo 0
+  i lane5_choke 0
+  f lane5_start 0
+  f lane5_end 1
+  f lane5_step0 0
+  f lane5_step1 0
+  f lane5_step2 0
+  f lane5_step3 0
+  f lane5_step4 0
+  f lane5_step5 0
+  f lane5_step6 0
+  f lane5_step7 0
+  s lane6_path 
+  f lane6_volume 0.800000012
+  f lane6_pan 0
+  f lane6_pitch 0
+  f lane6_finetune 0
+  f lane6_decay 1
+  f lane6_transient 0
+  b lane6_mute 0
+  b lane6_solo 0
+  i lane6_choke 0
+  f lane6_start 0
+  f lane6_end 1
+  f lane6_step0 0
+  f lane6_step1 0
+  f lane6_step2 0
+  f lane6_step3 0
+  f lane6_step4 0
+  f lane6_step5 0
+  f lane6_step6 0
+  f lane6_step7 0
+  s lane7_path 
+  f lane7_volume 0.800000012
+  f lane7_pan 0
+  f lane7_pitch 0
+  f lane7_finetune 0
+  f lane7_decay 1
+  f lane7_transient 0
+  b lane7_mute 0
+  b lane7_solo 0
+  i lane7_choke 0
+  f lane7_start 0
+  f lane7_end 1
+  f lane7_step0 0
+  f lane7_step1 0
+  f lane7_step2 0
+  f lane7_step3 0
+  f lane7_step4 0
+  f lane7_step5 0
+  f lane7_step6 0
+  f lane7_step7 0
+  i rate 12
+  i steps 8
+  f swing 0
+  f volume 0.800000012
+  b run 1
+  f globalTransient 0
+  f globalDecay -0.360000014
+  f globalPitch 0
+  f globalPan 0
+end
+node 2 Utility Audio Out
+  pos 5660 -40
+  flags 0 0 1 0
+  i formatIndex 0
+  s recordDirectory 
+end
+node 3 Synths Slicer
+  pos 4680 -1300
+  flags 0 0 1 0
+  s path 
+  i sliceBy 0
+  i onsets 9
+  i division 3
+  f sensitivity 65
+  f pitch -12
+  f finetune 0
+  f attack 1.53345203
+  f decay 1037.07104
+  f speed 1
+  f volume 0.800000012
+  b crossthrough 0
+  s slices 0.000000:1000000000.0000 0.071764:0.0870 0.129508:12.4053 0.191275:2.3894 0.252843:1.7719 0.319323:0.5953 0.375510:14.3795 0.444797:1.1626 0.474364:0.3027 0.496834:2.9925 0.568828:0.2798 0.624181:13.4499 0.685097:2.7257 0.747887:0.7616 0.810932:3.9894 0.824727:0.3131 0.845319:0.1198 0.873413:10.4403 0.887321:0.3262 0.936698:1.5181
+end
+node 4 Utility Mixer
+  pos 4900 -100
+  flags 0 0 1 0
+  i channels 9
+  f gain0 -9.42028904
+  f pan0 0
+  b mute0 0
+  b solo0 0
+  f gain1 0.521733284
+  f pan1 0
+  b mute1 0
+  b solo1 0
+  f gain2 -1.20773733
+  f pan2 0
+  b mute2 0
+  b solo2 0
+  f gain3 -10.6280184
+  f pan3 0
+  b mute3 0
+  b solo3 0
+  f gain4 -17.1497574
+  f pan4 0
+  b mute4 0
+  b solo4 0
+  f gain5 -4.83091784
+  f pan5 0
+  b mute5 0
+  b solo5 0
+  f gain6 0
+  f pan6 0
+  b mute6 0
+  b solo6 0
+  f gain7 -8.2125597
+  f pan7 0
+  b mute7 0
+  b solo7 0
+  f gain8 -7.24637222
+  f pan8 0
+  b mute8 0
+  b solo8 0
+  f gain9 0
+  f pan9 0
+  b mute9 0
+  b solo9 0
+  f gain10 0
+  f pan10 0
+  b mute10 0
+  b solo10 0
+  f gain11 0
+  f pan11 0
+  b mute11 0
+  b solo11 0
+end
+node 5 Notes Note Sequencer
+  pos 4120 -1680
+  flags 0 0 1 0
+  i steps 8
+  i rateMode 0
+  f rateBeats 0.25
+  f rateSeconds 0.200000003
+  f gatePercent 70
+  b useGlobalScale 0
+  i note0 36
+  f vel0 1
+  b en0 1
+  i note1 41
+  f vel1 0.800000012
+  b en1 1
+  i note2 38
+  f vel2 0.800000012
+  b en2 1
+  i note3 45
+  f vel3 0.800000012
+  b en3 1
+  i note4 39
+  f vel4 0.800000012
+  b en4 1
+  i note5 48
+  f vel5 0.800000012
+  b en5 1
+  i note6 39
+  f vel6 0.800000012
+  b en6 1
+  i note7 39
+  f vel7 0.800000012
+  b en7 1
+  i note8 60
+  f vel8 0.800000012
+  b en8 1
+  i note9 60
+  f vel9 0.800000012
+  b en9 1
+  i note10 60
+  f vel10 0.800000012
+  b en10 1
+  i note11 60
+  f vel11 0.800000012
+  b en11 1
+  i note12 60
+  f vel12 0.800000012
+  b en12 1
+  i note13 60
+  f vel13 0.800000012
+  b en13 1
+  i note14 60
+  f vel14 0.800000012
+  b en14 1
+  i note15 60
+  f vel15 0.800000012
+  b en15 1
+end
+node 6 Synths Molder
+  pos 5180 -1320
+  flags 0 0 1 0
+  s path 
+  f chaos 0.883103311
+  f pitch 0
+  f tone 0.5
+  f air 0.5
+  f snap 0.5
+  f stretch 0.5
+  f time 0.5
+  f level 0.800000012
+  f start 0
+  f end 1
+  b loop 1
+  b reverse 0
+  b pingpong 0
+  i seed 1703611088
+  i generation 1
+end
+node 7 Synths Slicer
+  pos 5660 -1300
+  flags 0 0 1 0
+  s path 
+  i sliceBy 0
+  i onsets 16
+  i division 3
+  f sensitivity 65
+  f pitch 0
+  f finetune 0
+  f attack 0
+  f decay 327.49762
+  f speed 1
+  f volume 0.699999988
+  b crossthrough 0
+  s slices 0.000000:1000000000.0000 0.061298:3.8028 0.088200:-0.1169 0.167330:5.0988 0.255916:5.9923 0.288584:2.2021 0.327674:0.0181 0.350689:-0.1223 0.368990:4.5381 0.407424:0.1282 0.421875:-0.1419 0.451923:-0.2254 0.486854:6.1418 0.539100:-0.1697 0.563636:3.8516 0.593224:-0.0705 0.609290:2.3127 0.636033:0.0964 0.686899:3.8193 0.720018:0.1847 0.785382:7.2049 0.827524:-0.0654 0.845562:5.0803 0.879751:2.7761 0.938101:4.9692 0.974760:-0.1549
+end
+node 8 AudioEffects Bitcrush
+  pos 4620 -720
+  flags 0 0 1 0
+  f mix 1
+  f rate 3587.19336
+  f bits 3.12500405
+  f analog 1
+end
+node 10 Synths PaulStretch
+  pos 5440 -760
+  flags 0 0 1 0
+  s path 
+  f stretch 1000
+  i window_size 4
+  f phase_rand 1
+  f pitch_shift 0
+  f fine_tune 0
+  f freq_shift 0
+  i unison 4
+  f detune 10
+  f volume 0.800000012
+  f start 0
+  f end 1
+  f position 0
+  b loop 1
+end
+node 11 AudioEffects Audio Filter
+  pos 5960 -700
+  flags 0 0 1 0
+  f mix 1
+  f type 1
+  f freq 11816.9316
+  f q 2.49107361
+  f gain 0
+  f outputGainDb 0
+  f envAmount 0.289999723
+  f sync 1
+  f rateDiv 12
+  f rate 5
+end
+node 12 Notes Chorder
+  pos 5600 -1960
+  flags 0 0 1 0
+  i scale 0
+  i root 0
+  i chordSize 4
+  f rateBeats 4
+  f strumMs 0
+  f humanizeTimingMs 10
+  f humanizeVelocity 15
+  f upperHarmonics 20
+  b useGlobalScale 1
+end
+node 13 Synths Wavetable
+  pos 6240 -2060
+  flags 0 0 1 0
+  f mix 0.540000558
+  f volume 0.800000012
+  f frequency 220
+  f glide 2.74869217e-05
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  b a.on 1
+  i a.table 0
+  f a.position 0.448990762
+  f a.volume 0.800000012
+  f a.pan 0
+  i a.unison 3
+  f a.detune 12
+  f a.stereoWidth 0.400000006
+  i a.octave 0
+  i a.semi 0
+  f a.fine 0
+  f a.phase 0
+  f a.phaseRandomize 0.52882129
+  i a.warpMode 5
+  f a.warpAmount 0.494811952
+  f a.warpRatio 4.2736969
+  i a.filterType 1
+  f a.cutoff 1355.67834
+  f a.resonance 0.156929016
+  f a.ampAttack 4
+  f a.ampDecay 219.762741
+  f a.ampSustain 0.369929224
+  f a.ampRelease 1276.84094
+  f a.pitchAmount 3.5
+  f a.pitchAttack 0.00221948186
+  f a.pitchDecay 120
+  f a.pitchSustain 0.473853827
+  f a.pitchRelease 291.747589
+  f a.filterAmount 0
+  f a.filterAttack 4
+  f a.filterDecay 400
+  f a.filterSustain 0.400000006
+  f a.filterRelease 300
+  b b.on 1
+  i b.table 2
+  f b.position 0.400000006
+  f b.volume 0.800000012
+  f b.pan 0
+  i b.unison 3
+  f b.detune 31.4999905
+  f b.stereoWidth 0.400000006
+  i b.octave 1
+  i b.semi 0
+  f b.fine 0
+  f b.phase 0
+  f b.phaseRandomize 0
+  i b.warpMode 0
+  f b.warpAmount 0
+  f b.warpRatio 1
+  i b.filterType 0
+  f b.cutoff 12000
+  f b.resonance 0.150000006
+  f b.ampAttack 4
+  f b.ampDecay 221.027115
+  f b.ampSustain 0.420681417
+  f b.ampRelease 1295.31836
+  f b.pitchAmount 0
+  f b.pitchAttack 0
+  f b.pitchDecay 120
+  f b.pitchSustain 0
+  f b.pitchRelease 120
+  f b.filterAmount 0
+  f b.filterAttack 4
+  f b.filterDecay 400
+  f b.filterSustain 0.400000006
+  f b.filterRelease 300
+end
+node 14 AudioEffects Reverb
+  pos 6500 -720
+  flags 0 0 1 0
+  f mix 0.63499999
+  f size 0.644999921
+  f decay 2.89802527
+  f damping 0.155000001
+  f predelay 20
+  f width 1
+  f analog 1
+end
+node 16 Synths Oscillator
+  pos 5100 -2180
+  flags 0 0 1 0
+  f frequency 220
+  f glide 0
+  f pitchBend 0
+  f fmDepth 0
+  i fmMode 0
+  i waveform 2
+  f fine 0
+  i octave 0
+  i semi 0
+  f volume 0.800000012
+  f phase 0
+  i unison 1
+  f detune 12
+  i filterType 1
+  f cutoff 6164.33936
+  f resonance 0.62159884
+  f sync 3.18123126
+  f pan 0
+  f ampAttack 4
+  f ampDecay 33.372364
+  f ampSustain 0.373382092
+  f ampRelease 260
+end
+node 17 Notes Note Transpose
+  pos 4720 -2000
+  flags 0 0 1 0
+  i semitones 0
+  b useGlobalScale 1
+end
+node 18 Synths PaulStretch
+  pos 6180 -60
+  flags 0 0 1 0
+  s path 
+  f stretch 1000
+  i window_size 4
+  f phase_rand 1
+  f pitch_shift 0
+  f fine_tune 0
+  f freq_shift 0
+  i unison 1
+  f detune 37.0736198
+  f volume 0.800000012
+  f start 0
+  f end 1
+  f position 0.488347948
+  b loop 1
+end
+node 19 AudioEffects Reverb
+  pos 6740 0
+  flags 0 0 1 0
+  f mix 0.579999864
+  f size 0.649999857
+  f decay 2.10882354
+  f damping 0.155000001
+  f predelay 20
+  f width 1
+  f analog 1
+end
+node 20 Synths Sampler
+  pos 7120 -600
+  flags 0 0 1 0
+  s path 
+  f pitch 3.28022575
+  f finetune 0
+  f speed 1
+  f start 0.235097438
+  f end 1
+  f position 0.235097438
+  f decay 2
+  f volume 0.800000012
+  b loop 1
+  b reverse 0
+  b pingpong 1
+end
+node 21 Notes Note Transpose
+  pos 5700 -2240
+  flags 0 0 1 0
+  i semitones 1
+  b useGlobalScale 1
+end
+node 22 Modulators LFO
+  pos 6020 -2360
+  flags 1 0 1 0
+  i shape 5
+  f rateBeats 4
+  f phase 0
+  f low 0
+  f high 1
+end
+node 23 Notes Note Merge
+  pos 5900 -1600
+  flags 0 0 1 0
+end
+node 24 Synths Metallic
+  pos 7440 -1680
+  flags 0 0 1 0
+  i material 0
+  f transient 0.384750664
+  f decay 6.87296438
+  f stiffness 0.710000038
+  f frequency 220
+  i octave 1
+  i semi 0
+  f fine 0
+  f glide 0.00460236846
+  i filterType 1
+  f filterCutoff 12000
+  f filterResonance 0.345000029
+  f drive 0.569999993
+  f width 0.600000024
+  f volume 0.800000012
+end
+aud 2 0 4
+aud 4 0 8
+aud 4 1 1
+aud 4 2 7
+aud 4 3 11
+aud 4 4 14
+aud 4 5 16
+aud 4 6 19
+aud 4 7 20
+aud 4 8 24
+aud 6 0 3
+aud 7 1 6
+aud 8 0 3
+aud 11 0 10
+aud 14 0 13
+aud 19 0 18
+note 3 0 5 0
+note 7 0 5 0
+note 13 0 23 0
+note 16 0 17 0
+note 17 0 5 0
+note 21 0 5 0
+note 23 0 21 0
+note 23 1 12 0
+note 24 0 23 0
+mod 21 0 22 0 0 1 0 0 12
+glob rand rand(0, 1, 2)
+glob sh sh(0, 1, 4)
+glob fast_lfo sin(t * 8) * 0.5 + 0.5
+glob rand_glide lerp(sh(1, 0, 2), sh(1, 0, 2), smoothstep(0, 1, mod(t * 2, 1)))
+glob bounce abs(sin(t * 3))
+glob slow_drift sin(t * 0.2) * 0.5 + 0.5
+glob chaos abs(mod(sin(t * 1.7) * 43.12 + cos(t * 2.3) * 17.54, 1.0))
+glob g8 0
+perfui 76 1
+perfname 0 Page 1
+transport 180 4 4 7 7

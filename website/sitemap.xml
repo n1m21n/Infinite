@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://n1m21n.github.io/Infinite/</loc><priority>1.0</priority></url>
-  <url><loc>https://n1m21n.github.io/Infinite/artworks.html</loc><priority>0.6</priority></url>
-  <url><loc>https://n1m21n.github.io/Infinite/library.html</loc><priority>0.6</priority></url>
-  <url><loc>https://n1m21n.github.io/Infinite/slides.html</loc><priority>0.4</priority></url>
+  <url><loc>https://n1m21n.github.io/Infinite/</loc><lastmod>2026-10-11</lastmod><priority>1.0</priority></url>
+  <url><loc>https://n1m21n.github.io/Infinite/library.html</loc><lastmod>2026-10-11</lastmod><priority>0.8</priority></url>
+  <url><loc>https://n1m21n.github.io/Infinite/artworks.html</loc><lastmod>2026-10-11</lastmod><priority>0.6</priority></url>
+  <url><loc>https://n1m21n.github.io/Infinite/assets/library/catalog.json</loc><lastmod>2026-10-11</lastmod><priority>0.3</priority></url>
 </urlset>

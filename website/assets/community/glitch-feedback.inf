@@ -1,0 +1,753 @@
+infinite-patch 1
+node 1 3D Curve
+  pos 2560 -5080
+  flags 1 0 1 0
+  i kind 0
+  i preset 0
+  i pointCount 6
+  i segments 44
+  b closed 0
+  f spread 1.08500004
+  f height -0.367287755
+  f twist 6
+  f seed 3
+  f radius 0.472357303
+  i sides 15
+  f taper 0.671999991
+  f posX 0
+  f posY 0
+  f posZ 0
+  f scale 1
+  c color 0.899999976 0.699999988 0.349999994
+  f metallic 0.200000003
+  f roughness 0.349999994
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 2 3D Render 3D
+  pos 3300 -4700
+  flags 1 0 1 0
+  f width 1440
+  f height 1920
+  i projection 0
+  f fov 45
+  f orthoHeight 1.5
+  f camDistance 0.982212603
+  f camAzimuth 163.488342
+  f camElevation -85.9437027
+  f targetX 0
+  f targetY 0
+  f targetZ 0
+  f near 0.0500000007
+  f far 100
+  f lightAzimuth 51.5662003
+  f lightElevation 51.5662003
+  c lightColor 1 0.980000019 0.939999998
+  f lightIntensity 1.20000005
+  c ambient 0.280000001 0.319999993 0.419999987
+  f rim 0.349999994
+  c envSky 0.419999987 0.529999971 0.75
+  c envHorizon 0.550000012 0.560000002 0.600000024
+  c envGround 0.159999996 0.140000001 0.129999995
+  f envIntensity 1
+  b envAsBackground 1
+  c bg 0.0399999991 0.0399999991 0.0599999987
+  f bgOpacity 1
+  b depthTest 1
+  b cull 1
+  i spriteShape 0
+  i spriteSizeMode 0
+  i samples 2
+  i tonemap 1
+  f exposure 1
+  b shadows 0
+  i shadowQuality 1
+  f shadowBias 0.00249999994
+  f shadowSoftness 1
+  f shadowStrength 0.800000012
+end
+node 3 3D Twist
+  pos 2940 -5020
+  flags 1 0 1 0
+  i op 6
+  b inherit 1
+  b selectionOnly 0
+  f amount 2
+  i count 5
+  f offsetX 0.600000024
+  f offsetY 0
+  f offsetZ 0
+  f rotStep 0
+  f scaleStep 1
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f spin 0
+  b radial 1
+  f radius 1
+  i levels 1
+  f smooth 1
+  f thickness 0.0500000007
+  b keepOriginal 1
+  f inset 0
+  b flat 0
+  b flip 0
+  f seed 0
+  i axis 1
+  i iterations 2
+  f mirrorOffset 0
+  b weldSeam 1
+  i screwSteps 32
+  f turns 1
+  f rise 0
+  f radiusOffset 0.5
+  i selectMode 3
+  f selectA 0.5
+  f selectB 0
+  f selectC 1
+  b selectInvert 0
+  b selectAppend 0
+  f selectSeed 1
+  b keepSelected 0
+  b moveAlongNormals 1
+  f normalAmount 0.200000003
+  c color 0.800000012 0.819999993 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+end
+node 4 Compositing Null
+  pos 3920 -5020
+  flags 0 0 1 0
+end
+node 5 Modulators LFO
+  pos 2280 -4720
+  flags 1 0 1 0
+  i shape 0
+  f rateBeats 4
+  f phase 0
+  f low 0.699999988
+  f high 1
+end
+node 6 Color Color Ramp
+  pos 4280 -5440
+  flags 1 0 1 0
+  i interpMode 0
+  f mix 1
+  i stopCount 5
+  f stop0 0
+  c stopColor0 0.198726207 0.109086238 0.309410274
+  f stop1 0.323563427
+  c stopColor1 0.402533501 0.32979691 0.33250916
+  f stop2 0.411425769
+  c stopColor2 0.601889312 0.562055826 0.689742804
+  f stop3 0.0599737875
+  c stopColor3 0.0155007727 0.00932294782 0.695255399
+  f stop4 1
+  c stopColor4 0.818786979 0.787773967 0.844470441
+  f stop5 0
+  c stopColor5 0 0 0
+  f stop6 0
+  c stopColor6 0 0 0
+  f stop7 0
+  c stopColor7 0 0 0
+  f stop8 0
+  c stopColor8 0 0 0
+  f stop9 0
+  c stopColor9 0 0 0
+  f stop10 0
+  c stopColor10 0 0 0
+  f stop11 0
+  c stopColor11 0 0 0
+  f stop12 0
+  c stopColor12 0 0 0
+  f stop13 0
+  c stopColor13 0 0 0
+  f stop14 0
+  c stopColor14 0 0 0
+  f stop15 0
+  c stopColor15 0 0 0
+  f stop16 0
+  c stopColor16 0 0 0
+  f stop17 0
+  c stopColor17 0 0 0
+  f stop18 0
+  c stopColor18 0 0 0
+  f stop19 0
+  c stopColor19 0 0 0
+  f stop20 0
+  c stopColor20 0 0 0
+  f stop21 0
+  c stopColor21 0 0 0
+  f stop22 0
+  c stopColor22 0 0 0
+  f stop23 0
+  c stopColor23 0 0 0
+  f stop24 0
+  c stopColor24 0 0 0
+  f stop25 0
+  c stopColor25 0 0 0
+  f stop26 0
+  c stopColor26 0 0 0
+  f stop27 0
+  c stopColor27 0 0 0
+  f stop28 0
+  c stopColor28 0 0 0
+  f stop29 0
+  c stopColor29 0 0 0
+  f stop30 0
+  c stopColor30 0 0 0
+  f stop31 0
+  c stopColor31 0 0 0
+end
+node 7 Modulators Palette
+  pos 3380 -5840
+  flags 1 0 1 0
+  s path 
+  i swatchCount 5
+  i sortMode 0
+  i stripMode 0
+  f minChroma 0.074000001
+  b includeNeutrals 1
+  f hueShift 0
+  f saturation 1
+  f brightness 0
+  f spread 1
+  b live 0
+  f sampleRate 12
+  i sampleSize 96
+  f seed 1
+end
+node 8 Color color adjustments
+  pos 4600 -5640
+  flags 1 0 1 0
+  f uBrightness 0
+  f uContrast 0.632000029
+  f uBlackPoint 0
+  f uWhitePoint 0.523000002
+  f uGamma 1.53400004
+  f uCyanRed 0.119999997
+  f uMagentaGreen 0.0270000007
+  f uYellowBlue -0.232999995
+  f uHueShift 0.312000006
+  f uSaturation 1
+  f uLightness 0
+  f uVibrance -0.144999996
+  f uShadows 0.120999999
+  f uMidtones -0.0289999992
+  f uHighlights -0.150000006
+  f uContrastPivot 0
+  c uRedRow 1 0 0
+  c uGreenRow 0 1 0
+  c uBlueRow 0 0 1
+  f uBWEnabled 0
+  f uRedWeight 0.298999995
+  f uGreenWeight 0.587000012
+  f uBlueWeight 0.114
+end
+node 9 Effects mirror tile
+  pos 4320 -6200
+  flags 1 0 1 0
+  f uTiles 3.37899995
+end
+node 10 Effects transform
+  pos 4660 -6360
+  flags 1 0 1 0
+  f uTranslateX 0.571428597
+  f uTranslateY 0.185000002
+  f uScale 1.88
+  f uScaleX 1.35500002
+  f uScaleY 1.29900002
+  f uRotation 0
+end
+node 11 Compositing Layer Stack
+  pos 6000 -5740
+  flags 1 0 1 0
+  i mode0 0
+  f opacity0 1
+  i mode1 0
+  f opacity1 1
+  i mode2 18
+  f opacity2 1
+  i mode3 0
+  f opacity3 1
+end
+node 12 Source Formula
+  pos 4040 -6060
+  flags 1 0 1 0
+  s formula    vec2 q = p;\n   float k = 6.0 + uA * 10.0;\n   for (int i = 0; i < 24; i++) {\n      float a = sin(q.x * k + t * 0.3) + cos(q.y * k - t * 0.2);\n      q += vec2(cos(a), sin(a)) * 0.008 * (0.5 + uB);\n   }\n   float v = sin(length(q) * 20.0 + atan(q.y, q.x) * 3.0);\n   return vec4(0.5 + 0.5 * cos(vec3(0.0, 2.0, 4.0) + v * 2.0 + uC * 6.0), 1.0);
+  f width 1440
+  f height 1920
+  f knobA 0.353989989
+  f knobB 0.5
+  f knobC 0.403020084
+  f knobD 0.165399313
+  b animate 1
+end
+node 13 Modulators Random
+  pos 3660 -6240
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 21.9000015
+end
+node 14 Modulators Random
+  pos 3700 -5760
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 36.5
+end
+node 15 Source Circle
+  pos 5040 -5420
+  flags 1 0 1 0
+  i shapeType 0
+  f width 4096
+  f height 1920
+  f sizeX 0.300000012
+  f sizeY 0.300000012
+  f size 0.349999994
+  f aspect 1
+  f cornerRadius 0.0500000007
+  i sides 5
+  f innerRatio 0.5
+  f rotation 0
+  f posX 0.5
+  f posY 0.5
+  c fillColor 1 1 1
+  f fillOpacity 1
+  f strokeWidth 0
+  c strokeColor 0 0 0
+  f feather 0.00499999989
+  c bgColor 0 0 0
+  f bgOpacity 0
+end
+node 16 Effects transform
+  pos 5380 -5300
+  flags 1 0 1 0
+  f uTranslateX 1
+  f uTranslateY 0.111000001
+  f uScale 0.726999998
+  f uScaleX 0.816999972
+  f uScaleY 1
+  f uRotation 3.96740484
+end
+node 17 Effects transform
+  pos 5380 -4800
+  flags 1 0 1 0
+  f uTranslateX -0.428571433
+  f uTranslateY 0
+  f uScale 0.510999978
+  f uScaleX 1
+  f uScaleY 1
+  f uRotation 0
+end
+node 18 Compositing Layer Stack
+  pos 5780 -5000
+  flags 1 0 1 0
+  i mode0 0
+  f opacity0 1
+  i mode1 0
+  f opacity1 1
+  i mode2 2
+  f opacity2 1
+  i mode3 0
+  f opacity3 1
+end
+node 19 Source Formula
+  pos 6400 -5200
+  flags 1 0 1 0
+  s formula    float a = length(p - vec2(0.15 * sin(t * 0.4), 0.0)) * (40.0 + uA * 200.0);\n   float b = length(p + vec2(0.15 * sin(t * 0.4), 0.0)) * (40.0 + uA * 200.0);\n   float v = sin(a) * sin(b);\n   float mask = smoothstep(0.0, 0.02, v);\n   return vec4(mix(vec3(uB * 0.3), vec3(1.0, 1.0, uC), mask), 1.0);
+  f width 1440
+  f height 1920
+  f knobA 0.5
+  f knobB 0.403020084
+  f knobC 0.353989989
+  f knobD 0.5
+  b animate 1
+end
+node 20 Compositing Blend
+  pos 6060 -4920
+  flags 1 0 1 0
+  i mode 20
+  f mix 1
+end
+node 21 Effects addnoise
+  pos 6300 -5760
+  flags 1 0 1 0
+  f uAmount 0.0500000007
+end
+node 22 Color color adjustments
+  pos 6680 -5800
+  flags 1 0 1 0
+  f uBrightness 0.180999994
+  f uContrast 0.330000013
+  f uBlackPoint 0.200000003
+  f uWhitePoint 1
+  f uGamma 1
+  f uCyanRed -0.112000003
+  f uMagentaGreen 0.136999995
+  f uYellowBlue 0.170000002
+  f uHueShift 0.623000026
+  f uSaturation 1
+  f uLightness 0
+  f uVibrance -0.370000005
+  f uShadows 0
+  f uMidtones 0
+  f uHighlights 0
+  f uContrastPivot 0.630999982
+  c uRedRow 1 0 0
+  c uGreenRow 0 1 0
+  c uBlueRow 0 0 1
+  f uBWEnabled 0
+  f uRedWeight 0.298999995
+  f uGreenWeight 0.587000012
+  f uBlueWeight 0.114
+end
+node 23 Text Text
+  pos 6280 -6780
+  flags 1 0 1 0
+  s text distortion
+  s fontName AppleGothic
+  f fontSize 263.682007
+  c color 1 1 1
+  f tracking 0
+  f posX 0.5
+  f posY 0.5
+  i align 1
+  f scaleX 1
+  f scaleY 2.49099994
+  b wordWrap 1
+  f wrapWidth 0.850000024
+  f wrapHeight 0.899999976
+  b fitToBox 1
+  f lineSpacing 0.569999993
+  f outlineWidth 0
+  c outlineColor 0 0 0
+  b outlineOnly 0
+  f width 1440
+  f height 1920
+end
+node 24 Effects transform
+  pos 6580 -6580
+  flags 1 0 1 0
+  f uTranslateX -0.149000004
+  f uTranslateY 0.30399999
+  f uScale 0.880999982
+  f uScaleX 1
+  f uScaleY 1
+  f uRotation 0
+end
+node 25 Compositing Layer Stack
+  pos 7020 -5840
+  flags 1 0 1 0
+  i mode0 0
+  f opacity0 1
+  i mode1 0
+  f opacity1 1
+  i mode2 0
+  f opacity2 1
+  i mode3 0
+  f opacity3 1
+end
+node 26 Modulators Random
+  pos 2180 -5180
+  flags 1 0 1 0
+  f rate 1
+  f smooth 1
+  f low 0.300000012
+  f high 0.699999988
+  f seed 211.700012
+end
+node 27 Modulators Random
+  pos 2920 -4320
+  flags 1 0 1 0
+  f rate 4
+  f smooth 1
+  f low 0
+  f high 1
+  f seed 240.900009
+end
+node 28 Text Text
+  pos 6860 -6940
+  flags 1 0 1 0
+  s text is sexy
+  s fontName AppleGothic
+  f fontSize 214.153
+  c color 1 1 1
+  f tracking 0
+  f posX 0.5
+  f posY 0.5
+  i align 1
+  f scaleX 1
+  f scaleY 2.49099994
+  b wordWrap 1
+  f wrapWidth 0.850000024
+  f wrapHeight 0.899999976
+  b fitToBox 1
+  f lineSpacing 0.569999993
+  f outlineWidth 0
+  c outlineColor 0 0 0
+  b outlineOnly 0
+  f width 1440
+  f height 1920
+end
+node 29 Effects transform
+  pos 7120 -6740
+  flags 1 0 1 0
+  f uTranslateX -0.179000005
+  f uTranslateY -0.375999987
+  f uScale 0.880999982
+  f uScaleX 1
+  f uScaleY 1.40499997
+  f uRotation 0
+end
+node 30 Effects twirl
+  pos 7300 -6080
+  flags 1 0 1 0
+  f uAngle 6.28299999
+  f uRadius 0.140000001
+  f uCenterX 0.289000005
+  f uCenterY 0.5
+end
+node 31 3D Cube
+  pos 2560 -5760
+  flags 1 0 1 0
+  i shape 12
+  i detail 24
+  i sides 4
+  f tube 0.400000006
+  i knotP 2
+  i knotQ 3
+  f bevel 0
+  i bevelSegments 1
+  f superN2 5.66699982
+  f superN3 7.83199978
+  f discInner 0
+  f superP2 2.71600008
+  f superP3 1.81900001
+  f posX 0
+  f posY 0
+  f posZ 0
+  f rotX 0
+  f rotY 0
+  f rotZ 0
+  f scaleX 1
+  f scaleY 1
+  f scaleZ 1
+  f scale 1
+  f spin 0
+  c color 0.850000024 0.860000014 0.899999976
+  f metallic 0.100000001
+  f roughness 0.449999988
+  f opacity 1
+  i shading 0
+  c emissionColor 1 0.850000024 0.600000024
+  f emission 0
+  f ior 1.5
+  f transmission 0
+  f transmissionRoughness 0
+  f specular 0.5
+  f clearcoat 0
+  f clearcoatRoughness 0.0299999993
+  f subsurface 0
+  c subsurfaceColor 1 0.200000003 0.100000001
+  f subsurfaceRadius 0.5
+  f sheen 0
+  c sheenColor 1 1 1
+  f sheenRoughness 0.5
+  f iridescence 0
+  f iridescenceIor 1.33000004
+  f iridescenceThickness 400
+  f anisotropy 0
+  f anisotropyRotation 0
+  f dispersion 0
+  f alphaCutoff 0
+end
+node 32 Modulators LFO
+  pos 5340 -5660
+  flags 0 0 1 0
+  i shape 0
+  f rateBeats 4
+  f phase 0
+  f low 0
+  f high 1
+end
+node 33 Effects lensdistortion
+  pos 7380 -5580
+  flags 1 0 1 0
+  f uBarrel -1.5
+  f uChroma 2.79099989
+  f uZoom 1
+end
+node 34 Output Output
+  pos 8760 -5900
+  flags 1 0 1 0
+  i recordFps 30
+  b includeAudio 0
+  i imageFormat 0
+  i videoFormat 0
+  s exportImagePath 
+  s recordVideoPath 
+end
+node 35 Effects glitch
+  pos 8340 -5600
+  flags 1 0 1 0
+  f uKind 2
+  f uAmount 0.100000001
+  f uDetail 0.749000013
+  f uSpeed 2.51999998
+  f uSeed 0
+end
+node 36 Feedback Feedback
+  pos 7800 -5140
+  flags 0 0 1 0
+  f delayFrames 1
+end
+node 37 Compositing Blend
+  pos 7720 -5620
+  flags 1 0 1 0
+  i mode 12
+  f mix 0.802999973
+end
+node 38 Effects transform
+  pos 8000 -5740
+  flags 1 0 1 0
+  f uTranslateX 0.00999999978
+  f uTranslateY 0
+  f uScale 1
+  f uScaleX 1
+  f uScaleY 1
+  f uRotation 0
+end
+node 39 Color color adjustments
+  pos 8100 -5140
+  flags 1 0 1 0
+  f uBrightness 0
+  f uContrast 0
+  f uBlackPoint 0.240999997
+  f uWhitePoint 0.68900001
+  f uGamma 1
+  f uCyanRed -0.344000012
+  f uMagentaGreen -0.200000003
+  f uYellowBlue 0.256000012
+  f uHueShift 0.338999987
+  f uSaturation 0.63499999
+  f uLightness -0.118000001
+  f uVibrance 1.03100002
+  f uShadows 0
+  f uMidtones 0
+  f uHighlights 0
+  f uContrastPivot 0
+  c uRedRow 1 0 0
+  c uGreenRow 0 1 0
+  c uBlueRow 0 0 1
+  f uBWEnabled 0
+  f uRedWeight 0.298999995
+  f uGreenWeight 0.587000012
+  f uBlueWeight 0.114
+end
+node 40 Effects addnoise
+  pos 8480 -5120
+  flags 1 0 1 0
+  f uAmount 0.00999999978
+end
+node 41 Output Output
+  pos 8780 -5100
+  flags 1 0 1 0
+  i recordFps 60
+  b includeAudio 0
+  i imageFormat 0
+  i videoFormat 1
+  s exportImagePath 
+  s recordVideoPath 
+end
+node 42 Output Output
+  pos 7660 -6220
+  flags 1 0 1 0
+  i recordFps 60
+  b includeAudio 0
+  i imageFormat 0
+  i videoFormat 1
+  s exportImagePath 
+  s recordVideoPath 
+end
+cable 4 0 2
+cable 6 0 4
+cable 8 0 6
+cable 9 0 12
+cable 10 0 9
+cable 11 0 8
+cable 11 1 10
+cable 11 2 20
+cable 16 0 15
+cable 17 0 15
+cable 18 0 16
+cable 18 1 17
+cable 20 0 18
+cable 20 1 19
+cable 21 0 11
+cable 22 0 21
+cable 24 0 23
+cable 25 0 22
+cable 25 1 24
+cable 25 2 29
+cable 29 0 28
+cable 30 0 25
+cable 33 0 25
+cable 35 0 38
+cable 36 0 35
+cable 37 0 33
+cable 37 1 36
+cable 38 0 37
+cable 39 0 36
+cable 40 0 39
+cable 41 0 40
+cable 42 0 30
+geo 2 0 3
+geo 3 0 31
+mod 1 3 26 0 0 1 -0.633000016
+mod 1 5 5 0 0 1 0.5
+mod 2 6 27 0 0 1 180
+mod 12 2 13 0 0 1 0.368999988
+mod 12 4 14 0 0 1 0.5
+mod 16 5 32 0 0 1 -2.23000002
+mod 19 3 14 0 0 1 0.5
+mod 19 4 13 0 0 1 0.5
+pal 6 0 7 0
+pal 6 1 7 1
+pal 6 2 7 2
+pal 6 3 7 3
+pal 6 4 7 4
+expr 10 0 4/7
+expr 17 0 -3/7

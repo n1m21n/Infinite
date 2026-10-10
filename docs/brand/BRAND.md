@@ -480,7 +480,7 @@ Audit after Romaniuk, *Building Distinctive Brand Assets* (2018): spend where an
 | Surface | State (2026-10-10) |
 |---|---|
 | `website/` | Done: links `brand.css`, palette aliases brand roles, springs by name, no retired colours (`brand_lint.py` guards it; illustration colours are baselined) |
-| `website/glass.css` | Open: glass only behind short labels, 72 to 78% opacity |
+| `website/glass.css` | Done: cards are solid surface-1, glass only behind labels at 76 to 78%, no outline rings, reduced transparency handled |
 | motion-film skills | Done: colours migrated, house style points at `brand.json` and the 3D kit |
 | `~/films/inside-infinite` palette | Open: Moon `#EEF1FA` ink |
 | 3D nodes in films | Done: import the `.glb` files or build with `build_3d.py` |
