@@ -1,0 +1,37 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Liquid Glass",
+    "author": "Infinite",
+    "description": "A frosted, refracting glass pane over whatever is behind it: bent edges, a colour split and a lit rim.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "input pixel image img;\nparam float cx = 0.5 [0.0, 1.0];\nparam float cy = 0.5 [0.0, 1.0];\nparam float halfW = 0.42 [0.05, 1.2];\nparam float halfH = 0.2 [0.05, 0.6];\nparam float radius = 0.12 [0.0, 0.6];\nparam float bezel = 0.08 [0.01, 0.4];\nparam float bend = 0.07 [0.0, 0.3];\nparam float frost = 0.85 [0.0, 1.0];\nparam float blurSize = 0.02 [0.0, 0.08];\nparam float chroma = 0.1 [0.0, 0.4];\nparam float tint = 0.3 [0.0, 1.0];\nparam float tintR = 0.09 [0.0, 1.0];\nparam float tintG = 0.105 [0.0, 1.0];\nparam float tintB = 0.2 [0.0, 1.0];\nparam float shine = 0.035 [0.0, 0.3];\nparam float rimWidth = 0.004 [0.001, 0.02];\nparam float shadow = 0.4 [0.0, 1.0];\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nctr = vec2((cx - 0.5) * aspect, cy - 0.5);\nrr = min(radius, min(halfW, halfH));\npc = p - ctr;\nq = abs(pc) - (vec2(halfW, halfH) - vec2(rr));\nmq = max(q, vec2(0.0));\nlq = length(mq);\nd = lq + min(max(q.x, q.y), 0.0) - rr;\naxis = vec2(step(q.y, q.x), 1.0 - step(q.y, q.x));\nnrm = sign(pc) * mix(axis, mq / (lq + 0.00001), step(0.00001, lq));\ndi = max(-d, 0.0);\nk = 1.0 - clamp(di / bezel, 0.0, 1.0);\nk = k * k;\noff = nrm * bend * k;\noffuv = vec2(off.x / aspect, off.y);\nbc = uv + offuv;\nsr = img(uv + offuv * (1.0 + chroma)).r;\nsg = img(bc).g;\nsb = img(uv + offuv * (1.0 - chroma)).b;\nsharp = vec3(sr, sg, sb);\nbx = vec2(blurSize / aspect, 0.0);\nby = vec2(0.0, blurSize);\nbd = vec2(blurSize / aspect, blurSize) * 0.7;\nbe = vec2(blurSize / aspect, -blurSize) * 0.7;\nsoft = img(bc).rgb;\nsoft = soft + img(bc + bx).rgb + img(bc - bx).rgb + img(bc + by).rgb + img(bc - by).rgb;\nsoft = soft + img(bc + bd).rgb + img(bc - bd).rgb + img(bc + be).rgb + img(bc - be).rgb;\nsoft = soft / 9.0;\nrgb = mix(sharp, soft, frost);\nrgb = mix(rgb, vec3(tintR, tintG, tintB), tint) + vec3(shine);\nldir = normalize(vec2(-0.55, 0.85));\nlit = clamp(dot(nrm, ldir), 0.0, 1.0);\ndark = clamp(dot(-nrm, ldir), 0.0, 1.0);\nrim = 1.0 - smoothstep(0.0, rimWidth, di);\nglow = 1.0 - smoothstep(0.0, bezel * 0.9, di);\nrgb = rgb + vec3(1.0, 0.97, 0.95) * (rim * (0.18 + 0.72 * lit * lit) + glow * 0.07 * lit);\nrgb = rgb + vec3(0.75, 0.82, 1.0) * rim * 0.22 * dark * dark;\naa = 1.2 / res.y;\ncover = 1.0 - smoothstep(-aa, aa, d);\nback = img(uv);\nunder = 1.0 - shadow * (1.0 - smoothstep(0.0, 0.09, max(d, 0.0))) * step(0.0, d);\ncol = mix(back.rgb * under, rgb, cover);\nalpha = back.a;\n",
+    "params": {
+      "cx": 0.5,
+      "cy": 0.5,
+      "halfW": 0.42,
+      "halfH": 0.2,
+      "radius": 0.12,
+      "bezel": 0.08,
+      "bend": 0.07,
+      "frost": 0.85,
+      "blurSize": 0.02,
+      "chroma": 0.1,
+      "tint": 0.3,
+      "tintR": 0.09,
+      "tintG": 0.105,
+      "tintB": 0.2,
+      "shine": 0.035,
+      "rimWidth": 0.004,
+      "shadow": 0.4
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

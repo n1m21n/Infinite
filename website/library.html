@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <title>Infinite — Library</title>
+  <meta name="description" content="Free downloadable Field devices for Infinite: dither, liquid glass, lenses, generators. Drop a file in and use it as a node.">
+  <link rel="canonical" href="https://n1m21n.github.io/Infinite/library.html">
+  <meta property="og:title" content="Infinite — Library">
+  <meta property="og:description" content="Free downloadable Field devices for Infinite.">
+  <meta property="og:image" content="https://n1m21n.github.io/Infinite/assets/library/previews/liquid-glass.jpg">
+  <meta property="og:url" content="https://n1m21n.github.io/Infinite/library.html">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="library.css?v=1">
+</head>
+<body>
+  <header class="bar">
+    <a href="index.html" class="brand"><img src="assets/icon-96.png" alt="" width="28" height="28"><span>Infinite</span></a>
+    <nav aria-label="Main">
+      <a href="index.html#nodes">Nodes</a>
+      <a href="artworks.html">Art Gallery</a>
+      <a href="library.html" aria-current="page">Library</a>
+      <a href="index.html#setup">Setup</a>
+    </nav>
+  </header>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">made for the films, yours to use</p>
+      <h1>Library</h1>
+      <p class="lede">Small Field devices lifted from the Infinite films. Download one, drop it into Infinite, and it shows up as a node you can patch and modulate.</p>
+    </section>
+
+    <div class="toolbar">
+      <div class="chips" id="chips" role="group" aria-label="Filter the library"></div>
+      <span class="spacer"></span>
+      <span class="count" id="count" aria-live="polite"></span>
+      <a class="all" href="assets/library/infinite-library.zip" download><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 20h16"/></svg>Download all (.zip)</a>
+    </div>
+
+    <div class="grid" id="grid" aria-live="polite"></div>
+    <p class="empty" id="empty" hidden>Nothing matches that filter.</p>
+
+    <section class="how" id="install">
+      <div><h3>Install</h3>
+        <ol><li>Download a <code>.field</code> file.</li><li>Add a Field Pixel node and press <b>Import</b> in its Devices row.</li><li>Pick the file. The device loads into the node, and you can save it to your own Devices list.</li></ol></div>
+      <div><h3>Filters and generators</h3>
+        <p><b>Filters</b> read an image you patch in (the small inset in a preview is the source). <b>Generators</b> draw on their own and need no input.</p></div>
+      <div><h3>Free for now</h3>
+        <p>Everything here is free while the library grows. Each device is plain Field code you can open and edit.</p></div>
+    </section>
+  </main>
+  <script src="library.js?v=1"></script>
+</body>
+</html>

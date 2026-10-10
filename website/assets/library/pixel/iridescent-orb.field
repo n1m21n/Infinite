@@ -1,0 +1,28 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Iridescent Orb",
+    "author": "Infinite",
+    "description": "A soft holographic pastel ball that slowly spins its colours, with a white sheen and a gloss spot.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float size = 0.3 [0.05, 0.6];\nparam float spin = 40.0 [-360.0, 360.0];\nparam float wobble = 0.04 [0.0, 0.15];\nparam float sheen = 0.75 [0.0, 1.0];\nparam float gloss = 0.9 [0.0, 1.0];\nparam float paperR = 0.082 [0.0, 1.0];\nparam float paperG = 0.098 [0.0, 1.0];\nparam float paperB = 0.188 [0.0, 1.0];\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\nang = atan2(p.y, p.x);\nrad = size * (1.0 + wobble * sin(3.0 * ang + t * 1.1) + wobble * 0.5 * sin(5.0 * ang - t * 1.3));\naa = 1.5 / res.y;\nedge = 1.0 - smoothstep(rad - aa, rad, r);\nu = fract(ang / 6.283185 + spin * t / 360.0);\ns = u * 5.0;\nw0 = max(0.0, 1.0 - abs(s)) + max(0.0, 1.0 - abs(s - 5.0));\nw1 = max(0.0, 1.0 - abs(s - 1.0));\nw2 = max(0.0, 1.0 - abs(s - 2.0));\nw3 = max(0.0, 1.0 - abs(s - 3.0));\nw4 = max(0.0, 1.0 - abs(s - 4.0));\nbody = vec3(1.0, 0.702, 0.851) * w0 + vec3(0.78, 0.722, 1.0) * w1 + vec3(0.659, 0.894, 1.0) * w2;\nbody = body + vec3(0.71, 0.961, 0.863) * w3 + vec3(1.0, 0.89, 0.69) * w4;\nsp = vec2(-0.3, 0.35) * size;\nsh = clamp(1.0 - length(p - sp) / (size * 1.2), 0.0, 1.0) * 0.75 * sheen;\nbody = mix(body, vec3(1.0), sh);\nrim = smoothstep(0.7, 1.0, r / (size * 1.05)) * 0.22;\nbody = mix(body, vec3(0.416, 0.361, 0.91), rim);\ngp = vec2(-0.34, 0.4) * size;\nspot = (1.0 - smoothstep(0.0, size * 0.14, length(p - gp))) * gloss;\nbody = mix(body, vec3(1.0), spot);\ncol = mix(vec3(paperR, paperG, paperB), body, edge);\nalpha = 1.0;\n",
+    "params": {
+      "size": 0.3,
+      "spin": 40.0,
+      "wobble": 0.04,
+      "sheen": 0.75,
+      "gloss": 0.9,
+      "paperR": 0.082,
+      "paperG": 0.098,
+      "paperB": 0.188
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}
