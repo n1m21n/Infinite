@@ -343,6 +343,7 @@ namespace app
          { "transform", I18N_KEY("Translates, scales, rotates, and flips (horizontal/vertical) the whole image. Scale X/Y let you stretch non-uniformly on top of the overall Scale. Crop X/Y symmetrically crop the source in from each axis before the rest of the transform is applied.") },
          { "invert", I18N_KEY("Inverts every colour channel (alpha untouched) - a photographic negative. No parameters.") },
          { "posterize", I18N_KEY("Reduces the image to a fixed number of tonal Levels per channel, producing flat colour bands.") },
+         { "dither", I18N_KEY("Reduces the image to a few Levels per channel like Posterize, but spreads the rounding error as a fixed pattern so gradients keep their tone instead of banding. Mode picks an ordered Bayer matrix (2, 4 or 8) or a noise pattern; Mix blends back toward the original.") },
          { "threshold", I18N_KEY("Converts to pure black or white based on luminance, split at Threshold.") },
          { "exposure", I18N_KEY("Multiplies brightness by powers of two, like a camera's exposure stop (compare Levels' linear/gamma remap).") },
          { "bloom", I18N_KEY("Isolates pixels above a brightness Threshold, blurs them outward by Radius, and adds the glow back at Intensity - classic HDR-style bloom.") },
