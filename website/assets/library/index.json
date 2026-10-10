@@ -17,7 +17,8 @@
       "params": 9,
       "file": "assets/library/pixel/ordered-dither.field",
       "preview": "assets/library/previews/ordered-dither.jpg",
-      "bytes": 1404
+      "bytes": 1404,
+      "category": "Pixel"
     },
     {
       "id": "liquid-glass",
@@ -34,7 +35,8 @@
       "params": 17,
       "file": "assets/library/pixel/liquid-glass.field",
       "preview": "assets/library/previews/liquid-glass.jpg",
-      "bytes": 3171
+      "bytes": 3171,
+      "category": "Pixel"
     },
     {
       "id": "metaball-lens",
@@ -51,7 +53,8 @@
       "params": 9,
       "file": "assets/library/pixel/metaball-lens.field",
       "preview": "assets/library/previews/metaball-lens.jpg",
-      "bytes": 2556
+      "bytes": 2556,
+      "category": "Pixel"
     },
     {
       "id": "pixel-plate",
@@ -68,7 +71,8 @@
       "params": 11,
       "file": "assets/library/pixel/pixel-plate.field",
       "preview": "assets/library/previews/pixel-plate.jpg",
-      "bytes": 1893
+      "bytes": 1893,
+      "category": "Pixel"
     },
     {
       "id": "iridescent-orb",
@@ -85,7 +89,8 @@
       "params": 8,
       "file": "assets/library/pixel/iridescent-orb.field",
       "preview": "assets/library/previews/iridescent-orb.jpg",
-      "bytes": 2031
+      "bytes": 2031,
+      "category": "Pixel"
     },
     {
       "id": "phyllotaxis-bloom",
@@ -102,7 +107,8 @@
       "params": 7,
       "file": "assets/library/pixel/phyllotaxis-bloom.field",
       "preview": "assets/library/previews/phyllotaxis-bloom.jpg",
-      "bytes": 4065
+      "bytes": 4065,
+      "category": "Pixel"
     }
   ]
 }

@@ -165,7 +165,7 @@ def main():
             print("     preview ->", os.path.relpath(make_preview(e, tmp), ROOT))
         items.append({
             "id": e["id"], "name": e["name"], "kind": e["kind"], "tags": e["tags"],
-            "description": e["blurb"], "price": 0, "domain": "pixel", "params": nparams,
+            "description": e["blurb"], "price": 0, "domain": "pixel", "category": "Pixel", "params": nparams,
             "file": f"assets/library/pixel/{e['id']}.field", "preview": f"assets/library/previews/{e['id']}.jpg",
             "bytes": os.path.getsize(path),
         })
