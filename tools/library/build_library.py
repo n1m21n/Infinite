@@ -114,23 +114,32 @@ def render(code_line, t, tmp, name):
     return pngs[0]
 
 
+SOURCE = os.path.join(os.path.dirname(__file__), "src", "source.jpg")  # NASA/ESA Hubble, Pillars of Creation (public domain)
+
+
 def make_preview(entry, tmp):
+    import numpy as np
     from PIL import Image, ImageDraw
+    import field_np
 
     code = clean(entry["code"])
-    is_filter = "input pixel image" in code
-    result = render(one_line(substitute_img(code)), entry["t"], tmp, entry["id"])
-    img = Image.open(result).convert("RGB").resize((PW, PH), Image.LANCZOS)
-    if is_filter:
-        src = render("col = " + src_expr("uv") + ".rgb;", 0.0, tmp, entry["id"] + "_src")
-        s = Image.open(src).convert("RGB").resize((PW // 5, PH // 5), Image.LANCZOS)
-        pad = 18
+    if "input pixel image" in code:
+        # Filters run on a real photo: the headless app cannot wire an image into a Field Pixel, so field_np evaluates the same code.
+        src = Image.open(SOURCE).convert("RGB")
+        ph = np.asarray(src, dtype=float) / 255
+        ph = np.concatenate([ph, np.ones(ph.shape[:2] + (1,))], -1)
+        img = Image.fromarray(field_np.run(code, ph, 900, 600, entry["t"]))
+        s = src.resize((900 // 5, 600 // 5), Image.LANCZOS)
+        pad = 14
         d = ImageDraw.Draw(img)
-        d.rounded_rectangle((pad - 3, PH - pad - s.height - 3, pad + s.width + 3, PH - pad + 3), 8, fill=(255, 255, 255))
-        img.paste(s, (pad, PH - pad - s.height))
+        d.rounded_rectangle((pad - 3, 600 - pad - s.height - 3, pad + s.width + 3, 600 - pad + 3), 8, fill=(255, 255, 255))
+        img.paste(s, (pad, 600 - pad - s.height))
+    else:
+        result = render(one_line(code), entry["t"], tmp, entry["id"])
+        img = Image.open(result).convert("RGB").resize((900, 600), Image.LANCZOS)
     dst = os.path.join(OUT, "previews", entry["id"] + ".jpg")
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    img.resize((900, 600), Image.LANCZOS).save(dst, quality=84, optimize=True)
+    img.save(dst, quality=86, optimize=True)
     return dst
 
 
