@@ -1,0 +1,27 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Phyllotaxis Bloom",
+    "author": "Infinite",
+    "description": "A sunflower of golden-angle seeds, each dot coloured along the spiral. Seed count and turn are live.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float seeds = 420.0 [60.0, 1500.0];\nparam float dotSize = 0.8 [0.2, 1.0];\nparam float turn = 8.0 [-90.0, 90.0];\nparam float hueSpan = 0.6 [0.0, 1.5];\nparam float paperR = 0.082 [0.0, 1.0];\nparam float paperG = 0.098 [0.0, 1.0];\nparam float paperB = 0.188 [0.0, 1.0];\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nsc = 0.46 / sqrt(seeds);\nrot = turn * 0.0174533 * t;\nr = length(p);\nphi = fract((atan2(p.y, p.x) - rot) / 6.283185);\ns = r * r / (sc * sc);\nfa = 34.0 * phi + s * 0.01315562;\nfb = 0.021286236 * s - 21.0 * phi;\nra = floor(fa + 0.5);\nrb = floor(fb + 0.5);\nkk0 = 21.0 * (ra + (-1.0)) + 34.0 * (rb + (-1.0));\nok0 = step(0.0, kk0) * step(kk0, seeds - 1.0);\nsa0 = kk0 * 2.399963 + rot;\nsp0 = sc * sqrt(max(kk0, 0.0)) * vec2(cos(sa0), sin(sa0));\ndk0 = length(p - sp0) + (1.0 - ok0) * 10.0;\ndm0 = dk0;\nkb0 = kk0;\nkk1 = 21.0 * (ra + (-1.0)) + 34.0 * (rb + (0.0));\nok1 = step(0.0, kk1) * step(kk1, seeds - 1.0);\nsa1 = kk1 * 2.399963 + rot;\nsp1 = sc * sqrt(max(kk1, 0.0)) * vec2(cos(sa1), sin(sa1));\ndk1 = length(p - sp1) + (1.0 - ok1) * 10.0;\ndm1 = min(dm0, dk1);\nkb1 = mix(kb0, kk1, step(dk1, dm0));\nkk2 = 21.0 * (ra + (-1.0)) + 34.0 * (rb + (1.0));\nok2 = step(0.0, kk2) * step(kk2, seeds - 1.0);\nsa2 = kk2 * 2.399963 + rot;\nsp2 = sc * sqrt(max(kk2, 0.0)) * vec2(cos(sa2), sin(sa2));\ndk2 = length(p - sp2) + (1.0 - ok2) * 10.0;\ndm2 = min(dm1, dk2);\nkb2 = mix(kb1, kk2, step(dk2, dm1));\nkk3 = 21.0 * (ra + (0.0)) + 34.0 * (rb + (-1.0));\nok3 = step(0.0, kk3) * step(kk3, seeds - 1.0);\nsa3 = kk3 * 2.399963 + rot;\nsp3 = sc * sqrt(max(kk3, 0.0)) * vec2(cos(sa3), sin(sa3));\ndk3 = length(p - sp3) + (1.0 - ok3) * 10.0;\ndm3 = min(dm2, dk3);\nkb3 = mix(kb2, kk3, step(dk3, dm2));\nkk4 = 21.0 * (ra + (0.0)) + 34.0 * (rb + (0.0));\nok4 = step(0.0, kk4) * step(kk4, seeds - 1.0);\nsa4 = kk4 * 2.399963 + rot;\nsp4 = sc * sqrt(max(kk4, 0.0)) * vec2(cos(sa4), sin(sa4));\ndk4 = length(p - sp4) + (1.0 - ok4) * 10.0;\ndm4 = min(dm3, dk4);\nkb4 = mix(kb3, kk4, step(dk4, dm3));\nkk5 = 21.0 * (ra + (0.0)) + 34.0 * (rb + (1.0));\nok5 = step(0.0, kk5) * step(kk5, seeds - 1.0);\nsa5 = kk5 * 2.399963 + rot;\nsp5 = sc * sqrt(max(kk5, 0.0)) * vec2(cos(sa5), sin(sa5));\ndk5 = length(p - sp5) + (1.0 - ok5) * 10.0;\ndm5 = min(dm4, dk5);\nkb5 = mix(kb4, kk5, step(dk5, dm4));\nkk6 = 21.0 * (ra + (1.0)) + 34.0 * (rb + (-1.0));\nok6 = step(0.0, kk6) * step(kk6, seeds - 1.0);\nsa6 = kk6 * 2.399963 + rot;\nsp6 = sc * sqrt(max(kk6, 0.0)) * vec2(cos(sa6), sin(sa6));\ndk6 = length(p - sp6) + (1.0 - ok6) * 10.0;\ndm6 = min(dm5, dk6);\nkb6 = mix(kb5, kk6, step(dk6, dm5));\nkk7 = 21.0 * (ra + (1.0)) + 34.0 * (rb + (0.0));\nok7 = step(0.0, kk7) * step(kk7, seeds - 1.0);\nsa7 = kk7 * 2.399963 + rot;\nsp7 = sc * sqrt(max(kk7, 0.0)) * vec2(cos(sa7), sin(sa7));\ndk7 = length(p - sp7) + (1.0 - ok7) * 10.0;\ndm7 = min(dm6, dk7);\nkb7 = mix(kb6, kk7, step(dk7, dm6));\nkk8 = 21.0 * (ra + (1.0)) + 34.0 * (rb + (1.0));\nok8 = step(0.0, kk8) * step(kk8, seeds - 1.0);\nsa8 = kk8 * 2.399963 + rot;\nsp8 = sc * sqrt(max(kk8, 0.0)) * vec2(cos(sa8), sin(sa8));\ndk8 = length(p - sp8) + (1.0 - ok8) * 10.0;\ndm8 = min(dm7, dk8);\nkb8 = mix(kb7, kk8, step(dk8, dm7));\nrad = dotSize * sc * 0.95;\naa = 1.5 / res.y;\ncover = 1.0 - smoothstep(rad - aa, rad, dm8);\npc = 0.5 + 0.5 * cos(6.283185 * (vec3(0.0, 0.33, 0.67) + hueSpan * kb8 / seeds + t * 0.04));\nshade = 1.0 - 0.35 * smoothstep(0.0, rad, dm8);\ncol = mix(vec3(paperR, paperG, paperB), pc * shade, cover);\nalpha = 1.0;\n",
+    "params": {
+      "seeds": 420.0,
+      "dotSize": 0.8,
+      "turn": 8.0,
+      "hueSpan": 0.6,
+      "paperR": 0.082,
+      "paperG": 0.098,
+      "paperB": 0.188
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

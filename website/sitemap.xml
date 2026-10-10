@@ -2,5 +2,6 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://n1m21n.github.io/Infinite/</loc><priority>1.0</priority></url>
   <url><loc>https://n1m21n.github.io/Infinite/artworks.html</loc><priority>0.6</priority></url>
+  <url><loc>https://n1m21n.github.io/Infinite/library.html</loc><priority>0.6</priority></url>
   <url><loc>https://n1m21n.github.io/Infinite/slides.html</loc><priority>0.4</priority></url>
 </urlset>
