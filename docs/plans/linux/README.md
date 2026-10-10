@@ -1,5 +1,7 @@
 # Linux Port — Master Plan
 
+> **Status: done (2026-10-09, owner).** The Status table at the bottom is the per-phase record.
+
 Paste the relevant `phase-NN-*.md` into a fresh Claude Code session. This
 README is the shared context every phase assumes. Read it first, every time.
 

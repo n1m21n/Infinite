@@ -150,13 +150,7 @@ void DrawNodeBodies(FrameCtx& fc)
                gHeadlessDrawn.insert(gn.index);
          }
 
-         // Canvas level of detail: zoomed out past kLodZoom the param section collapses exactly as if the eye were
-         // closed (title, preview and pins stay; bound params keep registering through the register-only pass, so
-         // modulation, ordinals and pins do not move). The saved gn.showParams is untouched: zoom back in and the
-         // section returns.
-         constexpr float kLodZoom = 0.45f;
-         const float canvasZoom = ed::CanvasToScreen(ImVec2(1.0f, 0.0f)).x - ed::CanvasToScreen(ImVec2(0.0f, 0.0f)).x; // screen px per canvas px
-         const bool paramsOpen = gn.showParams && canvasZoom >= kLodZoom;
+         const bool paramsOpen = gn.showParams;
 
          // Category tint: same idea as DrawGroupNode's stored colour, but from
          // the static per-category table since categories are a fixed
@@ -681,11 +675,16 @@ void DrawNodeBodies(FrameCtx& fc)
             {
                if (EyeToggle(gn.showParams))
                   gn.showParams = !gn.showParams;
-               ImGui::SameLine();
             }
             // R8: a node that cannot bypass (2+ inputs) has no hole where the power icon would be; the icons pack left.
+            // The SameLine lives here, not after the eye: with nothing to follow, it would glue the next control
+            // (Output's path field) onto the eye's row.
             if (CanBypass(gn))
+            {
+               if (!isMacroNode)
+                  ImGui::SameLine();
                drawBypassToggle();
+            }
             // Mini viewport toggle, only for nodes that actually have a mesh to
             // show - excludes CameraNode/LightNode, which appear in the stat-box
             // branch above but implement no geometry interface, and

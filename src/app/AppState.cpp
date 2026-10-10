@@ -970,6 +970,7 @@ bool gHeadlessNeedProbe = false;
 #endif
 
    bool gSettingsOpen = false;
+   bool gTemplatesOpen = false;
 
    bool gShowUpdateCheckModal = false;
    bool gShowAboutModal = false;

@@ -1,5 +1,7 @@
 # Arrangement Timeline — build plan
 
+> **Overall: done (2026-10-09, owner).** The WP status in `overhaul-prompt.md` is the history.
+
 > **Superseded in part.** `overhaul-prompt.md` in this folder replaces phases
 > 3, 4, 5, 7 and 8 of the build order below and is the **live plan** — it
 > carries the current WP status (WP0-WP3 done, WP4 next) and an *As built*

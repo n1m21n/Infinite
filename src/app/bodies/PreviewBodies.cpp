@@ -587,7 +587,20 @@ namespace app
    // Placeholder text for an empty preview: says *why* it's empty.
    const char* EmptyPreviewLabel(INode* node, const char* fallback)
    {
-      return node->bypassed ? "bypassed" : fallback;
+      if (node->bypassed)
+         return "bypassed";
+      // A Group 3D feeding anything but Render 3D / another group hands over no single mesh: say so, not just "no geometry".
+      if (auto* src = dynamic_cast<IGeometrySource*>(node);
+          src != nullptr && dynamic_cast<Group3DNode*>(node) == nullptr && std::strcmp(fallback, "no geometry") == 0)
+      {
+         for (int slot = 0; slot < 8; slot++)
+         {
+            IGeometrySource** in = node->GeometryInputSlot(slot);
+            if (in != nullptr && *in != nullptr && dynamic_cast<Group3DNode*>(*in) != nullptr)
+               return "group has no single mesh - use Join Geometry";
+         }
+      }
+      return fallback;
    }
 
 

@@ -1978,6 +1978,183 @@ void FrameTest_SIZETEST(int frameId, GLFWwindow* window)
       }
 }
 
+// INFINITE_NODEDRAGWIDTHTEST: every registered node type, one at a time, spawned with both param sections open and
+// dragged by its left padding with a real (synthetic) mouse gesture. A node's width must not change while it rests or
+// while it is dragged: a width that feeds on screen position or on last frame's width grows every frame of a drag.
+// INFINITE_NODEDRAGWIDTHTEST=<type name> runs just that type.
+void FrameTest_NODEDRAGWIDTHTEST(int frameId, GLFWwindow* window)
+{
+   const char* only = getenv("INFINITE_NODEDRAGWIDTHTEST");
+   if (only == nullptr || frameId < 2)
+      return;
+   static bool sUnbuffered = false;
+   if (!sUnbuffered) { setvbuf(stdout, nullptr, _IONBF, 0); sUnbuffered = true; }
+   ImGuiIO& tio = ImGui::GetIO();
+   tio.ConfigInputTrickleEventQueue = false;
+
+   // INFINITE_NODEDRAGWIDTHZOOM=<notches>: scroll the canvas first (negative zooms out) so the drag runs off zoom 1.
+   if (const char* z = getenv("INFINITE_NODEDRAGWIDTHZOOM"); z != nullptr && frameId >= 2 && frameId < 2 + std::abs(atoi(z)))
+   {
+      tio.AddMousePosEvent(tio.DisplaySize.x * 0.5f, tio.DisplaySize.y * 0.5f);
+      tio.AddMouseWheelEvent(0.0f, atoi(z) < 0 ? -1.0f : 1.0f);
+      return;
+   }
+   if (const char* z = getenv("INFINITE_NODEDRAGWIDTHZOOM"); z != nullptr && frameId < 4 + std::abs(atoi(z)))
+      return;
+
+   // With INFINITE_LOADPATCH the nodes already in the patch are the ones dragged, each lifted to the top and moved under
+   // the pointer first, so a real patch's state (cables, bindings, zoom, bound params) is what gets tested.
+   const bool patchMode = getenv("INFINITE_LOADPATCH") != nullptr;
+   struct Item { std::string name, category; };
+   static std::vector<Item> sItems;
+   static size_t sNext = 0;
+   static int sIndex = -1, sStart = 0, sFailures = 0, sSkipped = 0, sChecked = 0;
+   static float sRestW = 0.0f, sMaxW = 0.0f;
+   static ImVec2 sGrab(0, 0), sRestPos(0, 0);
+   static bool sGrabbed = false;
+   static std::vector<int> sPatchIdx;
+   static bool sPatchSnap = false;
+   if (patchMode && !sPatchSnap && frameId >= 40)
+   {
+      sPatchSnap = true;
+      for (const GraphNode& n : gNodes)
+         sPatchIdx.push_back(n.index);
+      sItems.resize(sPatchIdx.size());
+      printf("NODEDRAGWIDTHTEST %zu patch node(s)\n", sItems.size());
+      return;
+   }
+   if (patchMode && !sPatchSnap)
+      return;
+   if (!patchMode && sItems.empty() && sNext == 0)
+   {
+      for (const std::string& category : NodeFactory::Instance().GetCategories())
+         for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+            if (only[0] == '\0' || only[0] == '1' || name == only)
+               sItems.push_back({ name, category });
+      printf("NODEDRAGWIDTHTEST %zu node type(s)\n", sItems.size());
+      while (!gNodes.empty())   // the generic fixture graph (Shape + Output) would sit under the nodes under test
+         RemoveNodeByIndex(gNodes.back().index);
+      return;
+   }
+
+   auto finish = [&]() {
+      if (sFailures == 0)
+         printf("NODEDRAGWIDTHTEST %d nodes dragged, width held  OK (%d skipped: grab point off-screen)\n", sChecked, sSkipped);
+      else
+         printf("NODEDRAGWIDTHTEST FAIL: %d of %d node(s) changed width\n", sFailures, sChecked);
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+   };
+
+   if (sIndex < 0)
+   {
+      if (sNext >= sItems.size())
+      {
+         finish();
+         return;
+      }
+      const Item& it = sItems[sNext];
+      GraphNode* gn = patchMode ? FindNodeByIndex(sPatchIdx[sNext]) : SpawnNode(it.name, it.category, 20.0f, 20.0f);
+      sNext++;
+      if (gn == nullptr)
+         return;
+      if (patchMode)
+      {
+         ed::SetNodeZPosition(gn->NodeId(), 1000.0f);
+         ed::SetNodePosition(gn->NodeId(), ed::ScreenToCanvas(ImVec2(150.0f, 120.0f)));
+      }
+      else
+      {
+         gn->showParams = true;
+         gn->showAdvancedParams = true;
+      }
+      sIndex = gn->index;
+      sStart = frameId;
+      sMaxW = 0.0f;
+      sGrabbed = false;
+      return;
+   }
+
+   GraphNode* gn = FindNodeByIndex(sIndex);
+   if (gn == nullptr)
+   {
+      sIndex = -1;
+      return;
+   }
+   const int r = frameId - sStart;
+   const ImVec2 pos = ed::GetNodePosition(gn->NodeId());
+   const ImVec2 size = ed::GetNodeSize(gn->NodeId());
+   const char* typeName = gn->typeName.c_str();
+   auto fail = [&](const char* when) {
+      printf("NODEDRAGWIDTHTEST FAIL: %s is %.1f wide %s, %.1f at rest\n", typeName, size.x, when, sRestW);
+      sFailures++;
+   };
+
+   if (r < 6)
+   {
+      // Rest: the width must settle and then hold with no input at all.
+      if (r == 4)
+         sRestW = size.x;
+      else if (r == 5 && std::fabs(size.x - sRestW) > 0.5f)
+         fail("after settling without any drag");
+      return;
+   }
+   if (r == 6)
+   {
+      sRestPos = pos;
+      // Left padding strip: inside the node, between its edge and the first control.
+      sGrab = ed::CanvasToScreen(ImVec2(pos.x + 3.0f, pos.y + std::min(size.y * 0.5f, 60.0f)));
+      const ImVec2 d = tio.DisplaySize;
+      sGrabbed = sGrab.x > 2.0f && sGrab.y > 2.0f && sGrab.x < d.x - 90.0f && sGrab.y < d.y - 60.0f;
+      if (!sGrabbed)
+         sSkipped++;
+      else
+         tio.AddMousePosEvent(sGrab.x, sGrab.y);
+      return;
+   }
+   if (sGrabbed && r >= 7 && r <= 13)
+   {
+      if (r == 7)
+         tio.AddMouseButtonEvent(0, true);
+      else if (r <= 12)
+         tio.AddMousePosEvent(sGrab.x + (float)(r - 7) * 12.0f, sGrab.y + (float)(r - 7) * 8.0f);
+      else
+         tio.AddMouseButtonEvent(0, false);
+      if (r >= 8)
+      {
+         sMaxW = std::max(sMaxW, size.x);
+         if (std::fabs(size.x - sRestW) > 0.5f)
+         {
+            fail("during the drag");
+            tio.AddMouseButtonEvent(0, false);
+            sIndex = -1;
+            if (!patchMode)
+               RemoveNodeByIndex(gn->index);
+            else
+               ed::SetNodeZPosition(gn->NodeId(), 0.0f);
+            return;
+         }
+      }
+      return;
+   }
+   if (r >= 16)
+   {
+      if (sGrabbed)
+      {
+         sChecked++;
+         const bool moved = std::fabs(pos.x - sRestPos.x) > 10.0f || std::fabs(pos.y - sRestPos.y) > 10.0f;
+         if (!moved)
+            printf("NODEDRAGWIDTHTEST note: %s did not move; the grab point hit a control, not the node\n", typeName);
+         if (std::fabs(size.x - sRestW) > 0.5f)
+            fail("after the drag");
+      }
+      sIndex = -1;
+      if (!patchMode)
+         RemoveNodeByIndex(gn->index);
+      else
+         ed::SetNodeZPosition(gn->NodeId(), 0.0f);
+   }
+}
+
 void FrameTest_SAMPLERDRAGTEST_2(int frameId, GLFWwindow* window)
 {
    if (getenv("INFINITE_SAMPLERDRAGTEST") != nullptr && !gNodes.empty())

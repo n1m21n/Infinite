@@ -21,8 +21,8 @@
 namespace FormParts
 {
    constexpr float kLabelW = 200.0f;
-   constexpr float kControlW = 220.0f;
-   constexpr float kSliderW = 150.0f;   // a bar with one number needs less run than a dropdown
+   constexpr float kControlW = 150.0f;
+   constexpr float kSliderW = kControlW;   // sliders, dropdowns and inputs share one width in Settings
    constexpr float kRowH = 28.0f;
 
    // The hairline edge every surface carries (same value the Library wells use).
@@ -98,18 +98,38 @@ namespace FormParts
       return r;
    }
 
-   inline bool BeginCombo(const char* label, const char* preview)
+   // Every Settings dropdown face is the same width (kControlW). A value too long for it is cut with an ellipsis and
+   // shows whole in a tooltip; the open list is free to grow to kListMaxW so every option reads in full.
+   inline bool BeginCombo(const char* label, const char* preview, float listMinW = 0.0f)
    {
+      constexpr float kListMaxW = 280.0f;
       Label(label);
       ImGui::SetNextItemWidth(kControlW);
       FieldWell::PushStyle(ImGui::GetID(Id(label).c_str()) ^ 0x9e3779b9u);
       MenuParts::PushPopupPad();
       ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(tok::space_3, ImGui::GetStyle().FramePadding.y));
-      const bool open = ImGui::BeginCombo(Id(label).c_str(), preview, ImGuiComboFlags_NoArrowButton);
+      std::string shown = preview;
+      const float room = kControlW - 2.0f * tok::space_3;
+      const bool cut = ImGui::CalcTextSize(preview).x > room;
+      if (cut)
+      {
+         while (shown.size() > 1 && ImGui::CalcTextSize((shown + "...").c_str()).x > room)
+         {
+            size_t n = shown.size() - 1;
+            while (n > 0 && (shown[n] & 0xC0) == 0x80)   // never split a UTF-8 sequence
+               n--;
+            shown.resize(n);
+         }
+         shown += "...";
+      }
+      ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(kControlW, listMinW), 0.0f), ImVec2(std::max(kListMaxW, listMinW), FLT_MAX));
+      const bool open = ImGui::BeginCombo(Id(label).c_str(), shown.c_str(), ImGuiComboFlags_NoArrowButton);
       ImGui::PopStyleVar(2);
       FieldWell::PopStyle();
       if (open)
          MenuParts::BeginContent();
+      else if (cut && ImGui::IsItemHovered())
+         ImGui::SetTooltip("%s", preview);
       return open;
    }
    inline void EndCombo()

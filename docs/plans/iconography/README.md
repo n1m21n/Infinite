@@ -1,6 +1,6 @@
 # Infinite design system: iconography, controls and chrome
 
-Status: planned (2026-10-08). Owner: "dive deep into our own iconography foundations... make our own icons from scratch that fit the branding."
+Status: done (2026-10-09, owner). The design system is in place: tokens, glyphs, UiType/UiLayout/UiInteract, chrome, canvas and node controls, node polish 2. Work lives on `feature/ui-canvas` (not yet merged into `main`). The STATUS table below is the history of how it got there. Origin: owner "dive deep into our own iconography foundations... make our own icons from scratch that fit the branding."
 Reference: Logic Pro screenshots (top bar, timeline header, sliders, browser table, accent picker). Borrow the *grammar*, never the glyphs.
 Skills to load before building: `infinite-design-system`, `node-ui-pillars`, `codebase-navigation`, `windows-parity`, `linux-parity`, `node-ui-sweep`, `panels-sweep`.
 

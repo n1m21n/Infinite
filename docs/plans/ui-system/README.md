@@ -1,6 +1,6 @@
 # Infinite UI system: analysis and approach
 
-Status: analysis, awaiting sign-off on sections 1–7 (2026-10-08). No code changes until signed off.
+Status: signed off 2026-10-08, built (2026-10-09, owner: the design system is in place). Architecture reference for the UI system; the tracker is the STATUS table in `docs/plans/iconography/README.md`.
 Tracker: the STATUS table in `docs/plans/iconography/README.md` stays the single tracker; this doc is the architecture behind it.
 Skills: `infinite-design-system`, `node-ui-pillars`, `codebase-navigation`, `windows-parity`, `linux-parity`.
 

@@ -4,6 +4,7 @@
 // The labels live on UndoEntry and are never written into a patch.
 #include "app/AppShared.h"
 #include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/components/PanelFrame.h"
 
 namespace app
@@ -71,11 +72,13 @@ namespace
       }
 
       ImGui::BeginChild("##historyrows", ImVec2(0, 0), false);
-      const float rowH = ImGui::GetTextLineHeight() + tok::space_2 * 1.5f;
+      // Same 24 pt pitch as every menu and dropdown list (MenuParts::kRow); rows butt against each other.
+      const float pitch = MenuParts::kRow;
+      const float rowH = pitch - ImGui::GetStyle().ItemSpacing.y;
       // Rows top to bottom: undone (farthest first), then the current edit, the past, and the start.
       const size_t total = nRedo + nUndo + 1;
       ImGuiListClipper clip;
-      clip.Begin((int)total, rowH);
+      clip.Begin((int)total, pitch);
       while (clip.Step())
       {
          for (int r = clip.DisplayStart; r < clip.DisplayEnd; r++)

@@ -1260,6 +1260,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          getenv("INFINITE_RECTEST") != nullptr || getenv("INFINITE_MODTEST") != nullptr ||
          getenv("INFINITE_RECTEARDOWNTEST") != nullptr ||
          getenv("INFINITE_SIZETEST") != nullptr || getenv("INFINITE_INPUTTEST") != nullptr ||
+         getenv("INFINITE_NODEDRAGWIDTHTEST") != nullptr ||
          getenv("INFINITE_DRAGTEST") != nullptr || getenv("INFINITE_COLORTEST") != nullptr ||
          getenv("INFINITE_PICKERTEST") != nullptr || getenv("INFINITE_OSCTEST") != nullptr ||
          getenv("INFINITE_MODBOUNDSTEST") != nullptr || getenv("INFINITE_MODMATRIXTEST") != nullptr ||

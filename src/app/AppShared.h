@@ -1475,6 +1475,7 @@ extern bool gUiStyleEditorOpen;
 #endif
 
 extern bool gSettingsOpen;
+extern bool gTemplatesOpen;
 
 extern bool gShowUpdateCheckModal;
 extern bool gShowAboutModal;
@@ -5500,7 +5501,7 @@ void SetWindowIcon(GLFWwindow* window);
 void SavePatchInteractive(bool forceDialog);
 
 // Templates (TemplatesWindow.cpp): the window, the empty-canvas invitation, and the open-as-untitled-copy.
-void DrawTemplatesMenu();
+void DrawTemplatesWindow(bool* open);
 bool OpenTemplate(const std::string& path);
 
 

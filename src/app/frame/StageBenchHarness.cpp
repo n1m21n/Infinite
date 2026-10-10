@@ -2229,6 +2229,8 @@ void DrawBenchHarness(FrameCtx& fc)
 
       FrameTest_SIZETEST(frameId, window);
 
+      FrameTest_NODEDRAGWIDTHTEST(frameId, window);
+
       FrameTest_SAMPLERDRAGTEST_2(frameId, window);
 
       FrameTest_PLUGINDRAGTEST_2(frameId, window);

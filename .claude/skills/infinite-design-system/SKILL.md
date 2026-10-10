@@ -77,5 +77,5 @@ Known collisions are listed, not yet resolved; pair the colour with a glyph or l
 - Popups are chrome, not canvas content: constant on-screen size at any canvas zoom (only the global UI scale changes them). There is no zoom plumbing; do not add one.
 - One component: `MenuParts` (24 pt rows, `BeginPopup`, `Choice`, `Item`). Dropdown lists are 160-280 px wide, other canvas menus cap at 320 px; every popup caps its height to the window and scrolls.
 - Helper or reason text for a disabled row goes in a tooltip, never in the row (it widens the menu).
-- Canvas level of detail: below `kLodZoom` (0.45, `StageNodeBodies.cpp`) a node's param section draws as if its eye were closed (title, preview, pins stay). The saved `showParams` is untouched and bound params keep registering through the register-only pass, so bindings and ordinals do not move.
+- No canvas level of detail: zooming out never hides or collapses a node's params (removed 2026-10-10). Only the node's own eye toggle does.
 - A cursor restore as the last call before `EndGroup` must assign `window->DC.CursorPos` directly, not `SetCursorScreenPos` (ImGui "extend boundaries" error).

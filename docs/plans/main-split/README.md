@@ -1,5 +1,7 @@
 # Split `src/main.cpp` — execution brief
 
+Status: done (2026-10-09, owner). `src/main.cpp` is now 119 lines; the code lives under `src/app/`. Roadmap R639 closed (3cee4674).
+
 Goal: break the 107,480-line `src/main.cpp` into focused TUs so that (1) editing
 one panel / node body / fixture recompiles a few thousand lines, not 107k,
 (2) a full build parallelises across cores, and (3) the file layout matches

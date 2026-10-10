@@ -635,7 +635,9 @@ void DrawPopupsB(FrameCtx& fc)
             ImVec2 c = ed::CanvasToScreen(canvasMid);
             // Drawn on the foreground list, so it must be hidden by hand wherever something else is in front of the
             // cable's midpoint: a floating window / popup over it, or a node that covers it.
-            bool covered = false;
+            // Docked panels (viewport, timeline) sit outside the graph rect: a midpoint under one is hidden too.
+            bool covered = c.x < gGraphScreenTL.x || c.y < gGraphScreenTL.y || c.x > gGraphScreenTL.x + gGraphScreenSize.x ||
+                           c.y > gGraphScreenTL.y + gGraphScreenSize.y;
             {
                ImGuiContext& g = *ImGui::GetCurrentContext();
                const ImGuiWindow* canvasRoot = ImGui::GetCurrentWindow()->RootWindow;

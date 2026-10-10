@@ -111,9 +111,11 @@ std::string Change(const Patch::Data& before, const Patch::Data& after)
          moved++;
    }
    if (paramChanges == 1)
+   {
       if (oneKey.size() > 2 && oneKey[1] == ' ')
          oneKey.erase(0, 2);
       return oneKey + " " + Show(oneOld) + " \xE2\x86\x92 " + Show(oneNew);
+   }
    if (paramChanges > 1)
       return paramNodes.size() == 1 ? "Edit " + oneType : "Edit " + std::to_string(paramChanges) + " settings";
    if (bypassChanges > 0)

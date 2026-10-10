@@ -62,8 +62,8 @@ namespace app
                   const CategoryColors::Color& c = swatchCols[s];
                   const ImVec2 mid((p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f);   // filled circle, like the Clip Settings Color Tint
                   dl->AddCircleFilled(mid, sz * 0.5f, ImGui::GetColorU32(ImVec4(c.r, c.g, c.b, 1.0f)), 48);
-                  // Hairline: a preset's background colour can match the panel it sits on.
-                  dl->AddCircle(mid, sz * 0.5f, ImGui::GetColorU32(ImGuiCol_Border), 48, 1.0f);
+                  // Outline in the text colour: a preset's background colour can match the popup it sits on, and the swatch would vanish.
+                  { const ImVec4 tx = ImGui::GetStyleColorVec4(ImGuiCol_Text); dl->AddCircle(mid, sz * 0.5f - 0.5f, ImGui::GetColorU32(ImVec4(tx.x, tx.y, tx.z, 0.45f)), 48, 1.0f); }
                }
             };
 
@@ -71,7 +71,8 @@ namespace app
             const float kSwatchGap = 4.0f;
             const float kSwatchStripW = 3 * kSwatchSz + 2 * kSwatchGap;
 
-            if (FormParts::BeginCombo(L("Preset"), presets[currentPreset].c_str()))
+            static float sHeaderSwatchX = 0.0f;   // the list's swatches line up under the header swatch beside the combo (set last frame)
+            if (FormParts::BeginCombo(L("Preset"), presets[currentPreset].c_str(), 240.0f))
             {
                for (int i = 0; i < (int)presets.size(); i++)
                {
@@ -84,7 +85,8 @@ namespace app
                   const ImVec2 rMin = ImGui::GetItemRectMin();
                   const ImVec2 rMax = ImGui::GetItemRectMax();
                   const float y = rMin.y + (rMax.y - rMin.y - kSwatchSz) * 0.5f;
-                  const float x = rMax.x - 8.0f - kSwatchStripW;
+                  // One column for every row: from the popup's content edge, not from each row's own rect (the selected row differs).
+                  const float x = sHeaderSwatchX > 0.0f ? sHeaderSwatchX : ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x - 8.0f - kSwatchStripW;
                   drawThemeSwatches(ImVec2(x, y), kSwatchSz, kSwatchGap, CategoryColors::UiThemeForPreset(i));
                }
                FormParts::EndCombo();
@@ -94,6 +96,7 @@ namespace app
             // tab reads at a glance even before opening the dropdown.
             {
                const ImVec2 cursor = ImGui::GetCursorScreenPos();
+               sHeaderSwatchX = cursor.x;
                const float rowH = ImGui::GetFrameHeight();
                const float y = cursor.y + (rowH - kSwatchSz) * 0.5f;
                drawThemeSwatches(ImVec2(cursor.x, y), kSwatchSz, kSwatchGap, CategoryColors::UiThemeForPreset(currentPreset));
@@ -685,6 +688,19 @@ namespace app
                }
                FormParts::EndCombo();
             }
+
+            ImGui::Spacing();
+            FormParts::Section(T("Diagnostics"));
+            {
+               bool ct = CategoryColors::GetCookTimes();
+               if (FormParts::Switch(L("Cook times"), &ct))
+                  CategoryColors::SetCookTimes(ct);
+               ImGui::TextDisabled("%s", T("Shows how long each node takes to cook, on the node."));
+            }
+            if (FormParts::Button(L("Copy system info")))
+               CopySystemInfo();
+            if (FormParts::Button(L("Reveal logs")))
+               Platform::RevealLogs();
 
             ImGui::Spacing();
             FormParts::Section(T("Application & Updates"));

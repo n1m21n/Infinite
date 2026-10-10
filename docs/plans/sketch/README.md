@@ -1,6 +1,6 @@
 # Sketch: a JavaScript drawing source node
 
-Status: planned (2026-10-08). Owner: "seems simple, let's do this."
+Status: built on branches `feature/sketch-node` and `feature/svg-node` (worktree `~/infinte-sketch`), not merged (2026-10-10). Open: cross-OS pixel hashes (needs Windows + the Linux container), optional image input pin (S6), raw `ctx` (S4), Flow field preset ~6 ms at 1080p. SVG import (lunasvg) shipped in the same branch: drop/paste an SVG, `svgDraw/svgSet/svgText/svgBox`. Owner: "seems simple, let's do this."
 Skills to load before building: `new-source-node`, `node-ui-pillars`, `field-integration` (code-editor + keep-last-working patterns), `windows-parity`, `linux-parity`, `data-accuracy-sweep`.
 
 ## What it is
@@ -42,7 +42,7 @@ Why it isn't Field: Field runs one kernel per pixel or element with no loops ove
 | S12 | Presets | Ship 6-8 sketches: radial burst, flow-field lines, L-system tree, kinetic type, grid poster, particle list with `state` | Every code node ships with something that looks good first try |
 
 ## Out of scope (later)
-- `svg` output/input via lunasvg (MIT, same author as plutovg).
+- `svg` *output* (SVG import and animation is built, see Status).
 - GPU raster (only if profiling shows CPU raster > 4 ms at 1080p for typical sketches).
 - HTML/CSS: that's the CEF Web pack (`docs/plans/extensions/README.md`).
 

@@ -320,7 +320,7 @@ namespace app
       // rather than duplicated as a per-node-type accept.
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(recording ? "Stop##rec" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -338,7 +338,7 @@ namespace app
       // there needs to be a dedicated way to stop it.
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(playing ? "Stop##aud" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
@@ -530,7 +530,7 @@ namespace app
       }
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(recording ? "Stop##rec" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -541,7 +541,7 @@ namespace app
 
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(playing ? "Stop##aud" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
@@ -677,7 +677,7 @@ namespace app
       }
       ImGui::SameLine();
       const bool recording = n->IsRecording();
-      if (ActionButton::Draw(recording ? "Stop" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(recording ? "Stop##rec" : "Record", ImVec2(thirdW, 0), (recording) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          PushUndoCheckpoint();
          if (recording)
@@ -688,7 +688,7 @@ namespace app
 
       ImGui::SameLine();
       const bool playing = n->IsPlaying();
-      if (ActionButton::Draw(playing ? "Stop" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
+      if (ActionButton::Draw(playing ? "Stop##aud" : "Audition", ImVec2(thirdW, 0), (playing) ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
       {
          if (playing)
             n->StopPreview();
@@ -2276,7 +2276,7 @@ namespace app
       AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
 
       {
-         AudioKnobRow row(3);
+         AudioKnobRow row(3, 20.0f, 8.0f, false);
          std::vector<std::string> takeOptions;
          takeOptions.push_back("free");
          for (const std::string& s : MusicTime::RateDivisionList())

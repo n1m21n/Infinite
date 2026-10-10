@@ -162,7 +162,8 @@ namespace app
       // Channels param control
       {
          int ch = n->numChannels;
-         if (AudioSliderInt("channels", &ch, 0, MixerNode::kMaxSlots, AudioHalfWidth()))
+         // Fixed width: the node's width follows this value, so a width taken from the node moves the slider under the drag.
+         if (AudioSliderInt("channels", &ch, 0, MixerNode::kMaxSlots, 130.0f))
          {
             PushUndoCheckpoint();
             n->numChannels = std::clamp(ch, 0, (int)MixerNode::kMaxSlots);
@@ -768,7 +769,7 @@ namespace app
       {
          // Selectors on their own row, left-aligned on the same 3-cell grid as the knobs below (P1, P3): a dropdown
          // is at most 112 wide in any cell, so the scale name is no more clipped here than in a 2-cell row.
-         AudioKnobRow sel(3);
+         AudioKnobRow sel(3, 20.0f, 8.0f, false);
          if (n->useGlobalScale)
             ImGui::BeginDisabled();
          sel.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
@@ -1001,7 +1002,7 @@ namespace app
       snprintf(stat, sizeof(stat), "%s", options[safeDiv].c_str());
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-      AudioKnobRow row(1);
+      AudioKnobRow row(1, 20.0f, 8.0f, false);
       row.Dropdown("grid", options, safeDiv, [n](int i) {
          PushUndoCheckpoint();
          n->div = i;

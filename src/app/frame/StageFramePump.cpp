@@ -565,8 +565,6 @@ void DrawFramePump(FrameCtx& fc)
 
       // R571: while a node is the active node Tab belongs to the param walker,
       // not to ImGui's own tab navigation (which drops a slider into text edit).
-      if (gKbOwnTab)
-         ImGui::SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, ImGuiInputFlags_LockUntilRelease);
       // R571 slice 4: ImGui keyboard nav (Tab / arrows / Enter / Space) only while a popup or a window other than
       // the canvas host has focus. The canvas shares the "Infinite" window with the menu bar and panels, so it
       // can't be opted out per window; toggling per frame keeps the node keyboard model in charge of the canvas.
@@ -581,6 +579,9 @@ void DrawFramePump(FrameCtx& fc)
          if (navOn) nio.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
          else nio.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
          gNavOwnsKeys = navOn && nio.NavVisible;
+         // With no active node and no popup/panel owning the keys, Tab does nothing: it must not wander through params.
+         if (gKbOwnTab || (!navOn && !nio.WantTextInput))
+            ImGui::SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, ImGuiInputFlags_LockUntilRelease);
       }
       ImGui::NewFrame();
       // A focus ring belongs to keyboard navigation only; any mouse click hides one an earlier Enter left behind.

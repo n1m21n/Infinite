@@ -20,6 +20,8 @@ each number.
 
 ## Status — start here
 
+**Done (2026-10-09, owner): the arrangement is finished.** The WP list below is the history.
+
 **WP0-WP8 are built, verified and committed, and `verify-gate` has run
 (clear to merge).** The tip is `feature/arrange-step-11-main-sync` (WP8 +
 `main` merged in + two follow-ups); only the owner's merge remains. Current
