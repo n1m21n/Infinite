@@ -11,7 +11,7 @@
 .lib-chip, .lib-view button {
   min-height: 36px; padding: 0 16px; border-radius: var(--r-pill); white-space: nowrap;
   font-size: 0.85rem; font-weight: 500; color: var(--ink2);
-  transition: transform 0.5s var(--spring), background-color 0.2s, color 0.2s, box-shadow 0.2s;
+  transition: transform 0.5s var(--spring-slab), background-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 .lib-chip { background: var(--card); box-shadow: 0 0 0 1px var(--line); }
 .lib-chip:hover, .lib-view button:hover { color: var(--ink); }

@@ -155,7 +155,7 @@
     if (!word) return;
     const WORDS = [
       ['designers', '#3D6FE0'], ['artists', '#D6508C'], ['musicians', '#1F9E8E'],
-      ['VJs', '#7A5CE0'], ['scientists', '#3D6FE0'], ['creatives', '#D6508C'], ['you', '#C2593F']
+      ['VJs', '#7A5CE0'], ['scientists', '#3D6FE0'], ['creatives', '#D6508C'], ['you', '#B53700']
     ];
     const show = (w, col) => {
       word.textContent = w;
@@ -175,7 +175,7 @@
     window.addEventListener('resize', fit);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
 
-    if (reduced) { show('you', '#C2593F'); return; }
+    if (reduced) { show('you', '#B53700'); return; }
     let i = 0;
     const next = () => {
       const [w, col] = WORDS[i];
@@ -367,7 +367,7 @@
           if (n >= shown) return;
           const gl = FONT5x7[ln[ci]] || FONT5x7[' '];
           for (let pass = 0; pass < 2; pass++) {
-            g.fillStyle = pass === 0 ? '#22C55E' : '#1F1D1A';
+            g.fillStyle = pass === 0 ? '#22C55E' : '#12152A';
             const off = pass === 0 ? 1 : 0;
             for (let r = 0; r < 7; r++) for (let c = 0; c < 5; c++) {
               if (gl[r][c] === '1') g.fillRect((x0 + ci * 6 + c + off) * px, (li * 9 + r + off) * px, px, px);
@@ -441,7 +441,7 @@
         for (let s = 0; s < 50; s++) stepK(ghost, 0);
         g.lineCap = 'round';
         g.beginPath(); g.arc(cx, cy, R + 9, A0, A0 + SWEEP);
-        g.strokeStyle = 'rgba(45,35,25,0.08)'; g.lineWidth = 4; g.stroke();
+        g.strokeStyle = 'rgba(26,31,54,0.08)'; g.lineWidth = 4; g.stroke();
         const aV = A0 + SWEEP * k.v, aG = A0 + SWEEP * ghost.v;
         g.beginPath(); g.arc(cx, cy, R + 9, Math.min(aV, aG), Math.max(aV, aG));
         g.setLineDash([2, 6]); g.strokeStyle = 'rgba(34,197,94,0.9)'; g.lineWidth = 4; g.stroke(); g.setLineDash([]);
@@ -457,12 +457,12 @@
         g.beginPath(); g.moveTo(cx + Math.cos(aV) * R * 0.2, cy + Math.sin(aV) * R * 0.2);
         g.lineTo(cx + Math.cos(aV) * R * 0.62, cy + Math.sin(aV) * R * 0.62);
         g.strokeStyle = '#EEF0F6'; g.lineWidth = Math.max(2, R * 0.08); g.stroke();
-        g.fillStyle = '#5A534C';
+        g.fillStyle = '#404660';
         g.font = `500 ${Math.max(11, Math.min(13, W / 40))}px 'Geist Mono', monospace`;
         g.textAlign = 'center';
         g.fillText(`${k.name} ${String(Math.round(k.v * 100)).padStart(3, ' ')}`, cx, cy + R + 30);
         if (drag === k) {
-          g.fillStyle = '#C2593F';
+          g.fillStyle = '#B53700';
           g.fillText('you', cx, cy - R - 16);
         } else {
           g.fillStyle = '#1B7A4B';
@@ -519,7 +519,7 @@
     if (!cv || !perches.length) return;
     const g = cv.getContext('2d');
     const COLS = 34, ROWS = 24, X0 = -1.25, X1 = 1.25, Y0 = -0.95, Y1 = 0.85, FX = 0.08, FY = 0.80;
-    const INK = '#1F1D1A', EYE = '#E0654A';
+    const INK = '#12152A', EYE = '#D9430E';
 
     const inEll = (px, py, cx, cy, rx, ry, rot) => {
       const c = Math.cos(rot), s = Math.sin(rot), dx = px - cx, dy = py - cy;

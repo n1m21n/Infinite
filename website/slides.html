@@ -15,7 +15,9 @@
   <meta name="twitter:title" content="Infinite — Presentation Deck">
   <meta name="twitter:description" content="A visual overview of Infinite, the real-time node-based audiovisual workstation.">
   <meta name="twitter:image" content="https://n1m21n.github.io/Infinite/assets/screenshot.png">
-  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 
   <!-- Fonts: Geist, Caveat, Geist Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +25,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Direct Website Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=37">
+  <link rel="stylesheet" href="brand.css?v=2">
+  <link rel="stylesheet" href="style.css?v=52">
 
   <style>
     /* ==========================================================================
@@ -43,7 +46,7 @@
     }
 
     html, body {
-      background-color: #2b2723;
+      background-color: #20263f;
       font-family: var(--font-sans);
       color: var(--text-primary);
       -webkit-font-smoothing: antialiased;
@@ -101,7 +104,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background-image: radial-gradient(rgba(45, 35, 25, 0.08) 1.5px, transparent 1.5px);
+      background-image: radial-gradient(rgba(26, 31, 54, 0.08) 1.5px, transparent 1.5px);
       background-size: 36px 36px;
       pointer-events: none;
       z-index: 0;
@@ -190,7 +193,7 @@
       border: 1px solid var(--border-card);
       border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 16px 48px rgba(45, 35, 25, 0.08);
+      box-shadow: 0 16px 48px rgba(26, 31, 54, 0.08);
       position: relative;
     }
 
@@ -198,7 +201,7 @@
       display: flex;
       align-items: center;
       padding: 12px 18px;
-      background: #faf8f3;
+      background: #fbfaf6;
       border-bottom: 1px solid var(--border-subtle);
     }
 
@@ -289,7 +292,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 16px;
       padding: 20px;
-      background: #faf8f3;
+      background: #fbfaf6;
       height: 720px;
     }
     .deck-cap-grid .cap-card {
@@ -328,7 +331,7 @@
       flex-direction: column;
       gap: 18px;
       padding: 22px;
-      background: #faf8f3;
+      background: #fbfaf6;
       height: 720px;
       justify-content: center;
     }
@@ -409,7 +412,7 @@
       width: 80px;
       height: 80px;
       border-radius: 18px;
-      box-shadow: 0 8px 24px rgba(45,35,25,0.12);
+      box-shadow: 0 8px 24px rgba(26,31,54,0.12);
     }
     .deck-dl-title {
       font-size: 30px;
@@ -446,8 +449,8 @@
       color: var(--text-primary);
     }
     .deck-dl-cta-box {
-      background: #fdfaf7;
-      border: 2px solid rgba(194, 89, 63, 0.3);
+      background: #fbfaf6;
+      border: 2px solid rgba(181, 55, 0, 0.3);
       padding: 20px 24px;
       border-radius: 16px;
       display: flex;
@@ -463,7 +466,7 @@
       padding: 12px 24px;
       border-radius: var(--radius-pill);
       text-decoration: none;
-      box-shadow: 0 4px 14px rgba(194, 89, 63, 0.3);
+      box-shadow: 0 4px 14px rgba(181, 55, 0, 0.3);
     }
   </style>
 </head>
@@ -862,13 +865,13 @@
     let networkNodes = [], networkEdges = [], networkPulses = [];
 
     const NETWORK_ITEMS = [
-      { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.15, dtY: 0.22 },
-      { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.15, dtY: 0.78 },
+      { id: 'sound', label: 'Sound', color: '#b53700', bg: 'rgba(181, 55, 0, 0.12)', dtX: 0.15, dtY: 0.22 },
+      { id: 'music', label: 'Music', color: '#d9430e', bg: 'rgba(217, 67, 14, 0.12)', dtX: 0.15, dtY: 0.78 },
       { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.34, dtY: 0.30 },
-      { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.38, dtY: 0.75 },
+      { id: 'math', label: 'Math', color: '#b53700', bg: 'rgba(181, 55, 0, 0.12)', dtX: 0.38, dtY: 0.75 },
       { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.54, dtY: 0.20 },
       { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.58, dtY: 0.80 },
-      { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.72, dtY: 0.32 },
+      { id: 'light', label: 'Light', color: '#d9430e', bg: 'rgba(217, 67, 14, 0.12)', dtX: 0.72, dtY: 0.32 },
       { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.86, dtY: 0.22 },
       { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.85, dtY: 0.78 }
     ];
@@ -949,7 +952,7 @@
         const radius = badgeH / 2;
 
         natureCtx.fillStyle = '#ffffff';
-        natureCtx.strokeStyle = 'rgba(45, 35, 25, 0.16)';
+        natureCtx.strokeStyle = 'rgba(26, 31, 54, 0.16)';
         natureCtx.lineWidth = 1.5 * dpr;
         natureCtx.beginPath();
         natureCtx.roundRect(badgeX, badgeY, badgeW, badgeH, radius);
@@ -968,7 +971,7 @@
         natureCtx.fill();
 
         natureCtx.textAlign = 'left';
-        natureCtx.fillStyle = '#1f1d1a';
+        natureCtx.fillStyle = '#12152a';
         natureCtx.fillText(node.label, dotX + dotRadius + 8 * dpr, node.y);
       });
     }
@@ -1009,7 +1012,7 @@
             const py = lY + wave;
             if (x === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
           }
-          ctx.strokeStyle = layer === 6 ? '#d97736' : 'rgba(217, 119, 54, 0.35)';
+          ctx.strokeStyle = layer === 6 ? '#d9430e' : 'rgba(217, 67, 14, 0.35)';
           ctx.lineWidth = layer === 6 ? 2.5 : 1.2;
           ctx.stroke();
         }

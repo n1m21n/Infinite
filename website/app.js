@@ -35,7 +35,7 @@ function initCosmos() {
       pulseOffset: Math.random() * Math.PI * 2,
       vx: (Math.random() - 0.5) * 0.15,
       vy: (Math.random() - 0.5) * 0.15,
-      color: ['#2b2621', '#c2593f', '#d97736', '#4d7c67', '#6b6b99'][Math.floor(Math.random() * 5)]
+      color: ['#2b2621', '#b53700', '#d9430e', '#4d7c67', '#6b6b99'][Math.floor(Math.random() * 5)]
     });
   }
 
@@ -46,7 +46,7 @@ function initCosmos() {
       radius: Math.random() * 200 + 180,
       vx: (Math.random() - 0.5) * 0.08,
       vy: (Math.random() - 0.5) * 0.08,
-      color: ['rgba(194, 89, 63, 0.035)', 'rgba(217, 119, 54, 0.035)', 'rgba(77, 124, 103, 0.035)', 'rgba(107, 107, 153, 0.035)'][i % 4]
+      color: ['rgba(181, 55, 0, 0.035)', 'rgba(217, 67, 14, 0.035)', 'rgba(77, 124, 103, 0.035)', 'rgba(107, 107, 153, 0.035)'][i % 4]
     });
   }
 }
@@ -154,13 +154,13 @@ let netMouse = { x: -1000, y: -1000, active: false };
 let cachedCanvasRect = null;
 
 const NETWORK_ITEMS = [
-  { id: 'sound', label: 'Sound', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.12, dtY: 0.26, mbX: 0.20, mbY: 0.15 },
-  { id: 'music', label: 'Music', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.12, dtY: 0.74, mbX: 0.20, mbY: 0.38 },
+  { id: 'sound', label: 'Sound', color: '#b53700', bg: 'rgba(181, 55, 0, 0.12)', dtX: 0.12, dtY: 0.26, mbX: 0.20, mbY: 0.15 },
+  { id: 'music', label: 'Music', color: '#d9430e', bg: 'rgba(217, 67, 14, 0.12)', dtX: 0.12, dtY: 0.74, mbX: 0.20, mbY: 0.38 },
   { id: 'physics', label: 'Physics', color: '#5a6b7c', bg: 'rgba(90, 107, 124, 0.12)', dtX: 0.31, dtY: 0.32, mbX: 0.80, mbY: 0.38 },
-  { id: 'math', label: 'Math', color: '#c2593f', bg: 'rgba(194, 89, 63, 0.12)', dtX: 0.31, dtY: 0.70, mbX: 0.50, mbY: 0.52 },
+  { id: 'math', label: 'Math', color: '#b53700', bg: 'rgba(181, 55, 0, 0.12)', dtX: 0.31, dtY: 0.70, mbX: 0.50, mbY: 0.52 },
   { id: 'art', label: 'Art', color: '#b8860b', bg: 'rgba(184, 134, 11, 0.12)', dtX: 0.50, dtY: 0.46, mbX: 0.20, mbY: 0.70 },
   { id: 'motion', label: 'Motion', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)', dtX: 0.69, dtY: 0.70, mbX: 0.22, mbY: 0.88 },
-  { id: 'light', label: 'Light', color: '#d97736', bg: 'rgba(217, 119, 54, 0.12)', dtX: 0.69, dtY: 0.32, mbX: 0.80, mbY: 0.70 },
+  { id: 'light', label: 'Light', color: '#d9430e', bg: 'rgba(217, 67, 14, 0.12)', dtX: 0.69, dtY: 0.32, mbX: 0.80, mbY: 0.70 },
   { id: 'geometry', label: 'Geometry', color: '#4d7c67', bg: 'rgba(77, 124, 103, 0.12)', dtX: 0.88, dtY: 0.26, mbX: 0.80, mbY: 0.15 },
   { id: 'color', label: 'Color', color: '#6b6b99', bg: 'rgba(107, 107, 153, 0.12)', dtX: 0.88, dtY: 0.74, mbX: 0.78, mbY: 0.88 }
 ];
@@ -593,7 +593,7 @@ function animateNatureBranches(timestamp) {
 
     // Draw pill background
     natureCtx.fillStyle = '#ffffff';
-    natureCtx.strokeStyle = isHovered ? node.color : 'rgba(45, 35, 25, 0.14)';
+    natureCtx.strokeStyle = isHovered ? node.color : 'rgba(26, 31, 54, 0.14)';
     natureCtx.lineWidth = (isHovered ? 1.8 : 1.2) * dpr;
 
     natureCtx.beginPath();
@@ -619,7 +619,7 @@ function animateNatureBranches(timestamp) {
 
     // Label Text
     natureCtx.textAlign = 'left';
-    natureCtx.fillStyle = isHovered ? node.color : '#1f1d1a';
+    natureCtx.fillStyle = isHovered ? node.color : '#12152a';
     natureCtx.fillText(node.label, dotX + dotRadius + 5 * dpr, node.y);
   });
 }
@@ -821,7 +821,7 @@ function initWaves2DFallback(canvas) {
     ctx.lineWidth = 1.2 * dpr;
     for (let y = 0; y < h; y += 8 * dpr) {
       ctx.beginPath();
-      ctx.strokeStyle = `rgba(217, 119, 54, ${0.35 + Math.sin(y * 0.05 + t) * 0.25})`;
+      ctx.strokeStyle = `rgba(217, 67, 14, ${0.35 + Math.sin(y * 0.05 + t) * 0.25})`;
       for (let x = 0; x < w; x += 4 * dpr) {
         const d1 = Math.hypot(x - w * 0.35, y - h * 0.5);
         const wave = Math.sin(d1 * (0.08 / dpr) - t * 2);
@@ -1604,13 +1604,13 @@ function initMinimalAudioPlayer() {
 
       if (isPlayed) {
         const grad = ctx.createLinearGradient(0, y, 0, y + barH);
-        grad.addColorStop(0, '#c2593f');
-        grad.addColorStop(1, '#d97736');
+        grad.addColorStop(0, '#b53700');
+        grad.addColorStop(1, '#d9430e');
         ctx.fillStyle = grad;
       } else if (isHoverScrub) {
-        ctx.fillStyle = 'rgba(194, 89, 63, 0.45)';
+        ctx.fillStyle = 'rgba(181, 55, 0, 0.45)';
       } else {
-        ctx.fillStyle = 'rgba(45, 35, 25, 0.16)';
+        ctx.fillStyle = 'rgba(26, 31, 54, 0.16)';
       }
 
       ctx.beginPath();
@@ -1626,7 +1626,7 @@ function initMinimalAudioPlayer() {
       const playheadX = progressPct * w;
       ctx.beginPath();
       ctx.arc(playheadX, centerY, 3.5 * dpr, 0, Math.PI * 2);
-      ctx.fillStyle = '#c2593f';
+      ctx.fillStyle = '#b53700';
       ctx.fill();
     }
 
@@ -1635,7 +1635,7 @@ function initMinimalAudioPlayer() {
       ctx.beginPath();
       ctx.moveTo(scrubX, 2 * dpr);
       ctx.lineTo(scrubX, h - 2 * dpr);
-      ctx.strokeStyle = 'rgba(194, 89, 63, 0.5)';
+      ctx.strokeStyle = 'rgba(181, 55, 0, 0.5)';
       ctx.lineWidth = 1.2 * dpr;
       ctx.setLineDash([3 * dpr, 3 * dpr]);
       ctx.stroke();
