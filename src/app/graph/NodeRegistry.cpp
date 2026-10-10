@@ -20,6 +20,7 @@ namespace app
       }
       REGISTER_NODE(FormulaNode, Formula, "Source");
       REGISTER_NODE(FieldPixelNode, FieldPixel, "Source");
+      REGISTER_NODE(SketchNode, Sketch, "Source");
       REGISTER_NODE(TextNode, Text, "Source");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");

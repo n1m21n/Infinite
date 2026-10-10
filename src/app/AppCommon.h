@@ -171,6 +171,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/VideoSourceNode.h"
 #include "nodes/VideoInNode.h"
 #include "nodes/NoiseNode.h"
+#include "nodes/SketchNode.h"
 #include "nodes/TextureNode.h"
 #include "nodes/ResynthNode.h"
 #include "nodes/MacroNodes.h"

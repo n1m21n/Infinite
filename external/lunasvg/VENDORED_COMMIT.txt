@@ -1,0 +1,1 @@
+lunasvg v3.5.0 83c58df8103dc7dca423dfd824992af94d49bed6 (MIT; built against the vendored plutovg)
