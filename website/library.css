@@ -6,7 +6,11 @@
 
 /* toolbar */
 .lib-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin: 8px 0 32px; }
-.lib-chips { display: flex; gap: 8px; }
+.lib-chips { display: flex; gap: 8px; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.lib-chips::-webkit-scrollbar { display: none; }
+.lib-chip { flex: none; }
+.lib-hero, .lib-hero > *, .lib-bar { min-width: 0; max-width: 100%; }
+body:has(.lib-hero) { overflow-x: clip; }
 .lib-bar > * { min-width: 0; }
 .lib-chip, .lib-view button {
   min-height: 36px; padding: 0 16px; border-radius: var(--r-pill); white-space: nowrap;
@@ -78,7 +82,7 @@
 @media (max-width: 560px) {
   .lib-hero { --pad: 8px; }
   .lib-bar { flex-direction: column; align-items: stretch; gap: 12px; margin-bottom: 24px; }
-  .lib-chips { max-width: none; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 4px; }
+  .lib-chips { margin: 0 -16px; padding: 0 16px 4px; max-width: none; width: calc(100% + 32px); }
   .lib-chips::-webkit-scrollbar { display: none; }
   .lib-bar-end { justify-content: space-between; }
   .lib-card .node-head { font-size: 0.78rem; }

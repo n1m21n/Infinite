@@ -174,7 +174,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "A wave-terrain synth driving a slowly turning mandala.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/terrain-mandala.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/terrain-mandala.webp"
@@ -185,7 +185,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Transform, glitch and feedback loops with added noise.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/glitch-feedback.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/glitch-feedback.webp"
@@ -196,7 +196,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Audio blends through a frequency shifter, with liquify on the picture.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/shifted-blend.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/shifted-blend.webp"
@@ -207,7 +207,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Lens distortion over blended cubes, with a spectral synth underneath.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/lens-spectral.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/lens-spectral.webp"
@@ -218,7 +218,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "A cube in a checkered room with bold type, blended from image sources.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/checker-cube.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/checker-cube.webp"
@@ -240,7 +240,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Blended pads through delay and reverb, with random notes shifting the pitch.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/pad-wash.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/pad-wash.webp"
@@ -262,7 +262,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Trails, colour ramps and glitch blended, with reverbs on the sound.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/trail-glitch.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/trail-glitch.webp"
@@ -273,7 +273,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "A sampler into a spectral synth, reverb and PaulStretch.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/stretched-sampler.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/stretched-sampler.webp"
@@ -284,7 +284,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "A note sequencer plays a wavetable that displaces a 3D shape.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/displaced-wavetable.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/displaced-wavetable.webp"
@@ -306,7 +306,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "A 3D render with a colour ramp and added noise.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/soft-render.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/soft-render.webp"
@@ -317,7 +317,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "PaulStretch into blended audio with delay.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/stretched-blend.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/stretched-blend.webp"
@@ -328,7 +328,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "A slicer into blended audio, with delay and a mixer.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/slice-room.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/slice-room.webp"
@@ -339,7 +339,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "PaulStretch and mixers into a limiter.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/limited-stretch.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/limited-stretch.webp"
@@ -350,7 +350,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "PaulStretch through a spectrum slide and key snap.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/spectrum-slide.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/spectrum-slide.webp"
@@ -361,7 +361,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "A plugin and PaulStretch through a mixer.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/plugin-stretch.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/plugin-stretch.webp"
@@ -372,7 +372,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "A flat-shaded cube in a blue-white room with a light-grid wall.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/blue-cube.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/blue-cube.webp"
@@ -383,7 +383,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Large type repeated across a kaleidoscope of pink shapes.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/fairy-type.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/fairy-type.webp"
@@ -394,7 +394,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "An audio colour ramp drives a cube, rendered in 3D.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/cube-colour.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/cube-colour.webp"
@@ -405,7 +405,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Stacked blends with colour adjustments.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/layered-blends.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/layered-blends.webp"
@@ -416,7 +416,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Two note sequencers and oscillators into reverb, delay and EQ.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/drum-reverb.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/drum-reverb.webp"
@@ -427,7 +427,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Delay, reverb and a mixer into a limiter.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/delay-wash.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/delay-wash.webp"
@@ -438,7 +438,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Reverb and a mixer through an audio filter.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/filtered-mixer.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/filtered-mixer.webp"
@@ -449,7 +449,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "Merged notes play a wavetable into reverb.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/merged-wavetable.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/merged-wavetable.webp"
@@ -460,7 +460,7 @@
    "category": "Community",
    "type": "Patch",
    "description": "A note sequencer into an oscillator and reverb.",
-   "author": "",
+   "author": "n1m21n",
    "price": 0,
    "file": "https://n1m21n.github.io/Infinite/assets/community/oscillator-reverb.inf",
    "preview": "https://n1m21n.github.io/Infinite/assets/community/oscillator-reverb.webp"

@@ -63,7 +63,7 @@
   Promise.all([
     fetch('assets/library/index.json?v=4').then(function (r) { return r.json(); }),
     fetch('assets/templates/index.json?v=3').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
-    fetch('assets/community/index.json?v=1').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; })
+    fetch('assets/community/index.json?v=2').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; })
   ]).then(function (all) {
     var d = { items: all[1].items.concat(all[2].items, all[0].items) };
     grid.addEventListener('click', function (e) {
