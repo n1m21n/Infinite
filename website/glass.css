@@ -39,12 +39,12 @@ body::before {
 .nav-links > a[aria-current] { color: var(--ink); }
 .icon-btn:hover { background: rgba(255, 255, 255, 0.7); box-shadow: var(--glass-hi), 0 0 0 1px rgba(45, 35, 25, 0.06); }
 
-/* primary: Terracotta glass with a lit top edge (cards are the only dark surface) */
+/* primary: dark glass with a lit top edge */
 .btn-primary {
-  background: linear-gradient(180deg, #CB654A, #C2593F); color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), inset 0 -1px 0 rgba(0, 0, 0, 0.12), var(--glass-shadow);
+  background: linear-gradient(180deg, #2A3052, #151930);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.5), var(--glass-shadow);
 }
-.btn-primary:hover { background: linear-gradient(180deg, #D26F55, #C85F44); }
+.btn-primary:hover { background: linear-gradient(180deg, #343B5E, #20263F); }
 
 /* node cards: light glass (white Card on Paper); the app mock stays the app's dark */
 .node, .pnode {
@@ -58,14 +58,14 @@ body::before {
 
 /* chips and toggles: pressed state is dark glass */
 .lib-chip[aria-pressed="true"], .lib-view button[aria-pressed="true"] {
-  background: linear-gradient(180deg, #CB654A, #C2593F); color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30);
+  background: linear-gradient(180deg, #2A3052, #151930); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 .lib-view { box-shadow: var(--glass-hi), var(--glass-edge); }
 .lib-view button { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .lib-view button[aria-pressed="true"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.4); }
-.lib-dl { background: linear-gradient(180deg, #CB654A, #C2593F); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 4px 12px rgba(194, 89, 63, 0.25); }
-.lib-dl:hover { background: linear-gradient(180deg, #D26F55, #C85F44); }
+.lib-dl { background: linear-gradient(180deg, #2A3052, #151930); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 4px 12px rgba(21, 25, 48, 0.25); }
+.lib-dl:hover { background: linear-gradient(180deg, #343B5E, #20263F); }
 .lib-price { background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.12); }
 
 .site-footer { background: rgba(255, 255, 255, 0.35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-top: 1px solid rgba(255, 255, 255, 0.7); }

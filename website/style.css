@@ -634,7 +634,7 @@ strong { font-weight: 600; color: var(--ink); }
 .btn-dl span { display: flex; flex-direction: column; line-height: 1.2; }
 .btn-dl b { font-size: 1rem; }
 .btn-dl small { font-size: 0.74rem; color: var(--muted); font-weight: 500; }
-.btn-dl.primary { background: var(--accent); color: #fff; box-shadow: var(--shadow-2); }
+.btn-dl.primary { background: var(--ink); color: var(--paper); box-shadow: var(--shadow-2); }
 .btn-dl.primary small { color: rgba(251, 250, 246, 0.65); }
 .btn-dl.primary::after {
   content: 'your system'; margin-left: 10px; padding: 3px 8px; border-radius: var(--r-pill);
