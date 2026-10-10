@@ -59,13 +59,39 @@
   --shadow: #1A1F36;
 }
 :root {
+  --ember-50: #FFF2EE;
+  --ember-100: #FFE0D7;
+  --ember-200: #FFC0AC;
+  --ember-300: #FF9878;
   --ember-400: #FF6B35;
   --ember-500: #D9430E;
   --ember-600: #B53700;
+  --ember-700: #872700;
+  --ember-800: #5C1800;
+  --ember-900: #3C0C00;
+  --ember-950: #260500;
+  --signal-50: #F2F5FF;
+  --signal-100: #E1E7FF;
+  --signal-200: #C4CEFF;
   --signal-300: #A7B1FF;
+  --signal-400: #8795F4;
+  --signal-500: #6974DC;
   --signal-600: #4A54D6;
-  --midnight-950: #0D1020;
+  --signal-700: #3A3E9D;
+  --signal-800: #252572;
+  --signal-900: #15144F;
+  --signal-950: #0B0934;
+  --midnight-50: #F2F5FE;
+  --midnight-100: #E4E7F4;
+  --midnight-200: #CCD0E2;
+  --midnight-300: #B0B6CD;
+  --midnight-400: #969DB7;
+  --midnight-500: #787F9B;
+  --midnight-600: #616783;
+  --midnight-700: #464C65;
+  --midnight-800: #2D3246;
   --midnight-900: #151930;
+  --midnight-950: #0D1020;
   --brand-gradient: linear-gradient(90deg, #F57F66 0%, #D99A9C 35%, #C7AFC0 65%, #A9CDF1 100%);
   --iridescence: conic-gradient(#A7B1FF, #8FE3D0, #F6B4C8, #FF8A5C, #A7B1FF);
   --cat-source: #4ADE80;
@@ -114,14 +140,14 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
-  --spring-slab: linear(0, 0.016, 0.058, 0.121, 0.199, 0.287, 0.38, 0.475, 0.569, 0.658, 0.742, 0.818, 0.886, 0.945, 0.994, 1.035, 1.068, 1.092, 1.109, 1.12, 1.126, 1.126, 1.123, 1.116, 1.107, 1.097, 1.086, 1.074, 1.062, 1.05, 1.039, 1.029, 1);
-  --spring-slab-ms: 292ms;
-  --spring-letter: linear(0, 0.016, 0.059, 0.123, 0.201, 0.288, 0.38, 0.472, 0.563, 0.648, 0.728, 0.8, 0.864, 0.919, 0.966, 1.004, 1.035, 1.058, 1.075, 1.086, 1.093, 1.095, 1.094, 1.09, 1.084, 1.077, 1.068, 1.06, 1.051, 1.042, 1.034, 1.027, 1);
-  --spring-letter-ms: 271ms;
-  --spring-soft: linear(0, 0.01, 0.036, 0.075, 0.122, 0.175, 0.231, 0.289, 0.346, 0.403, 0.458, 0.51, 0.56, 0.606, 0.649, 0.689, 0.725, 0.758, 0.788, 0.815, 0.84, 0.861, 0.881, 0.898, 0.913, 0.926, 0.937, 0.947, 0.956, 0.964, 0.97, 0.976, 1);
-  --spring-soft-ms: 262ms;
-  --spring-press: linear(0, 0.015, 0.052, 0.105, 0.166, 0.232, 0.299, 0.365, 0.429, 0.489, 0.544, 0.596, 0.643, 0.685, 0.724, 0.758, 0.788, 0.815, 0.839, 0.861, 0.879, 0.895, 0.909, 0.922, 0.933, 0.942, 0.95, 0.957, 0.963, 0.968, 0.973, 0.977, 1);
-  --spring-press-ms: 209ms;
+  --spring-slab: linear(0, 0.017, 0.064, 0.133, 0.217, 0.311, 0.411, 0.511, 0.608, 0.699, 0.784, 0.859, 0.925, 0.98, 1.026, 1.062, 1.089, 1.108, 1.12, 1.126, 1.126, 1.122, 1.115, 1.105, 1.094, 1.082, 1.069, 1.056, 1.044, 1.033, 1.023, 1.014, 1.006, 1, 0.995, 0.991, 0.988, 0.986, 0.984, 0.984, 0.984, 0.985, 0.986, 0.987, 0.989, 0.99, 0.992, 0.994, 1);
+  --spring-slab-ms: 462ms;  /* settles within 2% at 292ms */
+  --spring-letter: linear(0, 0.017, 0.061, 0.127, 0.208, 0.297, 0.391, 0.485, 0.577, 0.664, 0.743, 0.815, 0.878, 0.932, 0.977, 1.014, 1.043, 1.065, 1.08, 1.089, 1.094, 1.095, 1.092, 1.087, 1.081, 1.073, 1.064, 1.055, 1.046, 1.038, 1.03, 1.022, 1.016, 1.01, 1.005, 1.001, 0.998, 0.995, 0.993, 0.992, 0.991, 0.991, 0.991, 0.991, 0.992, 0.993, 0.993, 0.994, 1);
+  --spring-letter-ms: 414ms;  /* settles within 2% at 271ms */
+  --spring-soft: linear(0, 0.006, 0.023, 0.048, 0.079, 0.116, 0.156, 0.199, 0.243, 0.288, 0.333, 0.377, 0.421, 0.463, 0.504, 0.543, 0.58, 0.615, 0.648, 0.679, 0.709, 0.736, 0.761, 0.784, 0.806, 0.826, 0.844, 0.861, 0.876, 0.89, 0.902, 0.914, 0.924, 0.933, 0.941, 0.949, 0.956, 0.962, 0.967, 0.972, 0.976, 0.979, 0.983, 0.986, 0.988, 0.99, 0.992, 0.994, 1);
+  --spring-soft-ms: 305ms;  /* settles within 2% at 262ms */
+  --spring-press: linear(0, 0.011, 0.039, 0.08, 0.128, 0.182, 0.238, 0.295, 0.351, 0.406, 0.458, 0.508, 0.554, 0.598, 0.638, 0.674, 0.708, 0.739, 0.767, 0.792, 0.815, 0.836, 0.854, 0.871, 0.885, 0.899, 0.91, 0.921, 0.93, 0.938, 0.946, 0.952, 0.958, 0.963, 0.968, 0.972, 0.975, 0.978, 0.981, 0.983, 0.985, 0.987, 0.989, 0.99, 0.991, 0.993, 0.993, 0.994, 1);
+  --spring-press-ms: 266ms;  /* settles within 2% at 209ms */
   --dur-instant: 0ms;
   --dur-micro: 120ms;
   --dur-small: 200ms;
@@ -485,7 +511,7 @@ footer.f{padding:48px 0;color:var(--ink-3);font-size:.85rem}
 <h3>Grammar</h3><div class="tw"><table class="t"><tr><th>verb</th><th>what it means</th></tr><tr><td><b>Land</b></td><td>An object arrives and settles: soft spring, 4-8 u of travel, 200-320 ms. Slabs and the key cable use the slab spring.</td></tr><tr><td><b>Patch</b></td><td>A cable draws from pin to pin: ease-out over 320-480 ms, plug snaps with the slab spring, the destination answers within 100 ms.</td></tr><tr><td><b>Carry</b></td><td>Between scenes an object travels and becomes the next frame (iris, zoom to a rect, carried object). No cuts on a beat that has motion.</td></tr><tr><td><b>Live</b></td><td>Anything that shows a value keeps moving: knobs breathe ±2°, waveforms scroll, meters fall. A frozen UI reads as a screenshot.</td></tr><tr><td><b>Breathe</b></td><td>One slow loop under everything (4-8 s): the ball&#x27;s iridescence, the gradient sweep. Never on type, stops for reduced motion.</td></tr></table></div>
 <h3>Durations</h3><div class="tw"><table class="t"><tr><th>token</th><th>ms</th></tr><tr><td>instant</td><td>0</td></tr><tr><td>micro</td><td>120</td></tr><tr><td>small</td><td>200</td></tr><tr><td>medium</td><td>320</td></tr><tr><td>large</td><td>480</td></tr><tr><td>page</td><td>640</td></tr></table></div>
 <p class="cap">In the app, motion stays at or under 200 ms and values never animate (they are data). Every brand motion stops for prefers-reduced-motion.</p>
-<pre>--spring-slab: linear(0, 0.016, 0.058, 0.121, 0.199, 0.287, 0.38, 0.475, 0.569, 0.658, 0.742, 0.818, 0.886, 0.945, 0.994, 1.035, 1.068, 1.092, 1.109, 1.12, 1.126, 1.126, 1.123, 1.116, 1.107, 1.097, 1.086, 1.074, 1.062, 1.05, 1.039, 1.029, 1);</pre></section>
+<pre>--spring-slab: linear(0, 0.017, 0.064, 0.133, 0.217, 0.311, 0.411, 0.511, 0.608, 0.699, 0.784, 0.859, 0.925, 0.98, 1.026, 1.062, 1.089, 1.108, 1.12, 1.126, 1.126, 1.122, 1.115, 1.105, 1.094, 1.082, 1.069, 1.056, 1.044, 1.033, 1.023, 1.014, 1.006, 1, 0.995, 0.991, 0.988, 0.986, 0.984, 0.984, 0.984, 0.985, 0.986, 0.987, 0.989, 0.99, 0.992, 0.994, 1);</pre></section>
 
 <section id="node3d"><span class="k">09 · The node in 3D</span><h2>The node as an instrument</h2><p class="s">A node in 3D is a physical panel, like a pedal or a module, built from the app's own measurements. It is not a screenshot tilted in space. Reference: Audio Filter (src/app/bodies/FxBodies1.cpp, docs/plans/ui-system/element-sizes.md): body 440, readout strip 21, response viewer 190, row of 4 cells of 110 (type dropdown, freq, Q, gain), output row (mix, env).</p>
 <figure><img class="shot" src="img/node_hero.webp" alt="Audio Filter as a 3D instrument object, Ember key cable in, category cable out"><figcaption class="cap">Audio Filter, rendered from tools/brand/build_3d.py. Every size is from the app: 56 knobs in 110 cells, 190 viewer, 21 readout, 4 caption gap.</figcaption></figure>

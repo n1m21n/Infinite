@@ -55,18 +55,19 @@ def spring(z, w, t):
     return 1 - (1 + w * t) * math.exp(-w * t)
 
 
-def spring_stats(z, w):
+def spring_stats(z, w, tol=0.02):
     over = math.exp(-math.pi * z / math.sqrt(1 - z * z)) if z < 1 else 0.0
     t, dt, settle = 0.0, 0.0005, 0.0
     while t < 3:
-        if abs(spring(z, w, t) - 1) > 0.02:
+        if abs(spring(z, w, t) - 1) > tol:
             settle = t
         t += dt
     return over, settle + dt
 
 
-def css_linear(z, w, n=32):
-    _, T = spring_stats(z, w)
+def css_linear(z, w, n=48):
+    """Sampled to the 0.5% settle, so the curve's last step to 1 is invisible; the returned ms is the CSS duration."""
+    _, T = spring_stats(z, w, 0.005)
     pts = [f"{spring(z, w, T * i / n):.3f}".rstrip("0").rstrip(".") or "0" for i in range(n + 1)]
     pts[-1] = "1"
     return f"linear({', '.join(pts)})", round(T * 1000)
@@ -76,7 +77,7 @@ SPRINGS = []
 for s in B["motion"]["springs"]:
     o, st = spring_stats(s["zeta"], s["omega"])
     lin, ms = css_linear(s["zeta"], s["omega"])
-    SPRINGS.append(dict(s, overshoot=o, settle_ms=ms, linear=lin, response=2 * math.pi / s["omega"]))
+    SPRINGS.append(dict(s, overshoot=o, settle_ms=round(st * 1000), css_ms=ms, linear=lin, response=2 * math.pi / s["omega"]))
 
 
 # ---------------------------------------------------------------- token files
@@ -101,8 +102,10 @@ def write_css():
         L += [f"  --{k}: {v};" for k, v in roles.items() if not k.startswith("_")]
         L.append("}")
     L.append(":root {")
-    for fam, pal in (("ember", C["anchors"]["ember"]), ("signal", C["anchors"]["signal"]), ("midnight", C["anchors"]["midnight"])):
-        L += [f"  --{fam}-{k}: {v};" for k, v in pal.items()]
+    for fam in ("ember", "signal", "midnight"):  # full ramps; anchors override the generated step
+        f = C["families"][fam]
+        r = dict(K.ramp(f["hue"], f["chroma"], C["ramp_steps"]), **C["anchors"].get(fam, {}))
+        L += [f"  --{fam}-{k}: {v};" for k, v in r.items()]
     g = C["gradient"]
     L.append(f"  --brand-gradient: linear-gradient(90deg, {', '.join(f'{h} {p * 100:g}%' for h, p in zip(g['stops'], g['positions']))});")
     L.append(f"  --iridescence: conic-gradient({', '.join(C['iridescence']['stops'])});")
@@ -120,12 +123,13 @@ def write_css():
         L.append(f"  --{e['name']}: {e['value']};")
     for s in SPRINGS:
         L.append(f"  --spring-{s['name']}: {s['linear']};")
-        L.append(f"  --spring-{s['name']}-ms: {s['settle_ms']}ms;")
+        L.append(f"  --spring-{s['name']}-ms: {s['css_ms']}ms;  /* settles within 2% at {s['settle_ms']}ms */")
     for k, v in B["motion"]["durations_ms"].items():
         L.append(f"  --dur-{k}: {v}ms;")
     L.append("}")
     L.append("@media (prefers-reduced-motion: reduce) { :root { " + " ".join(f"--dur-{k}: 0ms;" for k in B["motion"]["durations_ms"]) + " } }")
     open(os.path.join(DOC, "brand.css"), "w").write("\n".join(L) + "\n")
+    open(os.path.join(ROOT, "website", "brand.css"), "w").write("\n".join(L) + "\n")  # the site links its own copy
 
 
 def write_dtcg():

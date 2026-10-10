@@ -335,55 +335,64 @@
     "hex": "#F5866B",
     "name": "Coral (v1 accent on dark)",
     "now": "#FF6B35 Ember 400",
-    "why": "owner-approved film palette r5/r6 moved the warm end to a cleaner orange; coral survives only as the gradient's first stop #F57F66"
+    "why": "owner-approved film palette r5/r6 moved the warm end to a cleaner orange; coral survives only as the gradient's first stop #F57F66",
+    "replace": "#FF6B35"
    },
    {
     "hex": "#C2593F",
     "name": "Terracotta",
     "now": "#D9430E Ember 500 (marks) / #B53700 Ember 600 (text, fills)",
-    "why": "one warm hue on every mode; terracotta was a second warm family"
+    "why": "one warm hue on every mode; terracotta was a second warm family",
+    "replace": "#B53700"
    },
    {
     "hex": "#A8472F",
     "name": "Terracotta ink",
     "now": "#B53700 Ember 600",
-    "why": "same hue as the accent, passes 4.5 on Paper and Mist"
+    "why": "same hue as the accent, passes 4.5 on Paper and Mist",
+    "replace": "#B53700"
    },
    {
     "hex": "#8B6CFF",
     "name": "Violet glow",
     "now": "#A7B1FF Signal 300 or iridescence",
-    "why": "owner r5: no violet on violet; two cool hues competed"
+    "why": "owner r5: no violet on violet; two cool hues competed",
+    "replace": "#A7B1FF"
    },
    {
     "hex": "#1F1D1A",
     "name": "Warm ink",
     "now": "#12152A",
-    "why": "one neutral family on the Midnight hue for every mode"
+    "why": "one neutral family on the Midnight hue for every mode",
+    "replace": "#12152A"
    },
    {
     "hex": "#5A534C",
     "name": "Warm ink 2",
     "now": "#404660",
-    "why": "one neutral family"
+    "why": "one neutral family",
+    "replace": "#404660"
    },
    {
     "hex": "#6E6760",
     "name": "Warm ink 3",
     "now": "#5A6180",
-    "why": "one neutral family"
+    "why": "one neutral family",
+    "replace": "#5A6180"
    },
    {
     "hex": "#F3F0E7",
     "name": "Warm inner",
     "now": "#EFF0F4 paper deep",
-    "why": "one neutral family"
+    "why": "one neutral family",
+    "replace": "#EFF0F4"
    },
    {
     "hex": "#F1ECE2",
     "name": "Bone (film r5 ink)",
     "now": "#EEF1FA Moon",
-    "why": "matches the app's own text colour; one neutral family"
+    "why": "matches the app's own text colour; one neutral family",
+    "replace": "#EEF1FA"
    },
    {
     "hex": "#FF6B35",
@@ -397,7 +406,16 @@
     "now": "Paper",
     "why": "owner r6b picked Paper over Cobalt"
    }
-  ]
+  ],
+  "migrate": {
+   "_doc": "Extra one-to-one swaps for tools/brand/migrate_colours.py: v1 warm tints that were never named. Shadows move to the brand shadow #1A1F36.",
+   "#2D2319": "#1A1F36",
+   "#ECE8DC": "#E4E2EF",
+   "#2B2723": "#20263F",
+   "#E0654A": "#D9430E",
+   "#D97736": "#D9430E",
+   "#F9A58F": "#FF9878"
+  }
  },
  "type": {
   "families": [
