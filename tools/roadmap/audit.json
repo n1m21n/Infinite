@@ -1,16 +1,16 @@
 {
  "merges": [
-  321,
-  356
+  325,
+  360
  ],
  "direct": [
   487,
-  489
+  498
  ],
  "notes_total": 347,
  "evidence": [
-  513,
-  600
+  517,
+  604
  ],
  "per_release": {
   "v0.1": {
@@ -119,6 +119,15 @@
   }
  },
  "loose": [
+  "2026-10-10 9822aad Tracking: Face Track and Pose Track nodes, hand gestures, live preview with landmark overl",
+  "2026-10-10 dcfa065 Hand Track install hint uses a token colour",
+  "2026-10-10 9f6805e Sketch 3D: plan doc, param audit and patch-authoring facts regenerated",
+  "2026-10-10 bdd39e1 Sketch 3D node: JS-built mesh source (6 presets, editor window, params, help), registered ",
+  "2026-10-10 b56b26a Sketch 3D engine: JS draw(t) builds a triangle mesh (box, sphere, cylinder, cone, torus, p",
+  "2026-10-10 77ec937 Extensions tab: one line per pack, enable checkbox, install only; no refresh or catalog er",
+  "2026-10-10 bcd0402 Extensions tab in the design language: section, status dots, primary action, token error c",
+  "2026-10-10 b8e34dd Roadmap: regenerate release history, audit and quest ledger",
+  "2026-10-09 32b758a Fix ImGui SetCursorScreenPos boundary error on collapsed nodes with modulation links",
   "2026-10-08 2bed065 Add Field Pixel image coordinate reads and camera FX presets",
   "2026-10-08 cff222b Launcher card: play before the ImGui GLFW backend exists (Windows 0xc000041d at startup)"
  ],
@@ -204,12 +213,12 @@
   "R614 INFINITE_AUDIOUITEST screenshot fixture segfaults in AudioEffectNode::ParamIndex",
   "R616 Shape Resonator: accept point clouds and curves, not only meshes",
   "R618 Launcher screen: animated Infinite logo, vertical credits (authors, contributors",
-  "R649 Fixed Predictive Modulator bindings showing amber like a regular modulator; they",
-  "R651 Lower audio CPU on heavy patches: faster Reverb, worst case 53-61% down to 40-45",
-  "R652 Fix stuck notes when rewiring note cables during playback, and a Drum Sequencer ",
-  "R653 Exported movies get exact frames from video clips (0 dropped frames, sub-millise",
-  "R654 Add `--frames-dir`, `--node` and `--codec prores4444` (macOS) for frame sequence",
-  "R655 Add full keyboard-only navigation of the canvas and node parameters"
+  "R646 Fixed Predictive Modulator bindings showing amber like a regular modulator; they",
+  "R648 Lower audio CPU on heavy patches: faster Reverb, worst case 53-61% down to 40-45",
+  "R649 Fix stuck notes when rewiring note cables during playback, and a Drum Sequencer ",
+  "R650 Exported movies get exact frames from video clips (0 dropped frames, sub-millise",
+  "R651 Add `--frames-dir`, `--node` and `--codec prores4444` (macOS) for frame sequence",
+  "R652 Add full keyboard-only navigation of the canvas and node parameters"
  ],
  "first_commit": "2026-08-10"
 }
