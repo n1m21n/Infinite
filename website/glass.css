@@ -1,0 +1,73 @@
+/* Infinite — glass layer. Loaded after style.css on every light page, so the whole site shares one material:
+   frosted white panels with a bright top edge, soft coloured light behind them, dark glass for node cards. */
+:root {
+  --card: rgba(255, 255, 255, 0.62);
+  --glass-blur: blur(20px) saturate(1.6);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(255, 255, 255, 0.3);
+  --glass-edge: 0 0 0 1px rgba(255, 255, 255, 0.55), 0 0 0 1.5px rgba(45, 35, 25, 0.06);
+  --glass-shadow: 0 1px 2px rgba(45, 35, 25, 0.05), 0 10px 28px rgba(45, 35, 25, 0.08);
+  --glass-dark: linear-gradient(180deg, rgba(38, 43, 58, 0.86), rgba(20, 23, 33, 0.9));
+}
+
+/* soft coloured light behind the glass: coral, violet, blue (the brand gradient) */
+body::before {
+  content: ''; position: fixed; inset: -10% -10% auto -10%; height: 90vh; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(40% 50% at 12% 20%, rgba(245, 127, 102, 0.22), transparent 70%),
+    radial-gradient(38% 46% at 78% 12%, rgba(139, 108, 255, 0.16), transparent 70%),
+    radial-gradient(40% 50% at 92% 62%, rgba(169, 205, 241, 0.28), transparent 70%);
+  filter: blur(10px);
+}
+
+/* panels */
+.slab, .recipe, .predict-card, .wave-card, .setup-card, .download-card, .modal-card, .film-frame, .platform-chip,
+.btn-ghost, .ticker-pill, .tab-pill, .lib-chip, .lib-view {
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-hi), var(--glass-edge), var(--glass-shadow);
+}
+.btn-ghost:hover { box-shadow: var(--glass-hi), 0 0 0 1px rgba(45, 35, 25, 0.16), 0 14px 32px rgba(45, 35, 25, 0.12); }
+
+/* header: the same glass, edge to edge */
+.site-header {
+  background: rgba(251, 250, 246, 0.55);
+  -webkit-backdrop-filter: blur(24px) saturate(1.7); backdrop-filter: blur(24px) saturate(1.7);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+}
+.site-header.scrolled { box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.6), 0 8px 24px rgba(45, 35, 25, 0.06); }
+.nav-links > a:hover, .nav-links > a[aria-current] { background: rgba(255, 255, 255, 0.7); box-shadow: var(--glass-hi), 0 0 0 1px rgba(45, 35, 25, 0.06); }
+.nav-links > a[aria-current] { color: var(--ink); }
+.icon-btn:hover { background: rgba(255, 255, 255, 0.7); box-shadow: var(--glass-hi), 0 0 0 1px rgba(45, 35, 25, 0.06); }
+
+/* primary: dark glass with a lit top edge */
+.btn-primary {
+  background: linear-gradient(180deg, #3A3733, #1F1D1A);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.5), var(--glass-shadow);
+}
+.btn-primary:hover { background: linear-gradient(180deg, #4A4640, #26231F); }
+
+/* node cards: dark glass */
+.node {
+  background: var(--glass-dark);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 1px var(--app-border), 0 0 0 1px var(--cat) inset, var(--shadow-2);
+}
+
+/* chips and toggles: pressed state is dark glass */
+.lib-chip[aria-pressed="true"], .lib-view button[aria-pressed="true"] {
+  background: linear-gradient(180deg, #3A3733, #1F1D1A); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+.lib-view { box-shadow: var(--glass-hi), var(--glass-edge); }
+.lib-view button { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.lib-view button[aria-pressed="true"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.4); }
+.lib-dl { background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(226, 230, 242, 0.9)); box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.3); }
+.lib-dl:hover { background: #fff; }
+.lib-price { background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.12); }
+
+.site-footer { background: rgba(255, 255, 255, 0.35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-top: 1px solid rgba(255, 255, 255, 0.7); }
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --card: rgba(255, 255, 255, 0.92); }
+  .site-header { background: rgba(251, 250, 246, 0.95); }
+}
+@media (prefers-reduced-transparency: reduce) { :root { --card: #fff; } }
