@@ -489,6 +489,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return RunNdiTest();
    if (getenv("INFINITE_EXTENSIONSTEST") != nullptr)
       return RunExtensionsTest();
+   if (getenv("INFINITE_TRACKINGTEST") != nullptr)
+      return RunTrackingTest();
    if (getenv("INFINITE_MIDICC14TEST") != nullptr)
       return RunMidiCC14Test();
    if (getenv("INFINITE_CVRECTEST") != nullptr)

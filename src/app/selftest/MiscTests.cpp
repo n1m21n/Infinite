@@ -1,4 +1,10 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
+#include "core/Extensions.h"
+#include "core/tracking/HandTracker.h"
+#include "stb_image.h"
+#include "stb_image_write.h"
+#include <chrono>
+#include <algorithm>
 #include "app/AppShared.h"
 #include "miniz.h"
 #include <filesystem>
@@ -2065,6 +2071,118 @@ bool RunPerfPanelSelfTest()
 
    printf("[PERF MATRIX TEST] PASS\n");
    return true;
+}
+
+// INFINITE_TRACKINGTEST=1 INFINITE_TRACKINGTEST_ZIP=<tracking pack zip>
+// INFINITE_TRACKINGTEST_IMAGE=<jpg/png> [INFINITE_TRACKINGTEST_OUT=<png>]
+// Installs the pack the same way Settings does, loads ONNX Runtime from the
+// pack folder, runs the hand pipeline on a still image and prints timings.
+int RunTrackingTest()
+{
+   int fails = 0;
+   auto check = [&](bool ok, const char* what)
+   {
+      printf("TRACKINGTEST %s: %s\n", ok ? "PASS" : "FAIL", what);
+      if (!ok) fails++;
+   };
+   const char* zipPath = getenv("INFINITE_TRACKINGTEST_ZIP");
+   const char* imgPath = getenv("INFINITE_TRACKINGTEST_IMAGE");
+   if (!zipPath || !imgPath) { printf("TRACKINGTEST needs _ZIP and _IMAGE\n"); return 1; }
+
+   const std::string root = AppPaths::TempDir() + "/infinite-trackingtest";
+   std::error_code ec;
+   std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+   setenv("INFINITE_EXTENSIONS_DIR", root.c_str(), 1);
+
+   std::string bytes, err, id;
+   {
+      std::ifstream f(zipPath, std::ios::binary);
+      bytes.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+   }
+   check(!bytes.empty(), "pack zip read");
+   check(Extensions::InstallZip(bytes, "", "tracking", id, err), "pack installs through the Settings path");
+   if (!err.empty()) printf("  %s\n", err.c_str());
+   const std::string dir = Extensions::PackDir("tracking");
+   check(!dir.empty(), "PackDir resolves after install");
+
+   Tracking::OrtRuntime rt;
+#if defined(__APPLE__)
+   const std::string lib = dir + "/lib/libonnxruntime.dylib";
+#elif defined(_WIN32)
+   const std::string lib = dir + "/lib/onnxruntime.dll";
+#else
+   const std::string lib = dir + "/lib/libonnxruntime.so";
+#endif
+   check(rt.Load(lib, err), "ONNX Runtime loads from the pack folder");
+   if (!rt.Loaded()) { printf("  %s\n", err.c_str()); return 1; }
+
+   Tracking::HandTracker ht;
+   check(ht.Open(rt, dir, true, err), "hand models open");
+   if (!err.empty()) printf("  %s\n", err.c_str());
+   printf("TRACKINGTEST info: core ml  detector=%d landmark=%d\n", ht.UsedGpuDetector(), ht.UsedGpuLandmark());
+
+   int w = 0, h = 0, n = 0;
+   std::string imgBytes;
+   {
+      std::ifstream f(imgPath, std::ios::binary);
+      imgBytes.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+   }
+   unsigned char* px = stbi_load_from_memory((const unsigned char*)imgBytes.data(), (int)imgBytes.size(), &w, &h, &n, 3);
+   check(px != nullptr, "image decodes");
+   if (!px) return 1;
+
+   Tracking::HandResult r;
+   auto now = []() { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count(); };
+   // first frame includes model warm-up
+   double t0 = now();
+   bool ok = ht.Process(px, w, h, r, err);
+   printf("TRACKINGTEST info: first frame %.1f ms\n", now() - t0);
+   check(ok && r.found, "hand found on the still image");
+   if (r.found)
+   {
+      bool inside = true;
+      for (auto& p : r.lm) if (p[0] < -w * 0.2f || p[0] > w * 1.2f || p[1] < -h * 0.2f || p[1] > h * 1.2f) inside = false;
+      check(inside, "landmarks lie near the image");
+      printf("TRACKINGTEST info: score %.2f wrist (%.0f,%.0f) index tip (%.0f,%.0f)\n", r.score, r.lm[0][0], r.lm[0][1], r.lm[8][0], r.lm[8][1]);
+   }
+
+   std::vector<double> det, trk;
+   for (int i = 0; i < 40; ++i)
+   {
+      ht.Reset();
+      t0 = now();
+      ht.Process(px, w, h, r, err);
+      det.push_back(now() - t0);
+      t0 = now();
+      ht.Process(px, w, h, r, err);   // tracking frame: ROI reused, detector skipped
+      trk.push_back(now() - t0);
+   }
+   auto pct = [](std::vector<double> v, double q) { std::sort(v.begin(), v.end()); return v[(size_t)(q * (v.size() - 1))]; };
+   printf("TRACKINGTEST info: detection frame p50 %.1f p95 %.1f ms | tracking frame p50 %.1f p95 %.1f ms (image %dx%d)\n",
+          pct(det, .5), pct(det, .95), pct(trk, .5), pct(trk, .95), w, h);
+   check(r.found && !r.redetected, "tracking frame reuses the ROI");
+
+   if (const char* outPng = getenv("INFINITE_TRACKINGTEST_OUT"))
+   {
+      ht.Reset();
+      ht.Process(px, w, h, r, err);
+      auto dot = [&](int cx, int cy, int rad)
+      {
+         for (int dy = -rad; dy <= rad; ++dy)
+            for (int dx = -rad; dx <= rad; ++dx)
+            {
+               int x = cx + dx, y = cy + dy;
+               if (x < 0 || y < 0 || x >= w || y >= h) continue;
+               unsigned char* q = px + (y * w + x) * 3;
+               q[0] = 255; q[1] = 0; q[2] = 0;
+            }
+      };
+      if (r.found)
+         for (int i = 0; i < 21; ++i) dot((int)r.lm[i][0], (int)r.lm[i][1], std::max(2, w / 200));
+      stbi_write_png(outPng, w, h, 3, px, w * 3);
+   }
+   stbi_image_free(px);
+   return fails ? 1 : 0;
 }
 
 // ============================================== INFINITE_EXTENSIONSTEST

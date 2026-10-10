@@ -193,6 +193,20 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
+# macOS: only the ORT C API headers are needed at build time. The runtime
+# library itself is loaded from the Tracking extension pack (src/core/tracking),
+# never linked or bundled.
+if(APPLE)
+    include(FetchContent)
+    FetchContent_Declare(
+        onnxruntime_mac_headers
+        URL "https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-osx-universal2-1.20.1.tgz"
+        URL_HASH SHA256=da4349e01a7e997f5034563183c7183d069caadc1d95f499b560961787813efd
+    )
+    FetchContent_MakeAvailable(onnxruntime_mac_headers)
+    set(ORT_MAC_INCLUDE_DIR "${onnxruntime_mac_headers_SOURCE_DIR}/include")
+endif()
+
 # FFmpeg, for Platform::VideoOpen/RecorderStart/CameraOpen's decode/encode/mux
 # surface on Linux (src/platform/linux/MediaLinux.cpp) - macOS uses
 # AVFoundation and Windows uses Media Foundation, both OS-supplied; Linux has
@@ -534,6 +548,8 @@ set(COMMON_SOURCES
     src/core/OscMessage.cpp
     src/core/UpdateCheck.cpp
     src/core/Extensions.cpp
+    src/core/tracking/OrtRuntime.cpp
+    src/core/tracking/HandTracker.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
     src/audio/AudioEngine.cpp
@@ -1283,6 +1299,7 @@ if(NOT WIN32)
 endif()
 
 if(APPLE)
+    target_include_directories(Infinite PRIVATE "${ORT_MAC_INCLUDE_DIR}")
     set_source_files_properties(src/platform/Platform.mm src/platform/HeadTracker.mm src/audio/AudioFileWriter.mm
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${SYPHON_SOURCES}
