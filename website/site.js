@@ -16,7 +16,7 @@
 
   const CAT = {
     Source: '#4ADE80', '3D': '#38BDF8', Compositing: '#818CF8', Effects: '#FACC15',
-    Modulators: '#A3E635', Prediction: '#22C55E', Macros: '#FC963C', Utility: '#A3A9BA',
+    Modulators: '#A3E635', Prediction: '#22D388', Macros: '#FC963C', Utility: '#A3A9BA',
     Notes: '#4CD964', Synths: '#6992F6', AudioEffects: '#53C7E3'
   };
   const CAT_LABEL = { AudioEffects: 'Audio FX' };
@@ -367,7 +367,7 @@
           if (n >= shown) return;
           const gl = FONT5x7[ln[ci]] || FONT5x7[' '];
           for (let pass = 0; pass < 2; pass++) {
-            g.fillStyle = pass === 0 ? '#22C55E' : '#12152A';
+            g.fillStyle = pass === 0 ? '#22D388' : '#12152A';
             const off = pass === 0 ? 1 : 0;
             for (let r = 0; r < 7; r++) for (let c = 0; c < 5; c++) {
               if (gl[r][c] === '1') g.fillRect((x0 + ci * 6 + c + off) * px, (li * 9 + r + off) * px, px, px);
@@ -444,16 +444,16 @@
         g.strokeStyle = 'rgba(26,31,54,0.08)'; g.lineWidth = 4; g.stroke();
         const aV = A0 + SWEEP * k.v, aG = A0 + SWEEP * ghost.v;
         g.beginPath(); g.arc(cx, cy, R + 9, Math.min(aV, aG), Math.max(aV, aG));
-        g.setLineDash([2, 6]); g.strokeStyle = 'rgba(34,197,94,0.9)'; g.lineWidth = 4; g.stroke(); g.setLineDash([]);
+        g.setLineDash([2, 6]); g.strokeStyle = 'rgba(34,211,136,0.9)'; g.lineWidth = 4; g.stroke(); g.setLineDash([]);
         g.beginPath(); g.arc(cx + Math.cos(aG) * (R + 9), cy + Math.sin(aG) * (R + 9), 4.5, 0, Math.PI * 2);
-        g.fillStyle = 'rgba(34,197,94,0.35)'; g.fill();
+        g.fillStyle = 'rgba(34,211,136,0.35)'; g.fill();
         // body
         g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2);
         g.fillStyle = '#181B23'; g.fill();
         g.beginPath(); g.arc(cx, cy, R * 0.78, A0, A0 + SWEEP);
         g.strokeStyle = '#383C47'; g.lineWidth = R * 0.12; g.stroke();
         g.beginPath(); g.arc(cx, cy, R * 0.78, A0, aV);
-        g.strokeStyle = '#22C55E'; g.stroke();
+        g.strokeStyle = '#22D388'; g.stroke();
         g.beginPath(); g.moveTo(cx + Math.cos(aV) * R * 0.2, cy + Math.sin(aV) * R * 0.2);
         g.lineTo(cx + Math.cos(aV) * R * 0.62, cy + Math.sin(aV) * R * 0.62);
         g.strokeStyle = '#EEF0F6'; g.lineWidth = Math.max(2, R * 0.08); g.stroke();

@@ -239,7 +239,7 @@
    },
    {
     "name": "Prediction",
-    "hex": "#22C55E"
+    "hex": "#22D388"
    },
    {
     "name": "Macros",
@@ -409,6 +409,7 @@
   ],
   "migrate": {
    "_doc": "Extra one-to-one swaps for tools/brand/migrate_colours.py: v1 warm tints that were never named. Shadows move to the brand shadow #1A1F36.",
+   "#22C55E": "#22D388",
    "#2D2319": "#1A1F36",
    "#ECE8DC": "#E4E2EF",
    "#2B2723": "#20263F",

@@ -275,7 +275,7 @@ strong { font-weight: 600; color: var(--ink); }
   background: rgba(255, 255, 255, 0.7); box-shadow: 0 0 0 1px var(--line-soft);
   font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--ink2); letter-spacing: 0.02em;
 }
-.dot-live { width: 7px; height: 7px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18); flex: none; }
+.dot-live { width: 7px; height: 7px; border-radius: 50%; background: #22D388; box-shadow: 0 0 0 3px rgba(34, 211, 136, 0.18); flex: none; }
 
 /* --------------------------------------------------------------------------
    Product: one screenshot in an app window
