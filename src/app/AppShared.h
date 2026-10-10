@@ -3965,6 +3965,7 @@ void DrawDistributePointsOnFacesParams(DistributePointsOnFacesNode* n);
 
 void DrawPointsToVerticesParams(PointsToVerticesNode* n);
 void DrawDelaunayParams(DelaunayMeshNode* n);
+void DrawCurveOpsParams(CurveOpsNode* n);
 
 void DrawDistributePointsInGridParams(DistributePointsInGridNode* n);
 

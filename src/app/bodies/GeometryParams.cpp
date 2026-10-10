@@ -733,6 +733,33 @@ namespace app
    }
 
 
+   void DrawCurveOpsParams(CurveOpsNode* n)
+   {
+      if (n->input != nullptr)
+         ImGui::TextDisabled("%zu points out", n->PointCount());
+      DropdownButton("mode", CurveOpsNode::ModeNames(), n->mode,
+                     [n](int i) { PushUndoCheckpoint(); n->mode = i; });
+      switch (n->mode)
+      {
+         case CurveOpsNode::kSimplify:
+            ModSlider("tolerance", &n->tolerance, 0.0f, 0.5f, "%.3f");
+            break;
+         case CurveOpsNode::kSmooth:
+            ModSliderInt("iterations", &n->iterations, 0, 50);
+            ModSlider("strength", &n->strength, 0.0f, 1.0f);
+            break;
+         case CurveOpsNode::kOffset:
+            ModSlider("distance", &n->distance, -2.0f, 2.0f);
+            ModSliderInt("arc steps", &n->arcSteps, 1, 16);
+            break;
+         default:
+            ModSliderInt("count", &n->count, 2, 512);
+            break;
+      }
+      ModSlider("tube radius", &n->radius, 0.002f, 0.2f, "%.3f");
+   }
+
+
    void DrawDelaunayParams(DelaunayMeshNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());

@@ -514,6 +514,7 @@ set(COMMON_SOURCES
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
     src/core/Delaunay.cpp
+    src/core/CurveOps.cpp
     src/core/MeshDecimate.cpp
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
@@ -674,6 +675,7 @@ set(COMMON_SOURCES
     src/nodes/FieldGraphNode.cpp
     src/nodes/PointDistributionNodes.cpp
     src/nodes/DelaunayNodes.cpp
+    src/nodes/CurveOpsNode.cpp
     src/nodes/DepthProjectionNode.cpp
     src/nodes/SceneNodes.cpp
     src/nodes/FeedbackNodes.cpp
