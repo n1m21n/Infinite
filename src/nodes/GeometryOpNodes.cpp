@@ -19,7 +19,7 @@ namespace
       // still named here so a saved index still has a label, just not spawned
       // or offered in the operation dropdown (GeometryOpNode::IsSpawnable).
       "Select", "Delete Selected", "Transform Selected", "Extrude Selected",
-      "Delete"
+      "Delete", "Decimate"
    };
    const std::vector<std::string> kSourceNames = { "Vertices", "Edges", "Faces" };
    const std::vector<std::string> kWrapModeNames = { "Cylindrical", "Spherical", "Nearest Surface" };
@@ -187,6 +187,8 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.rise = rise;
    s.radiusOffset = radiusOffset;
    s.weldSeam = weldSeam;
+   s.decimateRatio = decimateRatio;
+   s.lockBorder = lockBorder;
    s.upstream = input;
    // The upstream's own revision stamp, not its triangle count: Select and
    // other mask-only operators leave the vertex/index count unchanged, so a
@@ -310,6 +312,10 @@ const Mesh& GeometryOpNode::GetMesh()
          // Duplicates the whole mesh - "only these faces" isn't meaningful.
          // selectionOnly hidden.
          mCache = MeshOps::Mirror(src, axis, mirrorOffset, weldSeam, keepOriginal);
+         break;
+      case kDecimate:
+         // Connectivity-dependent - see kSubdivide. selectionOnly hidden.
+         mCache = MeshOps::Decimate(src, decimateRatio, lockBorder);
          break;
       case kScrew:
          // Connectivity-dependent - see kSubdivide. selectionOnly hidden.

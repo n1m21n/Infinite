@@ -44,6 +44,9 @@ public:
       // every face, which is a legitimate (if unexciting) way to empty a
       // mesh; turn `selectionOnly` on to restrict it to a Select node's mask.
       kDelete,
+      // Quadric edge-collapse simplification (MeshOps::Decimate). Appended
+      // after kDelete so every saved `op` integer keeps its meaning.
+      kDecimate,
       kOpCount
    };
 
@@ -213,6 +216,9 @@ public:
    // Mirror
    float mirrorOffset = 0.0f;
    bool weldSeam = true;
+   // Decimate
+   float decimateRatio = 0.5f;
+   bool lockBorder = true;
    // Screw
    int screwSteps = 32;
    float turns = 1.0f;
@@ -281,6 +287,7 @@ public:
       v.Int("explodeBy", explodeBy);
       v.Int("iterations", iterations); v.Float("mirrorOffset", mirrorOffset);
       v.Bool("weldSeam", weldSeam); v.Int("screwSteps", screwSteps);
+      v.Float("decimateRatio", decimateRatio); v.Bool("lockBorder", lockBorder);
       v.Float("turns", turns); v.Float("rise", rise); v.Float("radiusOffset", radiusOffset);
       v.Int("selectMode", selectMode); v.Float("selectA", selectA);
       v.Float("selectB", selectB); v.Float("selectC", selectC);
@@ -316,6 +323,8 @@ private:
       int iter = 0, screwSteps = 0;
       float mirrorOffset = 0, turns = 0, rise = 0, radiusOffset = 0;
       bool weldSeam = false;
+      float decimateRatio = 0;
+      bool lockBorder = false;
       int selectMode = -1;
       float selectA = 0, selectB = 0, selectC = 0, selectSeed = 0, normalAmount = 0;
       bool selectInvert = false, selectAppend = false, keepSelected = false;
@@ -344,6 +353,7 @@ private:
                 flip == o.flip && iter == o.iter && screwSteps == o.screwSteps &&
                 mirrorOffset == o.mirrorOffset && turns == o.turns && rise == o.rise &&
                 radiusOffset == o.radiusOffset && weldSeam == o.weldSeam &&
+                decimateRatio == o.decimateRatio && lockBorder == o.lockBorder &&
                 selectMode == o.selectMode && selectA == o.selectA &&
                 selectB == o.selectB && selectC == o.selectC &&
                 selectSeed == o.selectSeed && normalAmount == o.normalAmount &&

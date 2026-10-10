@@ -1124,6 +1124,10 @@ namespace app
             ModSlider("distance", &n->thickness, -1.0f, 1.0f);
             ModSlider("inset", &n->inset, 0.0f, 0.9f);
             break;
+         case GeometryOpNode::kDecimate:
+            ModSlider("keep", &n->decimateRatio, 0.01f, 1.0f, "%.2f");
+            ModCheckbox("lock border", &n->lockBorder);
+            break;
          case GeometryOpNode::kScrew:
             ModSliderInt("steps", &n->screwSteps, 3, 256);
             ModSlider("turns", &n->turns, 0.05f, 6.0f);

@@ -514,6 +514,7 @@ set(COMMON_SOURCES
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
     src/core/Delaunay.cpp
+    src/core/MeshDecimate.cpp
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
