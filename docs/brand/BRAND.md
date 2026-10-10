@@ -174,7 +174,7 @@ Web scale (fluid from 375 to 1440 px; text steps × 1.25, display × 1.5):
 | Crossing | Branches cross at 90°, each at 45° to the axis |
 | Clear space | 2 s on every side |
 | Minimum | Mark 20 px wide; tile icon 16 px |
-| Tile | Midnight `#151930` rounded square (22.5% corner), mark at 0.70 of its width |
+| Tile | Midnight `#151930` rounded square, 18.5% corner, mark at 0.74 of its width (measured from the shipped icon; `build_logo.py --check` guards it) |
 | 3D | One tube, diameter s; the two passes through the crossing separate by 1.24 s so it reads over and under (`logo_3d.glb`) |
 
 Draw it from the formula and compare with `assets/Infinite.iconset` before shipping. Never recolour, rotate, outline, add glow or shadow to the flat mark, place it on a busy photo without the tile, or approximate the curve.

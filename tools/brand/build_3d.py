@@ -554,9 +554,9 @@ def build_logo(origin):
     pts = [(x, y, z + s / 2 + s * 0.62) for x, y, z in lemniscate(A, 480, s * 0.62)]
     ob = tube("lemniscate", pts, s / 2, gm, c, "logo", cyclic=True, res=24)
     ob.location = origin
-    # the tile: Midnight rounded square, mark width 0.70 of the tile, sitting flush (flat mark extruded 2)
-    T = (2 * A + s) / 0.70
-    tile = prism("tile", rrect(T, T, T * 0.225, 16), 0, 24, mat("tile", M["ground"], 0.5), c, "logo", bevel=5)
+    # the tile: Midnight rounded square, corner and mark width from brand.json logo.tile, sitting flush (flat mark extruded 2)
+    T = (2 * A + s) / B["logo"]["tile"]["mark_width"]
+    tile = prism("tile", rrect(T, T, T * B["logo"]["tile"]["corner"], 16), 0, 24, mat("tile", M["ground"], 0.5), c, "logo", bevel=5)
     flat = tube("lemniscate_flat", [(x, y, 24 + s / 2 - 1) for x, y, _ in lemniscate(A, 480)], s / 2, gm, c, "logo", cyclic=True, res=24)
     for o in (tile, flat):
         o.location = (origin[0], origin[1] - 520, origin[2])
