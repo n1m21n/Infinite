@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=30">
-  <link rel="stylesheet" href="library.css?v=3">
+  <link rel="stylesheet" href="library.css?v=4">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -73,12 +73,16 @@
         </div>
 
         <div class="lib-bar">
-          <div class="lib-chips" id="chips" role="group" aria-label="Filter the library"></div>
+          <div class="lib-chips" id="chips" role="group" aria-label="Filter by category"></div>
           <div class="lib-bar-end">
             <span class="lib-count mono" id="count" aria-live="polite"></span>
-            <a class="btn btn-ghost btn-sm" href="assets/library/infinite-library.zip" download>
+            <div class="lib-view" id="view" role="group" aria-label="Cards per row">
+              <button type="button" data-cols="4" aria-pressed="true" aria-label="4 cards per row">4</button>
+              <button type="button" data-cols="8" aria-pressed="false" aria-label="8 cards per row">8</button>
+            </div>
+            <a class="btn btn-ghost btn-sm" href="assets/library/infinite-library.zip" download aria-label="Download all">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 20h16"/></svg>
-              Download all
+              <span class="lib-dl-text">Download all</span>
             </a>
           </div>
         </div>
@@ -100,6 +104,6 @@
   </main>
 
   
-  <script src="library.js?v=3"></script>
+  <script src="library.js?v=4"></script>
 </body>
 </html>
