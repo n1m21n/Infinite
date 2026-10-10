@@ -1092,7 +1092,7 @@
   {
    "channel": "macOS",
    "asset": "DMG background",
-   "size": "660x400 @2x",
+   "size": "600x400 pt @2x (tools/dmg/make_background.py)",
    "mode": "paper"
   },
   {
@@ -1137,5 +1137,152 @@
    "size": "512x512 / 960x540",
    "mode": "tile / midnight"
   }
- ]
+ ],
+ "render": {
+  "_doc": "Targets for tools/brand/channels.py. safe = [x, y, w, h] in px where text and the mark must sit (platform UI and crops cover the rest); hero layouts use a 6% margin.",
+  "targets": [
+   {
+    "id": "og",
+    "name": "Website Open Graph",
+    "w": 1200,
+    "h": 630,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "yt-thumb",
+    "name": "YouTube thumbnail",
+    "w": 1280,
+    "h": 720,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "yt-banner",
+    "name": "YouTube channel banner",
+    "w": 2560,
+    "h": 1440,
+    "mode": "midnight",
+    "layout": "banner",
+    "safe": [
+     507,
+     508,
+     1546,
+     423
+    ]
+   },
+   {
+    "id": "x-post",
+    "name": "X post",
+    "w": 1600,
+    "h": 900,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "x-header",
+    "name": "X header",
+    "w": 1500,
+    "h": 500,
+    "mode": "midnight",
+    "layout": "banner",
+    "safe": [
+     300,
+     60,
+     1050,
+     380
+    ]
+   },
+   {
+    "id": "li-post",
+    "name": "LinkedIn post",
+    "w": 1200,
+    "h": 627,
+    "mode": "paper",
+    "layout": "hero"
+   },
+   {
+    "id": "li-banner",
+    "name": "LinkedIn banner",
+    "w": 1584,
+    "h": 396,
+    "mode": "midnight",
+    "layout": "banner",
+    "safe": [
+     420,
+     48,
+     1100,
+     300
+    ]
+   },
+   {
+    "id": "gh-social",
+    "name": "GitHub social preview",
+    "w": 1280,
+    "h": 640,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "readme-dark",
+    "name": "GitHub README hero (dark)",
+    "w": 2560,
+    "h": 1280,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "readme-light",
+    "name": "GitHub README hero (light)",
+    "w": 2560,
+    "h": 1280,
+    "mode": "paper",
+    "layout": "hero"
+   },
+   {
+    "id": "ig-post",
+    "name": "Instagram feed post",
+    "w": 1080,
+    "h": 1350,
+    "mode": "midnight",
+    "layout": "portrait",
+    "safe": [
+     65,
+     81,
+     950,
+     1188
+    ]
+   },
+   {
+    "id": "story",
+    "name": "Shorts / Reels / TikTok cover",
+    "w": 1080,
+    "h": 1920,
+    "mode": "midnight",
+    "layout": "portrait",
+    "safe": [
+     65,
+     269,
+     864,
+     1229
+    ]
+   },
+   {
+    "id": "slide-title",
+    "name": "Slide title",
+    "w": 1920,
+    "h": 1080,
+    "mode": "midnight",
+    "layout": "hero"
+   },
+   {
+    "id": "discord-banner",
+    "name": "Discord banner",
+    "w": 960,
+    "h": 540,
+    "mode": "midnight",
+    "layout": "hero"
+   }
+  ]
+ }
 }

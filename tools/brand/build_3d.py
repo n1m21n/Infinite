@@ -2,6 +2,10 @@
 
     python3 tools/brand/build_3d.py            # every asset, every render (about 2 min on an M-series laptop)
     python3 tools/brand/build_3d.py --quick    # low samples, for layout checks
+    python3 tools/brand/build_3d.py --only node_hero_cutout,logo_3d_cutout   # just these renders, no save/export
+
+Cutouts (*_cutout.png) are transparent PNGs rendered in Cycles with the floor as a shadow catcher, so the object and
+its contact shadow sit on any ground (channels.py, slides, the website).
 
 Run with system Python: it re-launches itself inside Blender (-b). Every number comes from docs/brand/brand.json
 (node3d, logo, colour.modes.midnight); geometry is built in app pixels (1 unit = 1 px at 100% UI scale) and exported
@@ -27,6 +31,9 @@ except ImportError:
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 QUICK = "--quick" in ARGS
+ONLY = set(next((a.split("=", 1)[1] for a in ARGS if a.startswith("--only=")), "").split(",")) - {""}
+if "--only" in ARGS:
+    ONLY = set(ARGS[ARGS.index("--only") + 1].split(","))
 B = json.load(open(os.path.join(ROOT, "docs", "brand", "brand.json")))
 M = B["colour"]["modes"]["midnight"]
 N3 = B["node3d"]
@@ -669,6 +676,8 @@ def setup_render():
 
 
 def render(cam, name, res, colls_on):
+    if ONLY and name not in ONLY:
+        return
     sc = bpy.context.scene
     for c in bpy.data.collections:
         c.hide_render = c.name not in colls_on
@@ -678,6 +687,27 @@ def render(cam, name, res, colls_on):
     sc.render.filepath = os.path.join(REN, name + ".png")
     bpy.ops.render.render(write_still=True)
     print("render", name)
+
+
+def render_cutout(cam, name, res, colls_on, floor_ob):
+    """Transparent PNG with a real contact shadow: Cycles, film transparent, floor as shadow catcher."""
+    if ONLY and name not in ONLY:
+        return
+    sc = bpy.context.scene
+    eng = sc.render.engine
+    sc.render.engine = "CYCLES"
+    sc.cycles.samples = 24 if QUICK else 128
+    sc.cycles.use_denoising = True
+    sc.render.film_transparent = True
+    sc.render.image_settings.color_mode = "RGBA"
+    floor_ob.is_shadow_catcher = True
+    try:
+        render(cam, name, res, colls_on)
+    finally:
+        floor_ob.is_shadow_catcher = False
+        sc.render.film_transparent = False
+        sc.render.image_settings.color_mode = "RGB"
+        sc.render.engine = eng
 
 
 def explode(coll, offsets):
@@ -738,6 +768,7 @@ def main():
     hero = camera("cam_hero", (-20, -10, 20), -yaw, pitch, 1380, 50)
     sun("fill", 270 - yaw, pitch, KEY * lt["fill"]["ratio"], 12)
     render(hero, "node_hero", (1920, 1200), {"node_audio_filter"})
+    render_cutout(hero, "node_hero_cutout", (1920, 1200), {"node_audio_filter"}, fl)
 
     top = camera("cam_top", (0, 0, 0), 0, 90, 3000, ortho=W * 1.14)
     render(top, "node_top", (1200, int(1200 * (H * 1.14) / (W * 1.14) + 0.5) // 2 * 2), {"node_audio_filter"})
@@ -757,6 +788,12 @@ def main():
 
     lc = camera("cam_logo", (LOGO[0], LOGO[1], 30), -14, 30, 900, 70)
     render(lc, "logo_3d", (1600, 900), {"logo"})
+    tile_obs = [o for o in bpy.data.collections["logo"].objects if o.name.startswith(("tile", "lemniscate_flat"))]
+    for o in tile_obs:
+        o.hide_render = True
+    render_cutout(lc, "logo_3d_cutout", (1600, 900), {"logo"}, fl)
+    for o in tile_obs:
+        o.hide_render = False
     tc = camera("cam_tile", (LOGO[0], LOGO[1] - 520, 10), -18, 48, 1150, 70)
     mark3d = bpy.data.objects["lemniscate"]
     mark3d.hide_render = True
@@ -765,6 +802,9 @@ def main():
 
     bc = camera("cam_ball", (BALL[0], BALL[1], 60), -20, 18, 700, 85)
     render(bc, "brand_ball", (1000, 1000), {"ball"})
+    render_cutout(bc, "brand_ball_cutout", (1000, 1000), {"ball"}, fl)
+    if ONLY:
+        return
 
     for c in bpy.data.collections:
         c.hide_render = False

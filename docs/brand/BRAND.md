@@ -351,7 +351,7 @@ To build another node, add a `build_<node>()` next to `build_node()` in `tools/b
 | GitHub | README hero | 1280 × 640 @2x, light and dark via `<picture>` | Both |
 | Release | Release notes | Markdown, sentence case | n/a |
 | macOS | App icon | 1024 master, iconset 16 to 512 @2x | Tile |
-| macOS | DMG background | 660 × 400 @2x | Paper |
+| macOS | DMG background | 600 × 400 pt @2x (`tools/dmg/make_background.py`) | Paper |
 | Windows | ICO | 16, 24, 32, 48, 64, 256 | Tile |
 | Linux | Desktop icon | SVG + 256 + 512 | Tile |
 | Docs / PDF | Manual page | A4 and US Letter | Paper |
