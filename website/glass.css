@@ -46,11 +46,14 @@ body::before {
 }
 .btn-primary:hover { background: linear-gradient(180deg, #D26F55, #C85F44); }
 
-/* node cards: dark glass */
+/* node cards: light glass (white Card on Paper); the app mock stays the app's dark */
+.node, .pnode {
+  --app-panel: #FFFFFF; --app-text: #1F1D1A; --app-dim: #5A534C; --app-border: rgba(45, 35, 25, 0.10);
+}
 .node {
-  background: var(--glass-dark);
+  background: rgba(255, 255, 255, 0.82);
   -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), var(--shadow-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--shadow-2);
 }
 
 /* chips and toggles: pressed state is dark glass */
@@ -61,8 +64,8 @@ body::before {
 .lib-view { box-shadow: var(--glass-hi), var(--glass-edge); }
 .lib-view button { background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .lib-view button[aria-pressed="true"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.4); }
-.lib-dl { background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(226, 230, 242, 0.9)); box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.3); }
-.lib-dl:hover { background: #fff; }
+.lib-dl { background: linear-gradient(180deg, #CB654A, #C2593F); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 4px 12px rgba(194, 89, 63, 0.25); }
+.lib-dl:hover { background: linear-gradient(180deg, #D26F55, #C85F44); }
 .lib-price { background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.12); }
 
 .site-footer { background: rgba(255, 255, 255, 0.35); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-top: 1px solid rgba(255, 255, 255, 0.7); }
@@ -75,5 +78,7 @@ body::before {
 
 /* cards carry no outline: depth comes from the glass, the lit top edge and the shadow */
 .step { box-shadow: none; }
-.lib-copy { background: rgba(255, 255, 255, 0.08); color: var(--app-text); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.12); }
-.lib-copy:hover { background: rgba(255, 255, 255, 0.16); }
+.lib-copy { background: var(--inner); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8); }
+.lib-copy:hover { background: #ECE8DC; }
+
+.lib-price { background: var(--inner); box-shadow: none; }
