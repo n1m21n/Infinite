@@ -48,7 +48,9 @@ REN = os.path.join(OUT, "renders")
 FONTS = os.path.join(ROOT, "art", "brand", "fonts")
 os.makedirs(REN, exist_ok=True)
 
-CAT = {c["name"]: c["hex"] for c in B["colour"]["category"]}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from category_audit import app_categories  # noqa: E402
+CAT = {c["name"]: c["hex"] for c in app_categories()}  # renders show the default theme preset
 ROLE = {r["name"]: r["dark"] for r in B["colour"]["role"]}
 EMBER = B["colour"]["anchors"]["ember"]["400"]
 SIGNAL = M["signal"]

@@ -90,6 +90,7 @@
   --midnight-950: #0D1020;
   --brand-gradient: linear-gradient(90deg, #F57F66 0%, #D99A9C 35%, #C7AFC0 65%, #A9CDF1 100%);
   --iridescence: conic-gradient(#A7B1FF, #8FE3D0, #F6B4C8, #FF8A5C, #A7B1FF);
+  /* category colours: the app's default theme preset; themes and users change them, so never hard-code */
   --cat-source: #4ADE80;
   --cat-3d: #38BDF8;
   --cat-compositing: #818CF8;
@@ -100,7 +101,7 @@
   --cat-utility: #A3A9BA;
   --cat-notes: #4CD964;
   --cat-synths: #6992F6;
-  --cat-audio-effects: #53C7E3;
+  --cat-audioeffects: #53C7E3;
   --type-display: 800 clamp(2.5rem, 1.268rem + 5.258vw, 6rem)/0.98 Geist, system-ui, sans-serif;
   --track-display: -0.04em;
   --type-h1: 750 clamp(2rem, 1.362rem + 2.723vw, 3.812rem)/1.04 Geist, system-ui, sans-serif;

@@ -11,11 +11,11 @@ Usage:
     python3 tools/brand/category_audit.py                # write the report, print a summary
     python3 tools/brand/category_audit.py --preset Infinite
     python3 tools/brand/category_audit.py --stdout       # print the report instead of writing it
-It also checks docs/brand/brand.json colour.category against the Infinite preset (the brand book's copy drifts).
+Category colours are theme-owned and user-editable, so the brand keeps no copy: other tools call app_categories()
+(the default preset, for renders and CSS) or presets() (all of them).
 Exit codes: 0 report written, 1 the Infinite preset has more near-identical pairs (deltaE under 3) than BASELINE_SAME
-(the ratchet: lower it when a fix lands) or brand.json disagrees with the app, 2 usage error.
+(the ratchet: lower it when a fix lands), 2 usage error.
 """
-import json
 import os
 import re
 import sys
@@ -55,6 +55,12 @@ def presets():
         if line.startswith("   };"):
             break
     return [p for p in out if p["cats"]]
+
+
+def app_categories(preset="Infinite"):
+    """[{name, hex}] for one theme preset (default: the app's default theme)."""
+    p = next(p for p in presets() if p["name"] == preset)
+    return [{"name": n, "hex": h} for n, h in p["cats"]]
 
 
 def audit(p):
@@ -123,13 +129,6 @@ def main():
         if same > BASELINE_SAME:
             print(f"  worse: Infinite has {same} near-identical pairs, baseline {BASELINE_SAME}")
             bad = 1
-        app = {n.replace(" ", ""): h for n, h in inf[0]["cats"]}
-        B = json.load(open(os.path.join(ROOT, "docs", "brand", "brand.json")))
-        for c in B["colour"]["category"]:
-            h = app.get(c["name"].replace(" ", ""))
-            if h and h.upper() != c["hex"].upper():
-                print(f"  drift: brand.json {c['name']} {c['hex']} but the app draws {h}")
-                bad = 1
     return bad
 
 

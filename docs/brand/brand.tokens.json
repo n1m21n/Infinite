@@ -641,6 +641,7 @@
     }
   },
   "category": {
+    "$description": "Default theme preset only (src/core/CategoryColors.cpp); themes and users change these.",
     "source": {
       "$type": "color",
       "$value": {
@@ -761,7 +762,7 @@
         "hex": "#6992F6"
       }
     },
-    "audio-effects": {
+    "audioeffects": {
       "$type": "color",
       "$value": {
         "colorSpace": "srgb",

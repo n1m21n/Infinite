@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build the brand book and its token files from docs/brand/brand.json.
 
-    python3 tools/brand/build_brand_book.py
+    python3 tools/brand/build_brand_book.py            # HTML, tokens, and brand-book.pdf (headless Chrome)
+    python3 tools/brand/build_brand_book.py --no-pdf   # skip the PDF
 
 Writes docs/brand/brand-book.html (the visual book), docs/brand/brand.css (CSS custom properties per mode),
 docs/brand/brand.tokens.json (Design Tokens Community Group format, 2025.10) and docs/brand/img/*.webp (the 3D
@@ -17,12 +18,26 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import colour as K  # noqa: E402
+from category_audit import app_categories, audit, presets  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DOC = os.path.join(ROOT, "docs", "brand")
 B = json.load(open(os.path.join(DOC, "brand.json")))
 C = B["colour"]
 MODES = C["modes"]
+# Category colours belong to the theme (CategoryColors.cpp presets + user overrides); the default preset stands in
+# wherever one set has to be picked. Role colours are fixed in every theme: the book fails if brand.json drifts.
+CATS = app_categories()
+PRESETS = presets()
+ROLE_TOKEN = {"Record": "action.record", "Solo": "action.solo", "Learn": "action.learn", "Modulation": "pin.mod",
+              "Expression": "pin.expr", "Prediction": "pin.pred", "Go": "action.go", "Favourite": "badge.favorite"}
+_pairs = json.load(open(os.path.join(ROOT, "src", "app", "ui", "design", "tokens.json")))["roles"]["pairs"]
+_hx = lambda c: "#%02X%02X%02X" % tuple(c[:3])
+_drift = [f'{r["name"]} {m}: brand.json {r[m]}, tokens.json {_hx(_pairs[ROLE_TOKEN[r["name"]]][m])}'
+          for r in C["role"] for m in ("dark", "light") if r[m].upper() != _hx(_pairs[ROLE_TOKEN[r["name"]]][m])]
+if _drift:
+    print("role colour drift:\n  " + "\n  ".join(_drift))
+    sys.exit(1)
 E = html.escape
 
 
@@ -106,7 +121,8 @@ def write_css():
     g = C["gradient"]
     L.append(f"  --brand-gradient: linear-gradient(90deg, {', '.join(f'{h} {p * 100:g}%' for h, p in zip(g['stops'], g['positions']))});")
     L.append(f"  --iridescence: conic-gradient({', '.join(C['iridescence']['stops'])});")
-    for c in C["category"]:
+    L.append("  /* category colours: the app's default theme preset; themes and users change them, so never hard-code */")
+    for c in CATS:
         L.append(f"  --cat-{slug(c['name'])}: {c['hex']};")
     for s in B["type"]["web_scale"]:
         fam = "'Geist Mono', ui-monospace, monospace" if "mono" in s["step"].lower() else "Geist, system-ui, sans-serif"
@@ -135,7 +151,8 @@ def write_dtcg():
     t = {"$description": "Infinite brand tokens (DTCG 2025.10). Generated from docs/brand/brand.json.",
          "mode": {m: {k: col(v) for k, v in r.items() if not k.startswith("_") and v.startswith("#")} for m, r in MODES.items()},
          "palette": {f: {k: col(v) for k, v in p.items()} for f, p in C["anchors"].items()},
-         "category": {slug(c["name"]): col(c["hex"]) for c in C["category"]},
+         "category": {"$description": "Default theme preset only (src/core/CategoryColors.cpp); themes and users change these.",
+                      **{slug(c["name"]): col(c["hex"]) for c in CATS}},
          "radius": {slug(r["name"]): {"$type": "dimension", "$value": {"value": r["px"], "unit": "px"}} for r in B["shape"]["brand_radius"]},
          "space": {str(s): {"$type": "dimension", "$value": {"value": s, "unit": "px"}} for s in B["shape"]["space"]},
          "duration": {k: {"$type": "duration", "$value": {"value": v, "unit": "ms"}} for k, v in B["motion"]["durations_ms"].items()},
@@ -261,17 +278,17 @@ def cvd_strip():
     return f'<div class="cvds" style="background:{MODES["midnight"]["ground"]}">{"".join(rows)}<p>Swatches: {", ".join(n for n, _ in pairs)}. Simulation: Machado, Oliveira and Fernandes 2009, severity 1.</p></div>'
 
 
-def collisions():
-    cats = C["category"]
-    out = []
-    for i, a in enumerate(cats):
-        for b in cats[i + 1:]:
-            worst = min([("normal", K.delta_e(a["hex"], b["hex"]))] + [(k, K.delta_e(K.cvd(a["hex"], k), K.cvd(b["hex"], k))) for k in ("protan", "deutan", "tritan")], key=lambda x: x[1])
-            if worst[1] < 6:
-                out.append((worst[1], a, b, worst[0]))
-    out.sort(key=lambda x: x[0])
-    rows = "".join(f'<tr><td><span class="dot" style="background:{a["hex"]}"></span>{a["name"]}</td><td><span class="dot" style="background:{b["hex"]}"></span>{b["name"]}</td><td>{k}</td><td><b>{d:.1f}</b></td></tr>' for d, a, b, k in out[:10])
-    return f'<table class="t"><tr><th>category</th><th>vs</th><th>worst vision</th><th>ΔE OK</th></tr>{rows}</table>'
+def theme_table():
+    """One row per theme preset: its category colours as a strip, plus how many pairs are confusable."""
+    rows = []
+    for p in PRESETS:
+        pairs, low = audit(p)
+        strip = "".join(f'<i title="{E(n)} {h}" style="background:{h}"></i>' for n, h in p["cats"])
+        rows.append(f'<tr><td><b>{E(p["name"])}</b></td><td><div class="strip" style="background:{p["panel"] or "transparent"}">{strip}</div></td>'
+                    f'<td>{len(pairs)}</td><td>{sum(1 for x in pairs if x[0] < 3)}</td></tr>')
+    names = " · ".join(n for n, _ in PRESETS[0]["cats"])
+    return (f'<table class="t"><tr><th>theme preset</th><th>categories on its panel</th><th>pairs ΔE &lt; 6</th><th>&lt; 3</th></tr>{"".join(rows)}</table>'
+            f'<p class="cap">Strip order: {E(names)}. Pairs are worst-case over normal, protan, deutan and tritan vision (tools/brand/category_audit.py).</p>')
 
 
 def fig_springs():
@@ -509,8 +526,7 @@ fams = "".join(f'<div class="fam"><b class="f{i}">{E(f["name"])}</b><code>{", ".
 spring_rows = [[f'<b>{s["name"]}</b>', f'{s["zeta"]}', f'{s["omega"]}', f'{s["overshoot"] * 100:.1f}%', (f'{M.peak_ms(s["zeta"], s["omega"]):.0f} ms · {M.snap(M.peak_ms(s["zeta"], s["omega"]))[0]}' if s["zeta"] < 1 else "-"), f'{s["settle_ms"]} ms', f'{s["response"]:.3f} s / {s["zeta"]}', E(s["role"])] for s in SPRINGS]
 radii = "".join(f'<div class="rd"><div style="border-radius:{min(r["px"], 44)}px"></div><b>{r["name"]}</b><code>{"pill" if r["px"] == 999 else str(r["px"]) + " px"}</code><span>{E(r["role"])}</span></div>' for r in B["shape"]["brand_radius"])
 space = "".join(f'<div class="spc"><i style="width:{s}px"></i><code>{s}</code></div>' for s in B["shape"]["space"])
-cats = "".join(f'<div class="ct"><i style="background:{c["hex"]}"></i><b>{c["name"]}</b><code>{c["hex"]}</code></div>' for c in C["category"])
-roles = "".join(f'<div class="ct"><i style="background:{r["dark"]}"></i><i style="background:{r["light"]}"></i><b>{r["name"]}</b></div>' for r in C["role"])
+roles = "".join(f'<div class="ct"><i style="background:{r["dark"]}"></i><i style="background:{r["light"]}"></i><b>{r["name"]}</b><code>{r["dark"]} · {r["light"]}</code></div>' for r in C["role"])
 retired = [[f'<span class="dot" style="background:{r["hex"]}"></span><s>{r["hex"]}</s> {E(r["name"])}', E(r["now"]), E(r["why"])] for r in C["retired"]]
 channels = [[E(c["channel"]), E(c["asset"]), f'<code>{E(c["size"])}</code>', E(c["mode"])] for c in B["channels"]]
 g = C["gradient"]
@@ -626,7 +642,7 @@ svg{{max-width:100%;height:auto;display:block}}figure{{margin:0}}
 .cvds{{border-radius:var(--radius-card);padding:20px;color:{MID["ink"]}}}.cvd{{display:grid;grid-template-columns:70px 1fr auto;gap:12px;align-items:center;margin-bottom:10px}}.cvd div{{display:flex;gap:6px}}.cvd i{{flex:1;height:34px;border-radius:10px}}.cvd span{{font:500 .74rem 'Geist Mono';color:{MID["ink-2"]}}}.cvds p{{font-size:.78rem;color:{MID["ink-3"]};margin:12px 0 0}}
 @media(max-width:560px){{.cvd{{grid-template-columns:1fr}}}}
 .bar{{height:72px;border-radius:var(--radius-media)}}
-.cg{{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}.ct{{display:flex;gap:8px;align-items:center;background:var(--surface-1);border-radius:12px;padding:10px 12px;font-size:.86rem}}.ct i{{width:14px;height:14px;border-radius:50%}}.ct code{{margin-left:auto;color:var(--ink-3)}}
+.cg{{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}.ct{{display:flex;gap:8px;align-items:center;background:var(--surface-1);border-radius:12px;padding:10px 12px;font-size:.86rem}}.ct i{{width:14px;height:14px;border-radius:50%}}.ct code{{margin-left:auto;color:var(--ink-3)}}.strip{{display:flex;gap:3px;padding:6px;border-radius:8px;width:max-content}}.strip i{{width:16px;height:16px;border-radius:4px}}
 .fams{{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));margin-bottom:24px}}.fam{{background:var(--surface-1);border-radius:var(--radius-card);padding:24px}}.fam b{{font-size:1.9rem;font-weight:700;display:block;letter-spacing:-.02em}}.fam .f1{{font-family:'Geist Mono';font-weight:500;letter-spacing:0}}.fam .f2{{font:700 2.4rem Caveat;color:var(--accent)}}.fam .f3{{font-family:'Geist Mono';letter-spacing:.2em}}.fam p{{margin:8px 0 0;color:var(--ink-2);font-size:.88rem}}
 .spec td:nth-child(2){{max-width:0;width:60%}}.spec span{{display:block;overflow-wrap:anywhere}}
 .rds{{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}}.rd{{background:var(--surface-1);border-radius:var(--radius-card);padding:20px;display:flex;flex-direction:column;gap:4px}}.rd div{{height:88px;background:{MID["surface-1"]};margin-bottom:10px}}.rd span{{color:var(--ink-2);font-size:.84rem}}
@@ -639,6 +655,10 @@ svg{{max-width:100%;height:auto;display:block}}figure{{margin:0}}
 .noimg{{padding:40px;border-radius:var(--radius-card);background:var(--surface-1);color:var(--ink-3)}}
 pre{{background:{MID["ground"]};color:{MID["ink-2"]};border-radius:var(--radius-media);padding:16px;overflow-x:auto;font:500 .72rem/1.5 'Geist Mono'}}
 footer.f{{padding:48px 0;color:var(--ink-3);font-size:.85rem}}
+@page{{size:1280px 1810px;margin:0}}
+@media print{{*{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}*,*:before,*:after{{animation:none!important;transition:none!important}}
+.toc{{display:none}}.hero{{min-height:1810px;display:flex;align-items:center}}section{{break-before:page;padding:56px 0}}section+section{{border-top:0}}
+figure,table tr,.card,.mode,.rd,.fam,.ct,.ramp,.cvds,.dk,.steps div,pre,svg{{break-inside:avoid}}h2,h3{{break-after:avoid}}.tw{{overflow:visible}}}}
 </style></head><body>
 <header class="hero"><main>
 <div class="mk">{mark(100, gid="gh")}</div>
@@ -671,8 +691,8 @@ footer.f{{padding:48px 0;color:var(--ink-3);font-size:.85rem}}
 <h3>Contrast gate</h3><p class="s">The build fails if any pair below misses its ratio. APCA Lc is shown for perceptual sense only (WCAG 3 has no contrast method yet).</p><div class="tw">{gate_table()}</div>
 <h3>Colour vision</h3><p class="s">The two ends stay apart for every common colour-vision type, so the warm/cool split works without hue.</p>{cvd_strip()}
 <h3>Gradient and iridescence</h3><div class="bar" style="background:{grad_css}"></div><p class="cap">{E(g["role"])}</p><div class="bar" style="background:{irid_css};margin-top:16px"></div><p class="cap">{E(C["iridescence"]["role"])}</p>
-<h3>Category and role colours</h3><p class="s">Owned by the app (src/core/CategoryColors.cpp). On brand surfaces they appear only where a node appears: title strip, pins, cables.</p><div class="cg">{cats}</div><div class="cg" style="margin-top:12px">{roles}</div>
-<h3>Category collisions (app report)</h3><p class="s">Pairs closer than ΔE 6 under some vision type. Not a brand change: logged for the infinite-design-system owner, because on a busy canvas these pairs are confusable.</p><div class="tw">{collisions()}</div>
+<h3>Role colours: fixed in every theme</h3><p class="s">These mean the same thing everywhere, so no theme or user setting changes them; only dark and light mode do (dark · light, from src/app/ui/design/tokens.json). The build fails if this page drifts from the app.</p><div class="cg" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">{roles}</div>
+<h3>Category and cable colours: the theme's</h3><p class="s">Category colours belong to the theme. Infinite ships {len(PRESETS)} presets and every user can recolour any category, so the brand never names a category hex. On a brand surface a node takes the colours of the theme in the shot (renders use the default, {E(PRESETS[0]["name"])}); the key cable is the one exception, always Ember.</p><div class="tw">{theme_table()}</div>
 <h3>Retired in v2</h3><div class="tw">{table(["was", "now", "why"], retired)}</div></section>
 
 <section id="type"><span class="k">04 · Type</span><h2>Four voices, no fifth</h2><div class="fams">{fams}</div>
@@ -733,3 +753,14 @@ footer.f{{padding:48px 0;color:var(--ink-3);font-size:.85rem}}
 </main></body></html>'''
 open(os.path.join(DOC, "brand-book.html"), "w").write(page)
 print(f"wrote docs/brand/brand-book.html {len(page) // 1024} KB, brand.css, brand.tokens.json, {len(IMGS)} images; contrast gate {len(GATE)} pairs pass")
+if "--no-pdf" not in sys.argv:
+    from channels import CHROME  # noqa: E402
+    import subprocess  # noqa: E402
+    pdf = os.path.join(DOC, "brand-book.pdf")
+    if not CHROME:
+        print("no Chrome or Chromium found: skipped brand-book.pdf")
+    else:
+        subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--virtual-time-budget=4000",
+                        f"--print-to-pdf={pdf}", "file://" + os.path.join(DOC, "brand-book.html")],
+                       check=True, capture_output=True, timeout=180)
+        print(f"wrote docs/brand/brand-book.pdf {os.path.getsize(pdf) // 1024} KB")

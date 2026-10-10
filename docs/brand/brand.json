@@ -216,52 +216,6 @@
    ],
    "role": "Thin-film sweep for one hero object per frame (ball, sphere, glass ring). Never on type or UI."
   },
-  "category": [
-   {
-    "name": "Source",
-    "hex": "#4ADE80"
-   },
-   {
-    "name": "3D",
-    "hex": "#38BDF8"
-   },
-   {
-    "name": "Compositing",
-    "hex": "#818CF8"
-   },
-   {
-    "name": "Effects",
-    "hex": "#FACC15"
-   },
-   {
-    "name": "Modulators",
-    "hex": "#A3E635"
-   },
-   {
-    "name": "Prediction",
-    "hex": "#22D388"
-   },
-   {
-    "name": "Macros",
-    "hex": "#FC963C"
-   },
-   {
-    "name": "Utility",
-    "hex": "#A3A9BA"
-   },
-   {
-    "name": "Notes",
-    "hex": "#4CD964"
-   },
-   {
-    "name": "Synths",
-    "hex": "#6992F6"
-   },
-   {
-    "name": "Audio Effects",
-    "hex": "#53C7E3"
-   }
-  ],
   "role": [
    {
     "name": "Record",

@@ -115,7 +115,8 @@ Use roles, never raw hexes. `brand.css` sets them per `data-mode`.
 | One Ember per frame | The key cable, the call to action, or the hand word. Not two. |
 | Text on Ember | Midnight on `#FF6B35`; white only on the `#B53700` fill. Never white on `#FF6B35`. |
 | Signal is not an accent | It draws structure. It never fills a button. |
-| Category colours | Owned by the app (`src/core/CategoryColors.cpp`). On brand surfaces they appear only where a node appears: title strip, pins, cables. |
+| Category and cable colours | The theme's, not the brand's: each preset in `src/core/CategoryColors.cpp` has its own and users can recolour any category, so no brand file names a category hex. On brand surfaces they appear only where a node appears (title strip, pins, cables) and follow the theme in the shot; renders use the default preset via `category_audit.app_categories()`. |
+| Role colours | Fixed in every theme, only dark/light changes: Record, Solo, Learn, Modulation, Expression, Prediction, Go, Favourite (`brand.json` `colour.role`, checked against `src/app/ui/design/tokens.json` on every book build). |
 | Gradient | Logo, brand ball and end-card lockup only. Exact stops `#F57F66 #D99A9C #C7AFC0 #A9CDF1` at 0 / .35 / .65 / 1, horizontal. |
 | Iridescence | One hero object per frame (ball, sphere, glass ring). Never on type or UI. |
 | Glass | Only behind short labels, 72 to 78% opacity, never behind body text. Respect Reduce Transparency. |
@@ -314,7 +315,7 @@ A node in 3D is a physical instrument panel built from the app's own measurement
 | Keycap | Pill on a shallow well; rest +6, pressed +2.5 with a Signal tint, LED at the left |
 | Fader | 6 rail recessed, 18 × 12 handle raised 7 with a Moon centre line, Signal fill along the rail |
 | Jacks | In the side walls at the pin row, like a pedal: input left, output right. Ring 14 in the category colour, hole 8. |
-| Cables | Matte tubes, 5 diameter; plug 12 × 18 with a metal sleeve, seated in the jack; the cable sags to the floor and runs off frame. The key cable is Ember; others take the source category colour. No glow. |
+| Cables | Matte tubes, 5 diameter; plug 12 × 18 with a metal sleeve, seated in the jack; the cable sags to the floor and runs off frame. The key cable is Ember; others take the source category colour from the theme in the shot. No glow. |
 
 | Light / camera | Rule |
 |---|---|
