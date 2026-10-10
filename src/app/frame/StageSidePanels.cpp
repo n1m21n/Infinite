@@ -10,6 +10,53 @@
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/frame/FrameCtx.h"
 
+// Field compile errors read "line N, col M: message". Show the message, then
+// the offending source line with the token at that column marked, so the user
+// sees where it went wrong without counting lines in the editor.
+static void DrawFieldError(const std::string& err, const std::string& code)
+{
+   const ImVec4 red(1, 0.4f, 0.4f, 1);
+   ImGui::PushStyleColor(ImGuiCol_Text, red);
+   ImGui::TextWrapped("%s", err.c_str());
+   ImGui::PopStyleColor();
+
+   int line = 0, col = 0;
+   if (sscanf(err.c_str(), "line %d, col %d:", &line, &col) != 2 || line < 1 || col < 1)
+      return;
+   size_t start = 0;
+   for (int l = 1; l < line; l++)
+   {
+      start = code.find('\n', start);
+      if (start == std::string::npos)
+         return;
+      start++;
+   }
+   size_t end = code.find('\n', start);
+   if (end == std::string::npos)
+      end = code.size();
+   const std::string text = code.substr(start, end - start);
+   size_t a = std::min((size_t)(col - 1), text.size());
+   size_t b = a;
+   auto isWord = [](char c) { return std::isalnum((unsigned char)c) || c == '_'; };
+   if (b < text.size())
+   {
+      if (isWord(text[b]))
+         while (b < text.size() && isWord(text[b])) b++;
+      else
+         b++;
+   }
+   const std::string before = text.substr(0, a), bad = text.substr(a, b - a), after = text.substr(b);
+   ImGui::TextDisabled("%d |", line);
+   ImGui::SameLine(0, 4);
+   ImGui::TextDisabled("%s", before.c_str());
+   ImGui::SameLine(0, 0);
+   ImGui::PushStyleColor(ImGuiCol_Text, red);
+   ImGui::Text("%s", bad.empty() ? "_" : bad.c_str());
+   ImGui::PopStyleColor();
+   ImGui::SameLine(0, 0);
+   ImGui::TextDisabled("%s", after.c_str());
+}
+
 namespace
 {
    // The shared chrome for the Field / Formula editor windows: Settings' recipe (elevated panel, 16 pt window pad,
@@ -762,7 +809,7 @@ void DrawSidePanels(FrameCtx& fc)
 
             if (!gFieldElementEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldElementEditor->LastError().c_str());
+               DrawFieldError(gFieldElementEditor->LastError(), gFieldElementEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -826,7 +873,7 @@ void DrawSidePanels(FrameCtx& fc)
 
             if (!gFieldPrimitiveEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPrimitiveEditor->LastError().c_str());
+               DrawFieldError(gFieldPrimitiveEditor->LastError(), gFieldPrimitiveEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -875,7 +922,7 @@ void DrawSidePanels(FrameCtx& fc)
 
             if (!gFieldPixelEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldPixelEditor->LastError().c_str());
+               DrawFieldError(gFieldPixelEditor->LastError(), gFieldPixelEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -962,7 +1009,7 @@ void DrawSidePanels(FrameCtx& fc)
                snprintf(editBuf, sizeof(editBuf), "%s", gSketchEditor->code.c_str());
 
             if (!gSketchEditor->LastError().empty())
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gSketchEditor->LastError().c_str());
+               DrawFieldError(gSketchEditor->LastError(), gSketchEditor->code);
          }
          EndEditorWindow(editorVisible);
       }
@@ -1019,7 +1066,7 @@ void DrawSidePanels(FrameCtx& fc)
                snprintf(editBuf, sizeof(editBuf), "%s", gSketch3DEditor->code.c_str());
 
             if (!gSketch3DEditor->LastError().empty())
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gSketch3DEditor->LastError().c_str());
+               DrawFieldError(gSketch3DEditor->LastError(), gSketch3DEditor->code);
          }
          EndEditorWindow(editorVisible);
       }
@@ -1098,7 +1145,7 @@ void DrawSidePanels(FrameCtx& fc)
 
             if (!gFieldSampleEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSampleEditor->LastError().c_str());
+               DrawFieldError(gFieldSampleEditor->LastError(), gFieldSampleEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -1162,7 +1209,7 @@ void DrawSidePanels(FrameCtx& fc)
 
             if (!gFieldSynthEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldSynthEditor->LastError().c_str());
+               DrawFieldError(gFieldSynthEditor->LastError(), gFieldSynthEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -1226,7 +1273,7 @@ void DrawSidePanels(FrameCtx& fc)
 
             if (!gFieldNotesEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldNotesEditor->LastError().c_str());
+               DrawFieldError(gFieldNotesEditor->LastError(), gFieldNotesEditor->code);
             }
          }
          EndEditorWindow(editorVisible);
@@ -1302,7 +1349,7 @@ void DrawSidePanels(FrameCtx& fc)
 
             if (!gFieldGraphEditor->LastError().empty())
             {
-               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gFieldGraphEditor->LastError().c_str());
+               DrawFieldError(gFieldGraphEditor->LastError(), gFieldGraphEditor->code);
             }
             if (!gFieldGraphEditor->Notice().empty())
             {
