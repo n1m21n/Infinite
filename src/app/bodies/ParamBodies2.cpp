@@ -698,6 +698,31 @@ namespace app
    }
 
 
+   void DrawHandTrackParams(HandTrackNode* n)
+   {
+      const float colW = kParamWidth;
+      if (n->PackMissing())
+         ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "%s", T("Install the Tracking pack: Settings > Extensions"));
+      else
+         ImGui::TextDisabled("%s", n->Status().c_str());
+
+      NodeSeparator("tracking", colW);
+      ModCheckbox("mirror", &n->mirror);
+      ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f, "%.2f", colW);
+      ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f", colW);
+
+      NodeSeparator("outputs", colW);
+      const float labelW = 60.0f;
+      const float barW = colW - labelW;
+      for (int i = 0; i < HandTrackNode::kOutputCount; i++)
+      {
+         ImGui::Text("%-9s", n->OutputLabel(i));
+         ImGui::SameLine(labelW);
+         ImGui::ProgressBar(std::clamp(n->Value(i), 0.0f, 1.0f), ImVec2(barW, 0), "");
+      }
+   }
+
+
    void DrawNullModulatorParams(NullModulatorNode* n)
    {
       if (!n->input)

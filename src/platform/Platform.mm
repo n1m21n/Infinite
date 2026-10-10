@@ -1307,6 +1307,32 @@ namespace Platform
       }
    }
 
+   std::string OpenExtensionPackDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Install extension pack"];
+         if (@available(macOS 11.0, *))
+         {
+            NSMutableArray<UTType*>* types = [NSMutableArray array];
+            UTType* tPack = [UTType typeWithFilenameExtension:@"infpack"];
+            if (tPack != nil) [types addObject:tPack];
+            UTType* tZip = [UTType typeWithFilenameExtension:@"zip"];
+            if (tZip != nil) [types addObject:tZip];
+            if ([types count] > 0)
+               [panel setAllowedContentTypes:types];
+         }
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
    std::string OpenDeviceDialog()
    {
       @autoreleasepool
@@ -7843,6 +7869,103 @@ namespace Platform
          return true;
       }
    }
+
+   bool HttpDownload(const std::string& url, const std::string& userAgent,
+                     const std::string& destPath, const HttpProgress& progress,
+                     std::string& outError, int timeoutSeconds)
+   {
+      outError.clear();
+      if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
+      {
+         outError = "url must be http(s)";
+         return false;
+      }
+
+      @autoreleasepool
+      {
+         NSURL* nsUrl = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
+         if (nsUrl == nil)
+         {
+            outError = "malformed url";
+            return false;
+         }
+         NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:nsUrl];
+         [request setValue:[NSString stringWithUTF8String:userAgent.c_str()] forHTTPHeaderField:@"User-Agent"];
+
+         NSURLSessionConfiguration* config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+         config.timeoutIntervalForRequest = 30.0; // stall timeout; the whole-transfer cap is the loop below
+         NSURLSession* session = [NSURLSession sessionWithConfiguration:config];
+
+         dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+         __block bool success = false;
+         __block std::string error;
+         NSString* nsDest = [NSString stringWithUTF8String:destPath.c_str()];
+
+         // The completion handler must move the temp file before it returns.
+         NSURLSessionDownloadTask* task = [session downloadTaskWithRequest:request
+            completionHandler:^(NSURL* location, NSURLResponse* response, NSError* nsError)
+            {
+               if (nsError != nil)
+                  error = std::string([[nsError localizedDescription] UTF8String]);
+               else
+               {
+                  NSInteger code = [(NSHTTPURLResponse*)response statusCode];
+                  if (code < 200 || code >= 300)
+                     error = "http status " + std::to_string((long)code);
+                  else
+                  {
+                     NSFileManager* fm = [NSFileManager defaultManager];
+                     [fm removeItemAtPath:nsDest error:nil];
+                     NSError* mv = nil;
+                     if ([fm moveItemAtURL:location toURL:[NSURL fileURLWithPath:nsDest] error:&mv])
+                        success = true;
+                     else
+                        error = "cannot write the download";
+                  }
+               }
+               dispatch_semaphore_signal(sema);
+            }];
+         [task resume];
+
+         const auto started = std::chrono::steady_clock::now();
+         bool cancelled = false;
+         while (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC)) != 0)
+         {
+            const uint64_t done = (uint64_t)[task countOfBytesReceived];
+            const int64_t expected = [task countOfBytesExpectedToReceive];
+            if (progress && !progress(done, expected > 0 ? (uint64_t)expected : 0))
+               cancelled = true;
+            else if (std::chrono::steady_clock::now() - started > std::chrono::seconds(timeoutSeconds))
+            {
+               outError = "timed out";
+               cancelled = true;
+            }
+            if (cancelled)
+            {
+               [task cancel];
+               dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+               if (outError.empty())
+                  outError = "cancelled";
+               [[NSFileManager defaultManager] removeItemAtPath:nsDest error:nil];
+               return false;
+            }
+         }
+         if (!success)
+         {
+            outError = error.empty() ? "request failed" : error;
+            return false;
+         }
+         // A fast transfer can finish between polls: always report the final
+         // size once, and honour a cancel raised by that last call.
+         NSDictionary* attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:nsDest error:nil];
+         const uint64_t finalSize = attrs ? (uint64_t)[attrs fileSize] : 0;
+         if (progress && !progress(finalSize, finalSize))
+         {
+            [[NSFileManager defaultManager] removeItemAtPath:nsDest error:nil];
+            outError = "cancelled";
+            return false;
+         }
+         return true;
+      }
+   }
 }
-
-

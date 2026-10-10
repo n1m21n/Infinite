@@ -379,6 +379,7 @@ void DrawFramePump(FrameCtx& fc)
 
       // Update-checker worker handoff - once a frame, main thread only.
       UpdateCheck::Poll();
+      Extensions::Poll();
 
       // Per-frame audio housekeeping off the audio thread (currently just
       // freeing sample-preview buffers the audio thread has retired) - see

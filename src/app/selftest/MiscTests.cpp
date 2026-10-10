@@ -1,6 +1,16 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
+#include "core/Extensions.h"
+#include "core/tracking/HandTracker.h"
+#include "nodes/HandTrackNode.h"
+#include "stb_image.h"
+#include "stb_image_write.h"
+#include <chrono>
+#include <algorithm>
 #include "app/AppShared.h"
 #include "app/graph/NodeClipboard.h"
+#include "miniz.h"
+#include <filesystem>
+#include <fstream>
 
 namespace app
 {
@@ -2296,4 +2306,250 @@ void RunClipboardTest()
    printf("CLIPBOARDTEST %s\n", ok ? "OK" : "FAIL");
 }
 
+// INFINITE_TRACKINGTEST=1 INFINITE_TRACKINGTEST_ZIP=<tracking pack zip>
+// INFINITE_TRACKINGTEST_IMAGE=<jpg/png> [INFINITE_TRACKINGTEST_OUT=<png>]
+// Installs the pack the same way Settings does, loads ONNX Runtime from the
+// pack folder, runs the hand pipeline on a still image and prints timings.
+int RunTrackingTest()
+{
+   int fails = 0;
+   auto check = [&](bool ok, const char* what)
+   {
+      printf("TRACKINGTEST %s: %s\n", ok ? "PASS" : "FAIL", what);
+      if (!ok) fails++;
+   };
+   const char* zipPath = getenv("INFINITE_TRACKINGTEST_ZIP");
+   const char* imgPath = getenv("INFINITE_TRACKINGTEST_IMAGE");
+   if (!zipPath || !imgPath) { printf("TRACKINGTEST needs _ZIP and _IMAGE\n"); return 1; }
+
+   const std::string root = AppPaths::TempDir() + "/infinite-trackingtest";
+   std::error_code ec;
+   std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+   setenv("INFINITE_EXTENSIONS_DIR", root.c_str(), 1);
+
+   std::string bytes, err, id;
+   {
+      std::ifstream f(zipPath, std::ios::binary);
+      bytes.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+   }
+   check(!bytes.empty(), "pack zip read");
+   check(Extensions::InstallZip(bytes, "", "tracking", id, err), "pack installs through the Settings path");
+   if (!err.empty()) printf("  %s\n", err.c_str());
+   const std::string dir = Extensions::PackDir("tracking");
+   check(!dir.empty(), "PackDir resolves after install");
+
+   Tracking::OrtRuntime rt;
+#if defined(__APPLE__)
+   const std::string lib = dir + "/lib/libonnxruntime.dylib";
+#elif defined(_WIN32)
+   const std::string lib = dir + "/lib/onnxruntime.dll";
+#else
+   const std::string lib = dir + "/lib/libonnxruntime.so";
+#endif
+   check(rt.Load(lib, err), "ONNX Runtime loads from the pack folder");
+   if (!rt.Loaded()) { printf("  %s\n", err.c_str()); return 1; }
+
+   Tracking::HandTracker ht;
+   check(ht.Open(rt, dir, true, err), "hand models open");
+   if (!err.empty()) printf("  %s\n", err.c_str());
+   printf("TRACKINGTEST info: core ml  detector=%d landmark=%d\n", ht.UsedGpuDetector(), ht.UsedGpuLandmark());
+
+   int w = 0, h = 0, n = 0;
+   std::string imgBytes;
+   {
+      std::ifstream f(imgPath, std::ios::binary);
+      imgBytes.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+   }
+   unsigned char* px = stbi_load_from_memory((const unsigned char*)imgBytes.data(), (int)imgBytes.size(), &w, &h, &n, 3);
+   check(px != nullptr, "image decodes");
+   if (!px) return 1;
+
+   Tracking::HandResult r;
+   auto now = []() { return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count(); };
+   // first frame includes model warm-up
+   double t0 = now();
+   bool ok = ht.Process(px, w, h, r, err);
+   printf("TRACKINGTEST info: first frame %.1f ms\n", now() - t0);
+   check(ok && r.found, "hand found on the still image");
+   if (r.found)
+   {
+      bool inside = true;
+      for (auto& p : r.lm) if (p[0] < -w * 0.2f || p[0] > w * 1.2f || p[1] < -h * 0.2f || p[1] > h * 1.2f) inside = false;
+      check(inside, "landmarks lie near the image");
+      printf("TRACKINGTEST info: score %.2f wrist (%.0f,%.0f) index tip (%.0f,%.0f)\n", r.score, r.lm[0][0], r.lm[0][1], r.lm[8][0], r.lm[8][1]);
+   }
+
+   std::vector<double> det, trk;
+   for (int i = 0; i < 40; ++i)
+   {
+      ht.Reset();
+      t0 = now();
+      ht.Process(px, w, h, r, err);
+      det.push_back(now() - t0);
+      t0 = now();
+      ht.Process(px, w, h, r, err);   // tracking frame: ROI reused, detector skipped
+      trk.push_back(now() - t0);
+   }
+   auto pct = [](std::vector<double> v, double q) { std::sort(v.begin(), v.end()); return v[(size_t)(q * (v.size() - 1))]; };
+   printf("TRACKINGTEST info: detection frame p50 %.1f p95 %.1f ms | tracking frame p50 %.1f p95 %.1f ms (image %dx%d)\n",
+          pct(det, .5), pct(det, .95), pct(trk, .5), pct(trk, .95), w, h);
+   check(r.found && !r.redetected, "tracking frame reuses the ROI");
+
+   if (const char* outPng = getenv("INFINITE_TRACKINGTEST_OUT"))
+   {
+      ht.Reset();
+      ht.Process(px, w, h, r, err);
+      auto dot = [&](int cx, int cy, int rad)
+      {
+         for (int dy = -rad; dy <= rad; ++dy)
+            for (int dx = -rad; dx <= rad; ++dx)
+            {
+               int x = cx + dx, y = cy + dy;
+               if (x < 0 || y < 0 || x >= w || y >= h) continue;
+               unsigned char* q = px + (y * w + x) * 3;
+               q[0] = 255; q[1] = 0; q[2] = 0;
+            }
+      };
+      if (r.found)
+         for (int i = 0; i < 21; ++i) dot((int)r.lm[i][0], (int)r.lm[i][1], std::max(2, w / 200));
+      stbi_write_png(outPng, w, h, 3, px, w * 3);
+   }
+   // The node itself, fed pixels directly (no GL): outputs must come alive.
+   {
+      HandTrackNode node;
+      node.smoothing = 0.f;
+      check(node.Value(HandTrackNode::kPresent) == 0.f, "Hand Track reads 0 before any frame");
+      node.SubmitFrame(px, w, h);
+      node.WaitIdle();
+      check(node.Value(HandTrackNode::kPresent) == 1.f, "Hand Track sees the hand");
+      printf("TRACKINGTEST info: node palm (%.2f,%.2f) index (%.2f,%.2f) pinch %.2f open %.2f roll %.2f size %.2f | %s\n",
+             node.Value(HandTrackNode::kPalmX), node.Value(HandTrackNode::kPalmY),
+             node.Value(HandTrackNode::kIndexX), node.Value(HandTrackNode::kIndexY),
+             node.Value(HandTrackNode::kPinch), node.Value(HandTrackNode::kOpen),
+             node.Value(HandTrackNode::kRoll), node.Value(HandTrackNode::kSize), node.Status().c_str());
+      check(node.Value(HandTrackNode::kPalmX) > 0.f && node.Value(HandTrackNode::kPalmY) > 0.f, "palm lands inside the frame");
+      std::vector<unsigned char> blank((size_t)w * h * 3, 0);
+      node.holdMs = 0.f;
+      node.SubmitFrame(blank.data(), w, h);
+      node.WaitIdle();
+      check(node.Value(HandTrackNode::kPresent) == 0.f && node.Value(HandTrackNode::kIndexX) == 0.f, "outputs drop to 0 when the hand leaves");
+   }
+   stbi_image_free(px);
+   return fails ? 1 : 0;
+}
+
+// ============================================== INFINITE_EXTENSIONSTEST
+// Headless check of the extension-pack framework: SHA-256, catalog parsing,
+// install/replace/remove, checksum and zip-slip rejection. Uses a temp root via
+// INFINITE_EXTENSIONS_DIR and never touches the network.
+int RunExtensionsTest()
+{
+   int fails = 0;
+   auto check = [&](bool ok, const char* what)
+   {
+      printf("EXTENSIONSTEST %s: %s\n", ok ? "PASS" : "FAIL", what);
+      if (!ok) fails++;
+   };
+
+   const std::string root = AppPaths::TempDir() + "/infinite-exttest";
+   std::error_code ec;
+   std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+#if defined(_WIN32)
+   _putenv_s("INFINITE_EXTENSIONS_DIR", root.c_str());
+#else
+   setenv("INFINITE_EXTENSIONS_DIR", root.c_str(), 1);
+#endif
+
+   check(Extensions::Sha256Hex("abc", 3) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "sha256 abc");
+   check(Extensions::Sha256Hex("", 0) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "sha256 empty");
+   {
+      std::string big(1000, 'a'); // crosses a block boundary
+      check(Extensions::Sha256Hex(big.data(), big.size()) == "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3", "sha256 1000 x 'a'");
+   }
+
+   auto makeZip = [](const std::vector<std::pair<std::string, std::string>>& files)
+   {
+      mz_zip_archive z;
+      memset(&z, 0, sizeof(z));
+      mz_zip_writer_init_heap(&z, 0, 0);
+      for (const auto& f : files)
+         mz_zip_writer_add_mem(&z, f.first.c_str(), f.second.data(), f.second.size(), MZ_DEFAULT_COMPRESSION);
+      void* buf = nullptr;
+      size_t n = 0;
+      mz_zip_writer_finalize_heap_archive(&z, &buf, &n);
+      std::string out((const char*)buf, n);
+      mz_zip_writer_end(&z);
+      mz_free(buf);
+      return out;
+   };
+
+   {
+      std::vector<Extensions::Pack> packs;
+      std::string err;
+      const std::string sha(64, 'a');
+      const std::string good = "{\"schema\":1,\"packs\":[{\"id\":\"tracking\",\"name\":\"Tracking\",\"version\":\"1.0\",\"size\":5,"
+         "\"files\":{\"macos\":{\"url\":\"https://x/y.zip\",\"sha256\":\"" + sha + "\"}}},"
+         "{\"id\":\"bad id\",\"version\":\"1\",\"files\":{\"macos\":{\"url\":\"https://x\",\"sha256\":\"" + sha + "\"}}},"
+         "{\"id\":\"nohash\",\"version\":\"1\",\"files\":{\"macos\":{\"url\":\"https://x\",\"sha256\":\"zz\"}}},"
+         "{\"id\":\"other-os\",\"version\":\"1\",\"files\":{\"linux-x64\":{\"url\":\"https://x\",\"sha256\":\"" + sha + "\"}}}]}";
+      check(Extensions::ParseManifest(good, "macos", packs, err) && packs.size() == 1 && packs[0].id == "tracking",
+            "catalog keeps only verifiable packs for this OS");
+      check(!Extensions::ParseManifest("{\"schema\":2,\"packs\":[]}", "macos", packs, err), "catalog rejects unknown schema");
+      check(!Extensions::ParseManifest("not json", "macos", packs, err), "catalog rejects garbage");
+   }
+
+   const std::string zip1 = makeZip({ { "pack.json", "{\"id\":\"demo\",\"version\":\"1\"}" }, { "models/a.bin", "hello" } });
+   std::string id, err;
+   check(Extensions::PackDir("demo").empty(), "not installed at first");
+   check(!Extensions::InstallZip(zip1, std::string(64, '0'), "demo", id, err), "wrong checksum is rejected");
+   check(Extensions::PackDir("demo").empty(), "rejected install leaves nothing behind");
+   check(!Extensions::InstallZip(zip1, "", "other", id, err), "id mismatch is rejected");
+   check(Extensions::InstallZip(zip1, Extensions::Sha256Hex(zip1.data(), zip1.size()), "demo", id, err) && id == "demo", "install with checksum");
+   check(Extensions::InstalledVersion("demo") == "1", "installed version read back");
+   {
+      std::ifstream f(AppPaths::FsPath(Extensions::PackDir("demo") + "/models/a.bin"), std::ios::binary);
+      std::string s((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+      check(s == "hello", "nested file unpacked intact");
+   }
+   const std::string zip2 = makeZip({ { "pack.json", "{\"id\":\"demo\",\"version\":\"2\"}" } });
+   check(Extensions::InstallZip(zip2, "", "", id, err) && Extensions::InstalledVersion("demo") == "2", "update replaces the pack");
+   check(!std::filesystem::exists(AppPaths::FsPath(Extensions::PackDir("demo") + "/models/a.bin")), "update drops files from the old version");
+
+   const std::string slip = makeZip({ { "pack.json", "{\"id\":\"evil\",\"version\":\"1\"}" }, { "../escape.txt", "x" } });
+   check(!Extensions::InstallZip(slip, "", "", id, err), "zip-slip entry is rejected");
+   check(!std::filesystem::exists(AppPaths::FsPath(root + "/../escape.txt")), "nothing written outside the pack");
+   check(Extensions::PackDir("evil").empty(), "hostile pack not installed");
+   check(!Extensions::InstallZip(makeZip({ { "a.txt", "x" } }), "", "", id, err), "zip without pack.json is rejected");
+   check(!Extensions::InstallZip("garbage", "", "", id, err), "non-zip is rejected");
+   check(Extensions::InstalledVersion("demo") == "2", "failed installs leave the installed pack alone");
+
+   check(Extensions::Remove("demo") && Extensions::PackDir("demo").empty(), "remove");
+   check(!Extensions::Remove("../x"), "remove refuses a bad id");
+
+   // Streaming download, only when a local server URL is supplied (no network in CI).
+   if (const char* url = getenv("INFINITE_EXTENSIONSTEST_URL"))
+   {
+      const std::string dest = root + "/dl.bin";
+      uint64_t lastDone = 0, lastTotal = 0;
+      std::string derr;
+      bool ok = Platform::HttpDownload(url, "Infinite-test", dest,
+         [&](uint64_t d, uint64_t t) { lastDone = d; lastTotal = t; return true; }, derr, 60);
+      check(ok, "download completes");
+      std::error_code sec;
+      const auto sz = std::filesystem::file_size(AppPaths::FsPath(dest), sec);
+      check(!sec && sz > 1048576, "download is larger than the old 1 MB HttpGet cap");
+      check(lastDone == sz, "progress ends at the file size");
+      check(lastTotal == 0 || lastTotal == sz, "progress total matches when known");
+      bool cancelled = !Platform::HttpDownload(url, "Infinite-test", root + "/dl2.bin",
+         [](uint64_t, uint64_t) { return false; }, derr, 60);
+      check(cancelled && derr == "cancelled", "cancel stops the download");
+      check(!std::filesystem::exists(AppPaths::FsPath(root + "/dl2.bin")), "cancel leaves no partial file");
+      check(!Platform::HttpDownload("http://127.0.0.1:9/none", "Infinite-test", root + "/dl3.bin", nullptr, derr, 5)
+            && !derr.empty(), "unreachable server reports an error");
+   }
+
+   std::filesystem::remove_all(AppPaths::FsPath(root), ec);
+   printf("EXTENSIONSTEST %s\n", fails == 0 ? "ALL PASS" : "FAILED");
+   return fails == 0 ? 0 : 1;
+}
 }

@@ -950,6 +950,16 @@ _no controls detected_
 | extent | slider | yes |
 | smooth | slider | yes |
 
+### Hand Track
+
+`HandTrackNode` · DrawHandTrackParams
+
+| control | type | modulatable |
+| --- | --- | --- |
+| mirror | checkbox | yes |
+| smoothing | slider | yes |
+| hold ms | slider | yes |
+
 ### Image Analyze
 
 `ImageAnalyzeNode` · DrawImageAnalyzeParams

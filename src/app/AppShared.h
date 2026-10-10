@@ -2854,6 +2854,7 @@ void DrawRampParams(RampNode* n);
 void DrawColorRampParams(ColorRampNode* n);
 
 void DrawImageAnalyzeParams(ImageAnalyzeNode* n);
+void DrawHandTrackParams(HandTrackNode* n);
 
 void DrawNullModulatorParams(NullModulatorNode* n);
 
@@ -5897,6 +5898,8 @@ int RunCVRecorderTest();
 
 int RunMidiCC14Test();
 int RunNdiTest();
+int RunExtensionsTest();
+int RunTrackingTest();
 
 int RunAudioParamSweepTest();
 
