@@ -4,6 +4,8 @@ usage: golden.py [--update]      goldens: tests/ui-golden/<platform>/gallery-{li
 Text rasterization differs per OS, so each platform keeps its own goldens. Exit 1 on any difference
 above the tolerance (top 64 px, the live menu bar, is ignored) (mean abs channel diff 0.05, or more than 0.02 % of pixels changed by > 24)."""
 import os, subprocess, sys, tempfile, platform
+if platform.system() != "Darwin":   # goldens exist for macOS only, and the app path below is the macOS bundle
+    print("gallery golden: macOS only, skipped on " + platform.system()); sys.exit(0)
 from PIL import Image, ImageChops
 root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 plat = {"Darwin": "macos", "Windows": "windows", "Linux": "linux"}[platform.system()]
