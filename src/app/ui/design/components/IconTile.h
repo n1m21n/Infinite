@@ -55,7 +55,7 @@ namespace IconTile
       const float gs = size * (20.0f / 28.0f) * (down ? 0.94f : 1.0f);
       const ImU32 glyphCol = ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, text.w * disabledA));
       if (swingTarget <= 1.0f)
-         glyph::DrawMetronome(dl, c, gs, glyphCol, UiAnim::Value(aid + 2, swingTarget, 140.0f));
+         glyph::DrawMetronome(dl, c, gs, glyphCol, UiAnim::Value(aid + 2, swingTarget, tok::motion_off));
       else
          glyph::Draw(dl, c, gs, glyphCol, (on && glyphOn != nullptr) ? glyphOn : glyphOff);
       (void)win;

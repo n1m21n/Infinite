@@ -47,12 +47,9 @@ if BAD:
     sys.exit(1)
 
 
-# ---------------------------------------------------------------- springs
-def spring(z, w, t):
-    if z < 1:
-        wd = w * math.sqrt(1 - z * z)
-        return 1 - math.exp(-z * w * t) * (math.cos(wd * t) + z / math.sqrt(1 - z * z) * math.sin(wd * t))
-    return 1 - (1 + w * t) * math.exp(-w * t)
+# ---------------------------------------------------------------- springs (the maths lives in motion.py)
+import motion as M  # noqa: E402
+spring = M.spring
 
 
 def spring_stats(z, w, tol=0.02):
@@ -293,6 +290,116 @@ def fig_springs():
     return f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Spring step responses">{grid}{ticks}<text x="{pl - 8}" y="{y1 + 4:.1f}" font-family="Geist Mono" font-size="10" fill="#5A6180" text-anchor="end">1</text>{"".join(paths)}<text x="{W - 12}" y="{H - 12}" font-family="Geist Mono" font-size="10" fill="#5A6180" text-anchor="end">ms</text></svg>'
 
 
+# ---------------------------------------------------------------- motion laws (motion.py)
+GREY, RULE = "#5A6180", "#C4C1D9"
+EMB, SIG = C["anchors"]["ember"]["500"], MODES["mist"]["signal"]
+
+
+def _t(x, y, s, size=10, fill=GREY, anchor="middle", rot=None, weight=400):
+    r = f' transform="rotate({rot} {x:.1f} {y:.1f})"' if rot is not None else ""
+    return f'<text x="{x:.1f}" y="{y:.1f}" font-family="Geist Mono" font-size="{size}" font-weight="{weight}" fill="{fill}" text-anchor="{anchor}"{r}>{E(s)}</text>'
+
+
+def fig_clock():
+    """L1: note values on a log time axis, with every brand and app token placed on it."""
+    W, H, pl, pr, ay = 1100, 250, 16, 40, 150
+    lo, hi = 8, 2400
+    X = lambda ms: pl + (W - pl - pr) * math.log(ms / lo) / math.log(hi / lo)
+    o = [f'<line x1="{pl}" y1="{ay}" x2="{W - pr}" y2="{ay}" stroke="{RULE}"/>']
+    for n in M.NOTES:
+        ms = M.note_ms(n)
+        if ms > hi:
+            continue
+        x = X(ms)
+        o.append(f'<line x1="{x:.1f}" y1="{ay - 5}" x2="{x:.1f}" y2="{ay + 5}" stroke="{GREY}"/>')
+        o.append(_t(x + 3, ay + 14, f"{n} {ms:.0f}", 9, rot=50, anchor="start"))
+    rows = [("brand", EMB, {k: v for k, v in {**B["motion"]["durations_ms"], **B["motion"]["stagger_ms"]}.items() if v}, ay - 22),
+            ("app", SIG, {k: v for k, v in B["motion"]["app_ms"].items() if v}, ay - 62)]
+    for name, col, toks, y in rows:
+        o.append(_t(pl, y - 26, name, 10, col, "start", weight=500))
+        seen = {}
+        for k, v in sorted(toks.items(), key=lambda kv: kv[1]):
+            x = X(v)
+            o.append(f'<line x1="{x:.1f}" y1="{y}" x2="{x:.1f}" y2="{ay}" stroke="{col}" stroke-opacity=".35"/><circle cx="{x:.1f}" cy="{y}" r="4" fill="{col}"/>')
+            seen[round(v)] = seen.get(round(v), 0) + 1
+            o.append(_t(x + 4, y - 8 - 9 * (seen[round(v)] - 1), k, 8.5, col, "start", rot=-35))
+    return f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Note values at 120 BPM with brand and app duration tokens">{"".join(o)}</svg>'
+
+
+def fig_mass():
+    """L2: duration grows with the square root of distance, then snaps to the nearest note."""
+    W, H, pl, pb, pt = 640, 300, 48, 34, 16
+    dmax, tmax = 1024, 1600
+    X = lambda d: pl + (W - pl - 12) * d / dmax
+    Y = lambda ms: H - pb - (H - pb - pt) * ms / tmax
+    pts = " L".join(f"{X(d):.1f},{Y(M.travel_ms(d, snap_to_grid=False)):.1f}" for d in range(1, dmax + 1, 4))
+    o = [f'<line x1="{pl}" y1="{H - pb}" x2="{W - 12}" y2="{H - pb}" stroke="{RULE}"/><line x1="{pl}" y1="{pt}" x2="{pl}" y2="{H - pb}" stroke="{RULE}"/>',
+         f'<path d="M{pts}" fill="none" stroke="{SIG}" stroke-width="2.4"/>']
+    for d in (8, 32, 128, 256, 512, 1024):
+        n, ms = M.travel_ms(d)
+        o.append(f'<circle cx="{X(d):.1f}" cy="{Y(ms):.1f}" r="4.5" fill="{EMB}"/>')
+        o.append(_t(X(d) + (10 if d < 1024 else -8), Y(ms) + (16 if d < 1024 else -10), f"{d} px · {n}", 9.5, GREY, "start" if d < 1024 else "end"))
+    for ms in (0, 500, 1000, 1500):
+        o.append(_t(pl - 6, Y(ms) + 3, str(ms), 9, anchor="end"))
+    for d in (0, 256, 512, 768, 1024):
+        o.append(_t(X(d), H - 14, str(d), 9))
+    o.append(_t(W - 12, H - 2, "travel px", 9, anchor="end"))
+    o.append(_t(pl + 4, pt + 4, "ms", 9, anchor="start"))
+    return f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Travel time against distance">{"".join(o)}</svg>'
+
+
+def fig_path():
+    """L4 + L5: the house arc (leaves at 22.5 deg) and sibling loops on the mark at golden phase offsets."""
+    W, H = 640, 260
+    a, b = (40, 150), (280, 150)
+    # in SVG y points down, so bow upward by mirroring the arc about the chord
+    arc = " L".join(f"{x:.1f},{2 * a[1] - y:.1f}" for x, y in (M.arc(a, b, i / 80) for i in range(81)))
+    L = 30
+    o = [f'<line x1="{a[0]}" y1="{a[1]}" x2="{b[0]}" y2="{b[1]}" stroke="{RULE}" stroke-dasharray="4 4"/>',
+         f'<path d="M{arc}" fill="none" stroke="{SIG}" stroke-width="2.4"/>',
+         f'<line x1="{a[0]}" y1="{a[1]}" x2="{a[0] + L * math.cos(math.radians(22.5)):.1f}" y2="{a[1] - L * math.sin(math.radians(22.5)):.1f}" stroke="{EMB}" stroke-width="1.5"/>',
+         f'<circle cx="{a[0]}" cy="{a[1]}" r="5" fill="{GREY}"/><circle cx="{b[0]}" cy="{b[1]}" r="5" fill="{EMB}"/>',
+         _t(a[0] - 4, a[1] + 18, "leaves at 22.5°", 10, EMB, "start"),
+         _t((a[0] + b[0]) / 2, a[1] - (b[0] - a[0]) * M.BOW - 10, f"bow {M.BOW * 100:.1f}% of chord", 10),
+         _t((a[0] + b[0]) / 2, 236, "L4 · arc from the mark", 10, weight=500)]
+    A, cx, cy = 130, 480, 120
+    o.append(f'<path d="{lem_path(A, cx, cy)}" fill="none" stroke="{RULE}" stroke-width="2"/>')
+    for i in range(5):
+        x, y = M.lemniscate(M.phase(i), A)
+        o.append(f'<circle cx="{cx + x:.1f}" cy="{cy - y:.1f}" r="7" fill="{EMB if i == 0 else SIG}" fill-opacity="{1 - i * 0.15:.2f}"/>')
+        dy = 22 if i == 0 else -12                            # 0 sits on the crossing beside 4: label it below
+        if x < -A / 2:
+            o.append(_t(cx + x - 12, cy - y + 4, f"{i}: {M.phase(i):.3f}", 9, anchor="end"))
+        else:
+            o.append(_t(cx + x, cy - y + dy, f"{i}: {M.phase(i):.3f}", 9))
+    o.append(_t(cx, 236, "L5 · siblings offset by 1 − 1/φ", 10, weight=500))
+    return f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="House arc and golden phase offsets on the mark">{"".join(o)}</svg>'
+
+
+def demo_live():
+    """Two live loops: three dots trace the mark over 4 bars at golden phases; a slab lands once a bar, its overshoot peak on the beat."""
+    A, W, H = 120, 300, 150
+    cx, cy = W / 2, H / 2
+    lp = lem_path(A, cx, cy)
+    loop = M.note_ms("4 bars") / 1000
+    dots = "".join(f'<circle r="7" fill="{EMB if i == 0 else SIG}"><animateMotion dur="{loop:g}s" repeatCount="indefinite" begin="{-M.phase(i) * loop:.3f}s" path="{lp}"/></circle>' for i in range(3))
+    s = SPRINGS[0]
+    bar = M.note_ms("bar")
+    land = s["css_ms"] / bar * 100
+    peak = M.peak_ms(s["zeta"], s["omega"]) / bar * 100
+    return (f'<style>@keyframes slabland{{0%{{transform:translateY(-44px);animation-timing-function:var(--spring-slab)}}{land:.2f}%,100%{{transform:none}}}}'
+            f'@keyframes beat{{0%,{peak - 0.01:.2f}%{{opacity:.15}}{peak:.2f}%{{opacity:1}}{peak + 8:.2f}%,100%{{opacity:.15}}}}'
+            f'.demo{{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}}.demo>div{{background:{MID["ground"]};border-radius:var(--radius-card);padding:20px;color:{MID["ink-2"]};font-size:.84rem}}'
+            f'.slabbox{{height:150px;display:flex;align-items:flex-end;justify-content:center;gap:28px;padding-bottom:20px}}.slab{{width:120px;height:34px;border-radius:8px;background:{EMB};animation:slabland {bar / 1000:g}s infinite}}'
+            f'.tick{{width:14px;height:14px;border-radius:50%;background:{MID["ink"]};animation:beat {bar / 1000:g}s infinite;margin-bottom:10px}}'
+            f'@media (prefers-reduced-motion: reduce){{.slab,.tick{{animation:none}}}}</style>'
+            f'<div class="demo"><div><svg id="lemdemo" viewBox="0 0 {W} {H}" role="img" aria-label="Three dots tracing the mark"><path d="{lp}" fill="none" stroke="{MID["surface-1"]}" stroke-width="3"/>{dots}</svg>'
+            f'<p>One loop = 4 bars ({loop:g} s). Three siblings start {M.phase(1):.3f} and {M.phase(2):.3f} of a loop apart, so they never move in step.</p></div>'
+            f'<div><div class="slabbox"><div class="slab"></div><div class="tick"></div></div>'
+            f'<p>The slab spring lands once a bar ({bar:.0f} ms). The dot flashes on the beat, {M.peak_ms(s["zeta"], s["omega"]):.0f} ms after launch: the overshoot peak, a dotted 1/16.</p></div></div>'
+            '<script>if(matchMedia("(prefers-reduced-motion: reduce)").matches){var d=document.getElementById("lemdemo");d&&d.pauseAnimations()}</script>')
+
+
 def fig_frame(w, h, label, safe=None, cols=0, extra=""):
     sc = 220 / max(w, h)
     W, H = w * sc, h * sc
@@ -399,7 +506,7 @@ type_rows = "".join(
     f'{"Patch anything into anything" if s["min"] >= 20 else "A cable carries a signal from one node to the next. 120 BPM, 4.00 ms."}</span></td><td><code>{s["min"]:g}→{s["max"]:g} / {s["weight"]} / {s["leading"]} / {s["tracking"]:+g}em</code></td></tr>'
     for s in B["type"]["web_scale"])
 fams = "".join(f'<div class="fam"><b class="f{i}">{E(f["name"])}</b><code>{", ".join(map(str, f["weights"])) or "drawn"}</code><p>{E(f["role"])}</p></div>' for i, f in enumerate(B["type"]["families"]))
-spring_rows = [[f'<b>{s["name"]}</b>', f'{s["zeta"]}', f'{s["omega"]}', f'{s["overshoot"] * 100:.1f}%', f'{s["settle_ms"]} ms', f'{s["response"]:.3f} s / {s["zeta"]}', E(s["role"])] for s in SPRINGS]
+spring_rows = [[f'<b>{s["name"]}</b>', f'{s["zeta"]}', f'{s["omega"]}', f'{s["overshoot"] * 100:.1f}%', (f'{M.peak_ms(s["zeta"], s["omega"]):.0f} ms · {M.snap(M.peak_ms(s["zeta"], s["omega"]))[0]}' if s["zeta"] < 1 else "-"), f'{s["settle_ms"]} ms', f'{s["response"]:.3f} s / {s["zeta"]}', E(s["role"])] for s in SPRINGS]
 radii = "".join(f'<div class="rd"><div style="border-radius:{min(r["px"], 44)}px"></div><b>{r["name"]}</b><code>{"pill" if r["px"] == 999 else str(r["px"]) + " px"}</code><span>{E(r["role"])}</span></div>' for r in B["shape"]["brand_radius"])
 space = "".join(f'<div class="spc"><i style="width:{s}px"></i><code>{s}</code></div>' for s in B["shape"]["space"])
 cats = "".join(f'<div class="ct"><i style="background:{c["hex"]}"></i><b>{c["name"]}</b><code>{c["hex"]}</code></div>' for c in C["category"])
@@ -433,12 +540,20 @@ r7 = [
     ("No shadows, objects floated, no key light", "One key light, soft shadows on, contact shadow 0.25, ground in the mode colour"),
     ("Glossy neon cables with big ball ends and glow", "Matte 5 u tubes, real plugs seated in side-wall jacks, catenary sag to the floor, no glow"),
 ]
+laws = [
+    ("L1 Clock", "Every duration is a note value at the transport tempo", "t = beats × 60 000 / BPM; house 120 BPM, film = the track's BPM", "Motion and music share one pulse; a token that is not a note is a bug (motion.py --check)"),
+    ("L2 Mass", "One acceleration for every object", f"T = 2√(D/a), a = {M.A_PX:.0f} px/s², then snap to L1", "Everything feels like the same weight on the same motor; long moves take longer, but not proportionally"),
+    ("L3 Spring", "One damping ladder; ω scales with BPM/120", "peak t = π / (ω√(1−ζ²)); slab: 188 ms = 1/16 dotted", "Start a slab a dotted 1/16 before the beat and the overshoot lands on it"),
+    ("L4 Path", "Moves travel on arcs taken from the mark", f"leave at 22.5° (a quarter of the 90° crossing); bow = tan 11.25° / 2 = {M.BOW * 100:.1f}% of the chord", "No straight-line travel; idle loops trace the lemniscate itself"),
+    ("L5 Phase", "Loops last whole bars; siblings offset by the golden fraction", "φᵢ = i(1 − 1/φ) mod 1 = 0, .382, .764, .146 …", "Many loops on screen never fall into step (Weyl equidistribution), yet each one loops cleanly"),
+    ("L6 Perception", "Interpolate in the space the eye measures", "zoom in log₂, colour in OKLab, rotation by the shortest arc", "A 1×→8× zoom spends equal time on each doubling; colour fades never go muddy"),
+]
 grammar = [
-    ("Land", "An object arrives and settles: soft spring, 4-8 u of travel, 200-320 ms. Slabs and the key cable use the slab spring."),
-    ("Patch", "A cable draws from pin to pin: ease-out over 320-480 ms, plug snaps with the slab spring, the destination answers within 100 ms."),
+    ("Land", "An object arrives and settles: soft spring, 4-8 u of travel, 188-333 ms (1/16 dotted to 1/4 triplet). Slabs and the key cable use the slab spring."),
+    ("Patch", "A cable draws from pin to pin: ease-out over 333-500 ms, plug snaps with the slab spring, the destination answers within 1/16 (125 ms)."),
     ("Carry", "Between scenes an object travels and becomes the next frame (iris, zoom to a rect, carried object). No cuts on a beat that has motion."),
     ("Live", "Anything that shows a value keeps moving: knobs breathe ±2°, waveforms scroll, meters fall. A frozen UI reads as a screenshot."),
-    ("Breathe", "One slow loop under everything (4-8 s): the ball's iridescence, the gradient sweep. Never on type, stops for reduced motion."),
+    ("Breathe", "One slow loop under everything, 2 or 4 bars (4 or 8 s at 120 BPM): the ball's iridescence, the gradient sweep. Never on type, stops for reduced motion."),
 ]
 assets = [
     ("Invest", "Lemniscate mark · Ember key cable · the digit bird · mono folio system", "Unique and already recognised; use in every film and post"),
@@ -469,6 +584,10 @@ research = [
     ("Tokens", "DTCG 2025.10, first stable", "W3C Community Group, 28 Oct 2025", "brand.tokens.json is emitted in that format"),
     ("Aesthetic-usability", "Beautiful UI is judged easier to use", "Kurosu and Kashimura 1995", "Polish is not decoration; it carries trust"),
     ("Animation", "Slow in/out, follow-through, squash", "Chang and Ungar 1993; Thomas and Johnston 1981", "Springs with measured overshoot, no linear moves"),
+    ("Motion: one mass", "Constant-acceleration (bang-bang) travel, T ∝ √D", "Classical kinematics; Flash and Hogan 1985 on smooth reaching", "L2: travel time from distance, snapped to the beat"),
+    ("Motion: magnitude", "Equal ratios feel equal", "Weber 1834; Fechner 1860", "L6: zoom and scale in log₂"),
+    ("Motion: loops", "Irrational rotations never repeat", "Weyl 1916, equidistribution", "L5: golden phase offsets between sibling loops"),
+    ("Motion: sync", "Sound may lead picture slightly; lagging hurts more", "van Wassenhove, Grant, Poeppel 2007; ITU-R BT.1359", "L1/L3: contact frames on the beat, sound 0-45 ms early"),
     ("Response time", "0.1 / 1 / 10 s; 400 ms", "Nielsen 1993; Doherty and Thadani 1982", "UI motion ≤200 ms, values never animate"),
     ("Icons", "Labels beat icons alone", "Wiedenbeck 1999; McDougall et al. 2000", "Icons pair with a label on first use and in menus"),
     ("Line length", "45-75 characters", "Bringhurst; Dyson 2004", "Body measure 60-72 ch"),
@@ -573,10 +692,16 @@ footer.f{{padding:48px 0;color:var(--ink-3);font-size:.85rem}}
 <div class="cards"><div class="card"><b>Pair with words</b><p>An icon alone only for universal actions (play, stop, record, close). Everywhere else a label sits beside it.</p></div><div class="card"><b>One family</b><p>Line by default; the -fill variant shows the on state, never decoration.</p></div></div></div>
 <div class="icons" style="margin-top:24px">{icons()}</div></section>
 
-<section id="motion"><span class="k">08 · Motion</span><h2>Springs you can measure</h2><p class="s">Overshoot = exp(-πζ/√(1-ζ²)). Settle (2%) ≈ 4/(ζω). For SwiftUI, response = 2π/ω and dampingFraction = ζ. For CSS, use the generated linear() curves in brand.css.</p>
-<div class="two"><div>{fig_springs()}</div><div class="tw">{table(["spring", "ζ", "ω", "overshoot", "settle", "SwiftUI", "use"], spring_rows)}</div></div>
+<section id="motion"><span class="k">08 · Motion</span><h2>Motion that keeps time</h2><p class="s">The look can change; the movement cannot. Six laws, all computed in <code>tools/brand/motion.py</code>, make any move recognisably Infinite in any visual style: the transport is the clock, everything has the same mass, springs land on the beat, paths come from the mark.</p>
+<div class="tw">{table(["law", "rule", "maths", "why"], [[f"<b>{a}</b>", E(b), E(c), E(d)] for a, b, c, d in laws])}</div>
+<h3>Live</h3>{demo_live()}
+<h3>L1 · Clock</h3>{fig_clock()}<p class="cap">Every brand and app token sits on a note value at 120 BPM, the app's default tempo (log time axis). In films the tempo is the track's: scale every duration by 120 / BPM, and spring ω by BPM / 120, so a move keeps its musical shape. The app's own UI always runs at 120.</p>
+<h3>L2 · Mass</h3><div class="two"><div>{fig_mass()}</div><div><p class="cap">One acceleration for everything: an object speeds up for half the trip and brakes for the other half, so time grows with the square root of distance. 8 px is a 1/16, 32 px an 1/8, 128 px a 1/4, 512 px a 1/2. Use <code>motion.travel_ms(px, bpm)</code>.</p></div></div>
+<h3>L4 · Path and L5 · Phase</h3>{fig_path()}
+<h3>L3 · Springs</h3><p class="s">Overshoot = exp(-πζ/√(1-ζ²)). Settle (2%) ≈ 4/(ζω). For SwiftUI, response = 2π/ω and dampingFraction = ζ. For CSS, use the generated linear() curves in brand.css.</p>
+<div class="two"><div>{fig_springs()}</div><div class="tw">{table(["spring", "ζ", "ω", "overshoot", "peak", "settle", "SwiftUI", "use"], spring_rows)}</div></div>
 <h3>Grammar</h3><div class="tw">{table(["verb", "what it means"], [[f"<b>{a}</b>", E(b)] for a, b in grammar])}</div>
-<h3>Durations</h3><div class="tw">{table(["token", "ms"], [[k, str(v)] for k, v in B["motion"]["durations_ms"].items()])}</div>
+<h3>Durations</h3><div class="tw">{table(["token", "ms", "note at 120 BPM"], [[k, str(v), M.snap(v)[0] if v else "-"] for k, v in B["motion"]["durations_ms"].items()])}</div>
 <p class="cap">In the app, motion stays at or under 200 ms and values never animate (they are data). Every brand motion stops for prefers-reduced-motion.</p>
 <pre>--spring-slab: {E(SPRINGS[0]["linear"])};</pre></section>
 

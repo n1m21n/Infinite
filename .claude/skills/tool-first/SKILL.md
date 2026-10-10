@@ -68,6 +68,7 @@ Tools must stay **MIT-clean** (no GPL code pasted in), **three-platform aware** 
 | Press kit zip | `tools/brand/press_kit.py` |
 | Off-brand / retired colours (ratchet); apply swaps | `tools/brand/brand_lint.py [PATH]`, `tools/brand/migrate_colours.py [--apply]` |
 | Confusable category colours per theme + brand.json drift | `tools/brand/category_audit.py` |
+| Motion laws (tempo clock, one mass, beat-locked springs, mark arcs, golden phase, log zoom); token grid check | `tools/brand/motion.py [--check]`; import it in films/3D/site |
 
 ## Exit check
 

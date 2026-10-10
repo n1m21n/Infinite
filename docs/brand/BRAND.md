@@ -241,10 +241,23 @@ The set is in `art/icons/src` (73 glyphs). The book renders all of them.
 
 ## 8. Motion
 
+The look can change; the movement cannot. Six laws make a move recognisably Infinite in any visual style. All of them are computed in `tools/brand/motion.py` (import it; never copy the maths), and the book draws them live.
+
+| Law | Rule | Maths | Why |
+|---|---|---|---|
+| L1 Clock | Every duration is a note value at the transport tempo | t = beats × 60 000 / BPM; house 120 BPM (`Transport.h`), films use the track's BPM | Motion and music share one pulse. `motion.py --check` fails on a token off the grid |
+| L2 Mass | One acceleration for every object | T = 2√(D/a), a = 2048 px/s², snapped to L1: 8 px = 1/16, 32 px = 1/8, 128 px = 1/4, 512 px = 1/2 | Everything feels like the same weight on the same motor |
+| L3 Spring | One damping ladder; ω scales with BPM / 120 | peak t = π / (ω√(1−ζ²)); slab 188 ms = a dotted 1/16 at 120 BPM | Launch a slab a dotted 1/16 before the beat and its overshoot lands on it (`motion.peak_ms`) |
+| L4 Path | Travel on arcs taken from the mark | circular arc leaving at 22.5° (a quarter of the mark's 90° crossing); bow = tan 11.25° / 2 = 9.9% of the chord | No straight-line travel; idle loops trace the lemniscate (`motion.arc`, `motion.lemniscate`) |
+| L5 Phase | Loops last whole bars; sibling loops start 1 − 1/φ apart | 0, .382, .764, .146, .528 … | Never in step (Weyl equidistribution), yet each loops cleanly (`motion.phase`) |
+| L6 Perception | Interpolate in the space the eye measures | zoom in log₂, colour in OKLab, rotation by the shortest arc | Equal ratios feel equal (Weber–Fechner); fades never go muddy (`motion.zoom_lerp`) |
+
+In films, scale every duration by 120 / BPM and pass `bpm=` to `spring`, `peak_ms` and `travel_ms`. The app's UI runs at a fixed 120 BPM: its `motion_ms` tokens are 1/16 (125), 1/16 triplet (83), 1/8 triplet (167) and 1/16 dotted (188), and `tools/design/motion_lint.py` keeps them on the grid. The 3D kit's baked loops are one bar long, with every overshoot peak on a beat.
+
 | Spring | ζ | ω | Overshoot | Settle (2%) | SwiftUI response / damping | Use |
 |---|---|---|---|---|---|---|
-| slab | 0.55 | 20 | 12.6% | 292 ms | 0.314 / 0.55 | Patch Type slabs, key cable snap. The signature. |
-| letter | 0.60 | 22 | 9.5% | 271 ms | 0.286 / 0.60 | Patch Type letters |
+| slab | 0.55 | 20 | 12.6% (peak 188 ms) | 292 ms | 0.314 / 0.55 | Patch Type slabs, key cable snap. The signature. |
+| letter | 0.60 | 22 | 9.5% (peak 178 ms) | 271 ms | 0.286 / 0.60 | Patch Type letters |
 | soft | 0.90 | 18 | 0.2% | 262 ms | 0.349 / 0.90 | Everything else that lands |
 | press | 1.00 | 28 | 0 | 209 ms | 0.224 / 1.00 | Buttons, keycaps, knob detents |
 
@@ -260,11 +273,11 @@ Durations are note values at 120 BPM (the transport default): micro 125 (1/16), 
 
 | Verb | Meaning |
 |---|---|
-| Land | An object arrives and settles: soft spring, 4 to 8 u of travel |
-| Patch | A cable draws pin to pin with ease-out over 320 to 480 ms; the plug seats with the slab spring; the destination answers within 100 ms |
+| Land | An object arrives and settles: soft spring, 4 to 8 u of travel, 188 to 333 ms |
+| Patch | A cable draws pin to pin with ease-out over 333 to 500 ms; the plug seats with the slab spring, peak on the beat; the destination answers within a 1/16 (125 ms) |
 | Carry | Between scenes an object travels and becomes the next frame: iris, zoom into a rect, zoom out of a rect, carried object |
 | Live | Anything that shows a value keeps moving: knobs breathe ±2°, waveforms scroll, meters fall |
-| Breathe | One slow loop under everything (4 to 8 s); never on type |
+| Breathe | One slow loop under everything, 2 or 4 bars (4 or 8 s at 120 BPM); never on type |
 
 App motion stays at or under 200 ms and values never animate. All brand motion stops under `prefers-reduced-motion`.
 

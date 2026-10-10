@@ -14,7 +14,8 @@ Why: the brand had springs and durations but no reason behind them; with laws, a
 
 Usage:
     python3 tools/brand/motion.py            # print the derived tables
-    python3 tools/brand/motion.py --check    # brand.json durations and staggers sit on the 120 BPM grid (5% tol)
+    python3 tools/brand/motion.py --check    # brand.json durations, staggers and app_ms sit on the 120 BPM grid (5% tol)
+                                             # and app_ms matches src/app/ui/design/tokens.json
     from motion import note_ms, spring, peak_ms, travel_ms, arc, lemniscate, phase, zoom_lerp   (in other tools)
 Exit codes: 0 ok, 1 a token is off the grid, 2 usage error.
 """
@@ -77,12 +78,20 @@ def travel_ms(d_px, bpm=BPM, snap_to_grid=True):
 
 
 def arc(p0, p1, u):
-    """L4: point at u in [0, 1] on the house arc from p0 to p1 (quadratic, bows left of travel by BOW*chord)."""
+    """L4: point at u in [0, 1] on the house arc from p0 to p1: a circular arc that leaves and arrives at 22.5 deg
+    to the chord (bow = BOW * chord), turning left of travel in y-up coordinates. Uniform speed in u."""
     (x0, y0), (x1, y1) = p0, p1
     dx, dy = x1 - x0, y1 - y0
-    cx, cy = (x0 + x1) / 2 - dy * BOW * 2, (y0 + y1) / 2 + dx * BOW * 2   # control at 2x sagitta
-    a, b, c = (1 - u) ** 2, 2 * u * (1 - u), u * u
-    return a * x0 + b * cx + c * x1, a * y0 + b * cy + c * y1
+    c = math.hypot(dx, dy)
+    if c == 0:
+        return x0, y0
+    th = math.radians(22.5)
+    R = c / (2 * math.sin(th))
+    nx, ny = -dy / c, dx / c                                  # left normal
+    cx, cy = (x0 + x1) / 2 - nx * R * math.cos(th), (y0 + y1) / 2 - ny * R * math.cos(th)
+    a0 = math.atan2(y0 - cy, x0 - cx)
+    a = a0 + 2 * th * u * (1 if dx * (y0 - cy) - dy * (x0 - cx) < 0 else -1)
+    return cx + R * math.cos(a), cy + R * math.sin(a)
 
 
 def lemniscate(u, A=1.0):
@@ -122,7 +131,7 @@ def tables(B):
 def check(B):
     bad = 0
     m = B["motion"]
-    for group in ("durations_ms", "stagger_ms"):
+    for group in ("durations_ms", "stagger_ms", "app_ms"):
         for k, v in m[group].items():
             if not v:
                 continue
@@ -130,7 +139,12 @@ def check(B):
             off = abs(v - ms) / ms
             flag = "ok " if off <= 0.05 else "OFF"
             bad += flag == "OFF"
-            print(f"  {flag} {group[:-3]}.{k:8} {v:4} ms  nearest {n:7} {ms:6.1f} ms  ({off * 100:.0f}% off)")
+            print(f"  {flag} {group[:-3]}.{k:13} {v:4} ms  nearest {n:7} {ms:6.1f} ms  ({off * 100:.0f}% off)")
+    app = json.load(open(os.path.join(ROOT, "src", "app", "ui", "design", "tokens.json")))["base"]["motion_ms"]
+    for k, v in app.items():
+        if m["app_ms"].get(k) != v:
+            print(f"  drift: brand.json app_ms.{k} = {m['app_ms'].get(k)} but tokens.json says {v}")
+            bad += 1
     return 1 if bad else 0
 
 
