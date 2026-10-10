@@ -623,6 +623,8 @@ void DrawNodeBodies(FrameCtx& fc)
             DrawFieldSampleScope(fsnPreview, 60.0f, kPreviewSize);
          else if (auto* fspPreview = dynamic_cast<FieldSynthNode*>(gn.node.get()))
             DrawFieldSynthScope(fspPreview, 60.0f, kPreviewSize);
+         else if (auto* fnnPreview = dynamic_cast<FieldNotesNode*>(gn.node.get()))
+            DrawFieldNotesRoll(fnnPreview, 60.0f, kPreviewSize);
          else if (isAudioBody)
             DrawAudioNodeBody(gn);
          else

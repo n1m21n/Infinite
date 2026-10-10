@@ -3457,6 +3457,7 @@ void DrawWavetableScope(WavetableNode* n, float h, float width);
 void DrawFieldSampleScope(FieldSampleNode* n, float h, float width);
 
 void DrawFieldSynthScope(FieldSynthNode* n, float h, float width);
+void DrawFieldNotesRoll(FieldNotesNode* n, float h, float width);
 
 void DrawFieldElementParams(FieldElementNode* n);
 
