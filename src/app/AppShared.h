@@ -2033,6 +2033,10 @@ bool AudioSliderFloat(const char* label, float* value, float minV, float maxV, c
                          FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
                          bool vividState = false);
 
+void OutputMeterRow(const char* label, float v, float width);
+
+void DrawOutputMeters(INode* node, float colW, int cols = 1, float gutter = 16.0f);
+
 void DrawModulationBindingMenu(int nodeIndex, int paramIndex, bool hovered);
 
 extern std::map<std::pair<int, int>, float> gDiscreteParamStore;

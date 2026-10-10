@@ -695,6 +695,9 @@ namespace app
       ModCheckbox("clamp 0..1", &n->clamp01);
 
       ImGui::EndGroup();
+
+      NodeSeparator("outputs", colW * 2 + gutter);
+      DrawOutputMeters(n, colW, 2, gutter);
    }
 
 
@@ -712,14 +715,7 @@ namespace app
       ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f", colW);
 
       NodeSeparator("outputs", colW);
-      const float labelW = 60.0f;
-      const float barW = colW - labelW;
-      for (int i = 0; i < HandTrackNode::kOutputCount; i++)
-      {
-         ImGui::Text("%-9s", n->OutputLabel(i));
-         ImGui::SameLine(labelW);
-         ImGui::ProgressBar(std::clamp(n->Value(i), 0.0f, 1.0f), ImVec2(barW, 0), "");
-      }
+      DrawOutputMeters(n, colW);
    }
 
 

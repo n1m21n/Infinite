@@ -130,6 +130,9 @@ namespace app
       ModSlider("release", &n->release, 0.005f, 1.0f, "%.3f", colW);
 
       ImGui::EndGroup();
+
+      NodeSeparator("outputs", bodyW);
+      DrawOutputMeters(n, colW, 2, gutter);
    }
 
 
