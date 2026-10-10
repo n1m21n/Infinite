@@ -49,3 +49,10 @@
   .lib-bar-end { width: 100%; justify-content: space-between; }
 }
 @media (prefers-reduced-motion: reduce) { .lib-card .node-view img { transition: none; } }
+
+/* phones: the download button is just the icon */
+@media (max-width: 560px) {
+  .lib-dl { width: 44px; min-height: 44px; padding: 0; border-radius: 50%; }
+  .lib-dl-text { display: none; }
+  .lib-dl svg { width: 20px; height: 20px; }
+}
