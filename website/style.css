@@ -31,10 +31,10 @@
 
   /* App chrome (node cards are the app's own dark UI) */
   --app-window: #0A0B0F;
-  --app-panel: #181B23;
+  --app-panel: #20263F;  /* brand surface Midnight 1, not the app's grey */
   --app-raised: #20242F;
-  --app-text: #EEF0F6;
-  --app-dim: #9198AD;
+  --app-text: #EEF1FA;
+  --app-dim: #A3AACB;
   --app-border: #383C47;
 
   --brand-grad: linear-gradient(90deg, #F57F66, #D99A9C 35%, #C7AFC0 65%, #A9CDF1);
@@ -292,7 +292,7 @@ strong { font-weight: 600; color: var(--ink); }
 }
 .app-bar {
   height: 36px; display: flex; align-items: center; gap: 12px; padding: 0 14px;
-  background: var(--app-panel); border-bottom: 1px solid #262A35; color: var(--app-dim);
+  background: #181B23; border-bottom: 1px solid #262A35; color: var(--app-dim);
   font-size: var(--fs-micro);
 }
 .app-bar .dots { display: flex; gap: 7px; }

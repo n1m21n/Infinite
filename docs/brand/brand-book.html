@@ -1,0 +1,328 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Infinite Brand Book</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FBFAF6;--card:#fff;--inner:#F3F0E7;--ink:#1F1D1A;--ink2:#5A534C;--ink3:#6E6760;--tc:#C2593F;--tci:#A8472F;--m:#151930;--m1:#20263F;--m2:#2A3052;--moon:#EEF1FA;--moon2:#A3AACB;--coral:#F5866B;--r:24px;--rm:16px;--gut:clamp(16px,4vw,48px)}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:400 1rem/1.55 Geist,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+code{font:500 .78rem 'Geist Mono',monospace}main{max-width:1180px;margin:0 auto;padding:0 var(--gut)}
+.hero{background:var(--m);color:var(--moon);padding:clamp(48px,9vw,110px) 0 clamp(40px,7vw,80px);position:relative;overflow:hidden}
+.hero:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 80% 20%,rgba(139,108,255,.35),transparent 45%),radial-gradient(circle at 10% 90%,rgba(245,134,107,.22),transparent 40%)}
+.hero main{position:relative}.hero img{width:64px;height:64px;border-radius:16px}
+h1{font-size:clamp(2.6rem,8vw,6rem);font-weight:800;letter-spacing:-.04em;line-height:1;margin:24px 0 8px}
+.hand{font:700 1.6rem Caveat,cursive;color:var(--coral);margin:0;transform:rotate(-2deg);display:inline-block}
+.lead{max-width:620px;color:var(--moon2);font-size:1.1rem}
+section{padding:clamp(40px,6vw,72px) 0;border-top:1px solid rgba(45,35,25,.06)}section:first-of-type{border:0}
+h2{font-size:clamp(1.6rem,3.4vw,2.4rem);font-weight:700;letter-spacing:-.03em;margin:0 0 8px}
+.k{font:500 .72rem 'Geist Mono',monospace;letter-spacing:.06em;color:var(--tci);text-transform:uppercase}
+p.s{color:var(--ink2);max-width:680px;margin:0 0 24px}
+.grid{display:grid;grid-auto-rows:1fr;gap:16px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.sw{border-radius:var(--r);padding:20px;min-height:150px;display:flex;flex-direction:column;gap:4px;justify-content:flex-end}.sw.big{min-height:200px}
+.sw b{font-weight:700}.sw span{font-size:.8rem;opacity:.8;line-height:1.4}
+.grad{height:90px;border-radius:var(--r);background:linear-gradient(90deg,#F57F66,#D99A9C,#C7AFC0,#A9CDF1);margin:16px 0}
+.cp{border-radius:var(--rm);padding:16px;display:flex;flex-direction:column;gap:2px}.cp span{font-size:2rem;font-weight:800}.cp small{font-size:.78rem}
+.ct{background:var(--card);border-radius:var(--rm);padding:12px 14px;display:flex;align-items:center;gap:10px}.ct i{width:14px;height:14px;border-radius:50%;background:var(--c)}.ct code{margin-left:auto;color:var(--ink3)}
+.rl{display:flex;align-items:center;gap:6px;background:var(--card);border-radius:var(--rm);padding:10px 14px}.rl i{width:18px;height:18px;border-radius:50%}.rl b{margin-left:8px;font-weight:600;font-size:.9rem}
+table{width:100%;border-collapse:collapse}td{padding:12px 8px;border-bottom:1px solid rgba(45,35,25,.07);vertical-align:baseline}td:first-child{color:var(--ink3);font:500 .78rem 'Geist Mono',monospace;width:110px}
+.fams{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:24px}.fam{background:var(--card);border-radius:var(--r);padding:24px}.fam b{font-size:1.6rem}.fam:nth-child(2) b{font-family:'Geist Mono'}.fam:nth-child(3) b{font:700 2.1rem Caveat;color:var(--tc)}.fam:nth-child(4) b{font:italic 1.9rem 'Instrument Serif',serif}.fam p{margin:6px 0 0;color:var(--ink2);font-size:.9rem}
+.rds{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.rd{background:var(--card);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:6px}.rd div{height:90px;background:var(--m1);margin-bottom:8px}.rd span{color:var(--ink2);font-size:.82rem}
+.dark{background:var(--m);color:var(--moon);border-radius:var(--r);padding:clamp(20px,4vw,48px);display:grid;gap:32px;grid-template-columns:minmax(0,320px) 1fr;align-items:center}
+@media(max-width:760px){.dark{grid-template-columns:1fr}}
+.ncard .hand{font-size:1.5rem;margin:0 0 6px 6px}.nc{background:linear-gradient(180deg,rgba(38,44,70,.95),rgba(32,38,63,.95));border-radius:var(--r);padding:0 0 4px;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 1px 2px rgba(0,0,0,.2),0 12px 28px rgba(4,5,14,.45)}
+.nc header{display:flex;justify-content:space-between;padding:14px 16px 10px;font-weight:600;font-size:.9rem}.nc header span{font:500 .7rem 'Geist Mono';color:var(--moon2)}
+.media{height:150px;margin:0 8px;border-radius:var(--rm)}.nc p{margin:10px 16px;font-size:.85rem;color:var(--moon2)}
+.nc footer{display:flex;justify-content:space-between;align-items:center;padding:8px 16px 12px}.pill{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 14px;border-radius:999px;font-size:.8rem;font-weight:600;background:rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}.pill.sm{width:32px;padding:0;font-style:normal}.pill.lit{background:#EEF1FA;color:#151930}.act{display:flex;gap:8px}
+.rules li{margin:6px 0}.rules{color:var(--ink2);padding-left:20px}
+.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;background:var(--m);color:var(--moon);border-radius:var(--r);padding:20px}.icons figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0}.icons figcaption{font:500 .6rem 'Geist Mono';color:var(--moon2);text-align:center}
+.mo{background:var(--card);border-radius:var(--rm);padding:14px 18px;display:grid;gap:2px}.mo span{color:var(--ink2);font-size:.85rem}
+.do{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.do div{background:var(--card);border-radius:var(--r);padding:22px}.do b{display:block;margin-bottom:8px}.do .no b{color:var(--tci)}
+footer.f{padding:48px 0;color:var(--ink3);font-size:.85rem}
+</style></head><body>
+<header class="hero"><main><img src="data:image/png;base64,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" alt="Infinite"><p class="hand">one language</p><h1>Brand book</h1>
+<p class="lead">How Infinite looks, moves and sounds, on one page. Values come from <code>docs/brand/brand.json</code>; the rules are in <code>docs/brand/BRAND.md</code>. If anything else disagrees, this wins. v1, 2026-10-10.</p></main></header>
+<main>
+<section><span class="k">01 · Principles</span><h2>Calm, premium, a little playful</h2><p class="s">Two grounds, one accent, rounded everything, no outlines. Loudness comes from the type, never from colour noise.</p>
+<div class="do"><div><b>Two grounds</b>Midnight and Paper. Never pure black or white.</div><div><b>One accent</b>Coral on dark, terracotta on paper.</div><div><b>One card</b>Radius 24, media 16, no outline.</div></div></section>
+
+<section><span class="k">02 · Colour</span><h2>Palette</h2><p class="s">60 percent ground, 30 percent surfaces and ink, 10 percent accent.</p>
+<div class="grid"><div class="sw big" style="background:#151930;color:#FFFFFF;"><b>Midnight</b><code>#151930</code><span>Dark ground. The logo tile colour. Never pure black.</span></div><div class="sw big" style="background:#20263F;color:#FFFFFF;"><b>Midnight 1</b><code>#20263F</code><span>Raised surface: cards, slabs, panels on Midnight.</span></div><div class="sw big" style="background:#2A3052;color:#FFFFFF;"><b>Midnight 2</b><code>#2A3052</code><span>Higher surface: hover, nested card, popover.</span></div><div class="sw big" style="background:#343B5E;color:#FFFFFF;"><b>Midnight 3</b><code>#343B5E</code><span>Highest surface and hairlines on dark.</span></div><div class="sw big" style="background:#FBFAF6;color:#151930;box-shadow: inset 0 0 0 1px rgba(128,128,128,.25);"><b>Paper</b><code>#FBFAF6</code><span>Light ground. A light master is a whole-film or whole-page variant.</span></div><div class="sw big" style="background:#FFFFFF;color:#151930;box-shadow: inset 0 0 0 1px rgba(128,128,128,.25);"><b>Card</b><code>#FFFFFF</code><span>Raised surface on Paper.</span></div><div class="sw big" style="background:#F3F0E7;color:#151930;box-shadow: inset 0 0 0 1px rgba(128,128,128,.25);"><b>Inner</b><code>#F3F0E7</code><span>Wells, media backing and code chips on Paper.</span></div></div><h3>Ink</h3><div class="grid"><div class="sw" style="background:#EEF1FA;color:#151930;"><b>Moon</b><code>#EEF1FA</code><span>Text on Midnight. Slightly blue, never pure white.</span></div><div class="sw" style="background:#A3AACB;color:#151930;"><b>Moon 2</b><code>#A3AACB</code><span>Secondary text on Midnight.</span></div><div class="sw" style="background:#1F1D1A;color:#FFFFFF;"><b>Ink</b><code>#1F1D1A</code><span>Text on Paper.</span></div><div class="sw" style="background:#5A534C;color:#FFFFFF;"><b>Ink 2</b><code>#5A534C</code><span>Secondary text on Paper.</span></div><div class="sw" style="background:#6E6760;color:#FFFFFF;"><b>Ink 3</b><code>#6E6760</code><span>Tertiary text on Paper. (Replaces #857C74, which measured 3.9:1.)</span></div></div>
+<h3>Accent</h3><div class="grid"><div class="sw" style="background:#F5866B;color:#151930;"><b>Coral</b><code>#F5866B</code><span>THE accent on Midnight. One coral thing per frame.</span></div><div class="sw" style="background:#C2593F;color:#FFFFFF;"><b>Terracotta</b><code>#C2593F</code><span>THE accent on Paper: fills, large type, marks. Not for small text.</span></div><div class="sw" style="background:#A8472F;color:#FFFFFF;"><b>Terracotta ink</b><code>#A8472F</code><span>Accent used as small text or a link on Paper.</span></div><div class="sw" style="background:#8B6CFF;color:#151930;"><b>Violet</b><code>#8B6CFF</code><span>Glow hero on Midnight only (spheres, key objects). Never a second accent for UI.</span></div><div class="sw" style="background:#A9CDF1;color:#151930;"><b>Sky</b><code>#A9CDF1</code><span>Gradient end only.</span></div></div><div class="grad"></div><p class="s"><b>Brand gradient:</b> Horizontal, exact stops. The logo, the brand ball and the end-card lockup only.</p>
+<h3>Contrast, measured</h3><div class="grid"><div class="cp" style="background:#151930;color:#F5866B"><span>Aa</span><small>Coral on Midnight</small><code>7.0:1</code></div><div class="cp" style="background:#151930;color:#EEF1FA"><span>Aa</span><small>Moon on Midnight</small><code>15.3:1</code></div><div class="cp" style="background:#151930;color:#A3AACB"><span>Aa</span><small>Moon 2 on Midnight</small><code>7.6:1</code></div><div class="cp" style="background:#151930;color:#8B6CFF"><span>Aa</span><small>Violet on Midnight</small><code>4.7:1</code></div><div class="cp" style="background:#FBFAF6;color:#1F1D1A"><span>Aa</span><small>Ink on Paper</small><code>16.1:1</code></div><div class="cp" style="background:#FBFAF6;color:#5A534C"><span>Aa</span><small>Ink 2 on Paper</small><code>7.2:1</code></div><div class="cp" style="background:#FBFAF6;color:#6E6760"><span>Aa</span><small>Ink 3 on Paper</small><code>5.3:1</code></div><div class="cp" style="background:#FBFAF6;color:#C2593F"><span>Aa</span><small>Terracotta on Paper (large only)</small><code>4.2:1</code></div><div class="cp" style="background:#FBFAF6;color:#A8472F"><span>Aa</span><small>Terracotta ink on Paper</small><code>5.6:1</code></div></div>
+<h3>Category colours (node UI only)</h3><div class="grid"><div class="ct" style="--c:#4ADE80"><i></i><b>Source</b><code>#4ADE80</code></div><div class="ct" style="--c:#38BDF8"><i></i><b>3D</b><code>#38BDF8</code></div><div class="ct" style="--c:#818CF8"><i></i><b>Compositing</b><code>#818CF8</code></div><div class="ct" style="--c:#FACC15"><i></i><b>Effects</b><code>#FACC15</code></div><div class="ct" style="--c:#A3E635"><i></i><b>Modulators</b><code>#A3E635</code></div><div class="ct" style="--c:#22C55E"><i></i><b>Prediction</b><code>#22C55E</code></div><div class="ct" style="--c:#FC963C"><i></i><b>Macros</b><code>#FC963C</code></div><div class="ct" style="--c:#A3A9BA"><i></i><b>Utility</b><code>#A3A9BA</code></div><div class="ct" style="--c:#4CD964"><i></i><b>Notes</b><code>#4CD964</code></div><div class="ct" style="--c:#6992F6"><i></i><b>Synths</b><code>#6992F6</code></div><div class="ct" style="--c:#53C7E3"><i></i><b>Audio Effects</b><code>#53C7E3</code></div></div>
+<h3>Role colours (dark, light)</h3><div class="grid"><div class="rl"><i style="background:#BE3434"></i><i style="background:#BE3434"></i><b>Record</b></div><div class="rl"><i style="background:#D9A626"></i><i style="background:#A57300"></i><b>Solo</b></div><div class="rl"><i style="background:#D98C1A"></i><i style="background:#B96900"></i><b>Learn</b></div><div class="rl"><i style="background:#FFBE5A"></i><i style="background:#B96405"></i><b>Modulation</b></div><div class="rl"><i style="background:#AA82FF"></i><i style="background:#8250E6"></i><b>Expression</b></div><div class="rl"><i style="background:#6ED78C"></i><i style="background:#1E9646"></i><b>Prediction</b></div><div class="rl"><i style="background:#2EAA4A"></i><i style="background:#268C3E"></i><b>Go</b></div><div class="rl"><i style="background:#FFCD2D"></i><i style="background:#AA7600"></i><b>Favourite</b></div></div></section>
+
+<section><span class="k">03 · Type</span><h2>Four families, no fifth</h2><div class="fams"><div class="fam"><b>Geist</b><p>Headlines and UI text. 700 to 800 for display, tracking -0.02 to -0.035 em.</p></div><div class="fam"><b>Geist Mono</b><p>Machine text: values, labels, code, coordinates. Tabular figures.</p></div><div class="fam"><b>Caveat</b><p>The one handwritten word per scene. 700, accent colour, hand underline, at most 1.5x the neighbouring text.</p></div><div class="fam"><b>Instrument Serif</b><p>Rare editorial accent, italic. Never alongside Caveat in the same line.</p></div></div><table><tr><td>Display</td><td style="font-family:Geist;font-weight:800;letter-spacing:-0.04em;font-size:clamp(1.4rem,3vw,2.2rem)">Connection is the point</td><td><code>clamp(2.4rem, 7vw, 5rem) / 800</code></td></tr><tr><td>Heading</td><td style="font-family:Geist;font-weight:700;letter-spacing:-0.03em;font-size:clamp(1.4rem,3vw,2.2rem)">Connection is the point</td><td><code>clamp(1.6rem, 3.4vw, 2.4rem) / 700</code></td></tr><tr><td>Subheading</td><td style="font-family:Geist;font-weight:700;letter-spacing:-0.02em;font-size:1.1rem">Connection is the point</td><td><code>1.1rem / 700</code></td></tr><tr><td>Body</td><td style="font-family:Geist;font-weight:400;letter-spacing:0;font-size:1rem">Connection is the point</td><td><code>1rem / 400</code></td></tr><tr><td>Caption</td><td style="font-family:Geist;font-weight:500;letter-spacing:0;font-size:0.85rem">Connection is the point</td><td><code>0.85rem / 500</code></td></tr><tr><td>Micro (mono)</td><td style="font-family:Geist;font-weight:500;letter-spacing:0.04em;font-size:0.72rem">Connection is the point</td><td><code>0.72rem / 500</code></td></tr></table></section>
+
+<section><span class="k">04 · Shape and depth</span><h2>Rounded, concentric, borderless</h2><div class="rds"><div class="rd"><div style="border-radius:24px"></div><b>Card</b><code>24 px</code><span>Every card: node card, white panel, film frame, step. 20 on phones.</span></div><div class="rd"><div style="border-radius:16px"></div><b>Media</b><code>16 px</code><span>Anything inside a card. Card radius minus its 8 px padding. 12 on phones.</span></div><div class="rd"><div style="border-radius:10px"></div><b>Chip</b><code>10 px</code><span>Small boxes: code chips, tags.</span></div><div class="rd"><div style="border-radius:40px"></div><b>Control</b><code>pill</code><span>Buttons, chips, toggles, inputs: always pill.</span></div></div>
+<p class="s" style="margin-top:20px">Media radius is the card radius minus the card padding (24 − 8 = 16). Depth comes from surface value, a lit top edge and soft stacked shadows.</p></section>
+
+<section><span class="k">05 · The card</span><h2>One card everywhere</h2><div class="dark"><article class="ncard"><p class="hand">filters a picture</p><div class="nc"><header><b>Liquid Glass</b><span>Pixel</span></header>
+<div class="media" style="background:linear-gradient(135deg,#8B6CFF,#F5866B 55%,#A9CDF1)"></div><p>A frosted, refracting glass pane over whatever is behind it.</p>
+<footer><span class="pill">Free</span><span class="act"><i class="pill sm">⧉</i><i class="pill sm lit">⤓</i></span></footer></div></article><ul class="rules"><li style="color:var(--moon2)">Surface Midnight 1, frosted, radius 24</li><li style="color:var(--moon2)">No outline, no line under the title, no rule above the footer</li><li style="color:var(--moon2)">Category colour only on the title bar and pins</li><li style="color:var(--moon2)">Controls are pills of one height</li><li style="color:var(--moon2)">Hand caption above, in Caveat</li></ul></div></section>
+
+<section><span class="k">06 · Iconography</span><h2>20 px grid, 1.5 px stroke, round</h2><p class="s">Stroke 1.5 at 20, 1.25 at 16, 1.75 at 24. Corners 2 and 1. A signal icon ends in a 3 px dot, the same dot as a pin.</p><div class="icons"><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 5.5H10"/>
+<path d="M12.5 5.5H16"/>
+<path d="M4 10H7"/>
+<path d="M9.5 10H16"/>
+<path d="M4 14.5H11"/>
+<path d="M13.5 14.5H16"/>
+</svg>
+<figcaption>arrange</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="3.4" y="3.4" width="13.2" height="13.2" rx="1.7"/>
+<path d="M7.5 4.2v11.6"/>
+</svg>
+<figcaption>browser</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 7V5a2 2 0 0 1 2-2h2M13 3h2a2 2 0 0 1 2 2v2M17 13v2a2 2 0 0 1-2 2h-2M7 17H5a2 2 0 0 1-2-2v-2"/>
+<circle cx="10" cy="10" r="2.25" fill="currentColor" stroke="none"/>
+</svg>
+<figcaption>capture</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M6 8l4 4 4-4"/>
+</svg>
+<figcaption>chevron-down</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M8 6l4 4-4 4"/>
+</svg>
+<figcaption>chevron-right</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M6 12l4-4 4 4"/>
+</svg>
+<figcaption>chevron-up</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/>
+</svg>
+<figcaption>close</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="10" cy="10" r="6.5"/>
+<path d="M10 6.5V10h3.5"/>
+</svg>
+<figcaption>count-in</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/>
+<path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/>
+</svg>
+<figcaption>cube</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/>
+<path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/>
+</svg>
+<figcaption>edit</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="10" cy="10" r="7"/>
+<path d="M10 6.2v4.6"/>
+<path d="M10 13.4v.1"/>
+</svg>
+<figcaption>error</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 10C4.7 6.8 7.1 5.2 10 5.2S15.3 6.8 17 10C15.3 13.2 12.9 14.8 10 14.8S4.7 13.2 3 10Z"/>
+<circle cx="10" cy="10" r="2.2" fill="currentColor" stroke="none"/>
+</svg>
+<figcaption>eye</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 10C4.7 6.8 7.1 5.2 10 5.2S15.3 6.8 17 10C15.3 13.2 12.9 14.8 10 14.8S4.7 13.2 3 10Z"/>
+<path d="M5 15 15 5"/>
+</svg>
+<figcaption>eye-off</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/>
+<path d="M3.8 6.7 10 10.05 16.2 6.7M10 10.05V16.9"/>
+</svg>
+<figcaption>family-3d</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 8v4M7 5v10M10 3v14M13 6v8M16 8.5v3"/>
+</svg>
+<figcaption>family-audio-effects</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="3.5" y="3.5" width="9" height="9" rx="2"/>
+<rect x="7.5" y="7.5" width="9" height="9" rx="2"/>
+</svg>
+<figcaption>family-compositing</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 3 11.7 8.3 17 10 11.7 11.7 10 17 8.3 11.7 3 10 8.3 8.3Z"/>
+</svg>
+<figcaption>family-effects</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="10" cy="10" r="6.5"/>
+<path d="M10 10 13 5.6"/>
+</svg>
+<figcaption>family-macros</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3.2 10c1.8-5.5 3.2-5.5 4.4 0s2.8 5.5 4.4 0 3.2-5.5 4.4 0"/>
+</svg>
+<figcaption>family-modulators</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M8.5 14.5V4.5l7-1.5v10"/>
+<circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/>
+<circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/>
+</svg>
+<figcaption>family-notes</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3.5 14.5c2.5 0 3-4 5.5-4.5"/>
+<path d="M11.5 8.4 13 7.8" stroke-dasharray="0.1 3"/>
+<circle cx="15.9" cy="6.2" r="1.7" fill="currentColor" stroke="none"/>
+</svg>
+<figcaption>family-prediction</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="6.5" cy="10" r="1.9" fill="currentColor" stroke="none"/>
+<path d="M10.5 6.5a5 5 0 0 1 0 7M13.5 4a8.6 8.6 0 0 1 0 12"/>
+</svg>
+<figcaption>family-source</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="3" y="5" width="14" height="10" rx="2"/>
+<path d="M7.7 5v10M12.3 5v10"/>
+<path d="M7.7 10h0M12.3 10h0" stroke="none"/>
+</svg>
+<figcaption>family-synths</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3.5 6h7M14.5 6h2M3.5 14h2M9.5 14h7"/>
+<circle cx="12.5" cy="6" r="1.9" fill="currentColor" stroke="none"/>
+<circle cx="7.5" cy="14" r="1.9" fill="currentColor" stroke="none"/>
+</svg>
+<figcaption>family-utility</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M5.5 17V3.5"/>
+<path d="M5.5 4.5h9l-2 3 2 3h-9"/>
+</svg>
+<figcaption>flag</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.6 2h5.9A1.5 1.5 0 0 1 17 8v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5Z"/>
+</svg>
+<figcaption>folder</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/>
+</svg>
+<figcaption>grid-dots</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="7.5" cy="5.5" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="12.5" cy="5.5" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="7.5" cy="10" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="12.5" cy="10" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="7.5" cy="14.5" r="1.1" fill="currentColor" stroke="none"/>
+<circle cx="12.5" cy="14.5" r="1.1" fill="currentColor" stroke="none"/>
+</svg>
+<figcaption>grip</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M7 10.5V5.2a1.2 1.2 0 0 1 2.4 0V9M9.4 8.5V4.2a1.2 1.2 0 0 1 2.4 0v4.3M11.8 8.5V5.2a1.2 1.2 0 0 1 2.4 0v5.3M14.2 8.8V7.6a1.2 1.2 0 0 1 2.4 0v4.6c0 3-2 4.8-5 4.8H10c-2 0-3-1-4-2.5l-2-3.2a1.2 1.2 0 0 1 2-1.3L7 12"/>
+</svg>
+<figcaption>hand</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M3.5 10a6.5 6.5 0 1 0 2-4.7"/>
+<path d="M3.5 3.8v3.4h3.4"/>
+<path d="M10 6.6V10l2.4 1.6"/>
+</svg>
+<figcaption>history</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/>
+<rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/>
+<path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/>
+</svg>
+<figcaption>library</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/>
+</svg>
+<figcaption>loop</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M7.6 4.25h4.8l3.4 11.5H4.2Z"/>
+<path d="M5.5 11.25h9"/>
+<path d="M9.4 11.25 14.7 4.9"/>
+</svg>
+<figcaption>metronome</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M7.6 4.25h4.8l3.4 11.5H4.2Z"/>
+<path d="M5.5 11.25h9"/>
+</svg>
+<figcaption>metronome-body</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M5 3v4M5 11v6M10 3v8M10 15v2M15 3v1M15 8v9"/>
+<circle cx="5" cy="9" r="1.9" fill="currentColor" stroke="none"/>
+<circle cx="10" cy="13" r="1.9" fill="currentColor" stroke="none"/>
+<circle cx="15" cy="6" r="1.9" fill="currentColor" stroke="none"/>
+</svg>
+<figcaption>mixer</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="3" y="3" width="14" height="14" rx="2"/>
+<path d="M3 10h14M10 3v14"/>
+<circle cx="6.5" cy="6.5" r="1.4" fill="currentColor" stroke="none"/>
+<circle cx="13.5" cy="13.5" r="1.4" fill="currentColor" stroke="none"/>
+</svg>
+<figcaption>mod-matrix</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M7.6 14V5.4L15.6 3.6V12"/>
+<path d="M7.6 8.6 15.6 6.8"/>
+<circle cx="5.6" cy="14.2" r="2"/>
+<circle cx="13.6" cy="12.4" r="2"/>
+</svg>
+<figcaption>note-snap</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="5.5" y="4.5" width="3" height="11" rx="1.2"/>
+<rect x="11.5" y="4.5" width="3" height="11" rx="1.2"/>
+</svg>
+<figcaption>pause</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/>
+<path d="M12 5.2l2.8 2.8"/>
+</svg>
+<figcaption>pencil</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="10" cy="10" r="7.2"/>
+<circle cx="10" cy="10" r="2.5"/>
+<circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/>
+<path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/>
+<path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/>
+</svg>
+<figcaption>perform</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="4" y="4" width="12" height="12" rx="2"/>
+<path d="M4 4l12 12"/>
+</svg>
+<figcaption>placeholder</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M7 4.8 15 10 7 15.2Z"/>
+</svg>
+<figcaption>play</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 4.5v11M4.5 10h11"/>
+</svg>
+<figcaption>plus</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/>
+</svg>
+<figcaption>pointer</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="10" cy="10" r="7.2"/>
+<path d="M7.3 7.1A4.2 4.2 0 1 0 12.7 7.1"/>
+<path d="M10 5.6V9.6"/>
+</svg>
+<figcaption>power</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/>
+<path d="M8.5 10h3"/>
+</svg>
+<figcaption>range</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="10" cy="10" r="6"/>
+</svg>
+<figcaption>record</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M15.8 9.5A6 6 0 0 0 5 6.6M4.2 10.5A6 6 0 0 0 15 13.4"/>
+<path d="M5 3.5v3.4h3.4M15 16.5v-3.4h-3.4"/>
+</svg>
+<figcaption>refresh</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M5 4.5v11"/>
+<path d="M15 5 8.5 10 15 15Z"/>
+</svg>
+<figcaption>rewind</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="5.8" cy="14.6" r="2.3"/>
+<circle cx="14.2" cy="14.6" r="2.3"/>
+<path d="M7.5 12.9 14.8 3.8M12.5 12.9 5.2 3.8"/>
+</svg>
+<figcaption>scissors</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="8.6" cy="8.6" r="5.1"/>
+<path d="M12.4 12.4 16.5 16.5"/>
+</svg>
+<figcaption>search</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M15.19 8.49 L16.91 8.85 L16.91 11.15 L15.19 11.51 L14.73 12.60 L15.70 14.07 L14.07 15.70 L12.60 14.73 L11.51 15.19 L11.15 16.91 L8.85 16.91 L8.49 15.19 L7.40 14.73 L5.93 15.70 L4.30 14.07 L5.27 12.60 L4.81 11.51 L3.09 11.15 L3.09 8.85 L4.81 8.49 L5.27 7.40 L4.30 5.93 L5.93 4.30 L7.40 5.27 L8.49 4.81 L8.85 3.09 L11.15 3.09 L11.51 4.81 L12.60 5.27 L14.07 4.30 L15.70 5.93 L14.73 7.40 Z"/>
+<circle cx="10" cy="10" r="2.4"/>
+</svg>
+<figcaption>settings</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4.5 3.5v7.5a5.5 5.5 0 0 0 11 0V3.5h-3.6V11a1.9 1.9 0 0 1-3.8 0V3.5Z"/>
+<path d="M4.5 7h3.6M11.9 7h3.6"/>
+</svg>
+<figcaption>snap</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 3.6l1.9 4.1 4.4.5-3.3 3 .9 4.4L10 13.3l-3.9 2.3.9-4.4-3.3-3 4.4-.5Z"/>
+</svg>
+<figcaption>star</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="5" y="5" width="10" height="10" rx="2"/>
+</svg>
+<figcaption>stop</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M5 3v14M3 5l2-2 2 2M3 15l2 2 2-2"/>
+<path d="M10 6h7M10 10h7M10 14h7"/>
+</svg>
+<figcaption>track-height</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 4v12"/>
+<path d="M7.5 10h-4M6 7.5 3.5 10 6 12.5"/>
+<path d="M12.5 10h4M14 7.5l2.5 2.5-2.5 2.5"/>
+</svg>
+<figcaption>trim</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="3" y="4" width="14" height="9.5" rx="2"/>
+<path d="M7 16.5h6M10 13.5v3"/>
+</svg>
+<figcaption>viewport</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 4L16.5 15.5h-13z"/>
+<path d="M10 8v3"/>
+<path d="M10 12.9v.1"/>
+</svg>
+<figcaption>warning</figcaption></figure><figure><svg width=28 height=28 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="8.6" cy="8.6" r="5.1"/>
+<path d="M12.4 12.4 16.5 16.5M8.6 6.6v4M6.6 8.6h4"/>
+</svg>
+<figcaption>zoom</figcaption></figure></div></section>
+
+<section><span class="k">07 · Motion</span><h2>Springs and ease-out, nothing linear</h2><div class="grid"><div class="mo"><b>ease-out</b><code>cubic-bezier(0.16, 1, 0.3, 1)</code><span>Entrances and most movement.</span></div><div class="mo"><b>ease-in-out</b><code>cubic-bezier(0.65, 0, 0.35, 1)</code><span>Camera and larger travel.</span></div><div class="mo"><b>spring</b><code>zeta 0.55-0.6 / omega 20-22</code><span>Signature slabs and Patch Type only. 9 to 13 percent overshoot.</span></div><div class="mo"><b>spring-soft</b><code>zeta 0.9+</code><span>Everything else that lands.</span></div></div></section>
+
+<section><span class="k">08 · Voice</span><h2>Plain and specific</h2><div class="do"><div><b>Do</b>A frosted glass pane that bends what is behind it.<br>Lowercase slab headlines. One handwritten word.<br><b style="margin-top:12px">The line: A DAW for you.</b></div><div class="no"><b>Don't</b>“The world's first…”, exclamation marks, em dashes, “Free for now”, a second accent colour, a card with an outline.</div></div></section>
+<footer class="f">Generated by tools/brand/build_brand_book.py from docs/brand/brand.json. Edit the JSON or BRAND.md, not this file.</footer>
+</main></body></html>

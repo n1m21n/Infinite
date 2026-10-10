@@ -39,7 +39,7 @@
 .lib-card .node-view img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.9s var(--ease-out); }
 .lib-card .node:hover .node-view img { transform: scale(1.03); }
 .lib-desc {
-  padding: 8px var(--pad) 0; color: #C8CCDA; font-size: 0.82rem; line-height: 1.5; flex: 1;
+  padding: 8px var(--pad) 0; color: var(--app-dim); font-size: 0.82rem; line-height: 1.5; flex: 1;
   display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: calc(3 * 1.5em + 8px);
 }
 .lib-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--pad); margin-top: 8px; }

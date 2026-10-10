@@ -1,0 +1,424 @@
+{
+  "_doc": "Infinite brand tokens for brand surfaces (website, films, thumbnails, social, docs). The app's own UI values live in src/app/ui/design/tokens.json and src/core/CategoryColors.cpp; the brand book says how the two relate. Edit here, then run tools/brand/build_brand_book.py.",
+  "updated": "2026-10-10",
+  "colour": {
+    "ground": [
+      {
+        "id": "midnight",
+        "name": "Midnight",
+        "hex": "#151930",
+        "role": "Dark ground. The logo tile colour. Never pure black.",
+        "on": "dark"
+      },
+      {
+        "id": "midnight-1",
+        "name": "Midnight 1",
+        "hex": "#20263F",
+        "role": "Raised surface: cards, slabs, panels on Midnight."
+      },
+      {
+        "id": "midnight-2",
+        "name": "Midnight 2",
+        "hex": "#2A3052",
+        "role": "Higher surface: hover, nested card, popover."
+      },
+      {
+        "id": "midnight-3",
+        "name": "Midnight 3",
+        "hex": "#343B5E",
+        "role": "Highest surface and hairlines on dark."
+      },
+      {
+        "id": "paper",
+        "name": "Paper",
+        "hex": "#FBFAF6",
+        "role": "Light ground. A light master is a whole-film or whole-page variant.",
+        "on": "light"
+      },
+      {
+        "id": "card",
+        "name": "Card",
+        "hex": "#FFFFFF",
+        "role": "Raised surface on Paper."
+      },
+      {
+        "id": "inner",
+        "name": "Inner",
+        "hex": "#F3F0E7",
+        "role": "Wells, media backing and code chips on Paper."
+      }
+    ],
+    "ink": [
+      {
+        "id": "text-dark",
+        "name": "Moon",
+        "hex": "#EEF1FA",
+        "role": "Text on Midnight. Slightly blue, never pure white."
+      },
+      {
+        "id": "text-dark-2",
+        "name": "Moon 2",
+        "hex": "#A3AACB",
+        "role": "Secondary text on Midnight."
+      },
+      {
+        "id": "ink",
+        "name": "Ink",
+        "hex": "#1F1D1A",
+        "role": "Text on Paper."
+      },
+      {
+        "id": "ink-2",
+        "name": "Ink 2",
+        "hex": "#5A534C",
+        "role": "Secondary text on Paper."
+      },
+      {
+        "id": "ink-3",
+        "name": "Ink 3",
+        "hex": "#6E6760",
+        "role": "Tertiary text on Paper. (Replaces #857C74, which measured 3.9:1.)"
+      }
+    ],
+    "accent": [
+      {
+        "id": "coral",
+        "name": "Coral",
+        "hex": "#F5866B",
+        "role": "THE accent on Midnight. One coral thing per frame."
+      },
+      {
+        "id": "terracotta",
+        "name": "Terracotta",
+        "hex": "#C2593F",
+        "role": "THE accent on Paper: fills, large type, marks. Not for small text."
+      },
+      {
+        "id": "terracotta-ink",
+        "name": "Terracotta ink",
+        "hex": "#A8472F",
+        "role": "Accent used as small text or a link on Paper."
+      },
+      {
+        "id": "violet",
+        "name": "Violet",
+        "hex": "#8B6CFF",
+        "role": "Glow hero on Midnight only (spheres, key objects). Never a second accent for UI."
+      },
+      {
+        "id": "sky",
+        "name": "Sky",
+        "hex": "#A9CDF1",
+        "role": "Gradient end only."
+      }
+    ],
+    "gradient": {
+      "name": "Brand gradient",
+      "stops": [
+        "#F57F66",
+        "#D99A9C",
+        "#C7AFC0",
+        "#A9CDF1"
+      ],
+      "role": "Horizontal, exact stops. The logo, the brand ball and the end-card lockup only."
+    },
+    "category": [
+      {
+        "name": "Source",
+        "hex": "#4ADE80"
+      },
+      {
+        "name": "3D",
+        "hex": "#38BDF8"
+      },
+      {
+        "name": "Compositing",
+        "hex": "#818CF8"
+      },
+      {
+        "name": "Effects",
+        "hex": "#FACC15"
+      },
+      {
+        "name": "Modulators",
+        "hex": "#A3E635"
+      },
+      {
+        "name": "Prediction",
+        "hex": "#22C55E"
+      },
+      {
+        "name": "Macros",
+        "hex": "#FC963C"
+      },
+      {
+        "name": "Utility",
+        "hex": "#A3A9BA"
+      },
+      {
+        "name": "Notes",
+        "hex": "#4CD964"
+      },
+      {
+        "name": "Synths",
+        "hex": "#6992F6"
+      },
+      {
+        "name": "Audio Effects",
+        "hex": "#53C7E3"
+      }
+    ],
+    "role": [
+      {
+        "name": "Record",
+        "dark": "#BE3434",
+        "light": "#BE3434"
+      },
+      {
+        "name": "Solo",
+        "dark": "#D9A626",
+        "light": "#A57300"
+      },
+      {
+        "name": "Learn",
+        "dark": "#D98C1A",
+        "light": "#B96900"
+      },
+      {
+        "name": "Modulation",
+        "dark": "#FFBE5A",
+        "light": "#B96405"
+      },
+      {
+        "name": "Expression",
+        "dark": "#AA82FF",
+        "light": "#8250E6"
+      },
+      {
+        "name": "Prediction",
+        "dark": "#6ED78C",
+        "light": "#1E9646"
+      },
+      {
+        "name": "Go",
+        "dark": "#2EAA4A",
+        "light": "#268C3E"
+      },
+      {
+        "name": "Favourite",
+        "dark": "#FFCD2D",
+        "light": "#AA7600"
+      }
+    ],
+    "app": [
+      {
+        "name": "App window",
+        "hex": "#0A0B0F"
+      },
+      {
+        "name": "App panel",
+        "hex": "#181B23"
+      },
+      {
+        "name": "App text",
+        "hex": "#EEF0F6"
+      },
+      {
+        "name": "App dim",
+        "hex": "#9198AD"
+      },
+      {
+        "name": "App border",
+        "hex": "#383C47"
+      },
+      {
+        "name": "App accent",
+        "hex": "#6FB4FF"
+      }
+    ],
+    "_role_doc": "Copied from src/app/ui/design/tokens.json (action.*, pin.*, badge.favorite). Colour is never the only cue: pair with a glyph or label."
+  },
+  "type": {
+    "families": [
+      {
+        "name": "Geist",
+        "role": "Headlines and UI text. 700 to 800 for display, tracking -0.02 to -0.035 em."
+      },
+      {
+        "name": "Geist Mono",
+        "role": "Machine text: values, labels, code, coordinates. Tabular figures."
+      },
+      {
+        "name": "Caveat",
+        "role": "The one handwritten word per scene. 700, accent colour, hand underline, at most 1.5x the neighbouring text."
+      },
+      {
+        "name": "Instrument Serif",
+        "role": "Rare editorial accent, italic. Never alongside Caveat in the same line."
+      }
+    ],
+    "web_scale": [
+      {
+        "step": "Display",
+        "size": "clamp(2.4rem, 7vw, 5rem)",
+        "weight": 800,
+        "tracking": "-0.04em"
+      },
+      {
+        "step": "Heading",
+        "size": "clamp(1.6rem, 3.4vw, 2.4rem)",
+        "weight": 700,
+        "tracking": "-0.03em"
+      },
+      {
+        "step": "Subheading",
+        "size": "1.1rem",
+        "weight": 700,
+        "tracking": "-0.02em"
+      },
+      {
+        "step": "Body",
+        "size": "1rem",
+        "weight": 400,
+        "tracking": "0"
+      },
+      {
+        "step": "Caption",
+        "size": "0.85rem",
+        "weight": 500,
+        "tracking": "0"
+      },
+      {
+        "step": "Micro (mono)",
+        "size": "0.72rem",
+        "weight": 500,
+        "tracking": "0.04em"
+      }
+    ],
+    "app_scale": [
+      {
+        "step": "caption",
+        "px": 11
+      },
+      {
+        "step": "body",
+        "px": 13
+      },
+      {
+        "step": "title",
+        "px": 15
+      },
+      {
+        "step": "display",
+        "px": 22
+      }
+    ]
+  },
+  "shape": {
+    "brand": [
+      {
+        "name": "Card",
+        "px": 24,
+        "role": "Every card: node card, white panel, film frame, step. 20 on phones."
+      },
+      {
+        "name": "Media",
+        "px": 16,
+        "role": "Anything inside a card. Card radius minus its 8 px padding. 12 on phones."
+      },
+      {
+        "name": "Chip",
+        "px": 10,
+        "role": "Small boxes: code chips, tags."
+      },
+      {
+        "name": "Control",
+        "px": 999,
+        "role": "Buttons, chips, toggles, inputs: always pill."
+      }
+    ],
+    "app": [
+      {
+        "name": "cell",
+        "px": 2
+      },
+      {
+        "name": "field",
+        "px": 4
+      },
+      {
+        "name": "tile",
+        "px": 6
+      },
+      {
+        "name": "pill",
+        "px": 8
+      },
+      {
+        "name": "group",
+        "px": 10
+      }
+    ],
+    "space": [
+      4,
+      8,
+      12,
+      16,
+      24,
+      32,
+      48,
+      64
+    ]
+  },
+  "motion": {
+    "brand": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "role": "Entrances and most movement."
+      },
+      {
+        "name": "ease-in-out",
+        "value": "cubic-bezier(0.65, 0, 0.35, 1)",
+        "role": "Camera and larger travel."
+      },
+      {
+        "name": "spring",
+        "value": "zeta 0.55-0.6 / omega 20-22",
+        "role": "Signature slabs and Patch Type only. 9 to 13 percent overshoot."
+      },
+      {
+        "name": "spring-soft",
+        "value": "zeta 0.9+",
+        "role": "Everything else that lands."
+      }
+    ],
+    "app_ms": {
+      "hover_in": 120,
+      "hover_out": 180,
+      "press": 0,
+      "on": 160,
+      "off": 140,
+      "focus": 100,
+      "tooltip_delay": 500,
+      "tooltip_fade": 100,
+      "accent_fade": 200
+    }
+  },
+  "icon": {
+    "grid": 20,
+    "padding": 2,
+    "stroke": 1.5,
+    "stroke_16": 1.25,
+    "stroke_24": 1.75,
+    "corner_outer": 2,
+    "corner_inner": 1,
+    "sizes": [
+      14,
+      16,
+      18,
+      20,
+      24
+    ]
+  }
+}
