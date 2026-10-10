@@ -93,23 +93,49 @@ const std::vector<FilterDef>& GetFilterDefs()
       // pixel instead of N², same result up to 16F rounding. Bloom's
       // bright-pass is applied per sample before weighting, so it splits the
       // same way (exact at integer Radius, where every tap is a texel centre).
+      // quality: Classic keeps the original nine taps spaced `radius` px apart
+      // (saved looks unchanged). Smooth walks every pixel out to 4 sigma with
+      // the same gaussian, so a large radius blurs instead of ghosting.
       { "gaussianblur", "Effects",
         "uniform float uRadius;\n"
+        "uniform int uQuality;\n"
         "void main() {\n"
         "   vec4 sum = vec4(0.0); float total = 0.0;\n"
-        "   for (int y = -4; y <= 4; y++) {\n"
-        "      float w = exp(-float(y*y) / 8.0);\n"
-        "      sum += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius)) * w; total += w;\n"
+        "   if (uQuality == 0) {\n"
+        "      for (int y = -4; y <= 4; y++) {\n"
+        "         float w = exp(-float(y*y) / 8.0);\n"
+        "         sum += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius)) * w; total += w;\n"
+        "      }\n"
+        "   } else {\n"
+        "      float r = max(uRadius, 0.001);\n"
+        "      int n = min(int(ceil(4.0 * r)), 40);\n"
+        "      for (int y = -n; y <= n; y++) {\n"
+        "         float d = float(y) / r;\n"
+        "         float w = exp(-d * d / 8.0);\n"
+        "         sum += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y)) * w; total += w;\n"
+        "      }\n"
         "   }\n"
         "   fragColor = sum / total;\n"
         "}\n",
-        { F("%.1f px", P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f)) }, 1,
+        { F("%.1f px", P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f)),
+          E("Quality", "uQuality", { "Classic", "Smooth" }, 0) }, 1,
         "uniform float uRadius;\n"
+        "uniform int uQuality;\n"
         "void main() {\n"
         "   vec4 sum = vec4(0.0); float total = 0.0;\n"
-        "   for (int x = -4; x <= 4; x++) {\n"
-        "      float w = exp(-float(x*x) / 8.0);\n"
-        "      sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * uRadius, 0.0)) * w; total += w;\n"
+        "   if (uQuality == 0) {\n"
+        "      for (int x = -4; x <= 4; x++) {\n"
+        "         float w = exp(-float(x*x) / 8.0);\n"
+        "         sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * uRadius, 0.0)) * w; total += w;\n"
+        "      }\n"
+        "   } else {\n"
+        "      float r = max(uRadius, 0.001);\n"
+        "      int n = min(int(ceil(4.0 * r)), 40);\n"
+        "      for (int x = -n; x <= n; x++) {\n"
+        "         float d = float(x) / r;\n"
+        "         float w = exp(-d * d / 8.0);\n"
+        "         sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x, 0.0)) * w; total += w;\n"
+        "      }\n"
         "   }\n"
         "   fragColor = sum / total;\n"
         "}\n" },
