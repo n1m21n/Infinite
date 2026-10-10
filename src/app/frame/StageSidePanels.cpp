@@ -857,6 +857,105 @@ void DrawSidePanels(FrameCtx& fc)
                }
          }
       }
+      if (gSketchEditorOpen && gSketchEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+            if (gn.node.get() == gSketchEditor)
+               alive = true;
+         if (!alive)
+         {
+            gSketchEditor = nullptr;
+            gSketchEditorOpen = false;
+         }
+      }
+
+      if (gSketchEditorOpen && gSketchEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 520), ImGuiCond_FirstUseEver);
+         PushElevatedPanelStyle(/*isChild=*/false);
+         if (ImGui::Begin(L("Sketch editor"), &gSketchEditorOpen))
+         {
+            ImGui::TextDisabled("%s", T("JavaScript, p5-style: define draw(t). Globals: width, height, t, beat, frame."));
+            ImGui::TextDisabled("%s", T("param(\"name\", default, lo, hi) makes a modulatable knob. Colours are 0..1; hsl(h,s,l) returns one."));
+            ImGui::Separator();
+
+            const auto& names = SketchNode::PresetNames();
+            const char* cur = (gSketchEditor->presetIndex >= 0 && gSketchEditor->presetIndex < (int)names.size())
+                                 ? names[gSketchEditor->presetIndex].c_str() : "Preset";
+            ImGui::SetNextItemWidth(220.0f);
+            if (ImGui::BeginCombo("##sketchPreset", cur))
+            {
+               for (int i = 0; i < (int)names.size(); i++)
+                  if (ImGui::Selectable(names[i].c_str(), i == gSketchEditor->presetIndex))
+                  {
+                     gCurrentNodeIndex = gSketchEditor->NodeIndex();
+                     gSketchEditor->presetIndex = i;
+                     gSketchEditor->LoadPreset(i);
+                     gCurrentNodeIndex = -1;
+                  }
+               ImGui::EndCombo();
+            }
+
+            // SVG: dropped on the canvas, or pasted here (no file dialog needed).
+            ImGui::SameLine();
+            if (ImGui::Button(L("Paste SVG"), ImVec2(100, 0)))
+            {
+               const char* clip = ImGui::GetClipboardText();
+               if (clip && std::strstr(clip, "<svg"))
+               {
+                  gSketchEditor->svg = clip;
+                  gSketchEditor->svgName = "pasted";
+                  gSketchEditor->Apply();
+               }
+            }
+            if (!gSketchEditor->svg.empty())
+            {
+               ImGui::SameLine();
+               if (ImGui::Button(L("Clear SVG"), ImVec2(100, 0)))
+               {
+                  gSketchEditor->svg.clear();
+                  gSketchEditor->svgName.clear();
+                  gSketchEditor->Apply();
+               }
+               ImGui::TextDisabled(T("SVG: %s (%d KB). svgSet(\"#id\", \"attr\", value), svgText, svgBox, svgDraw(x, y, w, h)"),
+                                   gSketchEditor->svgName.c_str(), (int)(gSketchEditor->svg.size() / 1024));
+            }
+            else
+               ImGui::TextDisabled("%s", T("No SVG yet: drop an .svg on the canvas, or copy SVG text and press Paste SVG."));
+
+            static char editBuf[32768];
+            static SketchNode* lastEdited = nullptr;
+            static std::string lastKnownCode;
+            if (lastEdited != gSketchEditor || gSketchEditor->code != lastKnownCode)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gSketchEditor->code.c_str());
+               lastEdited = gSketchEditor;
+               lastKnownCode = gSketchEditor->code;
+            }
+
+            ImGui::InputTextMultiline("##sketchCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+
+            PushPrimaryButtonStyle();
+            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            {
+               gSketchEditor->code = editBuf;
+               gSketchEditor->Apply();
+               lastKnownCode = gSketchEditor->code;
+            }
+            PopPrimaryButtonStyle();
+            ImGui::SameLine();
+            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gSketchEditor->code.c_str());
+
+            if (!gSketchEditor->LastError().empty())
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gSketchEditor->LastError().c_str());
+         }
+         ImGui::End();
+         PopElevatedPanelStyle();
+      }
+
       if (gFieldSampleEditorOpen && gFieldSampleEditor != nullptr)
       {
          bool alive = false;

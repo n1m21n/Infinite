@@ -910,6 +910,8 @@ bool gHeadlessNeedProbe = false;
    bool gFieldPrimitiveEditorOpen = false;
 
    FieldPixelNode* gFieldPixelEditor = nullptr;
+   SketchNode* gSketchEditor = nullptr;
+   bool gSketchEditorOpen = false;
 
    bool gFieldPixelEditorOpen = false;
 

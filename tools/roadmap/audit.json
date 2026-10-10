@@ -1,16 +1,16 @@
 {
  "merges": [
-  320,
-  355
+  321,
+  356
  ],
  "direct": [
   487,
-  488
+  489
  ],
  "notes_total": 347,
  "evidence": [
-  512,
-  599
+  513,
+  600
  ],
  "per_release": {
   "v0.1": {
@@ -119,6 +119,7 @@
   }
  },
  "loose": [
+  "2026-10-08 2bed065 Add Field Pixel image coordinate reads and camera FX presets",
   "2026-10-08 cff222b Launcher card: play before the ImGui GLFW backend exists (Windows 0xc000041d at startup)"
  ],
  "no_evidence": [
@@ -203,12 +204,12 @@
   "R614 INFINITE_AUDIOUITEST screenshot fixture segfaults in AudioEffectNode::ParamIndex",
   "R616 Shape Resonator: accept point clouds and curves, not only meshes",
   "R618 Launcher screen: animated Infinite logo, vertical credits (authors, contributors",
-  "R646 Fixed Predictive Modulator bindings showing amber like a regular modulator; they",
-  "R648 Lower audio CPU on heavy patches: faster Reverb, worst case 53-61% down to 40-45",
-  "R649 Fix stuck notes when rewiring note cables during playback, and a Drum Sequencer ",
-  "R650 Exported movies get exact frames from video clips (0 dropped frames, sub-millise",
-  "R651 Add `--frames-dir`, `--node` and `--codec prores4444` (macOS) for frame sequence",
-  "R652 Add full keyboard-only navigation of the canvas and node parameters"
+  "R649 Fixed Predictive Modulator bindings showing amber like a regular modulator; they",
+  "R651 Lower audio CPU on heavy patches: faster Reverb, worst case 53-61% down to 40-45",
+  "R652 Fix stuck notes when rewiring note cables during playback, and a Drum Sequencer ",
+  "R653 Exported movies get exact frames from video clips (0 dropped frames, sub-millise",
+  "R654 Add `--frames-dir`, `--node` and `--codec prores4444` (macOS) for frame sequence",
+  "R655 Add full keyboard-only navigation of the canvas and node parameters"
  ],
  "first_commit": "2026-08-10"
 }

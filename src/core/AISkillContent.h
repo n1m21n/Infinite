@@ -685,7 +685,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-306 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+307 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -730,7 +730,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Klein Bottle` | texture:image | out:geometry | 50 | bypass |
 | `Light` | none | out:light | 10 | bypass |
 | `Mapping` | geo:geometry | out:geometry | 11 | bypass |
-| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 29 |  |
+| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 30 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
 | `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
@@ -998,6 +998,7 @@ R"AISKILL(| `FieldPixel` | none | out:image | 9 | bypass |
 | `Ring` | none | out:image | 20 | bypass |
 | `Rounded Rect` | none | out:image | 20 | bypass |
 | `Shape` | none | out:image | 20 | bypass |
+| `Sketch` | none | out:image | 8 | bypass |
 | `Slideshow` | none | out:image | 7 | bypass |
 | `Star` | none | out:image | 20 | bypass |
 | `Superellipse` | none | out:image | 20 | bypass |

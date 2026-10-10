@@ -979,6 +979,8 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawFieldPrimitiveParams(n);
             else if (auto* n = dynamic_cast<FieldPixelNode*>(gn.node.get()))
                DrawFieldPixelParams(n);
+            else if (auto* n = dynamic_cast<SketchNode*>(gn.node.get()))
+               DrawSketchParams(n);
             else if (auto* n = dynamic_cast<FieldSampleNode*>(gn.node.get()))
                DrawFieldSampleParams(n);
             else if (auto* n = dynamic_cast<FieldSynthNode*>(gn.node.get()))

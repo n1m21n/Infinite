@@ -1,0 +1,1 @@
+plutovg f63f9b59dda96c7d1ca3c76e9b33e5ae4b91fab1 (MIT; source/FTL.TXT covers the FreeType-derived files)
