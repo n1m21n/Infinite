@@ -62,7 +62,7 @@ void DelaunayMeshNode::RebuildIfNeeded()
          sites.push_back({ p.px, p.py, p.pz });
       }
    }
-   const size_t cap = (size_t)std::max(3, maxPoints);
+   const size_t cap = (size_t)std::min(5000, std::max(3, maxPoints));
    if (sites.size() > cap)
    {
       std::vector<Site> thin;

@@ -267,12 +267,20 @@ float SmoothNode::Value01()
    // small enough to stay stable at any stiffness the knob allows.
    const float w = 6.2831853f * std::max(0.05f, frequency);
    const float z = std::max(0.0f, damping);
-   const int steps = std::min(64, std::max(1, (int)std::ceil(dt * w * 8.0)));
-   const float h = (float)dt / (float)steps;
+   // dt is capped (a hitch just takes a slower glide) and the step is bounded by
+   // both stiffness and damping, so h*w*(1+z) stays well under 1 at every knob value.
+   const float sdt = (float)std::min(dt, 0.1);
+   const int steps = std::min(256, std::max(1, (int)std::ceil(sdt * w * (1.0f + z) * 4.0f)));
+   const float h = sdt / (float)steps;
    for (int i = 0; i < steps; ++i)
    {
       mVel += (w * w * (target - mLast) - 2.0f * z * w * mVel) * h;
       mLast += mVel * h;
+   }
+   if (!std::isfinite(mLast) || !std::isfinite(mVel))
+   {
+      mLast = target;
+      mVel = 0.0f;
    }
    return mLast;
 }

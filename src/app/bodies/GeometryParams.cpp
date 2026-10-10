@@ -764,7 +764,7 @@ namespace app
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
       DropdownButton("plane", DelaunayMeshNode::PlaneNames(), n->plane,
-                     [n](int i) { n->plane = i; });
+                     [n](int i) { PushUndoCheckpoint(); n->plane = i; });
       ModCheckbox("alive only", &n->aliveOnly);
       ModSliderInt("max points", &n->maxPoints, 3, 5000);
       if (dynamic_cast<VoronoiCellsNode*>(n) != nullptr)

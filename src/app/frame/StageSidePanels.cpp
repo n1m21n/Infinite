@@ -15,10 +15,14 @@
 // sees where it went wrong without counting lines in the editor.
 static void DrawFieldError(const std::string& err, const std::string& code)
 {
-   const ImVec4 red(1, 0.4f, 0.4f, 1);
-   ImGui::PushStyleColor(ImGuiCol_Text, red);
-   ImGui::TextWrapped("%s", err.c_str());
-   ImGui::PopStyleColor();
+   const ImU32 red = tok::U32(tok::record);
+   {
+      // Wrapped, token-coloured message drawn directly (no style push).
+      const float wrap = std::max(40.0f, ImGui::GetContentRegionAvail().x);
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(), at, red, err.c_str(), nullptr, wrap);
+      ImGui::Dummy(ImGui::CalcTextSize(err.c_str(), nullptr, false, wrap));
+   }
 
    int line = 0, col = 0;
    if (sscanf(err.c_str(), "line %d, col %d:", &line, &col) != 2 || line < 1 || col < 1)
@@ -46,15 +50,21 @@ static void DrawFieldError(const std::string& err, const std::string& code)
          b++;
    }
    const std::string before = text.substr(0, a), bad = text.substr(a, b - a), after = text.substr(b);
-   ImGui::TextDisabled("%d |", line);
-   ImGui::SameLine(0, 4);
-   ImGui::TextDisabled("%s", before.c_str());
-   ImGui::SameLine(0, 0);
-   ImGui::PushStyleColor(ImGuiCol_Text, red);
-   ImGui::Text("%s", bad.empty() ? "_" : bad.c_str());
-   ImGui::PopStyleColor();
-   ImGui::SameLine(0, 0);
-   ImGui::TextDisabled("%s", after.c_str());
+   // One row drawn with the draw list so the bad token can take its own colour.
+   ImDrawList* dl = ImGui::GetWindowDrawList();
+   ImVec2 pos = ImGui::GetCursorScreenPos();
+   const ImU32 dim = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+   auto put = [&](const std::string& str, ImU32 c) {
+      dl->AddText(pos, c, str.c_str());
+      pos.x += ImGui::CalcTextSize(str.c_str()).x;
+   };
+   char num[24];
+   snprintf(num, sizeof(num), "%d | ", line);
+   put(num, dim);
+   put(before, dim);
+   put(bad.empty() ? "_" : bad, red);
+   put(after, dim);
+   ImGui::Dummy(ImVec2(pos.x - ImGui::GetCursorScreenPos().x, ImGui::GetTextLineHeight()));
 }
 
 namespace

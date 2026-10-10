@@ -1,6 +1,8 @@
 // Sketch node body: Edit button, error line, size, and the knobs that the script's
 // param() calls declared (modulatable like Field's, see docs/plans/sketch/README.md).
 #include "app/AppShared.h"
+#include "app/ui/design/TokenColors.h"
+#include "app/ui/design/components/ActionButton.h"
 
 namespace app
 {
@@ -10,7 +12,7 @@ namespace app
 
       if (!gParamRegisterOnly)
       {
-         if (ImGui::Button("Edit Sketch...", ImVec2(kPreviewSize, 0)))
+         if (ActionButton::Draw("Edit Sketch...", ImVec2(kPreviewSize, 0)))
          {
             gSketchEditor = n;
             gSketchEditorOpen = true;
@@ -26,7 +28,7 @@ namespace app
          if (!n->Notice().empty())
          {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", n->Notice().c_str());
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tok::U32(tok::modulation)), "%s", n->Notice().c_str());
             ImGui::PopTextWrapPos();
          }
       }
