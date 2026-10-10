@@ -57,6 +57,12 @@ namespace Field
       LoadNoteOn,    // dst = noteOn  (Step 26: 1.0 only on the sample a note-on was registered, else 0.0 - an edge, not held)
       LoadNotePitch, // dst = notePitch  (Step 26: most-recently-registered note's frequency in Hz, MidiNoteToHz convention)
       LoadNoteVel,   // dst = noteVel  (Step 26: most-recently-registered note's velocity, 0..1)
+      LoadNoteNum,   // dst = noteNum  (Field Notes: the note's MIDI number 0..127, holds after note-off)
+      LoadBeat,      // dst = beat  (Field Notes: transport position in beats at this sample, float view of the double clock)
+      Tick,          // dst = tick(div:a)  (1.0 on the one sample where the beat clock crosses a multiple of div beats)
+      Deg,           // dst = deg(d:a)  (MIDI note of scale degree a under the node's Root/Scale)
+      Rand,          // dst = rand()  (uniform 0..1 from the node's audio-thread generator)
+      EmitNote,      // note(pitch:b, vel:c, len:dst-as-register) predicated on reg a (a != 0)
       LoadDeclaredIn, // dst = declaredIns[a]  (Step 25: a declared 'input sample audio <name>', per-sample shared, indexed by declared-audio-input ordinal)
       LoadParam,   // dst = paramVals[a]  (per-sample shared, hoisted above the voice loop)
       LoadState,   // dst = stateCur[a]   (per-voice)
@@ -159,6 +165,10 @@ namespace Field
       std::vector<SampleParamSlot> params; // one entry per declared param
       std::vector<SampleDelayLine> delays; // Step 19: delay line allocations in AST order
       std::vector<SampleTable> tables;     // Step 24: table allocations in AST order
+
+      // True when the kernel calls note(); only a Field Notes node may
+      // compile such a program (BackendRegister refuses it elsewhere).
+      bool hasNoteEmit = false;
 
       bool hasReduceRms = false;
       float reduceLoHz = 20.0f;
