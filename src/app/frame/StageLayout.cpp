@@ -378,6 +378,7 @@ void DrawLayout(FrameCtx& fc)
       GestureRecorder::Instance().AdvanceClock(ImGui::GetIO().DeltaTime, Transport::Instance().IsPlaying());
       GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, GesturePlaybackClock());
       gGlobalScaleTooltipHovered = false;
+      gNodeHoverTip.clear();
 
       if (!gPendingSelect.empty())
       {

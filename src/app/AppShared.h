@@ -2225,6 +2225,7 @@ bool EyeToggle(bool shown);
 bool ViewportToggle(bool shown);
 
 extern bool gGlobalScaleTooltipHovered;
+extern std::string gNodeHoverTip;
 
 extern bool gGlobalScaleTooltipEnabled;
 

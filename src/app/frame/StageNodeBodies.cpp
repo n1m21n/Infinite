@@ -1371,8 +1371,8 @@ void DrawNodeBodies(FrameCtx& fc)
          ed::EndNode();
          CacheNodeWidth(gn.node.get(), ed::GetNodeSize(gn.NodeId()).x);
          if (hasCookWarning && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
-            ImGui::SetTooltip("%s", warnSrc->CookWarning().c_str());
-         else if (hasLiveIssue && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
+            gNodeHoverTip = warnSrc->CookWarning(); // a real fault, so shown even with Help tooltips off
+         else if (hasLiveIssue && CategoryColors::GetTooltips() && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
          {
             std::string tip;
             for (const Headless::Issue& w : liveIt->second)
@@ -1383,7 +1383,7 @@ void DrawNodeBodies(FrameCtx& fc)
                if (!w.hint.empty())
                   tip += "\n  -> " + w.hint;
             }
-            ImGui::SetTooltip("%s", tip.c_str());
+            gNodeHoverTip = tip;
          }
          ed::PopStyleColor(2);
          if (isComment)

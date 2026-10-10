@@ -958,6 +958,10 @@ void DrawKeyboard(FrameCtx& fc)
          ImGui::EndTooltip();
       }
 
+      // Deferred from the node draw loop (cook warning, live schema issue).
+      if (!gNodeHoverTip.empty())
+         ImGui::SetTooltip("%s", gNodeHoverTip.c_str());
+
       // Right-click (two-finger click on a Mac trackpad) opens the same
       // type-to-filter picker as double-click, so the keyboard works either way.
       if (ed::ShowBackgroundContextMenu() && gCommentEdit.target == nullptr)
