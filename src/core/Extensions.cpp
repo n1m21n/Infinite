@@ -627,6 +627,7 @@ const State& GetState()
 
 void Shutdown()
 {
+   gCancel.store(true); // a download in flight must not hold the window open
    if (gWorker.joinable())
       gWorker.join();
 }

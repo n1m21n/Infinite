@@ -333,7 +333,7 @@ namespace app
    const char* FilterHelpText(const std::string& typeName)
    {
       static const std::unordered_map<std::string, const char*> kText = {
-         { "gaussianblur", I18N_KEY("Blurs the image with a Gaussian-weighted kernel - a smooth, natural blur. Radius sets how far it samples.") },
+         { "gaussianblur", I18N_KEY("Blurs the image with a Gaussian-weighted kernel - a smooth, natural blur. Radius sets how far it samples; Quality Smooth samples every pixel for a cleaner result.") },
          { "boxblur", I18N_KEY("Blurs by averaging a flat square of neighbouring pixels - cheaper and blockier than Gaussian Blur. Radius sets the box size.") },
          { "motionblur", I18N_KEY("Smears the image along a straight line, like camera or subject motion. Angle sets the direction, Distance how far it smears.") },
          { "radialblur", I18N_KEY("Blurs outward from a centre point, like a zoom or spin blur. Amount sets the strength, Center X/Y the origin.") },
@@ -912,7 +912,7 @@ namespace app
                { "Math", I18N_KEY("Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant.") },
                { "Compare", I18N_KEY("Outputs 1 when the comparison holds, 0 otherwise.") },
                { "Range to Range", I18N_KEY("Remaps one modulator's input range onto a different output range.") },
-               { "Smoothing", I18N_KEY("An exponential moving average over another modulator, to damp jitter.") },
+               { "Smoothing", I18N_KEY("Damps another modulator. Per frame is a simple moving average (the default); Time glides with a time constant; Spring overshoots and settles with a frequency and damping.") },
                { "CV Recorder", I18N_KEY("Records any patched modulator - hit Rec, then it loops the take back with adjustable speed and low/high range.") },
                { "Velocity to CV", I18N_KEY("Turns note velocity into a 0..1 modulator with an adjustable velocity range.") },
                { "Envelope", I18N_KEY("Shapes an incoming modulator with an ADSR contour, gated by it crossing threshold, instead of generating its own trigger.") },

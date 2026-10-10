@@ -613,6 +613,37 @@ void SketchEngine::SetFontFile(const std::string& path)
    }
 }
 
+// lunasvg resolves <image href="/path"> and file: links while parsing, so an SVG from a drop, a paste or a
+// patch could pull any local image into the output. Only in-document (#id) and data: references are allowed;
+// every other href value is blanked to "#" before the document is parsed.
+static std::string StripExternalRefs(const std::string& in)
+{
+   std::string s = in;
+   auto lower = [](char ch) { return (char)((ch >= 'A' && ch <= 'Z') ? ch + 32 : ch); };
+   for (size_t i = 0; i + 4 < s.size(); i++)
+   {
+      if (lower(s[i]) != 'h' || lower(s[i + 1]) != 'r' || lower(s[i + 2]) != 'e' || lower(s[i + 3]) != 'f')
+         continue;
+      size_t j = i + 4;
+      while (j < s.size() && (s[j] == ' ' || s[j] == '\t' || s[j] == '\n' || s[j] == '\r')) j++;
+      if (j >= s.size() || s[j] != '=') continue;
+      j++;
+      while (j < s.size() && (s[j] == ' ' || s[j] == '\t' || s[j] == '\n' || s[j] == '\r')) j++;
+      if (j >= s.size() || (s[j] != '"' && s[j] != '\'')) continue;
+      const char q = s[j++];
+      const size_t end = s.find(q, j);
+      if (end == std::string::npos) break;
+      size_t k = j;
+      while (k < end && (s[k] == ' ' || s[k] == '\t' || s[k] == '\n' || s[k] == '\r')) k++;
+      const bool ok = (k < end && s[k] == '#') || (end - k >= 5 && lower(s[k]) == 'd' && lower(s[k + 1]) == 'a' &&
+                       lower(s[k + 2]) == 't' && lower(s[k + 3]) == 'a' && s[k + 4] == ':');
+      if (!ok)
+         s.replace(j, end - j, "#");
+      i = j;
+   }
+   return s;
+}
+
 bool SketchEngine::SetSvg(const std::string& text, SketchError& err)
 {
    err = SketchError{};
@@ -621,7 +652,7 @@ bool SketchEngine::SetSvg(const std::string& text, SketchError& err)
       mImpl->svg.reset(); mImpl->svgText.clear(); mImpl->svgDirty = false;
       return true;
    }
-   auto doc = lunasvg::Document::loadFromData(text);
+   auto doc = lunasvg::Document::loadFromData(StripExternalRefs(text));
    if (!doc) { err.message = "could not parse the SVG"; return false; }
    mImpl->svg = std::move(doc);
    mImpl->svgText = text;
@@ -680,6 +711,27 @@ bool SketchEngine::Compile(const std::string& code, SketchError& err)
    Reg(c, g, "svgDraw", js_svgDraw, 4);
    JS_FreeValue(c, g);
 
+   // Top-level code can call drawing functions (background(), translate(), circle()) while it compiles,
+   // before Run has made a real canvas. Give it a scratch one so the bindings never see a null canvas.
+   struct Scratch
+   {
+      Program* p;
+      explicit Scratch(Program* pr) : p(pr)
+      {
+         p->surf = plutovg_surface_create(4, 4);
+         p->cv = p->surf ? plutovg_canvas_create(p->surf) : nullptr;
+         p->W = 4; p->H = 4;
+      }
+      ~Scratch()
+      {
+         if (p->cv) plutovg_canvas_destroy(p->cv);
+         if (p->surf) plutovg_surface_destroy(p->surf);
+         p->cv = nullptr; p->surf = nullptr; p->font = nullptr;
+         p->stack.clear(); p->shape.clear();
+      }
+   } scratch(prog.get());
+   if (!prog->cv) { err.message = "out of memory"; return false; }
+
    // Math.random must be reproducible too (S7): route it to the seeded stream.
    const std::string pre = std::string(kPrelude) + "Math.random = () => random();\n";
    prog->deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(kCompileBudgetMs);
@@ -736,7 +788,7 @@ bool SketchEngine::Run(const Frame& f, std::vector<uint8_t>& rgba, SketchError& 
    p->inShape = false;
    p->font = mImpl->font;
    if (mImpl->svg && mImpl->svgDirty)   // undo last frame's svgSet so frames never depend on history
-      if (auto fresh = lunasvg::Document::loadFromData(mImpl->svgText)) mImpl->svg = std::move(fresh);
+      if (auto fresh = lunasvg::Document::loadFromData(StripExternalRefs(mImpl->svgText))) mImpl->svg = std::move(fresh);
    mImpl->svgDirty = false;
    p->svg = mImpl->svg.get();
    p->svgTouched = false;

@@ -248,11 +248,19 @@ void TrackNodeBase::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId) return;
    mLastCookFrame = frameId;
-   if (!mInput.IsConnected()) return;
+   if (!mInput.IsConnected())
+   {
+      Publish(nullptr, false, NowSec(), nullptr); // unplugged: report "not found", don't freeze the last pose
+      return;
+   }
    mInput.Pull(frameId);
 
    const unsigned int src = mInput.Texture();
-   if (src == 0) return;
+   if (src == 0)
+   {
+      Publish(nullptr, false, NowSec(), nullptr);
+      return;
+   }
 
    // Skip while the worker is still busy: the newest frame wins, and reading
    // back a frame nobody will use only stalls the GPU.

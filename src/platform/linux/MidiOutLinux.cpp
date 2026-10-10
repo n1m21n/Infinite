@@ -157,6 +157,13 @@ namespace Platform
       if (handle->seq)
       {
          snd_seq_drop_output(handle->seq); // anything still scheduled must not fire after close
+         // Dropping also discards queued note-offs, so release everything directly (CC123 all notes off)
+         // or a note scheduled into the future would hang on the synth.
+         for (unsigned char ch = 0; ch < 16; ch++)
+         {
+            const unsigned char off[3] = { (unsigned char)(0xB0 | ch), 123, 0 };
+            MidiOutSend(handle, off, 3, 0.0);
+         }
          snd_seq_free_queue(handle->seq, handle->queue);
          snd_seq_close(handle->seq);
       }

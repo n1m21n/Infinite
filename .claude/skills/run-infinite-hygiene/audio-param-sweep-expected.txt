@@ -295,3 +295,7 @@ Shape Resonator|decay|the mode solve runs on a worker thread, so the sweep's sho
 Shape Resonator|damping|the mode solve runs on a worker thread, so the sweep's short synchronous rig only ever hears the silent pre-solve state; the parameter is checked by SHAPERESONATORTEST (plate/sphere frequencies, strike position, decay/damping/modes).
 Shape Resonator|pos|the mode solve runs on a worker thread, so the sweep's short synchronous rig only ever hears the silent pre-solve state; the parameter is checked by SHAPERESONATORTEST (plate/sphere frequencies, strike position, decay/damping/modes).
 Shape Resonator|modes|the mode solve runs on a worker thread, so the sweep's short synchronous rig only ever hears the silent pre-solve state; the parameter is checked by SHAPERESONATORTEST (plate/sphere frequencies, strike position, decay/damping/modes).
+Field Notes|root|feeds only deg() in the script; the sweep rig reads the note outbox and the default Field Notes script never calls deg(), so changing root cannot change what it emits. The value does reach the audio thread (SetScale in CookIfNeeded).
+Field Notes|scale|same as Field Notes|root - feeds only deg(); the default script does not call it
+Field Notes|field_nextParamId|same as Field Synth|field_nextParamId above - Field::ParamTable's internal id-allocator bookkeeping counter
+Field Notes|p.hits|a script param read only by the preset that declares it; the default script emits no note that depends on it, so the note outbox the rig observes does not change

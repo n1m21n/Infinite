@@ -291,6 +291,8 @@ private:
    {
       if (!(e.vel > 0.0f) || !std::isfinite(e.pitch) || !std::isfinite(e.vel))
          return; // vel <= 0 is "don't play", not a drop
+      // A NaN/inf/huge length must not reach llround or the uint64 cast (undefined); treat as "no length".
+      const float evLen = (std::isfinite(e.len) && e.len < 1.0e6f) ? e.len : 0.0f;
       if (mBlockEmits >= kMaxBlockEmits)
       {
          Drop();
@@ -299,7 +301,7 @@ private:
 
       Pending* pend = nullptr;
       Follow* fol = nullptr;
-      if (e.len > 0.0f)
+      if (evLen > 0.0f)
       {
          pend = FreePending();
          if (pend == nullptr) { Drop(); return; }
@@ -327,7 +329,7 @@ private:
 
       if (pend != nullptr)
       {
-         const uint64_t len = (uint64_t)std::max(1.0, std::llround((double)e.len * mSamplesPerBeat) + 0.0);
+         const uint64_t len = (uint64_t)std::max(1.0, std::llround((double)evLen * mSamplesPerBeat) + 0.0);
          pend->active = true;
          pend->note = note;
          pend->voiceId = on.voiceId;

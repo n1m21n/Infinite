@@ -261,7 +261,7 @@ FN(js_hsl)
 }
 
 // ---- transforms -----------------------------------------------------------------
-FN(js_push) { P(c)->stack.push_back(P(c)->cur); return JS_UNDEFINED; }
+FN(js_push) { if (P(c)->stack.size() < 256) P(c)->stack.push_back(P(c)->cur); return JS_UNDEFINED; } // depth cap: a push() loop can't eat memory
 FN(js_pop)
 {
    Program* p = P(c);
