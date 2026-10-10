@@ -1452,6 +1452,12 @@ namespace app
       gn.uid = gNextNodeUid++;
       gn.spawnX = x;
       gn.spawnY = y;
+      // The analysers are their params and live output readout; collapsed they show nothing. Load, paste and
+      // undo restore the saved flag over this, so only a fresh spawn opens.
+      gn.showParams = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
+                      dynamic_cast<HandTrackNode*>(gn.node.get()) != nullptr ||
+                      dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr ||
+                      dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr;
       gNodes.push_back(std::move(gn));
       NoteNodeAppended();
       return &gNodes.back();

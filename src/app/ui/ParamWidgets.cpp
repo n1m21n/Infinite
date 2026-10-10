@@ -431,6 +431,69 @@ namespace app
    }
 
 
+   // A live output as a slider-shaped row: the same recessed well, name left, value right, but read-only and
+   // filled in the modulation amber (the colour a modulated slider and its pin use). `inset` leaves the
+   // slider's pin gutter blank so the row's edges line up with the sliders above it.
+   void OutputMeterRow(const char* label, float v, float width)
+   {
+      const float inset = tok::pin_box + 4.0f;
+      const float w = std::max(24.0f, width - inset);
+      const bool isLight = IsThemeLight();
+      const ImVec2 p0 = ImGui::GetCursorScreenPos();
+      const float h = ImGui::GetFrameHeight();
+      const ImVec2 r0(p0.x + inset, p0.y);
+      const ImVec2 r1(r0.x + w, p0.y + h);
+      ImGui::Dummy(ImVec2(width, h));
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      FieldWell::Draw(dl, r0, r1, false, false);
+      const float t = std::clamp(v, 0.0f, 1.0f);
+      if (t > 0.0f)
+      {
+         const ImU32 amber = tok::U32(tok::pin_mod, isLight);
+         const ImU32 soft = (amber & 0x00FFFFFF) | ((ImU32)(isLight ? 110 : 86) << 24);
+         dl->PushClipRect(r0, ImVec2(r0.x + w * t, r1.y), true);
+         dl->AddRectFilled(r0, r1, soft, tok::radius_tile);
+         dl->PopClipRect();
+      }
+
+      char valBuf[16];
+      snprintf(valBuf, sizeof(valBuf), "%.2f", v);
+      const float textY = r0.y + (h - ImGui::GetTextLineHeight()) * 0.5f;
+      const float valX = r1.x - 7.0f - AudioLabelSize(valBuf).x;
+      const ImU32 valCol = isLight ? tok::U32(tok::pal::c_4E5464FF) : tok::U32(tok::pal::c_CDD0DCFF);
+      const ImU32 nameCol = isLight ? tok::U32(tok::pal::c_646A7AFF) : tok::U32(tok::pal::c_B2B5C4FF);
+      dl->PushClipRect(r0, r1, true);
+      AudioLabelText(dl, ImVec2(valX, textY), valCol, valBuf);
+      dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - 6.0f), r1.y), true);
+      AudioLabelText(dl, ImVec2(r0.x + 7.0f, textY), nameCol, label);
+      dl->PopClipRect();
+      dl->PopClipRect();
+   }
+
+
+   // Every modulator output of a node as OutputMeterRow rows, in `cols` columns of `colW`. The cable pins stay in
+   // the node's bottom row; these are the readout, so the pins carry no bars of their own.
+   void DrawOutputMeters(INode* node, float colW, int cols, float gutter)
+   {
+      const int count = node->OutputCount();
+      cols = std::max(1, cols);
+      const int rows = (count + cols - 1) / cols;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const float rowH = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y;
+      for (int o = 0; o < count; o++)
+      {
+         const int c = o / rows;
+         const int r = o % rows;
+         ImGui::SetCursorScreenPos(ImVec2(origin.x + (float)c * (colW + gutter), origin.y + (float)r * rowH));
+         IModulator* mod = node->ModulatorOutput(o);
+         OutputMeterRow(node->OutputLabel(o), mod != nullptr ? mod->Value01() : 0.0f, colW);
+      }
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + (float)rows * rowH));
+      ImGui::Dummy(ImVec2(1.0f, 0.0f));
+   }
+
+
    // Right-click on a modulated (read-only) param requests this: a polarity
    // toggle plus, in Bipolar mode, a depth slider - and Unbind, so there's
    // still a way to detach a cable without dragging it off or selecting the
