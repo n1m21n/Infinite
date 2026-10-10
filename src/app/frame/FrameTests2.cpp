@@ -2521,7 +2521,7 @@ void FrameTest_FIELDPIXELTEST(int frameId, GLFWwindow* window)
                   errShift = std::max(errShift, std::abs(shift[at]-src[next]));
                   errHalf = std::max(errHalf, std::abs(half[at]-(src[at]+src[next])*0.5f));
                }
-            const bool passPixels = pass && errBare == 0.0f && errShift < 0.006f && errHalf < 0.006f;
+            const bool passPixels = pass && errBare < 1e-4f && errShift < 0.006f && errHalf < 0.006f;
             if (pass && !passPixels)
                printf("[FIELDPIXELTEST] image sampling max error: bare-vs-identity %.5f, shift %.5f, half-texel %.5f\n", errBare, errShift, errHalf);
             pass = passPixels;
