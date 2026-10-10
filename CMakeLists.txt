@@ -628,9 +628,11 @@ set(COMMON_SOURCES
     src/nodes/OscNodes.cpp
     src/nodes/NoiseNode.cpp
     src/nodes/SketchNode.cpp
+    src/nodes/Sketch3DNode.cpp
     src/core/sketch/SketchEngine.cpp
     src/core/sketch/Sketch3DEngine.cpp
     src/app/bodies/SketchParams.cpp
+    src/app/bodies/Sketch3DParams.cpp
     src/nodes/TextureNode.cpp
     src/nodes/ResynthNode.cpp
     src/nodes/MacroNodes.cpp

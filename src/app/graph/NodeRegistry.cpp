@@ -93,6 +93,7 @@ namespace app
       REGISTER_NODE(WrapNode, Wrap, "3D");
       REGISTER_NODE(FieldElementNode, Field Modifier, "3D");
       REGISTER_NODE(FieldPrimitiveNode, Field Primitive, "3D");
+      REGISTER_NODE(Sketch3DNode, Sketch 3D, "3D");
       REGISTER_NODE(DistributePointsOnFacesNode, Distribute Points on Faces, "3D");
       REGISTER_NODE(PointsToVerticesNode, Points to Vertices, "3D");
       REGISTER_NODE(DistributePointsInGridNode, Distribute Points in Grid, "3D");

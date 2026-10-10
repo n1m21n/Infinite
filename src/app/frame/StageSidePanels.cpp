@@ -946,6 +946,78 @@ void DrawSidePanels(FrameCtx& fc)
          PopElevatedPanelStyle();
       }
 
+      if (gSketch3DEditorOpen && gSketch3DEditor != nullptr)
+      {
+         bool alive = false;
+         for (const GraphNode& gn : gNodes)
+            if (gn.node.get() == gSketch3DEditor)
+               alive = true;
+         if (!alive)
+         {
+            gSketch3DEditor = nullptr;
+            gSketch3DEditorOpen = false;
+         }
+      }
+
+      if (gSketch3DEditorOpen && gSketch3DEditor != nullptr)
+      {
+         ImGui::SetNextWindowSize(ImVec2(640, 520), ImGuiCond_FirstUseEver);
+         PushElevatedPanelStyle(/*isChild=*/false);
+         if (ImGui::Begin(L("Sketch 3D editor"), &gSketch3DEditorOpen))
+         {
+            ImGui::TextDisabled("%s", T("JavaScript: define draw(t) that builds geometry. Globals: t, beat, frame."));
+            ImGui::TextDisabled("%s", T("box, sphere, cylinder, cone, torus, plane, tube, beginShape/vertex/endShape; translate, rotate, scale, push/pop; fill(r,g,b) 0..1."));
+            ImGui::Separator();
+
+            const auto& names = Sketch3DNode::PresetNames();
+            const char* cur = (gSketch3DEditor->presetIndex >= 0 && gSketch3DEditor->presetIndex < (int)names.size())
+                                 ? names[gSketch3DEditor->presetIndex].c_str() : "Preset";
+            ImGui::SetNextItemWidth(220.0f);
+            if (ImGui::BeginCombo("##sketch3dPreset", cur))
+            {
+               for (int i = 0; i < (int)names.size(); i++)
+                  if (ImGui::Selectable(names[i].c_str(), i == gSketch3DEditor->presetIndex))
+                  {
+                     gCurrentNodeIndex = gSketch3DEditor->NodeIndex();
+                     gSketch3DEditor->presetIndex = i;
+                     gSketch3DEditor->LoadPreset(i);
+                     gCurrentNodeIndex = -1;
+                  }
+               ImGui::EndCombo();
+            }
+
+            static char editBuf[32768];
+            static Sketch3DNode* lastEdited = nullptr;
+            static std::string lastKnownCode;
+            if (lastEdited != gSketch3DEditor || gSketch3DEditor->code != lastKnownCode)
+            {
+               snprintf(editBuf, sizeof(editBuf), "%s", gSketch3DEditor->code.c_str());
+               lastEdited = gSketch3DEditor;
+               lastKnownCode = gSketch3DEditor->code;
+            }
+
+            ImGui::InputTextMultiline("##sketch3dCode", editBuf, sizeof(editBuf),
+                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
+
+            PushPrimaryButtonStyle();
+            if (ImGui::Button(L("Apply"), ImVec2(120, 0)))
+            {
+               gSketch3DEditor->code = editBuf;
+               gSketch3DEditor->Apply();
+               lastKnownCode = gSketch3DEditor->code;
+            }
+            PopPrimaryButtonStyle();
+            ImGui::SameLine();
+            if (ImGui::Button(L("Revert"), ImVec2(120, 0)))
+               snprintf(editBuf, sizeof(editBuf), "%s", gSketch3DEditor->code.c_str());
+
+            if (!gSketch3DEditor->LastError().empty())
+               ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", gSketch3DEditor->LastError().c_str());
+         }
+         ImGui::End();
+         PopElevatedPanelStyle();
+      }
+
       // Design-review shot: INFINITE_OPENPANELS "fieldfxwin" opens the Field effect editor on the first Field Effect node.
       {
          static bool sShotDone = false;

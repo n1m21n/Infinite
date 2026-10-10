@@ -1421,6 +1421,10 @@ extern SketchNode* gSketchEditor;
 
 extern bool gSketchEditorOpen;
 
+extern Sketch3DNode* gSketch3DEditor;
+
+extern bool gSketch3DEditorOpen;
+
 extern bool gFieldPixelEditorOpen;
 
 extern FieldSampleNode* gFieldSampleEditor;
@@ -3469,6 +3473,7 @@ void DrawFieldGraphParams(FieldGraphNode* n);
 void DrawFieldPixelParams(FieldPixelNode* n);
 
 void DrawSketchParams(SketchNode* n);
+void DrawSketch3DParams(Sketch3DNode* n);
 
 void DrawSamplerWaveform(SamplerNode* n, float h, float width);
 

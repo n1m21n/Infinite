@@ -1,6 +1,7 @@
 // Standalone checks for the Sketch 3D engine (no GL, no app): primitive winding vs normals,
 // determinism, transforms, limits, abort, errors.
 #include "Sketch3DEngine.h"
+#include "Sketch3DPresets.h"
 
 #include <chrono>
 #include <cmath>
@@ -119,6 +120,24 @@ int main()
    Sketch3DEngine k;
    k.Compile("function draw(t){ box(1); }", err);
    Check(!k.Compile("function draw(t){ box( }", err) && k.HasProgram(), "failed compile keeps the last program");
+
+   // Every preset compiles, runs, builds a sane mesh, in budget.
+   int np = 0;
+   const Sketch3DPresets::Entry* pre = Sketch3DPresets::All(np);
+   for (int i = 0; i < np; ++i)
+   {
+      Sketch3DEngine pe2;
+      Mesh pm2;
+      Sketch3DEngine::Frame pf2; pf2.t = 1.5;
+      char msg[96];
+      const bool ok = pe2.Compile(pre[i].code, err);
+      auto t1 = std::chrono::steady_clock::now();
+      const bool ran = ok && pe2.Run(pf2, pm2, err);
+      const double ms2 = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
+      std::snprintf(msg, sizeof msg, "preset '%s': %zu tris, %.2f ms, winding %.3f", pre[i].name,
+                    pm2.indices.size() / 3, ms2, ran ? WindingAgreement(pm2) : 0.f);
+      Check(ran && !pm2.indices.empty() && ms2 < 40 && WindingAgreement(pm2) > 0.97f, msg);
+   }
 
    std::printf("%s\n", gFail ? "FAILED" : "all passed");
    return gFail ? 1 : 0;
