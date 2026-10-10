@@ -1,6 +1,6 @@
 ---
 name: new-modulator-node
-description: "Procedure for adding a Modulators/Macros node: IModulator contract, Value01() idempotency, multi-output, mod/performance-matrix visibility, unbind on delete, exit criterion. Use when implementing an LFO/random/pattern/macro node, or when a modulator freezes, runs at the wrong speed, jitters with fan-out, or leaves the matrix."
+description: "Procedure for adding a modulator/macro node (IModulator). Use when implementing an LFO/random/pattern/macro, or when one freezes, runs at the wrong speed, jitters, or leaves the matrix."
 ---
 
 ## When to use (full scope)

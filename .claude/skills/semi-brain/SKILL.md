@@ -1,7 +1,11 @@
 ---
 name: semi-brain
-description: Infinite's distilled-brain CLI (tools/semi-brain). Query it before a non-trivial architecture decision - fix-in-place vs rewrite/refactor, a new invariant, a choice between designs - and fold its Branch A/B/C scores and invariant checklist into the recommendation. Also use after a user correction to log a DPO preference, or to add a newly confirmed bug pattern to 2_distilled_brain/.
+description: "Query Infinite's distilled-brain CLI before non-trivial architecture calls (fix vs rewrite, new invariant, design choice). Also use to log a user correction or add a confirmed bug pattern."
 ---
+
+## When to use (full scope)
+
+Infinite's distilled-brain CLI (tools/semi-brain). Query it before a non-trivial architecture decision - fix-in-place vs rewrite/refactor, a new invariant, a choice between designs - and fold its Branch A/B/C scores and invariant checklist into the recommendation. Also use after a user correction to log a DPO preference, or to add a newly confirmed bug pattern to 2_distilled_brain/.
 
 # Semi-Brain: Cognitive Twin & Invariant Engine
 

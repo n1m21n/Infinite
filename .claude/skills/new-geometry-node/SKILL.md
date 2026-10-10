@@ -1,6 +1,6 @@
 ---
 name: new-geometry-node
-description: "Procedure for adding a 3D node (IGeometrySource): the contract, passthrough-field forwarding trap, mesh caching/revision rules, exit criterion. Use when implementing a geometry primitive/operator/3D utility, or when material/mapping doesn't pass through, the render freezes, or upstream transforms have no effect."
+description: "Procedure for adding a 3D node (IGeometrySource). Use when implementing a primitive or operator, or when material/mapping doesn't pass through, the render freezes, or transforms are ignored."
 ---
 
 ## When to use (full scope)

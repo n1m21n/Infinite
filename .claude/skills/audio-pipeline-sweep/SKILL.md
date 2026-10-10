@@ -1,6 +1,6 @@
 ---
 name: audio-pipeline-sweep
-description: "Audio pipeline regression sweep: DSP correctness, param delivery to the audio thread, note fan-out, PDC, device loss, teardown mid-playback, PCM conversion, transport clock. Use after audio/note node changes, when sound is silent/clicking/late or a knob does nothing audible, or before a release."
+description: "Audio pipeline regression sweep (DSP, param delivery, PDC, device loss, transport). Use after audio changes, when sound is silent/clicking/late, or before a release."
 ---
 
 ## When to use (full scope)

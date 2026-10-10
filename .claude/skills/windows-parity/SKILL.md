@@ -1,6 +1,6 @@
 ---
 name: windows-parity
-description: "Writing Windows-safe Infinite code from macOS: keep `_WIN32` out of nodes, three-sided Platform:: obligation, Windows trap catalogue (WASAPI, WinMM, GDI glyphs, Media Foundation stride, wide paths, static CRT, GLSL 330). Use before changing src/platform/ or adding a Platform:: function, or on a works-on-macOS-not-Windows bug."
+description: "Writing Windows-safe code from macOS: no `_WIN32` in nodes, three-sided Platform:: rule, Windows traps. Use before changing src/platform/ or on a works-on-macOS-not-Windows bug."
 ---
 
 ## When to use (full scope)

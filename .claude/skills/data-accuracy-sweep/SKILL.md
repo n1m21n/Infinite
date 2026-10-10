@@ -1,6 +1,6 @@
 ---
 name: data-accuracy-sweep
-description: "Sweep for data corruption along a patch chain: copy/paste and save/load drops, altering pass-throughs, stale caches, TextureRevision lies, fan-out memo breaks, bypass, out-of-unit modulation. Use when a value is right at one end and wrong at the other, after adding a param or changing serialization/caching, or before a release."
+description: "Find data corruption along a patch chain (copy/paste, save/load, stale caches, bypass). Use when a value is right at one end and wrong at the other, or after serialization/caching changes."
 ---
 
 ## When to use (full scope)

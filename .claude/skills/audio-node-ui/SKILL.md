@@ -1,6 +1,6 @@
 ---
 name: audio-node-ui
-description: "Layout grammar, widgets and visualizers that make Infinite's audio/note node bodies look like real instruments. Use when adding or restyling an audio/note node body, adding a knob/meter/scope/step grid/response curve, or when a node \"looks cramped / not like a real plugin\"."
+description: "Layout, widgets and visualizers for audio/note node bodies (knobs, meters, scopes, step grids). Use when adding or restyling one, or when it \"looks cramped / not like a real plugin\"."
 ---
 
 ## When to use (full scope)

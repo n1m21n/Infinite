@@ -1,6 +1,6 @@
 ---
 name: bug-blast-radius
-description: "The nine-question impact analysis (owner, faulty logic, callers, degraded nodes, pattern, all 3 platforms, loopholes, origin, why tests missed it). Run EVERY time the user shows a bug (screenshot, crash, trace, \"this looks wrong\", \"what else does this affect\") before writing any fix or fix prompt."
+description: "The nine-question impact analysis. Run EVERY time the user shows a bug (screenshot, crash, trace, \"this looks wrong\", \"what else does this affect\") before writing any fix or fix prompt."
 ---
 
 ## When to use (full scope)

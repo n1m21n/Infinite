@@ -1,6 +1,6 @@
 ---
 name: node-ui-pillars
-description: "Non-negotiable node-body UI rules: knob-row grid, where dropdown/checkbox/mod-dot may sit, bottom-right `mix` slot, filter-mode naming, light/dark contrast. Use BEFORE editing any Draw*Body/Draw*Params or the style helpers, and as the acceptance checklist after any node UI change."
+description: "Non-negotiable node-body UI rules (knob grid, mod-dot, `mix` slot, contrast). Load BEFORE editing any Draw*Body/Draw*Params or style helpers, and use as the checklist after."
 ---
 
 ## When to use (full scope)

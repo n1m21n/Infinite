@@ -1,6 +1,6 @@
 ---
 name: rhythmic-quantization-standard
-description: "Canonical tempo-sync/rate/quantize divisions from src/audio/MusicTime.h (4 bars to 1/32 with dotted and triplets, plus 1/64). Use whenever an audio, note, synth or modulator node needs sync, clock division or quantize options, instead of inventing a local list."
+description: "Canonical tempo-sync/quantize divisions from src/audio/MusicTime.h. Use whenever an audio, note, synth or modulator node needs sync, clock division or quantize options."
 ---
 
 ## When to use (full scope)

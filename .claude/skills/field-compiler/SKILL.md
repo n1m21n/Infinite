@@ -1,6 +1,6 @@
 ---
 name: field-compiler
-description: "How Field source becomes running code: lexer/AST/typed IR (type + domain), domain inference, the three backends (VM, GLSL, sample register machine), error keep-last-working. Use when building/reviewing any compiler stage or backend, when a program infers the wrong domain, or when writing a prompt for compiler work."
+description: "Field lexer/AST/IR, domain inference and the VM/GLSL/sample backends. Use when building or reviewing any compiler stage or backend, or when a program infers the wrong domain."
 ---
 
 ## When to use (full scope)

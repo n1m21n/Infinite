@@ -1,6 +1,6 @@
 ---
 name: field-realtime
-description: "Field real-time safety checklist (no heap, recursion, unbounded loops or dynamic types; bounded counts) plus the per-domain branching/GPU divergence cost model. Use when reviewing Field compiler diffs, code bound for the audio thread or shaders, proposed allocating features, or a Field xrun/frame spike."
+description: "Field real-time safety checklist and branching/GPU cost model. Use when reviewing Field compiler diffs, audio-thread or shader code, allocating features, or a Field xrun/frame spike."
 ---
 
 ## When to use (full scope)

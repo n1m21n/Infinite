@@ -1,6 +1,6 @@
 ---
 name: prior-art-scout
-description: "Find publicly documented solutions (peer repos, GitHub, forums) to bugs, platform quirks, dependency gotchas or architectural patterns, respecting the copyleft discussions-only rule. Use before Linux/platform, VST3/audio-hosting or packaging work, or when a bug's root cause is outside Infinite's code."
+description: "Find public fixes (peer repos, GitHub, forums) for bugs, platform quirks and packaging; copyleft is discussions-only. Use before platform/hosting/packaging work or when the cause is outside Infinite."
 ---
 
 # Prior Art Scout

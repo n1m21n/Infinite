@@ -1,6 +1,6 @@
 ---
 name: new-audio-node
-description: "Procedure for adding an audio, note or synth node: two-object rule, main.cpp/CMake wiring sites, bug traps, exit criterion. Use when implementing a node from docs/plans/audio/README.md §3, writing a prompt for one, or when a new audio node has no pins/body, doesn't save, or crashes on delete."
+description: "Procedure for adding an audio, note or synth node. Use when implementing or briefing one, or when a new audio node has no pins, doesn't save, or crashes on delete."
 ---
 
 ## When to use (full scope)

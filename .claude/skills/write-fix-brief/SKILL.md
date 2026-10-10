@@ -1,6 +1,6 @@
 ---
 name: write-fix-brief
-description: "Turn a bug report, review findings, broken-UI screenshot or new-node idea into a verified, file/line-precise implementation prompt after checking the real code. Use for \"is this a real bug\", \"are these fixes needed\", \"write me a prompt for this\", \"critically evaluate this\", or any UI glitch/idea to make actionable."
+description: "Turn a bug report, findings, screenshot or idea into a verified, file/line-precise implementation prompt. Use for \"is this a real bug\", \"write me a prompt for this\", or \"critically evaluate this\"."
 ---
 
 ## When to use (full scope)

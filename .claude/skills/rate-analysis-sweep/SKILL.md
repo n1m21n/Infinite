@@ -1,6 +1,6 @@
 ---
 name: rate-analysis-sweep
-description: "Measure and gate frame and audio rate: frame limiter, idle-frame caching, editor hit-test cost vs node count, callback jitter/xruns, audio start cost. Use when the app is slow or stutters, fps cap is ignored, audio clicks under load, after touching the render loop, limiter, cook caching or audio callback, or before a release."
+description: "Measure and gate frame and audio rate (limiter, idle caching, xruns). Use when the app is slow, stutters or clicks under load, or after touching the render loop or audio callback."
 ---
 
 ## When to use (full scope)

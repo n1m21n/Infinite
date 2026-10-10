@@ -1,6 +1,6 @@
 ---
 name: field-domains
-description: "Field's domain transfer operators (reduce, map, implicit broadcast, resample, downsample): legality, cost, audio→geometry→pixel examples. Use when a kernel needs data from another rate, on an incomparable-domain join error, or when reviewing any reduce/map/resample/downsample."
+description: "Field domain transfer operators (reduce, map, broadcast, resample, downsample). Use when a kernel needs data from another rate, or on an incomparable-domain join error."
 ---
 
 ## When to use (full scope)

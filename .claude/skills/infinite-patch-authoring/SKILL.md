@@ -1,7 +1,11 @@
 ---
 name: infinite-patch-authoring
-description: Write, check and render Infinite patches (.inf text files) headless, without the UI. Use whenever the user asks you to build, change or debug an Infinite patch, wire nodes, add modulation, or render a frame, video or audio measurement from a patch file.
+description: "Write, check and render Infinite .inf patches headless. Use whenever the user asks to build, change or debug a patch, wire nodes, add modulation, or render from a patch file."
 ---
+
+## When to use (full scope)
+
+Write, check and render Infinite patches (.inf text files) headless, without the UI. Use whenever the user asks you to build, change or debug an Infinite patch, wire nodes, add modulation, or render a frame, video or audio measurement from a patch file.
 
 # Authoring Infinite patches headless
 

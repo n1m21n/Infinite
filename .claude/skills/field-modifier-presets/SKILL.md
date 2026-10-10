@@ -1,6 +1,6 @@
 ---
 name: field-modifier-presets
-description: "Writing Field Modifier presets (FieldElementNode::Presets()): reserved P/N/Cd, self-mutation ordering bug, declared outputs vs legacy publish. Use BEFORE adding/editing/debugging a Field Modifier preset, or when one does nothing, mutates wrong, or an output reads frozen."
+description: "Writing Field Modifier (geometry) presets: reserved P/N/Cd, mutation ordering, declared outputs. Use before adding or debugging one, or when it does nothing or an output reads frozen."
 ---
 
 ## When to use (full scope)

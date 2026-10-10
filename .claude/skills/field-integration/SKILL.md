@@ -1,6 +1,6 @@
 ---
 name: field-integration
-description: "How a Field node joins Infinite: INode + IAudioSource/IGeometrySource, ParamRef, ParamMailbox, GLUtil::CompileProgram, Patch save/load grammar, undo. Use when wiring a Field node into main.cpp, making a Field param modulatable, or reviewing any Field diff touching existing source."
+description: "Wiring a Field node into Infinite (INode, ParamRef, mailbox, save/load, undo). Use when touching main.cpp for Field, making a Field param modulatable, or reviewing such a diff."
 ---
 
 ## When to use (full scope)
