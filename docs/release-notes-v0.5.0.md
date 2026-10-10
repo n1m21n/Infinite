@@ -9,7 +9,7 @@
 - Axis controls are a segmented X/Y/Z switch; short choices select with one click
 - Dropdowns, the modulation menu and every popup stay the same size on screen at any canvas zoom, with a capped width and shorter rows
 - Zoomed far out, nodes collapse their parameters to keep the canvas readable; pins and bindings stay where they are
-- A compact top bar: File, Edit and Menu fold into one Menu tile, the logo opens About, transport and Start Audio sit either side of BPM, and an available update shows as an icon. Settings moves to a gear on the right rail
+- A compact top bar: File, Edit and Menu share one compact group, the logo opens About, transport and Start Audio sit either side of BPM, and an available update shows as an icon. Settings moves to a gear on the right rail
 - The cable delete button sits at the middle of the cable, scales with zoom, is undoable, and has a short grace period so it does not vanish as you reach for it
 - Settings, the Field and Formula editors, and the Sketch editors share one window style; dialogs are tighter
 - Colour swatches look the same everywhere (Settings, the theme preset strip, markers)
