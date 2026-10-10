@@ -3,35 +3,12 @@
 #include <algorithm>
 #include <cmath>
 
+#include "TrackUtil.h"
+
 namespace Tracking
 {
    static constexpr int kDet = 192;
    static constexpr int kLm = 224;
-   static constexpr float kPi = 3.14159265358979f;
-
-   static void BuildAnchors(std::vector<float>& a)
-   {
-      // SSD anchors of the palm model: strides 8,16,16,16 on a 192 input, two
-      // per cell, fixed size.
-      a.clear();
-      const int strides[4] = {8, 16, 16, 16};
-      int layer = 0;
-      while (layer < 4)
-      {
-         int last = layer;
-         while (last < 4 && strides[last] == strides[layer]) ++last;
-         const int fm = (kDet + strides[layer] - 1) / strides[layer];
-         const int per = 2 * (last - layer);
-         for (int y = 0; y < fm; ++y)
-            for (int x = 0; x < fm; ++x)
-               for (int k = 0; k < per; ++k)
-               {
-                  a.push_back((x + 0.5f) / fm);
-                  a.push_back((y + 0.5f) / fm);
-               }
-         layer = last;
-      }
-   }
 
    bool HandTracker::Open(OrtRuntime& rt, const std::string& packDir, bool preferGpu, std::string& err)
    {
@@ -41,7 +18,7 @@ namespace Tracking
       if (!m_det) return false;
       m_lm = rt.OpenModel(packDir + "/models/hand_landmarks_detector.onnx", preferGpu, m_gpuLm, err);
       if (!m_lm) { Close(); return false; }
-      BuildAnchors(m_anchors);
+      BuildSsdAnchors(kDet, m_anchors);
       m_haveRoi = false;
       return true;
    }
@@ -51,48 +28,6 @@ namespace Tracking
       if (m_rt) { m_rt->CloseModel(m_det); m_rt->CloseModel(m_lm); }
       m_det = m_lm = nullptr;
       m_rt = nullptr;
-   }
-
-   static void SampleBilinear(const unsigned char* rgb, int w, int h, float x, float y, float* out)
-   {
-      if (x < 0 || y < 0 || x > w - 1 || y > h - 1)
-      {
-         out[0] = out[1] = out[2] = 0.f;
-         return;
-      }
-      const int x0 = (int)x, y0 = (int)y;
-      const int x1 = std::min(x0 + 1, w - 1), y1 = std::min(y0 + 1, h - 1);
-      const float fx = x - x0, fy = y - y0;
-      for (int c = 0; c < 3; ++c)
-      {
-         const float a = rgb[(y0 * w + x0) * 3 + c], b = rgb[(y0 * w + x1) * 3 + c];
-         const float d = rgb[(y1 * w + x0) * 3 + c], e = rgb[(y1 * w + x1) * 3 + c];
-         out[c] = ((a + (b - a) * fx) * (1 - fy) + (d + (e - d) * fx) * fy) * (1.f / 255.f);
-      }
-   }
-
-   // Fills dst (n*n*3 floats) with the rotated square ROI. Source point for crop
-   // pixel (u,v) = center + R * ((u/n - .5)*size, (v/n - .5)*size).
-   static void CropRoi(const unsigned char* rgb, int w, int h, const float roi[4], int n, float* dst)
-   {
-      const float c = std::cos(roi[3]), s = std::sin(roi[3]);
-      for (int v = 0; v < n; ++v)
-         for (int u = 0; u < n; ++u)
-         {
-            const float dx = ((u + 0.5f) / n - 0.5f) * roi[2];
-            const float dy = ((v + 0.5f) / n - 0.5f) * roi[2];
-            SampleBilinear(rgb, w, h, roi[0] + c * dx - s * dy - 0.5f, roi[1] + s * dx + c * dy - 0.5f,
-                           dst + (v * n + u) * 3);
-         }
-   }
-
-   static float Sigmoid(float x) { return 1.f / (1.f + std::exp(-x)); }
-
-   static float NormalizeAngle(float a)
-   {
-      while (a > kPi) a -= 2 * kPi;
-      while (a < -kPi) a += 2 * kPi;
-      return a;
    }
 
    bool HandTracker::Process(const unsigned char* rgb, int w, int h, HandResult& out, std::string& err)

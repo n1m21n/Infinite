@@ -2,6 +2,8 @@
 #include "core/Extensions.h"
 #include "core/tracking/HandTracker.h"
 #include "nodes/HandTrackNode.h"
+#include "nodes/FaceTrackNode.h"
+#include "nodes/PoseTrackNode.h"
 #include "stb_image.h"
 #include "stb_image_write.h"
 #include <chrono>
@@ -2433,6 +2435,109 @@ int RunTrackingTest()
       node.SubmitFrame(blank.data(), w, h);
       node.WaitIdle();
       check(node.Value(HandTrackNode::kPresent) == 0.f && node.Value(HandTrackNode::kIndexX) == 0.f, "outputs drop to 0 when the hand leaves");
+   }
+   // Gestures on the sample hand photo, then the face and pose nodes on their own photos (all optional).
+   {
+      HandTrackNode node;
+      node.smoothing = 0.f;
+      node.SubmitFrame(px, w, h);
+      node.WaitIdle();
+      printf("TRACKINGTEST info: gestures fist %.0f point %.0f peace %.0f thumbsup %.0f ok %.0f rock %.0f\n",
+             node.Value(HandTrackNode::kFist), node.Value(HandTrackNode::kPoint), node.Value(HandTrackNode::kPeace),
+             node.Value(HandTrackNode::kThumbsUp), node.Value(HandTrackNode::kOk), node.Value(HandTrackNode::kRock));
+      std::vector<float> ov;
+      node.GetOverlay(ov);
+      check(ov.size() == 42, "hand overlay has 21 points");
+   }
+   auto loadImg = [&](const char* env, std::vector<unsigned char>& rgb, int& iw, int& ih) -> bool
+   {
+      const char* path = getenv(env);
+      if (!path) return false;
+      std::ifstream f(path, std::ios::binary);
+      std::string b((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+      int c = 0;
+      unsigned char* q = stbi_load_from_memory((const unsigned char*)b.data(), (int)b.size(), &iw, &ih, &c, 3);
+      if (!q) return false;
+      rgb.assign(q, q + (size_t)iw * ih * 3);
+      stbi_image_free(q);
+      return true;
+   };
+   {
+      std::vector<unsigned char> rgb;
+      int iw = 0, ih = 0;
+      if (loadImg("INFINITE_TRACKINGTEST_FACE", rgb, iw, ih))
+      {
+         FaceTrackNode node;
+         node.smoothing = 0.f;
+         node.mirror = false;
+         node.SubmitFrame(rgb.data(), iw, ih);
+         node.WaitIdle();
+         check(node.Value(FaceTrackNode::kPresent) == 1.f, "Face Track sees the face");
+         printf("TRACKINGTEST info: face head (%.2f,%.2f) yaw %.2f pitch %.2f roll %.2f eyeL %.2f eyeR %.2f brows %.2f mouth %.2f smile %.2f gaze (%.2f,%.2f) | %s\n",
+                node.Value(FaceTrackNode::kHeadX), node.Value(FaceTrackNode::kHeadY), node.Value(FaceTrackNode::kYaw),
+                node.Value(FaceTrackNode::kPitch), node.Value(FaceTrackNode::kRoll), node.Value(FaceTrackNode::kEyeL),
+                node.Value(FaceTrackNode::kEyeR), node.Value(FaceTrackNode::kBrow), node.Value(FaceTrackNode::kMouth),
+                node.Value(FaceTrackNode::kSmile), node.Value(FaceTrackNode::kGazeX), node.Value(FaceTrackNode::kGazeY),
+                node.Status().c_str());
+         // a second frame is a tracking frame: ROI from landmarks, no detector
+         node.SubmitFrame(rgb.data(), iw, ih);
+         node.WaitIdle();
+         check(node.Value(FaceTrackNode::kPresent) == 1.f, "Face Track keeps the face on the tracking frame");
+         if (const char* outPng = getenv("INFINITE_TRACKINGTEST_FACE_OUT"))
+         {
+            std::vector<float> ov;
+            node.GetOverlay(ov);
+            for (size_t i = 0; i + 1 < ov.size(); i += 2)
+            {
+               const int cx = (int)(ov[i] * iw), cy = (int)(ov[i + 1] * ih);
+               for (int dy = -1; dy <= 1; ++dy)
+                  for (int dx = -1; dx <= 1; ++dx)
+                  {
+                     const int x = cx + dx, y = cy + dy;
+                     if (x < 0 || y < 0 || x >= iw || y >= ih) continue;
+                     unsigned char* q = &rgb[((size_t)y * iw + x) * 3];
+                     q[0] = 0; q[1] = 255; q[2] = 0;
+                  }
+            }
+            stbi_write_png(outPng, iw, ih, 3, rgb.data(), iw * 3);
+         }
+      }
+      if (loadImg("INFINITE_TRACKINGTEST_POSE", rgb, iw, ih))
+      {
+         PoseTrackNode node;
+         node.smoothing = 0.f;
+         node.mirror = false;
+         node.SubmitFrame(rgb.data(), iw, ih);
+         node.WaitIdle();
+         check(node.Value(PoseTrackNode::kPresent) == 1.f, "Pose Track sees the person");
+         printf("TRACKINGTEST info: pose body (%.2f,%.2f) head (%.2f,%.2f) wristL (%.2f,%.2f) wristR (%.2f,%.2f) armL %.2f armR %.2f spread %.2f lean %.2f size %.2f | %s\n",
+                node.Value(PoseTrackNode::kBodyX), node.Value(PoseTrackNode::kBodyY), node.Value(PoseTrackNode::kHeadX),
+                node.Value(PoseTrackNode::kHeadY), node.Value(PoseTrackNode::kWristLX), node.Value(PoseTrackNode::kWristLY),
+                node.Value(PoseTrackNode::kWristRX), node.Value(PoseTrackNode::kWristRY), node.Value(PoseTrackNode::kArmL),
+                node.Value(PoseTrackNode::kArmR), node.Value(PoseTrackNode::kSpread), node.Value(PoseTrackNode::kLean),
+                node.Value(PoseTrackNode::kSize), node.Status().c_str());
+         node.SubmitFrame(rgb.data(), iw, ih);
+         node.WaitIdle();
+         check(node.Value(PoseTrackNode::kPresent) == 1.f, "Pose Track keeps the person on the tracking frame");
+         if (const char* outPng = getenv("INFINITE_TRACKINGTEST_POSE_OUT"))
+         {
+            std::vector<float> ov;
+            node.GetOverlay(ov);
+            for (size_t i = 0; i + 1 < ov.size(); i += 2)
+            {
+               const int cx = (int)(ov[i] * iw), cy = (int)(ov[i + 1] * ih);
+               for (int dy = -3; dy <= 3; ++dy)
+                  for (int dx = -3; dx <= 3; ++dx)
+                  {
+                     const int x = cx + dx, y = cy + dy;
+                     if (x < 0 || y < 0 || x >= iw || y >= ih) continue;
+                     unsigned char* q = &rgb[((size_t)y * iw + x) * 3];
+                     q[0] = 0; q[1] = 255; q[2] = 0;
+                  }
+            }
+            stbi_write_png(outPng, iw, ih, 3, rgb.data(), iw * 3);
+         }
+      }
    }
    stbi_image_free(px);
    return fails ? 1 : 0;

@@ -166,6 +166,8 @@ namespace app
       REGISTER_NODE(NullModulatorNode, Null Modulator, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
       REGISTER_NODE(HandTrackNode, Hand Track, "Modulators");
+      REGISTER_NODE(FaceTrackNode, Face Track, "Modulators");
+      REGISTER_NODE(PoseTrackNode, Pose Track, "Modulators");
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");

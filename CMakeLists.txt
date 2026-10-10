@@ -564,7 +564,12 @@ set(COMMON_SOURCES
     src/core/Extensions.cpp
     src/core/tracking/OrtRuntime.cpp
     src/core/tracking/HandTracker.cpp
+    src/core/tracking/FaceTracker.cpp
+    src/core/tracking/PoseTracker.cpp
+    src/nodes/TrackNodeBase.cpp
     src/nodes/HandTrackNode.cpp
+    src/nodes/FaceTrackNode.cpp
+    src/nodes/PoseTrackNode.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
     src/audio/AudioEngine.cpp

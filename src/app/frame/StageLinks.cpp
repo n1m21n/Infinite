@@ -455,7 +455,7 @@ void DrawLinks(FrameCtx& fc)
                         rejectReason = T("Audio Analyze accepts any audio source - Audio In, Audio File, an effect, a Mixer");
                      }
                      else if (dstNode->node->ModulatorInputSlot(slot) != nullptr && dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) == nullptr &&
-                              dynamic_cast<HandTrackNode*>(dstNode->node.get()) == nullptr)
+                              dynamic_cast<TrackNodeBase*>(dstNode->node.get()) == nullptr)
                      {
                         rejectReason = T("This pin only accepts a modulator source");
                      }

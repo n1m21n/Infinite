@@ -352,7 +352,7 @@ void DrawNodeBodies(FrameCtx& fc)
          // --- preview: image for image nodes, a value meter for modulators ---
          const bool multiOutModulator =
             dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
-            dynamic_cast<HandTrackNode*>(gn.node.get()) != nullptr ||
+            dynamic_cast<TrackNodeBase*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr;
@@ -941,8 +941,8 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawRender3DParams(n);
             else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
                DrawImageAnalyzeParams(n);
-            else if (auto* n = dynamic_cast<HandTrackNode*>(gn.node.get()))
-               DrawHandTrackParams(n);
+            else if (auto* n = dynamic_cast<TrackNodeBase*>(gn.node.get()))
+               DrawTrackParams(n);
             else if (auto* n = dynamic_cast<NullModulatorNode*>(gn.node.get()))
                DrawNullModulatorParams(n);
             else if (auto* n = dynamic_cast<AudioFileNode*>(gn.node.get()))

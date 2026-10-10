@@ -701,21 +701,76 @@ namespace app
    }
 
 
-   void DrawHandTrackParams(HandTrackNode* n)
+   // The small live view every tracking node shows: the frame the tracker saw, with what it found drawn on top,
+   // so it is clear what is being tracked (and that the image is reaching the node at all).
+   static void DrawTrackPreview(TrackNodeBase* n, float w)
+   {
+      const float aspect = std::max(0.5f, std::min(2.0f, n->PreviewAspect()));
+      const float h = std::min(w / aspect, w * 0.8f);
+      const float iw = std::min(w, h * aspect);
+      const ImVec2 tl = ImGui::GetCursorScreenPos();
+      ImGui::Dummy(ImVec2(w, h));
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(tl.x + w, tl.y + h);
+      dl->AddRectFilled(tl, br, ImGui::GetColorU32(ImGuiCol_FrameBg), 4.0f);
+      const ImVec2 a(tl.x + (w - iw) * 0.5f, tl.y), b(a.x + iw, br.y);
+      const unsigned int tex = n->PreviewTexture();
+      if (tex == 0)
+      {
+         const char* msg = n->Input().IsConnected() ? "waiting for a frame" : "connect an image";
+         const ImVec2 ts = ImGui::CalcTextSize(msg);
+         dl->AddText(ImVec2(tl.x + (w - ts.x) * 0.5f, tl.y + (h - ts.y) * 0.5f), ImGui::GetColorU32(ImGuiCol_TextDisabled), msg);
+         return;
+      }
+      const bool mir = n->mirror;
+      dl->PushClipRect(tl, br, true);
+      dl->AddImage((ImTextureID)(intptr_t)tex, a, b, ImVec2(mir ? 1.f : 0.f, 1.f), ImVec2(mir ? 0.f : 1.f, 0.f));
+      std::vector<float> xy;
+      n->GetOverlay(xy);
+      const int np = (int)xy.size() / 2;
+      if (np > 0)
+      {
+         auto pt = [&](int i) { return ImVec2(a.x + (mir ? 1.f - xy[i * 2] : xy[i * 2]) * iw, a.y + xy[i * 2 + 1] * h); };
+         const ImU32 shadow = tok::U32(tok::pal::c_00000096);
+         const ImU32 ink = tok::U32(tok::action_go, CategoryColors::IsThemeLight());
+         for (const auto& l : n->OverlayLines())
+            if (l.first < np && l.second < np)
+               dl->AddLine(pt(l.first), pt(l.second), shadow, 3.0f);
+         for (const auto& l : n->OverlayLines())
+            if (l.first < np && l.second < np)
+               dl->AddLine(pt(l.first), pt(l.second), ink, 1.5f);
+         for (int i = 0; i < np; i++)
+         {
+            const bool key = n->OverlayKeyPoint(i);
+            dl->AddCircleFilled(pt(i), key ? 4.0f : 2.0f, shadow, 10);
+            dl->AddCircleFilled(pt(i), key ? 3.0f : 1.2f, key ? ImGui::GetColorU32(ImGuiCol_Text) : ink, 10);
+         }
+      }
+      dl->PopClipRect();
+   }
+
+   void DrawTrackParams(TrackNodeBase* n)
    {
       const float colW = kParamWidth;
+      const float gutter = 16.0f;
       if (n->PackMissing())
          ImGui::TextColored(tok::V4(tok::palf::v_1000_600_200_1000), "%s", T("Install the Tracking pack: Settings > Extensions"));
       else
          ImGui::TextDisabled("%s", n->Status().c_str());
 
-      NodeSeparator("tracking", colW);
+      NodeSeparator("tracking", colW * 2 + gutter);
+      ImGui::BeginGroup();
+      DrawTrackPreview(n, colW);
+      ImGui::EndGroup();
+      ImGui::SameLine(0.0f, gutter);
+      ImGui::BeginGroup();
       ModCheckbox("mirror", &n->mirror);
       ModSlider("smoothing", &n->smoothing, 0.0f, 1.0f, "%.2f", colW);
       ModSlider("hold ms", &n->holdMs, 0.0f, 1000.0f, "%.0f", colW);
+      ImGui::EndGroup();
 
-      NodeSeparator("outputs", colW);
-      DrawOutputMeters(n, colW);
+      NodeSeparator("outputs", colW * 2 + gutter);
+      DrawOutputMeters(n, colW, 2, gutter);
    }
 
 

@@ -959,7 +959,27 @@ _no controls detected_
 
 ### Hand Track
 
-`HandTrackNode` · DrawHandTrackParams
+`HandTrackNode` · DrawTrackParams
+
+| control | type | modulatable |
+| --- | --- | --- |
+| mirror | checkbox | yes |
+| smoothing | slider | yes |
+| hold ms | slider | yes |
+
+### Face Track
+
+`FaceTrackNode` · DrawTrackParams
+
+| control | type | modulatable |
+| --- | --- | --- |
+| mirror | checkbox | yes |
+| smoothing | slider | yes |
+| hold ms | slider | yes |
+
+### Pose Track
+
+`PoseTrackNode` · DrawTrackParams
 
 | control | type | modulatable |
 | --- | --- | --- |
