@@ -164,6 +164,48 @@ namespace app
    }
 
 
+
+   // A key's ParamRef.paramIndex on this node instance. The per-type join (gParamJoin) was probed on a
+   // default-state node, so it is wrong for any node whose body registers a different set of controls
+   // in another state; the live registration is the truth. Matches the control by the address of the
+   // member it edits (ParamRef.srcAddr against the address VisitParams hands out for the key), falling
+   // back to the join when the control is not drawn right now (a hidden control keeps a stable
+   // ordinal, see FixedParamOrdinal).
+   namespace
+   {
+      class KeyAddrFinder : public ParamVisitor
+      {
+      public:
+         explicit KeyAddrFinder(const std::string& k) : key(k) {}
+         const void* addr = nullptr;
+         void Float(const char* n, float& v) override { if (key == n) addr = &v; }
+         void Int(const char* n, int& v) override { if (key == n) addr = &v; }
+         void Bool(const char* n, bool& v) override { if (key == n) addr = &v; }
+         void Text(const char*, std::string&) override {}
+         void Color(const char*, float*) override {}
+      private:
+         std::string key;
+      };
+   }
+
+   int ParamIndexOfKeyOnNode(const GraphNode& gn, const std::string& key)
+   {
+      if (gn.node != nullptr)
+      {
+         KeyAddrFinder f(key);
+         gn.node->VisitParams(f);
+         if (f.addr != nullptr)
+            for (const ParamRef& r : Modulation::Instance().FrameParams())
+               if (r.nodeIndex == gn.index && r.srcAddr == f.addr)
+                  return r.paramIndex;
+      }
+      auto j = gParamJoin.find(gn.typeName);
+      if (j == gParamJoin.end())
+         return -1;
+      auto k = j->second.paramOfKey.find(key);
+      return k == j->second.paramOfKey.end() ? -1 : k->second;
+   }
+
    // Resolves the keyed bindings a load had to postpone (see PendingKeyed). Runs once a frame; waits for
    // every destination node to have registered its controls (a node only does that by drawing).
    void PollPendingKeyed()
@@ -186,7 +228,7 @@ namespace app
          ready = ready && drawn(m.dstIndex);
       for (const Patch::ExprRecord& e : pk.exprs)
          ready = ready && drawn(e.dstIndex);
-      if (pk.waited % 20 == 0)      if (!ready && ++pk.waited < 60)
+      if (!ready && ++pk.waited < 60)
          return;
       PendingKeyed work = std::move(pk);
       pk = PendingKeyed();
@@ -201,11 +243,7 @@ namespace app
       };
       auto paramOf = [&](const GraphNode& gn, const std::string& key) -> int
       {
-         auto j = gParamJoin.find(gn.typeName);
-         if (j == gParamJoin.end())
-            return -1;
-         auto k = j->second.paramOfKey.find(key);
-         return k == j->second.paramOfKey.end() ? -1 : k->second;
+         return ParamIndexOfKeyOnNode(gn, key);
       };
       for (const Patch::ModRecord& m : work.mods)
       {

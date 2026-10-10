@@ -1752,6 +1752,86 @@ void FrameTest_PATCHLAYOUTLIVETEST(int frameId, GLFWwindow* window)
       }
 }
 
+// Keyed mod/expr lines on a Star: the key must land on the control it names, not on whatever sits at
+// that registration ordinal in the probe's default shape, and must keep landing there when the shape
+// changes. Also holds the load's wait for undrawn nodes (PollPendingKeyed) open past the first retry.
+void FrameTest_KEYEDSTARTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_KEYEDSTARTEST") == nullptr)
+      return;
+   static std::string path;
+   static int fails = 0;
+   auto Fail = [&](const char* msg) { printf("KEYEDSTARTEST FAIL: %s\n", msg); fails++; };
+   auto shapeNode = []() -> GraphNode*
+   {
+      for (GraphNode& gn : gNodes)
+         if (gn.typeName == "Shape")
+            return &gn;
+      return nullptr;
+   };
+   auto ordinalOf = [](int nodeIndex, const char* name) -> int
+   {
+      // KnownParam is sticky: FrameParams is only filled while the frame draws.
+      for (int i = 0; i < 40; i++)
+         if (const ParamRef* r = Modulation::Instance().KnownParam(nodeIndex, i))
+            if (r->name == name)
+               return i;
+      return -1;
+   };
+   if (frameId == 3)
+   {
+      // A fresh app has probed Shape already; forget it so the keyed lines take the wait-for-draw path.
+      gParamJoin.erase("Shape");
+      path = TmpPath("infinite_keyedstar.inf");
+      std::ofstream f(path);
+      f << "infinite-patch 1\n"
+           "node 1 Source Shape\n  id shape\n  i shapeType 6\nend\n"
+           "node 2 Modulators LFO\n  id lfo\nend\n"
+           "node 3 Utility Output\n  id out\nend\n"
+           "cable out 0 shape\n"
+           "mod shape sizeX lfo 0 0 1 0.5\n"
+           "expr shape rotation 30\n";
+      f.close();
+      if (!LoadPatchFrom(path))
+         Fail("load failed");
+   }
+   if (frameId == 16)
+   {
+      GraphNode* gn = shapeNode();
+      if (gn == nullptr)
+         return Fail("no Shape node");
+      if (gPendingKeyed.active)
+         Fail("keyed lines still pending after the nodes drew");
+      const int rot = ordinalOf(gn->index, "rotation");
+      const int sides = ordinalOf(gn->index, "sides");
+      const int size = ordinalOf(gn->index, "size x");
+      if (rot < 0 || sides < 0 || size < 0)
+         return Fail("controls not registered on a Star");
+      if (!Modulation::Instance().HasExpression(gn->index, rot))
+         Fail("expr rotation is not on the rotation control");
+      if (Modulation::Instance().HasExpression(gn->index, sides))
+         Fail("expr rotation landed on the sides control");
+      if (!Modulation::Instance().IsModulated(gn->index, size))
+         Fail("mod sizeX is not on the size x control");
+      static_cast<ShapeNode*>(gn->node.get())->shapeType = 2; // Rectangle: corner/sides/inner ratio hide
+   }
+   if (frameId == 22)
+   {
+      GraphNode* gn = shapeNode();
+      if (gn == nullptr)
+         return Fail("no Shape node");
+      const int rot = ordinalOf(gn->index, "rotation");
+      if (rot < 0 || !Modulation::Instance().HasExpression(gn->index, rot))
+         Fail("rotation lost its expression, or moved ordinal, when the shape changed");
+   }
+   if (frameId == 23)
+   {
+      std::remove(path.c_str());
+      printf("KEYEDSTARTEST %s\n", fails == 0 ? "OK" : "FAIL");
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+   }
+}
+
 void FrameTest_ROUNDTRIPTEST(int frameId, GLFWwindow* window)
 {
    if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
