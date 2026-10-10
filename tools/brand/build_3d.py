@@ -3,6 +3,7 @@
     python3 tools/brand/build_3d.py            # every asset, every render (about 2 min on an M-series laptop)
     python3 tools/brand/build_3d.py --quick    # low samples, for layout checks
     python3 tools/brand/build_3d.py --only node_hero_cutout,logo_3d_cutout   # just these renders, no save/export
+    python3 tools/brand/build_3d.py --no-render  # geometry, animation, .blend and .glb only (seconds, not minutes)
 
 Cutouts (*_cutout.png) are transparent PNGs rendered in Cycles with the floor as a shadow catcher, so the object and
 its contact shadow sit on any ground (channels.py, slides, the website).
@@ -35,6 +36,7 @@ except ImportError:
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 QUICK = "--quick" in ARGS
+NORENDER = "--no-render" in ARGS
 ONLY = set(next((a.split("=", 1)[1] for a in ARGS if a.startswith("--only=")), "").split(",")) - {""}
 if "--only" in ARGS:
     ONLY = set(ARGS[ARGS.index("--only") + 1].split(","))
@@ -668,19 +670,21 @@ def patch_cable(c, MT, a, b, colour_mat, name="patch"):
     return plugs[1]
 
 
-# ---------------------------------------------------------------- baked animation (brand springs, 60 fps)
+# ---------------------------------------------------------------- baked animation (motion.py laws, 60 fps)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import motion as MO  # noqa: E402
+
 FPS = 60
-
-
-def spring(z, w, t):
-    """Unit step response of a damped spring (docs/brand/brand.json motion.springs)."""
-    if z >= 1:
-        return 1 - math.exp(-w * t) * (1 + w * t)
-    wd = w * math.sqrt(1 - z * z)
-    return 1 - math.exp(-z * w * t) * (math.cos(wd * t) + z / math.sqrt(1 - z * z) * math.sin(wd * t))
-
-
+spring = MO.spring
 SPR = {sp["name"]: (sp["zeta"], sp["omega"]) for sp in B["motion"]["springs"]}
+BEAT = MO.note_ms("1/4") / 1000                                  # L1: loops are one bar at 120 BPM
+BAR = MO.note_ms("bar") / 1000
+
+
+def on_beat(beat, kind):
+    """L3: launch time (s) so the spring's overshoot peak lands on `beat` (0-based quarter notes)."""
+    pk = MO.peak_ms(*SPR[kind])
+    return beat * BEAT - (pk / 1000 if pk else 0)
 
 
 def pivot(coll, obs, at, name):
@@ -716,29 +720,32 @@ def animate(node, lfo, fp, patch_plug):
     ctr = [sum((top.matrix_world @ v.co)[i] for v in top.data.vertices) / len(top.data.vertices) for i in range(2)]
     e = pivot(node, obs, (ctr[0], ctr[1], 0), "k_freq_turn")
     a = math.radians(270 * (0.62 - 0.30))
-    key_spring(e, "rotation_euler", 2, a, 0.0, "slab", 0.0, 1.0)
-    key_spring(e, "rotation_euler", 2, 0.0, a, "slab", 1.0, 1.0)
-    # Field Pixel: "Edit Field..." keycap goes down and comes back
+    t1, t3 = on_beat(1, "slab"), on_beat(3, "slab")             # peaks on beats 2 and 4
+    key_spring(e, "rotation_euler", 2, a, 0.0, "slab", t1, t3 - t1)
+    key_spring(e, "rotation_euler", 2, 0.0, a, "slab", t3, BAR - t3)
+    # Field Pixel: "Edit Field..." keycap goes down on beat 2 for a 1/8, comes back
     ek = [bpy.data.objects[n] for n in ANIM["edit_key"]]
     bpy.context.view_layer.update()
     ctr = [sum(o.matrix_world.translation[i] for o in ek) / len(ek) for i in range(2)]
     e = pivot(fp, ek, (ctr[0], ctr[1], 0), "edit_press")
     drop = Z["button_rest"] - Z["button_on"]
-    key_spring(e, "location", 2, 0.0, -drop, "press", 0.4, 0.3)
-    key_spring(e, "location", 2, -drop, 0.0, "press", 0.7, 0.5)
-    # LFO: playhead rides the wave, one cycle per 2 s
+    eighth = MO.note_ms("1/8") / 1000
+    key_spring(e, "location", 2, 0.0, -drop, "press", BEAT, eighth)
+    key_spring(e, "location", 2, -drop, 0.0, "press", BEAT + eighth, BAR - BEAT - eighth)
+    # LFO: playhead rides the wave, one cycle per bar
     ph = next(o for o in lfo.objects if o.name.startswith("playhead"))
     wave = ANIM["wave"]
     ox, oy = ph.location.x - wave[int(0.37 * 160)][0], ph.location.y - wave[int(0.37 * 160)][1]  # the build origin
-    for f in range(2 * FPS + 1):
-        i = int(160 * f / (2 * FPS)) % 161
+    n = int(round(BAR * FPS))
+    for f in range(n + 1):
+        i = int(160 * f / n) % 161
         ph.location.x, ph.location.y = wave[i][0] + ox, wave[i][1] + oy
         ph.keyframe_insert("location", frame=1 + f)
-    # Patch: the input plug slides 40 px out and snaps home on the slab spring
+    # Patch: the input plug slides 40 px out and snaps home on the slab spring, overshoot peak on beat 2
     for o in patch_plug:
         x = o.location.x
-        key_spring(o, "location", 0, x - 40, x, "slab", 0.2, 1.0)
-    sc.frame_start, sc.frame_end = 1, 2 * FPS + 1
+        key_spring(o, "location", 0, x - 40, x, "slab", on_beat(1, "slab"), BAR - on_beat(1, "slab"))
+    sc.frame_start, sc.frame_end = 1, int(round(BAR * FPS)) + 1
     for ob in bpy.data.objects:
         if ob.animation_data and ob.animation_data.action:
             for fc in getattr(ob.animation_data.action, "fcurves", []):
@@ -906,7 +913,7 @@ def setup_render():
 
 
 def render(cam, name, res, colls_on):
-    if ONLY and name not in ONLY:
+    if NORENDER or (ONLY and name not in ONLY):
         return
     sc = bpy.context.scene
     for c in bpy.data.collections:
@@ -921,7 +928,7 @@ def render(cam, name, res, colls_on):
 
 def render_cutout(cam, name, res, colls_on, floor_ob):
     """Transparent PNG with a real contact shadow: Cycles, film transparent, floor as shadow catcher."""
-    if ONLY and name not in ONLY:
+    if NORENDER or (ONLY and name not in ONLY):
         return
     sc = bpy.context.scene
     eng = sc.render.engine

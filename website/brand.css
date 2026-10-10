@@ -145,10 +145,10 @@
   --spring-press: linear(0, 0.011, 0.039, 0.08, 0.128, 0.182, 0.238, 0.295, 0.351, 0.406, 0.458, 0.508, 0.554, 0.598, 0.638, 0.674, 0.708, 0.739, 0.767, 0.792, 0.815, 0.836, 0.854, 0.871, 0.885, 0.899, 0.91, 0.921, 0.93, 0.938, 0.946, 0.952, 0.958, 0.963, 0.968, 0.972, 0.975, 0.978, 0.981, 0.983, 0.985, 0.987, 0.989, 0.99, 0.991, 0.993, 0.993, 0.994, 1);
   --spring-press-ms: 266ms;  /* settles within 2% at 209ms */
   --dur-instant: 0ms;
-  --dur-micro: 120ms;
-  --dur-small: 200ms;
-  --dur-medium: 320ms;
-  --dur-large: 480ms;
-  --dur-page: 640ms;
+  --dur-micro: 125ms;
+  --dur-small: 188ms;
+  --dur-medium: 333ms;
+  --dur-large: 500ms;
+  --dur-page: 667ms;
 }
 @media (prefers-reduced-motion: reduce) { :root { --dur-instant: 0ms; --dur-micro: 0ms; --dur-small: 0ms; --dur-medium: 0ms; --dur-large: 0ms; --dur-page: 0ms; } }
