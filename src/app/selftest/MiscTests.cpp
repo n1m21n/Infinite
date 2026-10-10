@@ -1,6 +1,7 @@
 // Browser / appearance / plugin / network / perf-panel self-tests (moved verbatim from main.cpp).
 #include "core/Extensions.h"
 #include "core/tracking/HandTracker.h"
+#include "nodes/HandTrackNode.h"
 #include "stb_image.h"
 #include "stb_image_write.h"
 #include <chrono>
@@ -2180,6 +2181,26 @@ int RunTrackingTest()
       if (r.found)
          for (int i = 0; i < 21; ++i) dot((int)r.lm[i][0], (int)r.lm[i][1], std::max(2, w / 200));
       stbi_write_png(outPng, w, h, 3, px, w * 3);
+   }
+   // The node itself, fed pixels directly (no GL): outputs must come alive.
+   {
+      HandTrackNode node;
+      node.smoothing = 0.f;
+      check(node.Value(HandTrackNode::kPresent) == 0.f, "Hand Track reads 0 before any frame");
+      node.SubmitFrame(px, w, h);
+      node.WaitIdle();
+      check(node.Value(HandTrackNode::kPresent) == 1.f, "Hand Track sees the hand");
+      printf("TRACKINGTEST info: node palm (%.2f,%.2f) index (%.2f,%.2f) pinch %.2f open %.2f roll %.2f size %.2f | %s\n",
+             node.Value(HandTrackNode::kPalmX), node.Value(HandTrackNode::kPalmY),
+             node.Value(HandTrackNode::kIndexX), node.Value(HandTrackNode::kIndexY),
+             node.Value(HandTrackNode::kPinch), node.Value(HandTrackNode::kOpen),
+             node.Value(HandTrackNode::kRoll), node.Value(HandTrackNode::kSize), node.Status().c_str());
+      check(node.Value(HandTrackNode::kPalmX) > 0.f && node.Value(HandTrackNode::kPalmY) > 0.f, "palm lands inside the frame");
+      std::vector<unsigned char> blank((size_t)w * h * 3, 0);
+      node.holdMs = 0.f;
+      node.SubmitFrame(blank.data(), w, h);
+      node.WaitIdle();
+      check(node.Value(HandTrackNode::kPresent) == 0.f && node.Value(HandTrackNode::kIndexX) == 0.f, "outputs drop to 0 when the hand leaves");
    }
    stbi_image_free(px);
    return fails ? 1 : 0;

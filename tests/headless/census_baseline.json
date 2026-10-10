@@ -1690,6 +1690,14 @@
   "render_vs_frame": 0.01
  },
  {
+  "type": "Hand Track",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
   "type": "Palette",
   "cat": "Modulators",
   "out": "palette",

@@ -114,6 +114,7 @@ namespace app
       // The multi-output modulators, which draw their meters in the params
       // panel rather than producing an image.
       if (dynamic_cast<ImageAnalyzeNode*>(n) != nullptr ||
+          dynamic_cast<HandTrackNode*>(n) != nullptr ||
           dynamic_cast<AudioFileNode*>(n) != nullptr ||
           dynamic_cast<AudioAnalyzeNode*>(n) != nullptr)
          return false;

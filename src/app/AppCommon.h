@@ -181,6 +181,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/ColorRampNode.h"
 #include "nodes/PaletteNode.h"
 #include "nodes/AnalyzeNodes.h"
+#include "nodes/HandTrackNode.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/FieldElementNode.h"

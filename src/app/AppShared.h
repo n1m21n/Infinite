@@ -2816,6 +2816,7 @@ void DrawRampParams(RampNode* n);
 void DrawColorRampParams(ColorRampNode* n);
 
 void DrawImageAnalyzeParams(ImageAnalyzeNode* n);
+void DrawHandTrackParams(HandTrackNode* n);
 
 void DrawNullModulatorParams(NullModulatorNode* n);
 

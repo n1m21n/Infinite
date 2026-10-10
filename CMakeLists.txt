@@ -550,6 +550,7 @@ set(COMMON_SOURCES
     src/core/Extensions.cpp
     src/core/tracking/OrtRuntime.cpp
     src/core/tracking/HandTracker.cpp
+    src/nodes/HandTrackNode.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
     src/audio/AudioEngine.cpp
