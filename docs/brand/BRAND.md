@@ -336,15 +336,20 @@ A node in 3D is a physical instrument panel built from the app's own measurement
 
 | File | Contents |
 |---|---|
-| `node_audio_filter.glb` | The hero node with both cables |
+| `node_audio_filter.glb` | The hero node with both cables; loop: freq knob turns on the slab spring |
+| `node_lfo.glb` | LFO (Modulators): wave viewer, shape, rate / phase / low / high sliders; loop: playhead rides the wave |
+| `node_field_pixel.glb` | Field Pixel (Source): preview, preset, Save / Export / Import, Edit Field..., preset sliders; loop: Edit key press on the press spring |
+| `patch_lfo_field_pixel.glb` | Both nodes patched by a Modulation-colour cable; loop: the plug snaps home on the slab spring |
 | `controls_kit.glb` | Knob, modulated knob, keycap off and on, switch, checkbox, dropdown, fader |
 | `logo_3d.glb` | The mark as a loop |
 | `logo_tile.glb` | The app tile |
 | `brand_ball.glb` | The iridescent hero object |
-| `kit.blend` | Everything, with lights and cameras |
-| `renders/*.png` | node_hero, node_top, node_exploded, knob_macro, kit_components, logo_3d, logo_tile, brand_ball |
+| `kit.blend` | Everything, with lights, cameras and the baked loops (60 fps, 2 s) |
+| `studio.blend` | The stage alone: world, key / rim / fill, shadow-catcher floor, cameras. Import any `.glb` into it |
+| `renders/*.png` | node_hero, node_top, node_exploded, knob_macro, kit_components, logo_3d, logo_tile, brand_ball, node_lfo_top, node_field_pixel_top, patch_hero |
+| `renders/*_cutout.png` | Transparent with contact shadow: node_hero, node_lfo, node_field_pixel, patch, logo_3d, brand_ball |
 
-To build another node, add a `build_<node>()` next to `build_node()` in `tools/brand/build_3d.py` using the same helpers (`knob`, `keycap`, `checkbox`, `switch`, `dropdown`, `fader`, `plug_and_cable`) and that node's body code as the layout source.
+To build another node, add a `build_<node>()` next to `build_lfo()` in `tools/brand/build_3d.py`: `slab()` makes the body, wells, title strip and jacks; fill it with `knob`, `hslider`, `keycap`, `checkbox`, `switch`, `dropdown`, `fader` in the order of that node's body code (`src/app/bodies/`). Connect nodes with `patch_cable()`; add loops in `animate()` with `key_spring()` and a brand spring name.
 
 ## 10. Channels
 

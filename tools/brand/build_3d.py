@@ -7,6 +7,10 @@
 Cutouts (*_cutout.png) are transparent PNGs rendered in Cycles with the floor as a shadow catcher, so the object and
 its contact shadow sit on any ground (channels.py, slides, the website).
 
+Nodes: Audio Filter (hero), LFO, Field Pixel, and the patch LFO -> Field Pixel; each laid out from its body code.
+The .glb files carry baked loops on the brand springs (knob turn, keycap press, LFO playhead, cable plug-in).
+studio.blend is the stage alone (world, lights, shadow-catcher floor, cameras) for new scenes.
+
 Run with system Python: it re-launches itself inside Blender (-b). Every number comes from docs/brand/brand.json
 (node3d, logo, colour.modes.midnight); geometry is built in app pixels (1 unit = 1 px at 100% UI scale) and exported
 to glTF in metres (1 px = 1 mm). Outputs go to art/brand/3d/: *.glb, kit.blend, renders/*.png.
@@ -516,6 +520,232 @@ def build_node(MT):
     return c, (W, H)
 
 
+# ---------------------------------------------------------------- more nodes: one slab, rows from each node's body code
+def hslider(c, MT, cx, cy, w, v, label, value, mod=0.0, z=TOP, name="slider"):
+    """ModSlider since v0.5: a full-width well, the name inside on the left, the value on the right, Signal fill."""
+    h = 24
+    prism(name + "_well", rrect(w, h, 6, 8, cx, cy), z - 0.2, z + 0.12, MT["deep"], c, "print", smooth=False)
+    fw = max(2.0, (w - 4) * v)
+    prism(name + "_fill", rrect(fw, h - 4, 4, 6, cx - w / 2 + 2 + fw / 2, cy), z + 0.12, z + 0.24, MT["signal_fill"], c, "print", smooth=False)
+    prism(name + "_edge", rrect(2, h - 4, 1, 2, cx - w / 2 + 2 + fw - 1, cy), z + 0.12, z + 0.5, MT["signal"], c, "print", smooth=False)
+    if mod:
+        x0 = cx - w / 2 + 2 + fw
+        prism(name + "_mod", rrect((w - 4) * mod, 2.2, 1.1, 2, x0 + (w - 4) * mod / 2, cy - h / 2 + 2.5), z + 0.24, z + 0.5, MT["mod"], c, "print", smooth=False)
+    text(label, 11.5, "Geist-Medium.ttf", MT["ink2"], c, cx - w / 2 + 9, cy - 4, z + 0.3)
+    text(value, 10.5, "GeistMono-Medium.ttf", MT["ink"], c, cx + w / 2 - 9, cy - 4, z + 0.3, "RIGHT")
+
+
+def slab(MT, coll, W, H, title, cat, cat_hex, wells):
+    """Body with recessed wells (list of (x, y, w, h, depth, radius) in app coords, y down), category title strip, jacks."""
+    c = new_coll(coll)
+    cd = N3["card"]
+    P, R, F, ty = cd["padding"], cd["radius"], cd["fillet"], cd["title_h"]
+    ox, oy = W / 2, H / 2
+
+    def P2(x, y):
+        return (x - ox, oy - y)
+
+    tmat = mat("title_" + coll, mix_hex(M["surface-1"], cat_hex, 0.18), 0.5)
+    card = prism("card", rrect(W, H, R, 14), 0, TOP, MT["body"], c, "body", bevel=F)
+    cutters = []
+    for i, (x, y, w, h, d, r) in enumerate(wells):
+        cx0, cy0 = P2(x + w / 2, y + h / 2)
+        cutters.append(prism(f"cut_{i}", rrect(w, h, r, 10, cx0, cy0), TOP + d, TOP + 5, MT["deep"], c, "body", smooth=False))
+        prism(f"well_{i}", rrect(w - 0.2, h - 0.2, r, 10, cx0, cy0), TOP + d - 0.5, TOP + d + 0.05, MT["well"], c, "body", smooth=False)
+    if cutters:
+        carve(card, cutters)
+    ins, rr = F, R - F
+    xr, yt, yb = W / 2 - ins, oy - ins, oy - ins - ty
+    tl = [(xr, yb)]
+    for cxs, a0 in ((xr - rr, 0), (-(xr - rr), 90)):
+        for i in range(15):
+            a = math.radians(a0 + 90 * i / 14)
+            tl.append((cxs + rr * math.cos(a), yt - rr + rr * math.sin(a)))
+    tl.append((-xr, yb))
+    prism("title_strip", tl, TOP - 0.05, TOP + 0.12, tmat, c, "print", smooth=False)
+    text(title, 15, "Geist-SemiBold.ttf", MT["ink"], c, *P2(P + 6, 20), TOP + 0.15)
+    text(cat.upper(), 9.5, "GeistMono-Medium.ttf", MT["ink3"], c, *P2(W - P - 6, 19.5), TOP + 0.15, "RIGHT")
+    ring = mat("ring_" + coll, cat_hex, 0.35, emit=0.25)
+    jy = P2(0, ty + 22)[1]
+    jo, ji = N3["jack"]["outer"] / 2, N3["jack"]["inner"] / 2
+    for side, sx in (("in", -W / 2), ("out", W / 2)):
+        d = -1 if side == "in" else 1
+        cylinder_x(f"jack_{side}", jo, 0, 1.2, 0, 0, ring, c, "jack", bevel=0.4).location = (sx + (0 if d > 0 else -1.2), jy, TOP / 2)
+        cylinder_x(f"hole_{side}", ji, 0, 1.3, 0, 0, MT["hole"], c, "jack").location = (sx + (0.05 if d > 0 else -1.35), jy, TOP / 2)
+    return c, P2, jy
+
+
+ANIM = {}  # objects and paths the builders hand to animate()
+
+
+def build_lfo(MT, origin):
+    """LFO (Modulators): wave viewer, shape dropdown, rate / phase / low / high sliders (bodies/ParamBodies1.cpp DrawLFOParams)."""
+    W = 250                                        # PatchLayout.cpp default width
+    P, ty = N3["card"]["padding"], N3["card"]["title_h"]
+    cw = W - 2 * P
+    vy, vh = ty + 10, 92
+    dy = vy + vh + 12 + 13
+    rows = [dy + 34 + 30 * i for i in range(4)]
+    H = rows[-1] + 12 + 18
+    c, P2, jy = slab(MT, "node_lfo", W, H, "LFO", "Modulators", CAT["Modulators"], [(P, vy, cw, vh, Z["display_well"], 10)])
+    zf = TOP + Z["display_well"] + 0.1
+    x0, x1, ya, yb = P + 10, W - P - 10, vy + 14, vy + vh - 14
+    for i in range(3):
+        prism(f"grid_{i}", rrect(x1 - x0, 0.8, 0.2, 1, *P2((x0 + x1) / 2, ya + (yb - ya) * i / 2)), zf, zf + 0.06, MT["line"], c, "print", smooth=False)
+    wave = [(x0 + (x1 - x0) * i / 160, (ya + yb) / 2 - (yb - ya) / 2 * math.sin(2 * math.pi * 1.5 * i / 160)) for i in range(161)]
+    tube("wave", [(*P2(x, y), zf + 1.1) for x, y in wave], 1.1, MT["mod"], c, "print", res=6)
+    k = 0.37                                       # playhead
+    px, py = wave[int(k * 160)]
+    ph = prism("playhead", circle(3.4, 32, 0, 0), zf + 0.5, zf + 2.6, MT["ink"], c, "caps", bevel=0.4, segs=2)
+    ph.location.xy = P2(px, py)
+    ANIM["wave"] = [P2(x, y) for x, y in wave]
+    dropdown(c, MT, *P2(W / 2, dy), cw, "Sine", name="d_shape")
+    for i, (lab, v, val, mod) in enumerate((("rate", 0.12, "4.00 beats", 0.0), ("phase", 0.0, "0.00", 0.0),
+                                            ("low", 0.0, "0.00", 0.0), ("high", 1.0, "1.00", 0.0))):
+        hslider(c, MT, *P2(W / 2, rows[i]), cw, v, lab, val, mod, name=f"s_{lab}")
+    for ob in c.objects:
+        ob.location.x += origin[0]
+        ob.location.y += origin[1]
+    return c, (W, H), jy
+
+
+def build_field_pixel(MT, origin):
+    """Field Pixel (Source): live preview, preset dropdown, Save / Export / Import, Edit Field..., the preset's params
+    (bodies/FieldParams.cpp DrawFieldPixelParams with the Organic Liquid Warp preset)."""
+    W = 340
+    P, ty = N3["card"]["padding"], N3["card"]["title_h"]
+    cw = W - 2 * P
+    vy, vh = ty + 10, round(cw * 9 / 16)
+    dy = vy + vh + 12 + 13
+    by = dy + 26 + 4
+    ey = by + 30
+    rows = [ey + 32 + 30 * i for i in range(4)]
+    H = rows[-1] + 12 + 18
+    c, P2, jy = slab(MT, "node_field_pixel", W, H, "Field Pixel", "Source", CAT["Source"], [(P, vy, cw, vh, Z["display_well"], 10)])
+    # the preview: a Field-style warped cosine palette as an emissive gradient on the well floor
+    cx0, cy0 = P2(W / 2, vy + vh / 2)
+    pm = gradient_mat("field_preview", [M["deep"], mix_hex(M["deep"], SIGNAL, 0.6), mix_hex(M["deep"], MOD, 0.5), mix_hex(M["deep"], EMBER, 0.7), M["deep"]], [0.0, 0.3, 0.55, 0.8, 1.0], cw / 2)
+    bsdf = next(n for n in pm.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    ramp = next(n for n in pm.node_tree.nodes if n.type == "VALTORGB")
+    pm.node_tree.links.new(ramp.outputs["Color"], bsdf.inputs["Emission Color"])
+    setin(bsdf, "Emission Strength", 0.45)
+    prism("preview", rrect(cw - 6, vh - 6, 8, 10, cx0, cy0), TOP + Z["display_well"] + 0.05, TOP + Z["display_well"] + 0.15, pm, c, "print", smooth=False)
+    dropdown(c, MT, *P2(W / 2, dy), cw, "Organic Liquid Warp", name="d_preset")
+    bw = (cw - 8) / 3
+    for i, lab in enumerate(("Save", "Export", "Import")):
+        keycap(c, MT, *P2(P + bw / 2 + i * (bw + 4), by), bw - 4, 22, False, lab, name=f"b_{lab.lower()}")
+    before = set(c.objects)
+    keycap(c, MT, *P2(W / 2, ey), cw - 4, 24, True, "Edit Field...", name="b_edit")
+    ANIM["edit_key"] = [o.name for o in c.objects if o not in before and not o.name.startswith("b_edit_well")]
+    for i, (lab, v, val, mod) in enumerate((("scale", 0.33, "3.00", 0.0), ("speed", 0.23, "0.50", 0.0),
+                                            ("warp", 0.34, "1.50", 0.18), ("hue", 0.0, "0.00", 0.0))):
+        hslider(c, MT, *P2(W / 2, rows[i]), cw, v, lab, val, mod, name=f"s_{lab}")
+    for ob in c.objects:
+        ob.location.x += origin[0]
+        ob.location.y += origin[1]
+    return c, (W, H), jy
+
+
+def patch_cable(c, MT, a, b, colour_mat, name="patch"):
+    """Plug seated in jack a (output, cable leaves +x) and jack b (input, leaves -x), the cable sagging to the floor
+    between them (cable.sag of the span). a and b are (x, y, z) at the jack mouths. Returns the input plug objects."""
+    L, pr, cr = N3["cable"]["plug_length"], N3["cable"]["plug"] / 2, N3["cable"]["diameter"] / 2
+    plugs = []
+    for (x, y, z), d in ((a, 1), (b, -1)):
+        sl = cylinder_x(name + "_sleeve", pr * 0.62, 0, 5, 0, 0, MT["metal"], c, "cable", bevel=0.4)
+        sl.location = (x + (0 if d > 0 else -5), y, z)
+        bd = cylinder_x(name + "_plug", pr, 0, L, 0, 0, colour_mat, c, "cable", bevel=1.8)
+        bd.location = (x + (5 if d > 0 else -5 - L), y, z)
+        plugs.append([sl, bd])
+    xa, xb = a[0] + 5 + L, b[0] - 5 - L
+    span = abs(xb - xa)
+    low = max(cr, a[2] - N3["cable"]["sag"] * span * 2)
+    pts = bezier3((xa - 1, a[1], a[2]), (xa + span * 0.3, a[1], a[2]), (xa + span * 0.25, (a[1] + b[1]) / 2, low),
+                  ((xa + xb) / 2, (a[1] + b[1]) / 2, low))
+    pts += bezier3(((xa + xb) / 2, (a[1] + b[1]) / 2, low), (xb - span * 0.25, (a[1] + b[1]) / 2, low),
+                   (xb - span * 0.3, b[1], b[2]), (xb + 1, b[1], b[2]))[1:]
+    tube(name + "_cable", pts, cr, colour_mat, c)
+    return plugs[1]
+
+
+# ---------------------------------------------------------------- baked animation (brand springs, 60 fps)
+FPS = 60
+
+
+def spring(z, w, t):
+    """Unit step response of a damped spring (docs/brand/brand.json motion.springs)."""
+    if z >= 1:
+        return 1 - math.exp(-w * t) * (1 + w * t)
+    wd = w * math.sqrt(1 - z * z)
+    return 1 - math.exp(-z * w * t) * (math.cos(wd * t) + z / math.sqrt(1 - z * z) * math.sin(wd * t))
+
+
+SPR = {sp["name"]: (sp["zeta"], sp["omega"]) for sp in B["motion"]["springs"]}
+
+
+def pivot(coll, obs, at, name):
+    """An empty at `at` that the objects hang from, so a turn or press happens about the control's own centre."""
+    e = bpy.data.objects.new(name, None)
+    link(e, coll, "anim")
+    e.location = at
+    bpy.context.view_layer.update()
+    for o in obs:
+        mw = o.matrix_world.copy()
+        o.parent = e
+        o.matrix_world = mw
+    return e
+
+
+def key_spring(ob, path, index, v0, v1, kind, t0, dur):
+    """Bake v0 -> v1 on the named spring as one key per frame from t0 (s) for dur (s)."""
+    z, w = SPR[kind]
+    for f in range(int(dur * FPS) + 1):
+        t = f / FPS
+        val = v0 + (v1 - v0) * spring(z, w, t)
+        getattr(ob, path)[index] = val
+        ob.keyframe_insert(path, index=index, frame=1 + int(t0 * FPS) + f)
+
+
+def animate(node, lfo, fp, patch_plug):
+    """Loops for the .glb files: knob turn (slab), keycap press (press), LFO playhead (linear), cable plug-in (slab)."""
+    sc = bpy.context.scene
+    sc.render.fps = FPS
+    # Audio Filter: freq knob sweeps 0.30 -> 0.62 and back (the arc on the card shows the end value)
+    obs = [o for o in node.objects if o.name.startswith(("k_freq_cap", "k_freq_top", "k_freq_ptr"))]
+    top = next(o for o in obs if o.name.startswith("k_freq_top"))  # a circle: its vertex mean is the knob centre
+    ctr = [sum((top.matrix_world @ v.co)[i] for v in top.data.vertices) / len(top.data.vertices) for i in range(2)]
+    e = pivot(node, obs, (ctr[0], ctr[1], 0), "k_freq_turn")
+    a = math.radians(270 * (0.62 - 0.30))
+    key_spring(e, "rotation_euler", 2, a, 0.0, "slab", 0.0, 1.0)
+    key_spring(e, "rotation_euler", 2, 0.0, a, "slab", 1.0, 1.0)
+    # Field Pixel: "Edit Field..." keycap goes down and comes back
+    ek = [bpy.data.objects[n] for n in ANIM["edit_key"]]
+    bpy.context.view_layer.update()
+    ctr = [sum(o.matrix_world.translation[i] for o in ek) / len(ek) for i in range(2)]
+    e = pivot(fp, ek, (ctr[0], ctr[1], 0), "edit_press")
+    drop = Z["button_rest"] - Z["button_on"]
+    key_spring(e, "location", 2, 0.0, -drop, "press", 0.4, 0.3)
+    key_spring(e, "location", 2, -drop, 0.0, "press", 0.7, 0.5)
+    # LFO: playhead rides the wave, one cycle per 2 s
+    ph = next(o for o in lfo.objects if o.name.startswith("playhead"))
+    wave = ANIM["wave"]
+    ox, oy = ph.location.x - wave[int(0.37 * 160)][0], ph.location.y - wave[int(0.37 * 160)][1]  # the build origin
+    for f in range(2 * FPS + 1):
+        i = int(160 * f / (2 * FPS)) % 161
+        ph.location.x, ph.location.y = wave[i][0] + ox, wave[i][1] + oy
+        ph.keyframe_insert("location", frame=1 + f)
+    # Patch: the input plug slides 40 px out and snaps home on the slab spring
+    for o in patch_plug:
+        x = o.location.x
+        key_spring(o, "location", 0, x - 40, x, "slab", 0.2, 1.0)
+    sc.frame_start, sc.frame_end = 1, 2 * FPS + 1
+    for ob in bpy.data.objects:
+        if ob.animation_data and ob.animation_data.action:
+            for fc in getattr(ob.animation_data.action, "fcurves", []):
+                for kp in fc.keyframe_points:
+                    kp.interpolation = "LINEAR"
+
+
 # ---------------------------------------------------------------- component sheet
 def build_kit(MT, origin):
     c = new_coll("kit_components")
@@ -730,19 +960,26 @@ def unexplode(moved):
             ob.location.z -= dz
 
 
-def export(coll, name, root_origin):
+def export(colls, name, root_origin):
+    """glTF in metres. A scaled root carries the offset, so baked location keys stay valid; undone afterwards."""
+    colls = colls if isinstance(colls, (list, tuple)) else [colls]
+    obs = [o for c in colls for o in c.objects]
     root = bpy.data.objects.new(name + "_root", None)
     bpy.context.scene.collection.objects.link(root)
-    for ob in coll.objects:
-        ob.parent = root
-        ob.location.x -= root_origin[0]
-        ob.location.y -= root_origin[1]
     root.scale = (0.001, 0.001, 0.001)
+    root.location = (-root_origin[0] * 0.001, -root_origin[1] * 0.001, 0)
+    tops = [o for o in obs if o.parent is None]
+    for ob in tops:
+        ob.parent = root
+    bpy.context.scene.frame_set(1)
     bpy.ops.object.select_all(action="DESELECT")
-    for ob in coll.objects:
+    for ob in obs:
         ob.select_set(True)
     root.select_set(True)
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, name + ".glb"), export_format="GLB", use_selection=True, export_apply=True)
+    for ob in tops:
+        ob.parent = None
+    bpy.data.objects.remove(root)
     print("export", name)
 
 
@@ -800,6 +1037,21 @@ def main():
     render(tc, "logo_tile", (1200, 1200), {"logo"})
     mark3d.hide_render = False
 
+    # the patch: LFO out -> Field Pixel in, a Modulation-colour cable between the side-wall jacks
+    LX, FX = -1900, -1900 + 125 + 230 + 170
+    lfo, (LW, LH), ljy = build_lfo(MT, (LX, 0))
+    fp, (FW, FH), fjy = build_field_pixel(MT, (FX, 0))
+    pc = new_coll("patch")
+    plug = patch_cable(pc, MT, (LX + LW / 2 + 1.2, ljy, TOP / 2), (FX - FW / 2 - 1.2, fjy, TOP / 2), MT["mod"])
+    for nm, cl, (cx, w, h) in (("node_lfo", lfo, (LX, LW, LH)), ("node_field_pixel", fp, (FX, FW, FH))):
+        cam = camera("cam_" + nm, (cx - 10, -10, 20), -yaw, pitch, 1380 * max(w, h) / max(W, H) * 1.05, 50)
+        render_cutout(cam, nm + "_cutout", (1600, 1200), {nm}, fl)
+        tcam = camera("cam_top_" + nm, (cx, 0, 0), 0, 90, 3000, ortho=max(w, h) * 1.14)
+        render(tcam, nm + "_top", (1000, 1000), {nm})
+    pcam = camera("cam_patch", ((LX + FX) / 2, -20, 20), -yaw * 0.6, pitch, 1700, 50)
+    render(pcam, "patch_hero", (1920, 1080), {"node_lfo", "node_field_pixel", "patch"})
+    render_cutout(pcam, "patch_cutout", (1920, 1080), {"node_lfo", "node_field_pixel", "patch"}, fl)
+
     bc = camera("cam_ball", (BALL[0], BALL[1], 60), -20, 18, 700, 85)
     render(bc, "brand_ball", (1000, 1000), {"ball"})
     render_cutout(bc, "brand_ball_cutout", (1000, 1000), {"ball"}, fl)
@@ -808,10 +1060,14 @@ def main():
 
     for c in bpy.data.collections:
         c.hide_render = False
+    animate(node, lfo, fp, plug)
     bpy.context.preferences.filepaths.save_version = 0
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "kit.blend"), compress=True)
     # glTF last: exporting re-parents into a metre-scaled root
     export(node, "node_audio_filter", (0, 0))
+    export(lfo, "node_lfo", (LX, 0))
+    export(fp, "node_field_pixel", (FX, 0))
+    export([lfo, fp, pc], "patch_lfo_field_pixel", ((LX + FX) / 2, 0))
     export(kit, "controls_kit", KIT)
     export(ball, "brand_ball", BALL)
     logo_flat = [o for o in logo.objects if o.name.startswith(("tile", "lemniscate_flat"))]
@@ -822,6 +1078,15 @@ def main():
         tile_c.objects.link(o)
     export(logo, "logo_3d", LOGO)
     export(tile_c, "logo_tile", (LOGO[0], LOGO[1] - 520))
+    # studio.blend: the stage alone (world, key/rim/fill suns, shadow-catcher floor, every camera) to drop .glb files into
+    for c in list(bpy.data.collections):
+        for o in list(c.objects):
+            bpy.data.objects.remove(o)
+        bpy.data.collections.remove(c)
+    bpy.ops.outliner.orphans_purge(do_recursive=True)
+    fl.is_shadow_catcher = True
+    bpy.context.scene.camera = hero
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "studio.blend"), compress=True)
 
 
 main()
