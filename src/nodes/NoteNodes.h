@@ -965,6 +965,9 @@ public:
    int transpose = 0;                // semitones applied to every note this node plays
    float velocityScale = 1.0f;       // 0..2, applied to every note this node plays
    bool computerKeyboardEnabled = true;
+   // Turbo 0.55: typing also plays when the pointer is not over the node
+   // (live use). Still off while a text field has focus or Ctrl/Alt/Shift is held.
+   bool typingAlways = false;
    bool useGlobalScale = false;      // snap transposed output to global scale
 
    // Main thread only: called once per frame from DrawKeyboardBody with the
@@ -983,6 +986,9 @@ public:
    // mouse click/drag, -1 if none. Public because the UI needs to track it
    // across frames the same way it owns baseOctave/computerKeyboardEnabled.
    int mMouseNote = -1;
+   // Turbo 0.55: last octave the UI played in; a change releases every held
+   // key first, so the note-off never goes to the new octave (stuck notes).
+   int mUiOctave = -100;
 
 private:
    std::unique_ptr<AudioKeyboardNode> mAudioNode;

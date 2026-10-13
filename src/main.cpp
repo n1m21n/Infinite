@@ -457,11 +457,23 @@ namespace
       if (name == "Synths")
          out = "SYNTHS & SAMPLERS";
       if (name == "Notes")
-         out = "NOTES & SEQUENCERS";
+         out = "NOTE TOOLS"; // Turbo 0.55: the sources moved to NoteSource
+      if (name == "NoteSource")
+         out = "NOTE SOURCES & SEQUENCERS";
+      if (name == "Shapes")
+         out = "SHAPES 2D";
+      if (name == "3DSource")
+         out = "3D SOURCES";
+      if (name == "3D")
+         out = "3D GEOMETRY";
+      if (name == "3DScene")
+         out = "3D SCENE & RENDER";
+      if (name == "Keyboard")
+         out = "VIRTUAL KEYBOARD"; // type key stays "Keyboard"
       if (name == "CVTools")
          out = "CV TOOLS";
       if (name == "Control")
-         out = "MIDI & OSC";
+         out = "MIDI, OSC & TRANSPORT";
       if (out.empty())
          out = name;
       std::transform(out.begin(), out.end(), out.begin(),
@@ -3735,7 +3747,7 @@ namespace
       {
          NodeFactory::Instance().Register(
             ShapeNode::ShapeNames()[i],
-            [i]() -> INode* { return ShapeNode::CreateFor(i); }, "Source");
+            [i]() -> INode* { return ShapeNode::CreateFor(i); }, "Shapes"); // Turbo 0.55 (was Source)
       }
       REGISTER_NODE(FormulaNode, Formula, "Source");
       REGISTER_NODE(TextNode, Text, "Text");
@@ -3754,7 +3766,7 @@ namespace
       {
          NodeFactory::Instance().Register(
             GeometryNode::ShapeNames()[i],
-            [i]() -> INode* { return GeometryNode::CreateFor(i); }, "3D");
+            [i]() -> INode* { return GeometryNode::CreateFor(i); }, "3DSource"); // Turbo 0.55 (was 3D)
       }
       REGISTER_NODE(ModelSourceNode, Model 3D, "3D");
       REGISTER_NODE(Text3DNode, Text 3D, "3D");
@@ -16081,6 +16093,62 @@ namespace
    // progression-wide knobs. The per-chord length and the keys are plain
    // widgets, not modulation pins: a pin on "the selected chord" would change
    // meaning every time another slot is clicked.
+   // Turbo 0.55: the chord slot menu (right-click on a chord) is opened and
+   // drawn outside the node editor, in the ed::Suspend() block, like the Clip
+   // Matrix cell menu. Opened inside the body it went through the canvas
+   // transform and landed at the bottom-right corner of the screen. The body
+   // only records the request; the picked item comes back as an op number
+   // (the SlotOp values of DrawChordProgressionBody).
+   ChordProgressionNode* gCpMenuNode = nullptr;
+   int gCpMenuSlot = -1;
+   int gCpMenuCount = 0;
+   bool gCpMenuHasClip = false;
+   bool gCpMenuOpen = false;
+   ChordProgressionNode* gCpMenuResultNode = nullptr;
+   int gCpMenuResultOp = 0;
+   int gCpMenuResultSlot = -1;
+
+   void DrawChordSlotDeferredMenu()
+   {
+      if (gCpMenuOpen)
+      {
+         ImGui::OpenPopup("##cpslotmenu");
+         gCpMenuOpen = false;
+      }
+      if (gCpMenuNode == nullptr)
+         return;
+      if (!ImGui::BeginPopup("##cpslotmenu"))
+      {
+         gCpMenuNode = nullptr;
+         return;
+      }
+      const int count = std::max(1, gCpMenuCount);
+      const int ms = std::clamp(gCpMenuSlot, 0, count - 1);
+      const bool full = count >= ChordProgressionNode::kMaxChords;
+      int op = 0;
+      if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, !full)) op = 1;
+      if (ImGui::MenuItem("Insert empty before", nullptr, false, !full)) op = 2;
+      if (ImGui::MenuItem("Insert empty after", nullptr, false, !full)) op = 3;
+      if (ImGui::MenuItem("Delete", "Del", false, count > 1)) op = 4;
+      ImGui::Separator();
+      if (ImGui::MenuItem("Move left", "Alt+Left", false, ms > 0)) op = 5;
+      if (ImGui::MenuItem("Move right", "Alt+Right", false, ms < count - 1)) op = 6;
+      ImGui::Separator();
+      if (ImGui::MenuItem("Copy", "Ctrl+C")) op = 7;
+      if (ImGui::MenuItem("Paste (replace)", "Ctrl+V", false, gCpMenuHasClip)) op = 8;
+      if (ImGui::MenuItem("Paste (insert after)", "Ctrl+Shift+V", false, gCpMenuHasClip && !full)) op = 9;
+      ImGui::Separator();
+      if (ImGui::MenuItem("Clear")) op = 10;
+      if (op != 0)
+      {
+         gCpMenuResultNode = gCpMenuNode;
+         gCpMenuResultOp = op;
+         gCpMenuResultSlot = ms;
+         gCpMenuNode = nullptr;
+      }
+      ImGui::EndPopup();
+   }
+
    void DrawChordProgressionBody(GraphNode& gn, ChordProgressionNode* n)
    {
       using CP = ChordProgressionNode;
@@ -16287,30 +16355,22 @@ namespace
                sDragLive = false;
             }
          }
-         static int sMenuSlot = -1;
+         // Menu drawn by DrawChordSlotDeferredMenu (outside the node editor).
+         static_assert(kOpDup == 1 && kOpClear == 10, "SlotOp numbers are shared with DrawChordSlotDeferredMenu");
          if (openMenu)
          {
-            sMenuSlot = opSlot;
-            ImGui::OpenPopup("##cpslotmenu");
+            gCpMenuNode = n;
+            gCpMenuSlot = opSlot;
+            gCpMenuCount = count;
+            gCpMenuHasClip = sHasClip;
+            gCpMenuOpen = true;
+            gParamRightClickConsumedThisFrame = true; // keep the node menu closed
          }
-         if (ImGui::BeginPopup("##cpslotmenu"))
+         if (gCpMenuResultNode == n)
          {
-            const int ms = std::clamp(sMenuSlot, 0, count - 1);
-            const bool full = count >= CP::kMaxChords;
-            if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, !full)) { op = kOpDup; opSlot = ms; }
-            if (ImGui::MenuItem("Insert empty before", nullptr, false, !full)) { op = kOpInsBefore; opSlot = ms; }
-            if (ImGui::MenuItem("Insert empty after", nullptr, false, !full)) { op = kOpInsAfter; opSlot = ms; }
-            if (ImGui::MenuItem("Delete", "Del", false, count > 1)) { op = kOpDelete; opSlot = ms; }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Move left", "Alt+Left", false, ms > 0)) { op = kOpLeft; opSlot = ms; }
-            if (ImGui::MenuItem("Move right", "Alt+Right", false, ms < count - 1)) { op = kOpRight; opSlot = ms; }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Copy", "Ctrl+C")) { op = kOpCopy; opSlot = ms; }
-            if (ImGui::MenuItem("Paste (replace)", "Ctrl+V", false, sHasClip)) { op = kOpPasteRep; opSlot = ms; }
-            if (ImGui::MenuItem("Paste (insert after)", "Ctrl+Shift+V", false, sHasClip && !full)) { op = kOpPasteIns; opSlot = ms; }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Clear")) { op = kOpClear; opSlot = ms; }
-            ImGui::EndPopup();
+            op = (SlotOp)gCpMenuResultOp;
+            opSlot = gCpMenuResultSlot;
+            gCpMenuResultNode = nullptr;
          }
 
          // Keys: only while the pointer is over the strip or a slot was the
@@ -16764,7 +16824,64 @@ namespace
       }
       AudioToggleButton("bass", &n->bass, 56.0f);
       ImGui::SameLine();
-      AudioToggleButton("sets key", &n->setsKey, 76.0f);
+      if (AudioToggleButton("sets key", &n->setsKey, 76.0f) && n->setsKey)
+         n->followKey = false;
+      ImGui::SameLine();
+      // Turbo 0.55: follow the global key (written in homeKey, played in the
+      // transport's key). Turning it on takes the current key as home.
+      {
+         const bool was = n->followKey;
+         if (AudioToggleButton("follows key", &n->followKey, 92.0f) && n->followKey)
+         {
+            n->setsKey = false;
+            if (!was)
+               n->homeKey = Transport::Instance().Key();
+         }
+         if (n->followKey)
+         {
+            static const char* const kPc[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+            ImGui::SameLine();
+            ImGui::TextDisabled("home %s, %+d", kPc[((n->homeKey % 12) + 12) % 12], n->KeyOffset());
+         }
+      }
+
+      // Turbo 0.55: suggestions (NT ChordGen styles + famous progressions).
+      // load = the picked progression, random = a new one from the style's
+      // templates; both in the global key, one bar per chord, undoable.
+      {
+         const std::vector<std::string>& styles = CP::SuggestionStyles();
+         if (!styles.empty())
+         {
+            n->suggestStyle = std::clamp(n->suggestStyle, 0, (int)styles.size() - 1);
+            const std::vector<int> picks = CP::SuggestionsInStyle(styles[n->suggestStyle]);
+            std::vector<std::string> pickNames;
+            for (int idx : picks)
+               pickNames.push_back(CP::SuggestionName(idx));
+            n->suggestPick = std::clamp(n->suggestPick, 0, std::max(0, (int)picks.size() - 1));
+            ImGui::Dummy(ImVec2(0.0f, 2.0f));
+            // Sized to stay inside kAudioNodeWidth (the row used to overflow it).
+            DropdownButton("##cpSuggestStyle", styles, n->suggestStyle,
+                           [n](int i) { n->suggestStyle = i; n->suggestPick = 0; }, 115.0f, /*modulatable=*/false);
+            ImGui::SameLine();
+            DropdownButton("##cpSuggestPick", pickNames, n->suggestPick,
+                           [n](int i) { n->suggestPick = i; }, 165.0f, /*modulatable=*/false);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("load##cpSuggest") && !picks.empty())
+            {
+               PushUndoCheckpoint();
+               n->LoadSuggestion(picks[n->suggestPick], Transport::Instance().Key());
+               gPatchDirty = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("random##cpSuggest"))
+            {
+               PushUndoCheckpoint();
+               n->RandomFromStyle(styles[n->suggestStyle], Transport::Instance().Key(),
+                                  (unsigned)(glfwGetTime() * 1000.0) ^ (unsigned)(gn.index * 2654435761u));
+               gPatchDirty = true;
+            }
+         }
+      }
 
       // Turbo 0.50: quantized restart.
       if (DrawRestartControls(&n->restartQuant, armed))
@@ -16927,9 +17044,31 @@ namespace
       if (last >= 0)
          snprintf(stat, sizeof(stat), "%s%d", NoteNameList()[((last % 12) + 12) % 12].c_str(), last / 12 - 1);
       else
-         snprintf(stat, sizeof(stat), "click, or hover and type");
+         snprintf(stat, sizeof(stat), "%s", n->typingAlways && n->computerKeyboardEnabled ? "click, or type" : "click, or hover and type");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      const ImGuiIO& io = ImGui::GetIO();
+      const bool isHovered = ed::GetHoveredNode() == ed::NodeId(gn.NodeId());
+      const bool mods = io.KeyCtrl || io.KeyAlt || io.KeySuper || io.KeyShift;
+      const bool typingLive = n->computerKeyboardEnabled && (isHovered || n->typingAlways) && !mods &&
+                              !io.WantTextInput;
+
+      // Turbo 0.55: - and = shift the octave while typing is live.
+      if (typingLive && ImGui::IsKeyPressed(ImGuiKey_Minus, false))
+         n->baseOctave = std::max(-1, n->baseOctave - 1);
+      if (typingLive && ImGui::IsKeyPressed(ImGuiKey_Equal, false))
+         n->baseOctave = std::min(7, n->baseOctave + 1);
+      n->baseOctave = std::clamp(n->baseOctave, -1, 7);
+      if (n->mUiOctave != n->baseOctave)
+      {
+         // knob, keys or a loaded patch moved the octave: let go of everything
+         // first, so no note-off lands in the new octave
+         for (int k = 0; k < 128; k++)
+            n->SetKeyState(k, false);
+         n->mMouseNote = -1;
+         n->mUiOctave = n->baseOctave;
+      }
 
       const int baseNote = (n->baseOctave + 1) * 12;
       const int lowNote = std::clamp(baseNote, 0, 103);
@@ -16944,19 +17083,17 @@ namespace
       }
 
       // Musical Typing (Z row = white keys, S row = black keys, Q row an octave
-      // up) only while the pointer is over this node, so single-letter typing
-      // never hijacks the rest of the app. Releases are always processed so a
-      // key held while the pointer leaves can't stick.
-      const ImGuiIO& io = ImGui::GetIO();
-      const bool isHovered = ed::GetHoveredNode() == ed::NodeId(gn.NodeId());
-      const bool mods = io.KeyCtrl || io.KeyAlt || io.KeySuper;
+      // up) while the pointer is over this node, or always with "always" on
+      // (Turbo 0.55). App shortcuts all use Ctrl or Shift, so plain letters are
+      // free; Shift is excluded here so Shift+D/Shift+A never also play.
+      // Releases are always processed so a key held while the pointer leaves
+      // can't stick.
       for (const TypingKey& tk : kTypingKeys)
       {
          const int note = std::clamp(baseNote + tk.semitone, 0, 127);
          if (ImGui::IsKeyReleased(tk.key))
             n->SetKeyState(note, false);
-         else if (n->computerKeyboardEnabled && isHovered && !mods && !io.WantTextInput &&
-                  ImGui::IsKeyPressed(tk.key, false))
+         else if (typingLive && ImGui::IsKeyPressed(tk.key, false))
             n->SetKeyState(note, true);
       }
 
@@ -16971,7 +17108,13 @@ namespace
       }
       AudioToggleButton("typing", &n->computerKeyboardEnabled, 64.0f);
       ImGui::SameLine();
+      ImGui::BeginDisabled(!n->computerKeyboardEnabled);
+      AudioToggleButton("always", &n->typingAlways, 64.0f); // Turbo 0.55: no hover needed
+      ImGui::EndDisabled();
+      ImGui::SameLine();
       AudioToggleButton("global scale", &n->useGlobalScale, 96.0f);
+      ImGui::SameLine();
+      ImGui::TextDisabled("Z-M  Q-P   - = octave");
 
       EndAudioBody();
    }
@@ -26540,7 +26683,7 @@ namespace
                { "Cycle Shaper", "Single-cycle waveform distortion and crossfade shaper." },
          { "Slideshow", "Plays the images of one folder in alphabetical order with a transition (fade, slide, wipe, zoom). Hold and transition time follow the transport; Native keeps source pixels 1:1, Best Fit stretches to fill, Proportional Fit preserves aspect. Restart / prev / next buttons are mappable (MIDI learn, Performance Mode, CV)." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
-         { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
+         { "Keyboard", "Virtual keyboard, a hardware-free note source: click-and-drag the on-screen piano, or type on the computer keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave with the S D G H J row as black keys, QWERTY... the octave above, - and = shift the octave). By default typing plays while the pointer is over the node; turn on 'always' to play without hovering, for live use (still off while a text field has focus or Ctrl/Alt/Shift is held, so shortcuts keep working)." },
          { "Chord Progression", "Plays a looped chord progression locked to the transport. Click a slot to select a chord, click the keys to set its notes (or pick a root and quality and press set; inv moves the lowest note up an octave), and set how many bars it lasts. chords sets how many slots play, octave moves the keyboard, transpose shifts the whole progression, gate shortens each chord (1 = legato), and bass adds the lowest note an octave down. sets key makes each chord set the global key and a matching scale, so key-aware nodes follow the progression. play sets how each chord is played: block, strum up/down (strum = ms between notes), arp up/down/up-down/random (one note per rate step, over 1-3 octaves), pulse (the whole chord re-struck every step), alberti (low-high-middle-high) and bass + chord (oom-pah); gate is the fraction of the chord in block/strum and of each step in the stepped modes. Patch the note output into any synth or plugin instrument." },
          { "Transport Control", "Drives the global transport without the mouse. Every control is a pin: patch an LFO, a Macro, a MIDI CC (or use MIDI learn) into bpm, key, scale or the meter, and a Macro Trigger or MIDI pad into PLAY/STOP/REWIND/TAP. A section only takes over while its drive switch is on; off, its controls follow the live transport. glide ramps tempo changes (accelerando/ritardando), MIDI clock follows an external clock, on bar holds a key/scale change until the next bar. T taps tempo while the pointer is over the node. AUDIO starts/stops the audio engine (audio on open starts it whenever this patch is opened). Metronome: click turns it on (a pin, so a MIDI pad or Macro Toggle can switch it), accent raises the first beat of the bar, direct plays it straight to the audio device with no cable (and keeps it out of recordings), and the click output sends it into the graph for a mixer or Audio Out. Outputs: beat and bar are 0..1 ramps locked to the transport, bpm is the tempo mapped 20..300 to 0..1, play is 1 while playing, click is the metronome audio." },
          { "Audio Meter", "A stereo level meter: separate L and R bars on a shared -60 to +3 dBFS scale, each showing RMS (solid) inside peak (faint), a peak-hold line, and the channel's highest peak as a number on top, which turns red once that channel has reached 0 dBFS. Audio passes through unchanged. It measures whatever its input is patched to even with its output left unconnected, so it can hang off any cable as a tap. Click the meter to clear the peak numbers, holds and clip." },
@@ -26846,10 +26989,14 @@ namespace
       if (category == "Feedback") return "Reads back a previous frame to build loops - trails, echoes, growth. See Menu > Help > 'Using Feedback'.";
       if (category == "Mask") return "Produces a mask, or isolates part of the image by colour or luminance.";
       if (category == "Resynth") return "Iteratively regenerates the image, each generation drifting from its source.";
-      if (category == "3D") return "Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights.";
+      if (category == "3D") return "Changes geometry: booleans, extrude, subdivide, scatter and instance points, transform. Feed it from a 3D source, end in Render 3D.";
+      if (category == "3DSource") return "Makes geometry: primitives, models, 3D text, metaballs, ocean, curves, particles, points from images or depth.";
+      if (category == "3DScene") return "The scene around the geometry: camera, lights, HDRI, materials and UV mapping, and Render 3D, which turns it all into an image.";
+      if (category == "Shapes") return "A 2D shape as an image, one node per shape (all are the Shape node with its shape preset).";
+      if (category == "NoteSource") return "Makes notes: the virtual keyboard, MIDI input and files, chord progression, sequencers and generators. Feed a synth, or a note tool first.";
       if (category == "Notes") return "Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.";
       if (category == "Output") return "Terminal node: shows, exports or records the final result.";
-      if (category == "Video") return "Video clips, cameras and Spout senders as images: Video, VMPC (clip launcher), Video In, Spout In.";
+      if (category == "Video") return "Video clips, cameras and Spout senders as images: Video, VMPC, Clip Matrix, Timeline, Video In, Spout In.";
       if (category == "Utility") return "Patch housekeeping: comments, groups, pass-through Null and Viewport, and wireless Send / Receive for every cable kind.";
       if (category == "AudioIO") return "Audio into and out of the graph: the sound card input and output, and audio files.";
       if (category == "AudioVisual") return "Turns audio into images or geometry: waveform/spectrum textures, colour ramps, displacement, ribbons.";
@@ -26859,7 +27006,7 @@ namespace
       if (category == "Prediction") return "Learns how you play and plays back or corrects in that style (ported from upstream Infinite).";
       if (category == "CVTools") return "Shapes modulation signals: math, compare, invert, range, smoothing, depth.";
       if (category == "Analysis") return "Measures audio, images or notes and turns the result into modulation values.";
-      if (category == "Control") return "External control: MIDI CC/trigger and OSC in and out. Patch their outputs onto any slider's dot.";
+      if (category == "Control") return "External control: MIDI CC/trigger, OSC in and out, and the transport. Patch their outputs onto any slider's dot.";
       if (category == "OSC") return "Sends or receives Open Sound Control messages over UDP to talk to other apps (TouchDesigner, Max, TouchOSC, lighting rigs), on this machine or the LAN.";
       return "No additional notes for this node.";
    }
@@ -47778,6 +47925,7 @@ int main(int argc, char** argv)
       // ---- popups: search, spawn menu, dropdown ----
       ed::Suspend();
       DrawClipMatrixDeferredPopups(); // Turbo 0.44
+      DrawChordSlotDeferredMenu(); // Turbo 0.55
       DrawReloadBanner(); // Turbo 0.45
       DrawHandoverBanner(); // Turbo 0.46
       if (!gLiveIssueTip.empty() && !ImGui::IsAnyItemActive())

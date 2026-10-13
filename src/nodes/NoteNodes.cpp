@@ -4324,6 +4324,7 @@ void KeyboardNode::VisitParams(ParamVisitor& v)
    v.Int("transpose", transpose);
    v.Float("velocityScale", velocityScale);
    v.Bool("computerKeyboardEnabled", computerKeyboardEnabled);
+   v.Bool("typingAlways", typingAlways);
    v.Bool("useGlobalScale", useGlobalScale);
 }
 

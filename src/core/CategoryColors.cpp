@@ -316,13 +316,13 @@ int FamilyRank(const std::string& category)
    if (category == "Source" || category == "Text" || category == "Compositing" ||
        category == "Color" || category == "Mask" || category == "Feedback" ||
        category == "Resynth" || category == "Effects" || category == "Output" ||
-       category == "Video" || category == "Utility")
+       category == "Video" || category == "Utility" || category == "Shapes")
       return 0;
-   if (category == "3D")
+   if (category == "3D" || category == "3DSource" || category == "3DScene")
       return 1;
    if (category == "Audio" || category == "Synths" || category == "AudioEffects" ||
        category == "AudioUtility" || category == "Notes" || category == "AudioIO" ||
-       category == "AudioVisual" || category == "Prediction")
+       category == "AudioVisual" || category == "Prediction" || category == "NoteSource")
       return 2;
    return 3;
 }

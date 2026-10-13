@@ -77,6 +77,24 @@ public:
    // and a matching scale, so Quantizer, Random Note and other key-aware
    // nodes follow the progression.
    bool setsKey = false;
+   // Turbo 0.55: the other direction. When on, the progression follows the
+   // global key: it was written in homeKey, and plays transposed by the
+   // distance from homeKey to the transport's key (nearest way, -6..+5), from
+   // the next chord on. Excludes setsKey (the two would chase each other).
+   bool followKey = false;
+   int homeKey = 0; // 0..11
+   int KeyOffset() const;                         // follow-key transposition now
+   int EffectiveTranspose() const { return transpose + KeyOffset(); }
+
+   // Turbo 0.55: suggestion library (ChordProgressionLibrary.h). Both replace
+   // every chord (one bar each, voice-led) in `keyPc` and set homeKey to it.
+   static const std::vector<std::string>& SuggestionStyles();
+   static std::vector<int> SuggestionsInStyle(const std::string& style); // library indices
+   static std::string SuggestionName(int index);
+   bool LoadSuggestion(int index, int keyPc);
+   bool RandomFromStyle(const std::string& style, int keyPc, unsigned seed);
+   int suggestStyle = 0; // UI only
+   int suggestPick = 0;  // UI only
 
    int chordMask[kMaxChords];
    float chordBars[kMaxChords]; // 1/16..16 (Turbo 0.51: was 0.5..16)

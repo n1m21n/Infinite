@@ -28,7 +28,17 @@ namespace
       static const std::map<std::string, std::string> kMap = {
          // visual
          { "Text", "Source" },
+         { "Shape", "Shapes" }, // Turbo 0.55: the named shapes register as Shapes
          { "Video", "Video" }, { "VMPC", "Video" }, { "Video In", "Video" }, { "Spout In", "Video" },
+         { "Clip Matrix", "Video" }, { "Timeline", "Video" },
+         // 3D, Turbo 0.55: sources (the primitives register as 3DSource) /
+         // geometry operators (stay "3D") / scene and render
+         { "Geometry", "3DSource" }, { "Model 3D", "3DSource" }, { "Text 3D", "3DSource" },
+         { "Metaballs", "3DSource" }, { "Ocean", "3DSource" }, { "Curve", "3DSource" },
+         { "Image to Points", "3DSource" }, { "Depth Projection", "3DSource" },
+         { "Particle System", "3DSource" }, { "Cloth", "3DSource" },
+         { "Camera", "3DScene" }, { "Light", "3DScene" }, { "HDRI", "3DScene" },
+         { "Material", "3DScene" }, { "Mapping", "3DScene" }, { "Render 3D", "3DScene" },
          { "Resynthesize", "Effects" },
          { "Macro Knob", "Macros" }, { "Macro XY", "Macros" },
          { "Comment", "Utility" }, { "Group", "Utility" }, { "Null", "Utility" }, { "Viewport", "Utility" },
@@ -36,6 +46,11 @@ namespace
          { "Audio In", "AudioIO" }, { "Audio Out", "AudioIO" }, { "Audio File", "AudioIO" },
          { "Audio Texture", "AudioVisual" }, { "Audio Color Ramp", "AudioVisual" },
          { "Audio Displacement", "AudioVisual" }, { "Audio Ribbon", "AudioVisual" },
+         // notes, Turbo 0.55: what makes notes (NoteSource) before what
+         // changes them (Notes)
+         { "Keyboard", "NoteSource" }, { "MIDI Notes", "NoteSource" }, { "MIDI File", "NoteSource" },
+         { "Chord Progression", "NoteSource" }, { "Note Sequencer", "NoteSource" },
+         { "Random Note Generator", "NoteSource" }, { "Bouncing Balls", "NoteSource" },
          { "Predictive Notes", "Prediction" }, { "Predictive Quantize", "Prediction" },
          { "Predictive Velocity", "Prediction" }, { "Predictive Rhythm", "Prediction" },
          // control
@@ -50,8 +65,34 @@ namespace
       return it != kMap.end() ? it->second : fallback;
    }
 
+   // Turbo 0.55: menu order follows the signal path inside each family
+   // (make, change, combine, send out), then the control family, utility
+   // last. A category not listed goes after these, by family, then A-Z.
+   int CategoryRank(const std::string& category)
+   {
+      static const char* const kOrder[] = {
+         "Source", "Shapes", "Video", "Color", "Effects", "Mask", "Feedback", "Compositing", "Output",
+         "3DSource", "3D", "3DScene",
+         "AudioIO", "NoteSource", "Notes", "Prediction", "Synths", "AudioEffects", "AudioUtility", "AudioVisual",
+         "Modulators", "CVTools", "Analysis", "Control", "Macros", "UI",
+         "Utility",
+      };
+      for (int i = 0; i < (int)(sizeof(kOrder) / sizeof(kOrder[0])); i++)
+         if (category == kOrder[i])
+            return i;
+      return -1;
+   }
+
    bool CategoryLess(const std::string& a, const std::string& b)
    {
+      const int rankA = CategoryRank(a);
+      const int rankB = CategoryRank(b);
+      if (rankA >= 0 || rankB >= 0)
+      {
+         if (rankA < 0 || rankB < 0)
+            return rankA >= 0; // listed ones first
+         return rankA < rankB;
+      }
       const int familyA = CategoryColors::FamilyRank(a);
       const int familyB = CategoryColors::FamilyRank(b);
       return familyA != familyB ? familyA < familyB : AlphabeticalLess(a, b);

@@ -88,7 +88,7 @@ current patch as text.
 | 3D | Geometry, Model 3D, Text 3D, Material, Instance on Points, Particle System, Camera, Light, HDRI, Render 3D |
 | Modulators | LFO, Envelope, Random, Drift, Pattern, Math, Smoothing, Range to Range, Audio Analyze (audio to CV), Image Analyze, MIDI CC, Macro Knob / Slider / XY |
 | Sound | Oscillator, Analog, Wavetable, Sampler, MPC, Granular, Slicer, Audio File, Audio In, Plugin (VST3), Mixer, Super Mixer, Looper, Audio Out |
-| Notes | Keyboard, Note Sequencer, Drum Sequencer, Arpeggiator, Chord Progression, MIDI File, Quantizer, MIDI Notes |
+| Notes | Keyboard (virtual keyboard: mouse or computer keys, typingAlways plays without hover), Note Sequencer, Drum Sequencer, Arpeggiator, Chord Progression, MIDI File, Quantizer, MIDI Notes |
 | Performance | Clip Matrix (+ Clip Matrix Out), Transport Control, Timeline |
 
 )SKILL"
@@ -108,6 +108,9 @@ for many layers prefer HAP / HAP Q (decoded on the GPU) or Resolume DXV clips.
 **Punch FX** (full build only; `describe` lists it when present): audio in -> Punch FX -> audio out.
 `effect` 0-26 (0 Loop 1/4 ... 25 Fade out, 26 Freeze) and `engage` 1 fire one effect; `pad<n>fx` and
 `pad<n>note` (n 0-15) map 16 pads to effects and MIDI notes (cable notes into the second input); `latch` 1 toggles.
+
+**Chord Progression**: `followKey` 1 makes it follow the global key (`homeKey` = the key it was written in);
+`setsKey` 1 does the opposite (never both).
 
 **Camera / capture card**: Video In, `active` 1, `deviceId` from the node's device list,
 `resolution` (0 Auto, 1 1080p, 2 720p, 3 480p) and `frameRate` (0 Auto, 1 60, 2 30, 3 25).

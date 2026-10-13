@@ -1,4 +1,5 @@
 #include "ChordProgressionNode.h"
+#include "ChordProgressionLibrary.h"
 
 #include <algorithm>
 #include <atomic>
@@ -271,7 +272,7 @@ public:
    {
       mCount.store(n.chordCount, std::memory_order_relaxed);
       mBaseOctave.store(n.baseOctave, std::memory_order_relaxed);
-      mTranspose.store(n.transpose, std::memory_order_relaxed);
+      mTranspose.store(n.EffectiveTranspose(), std::memory_order_relaxed); // Turbo 0.55: + follow-key offset
       mVelocity.store(n.velocity, std::memory_order_relaxed);
       mGate.store(n.gate, std::memory_order_relaxed);
       mBass.store(n.bass, std::memory_order_relaxed);
@@ -662,6 +663,9 @@ void ChordProgressionNode::CookIfNeeded(int frameId)
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioChordProgressionNode>();
    chordCount = std::clamp(chordCount, 1, kMaxChords);
+   homeKey = ((homeKey % 12) + 12) % 12;
+   if (followKey && setsKey)
+      setsKey = false; // never both: they would chase each other
    mAudioNode->PushParams(*this);
 
    // Publish the playing chord's key (main thread, once per chord change).
@@ -696,6 +700,8 @@ void ChordProgressionNode::VisitParams(ParamVisitor& v)
    v.Float("strumMs", strumMs);
    v.Int("arpOctaves", arpOctaves);
    v.Bool("setsKey", setsKey);
+   v.Bool("followKey", followKey);
+   v.Int("homeKey", homeKey);
    for (int i = 0; i < kMaxChords; i++)
    {
       char key[16];
@@ -756,6 +762,124 @@ float ChordProgressionNode::TotalBars() const
    for (int i = 0; i < std::clamp(chordCount, 1, kMaxChords); i++)
       total += std::clamp(chordBars[i], kMinBars, 16.0f);
    return total;
+}
+
+int ChordProgressionNode::KeyOffset() const
+{
+   if (!followKey)
+      return 0;
+   int d = ((Transport::Instance().Key() - homeKey) % 12 + 12) % 12;
+   return d > 6 ? d - 12 : d; // nearest way: up to +6, else down
+}
+
+const std::vector<std::string>& ChordProgressionNode::SuggestionStyles()
+{
+   static std::vector<std::string> styles;
+   if (styles.empty())
+   {
+      int n = 0;
+      const ChordLibrary::Progression* all = ChordLibrary::All(n);
+      for (int i = 0; i < n; ++i)
+         if (std::find(styles.begin(), styles.end(), all[i].style) == styles.end())
+            styles.push_back(all[i].style);
+   }
+   return styles;
+}
+
+std::vector<int> ChordProgressionNode::SuggestionsInStyle(const std::string& style)
+{
+   std::vector<int> out;
+   int n = 0;
+   const ChordLibrary::Progression* all = ChordLibrary::All(n);
+   for (int i = 0; i < n; ++i)
+      if (style == all[i].style)
+         out.push_back(i);
+   return out;
+}
+
+std::string ChordProgressionNode::SuggestionName(int index)
+{
+   int n = 0;
+   const ChordLibrary::Progression* all = ChordLibrary::All(n);
+   return (index >= 0 && index < n) ? all[index].name : std::string();
+}
+
+namespace
+{
+   // One library chord as a key mask: root in the lowest octave, then
+   // voice-led from the previous chord.
+   uint64_t LibraryChordMask(const ChordLibrary::Chord& c, int keyPc, uint64_t prev)
+   {
+      const int root = ((keyPc + c.degree) % 12 + 12) % 12;
+      const unsigned iv = ChordLibrary::Intervals(c.quality);
+      uint64_t m = 0;
+      for (int i = 0; i < 32; ++i)
+         if ((iv >> i) & 1u)
+         {
+            const int key = root + i;
+            if (key < ChordProgressionNode::kKeysTotal)
+               m |= 1ull << key;
+         }
+      if (prev != 0)
+      {
+         const uint64_t led = ChordProgressionNode::VoiceLead(prev, m);
+         if (led != 0)
+            m = led;
+      }
+      return m;
+   }
+}
+
+bool ChordProgressionNode::LoadSuggestion(int index, int keyPc)
+{
+   int n = 0;
+   const ChordLibrary::Progression* all = ChordLibrary::All(n);
+   if (index < 0 || index >= n || all[index].count <= 0)
+      return false;
+   const ChordLibrary::Progression& p = all[index];
+   uint64_t prev = 0;
+   chordCount = std::clamp(p.count, 1, kMaxChords);
+   for (int i = 0; i < chordCount; ++i)
+   {
+      prev = LibraryChordMask(p.chords[i], keyPc, prev);
+      SetFullMask(i, prev);
+      chordBars[i] = 1.0f;
+      slashBass[i] = -1;
+   }
+   homeKey = ((keyPc % 12) + 12) % 12;
+   transpose = 0;
+   selected = 0;
+   return true;
+}
+
+bool ChordProgressionNode::RandomFromStyle(const std::string& style, int keyPc, unsigned seed)
+{
+   const std::vector<int> pool = SuggestionsInStyle(style);
+   if (pool.empty())
+      return false;
+   int n = 0;
+   const ChordLibrary::Progression* all = ChordLibrary::All(n);
+   auto next = [&seed]() { seed = seed * 1664525u + 1013904223u; return seed >> 8; };
+   // Length from a random template of the style; each position takes the
+   // chord at that position of a (new) random template, so the result keeps
+   // the style's harmonic grammar without copying one progression.
+   const ChordLibrary::Progression& shape = all[pool[next() % pool.size()]];
+   const int len = std::clamp(shape.count, 2, 8);
+   uint64_t prev = 0;
+   chordCount = len;
+   for (int i = 0; i < len; ++i)
+   {
+      const ChordLibrary::Progression& src = all[pool[next() % pool.size()]];
+      const ChordLibrary::Chord& c = i == 0 ? shape.chords[0] : src.chords[i % src.count];
+      prev = LibraryChordMask(c, keyPc, prev);
+      SetFullMask(i, prev);
+      chordBars[i] = 1.0f;
+      slashBass[i] = -1;
+   }
+   homeKey = ((keyPc % 12) + 12) % 12;
+   transpose = 0;
+   selected = 0;
+   return true;
 }
 
 std::string ChordProgressionNode::ChordName(int index) const

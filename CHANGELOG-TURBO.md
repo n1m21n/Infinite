@@ -1,5 +1,42 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.55.0-turbo (2026-10-13)
+
+### Chord Progression
+- **follows key**: the progression follows the global key. It remembers the key it was written in
+  (home) and plays transposed by the distance to the transport's key, the nearest way (-6..+5), from the
+  next chord on (no stuck notes). Raise the global key a semitone and every chord rises with it.
+  Excludes **sets key** (turning one on turns the other off: they would chase each other).
+- **Suggestions**: style + progression dropdowns, **load** and **random**. 75 progressions: 15 famous ones
+  (pop axis, doo-wop, ii-V-I, Andalusian, Pachelbel, royal road, blues, lo-fi, neo soul...) and the 60
+  style templates of NT ChordGen 5.1 (Ricardo Palmieri / Noisetupi): rock / alternative, Brazil (samba,
+  bossa, samba-jazz, choro, baiao), soul / jazz / funk, flamenco, Africa / diaspora, modal, and composer
+  styles (Radiohead, Bjork, Arrigo Barnabe, Itamar Assumpcao, Sakamoto, Clube da Esquina, Hermeto,
+  Stevie Wonder, Debussy). **random** builds a new progression from the style's templates. Chords land
+  in the global key, one bar each, voice-led; home is set to that key; one undo step.
+- Following the mode (major to minor) is not automatic: chords are note sets, so only the key moves them.
+- Fix: the right-click chord menu opened at the bottom-right corner of the screen. It now opens at the
+  mouse (drawn outside the node editor, like the Clip Matrix menu) and no longer opens the node menu too.
+- The suggestions row fits the node width (it used to stretch the node).
+
+### Virtual Keyboard
+- The **Keyboard** node is now shown as **VIRTUAL KEYBOARD** (type key unchanged, old patches load).
+- **always**: computer-key typing plays without hovering the node, for live use. Still off while a text
+  field has focus or Ctrl/Alt/Shift is held, so every app shortcut keeps working.
+- **-** and **=** shift the octave while typing. Changing the octave (keys, knob or patch) releases the
+  held keys first, so no note gets stuck.
+
+### Menu organisation
+- Categories follow the signal path: make, change, combine, send out. Order: Source, Shapes 2D, Video,
+  Color, Effects, Mask, Feedback, Compositing, Output / 3D Sources, 3D Geometry, 3D Scene & Render /
+  Audio In-Out, Note Sources & Sequencers, Note Tools, Prediction, Synths & Samplers, Audio Effects &
+  Plugins, Audio Mix & Routing, Audio to Visual / Modulators, CV Tools, Analysis, MIDI-OSC-Transport,
+  Macros, UI / Utility.
+- New groups: **Shapes 2D** (the 21 named shapes, out of Source), **3D** split into Sources / Geometry /
+  Scene & Render, **Notes** split into Note Sources (Keyboard, MIDI Notes, MIDI File, Chord Progression,
+  Note Sequencer, Random Note Generator, Bouncing Balls) and Note Tools. Clip Matrix and Timeline moved
+  to Video. Saved patches re-file their nodes on load.
+
 ## 0.54.0-turbo (2026-10-13)
 
 Two editions from one source, and the first GPL "superpower".
