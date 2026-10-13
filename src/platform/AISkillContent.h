@@ -102,7 +102,11 @@ param (scale, brightness, blur) from one of its outputs (`describe Audio Analyze
 level). Keep the sound itself routed to an Audio Out if it should be heard.
 
 **Video with effects**: Video (`set_param path` to a file the user gives you) -> effects -> Output.
-The Video's audio output goes to an Audio Out to hear its soundtrack.
+The Video's audio output goes to an Audio Out to hear its soundtrack. Any FFmpeg format plays;
+for many layers prefer HAP / HAP Q (decoded on the GPU) or Resolume DXV clips.
+
+**Camera / capture card**: Video In, `active` 1, `deviceId` from the node's device list,
+`resolution` (0 Auto, 1 1080p, 2 720p, 3 480p) and `frameRate` (0 Auto, 1 60, 2 30, 3 25).
 
 **A 3D scene**: Geometry (or Text 3D) -> Material -> Render 3D (slot 0), Camera into its camera
 slot, a Light into a light slot; Render 3D -> Output.

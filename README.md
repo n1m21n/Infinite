@@ -130,6 +130,8 @@ The Settings menu has the same setup under "AI assistants", plus **Install AI sk
 and **Save AI skill to a folder** (zip the folder to upload it as a skill in Claude).
 
 If the app is closed, the first request starts it. Every change is one undo step (Ctrl+Z).
+Video files and cameras are set with `set_param` like any other setting: Video / VMPC / Clip Matrix
+take any FFmpeg format (HAP and DXV included), Video In takes `deviceId`, `resolution` and `frameRate`.
 
 | Tool | Purpose |
 |---|---|
@@ -220,7 +222,7 @@ src/core/       graph, patch format, transport, modulation, RPC
 src/nodes/      visual, 3D, audio, MIDI, CV and UI nodes
 src/arrange/    Arrangement Timeline
 src/audio/      audio engine, DSP, plugin scanning, file writing
-src/platform/   Windows layer (JUCE, OpenCV, Spout2, Windows ML, Win32, MCP bridge)
+src/platform/   Windows layer (JUCE audio/MIDI/VST3, FFmpeg video, Media Foundation cameras, Spout2, Windows ML, Win32, MCP bridge)
 scripts/, cmake/, assets/   packaging, resources, fonts and examples
 ```
 

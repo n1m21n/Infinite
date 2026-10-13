@@ -4,6 +4,10 @@
 
 Video engine rebuilt for live use. Old patches load unchanged.
 
+### MCP / docs
+- Authoring guide (MCP skill) and README: video formats, Video In `resolution` / `frameRate`.
+- ARCHITECTURE: the 0.53 video path.
+
 ### Video files
 - New decoder on FFmpeg directly (OpenCV no longer sits in the video path).
 - **HAP, HAP Alpha, HAP Q, HAP Q Alpha, HAP R** play GPU-native: the compressed DXT/BC blocks go
@@ -31,9 +35,11 @@ Video engine rebuilt for live use. Old patches load unchanged.
 - One GPU copy per frame instead of two.
 
 ### Quit
-- Closing the app with audio running could freeze it. Every teardown step is now logged and a
-  watchdog terminates the process if one blocks for 4 s, so quitting always finishes; the log
-  names the step (and node) that hung.
+- Quitting with a camera open froze the app: the capture device was shut down from the UI thread
+  while the capture thread was waiting for a frame. The capture thread now tears the device down
+  itself; a device that stopped sending is left to finish on its own instead of blocking.
+- Every teardown step is logged and a watchdog terminates the process if one blocks for 4 s, so
+  quitting always finishes; the log names the step (and node) that hung.
 
 ### Repo
 - Removed the upstream PDFs, three demo .mov files, an old prompt, stale build archives, an unused

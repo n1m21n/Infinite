@@ -1,10 +1,19 @@
 # Architecture Map
 
-> **Infinite-Turbo note (0.32):** this project is Windows-only now. `src/main.cpp` is ~38,300
+> **Infinite-Turbo note (0.53):** this project is Windows-only now. `src/main.cpp` is ~50,000
 > lines, so the line numbers below are from the original 9k-line file and are only a rough
 > guide: search for the function names instead. The Platform Layer is `PlatformWindows.cpp`
 > (+ `PluginVST3Windows.cpp`, `AudioFileWriterWindows.cpp`, `TextNodeWindows.cpp`); ignore
 > every mention of `Platform.mm`, AppKit, AU or Syphon internals below.
+>
+> **Video path (0.53):** every decoded picture is a `Platform::VideoFrame` in its native
+> layout (NV12, YUV420P, RGBA/BGRA, packed BGR, or HAP's BC1/BC3/BC7/YCoCg blocks), never
+> converted or flipped on the CPU. `core/VideoTexture` uploads the planes through orphaned PBOs
+> and converts them to the node's RGBA8 texture in one shader pass. Producers:
+> `platform/VideoDecodeWindows.cpp` (FFmpeg: HAP unpacked by `core/HapDecode`, DXV and the rest
+> through libavcodec, D3D11VA hardware decode) for Video / VMPC / Clip Matrix, and
+> `platform/CameraWindows.cpp` (Media Foundation: explicit mode choice, MJPG decoded to NV12)
+> for Video In. The capture thread owns the source reader and tears it down itself.
 
 Documentation-only index of where things live in this codebase. No code was
 moved to produce this — `main.cpp` is a single ~9,146-line file (almost
