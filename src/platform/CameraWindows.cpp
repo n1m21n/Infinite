@@ -25,6 +25,7 @@
 #include <atomic>
 #include <chrono>
 #include <climits>
+#include <future>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -145,9 +146,7 @@ namespace Platform
       };
 
       // Lower is better. Frame rate below the target costs the most (that is
-      // what "dropped" looks like on stage), then distance from the wanted
-      // height. Ties go to MJPG at 720p and up: an uncompressed mode at that
-      // size is the one USB 2.0 capture sticks advertise but cannot carry.
+      // what "dropped" looks like on stage), then distance from the wanted height.
       long long ScoreMode(const NativeMode& m, int targetH, int targetFps)
       {
          if (m.w == 0 || m.h == 0 || m.fps <= 0.0)
@@ -164,10 +163,12 @@ namespace Platform
          else
             score += (long long)(fps - targetFps); // prefer the closest rate at/above target
          score += (long long)std::abs((int)m.h - targetH) * 10;
-         const bool mjpg = m.subtype == MFVideoFormat_MJPG;
-         if (m.h >= 720 ? !mjpg : mjpg)
-            score += 1;
-         return score;
+         // Tie-breaks at the same size and rate: native NV12 (no decode, it is
+         // what USB 3 capture cards offer), then MJPG, then the rest (YUY2 at
+         // 720p and up is the mode USB 2.0 sticks advertise but cannot carry).
+         if (m.subtype == MFVideoFormat_NV12) return score * 4;
+         if (m.subtype == MFVideoFormat_MJPG) return score * 4 + 1;
+         return score * 4 + (m.h >= 720 ? 3 : 2);
       }
    }
 
@@ -271,40 +272,32 @@ namespace Platform
             return false;
          }
 
-         IMFMediaType* native = nullptr;
-         HRESULT hr = h->reader->GetNativeMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, best->index, &native);
-         if (SUCCEEDED(hr))
-            hr = h->reader->SetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, nullptr, native);
-         // Output: NV12 (the reader adds the MJPG decoder / converter), RGB32 as fallback.
+         // One SetCurrentMediaType: the device's native mode with only the
+         // subtype swapped for what we upload. The reader selects that mode
+         // on the device and inserts the MJPG decoder / colour converter.
+         // Native NV12 needs no conversion at all.
+         HRESULT hr = E_FAIL;
          const GUID outputs[2] = { MFVideoFormat_NV12, MFVideoFormat_RGB32 };
-         bool set = false;
-         for (int k = 0; k < 2 && SUCCEEDED(hr) && !set; ++k)
+         for (int k = 0; k < 2 && FAILED(hr); ++k)
          {
-            if (best->subtype == outputs[k])
+            IMFMediaType* t = nullptr;
+            hr = h->reader->GetNativeMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, best->index, &t);
+            if (SUCCEEDED(hr))
             {
-               set = true;
-               h->outNv12 = k == 0;
-               break;
-            }
-            IMFMediaType* out = nullptr;
-            if (SUCCEEDED(MFCreateMediaType(&out)))
-            {
-               native->CopyAllItems(out);
-               out->SetGUID(MF_MT_SUBTYPE, outputs[k]);
-               out->DeleteItem(MF_MT_DEFAULT_STRIDE);
-               out->DeleteItem(MF_MT_SAMPLE_SIZE);
-               out->DeleteItem(MF_MT_COMPRESSED);
-               out->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
-               if (SUCCEEDED(h->reader->SetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, nullptr, out)))
+               if (best->subtype != outputs[k])
                {
-                  set = true;
-                  h->outNv12 = k == 0;
+                  t->SetGUID(MF_MT_SUBTYPE, outputs[k]);
+                  t->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
                }
-               out->Release();
+               hr = h->reader->SetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, nullptr, t);
+               t->Release();
             }
+            if (SUCCEEDED(hr))
+               h->outNv12 = k == 0;
+            else
+               RuntimeLog::Write("camera: output %s refused (hr=0x%08lx)", k == 0 ? "NV12" : "RGB32", (unsigned long)hr);
          }
-         SafeRelease(native);
-         if (FAILED(hr) || !set)
+         if (FAILED(hr))
          {
             error = "could not configure the camera format";
             return false;
@@ -331,7 +324,6 @@ namespace Platform
 
       void CaptureLoop(CameraHandle* h)
       {
-         ComInit com;
          VideoFrame staging;
          int windowFrames = 0;
          int failures = 0;
@@ -460,40 +452,60 @@ namespace Platform
       h->requestedFps = fps;
       h->mirror.store(mirror, std::memory_order_relaxed);
 
-      IMFAttributes* attrs = nullptr;
-      HRESULT hr = MFCreateAttributes(&attrs, 2);
-      if (SUCCEEDED(hr))
-      {
-         attrs->SetGUID(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID);
-         attrs->SetString(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK, devices[pick].symbolicLink.c_str());
-         hr = MFCreateDeviceSource(attrs, &h->source);
-         attrs->Release();
-      }
-      IMFAttributes* readerAttrs = nullptr;
-      if (SUCCEEDED(hr))
-         hr = MFCreateAttributes(&readerAttrs, 3);
-      if (SUCCEEDED(hr))
-      {
-         readerAttrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
-         readerAttrs->SetUINT32(MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, TRUE);
-         hr = MFCreateSourceReaderFromMediaSource(h->source, readerAttrs, &h->reader);
-         readerAttrs->Release();
-      }
-      if (FAILED(hr))
-      {
-         error = "could not open camera";
-         RuntimeLog::Write("camera open failed: %s (hr=0x%08lx)", devices[pick].name.c_str(), (unsigned long)hr);
-         return nullptr;
-      }
-      if (!ConfigureReader(h.get(), error))
-      {
-         RuntimeLog::Write("camera open failed: %s: %s", devices[pick].name.c_str(), error.c_str());
-         return nullptr;
-      }
-      h->running.store(true, std::memory_order_release);
+      // The source and reader are created, configured and read on one
+      // dedicated MTA thread (the UI thread is STA because of JUCE).
+      std::promise<std::string> opened;
+      std::future<std::string> openedResult = opened.get_future();
+      const std::wstring link = devices[pick].symbolicLink;
+      const std::string name = devices[pick].name;
       CameraHandle* raw = h.get();
-      h->worker = std::thread(CaptureLoop, raw);
-      RuntimeLog::Write("camera opened: %s", devices[pick].name.c_str());
+      h->running.store(true, std::memory_order_release);
+      h->worker = std::thread([raw, link, name, opened = std::move(opened)]() mutable
+      {
+         ComInit threadCom;
+         std::string err;
+         IMFAttributes* attrs = nullptr;
+         HRESULT hr = MFCreateAttributes(&attrs, 2);
+         if (SUCCEEDED(hr))
+         {
+            attrs->SetGUID(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID);
+            attrs->SetString(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK, link.c_str());
+            hr = MFCreateDeviceSource(attrs, &raw->source);
+            attrs->Release();
+         }
+         IMFAttributes* readerAttrs = nullptr;
+         if (SUCCEEDED(hr))
+            hr = MFCreateAttributes(&readerAttrs, 1);
+         if (SUCCEEDED(hr))
+         {
+            // No MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS: a hardware MJPG MFT
+            // without a D3D device manager fails every ReadSample with E_FAIL.
+            readerAttrs->SetUINT32(MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, TRUE);
+            hr = MFCreateSourceReaderFromMediaSource(raw->source, readerAttrs, &raw->reader);
+            readerAttrs->Release();
+         }
+         if (FAILED(hr))
+         {
+            char b[96];
+            std::snprintf(b, sizeof(b), "could not open camera (hr=0x%08lx)", (unsigned long)hr);
+            err = b;
+         }
+         else
+            ConfigureReader(raw, err);
+         const bool ok = err.empty();
+         if (!ok)
+            RuntimeLog::Write("camera open failed: %s: %s", name.c_str(), err.c_str());
+         opened.set_value(err);
+         if (ok)
+            CaptureLoop(raw);
+      });
+      error = openedResult.get();
+      if (!error.empty())
+      {
+         h->running.store(false);
+         return nullptr; // ~CameraHandle joins the finished thread
+      }
+      RuntimeLog::Write("camera opened: %s", name.c_str());
       return h.release();
    }
 
