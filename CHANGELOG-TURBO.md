@@ -30,6 +30,11 @@ Video engine rebuilt for live use. Old patches load unchanged.
 ### Spout In
 - One GPU copy per frame instead of two.
 
+### Quit
+- Closing the app with audio running could freeze it. Every teardown step is now logged and a
+  watchdog terminates the process if one blocks for 4 s, so quitting always finishes; the log
+  names the step (and node) that hung.
+
 ### Repo
 - Removed the upstream PDFs, three demo .mov files, an old prompt, stale build archives, an unused
   vcpkg_installed copy and old dist packages.

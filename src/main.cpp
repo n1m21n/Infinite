@@ -50186,13 +50186,64 @@ int main(int argc, char** argv)
       }
    }
 
+   // Turbo 0.53: shutdown watchdog. Quitting must never leave a frozen
+   // window on stage: every teardown step is logged, and if one blocks (an
+   // audio driver that will not stop, a plugin that waits on the message
+   // thread, a decoder or capture thread that does not return) the process
+   // is terminated after a few seconds. The log names the step that hung.
+   static std::atomic<const char*> sShutdownStep { "begin" };
+   static std::string sShutdownNode;
+   static std::mutex sShutdownNodeMutex;
+   auto shutdownStep = [](const char* step)
+   {
+      sShutdownStep.store(step);
+      RuntimeLog::Write("shutdown: %s", step);
+   };
+   RuntimeLog::Write("shutdown requested");
+   std::thread([]()
+   {
+      constexpr int kShutdownTimeoutMs = 4000;
+      std::this_thread::sleep_for(std::chrono::milliseconds(kShutdownTimeoutMs));
+      std::string node;
+      {
+         std::lock_guard<std::mutex> lock(sShutdownNodeMutex);
+         node = sShutdownNode;
+      }
+      RuntimeLog::Write("shutdown stuck for %d ms in '%s'%s%s; terminating",
+                        kShutdownTimeoutMs, sShutdownStep.load(),
+                        node.empty() ? "" : " at node ", node.c_str());
+      std::error_code ec;
+      std::filesystem::remove(std::filesystem::u8path(SessionMarkerPath()), ec);
+      Platform::TerminateNow(0);
+   }).detach();
+
+   shutdownStep("save prediction profiles");
    SavePredictionProfiles();
+   shutdownStep("close output windows");
    CloseAllProjectorWindows();
+   shutdownStep("stop audio engine");
    AudioEngine::Instance().Stop();
+   shutdownStep("clear media thumbnails");
    ClearMediaThumbnails();
+   shutdownStep("delete nodes");
+   for (GraphNode& gn : gNodes)
+   {
+      {
+         std::lock_guard<std::mutex> lock(sShutdownNodeMutex);
+         sShutdownNode = gn.typeName;
+      }
+      gn.node.reset();
+   }
+   {
+      std::lock_guard<std::mutex> lock(sShutdownNodeMutex);
+      sShutdownNode.clear();
+   }
    gNodes.clear();
+   shutdownStep("destroy editor");
    ed::DestroyEditor(gEditor);
+   shutdownStep("update checker");
    TurboUpdate::Shutdown(); // Turbo 0.46
+   shutdownStep("ui and window");
    ImGui_ImplOpenGL3_Shutdown();
    ImGui_ImplGlfw_Shutdown();
    ImGui::DestroyContext();
