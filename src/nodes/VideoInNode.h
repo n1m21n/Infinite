@@ -5,6 +5,7 @@
 
 #include "INode.h"
 #include "Platform.h"
+#include "core/VideoTexture.h"
 
 // Live camera video source (built-in FaceTime HD camera, external USB webcams, Continuity Camera).
 class VideoInNode : public INode
@@ -24,6 +25,7 @@ public:
    std::string deviceId;
    int resolution = 0; // 0 = Auto, 1 = 1080p, 2 = 720p, 3 = 480p
    bool mirror = true;
+   int frameRate = 0;  // 0 = Auto (highest), 1 = 60, 2 = 30, 3 = 25
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -31,6 +33,7 @@ public:
       v.Text("deviceId", deviceId);
       v.Int("resolution", resolution);
       v.Bool("mirror", mirror);
+      v.Int("frameRate", frameRate);
    }
 
    const std::string& LastError() const { return mLastError; }
@@ -39,6 +42,8 @@ public:
    void RefreshDevices();
    const std::vector<Platform::CameraDeviceInfo>& AvailableDevices() const { return mCachedDevices; }
    static const std::vector<std::string>& ResolutionNames();
+   static const std::vector<std::string>& FrameRateNames();
+   std::string StatusLine() const { return Platform::CameraStatus(mCamera); }
 
 private:
    void EnsurePlaceholder();
@@ -53,7 +58,8 @@ private:
    int mTexH = 0;
    bool mHasPlaceholder = false;
    unsigned long long mRevision = 1;
-   std::vector<unsigned char> mFrame;
+   Platform::VideoFrame mFrame;
+   VideoTexture mUploader;
    std::vector<Platform::CameraDeviceInfo> mCachedDevices;
    std::string mLastError;
    int mLastCookFrame = -1;
@@ -61,5 +67,6 @@ private:
    bool mLastActive = false;
    std::string mLastDeviceId;
    int mLastResolution = -1;
+   int mLastFrameRate = -1;
    bool mLastMirror = true;
 };

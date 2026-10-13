@@ -10,6 +10,7 @@
 #include "core/INode.h"
 #include "core/NoteCable.h"
 #include "platform/Platform.h"
+#include "core/VideoTexture.h"
 
 class AudioClipMatrixNode;
 class AudioClipMatrixTap;
@@ -203,7 +204,8 @@ private:
    int mRowTexW[kMaxRows] = {}, mRowTexH[kMaxRows] = {};
    unsigned int mRowShowTex[kMaxRows] = {}; // what the row shows this frame (0 = nothing)
    int mRowShowW[kMaxRows] = {}, mRowShowH[kMaxRows] = {};
-   std::vector<unsigned char> mFrame;
+   Platform::VideoFrame mFrame;
+   VideoTexture mRowUploader[kMaxRows];
    GLUtil::Fbo mScratch[2];
    GLUtil::Fbo mOut;
    unsigned int mProgram = 0;

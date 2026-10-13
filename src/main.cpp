@@ -5648,6 +5648,9 @@ namespace
       DropdownButton("res", VideoInNode::ResolutionNames(), n->resolution, [n](int idx) {
          n->resolution = idx;
       });
+      DropdownButton("fps", VideoInNode::FrameRateNames(), n->frameRate, [n](int idx) {
+         n->frameRate = idx;
+      });
 
       if (!n->LastError().empty())
       {
@@ -5658,7 +5661,7 @@ namespace
       else if (n->IsRunning() && n->GetOutputWidth() > 0 && n->GetOutputHeight() > 0)
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-         ImGui::TextDisabled("%dx%d", n->GetOutputWidth(), n->GetOutputHeight());
+         ImGui::TextDisabled("%s", n->StatusLine().c_str());
          ImGui::PopTextWrapPos();
       }
    }

@@ -1109,22 +1109,7 @@ void ClipMatrixNode::UpdateRowVideo(int row, double /*beat*/)
    }
    if (Platform::VideoFrameAt(c.video, pos, mFrame) && !mFrame.empty())
    {
-      const int w = Platform::VideoWidth(c.video);
-      const int h = Platform::VideoHeight(c.video);
-      if (w > 0 && h > 0 && mFrame.size() >= (size_t)w * (size_t)h * 4)
-      {
-         glBindTexture(GL_TEXTURE_2D, mRowTex[row]);
-         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-         if (w != mRowTexW[row] || h != mRowTexH[row])
-         {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, mFrame.data());
-            mRowTexW[row] = w;
-            mRowTexH[row] = h;
-         }
-         else
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, mFrame.data());
-         glBindTexture(GL_TEXTURE_2D, 0);
-      }
+      mRowUploader[row].Upload(mFrame, mRowTex[row], mRowTexW[row], mRowTexH[row]);
    }
    if (mRowTexW[row] > 0)
    {

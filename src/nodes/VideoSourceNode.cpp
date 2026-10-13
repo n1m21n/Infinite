@@ -424,24 +424,10 @@ void VideoSourceNode::CookIfNeeded(int frameId)
 
    if (Platform::VideoFrameAt(mVideo, mPosition, mFrame) && !mFrame.empty())
    {
-      const int w = Platform::VideoWidth(mVideo);
-      const int h = Platform::VideoHeight(mVideo);
-      if (w > 0 && h > 0 && mFrame.size() >= (size_t)w * (size_t)h * 4)
+      const int w = mFrame.width;
+      const int h = mFrame.height;
+      if (mUploader.Upload(mFrame, mTex, mTexW, mTexH))
       {
-         // BGRA8 straight from the decoder (the native upload format).
-         // Storage is (re)allocated only when the size changes - every other
-         // frame is a plain sub-image update into the existing texture.
-         glBindTexture(GL_TEXTURE_2D, mTex);
-         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-         if (w != mTexW || h != mTexH)
-         {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, mFrame.data());
-            mTexW = w;
-            mTexH = h;
-         }
-         else
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, mFrame.data());
-         glBindTexture(GL_TEXTURE_2D, 0);
          mWidth = w;
          mHeight = h;
          mHasPlaceholder = false;

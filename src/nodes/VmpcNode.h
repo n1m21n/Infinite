@@ -10,6 +10,7 @@
 #include "INode.h"
 #include "NoteCable.h"
 #include "Platform.h"
+#include "core/VideoTexture.h"
 
 class AudioVmpcNode;
 
@@ -133,7 +134,8 @@ private:
    int mWidth = 1280;
    int mHeight = 720;
    unsigned long long mRevision = 1;
-   std::vector<unsigned char> mFrame;
+   Platform::VideoFrame mFrame;
+   VideoTexture mUploader;
    int mActive = -1;
    bool mPlaying = false;
    bool mShowClip = false;   // mTex holds a frame worth showing

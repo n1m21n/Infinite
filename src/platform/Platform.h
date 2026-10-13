@@ -145,9 +145,47 @@ namespace Platform
    bool LoadModel(const std::string& path, std::vector<ModelVertex>& outVertices,
                   std::vector<unsigned int>& outIndices, std::string& outError);
 
+   // ---- video frames (Turbo 0.53) ------------------------------------------
+   // A decoded picture in whatever layout is cheapest to get to the GPU. The
+   // decoder never converts colour or flips rows on the CPU: VideoTexture
+   // (core/VideoTexture.h) uploads the planes as-is and does YUV->RGB, the
+   // BGR swizzle, HAP's YCoCg decode, the vertical flip and the mirror in one
+   // shader pass into a plain RGBA8, GL bottom-up texture.
+   enum class VideoPixelFormat : unsigned char
+   {
+      None = 0,
+      BGRA8,         // plane[0]: 4 bytes/px
+      RGBA8,         // plane[0]: 4 bytes/px
+      BGR8,          // plane[0]: 3 bytes/px, tightly packed (OpenCV camera frames)
+      NV12,          // plane[0] Y (w*h), plane[1] interleaved UV (w*h/2)
+      YUV420P,       // plane[0] Y, plane[1] U, plane[2] V (chroma w/2 x h/2)
+      BC1,           // HAP: DXT1, plane[0] = blocks of the 4-padded picture
+      BC3,           // HAP Alpha: DXT5
+      BC7,           // HAP R: BPTC
+      BC3YCoCg,      // HAP Q: scaled YCoCg in DXT5
+      BC3YCoCgAlpha  // HAP Q Alpha: plane[0] YCoCg DXT5, plane[1] BC4 alpha
+   };
+
+   struct VideoFrame
+   {
+      VideoPixelFormat format = VideoPixelFormat::None;
+      int width = 0;           // picture size in pixels (not padded)
+      int height = 0;
+      bool topDown = true;     // row 0 = top of the picture
+      bool mirrorX = false;
+      bool opaque = false;     // ignore the alpha channel (RGB0, DXT1)
+      bool yuv709 = true;      // YUV matrix: BT.709 (else BT.601)
+      bool fullRange = false;  // YUV range: full (JPEG) or limited (TV)
+      std::vector<unsigned char> plane[3];
+
+      bool empty() const { return format == VideoPixelFormat::None || plane[0].empty(); }
+   };
+
    // ---- video decoding ----------------------------------------------------
-   // Opaque handle around an AVAssetReader that decodes frames in order.
-   // Frames are delivered as RGBA8, already row-flipped for OpenGL.
+   // Turbo 0.53: FFmpeg (libavformat/libavcodec) on a worker thread per clip.
+   // HAP is unpacked natively to GPU-compressed blocks; DXV (Resolume) and
+   // every other codec go through libavcodec, H.264/HEVC/VP9/AV1 with D3D11VA
+   // hardware decode when the GPU supports it.
    struct VideoHandle;
 
    std::string OpenVideoDialog();
@@ -157,13 +195,14 @@ namespace Platform
    int VideoWidth(VideoHandle* handle);
    int VideoHeight(VideoHandle* handle);
    double VideoDuration(VideoHandle* handle);
+   // "HAP Q 1920x1080 30 fps" style line for node bodies.
+   std::string VideoDescribe(VideoHandle* handle);
 
    // Requests the frame covering `seconds` from the clip's decoder thread and
    // hands back the newest finished frame without waiting. Returns true when a
-   // new frame was produced (so the caller can skip re-uploading).
-   // Turbo: outPixels is BGR8 (3 bytes/pixel), GL bottom-up row order. Upload
-   // it with GL_BGR; the buffer is swapped, not copied, so reuse `outPixels`.
-   bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels);
+   // new frame was produced (so the caller can skip re-uploading). The frame
+   // is swapped, not copied: keep passing the same VideoFrame object.
+   bool VideoFrameAt(VideoHandle* handle, double seconds, VideoFrame& outFrame);
 
    // ---- background removal ----
    // Apple uses Vision. Windows uses the packaged U2Net models through Windows
@@ -879,15 +918,20 @@ namespace Platform
    struct CameraHandle;
 
    std::vector<CameraDeviceInfo> CameraListDevices();
-   CameraHandle* CameraOpen(const std::string& deviceId, CameraResolution res, bool mirrorX, std::string& outError);
+   CameraHandle* CameraOpen(const std::string& deviceId, CameraResolution res, int fps, bool mirrorX, std::string& outError);
    void CameraClose(CameraHandle* handle);
    bool CameraIsRunning(CameraHandle* handle);
    void CameraSetMirror(CameraHandle* handle, bool mirrorX);
    void CameraSetResolution(CameraHandle* handle, CameraResolution res);
 
-   // Drains the latest frame into outPixels (BGR8, 3 bytes/pixel, GL bottom-up;
-   // mirror already applied). The buffer is swapped, not copied.
-   // Returns true only when a new frame was received and written.
-   bool CameraReadFrame(CameraHandle* handle, std::vector<unsigned char>& outPixels,
-                        int& outWidth, int& outHeight, unsigned long long& outFrameSeq);
+   // Turbo 0.53: frame rate to ask the device for (0 = highest available).
+   void CameraSetFrameRate(CameraHandle* handle, int fps);
+   // Negotiated format and the rate frames actually arrive at, e.g.
+   // "1920x1080 MJPG 30 fps, 29.9 delivered".
+   std::string CameraStatus(CameraHandle* handle);
+
+   // Drains the latest frame (BGR8, top-down; the mirror travels as a flag
+   // and is applied on the GPU). The frame is swapped, not copied.
+   // Returns true only when a new frame was received.
+   bool CameraReadFrame(CameraHandle* handle, VideoFrame& outFrame, unsigned long long& outFrameSeq);
 }

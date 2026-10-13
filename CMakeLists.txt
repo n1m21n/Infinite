@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.52.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.53.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -40,6 +40,9 @@ FetchContent_MakeAvailable(glfw)
 find_package(OpenGL REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED COMPONENTS core imgproc imgcodecs videoio dnn)
+# Turbo 0.53: video files decode on FFmpeg directly (HAP to GPU blocks, DXV,
+# D3D11VA hardware decode). Same static FFmpeg the opencv4[ffmpeg] port uses.
+find_package(FFMPEG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 
 set(INFINITE_HAS_WINDOWS_ML 0)
@@ -157,6 +160,7 @@ set(STB_DIR external/stb)
 
 set(INFINITE_PLATFORM_SOURCES
     src/platform/PlatformWindows.cpp
+    src/platform/VideoDecodeWindows.cpp
     src/platform/ImageDecodeMemory.cpp
     src/platform/CrashHandlerWindows.cpp
     src/platform/PluginVST3Windows.cpp
@@ -167,6 +171,8 @@ set(INFINITE_PLATFORM_SOURCES
 add_executable(Infinite WIN32
     src/main.cpp
     src/core/GLUtil.cpp
+    src/core/HapDecode.cpp
+    src/core/VideoTexture.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
     src/core/CategoryColors.cpp
@@ -424,9 +430,12 @@ target_compile_definitions(Infinite PRIVATE
     INFINITE_ENABLE_SPOUT=$<BOOL:${INFINITE_ENABLE_SPOUT}>
     INFINITE_HAS_WINDOWS_ML=${INFINITE_HAS_WINDOWS_ML}
 )
+target_include_directories(Infinite PRIVATE ${FFMPEG_INCLUDE_DIRS})
+target_link_directories(Infinite PRIVATE ${FFMPEG_LIBRARY_DIRS})
 target_link_libraries(Infinite PRIVATE
     OpenGL::GL
     GLEW::GLEW
+    ${FFMPEG_LIBRARIES}
     ${OpenCV_LIBS}
     assimp::assimp
     juce::juce_core

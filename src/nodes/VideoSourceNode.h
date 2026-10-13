@@ -7,6 +7,7 @@
 
 #include "INode.h"
 #include "Platform.h"
+#include "core/VideoTexture.h"
 
 class VideoAudioNode;
 
@@ -110,7 +111,8 @@ private:
    double mDuration = 0.0;
    double mPosition = 0.0;
    double mLastTransportSeconds = 0.0;
-   std::vector<unsigned char> mFrame;
+   Platform::VideoFrame mFrame;
+   VideoTexture mUploader;
    std::string mLoadedPath;
    std::string mLastError;
    std::string mAudioError;

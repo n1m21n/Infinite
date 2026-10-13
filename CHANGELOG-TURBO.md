@@ -1,5 +1,36 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.53.0-turbo (2026-10-13)
+
+Video engine rebuilt for live use. Old patches load unchanged.
+
+### Video files
+- New decoder on FFmpeg directly (OpenCV no longer sits in the video path).
+- **HAP, HAP Alpha, HAP Q, HAP Q Alpha, HAP R** play GPU-native: the compressed DXT/BC blocks go
+  straight to the graphics card, HAP Q's YCoCg is decoded in a shader. Many 1080p/4K layers with
+  almost no CPU. Chunked HAP frames unpack on several cores.
+- **Resolume DXV** (.mov) plays, multithreaded.
+- H.264 / HEVC / VP9 / AV1 decode on the GPU (D3D11VA) when the card supports it; NV12 / YUV
+  frames are uploaded as-is and converted to RGB on the GPU (no CPU colour conversion, no CPU
+  flip, a third of the upload bandwidth of RGBA).
+- Uploads go through pixel buffers (asynchronous DMA) instead of stalling the render thread.
+- Video, VMPC and Clip Matrix share the same path.
+
+### Video In (cameras and HDMI capture)
+- Asks the device for MJPG at the chosen size and frame rate. Capture sticks that defaulted to
+  5-10 fps YUY2 now run at 30/60 fps.
+- New **fps** control (Auto, 60, 30, 25). Auto = 1080p at the highest rate the device offers.
+- The node shows the negotiated format and the measured frame rate
+  (e.g. "1920x1080 MJPG 30 fps, 29.9 delivered"); the same line goes to the log.
+- One CPU copy per frame; colour swizzle, flip and mirror moved to the GPU.
+
+### Spout In
+- One GPU copy per frame instead of two.
+
+### Repo
+- Removed the upstream PDFs, three demo .mov files, an old prompt, stale build archives, an unused
+  vcpkg_installed copy and old dist packages.
+
 ## 0.52.0-turbo (2026-10-13)
 
 TouchDesigner TOP parity, stage 1 (plan: docs/TOP-PARITY.md). Old patches render as before: every

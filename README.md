@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.52.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.53.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -67,6 +67,8 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 
 | Feature | What it does |
 |---|---|
+| **Video playback** | FFmpeg engine: HAP / HAP Alpha / HAP Q / HAP Q Alpha / HAP R decoded on the GPU, Resolume DXV, H.264 / HEVC / VP9 / AV1 with D3D11VA hardware decode; loop, reverse, scrub, trim |
+| **Video In** | cameras and HDMI-USB capture with format and frame-rate negotiation (MJPG, Auto / 60 / 30 / 25 fps) and a live fps readout |
 | **Layout** | pixel-exact canvas (e.g. 1920 x 1080) with 8 layers, drag on the miniature, fit / fill / 1:1 |
 | **Projection** | warp with alpha outside, per-edge blend, antialiased outline |
 | **Output windows** | exact pixel size, fit / 1:1 / fill / stretch, F11 fullscreen on any monitor, stays on top |

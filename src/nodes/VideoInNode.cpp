@@ -14,6 +14,12 @@ const std::vector<std::string>& VideoInNode::ResolutionNames()
    return sNames;
 }
 
+const std::vector<std::string>& VideoInNode::FrameRateNames()
+{
+   static const std::vector<std::string> sNames = { "Auto", "60 fps", "30 fps", "25 fps" };
+   return sNames;
+}
+
 VideoInNode::VideoInNode()
 {
 }
@@ -50,7 +56,9 @@ void VideoInNode::ReopenCamera()
       ? (Platform::CameraResolution)resolution
       : Platform::CameraResolution::Auto;
 
-   mCamera = Platform::CameraOpen(deviceId, res, mirror, err);
+   static const int kRates[] = { 0, 60, 30, 25 };
+   const int fps = (frameRate >= 0 && frameRate < 4) ? kRates[frameRate] : 0;
+   mCamera = Platform::CameraOpen(deviceId, res, fps, mirror, err);
    if (mCamera == nullptr)
    {
       mLastError = err;
@@ -120,6 +128,7 @@ void VideoInNode::CookIfNeeded(int frameId)
    const bool configChanged = (active != mLastActive ||
                                deviceId != mLastDeviceId ||
                                resolution != mLastResolution ||
+                               frameRate != mLastFrameRate ||
                                mirror != mLastMirror);
 
    if (configChanged)
@@ -128,7 +137,8 @@ void VideoInNode::CookIfNeeded(int frameId)
       {
          CloseCamera();
       }
-      else if (mCamera != nullptr && deviceId == mLastDeviceId && resolution == mLastResolution)
+      else if (mCamera != nullptr && deviceId == mLastDeviceId && resolution == mLastResolution &&
+               frameRate == mLastFrameRate)
       {
          if (mirror != mLastMirror)
             Platform::CameraSetMirror(mCamera, mirror);
@@ -141,6 +151,7 @@ void VideoInNode::CookIfNeeded(int frameId)
       mLastActive = active;
       mLastDeviceId = deviceId;
       mLastResolution = resolution;
+      mLastFrameRate = frameRate;
       mLastMirror = mirror;
    }
 
@@ -156,33 +167,15 @@ void VideoInNode::CookIfNeeded(int frameId)
 
    if (mCamera != nullptr)
    {
-      int w = 0;
-      int h = 0;
       unsigned long long frameSeq = 0;
-      if (Platform::CameraReadFrame(mCamera, mFrame, w, h, frameSeq) && !mFrame.empty())
+      if (Platform::CameraReadFrame(mCamera, mFrame, frameSeq) && !mFrame.empty() &&
+          mUploader.Upload(mFrame, mTex, mTexW, mTexH))
       {
-         if (w > 0 && h > 0 && mFrame.size() >= (size_t)w * (size_t)h * 4)
-         {
-            // BGRA8 from the capture thread (native upload format);
-            // storage reallocated only when the camera resolution changes.
-            glBindTexture(GL_TEXTURE_2D, mTex);
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-            if (w != mTexW || h != mTexH)
-            {
-               glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, mFrame.data());
-               mTexW = w;
-               mTexH = h;
-            }
-            else
-               glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, mFrame.data());
-            glBindTexture(GL_TEXTURE_2D, 0);
-
-            mWidth = w;
-            mHeight = h;
-            mHasPlaceholder = false;
-            mRevision = NextTextureRevision();
-            mLastError.clear();
-         }
+         mWidth = mFrame.width;
+         mHeight = mFrame.height;
+         mHasPlaceholder = false;
+         mRevision = NextTextureRevision();
+         mLastError.clear();
       }
    }
 }
