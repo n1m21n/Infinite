@@ -161,6 +161,7 @@ set(STB_DIR external/stb)
 set(INFINITE_PLATFORM_SOURCES
     src/platform/PlatformWindows.cpp
     src/platform/VideoDecodeWindows.cpp
+    src/platform/CameraWindows.cpp
     src/platform/ImageDecodeMemory.cpp
     src/platform/CrashHandlerWindows.cpp
     src/platform/PluginVST3Windows.cpp
@@ -449,7 +450,7 @@ target_link_libraries(Infinite PRIVATE
     juce::juce_audio_formats
     juce::juce_audio_processors
     juce::juce_dsp
-    avrt d3d11 d3d12 dxgi dwmapi mfplat mfreadwrite mfuuid shlwapi version winmm ws2_32 windowscodecs ole32 shell32 comdlg32 gdiplus
+    avrt d3d11 d3d12 dxgi dwmapi mf mfplat mfreadwrite mfuuid shlwapi version winmm ws2_32 windowscodecs ole32 shell32 comdlg32 gdiplus
 )
 if(INFINITE_HAS_WINDOWS_ML)
     target_include_directories(Infinite PRIVATE "${INFINITE_WINDOWSML_ORT_INCLUDE_DIR}")

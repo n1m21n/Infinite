@@ -17,8 +17,11 @@ Video engine rebuilt for live use. Old patches load unchanged.
 - Video, VMPC and Clip Matrix share the same path.
 
 ### Video In (cameras and HDMI capture)
-- Asks the device for MJPG at the chosen size and frame rate. Capture sticks that defaulted to
-  5-10 fps YUY2 now run at 30/60 fps.
+- New Media Foundation backend (replaces OpenCV/DirectShow, which never switched capture sticks
+  off their default YUY2 mode). Every mode the device offers is listed in the log; the best one
+  for the chosen size and frame rate is picked explicitly (MJPG preferred at 720p and up) and
+  decoded to NV12, hardware MJPG decoder when available. Closing a device that stopped sending
+  no longer hangs.
 - New **fps** control (Auto, 60, 30, 25). Auto = 1080p at the highest rate the device offers.
 - The node shows the negotiated format and the measured frame rate
   (e.g. "1920x1080 MJPG 30 fps, 29.9 delivered"); the same line goes to the log.
