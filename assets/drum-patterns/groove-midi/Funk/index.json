@@ -1,0 +1,322 @@
+{
+ "patterns": [
+  {
+   "file": "drummer1-session1-001-funk-80.mid",
+   "title": "Funk 80 bpm (4/4) - drummer 1 session1 #1",
+   "style": "Funk",
+   "bpm": 80
+  },
+  {
+   "file": "drummer1-session1-002-funk-80.mid",
+   "title": "Funk 80 bpm (4/4) - drummer 1 session1 #2",
+   "style": "Funk",
+   "bpm": 80
+  },
+  {
+   "file": "drummer1-session1-003-funk-80.mid",
+   "title": "Funk 80 bpm (4/4) - drummer 1 session1 #3",
+   "style": "Funk",
+   "bpm": 80
+  },
+  {
+   "file": "drummer8-session1-006-funk-80.mid",
+   "title": "Funk 80 bpm (4/4) - drummer 8 session1 #6",
+   "style": "Funk",
+   "bpm": 80
+  },
+  {
+   "file": "drummer8-session1-007-funk-80.mid",
+   "title": "Funk 80 bpm (4/4) - drummer 8 session1 #7",
+   "style": "Funk",
+   "bpm": 80
+  },
+  {
+   "file": "drummer8-session2-011-funk-81.mid",
+   "title": "Funk 81 bpm (4/4) - drummer 8 session2 #11",
+   "style": "Funk",
+   "bpm": 81
+  },
+  {
+   "file": "drummer8-session2-012-funk-81.mid",
+   "title": "Funk 81 bpm (4/4) - drummer 8 session2 #12",
+   "style": "Funk",
+   "bpm": 81
+  },
+  {
+   "file": "drummer1-eval_session-005-funk-groove5-84.mid",
+   "title": "Funk groove5 84 bpm (4/4) - drummer 1 eval_session #5",
+   "style": "Funk",
+   "bpm": 84
+  },
+  {
+   "file": "drummer5-eval_session-005-funk-groove5-84.mid",
+   "title": "Funk groove5 84 bpm (4/4) - drummer 5 eval_session #5",
+   "style": "Funk",
+   "bpm": 84
+  },
+  {
+   "file": "drummer7-eval_session-005-funk-groove5-84.mid",
+   "title": "Funk groove5 84 bpm (4/4) - drummer 7 eval_session #5",
+   "style": "Funk",
+   "bpm": 84
+  },
+  {
+   "file": "drummer8-eval_session-005-funk-groove5-84.mid",
+   "title": "Funk groove5 84 bpm (4/4) - drummer 8 eval_session #5",
+   "style": "Funk",
+   "bpm": 84
+  },
+  {
+   "file": "drummer8-session2-005-funk-91.mid",
+   "title": "Funk 91 bpm (4/4) - drummer 8 session2 #5",
+   "style": "Funk",
+   "bpm": 91
+  },
+  {
+   "file": "drummer8-session2-006-funk-91.mid",
+   "title": "Funk 91 bpm (4/4) - drummer 8 session2 #6",
+   "style": "Funk",
+   "bpm": 91
+  },
+  {
+   "file": "drummer8-session2-001-funk-92.mid",
+   "title": "Funk 92 bpm (4/4) - drummer 8 session2 #1",
+   "style": "Funk",
+   "bpm": 92
+  },
+  {
+   "file": "drummer8-session2-002-funk-92.mid",
+   "title": "Funk 92 bpm (4/4) - drummer 8 session2 #2",
+   "style": "Funk",
+   "bpm": 92
+  },
+  {
+   "file": "drummer1-session2-090-funk-rock-92.mid",
+   "title": "Funk rock 92 bpm (4/4) - drummer 1 session2 #90",
+   "style": "Funk",
+   "bpm": 92
+  },
+  {
+   "file": "drummer1-session1-102-funk-95.mid",
+   "title": "Funk 95 bpm (4/4) - drummer 1 session1 #102",
+   "style": "Funk",
+   "bpm": 95
+  },
+  {
+   "file": "drummer8-session1-001-funk-95.mid",
+   "title": "Funk 95 bpm (4/4) - drummer 8 session1 #1",
+   "style": "Funk",
+   "bpm": 95
+  },
+  {
+   "file": "drummer8-session1-002-funk-95.mid",
+   "title": "Funk 95 bpm (4/4) - drummer 8 session1 #2",
+   "style": "Funk",
+   "bpm": 95
+  },
+  {
+   "file": "drummer8-session2-015-funk-95.mid",
+   "title": "Funk 95 bpm (4/4) - drummer 8 session2 #15",
+   "style": "Funk",
+   "bpm": 95
+  },
+  {
+   "file": "drummer8-session2-016-funk-95.mid",
+   "title": "Funk 95 bpm (4/4) - drummer 8 session2 #16",
+   "style": "Funk",
+   "bpm": 95
+  },
+  {
+   "file": "drummer8-session1-008-funk-96.mid",
+   "title": "Funk 96 bpm (4/4) - drummer 8 session1 #8",
+   "style": "Funk",
+   "bpm": 96
+  },
+  {
+   "file": "drummer8-session1-009-funk-96.mid",
+   "title": "Funk 96 bpm (4/4) - drummer 8 session1 #9",
+   "style": "Funk",
+   "bpm": 96
+  },
+  {
+   "file": "drummer5-session1-015-funk-100.mid",
+   "title": "Funk 100 bpm (4/4) - drummer 5 session1 #15",
+   "style": "Funk",
+   "bpm": 100
+  },
+  {
+   "file": "drummer7-session2-072-funk-100.mid",
+   "title": "Funk 100 bpm (4/4) - drummer 7 session2 #72",
+   "style": "Funk",
+   "bpm": 100
+  },
+  {
+   "file": "drummer7-session2-076-funk-100.mid",
+   "title": "Funk 100 bpm (4/4) - drummer 7 session2 #76",
+   "style": "Funk",
+   "bpm": 100
+  },
+  {
+   "file": "drummer7-session2-077-funk-100.mid",
+   "title": "Funk 100 bpm (4/4) - drummer 7 session2 #77",
+   "style": "Funk",
+   "bpm": 100
+  },
+  {
+   "file": "drummer7-session2-078-funk-100.mid",
+   "title": "Funk 100 bpm (4/4) - drummer 7 session2 #78",
+   "style": "Funk",
+   "bpm": 100
+  },
+  {
+   "file": "drummer7-session2-079-funk-100.mid",
+   "title": "Funk 100 bpm (4/4) - drummer 7 session2 #79",
+   "style": "Funk",
+   "bpm": 100
+  },
+  {
+   "file": "drummer8-session1-024-funk-latin-100.mid",
+   "title": "Funk latin 100 bpm (4/4) - drummer 8 session1 #24",
+   "style": "Funk",
+   "bpm": 100
+  },
+  {
+   "file": "drummer8-session1-025-funk-latin-100.mid",
+   "title": "Funk latin 100 bpm (4/4) - drummer 8 session1 #25",
+   "style": "Funk",
+   "bpm": 100
+  },
+  {
+   "file": "drummer7-session1-012-funk-102.mid",
+   "title": "Funk 102 bpm (4/4) - drummer 7 session1 #12",
+   "style": "Funk",
+   "bpm": 102
+  },
+  {
+   "file": "drummer7-session1-013-funk-102.mid",
+   "title": "Funk 102 bpm (4/4) - drummer 7 session1 #13",
+   "style": "Funk",
+   "bpm": 102
+  },
+  {
+   "file": "drummer1-eval_session-002-funk-groove2-105.mid",
+   "title": "Funk groove2 105 bpm (4/4) - drummer 1 eval_session #2",
+   "style": "Funk",
+   "bpm": 105
+  },
+  {
+   "file": "drummer5-eval_session-002-funk-groove2-105.mid",
+   "title": "Funk groove2 105 bpm (4/4) - drummer 5 eval_session #2",
+   "style": "Funk",
+   "bpm": 105
+  },
+  {
+   "file": "drummer7-eval_session-002-funk-groove2-105.mid",
+   "title": "Funk groove2 105 bpm (4/4) - drummer 7 eval_session #2",
+   "style": "Funk",
+   "bpm": 105
+  },
+  {
+   "file": "drummer8-eval_session-002-funk-groove2-105.mid",
+   "title": "Funk groove2 105 bpm (4/4) - drummer 8 eval_session #2",
+   "style": "Funk",
+   "bpm": 105
+  },
+  {
+   "file": "drummer8-session1-018-funk-108.mid",
+   "title": "Funk 108 bpm (4/4) - drummer 8 session1 #18",
+   "style": "Funk",
+   "bpm": 108
+  },
+  {
+   "file": "drummer8-session1-019-funk-108.mid",
+   "title": "Funk 108 bpm (4/4) - drummer 8 session1 #19",
+   "style": "Funk",
+   "bpm": 108
+  },
+  {
+   "file": "drummer7-session3-047-funk-112.mid",
+   "title": "Funk 112 bpm (4/4) - drummer 7 session3 #47",
+   "style": "Funk",
+   "bpm": 112
+  },
+  {
+   "file": "drummer7-session3-048-funk-112.mid",
+   "title": "Funk 112 bpm (4/4) - drummer 7 session3 #48",
+   "style": "Funk",
+   "bpm": 112
+  },
+  {
+   "file": "drummer7-session3-049-funk-112.mid",
+   "title": "Funk 112 bpm (4/4) - drummer 7 session3 #49",
+   "style": "Funk",
+   "bpm": 112
+  },
+  {
+   "file": "drummer7-session3-064-funk-112.mid",
+   "title": "Funk 112 bpm (4/4) - drummer 7 session3 #64",
+   "style": "Funk",
+   "bpm": 112
+  },
+  {
+   "file": "drummer7-session3-065-funk-112.mid",
+   "title": "Funk 112 bpm (4/4) - drummer 7 session3 #65",
+   "style": "Funk",
+   "bpm": 112
+  },
+  {
+   "file": "drummer8-session1-022-funk-115.mid",
+   "title": "Funk 115 bpm (4/4) - drummer 8 session1 #22",
+   "style": "Funk",
+   "bpm": 115
+  },
+  {
+   "file": "drummer1-session3-015-funk-117.mid",
+   "title": "Funk 117 bpm (4/4) - drummer 1 session3 #15",
+   "style": "Funk",
+   "bpm": 117
+  },
+  {
+   "file": "drummer1-session3-016-funk-117.mid",
+   "title": "Funk 117 bpm (4/4) - drummer 1 session3 #16",
+   "style": "Funk",
+   "bpm": 117
+  },
+  {
+   "file": "drummer1-session1-126-funk-fast-125.mid",
+   "title": "Funk fast 125 bpm (4/4) - drummer 1 session1 #126",
+   "style": "Funk",
+   "bpm": 125
+  },
+  {
+   "file": "drummer1-session1-239-funk-purdieshuffle-130.mid",
+   "title": "Funk purdieshuffle 130 bpm (4/4) - drummer 1 session1 #239",
+   "style": "Funk",
+   "bpm": 130
+  },
+  {
+   "file": "drummer1-eval_session-001-funk-groove1-138.mid",
+   "title": "Funk groove1 138 bpm (4/4) - drummer 1 eval_session #1",
+   "style": "Funk",
+   "bpm": 138
+  },
+  {
+   "file": "drummer5-eval_session-001-funk-groove1-138.mid",
+   "title": "Funk groove1 138 bpm (4/4) - drummer 5 eval_session #1",
+   "style": "Funk",
+   "bpm": 138
+  },
+  {
+   "file": "drummer7-eval_session-001-funk-groove1-138.mid",
+   "title": "Funk groove1 138 bpm (4/4) - drummer 7 eval_session #1",
+   "style": "Funk",
+   "bpm": 138
+  },
+  {
+   "file": "drummer8-eval_session-001-funk-groove1-138.mid",
+   "title": "Funk groove1 138 bpm (4/4) - drummer 8 eval_session #1",
+   "style": "Funk",
+   "bpm": 138
+  }
+ ]
+}

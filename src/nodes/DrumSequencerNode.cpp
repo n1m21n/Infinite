@@ -950,11 +950,8 @@ int DrumSequencerNode::LoadKitIntoEmptyLanes(const std::string& kitDir)
    {
       if (!laneFilePath[lane].empty())
          continue;
-      std::string path = kitDir;
-      if (path.back() != '/' && path.back() != '\\')
-         path += '/';
-      path += DrumPatterns::KitFile(lane);
-      if (LoadFileToLane(lane, path))
+      const std::string path = DrumPatterns::KitLanePath(kitDir, lane);
+      if (!path.empty() && LoadFileToLane(lane, path))
       {
          loaded++;
          // Closed and open hat share a choke group, as on hardware, unless
@@ -963,6 +960,22 @@ int DrumSequencerNode::LoadKitIntoEmptyLanes(const std::string& kitDir)
             laneChoke[lane] = 1;
       }
    }
+   return loaded;
+}
+
+// Turbo 0.54: a whole kit onto the 8 lanes (the kit picker); lanes the kit
+// has no file for keep their sample.
+int DrumSequencerNode::LoadKit(const std::string& kitDir)
+{
+   int loaded = 0;
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      const std::string path = DrumPatterns::KitLanePath(kitDir, lane);
+      if (!path.empty() && LoadFileToLane(lane, path))
+         loaded++;
+   }
+   if (loaded > 0 && laneChoke[2] == 0 && laneChoke[3] == 0)
+      laneChoke[2] = laneChoke[3] = 1;
    return loaded;
 }
 

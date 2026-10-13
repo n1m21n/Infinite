@@ -1,0 +1,310 @@
+{
+ "patterns": [
+  {
+   "file": "drummer5-session2-015-latin-venezuelan-joropo-80.mid",
+   "title": "Latin venezuelan-joropo 80 bpm (4/4) - drummer 5 session2 #15",
+   "style": "Latin",
+   "bpm": 80
+  },
+  {
+   "file": "drummer8-session2-024-latin-84.mid",
+   "title": "Latin 84 bpm (4/4) - drummer 8 session2 #24",
+   "style": "Latin",
+   "bpm": 84
+  },
+  {
+   "file": "drummer8-session2-025-latin-84.mid",
+   "title": "Latin 84 bpm (4/4) - drummer 8 session2 #25",
+   "style": "Latin",
+   "bpm": 84
+  },
+  {
+   "file": "drummer5-session1-003-latin-brazilian-samba-89.mid",
+   "title": "Latin brazilian-samba 89 bpm (4/4) - drummer 5 session1 #3",
+   "style": "Latin",
+   "bpm": 89
+  },
+  {
+   "file": "drummer5-session1-004-latin-brazilian-samba-89.mid",
+   "title": "Latin brazilian-samba 89 bpm (4/4) - drummer 5 session1 #4",
+   "style": "Latin",
+   "bpm": 89
+  },
+  {
+   "file": "drummer5-session1-005-latin-brazilian-samba-89.mid",
+   "title": "Latin brazilian-samba 89 bpm (4/4) - drummer 5 session1 #5",
+   "style": "Latin",
+   "bpm": 89
+  },
+  {
+   "file": "drummer1-session1-079-latin-reggaeton-90.mid",
+   "title": "Latin reggaeton 90 bpm (4/4) - drummer 1 session1 #79",
+   "style": "Latin",
+   "bpm": 90
+  },
+  {
+   "file": "drummer4-session1-004-latin-brazilian-92.mid",
+   "title": "Latin brazilian 92 bpm (4/4) - drummer 4 session1 #4",
+   "style": "Latin",
+   "bpm": 92
+  },
+  {
+   "file": "drummer5-session2-018-latin-brazilian-samba-93.mid",
+   "title": "Latin brazilian-samba 93 bpm (4/4) - drummer 5 session2 #18",
+   "style": "Latin",
+   "bpm": 93
+  },
+  {
+   "file": "drummer8-session2-007-latin-95.mid",
+   "title": "Latin 95 bpm (4/4) - drummer 8 session2 #7",
+   "style": "Latin",
+   "bpm": 95
+  },
+  {
+   "file": "drummer8-session2-008-latin-95.mid",
+   "title": "Latin 95 bpm (4/4) - drummer 8 session2 #8",
+   "style": "Latin",
+   "bpm": 95
+  },
+  {
+   "file": "drummer1-session1-145-latin-brazilian-baiao-95.mid",
+   "title": "Latin brazilian-baiao 95 bpm (4/4) - drummer 1 session1 #145",
+   "style": "Latin",
+   "bpm": 95
+  },
+  {
+   "file": "drummer1-session1-146-latin-brazilian-baiao-95.mid",
+   "title": "Latin brazilian-baiao 95 bpm (4/4) - drummer 1 session1 #146",
+   "style": "Latin",
+   "bpm": 95
+  },
+  {
+   "file": "drummer1-session3-012-latin-bomba-96.mid",
+   "title": "Latin bomba 96 bpm (4/4) - drummer 1 session3 #12",
+   "style": "Latin",
+   "bpm": 96
+  },
+  {
+   "file": "drummer5-session1-006-latin-brazilian-maracatu-96.mid",
+   "title": "Latin brazilian-maracatu 96 bpm (4/4) - drummer 5 session1 #6",
+   "style": "Latin",
+   "bpm": 96
+  },
+  {
+   "file": "drummer5-session1-007-latin-brazilian-maracatu-96.mid",
+   "title": "Latin brazilian-maracatu 96 bpm (4/4) - drummer 5 session1 #7",
+   "style": "Latin",
+   "bpm": 96
+  },
+  {
+   "file": "drummer5-session1-010-latin-brazilian-sambareggae-96.mid",
+   "title": "Latin brazilian-sambareggae 96 bpm (4/4) - drummer 5 session1 #10",
+   "style": "Latin",
+   "bpm": 96
+  },
+  {
+   "file": "drummer5-session1-011-latin-brazilian-sambareggae-96.mid",
+   "title": "Latin brazilian-sambareggae 96 bpm (4/4) - drummer 5 session1 #11",
+   "style": "Latin",
+   "bpm": 96
+  },
+  {
+   "file": "drummer5-session1-012-latin-brazilian-sambareggae-96.mid",
+   "title": "Latin brazilian-sambareggae 96 bpm (4/4) - drummer 5 session1 #12",
+   "style": "Latin",
+   "bpm": 96
+  },
+  {
+   "file": "drummer5-session2-002-latin-brazilian-101.mid",
+   "title": "Latin brazilian 101 bpm (4/4) - drummer 5 session2 #2",
+   "style": "Latin",
+   "bpm": 101
+  },
+  {
+   "file": "drummer5-session2-003-latin-brazilian-101.mid",
+   "title": "Latin brazilian 101 bpm (4/4) - drummer 5 session2 #3",
+   "style": "Latin",
+   "bpm": 101
+  },
+  {
+   "file": "drummer5-session2-001-latin-venezuelan-sangueo-101.mid",
+   "title": "Latin venezuelan-sangueo 101 bpm (4/4) - drummer 5 session2 #1",
+   "style": "Latin",
+   "bpm": 101
+  },
+  {
+   "file": "drummer8-session2-028-latin-bounce-106.mid",
+   "title": "Latin bounce 106 bpm (4/4) - drummer 8 session2 #28",
+   "style": "Latin",
+   "bpm": 106
+  },
+  {
+   "file": "drummer8-session2-029-latin-bounce-106.mid",
+   "title": "Latin bounce 106 bpm (4/4) - drummer 8 session2 #29",
+   "style": "Latin",
+   "bpm": 106
+  },
+  {
+   "file": "drummer5-session2-019-latin-brazilian-ijexa-108.mid",
+   "title": "Latin brazilian-ijexa 108 bpm (4/4) - drummer 5 session2 #19",
+   "style": "Latin",
+   "bpm": 108
+  },
+  {
+   "file": "drummer5-session2-020-latin-brazilian-ijexa-108.mid",
+   "title": "Latin brazilian-ijexa 108 bpm (4/4) - drummer 5 session2 #20",
+   "style": "Latin",
+   "bpm": 108
+  },
+  {
+   "file": "drummer5-session2-021-latin-brazilian-ijexa-108.mid",
+   "title": "Latin brazilian-ijexa 108 bpm (4/4) - drummer 5 session2 #21",
+   "style": "Latin",
+   "bpm": 108
+  },
+  {
+   "file": "drummer5-session1-020-latin-brazilian-baiao-110.mid",
+   "title": "Latin brazilian-baiao 110 bpm (4/4) - drummer 5 session1 #20",
+   "style": "Latin",
+   "bpm": 110
+  },
+  {
+   "file": "drummer5-session2-017-latin-brazilian-samba-110.mid",
+   "title": "Latin brazilian-samba 110 bpm (4/4) - drummer 5 session2 #17",
+   "style": "Latin",
+   "bpm": 110
+  },
+  {
+   "file": "drummer5-session1-014-latin-brazilian-songo-112.mid",
+   "title": "Latin brazilian-songo 112 bpm (4/4) - drummer 5 session1 #14",
+   "style": "Latin",
+   "bpm": 112
+  },
+  {
+   "file": "drummer1-session1-028-latin-samba-116.mid",
+   "title": "Latin samba 116 bpm (4/4) - drummer 1 session1 #28",
+   "style": "Latin",
+   "bpm": 116
+  },
+  {
+   "file": "drummer1-session1-038-latin-samba-116.mid",
+   "title": "Latin samba 116 bpm (4/4) - drummer 1 session1 #38",
+   "style": "Latin",
+   "bpm": 116
+  },
+  {
+   "file": "drummer8-session1-012-latin-118.mid",
+   "title": "Latin 118 bpm (4/4) - drummer 8 session1 #12",
+   "style": "Latin",
+   "bpm": 118
+  },
+  {
+   "file": "drummer8-session1-013-latin-118.mid",
+   "title": "Latin 118 bpm (4/4) - drummer 8 session1 #13",
+   "style": "Latin",
+   "bpm": 118
+  },
+  {
+   "file": "drummer8-session2-036-latin-118.mid",
+   "title": "Latin 118 bpm (4/4) - drummer 8 session2 #36",
+   "style": "Latin",
+   "bpm": 118
+  },
+  {
+   "file": "drummer1-session2-002-latin-chacarera-118.mid",
+   "title": "Latin chacarera 118 bpm (4/4) - drummer 1 session2 #2",
+   "style": "Latin",
+   "bpm": 118
+  },
+  {
+   "file": "drummer1-session2-003-latin-chacarera-118.mid",
+   "title": "Latin chacarera 118 bpm (4/4) - drummer 1 session2 #3",
+   "style": "Latin",
+   "bpm": 118
+  },
+  {
+   "file": "drummer5-session2-023-latin-brazilian-songo-120.mid",
+   "title": "Latin brazilian-songo 120 bpm (4/4) - drummer 5 session2 #23",
+   "style": "Latin",
+   "bpm": 120
+  },
+  {
+   "file": "drummer5-session2-024-latin-brazilian-songo-120.mid",
+   "title": "Latin brazilian-songo 120 bpm (4/4) - drummer 5 session2 #24",
+   "style": "Latin",
+   "bpm": 120
+  },
+  {
+   "file": "drummer8-session2-034-latin-brazilian-songo-120.mid",
+   "title": "Latin brazilian-songo 120 bpm (4/4) - drummer 8 session2 #34",
+   "style": "Latin",
+   "bpm": 120
+  },
+  {
+   "file": "drummer8-session2-035-latin-brazilian-songo-120.mid",
+   "title": "Latin brazilian-songo 120 bpm (4/4) - drummer 8 session2 #35",
+   "style": "Latin",
+   "bpm": 120
+  },
+  {
+   "file": "drummer8-session1-027-latin-122.mid",
+   "title": "Latin 122 bpm (4/4) - drummer 8 session1 #27",
+   "style": "Latin",
+   "bpm": 122
+  },
+  {
+   "file": "drummer5-session2-016-latin-ando-125.mid",
+   "title": "Latin ando 125 bpm (3/4) - drummer 5 session2 #16",
+   "style": "Latin",
+   "bpm": 125
+  },
+  {
+   "file": "drummer5-session1-001-latin-brazilian-bossa-127.mid",
+   "title": "Latin brazilian-bossa 127 bpm (4/4) - drummer 5 session1 #1",
+   "style": "Latin",
+   "bpm": 127
+  },
+  {
+   "file": "drummer5-session1-002-latin-brazilian-bossa-127.mid",
+   "title": "Latin brazilian-bossa 127 bpm (4/4) - drummer 5 session1 #2",
+   "style": "Latin",
+   "bpm": 127
+  },
+  {
+   "file": "drummer5-session1-009-latin-dominican-merengue-130.mid",
+   "title": "Latin dominican-merengue 130 bpm (4/4) - drummer 5 session1 #9",
+   "style": "Latin",
+   "bpm": 130
+  },
+  {
+   "file": "drummer5-session2-022-latin-brazilian-frevo-133.mid",
+   "title": "Latin brazilian-frevo 133 bpm (4/4) - drummer 5 session2 #22",
+   "style": "Latin",
+   "bpm": 133
+  },
+  {
+   "file": "drummer1-session2-001-latin-chacarera-157.mid",
+   "title": "Latin chacarera 157 bpm (3/4) - drummer 1 session2 #1",
+   "style": "Latin",
+   "bpm": 157
+  },
+  {
+   "file": "drummer4-session1-009-latin-merengue-158.mid",
+   "title": "Latin merengue 158 bpm (4/4) - drummer 4 session1 #9",
+   "style": "Latin",
+   "bpm": 158
+  },
+  {
+   "file": "drummer5-session1-008-latin-venezuelan-merengue-162.mid",
+   "title": "Latin venezuelan-merengue 162 bpm (5/8) - drummer 5 session1 #8",
+   "style": "Latin",
+   "bpm": 162
+  },
+  {
+   "file": "drummer4-session1-005-latin-brazilian-184.mid",
+   "title": "Latin brazilian 184 bpm (4/4) - drummer 4 session1 #5",
+   "style": "Latin",
+   "bpm": 184
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+{
+ "patterns": [
+  {
+   "file": "drummer8-session2-041-highlife-126.mid",
+   "title": "Highlife 126 bpm (4/4) - drummer 8 session2 #41",
+   "style": "Highlife",
+   "bpm": 126
+  },
+  {
+   "file": "drummer8-session2-042-highlife-126.mid",
+   "title": "Highlife 126 bpm (4/4) - drummer 8 session2 #42",
+   "style": "Highlife",
+   "bpm": 126
+  }
+ ]
+}

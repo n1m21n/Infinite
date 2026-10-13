@@ -9,6 +9,9 @@ CHANGELOG-TURBO.md when it ships.
 
 ## Later
 
+- Full build, next GPL modules: DUCK sidechain; Surge XT effects (spring reverb, Nimbus); frei0r video
+  filters. A live SLOOP drum synth node (the kits are already in as rendered samples).
+
 - Video In: format dropdown with the device's real mode list (resolution x fps x subtype), as the
   log already prints it.
 - Zero-copy GPU video: D3D11VA frames shared with GL (WGL_NV_DX_interop2) instead of the

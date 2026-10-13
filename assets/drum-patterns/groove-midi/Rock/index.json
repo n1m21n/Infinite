@@ -1,0 +1,1270 @@
+{
+ "patterns": [
+  {
+   "file": "drummer1-session2-180-rock-50.mid",
+   "title": "Rock 50 bpm (4/4) - drummer 1 session2 #180",
+   "style": "Rock",
+   "bpm": 50
+  },
+  {
+   "file": "drummer7-session3-001-rock-60.mid",
+   "title": "Rock 60 bpm (4/4) - drummer 7 session3 #1",
+   "style": "Rock",
+   "bpm": 60
+  },
+  {
+   "file": "drummer7-session3-010-rock-60.mid",
+   "title": "Rock 60 bpm (4/4) - drummer 7 session3 #10",
+   "style": "Rock",
+   "bpm": 60
+  },
+  {
+   "file": "drummer6-session1-005-rock-60.mid",
+   "title": "Rock 60 bpm (6/8) - drummer 6 session1 #5",
+   "style": "Rock",
+   "bpm": 60
+  },
+  {
+   "file": "drummer7-session3-039-rock-indie-63.mid",
+   "title": "Rock indie 63 bpm (4/4) - drummer 7 session3 #39",
+   "style": "Rock",
+   "bpm": 63
+  },
+  {
+   "file": "drummer7-session3-046-rock-indie-63.mid",
+   "title": "Rock indie 63 bpm (4/4) - drummer 7 session3 #46",
+   "style": "Rock",
+   "bpm": 63
+  },
+  {
+   "file": "drummer1-eval_session-008-rock-groove8-65.mid",
+   "title": "Rock groove8 65 bpm (4/4) - drummer 1 eval_session #8",
+   "style": "Rock",
+   "bpm": 65
+  },
+  {
+   "file": "drummer5-eval_session-008-rock-groove8-65.mid",
+   "title": "Rock groove8 65 bpm (4/4) - drummer 5 eval_session #8",
+   "style": "Rock",
+   "bpm": 65
+  },
+  {
+   "file": "drummer7-eval_session-008-rock-groove8-65.mid",
+   "title": "Rock groove8 65 bpm (4/4) - drummer 7 eval_session #8",
+   "style": "Rock",
+   "bpm": 65
+  },
+  {
+   "file": "drummer8-eval_session-008-rock-groove8-65.mid",
+   "title": "Rock groove8 65 bpm (4/4) - drummer 8 eval_session #8",
+   "style": "Rock",
+   "bpm": 65
+  },
+  {
+   "file": "drummer6-session1-001-rock-70.mid",
+   "title": "Rock 70 bpm (6/8) - drummer 6 session1 #1",
+   "style": "Rock",
+   "bpm": 70
+  },
+  {
+   "file": "drummer6-session1-002-rock-70.mid",
+   "title": "Rock 70 bpm (6/8) - drummer 6 session1 #2",
+   "style": "Rock",
+   "bpm": 70
+  },
+  {
+   "file": "drummer7-session2-027-rock-75.mid",
+   "title": "Rock 75 bpm (4/4) - drummer 7 session2 #27",
+   "style": "Rock",
+   "bpm": 75
+  },
+  {
+   "file": "drummer7-session2-029-rock-75.mid",
+   "title": "Rock 75 bpm (4/4) - drummer 7 session2 #29",
+   "style": "Rock",
+   "bpm": 75
+  },
+  {
+   "file": "drummer7-session2-030-rock-75.mid",
+   "title": "Rock 75 bpm (4/4) - drummer 7 session2 #30",
+   "style": "Rock",
+   "bpm": 75
+  },
+  {
+   "file": "drummer7-session2-033-rock-75.mid",
+   "title": "Rock 75 bpm (4/4) - drummer 7 session2 #33",
+   "style": "Rock",
+   "bpm": 75
+  },
+  {
+   "file": "drummer6-session1-003-rock-80.mid",
+   "title": "Rock 80 bpm (6/8) - drummer 6 session1 #3",
+   "style": "Rock",
+   "bpm": 80
+  },
+  {
+   "file": "drummer6-session1-004-rock-80.mid",
+   "title": "Rock 80 bpm (6/8) - drummer 6 session1 #4",
+   "style": "Rock",
+   "bpm": 80
+  },
+  {
+   "file": "drummer2-session3-001-rock-shuffle-85.mid",
+   "title": "Rock shuffle 85 bpm (4/4) - drummer 2 session3 #1",
+   "style": "Rock",
+   "bpm": 85
+  },
+  {
+   "file": "drummer7-session1-001-rock-86.mid",
+   "title": "Rock 86 bpm (4/4) - drummer 7 session1 #1",
+   "style": "Rock",
+   "bpm": 86
+  },
+  {
+   "file": "drummer4-session1-001-rock-87.mid",
+   "title": "Rock 87 bpm (4/4) - drummer 4 session1 #1",
+   "style": "Rock",
+   "bpm": 87
+  },
+  {
+   "file": "drummer6-session2-003-rock-88.mid",
+   "title": "Rock 88 bpm (4/4) - drummer 6 session2 #3",
+   "style": "Rock",
+   "bpm": 88
+  },
+  {
+   "file": "drummer6-session3-006-rock-88.mid",
+   "title": "Rock 88 bpm (4/4) - drummer 6 session3 #6",
+   "style": "Rock",
+   "bpm": 88
+  },
+  {
+   "file": "drummer6-session3-007-rock-88.mid",
+   "title": "Rock 88 bpm (4/4) - drummer 6 session3 #7",
+   "style": "Rock",
+   "bpm": 88
+  },
+  {
+   "file": "drummer6-session3-001-rock-90.mid",
+   "title": "Rock 90 bpm (4/4) - drummer 6 session3 #1",
+   "style": "Rock",
+   "bpm": 90
+  },
+  {
+   "file": "drummer9-session1-024-rock-90.mid",
+   "title": "Rock 90 bpm (4/4) - drummer 9 session1 #24",
+   "style": "Rock",
+   "bpm": 90
+  },
+  {
+   "file": "drummer9-session1-025-rock-90.mid",
+   "title": "Rock 90 bpm (4/4) - drummer 9 session1 #25",
+   "style": "Rock",
+   "bpm": 90
+  },
+  {
+   "file": "drummer9-session1-026-rock-90.mid",
+   "title": "Rock 90 bpm (4/4) - drummer 9 session1 #26",
+   "style": "Rock",
+   "bpm": 90
+  },
+  {
+   "file": "drummer9-session1-027-rock-90.mid",
+   "title": "Rock 90 bpm (4/4) - drummer 9 session1 #27",
+   "style": "Rock",
+   "bpm": 90
+  },
+  {
+   "file": "drummer9-session1-028-rock-90.mid",
+   "title": "Rock 90 bpm (4/4) - drummer 9 session1 #28",
+   "style": "Rock",
+   "bpm": 90
+  },
+  {
+   "file": "drummer9-session1-029-rock-90.mid",
+   "title": "Rock 90 bpm (4/4) - drummer 9 session1 #29",
+   "style": "Rock",
+   "bpm": 90
+  },
+  {
+   "file": "drummer9-session1-030-rock-90.mid",
+   "title": "Rock 90 bpm (4/4) - drummer 9 session1 #30",
+   "style": "Rock",
+   "bpm": 90
+  },
+  {
+   "file": "drummer1-session3-010-rock-folk-90.mid",
+   "title": "Rock folk 90 bpm (4/4) - drummer 1 session3 #10",
+   "style": "Rock",
+   "bpm": 90
+  },
+  {
+   "file": "drummer3-session2-020-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #20",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-021-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #21",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-022-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #22",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-023-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #23",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-024-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #24",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-028-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #28",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-029-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #29",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-030-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #30",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-034-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #34",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-035-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #35",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-036-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #36",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-037-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #37",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer3-session2-038-rock-92.mid",
+   "title": "Rock 92 bpm (4/4) - drummer 3 session2 #38",
+   "style": "Rock",
+   "bpm": 92
+  },
+  {
+   "file": "drummer7-session1-010-rock-93.mid",
+   "title": "Rock 93 bpm (4/4) - drummer 7 session1 #10",
+   "style": "Rock",
+   "bpm": 93
+  },
+  {
+   "file": "drummer7-session1-011-rock-93.mid",
+   "title": "Rock 93 bpm (4/4) - drummer 7 session1 #11",
+   "style": "Rock",
+   "bpm": 93
+  },
+  {
+   "file": "drummer7-session1-007-rock-93.mid",
+   "title": "Rock 93 bpm (4/4) - drummer 7 session1 #7",
+   "style": "Rock",
+   "bpm": 93
+  },
+  {
+   "file": "drummer7-session1-008-rock-93.mid",
+   "title": "Rock 93 bpm (4/4) - drummer 7 session1 #8",
+   "style": "Rock",
+   "bpm": 93
+  },
+  {
+   "file": "drummer7-session1-009-rock-93.mid",
+   "title": "Rock 93 bpm (4/4) - drummer 7 session1 #9",
+   "style": "Rock",
+   "bpm": 93
+  },
+  {
+   "file": "drummer7-session3-120-rock-93.mid",
+   "title": "Rock 93 bpm (4/4) - drummer 7 session3 #120",
+   "style": "Rock",
+   "bpm": 93
+  },
+  {
+   "file": "drummer7-session3-129-rock-93.mid",
+   "title": "Rock 93 bpm (4/4) - drummer 7 session3 #129",
+   "style": "Rock",
+   "bpm": 93
+  },
+  {
+   "file": "drummer1-session3-014-rock-94.mid",
+   "title": "Rock 94 bpm (4/4) - drummer 1 session3 #14",
+   "style": "Rock",
+   "bpm": 94
+  },
+  {
+   "file": "drummer6-session2-001-rock-95.mid",
+   "title": "Rock 95 bpm (4/4) - drummer 6 session2 #1",
+   "style": "Rock",
+   "bpm": 95
+  },
+  {
+   "file": "drummer6-session2-002-rock-95.mid",
+   "title": "Rock 95 bpm (4/4) - drummer 6 session2 #2",
+   "style": "Rock",
+   "bpm": 95
+  },
+  {
+   "file": "drummer7-session2-012-rock-95.mid",
+   "title": "Rock 95 bpm (4/4) - drummer 7 session2 #12",
+   "style": "Rock",
+   "bpm": 95
+  },
+  {
+   "file": "drummer7-session2-014-rock-95.mid",
+   "title": "Rock 95 bpm (4/4) - drummer 7 session2 #14",
+   "style": "Rock",
+   "bpm": 95
+  },
+  {
+   "file": "drummer7-session2-008-rock-95.mid",
+   "title": "Rock 95 bpm (4/4) - drummer 7 session2 #8",
+   "style": "Rock",
+   "bpm": 95
+  },
+  {
+   "file": "drummer7-session3-108-rock-95.mid",
+   "title": "Rock 95 bpm (4/4) - drummer 7 session3 #108",
+   "style": "Rock",
+   "bpm": 95
+  },
+  {
+   "file": "drummer7-session3-109-rock-95.mid",
+   "title": "Rock 95 bpm (4/4) - drummer 7 session3 #109",
+   "style": "Rock",
+   "bpm": 95
+  },
+  {
+   "file": "drummer7-session3-117-rock-95.mid",
+   "title": "Rock 95 bpm (4/4) - drummer 7 session3 #117",
+   "style": "Rock",
+   "bpm": 95
+  },
+  {
+   "file": "drummer7-session3-119-rock-95.mid",
+   "title": "Rock 95 bpm (4/4) - drummer 7 session3 #119",
+   "style": "Rock",
+   "bpm": 95
+  },
+  {
+   "file": "drummer8-session2-022-rock-96.mid",
+   "title": "Rock 96 bpm (4/4) - drummer 8 session2 #22",
+   "style": "Rock",
+   "bpm": 96
+  },
+  {
+   "file": "drummer8-session2-023-rock-96.mid",
+   "title": "Rock 96 bpm (4/4) - drummer 8 session2 #23",
+   "style": "Rock",
+   "bpm": 96
+  },
+  {
+   "file": "drummer3-session2-001-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #1",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-010-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #10",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-011-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #11",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-012-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #12",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-013-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #13",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-014-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #14",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-015-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #15",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-016-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #16",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-017-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #17",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-018-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #18",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-019-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #19",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-002-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #2",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-003-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #3",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-004-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #4",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-005-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #5",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-006-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #6",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-007-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #7",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-008-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #8",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer3-session2-009-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 3 session2 #9",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer6-session3-002-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 6 session3 #2",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer6-session3-003-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 6 session3 #3",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-001-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #1",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-010-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #10",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-011-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #11",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-012-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #12",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-002-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #2",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-003-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #3",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-004-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #4",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-005-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #5",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-006-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #6",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-007-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #7",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-008-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #8",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer9-session1-009-rock-100.mid",
+   "title": "Rock 100 bpm (4/4) - drummer 9 session1 #9",
+   "style": "Rock",
+   "bpm": 100
+  },
+  {
+   "file": "drummer1-session2-006-rock-102.mid",
+   "title": "Rock 102 bpm (3/4) - drummer 1 session2 #6",
+   "style": "Rock",
+   "bpm": 102
+  },
+  {
+   "file": "drummer2-session1-002-rock-102.mid",
+   "title": "Rock 102 bpm (4/4) - drummer 2 session1 #2",
+   "style": "Rock",
+   "bpm": 102
+  },
+  {
+   "file": "drummer8-session1-028-rock-102.mid",
+   "title": "Rock 102 bpm (4/4) - drummer 8 session1 #28",
+   "style": "Rock",
+   "bpm": 102
+  },
+  {
+   "file": "drummer8-session2-039-rock-indie-104.mid",
+   "title": "Rock indie 104 bpm (4/4) - drummer 8 session2 #39",
+   "style": "Rock",
+   "bpm": 104
+  },
+  {
+   "file": "drummer8-session2-040-rock-indie-104.mid",
+   "title": "Rock indie 104 bpm (4/4) - drummer 8 session2 #40",
+   "style": "Rock",
+   "bpm": 104
+  },
+  {
+   "file": "drummer3-session1-001-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 3 session1 #1",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer3-session1-010-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 3 session1 #10",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer3-session1-002-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 3 session1 #2",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer3-session1-003-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 3 session1 #3",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer3-session1-004-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 3 session1 #4",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer3-session1-005-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 3 session1 #5",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer3-session1-006-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 3 session1 #6",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer3-session1-007-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 3 session1 #7",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer3-session1-009-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 3 session1 #9",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer5-session2-012-rock-105.mid",
+   "title": "Rock 105 bpm (4/4) - drummer 5 session2 #12",
+   "style": "Rock",
+   "bpm": 105
+  },
+  {
+   "file": "drummer2-session1-001-rock-110.mid",
+   "title": "Rock 110 bpm (4/4) - drummer 2 session1 #1",
+   "style": "Rock",
+   "bpm": 110
+  },
+  {
+   "file": "drummer3-session2-042-rock-110.mid",
+   "title": "Rock 110 bpm (4/4) - drummer 3 session2 #42",
+   "style": "Rock",
+   "bpm": 110
+  },
+  {
+   "file": "drummer3-session2-043-rock-110.mid",
+   "title": "Rock 110 bpm (4/4) - drummer 3 session2 #43",
+   "style": "Rock",
+   "bpm": 110
+  },
+  {
+   "file": "drummer3-session2-047-rock-110.mid",
+   "title": "Rock 110 bpm (4/4) - drummer 3 session2 #47",
+   "style": "Rock",
+   "bpm": 110
+  },
+  {
+   "file": "drummer3-session2-048-rock-110.mid",
+   "title": "Rock 110 bpm (4/4) - drummer 3 session2 #48",
+   "style": "Rock",
+   "bpm": 110
+  },
+  {
+   "file": "drummer1-session2-111-rock-prog-110.mid",
+   "title": "Rock prog 110 bpm (5/4) - drummer 1 session2 #111",
+   "style": "Rock",
+   "bpm": 110
+  },
+  {
+   "file": "drummer7-session2-037-rock-112.mid",
+   "title": "Rock 112 bpm (4/4) - drummer 7 session2 #37",
+   "style": "Rock",
+   "bpm": 112
+  },
+  {
+   "file": "drummer8-session2-037-rock-112.mid",
+   "title": "Rock 112 bpm (4/4) - drummer 8 session2 #37",
+   "style": "Rock",
+   "bpm": 112
+  },
+  {
+   "file": "drummer8-session2-038-rock-112.mid",
+   "title": "Rock 112 bpm (4/4) - drummer 8 session2 #38",
+   "style": "Rock",
+   "bpm": 112
+  },
+  {
+   "file": "drummer8-session1-020-rock-shuffle-112.mid",
+   "title": "Rock shuffle 112 bpm (4/4) - drummer 8 session1 #20",
+   "style": "Rock",
+   "bpm": 112
+  },
+  {
+   "file": "drummer8-session1-021-rock-shuffle-112.mid",
+   "title": "Rock shuffle 112 bpm (4/4) - drummer 8 session1 #21",
+   "style": "Rock",
+   "bpm": 112
+  },
+  {
+   "file": "drummer1-session2-181-rock-115.mid",
+   "title": "Rock 115 bpm (4/4) - drummer 1 session2 #181",
+   "style": "Rock",
+   "bpm": 115
+  },
+  {
+   "file": "drummer1-session3-013-rock-115.mid",
+   "title": "Rock 115 bpm (4/4) - drummer 1 session3 #13",
+   "style": "Rock",
+   "bpm": 115
+  },
+  {
+   "file": "drummer8-session2-032-rock-117.mid",
+   "title": "Rock 117 bpm (4/4) - drummer 8 session2 #32",
+   "style": "Rock",
+   "bpm": 117
+  },
+  {
+   "file": "drummer8-session2-033-rock-117.mid",
+   "title": "Rock 117 bpm (4/4) - drummer 8 session2 #33",
+   "style": "Rock",
+   "bpm": 117
+  },
+  {
+   "file": "drummer7-session2-015-rock-118.mid",
+   "title": "Rock 118 bpm (4/4) - drummer 7 session2 #15",
+   "style": "Rock",
+   "bpm": 118
+  },
+  {
+   "file": "drummer7-session2-022-rock-118.mid",
+   "title": "Rock 118 bpm (4/4) - drummer 7 session2 #22",
+   "style": "Rock",
+   "bpm": 118
+  },
+  {
+   "file": "drummer7-session2-024-rock-118.mid",
+   "title": "Rock 118 bpm (4/4) - drummer 7 session2 #24",
+   "style": "Rock",
+   "bpm": 118
+  },
+  {
+   "file": "drummer7-session2-026-rock-118.mid",
+   "title": "Rock 118 bpm (4/4) - drummer 7 session2 #26",
+   "style": "Rock",
+   "bpm": 118
+  },
+  {
+   "file": "drummer3-session1-011-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #11",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-012-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #12",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-013-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #13",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-014-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #14",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-018-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #18",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-020-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #20",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-024-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #24",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-025-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #25",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-026-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #26",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-027-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #27",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-028-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #28",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-029-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #29",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-030-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #30",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-034-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #34",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-035-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #35",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-036-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #36",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-037-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #37",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-038-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #38",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-040-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #40",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-041-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #41",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-042-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #42",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-043-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #43",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-044-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #44",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-045-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #45",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-046-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #46",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-047-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #47",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-048-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #48",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-049-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #49",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-050-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 3 session1 #50",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer7-session2-001-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 7 session2 #1",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer7-session2-002-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 7 session2 #2",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer7-session2-003-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 7 session2 #3",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer7-session2-004-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 7 session2 #4",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer7-session2-005-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 7 session2 #5",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer7-session2-006-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 7 session2 #6",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer7-session2-007-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 7 session2 #7",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-013-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #13",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-014-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #14",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-015-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #15",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-016-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #16",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-017-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #17",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-018-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #18",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-019-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #19",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-020-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #20",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-021-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #21",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-022-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #22",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer9-session1-023-rock-120.mid",
+   "title": "Rock 120 bpm (4/4) - drummer 9 session1 #23",
+   "style": "Rock",
+   "bpm": 120
+  },
+  {
+   "file": "drummer1-session3-001-rock-prog-125.mid",
+   "title": "Rock prog 125 bpm (4/4) - drummer 1 session3 #1",
+   "style": "Rock",
+   "bpm": 125
+  },
+  {
+   "file": "drummer1-session1-051-rock-shuffle-125.mid",
+   "title": "Rock shuffle 125 bpm (4/4) - drummer 1 session1 #51",
+   "style": "Rock",
+   "bpm": 125
+  },
+  {
+   "file": "drummer6-session3-004-rock-127.mid",
+   "title": "Rock 127 bpm (4/4) - drummer 6 session3 #4",
+   "style": "Rock",
+   "bpm": 127
+  },
+  {
+   "file": "drummer1-session3-018-rock-128.mid",
+   "title": "Rock 128 bpm (4/4) - drummer 1 session3 #18",
+   "style": "Rock",
+   "bpm": 128
+  },
+  {
+   "file": "drummer2-session2-001-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #1",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-010-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #10",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-011-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #11",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-012-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #12",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-013-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #13",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-014-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #14",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-015-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #15",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-002-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #2",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-003-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #3",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-004-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #4",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-006-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #6",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-007-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #7",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-008-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #8",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer2-session2-009-rock-130.mid",
+   "title": "Rock 130 bpm (4/4) - drummer 2 session2 #9",
+   "style": "Rock",
+   "bpm": 130
+  },
+  {
+   "file": "drummer1-session3-008-rock-135.mid",
+   "title": "Rock 135 bpm (4/4) - drummer 1 session3 #8",
+   "style": "Rock",
+   "bpm": 135
+  },
+  {
+   "file": "drummer1-session3-009-rock-135.mid",
+   "title": "Rock 135 bpm (4/4) - drummer 1 session3 #9",
+   "style": "Rock",
+   "bpm": 135
+  },
+  {
+   "file": "drummer7-session2-045-rock-135.mid",
+   "title": "Rock 135 bpm (4/4) - drummer 7 session2 #45",
+   "style": "Rock",
+   "bpm": 135
+  },
+  {
+   "file": "drummer7-session2-046-rock-135.mid",
+   "title": "Rock 135 bpm (4/4) - drummer 7 session2 #46",
+   "style": "Rock",
+   "bpm": 135
+  },
+  {
+   "file": "drummer7-session2-049-rock-135.mid",
+   "title": "Rock 135 bpm (4/4) - drummer 7 session2 #49",
+   "style": "Rock",
+   "bpm": 135
+  },
+  {
+   "file": "drummer7-session2-053-rock-135.mid",
+   "title": "Rock 135 bpm (4/4) - drummer 7 session2 #53",
+   "style": "Rock",
+   "bpm": 135
+  },
+  {
+   "file": "drummer5-session1-016-rock-136.mid",
+   "title": "Rock 136 bpm (4/4) - drummer 5 session1 #16",
+   "style": "Rock",
+   "bpm": 136
+  },
+  {
+   "file": "drummer5-session2-013-rock-140.mid",
+   "title": "Rock 140 bpm (4/4) - drummer 5 session2 #13",
+   "style": "Rock",
+   "bpm": 140
+  },
+  {
+   "file": "drummer5-session2-014-rock-140.mid",
+   "title": "Rock 140 bpm (4/4) - drummer 5 session2 #14",
+   "style": "Rock",
+   "bpm": 140
+  },
+  {
+   "file": "drummer1-session1-202-rock-halftime-140.mid",
+   "title": "Rock halftime 140 bpm (4/4) - drummer 1 session1 #202",
+   "style": "Rock",
+   "bpm": 140
+  },
+  {
+   "file": "drummer7-session2-064-rock-145.mid",
+   "title": "Rock 145 bpm (4/4) - drummer 7 session2 #64",
+   "style": "Rock",
+   "bpm": 145
+  },
+  {
+   "file": "drummer6-session3-005-rock-180.mid",
+   "title": "Rock 180 bpm (4/4) - drummer 6 session3 #5",
+   "style": "Rock",
+   "bpm": 180
+  },
+  {
+   "file": "drummer1-session2-110-rock-prog-190.mid",
+   "title": "Rock prog 190 bpm (4/4) - drummer 1 session2 #110",
+   "style": "Rock",
+   "bpm": 190
+  },
+  {
+   "file": "drummer1-session3-003-rock-rockabilly-200.mid",
+   "title": "Rock rockabilly 200 bpm (4/4) - drummer 1 session3 #3",
+   "style": "Rock",
+   "bpm": 200
+  }
+ ]
+}

@@ -4,7 +4,8 @@ cd /d "%~dp0"
 title Infinite-Turbo - release
 
 rem Uso: release-windows.bat [nobuild]
-rem   1. compila do zero e empacota (build-windows.bat fresh pack)
+rem   1. compila do zero o build MIT e empacota (build-windows.bat mit fresh pack);
+rem      o release publico nunca leva os modulos GPL de src\gpl
 rem   2. copia o ZIP para dist\release\Infinite-Turbo-<versao>-Windows-x64.zip
 rem   3. extrai as notas da versao do CHANGELOG-TURBO.md
 rem   4. cria a tag git v<versao> (local; o push e seu)
@@ -21,7 +22,7 @@ echo Infinite-Turbo %VER%
 echo.
 
 if /I not "%~1"=="nobuild" (
-  call build-windows.bat fresh pack
+  call build-windows.bat mit fresh pack
   if errorlevel 1 (
     echo ERRO: a compilacao falhou. Nada foi publicado.
     exit /b 1

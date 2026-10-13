@@ -1,0 +1,46 @@
+{
+ "patterns": [
+  {
+   "file": "drummer1-session1-101-dance-disco-120.mid",
+   "title": "Dance disco 120 bpm (4/4) - drummer 1 session1 #101",
+   "style": "Dance",
+   "bpm": 120
+  },
+  {
+   "file": "drummer1-session3-006-dance-disco-120.mid",
+   "title": "Dance disco 120 bpm (4/4) - drummer 1 session3 #6",
+   "style": "Dance",
+   "bpm": 120
+  },
+  {
+   "file": "drummer1-session3-007-dance-disco-120.mid",
+   "title": "Dance disco 120 bpm (4/4) - drummer 1 session3 #7",
+   "style": "Dance",
+   "bpm": 120
+  },
+  {
+   "file": "drummer8-session2-026-dance-disco-137.mid",
+   "title": "Dance disco 137 bpm (4/4) - drummer 8 session2 #26",
+   "style": "Dance",
+   "bpm": 137
+  },
+  {
+   "file": "drummer8-session2-027-dance-disco-137.mid",
+   "title": "Dance disco 137 bpm (4/4) - drummer 8 session2 #27",
+   "style": "Dance",
+   "bpm": 137
+  },
+  {
+   "file": "drummer1-session1-080-dance-breakbeat-170.mid",
+   "title": "Dance breakbeat 170 bpm (4/4) - drummer 1 session1 #80",
+   "style": "Dance",
+   "bpm": 170
+  },
+  {
+   "file": "drummer1-session1-081-dance-breakbeat-170.mid",
+   "title": "Dance breakbeat 170 bpm (4/4) - drummer 1 session1 #81",
+   "style": "Dance",
+   "bpm": 170
+  }
+ ]
+}

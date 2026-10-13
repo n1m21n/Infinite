@@ -1,0 +1,82 @@
+{
+ "patterns": [
+  {
+   "file": "drummer8-session1-010-neworleans-funk-82.mid",
+   "title": "New Orleans funk 82 bpm (4/4) - drummer 8 session1 #10",
+   "style": "New Orleans",
+   "bpm": 82
+  },
+  {
+   "file": "drummer8-session1-011-neworleans-funk-82.mid",
+   "title": "New Orleans funk 82 bpm (4/4) - drummer 8 session1 #11",
+   "style": "New Orleans",
+   "bpm": 82
+  },
+  {
+   "file": "drummer1-session1-082-neworleans-funk-84.mid",
+   "title": "New Orleans funk 84 bpm (4/4) - drummer 1 session1 #82",
+   "style": "New Orleans",
+   "bpm": 84
+  },
+  {
+   "file": "drummer8-session2-019-neworleans-funk-90.mid",
+   "title": "New Orleans funk 90 bpm (4/4) - drummer 8 session2 #19",
+   "style": "New Orleans",
+   "bpm": 90
+  },
+  {
+   "file": "drummer8-session2-020-neworleans-funk-90.mid",
+   "title": "New Orleans funk 90 bpm (4/4) - drummer 8 session2 #20",
+   "style": "New Orleans",
+   "bpm": 90
+  },
+  {
+   "file": "drummer7-session3-067-neworleans-funk-93.mid",
+   "title": "New Orleans funk 93 bpm (4/4) - drummer 7 session3 #67",
+   "style": "New Orleans",
+   "bpm": 93
+  },
+  {
+   "file": "drummer7-session3-091-neworleans-funk-93.mid",
+   "title": "New Orleans funk 93 bpm (4/4) - drummer 7 session3 #91",
+   "style": "New Orleans",
+   "bpm": 93
+  },
+  {
+   "file": "drummer1-session1-100-neworleans-secondline-94.mid",
+   "title": "New Orleans secondline 94 bpm (4/4) - drummer 1 session1 #100",
+   "style": "New Orleans",
+   "bpm": 94
+  },
+  {
+   "file": "drummer5-session2-006-neworleans-secondline-99.mid",
+   "title": "New Orleans secondline 99 bpm (4/4) - drummer 5 session2 #6",
+   "style": "New Orleans",
+   "bpm": 99
+  },
+  {
+   "file": "drummer5-session2-010-neworleans-funk-102.mid",
+   "title": "New Orleans funk 102 bpm (4/4) - drummer 5 session2 #10",
+   "style": "New Orleans",
+   "bpm": 102
+  },
+  {
+   "file": "drummer5-session2-009-neworleans-shuffle-104.mid",
+   "title": "New Orleans shuffle 104 bpm (4/4) - drummer 5 session2 #9",
+   "style": "New Orleans",
+   "bpm": 104
+  },
+  {
+   "file": "drummer5-session2-008-neworleans-chacha-124.mid",
+   "title": "New Orleans chacha 124 bpm (4/4) - drummer 5 session2 #8",
+   "style": "New Orleans",
+   "bpm": 124
+  },
+  {
+   "file": "drummer5-session2-007-neworleans-secondline-124.mid",
+   "title": "New Orleans secondline 124 bpm (4/4) - drummer 5 session2 #7",
+   "style": "New Orleans",
+   "bpm": 124
+  }
+ ]
+}

@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.53.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.54.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -28,12 +28,13 @@ The core is Infinite (same graph, same modules, `.inf` patches). Turbo adds Wind
 |---|---|
 | use a prebuilt ZIP | extract it to a writable folder (not inside the ZIP), run `install-runtime.bat` once, then `run-windows.bat` |
 | set up a dev machine | `install-dependencies.bat` (UAC: Build Tools, vcpkg, libraries, Windows ML, models) |
-| compile | `build-windows.bat` (exe in `build\windows-vs2022\Release`) |
+| compile (full build, with the GPL modules) | `build-windows.bat` (exe in `build\windows-vs2022\Release`) |
+| compile the MIT build | `build-windows.bat mit` (exe in `build\windows-vs2022-mit\Release`) |
 | compile and package | `build-windows.bat pack` (`dist\` folder and ZIP) |
 | debug build / clean reconfigure | `build-windows.bat debug` / `build-windows.bat fresh` |
 | run | `run-windows.bat` |
 | connect Claude (MCP) | `setup-mcp.bat`, then restart Claude Desktop |
-| make a release (ZIP + notes + tag) | `release-windows.bat`, then upload `dist\release\*` on the GitHub page it opens |
+| make a release (MIT build: ZIP + notes + tag) | `release-windows.bat`, then upload `dist\release\*` on the GitHub page it opens |
 | run the self-tests | `test-windows.bat` (`-Quick` for a smoke run) |
 | report a startup problem | `diagnose-windows.bat` (writes `Infinite-Turbo-diagnostic.log`) |
 
@@ -67,6 +68,9 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 
 | Feature | What it does |
 |---|---|
+| **Punch FX** (full build) | pocket-operator performance effects: 16 MPC-style pads, each with its own effect (27, freeze included) and its own MIDI-learnable pin; hold or latch, several at once; loops lock to the beat |
+| **Drum kits and patterns** | kit picker on the Drum Sequencer; CC0 acoustic kit by default; SLOOP's 37 kits in the full build; Magenta Groove MIDI human-played patterns in the MIDI browser |
+| **CC0 sample pack** | acoustic kit, percussion, vinyl scratches and piano / vibes / bass / horns / strings / flute multisamples in the Samples panel (Turbo kits) |
 | **Video playback** | FFmpeg engine: HAP / HAP Alpha / HAP Q / HAP Q Alpha / HAP R decoded on the GPU, Resolume DXV, H.264 / HEVC / VP9 / AV1 with D3D11VA hardware decode; loop, reverse, scrub, trim |
 | **Video In** | cameras and HDMI-USB capture with format and frame-rate negotiation (MJPG, Auto / 60 / 30 / 25 fps) and a live fps readout |
 | **Layout** | pixel-exact canvas (e.g. 1920 x 1080) with 8 layers, drag on the miniature, fit / fill / 1:1 |
@@ -225,6 +229,18 @@ src/audio/      audio engine, DSP, plugin scanning, file writing
 src/platform/   Windows layer (JUCE audio/MIDI/VST3, FFmpeg video, Media Foundation cameras, Spout2, Windows ML, Win32, MCP bridge)
 scripts/, cmake/, assets/   packaging, resources, fonts and examples
 ```
+
+## Editions: MIT and full
+
+Infinite-Turbo builds in two editions from the same source:
+
+- **MIT** (`build-windows.bat mit`): Infinite plus everything Turbo wrote, all MIT. This is the public
+  release (`release-windows.bat` builds only this one), and every file in it can go back to upstream.
+- **Full** (`build-windows.bat`): the MIT edition plus the modules in `src/gpl/`, ported from GPL-3.0
+  projects (first one: **Punch FX**, from SLOOP's punch-in effects). The full build as a whole is GPL-3.0.
+
+A patch that uses a full-build node opens in the MIT build without that node, and the status line
+says which ones. Licences and bundled media: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Credits and license
 

@@ -311,6 +311,21 @@ void SampleScanner::SeedDefaultFolders(const std::vector<std::pair<std::string, 
       StartScanRoots(added);
 }
 
+void SampleScanner::SeedFolderOnce(const std::string& key, const std::string& path, const std::string& label)
+{
+   if (key.empty() || path.empty() || std::find(mSeededKeys.begin(), mSeededKeys.end(), key) != mSeededKeys.end())
+      return;
+   mSeededKeys.push_back(key);
+   const std::string canon = CanonicalFolder(path);
+   if (SameRootIndex(canon) < 0)
+   {
+      mFolders.push_back(canon);
+      mLabels.push_back(label);
+   }
+   SaveFoldersToDisk();
+   StartScanRoots({ canon });
+}
+
 void SampleScanner::StartScan(const std::string& folder)
 {
    StartScanRoots(folder.empty() ? mFolders : std::vector<std::string> { folder });
@@ -670,6 +685,8 @@ void SampleScanner::LoadFromDisk()
             {
                if (v.contains("turboDefaultsSeeded"))
                   mDefaultsSeeded = true;
+               if (v.contains("turboSeeded") && v["turboSeeded"].is_string())
+                  mSeededKeys.push_back(v["turboSeeded"].get<crude_json::string>());
                if (v.contains("path") && v["path"].is_string())
                   path = v["path"].get<crude_json::string>();
                if (v.contains("label") && v["label"].is_string())
@@ -744,6 +761,12 @@ void SampleScanner::SaveFoldersToDisk() const
    {
       crude_json::value marker = crude_json::object{};
       marker["turboDefaultsSeeded"] = true;
+      json.push_back(std::move(marker));
+   }
+   for (const std::string& key : mSeededKeys)
+   {
+      crude_json::value marker = crude_json::object{};
+      marker["turboSeeded"] = key;
       json.push_back(std::move(marker));
    }
    json.save(path, 2);

@@ -1,0 +1,304 @@
+{
+ "patterns": [
+  {
+   "file": "drummer1-session2-007-jazz-march-88.mid",
+   "title": "Jazz march 88 bpm (4/4) - drummer 1 session2 #7",
+   "style": "Jazz",
+   "bpm": 88
+  },
+  {
+   "file": "drummer3-session2-027-jazz-92.mid",
+   "title": "Jazz 92 bpm (4/4) - drummer 3 session2 #27",
+   "style": "Jazz",
+   "bpm": 92
+  },
+  {
+   "file": "drummer1-session1-048-jazz-93.mid",
+   "title": "Jazz 93 bpm (4/4) - drummer 1 session1 #48",
+   "style": "Jazz",
+   "bpm": 93
+  },
+  {
+   "file": "drummer7-session2-112-jazz-fusion-96.mid",
+   "title": "Jazz fusion 96 bpm (4/4) - drummer 7 session2 #112",
+   "style": "Jazz",
+   "bpm": 96
+  },
+  {
+   "file": "drummer7-session2-113-jazz-fusion-96.mid",
+   "title": "Jazz fusion 96 bpm (4/4) - drummer 7 session2 #113",
+   "style": "Jazz",
+   "bpm": 96
+  },
+  {
+   "file": "drummer7-session2-114-jazz-fusion-96.mid",
+   "title": "Jazz fusion 96 bpm (4/4) - drummer 7 session2 #114",
+   "style": "Jazz",
+   "bpm": 96
+  },
+  {
+   "file": "drummer7-session2-115-jazz-fusion-96.mid",
+   "title": "Jazz fusion 96 bpm (4/4) - drummer 7 session2 #115",
+   "style": "Jazz",
+   "bpm": 96
+  },
+  {
+   "file": "drummer7-session1-014-jazz-100.mid",
+   "title": "Jazz 100 bpm (4/4) - drummer 7 session1 #14",
+   "style": "Jazz",
+   "bpm": 100
+  },
+  {
+   "file": "drummer1-session1-047-jazz-102.mid",
+   "title": "Jazz 102 bpm (4/4) - drummer 1 session1 #47",
+   "style": "Jazz",
+   "bpm": 102
+  },
+  {
+   "file": "drummer3-session1-008-jazz-105.mid",
+   "title": "Jazz 105 bpm (4/4) - drummer 3 session1 #8",
+   "style": "Jazz",
+   "bpm": 105
+  },
+  {
+   "file": "drummer10-session1-010-jazz-swing-110.mid",
+   "title": "Jazz swing 110 bpm (4/4) - drummer 10 session1 #10",
+   "style": "Jazz",
+   "bpm": 110
+  },
+  {
+   "file": "drummer10-session1-009-jazz-swing-110.mid",
+   "title": "Jazz swing 110 bpm (4/4) - drummer 10 session1 #9",
+   "style": "Jazz",
+   "bpm": 110
+  },
+  {
+   "file": "drummer7-session1-015-jazz-112.mid",
+   "title": "Jazz 112 bpm (4/4) - drummer 7 session1 #15",
+   "style": "Jazz",
+   "bpm": 112
+  },
+  {
+   "file": "drummer1-session1-004-jazz-funk-116.mid",
+   "title": "Jazz funk 116 bpm (4/4) - drummer 1 session1 #4",
+   "style": "Jazz",
+   "bpm": 116
+  },
+  {
+   "file": "drummer1-session1-005-jazz-funk-116.mid",
+   "title": "Jazz funk 116 bpm (4/4) - drummer 1 session1 #5",
+   "style": "Jazz",
+   "bpm": 116
+  },
+  {
+   "file": "drummer1-session2-004-jazz-120.mid",
+   "title": "Jazz 120 bpm (3/4) - drummer 1 session2 #4",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-015-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #15",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-016-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #16",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-017-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #17",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-019-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #19",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-021-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #21",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-022-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #22",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-023-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #23",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-031-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #31",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-032-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #32",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-033-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #33",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer3-session1-039-jazz-120.mid",
+   "title": "Jazz 120 bpm (4/4) - drummer 3 session1 #39",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer1-session2-009-jazz-march-120.mid",
+   "title": "Jazz march 120 bpm (4/4) - drummer 1 session2 #9",
+   "style": "Jazz",
+   "bpm": 120
+  },
+  {
+   "file": "drummer10-session1-001-jazz-swing-124.mid",
+   "title": "Jazz swing 124 bpm (4/4) - drummer 10 session1 #1",
+   "style": "Jazz",
+   "bpm": 124
+  },
+  {
+   "file": "drummer1-session1-049-jazz-125.mid",
+   "title": "Jazz 125 bpm (4/4) - drummer 1 session1 #49",
+   "style": "Jazz",
+   "bpm": 125
+  },
+  {
+   "file": "drummer1-session1-050-jazz-125.mid",
+   "title": "Jazz 125 bpm (4/4) - drummer 1 session1 #50",
+   "style": "Jazz",
+   "bpm": 125
+  },
+  {
+   "file": "drummer1-session1-052-jazz-125.mid",
+   "title": "Jazz 125 bpm (4/4) - drummer 1 session1 #52",
+   "style": "Jazz",
+   "bpm": 125
+  },
+  {
+   "file": "drummer1-session1-075-jazz-125.mid",
+   "title": "Jazz 125 bpm (4/4) - drummer 1 session1 #75",
+   "style": "Jazz",
+   "bpm": 125
+  },
+  {
+   "file": "drummer1-session3-005-jazz-linear-128.mid",
+   "title": "Jazz linear 128 bpm (4/4) - drummer 1 session3 #5",
+   "style": "Jazz",
+   "bpm": 128
+  },
+  {
+   "file": "drummer4-session1-003-jazz-klezmer-152.mid",
+   "title": "Jazz klezmer 152 bpm (4/4) - drummer 4 session1 #3",
+   "style": "Jazz",
+   "bpm": 152
+  },
+  {
+   "file": "drummer4-session1-002-jazz-158.mid",
+   "title": "Jazz 158 bpm (4/4) - drummer 4 session1 #2",
+   "style": "Jazz",
+   "bpm": 158
+  },
+  {
+   "file": "drummer1-session2-008-jazz-march-176.mid",
+   "title": "Jazz march 176 bpm (4/4) - drummer 1 session2 #8",
+   "style": "Jazz",
+   "bpm": 176
+  },
+  {
+   "file": "drummer1-session1-076-jazz-mediumfast-180.mid",
+   "title": "Jazz mediumfast 180 bpm (4/4) - drummer 1 session1 #76",
+   "style": "Jazz",
+   "bpm": 180
+  },
+  {
+   "file": "drummer1-session1-077-jazz-mediumfast-180.mid",
+   "title": "Jazz mediumfast 180 bpm (4/4) - drummer 1 session1 #77",
+   "style": "Jazz",
+   "bpm": 180
+  },
+  {
+   "file": "drummer1-session3-004-jazz-linear-182.mid",
+   "title": "Jazz linear 182 bpm (4/4) - drummer 1 session3 #4",
+   "style": "Jazz",
+   "bpm": 182
+  },
+  {
+   "file": "drummer1-session3-002-jazz-swing-185.mid",
+   "title": "Jazz swing 185 bpm (4/4) - drummer 1 session3 #2",
+   "style": "Jazz",
+   "bpm": 185
+  },
+  {
+   "file": "drummer1-session2-005-jazz-200.mid",
+   "title": "Jazz 200 bpm (3/4) - drummer 1 session2 #5",
+   "style": "Jazz",
+   "bpm": 200
+  },
+  {
+   "file": "drummer10-session1-002-jazz-swing-215.mid",
+   "title": "Jazz swing 215 bpm (4/4) - drummer 10 session1 #2",
+   "style": "Jazz",
+   "bpm": 215
+  },
+  {
+   "file": "drummer10-session1-003-jazz-swing-215.mid",
+   "title": "Jazz swing 215 bpm (4/4) - drummer 10 session1 #3",
+   "style": "Jazz",
+   "bpm": 215
+  },
+  {
+   "file": "drummer10-session1-004-jazz-swing-215.mid",
+   "title": "Jazz swing 215 bpm (4/4) - drummer 10 session1 #4",
+   "style": "Jazz",
+   "bpm": 215
+  },
+  {
+   "file": "drummer10-session1-005-jazz-swing-215.mid",
+   "title": "Jazz swing 215 bpm (4/4) - drummer 10 session1 #5",
+   "style": "Jazz",
+   "bpm": 215
+  },
+  {
+   "file": "drummer10-session1-006-jazz-swing-215.mid",
+   "title": "Jazz swing 215 bpm (4/4) - drummer 10 session1 #6",
+   "style": "Jazz",
+   "bpm": 215
+  },
+  {
+   "file": "drummer10-session1-007-jazz-swing-215.mid",
+   "title": "Jazz swing 215 bpm (4/4) - drummer 10 session1 #7",
+   "style": "Jazz",
+   "bpm": 215
+  },
+  {
+   "file": "drummer10-session1-008-jazz-swing-215.mid",
+   "title": "Jazz swing 215 bpm (4/4) - drummer 10 session1 #8",
+   "style": "Jazz",
+   "bpm": 215
+  },
+  {
+   "file": "drummer1-session1-078-jazz-fast-290.mid",
+   "title": "Jazz fast 290 bpm (4/4) - drummer 1 session1 #78",
+   "style": "Jazz",
+   "bpm": 290
+  }
+ ]
+}

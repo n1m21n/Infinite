@@ -6,6 +6,10 @@
 > (+ `PluginVST3Windows.cpp`, `AudioFileWriterWindows.cpp`, `TextNodeWindows.cpp`); ignore
 > every mention of `Platform.mm`, AppKit, AU or Syphon internals below.
 >
+> **Editions (0.54):** `src/gpl/` holds modules ported from GPL-3.0 projects, compiled only with
+> `INFINITE_ENABLE_GPL=ON` (full build). Everything else stays MIT. `main.cpp` touches them only
+> inside `#if INFINITE_GPL` (include, registration, body, help). Rules in `src/gpl/README.md`.
+>
 > **Video path (0.53):** every decoded picture is a `Platform::VideoFrame` in its native
 > layout (NV12, YUV420P, RGBA/BGRA, packed BGR, or HAP's BC1/BC3/BC7/YCoCg blocks), never
 > converted or flipped on the CPU. `core/VideoTexture` uploads the planes through orphaned PBOs

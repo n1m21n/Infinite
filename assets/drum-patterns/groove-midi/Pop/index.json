@@ -1,0 +1,94 @@
+{
+ "patterns": [
+  {
+   "file": "drummer7-session3-011-pop-soft-83.mid",
+   "title": "Pop soft 83 bpm (4/4) - drummer 7 session3 #11",
+   "style": "Pop",
+   "bpm": 83
+  },
+  {
+   "file": "drummer7-session3-022-pop-soft-83.mid",
+   "title": "Pop soft 83 bpm (4/4) - drummer 7 session3 #22",
+   "style": "Pop",
+   "bpm": 83
+  },
+  {
+   "file": "drummer7-session3-023-pop-soft-83.mid",
+   "title": "Pop soft 83 bpm (4/4) - drummer 7 session3 #23",
+   "style": "Pop",
+   "bpm": 83
+  },
+  {
+   "file": "drummer7-session2-102-pop-132.mid",
+   "title": "Pop 132 bpm (4/4) - drummer 7 session2 #102",
+   "style": "Pop",
+   "bpm": 132
+  },
+  {
+   "file": "drummer7-session2-103-pop-132.mid",
+   "title": "Pop 132 bpm (4/4) - drummer 7 session2 #103",
+   "style": "Pop",
+   "bpm": 132
+  },
+  {
+   "file": "drummer7-session2-104-pop-132.mid",
+   "title": "Pop 132 bpm (4/4) - drummer 7 session2 #104",
+   "style": "Pop",
+   "bpm": 132
+  },
+  {
+   "file": "drummer7-session2-105-pop-132.mid",
+   "title": "Pop 132 bpm (4/4) - drummer 7 session2 #105",
+   "style": "Pop",
+   "bpm": 132
+  },
+  {
+   "file": "drummer1-eval_session-007-pop-groove7-138.mid",
+   "title": "Pop groove7 138 bpm (4/4) - drummer 1 eval_session #7",
+   "style": "Pop",
+   "bpm": 138
+  },
+  {
+   "file": "drummer5-eval_session-007-pop-groove7-138.mid",
+   "title": "Pop groove7 138 bpm (4/4) - drummer 5 eval_session #7",
+   "style": "Pop",
+   "bpm": 138
+  },
+  {
+   "file": "drummer7-eval_session-007-pop-groove7-138.mid",
+   "title": "Pop groove7 138 bpm (4/4) - drummer 7 eval_session #7",
+   "style": "Pop",
+   "bpm": 138
+  },
+  {
+   "file": "drummer8-eval_session-007-pop-groove7-138.mid",
+   "title": "Pop groove7 138 bpm (4/4) - drummer 8 eval_session #7",
+   "style": "Pop",
+   "bpm": 138
+  },
+  {
+   "file": "drummer7-session2-100-pop-142.mid",
+   "title": "Pop 142 bpm (4/4) - drummer 7 session2 #100",
+   "style": "Pop",
+   "bpm": 142
+  },
+  {
+   "file": "drummer7-session2-101-pop-142.mid",
+   "title": "Pop 142 bpm (4/4) - drummer 7 session2 #101",
+   "style": "Pop",
+   "bpm": 142
+  },
+  {
+   "file": "drummer7-session2-096-pop-142.mid",
+   "title": "Pop 142 bpm (4/4) - drummer 7 session2 #96",
+   "style": "Pop",
+   "bpm": 142
+  },
+  {
+   "file": "drummer7-session2-097-pop-142.mid",
+   "title": "Pop 142 bpm (4/4) - drummer 7 session2 #97",
+   "style": "Pop",
+   "bpm": 142
+  }
+ ]
+}

@@ -1,0 +1,71 @@
+CC0 sample pack bundled with Infinite-Turbo (MIT and full builds).
+All files are CC0 1.0 (public domain). Taken as prepared by SLOOP (github.com/isod89/sloop-fm1, assets/samples-cc0).
+
+Samples in the SAMPLE engine's built-in sets. All CC0 1.0 (public domain).
+
+PIANO  VCSL (Versilian Community Sample Library), Grand Piano (Steinway B), sustain, close mics
+       (until 2.1 the piano was VCSL's Upright Piano (Knight), DUSTY; it is no longer in the tree)
+VIBES  VCSL, Vibraphone (hard mallets)                    https://github.com/sgossner/VCSL
+BASS   VSCO-2 Community Edition, Solo Contrabass pizzicato
+HORNS  VSCO-2 Community Edition, Trumpet + Tenor Trombone staccato
+STRGS  VSCO-2 Community Edition, Violin + Viola sections spiccato
+FLUTE  VSCO-2 Community Edition, Flute (susvib)           https://github.com/sgossner/VSCO-2-CE
+SCRCH  Sonic Pi sample set (freesound.org CC0 recordings): vinyl_scratch (hello_flowers),
+       vinyl_backspin (il112), vinyl_rewind (TasmanianPower)
+       https://github.com/sonic-pi-net/sonic-pi/tree/main/etc/samples
+KIT    VCSL: the acoustic drum kit of the GM map (bass drum, snare, side stick, claps, hi-hat, toms,
+       suspended cymbal, cowbell) and hand percussion (tambourine, shaker, conga, claves, woodblock)
+
+Thanks to Versilian Studios / Sam Gossner and to the Sonic Pi project.
+Retuned, cut and coloured by tools/gen_builtin_hiphop.py (gen_hiphop_pack.py's chain).
+
+---- ATTRIBUTION.txt (SLOOP) ----
+SLOOP SAMPLE engine - built-in sets: source material
+Licence: CC0 1.0 Universal (public domain dedication)
+  https://creativecommons.org/publicdomain/zero/1.0/
+Sources:
+  VSCO-2 Community Edition  https://github.com/sgossner/VSCO-2-CE  (Versilian Studios, CC0-1.0)
+  VCSL                      https://github.com/sgossner/VCSL       (Versilian Studios, CC0-1.0)
+  Sonic Pi sample set       https://github.com/sonic-pi-net/sonic-pi/tree/main/etc/samples (CC0, freesound.org)
+Each file is retuned, cut and coloured (tools/gen_builtin_hiphop.py) from:
+
+BASS/00_E1_m52.wav  <-  sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/Pizz/BKCtbss_Pizz_E0_v3_rr1.wav
+BASS/01_B1_m59.wav  <-  sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/Pizz/BKCtbss_Pizz_A#0_v3_rr1.wav
+BASS/02_Fs2_m66.wav  <-  sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/Pizz/BKCtbss_Pizz_F#1_v1_rr1.wav
+BASS/03_Cs3_m73.wav  <-  sgossner/VSCO-2-CE/master/Strings/Solo Contrabass/Pizz/BKCtbss_Pizz_C#2_v1_rr1.wav
+VIBES/00_F3_m53.wav  <-  sgossner/VCSL/master/Idiophones/Struck Idiophones/Vibraphone/Hard Mallets/Vibes_hard_F2_v3_rr1_Main.wav
+VIBES/01_D4_m62.wav  <-  sgossner/VCSL/master/Idiophones/Struck Idiophones/Vibraphone/Hard Mallets/Vibes_hard_C3_v3_rr1_Main.wav
+VIBES/02_B4_m71.wav  <-  sgossner/VCSL/master/Idiophones/Struck Idiophones/Vibraphone/Hard Mallets/Vibes_hard_B3_v3_rr1_Main.wav
+HORNS/00_G3_m55.wav  <-  sgossner/VSCO-2-CE/master/Brass/Trumpet/stac/Sum_SHTrumpet_stac_F2_v3_rr1.wav + sgossner/VSCO-2-CE/master/Brass/Tenor Trombone/stac/tenortbn_stac_F1_v3_rr1.wav
+HORNS/01_D4_m62.wav  <-  sgossner/VSCO-2-CE/master/Brass/Trumpet/stac/Sum_SHTrumpet_stac_D#3_v3_rr1.wav + sgossner/VSCO-2-CE/master/Brass/Tenor Trombone/stac/tenortbn_stac_F2_v3_rr1.wav
+HORNS/02_A4_m69.wav  <-  sgossner/VSCO-2-CE/master/Brass/Trumpet/stac/Sum_SHTrumpet_stac_A#3_v3_rr1.wav + sgossner/VSCO-2-CE/master/Brass/Tenor Trombone/stac/tenortbn_stac_A#2_v3_rr1.wav
+HORNS/03_E5_m76.wav  <-  sgossner/VSCO-2-CE/master/Brass/Trumpet/stac/Sum_SHTrumpet_stac_F4_v3_rr1.wav + sgossner/VSCO-2-CE/master/Brass/Tenor Trombone/stac/tenortbn_stac_F3_v3_rr1.wav
+STRGS/00_G3_m55.wav  <-  sgossner/VSCO-2-CE/master/Strings/Violin Section/Spic/VlnEns_Spic_G2_v2_rr1.wav + sgossner/VSCO-2-CE/master/Strings/Viola Section/spic/Violas_spic_C2_v2_rr1.wav
+STRGS/01_E4_m64.wav  <-  sgossner/VSCO-2-CE/master/Strings/Violin Section/Spic/VlnEns_Spic_D3_v2_rr1.wav + sgossner/VSCO-2-CE/master/Strings/Viola Section/spic/Violas_spic_E2_v2_rr1.wav
+STRGS/02_Cs5_m73.wav  <-  sgossner/VSCO-2-CE/master/Strings/Violin Section/Spic/VlnEns_Spic_C4_v2_rr1.wav + sgossner/VSCO-2-CE/master/Strings/Viola Section/spic/Violas_spic_D3_v2_rr1.wav
+SCRCH/00_vinyl_scratch_m57.wav  <-  sonic-pi-net/sonic-pi/main/etc/samples/vinyl_scratch.flac
+SCRCH/01_vinyl_backspin_m65.wav  <-  sonic-pi-net/sonic-pi/main/etc/samples/vinyl_backspin.flac
+SCRCH/02_vinyl_rewind_m72.wav  <-  sonic-pi-net/sonic-pi/main/etc/samples/vinyl_rewind.flac
+FLUTE/00_LDFlute_susvib_C4_v1_1.wav  <-  sgossner/VSCO-2-CE: Woodwinds/Flute/susvib/LDFlute_susvib_C4_v1_1.wav
+FLUTE/01_LDFlute_susvib_C5_v1_1.wav  <-  sgossner/VSCO-2-CE: Woodwinds/Flute/susvib/LDFlute_susvib_C5_v1_1.wav
+FLUTE/02_LDFlute_susvib_C6_v1_1.wav  <-  sgossner/VSCO-2-CE: Woodwinds/Flute/susvib/LDFlute_susvib_C6_v1_1.wav
+KIT/00_Tamb1_Hit_v2_rr1_Mid.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Tambourine 1/Tamb1_Hit_v2_rr1_Mid.wav
+KIT/01_Mid_ShakerDouble_Down_rr1.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Shaker, Small/Mid_ShakerDouble_Down_rr1.wav
+KIT/02_Conga_HitN_v2_rr1_Sum.wav  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Conga/Conga_HitN_v2_rr1_Sum.wav
+KIT/03_Claves1_Hit_v2_rr1_Mid.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Claves/Claves1_Hit_v2_rr1_Mid.wav
+KIT/04_wood_click_mp.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Woodblock/wood_click_mp.wav
+KIT/10_kick_BDrumNew_hit_v5.wav  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Bass Drum 1/BDrumNew_hit_v5_rr1_Sum.wav (mono, cut, normalised)
+KIT/11_snare_Snare2_HitSN_v7.wav  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Snare Drum, Modern 1/Snare2_HitSN_v7_rr1_Mid.wav (mono, cut, normalised)
+KIT/12_rim_sidestick.wav  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Legacy Snares/OldSnare/snare_rim.wav (mono, cut, normalised)
+KIT/13_clap_Clap_rr1.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Claps/Clap_rr1.wav (mono, cut, normalised)
+KIT/14_hihat_HitC_v3.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitC_v3_rr1_Mid.wav (mono, cut, normalised)
+KIT/15_ohat_HitO.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitO_rr1_Mid.wav (mono, cut, normalised)
+KIT/16_tomlo_TomL_HitS_v4.wav  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Tom 2/Stick/TomL_HitS_v4_rr1_Mid.wav (mono, cut, normalised)
+KIT/17_tomhi_TomH_HitS_v4.wav  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Tom 1/Stick/TomH_HitS_v4_rr1_Mid.wav (mono, cut, normalised)
+KIT/18_crash_susCymb2_hit_f1.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Suspended Cymbal 2/susCymb2_hit_f1.wav (mono, cut, normalised)
+KIT/19_ride_susCymb2_stick_mf1.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Suspended Cymbal 2/susCymb2_hit_stick_mf1.wav (mono, cut, normalised)
+KIT/20_cowbell_Cowbell1_Normal_v3.wav  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Cowbells/Cowbell1_Normal_v3_rr1_Mid.wav (mono, cut, normalised)
+PIANO/00_C3_m48.wav  <-  sgossner/VCSL: Chordophones/Zithers/Grand Piano, Steinway B/Sus/JHPiano_Sus_Close_C3_vl3_rr1.wav (mono, cut)
+PIANO/01_Gs3_m56.wav  <-  sgossner/VCSL: Chordophones/Zithers/Grand Piano, Steinway B/Sus/JHPiano_Sus_Close_G#3_vl3_rr1.wav (mono, cut)
+PIANO/02_E4_m64.wav  <-  sgossner/VCSL: Chordophones/Zithers/Grand Piano, Steinway B/Sus/JHPiano_Sus_Close_E4_vl3_rr1.wav (mono, cut)
+PIANO/03_C5_m72.wav  <-  sgossner/VCSL: Chordophones/Zithers/Grand Piano, Steinway B/Sus/JHPiano_Sus_Close_C5_vl3_rr1.wav (mono, cut)

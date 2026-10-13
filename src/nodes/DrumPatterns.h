@@ -57,19 +57,58 @@ namespace DrumPatterns
       return (lane >= 0 && lane < 8) ? kFiles[lane] : "";
    }
 
-   // Turbo 0.51 (upstream 46c64b5, adapted): the bundled kit folder next to the
-   // exe (or relative to the working directory), "" when neither has the kit.
-   inline std::string BundledKitDir()
+   // Turbo 0.54: a kit lane's file in `dir`: KitFile(lane) as .wav, or the
+   // same name as .flac (the rendered SLOOP kits ship as FLAC). "" if neither.
+   inline std::string KitLanePath(const std::string& dir, int lane)
+   {
+      if (dir.empty() || lane < 0 || lane >= 8)
+         return std::string();
+      std::error_code ec;
+      std::filesystem::path p = std::filesystem::u8path(dir) / KitFile(lane);
+      if (std::filesystem::exists(p, ec))
+         return p.u8string();
+      p.replace_extension(".flac");
+      if (std::filesystem::exists(p, ec))
+         return p.u8string();
+      return std::string();
+   }
+
+   // Turbo 0.54: bundled kits, first one found is the default. The acoustic
+   // CC0 kit (VCSL recordings) uses the same lane file names as turbo-basic.
+   inline const char* const* BundledKitNames(int& count)
+   {
+      static const char* const kKits[] = { "cc0-acoustic-kit", "turbo-basic" };
+      count = (int)(sizeof(kKits) / sizeof(kKits[0]));
+      return kKits;
+   }
+
+   // The folder holding the bundled kits (assets/drumkits next to the exe, or
+   // relative to the working directory), "" when neither exists.
+   inline std::filesystem::path BundledKitsRoot()
    {
       const std::filesystem::path exeDir = std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
-      const std::filesystem::path candidates[] = {
-         exeDir / "assets" / "drumkits" / "turbo-basic",
-         std::filesystem::u8path("assets/drumkits/turbo-basic"),
-      };
+      const std::filesystem::path roots[] = { exeDir / "assets" / "drumkits", std::filesystem::u8path("assets/drumkits") };
       std::error_code ec;
-      for (const std::filesystem::path& p : candidates)
-         if (std::filesystem::exists(p / KitFile(0), ec))
-            return p.u8string();
+      for (const std::filesystem::path& r : roots)
+         if (std::filesystem::is_directory(r, ec))
+            return r;
+      return std::filesystem::path();
+   }
+
+   // Turbo 0.51 (upstream 46c64b5, adapted), 0.54: the default kit folder,
+   // "" when no bundled kit is found.
+   inline std::string BundledKitDir()
+   {
+      const std::filesystem::path root = BundledKitsRoot();
+      if (root.empty())
+         return std::string();
+      int count = 0;
+      const char* const* kits = BundledKitNames(count);
+      std::error_code ec;
+      for (int i = 0; i < count; ++i)
+         if (!KitLanePath((root / kits[i]).u8string(), 0).empty())
+            return (root / kits[i]).u8string();
+      (void)ec;
       return std::string();
    }
 
@@ -88,12 +127,13 @@ namespace DrumPatterns
       const size_t prev = path.find_last_of("/\\", last - 1);
       const std::string parent = path.substr(prev == std::string::npos ? 0 : prev + 1,
                                              last - (prev == std::string::npos ? 0 : prev + 1));
-      if (parent != "turbo-basic")
+      // Any bundled kit folder (turbo-basic, cc0-*): retry under the current install.
+      if (parent != "turbo-basic" && parent.rfind("cc0-", 0) != 0)
          return std::string();
-      const std::string dir = BundledKitDir();
-      if (dir.empty())
+      const std::filesystem::path root = BundledKitsRoot();
+      if (root.empty())
          return std::string();
-      const std::filesystem::path retry = std::filesystem::u8path(dir) / std::filesystem::u8path(path.substr(last + 1));
+      const std::filesystem::path retry = root / std::filesystem::u8path(parent) / std::filesystem::u8path(path.substr(last + 1));
       if (!std::filesystem::exists(retry, ec))
          return std::string();
       return retry.u8string();

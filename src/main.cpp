@@ -124,6 +124,10 @@
 #include "nodes/SyphonOutNode.h"
 #include "nodes/ProjectionNode.h"
 #include "nodes/AudioNodes.h"
+#if INFINITE_GPL
+// Turbo full build: GPL-3.0 modules (src/gpl/README.md).
+#include "gpl/PunchFxNode.h"
+#endif
 #include "nodes/AudioEffectNode.h"
 #include "nodes/WavetableNode.h"
 #include "nodes/AnalogNode.h"
@@ -1090,6 +1094,7 @@ namespace
    std::string gPatchPath;      // "" until the patch has been saved somewhere
    bool gPatchDirty = false;
    std::string gPatchStatus;
+   std::vector<std::string> gSkippedNodeTypes; // Turbo 0.53
    bool gSuppressSettingsDirtyOnce = false;
    // Set whenever a Start() call from the toolbar toggle or "Apply audio
    // settings" fails, so the toggle button can surface why on hover instead
@@ -3919,6 +3924,9 @@ namespace
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
       REGISTER_NODE(AudioPluginNode, Plugin, "AudioEffects");
       REGISTER_NODE(GainNode, Gain, "AudioUtility");
+#if INFINITE_GPL
+      REGISTER_NODE(PunchFxNode, Punch FX, "AudioEffects");
+#endif
       REGISTER_NODE(AudioMeterNode, Audio Meter, "AudioUtility");
       REGISTER_NODE(AudioInputNode, Audio In, "AudioUtility");
       REGISTER_NODE(AudioOutputNode, Audio Out, "AudioUtility");
@@ -11292,6 +11300,83 @@ namespace
       EndAudioBody();
    }
 
+#if INFINITE_GPL
+   // Punch FX (src/gpl): 16 pads, each with its own effect and MIDI note.
+   // Click a pad to play it (hold, or toggle with latch) and to select it for
+   // the editor row below (effect, note, learn). Lit = its effect is playing.
+   void DrawPunchFxBody(GraphNode& gn, PunchFxNode* n)
+   {
+      const uint32_t active = n->ActiveMask();
+      char stat[160] = "hold a pad";
+      if (active != 0)
+      {
+         stat[0] = 0;
+         for (int fx = 0; fx < PunchFxNode::kNumEffects; ++fx)
+            if (active & (1u << fx))
+            {
+               if (stat[0] != 0) strncat(stat, " + ", sizeof(stat) - strlen(stat) - 1);
+               strncat(stat, PunchFxNode::EffectName(fx), sizeof(stat) - strlen(stat) - 1);
+            }
+      }
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // 4x4 pads, pad 1 bottom-left like the MPC. Each is a gate button with
+      // its own CV pin (MIDI learn it to a controller pad from the pin);
+      // click selects the pad for the effect dropdown below.
+      {
+         const float gap = 6.0f;
+         const float padW = (gAudioContentW - gap * 3.0f) / 4.0f;
+         const float padH = 44.0f;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         uint32_t heldMask = 0;
+         for (int row = 0; row < 4; row++)
+            for (int col = 0; col < 4; col++)
+            {
+               const int p = (3 - row) * 4 + col;
+               ImGui::SetCursorScreenPos(ImVec2(origin.x + (float)col * (padW + gap), origin.y + (float)row * (padH + gap)));
+               ImGui::PushID(p);
+               char label[32];
+               snprintf(label, sizeof(label), "%d##punchPad%d", p + 1, p + 1);
+               const bool lit = ((active >> n->padFx[p]) & 1u) != 0 || (n->latch && n->PadLatched(p));
+               bool clicked = false;
+               const bool held = ModGateButton(label, ImVec2(padW, padH), lit, p == n->selectedPad, true,
+                                               PunchFxNode::EffectName(n->padFx[p]), clicked);
+               if (clicked)
+                  n->selectedPad = p;
+               if (held && !n->uiHeld[p] && n->latch)
+                  n->TogglePadLatch(p);
+               n->uiHeld[p] = held;
+               if (held)
+                  heldMask |= 1u << p;
+               ImGui::PopID();
+            }
+         n->heldPads = heldMask;
+         ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + 4.0f * (padH + gap)));
+         ImGui::Dummy(ImVec2(gAudioContentW, 2.0f));
+      }
+
+      // The selected pad's effect.
+      const int sp = std::clamp(n->selectedPad, 0, PunchFxNode::kNumPads - 1);
+      std::vector<std::string> names;
+      names.reserve(PunchFxNode::kNumEffects);
+      for (int i = 0; i < PunchFxNode::kNumEffects; ++i)
+         names.push_back(PunchFxNode::EffectName(i));
+      ImGui::Text("pad %d", sp + 1);
+      ImGui::SameLine();
+      DropdownButton("##padfx", names, n->padFx[sp], [n, sp](int idx) { PushUndoCheckpoint(); n->padFx[sp] = idx; },
+                     160.0f, /*modulatable=*/false);
+
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ModCheckbox("latch", &n->latch);
+      ImGui::SameLine();
+      DropdownButton("effect", names, n->effect, [n](int idx) { n->effect = idx; }, 120.0f);
+      ImGui::SameLine();
+      ModCheckbox("engage", &n->engage);
+      EndAudioBody();
+   }
+#endif
+
    void DrawBlendAudioBody(GraphNode& gn, BlendAudioNode* n)
    {
       char stat[48];
@@ -11790,22 +11875,90 @@ namespace
    // DrawDrumSequencerBody, so gAudioBodyW/gAudioContentW already read as
    // the column's width - the section panel and knob row size themselves
    // from that with no extra plumbing (the "width is a scope" rule).
-   // Turbo: the bundled drum kit (assets/drumkits/turbo-basic), next to the
-   // exe in a build or package, else relative to the working directory.
-   // Empty when neither exists.
+   // Turbo: the default bundled drum kit (0.54: the CC0 acoustic kit, else
+   // turbo-basic), next to the exe or relative to the working directory.
+   // Empty when none exists.
    std::string TurboDrumKitDir()
    {
-      const std::filesystem::path exeDir =
-         std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
-      const std::filesystem::path candidates[] = {
-         exeDir / "assets" / "drumkits" / "turbo-basic",
-         std::filesystem::u8path("assets/drumkits/turbo-basic"),
-      };
+      return DrumPatterns::BundledKitDir();
+   }
+
+   // Turbo 0.54: every bundled kit the Drum Sequencer's kit picker offers:
+   // folders under assets/drumkits (both builds) and assets/drumkits-gpl
+   // (full build: SLOOP's kits, rendered) holding at least a kick lane.
+   struct BundledKit { std::string name, dir; };
+   const std::vector<BundledKit>& BundledKits()
+   {
+      static std::vector<BundledKit> sKits;
+      static bool sScanned = false;
+      if (sScanned)
+         return sKits;
+      sScanned = true;
+      const std::filesystem::path root = DrumPatterns::BundledKitsRoot();
+      if (root.empty())
+         return sKits;
+      for (const std::filesystem::path& base : { root, root.parent_path() / "drumkits-gpl" })
+      {
+         std::error_code ec;
+         if (!std::filesystem::is_directory(base, ec))
+            continue;
+         std::vector<BundledKit> found;
+         for (const auto& e : std::filesystem::directory_iterator(base, ec))
+         {
+            if (!e.is_directory(ec))
+               continue;
+            const std::string dir = e.path().u8string();
+            if (!DrumPatterns::KitLanePath(dir, 0).empty())
+               found.push_back({ e.path().filename().u8string(), dir });
+         }
+         std::sort(found.begin(), found.end(), [](const BundledKit& a, const BundledKit& b) { return a.name < b.name; });
+         sKits.insert(sKits.end(), found.begin(), found.end());
+      }
+      return sKits;
+   }
+
+   // Turbo 0.54: bundled pattern packs (assets/drum-patterns/<pack>) are
+   // copied once into the user's MIDI pattern folder, where the Drum
+   // Sequencer's MIDI browser lists them by style. A marker file per pack
+   // keeps it from coming back after the user deletes it.
+   void SeedBundledDrumPatterns()
+   {
+      const std::filesystem::path kitsRoot = DrumPatterns::BundledKitsRoot();
+      const std::string userDir = DrumMidi::DefaultFolder();
+      if (kitsRoot.empty() || userDir.empty())
+         return;
+      const std::filesystem::path packsRoot = kitsRoot.parent_path() / "drum-patterns";
       std::error_code ec;
-      for (const std::filesystem::path& p : candidates)
-         if (std::filesystem::exists(p / DrumPatterns::KitFile(0), ec))
-            return p.u8string();
-      return std::string();
+      if (!std::filesystem::is_directory(packsRoot, ec))
+         return;
+      bool copied = false;
+      for (const auto& pack : std::filesystem::directory_iterator(packsRoot, ec))
+      {
+         if (!pack.is_directory(ec))
+            continue;
+         const std::string name = pack.path().filename().u8string();
+         const std::filesystem::path marker = std::filesystem::u8path(userDir) / (".turbo-pack-" + name);
+         if (std::filesystem::exists(marker, ec))
+            continue;
+         std::filesystem::copy(pack.path(), std::filesystem::u8path(userDir) / pack.path().filename(),
+                               std::filesystem::copy_options::recursive | std::filesystem::copy_options::skip_existing, ec);
+         std::ofstream(marker) << "copied by Infinite-Turbo; delete the pack folder to remove it for good\n";
+         RuntimeLog::Write("drum patterns: installed pack '%s' (%s)", name.c_str(), ec ? ec.message().c_str() : "ok");
+         copied = true;
+      }
+      if (copied)
+         DrumMidi::RequestScan();
+   }
+
+   // Turbo 0.54: defaults applied when the user (or Claude through MCP) adds a
+   // node, never when a patch loads or nodes are pasted: a new Drum Sequencer
+   // comes with the default kit on its lanes.
+   void ApplySpawnDefaults(GraphNode* gn)
+   {
+      if (gn == nullptr)
+         return;
+      if (auto* d = dynamic_cast<DrumSequencerNode*>(gn->node.get()))
+         d->LoadKitIntoEmptyLanes(TurboDrumKitDir());
    }
 
    // Turbo 0.47: groove index of the node's saved pattern name, -1 if none.
@@ -12328,6 +12481,40 @@ namespace
                   MusicTime::RateDivisionName(n->rate));
 
       BeginAudioBody(gn.index, gn.category, kAudioWideWidth, stat);
+
+      // Turbo 0.54: kit picker (bundled kits; replaces every lane, undoable).
+      {
+         static std::unordered_map<int, int> sKitChoice; // node index -> picked kit (UI only)
+         const std::vector<BundledKit>& kits = BundledKits();
+         if (!kits.empty())
+         {
+            std::vector<std::string> names;
+            names.reserve(kits.size());
+            for (const BundledKit& k : kits)
+               names.push_back(k.name);
+            auto it = sKitChoice.find(gn.index);
+            int current = it != sKitChoice.end() ? it->second : -1;
+            if (current < 0) // not picked here yet: show the default kit a new node gets
+            {
+               const std::string def = TurboDrumKitDir();
+               for (size_t k = 0; k < kits.size(); ++k)
+                  if (kits[k].dir == def)
+                     current = (int)k;
+            }
+            const int nodeIndex = gn.index;
+            DropdownButton("kit", names, current, [n, nodeIndex](int idx)
+            {
+               const std::vector<BundledKit>& list = BundledKits();
+               if (idx < 0 || idx >= (int)list.size())
+                  return;
+               PushUndoCheckpoint();
+               n->LoadKit(list[idx].dir);
+               sKitChoice[nodeIndex] = idx;
+               gPatchDirty = true;
+            }, 220.0f, /*modulatable=*/false);
+            ImGui::Dummy(ImVec2(0.0f, 2.0f));
+         }
+      }
 
       // ---- lane cards: 4 rows x 2 columns, left column lanes 1-4, right
       // column lanes 5-8, matching the mockup. BeginAudioColumns is the
@@ -22617,6 +22804,10 @@ namespace
          DrawDrumSequencerBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))
          DrawGainBody(gn, n);
+#if INFINITE_GPL
+      else if (auto* n = dynamic_cast<PunchFxNode*>(gn.node.get()))
+         DrawPunchFxBody(gn, n);
+#endif
       else if (auto* n = dynamic_cast<AudioMeterNode*>(gn.node.get()))
          DrawAudioMeterBody(gn, n);
       else if (auto* n = dynamic_cast<MixerNode*>(gn.node.get()))
@@ -26289,6 +26480,9 @@ namespace
       static const std::unordered_map<std::string, const char*> kText = {
          // ---------------- Source / Text ----------------
          { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
+#if INFINITE_GPL
+         { "Punch FX", "Pocket-operator performance effects (full build, GPL). 16 pads, each with its own effect (27: loops, stutter, reverse, tape stop, filter sweeps, kills, crush, gate, echo, rewind, flanger, freeze...): click a pad to select it and pick its effect below. Every pad has its own pin, like the MPC: MIDI learn it to a controller pad, or patch a Macro / MIDI Trigger. Notes cabled into the second input also play pads (36 = pad 1). Hold to play, or latch to toggle; any number at once. Loops lock to the beat. effect + engage are a single MIDI-learnable trigger. Port of SLOOP/Felucca's punch-in FX." },
+#endif
          { "Video", "Plays video and its soundtrack from separate video/audio output pins. Includes trim in/out, restart, reverse, loop and four cue inputs. Click the timeline to seek or Shift-click to create a cue; any cue input crossing above zero jumps to its marker." },
          { "VMPC", "VJ clip launcher, the MPC for video: 16 pads, one video clip each, hit with the mouse, a CV pin per pad or the note input (base note 36 = pad 1). Per pad: one shot, gate (loops while held) or loop (toggle), trim in/out and speed (negative = reverse). The output is the clip of the last pad hit; with nothing playing it is transparent (or the last frame with hold last frame). Transition (cut, fade, slide, wipe, zoom) and its time apply when a hit switches clips. Silent: use a Video node for soundtracks." },
          { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included. The 4D types (Simplex, Perlin, Ridged, Turbulence, Billow 4D) work like TouchDesigner's Noise TOP: the picture is a slice of 4D noise and speed moves along the 4th axis, so it morphs in place; drift adds an optional scroll, plus translate, z, rotate and exponent." },
@@ -28300,6 +28494,7 @@ namespace
             // A patch naming a node type this build does not have still opens;
             // it just comes back missing that node.
             fprintf(stderr, "patch: unknown node type '%s', skipped\n", rec.typeName.c_str());
+            gSkippedNodeTypes.push_back(rec.typeName); // Turbo 0.53: MIT build opening a full-build patch
             continue;
          }
          remap[rec.index] = spawned->index;
@@ -28541,6 +28736,7 @@ namespace
 
    bool LoadPatchFrom(const std::string& path)
    {
+      gSkippedNodeTypes.clear();
       Patch::Data data;
       std::string error;
       if (!Patch::Read(path, data, error))
@@ -28569,6 +28765,18 @@ namespace
       gPatchPath = path;
       gPatchDirty = false;
       gPatchStatus = "Opened";
+      if (!gSkippedNodeTypes.empty())
+      {
+         // Turbo 0.53: a patch made with the full (GPL) build opened in the
+         // MIT build comes back without those nodes; say which ones.
+         std::string list;
+         for (const std::string& t : gSkippedNodeTypes)
+            if (list.find(t) == std::string::npos)
+               list += (list.empty() ? "" : ", ") + t;
+         gPatchStatus = "Opened without " + std::to_string(gSkippedNodeTypes.size()) +
+                        " node(s) this build lacks: " + list;
+         RuntimeLog::Write("patch: %s", gPatchStatus.c_str());
+      }
       gWatchedPath = path; // Turbo 0.45
       gWatchedStamp = PatchFileStamp(path);
       gWatchPendingStamp = 0;
@@ -28995,6 +29203,7 @@ namespace
                   }
          }
          GraphNode* gn = SpawnNode(typeName, category, x, y);
+         ApplySpawnDefaults(gn); // Turbo 0.54: MCP create_node gets the same defaults
          if (gn == nullptr)
          {
             outError = "unknown node type '" + typeName + "' (describe lists them)";
@@ -36404,8 +36613,18 @@ int main(int argc, char** argv)
    // library once; removing them from the panel is remembered. Adding them
    // starts a background scan.
    if (const std::string kit = TurboDrumKitDir(); !kit.empty())
-      gSampleScanner.SeedDefaultFolders(
-         { { std::filesystem::u8path(kit).parent_path().u8string(), "Turbo kits" } });
+   {
+      const std::filesystem::path kitsRoot = std::filesystem::u8path(kit).parent_path();
+      gSampleScanner.SeedDefaultFolders({ { kitsRoot.u8string(), "Turbo kits" } });
+      // Turbo 0.54: the CC0 pack landed inside that root (one rescan), and the
+      // full build adds SLOOP's 37 kits rendered to samples.
+      gSampleScanner.SeedFolderOnce("cc0-pack-0.54", kitsRoot.u8string(), "Turbo kits");
+      std::error_code gplEc;
+      const std::filesystem::path gplKits = kitsRoot.parent_path() / "drumkits-gpl";
+      if (std::filesystem::is_directory(gplKits, gplEc))
+         gSampleScanner.SeedFolderOnce("sloop-kits-0.54", gplKits.u8string(), "SLOOP kits");
+   }
+   SeedBundledDrumPatterns(); // Turbo 0.54
    // Never a scan at launch, for the same reason the two above aren't:
    // the cached index is shown instantly and rebuilding it is the user's
    // explicit Rescan.
@@ -36485,7 +36704,8 @@ int main(int argc, char** argv)
       }
       std::ofstream sessionMarker(SessionMarkerPath(), std::ios::trunc);
       sessionMarker << "active\n";
-      RuntimeLog::Write("startup complete; prior recovery=%s", gRecoveryAvailable ? "available" : "none");
+      RuntimeLog::Write("startup complete; prior recovery=%s; edition=%s", gRecoveryAvailable ? "available" : "none",
+                        INFINITE_GPL ? "full (GPL modules)" : "MIT");
    }
 
    RegisterNodes();
@@ -40037,6 +40257,7 @@ int main(int argc, char** argv)
                           gViewCenterCanvas.y - 115.0f + cascade);
          GraphNode* spawned = SpawnNode(request.name, request.category,
                                         pos.x, pos.y);
+         ApplySpawnDefaults(spawned);
          if (spawned != nullptr)
          {
             ed::SetNodePosition(spawned->NodeId(), pos);
@@ -48714,6 +48935,7 @@ int main(int argc, char** argv)
          if (!spawnName.empty())
          {
             GraphNode* spawned = SpawnNode(spawnName, spawnCategory, gSpawnPos.x, gSpawnPos.y);
+            ApplySpawnDefaults(spawned);
             if (gLinkDragSourcePin >= 0 && spawned != nullptr)
             {
                GraphNode* dragSrcNode = FindNodeByIndex(GraphNode::NodeIndexFromPin(gLinkDragSourcePin));

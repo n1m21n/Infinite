@@ -1,0 +1,46 @@
+{
+ "patterns": [
+  {
+   "file": "drummer1-session2-033-punk-128.mid",
+   "title": "Punk 128 bpm (4/4) - drummer 1 session2 #33",
+   "style": "Punk",
+   "bpm": 128
+  },
+  {
+   "file": "drummer1-session2-034-punk-128.mid",
+   "title": "Punk 128 bpm (4/4) - drummer 1 session2 #34",
+   "style": "Punk",
+   "bpm": 128
+  },
+  {
+   "file": "drummer1-session2-035-punk-128.mid",
+   "title": "Punk 128 bpm (4/4) - drummer 1 session2 #35",
+   "style": "Punk",
+   "bpm": 128
+  },
+  {
+   "file": "drummer1-session2-036-punk-128.mid",
+   "title": "Punk 128 bpm (4/4) - drummer 1 session2 #36",
+   "style": "Punk",
+   "bpm": 128
+  },
+  {
+   "file": "drummer1-session2-037-punk-128.mid",
+   "title": "Punk 128 bpm (4/4) - drummer 1 session2 #37",
+   "style": "Punk",
+   "bpm": 128
+  },
+  {
+   "file": "drummer1-session2-032-punk-140.mid",
+   "title": "Punk 140 bpm (4/4) - drummer 1 session2 #32",
+   "style": "Punk",
+   "bpm": 140
+  },
+  {
+   "file": "drummer1-session2-062-punk-144.mid",
+   "title": "Punk 144 bpm (4/4) - drummer 1 session2 #62",
+   "style": "Punk",
+   "bpm": 144
+  }
+ ]
+}

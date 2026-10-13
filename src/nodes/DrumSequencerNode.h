@@ -167,6 +167,7 @@ public:
    // Turbo: loads the bundled kit (one file per lane, DrumPatterns::KitFile)
    // into every lane that has no sample. Returns how many lanes it filled.
    int LoadKitIntoEmptyLanes(const std::string& kitDir);
+   int LoadKit(const std::string& kitDir); // Turbo 0.54: every lane from the kit
    // UI state of the pattern picker (saved): the groove by name, so a later
    // library with a different order still finds it, and the part.
    std::string patternName;

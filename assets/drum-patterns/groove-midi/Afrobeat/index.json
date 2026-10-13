@@ -1,0 +1,82 @@
+{
+ "patterns": [
+  {
+   "file": "drummer8-session2-017-afrobeat-85.mid",
+   "title": "Afrobeat 85 bpm (4/4) - drummer 8 session2 #17",
+   "style": "Afrobeat",
+   "bpm": 85
+  },
+  {
+   "file": "drummer8-session2-018-afrobeat-85.mid",
+   "title": "Afrobeat 85 bpm (4/4) - drummer 8 session2 #18",
+   "style": "Afrobeat",
+   "bpm": 85
+  },
+  {
+   "file": "drummer8-session1-016-afrobeat-90.mid",
+   "title": "Afrobeat 90 bpm (4/4) - drummer 8 session1 #16",
+   "style": "Afrobeat",
+   "bpm": 90
+  },
+  {
+   "file": "drummer8-session1-017-afrobeat-90.mid",
+   "title": "Afrobeat 90 bpm (4/4) - drummer 8 session1 #17",
+   "style": "Afrobeat",
+   "bpm": 90
+  },
+  {
+   "file": "drummer1-session3-011-afrobeat-94.mid",
+   "title": "Afrobeat 94 bpm (4/4) - drummer 1 session3 #11",
+   "style": "Afrobeat",
+   "bpm": 94
+  },
+  {
+   "file": "drummer8-session1-026-afrobeat-94.mid",
+   "title": "Afrobeat 94 bpm (4/4) - drummer 8 session1 #26",
+   "style": "Afrobeat",
+   "bpm": 94
+  },
+  {
+   "file": "drummer8-session2-030-afrobeat-98.mid",
+   "title": "Afrobeat 98 bpm (4/4) - drummer 8 session2 #30",
+   "style": "Afrobeat",
+   "bpm": 98
+  },
+  {
+   "file": "drummer8-session2-031-afrobeat-98.mid",
+   "title": "Afrobeat 98 bpm (4/4) - drummer 8 session2 #31",
+   "style": "Afrobeat",
+   "bpm": 98
+  },
+  {
+   "file": "drummer8-session2-013-afrobeat-103.mid",
+   "title": "Afrobeat 103 bpm (4/4) - drummer 8 session2 #13",
+   "style": "Afrobeat",
+   "bpm": 103
+  },
+  {
+   "file": "drummer8-session2-014-afrobeat-103.mid",
+   "title": "Afrobeat 103 bpm (4/4) - drummer 8 session2 #14",
+   "style": "Afrobeat",
+   "bpm": 103
+  },
+  {
+   "file": "drummer8-session2-021-afrobeat-110.mid",
+   "title": "Afrobeat 110 bpm (4/4) - drummer 8 session2 #21",
+   "style": "Afrobeat",
+   "bpm": 110
+  },
+  {
+   "file": "drummer8-session2-003-afrobeat-114.mid",
+   "title": "Afrobeat 114 bpm (4/4) - drummer 8 session2 #3",
+   "style": "Afrobeat",
+   "bpm": 114
+  },
+  {
+   "file": "drummer8-session2-004-afrobeat-114.mid",
+   "title": "Afrobeat 114 bpm (4/4) - drummer 8 session2 #4",
+   "style": "Afrobeat",
+   "bpm": 114
+  }
+ ]
+}

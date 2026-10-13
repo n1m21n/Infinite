@@ -1,0 +1,46 @@
+{
+ "patterns": [
+  {
+   "file": "drummer1-session1-176-afrocuban-105.mid",
+   "title": "Afro-Cuban 105 bpm (4/4) - drummer 1 session1 #176",
+   "style": "Afro-Cuban",
+   "bpm": 105
+  },
+  {
+   "file": "drummer1-session1-183-afrocuban-105.mid",
+   "title": "Afro-Cuban 105 bpm (4/4) - drummer 1 session1 #183",
+   "style": "Afro-Cuban",
+   "bpm": 105
+  },
+  {
+   "file": "drummer1-session3-017-afrocuban-calypso-108.mid",
+   "title": "Afro-Cuban calypso 108 bpm (4/4) - drummer 1 session3 #17",
+   "style": "Afro-Cuban",
+   "bpm": 108
+  },
+  {
+   "file": "drummer1-session2-161-afrocuban-rhumba-110.mid",
+   "title": "Afro-Cuban rhumba 110 bpm (4/4) - drummer 1 session2 #161",
+   "style": "Afro-Cuban",
+   "bpm": 110
+  },
+  {
+   "file": "drummer1-session2-112-afrocuban-bembe-122.mid",
+   "title": "Afro-Cuban bembe 122 bpm (4/4) - drummer 1 session2 #112",
+   "style": "Afro-Cuban",
+   "bpm": 122
+  },
+  {
+   "file": "drummer5-session1-013-afrocuban-calypso-124.mid",
+   "title": "Afro-Cuban calypso 124 bpm (4/4) - drummer 5 session1 #13",
+   "style": "Afro-Cuban",
+   "bpm": 124
+  },
+  {
+   "file": "drummer5-session1-018-afrocuban-128.mid",
+   "title": "Afro-Cuban 128 bpm (4/4) - drummer 5 session1 #18",
+   "style": "Afro-Cuban",
+   "bpm": 128
+  }
+ ]
+}

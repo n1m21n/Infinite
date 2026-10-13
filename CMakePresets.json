@@ -8,7 +8,7 @@
   "configurePresets": [
     {
       "name": "windows-vs2022",
-      "displayName": "Infinite-Turbo Windows x64 (Visual Studio 2022)",
+      "displayName": "Infinite-Turbo Windows x64, full build with GPL modules (Visual Studio 2022)",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/windows-vs2022",
@@ -17,7 +17,18 @@
         "VCPKG_TARGET_TRIPLET": "x64-windows-static",
         "INFINITE_ENABLE_VST3": "ON",
         "INFINITE_ENABLE_SPOUT": "ON",
-        "INFINITE_ENABLE_DIRECTML_MATTING": "ON"
+        "INFINITE_ENABLE_DIRECTML_MATTING": "ON",
+        "INFINITE_ENABLE_GPL": "ON"
+      }
+    },
+    {
+      "name": "windows-vs2022-mit",
+      "displayName": "Infinite-Turbo Windows x64, MIT build (Visual Studio 2022)",
+      "inherits": "windows-vs2022",
+      "binaryDir": "${sourceDir}/build/windows-vs2022-mit",
+      "cacheVariables": {
+        "INFINITE_ENABLE_GPL": "OFF",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/build/windows-vs2022/vcpkg_installed"
       }
     }
   ],
@@ -30,6 +41,16 @@
     {
       "name": "windows-debug",
       "configurePreset": "windows-vs2022",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-mit-release",
+      "configurePreset": "windows-vs2022-mit",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-mit-debug",
+      "configurePreset": "windows-vs2022-mit",
       "configuration": "Debug"
     }
   ]

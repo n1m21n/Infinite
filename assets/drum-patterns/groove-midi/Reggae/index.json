@@ -1,0 +1,28 @@
+{
+ "patterns": [
+  {
+   "file": "drummer1-session1-201-reggae-slow-64.mid",
+   "title": "Reggae slow 64 bpm (4/4) - drummer 1 session1 #201",
+   "style": "Reggae",
+   "bpm": 64
+  },
+  {
+   "file": "drummer1-session1-184-reggae-78.mid",
+   "title": "Reggae 78 bpm (4/4) - drummer 1 session1 #184",
+   "style": "Reggae",
+   "bpm": 78
+  },
+  {
+   "file": "drummer5-session2-005-reggae-126.mid",
+   "title": "Reggae 126 bpm (4/4) - drummer 5 session2 #5",
+   "style": "Reggae",
+   "bpm": 126
+  },
+  {
+   "file": "drummer5-session2-004-reggae-141.mid",
+   "title": "Reggae 141 bpm (4/4) - drummer 5 session2 #4",
+   "style": "Reggae",
+   "bpm": 141
+  }
+ ]
+}

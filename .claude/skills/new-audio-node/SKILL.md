@@ -16,8 +16,11 @@ then that one before writing any `Draw*Body`.
 
 A fresh session cannot infer them, and each has already cost real time here.
 
-1. **Clean room.** *Do not open, read, grep, or reference
+1. **Clean room (MIT side).** *Do not open, read, grep, or reference
    `/Users/namansoni/BespokeSynth`.* Infinite is MIT, BespokeSynth is GPLv3.
+   Infinite-Turbo exception: a node ported from GPL-3.0 code lives in `src/gpl/` only,
+   behind `INFINITE_ENABLE_GPL` / `#if INFINITE_GPL` (rules in `src/gpl/README.md`).
+   Never copy GPL code into any other folder.
    Work only from the spec in `docs/plans/audio/README.md` and the cited DSP
    literature (PolyBLEP, TPT/Zavalishin SVF, RBJ biquad cookbook, FDN reverb,
    Voss-McCartney pink noise). Implement each algorithm from its **primary

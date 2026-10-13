@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.53.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.54.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -17,6 +17,9 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 option(INFINITE_ENABLE_VST3 "Build the VST3 plugin backend (JUCE)" ON)
 option(INFINITE_ENABLE_SPOUT "Build Spout input/output support" ON)
+# Turbo 0.53: GPL-3.0 modules in src/gpl (full build). OFF = the MIT build,
+# which is what release-windows.bat publishes. See src/gpl/README.md.
+option(INFINITE_ENABLE_GPL "Build the GPL-3.0 modules in src/gpl (full Infinite-Turbo build)" ON)
 option(INFINITE_ENABLE_DIRECTML_MATTING "Accelerate Remove Background with Windows ML / DirectML" ON)
 option(INFINITE_ENABLE_AVX2 "Compile with /arch:AVX2 (any x64 CPU from ~2013 on)" ON)
 option(INFINITE_ENABLE_ASIO "ASIO driver support (downloads the Steinberg ASIO SDK, GPLv3)" ON)
@@ -429,8 +432,16 @@ target_compile_definitions(Infinite PRIVATE
     INFINITE_WINDOWS=1
     INFINITE_ENABLE_VST3=$<BOOL:${INFINITE_ENABLE_VST3}>
     INFINITE_ENABLE_SPOUT=$<BOOL:${INFINITE_ENABLE_SPOUT}>
+    INFINITE_GPL=$<BOOL:${INFINITE_ENABLE_GPL}>
     INFINITE_HAS_WINDOWS_ML=${INFINITE_HAS_WINDOWS_ML}
 )
+if(INFINITE_ENABLE_GPL)
+    file(GLOB INFINITE_GPL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/gpl/*.cpp")
+    target_sources(Infinite PRIVATE ${INFINITE_GPL_SOURCES})
+    message(STATUS "Infinite-Turbo edition: full (GPL-3.0 modules from src/gpl)")
+else()
+    message(STATUS "Infinite-Turbo edition: MIT (src/gpl left out)")
+endif()
 target_include_directories(Infinite PRIVATE ${FFMPEG_INCLUDE_DIRS})
 target_link_directories(Infinite PRIVATE ${FFMPEG_LIBRARY_DIRS})
 target_link_libraries(Infinite PRIVATE
@@ -511,6 +522,22 @@ add_custom_command(TARGET Infinite POST_BUILD
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits"
         "$<TARGET_FILE_DIR:Infinite>/assets/drumkits"
     VERBATIM)
+# Turbo 0.54: bundled MIDI pattern packs (both builds) and, in the full build
+# only, SLOOP's kits rendered to samples (GPL-3.0 material, src/gpl/README.md).
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/drum-patterns")
+    add_custom_command(TARGET Infinite POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/drum-patterns"
+            "$<TARGET_FILE_DIR:Infinite>/assets/drum-patterns"
+        VERBATIM)
+endif()
+if(INFINITE_ENABLE_GPL)
+    add_custom_command(TARGET Infinite POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits-gpl"
+            "$<TARGET_FILE_DIR:Infinite>/assets/drumkits-gpl"
+        VERBATIM)
+endif()
 # The upstream codebase stores UTF-8 paths in std::string. Preserve that
 # ABI while using C++20 for the Windows ML headers.
 target_compile_options(Infinite PRIVATE /utf-8 /bigobj /permissive- /Zc:char8_t- /Zc:__cplusplus /MP)

@@ -1,0 +1,28 @@
+{
+ "patterns": [
+  {
+   "file": "drummer5-session1-017-blues-shuffle-72.mid",
+   "title": "Blues shuffle 72 bpm (4/4) - drummer 5 session1 #17",
+   "style": "Blues",
+   "bpm": 72
+  },
+  {
+   "file": "drummer4-session1-008-blues-shuffle-112.mid",
+   "title": "Blues shuffle 112 bpm (4/4) - drummer 4 session1 #8",
+   "style": "Blues",
+   "bpm": 112
+  },
+  {
+   "file": "drummer4-session1-006-blues-shuffle-134.mid",
+   "title": "Blues shuffle 134 bpm (4/4) - drummer 4 session1 #6",
+   "style": "Blues",
+   "bpm": 134
+  },
+  {
+   "file": "drummer4-session1-007-blues-shuffle-134.mid",
+   "title": "Blues shuffle 134 bpm (4/4) - drummer 4 session1 #7",
+   "style": "Blues",
+   "bpm": 134
+  }
+ ]
+}

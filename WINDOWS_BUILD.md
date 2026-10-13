@@ -234,3 +234,10 @@ cmake --preset windows-vs2022 --fresh -DINFINITE_ENABLE_DIRECTML_MATTING=OFF
 ## Licenças
 
 O código original é MIT. O build Windows usa JUCE 8, disponível sob licença comercial ou AGPLv3. A distribuição do executável deve respeitar a licença aplicável do JUCE e as licenças do VST3 SDK, FFmpeg, OpenCV, Spout2, Assimp, Windows ML/ONNX Runtime, DirectML e demais dependências. Consulte `LICENSE` antes de redistribuir.
+
+
+## Edições (0.54)
+
+- `build-windows.bat` compila o build completo (com `src\gpl`, GPL-3.0) em `build\windows-vs2022`.
+- `build-windows.bat mit` compila o build MIT em `build\windows-vs2022-mit` (reaproveita as bibliotecas do vcpkg do build completo).
+- `release-windows.bat` publica só o build MIT.

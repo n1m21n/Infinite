@@ -1,0 +1,4 @@
+Groove MIDI Dataset (Magenta, Google), CC BY 4.0 - https://magenta.tensorflow.org/datasets/groove
+Jon Gillick, Adam Roberts, Jesse Engel, Douglas Eck, David Bamman. "Learning to Groove with Inverse
+Sequence Transformations." ICML 2019. Human drummers on a Roland TD-11; kept here: the beat performances,
+renamed and grouped by style for the Infinite-Turbo Drum Sequencer.

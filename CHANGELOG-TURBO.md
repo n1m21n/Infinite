@@ -1,5 +1,53 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.54.0-turbo (2026-10-13)
+
+Two editions from one source, and the first GPL "superpower".
+
+### Editions
+- **MIT build** (`build-windows.bat mit`, preset `windows-vs2022-mit`, folder `build\windows-vs2022-mit`):
+  Infinite + Turbo code, all MIT. `release-windows.bat` now builds and publishes only this one.
+- **Full build** (`build-windows.bat`, default): the MIT build plus `src/gpl/`, modules ported from GPL-3.0
+  projects. CMake option `INFINITE_ENABLE_GPL`; the startup log says which edition is running.
+- Opening a patch with full-build nodes in the MIT build keeps the rest of the patch and the status line
+  names the missing nodes.
+- New `THIRD_PARTY_NOTICES.md` (shipped in the ZIP) and `src/gpl/README.md` + `src/gpl/LICENSE`.
+
+### Punch FX (full build)
+- Pocket-operator style performance effects, a float port of SLOOP / Felucca's punch-in FX (GPL-3.0),
+  27 effects: loops 1/4, 1/8, 1/16, 1/32 and 1/8T, stutter, reverse, tape stop, half speed, low / high
+  pass sweeps, phone, crush, alias, gate, echo, wobble, kill low / mid / high, rewind, octave up, flanger,
+  auto-pan, mono, fade out and **freeze** (new: a granular hold of the last quarter second).
+- **16 pads** laid out like the MPC, each with its own effect (click a pad, pick its effect below) and
+  its own pin: MIDI learn a controller pad straight onto it, or patch a Macro / MIDI Trigger. Notes cabled
+  into the second input play the pads too (36 = pad 1).
+- **Any number of effects at once**: every effect runs in its own engine, chained in table order.
+- **Latch**: pads (mouse and MIDI) toggle on / off instead of momentary.
+- Loops and stutter start on the beat grid while the transport runs. `effect` + `engage` stay as one
+  MIDI-learnable trigger.
+
+### Drum Sequencer
+- A new Drum Sequencer (sidebar, canvas menu or MCP) comes with the **CC0 acoustic kit** on its lanes
+  (kick, snare, closed / open hat, clap, low / high tom, bell); patches that load keep their own samples.
+  Lanes whose saved sample moved with an older install are found again in any bundled kit folder.
+
+- **Kit picker** on the Drum Sequencer: every bundled kit, one click loads all 8 lanes (undoable).
+- **SLOOP's 37 drum kits** (full build only): 808, 909, 606, 80s, vintage, trap, drill, boom bap, lo-fi,
+  phonk, house, deep house, techno, minimal, electro, disco, garage, jungle, dubstep, dembow, amapiano,
+  afro, latin, tribal, synthwave, chip, arcade, glitch, industrial, hyper, ambient, jazz and the five
+  sampled ones, rendered with SLOOP's own engine: 8 lane sounds + 8 extras per kit (FLAC, 19 MB), also in
+  the Samples panel under "SLOOP kits".
+- **Pattern packs**: `assets/drum-patterns/<pack>` is copied once into the MIDI pattern folder, where the
+  MIDI browser lists it by style. `scripts/import_groove_midi.py` builds the Magenta Groove MIDI pack
+  (human drummers, CC BY 4.0) from the dataset's zip.
+- The Samples panel picks up new bundled content once (a rescan of the Turbo kits root for the CC0 pack).
+
+### CC0 sample pack (both builds)
+- `assets/drumkits/cc0-acoustic-kit` (11 sounds, named like the Drum Sequencer lanes plus rim, crash, ride), `cc0-percussion` (tambourine, shaker, conga, claves,
+  woodblock, three vinyl scratches) and `cc0-instruments` (piano, vibes, bass, horns, strings, flute
+  multisamples). VCSL / VSCO-2 CE / Sonic Pi recordings as prepared by SLOOP, all CC0. They show in the
+  Samples panel under Turbo kits.
+
 ## 0.53.0-turbo (2026-10-13)
 
 Video engine rebuilt for live use. Old patches load unchanged.

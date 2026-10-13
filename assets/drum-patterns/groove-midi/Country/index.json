@@ -1,0 +1,16 @@
+{
+ "patterns": [
+  {
+   "file": "drummer7-session2-080-country-78.mid",
+   "title": "Country 78 bpm (4/4) - drummer 7 session2 #80",
+   "style": "Country",
+   "bpm": 78
+  },
+  {
+   "file": "drummer1-session2-010-country-114.mid",
+   "title": "Country 114 bpm (4/4) - drummer 1 session2 #10",
+   "style": "Country",
+   "bpm": 114
+  }
+ ]
+}

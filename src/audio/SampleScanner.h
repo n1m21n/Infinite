@@ -65,6 +65,10 @@ public:
    // the folders file remembers it was done, so a default the user removed
    // stays removed). Skips empty paths.
    void SeedDefaultFolders(const std::vector<std::pair<std::string, std::string>>& pathAndLabel);
+   // Turbo 0.54: once per `key` (remembered in the folders file): adds `path`
+   // as a labelled root, or rescans it when it already is one (new bundled
+   // content inside an existing root). Removing the root later is respected.
+   void SeedFolderOnce(const std::string& key, const std::string& path, const std::string& label);
 
    // Kicks off a scan on a background thread: every added folder by default,
    // or just `folder` when given, in which case the other folders' existing
@@ -122,6 +126,7 @@ private:
    std::vector<std::string> mFolders;
    std::vector<std::string> mLabels; // parallel to mFolders
    bool mDefaultsSeeded = false;
+   std::vector<std::string> mSeededKeys; // Turbo 0.54, see SeedFolderOnce
    std::vector<Entry> mIndex;
    uint64_t mIndexVersion { 1 };
 

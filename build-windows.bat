@@ -3,7 +3,9 @@ setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 title Infinite-Turbo - compilacao Windows x64
 
-rem Uso: build-windows.bat [debug] [fresh] [pack]
+rem Uso: build-windows.bat [mit] [debug] [fresh] [pack]
+rem   mit     build MIT (sem os modulos GPL de src\gpl), em build\windows-vs2022-mit;
+rem           sem "mit" sai o build completo (com src\gpl), em build\windows-vs2022
 rem   debug   compila Debug em vez de Release
 rem   fresh   reconfigura do zero (apaga o cache do CMake; use depois de trocar
 rem           dependencias ou quando o CMake reclamar de cache antigo)
@@ -13,15 +15,30 @@ set "CONFIG=Release"
 set "BUILD_PRESET=windows-release"
 set "FRESH="
 set "PACK="
+set "MIT="
+for %%A in (%*) do if /I "%%~A"=="mit" set "MIT=1"
 for %%A in (%*) do (
   if /I "%%~A"=="debug" (set "CONFIG=Debug" & set "BUILD_PRESET=windows-debug")
   if /I "%%~A"=="fresh" set "FRESH=--fresh"
   if /I "%%~A"=="pack" set "PACK=1"
   if /I "%%~A"=="nopack" set "PACK="
 )
-set "BUILD_DIR=%CD%\build\windows-vs2022"
+set "CONFIGURE_PRESET=windows-vs2022"
+set "BUILD_REL=build\windows-vs2022"
+set "DIST_NAME=Infinite-Turbo-Full-Windows-x64"
+set "INFINITE_EDITION=full (GPL modules)"
+if defined MIT (
+  set "CONFIGURE_PRESET=windows-vs2022-mit"
+  set "BUILD_REL=build\windows-vs2022-mit"
+  set "DIST_NAME=Infinite-Turbo-Windows-x64"
+  set "INFINITE_EDITION=MIT"
+  if /I "%CONFIG%"=="Debug" (set "BUILD_PRESET=windows-mit-debug") else (set "BUILD_PRESET=windows-mit-release")
+)
+set "BUILD_DIR=%CD%\%BUILD_REL%"
 set "EXE_NAME=Infinite-Turbo.exe"
-set "DIST_NAME=Infinite-Turbo-Windows-x64"
+set "INFINITE_BUILD_DIR=%BUILD_REL%"
+set "INFINITE_DIST_NAME=%DIST_NAME%"
+echo Edicao: %INFINITE_EDITION%
 
 call :refresh_path
 
@@ -88,7 +105,7 @@ if defined FRESH set "NEED_CONFIGURE=1"
 if not exist "%BUILD_DIR%\CMakeCache.txt" set "NEED_CONFIGURE=1"
 if defined NEED_CONFIGURE (
   echo Configurando o projeto...
-  "!CMAKE_EXE!" --preset windows-vs2022 !FRESH! -DCMAKE_TOOLCHAIN_FILE="!VCPKG_ROOT!\scripts\buildsystems\vcpkg.cmake"
+  "!CMAKE_EXE!" --preset %CONFIGURE_PRESET% !FRESH! -DCMAKE_TOOLCHAIN_FILE="!VCPKG_ROOT!\scripts\buildsystems\vcpkg.cmake"
   if errorlevel 1 exit /b 1
 )
 
@@ -104,12 +121,12 @@ echo Inicio: %START_TIME%  Fim: %TIME%
 
 if not defined PACK (
   echo.
-  echo Compilacao concluida: build\windows-vs2022\%CONFIG%\%EXE_NAME%
+  echo Compilacao concluida: %BUILD_REL%\%CONFIG%\%EXE_NAME%
   exit /b 0
 )
 if /I not "%CONFIG%"=="Release" (
   echo.
-  echo Compilacao Debug concluida: build\windows-vs2022\Debug\%EXE_NAME%
+  echo Compilacao Debug concluida: %BUILD_REL%\Debug\%EXE_NAME%
   exit /b 0
 )
 

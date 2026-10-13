@@ -105,6 +105,10 @@ level). Keep the sound itself routed to an Audio Out if it should be heard.
 The Video's audio output goes to an Audio Out to hear its soundtrack. Any FFmpeg format plays;
 for many layers prefer HAP / HAP Q (decoded on the GPU) or Resolume DXV clips.
 
+**Punch FX** (full build only; `describe` lists it when present): audio in -> Punch FX -> audio out.
+`effect` 0-26 (0 Loop 1/4 ... 25 Fade out, 26 Freeze) and `engage` 1 fire one effect; `pad<n>fx` and
+`pad<n>note` (n 0-15) map 16 pads to effects and MIDI notes (cable notes into the second input); `latch` 1 toggles.
+
 **Camera / capture card**: Video In, `active` 1, `deviceId` from the node's device list,
 `resolution` (0 Auto, 1 1080p, 2 720p, 3 480p) and `frameRate` (0 Auto, 1 60, 2 30, 3 25).
 
