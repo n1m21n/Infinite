@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "INode.h"
+#include "ImageCable.h"
 #include "GLUtil.h"
 
 // User-authored formula source. The user types a GLSL expression body; Apply()
@@ -44,7 +45,16 @@ public:
       v.Float("knobA", knobA); v.Float("knobB", knobB);
       v.Float("knobC", knobC); v.Float("knobD", knobD);
       v.Bool("animate", animate);
+      v.Bool("matchInput", matchInput);
    }
+
+   // Turbo (TOP parity, GLSL TOP): image inputs, read in the formula as
+   // uIn0..uIn3 (uHasIn0..3 says which are patched, uInRes0..3 their size).
+   static constexpr int kInputs = 4;
+   ImageCable& Input(int slot) { return mInputs[slot]; }
+   const char* InputLabel(int slot) const override;
+   INode* BypassSource() override { return mInputs[0].GetSource(); }
+   bool matchInput = false; // render at in0's size instead of width x height
 
    // Bound directly by the ImGui params panel.
    std::string formula;
@@ -64,4 +74,5 @@ private:
 
    GLUtil::Fbo mOut;
    int mLastCookFrame = -1;
+   ImageCable mInputs[kInputs];
 };

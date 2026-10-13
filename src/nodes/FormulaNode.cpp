@@ -18,6 +18,19 @@ namespace
       "uniform float uC;\n"
       "uniform float uD;\n"
       "uniform float uAspect;\n"
+      // Turbo (TOP parity): patched image inputs, sampled with texture(uIn0, uv).
+      "uniform sampler2D uIn0;\n"
+      "uniform sampler2D uIn1;\n"
+      "uniform sampler2D uIn2;\n"
+      "uniform sampler2D uIn3;\n"
+      "uniform int uHasIn0;\n"
+      "uniform int uHasIn1;\n"
+      "uniform int uHasIn2;\n"
+      "uniform int uHasIn3;\n"
+      "uniform vec2 uInRes0;\n"
+      "uniform vec2 uInRes1;\n"
+      "uniform vec2 uInRes2;\n"
+      "uniform vec2 uInRes3;\n"
       "\n"
       "#define PI 3.14159265359\n"
       "#define TAU 6.28318530718\n"
@@ -27,6 +40,7 @@ namespace
       "float sdBox(vec2 p, vec2 b) { vec2 d = abs(p) - b; return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0); }\n"
       "\n"
       "// uv is 0..1, p is centered and aspect-corrected, t is seconds, knobs uA..uD are 0..1.\n"
+      "// Patched images: texture(uIn0, uv) .. uIn3; uHasIn0 == 1 when in0 is connected.\n"
       "// Return the final RGBA for this pixel.\n"
       "vec4 shape(vec2 uv, vec2 p, float t) {\n";
 
@@ -380,6 +394,12 @@ FormulaNode::FormulaNode()
    formula = kDefaultFormula;
 }
 
+const char* FormulaNode::InputLabel(int slot) const
+{
+   static const char* kLabels[kInputs] = { "in0", "in1", "in2", "in3" };
+   return (slot >= 0 && slot < kInputs) ? kLabels[slot] : nullptr;
+}
+
 FormulaNode::~FormulaNode()
 {
    if (mProgram != 0)
@@ -420,13 +440,41 @@ void FormulaNode::CookIfNeeded(int frameId)
    if (animate)
       mClock = (float)Transport::Instance().Seconds();
 
-   const int w = std::max(4, (int)width);
-   const int h = std::max(4, (int)height);
+   unsigned int inTex[kInputs] = {};
+   unsigned int anyTex = 0;
+   for (int i = 0; i < kInputs; i++)
+   {
+      inTex[i] = mInputs[i].Pull(frameId);
+      if (anyTex == 0)
+         anyTex = inTex[i];
+   }
+
+   int w = std::max(4, (int)width);
+   int h = std::max(4, (int)height);
+   if (matchInput && inTex[0] != 0)
+   {
+      w = std::max(1, mInputs[0].Width());
+      h = std::max(1, mInputs[0].Height());
+   }
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
-   GLUtil::RunShaderPass(mOut, mProgram, [this]()
+   GLUtil::RunShaderPass(mOut, mProgram, [this, &inTex, anyTex]()
    {
+      static const char* kSampler[kInputs] = { "uIn0", "uIn1", "uIn2", "uIn3" };
+      static const char* kHas[kInputs] = { "uHasIn0", "uHasIn1", "uHasIn2", "uHasIn3" };
+      static const char* kRes[kInputs] = { "uInRes0", "uInRes1", "uInRes2", "uInRes3" };
+      for (int i = 0; i < kInputs; i++)
+      {
+         // An unpatched input aliases a patched one (or nothing at all, when
+         // none is): sampling an unbound unit is undefined.
+         glActiveTexture(GL_TEXTURE0 + i);
+         glBindTexture(GL_TEXTURE_2D, inTex[i] != 0 ? inTex[i] : anyTex);
+         glUniform1i(glGetUniformLocation(mProgram, kSampler[i]), i);
+         glUniform1i(glGetUniformLocation(mProgram, kHas[i]), inTex[i] != 0 ? 1 : 0);
+         glUniform2f(glGetUniformLocation(mProgram, kRes[i]), (float)mInputs[i].Width(), (float)mInputs[i].Height());
+      }
+      glActiveTexture(GL_TEXTURE0);
       glUniform1f(glGetUniformLocation(mProgram, "uTime"), mClock);
       glUniform1f(glGetUniformLocation(mProgram, "uA"), knobA);
       glUniform1f(glGetUniformLocation(mProgram, "uB"), knobB);

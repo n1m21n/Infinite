@@ -101,6 +101,7 @@
 #include "nodes/ModelSourceNode.h"
 #include "nodes/Text3DNode.h"
 #include "nodes/UtilityNodes.h"
+#include "nodes/WirelessNodes.h"
 #include "nodes/PointDistributionNodes.h"
 #include "nodes/PathNode.h"
 #include "nodes/CurveNode.h"
@@ -730,6 +731,9 @@ namespace
          if (shapeNode->shapeType >= 0 && shapeNode->shapeType < (int)names.size())
             return DisplayName(names[shapeNode->shapeType]);
       }
+      // Turbo: a Send/Receive reads by its channel, the way [s name] does in Pd.
+      if (auto* wireless = dynamic_cast<WirelessNode*>(gn.node.get()))
+         return DisplayName(gn.typeName) + " " + wireless->channel;
       return DisplayName(gn.typeName);
    }
 
@@ -3867,6 +3871,17 @@ namespace
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
       REGISTER_NODE(OscReceiveNode, OSC Receive, "OSC");
       REGISTER_NODE(OscSendNode, OSC Send, "OSC");
+      // Turbo: Pure Data style wireless send/receive, one pair per cable kind.
+      REGISTER_NODE(SendImageNode, Send Image, "Utility");
+      REGISTER_NODE(ReceiveImageNode, Receive Image, "Utility");
+      REGISTER_NODE(SendCVNode, Send CV, "Utility");
+      REGISTER_NODE(ReceiveCVNode, Receive CV, "Utility");
+      REGISTER_NODE(SendNotesNode, Send Notes, "Utility");
+      REGISTER_NODE(ReceiveNotesNode, Receive Notes, "Utility");
+      REGISTER_NODE(SendAudioNode, Send Audio, "Utility");
+      REGISTER_NODE(ReceiveAudioNode, Receive Audio, "Utility");
+      REGISTER_NODE(SendGeometryNode, Send Geometry, "Utility");
+      REGISTER_NODE(ReceiveGeometryNode, Receive Geometry, "Utility");
       REGISTER_NODE(OscToCvNode, OSC to CV, "Control");
       // Ported from upstream Infinite: the note-prediction family.
       REGISTER_NODE(PredictiveNotesNode, Predictive Notes, "Prediction");
@@ -4197,6 +4212,11 @@ namespace
          return filter->Def().inputs;
       if (dynamic_cast<FitNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<FormulaNode*>(gn.node.get()) != nullptr)
+         return FormulaNode::kInputs;
+      if (dynamic_cast<SendImageNode*>(gn.node.get()) != nullptr ||
+          dynamic_cast<SendGeometryNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<ProjectionNode*>(gn.node.get()) != nullptr)
@@ -4341,6 +4361,10 @@ namespace
       }
       if (auto* fit = dynamic_cast<FitNode*>(gn.node.get()))
          return slot == 0 ? &fit->Input() : nullptr;
+      if (auto* formula = dynamic_cast<FormulaNode*>(gn.node.get()))
+         return (slot >= 0 && slot < FormulaNode::kInputs) ? &formula->Input(slot) : nullptr;
+      if (auto* sendImage = dynamic_cast<SendImageNode*>(gn.node.get()))
+         return slot == 0 ? &sendImage->Input() : nullptr;
       if (auto* resynth = dynamic_cast<ResynthNode*>(gn.node.get()))
          return slot == 0 ? &resynth->Input() : nullptr;
       if (auto* i2p = dynamic_cast<ImageToPointsNode*>(gn.node.get()))
@@ -4472,7 +4496,7 @@ namespace
    // Geometry, camera and light connections are raw pointers rather than
    // ImageCables, so saving and loading them needs this one place that knows
    // the mapping - the same knowledge the link-drawing and connect paths use.
-   void ConnectGeometrySlot(GraphNode& dst, int slot, GraphNode& src)
+   void ConnectGeometrySlot(GraphNode& dst, int slot, GraphNode& src, int srcOutput = 0)
    {
       auto* geo = dynamic_cast<IGeometrySource*>(src.node.get());
       auto* cam = dynamic_cast<CameraNode*>(src.node.get());
@@ -4504,14 +4528,11 @@ namespace
          audio->fileSource = dynamic_cast<AudioFileNode*>(src.node.get());
          return;
       }
-      if (auto* math = dynamic_cast<MathNode*>(dst.node.get()))
-      {
-         IModulator* mod = ModulatorForOutput(src.node.get(), 0);
-         if (slot == 0)
-            math->inputA = mod;
-         else
-            math->inputB = mod;
-      }
+      // Every modulator-input pin (Math, Range to Range, Smoothing, Send CV,
+      // ...), not just Math's: the patch stores them in the same `geo`
+      // records, with the source's modulator output as the 4th token.
+      if (IModulator** field = dst.node->ModulatorInputSlot(slot))
+         *field = ModulatorForOutput(src.node.get(), srcOutput);
    }
 
    // Whether an output pin carrying the given src-side facts may connect into
@@ -5000,6 +5021,7 @@ namespace
       // hidden behind the small eye toggle.
       if (dynamic_cast<VideoSourceNode*>(node) != nullptr || dynamic_cast<VideoInNode*>(node) != nullptr ||
           dynamic_cast<FeedbackNode*>(node) != nullptr || dynamic_cast<OutputNode*>(node) != nullptr ||
+          dynamic_cast<WirelessNode*>(node) != nullptr ||
           dynamic_cast<ClipMatrixNode*>(node) != nullptr || dynamic_cast<ClipMatrixOutNode*>(node) != nullptr)
          gn.showParams = true;
       gBringToFrontQueue.push_back(gn.index); // Turbo 0.50
@@ -5248,6 +5270,76 @@ namespace
       }
    }
 
+   // Turbo: Send / Receive (Pure Data style). The channel name is the whole
+   // connection, so it gets a text field plus a picker of names already in use.
+   void DrawWirelessParams(WirelessNode* n)
+   {
+      char buf[128];
+      snprintf(buf, sizeof(buf), "%s", n->channel.c_str());
+      ImGui::SetNextItemWidth(kParamWidth);
+      if (ImGui::InputText("channel##wirelessName", buf, sizeof(buf)))
+      {
+         n->channel = buf;
+         gPatchDirty = true;
+      }
+      if (ImGui::IsItemActivated())
+         PushUndoCheckpoint();
+      const std::vector<std::string> names = WirelessNode::ChannelNames();
+      if (names.size() > 1)
+      {
+         int current = -1;
+         for (int i = 0; i < (int)names.size(); i++)
+            if (names[i] == n->channel)
+               current = i;
+         DropdownButton("pick##wirelessPick", names, std::max(0, current), [n, names](int i) {
+            if (i < 0 || i >= (int)names.size() || names[i] == n->channel)
+               return;
+            PushUndoCheckpoint();
+            n->channel = names[i];
+            gPatchDirty = true;
+         }, kParamWidth, false);
+      }
+
+      auto setter = [](int* field) {
+         return [field](int i) {
+            if (*field == i)
+               return;
+            if (!gApplyingDiscreteCv)
+               PushUndoCheckpoint();
+            *field = i;
+            gPatchDirty = true;
+         };
+      };
+      if (auto* r = dynamic_cast<ReceiveImageNode*>(n))
+      {
+         DropdownButton("combine", ReceiveImageNode::ModeNames(), r->mode, setter(&r->mode));
+         if (r->mode == ReceiveImageNode::kIndex)
+            ModSliderInt("index", &r->index, 0, ReceiveImageNode::kMaxSenders - 1);
+      }
+      else if (auto* r = dynamic_cast<ReceiveCVNode*>(n))
+      {
+         DropdownButton("combine", ReceiveCVNode::ModeNames(), r->mode, setter(&r->mode));
+         ImGui::TextDisabled("value %.3f", r->Value01());
+      }
+      else if (auto* r = dynamic_cast<ReceiveAudioNode*>(n))
+         ModSlider("gain", &r->gain, 0.0f, 2.0f);
+      else if (auto* r = dynamic_cast<ReceiveGeometryNode*>(n))
+         ModSliderInt("index", &r->index, 0, 15);
+
+      // Who is on this channel, so a typo in a name shows up at once.
+      const size_t sends = WirelessNode::Senders(n->GetKind(), n->channel).size();
+      const size_t recvs = WirelessNode::Receivers(n->GetKind(), n->channel).size();
+      if (n->IsSend())
+         ImGui::TextDisabled("%zu %s receive%s on \"%s\"", recvs, WirelessNode::KindName(n->GetKind()),
+                             recvs == 1 ? "" : "s", n->channel.c_str());
+      else
+         ImGui::TextDisabled("%zu %s send%s on \"%s\"", sends, WirelessNode::KindName(n->GetKind()),
+                             sends == 1 ? "" : "s", n->channel.c_str());
+      if (auto* r = dynamic_cast<ReceiveGeometryNode*>(n))
+         if (sends > 0 && r->Source() == nullptr)
+            ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.25f, 1.0f), "nothing to forward: Send unpatched, or a loop");
+   }
+
    void DrawOscSendParams(OscSendNode* n)
    {
       ImGui::SetNextItemWidth(kParamWidth);
@@ -5345,6 +5437,8 @@ namespace
       ModSlider("uC", &n->knobC, 0.0f, 1.0f);
       ModSlider("uD", &n->knobD, 0.0f, 1.0f);
       ModCheckbox("animate", &n->animate);
+      ModCheckbox("size from in0", &n->matchInput);
+      ImGui::TextDisabled("images: texture(uIn0, uv) .. uIn3");
    }
 
    void DrawTextParams(TextNode* n)
@@ -5582,6 +5676,16 @@ namespace
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
       ModSlider("offset X", &n->offsetX, -4096.0f, 4096.0f, "%.0f px"); // Turbo 0.46
       ModSlider("offset Y", &n->offsetY, -4096.0f, 4096.0f, "%.0f px");
+      if (!n->matchInput)
+         ModCheckbox("limit (shrink only)", &n->limit);
+      DropdownButton("smoothness", FilterNode::Common::SmoothNames(), n->smooth, [n](int i) {
+         if (n->smooth == i)
+            return;
+         if (!gApplyingDiscreteCv)
+            PushUndoCheckpoint();
+         n->smooth = i;
+      });
+      ImGui::TextDisabled("%d x %d", n->GetOutputWidth(), n->GetOutputHeight());
    }
 
    void DrawProjectionHandleOverlay(ProjectionNode* node, ImVec2 origin, ImVec2 imageSize, const char* btnIdSuffix)
@@ -6225,8 +6329,11 @@ namespace
       ModCheckbox("manual", &n->manual);
       if (n->manual)
       {
-         ImGui::SetNextItemWidth(kParamWidth);
-         ImGui::SliderInt("slot", &n->manualSlot, 0, SwitcherNode::kSlots - 1);
+         // Turbo (TOP parity): fractional index blends neighbouring inputs.
+         if (n->index < 0.0f)
+            n->index = (float)n->manualSlot;
+         ModSlider("index", &n->index, 0.0f, (float)(SwitcherNode::kSlots - 1), "%.2f");
+         ImGui::TextDisabled("A=0  B=1  C=2  D=3");
       }
       else
       {
@@ -7205,6 +7312,13 @@ namespace
       ImGui::TextDisabled("delay: 1 frame");
       if (ModTriggerButton("Clear loop memory##feedbackClear", ImVec2(kPreviewSize, 0)))
          n->Clear();
+      DropdownButton("pixel format", FeedbackNode::FormatNames(), n->format, [n](int i) {
+         if (n->format == i)
+            return;
+         if (!gApplyingDiscreteCv)
+            PushUndoCheckpoint();
+         n->format = i;
+      });
    }
 
    void DrawTrailsParams(TrailsNode* n)
@@ -24295,6 +24409,52 @@ namespace
       DropdownButton("mode", BlendNode::ModeNames(), n->ModeIndex(),
                      [n](int i) { n->ModeIndex() = i; });
       ModSlider("opacity", &n->Mix(), 0.0f, 1.0f);
+
+      // Turbo (TOP parity, Composite TOP). The sliders come after "opacity"
+      // so its modulation ordinal stays where existing patches have it.
+      auto setter = [](int* field) {
+         return [field](int i) {
+            if (*field == i)
+               return;
+            if (!gApplyingDiscreteCv)
+               PushUndoCheckpoint();
+            *field = i;
+            gPatchDirty = true;
+         };
+      };
+      DropdownButton("alpha op", BlendNode::AlphaOpNames(), n->alphaOp, setter(&n->alphaOp));
+      NodeSeparator("B placement");
+      DropdownButton("pre-fit B", BlendNode::PreFitNames(), n->preFit, setter(&n->preFit));
+      DropdownButton("justify h", BlendNode::JustifyHNames(), n->justifyH, setter(&n->justifyH));
+      DropdownButton("justify v", BlendNode::JustifyVNames(), n->justifyV, setter(&n->justifyV));
+      ModSlider("B translate x", &n->bTx, -1.0f, 1.0f);
+      ModSlider("B translate y", &n->bTy, -1.0f, 1.0f);
+      ModSlider("B scale", &n->bScale, 0.05f, 4.0f);
+      ModSlider("B rotate", &n->bRotate, -180.0f, 180.0f, "%.1f\xC2\xB0");
+      DropdownButton("B extend", BlendNode::ExtendNames(), n->extendB, setter(&n->extendB));
+      NodeSeparator("output");
+      DropdownButton("size from", BlendNode::SizeFromNames(), n->sizeFrom, setter(&n->sizeFrom));
+      if (n->sizeFrom == 2)
+      {
+         ImGui::SetNextItemWidth(kParamWidth * 0.5f);
+         int cw = n->customW;
+         if (ImGui::InputInt("w##blendW", &cw, 0, 0) && cw != n->customW)
+         {
+            PushUndoCheckpoint();
+            n->customW = std::clamp(cw, 1, 16384);
+         }
+         ImGui::SameLine();
+         ImGui::SetNextItemWidth(kParamWidth * 0.5f);
+         int ch = n->customH;
+         if (ImGui::InputInt("h##blendH", &ch, 0, 0) && ch != n->customH)
+         {
+            PushUndoCheckpoint();
+            n->customH = std::clamp(ch, 1, 16384);
+         }
+      }
+      DropdownButton("pixel format", BlendNode::FormatNames(), n->format, setter(&n->format));
+      ImGui::TextDisabled("%d x %d  %s", n->GetOutputWidth(), n->GetOutputHeight(),
+                          GLUtil::FormatName(n->GetOutputFormat()));
    }
 
    void DrawLayerStackParams(LayerStackNode* n)
@@ -24394,6 +24554,79 @@ namespace
       }
    }
 
+   // Turbo (TOP parity): TouchDesigner's Common page, folded away by default.
+   // Drawn after every per-def control and with no ModSlider, so it never
+   // shifts a slider ordinal (the modulation key in saved patches).
+   void DrawFilterCommon(FilterNode* n)
+   {
+      static std::set<const FilterNode*> sOpen;
+      FilterNode::Common& c = n->common;
+      const bool open = sOpen.count(n) != 0;
+      ImGui::PushID("filterCommon");
+      NodeSeparator("common");
+      ImGui::TextDisabled("%d x %d  %s", n->GetOutputWidth(), n->GetOutputHeight(),
+                          GLUtil::FormatName(n->GetOutputFormat()));
+      ImGui::SameLine();
+      if (ImGui::SmallButton(open ? "less" : "more"))
+      {
+         if (open)
+            sOpen.erase(n);
+         else
+            sOpen.insert(n);
+      }
+      if (!open)
+      {
+         ImGui::PopID();
+         return;
+      }
+      auto setter = [](int* field) {
+         return [field](int i) {
+            if (*field == i)
+               return;
+            if (!gApplyingDiscreteCv)
+               PushUndoCheckpoint();
+            *field = i;
+            gPatchDirty = true;
+         };
+      };
+      auto intField = [](const char* label, int* value, int lo, int hi) {
+         ImGui::SetNextItemWidth(kParamWidth * 0.5f);
+         int v = *value;
+         if (ImGui::InputInt(label, &v, 0, 0) && v != *value)
+         {
+            PushUndoCheckpoint();
+            *value = std::clamp(v, lo, hi);
+            gPatchDirty = true;
+         }
+      };
+      DropdownButton("resolution", FilterNode::Common::ResNames(), c.res, setter(&c.res), kParamWidth, false);
+      if (c.res >= FilterNode::Common::kResCustom)
+      {
+         intField("w##cmnW", &c.width, 1, 16384);
+         ImGui::SameLine();
+         intField("h##cmnH", &c.height, 1, 16384);
+      }
+      DropdownButton("pixel format", FilterNode::Common::FormatNames(), c.format, setter(&c.format), kParamWidth, false);
+      DropdownButton("extend", FilterNode::Common::ExtendNames(), c.extend, setter(&c.extend), kParamWidth, false);
+      DropdownButton("smoothness", FilterNode::Common::SmoothNames(), c.smooth, setter(&c.smooth), kParamWidth, false);
+      intField("passes", &c.passes, 1, 32);
+      bool* chans[4] = { &c.chanR, &c.chanG, &c.chanB, &c.chanA };
+      const char* names[4] = { "R", "G", "B", "A" };
+      for (int i = 0; i < 4; i++)
+      {
+         if (i > 0)
+            ImGui::SameLine();
+         bool v = *chans[i];
+         if (ImGui::Checkbox(names[i], &v))
+         {
+            PushUndoCheckpoint();
+            *chans[i] = v;
+            gPatchDirty = true;
+         }
+      }
+      ImGui::PopID();
+   }
+
    void DrawFilterParams(FilterNode* n)
    {
       const FilterDef& def = n->Def();
@@ -24428,6 +24661,7 @@ namespace
       }
       if (def.params.empty())
          ImGui::TextDisabled("(no parameters)");
+      DrawFilterCommon(n);
    }
 
    void ExportImage(OutputNode* out, const std::string& path, int jpgQuality = 90)
@@ -26057,7 +26291,7 @@ namespace
          { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included. The 4D types (Simplex, Perlin, Ridged, Turbulence, Billow 4D) work like TouchDesigner's Noise TOP: the picture is a slice of 4D noise and speed moves along the 4th axis, so it morphs in place; drift adds an optional scroll, plus translate, z, rotate and exponent." },
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
          { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
-         { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
+         { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation. Four image inputs (in0-in3) are read as texture(uIn0, uv) .. uIn3, with uHasIn0..3 and uInRes0..3, like TouchDesigner's GLSL TOP; 'size from in0' renders at in0's resolution." },
          { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
          { "Ramp", "Generates a gradient from scratch (no input) between up to 8 user-set colour stops, at a chosen angle, scale and offset. Gamma and dither smooth out visible banding." },
          { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
@@ -26069,14 +26303,24 @@ namespace
          { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
 
          // ---------------- Compositing ----------------
-         { "Blend", "Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase and Anti-Erase (keep A only where B is opaque, a mask)." },
+         { "Blend", "Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase and Anti-Erase (keep A only where B is opaque, a mask). Like TouchDesigner's Composite TOP it can place B instead of stretching it (pre-fit Fit / Fill / Native with justify, plus B translate, scale and rotate), combine alpha with Over / Under / Inside / Outside / Atop / Xor, and take its size from A, B or a custom resolution." },
          { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
          { "Layout", "TouchDesigner-style Layout: a canvas of exact pixel size (1920x1080 by default) with up to 8 image inputs placed on it. Each layer starts at its REAL pixel size, and you set x/y in canvas pixels, a scale (anchored at the layer centre) or an exact custom width/height, and opacity. Drag layers on the miniature, or use 1:1 / fit / fill / centre. x, y, scale and opacity have CV pins." },
-         { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
-         { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Use it to make differently-sized sources composite predictably." },
+         { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. With 'manual' an index picks the input instead (A=0 .. D=3); a fractional index blends the two inputs either side of it, like TouchDesigner's Switch TOP, so modulating it crossfades." },
+         { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Limit only ever shrinks: the source keeps its aspect and is scaled down to fit inside width x height. Smoothness Mipmap stops detailed images sparkling when shrunk. Use it to make differently-sized sources composite predictably." },
          { "Comment", "A free-floating note on the canvas - has no image input or output, just text. Double-click to edit." },
          { "Group", "A resizable box that owns whatever nodes are geometrically inside it - drag it and its members move together, right-click > Ungroup dissolves it (or ungroup one member from its own context menu)." },
          { "Null", "A pass-through node: its output is exactly its input, unchanged. Useful as a stable junction point to branch a cable to several destinations, or as a placeholder while rewiring." },
+         { "Send Image", "Sends the image patched into it to every Receive Image with the same channel name, without a cable - Pure Data's [send]. Several Sends may share a name; a bypassed Send is muted. It has no output pin." },
+         { "Receive Image", "Outputs the image of the Send Image nodes on its channel. With several Sends, combine picks the first, one by index, or adds / maxes / averages them. A Receive patched back into its own Send works like a Feedback loop: it reads the previous frame." },
+         { "Send CV", "Sends the modulator patched into it to every Receive CV with the same channel name, without a cable." },
+         { "Receive CV", "A modulator output carrying the Send CV nodes on its channel: the first one, or their sum, average, max or min (0..1)." },
+         { "Send Notes", "Sends the note stream patched into it to every Receive Notes with the same channel name, without a cable." },
+         { "Receive Notes", "Outputs the notes of every Send Notes on its channel, merged in time order, like Note Merge without the cables." },
+         { "Send Audio", "Sends the audio patched into it to every Receive Audio with the same channel name, without a cable - Pure Data's [throw~]." },
+         { "Receive Audio", "Outputs the sum of every Send Audio on its channel, scaled by gain - Pure Data's [catch~]. A loop through its own Send reads silence instead of feeding back." },
+         { "Send Geometry", "Sends the geometry patched into it to every Receive Geometry with the same channel name, without a cable." },
+         { "Receive Geometry", "Forwards the geometry of one Send Geometry on its channel (index picks which, oldest first), every material, texture and point-cloud channel included." },
          { "Viewport", "Shows its input at actual pixel size in its own resizable window, separate from the small node preview - useful for judging detail without zooming the whole canvas." },
 
          // ---------------- Modulators ----------------
@@ -26280,7 +26524,7 @@ namespace
          { "pixelate", "Chunks the image into flat colour blocks. Block Size sets how large each block is." },
          { "addnoise", "Adds random per-pixel grain, re-randomised every frame. Amount sets how strong it is." },
          { "vignette", "Darkens the image toward the edges, framing the centre. Radius and Softness shape the falloff, Center X/Y offsets it." },
-         { "transform", "Translates, scales, rotates, and flips (horizontal/vertical) the whole image. Scale X/Y let you stretch non-uniformly on top of the overall Scale." },
+         { "transform", "Translates, scales, rotates, and flips (horizontal/vertical) the whole image. Scale X/Y let you stretch non-uniformly on top of the overall Scale. Pivot moves the point it scales and rotates around, order picks which of scale, rotate and translate happens first, and common > extend chooses what fills the frame past the image edge: nothing (default), the edge pixels held, the image repeated or mirrored (Limit Tiles caps how many copies). Comp Over Background fills the transparent part with Background." },
          { "brightnesscontrast", "Basic exposure control: Brightness adds or subtracts a flat amount, Contrast steepens or flattens the curve around mid-grey." },
          { "levels", "Remaps the input range: Black Point and White Point set what maps to pure black/white, Gamma curves the midtones." },
          { "hsl", "Shifts Hue, scales Saturation and adds Lightness, independent of the underlying colour." },
@@ -26294,14 +26538,14 @@ namespace
          { "glitch", "Ten glitch algorithms behind one 'kind' dropdown: Slice Shift (RGB-split rows), RGB Shift, Scanlines, Blocks (jittered tiles), Wave, Datamosh (shifted slices with a streak smear), Scan Jitter (per-line exponential offsets and tear bands), VHS (drifting tracking band, chroma bleed, head-switch noise, tape noise), Compression (8/16 px macroblocks, chroma subsampling, per-block posterize, stale blocks; Detail below 0.5 = 8 px, above = 16 px) and Pixel Sort (single-pass approximation along bright spans; Detail = threshold, Amount = span length). Amount/Detail control strength/scale, Speed animates it, Seed reseeds the randomness. Extra controls (all off by default, so older patches look the same): Size Var (uneven slice/block sizes from a random split) and Splits (split depth), Contrast (more small offsets, a few big ones), Density (share of slices that move), Stagger (each slice on its own step phase), Burst (share of clean 4-step blocks), Decay (offsets settle within a block), Sync (steps locked to the beat, 1 bar to 1/32; Free uses Speed; 1 bar assumes 4/4), RGB Var (per-slice channel split), Color FX (per-slice channel swap, invert or posterize), Axis (Horizontal, Vertical, Both) and Clock (Transport follows play/pause, Free-run keeps moving while stopped)." },
          { "Datamosh", "Codec-style datamosh. Blocks that are held keep sampling the previous output displaced by a motion vector, estimated from the image (or the optional second input, the motion source) between frames. Mosh = share of held blocks, Gain scales the vectors, Bloom keeps accumulating the last vector so smears grow, Threshold ignores small motion, Block (8/16/32) and Block Var (uneven block sizes), Leak lets some mosh into refreshed blocks. Refresh (off, bar, beat, 1/2, 1/4, 1/8 of a beat) or the Refresh button (mappable) copies the live image back into a share of the blocks (Refresh Chance), like an I-frame. Seed picks which blocks are held. Renders every frame." },
          { "lensdistortion", "Simulates a camera lens: Barrel bows the image in or out, Chromatic separates the colour channels' distortion for fringing, Zoom scales the result." },
-         { "displace", "Offsets each pixel using a second patched-in image's red/green channels as a displacement map, or a built-in animated wave if nothing is patched. Map Scale tiles the map." },
+         { "displace", "Offsets each pixel using a second patched-in image as a displacement map (red moves horizontally, green vertically, or any channel you pick), or a built-in animated wave if nothing is patched. Map Scale tiles the map, Midpoint is the map value that means no movement, Amount X/Y scale each direction. common > extend sets what is pulled in from past the edge." },
          { "liquify", "Flows pixels around using animated Perlin-style noise, like a liquid warp. Scale sets the flow's feature size, Speed animates it." },
          { "symmetry", "Mirrors the image about the X axis, Y axis, or both, from a chosen centre point. Flip additionally reverses the whole image before mirroring." },
          { "kaleidoscope", "Slices the image into angular Segments around a centre and mirrors each one, kaleidoscope-style. Rotation spins the pattern, Zoom scales it." },
          { "mirror tile", "Tiles the image and alternately mirrors each tile so the edges line up seamlessly, unlike a plain repeat. Tiles sets how many repeats." },
          { "chroma key", "Removes a chosen Key Colour (green/blue-screen style), matched in a brightness-independent colour space. Tolerance/Softness shape the edge, Spill Removal desaturates colour-cast fringes, 'show: Matte' previews the alpha instead of the keyed result." },
          { "luma key", "Keys out a brightness range (Low-High) instead of a colour, with Softness at the edges and Invert to flip which range is kept. 'show: Matte' previews the alpha." },
-         { "crop", "Crops in from each edge (Left/Right/Top/Bottom). 'outside' chooses what happens to the cropped-away area: stays transparent, the kept region zooms to fill the frame, or gets replaced with a Fill colour." },
+         { "crop", "Crops in from each edge (Left/Right/Top/Bottom). With outside = Cut (the default) the cropped part is discarded and the image gets smaller, like TouchDesigner's Crop TOP. The other modes keep the input size: the cropped-away area stays transparent, gets a Fill colour, or the kept region zooms back up to fill the frame." },
          { "emboss", "Turns edges into a relief/bump look by differencing the image against itself offset along Angle/Distance. 'style: Over colour' keeps the original colours and adds the emboss on top; 'Grey' replaces the image with a flat emboss." },
          { "normal map", "Derives a tangent-space normal map from the image's luminance treated as a height field, for use as a bump/normal input elsewhere. 'output' can show the raw Normals, the source Height, or the gradient's Slope instead." },
          { "convolve", "A user-editable 3x3 convolution kernel (k11-k33) - blur, sharpen, edge-detect and emboss are all just different numbers in this grid. Divisor and Bias adjust the result, Spread scales the sample distance, Mix blends with the original." },
@@ -26409,7 +26653,7 @@ namespace
       if (category == "Notes") return "Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.";
       if (category == "Output") return "Terminal node: shows, exports or records the final result.";
       if (category == "Video") return "Video clips, cameras and Spout senders as images: Video, VMPC (clip launcher), Video In, Spout In.";
-      if (category == "Utility") return "Patch housekeeping: comments, groups, pass-through Null and Viewport.";
+      if (category == "Utility") return "Patch housekeeping: comments, groups, pass-through Null and Viewport, and wireless Send / Receive for every cable kind.";
       if (category == "AudioIO") return "Audio into and out of the graph: the sound card input and output, and audio files.";
       if (category == "AudioVisual") return "Turns audio into images or geometry: waveform/spectrum textures, colour ramps, displacement, ribbons.";
       if (category == "AudioUtility") return "Mixing and routing audio: gain, mixers, splitter, blend, looper, MPC pad outputs.";
@@ -26552,7 +26796,7 @@ namespace
                { "Shape", "Ten vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line - with fill, stroke, feather and background." },
                { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included. The 4D types (Simplex, Perlin, Ridged, Turbulence, Billow 4D) work like TouchDesigner's Noise TOP: the picture is a slice of 4D noise and speed moves along the 4th axis, so it morphs in place; drift adds an optional scroll, plus translate, z, rotate and exponent." },
                { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
-               { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
+               { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation. Four image inputs (in0-in3) are read as texture(uIn0, uv) .. uIn3, with uHasIn0..3 and uInRes0..3, like TouchDesigner's GLSL TOP; 'size from in0' renders at in0's resolution." },
                { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
             } },
             { "Text", {
@@ -26580,11 +26824,11 @@ namespace
             } },
             { "Compositing", {
                { "Transform", "Translate, scale, rotate, flip horizontal and flip vertical." },
-               { "Blend", "Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase and Anti-Erase (keep A only where B is opaque, a mask)." },
+               { "Blend", "Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase and Anti-Erase (keep A only where B is opaque, a mask). Like TouchDesigner's Composite TOP it can place B instead of stretching it (pre-fit Fit / Fill / Native with justify, plus B translate, scale and rotate), combine alpha with Over / Under / Inside / Outside / Atop / Xor, and take its size from A, B or a custom resolution." },
                { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
                { "Layout", "TouchDesigner-style Layout: a canvas of exact pixel size (1920x1080 by default) with up to 8 image inputs placed on it. Each layer starts at its REAL pixel size, and you set x/y in canvas pixels, a scale (anchored at the layer centre) or an exact custom width/height, and opacity. Drag layers on the miniature, or use 1:1 / fit / fill / centre. x, y, scale and opacity have CV pins." },
-               { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
-               { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Use it to make differently-sized sources composite predictably." },
+               { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. With 'manual' an index picks the input instead (A=0 .. D=3); a fractional index blends the two inputs either side of it, like TouchDesigner's Switch TOP, so modulating it crossfades." },
+               { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Limit only ever shrinks: the source keeps its aspect and is scaled down to fit inside width x height. Smoothness Mipmap stops detailed images sparkling when shrunk. Use it to make differently-sized sources composite predictably." },
                { "Drop Shadow / Outer Glow / Colour Overlay", "Layer-effect style filters." },
             } },
             { "Modulators", {
@@ -26721,6 +26965,14 @@ namespace
             if (cable != nullptr && cable->GetSource() == dying)
                cable->Disconnect();
          }
+         // Turbo: Receive Audio/Notes' hidden cables point past the Send, at
+         // whatever feeds it, so they have to let go of a dying node too.
+         for (int w = 0; AudioCable* cable = other.node->WirelessAudioInput(w); w++)
+            if (cable->GetSource() == dying)
+               cable->Disconnect();
+         for (int w = 0; NoteCable* cable = other.node->WirelessNoteInput(w); w++)
+            if (cable->GetSource() == dying)
+               cable->Disconnect();
       }
    }
 
@@ -26774,6 +27026,73 @@ namespace
    // feeding several consumers (each consumer just looks up the same buffer
    // index - no reprocessing, no aliasing) and backstops WouldCreateAudioCycle
    // in case a cycle ever slips through.
+   // Turbo: points every Receive Audio / Receive Notes' hidden cables at
+   // whatever feeds the Sends on its channel - past the Send itself, which
+   // has no audio node of its own. Run once per frame; true when anything
+   // changed, so the caller rebuilds the topology once. A Send fed straight
+   // from its own Receive is skipped (that loop has no delay stage).
+   bool UpdateWirelessCables()
+   {
+      bool changed = false;
+      for (GraphNode& gn : gNodes)
+      {
+         auto* recv = dynamic_cast<WirelessNode*>(gn.node.get());
+         if (recv == nullptr || recv->IsSend())
+            continue;
+         if (recv->GetKind() == WirelessNode::kAudio)
+         {
+            int w = 0;
+            for (WirelessNode* s : WirelessNode::Senders(WirelessNode::kAudio, recv->channel))
+            {
+               const AudioCable& in = static_cast<SendAudioNode*>(s)->input;
+               if (!in.IsConnected() || in.GetSource() == gn.node.get())
+                  continue;
+               AudioCable* hidden = gn.node->WirelessAudioInput(w);
+               if (hidden == nullptr)
+                  break;
+               if (hidden->GetSource() != in.GetSource() || hidden->GetOutputSlot() != in.GetOutputSlot())
+               {
+                  hidden->Connect(in.GetSource(), in.GetOutputSlot());
+                  changed = true;
+               }
+               w++;
+            }
+            for (; AudioCable* hidden = gn.node->WirelessAudioInput(w); w++)
+               if (hidden->IsConnected())
+               {
+                  hidden->Disconnect();
+                  changed = true;
+               }
+         }
+         else if (recv->GetKind() == WirelessNode::kNotes)
+         {
+            int w = 0;
+            for (WirelessNode* s : WirelessNode::Senders(WirelessNode::kNotes, recv->channel))
+            {
+               const NoteCable& in = static_cast<SendNotesNode*>(s)->noteInput;
+               if (!in.IsConnected() || in.GetSource() == gn.node.get())
+                  continue;
+               NoteCable* hidden = gn.node->WirelessNoteInput(w);
+               if (hidden == nullptr)
+                  break;
+               if (hidden->GetSource() != in.GetSource() || hidden->GetOutputSlot() != in.GetOutputSlot())
+               {
+                  hidden->Connect(in.GetSource(), in.GetOutputSlot());
+                  changed = true;
+               }
+               w++;
+            }
+            for (; NoteCable* hidden = gn.node->WirelessNoteInput(w); w++)
+               if (hidden->IsConnected())
+               {
+                  hidden->Disconnect();
+                  changed = true;
+               }
+         }
+      }
+      return changed;
+   }
+
    void CollectAudioChain(INode* node, std::set<INode*>& visited,
                            std::vector<AudioTopologyEntry>& outOrder,
                            std::unordered_map<AudioNode*, int>& bufferIndexOf)
@@ -26801,6 +27120,21 @@ namespace
          {
             CollectAudioChain(cable->GetSource(), visited, outOrder, bufferIndexOf);
             entry.inputBufferIndices[slot] = AudioBufferIndexOf(cable->GetSource(), bufferIndexOf, cable->GetOutputSlot());
+         }
+      }
+      // Turbo: Receive Audio's hidden per-Send cables (no pins of their own,
+      // so they take topology inputs 0..n-1). A wireless loop back to this
+      // node is already `visited`, so it reads as silence instead of recursing.
+      for (int w = 0; w < kAudioMaxNodeInputs; w++)
+      {
+         AudioCable* cable = node->WirelessAudioInput(w);
+         if (cable == nullptr)
+            break;
+         entry.numInputs = std::max(entry.numInputs, w + 1);
+         if (cable->IsConnected())
+         {
+            CollectAudioChain(cable->GetSource(), visited, outOrder, bufferIndexOf);
+            entry.inputBufferIndices[w] = AudioBufferIndexOf(cable->GetSource(), bufferIndexOf, cable->GetOutputSlot());
          }
       }
 
@@ -26837,6 +27171,9 @@ namespace
          if (cable != nullptr && cable->IsConnected())
             CollectAudioChain(cable->GetSource(), visited, outOrder, bufferIndexOf);
       }
+      for (int w = 0; NoteCable* cable = node->WirelessNoteInput(w); w++)
+         if (cable->IsConnected())
+            CollectAudioChain(cable->GetSource(), visited, outOrder, bufferIndexOf);
 
       if (AudioNode* audioNode = AudioNodeOfAny(node))
       {
@@ -26943,6 +27280,9 @@ namespace
             if (cable != nullptr && cable->IsConnected())
                CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf);
          }
+         for (int w = 0; NoteCable* cable = gn.node->WirelessNoteInput(w); w++)
+            if (cable->IsConnected())
+               CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf);
       }
 
       // A node that must run even though nothing downstream pulls it and it
@@ -26983,11 +27323,10 @@ namespace
             // Visit every slot the node exposes, not just the first - a
             // multi-input consumer (Note Merge) can have several connected
             // note pins whose producers all need their outbox reset.
-            for (int slot = 0; slot < kMaxNoteSlots; slot++)
+            auto resetFor = [&resetOutboxes](NoteCable* cable)
             {
-               NoteCable* cable = gn.node->NoteInputSlot(slot);
                if (cable == nullptr || !cable->IsConnected())
-                  continue;
+                  return;
                if (AudioNode* producer = AudioNodeOfAny(cable->GetSource()))
                {
                   if (NoteEventQueue* outbox = producer->NoteOutbox(cable->GetOutputSlot()))
@@ -26996,7 +27335,11 @@ namespace
                         outbox->ResetConsumers();
                   }
                }
-            }
+            };
+            for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               resetFor(gn.node->NoteInputSlot(slot));
+            for (int w = 0; NoteCable* cable = gn.node->WirelessNoteInput(w); w++)
+               resetFor(cable);
          }
       }
       for (GraphNode& gn : gNodes)
@@ -27010,11 +27353,8 @@ namespace
          // nullptr/-1 - so a slot that was wired last generation and got
          // disconnected doesn't leave a stale producer pointer behind on
          // the audio node.
-         for (int slot = 0; slot < kMaxNoteSlots; slot++)
+         auto wire = [consumer](int slot, NoteCable* cable)
          {
-            NoteCable* cable = gn.node->NoteInputSlot(slot);
-            if (cable == nullptr)
-               continue;
             NoteEventQueue* inbox = nullptr;
             int cursor = -1;
             if (cable->IsConnected())
@@ -27027,7 +27367,18 @@ namespace
                }
             }
             consumer->SetNoteInbox(slot, inbox, cursor);
+         };
+         for (int slot = 0; slot < kMaxNoteSlots; slot++)
+         {
+            NoteCable* cable = gn.node->NoteInputSlot(slot);
+            if (cable == nullptr)
+               continue;
+            wire(slot, cable);
          }
+         // Turbo: Receive Notes' hidden per-Send cables are inboxes 0..n-1
+         // (it has no note pins of its own to collide with).
+         for (int w = 0; NoteCable* cable = gn.node->WirelessNoteInput(w); w++)
+            wire(w, cable);
       }
 
       const double sampleRate = AudioEngine::Instance().SampleRate();
@@ -27539,13 +27890,14 @@ namespace
          if (auto* asPal = dynamic_cast<IPaletteSource*>(gn.node.get()))
             addrToIndex.emplace((const void*)asPal, gn.index);
       }
-      std::unordered_map<const void*, int> modAddrToIndex; // first match wins, like the old scan
+      // modulator address -> (node index, output index); first match wins, like the old scan
+      std::unordered_map<const void*, std::pair<int, int>> modAddrToIndex;
       for (GraphNode& src : gNodes)
       {
          const int outputs = std::max(1, src.node->OutputCount());
          for (int o = 0; o < outputs; o++)
             if (IModulator* mod = ModulatorForOutput(src.node.get(), o))
-               modAddrToIndex.emplace((const void*)mod, src.index);
+               modAddrToIndex.emplace((const void*)mod, std::make_pair(src.index, o));
       }
       auto indexOf = [&addrToIndex](const void* p) -> int {
          auto it = addrToIndex.find(p);
@@ -27654,7 +28006,7 @@ namespace
                   continue;
                auto it = modAddrToIndex.find((const void*)wanted);
                if (it != modAddrToIndex.end())
-                  data.geometry.push_back({ gn.index, slot, it->second });
+                  data.geometry.push_back({ gn.index, slot, it->second.first, it->second.second });
             }
          }
       }
@@ -28003,7 +28355,7 @@ namespace
          GraphNode* dst = resolve(c.dstIndex);
          GraphNode* src = resolve(c.srcIndex);
          if (dst != nullptr && src != nullptr)
-            ConnectGeometrySlot(*dst, c.dstSlot, *src);
+            ConnectGeometrySlot(*dst, c.dstSlot, *src, c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.audio)
       {
@@ -37124,6 +37476,120 @@ int main(int argc, char** argv)
          static_cast<Render3DNode*>(gNodes[2].node.get())->geometry[0] =
             static_cast<OceanNode*>(gNodes[1].node.get());
       }
+      else if (getenv("INFINITE_TOPPARITYTEST") != nullptr)
+      {
+         // Turbo (TOP parity): Common page, Crop/Transform/Blend/Switcher/
+         // Formula changes and the wireless Send/Receive family. Checked at
+         // frame 4, below.
+         auto formula = [](int i, const char* body, float w, float h)
+         {
+            auto* f = static_cast<FormulaNode*>(gNodes[i].node.get());
+            f->formula = body;
+            f->width = w;
+            f->height = h;
+            f->Apply();
+         };
+         SpawnNode("Formula", "Source", 40.0f, 40.0f);              // 0 gradient 200x100
+         SpawnNode("crop", "Effects", 300.0f, 40.0f);               // 1
+         SpawnNode("transform", "Compositing", 560.0f, 40.0f);      // 2
+         SpawnNode("invert", "Color", 820.0f, 40.0f);               // 3
+         SpawnNode("Formula", "Source", 40.0f, 400.0f);             // 4 white 100x100
+         SpawnNode("Formula", "Source", 40.0f, 700.0f);             // 5 transparent 200x100
+         SpawnNode("Blend", "Compositing", 300.0f, 400.0f);         // 6
+         SpawnNode("Switcher", "Compositing", 560.0f, 400.0f);      // 7
+         SpawnNode("Formula", "Source", 820.0f, 400.0f);            // 8 reads uIn0
+         SpawnNode("Send Image", "Utility", 300.0f, 700.0f);        // 9
+         SpawnNode("Send Image", "Utility", 560.0f, 700.0f);        // 10
+         SpawnNode("Receive Image", "Utility", 820.0f, 700.0f);     // 11
+         SpawnNode("Constant", "Modulators", 40.0f, 1000.0f);       // 12
+         SpawnNode("Send CV", "Utility", 300.0f, 1000.0f);          // 13
+         SpawnNode("Receive CV", "Utility", 560.0f, 1000.0f);       // 14
+         SpawnNode("Geometry", "3D", 40.0f, 1300.0f);               // 15
+         SpawnNode("Send Geometry", "Utility", 300.0f, 1300.0f);    // 16
+         SpawnNode("Receive Geometry", "Utility", 560.0f, 1300.0f); // 17
+         SpawnNode("Null 3D", "3D", 820.0f, 1300.0f);               // 18
+         SpawnNode("Send Geometry", "Utility", 1080.0f, 1300.0f);   // 19
+         SpawnNode("Receive Geometry", "Utility", 1340.0f, 1300.0f);// 20
+         SpawnNode("Oscillator", "Synths", 40.0f, 1600.0f);         // 21
+         SpawnNode("Send Audio", "Utility", 300.0f, 1600.0f);       // 22
+         SpawnNode("Receive Audio", "Utility", 560.0f, 1600.0f);    // 23
+         SpawnNode("Note Sequencer", "Notes", 40.0f, 1900.0f);      // 24
+         SpawnNode("Send Notes", "Utility", 300.0f, 1900.0f);       // 25
+         SpawnNode("Receive Notes", "Utility", 560.0f, 1900.0f);    // 26
+
+         formula(0, "   return vec4(uv.x, uv.y, 0.0, 1.0);", 200.0f, 100.0f);
+         formula(4, "   return vec4(1.0);", 100.0f, 100.0f);
+         formula(5, "   return vec4(0.0);", 200.0f, 100.0f);
+         formula(8, "   return texture(uIn0, uv);", 64.0f, 64.0f);
+
+         auto setFilter = [](int i, const char* uniform, float v)
+         {
+            auto* f = static_cast<FilterNode*>(gNodes[i].node.get());
+            for (size_t p = 0; p < f->Def().params.size(); p++)
+               if (f->Def().params[p].uniformName == uniform)
+                  f->SetParamValue(p, 0, v);
+         };
+         CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
+         setFilter(1, "uLeft", 0.25f);
+         setFilter(1, "uRight", 0.25f);
+         setFilter(1, "uTop", 0.1f);
+         setFilter(1, "uBottom", 0.1f);
+         setFilter(1, "uMode", 3.0f);
+
+         CableFor(gNodes[2], 0)->Connect(gNodes[0].node.get());
+         setFilter(2, "uTranslateX", 0.5f);
+
+         CableFor(gNodes[3], 0)->Connect(gNodes[0].node.get());
+         auto* inv = static_cast<FilterNode*>(gNodes[3].node.get());
+         inv->common.res = FilterNode::Common::kResHalf;
+         inv->common.format = FilterNode::Common::kFmt16f;
+         inv->common.chanG = false;
+         inv->common.chanB = false;
+
+         auto* blend = static_cast<BlendNode*>(gNodes[6].node.get());
+         blend->InputA().Connect(gNodes[5].node.get());
+         blend->InputB().Connect(gNodes[4].node.get());
+         blend->preFit = BlendNode::kFit;
+
+         auto* sw = static_cast<SwitcherNode*>(gNodes[7].node.get());
+         sw->Input(0).Connect(gNodes[4].node.get());
+         sw->Input(1).Connect(gNodes[5].node.get());
+         sw->manual = true;
+         sw->index = 0.5f;
+
+         static_cast<FormulaNode*>(gNodes[8].node.get())->Input(0).Connect(gNodes[4].node.get());
+         static_cast<FormulaNode*>(gNodes[8].node.get())->matchInput = true;
+
+         static_cast<SendImageNode*>(gNodes[9].node.get())->Input().Connect(gNodes[4].node.get());
+         static_cast<SendImageNode*>(gNodes[10].node.get())->Input().Connect(gNodes[0].node.get());
+         static_cast<WirelessNode*>(gNodes[9].node.get())->channel = "img";
+         static_cast<WirelessNode*>(gNodes[10].node.get())->channel = "img";
+         static_cast<WirelessNode*>(gNodes[11].node.get())->channel = "img";
+
+         static_cast<ConstantNode*>(gNodes[12].node.get())->value = 0.3f;
+         ConnectGeometrySlot(gNodes[13], 0, gNodes[12]); // the patch-load path for a modulator pin
+         static_cast<WirelessNode*>(gNodes[13].node.get())->channel = "cv";
+         static_cast<WirelessNode*>(gNodes[14].node.get())->channel = "cv";
+
+         static_cast<SendGeometryNode*>(gNodes[16].node.get())->input =
+            dynamic_cast<IGeometrySource*>(gNodes[15].node.get());
+         static_cast<WirelessNode*>(gNodes[16].node.get())->channel = "geo";
+         static_cast<WirelessNode*>(gNodes[17].node.get())->channel = "geo";
+         // A wireless geometry loop: Receive "loop" -> Null 3D -> Send "loop".
+         static_cast<Null3DNode*>(gNodes[18].node.get())->input =
+            dynamic_cast<IGeometrySource*>(gNodes[20].node.get());
+         static_cast<SendGeometryNode*>(gNodes[19].node.get())->input =
+            dynamic_cast<IGeometrySource*>(gNodes[18].node.get());
+         static_cast<WirelessNode*>(gNodes[19].node.get())->channel = "loop";
+         static_cast<WirelessNode*>(gNodes[20].node.get())->channel = "loop";
+
+         static_cast<SendAudioNode*>(gNodes[22].node.get())->input.Connect(gNodes[21].node.get());
+         static_cast<WirelessNode*>(gNodes[22].node.get())->channel = "aud";
+         static_cast<WirelessNode*>(gNodes[23].node.get())->channel = "aud";
+         static_cast<SendNotesNode*>(gNodes[25].node.get())->noteInput.Connect(gNodes[24].node.get());
+         static_cast<WirelessNode*>(gNodes[25].node.get())->channel = "nt";
+         static_cast<WirelessNode*>(gNodes[26].node.get())->channel = "nt";
+      }
       else if (getenv("INFINITE_UTILTEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);        // 0
@@ -43995,6 +44461,123 @@ int main(int argc, char** argv)
          printf("%s\n", ok ? "PALETTE OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_TOPPARITYTEST") != nullptr && frameId == 4)
+      {
+         std::vector<std::string> failed;
+         auto check = [&failed](bool ok, const std::string& what)
+         {
+            printf("  %-44s %s\n", what.c_str(), ok ? "ok" : "FAIL");
+            if (!ok)
+               failed.push_back(what);
+         };
+         // Each read cooks with a fresh frame id, so a param changed between
+         // reads is always rendered.
+         static int sCookId = 1000000;
+         auto px = [](int i, float u, float v) -> std::array<float, 4>
+         {
+            INode* n = gNodes[i].node.get();
+            n->CookIfNeeded(++sCookId);
+            static unsigned int scratch = 0;
+            std::vector<float> rgba;
+            const int w = n->GetOutputWidth(), h = n->GetOutputHeight();
+            if (w <= 0 || h <= 0 || !GLUtil::ReadTexturePixels(scratch, n->GetOutputTexture(), w, h, rgba))
+               return { -1.0f, -1.0f, -1.0f, -1.0f };
+            const int x = std::clamp((int)(u * w), 0, w - 1), y = std::clamp((int)(v * h), 0, h - 1);
+            const size_t k = ((size_t)y * w + x) * 4;
+            return { rgba[k], rgba[k + 1], rgba[k + 2], rgba[k + 3] };
+         };
+         auto near = [](float a, float b) { return std::fabs(a - b) < 0.03f; };
+         auto size = [](int i) { return std::to_string(gNodes[i].node->GetOutputWidth()) + "x" +
+                                        std::to_string(gNodes[i].node->GetOutputHeight()); };
+
+         printf("TOP parity:\n");
+         px(1, 0.5f, 0.5f);
+         check(size(1) == "100x80", "crop Cut: 200x100 -> " + size(1));
+         const auto cropCorner = px(1, 0.0f, 0.0f);
+         check(near(cropCorner[0], 0.25f) && near(cropCorner[1], 0.1f), "crop Cut keeps the kept region's pixels");
+
+         const auto zeroEdge = px(2, 0.05f, 0.5f);
+         check(near(zeroEdge[3], 0.0f), "transform extend default (zero) leaves the edge empty");
+         auto* xf = static_cast<FilterNode*>(gNodes[2].node.get());
+         xf->common.extend = 1 + GLUtil::kExtendRepeat;
+         const auto repeatEdge = px(2, 0.05f, 0.5f);
+         check(near(repeatEdge[3], 1.0f) && near(repeatEdge[0], 0.55f), "transform extend repeat wraps the image");
+         xf->common.extend = 1 + GLUtil::kExtendMirror;
+         const auto mirrorEdge = px(2, 0.05f, 0.5f);
+         check(near(mirrorEdge[3], 1.0f) && near(mirrorEdge[0], 0.45f), "transform extend mirror reflects the image");
+         xf->common.passes = 2;
+         px(2, 0.5f, 0.5f);
+         check(size(2) == "200x100", "transform 2 passes keeps its size");
+
+         const auto inv = px(3, 0.25f, 0.75f);
+         check(size(3) == "100x50", "common resolution Half: " + size(3));
+         check(gNodes[3].node->GetOutputFormat() == GL_RGBA16F, "common pixel format 16-bit float");
+         check(near(inv[0], 0.75f) && near(inv[1], 0.75f), "channel mask: R inverted, G untouched");
+
+         const auto blendBar = px(6, 0.05f, 0.5f), blendMid = px(6, 0.5f, 0.5f);
+         check(size(6) == "200x100" && near(blendBar[3], 0.0f) && near(blendMid[3], 1.0f),
+               "blend pre-fit Fit centres B, bars stay empty");
+
+         const auto swMid = px(7, 0.5f, 0.5f);
+         check(near(swMid[0], 0.5f), "switcher index 0.5 blends A and B");
+
+         const auto fIn = px(8, 0.5f, 0.5f);
+         check(size(8) == "100x100" && near(fIn[0], 1.0f), "formula reads uIn0 at in0's size");
+
+         const auto recv = px(11, 0.5f, 0.5f);
+         auto* recvImg = static_cast<ReceiveImageNode*>(gNodes[11].node.get());
+         check(recvImg->SenderCount() == 2 && size(11) == "100x100" && near(recv[0], 1.0f),
+               "receive image (first of 2 sends)");
+         recvImg->mode = ReceiveImageNode::kIndex;
+         recvImg->index = 1;
+         const auto recv2 = px(11, 0.25f, 0.5f);
+         check(size(11) == "200x100" && near(recv2[0], 0.25f), "receive image index 1");
+
+         auto* recvCv = static_cast<ReceiveCVNode*>(gNodes[14].node.get());
+         check(near(recvCv->Value01(), 0.3f), "receive CV = 0.3 (modulator pin restored by load path)");
+
+         auto* recvGeo = static_cast<ReceiveGeometryNode*>(gNodes[17].node.get());
+         auto* geo = dynamic_cast<IGeometrySource*>(gNodes[15].node.get());
+         recvGeo->CookIfNeeded(++sCookId);
+         check(!recvGeo->GetMesh().indices.empty() && recvGeo->MeshRevision() == geo->MeshRevision(),
+               "receive geometry forwards mesh and stamp");
+         check(static_cast<ReceiveGeometryNode*>(gNodes[20].node.get())->Source() == nullptr,
+               "wireless geometry loop is refused, no hang");
+
+         // Every FilterDef still compiles and renders with the new preamble
+         // (srcExt, uExtend) and the channel-mask wrapper around its main().
+         {
+            int rendered = 0;
+            std::string broken;
+            for (const FilterDef& def : GetFilterDefs())
+            {
+               std::unique_ptr<FilterNode> f(static_cast<FilterNode*>(FilterNode::CreateFor(def)));
+               f->Input().Connect(gNodes[0].node.get());
+               if (def.inputs > 1)
+                  f->Input2().Connect(gNodes[4].node.get());
+               f->common.chanB = false; // exercise the mask path too
+               f->CookIfNeeded(++sCookId);
+               if (f->GetOutputTexture() != 0)
+                  rendered++;
+               else
+                  broken += " " + def.name;
+            }
+            check(broken.empty(), "all " + std::to_string(rendered) + " filters compile and render" + broken);
+         }
+
+         AudioCable* hiddenAudio = gNodes[23].node->WirelessAudioInput(0);
+         check(hiddenAudio != nullptr && hiddenAudio->GetSource() == gNodes[21].node.get(),
+               "receive audio is fed by the send's source");
+         NoteCable* hiddenNotes = gNodes[26].node->WirelessNoteInput(0);
+         check(hiddenNotes != nullptr && hiddenNotes->GetSource() == gNodes[24].node.get(),
+               "receive notes is fed by the send's source");
+
+         if (failed.empty())
+            printf("TOP PARITY OK\n");
+         else
+            printf("TOP PARITY FAIL (%zu)\n", failed.size());
+      }
+
       if (getenv("INFINITE_UTILTEST") != nullptr && (frameId == 4 || frameId == 10))
       {
          auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
@@ -45553,6 +46136,8 @@ int main(int argc, char** argv)
                DrawOscToCvParams(n);
             else if (auto* n = dynamic_cast<OscSendNode*>(gn.node.get()))
                DrawOscSendParams(n);
+            else if (auto* n = dynamic_cast<WirelessNode*>(gn.node.get()))
+               DrawWirelessParams(n);
             else if (auto* n = dynamic_cast<MaterialNode*>(gn.node.get()))
                DrawMaterialParams(n);
             else if (auto* n = dynamic_cast<MappingNode*>(gn.node.get()))
@@ -45823,7 +46408,11 @@ int main(int argc, char** argv)
          // than useless: link validation only asks whether a source is an image
          // node, so a comment would happily patch into any image input and feed
          // it a blank texture. No pin, no way to make that mistake.
-         if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment)
+         // A Send has no out pin either: what it carries leaves by name, to
+         // every Receive on its channel.
+         const auto* wireless = dynamic_cast<WirelessNode*>(gn.node.get());
+         if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment &&
+             !(wireless != nullptr && wireless->IsSend()))
          {
             // Geometry Table draws its row pins (index 4 and up) inline in its
             // table grid; only the four aggregates go through this row.
@@ -48780,6 +49369,10 @@ int main(int argc, char** argv)
             AudioTopologyRequest::Request();
             break;
          }
+      // Turbo: a Send/Receive's channel, a Send's cable or the set of Sends
+      // changed since last frame - re-point the hidden audio/note cables.
+      if (UpdateWirelessCables())
+         AudioTopologyRequest::Request();
       if (AudioTopologyRequest::PendingRebuild())
       {
          AudioTopologyRequest::PendingRebuild() = false;

@@ -41,12 +41,19 @@ public:
    float crossfade = 0.0f;   // fade duration as a fraction of the interval
    bool manual = false;      // ignore the clock and hold manualSlot
    int manualSlot = 0;
+   // Turbo (TOP parity, Switch TOP): in manual mode a fractional index blends
+   // the two inputs either side of it (1.5 = half B, half C). -1 = not set
+   // yet, which reads manualSlot, so patches from before it keep their slot.
+   float index = -1.0f;
+
+   float EffectiveIndex() const { return index >= 0.0f ? index : (float)manualSlot; }
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("unit", unit); v.Float("interval", interval);
       v.Float("crossfade", crossfade);
       v.Bool("manual", manual); v.Int("manualSlot", manualSlot);
+      v.Float("index", index);
    }
 
 private:

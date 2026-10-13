@@ -30,8 +30,13 @@ public:
    void Clear();
 
    float delayFrames = 1.0f; // held for information; the delay is always one frame
+   // Turbo (TOP parity): loop memory precision. 16-bit float is what it
+   // always used; 32-bit keeps very long decays from stepping, 8-bit is cheap.
+   int format = 0; // 0 = 16f, 1 = 32f, 2 = 8-bit
+   static const std::vector<std::string>& FormatNames();
+   unsigned int GetOutputFormat() const override { return mBuffers[1 - mWrite].internalFormat; }
 
-   void VisitParams(ParamVisitor& v) override { v.Float("delayFrames", delayFrames); }
+   void VisitParams(ParamVisitor& v) override { v.Float("delayFrames", delayFrames); v.Int("format", format); }
 
 private:
    bool EnsureShader();

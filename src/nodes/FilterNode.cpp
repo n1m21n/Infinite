@@ -1,6 +1,7 @@
 #include "FilterNode.h"
 
 #include "platform/OpenGLHeaders.h"
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <string>
@@ -28,14 +29,60 @@ namespace
       "uniform float uClock;\n" // Turbo 0.51: wall-clock seconds, runs while the transport is stopped
       "uniform sampler2D uSrc2;\n"
       "uniform int uHasSrc2;\n"
-      "uniform sampler2D uPass;\n"; // prePassBody's output, two-pass filters only
+      "uniform sampler2D uPass;\n" // prePassBody's output, two-pass filters only
+      // Turbo (TOP parity): the Extend in effect (a GLUtil::Extend). The
+      // sampler bound to uSrc already wraps/repeats/mirrors; srcExt adds the
+      // exact "nothing past the edge" test for Zero, so a body that reads
+      // through it behaves identically with or without sampler objects.
+      "uniform int uExtend;\n"
+      "vec4 srcExt(vec2 uv) {\n"
+      "   if (uExtend == 1 && (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)) return vec4(0.0);\n"
+      "   return texture(uSrc, uv);\n"
+      "}\n";
 
+   // Channel Mask: the def's own main() is renamed and wrapped, so the mask
+   // works on every filter without touching its body.
+   const char* kMaskPrologue = "#define main fxMain\n";
+   const char* kMaskEpilogue =
+      "\n#undef main\n"
+      "uniform int uMaskOn;\n"
+      "uniform vec4 uMask;\n"
+      "void main() {\n"
+      "   fxMain();\n"
+      "   if (uMaskOn == 1) fragColor = mix(texture(uSrc, vUv), fragColor, uMask);\n"
+      "}\n";
+}
 
+const std::vector<std::string>& FilterNode::Common::ResNames()
+{
+   static const std::vector<std::string> k = { "Use Input", "Half", "Quarter", "Eighth", "2x", "4x",
+                                               "Custom", "Fit in Custom", "Limit to Custom" };
+   return k;
+}
+
+const std::vector<std::string>& FilterNode::Common::FormatNames()
+{
+   static const std::vector<std::string> k = { "8-bit", "16-bit float", "32-bit float", "Use Input" };
+   return k;
+}
+
+const std::vector<std::string>& FilterNode::Common::ExtendNames()
+{
+   static const std::vector<std::string> k = { "Node default", "Hold", "Zero", "Repeat", "Mirror" };
+   return k;
+}
+
+const std::vector<std::string>& FilterNode::Common::SmoothNames()
+{
+   static const std::vector<std::string> k = { "Interpolate", "Nearest", "Mipmap" };
+   return k;
 }
 
 FilterNode::~FilterNode()
 {
    GLUtil::DestroyFbo(mOut);
+   GLUtil::DestroyFbo(mPassFbo[0]);
+   GLUtil::DestroyFbo(mPassFbo[1]);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
    if (mPreProgram != 0)
@@ -67,6 +114,38 @@ FilterNode::FilterNode(const FilterDef& def)
          mClockModeParam = (int)i;
 }
 
+void FilterNode::OutputSizeFor(int inW, int inH, int& outW, int& outH) const
+{
+   int w = inW, h = inH;
+   if (mDef.naturalSize != nullptr)
+      mDef.naturalSize(mParamValues, inW, inH, w, h);
+   const int cw = std::clamp(common.width, 1, 16384);
+   const int ch = std::clamp(common.height, 1, 16384);
+   switch (common.res)
+   {
+      case Common::kResHalf:    w /= 2; h /= 2; break;
+      case Common::kResQuarter: w /= 4; h /= 4; break;
+      case Common::kResEighth:  w /= 8; h /= 8; break;
+      case Common::kRes2x:      w *= 2; h *= 2; break;
+      case Common::kRes4x:      w *= 4; h *= 4; break;
+      case Common::kResCustom:  w = cw; h = ch; break;
+      case Common::kResFit:
+      case Common::kResLimit:
+      {
+         // Keep the aspect, scaled to fit inside Custom; Limit only ever shrinks.
+         float k = std::min((float)cw / (float)std::max(1, w), (float)ch / (float)std::max(1, h));
+         if (common.res == Common::kResLimit)
+            k = std::min(k, 1.0f);
+         w = (int)std::lround(w * k);
+         h = (int)std::lround(h * k);
+         break;
+      }
+      default: break;
+   }
+   outW = std::clamp(w, 1, 16384);
+   outH = std::clamp(h, 1, 16384);
+}
+
 bool FilterNode::EnsureShader()
 {
    if (mShaderTried)
@@ -82,7 +161,7 @@ bool FilterNode::EnsureShader()
       LookupLocs(mPreProgram, mPreLocs);
    }
 
-   std::string src = std::string(kPreamble) + mDef.fragmentBody;
+   std::string src = std::string(kPreamble) + kMaskPrologue + mDef.fragmentBody + kMaskEpilogue;
    mProgram = GLUtil::CompileProgram(src.c_str());
    if (mProgram == 0)
       return false;
@@ -100,17 +179,22 @@ void FilterNode::LookupLocs(unsigned int program, PassLocs& locs) const
    locs.time = glGetUniformLocation(program, "uTime");
    locs.beats = glGetUniformLocation(program, "uBeats");
    locs.clock = glGetUniformLocation(program, "uClock");
+   locs.extend = glGetUniformLocation(program, "uExtend");
+   locs.maskOn = glGetUniformLocation(program, "uMaskOn");
+   locs.mask = glGetUniformLocation(program, "uMask");
    locs.params.resize(mDef.params.size());
    for (size_t i = 0; i < mDef.params.size(); i++)
       locs.params[i] = glGetUniformLocation(program, mDef.params[i].uniformName.c_str());
 }
 
 void FilterNode::BindUniforms(const PassLocs& locs, unsigned int srcTex, unsigned int srcTex2,
-                              unsigned int passTex, float time, float beats, float clock) const
+                              unsigned int passTex, int srcW, int srcH,
+                              float time, float beats, float clock) const
 {
    glActiveTexture(GL_TEXTURE0);
    glBindTexture(GL_TEXTURE_2D, srcTex);
    glUniform1i(locs.src, 0);
+   GLUtil::BindSampler(0, EffectiveExtend(), common.smooth);
 
    // bind the second sampler to a real texture even when unused; sampling an
    // unbound unit is undefined and spams the GL driver log
@@ -124,11 +208,16 @@ void FilterNode::BindUniforms(const PassLocs& locs, unsigned int srcTex, unsigne
    glBindTexture(GL_TEXTURE_2D, passTex != 0 ? passTex : srcTex);
    glUniform1i(locs.pass, 2);
 
-   glUniform2f(locs.texel, 1.0f / mInput.Width(), 1.0f / mInput.Height());
+   glUniform2f(locs.texel, 1.0f / (float)std::max(1, srcW), 1.0f / (float)std::max(1, srcH));
 
    glUniform1f(locs.time, time);
    glUniform1f(locs.beats, beats);
    glUniform1f(locs.clock, clock);
+
+   glUniform1i(locs.extend, EffectiveExtend());
+   glUniform1i(locs.maskOn, common.AllChannels() ? 0 : 1);
+   glUniform4f(locs.mask, common.chanR ? 1.0f : 0.0f, common.chanG ? 1.0f : 0.0f,
+               common.chanB ? 1.0f : 0.0f, common.chanA ? 1.0f : 0.0f);
 
    for (size_t i = 0; i < mDef.params.size(); i++)
    {
@@ -172,15 +261,34 @@ void FilterNode::CookIfNeeded(int frameId)
 
    if (!EnsureShader())
       return;
-   if (!GLUtil::EnsureFbo(mOut, mInput.Width(), mInput.Height()))
+
+   const int inW = mInput.Width();
+   const int inH = mInput.Height();
+   int outW = 0, outH = 0;
+   OutputSizeFor(inW, inH, outW, outH);
+   unsigned int format = GL_RGBA8;
+   switch (common.format)
+   {
+      case Common::kFmt16f:   format = GL_RGBA16F; break;
+      case Common::kFmt32f:   format = GL_RGBA32F; break;
+      case Common::kFmtInput: format = mInput.Format(); break;
+      default: break;
+   }
+   if (format != GL_RGBA8 && format != GL_RGBA16F && format != GL_RGBA32F)
+      format = GL_RGBA8;
+   if (!GLUtil::EnsureFbo(mOut, outW, outH, format))
       return;
 
    Signature sig;
    sig.upstreamRev = mInput.Revision();
    sig.upstreamRev2 = (mDef.inputs > 1) ? mInput2.Revision() : 0;
-   sig.width = mInput.Width();
-   sig.height = mInput.Height();
+   sig.width = inW;
+   sig.height = inH;
    sig.params = mParamValues;
+   sig.outW = outW;
+   sig.outH = outH;
+   sig.format = format;
+   common.Visit(sig.common);
    sig.time = mUsesTime ? (float)Transport::Instance().Seconds() : 0.0f;
    if (mUsesTime)
    {
@@ -195,27 +303,56 @@ void FilterNode::CookIfNeeded(int frameId)
       return; // nothing changed since the last cook - reuse mOut as-is
 
    NodeWorkCounter()++;
-   unsigned int passTex = 0;
-   if (mPreProgram != 0)
+   const bool mipmap = common.smooth == GLUtil::kFilterMipmap;
+   const int passes = std::clamp(common.passes, 1, 32);
+   unsigned int curTex = srcTex;
+   int curW = inW, curH = inH;
+   for (int k = 0; k < passes; k++)
    {
-      // Two-pass filters (separable blurs): horizontal pass into a float
-      // intermediate, then the main body reads it as uPass.
-      // Shared scratch target: it only lives from this pass to the main
-      // pass below, and both input Pulls already ran, so nothing can
-      // acquire it in between. Keep it that way.
-      GLUtil::Fbo* mid = GLUtil::AcquireScratchFbo(mInput.Width(), mInput.Height(), GL_RGBA16F);
-      if (mid == nullptr)
-         return;
-      GLUtil::RunShaderPass(*mid, mPreProgram, [this, srcTex, srcTex2, &sig]()
+      // Each pass after the first reads the previous one (TouchDesigner's
+      // Passes); intermediates ping-pong so a pass never reads its own target.
+      GLUtil::Fbo* target = &mOut;
+      if (k < passes - 1)
       {
-         BindUniforms(mPreLocs, srcTex, srcTex2, 0, sig.time, sig.beats, sig.clock);
+         target = &mPassFbo[k & 1];
+         if (!GLUtil::EnsureFbo(*target, outW, outH, format))
+            return;
+      }
+      if (mipmap)
+         GLUtil::GenerateMipmaps(curTex);
+
+      unsigned int passTex = 0;
+      if (mPreProgram != 0)
+      {
+         // Two-pass filters (separable blurs): horizontal pass into a float
+         // intermediate, then the main body reads it as uPass.
+         // Shared scratch target: it only lives from this pass to the main
+         // pass below, and both input Pulls already ran, so nothing can
+         // acquire it in between. Keep it that way.
+         GLUtil::Fbo* mid = GLUtil::AcquireScratchFbo(curW, curH, GL_RGBA16F);
+         if (mid == nullptr)
+            return;
+         GLUtil::RunShaderPass(*mid, mPreProgram, [this, curTex, srcTex2, curW, curH, &sig]()
+         {
+            BindUniforms(mPreLocs, curTex, srcTex2, 0, curW, curH, sig.time, sig.beats, sig.clock);
+         });
+         GLUtil::UnbindSampler(0);
+         passTex = GLUtil::FboTexture(*mid);
+      }
+      GLUtil::RunShaderPass(*target, mProgram, [this, curTex, srcTex2, passTex, curW, curH, &sig]()
+      {
+         BindUniforms(mMainLocs, curTex, srcTex2, passTex, curW, curH, sig.time, sig.beats, sig.clock);
       });
-      passTex = GLUtil::FboTexture(*mid);
+      GLUtil::UnbindSampler(0);
+      curTex = GLUtil::FboTexture(*target);
+      curW = outW;
+      curH = outH;
    }
-   GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, srcTex2, passTex, &sig]()
+   if (passes == 1)
    {
-      BindUniforms(mMainLocs, srcTex, srcTex2, passTex, sig.time, sig.beats, sig.clock);
-   });
+      GLUtil::DestroyFbo(mPassFbo[0]);
+      GLUtil::DestroyFbo(mPassFbo[1]);
+   }
 
    mBuilt = sig;
    mHasBuilt = true;

@@ -2,6 +2,7 @@
 
 #include "platform/OpenGLHeaders.h"
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -66,6 +67,12 @@ void FitNode::CookIfNeeded(int frameId)
 
    int dstW = matchInput ? srcW : std::max(1, (int)width);
    int dstH = matchInput ? srcH : std::max(1, (int)height);
+   if (limit && !matchInput)
+   {
+      const float k = std::min(1.0f, std::min((float)dstW / srcW, (float)dstH / srcH));
+      dstW = std::max(1, (int)std::lround(srcW * k));
+      dstH = std::max(1, (int)std::lround(srcH * k));
+   }
 
    if (!EnsureShader())
       return;
@@ -109,8 +116,11 @@ void FitNode::CookIfNeeded(int frameId)
       return;
    NodeWorkCounter()++;
 
+   if (smooth == GLUtil::kFilterMipmap)
+      GLUtil::GenerateMipmaps(srcTex);
    GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, scaleX, scaleY, dstW, dstH]()
    {
+      GLUtil::BindSampler(0, GLUtil::kExtendHold, smooth);
       glUniform2f(glGetUniformLocation(mProgram, "uShift"), offsetX / (float)std::max(1, dstW),
                   offsetY / (float)std::max(1, dstH));
       glActiveTexture(GL_TEXTURE0);
@@ -120,6 +130,7 @@ void FitNode::CookIfNeeded(int frameId)
       glUniform3f(glGetUniformLocation(mProgram, "uBgColor"), bgColor[0], bgColor[1], bgColor[2]);
       glUniform1f(glGetUniformLocation(mProgram, "uBgOpacity"), bgOpacity);
    });
+   GLUtil::UnbindSampler(0);
    mBuiltSig = std::move(sig);
    mHasBuilt = true;
    mRevision = NextTextureRevision();

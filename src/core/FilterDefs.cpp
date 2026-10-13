@@ -1,5 +1,7 @@
 #include "FilterDefs.h"
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 #include "GlitchShader.inl"
 
@@ -44,6 +46,21 @@ namespace
       return p;
    }
 
+   // Crop's "Cut" mode (outside = 3) renders only the kept region, like
+   // TouchDesigner's Crop TOP: the cropped part is discarded, so the image
+   // gets smaller. Params in def order: Left, Right, Top, Bottom, outside.
+   void CropNaturalSize(const std::vector<std::array<float, 3>>& p, int inW, int inH, int& outW, int& outH)
+   {
+      outW = inW;
+      outH = inH;
+      if (p.size() < 5 || (int)(p[4][0] + 0.5f) != 3)
+         return;
+      const float keepX = 1.0f - p[0][0] - p[1][0];
+      const float keepY = 1.0f - p[2][0] - p[3][0];
+      outW = std::max(1, (int)std::lround(inW * std::max(0.0f, keepX)));
+      outH = std::max(1, (int)std::lround(inH * std::max(0.0f, keepY)));
+   }
+
    // Shared helpers available to every filter body (hue/sat conversions used by HSL).
    const char* kSharedHelpers =
       "vec3 rgb2hsv(vec3 c) {\n"
@@ -63,7 +80,8 @@ namespace
 
 const std::vector<FilterDef>& GetFilterDefs()
 {
-   static const std::vector<FilterDef> kDefs = {
+   static const std::vector<FilterDef> kDefs = [] {
+   std::vector<FilterDef> defs = {
       // ---------------- Effects: blur family ----------------
       // The blur family is separable: exp(-(x²+y²)/k) = exp(-x²/k)·exp(-y²/k),
       // so each 2D kernel runs as a horizontal prePassBody into a 16F
@@ -280,18 +298,45 @@ const std::vector<FilterDef>& GetFilterDefs()
         "uniform float uRotation;\n"
         "uniform int uFlipH;\n"
         "uniform int uFlipV;\n"
+        "uniform float uPivotX;\n"
+        "uniform float uPivotY;\n"
+        "uniform int uOrder;\n"
+        "uniform int uCompOver;\n"
+        "uniform vec3 uBgColor;\n"
+        "uniform float uBgAlpha;\n"
+        "uniform int uLimitTiles;\n"
+        "uniform float uTiles;\n"
         "void main() {\n"
-        "   vec2 uv = vUv - vec2(0.5, 0.5);\n"
+        // Work in aspect-corrected space so a rotation of a non-square image
+        // stays rigid instead of shearing; translate and pivot stay in image
+        // fractions (0.5 = half the image).
+        "   vec2 ax = vec2(uTexelSize.y / uTexelSize.x, 1.0);\n"
+        "   vec2 p = (vUv - 0.5) * ax;\n"
+        "   vec2 piv = vec2(uPivotX, uPivotY) * ax;\n"
+        "   vec2 tr = vec2(uTranslateX, uTranslateY) * ax;\n"
+        "   vec2 sc = vec2(max(uScale, 0.0001) * max(uScaleX, 0.0001), max(uScale, 0.0001) * max(uScaleY, 0.0001));\n"
+        "   if (uFlipH != 0) sc.x = -sc.x;\n"
+        "   if (uFlipV != 0) sc.y = -sc.y;\n"
         "   float s = sin(-uRotation), c = cos(-uRotation);\n"
-        "   uv = vec2(c*uv.x - s*uv.y, s*uv.x + c*uv.y);\n"
-        "   uv /= max(uScale, 0.0001);\n"
-        "   uv /= vec2(max(uScaleX, 0.0001), max(uScaleY, 0.0001));\n"
-        "   if (uFlipH != 0) uv.x = -uv.x;\n"
-        "   if (uFlipV != 0) uv.y = -uv.y;\n"
-        "   uv -= vec2(uTranslateX, uTranslateY);\n"
-        "   uv += vec2(0.5, 0.5);\n"
-        "   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) fragColor = vec4(0.0);\n"
-        "   else fragColor = texture(uSrc, uv);\n"
+        // forward order as listed (0 = scale, 1 = rotate, 2 = translate);
+        // undo it back to front to find the source pixel
+        "   ivec3 ops = uOrder == 0 ? ivec3(0, 1, 2) : uOrder == 1 ? ivec3(0, 2, 1) : uOrder == 2 ? ivec3(1, 0, 2)\n"
+        "             : uOrder == 3 ? ivec3(1, 2, 0) : uOrder == 4 ? ivec3(2, 0, 1) : ivec3(2, 1, 0);\n"
+        "   for (int i = 2; i >= 0; i--) {\n"
+        "      int op = ops[i];\n"
+        "      if (op == 0) p = piv + (p - piv) / sc;\n"
+        "      else if (op == 1) { vec2 q = p - piv; p = piv + vec2(c*q.x - s*q.y, s*q.x + c*q.y); }\n"
+        "      else p -= tr;\n"
+        "   }\n"
+        "   vec2 uv = p / ax + 0.5;\n"
+        "   vec4 col = srcExt(uv);\n"
+        "   if (uLimitTiles == 1 && (uv.x < -uTiles || uv.x > 1.0 + uTiles || uv.y < -uTiles || uv.y > 1.0 + uTiles))\n"
+        "      col = vec4(0.0);\n"
+        "   if (uCompOver == 1) {\n"
+        "      float a = col.a + uBgAlpha * (1.0 - col.a);\n"
+        "      col = vec4((col.rgb * col.a + uBgColor * uBgAlpha * (1.0 - col.a)) / max(a, 1e-5), a);\n"
+        "   }\n"
+        "   fragColor = col;\n"
         "}\n",
         { P("Translate X", "uTranslateX", T::Float, -1.0f, 1.0f, 0.0f),
           P("Translate Y", "uTranslateY", T::Float, -1.0f, 1.0f, 0.0f),
@@ -300,7 +345,18 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Scale Y", "uScaleY", T::Float, 0.1f, 4.0f, 1.0f),
           P("Rotation", "uRotation", T::Float, -6.2832f, 6.2832f, 0.0f),
           P("Flip Horizontal", "uFlipH", T::Bool, 0.0f, 1.0f, 0.0f),
-          P("Flip Vertical", "uFlipV", T::Bool, 0.0f, 1.0f, 0.0f) } },
+          P("Flip Vertical", "uFlipV", T::Bool, 0.0f, 1.0f, 0.0f),
+          // Turbo (TOP parity). Appended after the existing sliders: slider
+          // ordinals are the patch's modulation keys.
+          S("pivot & order", P("Pivot X", "uPivotX", T::Float, -1.0f, 1.0f, 0.0f)),
+          P("Pivot Y", "uPivotY", T::Float, -1.0f, 1.0f, 0.0f),
+          E("order", "uOrder", { "Scale Rotate Translate", "Scale Translate Rotate", "Rotate Scale Translate",
+                                 "Rotate Translate Scale", "Translate Scale Rotate", "Translate Rotate Scale" }, 4),
+          S("background & tiles", P("Comp Over Background", "uCompOver", T::Bool, 0.0f, 1.0f, 0.0f)),
+          P("Background", "uBgColor", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f),
+          P("Background Alpha", "uBgAlpha", T::Float, 0.0f, 1.0f, 1.0f),
+          P("Limit Tiles", "uLimitTiles", T::Bool, 0.0f, 1.0f, 0.0f),
+          P("Tiles", "uTiles", T::Float, 0.0f, 16.0f, 1.0f) } },
 
       // ---------------- Color adjustments ----------------
       { "invert", "Color",
@@ -521,19 +577,32 @@ const std::vector<FilterDef>& GetFilterDefs()
       { "displace", "Effects",
         "uniform float uAmount;\n"
         "uniform float uScale;\n"
+        "uniform float uAmountX;\n"
+        "uniform float uAmountY;\n"
+        "uniform float uMidpoint;\n"
+        "uniform int uChanX;\n"
+        "uniform int uChanY;\n"
+        "float pick(vec4 m, int ch) {\n"
+        "   return ch == 4 ? dot(m.rgb, vec3(0.2126, 0.7152, 0.0722)) : m[ch];\n"
+        "}\n"
         "void main() {\n"
         "   vec2 offset;\n"
         "   if (uHasSrc2 == 1) {\n"
-        "      vec3 m = texture(uSrc2, vUv * max(uScale, 0.01)).rgb;\n"
-        "      offset = (m.rg - 0.5) * 2.0;\n"
+        "      vec4 m = texture(uSrc2, vUv * max(uScale, 0.01));\n"
+        "      offset = (vec2(pick(m, uChanX), pick(m, uChanY)) - uMidpoint) * 2.0;\n"
         "   } else {\n"
         "      float n = sin(vUv.x * 20.0 * uScale + uTime) * cos(vUv.y * 20.0 * uScale - uTime);\n"
         "      offset = vec2(n, -n);\n"
         "   }\n"
-        "   fragColor = texture(uSrc, clamp(vUv + offset * uAmount * 0.1, 0.0, 1.0));\n"
+        "   fragColor = srcExt(vUv + offset * vec2(uAmountX, uAmountY) * uAmount * 0.1);\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.0f, 2.0f, 0.3f),
-          P("Map Scale", "uScale", T::Float, 0.1f, 8.0f, 1.0f) },
+          P("Map Scale", "uScale", T::Float, 0.1f, 8.0f, 1.0f),
+          P("Amount X", "uAmountX", T::Float, -2.0f, 2.0f, 1.0f),
+          P("Amount Y", "uAmountY", T::Float, -2.0f, 2.0f, 1.0f),
+          P("Midpoint", "uMidpoint", T::Float, 0.0f, 1.0f, 0.5f),
+          E("horizontal from", "uChanX", { "Red", "Green", "Blue", "Alpha", "Luminance" }, 0),
+          E("vertical from", "uChanY", { "Red", "Green", "Blue", "Alpha", "Luminance" }, 1) },
         2 },
 
       { "liquify", "Effects",
@@ -553,7 +622,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "void main() {\n"
         "   float t = uTime * uSpeed;\n"
         "   vec2 flow = vec2(noise(vUv * uScale + t), noise(vUv * uScale + 5.2 - t)) - 0.5;\n"
-        "   fragColor = texture(uSrc, clamp(vUv + flow * uAmount * 0.2, 0.0, 1.0));\n"
+        "   fragColor = srcExt(vUv + flow * uAmount * 0.2);\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.0f, 2.0f, 0.4f),
           P("Scale", "uScale", T::Float, 0.5f, 20.0f, 4.0f),
@@ -596,7 +665,7 @@ const std::vector<FilterDef>& GetFilterDefs()
         "   a = mod(a, seg);\n"
         "   a = abs(a - seg * 0.5);\n"
         "   vec2 uv = vec2(cos(a), sin(a)) * r * max(uZoom, 0.01) + 0.5;\n"
-        "   fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
+        "   fragColor = srcExt(uv);\n"
         "}\n",
         { P("Segments", "uSegments", T::Float, 2.0f, 32.0f, 6.0f),
           P("Rotation", "uRotation", T::Float, 0.0f, 6.2832f, 0.0f),
@@ -682,10 +751,12 @@ const std::vector<FilterDef>& GetFilterDefs()
         "uniform vec3 uFill;\n"
         "void main() {\n"
         "   float l = uLeft, r = 1.0 - uRight, b = uBottom, t = 1.0 - uTop;\n"
-        "   if (uMode == 1) {\n"
-        "      // zoom the kept region back out to fill the frame\n"
+        "   if (uMode == 1 || uMode == 3) {\n"
+        // 1 zooms the kept region back out to the input's size; 3 (Cut) is
+        // the same mapping, but the node's output is only the kept region's
+        // size (CropNaturalSize), so nothing is resampled at 100% scale.
         "      vec2 uv = vec2(mix(l, r, vUv.x), mix(b, t, vUv.y));\n"
-        "      fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
+        "      fragColor = srcExt(uv);\n"
         "      return;\n"
         "   }\n"
         "   if (vUv.x < l || vUv.x > r || vUv.y < b || vUv.y > t) {\n"
@@ -698,7 +769,7 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Right", "uRight", T::Float, 0.0f, 0.95f, 0.1f),
           P("Top", "uTop", T::Float, 0.0f, 0.95f, 0.1f),
           P("Bottom", "uBottom", T::Float, 0.0f, 0.95f, 0.1f),
-          E("outside", "uMode", { "Transparent", "Zoom to fill", "Fill colour" }, 0),
+          E("outside", "uMode", { "Transparent", "Zoom to fill", "Fill colour", "Cut (smaller image)" }, 3),
           P("Fill", "uFill", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f) } },
 
       { "emboss", "Effects",
@@ -1067,6 +1138,19 @@ const std::vector<FilterDef>& GetFilterDefs()
           P("Color", "uColor", T::Color, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f),
           P("Opacity", "uOpacity", T::Float, 0.0f, 1.0f, 0.6f) } },
    };
+
+   for (FilterDef& def : defs)
+   {
+      if (def.name == "transform")
+         def.defaultExtend = 1; // GLUtil::kExtendZero: the empty border it always drew
+      else if (def.name == "crop")
+      {
+         def.defaultExtend = 1;
+         def.naturalSize = CropNaturalSize;
+      }
+   }
+   return defs;
+   }();
 
    return kDefs;
 }

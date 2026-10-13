@@ -68,10 +68,19 @@ void SwitcherNode::CookIfNeeded(int frameId)
    int slotB = connected[0];
    float mix = 0.0f;
 
-   if (manual || count == 1)
+   if (manual)
    {
-      const int pick = manual ? std::max(0, std::min(manualSlot, kSlots - 1)) : connected[0];
-      slotA = mInputs[pick].IsConnected() ? pick : connected[0];
+      const float idx = std::clamp(EffectiveIndex(), 0.0f, (float)(kSlots - 1));
+      const int lo = (int)std::floor(idx);
+      const int hi = std::min(lo + 1, kSlots - 1);
+      slotA = mInputs[lo].IsConnected() ? lo : connected[0];
+      slotB = mInputs[hi].IsConnected() ? hi : slotA;
+      mix = slotB == slotA ? 0.0f : idx - (float)lo;
+      manualSlot = (int)std::lround(idx);
+   }
+   else if (count == 1)
+   {
+      slotA = connected[0];
       slotB = slotA;
    }
    else

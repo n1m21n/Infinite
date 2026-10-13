@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -50,6 +51,18 @@ struct FilterDef
    // that intermediate bound as uPass. A 2D Gaussian written as a horizontal
    // prePass plus a vertical main pass reads 2N texels instead of N².
    std::string prePassBody;
+
+   // Turbo (TOP parity). The size this filter renders at when Output
+   // Resolution is "Use Input", if that is not simply the input's size
+   // (Crop cutting the image down). `params` are the node's current values in
+   // def order. Null = the input's size.
+   void (*naturalSize)(const std::vector<std::array<float, 3>>& params, int inW, int inH,
+                       int& outW, int& outH) = nullptr;
+
+   // What "Extend: node default" means for this filter (a GLUtil::Extend).
+   // Hold is the clamp-to-edge every filter read with before Extend existed;
+   // Transform and Crop default to Zero, which is what they always drew.
+   int defaultExtend = 0;
 };
 
 const std::vector<FilterDef>& GetFilterDefs();

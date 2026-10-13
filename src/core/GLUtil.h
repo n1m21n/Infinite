@@ -37,6 +37,23 @@ namespace GLUtil
 
    inline unsigned int FboTexture(const Fbo& fbo) { return fbo.tex; }
 
+   // Turbo (TOP parity): how a shader reads past the edge of its input
+   // (TouchDesigner's Extend) and how it filters it (Input Smoothness).
+   // Sampler objects override the texture's own wrap/filter state for one
+   // texture unit only, so a consumer can read an upstream texture with
+   // Repeat or Nearest without changing what any other consumer of that same
+   // texture sees. Always UnbindSampler after the pass: an unbound sampler
+   // is what every other node in the codebase assumes.
+   enum Extend { kExtendHold = 0, kExtendZero, kExtendRepeat, kExtendMirror, kExtendCount };
+   enum Filter { kFilterLinear = 0, kFilterNearest, kFilterMipmap, kFilterCount };
+   unsigned int SamplerFor(int extend, int filter);
+   void BindSampler(int unit, int extend, int filter);
+   void UnbindSampler(int unit);
+   // Rebuilds tex's mip chain; kFilterMipmap reads it. Call when the
+   // texture's pixels changed (its producer's revision moved).
+   void GenerateMipmaps(unsigned int tex);
+   const char* FormatName(unsigned int internalFormat); // "8-bit" / "16f" / "32f"
+
    // Compiles fragSrc against a shared fullscreen-quad vertex shader (attributes
    // aPos/aUv at locations 0/1). Returns 0 on failure; if outError is non-null the
    // compile/link log is written there instead of stderr (used by FormulaNode to

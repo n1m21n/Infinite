@@ -299,8 +299,16 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
          file << " " << c.srcOutput;
       file << "\n";
    }
+   // A modulator-input cable from a multi-output modulator (XY pad, Path)
+   // names its output as a 4th token, like `cable`; the reader already
+   // accepts it.
    for (const CableRecord& c : data.geometry)
-      file << "geo " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
+   {
+      file << "geo " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex;
+      if (c.srcOutput != 0)
+         file << " " << c.srcOutput;
+      file << "\n";
+   }
    for (const CableRecord& c : data.audio)
    {
       file << "aud " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex;

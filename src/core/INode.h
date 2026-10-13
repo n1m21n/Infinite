@@ -145,6 +145,9 @@ public:
    virtual unsigned int GetOutputTexture() = 0;
    virtual int GetOutputWidth() const = 0;
    virtual int GetOutputHeight() const = 0;
+   // GL internal format of GetOutputTexture() (GL_RGBA8 = 0x8058 unless the
+   // node renders float), so a downstream "Pixel Format: Use Input" can follow it.
+   virtual unsigned int GetOutputFormat() const { return 0x8058; }
 
    // Ensure this node has produced its output for the given frame (memoized).
    // Nodes with inputs should pull their inputs' CookIfNeeded() before rendering themselves.
@@ -203,6 +206,15 @@ public:
    // raw pointer types - matching how CableFor hands back an ImageCable*.
    virtual AudioCable* AudioInputSlot(int /*slot*/) { return nullptr; }
    virtual NoteCable* NoteInputSlot(int /*slot*/) { return nullptr; }
+
+   // Turbo: hidden audio/note inputs that are not pins - Receive Audio /
+   // Receive Notes hold one per matching Send, re-resolved by channel name
+   // every frame (UpdateWirelessCables in main.cpp). The topology builder
+   // treats them exactly like AudioInputSlot/NoteInputSlot (wireless input i
+   // is topology input i), but they are never drawn, saved or offered to a
+   // cable, so they must not live behind AudioInputSlot/NoteInputSlot.
+   virtual AudioCable* WirelessAudioInput(int /*i*/) { return nullptr; }
+   virtual NoteCable* WirelessNoteInput(int /*i*/) { return nullptr; }
 
    // Address of this node's underlying AudioNode, for wiring note ports
    // only - distinct from IAudioSource::GetAudioNode(), which additionally

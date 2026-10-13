@@ -43,6 +43,11 @@ public:
    float bgOpacity = 0.0f;
    float offsetX = 0.0f;    // Turbo 0.46 (upstream R289): output pixels, + moves the image right
    float offsetY = 0.0f;    // output pixels, + moves the image up
+   // Turbo (TOP parity): Limit = TouchDesigner's "Limit Resolution": the
+   // output keeps the source's aspect and only ever shrinks to fit inside
+   // width x height (a smaller source passes through at its own size).
+   bool limit = false;
+   int smooth = 0; // GLUtil::Filter - Mipmap avoids sparkle when shrinking a lot
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -50,6 +55,7 @@ public:
       v.Bool("matchInput", matchInput);
       v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
       v.Float("offsetX", offsetX); v.Float("offsetY", offsetY);
+      v.Bool("limit", limit); v.Int("smooth", smooth);
    }
 
 private:

@@ -18,6 +18,12 @@ namespace
 
 // ============================================================== Feedback
 
+const std::vector<std::string>& FeedbackNode::FormatNames()
+{
+   static const std::vector<std::string> k = { "16-bit float", "32-bit float", "8-bit" };
+   return k;
+}
+
 FeedbackNode::~FeedbackNode()
 {
    GLUtil::DestroyFbo(mBuffers[0]);
@@ -57,9 +63,10 @@ void FeedbackNode::CookIfNeeded(int frameId)
 
    const int w = std::max(1, mInput.Width());
    const int h = std::max(1, mInput.Height());
-   if (!GLUtil::EnsureFbo(mBuffers[mWrite], w, h, GL_RGBA16F))
+   const unsigned int fmt = format == 1 ? GL_RGBA32F : format == 2 ? GL_RGBA8 : GL_RGBA16F;
+   if (!GLUtil::EnsureFbo(mBuffers[mWrite], w, h, fmt))
       return;
-   GLUtil::EnsureFbo(mBuffers[1 - mWrite], w, h, GL_RGBA16F);
+   GLUtil::EnsureFbo(mBuffers[1 - mWrite], w, h, fmt);
 
    // Capture this frame into the write buffer; readers keep seeing the other
    // one until the swap below, which is what produces the one-frame delay.

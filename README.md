@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.51.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.52.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -71,6 +71,7 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Projection** | warp with alpha outside, per-edge blend, antialiased outline |
 | **Output windows** | exact pixel size, fit / 1:1 / fill / stretch, F11 fullscreen on any monitor, stays on top |
 | **Canvas preview** | any node's image behind the patch (Ctrl+Shift+B), with F11 borderless UI for live coding |
+| **TOP-style image controls** | every filter has TouchDesigner's Common page (output resolution, 8/16/32-bit pixel format, extend hold / zero / repeat / mirror, nearest / mipmap smoothness, passes, channel mask); Crop really cuts the image; Transform gets pivot, order, background and tiling; Blend places B like the Composite TOP; Switcher blends a fractional index; Formula takes four image inputs |
 | **Spout In / Out** | Spout2 sender and receiver (old `Syphon` patches still open) |
 | **Background removal** | U2Net on Windows ML / DirectML (any DX12 GPU), CPU fallback |
 
@@ -88,6 +89,7 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 
 | Feature | What it does |
 |---|---|
+| **Send / Receive** | Pure Data style wireless cables for images, CV, notes, audio and geometry: a Send and every Receive with the same channel name are connected without a cable; several Sends on one name are combined (first / index / add / max / average, sum, merge) |
 | **Live hints** | an amber border (with a tooltip) on half-wired mixers, empty Outputs and image loops without a Feedback node |
 | **Live reload** | the open `.inf` is watched: an outside change reloads it (one undo step), or asks first if you have unsaved edits |
 | **Auto layout** | nodes without a position (patches written by hand or by an AI) are laid out by signal flow |

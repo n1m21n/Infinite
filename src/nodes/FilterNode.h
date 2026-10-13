@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <string>
 #include <vector>
 
 #include "INode.h"
@@ -24,6 +25,7 @@ public:
    unsigned int GetOutputTexture() override { return GLUtil::FboTexture(mOut); }
    int GetOutputWidth() const override { return mOut.w; }
    int GetOutputHeight() const override { return mOut.h; }
+   unsigned int GetOutputFormat() const override { return mOut.internalFormat; }
    void CookIfNeeded(int frameId) override;
    unsigned long long TextureRevision() const override { return mRevision; }
 
@@ -52,7 +54,47 @@ public:
          else
             v.Float(def.uniformName.c_str(), mParamValues[i][0]);
       }
+      common.Visit(v);
    }
+
+   // Turbo (TOP parity): TouchDesigner's "Common" page, shared by every
+   // FilterDef. Every default reproduces what a filter did before these
+   // existed (input size, 8-bit, the def's own edge rule, linear, one pass,
+   // all channels), so older patches render unchanged.
+   struct Common
+   {
+      enum Res { kResInput, kResHalf, kResQuarter, kResEighth, kRes2x, kRes4x, kResCustom, kResFit, kResLimit };
+      enum Format { kFmt8, kFmt16f, kFmt32f, kFmtInput };
+
+      int res = kResInput;
+      int width = 1280; // Custom / Fit / Limit
+      int height = 720;
+      int format = kFmt8;
+      int extend = 0; // 0 = the def's defaultExtend, else GLUtil::Extend + 1
+      int smooth = 0; // GLUtil::Filter
+      int passes = 1;
+      bool chanR = true, chanG = true, chanB = true, chanA = true;
+
+      void Visit(ParamVisitor& v)
+      {
+         v.Int("cmnRes", res); v.Int("cmnW", width); v.Int("cmnH", height);
+         v.Int("cmnFormat", format); v.Int("cmnExtend", extend); v.Int("cmnSmooth", smooth);
+         v.Int("cmnPasses", passes);
+         v.Bool("cmnR", chanR); v.Bool("cmnG", chanG); v.Bool("cmnB", chanB); v.Bool("cmnA", chanA);
+      }
+      bool AllChannels() const { return chanR && chanG && chanB && chanA; }
+
+      static const std::vector<std::string>& ResNames();
+      static const std::vector<std::string>& FormatNames();
+      static const std::vector<std::string>& ExtendNames();
+      static const std::vector<std::string>& SmoothNames();
+   };
+   Common common;
+
+   // The size this node renders at for an input of inW x inH (its natural
+   // size - see FilterDef::naturalSize - put through Output Resolution).
+   void OutputSizeFor(int inW, int inH, int& outW, int& outH) const;
+   int EffectiveExtend() const { return common.extend > 0 ? common.extend - 1 : mDef.defaultExtend; }
 
 private:
    // Uniform locations are fixed for the life of a linked program, so they're
@@ -69,13 +111,17 @@ private:
       GLint time = -1;
       GLint beats = -1;
       GLint clock = -1;
+      GLint extend = -1;
+      GLint maskOn = -1;
+      GLint mask = -1;
       std::vector<GLint> params;
    };
 
    bool EnsureShader();
    void LookupLocs(unsigned int program, PassLocs& locs) const;
    void BindUniforms(const PassLocs& locs, unsigned int srcTex, unsigned int srcTex2,
-                     unsigned int passTex, float time, float beats, float clock) const;
+                     unsigned int passTex, int srcW, int srcH,
+                     float time, float beats, float clock) const;
 
    // Everything the shader pass's output depends on. Reusing mOut's contents
    // is only safe when all of this is identical to the last time it ran -
@@ -96,12 +142,18 @@ private:
       // is only part of the signature in free-run mode.
       float beats = 0.0f;
       float clock = 0.0f;
+      // Turbo (TOP parity): output size/format and the Common page.
+      int outW = 0;
+      int outH = 0;
+      unsigned int format = 0;
+      ParamSnapshot common;
 
       bool operator==(const Signature& o) const
       {
          return upstreamRev == o.upstreamRev && upstreamRev2 == o.upstreamRev2 &&
                 width == o.width && height == o.height && params == o.params &&
-                time == o.time && beats == o.beats && clock == o.clock;
+                time == o.time && beats == o.beats && clock == o.clock &&
+                outW == o.outW && outH == o.outH && format == o.format && common == o.common;
       }
    };
 
@@ -111,6 +163,7 @@ private:
    ImageCable mInput;
    ImageCable mInput2; // only used when Def().inputs == 2
    GLUtil::Fbo mOut;
+   GLUtil::Fbo mPassFbo[2]; // Passes > 1: ping-pong between these, last pass into mOut
    unsigned int mProgram = 0;
    unsigned int mPreProgram = 0;
    bool mShaderTried = false;

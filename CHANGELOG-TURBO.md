@@ -1,5 +1,47 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.52.0-turbo (2026-10-13)
+
+TouchDesigner TOP parity, stage 1 (plan: docs/TOP-PARITY.md). Old patches render as before: every
+new control defaults to the previous behaviour.
+
+### Common page on every filter
+- **Resolution**: use input, half, quarter, eighth, 2x, 4x, custom, fit in custom, limit to custom.
+- **Pixel format**: 8-bit, 16-bit float, 32-bit float, or the input's.
+- **Extend**: what is read past the image edge - hold, zero, repeat, mirror (node default otherwise).
+  Transform, Crop, Displace, Liquify and Kaleidoscope use it.
+- **Smoothness** (interpolate, nearest, mipmap), **passes** (repeat the filter on its own output) and
+  a **channel mask** (R G B A).
+- Folded under "common" at the bottom of every filter; the line above it shows size and format.
+
+### Image nodes
+- **Crop**: new default "Cut (smaller image)" discards the cropped part, like the Crop TOP.
+- **Transform**: pivot, transform order, background colour with comp over, tile limit, and rotation
+  that no longer shears non-square images.
+- **Blend**: Composite TOP placement of B (pre-fit stretch / fit / fill / native / fit h / fit v,
+  justify, translate, scale, rotate, extend), alpha ops (over, under, inside, outside, atop, xor),
+  size from A, B or custom, pixel format.
+- **Fit**: limit (shrink only) and smoothness.
+- **Switcher**: manual index is now fractional and modulatable; 1.5 blends B and C.
+- **Feedback**: pixel format (16-bit float as before, 32-bit float, 8-bit).
+- **Formula**: four image inputs, read as `texture(uIn0, uv)` .. `uIn3`, and "size from in0".
+- **Displace**: amount X / Y, midpoint, and which channel moves each direction.
+
+### Send / Receive
+- Ten new Utility nodes: Send / Receive for images, CV, notes, audio and geometry, connected by a
+  channel name, like Pure Data's `[send]` / `[receive]`. Several Sends can share a name; Receives
+  combine them (image: first / index / add / max / average; CV: first / sum / average / max / min;
+  notes: merged; audio: summed with gain; geometry: by index). A bypassed Send is muted.
+  A loop through a Receive Image works like a Feedback node; audio and geometry loops are refused.
+
+### Fixes
+- Modulator cables into Range to Range, Smoothing, Mod Depth and the other modulator-input nodes
+  (all but Math) were not restored when a patch was loaded; a multi-output modulator (XY, Path)
+  feeding one now reloads on the right output.
+
+### Tests
+- New `TOPPARITYTEST` self-test (20 checks: pixels, sizes, formats, every filter compiling).
+
 ## 0.51.0-turbo (2026-10-06)
 
 ### Glitch, rebuilt

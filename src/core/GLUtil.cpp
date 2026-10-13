@@ -153,7 +153,7 @@ namespace GLUtil
       DestroyFbo(fbo);
 
       GLenum format = GL_RGBA;
-      GLenum type = (internalFormat == GL_RGBA16F) ? GL_FLOAT : GL_UNSIGNED_BYTE;
+      GLenum type = (internalFormat == GL_RGBA16F || internalFormat == GL_RGBA32F) ? GL_FLOAT : GL_UNSIGNED_BYTE;
 
       glGenFramebuffers(1, &fbo.fbo);
       glGenTextures(1, &fbo.tex);
@@ -220,6 +220,70 @@ namespace GLUtil
       e.lastUsedFrame = sScratchFrame;
       sScratch.push_back(e);
       return &sScratch.back().fbo;
+   }
+
+   unsigned int SamplerFor(int extend, int filter)
+   {
+      extend = extend < 0 || extend >= kExtendCount ? kExtendHold : extend;
+      filter = filter < 0 || filter >= kFilterCount ? kFilterLinear : filter;
+      static GLuint sSamplers[kExtendCount][kFilterCount] = {};
+      static bool sUnsupported = false;
+      if (sUnsupported)
+         return 0;
+      GLuint& s = sSamplers[extend][filter];
+      if (s != 0)
+         return s;
+      if (!(GLEW_VERSION_3_3 || GLEW_ARB_sampler_objects))
+      {
+         sUnsupported = true;
+         return 0;
+      }
+      glGenSamplers(1, &s);
+      static const GLenum kWrap[kExtendCount] = { GL_CLAMP_TO_EDGE, GL_CLAMP_TO_BORDER, GL_REPEAT, GL_MIRRORED_REPEAT };
+      glSamplerParameteri(s, GL_TEXTURE_WRAP_S, (GLint)kWrap[extend]);
+      glSamplerParameteri(s, GL_TEXTURE_WRAP_T, (GLint)kWrap[extend]);
+      const GLfloat transparent[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+      glSamplerParameterfv(s, GL_TEXTURE_BORDER_COLOR, transparent);
+      const GLint mag = filter == kFilterNearest ? GL_NEAREST : GL_LINEAR;
+      const GLint min = filter == kFilterNearest ? GL_NEAREST
+                      : filter == kFilterMipmap  ? GL_LINEAR_MIPMAP_LINEAR
+                                                 : GL_LINEAR;
+      glSamplerParameteri(s, GL_TEXTURE_MAG_FILTER, mag);
+      glSamplerParameteri(s, GL_TEXTURE_MIN_FILTER, min);
+      return s;
+   }
+
+   void BindSampler(int unit, int extend, int filter)
+   {
+      if (GLuint s = SamplerFor(extend, filter))
+         glBindSampler((GLuint)unit, s);
+   }
+
+   void UnbindSampler(int unit)
+   {
+      if (GLEW_VERSION_3_3 || GLEW_ARB_sampler_objects)
+         glBindSampler((GLuint)unit, 0);
+   }
+
+   void GenerateMipmaps(unsigned int tex)
+   {
+      if (tex == 0)
+         return;
+      GLint prev = 0;
+      glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev);
+      glBindTexture(GL_TEXTURE_2D, tex);
+      glGenerateMipmap(GL_TEXTURE_2D);
+      glBindTexture(GL_TEXTURE_2D, (GLuint)prev);
+   }
+
+   const char* FormatName(unsigned int internalFormat)
+   {
+      switch (internalFormat)
+      {
+         case GL_RGBA16F: return "16f";
+         case GL_RGBA32F: return "32f";
+         default: return "8-bit";
+      }
    }
 
    void EndFrameScratchFbos()

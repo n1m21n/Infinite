@@ -59,6 +59,12 @@ public:
       return node ? (node == mSource ? node->GetOutputHeightAt(mOutput) : node->GetOutputHeight()) : 0;
    }
 
+   unsigned int Format() const
+   {
+      INode* node = Resolved();
+      return node ? node->GetOutputFormat() : 0x8058;
+   }
+
    // Current revision of whatever this cable resolves to. Call after Pull()
    // has cooked it this frame, so a node that just re-rendered has already
    // bumped its stamp before this is read for a downstream cache signature.
