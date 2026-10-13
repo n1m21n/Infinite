@@ -191,17 +191,16 @@ namespace Platform
       bool outNv12 = true;
       bool yuv709 = true;
 
+      // Set by the capture thread once it has released the reader and shut
+      // the source down itself (on its own thread: calling Shutdown from the
+      // UI thread while a ReadSample is pending deadlocked the quit).
+      std::atomic<bool> exited { false };
+
       ~CameraHandle()
       {
          running.store(false);
-         // Shutdown first: a blocked ReadSample returns MF_E_SHUTDOWN, so a
-         // capture card that stopped sending never hangs the app on close.
-         if (source != nullptr)
-            source->Shutdown();
          if (worker.joinable())
             worker.join();
-         SafeRelease(reader);
-         SafeRelease(source);
       }
    };
 
@@ -498,6 +497,13 @@ namespace Platform
          opened.set_value(err);
          if (ok)
             CaptureLoop(raw);
+         SafeRelease(raw->reader);
+         if (raw->source != nullptr)
+         {
+            raw->source->Shutdown();
+            SafeRelease(raw->source);
+         }
+         raw->exited.store(true, std::memory_order_release);
       });
       error = openedResult.get();
       if (!error.empty())
@@ -512,6 +518,20 @@ namespace Platform
    void CameraClose(CameraHandle* h)
    {
       if (h == nullptr) return;
+      h->running.store(false, std::memory_order_release);
+      // A live device returns from ReadSample within one frame. One that
+      // stopped sending can block it indefinitely: then the thread is left
+      // to finish on its own (the handle is leaked, not freed under it)
+      // instead of freezing the app.
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(1500);
+      while (!h->exited.load(std::memory_order_acquire) && std::chrono::steady_clock::now() < deadline)
+         std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      if (!h->exited.load(std::memory_order_acquire))
+      {
+         h->worker.detach();
+         RuntimeLog::Write("camera closed (capture thread still blocked, detached)");
+         return;
+      }
       delete h;
       RuntimeLog::Write("camera closed");
    }
