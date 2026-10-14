@@ -135,6 +135,7 @@ case "$cmd" in
     cat > "$run" <<RUN
 #!/bin/bash
 cd "$wt" || exit 1
+export PATH=/opt/homebrew/bin:/usr/local/bin:\$PATH
 export CLAUDE_CODE_OAUTH_TOKEN=\$(cat \$HOME/.claude-remote-token)
 echo "== started \$(date)"
 \$HOME/.local/bin/claude -p "Read docs/handoff/$slug.md and do it." --permission-mode acceptEdits --allowedTools "$tools" < /dev/null
