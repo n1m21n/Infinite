@@ -5,7 +5,7 @@
 #   scripts/sync_laptops.sh memory   merge Claude memory both ways (newest file wins, nothing deleted)
 #   scripts/sync_laptops.sh wip [list|diff <branch>|branch <branch>]   the other laptop's uncommitted-work snapshots
 #   scripts/sync_laptops.sh handoff <slug> <branch> <brief-file>   put a task brief on the other laptop
-#   scripts/sync_laptops.sh dispatch <slug> <branch> <brief-file>   start the other laptop's Claude on a brief, in its own worktree
+#   scripts/sync_laptops.sh dispatch <slug> <branch> <brief-file> [model]   start the other laptop's Claude on a brief, in its own worktree
 #   scripts/sync_laptops.sh dispatch-log <slug>                      tail what it is doing
 #   scripts/sync_laptops.sh tick     what the 5-minute background job runs: snapshot + fetch + safe memory
 # It never pushes, never merges, never resets: you merge or cherry-pick yourself.
@@ -105,7 +105,7 @@ case "$cmd" in
     esac
     ;;
   handoff)
-    slug="${2:-}"; br="${3:-}"; brief="${4:-}"
+    slug="${2:-}"; br="${3:-}"; brief="${4:-}"; model="${5:-${DISPATCH_MODEL:-}}"
     [ -n "$slug" ] && [ -n "$br" ] && [ -f "$brief" ] || { echo "usage: $0 handoff <slug> <branch> <brief-file>" >&2; exit 2; }
     dest="docs/handoff/$slug.md"
     { echo "# Hand-off: $slug"; echo; echo "Branch: \`$br\` (create it off main; you own it, the other laptop never edits it)."
@@ -119,7 +119,7 @@ case "$cmd" in
     ;;
   dispatch)
     slug="${2:-}"; br="${3:-}"; brief="${4:-}"
-    [ -n "$slug" ] && [ -n "$br" ] && [ -f "$brief" ] || { echo "usage: $0 dispatch <slug> <branch> <brief-file>" >&2; exit 2; }
+    [ -n "$slug" ] && [ -n "$br" ] && [ -f "$brief" ] || { echo "usage: $0 dispatch <slug> <branch> <brief-file> [model]" >&2; exit 2; }
     wt="$HOME/infinte-wt/$slug"
     tools="${DISPATCH_TOOLS:-Read Edit Write Glob Grep Bash(git *) Bash(python3 *) Bash(ls *) Bash(cat *) Bash(scripts/*)}"
     # 1. isolated worktree on a new branch off main (the other laptop's own checkout is not touched)
@@ -131,6 +131,7 @@ case "$cmd" in
     remote "mkdir -p $wt/docs/handoff" >/dev/null
     scp -q $SSH_OPTS "$tmp" "namansoni@$PEER_HOST:$wt/docs/handoff/$slug.md" 2>&1 | grep -v '\.cargo/env'
     # 3. runner script, started in the background on the other laptop
+    mflag=""; [ -n "$model" ] && mflag="--model $model "
     run=$(mktemp)
     cat > "$run" <<RUN
 #!/bin/bash
@@ -138,7 +139,7 @@ cd "$wt" || exit 1
 export PATH=/opt/homebrew/bin:/usr/local/bin:\$PATH
 export CLAUDE_CODE_OAUTH_TOKEN=\$(cat \$HOME/.claude-remote-token)
 echo "== started \$(date)"
-\$HOME/.local/bin/claude -p "Read docs/handoff/$slug.md and do it." --permission-mode acceptEdits --allowedTools "$tools" < /dev/null
+\$HOME/.local/bin/claude -p "Read docs/handoff/$slug.md and do it." $mflag--permission-mode acceptEdits --allowedTools "$tools" < /dev/null
 echo "== finished \$(date) exit=\$?"
 RUN
     scp -q $SSH_OPTS "$run" "namansoni@$PEER_HOST:$wt.run.sh" 2>&1 | grep -v '\.cargo/env'

@@ -97,11 +97,12 @@ The two accounts cannot message each other. The Primary writes a brief, `handoff
 the owner tells the Secondary's Claude to read it. Or, without touching the Air:
 
 ```
-scripts/sync_laptops.sh dispatch <slug> <branch> <brief-file>   # worktree ~/infinte-wt/<slug> on the Air, Claude runs headless
+scripts/sync_laptops.sh dispatch <slug> <branch> <brief-file> [model]   # worktree ~/infinte-wt/<slug> on the Air, Claude runs headless
 scripts/sync_laptops.sh dispatch-log <slug>                     # tail its log
 scripts/sync_laptops.sh fetch                                   # then review air/<branch> and merge on the Pro
 ```
 
+Model: pass it as the 4th argument (`sonnet`, `opus`, or a full model id) or set `DISPATCH_MODEL`; omitted means the Air account's default.
 It uses the token in `~/.claude-remote-token` on the Air (`claude setup-token`), edits only inside its
 own worktree, and may not push or merge. Tools allowed: Read, Edit, Write, Glob, Grep and a few
 `git`/`python3`/`scripts/` Bash patterns (override with `DISPATCH_TOOLS`).
