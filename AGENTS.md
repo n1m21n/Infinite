@@ -2,6 +2,8 @@
 
 **Start every session by reading `docs/NOW.md`, then follow `infinite-lifecycle` (the process) in every decision, including when the owner is away.**
 
+**Two laptops:** run `hostname -s` and read the Laptops section of `docs/NOW.md`. The Pro (`Namans-MacBook-Pro-366`) is Primary: only it merges `main` and pushes `origin`. The Air (`Namans-MacBook-Air`) is Secondary + Marketing: it works in its own worktree on `air/<slug>` branches, commits, and stops. Rules: `docs/plans/two-laptops/README.md`.
+
 This repository contains dedicated skills and runbooks in `.claude/skills/<name>/SKILL.md` (also symlinked to `.agents/skills/`).
 Whenever working on tasks in this repository, **you must consult and follow the relevant skill document before taking action**.
 
