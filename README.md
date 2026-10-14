@@ -60,7 +60,8 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Sample / media library** | your own library folders, browse by folder with a breadcrumb, search across all, no duplicates; drag a kit folder onto a Drum Sequencer or MPC |
 | **MIDI File** | plays a .mid file (drop it on the canvas) in time with the transport, starting on the quantize grid; track and channel filter, transpose, velocity, loop, piano-roll preview |
 | **Drum Sequencer patterns** | 141 grooves in 10 groups (rock, funk and breaks, hip hop, electronic, latin, Brazil, Middle East, India, Africa, jazz), each in three parts (A verse, B bridge, C chorus with a fill), picked by group and groove with A / B / C buttons; two-tone bells; empty lanes get the bundled Turbo kit; edits kept per part, user presets, import .mid (GM drums), your own MIDI groove folder |
-| **Chord Progression** | chords held per bar, strum / arp / pulse modes; the builder now has extended, altered and quartal chords (11, 13, maj9#11, 7alt, 7#9, 6/9, so what...); quantized restart; chord names spelled MAJ / MIN; duplicate / drag slots, typed lengths, extension chips, playable 4-octave keyboard |
+| **Chord Progression** | chords held per bar, strum / arp / pulse modes; the builder now has extended, altered and quartal chords (11, 13, maj9#11, 7alt, 7#9, 6/9, so what...); quantized restart; chord names spelled MAJ / MIN; duplicate / drag slots, typed lengths, extension chips, playable 4-octave keyboard; **follows key** (transposes with the global key) and **suggestions**: 75 progressions by style (famous ones plus the NT ChordGen styles), load or random |
+| **Virtual Keyboard** | play notes with the mouse or the computer keyboard (Z-M / Q-P, - and = for the octave); **always** plays without hovering the node, for live use |
 | **Scenes** | radio-button scene launcher, one button for several changes: up to 8 scenes x 8 outputs cabled to any params (switcher slot, drum part, mutes, restart triggers), quantized, every scene mappable |
 | **Note Switcher** | up to 8 note inputs, quantized manual switching, mappable slot buttons |
 
@@ -101,7 +102,7 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Auto layout** | nodes without a position (patches written by hand or by an AI) are laid out by signal flow |
 | **Single instance** | double-clicking a `.inf` opens it in the running Infinite-Turbo (asks first if there are unsaved edits) |
 | **Interface scale** | follows Windows' display scale per monitor, or a fixed size in Settings |
-| **Browser** | favourites, filter and sort for modules, samples, media and plugins |
+| **Browser** | favourites, filter and sort for modules, samples, media and plugins; categories in signal-path order (make, change, combine, send out), with Shapes 2D, 3D Sources / Geometry / Scene and Note Sources / Note Tools |
 | **Color markers, comments, groups** | right-click a node; comments are edited by hovering and typing |
 
 ### Windows platform

@@ -10,6 +10,17 @@
 > `INFINITE_ENABLE_GPL=ON` (full build). Everything else stays MIT. `main.cpp` touches them only
 > inside `#if INFINITE_GPL` (include, registration, body, help). Rules in `src/gpl/README.md`.
 >
+> **Menu categories (0.55):** the registered category is only a default. `TurboCategory()` in
+> `core/NodeFactory.cpp` re-files nodes by name and `CategoryRank()` fixes the menu order (signal
+> path per family, Utility last); a category not listed sorts after them by colour family. Keys
+> stay one token (Patch.cpp reads them with `>>`); captions come from `DisplayName()` in main.cpp.
+> Patches re-file their nodes on load (`SpawnNode` asks the registry).
+>
+> **Popups from node bodies (0.55):** a body runs under the node editor's canvas transform, so a
+> popup opened there lands in the wrong place. Record the request in a global and open/draw the
+> popup in the `ed::Suspend()` block (see `DrawClipMatrixDeferredPopups`,
+> `DrawChordSlotDeferredMenu`).
+>
 > **Video path (0.53):** every decoded picture is a `Platform::VideoFrame` in its native
 > layout (NV12, YUV420P, RGBA/BGRA, packed BGR, or HAP's BC1/BC3/BC7/YCoCg blocks), never
 > converted or flipped on the CPU. `core/VideoTexture` uploads the planes through orphaned PBOs

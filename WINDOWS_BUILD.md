@@ -97,7 +97,7 @@ O painel `Media` mostra miniaturas para imagens. A decodificação é feita apen
 
 Ao abrir o seletor de objetos com o botão direito no fundo do grafo, o campo de busca recebe o foco automaticamente e já aceita digitação.
 
-As categorias e os módulos são ordenados alfabeticamente. Sem texto no campo de busca, cada categoria funciona como um menu sanfona e pode permanecer fechada.
+As categorias seguem o caminho do sinal (0.55): visual 2D (Source, Shapes 2D, Video, Color, Effects, Mask, Feedback, Compositing, Output), 3D (Sources, Geometry, Scene & Render), áudio (In/Out, Note Sources, Note Tools, Prediction, Synths, Effects, Mix & Routing, Audio to Visual), controle (Modulators, CV Tools, Analysis, MIDI/OSC/Transport, Macros, UI) e Utility por último. A ordem fica em `CategoryRank` e o remanejamento de nodes em `TurboCategory`, ambos em `src/core/NodeFactory.cpp`. Os módulos dentro de cada categoria seguem em ordem alfabética. Sem texto no campo de busca, cada categoria funciona como um menu sanfona e pode permanecer fechada.
 
 ## Spout
 
