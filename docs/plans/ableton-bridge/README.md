@@ -30,6 +30,23 @@ possible; there is no catalogue to ask. What exists, by layer:
 Consequence: the **live tier becomes AbletonOSC**, not an M4L device. Still true: nothing runs
 without Live open, and no source of closed Live internals is read.
 
+## Headless (owner requirement, 2026-10-14)
+
+Live itself cannot run headless: no CLI, no render flag, and its Python API exposes no export or
+freeze (confirmed by several MCP projects, which fall back to GUI scripting or real-time capture
+through a virtual audio device). So "headless Ableton" is built the other way round:
+**Infinite is the headless engine; the `.als` file is the interchange.**
+
+| Need | Headless route | Limit |
+|---|---|---|
+| Read a Live set | `als.py` (gzip + XML), no Live | none |
+| Play or render a Live set | Convert to an Infinite patch: MIDI clips and tempo to note nodes, audio clips to sample players, Live's built-in devices to the nearest Infinite node; render with the CLI (`--render`, `--audio-summary`) | Plugin state and Live-only instruments are opaque; they become silent placeholders or a stem the user exports once |
+| Write a Live set | `.mid` and minimal `.als` from Infinite data | Opens in Live as plain tracks and clips |
+| Live-only action (fire clips on a running set) | AbletonOSC, needs Live open | Not headless; optional, never required |
+
+Rule: no feature of the bridge may require Live to be running except the live tier, and that tier is
+marked as such in the node UI.
+
 ## Decision
 
 Two tiers, in order:
@@ -52,6 +69,7 @@ Live, `.als` reading still works; the live link nodes show "Live not found".
 | 1 | Inspect real `.als` files (Live 12.x): write `als.py` reader, schema notes in `SCHEMA.md` | tempo, tracks, MIDI notes of 3 sets match what Live shows |
 | 2 | `.mid` writer for Infinite note data, plus Infinite import path check | clip opens in Live with the same notes |
 | 3 | Set writer for a minimal valid `.als` (one MIDI track) | Live opens it without a repair prompt |
+| 3b | `als2inf.py`: set to Infinite patch (notes, tempo, audio clips; devices mapped by a small table) and render it headless | a real set renders audio from the CLI with the right tempo and notes |
 | 4 | Link tempo sync spike; licence decision recorded | tempo follows Live within one beat |
 | 5 | AbletonOSC spike: Infinite sends `/live/clip/fire`, reads tempo | one clip fires from Infinite, tempo read back |
 
