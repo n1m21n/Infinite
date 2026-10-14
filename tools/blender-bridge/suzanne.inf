@@ -1,0 +1,17 @@
+infinite-patch 1
+# Blender -> Infinite: a model made headless in Blender (make_suzanne.py), loaded and rendered.
+node 1 3D Model 3D
+  id mdl
+  s path /Users/namansoni/infinte-wt/blender-bridge/tools/blender-bridge/out/suzanne.glb
+end
+node 2 3D Render 3D
+  id r3d
+  f camAzimuth 20
+  f camElevation 15
+  f width 256
+  f height 256
+end
+node 3 Utility Output
+end
+geo r3d 0 mdl
+cable 3 0 r3d
