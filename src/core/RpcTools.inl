@@ -716,6 +716,18 @@ nlohmann::json ExplainNode(GraphNode& gn)
          w.push_back({ { "code", is.code }, { "message", is.message }, { "hint", is.hint } });
       out["warnings"] = w;
    }
+   // Turbo 0.56: a Formula's compile state, so a client can fix its GLSL.
+   if (auto* formula = dynamic_cast<FormulaNode*>(gn.node.get()))
+   {
+      json sh = json::object();
+      sh["mode"] = formula->ShadertoyMode() ? "shadertoy" : "native";
+      sh["error"] = formula->LastError();
+      json knobs = json::array();
+      for (const FormulaNode::UserParam& up : formula->userParams)
+         knobs.push_back({ { "key", "uniform_" + up.name }, { "lo", up.lo }, { "hi", up.hi }, { "value", up.value } });
+      sh["uniform_knobs"] = knobs;
+      out["shader"] = sh;
+   }
    return out;
 }
 

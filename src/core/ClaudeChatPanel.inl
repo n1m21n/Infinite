@@ -13,7 +13,7 @@ struct ChatEntry
 bool gChatOpen = false;
 std::vector<ChatEntry> gChatLog;
 std::string gChatSession;
-char gChatInput[4096] = "";
+std::string gChatInput; // Turbo 0.56: growable (a 4 KB buffer refused long pastes)
 int gChatModel = 0;
 bool gChatScroll = false;
 bool gChatFocusInput = false;
@@ -106,7 +106,7 @@ void ChatPump()
 void ChatSend()
 {
    std::string prompt = gChatInput;
-   while (!prompt.empty() && (prompt.back() == '\n' || prompt.back() == ' '))
+   while (!prompt.empty() && (prompt.back() == '\n' || prompt.back() == '\r' || prompt.back() == ' ' || prompt.back() == '\t'))
       prompt.pop_back();
    if (prompt.empty() || ClaudeChat::Busy())
       return;
@@ -127,7 +127,7 @@ void ChatSend()
       ChatAppend(ChatEntry::kError, error);
       return;
    }
-   gChatInput[0] = '\0';
+   gChatInput.clear();
    gChatStarted = glfwGetTime();
 }
 
@@ -271,14 +271,18 @@ void DrawClaudeChat()
    }
    ImGui::EndChild();
 
-   // Input: Enter sends, Ctrl+Enter is a new line.
+   // Input: Enter sends, Shift+Enter is a new line (Turbo 0.56). The field
+   // itself inserts the new line on Enter; a plain Enter then sends and the
+   // trailing new line is trimmed in ChatSend.
    if (gChatFocusInput)
    {
       ImGui::SetKeyboardFocusHere();
       gChatFocusInput = false;
    }
-   const bool enter = ImGui::InputTextMultiline("##chatinput", gChatInput, sizeof(gChatInput), ImVec2(-1.0f, inputH),
-                                                ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CtrlEnterForNewLine);
+   ImGui::InputTextMultiline("##chatinput", &gChatInput, ImVec2(-1.0f, inputH));
+   const ImGuiIO& chatIo = ImGui::GetIO();
+   const bool enter = ImGui::IsItemActive() && !chatIo.KeyShift && !chatIo.KeyCtrl &&
+                      (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
    if (enter && !busy)
    {
       ChatSend();
@@ -294,7 +298,7 @@ void DrawClaudeChat()
    }
    else
    {
-      ImGui::BeginDisabled(gChatInput[0] == '\0');
+      ImGui::BeginDisabled(gChatInput.find_first_not_of(" \t\r\n") == std::string::npos);
       if (ImGui::Button("Send  (Enter)", ImVec2(-1.0f, 0)))
       {
          ChatSend();

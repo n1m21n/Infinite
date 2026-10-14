@@ -9,6 +9,9 @@ CHANGELOG-TURBO.md when it ships.
 
 ## Later
 
+- Formula: colour (vec3) and toggle uniforms as knobs; Shadertoy keyboard channel from MIDI notes;
+  cubemap passes (render to six faces) and a samplerCube from an HDRI.
+
 - Full build, next GPL modules: DUCK sidechain; Surge XT effects (spring reverb, Nimbus); frei0r video
   filters. A live SLOOP drum synth node (the kits are already in as rendered samples).
 

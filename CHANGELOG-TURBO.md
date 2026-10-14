@@ -1,5 +1,31 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.56.0-turbo (2026-10-13)
+
+### Formula: Shadertoy mode
+- Code that defines `mainImage(out vec4 fragColor, in vec2 fragCoord)` compiles as a whole file
+  (GLSL 330, 150 on old contexts) with Shadertoy's uniforms: iTime, iResolution, iFrame, iTimeDelta,
+  iFrameRate, iMouse, iDate, iSampleRate, iChannel0-3 (= in0-in3), iChannelResolution, iChannelTime.
+  Paste the Image tab as is (Common tab code above it). Errors point at your own line numbers. Code
+  without mainImage stays the body of shape(uv, p, t), as before; the 0.55 adapter block still works.
+- Extra knobs from the code: each `uniform float name; // lo..hi = default` line becomes a knob with
+  a CV pin (up to 16, saved by name as `uniform_<name>`), in both modes.
+- Buffers: **float buffer** renders RGBA32F and keeps alpha; **last frame to** feeds the node's own
+  previous frame to iChannel0-3 (ping-pong, cleared on compile / resize, iFrame restarts). Chain
+  Formula nodes for Buffer A -> B -> Image.
+- **mouse x / mouse y / mouse down** params drive iMouse (CV-able: map them to an XY pad or MIDI).
+- Two new presets written for Infinite-Turbo (MIT): **Shadertoy: fractal tunnel** and **Shadertoy:
+  terrain and clouds**, each with its own uniform knobs.
+- GLSL editor: growable text buffer (the 8 KB one refused longer code), **Paste + Apply**, Tab inserts a
+  tab, Apply is one undo step.
+- MCP: the authoring guide has a full conversion section (Shadertoy tabs, buffers, textures, sound,
+  keyboard, cubemaps, GLSL ES gotchas, GLSL Sandbox, ISF, TouchDesigner, HLSL, licences); `explain` on a
+  Formula reports its mode, the compile error and its uniform knobs.
+
+### Claude chat panel
+- Paste works for long text (the input was a fixed 4 KB buffer, and ImGui drops a paste that does not
+  fit whole). Shift+Enter makes a new line, Enter sends.
+
 ## 0.55.0-turbo (2026-10-13)
 
 ### Chord Progression

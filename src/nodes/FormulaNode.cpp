@@ -2,6 +2,12 @@
 
 #include "platform/OpenGLHeaders.h"
 #include <algorithm>
+#include <chrono>
+#include <ctime>
+#include <regex>
+#include <set>
+#include <sstream>
+#include <utility>
 
 #include "Transport.h"
 
@@ -58,6 +64,153 @@ namespace
       "   float mask = smoothstep(0.005, -0.005, d);\n"
       "   vec3 col = mix(vec3(0.05), vec3(uC, 0.6, 1.0 - uC), mask);\n"
       "   return vec4(col, 1.0);";
+}
+
+namespace
+{
+   // Turbo 0.56: Shadertoy mode. The user's file goes between these two, after
+   // a #line 1 so compile errors point at the user's own line numbers.
+   const char* kShadertoyPreamble =
+      "in vec2 vUv;\n"
+      "out vec4 infiniteFragOut;\n"
+      "uniform vec3 iResolution;\n"
+      "uniform float iTime;\n"
+      "uniform float iTimeDelta;\n"
+      "uniform float iFrameRate;\n"
+      "uniform int iFrame;\n"
+      "uniform vec4 iMouse;\n"
+      "uniform vec4 iDate;\n"
+      "uniform float iSampleRate;\n"
+      "uniform vec3 iChannelResolution[4];\n"
+      "uniform float iChannelTime[4];\n"
+      "uniform sampler2D iChannel0;\n"
+      "uniform sampler2D iChannel1;\n"
+      "uniform sampler2D iChannel2;\n"
+      "uniform sampler2D iChannel3;\n"
+      "uniform float uTime;\n"
+      "uniform float uA;\n"
+      "uniform float uB;\n"
+      "uniform float uC;\n"
+      "uniform float uD;\n"
+      "uniform float uAspect;\n"
+      "uniform int uKeepAlpha;\n"
+      "#define texture2D texture\n";
+
+   const char* kShadertoyEpilogue =
+      "\nvoid main() {\n"
+      "   vec4 c = vec4(0.0, 0.0, 0.0, 1.0);\n"
+      "   mainImage(c, gl_FragCoord.xy);\n"
+      "   infiniteFragOut = uKeepAlpha != 0 ? c : vec4(c.rgb, 1.0);\n"
+      "}\n";
+
+   // 330 where the context has it (floatBitsToUint and friends, common in
+   // Shadertoy code); the vertex stage stays 150, which links with it.
+   const char* ShadertoyVersionLine()
+   {
+      static int version = 0;
+      if (version == 0)
+      {
+         GLint major = 0, minor = 0;
+         glGetIntegerv(GL_MAJOR_VERSION, &major);
+         glGetIntegerv(GL_MINOR_VERSION, &minor);
+         version = (major * 10 + minor >= 33) ? 330 : 150;
+      }
+      return version == 330 ? "#version 330\n" : "#version 150\n";
+   }
+
+   // Names the node already declares; a uniform line with one of these is
+   // dropped from the code (no redeclaration) and gets no knob.
+   bool IsReservedUniform(const std::string& name)
+   {
+      static const std::set<std::string> kReserved = {
+         "uTime", "uA", "uB", "uC", "uD", "uAspect", "uKeepAlpha",
+         "uIn0", "uIn1", "uIn2", "uIn3", "uHasIn0", "uHasIn1", "uHasIn2", "uHasIn3",
+         "uInRes0", "uInRes1", "uInRes2", "uInRes3",
+         "iResolution", "iTime", "iTimeDelta", "iFrameRate", "iFrame", "iMouse", "iDate",
+         "iSampleRate", "iChannelResolution", "iChannelTime",
+         "iChannel0", "iChannel1", "iChannel2", "iChannel3",
+      };
+      return kReserved.count(name) != 0;
+   }
+
+   const std::regex& UniformLineRegex()
+   {
+      static const std::regex re(R"(^[ \t]*uniform[ \t]+float[ \t]+([A-Za-z_][A-Za-z0-9_]*)[ \t]*;(.*)$)");
+      return re;
+   }
+
+   // "// lo..hi = default" after the declaration; all parts optional.
+   void ParseUniformComment(const std::string& rest, float& lo, float& hi, float& def)
+   {
+      static const std::regex re(
+         R"(//\s*(-?[0-9]*\.?[0-9]+)\s*\.\.\s*(-?[0-9]*\.?[0-9]+)(?:\s*=\s*(-?[0-9]*\.?[0-9]+))?)");
+      lo = 0.0f;
+      hi = 1.0f;
+      bool hasDef = false;
+      std::smatch m;
+      if (std::regex_search(rest, m, re))
+      {
+         lo = std::stof(m[1].str());
+         hi = std::stof(m[2].str());
+         if (m[3].matched)
+         {
+            def = std::stof(m[3].str());
+            hasDef = true;
+         }
+      }
+      if (hi < lo)
+         std::swap(lo, hi);
+      if (!hasDef)
+         def = 0.5f * (lo + hi);
+      def = std::clamp(def, lo, hi);
+   }
+
+   // The code with every uniform-float line blanked (same line count), and the
+   // declarations to put in front of it.
+   void SplitUniforms(const std::string& code, std::string& body, std::string& decls)
+   {
+      body.clear();
+      decls.clear();
+      size_t start = 0;
+      while (start <= code.size())
+      {
+         size_t end = code.find('\n', start);
+         if (end == std::string::npos)
+            end = code.size();
+         std::string line = code.substr(start, end - start);
+         if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+         std::smatch m;
+         if (std::regex_match(line, m, UniformLineRegex()))
+         {
+            if (!IsReservedUniform(m[1].str()))
+               decls += "uniform float " + m[1].str() + ";\n";
+         }
+         else
+            body += line;
+         if (end < code.size())
+            body += '\n';
+         start = end + 1;
+      }
+   }
+
+   bool HasMainImage(const std::string& code)
+   {
+      // The 0.55 adapter (native mode closing shape() by hand) also has a
+      // mainImage; it defines `shape` itself, so it stays in native mode.
+      static const std::regex re(R"(\bvoid\s+mainImage\s*\()");
+      return std::regex_search(code, re) && code.find("#define shape") == std::string::npos;
+   }
+
+   void ClearFbo(const GLUtil::Fbo& fbo)
+   {
+      GLint previous = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previous);
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo);
+      glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+      glClear(GL_COLOR_BUFFER_BIT);
+      glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)previous);
+   }
 }
 
 namespace
@@ -359,6 +512,215 @@ namespace
         "   vec3 col = mix(vec3(0.03, 0.05, 0.08),\n"
         "                  0.5 + 0.5 * cos(vec3(0.0, 2.0, 4.0) + h * 3.0 + uC * 6.0), h);\n"
         "   return vec4(mix(col, vec3(1.0), contour * 0.8), 1.0);" },
+
+      // Turbo 0.56: Shadertoy-mode examples (MIT, written for Infinite-Turbo).
+      // Whole files with mainImage(); their uniform lines become knobs.
+      { "Shadertoy: fractal tunnel",
+        "// Fractal tunnel. Infinite-Turbo example (MIT), written for the Formula's Shadertoy mode.\n"
+        "// The uniforms below become knobs on the node: name, range and default come from the comment.\n"
+        "uniform float uSpeed; // 0..4 = 1\n"
+        "uniform float uFold;  // 0..1 = 0.5\n"
+        "uniform float uHue;   // 0..1 = 0.6\n"
+        "uniform float uGlow;  // 0..2 = 1\n"
+        "\n"
+        "mat2 rot2(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }\n"
+        "\n"
+        "// kaleidoscopic IFS, repeated in space; trap keeps the closest orbit for colour\n"
+        "float fractalDE(vec3 p, out float trap)\n"
+        "{\n"
+        "    p = mod(p + 2.0, 4.0) - 2.0;\n"
+        "    float s = 1.0;\n"
+        "    trap = 10.0;\n"
+        "    for (int i = 0; i < 7; i++)\n"
+        "    {\n"
+        "        p = abs(p);\n"
+        "        if (p.x < p.y) p.xy = p.yx;\n"
+        "        if (p.x < p.z) p.xz = p.zx;\n"
+        "        if (p.y < p.z) p.yz = p.zy;\n"
+        "        p.xy = rot2(0.15 + uFold * 0.5) * p.xy;\n"
+        "        p = p * 2.0 - vec3(1.4, 1.0, 0.6 + uFold * 0.6);\n"
+        "        s *= 2.0;\n"
+        "        trap = min(trap, dot(p, p));\n"
+        "    }\n"
+        "    return (length(p) - 1.2) / s;\n"
+        "}\n"
+        "\n"
+        "float map(vec3 p, out float trap)\n"
+        "{\n"
+        "    float f = fractalDE(p, trap);\n"
+        "    float tunnel = 1.0 - length(p.xy); // carve a free path for the camera\n"
+        "    return max(f, tunnel);\n"
+        "}\n"
+        "\n"
+        "void mainImage(out vec4 fragColor, in vec2 fragCoord)\n"
+        "{\n"
+        "    vec2 uv = (2.0 * fragCoord - iResolution.xy) / iResolution.y;\n"
+        "    float fly = iTime * uSpeed;\n"
+        "    vec3 ro = vec3(0.0, 0.0, fly);\n"
+        "    vec3 rd = normalize(vec3(uv, 1.3));\n"
+        "    rd.xy = rot2(0.25 * sin(iTime * 0.2)) * rd.xy;\n"
+        "\n"
+        "    float d = 0.0, trap = 0.0, glow = 0.0;\n"
+        "    int steps = 0;\n"
+        "    for (int i = 0; i < 110; i++)\n"
+        "    {\n"
+        "        float h = map(ro + rd * d, trap);\n"
+        "        glow += 0.01 / (0.02 + abs(h));\n"
+        "        steps = i;\n"
+        "        if (h < 0.0008 * d || d > 25.0) break;\n"
+        "        d += h * 0.8;\n"
+        "    }\n"
+        "\n"
+        "    vec3 p = ro + rd * d;\n"
+        "    vec2 e = vec2(0.0015, -0.0015);\n"
+        "    float tk;\n"
+        "    vec3 n = normalize(e.xyy * map(p + e.xyy, tk) + e.yyx * map(p + e.yyx, tk) +\n"
+        "                       e.yxy * map(p + e.yxy, tk) + e.xxx * map(p + e.xxx, tk));\n"
+        "    vec3 lightDir = normalize(vec3(0.4, 0.6, -0.5));\n"
+        "    float dif = 0.35 + 0.65 * max(dot(n, lightDir), 0.0);\n"
+        "    float rim = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);\n"
+        "    vec3 base = 0.5 + 0.5 * cos(6.28318 * (uHue + 0.25 * log(1.0 + trap) + vec3(0.0, 0.33, 0.67)));\n"
+        "    float ao = 1.0 - float(steps) / 110.0;\n"
+        "    float fog = exp(-0.11 * d);\n"
+        "    vec3 col = (base * dif * ao + rim * 0.3 * base) * fog;\n"
+        "    col += uGlow * 0.0008 * glow * vec3(0.4, 0.7, 1.0) * (1.0 - fog);\n"
+        "    col = pow(clamp(col, 0.0, 1.0), vec3(0.4545));\n"
+        "    fragColor = vec4(col, 1.0);\n"
+        "}\n" },
+
+      { "Shadertoy: terrain and clouds",
+        "// Terrain and clouds. Infinite-Turbo example (MIT), written for the Formula's Shadertoy mode.\n"
+        "// The uniforms below become knobs on the node: name, range and default come from the comment.\n"
+        "uniform float uFly;   // 0..4 = 1\n"
+        "uniform float uSun;   // 0..1 = 0.35\n"
+        "uniform float uCloud; // 0..1 = 0.5\n"
+        "uniform float uHaze;  // 0..1 = 0.4\n"
+        "\n"
+        "float hash12(vec2 p)\n"
+        "{\n"
+        "    vec3 q = fract(vec3(p.xyx) * 0.1031);\n"
+        "    q += dot(q, q.yzx + 33.33);\n"
+        "    return fract((q.x + q.y) * q.z);\n"
+        "}\n"
+        "\n"
+        "float vnoise(vec2 p)\n"
+        "{\n"
+        "    vec2 i = floor(p), f = fract(p);\n"
+        "    vec2 u = f * f * (3.0 - 2.0 * f);\n"
+        "    return mix(mix(hash12(i), hash12(i + vec2(1, 0)), u.x),\n"
+        "               mix(hash12(i + vec2(0, 1)), hash12(i + vec2(1, 1)), u.x), u.y);\n"
+        "}\n"
+        "\n"
+        "const mat2 kRot = mat2(1.6, 1.2, -1.2, 1.6);\n"
+        "\n"
+        "float fbm(vec2 p, int octaves)\n"
+        "{\n"
+        "    float a = 0.0, b = 0.5;\n"
+        "    for (int i = 0; i < 9; i++)\n"
+        "    {\n"
+        "        if (i >= octaves) break;\n"
+        "        a += b * vnoise(p);\n"
+        "        p = kRot * p;\n"
+        "        b *= 0.5;\n"
+        "    }\n"
+        "    return a;\n"
+        "}\n"
+        "\n"
+        "const float kWater = 1.2;\n"
+        "\n"
+        "float terrain(vec2 p, int octaves)\n"
+        "{\n"
+        "    float h = fbm(p * 0.018, octaves);\n"
+        "    return max(h * h * 34.0, kWater);\n"
+        "}\n"
+        "\n"
+        "vec3 sunDir() { return normalize(vec3(0.6, 0.08 + uSun * 0.9, -0.5)); }\n"
+        "\n"
+        "vec3 sky(vec3 rd)\n"
+        "{\n"
+        "    vec3 sd = sunDir();\n"
+        "    vec3 col = mix(vec3(0.75, 0.82, 0.92), vec3(0.25, 0.45, 0.8), clamp(rd.y * 2.0, 0.0, 1.0));\n"
+        "    float sun = max(dot(rd, sd), 0.0);\n"
+        "    col += vec3(1.0, 0.75, 0.45) * (pow(sun, 400.0) * 2.0 + pow(sun, 8.0) * 0.25);\n"
+        "    if (rd.y > 0.0)\n"
+        "    {\n"
+        "        vec2 cp = rd.xz / rd.y * 30.0 + vec2(iTime * 0.6, 0.0);\n"
+        "        float c = fbm(cp * 0.03, 6);\n"
+        "        float cover = smoothstep(0.75 - uCloud * 0.5, 0.95, c);\n"
+        "        col = mix(col, vec3(1.0) * (0.85 + 0.15 * sun), cover * smoothstep(0.0, 0.15, rd.y));\n"
+        "    }\n"
+        "    return col;\n"
+        "}\n"
+        "\n"
+        "float softShadow(vec3 ro, vec3 rd)\n"
+        "{\n"
+        "    float res = 1.0, t = 0.5;\n"
+        "    for (int i = 0; i < 28; i++)\n"
+        "    {\n"
+        "        vec3 p = ro + rd * t;\n"
+        "        float h = p.y - terrain(p.xz, 5);\n"
+        "        res = min(res, 8.0 * h / t);\n"
+        "        if (res < 0.01) break;\n"
+        "        t += clamp(h, 0.4, 4.0);\n"
+        "    }\n"
+        "    return clamp(res, 0.0, 1.0);\n"
+        "}\n"
+        "\n"
+        "void mainImage(out vec4 fragColor, in vec2 fragCoord)\n"
+        "{\n"
+        "    vec2 uv = (2.0 * fragCoord - iResolution.xy) / iResolution.y;\n"
+        "    float z = iTime * uFly * 3.0;\n"
+        "    vec3 ro = vec3(0.0, 0.0, z);\n"
+        "    ro.y = max(terrain(ro.xz, 4), 8.0) + 4.0;\n"
+        "    vec3 ta = vec3(0.0, ro.y - 2.5, z + 12.0);\n"
+        "    vec3 fw = normalize(ta - ro);\n"
+        "    vec3 rt = normalize(cross(fw, vec3(0, 1, 0)));\n"
+        "    vec3 up = cross(rt, fw);\n"
+        "    vec3 rd = normalize(uv.x * rt + uv.y * up + 1.6 * fw);\n"
+        "\n"
+        "    float t = 0.5;\n"
+        "    bool hit = false;\n"
+        "    for (int i = 0; i < 220; i++)\n"
+        "    {\n"
+        "        vec3 p = ro + rd * t;\n"
+        "        float h = p.y - terrain(p.xz, 6);\n"
+        "        if (h < 0.002 * t) { hit = true; break; }\n"
+        "        t += h * 0.45;\n"
+        "        if (t > 220.0) break;\n"
+        "    }\n"
+        "\n"
+        "    vec3 col = sky(rd);\n"
+        "    if (hit)\n"
+        "    {\n"
+        "        vec3 p = ro + rd * t;\n"
+        "        vec2 e = vec2(0.05, 0.0);\n"
+        "        vec3 n = normalize(vec3(terrain(p.xz - e.xy, 8) - terrain(p.xz + e.xy, 8), 2.0 * e.x,\n"
+        "                                terrain(p.xz - e.yx, 8) - terrain(p.xz + e.yx, 8)));\n"
+        "        vec3 sd = sunDir();\n"
+        "        float dif = max(dot(n, sd), 0.0) * softShadow(p + n * 0.05, sd);\n"
+        "        vec3 mat;\n"
+        "        if (p.y <= kWater + 0.001)\n"
+        "        {\n"
+        "            mat = vec3(0.05, 0.15, 0.2);\n"
+        "            vec3 r = reflect(rd, vec3(0, 1, 0));\n"
+        "            mat += sky(r) * 0.35;\n"
+        "        }\n"
+        "        else\n"
+        "        {\n"
+        "            float slope = n.y;\n"
+        "            mat = mix(vec3(0.35, 0.3, 0.25), vec3(0.2, 0.32, 0.12), smoothstep(0.75, 0.9, slope));\n"
+        "            mat = mix(mat, vec3(0.95), smoothstep(17.0, 21.0, p.y + slope * 3.0));\n"
+        "        }\n"
+        "        vec3 light = vec3(1.0, 0.92, 0.8) * dif * 1.6 + vec3(0.35, 0.45, 0.6) * (0.5 + 0.5 * n.y) * 0.5;\n"
+        "        col = mat * light;\n"
+        "        float fog = 1.0 - exp(-t * (0.004 + uHaze * 0.02));\n"
+        "        col = mix(col, sky(normalize(vec3(rd.x, 0.02, rd.z))), fog);\n"
+        "    }\n"
+        "    col = pow(clamp(col, 0.0, 1.0), vec3(0.4545));\n"
+        "    col *= 0.6 + 0.4 * pow(16.0 * (fragCoord.x / iResolution.x) * (fragCoord.y / iResolution.y)\n"
+        "                          * (1.0 - fragCoord.x / iResolution.x) * (1.0 - fragCoord.y / iResolution.y), 0.1);\n"
+        "    fragColor = vec4(col, 1.0);\n"
+        "}\n" },
    };
 
    std::vector<std::string> BuildPresetNames()
@@ -405,11 +767,79 @@ FormulaNode::~FormulaNode()
    if (mProgram != 0)
       glDeleteProgram(mProgram);
    GLUtil::DestroyFbo(mOut);
+   GLUtil::DestroyFbo(mPrev);
+}
+
+void FormulaNode::VisitParams(ParamVisitor& v)
+{
+   v.Text("formula", formula);
+   v.Float("width", width); v.Float("height", height);
+   v.Float("knobA", knobA); v.Float("knobB", knobB);
+   v.Float("knobC", knobC); v.Float("knobD", knobD);
+   v.Bool("animate", animate);
+   v.Bool("matchInput", matchInput);
+   // Turbo 0.56
+   v.Bool("floatBuffer", floatBuffer);
+   v.Int("selfChannel", selfChannel);
+   v.Float("mouseX", mouseX);
+   v.Float("mouseY", mouseY);
+   v.Bool("mouseDown", mouseDown);
+   ParseUserParams(); // the formula may have just been loaded
+   for (UserParam& up : userParams)
+      v.Float(("uniform_" + up.name).c_str(), up.value);
+}
+
+void FormulaNode::ParseUserParams()
+{
+   if (formula == mParsedFormula)
+      return;
+   mParsedFormula = formula;
+   std::vector<UserParam> next;
+   std::istringstream in(formula);
+   std::string line;
+   while (std::getline(in, line) && (int)next.size() < kMaxUserParams)
+   {
+      if (!line.empty() && line.back() == '\r')
+         line.pop_back();
+      std::smatch m;
+      if (!std::regex_match(line, m, UniformLineRegex()) || IsReservedUniform(m[1].str()))
+         continue;
+      UserParam up;
+      up.name = m[1].str();
+      bool dup = false;
+      for (const UserParam& e : next)
+         dup = dup || e.name == up.name;
+      if (dup)
+         continue;
+      ParseUniformComment(m[2].str(), up.lo, up.hi, up.def);
+      up.value = up.def;
+      for (const UserParam& old : userParams)
+         if (old.name == up.name)
+            up.value = std::clamp(old.value, up.lo, up.hi);
+      next.push_back(up);
+   }
+   userParams = std::move(next);
 }
 
 bool FormulaNode::Apply()
 {
-   std::string src = std::string(kPreamble) + formula + kEpilogue;
+   ParseUserParams();
+   std::string body, decls;
+   SplitUniforms(formula, body, decls);
+   const bool shadertoy = HasMainImage(body);
+   std::string src;
+   if (shadertoy)
+   {
+      src = std::string(ShadertoyVersionLine()) + kShadertoyPreamble + decls + "#line 1\n" + body +
+            kShadertoyEpilogue;
+   }
+   else
+   {
+      std::string pre = kPreamble;
+      const size_t at = pre.find("vec4 shape(");
+      pre.insert(at == std::string::npos ? pre.size() : at, decls);
+      src = pre + body + kEpilogue;
+   }
 
    std::string error;
    unsigned int program = GLUtil::CompileProgram(src.c_str(), &error);
@@ -422,6 +852,8 @@ bool FormulaNode::Apply()
    if (mProgram != 0)
       glDeleteProgram(mProgram);
    mProgram = program;
+   mShadertoy = shadertoy;
+   mFrame = 0;
    mLastError.clear();
    return true;
 }
@@ -439,6 +871,8 @@ void FormulaNode::CookIfNeeded(int frameId)
 
    if (animate)
       mClock = (float)Transport::Instance().Seconds();
+   const float dt = std::clamp(mClock - mLastClock, 0.0f, 0.25f);
+   mLastClock = mClock;
 
    unsigned int inTex[kInputs] = {};
    unsigned int anyTex = 0;
@@ -456,23 +890,58 @@ void FormulaNode::CookIfNeeded(int frameId)
       w = std::max(1, mInputs[0].Width());
       h = std::max(1, mInputs[0].Height());
    }
-   if (!GLUtil::EnsureFbo(mOut, w, h))
-      return;
 
-   GLUtil::RunShaderPass(mOut, mProgram, [this, &inTex, anyTex]()
+   // Turbo 0.56: float buffers and the node's own last frame (ping-pong).
+   const unsigned int format = floatBuffer ? GL_RGBA32F : GL_RGBA8;
+   const bool self = selfChannel >= 0 && selfChannel < kInputs;
+   if (self)
+      std::swap(mOut, mPrev);
+   const bool outFresh = mOut.fbo == 0 || mOut.w != w || mOut.h != h || mOut.internalFormat != format;
+   if (!GLUtil::EnsureFbo(mOut, w, h, format))
+      return;
+   if (outFresh)
+      mFrame = 0;
+   unsigned int selfTex = 0;
+   if (self)
+   {
+      const bool prevFresh = mPrev.fbo == 0 || mPrev.w != w || mPrev.h != h || mPrev.internalFormat != format;
+      if (!GLUtil::EnsureFbo(mPrev, w, h, format))
+         return;
+      if (prevFresh)
+      {
+         ClearFbo(mPrev);
+         mFrame = 0;
+      }
+      selfTex = mPrev.tex;
+   }
+   const unsigned int fallbackTex = anyTex != 0 ? anyTex : selfTex;
+
+   GLUtil::RunShaderPass(mOut, mProgram, [this, &inTex, fallbackTex, self, selfTex, dt]()
    {
       static const char* kSampler[kInputs] = { "uIn0", "uIn1", "uIn2", "uIn3" };
+      static const char* kChannel[kInputs] = { "iChannel0", "iChannel1", "iChannel2", "iChannel3" };
       static const char* kHas[kInputs] = { "uHasIn0", "uHasIn1", "uHasIn2", "uHasIn3" };
       static const char* kRes[kInputs] = { "uInRes0", "uInRes1", "uInRes2", "uInRes3" };
+      float channelRes[kInputs * 3] = {};
+      float channelTime[kInputs] = {};
       for (int i = 0; i < kInputs; i++)
       {
+         const bool isSelf = self && i == selfChannel;
+         const unsigned int tex = isSelf ? selfTex : (inTex[i] != 0 ? inTex[i] : fallbackTex);
+         const float cw = isSelf ? (float)mOut.w : (float)mInputs[i].Width();
+         const float ch = isSelf ? (float)mOut.h : (float)mInputs[i].Height();
          // An unpatched input aliases a patched one (or nothing at all, when
          // none is): sampling an unbound unit is undefined.
          glActiveTexture(GL_TEXTURE0 + i);
-         glBindTexture(GL_TEXTURE_2D, inTex[i] != 0 ? inTex[i] : anyTex);
+         glBindTexture(GL_TEXTURE_2D, tex);
          glUniform1i(glGetUniformLocation(mProgram, kSampler[i]), i);
-         glUniform1i(glGetUniformLocation(mProgram, kHas[i]), inTex[i] != 0 ? 1 : 0);
-         glUniform2f(glGetUniformLocation(mProgram, kRes[i]), (float)mInputs[i].Width(), (float)mInputs[i].Height());
+         glUniform1i(glGetUniformLocation(mProgram, kChannel[i]), i);
+         glUniform1i(glGetUniformLocation(mProgram, kHas[i]), (isSelf || inTex[i] != 0) ? 1 : 0);
+         glUniform2f(glGetUniformLocation(mProgram, kRes[i]), cw, ch);
+         channelRes[i * 3 + 0] = cw;
+         channelRes[i * 3 + 1] = ch;
+         channelRes[i * 3 + 2] = 1.0f;
+         channelTime[i] = mClock;
       }
       glActiveTexture(GL_TEXTURE0);
       glUniform1f(glGetUniformLocation(mProgram, "uTime"), mClock);
@@ -481,5 +950,34 @@ void FormulaNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uC"), knobC);
       glUniform1f(glGetUniformLocation(mProgram, "uD"), knobD);
       glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
+      for (const UserParam& up : userParams)
+         glUniform1f(glGetUniformLocation(mProgram, up.name.c_str()), up.value);
+      if (mShadertoy)
+      {
+         const float fw = (float)mOut.w, fh = (float)mOut.h;
+         glUniform3f(glGetUniformLocation(mProgram, "iResolution"), fw, fh, 1.0f);
+         glUniform1f(glGetUniformLocation(mProgram, "iTime"), mClock);
+         glUniform1f(glGetUniformLocation(mProgram, "iTimeDelta"), dt);
+         glUniform1f(glGetUniformLocation(mProgram, "iFrameRate"), dt > 0.0f ? 1.0f / dt : 0.0f);
+         glUniform1i(glGetUniformLocation(mProgram, "iFrame"), mFrame);
+         const float mx = std::clamp(mouseX, 0.0f, 1.0f) * fw, my = std::clamp(mouseY, 0.0f, 1.0f) * fh;
+         glUniform4f(glGetUniformLocation(mProgram, "iMouse"), mx, my, mouseDown ? mx : -mx, mouseDown ? my : -my);
+         const auto now = std::chrono::system_clock::now();
+         const std::time_t tt = std::chrono::system_clock::to_time_t(now);
+         std::tm lt = {};
+#ifdef _WIN32
+         localtime_s(&lt, &tt);
+#else
+         localtime_r(&tt, &lt);
+#endif
+         const double ms = (double)(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
+         glUniform4f(glGetUniformLocation(mProgram, "iDate"), (float)(lt.tm_year + 1900), (float)lt.tm_mon,
+                     (float)lt.tm_mday, (float)(lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec + ms / 1000.0));
+         glUniform1f(glGetUniformLocation(mProgram, "iSampleRate"), 44100.0f);
+         glUniform3fv(glGetUniformLocation(mProgram, "iChannelResolution"), kInputs, channelRes);
+         glUniform1fv(glGetUniformLocation(mProgram, "iChannelTime"), kInputs, channelTime);
+         glUniform1i(glGetUniformLocation(mProgram, "uKeepAlpha"), floatBuffer ? 1 : 0);
+      }
    });
+   mFrame++;
 }

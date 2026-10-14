@@ -82,7 +82,7 @@ current patch as text.
 
 | Job | Nodes |
 |---|---|
-| Image sources | Shape, Noise, Ramp, Texture, Image Source, Video, Video In (camera), Text, Draw, Slideshow, Spout In |
+| Image sources | Shape, Noise, Ramp, Texture, Formula (GLSL, Shadertoy code as is), Image Source, Video, Video In (camera), Text, Draw, Slideshow, Spout In |
 | Effects | the filter family (gaussianblur and many more: describe lists them), Blend, Layer Stack, Layout, Fit, Color Ramp, Curves, Feedback, Trails, Reaction Diffusion |
 | Output | Output (a window / projector), Projection (warp + edge blend), Spout Out |
 | 3D | Geometry, Model 3D, Text 3D, Material, Instance on Points, Particle System, Camera, Light, HDRI, Render 3D |
@@ -350,5 +350,77 @@ RGB Var, Color FX, Axis, Clock) default to the old look, so only set them to cha
 locks steps to the transport beat; Clock = Free-run keeps it moving while the transport is stopped.
 The `Datamosh` node (Effects) is the real codec-style effect: inputs `image` and optional `motion`; params
 mosh, gain, bloom, threshold, block, blockVar, leak, refresh, refreshChance, seed.
+)SKILL"
+R"SKILL(
+## GLSL into the Formula node: Shadertoy and friends (Turbo 0.56)
+
+The `Formula` node (Source) runs GLSL. It picks its mode by itself:
+- **Shadertoy mode**: the code defines `void mainImage(out vec4 fragColor, in vec2 fragCoord)`. It
+  compiles as a whole file (`#version 330`, 150 on old contexts) with Shadertoy's uniforms: `iTime`
+  (transport seconds), `iResolution` (vec3), `iFrame` (frames since compile / resize), `iTimeDelta`,
+  `iFrameRate`, `iMouse` (from the params mouseX / mouseY 0..1 and mouseDown), `iDate`, `iSampleRate`,
+  `iChannel0..3` (= image inputs in0..in3), `iChannelResolution[4]`, `iChannelTime[4]`. `texture2D` is
+  defined as `texture`. Output alpha is forced to 1 unless `floatBuffer` is on.
+- **native mode**: anything else is the body of `vec4 shape(vec2 uv, vec2 p, float t)` (uv 0..1,
+  p centred and aspect-corrected, t seconds) and must `return` a vec4. Helpers in scope: PI, TAU,
+  rand(vec2), rot(a), sdCircle, sdBox; images `texture(uIn0, uv)`..uIn3 with uHasIn0..3, uInRes0..3.
+
+Both modes: knobs `uA`..`uD` (0..1, settings knobA..knobD), and **extra knobs from the code**: each
+line `uniform float NAME; // lo..hi = default` becomes a knob with a CV pin (max 16, saved as
+`uniform_NAME`; range and default optional, 0..1 and the middle). Do not declare uA-uD, uTime or
+any i* uniform yourself (those lines are dropped).
+
+**Workflow**: `create_node {"type":"Formula","settings":{"width":960,"height":540,"formula":"<code>"}}`
+(or `set_param` key `formula` on an existing one; it recompiles at once). Then `explain` the node:
+its `shader` block gives `mode`, `error` (the GLSL log; line numbers match the user's code in
+Shadertoy mode) and `uniform_knobs`. Fix and set again until `error` is empty, then
+`screenshot_node` to look. Keep 960x540 or less for heavy raymarchers and say so; scale up with Fit.
+
+**Converting a Shadertoy, tab by tab**
+- **Image only**: paste it unchanged.
+- **Common tab**: put its code above the Image code in the same formula.
+- **Buffer A..D**: one Formula per buffer, chained like the Shadertoy channel setup: the buffer's
+  output cable goes into the next pass's inN matching its iChannelN. Buffers set `floatBuffer` true
+  (RGBA32F, alpha kept: Shadertoy buffers are float and often store state in alpha). A buffer that reads
+  itself (iChannelN = Buffer A inside Buffer A) sets `selfChannel` to N: that channel gets the node's own
+  previous frame (cleared to 0 on compile / resize, iFrame restarts at 0). Two buffers that read each
+  other: route one of them through a `Feedback` node.
+- **Textures** (noise, organic, font, etc.): Shadertoy's own images are not bundled; feed an Image
+  Source with a similar picture, or a `Noise` / `Texture` node, into the matching in0..in3. Tell the user.
+- **Video / webcam channels**: Video, VMPC or Video In into inN.
+- **Sound / microphone / music channels** (texture with FFT in row 0, waveform in row 1): build it from
+  audio with `Audio Texture` (AudioVisual) into inN; check its rows with describe and adapt the
+  texture() reads if needed.
+- **Keyboard channel**: not available; replace the key reads with uniform knobs (map them to MIDI or
+  Macro buttons) and explain the change.
+- **Cubemap channels / cubemap passes, 3D volume textures, VR mainVR, sound shaders (mainSound)**:
+  not supported. Say so; offer a 2D rewrite (e.g. an equirect texture read with a direction-to-uv
+  function instead of a samplerCube).
+- **iMouse**: mouseX / mouseY / mouseDown params (CV-able: map them to a Macro XY or MIDI).
+
+**GLSL ES to desktop GLSL gotchas** (fix while converting): `precision` lines are fine; avoid
+`const` arrays built from non-constant expressions; global variables initialised from uniforms
+(`vec2 R = iResolution.xy;` at file scope) must move into functions or become `#define R iResolution.xy`;
+integer-float mixing needs explicit casts on strict drivers (`float(i)`, `2.0` not `2`); `texelFetch`
+needs `ivec2`; loops with non-constant bounds are fine. Rename user identifiers that clash with
+the node's own (`uA`..`uD`, `uTime`, `uAspect`, `uIn0`...), and in native mode avoid redefining
+`rand`, `rot`, `sdCircle`, `sdBox`.
+
+**Other formats**: GLSL Sandbox / glslsandbox / The Book of Shaders (`uniform float time;
+uniform vec2 resolution; uniform vec2 mouse; void main(){ gl_FragColor = ... }`): wrap as
+`mainImage`: rename `time` -> iTime, `resolution` -> iResolution.xy, `mouse` -> iMouse.xy/iResolution.xy,
+`gl_FragCoord` -> fragCoord, `gl_FragColor` -> fragColor, drop the uniform lines and `main`.
+**ISF** (VDMX / Resolume / Magic: JSON header + main): drop the JSON, map `TIME` -> iTime,
+`RENDERSIZE` -> iResolution.xy, `isf_FragNormCoord` -> fragCoord/iResolution.xy, `IMG_NORM_PIXEL(img, uv)`
+-> texture(iChannelN, uv), `IMG_PIXEL` -> texelFetch, each INPUT float -> `uniform float name; // min..max = default`,
+image INPUTs -> iChannel0..3, PASSES -> chained Formulas as Buffers. **TouchDesigner GLSL TOP**:
+`sTD2DInputs[n]` -> iChannelN, `vUV.st` -> fragCoord/iResolution.xy, `uTD2DInfos[n].res.zw` ->
+iChannelResolution[n].xy, `fragColor = TDOutputSwizzle(c)` -> `fragColor = c`, custom uniforms -> uniform
+knob lines. **Vulkan / HLSL / Metal**: rewrite by hand into GLSL (float2 -> vec2, lerp -> mix,
+frac -> fract, mul(a,b) -> a*b with care for order, saturate(x) -> clamp(x,0.,1.)).
+
+**Licences**: Shadertoy code is CC BY-NC-SA 3.0 unless the author says otherwise, and some
+authors forbid any reuse. Check the header. Never put third-party shaders into the Infinite-Turbo
+repository or a release; keep them in the user's own patches, and keep the author's credit line.
 )SKILL";
 }

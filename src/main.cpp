@@ -5458,7 +5458,26 @@ namespace
       ModSlider("uD", &n->knobD, 0.0f, 1.0f);
       ModCheckbox("animate", &n->animate);
       ModCheckbox("size from in0", &n->matchInput);
-      ImGui::TextDisabled("images: texture(uIn0, uv) .. uIn3");
+      // Turbo 0.56: Shadertoy mode controls, then the knobs declared in the
+      // code (uniform float name; // lo..hi = default). The sliders always
+      // draw in this order so modulation ordinals stay put.
+      ModSlider("mouse x", &n->mouseX, 0.0f, 1.0f);
+      ModSlider("mouse y", &n->mouseY, 0.0f, 1.0f);
+      ModCheckbox("mouse down", &n->mouseDown);
+      ModCheckbox("float buffer", &n->floatBuffer);
+      {
+         static const std::vector<std::string> kSelf = { "off", "iChannel0 / in0", "iChannel1 / in1",
+                                                         "iChannel2 / in2", "iChannel3 / in3" };
+         DropdownButton("last frame to", kSelf, std::clamp(n->selfChannel + 1, 0, 4),
+                        [n](int i) { PushUndoCheckpoint(); n->selfChannel = i - 1; }, kParamWidth, false);
+      }
+      n->ParseUserParams();
+      for (FormulaNode::UserParam& up : n->userParams)
+         ModSlider(up.name.c_str(), &up.value, up.lo, up.hi);
+      if (n->ShadertoyMode())
+         ImGui::TextDisabled("Shadertoy mode: iChannel0-3 = in0-in3, iMouse = mouse x / y");
+      else
+         ImGui::TextDisabled("images: texture(uIn0, uv) .. uIn3");
    }
 
    void DrawTextParams(TextNode* n)
@@ -26631,7 +26650,7 @@ namespace
          { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included. The 4D types (Simplex, Perlin, Ridged, Turbulence, Billow 4D) work like TouchDesigner's Noise TOP: the picture is a slice of 4D noise and speed moves along the 4th axis, so it morphs in place; drift adds an optional scroll, plus translate, z, rotate and exponent." },
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
          { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
-         { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation. Four image inputs (in0-in3) are read as texture(uIn0, uv) .. uIn3, with uHasIn0..3 and uInRes0..3, like TouchDesigner's GLSL TOP; 'size from in0' renders at in0's resolution." },
+         { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation. Four image inputs (in0-in3) are read as texture(uIn0, uv) .. uIn3, with uHasIn0..3 and uInRes0..3, like TouchDesigner's GLSL TOP; 'size from in0' renders at in0's resolution. Shadertoy mode: paste a whole Image tab (code with mainImage) and it runs as is, with iTime, iResolution, iFrame, iTimeDelta, iMouse (the mouse x / y / down params), iDate and iChannel0-3 = in0-in3. Every 'uniform float name; // lo..hi = default' line becomes an extra knob with a CV pin. For a Buffer pass turn on 'float buffer' (RGBA32F, alpha kept) and route 'last frame to' an iChannel for the node's own previous frame; chain Formula nodes for Buffer A -> B -> Image." },
          { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
          { "Ramp", "Generates a gradient from scratch (no input) between up to 8 user-set colour stops, at a chosen angle, scale and offset. Gamma and dither smooth out visible banding." },
          { "Text", "Renders text using any font installed on the system, with size, colour, tracking, alignment and position." },
@@ -27140,7 +27159,7 @@ namespace
                { "Shape", "Ten vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line - with fill, stroke, feather and background." },
                { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included. The 4D types (Simplex, Perlin, Ridged, Turbulence, Billow 4D) work like TouchDesigner's Noise TOP: the picture is a slice of 4D noise and speed moves along the 4th axis, so it morphs in place; drift adds an optional scroll, plus translate, z, rotate and exponent." },
                { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
-               { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation. Four image inputs (in0-in3) are read as texture(uIn0, uv) .. uIn3, with uHasIn0..3 and uInRes0..3, like TouchDesigner's GLSL TOP; 'size from in0' renders at in0's resolution." },
+               { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation. Four image inputs (in0-in3) are read as texture(uIn0, uv) .. uIn3, with uHasIn0..3 and uInRes0..3, like TouchDesigner's GLSL TOP; 'size from in0' renders at in0's resolution. Shadertoy mode: paste a whole Image tab (code with mainImage) and it runs as is, with iTime, iResolution, iFrame, iTimeDelta, iMouse (the mouse x / y / down params), iDate and iChannel0-3 = in0-in3. Every 'uniform float name; // lo..hi = default' line becomes an extra knob with a CV pin. For a Buffer pass turn on 'float buffer' (RGBA32F, alpha kept) and route 'last frame to' an iChannel for the node's own previous frame; chain Formula nodes for Buffer A -> B -> Image." },
                { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
             } },
             { "Text", {
@@ -49493,29 +49512,48 @@ int main(int argc, char** argv)
          ImGui::SetNextWindowSize(ImVec2(620, 460), ImGuiCond_FirstUseEver);
          if (ImGui::Begin("Formula editor", &gFormulaEditorOpen))
          {
-            ImGui::TextDisabled("body of  vec4 shape(vec2 uv, vec2 p, float t)");
-            ImGui::TextDisabled("p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs");
+            ImGui::TextDisabled("native: the body of  vec4 shape(vec2 uv, vec2 p, float t);  p is centred, t is seconds, knobs uA-uD");
+            ImGui::TextDisabled("Shadertoy: paste the whole Image tab (with mainImage); Common tab code goes above it");
+            ImGui::TextDisabled("extra knobs:  uniform float uSpeed; // 0..4 = 1");
             ImGui::Separator();
 
-            static char editBuf[8192];
+            // Turbo 0.56: growable buffer (a fixed 8 KB one silently refused
+            // longer pastes) and a one-click paste for Shadertoy code.
+            static std::string editBuf;
             static FormulaNode* lastEdited = nullptr;
             if (lastEdited != gFormulaEditor)
             {
-               snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
+               editBuf = gFormulaEditor->formula;
                lastEdited = gFormulaEditor;
             }
 
-            ImGui::InputTextMultiline("##glsl", editBuf, sizeof(editBuf),
-                                      ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+            ImGui::InputTextMultiline("##glsl", &editBuf, ImVec2(-1, ImGui::GetContentRegionAvail().y - 70),
+                                      ImGuiInputTextFlags_AllowTabInput);
 
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
+               PushUndoCheckpoint();
                gFormulaEditor->formula = editBuf;
                gFormulaEditor->Apply();
+               gPatchDirty = true;
             }
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
-               snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
+               editBuf = gFormulaEditor->formula;
+            ImGui::SameLine();
+            if (ImGui::Button("Paste + Apply", ImVec2(140, 0)))
+            {
+               if (const char* clip = ImGui::GetClipboardText())
+               {
+                  editBuf = clip;
+                  PushUndoCheckpoint();
+                  gFormulaEditor->formula = editBuf;
+                  gFormulaEditor->Apply();
+                  gPatchDirty = true;
+               }
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled(gFormulaEditor->ShadertoyMode() ? "Shadertoy mode" : "native mode");
 
             if (!gFormulaEditor->LastError().empty())
             {

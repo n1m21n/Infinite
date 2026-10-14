@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.55.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.56.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -72,6 +72,7 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Punch FX** (full build) | pocket-operator performance effects: 16 MPC-style pads, each with its own effect (27, freeze included) and its own MIDI-learnable pin; hold or latch, several at once; loops lock to the beat |
 | **Drum kits and patterns** | kit picker on the Drum Sequencer; CC0 acoustic kit by default; SLOOP's 37 kits in the full build; Magenta Groove MIDI human-played patterns in the MIDI browser |
 | **CC0 sample pack** | acoustic kit, percussion, vinyl scratches and piano / vibes / bass / horns / strings / flute multisamples in the Samples panel (Turbo kits) |
+| **Formula: Shadertoy mode** | paste a Shadertoy Image tab as is (iTime, iResolution, iFrame, iMouse, iDate, iChannel0-3 from the inputs); `uniform float name; // lo..hi = default` lines become extra knobs with CV pins; float buffers and the node's own last frame for Buffer A-D passes, chained node to node; two examples in the presets; the MCP guide explains how to convert Shadertoy, GLSL Sandbox, ISF and TouchDesigner shaders |
 | **Video playback** | FFmpeg engine: HAP / HAP Alpha / HAP Q / HAP Q Alpha / HAP R decoded on the GPU, Resolume DXV, H.264 / HEVC / VP9 / AV1 with D3D11VA hardware decode; loop, reverse, scrub, trim |
 | **Video In** | cameras and HDMI-USB capture with format and frame-rate negotiation (MJPG, Auto / 60 / 30 / 25 fps) and a live fps readout |
 | **Layout** | pixel-exact canvas (e.g. 1920 x 1080) with 8 layers, drag on the miniature, fit / fill / 1:1 |
