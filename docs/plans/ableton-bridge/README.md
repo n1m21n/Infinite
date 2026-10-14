@@ -15,8 +15,20 @@ possible; there is no catalogue to ask. What exists, by layer:
 | Exports | audio stems, MIDI clips (`.mid`), `.alc` clips | no (the user exports) | Already importable by Infinite's MIDI/audio nodes |
 | MIDI and virtual ports | notes, CC, clock, transport | yes | Infinite already has MIDI in and out plans (`docs/plans/midi-out`) |
 | Ableton Link | shared tempo, beat and phase on the local network | yes | Open protocol, GPL-2.0-or-later with a commercial option: licence check before linking it into an MIT app; or implement only the documented behaviour, no source reading |
-| Max for Live / Live Object Model | full control of tracks, clips, devices, parameters | yes, needs Max for Live (Suite) | Official, documented LOM; a small M4L device can speak OSC to Infinite |
+| Live Object Model over OSC (AbletonOSC) | full control of tracks, clips, devices, parameters | yes (any edition, Live 11+) | Documented LOM, open-source Remote Script; no Max for Live needed. M4L stays an alternative |
 | Remote Scripts (Python in Live) | control surface API | yes | Unofficial and unstable; not used |
+
+## Prior art (found online, 2026-10-14; licences to be confirmed from each LICENSE file before any reuse)
+
+| Project | What it is | Use for us |
+|---|---|---|
+| [AbletonOSC](https://github.com/ideoforms/AbletonOSC) (ideoforms, NIME 2023 paper) | A Remote Script that puts the **whole Live Object Model on OSC**: listens on UDP 11000, replies on 11001, addresses mirror the LOM (`/live/clip/...`, wildcards allowed), Live 11+. Reported MIT | The live tier, with no Max for Live needed. Infinite speaks OSC; the user installs one folder into Live's Remote Scripts. Replaces the M4L spike |
+| Ableton MCP servers (`ahujasid/ableton-mcp`, `Simon-Kansara/ableton-live-mcp-server`, LiveMCP and others) | An MCP server plus a Remote Script and a local socket (JSON over TCP, or OSC) | Proof that agents already drive Live; confirms the architecture. All need Live running; none is headless |
+| `pyableton` (PyPI), `@pohy/ableton` (npm), `bravoh-daw` (Rust), `daw-schemas` (JSON schemas incl. a Live 12 `.als` schema) | Parsers for `.als` (gzip + XML), clips, MIDI export | The offline tier: use the schema as a reference for our own small reader; do not add a dependency for what gzip + XML parse does |
+| PRONOM / Ableton forum threads | Confirm `.als` is gzipped XML from 8.2.1 on; warn to work on copies | Rule: the writer never edits a user's set in place |
+
+Consequence: the **live tier becomes AbletonOSC**, not an M4L device. Still true: nothing runs
+without Live open, and no source of closed Live internals is read.
 
 ## Decision
 
@@ -26,8 +38,7 @@ Two tiers, in order:
    small JSON (tempo, tracks, clips with notes and times, audio file refs) and write a minimal
    `.als` or `.mid` from Infinite data. Commands: `als-read`, `als-notes`, `als-write-midi`. Works
    with no Live running, on the Air, in tests. Fixtures: the user's own sets, never committed.
-2. **Live link**: MIDI clock/notes plus Ableton Link for tempo, then an optional M4L device over OSC
-   for clip and parameter control. Only after tier 1 proves what data is worth moving.
+2. **Live link**: MIDI clock/notes plus Ableton Link for tempo, then AbletonOSC for clip and parameter control. Only after tier 1 proves what data is worth moving.
 
 ## User must have
 
@@ -42,7 +53,7 @@ Live, `.als` reading still works; the live link nodes show "Live not found".
 | 2 | `.mid` writer for Infinite note data, plus Infinite import path check | clip opens in Live with the same notes |
 | 3 | Set writer for a minimal valid `.als` (one MIDI track) | Live opens it without a repair prompt |
 | 4 | Link tempo sync spike; licence decision recorded | tempo follows Live within one beat |
-| 5 | M4L device spike (OSC) | one clip fire from Infinite |
+| 5 | AbletonOSC spike: Infinite sends `/live/clip/fire`, reads tempo | one clip fires from Infinite, tempo read back |
 
 ## Limits
 
