@@ -54,6 +54,13 @@ Sentence case in headings. Node names exactly as the app spells them. Numbers, s
 | Callout | Surface card with a Caveat word in Ember as its only decoration |
 | Contents | Number in Caveat Ember, title Geist 650, hairline dotted leader to the right, one line per entry |
 
+## Card layout and page fill
+
+- Crop each node shot tight to the node plus 24 px of brand padding, so no wide empty ground sits beside it (`common.trim()` does this at build time).
+- A tall node (height more than 1.6 times its width) uses a split card: the shot in the left 4 of 12 columns, left aligned at its natural size, and name, description and "Try it" in the right 8 columns, aligned to the top.
+- A wide node, panel or dialog keeps the full-width card: text above, shot below, centred.
+- Cards flow and never split, so short cards share a page. A page that ends more than 45 per cent empty before its folio is a layout bug, except the last page of a chapter.
+
 ## Checks
 
-`python3 tools/docs-shots/pdf_check.py <file.pdf>` fails on: a font that is not Geist, Geist Mono or Caveat; a page that is not Letter or A4; an em dash in the text. `run.py` runs it on every PDF it builds.
+`python3 tools/docs-shots/pdf_check.py <file.pdf>` fails on: a font that is not Geist, Geist Mono or Caveat; a page that is not Letter or A4; an em dash in the text. It also warns, without failing, on any non-final page with more than 45 per cent of the text area blank. `run.py` runs it on every PDF it builds.

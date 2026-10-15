@@ -125,11 +125,18 @@ def chapter_html(ch):
     for name, tag, desc, tryit, chain in ch["cards"]:
         chips = '<span class="arrow">→</span>'.join(f'<span class="chip">{esc(c)}</span>' for c in chain)
         chips = chips.replace('</span><span class="arrow">', '</span><span class="arrow">')
-        cards.append(
-            f'<div class="card"><div class="top"><h2>{esc(name)}</h2><span class="tag">{esc(tag)}</span></div>'
-            f'<p>{esc(desc)}</p>{shots.figure(shots.find_by_name(name, "o", manifest) or "", None, manifest)}<div class="try"><b>Try it</b> — {esc(tryit)}'
-            f'<div class="chain">{chips}</div></div></div>'
-        )
+        sid = shots.find_by_name(name, "o", manifest) or ""
+        fig = shots.figure(sid, None, manifest)
+        sh = manifest["shots"].get(sid, {})
+        tall = bool(fig) and sh.get("height", 0) > 1.6 * sh.get("width", 1)
+        head = f'<div class="top"><h2>{esc(name)}</h2><span class="tag">{esc(tag)}</span></div>'
+        tail = (f'<div class="try"><b>Try it</b> — {esc(tryit)}'
+                f'<div class="chain">{chips}</div></div>')
+        if tall:
+            cards.append(f'<div class="card split"><div class="side">{fig}</div>'
+                         f'<div class="main">{head}<p>{esc(desc)}</p>{tail}</div></div>')
+        else:
+            cards.append(f'<div class="card">{head}<p>{esc(desc)}</p>{fig}{tail}</div>')
     body = (f'<div class="chap">Chapter {ch["num"]}</div><h1>{esc(ch["title"])}</h1>'
             f'<p class="intro">{esc(ch["intro"])}</p>' + "".join(cards))
     return doc(body, f'Chapter {ch["n"]} — {ch["title"]}')

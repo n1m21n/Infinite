@@ -108,6 +108,12 @@ table.t tr {{ break-inside: avoid; }}
 .toc li {{ border-bottom: 0.5pt dotted var(--line) !important; }} .toc .n {{ font: 700 14pt/16pt Caveat, Geist; color: var(--accent); }} .toc .t {{ font-weight: 650; }}
 .shot {{ margin: 0 0 16pt; text-align: center; break-inside: avoid; }}
 .shot img {{ max-width: 100%; max-height: 4.6in; border-radius: 8pt; }}
+.card.split {{ display: grid; grid-template-columns: 4fr 8fr; column-gap: 16pt; align-items: start; }}
+.card.split .side .shot {{ margin: 0; }}
+.card.split .side .shot {{ text-align: left; }}
+.card.split .side .shot img {{ max-width: 100%; max-height: 4.2in; width: auto; }}
+.card.split .main p {{ max-width: none; }}
+.card.split .try {{ margin-top: 8pt; }}
 .shot figcaption {{ font: 500 8pt/12pt Geist; color: var(--ink2); margin-top: 4pt; }}
 .atlas {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12pt; }}
 .atlas .cell {{ text-align: center; margin: 0 !important; background: var(--card); }}
@@ -117,6 +123,25 @@ table.t tr {{ break-inside: avoid; }}
 """
 
 
+def trim(path, pad=24):
+    """Crop the frame ground off a framed shot, keeping `pad` px of brand padding, so figures hug the node."""
+    out = path.replace(".pdf.jpg", ".trim.jpg")
+    if os.path.exists(out) and os.path.getmtime(out) >= os.path.getmtime(path):
+        return out
+    try:
+        from PIL import Image, ImageChops
+        im = Image.open(path).convert("RGB")
+        bg = Image.new("RGB", im.size, im.getpixel((2, 2)))
+        box = ImageChops.difference(im, bg).point(lambda v: 255 if v > 12 else 0).getbbox()
+        if not box:
+            return path
+        l, t, r, b = box
+        im.crop((max(0, l - pad), max(0, t - pad), min(im.width, r + pad), min(im.height, b + pad))).save(out, quality=92)
+        return out
+    except Exception:
+        return path
+
+
 def figure(shot_id, caption=None, manifest=None):
     """HTML <figure> for a manifest shot (the PDF-sized image); empty string when the shot was not captured."""
     m = manifest or load_manifest()
@@ -124,7 +149,7 @@ def figure(shot_id, caption=None, manifest=None):
     if not s or not s.get("pdf"):
         return ""
     cap = f"<figcaption>{caption}</figcaption>" if caption else ""
-    return f'<figure class="shot"><img src="file://{os.path.join(ROOT, s["pdf"])}">{cap}</figure>'
+    return f'<figure class="shot"><img src="file://{trim(os.path.join(ROOT, s["pdf"]))}">{cap}</figure>'
 
 
 def find_by_name(name, state="o", manifest=None):
