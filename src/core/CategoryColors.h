@@ -46,6 +46,12 @@ namespace CategoryColors
    int CurrentPreset();
    void SetPreset(int index); // clamps out-of-range, persists immediately
 
+   // Turbo 0.57: true while the "Infinite Dark (2026)" preset is active - the
+   // design-system look ported from upstream (Inter font, field wells, ring
+   // pins, emphasis ladder, borderless popups). Widgets ask this to pick
+   // their face; everything else stays the Turbo classic look.
+   bool IsDesignTheme();
+
    // Falls back to a neutral grey for any category string not in the current
    // preset's table (a category added to RegisterNodes() with no matching
    // entry), so an unrecognised category dims rather than crashes.

@@ -1,5 +1,67 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.57.0-turbo (2026-10-14)
+
+### Pattern Player (new, Notes)
+- Plays note patterns from a bank: 66 built in (Arp, Piano, Guitar, Strum, Bass, Sequencer, Ambient),
+  118 bundled .mid loops in 8 packs (Classical themes, Classical figures, Folk and traditional,
+  Basslines, Latin and Brazil, Jazz and blues, Electronic, Turbo examples), your own .mid files in
+  `%LOCALAPPDATA%\Infinite\NotePatterns` (one subfolder per category, **rescan** to reload) and
+  sequences saved from the Note Looper. The bundled loops are all MIT: themes from public domain works
+  (Bach, Beethoven, Mozart, Grieg, Joplin, Satie, Vivaldi, Pachelbel...) and traditional tunes,
+  transcribed by hand, plus original patterns in common styles (see `assets/note-patterns/CREDITS.txt`).
+- **open .mid**: copies any .mid into the bank (category Imported) and plays it.
+- **Trim**: drag the start / end handles on the step view to loop part of the pattern.
+- .mid patterns follow the file's key signature (its tonic lands on the chord root; files without
+  one use their lowest note). **fit scale** snaps them to the global scale, so the degree knob moves
+  a melody inside the key.
+- **play** button (CV-able), **latch**, **bar sync** (starts on the next bar), **thru**.
+- **source**: auto / input / global. With nothing held (or on global) it plays the chord built on the
+  chosen **degree** of the global key and scale (stacked thirds, 3-5 notes), so it runs with no input
+  and follows key / scale changes. With notes held it arpeggiates them.
+- octave, transpose, speed (half / x1 / double), gate, swing, velocity; < / > / random (CV-able).
+- Patterns are written as text tokens: `.` rest, `-` tie, `1..9` chord tone, `c` whole chord, `b` bass,
+  `r` random tone, `+` play together; `'` octave up, `,` octave down, `!` accent, `?` 50% chance,
+  `~` legato, `*N` ratchet.
+
+### Note Looper (new, Notes)
+- MPC-style note recorder: 8 sequences of up to 8 layers, length in bars, count-in, record / play /
+  overdub that start on the bar, undo / redo by layer, erase, mute per layer.
+- Quantize (with strength and swing) applies at playback, so the original timing is kept.
+- **switch**: what happens when you pick another sequence while playing. **next bar** and **end of
+  loop** keep the current one playing until then (no gap); **now** starts the new one from its top at
+  once.
+- **Trim**: start / end handles on the piano roll (1/16 grid) loop part of a take; saved with the
+  sequence, used by save to bank.
+- MPC-style face: a display (sequence, mode, bar.beat, tempo, length), big REC / OVERDUB / PLAY pads,
+  UNDO / CLEAR / ERASE, sequence pads A-H in a 4 x 2 grid.
+- Export / import .mid; **save to bank** writes the sequence to the Pattern Player bank
+  (`NotePatterns/Note Looper/`). Sequences are saved in the patch.
+
+### From upstream Infinite
+- **MIDI Out**: sends notes and CC to a MIDI port (WinMM), clock optional.
+- **Spatial Mixer**: binaural / stereo object panner (MIT KEMAR HRTF set) with a top-view stage. Head
+  tracking is left out.
+- Effects: **Key-Snap** (snaps the spectrum to the global key and scale) and **Spectrum Slide**.
+- Shape Resonator is not ported (it needs a 3D geometry input).
+
+### Fixes
+- Dropdowns inside node bodies opened at the bottom-right corner of the screen and could not be
+  used (MPC "sync to" division, Layout layer picker). They now open at the button, through the same
+  deferred dropdown as every other node menu (`NodeDropdown`).
+
+### Code and repository
+- `src/main.cpp` (52k lines) is now a 280-line outline that includes the app's code from `src/app/`
+  in order: `ui/`, `bodies/`, `graph/`, `frame/` (main() step by step) and `selftest/`. Still one
+  translation unit, so the code, inlining and link are the same as before (checked line by line).
+- MIDI file reader: key signatures (FF 59).
+- `.gitattributes`: text stored as LF, `.bat` always CRLF, binaries marked.
+
+### Infinite Dark (2026) theme
+- Upstream's new look as a theme (Settings > Theme): design tokens, Inter font, rounded fields, accent
+  ladder, field-well dropdowns, ring param pins that fill and pulse when modulated, quiet category
+  caption on node headers. The classic themes are unchanged.
+
 ## 0.56.0-turbo (2026-10-13)
 
 ### Formula: Shadertoy mode

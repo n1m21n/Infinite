@@ -6,6 +6,8 @@
 #include "dsp/CycleShaperKernel.h"
 #include "dsp/ResonatorBankKernel.h"
 #include "dsp/SpecBlurKernel.h"
+#include "dsp/KeySnapKernel.h"
+#include "dsp/SpectrumSlideKernel.h"
 #include "dsp/EqKernel.h"
 #include "dsp/DynamicsKernel.h"
 #include "dsp/LimiterKernel.h"
@@ -761,6 +763,40 @@ namespace
          def.params.push_back({ "freeze", 0.0f, 1.0f, 0.0f });
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<SpecBlurKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ---------------------------------------------- Key-Snap (Turbo 0.57, upstream)
+      {
+         EffectDef def;
+         def.name = "Key-Snap";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kKeySnapScale;
+         def.defaultMix = 1.0f;
+         def.params.push_back({ "snap", 0.0f, 1.0f, 1.0f });
+         def.params.push_back({ "glide", 0.0f, 500.0f, 60.0f });
+         def.params.push_back({ "scale", 0.0f, (float)(MusicTime::kNumScaleTypes - 1), (float)MusicTime::kMajor });
+         def.params.push_back({ "root", 0.0f, 11.0f, 0.0f });
+         // Global key only audibly differs from the node's own scale when that
+         // scale is not the transport's (C major): pin it to minor pentatonic.
+         def.params.push_back({ "globalKey", 0.0f, 1.0f, 0.0f, false, { { "scale", (float)MusicTime::kMinorPentatonic } } });
+         def.makeKernel = []() { return std::make_unique<KeySnapKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // ---------------------------------------- Spectrum Slide (Turbo 0.57, upstream)
+      {
+         EffectDef def;
+         def.name = "Spectrum Slide";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kSpectrumSlide;
+         def.defaultMix = 1.0f;
+         def.hasSidechain = true;
+         def.sidechainLabel = "to";
+         def.params.push_back({ "slide", 0.0f, 1.0f, 0.5f });
+         def.makeKernel = []() { return std::make_unique<SpectrumSlideKernel>(); };
          defs.push_back(std::move(def));
       }
 

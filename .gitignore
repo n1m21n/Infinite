@@ -24,3 +24,7 @@ local-prompts/
 # never swept into this repo's history by git add -A. See
 # .claude/skills/repo-privacy-split.
 mcp-server/
+
+# Palmi's own test patches at the repo root (never committed)
+/test+turbo.inf
+/superSynthMCP.inf

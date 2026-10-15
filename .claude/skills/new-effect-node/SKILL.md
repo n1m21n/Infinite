@@ -3,6 +3,11 @@ name: new-effect-node
 description: The standard procedure for adding a new Effects/Color/Compositing node to Infinite — the FilterDef table pattern, when it's a table entry vs a real C++ class, the shared GLSL preamble, the caching bug trap that has already happened here, and the machine-checkable exit criterion. Use when implementing a new image effect, color-grading module, or compositing operator; when writing the prompt for a fresh session that will implement one; or when a filter node produces a black/frozen/wrong-looking image, doesn't animate, or its params don't reach the shader.
 ---
 
+> Infinite-Turbo 0.57: what this skill calls `main.cpp` now lives in `src/app/*.inl`, included by
+> `main.cpp` in order (see ARCHITECTURE.md). Node `#include`s stay in `main.cpp`; registration is in
+> `src/app/frame/Startup.inl`, bodies in `src/app/bodies/`, help in `src/app/ui/Help.inl`. Line numbers
+> here are stale: search by name.
+
 Paths are relative to the repo root (`/Users/namansoni/infinite`).
 
 This is the 2D-effects sibling of `new-audio-node` and `new-geometry-node`.

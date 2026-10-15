@@ -40,4 +40,6 @@ Windows builds of it are GPL); it is not linked into Infinite-Turbo.
 | `assets/drumkits-gpl/sloop-*` (full build only) | SLOOP's 37 drum kits rendered with its own engine | GPL-3.0 material, see `assets/drumkits-gpl/README.md` |
 | `assets/drum-patterns/groove-midi` | Magenta Groove MIDI Dataset (beat performances) | CC BY 4.0, Gillick, Roberts, Engel, Eck, Bamman (2019), see its CREDITS.txt |
 | `assets/drumkits/cc0-*` | VCSL, VSCO-2 CE (Versilian Studios), Sonic Pi samples, as prepared by SLOOP | CC0 1.0, see `assets/drumkits/CC0-CREDITS.txt` |
-| `assets/fonts` | IBM Plex Sans, Atkinson Hyperlegible | SIL OFL 1.1 |
+| `assets/fonts` | IBM Plex Sans, Atkinson Hyperlegible, Inter (Infinite Dark theme) | SIL OFL 1.1 (`OFL-Inter.txt` for Inter) |
+| `src/audio/dsp/HrtfKemarData.cpp` | MIT Media Lab KEMAR HRTF measurements (Gardner and Martin, 1994) | no usage restrictions; cite the authors |
+| `assets/note-patterns`, built-in Pattern Player bank | Infinite-Turbo | MIT |

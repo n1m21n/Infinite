@@ -87,8 +87,8 @@ current patch as text.
 | Output | Output (a window / projector), Projection (warp + edge blend), Spout Out |
 | 3D | Geometry, Model 3D, Text 3D, Material, Instance on Points, Particle System, Camera, Light, HDRI, Render 3D |
 | Modulators | LFO, Envelope, Random, Drift, Pattern, Math, Smoothing, Range to Range, Audio Analyze (audio to CV), Image Analyze, MIDI CC, Macro Knob / Slider / XY |
-| Sound | Oscillator, Analog, Wavetable, Sampler, MPC, Granular, Slicer, Audio File, Audio In, Plugin (VST3), Mixer, Super Mixer, Looper, Audio Out |
-| Notes | Keyboard (virtual keyboard: mouse or computer keys, typingAlways plays without hover), Note Sequencer, Drum Sequencer, Arpeggiator, Chord Progression, MIDI File, Quantizer, MIDI Notes |
+| Sound | Oscillator, Analog, Wavetable, Sampler, MPC, Granular, Slicer, Audio File, Audio In, Plugin (VST3), Mixer, Super Mixer, Spatial Mixer (binaural), Looper, Audio Out |
+| Notes | Keyboard (virtual keyboard: mouse or computer keys, typingAlways plays without hover), Note Sequencer, Drum Sequencer, Arpeggiator, Pattern Player, Note Looper, Chord Progression, MIDI File, Quantizer, MIDI Notes, MIDI Out |
 | Performance | Clip Matrix (+ Clip Matrix Out), Transport Control, Timeline |
 
 )SKILL"
@@ -111,6 +111,21 @@ for many layers prefer HAP / HAP Q (decoded on the GPU) or Resolume DXV clips.
 
 **Chord Progression**: `followKey` 1 makes it follow the global key (`homeKey` = the key it was written in);
 `setsKey` 1 does the opposite (never both).
+
+**Pattern Player**: plays a pattern from the bank (`category`, `patternName` text; `playing` 1 runs it).
+`source` 0 auto (held notes, else global chord), 1 input, 2 global: the chord on `degree` 1-7 of the
+global key/scale, `chordSize` 3-5, so it needs no note input. `speed` 0 half 1 x1 2 double; `gate`,
+`swing`, `velocity`, `octave`, `transpose`, `latch`, `syncBar`. Pattern text tokens (for user files):
+`.` rest, `-` tie, `1..9` chord tone, `c` chord, `b` bass, `r` random, `+` together; `'` up, `,` down,
+`!` accent, `?` 50%, `~` legato, `*N` ratchet. User .mid patterns go in %LOCALAPPDATA%\Infinite\NotePatterns.
+
+`trimStart` / `trimEnd` (steps, 0 = whole) loop part of it; `fitScale` 1 snaps .mid patterns to the
+global scale. Bundled packs: Classical themes, Classical figures, Folk and traditional, Basslines,
+Latin and Brazil, Jazz and blues, Electronic, Turbo examples.
+
+**Note Looper**: MPC-style note recorder (notes in, notes out): `lengthBars`, `quantize`, `strength`,
+`swing`, `countIn`, `thru`, `activeSeq` 0-7, `switchMode` (0 next bar, 1 end of loop, 2 now: how a
+sequence change takes over while playing); record / play / overdub from the node's buttons.
 
 **Camera / capture card**: Video In, `active` 1, `deviceId` from the node's device list,
 `resolution` (0 Auto, 1 1080p, 2 720p, 3 480p) and `frameRate` (0 Auto, 1 60, 2 30, 3 25).

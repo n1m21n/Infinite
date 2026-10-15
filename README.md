@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.56.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.57.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -63,6 +63,8 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Chord Progression** | chords held per bar, strum / arp / pulse modes; the builder now has extended, altered and quartal chords (11, 13, maj9#11, 7alt, 7#9, 6/9, so what...); quantized restart; chord names spelled MAJ / MIN; duplicate / drag slots, typed lengths, extension chips, playable 4-octave keyboard; **follows key** (transposes with the global key) and **suggestions**: 75 progressions by style (famous ones plus the NT ChordGen styles), load or random |
 | **Virtual Keyboard** | play notes with the mouse or the computer keyboard (Z-M / Q-P, - and = for the octave); **always** plays without hovering the node, for live use |
 | **Scenes** | radio-button scene launcher, one button for several changes: up to 8 scenes x 8 outputs cabled to any params (switcher slot, drum part, mutes, restart triggers), quantized, every scene mappable |
+| **Pattern Player** | plays note patterns from a bank: 66 built in, 118 bundled .mid loops in 8 packs (classical themes and figures, folk, basslines, Latin and Brazil, jazz and blues, electronic), your own .mid folder, open .mid, Note Looper saves; runs on the global key and scale with no input (chord on a chosen degree) or arpeggiates held notes; play / stop button, trim, fit to scale, latch, bar sync, speed, gate, swing |
+| **Note Looper** | MPC-style note recorder: display, big REC / OVERDUB / PLAY pads, 8 sequences x 8 layers, sequence switch on the next bar / end of loop / now, trim, count-in, quantize with strength and swing at playback, undo by layer, import .mid, save to the Pattern Player bank |
 | **Note Switcher** | up to 8 note inputs, quantized manual switching, mappable slot buttons |
 
 ### Video and output

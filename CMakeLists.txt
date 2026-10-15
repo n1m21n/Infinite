@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.56.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.57.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -163,6 +163,8 @@ set(STB_DIR external/stb)
 
 set(INFINITE_PLATFORM_SOURCES
     src/platform/PlatformWindows.cpp
+    src/platform/MidiOutWindows.cpp
+    src/platform/common/MidiOutSink.cpp
     src/platform/VideoDecodeWindows.cpp
     src/platform/CameraWindows.cpp
     src/platform/ImageDecodeMemory.cpp
@@ -251,6 +253,8 @@ add_executable(Infinite WIN32
     src/audio/dsp/CycleShaperKernel.cpp
     src/audio/dsp/ResonatorBankKernel.cpp
     src/audio/dsp/SpecBlurKernel.cpp
+    src/audio/dsp/KeySnapKernel.cpp
+    src/audio/dsp/SpectrumSlideKernel.cpp
     src/audio/dsp/SlicerDsp.cpp
     src/audio/dsp/MolderDsp.cpp
     src/audio/dsp/GrainMolderDsp.cpp
@@ -294,6 +298,13 @@ add_executable(Infinite WIN32
     src/nodes/GeometryTableNode.cpp
     src/nodes/DepthProjectionNode.cpp
     src/nodes/ChordProgressionNode.cpp
+    src/nodes/MidiOutNode.cpp
+    src/nodes/SpatialMixerNode.cpp
+    src/nodes/NotePatternLibrary.cpp
+    src/nodes/PatternPlayerNode.cpp
+    src/nodes/NoteLooperNode.cpp
+    src/audio/dsp/HrtfSet.cpp
+    src/audio/dsp/HrtfKemarData.cpp
     src/nodes/MidiFileNode.cpp
     src/core/MidiFile.cpp
     src/nodes/TransportControlNode.cpp
@@ -344,6 +355,14 @@ add_executable(Infinite WIN32
     ${NODE_EDITOR_DIR}/imgui_canvas.cpp
     ${NODE_EDITOR_DIR}/crude_json.cpp
 )
+
+# Turbo 0.57: main.cpp includes the app's code from src/app/*.inl (one
+# translation unit). Listed here only so IDEs show them; they are not compiled
+# on their own, and MSVC tracks them as dependencies of main.cpp.
+file(GLOB_RECURSE INFINITE_APP_FRAGMENTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/app/*.inl")
+target_sources(Infinite PRIVATE ${INFINITE_APP_FRAGMENTS})
+set_source_files_properties(${INFINITE_APP_FRAGMENTS} PROPERTIES HEADER_FILE_ONLY TRUE)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src/app" PREFIX "app" FILES ${INFINITE_APP_FRAGMENTS})
 
 # GUI subsystem without a console window, keeping the portable main().
 target_link_options(Infinite PRIVATE "/ENTRY:mainCRTStartup")
@@ -511,6 +530,13 @@ add_custom_command(TARGET Infinite POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-AtkinsonHyperlegible.txt"
         "$<TARGET_FILE_DIR:Infinite>/assets/fonts/OFL-AtkinsonHyperlegible.txt"
+    # Turbo 0.57: Inter, the font of the "Infinite Dark" theme (upstream's design system), OFL licensed.
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Inter-Regular.ttf"
+        "$<TARGET_FILE_DIR:Infinite>/assets/fonts/Inter-Regular.ttf"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Inter.txt"
+        "$<TARGET_FILE_DIR:Infinite>/assets/fonts/OFL-Inter.txt"
     # Turbo 0.46: the example patch Infinite-Turbo opens with.
     COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:Infinite>/assets/examples"
@@ -529,6 +555,13 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/drum-patterns")
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/drum-patterns"
             "$<TARGET_FILE_DIR:Infinite>/assets/drum-patterns"
+        VERBATIM)
+endif()
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/note-patterns")
+    add_custom_command(TARGET Infinite POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/note-patterns"
+            "$<TARGET_FILE_DIR:Infinite>/assets/note-patterns"
         VERBATIM)
 endif()
 if(INFINITE_ENABLE_GPL)

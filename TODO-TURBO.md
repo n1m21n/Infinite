@@ -19,7 +19,9 @@ CHANGELOG-TURBO.md when it ships.
   log already prints it.
 - Zero-copy GPU video: D3D11VA frames shared with GL (WGL_NV_DX_interop2) instead of the
   download/upload round trip; DXV decoded to BC blocks on the GPU like HAP.
-- Split main.cpp along upstream's src/app layout (bodies, frame, graph, panels, selftest, ui).
+- main.cpp split, step two: turn the src/app fragments into separate .cpp files (shared state in
+  headers) for faster incremental builds; then the frame steps into functions.
+- Packaging in plain cmd: package-windows.bat still calls scripts/package-windows.ps1.
 
 - TOP parity, what 0.52 left open (docs/TOP-PARITY.md): Common page on sources, Layer Stack and
   Switcher; pixel units for Crop / Transform; Blend with N inputs; the missing TOPs (Cache / Time

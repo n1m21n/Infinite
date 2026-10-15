@@ -1,0 +1,18 @@
+Infinite-Turbo note pattern bank
+================================
+
+Every file here was written for Infinite-Turbo and is released under the MIT
+licence (see LICENSE at the top of the repository).
+
+Classical themes, Classical figures, Folk and traditional
+   Hand transcriptions of public domain works: the composers died more than 70
+   years ago (Bach, Beethoven, Brahms, Chopin, Grieg, Joplin, Mozart, Offenbach,
+   Pachelbel, Petzold, Rimsky-Korsakov, Satie, Vivaldi) or the tunes are
+   traditional. Short excerpts, arranged as loops.
+
+Basslines, Latin and Brazil, Jazz and blues, Electronic, Turbo examples
+   Original patterns in common styles.
+
+Each file carries a key signature: the Pattern Player puts the key's tonic on
+the chord root (the global key when nothing is played into it). Regenerate
+with scripts/make_note_patterns.py.

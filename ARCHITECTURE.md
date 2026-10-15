@@ -1,8 +1,17 @@
 # Architecture Map
 
-> **Infinite-Turbo note (0.53):** this project is Windows-only now. `src/main.cpp` is ~50,000
-> lines, so the line numbers below are from the original 9k-line file and are only a rough
-> guide: search for the function names instead. The Platform Layer is `PlatformWindows.cpp`
+> **Infinite-Turbo note (0.53):** this project is Windows-only now. The line numbers below are
+> from the original 9k-line `main.cpp` and are only a rough guide: search for the function names.
+>
+> **main.cpp split (0.57):** everything below that says `src/main.cpp` now lives in `src/app/`,
+> in fragments that `main.cpp` includes in order (still one translation unit, so behaviour, inlining
+> and link are unchanged). `main.cpp` keeps the includes and the outline: the anonymous namespace
+> (`app/Globals.inl`, `app/ui/*`, `app/bodies/*`, `app/graph/*`), the test fixtures
+> (`app/selftest/*`), and `main()` as a list of steps (`app/frame/Startup.inl`, then the frame loop
+> `FrameBegin` > `FrameSetup` > `MenuBar` > `Canvas` > `Nodes` > `Links` > `Popups` > `ModMatrix` >
+> `Panels` > `Cook`, then `Shutdown.inl`). Node registration is in `frame/Startup.inl`, node bodies in
+> `bodies/`, help texts in `ui/Help.inl`, patch I/O in `graph/PatchIO.inl`. A fragment sees only
+> what the fragments before it declare. The Platform Layer is `PlatformWindows.cpp`
 > (+ `PluginVST3Windows.cpp`, `AudioFileWriterWindows.cpp`, `TextNodeWindows.cpp`); ignore
 > every mention of `Platform.mm`, AppKit, AU or Syphon internals below.
 >
@@ -16,10 +25,20 @@
 > stay one token (Patch.cpp reads them with `>>`); captions come from `DisplayName()` in main.cpp.
 > Patches re-file their nodes on load (`SpawnNode` asks the registry).
 >
+> **0.57:** note-pattern nodes live in `nodes/NotePatternLibrary` (token grammar, bank, .mid I/O),
+> `PatternPlayerNode` and `NoteLooperNode` (both schedule notes by transport beats on the audio half,
+> state crosses via triple buffers and an SPSC ring). The "Infinite Dark (2026)" theme is upstream's
+> design tokens (`app/ui/design/Tokens.gen.h`, `TokenColors.h`); every widget face that differs is
+> gated by `CategoryColors::IsDesignTheme()` in main.cpp (`ApplyDesignTheme`, `DesignDropdownFace`,
+> `DrawDesignParamPin`), so classic themes keep their exact look.
+>
 > **Popups from node bodies (0.55):** a body runs under the node editor's canvas transform, so a
 > popup opened there lands in the wrong place. Record the request in a global and open/draw the
 > popup in the `ed::Suspend()` block (see `DrawClipMatrixDeferredPopups`,
 > `DrawChordSlotDeferredMenu`).
+> Same for dropdowns: never `ImGui::BeginCombo` / `Combo` in a body (its list opens at the screen's
+> corner). Use `DropdownButton`, `AudioBareDropdown`, `row.Dropdown` or the plain `NodeDropdown`
+> (`app/ui/Widgets.inl`), which go through the deferred dropdown.
 >
 > **Video path (0.53):** every decoded picture is a `Platform::VideoFrame` in its native
 > layout (NV12, YUV420P, RGBA/BGRA, packed BGR, or HAP's BC1/BC3/BC7/YCoCg blocks), never

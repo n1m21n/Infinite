@@ -79,6 +79,9 @@ namespace MidiFile
       std::vector<TempoChange> tempos;   // sorted by tick, may be empty
       int timeSigNum = 4;                // first time signature (4/4 if none)
       int timeSigDen = 4;
+      bool hasKeySig = false;            // Turbo 0.57: first key signature (FF 59)
+      int keySigSharps = 0;              // -7..7 (negative = flats)
+      bool keySigMinor = false;
       uint64_t lengthTicks = 0;          // latest end of track / note end
       std::string warning;               // non-fatal problems, empty if none
 

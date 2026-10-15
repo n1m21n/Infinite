@@ -11,6 +11,9 @@ namespace
 {
 using Table = std::map<std::string, Color>;
 
+// Turbo 0.57: the upstream design-system theme (see IsDesignTheme).
+constexpr const char* kDesignThemeName = "Infinite Dark (2026)";
+
 struct Preset
 {
    std::string name;
@@ -268,11 +271,45 @@ const std::vector<Preset>& Presets()
         { 0.706f, 0.773f, 0.682f },  // border  Sage Lichen     #B4C5AE
         { 0.102f, 0.431f, 0.231f } } // accent  Forest Emerald  #1A6E3B
       },
+      // Turbo 0.57: the design-system theme ported from upstream Infinite
+      // (Inter, contrast-checked text, one emphasis ladder, field wells, ring
+      // pins, borderless popups). Same palette as "Infinite"; appended last so
+      // the preset indices saved in patches keep pointing at the same themes.
+      { kDesignThemeName, {
+         { "Source",      { 0.290f, 0.871f, 0.502f } }, // #4ADE80
+         { "Text",        { 0.176f, 0.831f, 0.749f } }, // #2DD4BF
+         { "3D",          { 0.220f, 0.741f, 0.973f } }, // #38BDF8
+         { "Compositing", { 0.506f, 0.549f, 0.973f } }, // #818CF8
+         { "Color",       { 0.753f, 0.518f, 0.988f } }, // #C084FC
+         { "Mask",        { 0.957f, 0.447f, 0.714f } }, // #F472B6
+         { "Feedback",    { 0.984f, 0.443f, 0.522f } }, // #FB7185
+         { "Resynth",     { 0.984f, 0.573f, 0.235f } }, // #FB923C
+         { "Effects",     { 0.980f, 0.800f, 0.082f } }, // #FACC15
+         { "Modulators",  { 0.639f, 0.902f, 0.208f } }, // #A3E635
+         { "Output",      { 0.886f, 0.910f, 0.941f } }, // #E2E8F0
+         { "Notes",       { 0.298f, 0.851f, 0.392f } }, // #4CD964
+         { "Synths",      { 0.412f, 0.573f, 0.965f } }, // #6992F6
+         { "AudioEffects", { 0.325f, 0.780f, 0.890f } }, // #53C7E3
+         { "AudioUtility",  { 0.639f, 0.663f, 0.729f } }, // #A3A9BA
+      },
+      { { 0.039f, 0.043f, 0.059f },  // window  #0A0B0F
+        { 0.094f, 0.106f, 0.137f },  // panel   #181B23
+        { 0.933f, 0.941f, 0.965f },  // text    #EEF0F6
+        { 0.569f, 0.596f, 0.678f },  // textDim #9198AD
+        { 0.220f, 0.235f, 0.278f },  // border
+        { 0.435f, 0.706f, 1.000f } } // accent  #6FB4FF
+      },
    };
    return presets;
 }
 
 int gCurrent = 0;
+
+bool IsDesignThemeImpl()
+{
+   const auto& presets = Presets();
+   return gCurrent >= 0 && gCurrent < (int)presets.size() && presets[gCurrent].name == kDesignThemeName;
+}
 
 // Mirrors Patch.cpp's RecentsPath(): one flat preference file next to the
 // app's other Application Support state, not a bundled settings format.
@@ -373,5 +410,9 @@ void LoadPreference()
          return;
       }
    }
+}
+bool IsDesignTheme()
+{
+   return IsDesignThemeImpl();
 }
 }

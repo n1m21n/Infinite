@@ -3,6 +3,11 @@ name: new-audio-node
 description: The standard procedure for adding any audio, note, or synth node to Infinite — the two-object rule, the exact wiring sites in main.cpp/CMakeLists, the bug traps each rule exists to prevent, and the machine-checkable exit criterion. Use whenever implementing a node from docs/plans/audio/README.md §3 (Oscillator, Audio Filter, Delay, Reverb, Dynamics, Drive, Stereo, Pitch Time, Sampler, Drum Sequencer, Resonator, Scope, Audio In, Recorder, Note Filter/Modify/Echo/Router/Display, Arpeggiator, Note Sequencer, Shaper, Macro, Mod Recorder), when writing the prompt for a fresh session that will implement one, or when a newly added audio node has no pins / no body / doesn't save / crashes on delete.
 ---
 
+> Infinite-Turbo 0.57: what this skill calls `main.cpp` now lives in `src/app/*.inl`, included by
+> `main.cpp` in order (see ARCHITECTURE.md). Node `#include`s stay in `main.cpp`; registration is in
+> `src/app/frame/Startup.inl`, bodies in `src/app/bodies/`, help in `src/app/ui/Help.inl`. Line numbers
+> here are stale: search by name.
+
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 
 This skill is the **implementation** half. The **appearance** half is the

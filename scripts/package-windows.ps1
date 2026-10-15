@@ -43,6 +43,8 @@ $fontTarget = Join-Path $package 'assets\fonts'
 New-Item -ItemType Directory -Path $fontTarget -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'assets\fonts\IBMPlexSans-Regular.ttf') -Destination $fontTarget
 Copy-Item -LiteralPath (Join-Path $root 'assets\fonts\OFL.txt') -Destination $fontTarget
+Copy-Item -LiteralPath (Join-Path $root 'assets\fonts\Inter-Regular.ttf') -Destination $fontTarget
+Copy-Item -LiteralPath (Join-Path $root 'assets\fonts\OFL-Inter.txt') -Destination $fontTarget
 
 # Turbo 0.46: the example patch the app opens with.
 $exampleTarget = Join-Path $package 'assets\examples'
@@ -51,6 +53,7 @@ Copy-Item -LiteralPath (Join-Path $root 'assets\examples\superSynthMCP.inf') -De
 # Turbo 0.47: drum kit for the Drum Sequencer pattern library
 Copy-Item -LiteralPath (Join-Path $root 'assets\drumkits') -Destination (Join-Path $package 'assets') -Recurse -Force
 # Turbo 0.54: MIDI pattern packs (both builds); SLOOP kits only in the full build (GPL material).
+Copy-Item -LiteralPath (Join-Path $root 'assets\note-patterns') -Destination (Join-Path $package 'assets') -Recurse -Force
 if (Test-Path -LiteralPath (Join-Path $root 'assets\drum-patterns')) {
     Copy-Item -LiteralPath (Join-Path $root 'assets\drum-patterns') -Destination (Join-Path $package 'assets') -Recurse -Force
 }

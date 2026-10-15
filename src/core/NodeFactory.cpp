@@ -51,6 +51,7 @@ namespace
          { "Keyboard", "NoteSource" }, { "MIDI Notes", "NoteSource" }, { "MIDI File", "NoteSource" },
          { "Chord Progression", "NoteSource" }, { "Note Sequencer", "NoteSource" },
          { "Random Note Generator", "NoteSource" }, { "Bouncing Balls", "NoteSource" },
+         { "Pattern Player", "NoteSource" }, { "Note Looper", "NoteSource" }, // Turbo 0.57
          { "Predictive Notes", "Prediction" }, { "Predictive Quantize", "Prediction" },
          { "Predictive Velocity", "Prediction" }, { "Predictive Rhythm", "Prediction" },
          // control

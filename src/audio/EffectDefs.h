@@ -89,6 +89,8 @@ enum class EffectVisualizerId
    kResonatorBankSpectrum,
    kCycleShaperWave,
    kSpecBlurSpectrum,
+   kKeySnapScale,   // Turbo 0.57 (from upstream)
+   kSpectrumSlide,  // Turbo 0.57 (from upstream)
 };
 
 struct EffectDef

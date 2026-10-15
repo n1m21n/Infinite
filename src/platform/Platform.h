@@ -805,6 +805,23 @@ namespace Platform
    bool MidiClockIsPresent(); // pulses seen within the last couple of seconds
    float MidiClockBpm();      // smoothed estimate; 0 if not enough pulses yet
 
+   // ---- MIDI output (Turbo 0.57, ported from upstream: docs/plans/midi-out) --
+   // Sends to a hardware or virtual MIDI destination. None of this is audio-thread
+   // safe: the audio thread pushes into a MidiOutSink (platform/common/MidiOutSink.h)
+   // whose own thread calls MidiOutSend.
+   struct MidiOutHandle;
+   // Seconds on std::chrono::steady_clock's timeline (the one MidiOutSend uses).
+   double MidiOutNowSeconds();
+   // Kept for parity with upstream; WinMM cannot publish a virtual port (use loopMIDI).
+   constexpr const char* kMidiOutVirtualDevice = "Infinite (virtual)";
+   std::vector<std::string> MidiOutListDevices();
+   // Main thread. Opens the destination whose name matches exactly.
+   MidiOutHandle* MidiOutOpen(const std::string& name, std::string& outError);
+   void MidiOutClose(MidiOutHandle* handle);
+   // The MIDI-out thread only: one 1-3 byte message, delivered at deliverAtSeconds.
+   bool MidiOutSend(MidiOutHandle* handle, const unsigned char* bytes, size_t len, double deliverAtSeconds);
+   bool MidiOutVirtualAvailable();
+
    // ---- video recording ---------------------------------------------------
    struct RecorderHandle;
 

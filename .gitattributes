@@ -1,0 +1,22 @@
+# Line endings: text is stored as LF; Git for Windows checks it out as CRLF
+# (core.autocrlf) and converts back on commit. cmd.exe needs CRLF in .bat
+# files whatever the checkout settings, so those are pinned.
+* text=auto
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Kept byte for byte.
+PACKAGE_MANIFEST.txt -text
+
+# Binary assets.
+*.mid binary
+*.wav binary
+*.flac binary
+*.ogg binary
+*.mp3 binary
+*.ttf binary
+*.otf binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.onnx binary

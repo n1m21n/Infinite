@@ -143,6 +143,12 @@ namespace MidiFile
                   const int den = m[1] <= 6 ? (1 << m[1]) : 4;
                   push(kTimeSignature, 0, std::max<uint8_t>(1, m[0]), (uint8_t)den, 0);
                }
+               else if (type == 0x59 && mlen >= 2 && !out.hasKeySig)
+               {
+                  out.hasKeySig = true;
+                  out.keySigSharps = std::clamp((int)(int8_t)m[0], -7, 7);
+                  out.keySigMinor = m[1] != 0;
+               }
                else if (type == 0x03 && track.name.empty())
                {
                   // Keep printable bytes only; names are shown in the UI.
