@@ -19,6 +19,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 from cards import CHAPTERS  # noqa: E402
+sys.path.insert(0, os.path.join(ROOT, "tools", "docs-shots"))
+import common as shots  # noqa: E402  (screenshot manifest + Brand v2 Paper styling)
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 BASE_PAGES = os.path.join(HERE, "base", "chapters_1_20.pdf")  # old pages 4..50, untouched
@@ -119,12 +121,13 @@ def doc(body, footer_left):
 
 def chapter_html(ch):
     cards = []
+    manifest = shots.load_manifest()
     for name, tag, desc, tryit, chain in ch["cards"]:
         chips = '<span class="arrow">→</span>'.join(f'<span class="chip">{esc(c)}</span>' for c in chain)
         chips = chips.replace('</span><span class="arrow">', '</span><span class="arrow">')
         cards.append(
             f'<div class="card"><div class="top"><h2>{esc(name)}</h2><span class="tag">{esc(tag)}</span></div>'
-            f'<p>{esc(desc)}</p><div class="try"><b>Try it</b> — {esc(tryit)}'
+            f'<p>{esc(desc)}</p>{shots.figure(shots.find_by_name(name, "o", manifest) or "", None, manifest)}<div class="try"><b>Try it</b> — {esc(tryit)}'
             f'<div class="chain">{chips}</div></div></div>'
         )
     body = (f'<div class="chap">Chapter {ch["num"]}</div><h1>{esc(ch["title"])}</h1>'
@@ -187,6 +190,24 @@ def front_html():
     return cover, intro, css_extra
 
 
+def atlas_html(manifest, limit=0):
+    """Node Atlas: every captured node (params open) by category, from docs/shots/manifest.json."""
+    cats = {}
+    for sid, sh in sorted(manifest["shots"].items()):
+        if sh.get("kind") == "node" and sh["state"] == "o":
+            cats.setdefault(sh["category"], []).append(sh)
+    pages = []
+    for cat, items in sorted(cats.items()):
+        items = items[:limit] if limit else items
+        cells = "".join(
+            f'<div class="cell"><h4>{esc(i["name"])}<span>{esc(cat)}</span></h4>'
+            f'<img src="file://{os.path.join(ROOT, i["pdf"])}"></div>' for i in items)
+        pages.append(f'<div class="page"><div class="kick">Node Atlas</div><h1>{esc(cat)}</h1>'
+                     f'<p class="intro">{len(items)} nodes as they look in the app, parameters open.</p>'
+                     f'<div class="atlas">{cells}</div></div>')
+    return pages
+
+
 def closing_html():
     body = f"""<div style="padding-top:1.2in">
 <h1 style="font-size:30px">That's the field guide.</h1>
@@ -207,28 +228,48 @@ def render(html_text, out_pdf, workdir):
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", help="write here only (no copy to the shipped locations)")
+    ap.add_argument("--chapters", help="comma list of new chapter numbers (21..); default all")
+    ap.add_argument("--atlas-limit", type=int, default=0, help="max nodes per category in the Node Atlas")
+    ap.add_argument("--no-base", action="store_true", help="skip the frozen chapters 1-20 pages (smoke builds)")
+    a = ap.parse_args()
     if not os.path.exists(BASE_PAGES):
         sys.exit(f"missing {BASE_PAGES}")
     tmp = tempfile.mkdtemp()
     cover, intro, css_extra = front_html()
     global CSS
-    CSS += css_extra
+    CSS += css_extra + shots.brand_css()
     parts = []
     # cover and intro/contents share one document so the contents flow onto a second page
     front = doc(cover + intro, "")
     p = os.path.join(tmp, "00_front.pdf")
     render(front, p, tmp)
     parts.append(p)
-    parts.append(BASE_PAGES)
+    if not a.no_base:
+        parts.append(BASE_PAGES)
+    want = {int(x) for x in a.chapters.split(",")} if a.chapters else None
     for ch in CHAPTERS:
+        if want and ch["n"] not in want:
+            continue
         p = os.path.join(tmp, f"ch{ch['n']}.pdf")
         render(chapter_html(ch), p, tmp)
+        parts.append(p)
+    atlas = atlas_html(shots.load_manifest(), a.atlas_limit)
+    if atlas:
+        p = os.path.join(tmp, "yy_atlas.pdf")
+        render(doc("".join(atlas), "Node Atlas"), p, tmp)
         parts.append(p)
     p = os.path.join(tmp, "zz_closing.pdf")
     render(closing_html(), p, tmp)
     parts.append(p)
     joined = os.path.join(tmp, "joined.pdf")
     subprocess.run(["pdfunite"] + parts + [joined], check=True)
+    if a.out:
+        shutil.copy(joined, a.out)
+        print("wrote", a.out)
+        return
     shutil.copy(joined, OUT)
     shutil.copy(joined, OUT_WEB)
     print("wrote", OUT, "and", OUT_WEB)

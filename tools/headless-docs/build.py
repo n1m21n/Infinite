@@ -7,12 +7,16 @@ import html
 import os
 import re
 import subprocess
+import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "docs", "headless", "GUIDE.md")
 OUT = os.path.join(ROOT, "docs", "headless", "Infinite_Headless_User_Guide.pdf")
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+sys.path.insert(0, os.path.join(ROOT, "tools", "docs-shots"))
+import common as shots  # noqa: E402  (screenshot manifest + Brand v2 Paper styling)
 
 CSS = """
 @page { size: 8.5in 11in; margin: 0; }
@@ -102,6 +106,13 @@ def convert(md, sections):
                 i += 1
             i -= 1
             out.append(f"<{tag}>" + "".join(f"<li>{inline(x)}</li>" for x in items) + f"</{tag}>")
+        elif ln.startswith("{{shot:"):
+            # {{shot:<id>|caption}} (one or more per line, shown side by side); dropped if the shot was not captured
+            figs = [shots.figure(i.split("|")[0], i.split("|")[1] if "|" in i else None)
+                    for i in re.findall(r"\{\{shot:([^}]+)\}\}", ln)]
+            figs = "".join(f for f in figs if f)
+            if figs:
+                out.append(f'<div style="display:flex;gap:14px;justify-content:center;align-items:flex-start">{figs}</div>')
         elif ln.strip():
             keep = ' style="break-after:avoid"' if ln.rstrip().endswith(":") else ""
             out.append(f"<p{keep}>{inline(ln)}</p>")
@@ -116,12 +127,20 @@ def page(body, footer=True):
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", help="write here instead of docs/headless/ (no copy elsewhere)")
+    ap.add_argument("--app", default=shots.DEFAULT_APP, help="Infinite.app used to read the version for the cover")
+    args = ap.parse_args()
+    global OUT
+    if args.out:
+        OUT = args.out
     md = open(SRC, encoding="utf-8").read()
     title, rest = md.split("\n", 1)
     intro, body = rest.split("\n## ", 1)
     sections = []
     main_html = convert("## " + body, sections)
-    ver = subprocess.run([os.path.join(ROOT, "build/Infinite.app/Contents/MacOS/Infinite"), "--version"],
+    ver = subprocess.run([os.path.join(args.app, "Contents/MacOS/Infinite"), "--version"],
                          capture_output=True, text=True).stdout.strip().splitlines()[-1:] or [""]
     icon = os.path.join(ROOT, "website", "assets", "icon-96.png")
     cover = f"""
@@ -157,7 +176,7 @@ def main():
 <h2 style="font-size:30px;margin:10px 0 18px">What is the headless engine?</h2>
 <div class="panel">{convert(intro, [])}</div>
 <div class="kick">Contents</div><h2 style="font-size:28px;margin:8px 0 0">{len(sections)} sections</h2><ul class="toc">{toc}</ul></div>"""
-    doc = (f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}</style></head><body>{cover}'
+    doc = (f'<!doctype html><html><head><meta charset="utf-8"><style>{CSS}{shots.brand_css()}</style></head><body>{cover}'
            f'{page(front).replace("<table", "<div class=page><table", 1).replace("</table>", "</table></div>", 1)}'
            f'{page(main_html)}</body></html>')
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as f:

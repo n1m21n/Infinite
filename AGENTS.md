@@ -56,6 +56,7 @@ One owner per topic: if two files seem to disagree, the skill named in this tabl
 | `infinite-patch-authoring` | Process | Write, validate, explain and render `.inf` patches headless; node facts are generated (`tools/gen-patch-skill.py`) |
 | `quality-system` | Process | One registry, row format, gate and scoreboard for audits, re-survey, benches and checks (`docs/quality/`) |
 | `tool-first` | Process | Write a script/tool instead of by-hand work; inventory of existing tools in `tools/` and `scripts/` |
+| `docs-screenshots` | Release | One command: shoot every node/panel/dialog and rebuild the three manual PDFs in the brand style |
 | `write-fix-brief` | Process | Turn a bug report / findings / idea into a verified implementation prompt |
 | `invariant-interaction-audit` | Process | Before shipping any guarantee: can a sibling control or call site undo it |
 | `infinite-code-review` | Process | Review code against Infinite's four standards |
