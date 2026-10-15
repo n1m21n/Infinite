@@ -8,6 +8,7 @@ Checked on disk 2026-10-15 against `RELEASE_BUGHUNT_PLAN.md` (which marked tools
 |---|---|
 | `tools/release/findings.py` | Findings tracker: `new`, `list`, `counts`, `exit` (exit criteria 1, 2, 8 from the tracker), `--self-test`. Findings in `docs/release/findings/<version>/`. |
 | `tools/release/run_gate.sh` | Serial P1 then P2 runner over existing tools, one pass/fail table per category, `--list` dry run, never builds, refuses P2 while a build or an Infinite app runs. `--self-test` checks the step table. |
+| `tools/release/patch_variants.py` | Patch-variation smoke test: seeded, resumable mutations of the community and example patches (parameters, sizes/rates/tempo, bypass/delete/uncable) through the headless engine, hard checks, minimiser, one finding per distinct failure. Skill `patch-variation`. Needs an idle machine (refuses while a build or an Infinite app runs). `--list`, `--self-test`. |
 
 ## Exists and was verified (paths corrected)
 
