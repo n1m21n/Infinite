@@ -45,12 +45,15 @@ tmp = tempfile.mkdtemp()
 base = os.path.join(tmp, "base.pdf")
 open(base, "wb").write(subprocess.check_output(["git", "-C", ROOT, "show", "a1ccd8f:Field_Language_Manual.pdf"]))
 add = os.path.join(tmp, "add.pdf")
-subprocess.check_call([CHROME, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", f"--print-to-pdf={add}",
-                       "file://" + os.path.join(HERE, "addendum.html")], stderr=subprocess.DEVNULL)
+src = open(os.path.join(HERE, "addendum.html"), encoding="utf-8").read()   # brand layout laid over the hand-written styles
+src = shots.house_text(src.replace("</head>", f"<style>{shots.brand_css()}</style></head>", 1))
+open(os.path.join(tmp, "addendum.html"), "w", encoding="utf-8").write(src)
+subprocess.check_call([CHROME, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--allow-file-access-from-files",
+                       f"--print-to-pdf={add}", "file://" + os.path.join(tmp, "addendum.html")], stderr=subprocess.DEVNULL)
 parts = [add] if args.no_base else [base, add]
 sh = screens_html()
 if sh:
-    open(os.path.join(tmp, "screens.html"), "w").write(sh)
+    open(os.path.join(tmp, "screens.html"), "w").write(shots.house_text(sh))
     scr = os.path.join(tmp, "screens.pdf")
     subprocess.check_call([CHROME, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--allow-file-access-from-files",
                            f"--print-to-pdf={scr}", "file://" + os.path.join(tmp, "screens.html")], stderr=subprocess.DEVNULL)

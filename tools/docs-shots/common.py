@@ -55,30 +55,65 @@ def slug(s):
     return "".join(c if c.isalnum() else "_" for c in s).strip("_")
 
 
-# Brand v2 Paper mode (docs/brand/brand.json) laid over the legacy manual variable names, plus Geist from art/brand/fonts.
+# Print layout values from docs/brand/PDF_GUIDELINES.md
+PDF = {"page": os.environ.get("PDF_PAGE", "letter").lower(), "margin_x": "18mm", "margin_top": "18mm", "margin_bottom": "22mm"}
+
+
+def house_text(html):
+    """Brand voice: no em dashes."""
+    return html.replace(" \u2014 ", ": ").replace("\u2014", ", ").replace("\u270e", "")
+
+
 def brand_css():
+    """Brand v2 Paper styling and print layout laid over the legacy builder selectors (see PDF_GUIDELINES.md)."""
     f = lambda n: f"file://{FONTS}/{n}"
+    size = "210mm 297mm" if PDF["page"] == "a4" else "8.5in 11in"
     return f"""
 @font-face {{ font-family: Geist; font-weight: 400 500; src: url("{f('Geist-Medium.ttf')}"); }}
 @font-face {{ font-family: Geist; font-weight: 600; src: url("{f('Geist-SemiBold.ttf')}"); }}
 @font-face {{ font-family: Geist; font-weight: 700 900; src: url("{f('Geist-ExtraBold.ttf')}"); }}
 @font-face {{ font-family: 'Geist Mono'; font-weight: 400 700; src: url("{f('GeistMono-Medium.ttf')}"); }}
 @font-face {{ font-family: Caveat; font-weight: 400 700; src: url("{f('Caveat-Bold.ttf')}"); }}
-:root {{ --bg:#FBFAF6; --card:#FFFFFF; --ink:#12152A; --mute:#5A6180; --faint:#8a90a8; --accent:#D9430E; --chip:#EFF0F4;
-        --line:#DAD8E6; --green:#3d7a57; --amber:#c98f2e; --purple:#7b68a8; --blue:#4A54D6; }}
-html, body {{ background: var(--bg); font-family: Geist, "Helvetica Neue", Helvetica, sans-serif; }}
-.mono, code, pre, .tag, .chip, .foot, .kick {{ font-family: "Geist Mono", Menlo, monospace; }}
-.hand {{ font-family: Caveat, "Bradley Hand", cursive; }}
-.card {{ background: var(--bg) !important; border-color: var(--line) !important; border-radius: 16px !important; }}
-.chip {{ border-color: var(--line) !important; border-radius: 999px !important; }}
-.shot {{ margin: 0 0 12px; text-align: center; break-inside: avoid; }}
-.shot img {{ max-width: 100%; max-height: 4.6in; }}
-.shot figcaption {{ font-size: 9.5px; color: var(--mute); margin-top: 4px; }}
-.atlas {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }}
-.atlas .cell {{ break-inside: avoid; background: var(--bg); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px 12px; text-align: center; }}
-.atlas .cell img {{ max-width: 100%; max-height: 3.3in; }}
-.atlas .cell h4 {{ margin: 0 0 6px; font-size: 12.5px; text-align: left; }}
-.atlas .cell h4 span {{ font-family: "Geist Mono", monospace; font-size: 8px; letter-spacing: 1px; color: var(--faint); margin-left: 6px; text-transform: uppercase; }}
+@page {{ size: {size}; margin: 0; }}
+:root {{ --bg:#FBFAF6; --card:#FFFFFF; --deep:#EFF0F4; --ink:#12152A; --ink2:#404660; --mute:#5A6180; --faint:#5A6180; --accent:#D9430E;
+        --chip:#EFF0F4; --line:#DAD8E6; --green:#4A54D6; --amber:#D9430E; --purple:#4A54D6; --blue:#4A54D6; }}
+html, body {{ background: var(--bg); color: var(--ink); font: 400 10pt/16pt Geist, sans-serif; font-feature-settings: "tnum"; }}
+table.w > tbody > tr > td, table.w > thead td, table.w > tfoot td, table.w td {{ padding: 0 {PDF['margin_x']}; }}
+.sp.t {{ height: {PDF['margin_top']}; }} .sp.b {{ height: {PDF['margin_bottom']}; }}
+.mono, code, pre, .tag, .chip, .foot, .kick, th {{ font-family: "Geist Mono", monospace; font-weight: 500; }}
+.hand {{ font-family: Caveat, Geist, cursive; font-weight: 700; color: var(--accent); }}
+h1 {{ font: 750 28pt/32pt Geist; letter-spacing: -0.035em; margin: 0 0 12pt; break-after: avoid; }}
+h2 {{ font: 700 18pt/24pt Geist; letter-spacing: -0.025em; margin: 24pt 0 8pt; break-after: avoid; }}
+h3 {{ font: 650 13pt/20pt Geist; letter-spacing: -0.015em; margin: 16pt 0 4pt; break-after: avoid; }}
+h3::before {{ display: none !important; }}
+p, .panel p {{ font: 400 10pt/16pt Geist; margin: 0 0 8pt; max-width: 34em; }}
+.intro {{ font: 450 12pt/20pt Geist; color: var(--ink2); max-width: 34em; margin: 0 0 16pt; }}
+ul, ol {{ font: 400 10pt/16pt Geist; margin: 0 0 8pt; padding-left: 16pt; }} li {{ margin: 0 0 4pt; }} li::marker {{ color: var(--accent); }}
+.kick, .chap {{ font: 500 7pt/12pt "Geist Mono"; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); font-style: normal; margin: 0 0 4pt; }}
+.card, .panel, .atlas .cell {{ background: var(--card) !important; border: 0 !important; border-radius: 12pt !important; padding: 12pt 16pt !important; margin: 0 0 12pt !important; break-inside: avoid; }}
+.card h2 {{ font: 650 13pt/20pt Geist; margin: 0 0 4pt; }}
+.card p {{ font: 400 10pt/16pt Geist; }}
+.tag, .foot {{ font: 500 7pt/12pt "Geist Mono"; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }}
+.foot {{ bottom: 10mm; margin: 0 {PDF['margin_x']}; border-top: 0.5pt solid var(--line); padding-top: 4pt; }}
+.try {{ border-top: 0.5pt solid var(--line) !important; padding-top: 8pt !important; font: 400 10pt/16pt Geist; color: var(--ink2); }}
+.try b {{ font: 700 14pt/16pt Caveat, Geist; color: var(--accent); }}
+.chip {{ background: var(--deep) !important; border: 0 !important; border-radius: 999px !important; padding: 2pt 8pt !important; font-size: 8pt; }}
+code {{ font: 500 8.5pt/12pt "Geist Mono"; background: var(--deep) !important; border: 0 !important; border-radius: 2pt !important; padding: 0 3pt !important; }}
+pre {{ background: var(--deep) !important; border: 0 !important; border-radius: 8pt !important; padding: 12pt !important; margin: 0 0 16pt !important; break-inside: avoid; }}
+pre code {{ font: 500 8.5pt/12pt "Geist Mono"; background: none !important; padding: 0 !important; }}
+table.t {{ background: none !important; border: 0 !important; border-radius: 0 !important; font: 400 9pt/14pt Geist; margin: 0 0 16pt !important; }}
+table.t th {{ background: var(--deep) !important; color: var(--mute); font: 500 7pt/12pt "Geist Mono"; letter-spacing: 0.12em; padding: 6pt 8pt !important; border: 0 !important; }}
+table.t td {{ padding: 8pt !important; border: 0 !important; border-top: 0.5pt solid var(--line) !important; }}
+table.t tr {{ break-inside: avoid; }}
+.toc li {{ border-bottom: 0.5pt dotted var(--line) !important; }} .toc .n {{ font: 700 14pt/16pt Caveat, Geist; color: var(--accent); }} .toc .t {{ font-weight: 650; }}
+.shot {{ margin: 0 0 16pt; text-align: center; break-inside: avoid; }}
+.shot img {{ max-width: 100%; max-height: 4.6in; border-radius: 8pt; }}
+.shot figcaption {{ font: 500 8pt/12pt Geist; color: var(--ink2); margin-top: 4pt; }}
+.atlas {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12pt; }}
+.atlas .cell {{ text-align: center; margin: 0 !important; background: var(--card); }}
+.atlas .cell img {{ max-width: 100%; max-height: 3.3in; border-radius: 8pt; }}
+.atlas .cell h4 {{ margin: 0 0 8pt; font: 650 13pt/20pt Geist; text-align: left; }}
+.atlas .cell h4 span {{ font: 500 7pt/12pt "Geist Mono"; letter-spacing: 0.12em; color: var(--mute); margin-left: 8pt; text-transform: uppercase; }}
 """
 
 

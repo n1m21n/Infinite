@@ -180,7 +180,7 @@ def main():
            f'{page(front).replace("<table", "<div class=page><table", 1).replace("</table>", "</table></div>", 1)}'
            f'{page(main_html)}</body></html>')
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as f:
-        f.write(doc)
+        f.write(shots.house_text(doc))
     subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--allow-file-access-from-files",
                     f"--print-to-pdf={OUT}", "file://" + f.name], check=True, capture_output=True)
     os.unlink(f.name)

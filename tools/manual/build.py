@@ -222,7 +222,7 @@ CHAPTER_COUNT_WORD = {26: "Twenty-six"}.get(CHAPTER_COUNT, str(CHAPTER_COUNT))
 def render(html_text, out_pdf, workdir):
     src = os.path.join(workdir, os.path.basename(out_pdf) + ".html")
     with open(src, "w", encoding="utf-8") as f:
-        f.write(html_text)
+        f.write(shots.house_text(html_text))
     subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--virtual-time-budget=2000",
                     f"--print-to-pdf={out_pdf}", "file://" + src], check=True, capture_output=True, timeout=120)
 

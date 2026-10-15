@@ -67,6 +67,9 @@ def main():
         sh([PY, "tools/headless-docs/build.py", "--app", a.app] + (["--out", os.path.join(out, "Headless_User_Guide.pdf")] if subset else []))
         if not subset:   # the guide's shipped website copy
             sh(["cp", os.path.join(C.ROOT, "docs/headless/Infinite_Headless_User_Guide.pdf"), os.path.join(C.ROOT, "website/assets/Infinite_Headless_User_Guide.pdf")])
+    built = [os.path.join(out, f) for f in os.listdir(out) if f.endswith(".pdf")] if subset else [
+        os.path.join(C.ROOT, f) for f in ("Infinite_Node_Reference_Manual.pdf", "Field_Language_Manual.pdf", "docs/headless/Infinite_Headless_User_Guide.pdf")]
+    sh([PY, os.path.join(HERE, "pdf_check.py")] + built)
     print("done.", "PDFs in docs/shots/out/ (subset run)" if subset else "shipped PDFs updated; review with git status")
 
 
