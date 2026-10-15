@@ -39,3 +39,6 @@ bench/media/
 .repowise-workspace.yaml
 
 __pycache__/
+
+# release gate run logs (tools/release/run_gate.sh)
+docs/release/runs/
