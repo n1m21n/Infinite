@@ -1,5 +1,7 @@
 # Infinite v0.6: pre-release bug hunt and review protocol
 
+> **Superseded as the standard by `docs/release/PROTOCOL.md`** (every release) and `docs/release/v0.6.md` (this release's numbers). This file is kept as the source plan. Tool paths below were checked on disk on 2026-10-15; where this plan says `scripts/bench/<x>.py` for a re-survey tool, the file is in `tools/re-survey/`; `driver.sh` is `.claude/skills/run-infinite-hygiene/driver.sh`; its baselines live in that folder; `USER_TEST_CHECKLIST.md` is not in the repo.
+
 Status: PLAN ONLY. Nothing here has been run. Written 2026-10-15 from `infinite-tests/TESTS_INDEX.md`, `infinite-index/INDEX.md`, `v06-block2/block2-final-report.md` and `USER_TEST_CHECKLIST.md`.
 
 **Not read:** the release gate in `docs/plans/v0.6-quality/README.md` lives on the Mac at `~/Infinite/repo` and is not in this project or the GitHub copy I can reach. Step 0 below reconciles this plan with it. Where the two disagree, the gate's numbers win and this plan's structure stays.
