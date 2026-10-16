@@ -411,6 +411,17 @@
       REGISTER_NODE(DistributePointsInGridNode, Distribute Points in Grid, "3D");
       REGISTER_NODE(MergeByDistanceNode, Merge by Distance, "3D");
       REGISTER_NODE(Switcher3DNode, Switcher 3D, "3D");
+      REGISTER_NODE(Group3DNode, Group 3D, "3D");
+      REGISTER_NODE(DelaunayMeshNode, Delaunay Mesh, "3D");
+      REGISTER_NODE(VoronoiCellsNode, Voronoi Cells, "3D");
+      REGISTER_NODE(CurveOpsNode, Curve Ops, "3D");
+      // The PointZ family (src/pop): one PopNode class runs every operator in the
+      // table, so the whole family registers from it.
+      for (const pop::PopDef& def : pop::Registry())
+      {
+         const std::string popName = def.name;
+         NodeFactory::Instance().Register(popName, [popName]() -> INode* { return PopNode::CreateFor(popName); }, "PointZ");
+      }
       REGISTER_NODE(CameraNode, Camera, "3D");
       REGISTER_NODE(LightNode, Light, "3D");
       REGISTER_NODE(EnvironmentNode, HDRI, "3D");

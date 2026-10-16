@@ -23,6 +23,8 @@ const std::vector<std::string>& PathNode::FollowModeNames() { return kFollowMode
 
 void PathNode::RebuildFollowIfNeeded()
 {
+   mCookWarning = DescribeGeometryMismatch(curveSource, GeometryRequirement::kCurve);
+
    // A curve is already a polyline, so following one is free; a mesh has to be
    // reduced to one, which is not, hence the cache.
    const Polyline* curve = curveSource ? curveSource->GetCurve() : nullptr;
@@ -41,6 +43,7 @@ void PathNode::RebuildFollowIfNeeded()
 
    if (geometrySource == nullptr)
    {
+      mCookWarning.clear();
       if (!mFollow.Empty())
          mFollow = Polyline();
       mBuiltCurve = nullptr;
@@ -48,6 +51,7 @@ void PathNode::RebuildFollowIfNeeded()
       return;
    }
 
+   mCookWarning = DescribeGeometryMismatch(geometrySource, GeometryRequirement::kMeshSurface);
    const unsigned long long revision = geometrySource->MeshRevision();
    const Mat4 geometryModel = geometrySource->GetModelMatrix();
    if (mBuiltGeometry == (const void*)geometrySource && mBuiltRevision == revision &&

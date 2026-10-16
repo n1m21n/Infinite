@@ -141,6 +141,9 @@ public:
 
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override { return input ? input->MeshRevision() : 0; }
+   // PointZ sources pass through untouched (Render 3D draws them from the GPU).
+   const pop::PopData* GetPop() override { return input ? input->GetPop() : nullptr; }
+   const pop::PopData* GetPopInstances() override { return input ? input->GetPopInstances() : nullptr; }
    Mat4 GetModelMatrix() const override
    {
       return input ? input->GetModelMatrix() : Mat4::Identity();
@@ -198,6 +201,9 @@ public:
 
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override { return input ? input->MeshRevision() : 0; }
+   // PointZ sources pass through untouched (Render 3D draws them from the GPU).
+   const pop::PopData* GetPop() override { return input ? input->GetPop() : nullptr; }
+   const pop::PopData* GetPopInstances() override { return input ? input->GetPopInstances() : nullptr; }
    Mat4 GetModelMatrix() const override
    {
       return input ? input->GetModelMatrix() : Mat4::Identity();
@@ -270,6 +276,9 @@ public:
    float anisotropyRotation = 0.0f;
    float dispersion = 0.0f;
    float alphaCutoff = 0.0f;
+   bool textureAlpha = false;
+   // Normal slot holds a height map (grayscale), not a tangent-space normal.
+   bool normalBump = false;
    // How the albedo/roughness/metallic/normal/ao/emission/clearcoat/sheen
    // maps sample outside 0..1 UV - 0=Clamp (smear edge pixel, matches every
    // saved patch before this param existed), 1=Repeat, 2=Mirror.
@@ -298,6 +307,8 @@ public:
       v.Float("iridescenceThickness", iridescenceThickness);
       v.Float("anisotropy", anisotropy); v.Float("anisotropyRotation", anisotropyRotation);
       v.Float("dispersion", dispersion); v.Float("alphaCutoff", alphaCutoff);
+      v.Bool("textureAlpha", textureAlpha);
+      v.Bool("normalBump", normalBump);
       v.Float("normalStrength", normalStrength);
    }
 private:
@@ -332,6 +343,9 @@ public:
 
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override { return input ? input->MeshRevision() : 0; }
+   // PointZ sources pass through untouched (Render 3D draws them from the GPU).
+   const pop::PopData* GetPop() override { return input ? input->GetPop() : nullptr; }
+   const pop::PopData* GetPopInstances() override { return input ? input->GetPopInstances() : nullptr; }
    Mat4 GetModelMatrix() const override
    {
       return input ? input->GetModelMatrix() : Mat4::Identity();
@@ -393,6 +407,7 @@ private:
 class JoinGeometryNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    static const int kSlots = 4;
 
    // Merge is a plain concatenation; the rest are real CSG. Registered as
@@ -506,6 +521,9 @@ private:
    // the mesh stamp meant moving or scaling an input did nothing at all.
    Mat4 mBuiltMatrices[kSlots];
    int mLastCookFrame = -1;
+private:
+   // Cook-time pin mismatch message (DescribeGeometryMismatch); empty = fine.
+   std::string mCookWarning;
 };
 
 // --- Metaballs ----------------------------------------------------------
@@ -515,6 +533,7 @@ private:
 class MetaBallNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    static constexpr int kMaxBalls = 8;
 
    static INode* Create() { return new MetaBallNode(); }
@@ -612,6 +631,9 @@ private:
    const void* mBuiltCloud = nullptr;
    unsigned long long mBuiltCloudRevision = 0;
    int mLastCookFrame = -1;
+private:
+   // Cook-time pin mismatch message (DescribeGeometryMismatch); empty = fine.
+   std::string mCookWarning;
 };
 
 // --- Mesh to Points -----------------------------------------------------
@@ -622,6 +644,7 @@ private:
 class MeshToPointsNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    static INode* Create() { return new MeshToPointsNode(); }
    // Registered three times under Points/Edges/Faces names sharing one class,
    // the same way the geometry operators are.
@@ -748,4 +771,7 @@ private:
    bool mBuiltWeld = true;
    float mBuiltDissolve = -1.0f;
    int mLastCookFrame = -1;
+private:
+   // Cook-time pin mismatch message (DescribeGeometryMismatch); empty = fine.
+   std::string mCookWarning;
 };

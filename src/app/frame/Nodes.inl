@@ -94,10 +94,16 @@
                                     (isLight ? 0.95f : 0.784f) * (gCanvasBgActive ? gCanvasBgNodeAlpha : 1.0f)));
          // Turbo 0.45: a live validation hint turns the border amber.
          const bool hasLiveIssue = gLiveIssues.count(gn.index) != 0;
+         // Naman's D1 pin contract: a geometry input of the wrong kind (a mesh
+         // where a cloud is expected, ...) turns the border red, message on hover.
+         const auto* cookWarnSrc = dynamic_cast<ICookWarningSource*>(gn.node.get());
+         const bool hasCookWarning = cookWarnSrc != nullptr && !cookWarnSrc->CookWarning().empty();
+         const bool hasBorderIssue = hasLiveIssue || hasCookWarning;
          ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                            hasLiveIssue ? ImColor(0.95f, 0.65f, 0.15f, 0.95f)
-                                         : ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
-         if (hasLiveIssue)
+                            hasCookWarning ? ImColor(0.95f, 0.25f, 0.2f, 0.9f)
+                            : hasLiveIssue ? ImColor(0.95f, 0.65f, 0.15f, 0.95f)
+                                           : ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+         if (hasBorderIssue)
             ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.5f);
 
          ed::BeginNode(gn.NodeId());
@@ -250,6 +256,10 @@
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<WrapNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<Group3DNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<DelaunayMeshNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<CurveOpsNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<PopNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MeshResynthNode*>(gn.node.get()) != nullptr ||
@@ -306,6 +316,14 @@
                snprintf(line, sizeof(line), "%zu tris", wr->TriangleCount());
             else if (auto* sw3 = dynamic_cast<Switcher3DNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "showing input %c", 'A' + sw3->ActiveSlot());
+            else if (auto* grp = dynamic_cast<Group3DNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%d in group", grp->GroupChildCount());
+            else if (auto* dn = dynamic_cast<DelaunayMeshNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu tris", dn->TriangleCount());
+            else if (auto* co = dynamic_cast<CurveOpsNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%zu points", co->PointCount());
+            else if (auto* pn = dynamic_cast<PopNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%d pts, %zu faces", pn->PointCount(), pn->TriangleCount());
             else if (auto* cl = dynamic_cast<ClothNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu tris, %zu links", cl->TriangleCount(), cl->ConstraintCount());
             else if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get()))
@@ -631,6 +649,12 @@
                DrawMergeByDistanceParams(n);
             else if (auto* n = dynamic_cast<Switcher3DNode*>(gn.node.get()))
                DrawSwitcher3DParams(n);
+            else if (auto* n = dynamic_cast<DelaunayMeshNode*>(gn.node.get()))
+               DrawDelaunayParams(n);
+            else if (auto* n = dynamic_cast<CurveOpsNode*>(gn.node.get()))
+               DrawCurveOpsParams(n);
+            else if (auto* n = dynamic_cast<PopNode*>(gn.node.get()))
+               DrawPopParams(n);
             else if (auto* n = dynamic_cast<CameraNode*>(gn.node.get()))
                DrawCameraParams(n);
             else if (auto* n = dynamic_cast<LightNode*>(gn.node.get()))
@@ -884,11 +908,11 @@
          ed::EndNode();
          gCurrentNodeIndex = -1;
          ed::PopStyleColor(2);
-         if (hasLiveIssue)
+         if (hasBorderIssue)
          {
             ed::PopStyleVar();
             if (ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
-               gLiveIssueTip = LiveIssueTooltip(gn.index);
+               gLiveIssueTip = hasCookWarning ? cookWarnSrc->CookWarning() : LiveIssueTooltip(gn.index);
          }
          // Turbo: colour marker - a band across the top and a coloured frame.
          if (gn.colorTag > 0)

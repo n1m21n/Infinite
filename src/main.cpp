@@ -113,6 +113,10 @@
 #include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
 #include "nodes/Switcher3DNode.h"
+#include "nodes/Group3DNode.h"
+#include "nodes/DelaunayNodes.h"
+#include "nodes/CurveOpsNode.h"
+#include "nodes/PopNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/OscNodes.h"
 #include "nodes/PredictiveNotesNode.h"
@@ -247,6 +251,7 @@ namespace
    #include "app/bodies/TurboInstruments.inl" // Looper, MPC, Super Mixer, Analog, Slicer, Molders, Transport Control
    #include "app/bodies/AudioBody.inl" // DrawAudioNodeBody: the audio body dispatcher
    #include "app/bodies/SceneParams.inl" // media, geometry, 3D, material, blend and filter params
+   #include "app/bodies/PopParams.inl" // the PointZ family's generic parameter body
    #include "app/ui/Preview.inl" // previews, comments, groups, mini viewport, viewport panel
    #include "app/ui/Mapping.inl" // colour tags, MIDI mapping and modulation range editors
    #include "app/ui/Help.inl" // node help texts and the help window

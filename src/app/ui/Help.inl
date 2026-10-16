@@ -206,6 +206,10 @@
          { "Render 3D", "Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. An HDRI node patched into the env input replaces the procedural sky gradient for background, reflections and ambient light." },
          { "Model 3D", "Loads a 3D model file - obj, ply, stl, usd or usdz." },
          { "Null 3D", "A pass-through node for geometry: its output is exactly its input mesh, unchanged. Useful as a stable junction point to branch geometry to several destinations." },
+         { "Group 3D", "Carries up to eight geometry inputs through one pin into Render 3D (or into another Group 3D), so a scene is not limited to Render 3D's four geometry pins. Nothing is merged: each input keeps its own material, texture, mapping and transform. It only means something to Render 3D - use Join Geometry to combine meshes into one." },
+         { "Delaunay Mesh", "Point cloud in (a mesh is flagged red and ignored; use Mesh to Points first), triangulated surface out. Use it to turn a scatter into a terrain or low-poly surface. Points are projected onto the chosen plane, joined into Delaunay triangles (no sliver-prone long edges), and lifted back to their real 3D positions, so a scatter with height becomes a terrain. 'max points' thins very large clouds." },
+         { "Voronoi Cells", "Point cloud in (a mesh is flagged red and ignored), one polygon cell per point out, for cracked-glass, cell and fracture looks: every cell is the region closer to its point than to any other. Points on the outer hull have unbounded cells and are skipped. 'inset' pulls each cell toward its point to leave gaps between them." },
+         { "Curve Ops", "Curve in, curve out. Resample spaces points evenly along the length, Simplify drops points that barely change the shape (within 'tolerance'), Smooth relaxes corners while the ends stay put, Offset draws a parallel curve at a signed distance in the XY plane with round outer corners. The result can still drive a Path and shows as a thin tube." },
          { "Switcher 3D", "Cycles between up to four connected geometry inputs every N beats or seconds, forwarding whichever one is active. Can be pinned to one input with 'manual'. Unlike the 2D Switcher, there is no crossfade - it always hard-cuts, since interpolating between two arbitrary meshes' topology isn't generally well-defined." },
 
          // ---------------- Join Geometry boolean modes (also spawnable directly) ----------------
@@ -227,6 +231,7 @@
          { "Smooth", "Iteratively averages each vertex toward its neighbours (a Laplacian smooth) - Iterations and Strength control how much it relaxes. On a low-poly mesh like a Cube there's no extra geometry between the corners to round out, so raise Pre-subdivide first to see rounded edges." },
          { "Mirror", "Mirrors the mesh across a plane perpendicular to a chosen Axis, at a given plane offset. 'keep original' keeps the source geometry too, 'weld seam' merges the two halves where they meet." },
          { "Screw", "Sweeps the input profile around an Axis in a helical path - Steps sets resolution, Turns the number of revolutions, Rise/turn the pitch, Radius offsets the sweep outward." },
+         { "Decimate", "Reduces triangle count while keeping the overall shape (quadric error edge collapse). 'keep' is the fraction of triangles to leave; 'lock border' holds open edges in place. UVs, colours and hard shading survive; very low settings stop when no safe collapse remains." },
          { "Select", "Marks a subset of faces - by index range, position along an axis, normal direction, random chance, or within a radius - for downstream ops (Delete Selected / Transform Selected / Extrude Selected) to act on. Invert flips the selection, 'add to selection' unions with whatever was already selected." },
          { "Delete Selected", "Deletes the faces marked by an upstream Select op - or, with 'keep selected instead', deletes everything else and keeps only the selection." },
          { "Transform Selected", "Moves, rotates and scales only the faces marked by an upstream Select op, optionally sliding them along their own normals instead of a fixed direction." },
@@ -378,6 +383,7 @@
       if (category == "Feedback") return "Reads back a previous frame to build loops - trails, echoes, growth. See Menu > Help > 'Using Feedback'.";
       if (category == "Mask") return "Produces a mask, or isolates part of the image by colour or luminance.";
       if (category == "Resynth") return "Iteratively regenerates the image, each generation drifting from its source.";
+      if (category == "PointZ") return "Point operators: geometry as points with named attributes (P, N, Color, PScale...), processed on the GPU. Any 3D source plugs in; Render 3D draws a PointZ straight from the GPU, Instance PointZ draws a shape at every point. Loops (Particle, Feedback) end in a tagged Null PointZ.";
       if (category == "3D") return "Changes geometry: booleans, extrude, subdivide, scatter and instance points, transform. Feed it from a 3D source, end in Render 3D.";
       if (category == "3DSource") return "Makes geometry: primitives, models, 3D text, metaballs, ocean, curves, particles, points from images or depth.";
       if (category == "3DScene") return "The scene around the geometry: camera, lights, HDRI, materials and UV mapping, and Render 3D, which turns it all into an image.";
@@ -410,6 +416,9 @@
          return shape;
       if (const char* geo3d = Geometry3DHelpText(gn.typeName))
          return geo3d;
+      // PointZ family: each operator carries its own help in the table.
+      if (const pop::PopDef* def = pop::FindDef(gn.typeName))
+         return def->help.c_str();
       return CategoryHelpText(gn.category);
    }
 

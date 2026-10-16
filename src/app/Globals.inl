@@ -1056,6 +1056,10 @@
    float gZoomSensitivity = 0.5f;
    bool gHoveringItem = false;   // last frame: cursor over a node/pin/link
    bool gPanWithLeft = false;    // current left-drag is a canvas pan, not a select
+   // A Render 3D viewport was hovered this frame (set while drawing nodes) /
+   // owns the current right or middle drag, so the canvas must not pan with it.
+   bool gViewport3DHoveredNow = false;
+   bool gViewport3DOwnsDrag = false;
    ImVec2 gDragTestNodeScreen(0.0f, 0.0f);
    ImVec2 gDragTestNodePos(0.0f, 0.0f);
    ImVec2 gTestMouse(0.0f, 0.0f);

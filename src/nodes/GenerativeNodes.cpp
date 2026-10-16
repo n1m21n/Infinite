@@ -180,11 +180,14 @@ void MeshResynthNode::CookIfNeeded(int frameId)
          mRevision = NextMeshRevision();
       }
       mBuiltInput = nullptr;
+      mCookWarning.clear();
       return;
    }
 
    if (auto* node = dynamic_cast<INode*>(input))
       node->CookIfNeeded(frameId);
+
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    const unsigned long long inputRevision = input->MeshRevision();
    // A changed source restarts the evolution rather than mutating the old

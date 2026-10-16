@@ -54,6 +54,32 @@ public:
             return { { "fxLimOn", 1.0f } };
          return { { "fxLimOn", 1.0f }, { "fxLimCeilingDb", -24.0f } };
       }
+      // Turbo 0.58: every other master FX stage defaults to off, so its
+      // settings are inaudible until the stage's own switch is in. EQ
+      // frequencies and Q also need their band boosted, the compressor a
+      // threshold the probe tone crosses, the width switch a width != 1.
+      if (paramName.rfind("fxEq", 0) == 0)
+      {
+         if (paramName == "fxEqOn")
+            return { { "fxEqLowDb", 12.0f }, { "fxEqHighDb", 12.0f } };
+         std::vector<SweepParamPrereq> p = { { "fxEqOn", 1.0f } };
+         if (paramName == "fxEqLowHz") p.push_back({ "fxEqLowDb", 12.0f });
+         if (paramName == "fxEqMidHz" || paramName == "fxEqMidQ") p.push_back({ "fxEqMidDb", 12.0f });
+         if (paramName == "fxEqHighHz") p.push_back({ "fxEqHighDb", 12.0f });
+         return p;
+      }
+      if (paramName.rfind("fxComp", 0) == 0 && paramName != "fxCompOn")
+      {
+         if (paramName == "fxCompThreshDb")
+            return { { "fxCompOn", 1.0f } };
+         return { { "fxCompOn", 1.0f }, { "fxCompThreshDb", -40.0f } };
+      }
+      if (paramName == "fxWidthOn")
+         return { { "fxWidth", 0.0f } };
+      if (paramName == "fxWidth")
+         return { { "fxWidthOn", 1.0f } };
+      if (paramName.rfind("fxSat", 0) == 0 && paramName != "fxSatOn")
+         return { { "fxSatOn", 1.0f } };
       return {};
    }
 

@@ -45,6 +45,11 @@ public:
 
    const std::vector<Entry>& Index() const { return mIndex; }
 
+   // Self-test only (INFINITE_PLUGINDRAGTEST): replace the index without a
+   // scan, so the drag test does not wait on a full walk of the machine's
+   // VST3 folders. Never called by a normal run.
+   void DebugSetIndex(std::vector<Entry> entries) { mIndex = std::move(entries); }
+
    // Bundles the last scan could not describe, by path: each one crashed or
    // hung its child process rather than returning a description. Surfaced in
    // the Plugins panel because the alternative - silently showing a shorter

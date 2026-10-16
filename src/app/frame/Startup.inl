@@ -626,7 +626,23 @@
          SpawnNode("Plugin", "AudioEffects", 900.0f, 60.0f); // 0
          gNodePanelOpen = true;
          gSearchPanelMode = 3;
-         gPluginScanner.StartScan();
+         // The check is that the drag resolves onto the node under the cursor
+         // (the node's saved identity), not that a plugin instantiates, so one
+         // fake row is enough. A real scan with no cache (this test uses a
+         // throwaway settings dir) can outlast the 600-frame budget on a
+         // machine with many VST3s; INFINITE_PLUGINDRAG_REALSCAN=1 keeps it.
+         if (getenv("INFINITE_PLUGINDRAG_REALSCAN") != nullptr)
+            gPluginScanner.StartScan();
+         else
+         {
+            Platform::PluginDesc fake;
+            fake.format = "vst3";
+            fake.name = "Drag Test Plugin";
+            fake.manufacturer = "Infinite self-test";
+            fake.identifier = "vst3:selftest-plugindrag";
+            fake.path = "C:/tmp/infinite_plugindrag/missing.vst3"; // never exists: load fails cleanly
+            gPluginScanner.DebugSetIndex({ fake });
+         }
       }
       else if (getenv("INFINITE_MEDIADRAGTEST") != nullptr)
       {
@@ -1947,7 +1963,10 @@
    }
    // Turbo 0.46: with no file to open (and nothing to recover), start on the
    // bundled example, playing. Settings > "Open the example at startup".
-   if (gStartWithExample && gNodes.empty() && gPatchPath.empty() && !gRecoveryAvailable)
+   // Never in a self-test run (test-windows.bat sets INFINITE_EXITAFTER): the
+   // example would start audio, move the view and add nodes under the fixture.
+   const bool selfTestRun = getenv("INFINITE_EXITAFTER") != nullptr || getenv("IMAGERESYNTH_SCREENSHOT") != nullptr;
+   if (gStartWithExample && !selfTestRun && gNodes.empty() && gPatchPath.empty() && !gRecoveryAvailable)
       LoadExamplePatch(true);
    // Any launch-time Finder open is drained by the in-frame loop below, right
    // after the first glfwPollEvents() call.

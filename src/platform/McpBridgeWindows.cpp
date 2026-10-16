@@ -429,7 +429,9 @@ namespace
       "patch open in the running app. Typical flow: describe (node types) -> describe {type} (inputs, outputs, "
       "settings) -> build with create_node + connect (or batch, with $N references), or write patch text "
       "(patch_format) and validate_patch_text before load_patch_text -> explain to check the result. An image "
-      "chain needs an Output node at the end to be seen. Params that modulate / set_expression take are the "
+      "chain needs an Output node at the end to be seen; sound needs an Audio Out, and two or more sound sources "
+      "go through a Super Mixer (one channel each) before it. Render 3D takes four geometry inputs; Group 3D "
+      "carries more. Params that modulate / set_expression take are the "
       "drawn control names explain lists. render_frame / screenshot_node show the picture. Turbo-only tools: "
       "clip_matrix, pads (MPC / VMPC), looper, chord_progression, drum_pattern (Drum Sequencer grooves), scenes (radio scene launcher, one button many params), perf_* (Performance Mode). Read authoring_guide once before "
       "building. Everything is undoable (undo).";

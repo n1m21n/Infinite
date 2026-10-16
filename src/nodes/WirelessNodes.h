@@ -301,6 +301,8 @@ public:
    MappingTransform GetMappingTransform() const override;
    IGeometrySource* PassthroughSource() const override { return Source(); }
    Mat4 GetInstanceGroupMatrix() const override;
+   const pop::PopData* GetPop() override { IGeometrySource* s = Source(); return s ? s->GetPop() : nullptr; }
+   const pop::PopData* GetPopInstances() override { IGeometrySource* s = Source(); return s ? s->GetPopInstances() : nullptr; }
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
    float PointBaseSize() const override;

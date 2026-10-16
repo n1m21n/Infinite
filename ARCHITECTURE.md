@@ -119,6 +119,39 @@ What each node type does: math, state, per-node parameter UI.
 | ProjectionNode | Projection mapping, 4-corner homography warp, mesh warping, and test patterns |
 | OutputNode | Terminal node — identity-pass FBO, drives recording |
 
+### PointZ family (`src/pop`, Turbo 0.58)
+
+Point operators after TouchDesigner's POPs: geometry as named per-point attributes on the GPU.
+Portable OpenGL 3.2 core (transform feedback, texture buffers), no compute shaders, so the same code
+runs on macOS.
+
+| File | Role |
+|---|---|
+| `pop/PopData.h/.cpp` | `PopBuffer` (one attribute, lazily mirrored CPU <-> GPU, immutable), `PopTopology` (triangles, line strips, point prims, shared), `PopData` (attributes + topology + revision), conversions from / to `Mesh`, `Particle` clouds and `Polyline` |
+| `pop/PopGpu.h/.cpp`, `pop/PopKernelSource.cpp` | the kernel engine: a `KernelSpec` (GLSL body, reads, writes, lookups) becomes a vertex shader run with transform feedback over every point; GPU bounds by MAX blending into one pixel; per-instance matrices for Render 3D. The GLSL generation has no GL calls, so it is validated offline |
+| `pop/PopOps.h/.cpp` | the operator table: `PopDef` (name, pins, declarative `ParamSpec` list, cook function), `CookCtx`, `KernelOp` |
+| `pop/PopOpsGen.cpp`, `PopOpsA.cpp`, `PopOpsA2.cpp` | tier A: generators and per-point kernels |
+| `pop/PopOpsB*.cpp`, `pop/PopCpu.h/.cpp` | tier B: topology, lines, analysis, memory (Particle, Feedback, Trail, Cache), files, Instance PointZ, on CPU working copies (`Arrays`, `PointBuilder`) |
+| `pop/PopOpsPlatform.cpp` | Text PointZ (needs the platform font outlines) |
+| `nodes/PopNode.h/.cpp` | the one INode class that runs any `PopDef`; converts non-PointZ inputs, caches by input revisions + params, keeps operator state, tag registry for loop targets |
+| `app/bodies/PopParams.inl` | the generic body drawn from the param table |
+
+Adding a PointZ is one table entry: no app dispatch code changes (pins come from `InputPinCount` /
+`ImageInputSlot` / `GeometryInputSlot`, the body from the table, help from `PopDef::help`).
+Render 3D draws `IGeometrySource::GetPop()` straight from the buffers and instances
+`GetPopInstances()` with GPU-built matrices; pure pass-through wrappers forward both. Reference of
+every operator: `docs/POINTZ-REFERENCE.md` (generated from the table).
+
+Per-frame rules (0.58): nothing on the draw path waits for the GPU. Render 3D reads PointZ bounds
+with `PopData::BoundsAsync` (a fenced pixel-pack read, about a frame late) instead of the blocking
+`GpuBounds`; kernel outputs take their stores from the size-keyed pool in `PopData.cpp`
+(`AcquireGpuBuffer` / `ReleaseGpuBuffer`, only GPU-side writes reuse a store); operators that keep
+history on the GPU (`GpuShiftIn`, Trail PointZ) and Copy PointZ keep their topology in operator state
+while the counts hold, so index buffers upload once. A CPU operator after a GPU one still downloads
+its input (one stall), so the fast paths stay on the GPU end to end. Instance PointZ carries a
+`PopData::InstanceLook` (scale XYZ, rotate / translate offsets, per-instance texture mode and the
+texture ids of its four image pins) that `InstanceMatrices` and Render 3D's shader read.
+
 ### Audio / note node system
 
 A second cable type and DAG. Most audio *effects* share one C++ class rather than

@@ -9,6 +9,7 @@
 // feeding several consumers only renders once.
 class IModulator;
 class IGeometrySource;
+class ImageCable;
 class AudioNode;
 class AudioCable;
 class NoteCable;
@@ -195,6 +196,11 @@ public:
    // wire slot N just does `*node->GeometryInputSlot(N) = source` instead of
    // knowing which of `input`/`pointSource`/`inputs[N]`/... to reach for.
    virtual IGeometrySource** GeometryInputSlot(int /*slot*/) { return nullptr; }
+   // Generic pin hooks (Turbo, PointZ family): an image input on `slot`, and the
+   // total number of input pins. Nodes that answer these need no entry in the
+   // app's per-type pin ladders (Graph.inl InputCountFor / CableFor).
+   virtual ImageCable* ImageInputSlot(int /*slot*/) { return nullptr; }
+   virtual int InputPinCount() const { return 0; }
 
    // Same idea as GeometryInputSlot, but for modulator input pins (see MathNode).
    virtual IModulator** ModulatorInputSlot(int /*slot*/) { return nullptr; }

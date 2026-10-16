@@ -549,6 +549,74 @@
    }
 
    // Square, letterboxed preview so non-square sources still read 1:1.
+   // Render 3D viewport mouse, TouchDesigner style: left drag orbits, middle
+   // drag (or Shift + left) pans the target in the view plane, right drag
+   // dollies, the wheel zooms. Called right after the viewport's
+   // InvisibleButton, which must accept all three buttons. A patched Camera
+   // node owns the view, so its values move instead of the built-in ones.
+   void Render3DViewportControls(Render3DNode* render, float viewPx)
+   {
+      const bool hasCam = render->camera != nullptr;
+      float* azimuth = hasCam ? &render->camera->azimuth : &render->camAzimuth;
+      float* elevation = hasCam ? &render->camera->elevation : &render->camElevation;
+      float* distance = hasCam ? &render->camera->distance : &render->camDistance;
+      float* tx = hasCam ? &render->camera->targetX : &render->targetX;
+      float* ty = hasCam ? &render->camera->targetY : &render->targetY;
+      float* tz = hasCam ? &render->camera->targetZ : &render->targetZ;
+      const bool ortho = (hasCam ? render->camera->projection : render->projection) == 1;
+      const float fov = hasCam ? render->camera->fov : render->fov;
+      const float orthoH = hasCam ? render->camera->orthoHeight : render->orthoHeight;
+
+      ImGuiIO& io = ImGui::GetIO();
+      if (ImGui::IsItemHovered())
+         gViewport3DHoveredNow = true;
+      if (!ImGui::IsItemActive())
+      {
+         if (ImGui::IsItemHovered() && io.MouseWheel != 0.0f)
+         {
+            *distance = std::max(0.2f, std::min(*distance * (1.0f - io.MouseWheel * 0.15f), 60.0f));
+            io.MouseWheel = 0.0f; // consumed, or the canvas zooms too
+         }
+         return;
+      }
+      const ImVec2 d = io.MouseDelta;
+      if (d.x == 0.0f && d.y == 0.0f)
+         return;
+      const bool pan = ImGui::IsMouseDown(ImGuiMouseButton_Middle) ||
+                       (ImGui::IsMouseDown(ImGuiMouseButton_Left) && io.KeyShift);
+      if (pan)
+      {
+         const float az = *azimuth * (float)M_PI / 180.0f, el = *elevation * (float)M_PI / 180.0f;
+         // Eye direction from the target (see Render3DNode's camera setup).
+         const float dir[3] = { std::cos(el) * std::cos(az), std::sin(el), std::cos(el) * std::sin(az) };
+         // right = normalize(cross(forward, worldUp)), forward = -dir.
+         float right[3] = { dir[2], 0.0f, -dir[0] };
+         const float rl = std::sqrt(right[0] * right[0] + right[2] * right[2]);
+         if (rl > 1e-6f) { right[0] /= rl; right[2] /= rl; }
+         else { right[0] = 1.0f; right[2] = 0.0f; }
+         // up = cross(right, forward)
+         const float up[3] = { -(right[1] * dir[2] - right[2] * dir[1]), -(right[2] * dir[0] - right[0] * dir[2]),
+                               -(right[0] * dir[1] - right[1] * dir[0]) };
+         const float worldPerPx = (ortho ? orthoH : 2.0f * *distance * std::tan(fov * 0.5f * (float)M_PI / 180.0f)) /
+                                  std::max(1.0f, viewPx);
+         // The picture follows the mouse: the target moves the other way.
+         *tx += (-right[0] * d.x + up[0] * d.y) * worldPerPx;
+         *ty += (-right[1] * d.x + up[1] * d.y) * worldPerPx;
+         *tz += (-right[2] * d.x + up[2] * d.y) * worldPerPx;
+      }
+      else if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+      {
+         *distance = std::max(0.2f, std::min(*distance * (1.0f + d.y * 0.01f), 60.0f));
+      }
+      else if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+      {
+         // Degrees per pixel (0.6875 matches the old 0.012 rad/px feel).
+         *azimuth -= d.x * 0.6875f;
+         // Clamped short of the poles: overhead would make the view roll.
+         *elevation = std::max(-85.9437f, std::min(*elevation + d.y * 0.6875f, 85.9437f));
+      }
+   }
+
    void DrawPreview(INode* node)
    {
       unsigned int tex = node->GetOutputTexture();
@@ -600,39 +668,12 @@
       }
 
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##viewport", ImVec2(size, size));
+      ImGui::InvisibleButton("##viewport", ImVec2(size, size),
+                             ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
+      Render3DViewportControls(render, size);
 
-      // A patched Camera node owns the view, so drive that instead of the
-      // built-in values; otherwise the drag would appear to do nothing. This
-      // is this Render3DNode's own camera, entirely separate from any node's
-      // mini-viewport/panel camera (SharedViewportCamera.h/gNodeCameras): the
-      // final output framing is a deliberate setup, not something casual
-      // node-viewport orbiting should ever move.
       float* azimuth = render->camera ? &render->camera->azimuth : &render->camAzimuth;
       float* elevation = render->camera ? &render->camera->elevation : &render->camElevation;
-      float* distance = render->camera ? &render->camera->distance : &render->camDistance;
-
-      if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-      {
-         const ImVec2 drag = ImGui::GetIO().MouseDelta;
-         // azimuth/elevation are stored in degrees; 0.6875 deg/px matches the
-         // drag feel of the old 0.012 rad/px (0.012 * 180/pi).
-         *azimuth -= drag.x * 0.6875f;
-         // Clamped just short of the poles: straight overhead makes the view
-         // matrix's up vector parallel to the view direction and the image rolls.
-         *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * 0.6875f, 85.9437f));
-      }
-
-      if (ImGui::IsItemHovered())
-      {
-         ImGuiIO& vio = ImGui::GetIO();
-         if (vio.MouseWheel != 0.0f)
-         {
-            *distance = std::max(0.2f, std::min(*distance * (1.0f - vio.MouseWheel * 0.15f), 60.0f));
-            // Consumed, or the canvas zooms at the same time as the camera.
-            vio.MouseWheel = 0.0f;
-         }
-      }
 
       // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7). Unlike drag-orbit above,
       // a hotkey view snap on this render's own camera is treated as a
@@ -1024,27 +1065,12 @@
             ImGui::SetCursorScreenPos(origin);
             char btnId[32];
             snprintf(btnId, sizeof(btnId), "##render3dviewportcanvas%d", gn.index);
-            ImGui::InvisibleButton(btnId, imageSize);
+            ImGui::InvisibleButton(btnId, imageSize,
+                                   ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
+            Render3DViewportControls(render, std::min(imageSize.x, imageSize.y));
 
             float* azimuth = render->camera ? &render->camera->azimuth : &render->camAzimuth;
             float* elevation = render->camera ? &render->camera->elevation : &render->camElevation;
-            float* distance = render->camera ? &render->camera->distance : &render->camDistance;
-
-            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-            {
-               const ImVec2 drag = ImGui::GetIO().MouseDelta;
-               *azimuth -= drag.x * 0.6875f;
-               *elevation = std::max(-85.9437f, std::min(*elevation + drag.y * 0.6875f, 85.9437f));
-            }
-            if (ImGui::IsItemHovered())
-            {
-               ImGuiIO& vio = ImGui::GetIO();
-               if (vio.MouseWheel != 0.0f)
-               {
-                  *distance = std::max(0.2f, std::min(*distance * (1.0f - vio.MouseWheel * 0.15f), 60.0f));
-                  vio.MouseWheel = 0.0f;
-               }
-            }
             // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7) - undoable, same as
             // this render's "orbit"/"elevation" sliders (main.cpp ~23053).
             ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });

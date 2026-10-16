@@ -56,9 +56,23 @@ current patch as text.
   refuses a wrong pairing.
 - **To be seen, an image chain must end in an Output** (or Projection / Spout Out). To be heard,
   audio must reach an **Audio Out** (Clip Matrix, MPC, Looper and synths need one too).
+- **Mixing: use the Super Mixer.** As soon as a patch has two or more sound sources (synths, drums,
+  samples, a Looper, a Plugin, video soundtracks), wire each one into its own **Super Mixer**
+  channel (input slots `1`..`16`, numbers 0..15) and only the Super Mixer into the Audio Out. Name
+  nothing else "the mix": it gives every source a fader, pan, mute, solo and EQ the user can play
+  live, a master meter and the master limiter. Set the levels with `gain<n>` (dB, 0 = unity; start
+  sources around -6) and leave `fxLimOn` true for anything loud. Effects that belong to one source
+  (a Delay on the lead) go before its channel; a shared Reverb goes after the Super Mixer or on its
+  own channel. The plain **Mixer** (8 inputs, levels only) is only for a quick sum inside a chain
+  (two oscillators into one filter); **Spatial Mixer** is for binaural / 3D placement.
 - **3D** is built from geometry nodes (Geometry, Model 3D, Text 3D, Particle System ...) wired into
   a **Render 3D** (geometry slots, then camera, lights, environment), whose image goes on to effects
-  and an Output.
+  and an Output. Render 3D has four geometry slots: for more objects put them into a **Group 3D**
+  (8 inputs, nestable, each object keeps its own material and transform; up to 64 objects per
+  Render 3D). **Join Geometry** instead merges meshes into one. Render 3D `renderPass` gives 0 colour,
+  1 linear depth, 2 raw Z, 3 normals, 4 position, for depth-of-field, fog or relight effects in 2D.
+  A red node border means a geometry input of the wrong kind (a mesh where a point cloud is expected);
+  `explain` shows the message under warnings.
 - **Feedback** loops need a Feedback (or Trails) node; anything else in a loop is a warning.
 - **Slots and outputs** can be given by number or by label (`"dstSlot": "B"`, `"srcOutput": "audio"`).
 
@@ -85,9 +99,11 @@ current patch as text.
 | Image sources | Shape, Noise, Ramp, Texture, Formula (GLSL, Shadertoy code as is), Image Source, Video, Video In (camera), Text, Draw, Slideshow, Spout In |
 | Effects | the filter family (gaussianblur and many more: describe lists them), Blend, Layer Stack, Layout, Fit, Color Ramp, Curves, Feedback, Trails, Reaction Diffusion |
 | Output | Output (a window / projector), Projection (warp + edge blend), Spout Out |
-| 3D | Geometry, Model 3D, Text 3D, Material, Instance on Points, Particle System, Camera, Light, HDRI, Render 3D |
+| PointZ (GPU points) | Grid / Sphere / Box / Point Generator / Line / Text PointZ, Noise / Transform / Twist / Math / Field / Random / GLSL PointZ, Instance PointZ, Particle PointZ + Null PointZ, Copy / Merge / Delete / Extrude / Sprinkle PointZ, Image to PointZ (`describe` lists all 85) |
+| 3D | Geometry, Model 3D, Text 3D, Material, Mapping, Displacement, the Geometry Op family (Transform, Array, Subdivide, Extrude, Twist, Decimate ...), Join Geometry, Group 3D, Instance on Points, Distribute Points on Faces / in Grid, Delaunay Mesh, Voronoi Cells, Curve, Curve Ops, Particle System, Cloth, Metaballs, Camera, Light, HDRI, Render 3D |
 | Modulators | LFO, Envelope, Random, Drift, Pattern, Math, Smoothing, Range to Range, Audio Analyze (audio to CV), Image Analyze, MIDI CC, Macro Knob / Slider / XY |
-| Sound | Oscillator, Analog, Wavetable, Sampler, MPC, Granular, Slicer, Audio File, Audio In, Plugin (VST3), Mixer, Super Mixer, Spatial Mixer (binaural), Looper, Audio Out |
+| Sound | Oscillator, Analog, Wavetable, Sampler, MPC, Granular, Slicer, Audio File, Audio In, Plugin (VST3), Looper, Audio Out |
+| Mixing | **Super Mixer** (16 channels, the default whenever 2+ sources play), Mixer (8-input sum inside a chain), Spatial Mixer (binaural) |
 | Notes | Keyboard (virtual keyboard: mouse or computer keys, typingAlways plays without hover), Note Sequencer, Drum Sequencer, Arpeggiator, Pattern Player, Note Looper, Chord Progression, MIDI File, Quantizer, MIDI Notes, MIDI Out |
 | Performance | Clip Matrix (+ Clip Matrix Out), Transport Control, Timeline |
 
@@ -131,10 +147,18 @@ sequence change takes over while playing); record / play / overdub from the node
 `resolution` (0 Auto, 1 1080p, 2 720p, 3 480p) and `frameRate` (0 Auto, 1 60, 2 30, 3 25).
 
 **A 3D scene**: Geometry (or Text 3D) -> Material -> Render 3D (slot 0), Camera into its camera
-slot, a Light into a light slot; Render 3D -> Output.
+slot, a Light into a light slot; Render 3D -> Output. More than four objects: Group 3D into one slot.
 
-**A synth line**: Note Sequencer (or Keyboard) -> Oscillator / Analog (note input) -> Audio Out.
-`transport {"play": true, "audio": true}` starts the clock and the audio engine.
+**A terrain from points**: Distribute Points in Grid (or a Particle System) -> Delaunay Mesh ->
+Displacement / Material -> Render 3D. Voronoi Cells on the same points gives cracked-glass cells.
+
+**A synth line**: Note Sequencer (or Keyboard) -> Oscillator / Analog (note input) -> Super Mixer
+channel 1 -> Audio Out. `transport {"play": true, "audio": true}` starts the clock and the audio engine.
+
+**A band / a song**: every source on its own Super Mixer channel (drums 1, bass 2, chords 3, lead 4,
+loops and samples next), per-source effects before the channel, the Super Mixer into the Audio Out,
+`fxLimOn` true. Put the channel faders (`gain<n>`) and mutes on the Performance panel so the user can
+mix live.
 
 ## Rules that bite
 
@@ -343,7 +367,7 @@ Performance panel's MIDI learn (right-click a control).
 
 **The bundled example** `superSynthMCP` (FILE / Settings > Startup) is a good reference: two
 Analog synths fed by Note Sequencers through Note Switchers, Delay / Mixer / Reverb to an Audio
-Out, an Audio Analyze driving the visuals (Noise, kaleidoscope, Blend, glitch, bloom), and a
+Out (it predates the Super Mixer; new patches mix in a Super Mixer), an Audio Analyze driving the visuals (Noise, kaleidoscope, Blend, glitch, bloom), and a
 Performance page with chords, delay, filters, autoplay and reverb. `explain` it to learn a working
 layout.
 )SKILL"
@@ -437,5 +461,56 @@ frac -> fract, mul(a,b) -> a*b with care for order, saturate(x) -> clamp(x,0.,1.
 **Licences**: Shadertoy code is CC BY-NC-SA 3.0 unless the author says otherwise, and some
 authors forbid any reuse. Check the header. Never put third-party shaders into the Infinite-Turbo
 repository or a release; keep them in the user's own patches, and keep the author's credit line.
+)SKILL"
+R"SKILL(
+## PointZ nodes: GPU point operators (Turbo 0.58)
+
+The `PointZ` category is Infinite-Turbo's take on TouchDesigner's POP family: geometry as points with
+named attributes, processed on the GPU. Names end in ` PointZ` (`Noise PointZ`, `Transform PointZ`,
+`Particle PointZ`...); `describe` lists them all and every setting key. `docs/POINTZ-REFERENCE.md` in the
+repository has the full table.
+
+- **Attributes**: P (position), N (normal), Color (rgba), Tex (uv), PScale (point / instance size),
+  Rotate (degrees), Active (0 hides an instance), Part* (particles: PartVel, PartAge, PartLifeSpan,
+  PartForce, PartMass, PartId), plus any name an operator writes (Group, Weight, Phase, ArcU...).
+  Most operators take an `attrib` setting naming the attribute they work on, and a `mask` naming a
+  0..1 attribute that limits them per point (from Field PointZ or Group PointZ).
+- **Mixing with the rest of 3D**: any 3D source plugs into a PointZ input (Geometry, Model 3D, Particle
+  System... are converted, with their placement). A PointZ plugs into Render 3D directly (or through
+  Material / Mapping / Null 3D / Group 3D), drawn straight from the GPU: faces as surfaces, lines as
+  lines, bare points as sprites. Every other 3D node can read a PointZ too.
+- **Instancing (the Geometry COMP idea)**: `Instance PointZ`, points on input 0, the shape on input 1,
+  into Render 3D. One draw call for every point; each instance reads P (translate), N (aim, setting
+  `align`), PScale (uniform size), Scale (vec3, size per axis), Rotate (degrees), Color and Active; the
+  `*Attr` settings rename any of them, and `scaleXYZ` / `rotOffset` / `offset` add to all instances.
+  Per-instance textures: up to four images on the `texture 0..3` pins with `texMode` 1 (pick image by
+  index), or `texMode` 2 (atlas grid, `atlasCols` x `atlasRows` cells of texture 0, or of the Material's
+  texture when no pin is connected); the index comes from `texFrom` (0 the TexIndex attribute, 1 the
+  instance number, 2 random). This is the fast way to draw many copies: prefer it to Copy PointZ, which
+  builds real geometry on the CPU. Example: `Grid PointZ` (kind 2 points) -> `Noise PointZ` (attrib
+  PScale, mode 1 set) -> `Instance PointZ` with `Box PointZ` as the shape -> Material -> Render 3D.
+- **Noise PointZ**: types 0 gradient, 1 fractal, 2 curl, 3 ridged, 4 turbulence, 5 cells, 6 value,
+  7 random; `use4d` (on by default) moves time and `t4d` through a fourth dimension so the noise
+  evolves in place; `oct` / `spread` / `rough` shape the harmonics, `expo` sharpens, `bias` offsets.
+- **Loops**: `Particle PointZ` and `Feedback PointZ` read last frame's result from a `Null PointZ` whose `tag`
+  matches their `target`. Particle chain: source points -> Particle PointZ (target "loop") -> Force
+  Radial PointZ / Noise PointZ on PartForce -> Null PointZ (tag "loop") -> Render 3D. Cache Select / Cache
+  Blend read a Cache PointZ by its `tag`.
+- **Images in and out**: `Image to PointZ` (an image as coloured points / a relief), `Lookup Texture PointZ`
+  (colour or displace points from an image), `Signal to PointZ` (a row of an image as a line: feed it an
+  Audio Texture for a live waveform). Render 3D's `renderPass` gives depth / normals / position for
+  2D effects.
+- **Your own GLSL**: `GLSL PointZ` (set `outputs` to the attributes you change, write the body in `code`:
+  every attribute is a variable of its name, plus id, uCount, uTime, uBeat, uA..uD, gnoise / fbm /
+  curl / hash3i / rotX / eulerDeg helpers), `GLSL Create PointZ` (points from nothing), `GLSL Copy PointZ`
+  (copyId per copy), `GLSL Advanced PointZ` (fetch_<name>(i) reads input B). After setting code,
+  `explain` the node: a compile error shows as its warning.
+- **Files**: Point File In (PLY, xyz, csv), File In (OBJ, PLY with faces), File Out (PLY, OBJ, CSV;
+  setting `write` true writes once), Table to PointZ (a typed table).
+- Cost: kernels (Noise, Transform, Math, Field...), Instance PointZ and Trail PointZ (matched by index)
+  stay on the GPU; topology operators (Merge, Copy, Delete, Extrude, Subdivide, the Line PointZ nodes,
+  Particle) work on a CPU copy, fine for tens or hundreds of thousands of points, and a CPU operator after
+  a GPU one reads the data back. The node shows points, faces, lines and its cook time.
+- Render 3D viewport: left drag orbits, middle drag (or Shift + left) pans, right drag dollies, wheel zooms.
 )SKILL";
 }

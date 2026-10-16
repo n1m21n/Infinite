@@ -3,7 +3,7 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 title Infinite-Turbo - testes automaticos
 
-rem Uso: test-windows.bat [-SkipBuild] [-Quick] [-Only A,B] [-Config Debug] [-ShotOnly]
+rem Uso: test-windows.bat [-SkipBuild] [-Quick] [-Only A,B] [-Config Debug] [-ShotOnly] [-Exe outro.exe]
 rem Resultados: build\test-results\summary.txt (+ um .log por teste e screenshot.png)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0.claude\skills\run-turbo-tests\driver.ps1" %*
 set "RESULT=%ERRORLEVEL%"

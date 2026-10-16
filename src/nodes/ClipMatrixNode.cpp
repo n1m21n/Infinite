@@ -1,6 +1,7 @@
 #include "ClipMatrixNode.h"
 
 #include "platform/OpenGLHeaders.h"
+#include <GLFW/glfw3.h>
 
 #include <algorithm>
 #include <atomic>
@@ -1278,6 +1279,10 @@ void ClipMatrixNode::CookIfNeeded(int frameId)
          Release(r, c);
    }
 
+   // Headless runs (AUDIOPARAMSWEEPTEST, DSPTEST) cook with no window and no
+   // GL context: every GL call in the video half would jump through a null
+   // GLEW pointer. The audio half above already ran; skip the pictures.
+   const bool hasGl = glfwGetCurrentContext() != nullptr;
    for (int r = 0; r < kMaxRows; r++)
    {
       mPlaying[r] = mAudio->PubPlaying(r);
@@ -1287,12 +1292,15 @@ void ClipMatrixNode::CookIfNeeded(int frameId)
       const int col = mPlaying[r];
       const double dur = col >= 0 ? mCells[r][col].duration : 0.0;
       mProgress[r] = dur > 0.0 ? (float)std::clamp(mAudio->PubPos(r) / dur, 0.0, 1.0) : 0.0f;
-      if (r < rows)
+      if (!hasGl)
+         mRowShowTex[r] = 0;
+      else if (r < rows)
          UpdateRowVideo(r, Transport::Instance().Beats());
       else
          mRowShowTex[r] = 0;
    }
-   Compose();
+   if (hasGl)
+      Compose();
 }
 
 unsigned int ClipMatrixNode::GetOutputTexture()

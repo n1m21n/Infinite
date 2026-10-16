@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.57.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.58.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -66,6 +66,16 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Pattern Player** | plays note patterns from a bank: 66 built in, 118 bundled .mid loops in 8 packs (classical themes and figures, folk, basslines, Latin and Brazil, jazz and blues, electronic), your own .mid folder, open .mid, Note Looper saves; runs on the global key and scale with no input (chord on a chosen degree) or arpeggiates held notes; play / stop button, trim, fit to scale, latch, bar sync, speed, gate, swing |
 | **Note Looper** | MPC-style note recorder: display, big REC / OVERDUB / PLAY pads, 8 sequences x 8 layers, sequence switch on the next bar / end of loop / now, trim, count-in, quantize with strength and swing at playback, undo by layer, import .mid, save to the Pattern Player bank |
 | **Note Switcher** | up to 8 note inputs, quantized manual switching, mappable slot buttons |
+
+### 3D and PointZ nodes
+
+| Feature | What it does |
+|---|---|
+| **PointZ nodes** | 85 GPU point operators after TouchDesigner's POP family: generators (Box, Sphere, Grid, Torus, Tube, Circle, Line, Point Generator, Pattern, Text), attribute math, noise, fields, forces, lookups, groups, GLSL (your own code per point), topology (Merge, Copy, Delete, Extrude, Subdivide, Sprinkle, Revolve, Curve, Facet, Normal, Sort), lines (Resample, Divide, Break, Metrics, Smooth, Thick), Particle and Feedback loops, Trail, Cache, file in / out (PLY, OBJ, CSV). Reference: [docs/POINTZ-REFERENCE.md](docs/POINTZ-REFERENCE.md) |
+| **Instance PointZ** | draws a shape at every point in one GPU draw call (P, N aim, PScale, Rotate, Color, Active per instance) |
+| **Group 3D** | up to 8 objects through one pin, nestable, 64 per Render 3D |
+| **Render passes** | Render 3D outputs colour, linear depth, raw Z, normals or position |
+| **From upstream** | Delaunay Mesh, Voronoi Cells, Curve Ops, Decimate, Material bump (height map) and texture alpha, red-border warning on a 3D pin fed the wrong kind |
 
 ### Video and output
 

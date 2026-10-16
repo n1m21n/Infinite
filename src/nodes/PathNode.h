@@ -16,9 +16,10 @@
 // Outputs are normalised 0..1 like every other modulator, and each destination
 // maps that onto its own range. Position is therefore emitted as 0..1 across
 // the path's bounding extent, not in scene units.
-class PathNode : public INode, public IModulator
+class PathNode : public INode, public IModulator, public ICookWarningSource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    enum Shape
    {
       kCircle = 0, kLine, kFigureEight, kHelix, kSpiral, kLissajous, kShapeCount
@@ -133,4 +134,7 @@ private:
 
    AxisOutput mY, mZ, mT;
    bool mOutputsBound = false;
+private:
+   // Cook-time pin mismatch message (DescribeGeometryMismatch); empty = fine.
+   std::string mCookWarning;
 };

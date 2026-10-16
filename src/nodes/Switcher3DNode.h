@@ -53,6 +53,8 @@ public:
    // Turbo 0.45 (upstream R484): cloud and curve come from the same active
    // slot as the mesh, so a point cloud or curve survives the switcher.
    const std::vector<Particle>* GetPointCloud() override;
+   const pop::PopData* GetPop() override { IGeometrySource* a = Active(); return a ? a->GetPop() : nullptr; }
+   const pop::PopData* GetPopInstances() override { IGeometrySource* a = Active(); return a ? a->GetPopInstances() : nullptr; }
    unsigned long long PointCloudRevision() override;
    float PointBaseSize() const override; // Turbo 0.49
    const Polyline* GetCurve() override;

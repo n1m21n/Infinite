@@ -100,6 +100,9 @@
       // as the editor is concerned.
       if (int c = gn.node->ModulatorInputCount())
          return c;
+      // Generic pins (PointZ family and any node that answers InputPinCount).
+      if (int c = gn.node->InputPinCount())
+         return c;
       if (dynamic_cast<BlendNode*>(gn.node.get()) != nullptr)
          return 2;
       if (auto* filter = dynamic_cast<FilterNode*>(gn.node.get()))
@@ -190,6 +193,12 @@
       // DistributePointsInGridNode has no inputs - falls through to 0 below.
       if (dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr)
          return Switcher3DNode::kSlots;
+      if (dynamic_cast<Group3DNode*>(gn.node.get()) != nullptr)
+         return Group3DNode::kSlots;
+      if (dynamic_cast<DelaunayMeshNode*>(gn.node.get()) != nullptr)
+         return 1; // also covers VoronoiCellsNode
+      if (dynamic_cast<CurveOpsNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
@@ -235,6 +244,9 @@
 
    ImageCable* CableFor(GraphNode& gn, int slot)
    {
+      // Generic image pins (PointZ family): no per-type entry needed below.
+      if (ImageCable* generic = gn.node->ImageInputSlot(slot))
+         return generic;
       // Every other Render3D input (geometry/camera/light) is a raw pointer
       // handled by ConnectGeometrySlot; only the env slot is an ImageCable.
       if (auto* render = dynamic_cast<Render3DNode*>(gn.node.get()))
@@ -341,10 +353,10 @@
    }
 
    // Upper bound on how many geometry-input slots any single node exposes via
-   // GeometryInputSlot() - the widest today is JoinGeometryNode/Switcher3DNode
-   // at 4. Generic loops over "every geometry slot this node might have" stop
-   // here rather than walking off into unrelated pins.
-   const int kMaxGeometrySlots = 4;
+   // GeometryInputSlot() - the widest today is Group3DNode at 8. Generic loops
+   // over "every geometry slot this node might have" stop here rather than
+   // walking off into unrelated pins.
+   const int kMaxGeometrySlots = 8;
 
    // Upper bound on how many audio/note-input slots any single node exposes.
    // Turbo: the widest is Super Mixer, at SuperMixerNode::kChannels (16).

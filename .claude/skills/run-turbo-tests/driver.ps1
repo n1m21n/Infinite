@@ -29,13 +29,17 @@ param(
    [string[]]$Only,
    [switch]$Quick,
    [switch]$ShotOnly,
-   [int]$TimeoutSec = 180
+   [int]$TimeoutSec = 180,
+   # Run the suite against another build (e.g. dist\Infinite-Turbo-Windows-x64\Infinite-Turbo.exe)
+   # to tell a regression from an old failure. Implies -SkipBuild.
+   [string]$Exe
 )
 
 $ErrorActionPreference = 'Continue'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 Set-Location $root
 $bin = Join-Path $root "build\windows-vs2022\$Config\Infinite-Turbo.exe"
+if ($Exe) { $bin = (Resolve-Path $Exe).Path; $SkipBuild = $true }
 $out = Join-Path $root 'build\test-results'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 Get-ChildItem -LiteralPath $out -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
@@ -55,7 +59,7 @@ $tests = @(
    'TRANSFORMSWEEPTEST:10','MAPPINGSWEEPTEST:10','REVISIONSWEEPTEST:10','ENVTEST:14',
    'TOPPARITYTEST:10',
    'PHASEATEST:35','PHASECTEST:35','PHASEDTEST:35','PHASEETEST:35','PHASEFTEST:35',
-   'WRAPTEST:35','LIVETEST:35','PHASE1TEST:35','DELETECRASHTEST:8','AUDIOGRAPHTEST:8',
+   'WRAPTEST:35','GEOWAVEUTEST:10','POPTEST:10','LIVETEST:35','PHASE1TEST:35','DELETECRASHTEST:8','AUDIOGRAPHTEST:8',
    'DRAGTEST:35','WTDRAGTEST:35','AUDIOPARAMSWEEPTEST:1','AUDIOTEARDOWNSWEEPTEST:10',
    'AUDIOPDCTEST:1','AUDIOLIFECYCLETEST:8','AUDIORECOVERYTEST:8',
    'SAMPLERDRAGTEST:600','MEDIADRAGTEST:600','PLUGINDRAGTEST:600'
@@ -127,7 +131,8 @@ foreach ($spec in $tests) {
       Say ("  [CRASH] {0} - exit code {1} (0x{2:X8}), see build\test-results\{0}.log" -f $name, $rc, ([int64]$rc -band 0xffffffff))
       $fail++; $failed += "$name (crash)"; continue
    }
-   $bad = $text | Where-Object { $_ -match 'FAIL' -or $_ -match 'BUG$' }
+   # Case-sensitive: "0 failed" in a summary line is not a failure.
+   $bad = $text | Where-Object { $_ -cmatch 'FAIL' -or $_ -cmatch 'BUG$' }
    if ($bad) {
       Say "  [FAIL]  $name - see build\test-results\$name.log"
       $bad | Select-Object -First 12 | ForEach-Object { Say "          $_" }

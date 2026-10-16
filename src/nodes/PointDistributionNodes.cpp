@@ -37,8 +37,11 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
          mMeshRevision = NextMeshRevision();
       }
       mBuiltInput = nullptr;
+      mCookWarning.clear();
       return;
    }
+
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    const unsigned long long upstream = input->MeshRevision();
    // Turbo 0.45 (upstream R483): the tint (inherited albedo or own colour) is
@@ -370,8 +373,11 @@ void MergeByDistanceNode::RebuildIfNeeded()
          mMeshRevision = NextMeshRevision();
       }
       mBuiltInput = nullptr;
+      mCookWarning.clear();
       return;
    }
+
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    const unsigned long long upstream = input->MeshRevision();
    if (mBuiltInput == input && mBuiltUpstream == upstream && mBuiltThreshold == threshold)

@@ -241,8 +241,15 @@
          // points off-screen entirely - ImGui never saw the canvas as
          // hovered, the window lost focus, and NavigateAction never armed.
          // Anchor to the real display size instead.
+         // Anchor to the graph's own rect (last frame's, from Canvas.inl), not
+         // the window: the module panel docked on the right (on whenever the
+         // user's settings left it open) covers ~30% of the window, and a drag
+         // starting on it never reaches the canvas.
          const ImVec2 dispSize = tio.DisplaySize;
-         const ImVec2 dragBase(dispSize.x * 0.75f, dispSize.y * 0.70f);
+         const bool haveGraph = gGraphScreenSize.x > 300.0f && gGraphScreenSize.y > 300.0f;
+         const ImVec2 dragBase = haveGraph
+            ? ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.50f, gGraphScreenTL.y + gGraphScreenSize.y * 0.55f)
+            : ImVec2(dispSize.x * 0.50f, dispSize.y * 0.60f);
          switch (frameId)
          {
             // --- phase 1: drag empty canvas (should pan, not move nodes) ---
@@ -324,7 +331,10 @@
             if (frameId >= sPhaseFrame + 3)
             {
                auto* samplerNode = static_cast<SamplerNode*>(gNodes[0].node.get());
-               const bool ok = samplerNode->FilePath() == "/tmp/infinite_samplerdrag/sample.wav";
+               // Same file, not same spelling: on Windows the scanner hands back
+               // "C:\\tmp\\..." for the fixture's "/tmp/..." path.
+               std::error_code eqErr;
+               const bool ok = !samplerNode->FilePath().empty() && std::filesystem::equivalent(samplerNode->FilePath(), "/tmp/infinite_samplerdrag/sample.wav", eqErr);
                printf("SAMPLERDRAG drop onto node: path='%s' %s\n", samplerNode->FilePath().c_str(),
                       ok ? "OK" : "FAIL");
                printf("%s\n", ok ? "SAMPLERDRAGTEST OK" : "SAMPLERDRAGTEST FAIL");
@@ -482,7 +492,10 @@
             if (frameId >= sPhaseFrame + 3)
             {
                auto* imageNode = static_cast<ImageSourceNode*>(gNodes[0].node.get());
-               const bool ok = imageNode->LoadedPath() == "/tmp/infinite_mediadrag/fixture.png";
+               // Same file, not same spelling: on Windows the scanner hands back
+               // "C:\\tmp\\..." for the fixture's "/tmp/..." path.
+               std::error_code eqErr;
+               const bool ok = !imageNode->LoadedPath().empty() && std::filesystem::equivalent(imageNode->LoadedPath(), "/tmp/infinite_mediadrag/fixture.png", eqErr);
                printf("MEDIADRAG drop onto node: path='%s' %s\n", imageNode->LoadedPath().c_str(),
                       ok ? "OK" : "FAIL");
                printf("%s\n", ok ? "MEDIADRAGTEST OK" : "MEDIADRAGTEST FAIL");

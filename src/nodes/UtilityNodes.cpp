@@ -84,6 +84,9 @@ Material MaterialNode::GetMaterial() const
    m.anisotropyRotation = anisotropyRotation;
    m.dispersion = dispersion;
    m.alphaCutoff = alphaCutoff;
+   m.textureAlpha = textureAlpha;
+   m.normalStrength = normalStrength;
+   m.normalBump = normalBump ? 1 : 0;
    return m;
 }
 
@@ -179,6 +182,12 @@ int JoinGeometryNode::ConnectedCount() const
 
 void JoinGeometryNode::RebuildIfNeeded()
 {
+   // Inputs that are not surfaces contribute nothing; say so instead of
+   // skipping them silently.
+   mCookWarning.clear();
+   for (int i = 0; i < kSlots && mCookWarning.empty(); i++)
+      mCookWarning = DescribeGeometryMismatch(inputs[i], GeometryRequirement::kMeshSurface);
+
    auto sameMatrix = [](const Mat4& a, const Mat4& b)
    {
       for (int k = 0; k < 16; k++)
@@ -352,6 +361,9 @@ const std::vector<std::string>& MeshToPointsNode::ModeNames() { return kModeName
 
 void MeshToPointsNode::RebuildIfNeeded()
 {
+   // Vertices mode only needs positions; edges/faces need real topology.
+   mCookWarning = DescribeGeometryMismatch(
+      input, mode == 0 ? GeometryRequirement::kMeshVertices : GeometryRequirement::kMeshSurface);
    if (input == nullptr)
    {
       if (!mCache.vertices.empty())
@@ -493,6 +505,8 @@ void MetaBallNode::RebuildIfNeeded()
    const double quantised = std::floor(beat * 60.0) / 60.0;
    const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
    const unsigned long long cloudRevision = cloudSource ? cloudSource->PointCloudRevision() : 0;
+
+   mCookWarning = DescribeGeometryMismatch(cloudSource, GeometryRequirement::kCloud);
 
    if (mBuiltCount == ballCount && mBuiltRes == resolution &&
        mBuiltThreshold == threshold && mBuiltBounds == bounds &&

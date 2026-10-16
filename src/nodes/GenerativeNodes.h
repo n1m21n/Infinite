@@ -20,6 +20,7 @@
 class MeshResynthNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    // The eight mutation operators. Each has a weight; every generation applies
    // all of them scaled by weight * chaos, so the character comes from the mix
    // rather than from picking one.
@@ -122,6 +123,9 @@ private:
    const void* mBuiltInput = nullptr;
    unsigned long long mBuiltInputRevision = 0;
    double mLastStepBeat = 0.0;
+private:
+   // Cook-time pin mismatch message (DescribeGeometryMismatch); empty = fine.
+   std::string mCookWarning;
 };
 
 // Turns an image into a point cloud: one particle per sampled pixel, positioned

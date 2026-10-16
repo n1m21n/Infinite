@@ -709,13 +709,17 @@ nlohmann::json ExplainNode(GraphNode& gn)
    }
    out["settings"] = settings;
    auto issues = gLiveIssues.find(gn.index);
+   json w = json::array();
    if (issues != gLiveIssues.end())
-   {
-      json w = json::array();
       for (const RpcIssue& is : issues->second)
          w.push_back({ { "code", is.code }, { "message", is.message }, { "hint", is.hint } });
+   // Geometry pin contract (red border): an input of the wrong kind.
+   if (const auto* cw = dynamic_cast<ICookWarningSource*>(gn.node.get()))
+      if (!cw->CookWarning().empty())
+         w.push_back({ { "code", "geometry_kind" }, { "message", cw->CookWarning() },
+                       { "hint", "feed this input the kind it names (Mesh to Points turns a mesh into a cloud)" } });
+   if (!w.empty())
       out["warnings"] = w;
-   }
    // Turbo 0.56: a Formula's compile state, so a client can fix its GLSL.
    if (auto* formula = dynamic_cast<FormulaNode*>(gn.node.get()))
    {

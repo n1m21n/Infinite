@@ -120,6 +120,7 @@ private:
 class ClothNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    enum PinMode { kPinNone = 0, kPinTop, kPinCorners, kPinEdges, kPinModeCount };
 
    static INode* Create() { return new ClothNode(); }
@@ -275,4 +276,7 @@ private:
    double mLastBeats = -1.0;
    float mElapsed = 0.0f;
    int mLastCookFrame = -1;
+private:
+   // Cook-time pin mismatch message (DescribeGeometryMismatch); empty = fine.
+   std::string mCookWarning;
 };

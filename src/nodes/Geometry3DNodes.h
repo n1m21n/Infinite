@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -68,6 +69,18 @@ struct Material
 
    // Alpha test / cutout threshold (0 = smooth alpha blend, >0 = mask cutoff)
    float alphaCutoff = 0.0f;
+
+   // Normal slot: strength scales the tilt; bump=1 reads the slot as a
+   // height map (grayscale) and derives the normal from its slope. Carried
+   // here, not read off the MaterialNode, so a passthrough node between
+   // Material and Render 3D can't drop them.
+   float normalStrength = 1.0f;
+   int normalBump = 0;
+
+   // Multiply the albedo texture's own alpha into opacity (sparkle / cutout
+   // sprites). Off by default so existing patches render unchanged; on, the
+   // slot joins Render 3D's sorted translucent pass.
+   bool textureAlpha = false;
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own
@@ -115,7 +128,30 @@ struct MappingTransform
    float triplanarBlend = 0.0f; // 0 = sharp pick, >0 = smooth blended triplanar
 };
 
-class IGeometrySource
+namespace pop { class PopData; }
+
+// D1 (geometry-domains audit, Phase 4): cook-time error channel. A consumer
+// pin that requires one of GetMesh()/GetPointCloud()/GetCurve() but was fed a
+// source that satisfies a *different* one sets this to a message like
+// "expected a surface, got a point cloud" during its own rebuild (see
+// DescribeGeometryMismatch below); empty means no problem. Deliberately not a
+// hard connect-time refusal (per D1's decision) - the cable stays, the node
+// just reports what it actually got. Separate from IGeometrySource because a
+// few consumers (PathNode) read an IGeometrySource curve/mesh input without
+// producing geometry of their own, and still need somewhere to report a
+// mismatch; IGeometrySource inherits this rather than declaring its own copy.
+class ICookWarningSource
+{
+public:
+   virtual ~ICookWarningSource() {}
+   virtual const std::string& CookWarning() const
+   {
+      static const std::string kEmpty;
+      return kEmpty;
+   }
+};
+
+class IGeometrySource : public ICookWarningSource
 {
 public:
    virtual ~IGeometrySource() {}
@@ -160,6 +196,23 @@ public:
    // where the mesh actually comes from".
    virtual IGeometrySource* PassthroughSource() const { return nullptr; }
 
+   // A container (Group 3D) that hands Render 3D several sources through one
+   // pin. Render 3D draws each child as if it were patched into its own slot,
+   // so a scene is not capped at its four geometry pins. 0 by default: an
+   // ordinary source is its own single draw.
+   virtual int GroupChildCount() const { return 0; }
+   virtual IGeometrySource* GroupChild(int /*index*/) const { return nullptr; }
+
+   // PointZ family (src/pop): the source's geometry as GPU-resident point data.
+   // Render 3D draws it without a CPU copy; other consumers keep using
+   // GetMesh()/GetPointCloud()/GetCurve(), which a PointZ source also answers.
+   // Pure pass-through wrappers (Null 3D, Material, Mapping, Switcher 3D)
+   // forward it; anything that reshapes the mesh must leave it null.
+   virtual const pop::PopData* GetPop() { return nullptr; }
+   // When non-null, Render 3D draws this source's geometry once per point of
+   // the returned data (Instance PointZ): P, N, PScale, Rotate, Color, Active.
+   virtual const pop::PopData* GetPopInstances() { return nullptr; }
+
    // An extra rigid transform to compose onto each of an upstream instancer's
    // per-instance matrices, for a wrapper (Transform) that sits between an
    // InstanceOnPoints and whatever's drawing it - see GeometryOpNode's
@@ -184,6 +237,77 @@ public:
    virtual const Polyline* GetCurve() { return nullptr; }
    virtual unsigned long long CurveStamp() { return 0; }
 };
+
+// What a consumer pin actually needs from an upstream IGeometrySource,
+// mirroring the four requirement categories in the phase 2 rule matrix
+// (docs/reference/geometry-domains.md, "Satisfaction rule").
+enum class GeometryRequirement
+{
+   kMeshSurface,   // real face topology (GetMesh().indices non-empty)
+   kMeshVertices,  // positions only, faces optional (GetMesh() non-empty)
+   kCloud,         // GetPointCloud()
+   kCurve,         // GetCurve()
+};
+
+// Cook-time classification for D1: if `source` doesn't satisfy `requirement`,
+// returns a message describing what it offered instead; empty string means
+// the pin's requirement is satisfied and there is nothing to warn about.
+// `source` may be null (unconnected pin) - callers that treat "unconnected"
+// as its own state should check that separately, this always returns empty
+// for it since an unconnected pin isn't a *mismatched* connection.
+inline std::string DescribeGeometryMismatch(IGeometrySource* source, GeometryRequirement requirement)
+{
+   if (source == nullptr)
+      return std::string();
+
+   // Mesh::Empty() is true for vertices with no faces, so test the two arrays
+   // directly: a vertices-only mesh is "vertices", not "nothing".
+   const Mesh& mesh = source->GetMesh();
+   const bool hasVerts = !mesh.vertices.empty();
+   const bool hasSurface = hasVerts && !mesh.indices.empty();
+   const std::vector<Particle>* cloud = source->GetPointCloud();
+   const bool hasCloud = cloud != nullptr && !cloud->empty();
+   const bool hasCurve = source->GetCurve() != nullptr;
+
+   switch (requirement)
+   {
+      case GeometryRequirement::kMeshSurface:
+         if (hasSurface)
+            return std::string();
+         if (hasCloud)
+            return "expected a surface, got a point cloud";
+         if (hasCurve)
+            return "expected a surface, got a curve";
+         if (hasVerts)
+            return "expected a surface, got vertices only (no faces)";
+         return "expected a surface, got nothing";
+      case GeometryRequirement::kMeshVertices:
+         if (hasVerts)
+            return std::string();
+         if (hasCloud)
+            return "expected mesh vertices, got a point cloud";
+         if (hasCurve)
+            return "expected mesh vertices, got a curve";
+         return "expected mesh vertices, got nothing";
+      case GeometryRequirement::kCloud:
+         if (hasCloud)
+            return std::string();
+         if (hasSurface || hasVerts)
+            return "expected a point cloud, got a mesh";
+         if (hasCurve)
+            return "expected a point cloud, got a curve";
+         return "expected a point cloud, got nothing";
+      case GeometryRequirement::kCurve:
+         if (hasCurve)
+            return std::string();
+         if (hasSurface || hasVerts)
+            return "expected a curve, got a mesh";
+         if (hasCloud)
+            return "expected a curve, got a point cloud";
+         return "expected a curve, got nothing";
+   }
+   return std::string();
+}
 
 // --- Geometry -----------------------------------------------------------
 class GeometryNode : public INode, public IGeometrySource
@@ -341,9 +465,13 @@ class Render3DNode : public INode
 {
 public:
    static const int kSlots = 4;
+   // Most sources one Render 3D draws once Group 3D containers are expanded.
+   static const int kMaxDraw = 64;
 
    static INode* Create() { return new Render3DNode(); }
    static const std::vector<std::string>& ProjectionNames();
+   static const std::vector<std::string>& RenderPassNames();
+   int renderPass = 0; // 0 = color, 1 = linear depth, 2 = raw Z depth, 3 = normals, 4 = position
 
    ~Render3DNode() override;
 
@@ -358,6 +486,11 @@ public:
    {
       return (slot >= 0 && slot < kSlots) ? &geometry[slot] : nullptr;
    }
+   // Rebuild and return the flattened list of sources this node draws (the
+   // four pins with Group 3D containers expanded, at most kMaxDraw).
+   const std::vector<IGeometrySource*>& CollectDraw();
+   // Same list without touching GPU state, for UI and framing code.
+   std::vector<IGeometrySource*> FlattenedGeometry() const;
 
    // Optional scene nodes. When null, the built-in camera/light values below
    // are used, so a Render node works on its own.
@@ -459,6 +592,7 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("width", width); v.Float("height", height);
+      v.Int("renderPass", renderPass);
       v.Int("projection", projection); v.Float("fov", fov);
       v.Float("orthoHeight", orthoHeight); v.Float("camDistance", camDistance);
       v.Float("camAzimuth", camAzimuth); v.Float("camElevation", camElevation);
@@ -517,6 +651,16 @@ private:
       // Turbo 0.49: PointBaseSize() baked into a cloud's sprite instances, so
       // flipping it (no cloud revision bump) still re-uploads.
       float instanceBaseSize = 1.0f;
+      // PointZ sources: the primitive drawn (GL_TRIANGLES, or GL_LINES for a PointZ
+      // made of lines), whether the instances come from a PointZ (GPU-built
+      // matrices), and the PointZ buffers the VAO points at, kept alive here.
+      unsigned int primMode = 0x0004;
+      bool popInstanced = false;
+      std::vector<std::shared_ptr<const void>> popKeep;
+      std::vector<std::shared_ptr<const void>> popInstKeep;
+      // Non-blocking bounds of a GPU-resident PointZ (pop::GpuBoundsAsync):
+      // waiting on a 1x1 read every frame stalled the whole GPU pipeline.
+      std::shared_ptr<void> popBounds;
    };
 
    bool EnsureResources(int w, int h, int sampleCount);
@@ -583,17 +727,19 @@ private:
       std::vector<float> camera;
       bool hasLight[kLightSlots] = { false, false, false };
       std::vector<float> light[kLightSlots];
-      bool hasGeom[kSlots] = { false, false, false, false };
-      unsigned long long meshRev[kSlots] = { 0, 0, 0, 0 };
-      unsigned long long cloudRev[kSlots] = { 0, 0, 0, 0 };
-      unsigned long long curveRev[kSlots] = { 0, 0, 0, 0 };
-      unsigned long long surfaceTexRev[kSlots] = { 0, 0, 0, 0 };
-      Material material[kSlots];
-      Mat4 modelMatrix[kSlots];
-      unsigned long long instanceRev[kSlots] = { 0, 0, 0, 0 };
-      size_t instanceCount[kSlots] = { 0, 0, 0, 0 };
-      Mat4 instanceGroupMatrix[kSlots];
-      float pointBaseSize[kSlots] = { 1.0f, 1.0f, 1.0f, 1.0f }; // Turbo 0.49
+      // One entry per drawn source (the flattened draw list, groups expanded),
+      // sized by BuildSceneSignature. A different count is a different scene.
+      std::vector<unsigned char> hasGeom;
+      std::vector<unsigned long long> meshRev;
+      std::vector<unsigned long long> cloudRev;
+      std::vector<unsigned long long> curveRev;
+      std::vector<unsigned long long> surfaceTexRev;
+      std::vector<Material> material;
+      std::vector<Mat4> modelMatrix;
+      std::vector<unsigned long long> instanceRev;
+      std::vector<size_t> instanceCount;
+      std::vector<Mat4> instanceGroupMatrix;
+      std::vector<float> pointBaseSize; // Turbo 0.49
       bool envConnected = false;
       unsigned long long envRev = 0;
       float envRotation = 0.0f;
@@ -610,7 +756,9 @@ private:
          for (int i = 0; i < kLightSlots; i++)
             if (hasLight[i] != o.hasLight[i] || light[i] != o.light[i])
                return false;
-         for (int i = 0; i < kSlots; i++)
+         if (hasGeom.size() != o.hasGeom.size())
+            return false;
+         for (size_t i = 0; i < hasGeom.size(); i++)
          {
             if (hasGeom[i] != o.hasGeom[i] || meshRev[i] != o.meshRev[i] ||
                 cloudRev[i] != o.cloudRev[i] || curveRev[i] != o.curveRev[i] ||
@@ -668,7 +816,10 @@ private:
    unsigned int mShadowTex = 0;
    int mShadowSize = 0;
    Mat4 mLightViewProj;
-   GpuMesh mGpu[kSlots];
+   std::vector<GpuMesh> mGpu;
+   // The sources actually drawn: the four geometry pins with every Group 3D
+   // expanded into its children, rebuilt each cook.
+   std::vector<IGeometrySource*> mDraw;
    int mLastCookFrame = -1;
    size_t mLastTriangles = 0;
    size_t mLastDrawCalls = 0;

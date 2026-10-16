@@ -525,7 +525,7 @@
          {
             for (const ParamRef& ref : mod.FrameParams())
             {
-               if (ref.nodeIndex == gNodes[0].index && ref.name == "size")
+               if (ref.nodeIndex == gNodes[0].index && ref.name == "size x") // Shape size is split per axis now
                   mod.Bind(ref.nodeIndex, ref.paramIndex, gNodes[2].index);
             }
             printf("bound: links=%zu (frameParams=%zu)\n", mod.Links().size(), mod.FrameParams().size());
@@ -712,6 +712,10 @@
                 dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<WrapNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<Group3DNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<DelaunayMeshNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<CurveOpsNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<PopNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr ||

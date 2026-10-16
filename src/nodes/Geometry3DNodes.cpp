@@ -10,6 +10,10 @@
 #include "GeometryOpNodes.h"
 #include "UtilityNodes.h"
 #include "EnvironmentNode.h"
+#include <unordered_map>
+
+#include "pop/PopData.h"
+#include "pop/PopGpu.h"
 
 namespace
 {
@@ -24,6 +28,7 @@ namespace
    };
    const std::vector<std::string> kShadingNames = { "Lit", "Normals", "UV", "Flat" };
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
+   const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position" };
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
@@ -54,6 +59,65 @@ namespace
    // Transform node between InstanceOnPoints and Render 3D silently dropped
    // every instance but the first, since the direct dynamic_cast only ever
    // saw the wrapping node.
+   // PointZ sources made only of points draw as sprites, like a point cloud.
+   bool IsPopCloud(const pop::PopData& d)
+   {
+      const pop::PopTopology& t = d.Topo();
+      return !t.HasFaces() && !t.HasLines() && d.pointCount > 0;
+   }
+
+   // A source Render 3D draws as camera-facing sprites. For a PointZ this never
+   // calls GetPointCloud(), which would download the GPU data every frame.
+   bool IsSpriteSource(IGeometrySource* s)
+   {
+      if (s == nullptr)
+         return false;
+      if (const pop::PopData* d = s->GetPop())
+         return s->GetPopInstances() == nullptr && IsPopCloud(*d);
+      return s->GetPointCloud() != nullptr;
+   }
+
+   // Points a VAO slot at a PointZ attribute (or a constant buffer of its
+   // default when the PointZ lacks it), keeping the buffer alive in `keep`.
+   void BindPopAttrib(unsigned int loc, const pop::PopData& d, const char* name, int size,
+                      std::vector<std::shared_ptr<const void>>& keep, bool divisor)
+   {
+      pop::BufferPtr buf;
+      if (const pop::PopAttrib* a = d.Find(name))
+         if (a->buffer->Count() >= d.pointCount)
+            buf = a->buffer;
+      if (!buf)
+      {
+         // One shared constant buffer per attribute name, grown on demand: a
+         // cloud without Tex used to get a fresh one, uploaded, every frame.
+         static std::unordered_map<std::string, pop::BufferPtr> sDefaults;
+         pop::BufferPtr& cached = sDefaults[std::string(name) + "#" + std::to_string(size)];
+         const int need = std::max(1, d.pointCount);
+         if (!cached || cached->Count() < need)
+         {
+            float def[4];
+            pop::DefaultValue(name, def);
+            cached = pop::MakeFilled(std::max(need, cached ? cached->Count() * 2 : 0), std::max(1, size), def);
+         }
+         buf = cached;
+      }
+      keep.push_back(buf);
+      glBindBuffer(GL_ARRAY_BUFFER, buf->Gpu());
+      glEnableVertexAttribArray(loc);
+      glVertexAttribPointer(loc, std::min(size, buf->Comps()), GL_FLOAT, GL_FALSE,
+                            buf->Comps() * (GLsizei)sizeof(float), (void*)0);
+      glVertexAttribDivisor(loc, divisor ? 1 : 0);
+   }
+
+   // Bounds of a PointZ for a draw slot, without waiting on the GPU.
+   template <class Slot>
+   bool PopSlotBounds(Slot& gpu, const pop::PopData& d, float lo[3], float hi[3])
+   {
+      if (!gpu.popBounds)
+         gpu.popBounds = std::make_shared<pop::AsyncBounds>();
+      return d.BoundsAsync(*static_cast<pop::AsyncBounds*>(gpu.popBounds.get()), lo, hi);
+   }
+
    InstanceOnPointsNode* FindInstancer(IGeometrySource* source)
    {
       for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
@@ -282,6 +346,9 @@ namespace
       "in mat4 aInstance;\n"      // per-instance transform, divisor 1
       "in vec3 aInstanceColor;\n" // per-instance tint, divisor 1
       "in vec3 aVertexColor;\n"   // per-vertex tint, from Mesh::vertexColor
+      "in float aInstanceTex;\n"  // per-instance texture index (Instance PointZ), divisor 1
+      "uniform int uInstTexFrom;\n" // 0 the attribute, 1 instance number, 2 random per instance
+      "flat out float vInstTex;\n"
       "uniform mat4 uModel;\n"
       "uniform int uInstanced;\n"
       "uniform int uInstanceColored;\n"
@@ -337,6 +404,14 @@ namespace
       // Sprites carry their colour on aInstanceColor, not aVertexColor - the
       // mesh domain and the point-cloud domain never mix on the same draw.
       "   vVertexColor = (uHasVertexColor == 1 && uIsSprite == 0) ? aVertexColor : vec3(1.0);\n"
+      "   float instTex = aInstanceTex;\n"
+      "   if (uInstTexFrom == 1) instTex = float(gl_InstanceID);\n"
+      "   else if (uInstTexFrom == 2) {\n"
+      "      uint h = uint(gl_InstanceID) * 2654435761u;\n"
+      "      h ^= h >> 15; h *= 0x846ca68bu; h ^= h >> 16;\n"
+      "      instTex = float(h & 0xffffu);\n"
+      "   }\n"
+      "   vInstTex = instTex;\n"
       "   vLightSpacePos = uLightViewProj * vec4(worldPos, 1.0);\n"
       "   gl_Position = uViewProj * vec4(worldPos, 1.0);\n"
       "}\n";
@@ -349,7 +424,17 @@ namespace
       "in vec2 vUv;\n"
       "in vec3 vInstanceColor;\n"
       "in vec3 vVertexColor;\n"
+      "flat in float vInstTex;\n"
       "in vec4 vLightSpacePos;\n"
+      // Instance PointZ textures: 1 picks one of uInstTexCount images by the
+      // instance's index, 2 cuts uInstTex0 into a uInstAtlas grid of cells.
+      "uniform int uInstTexMode;\n"
+      "uniform int uInstTexCount;\n"
+      "uniform vec2 uInstAtlas;\n"
+      "uniform sampler2D uInstTex0;\n"
+      "uniform sampler2D uInstTex1;\n"
+      "uniform sampler2D uInstTex2;\n"
+      "uniform sampler2D uInstTex3;\n"
       "out vec4 fragColor;\n"
       "uniform mat4 uViewProj;\n"
       "uniform vec3 uBaseColor;\n"
@@ -357,6 +442,9 @@ namespace
       "uniform float uRoughness;\n"
       "uniform float uOpacity;\n"
       "uniform int uShading;\n"
+      "uniform int uRenderPass;\n"
+      "uniform float uNear;\n"
+      "uniform float uFar;\n"
       "uniform float uIor;\n"
       "uniform float uSpecular;\n"
       "uniform float uClearcoat;\n"
@@ -374,6 +462,7 @@ namespace
       "uniform float uAnisotropyRotation;\n"
       "uniform float uDispersion;\n"
       "uniform float uAlphaCutoff;\n"
+      "uniform int uTextureAlpha;\n"
       "uniform float uTransmission;\n"
       "uniform float uTransmissionRoughness;\n"
       "uniform sampler2D uSceneColor;\n"
@@ -406,6 +495,7 @@ namespace
       "uniform int uHasClearcoatMap;\n"
       "uniform int uHasSheenMap;\n"
       "uniform float uNormalStrength;\n"
+      "uniform int uNormalBump;\n"
       // Mapping: which coordinate space the material maps sample (UV /
       // Generated / Object) and the offset/rotation/scale applied to it before
       // lookup. uObjLo/uObjHi are the mesh's own object-space bounds, needed to
@@ -547,7 +637,20 @@ namespace
       "   vec3 tangent, bitangent;\n"
       "   getCotangentFrame(normal, vWorldPos, uv, tangent, bitangent);\n"
       "   mat3 tbn = mat3(tangent, bitangent, normal);\n"
-      "   vec3 sampled = texture(uNormalMap, uv).rgb * 2.0 - 1.0;\n"
+      "   vec3 sampled;\n"
+      "   if (uNormalBump == 1) {\n"
+      // Grayscale height: slope from central differences, +Z up. Height
+      // falls toward +U/+V -> normal tilts toward +U/+V.
+      "      vec2 px = 1.0 / vec2(textureSize(uNormalMap, 0));\n"
+      "      const vec3 lum = vec3(0.2126, 0.7152, 0.0722);\n"
+      "      float hl = dot(texture(uNormalMap, uv - vec2(px.x, 0.0)).rgb, lum);\n"
+      "      float hr = dot(texture(uNormalMap, uv + vec2(px.x, 0.0)).rgb, lum);\n"
+      "      float hd = dot(texture(uNormalMap, uv - vec2(0.0, px.y)).rgb, lum);\n"
+      "      float hu = dot(texture(uNormalMap, uv + vec2(0.0, px.y)).rgb, lum);\n"
+      "      sampled = normalize(vec3((hl - hr) * 2.0, (hd - hu) * 2.0, 1.0));\n"
+      "   } else {\n"
+      "      sampled = texture(uNormalMap, uv).rgb * 2.0 - 1.0;\n"
+      "   }\n"
       "   sampled.xy *= uNormalStrength;\n"
       "   return normalize(tbn * sampled);\n"
       "}\n"
@@ -602,19 +705,59 @@ namespace
       "   return texture(tex, base.yz) * w.x + texture(tex, base.xz) * w.y + texture(tex, base.xy) * w.z;\n"
       "}\n"
       "\n"
+      "vec4 instanceTexel(vec2 uv) {\n"
+      "   int idx = int(floor(vInstTex + 0.5));\n"
+      "   if (uInstTexMode == 2) {\n"
+      "      int cols = max(1, int(uInstAtlas.x)), rows = max(1, int(uInstAtlas.y));\n"
+      "      int cells = cols * rows;\n"
+      "      idx = ((idx % cells) + cells) % cells;\n"
+      // Cell 0 is the top-left one, reading order, like a sprite sheet.
+      "      vec2 cell = vec2(float(idx % cols), float(rows - 1 - idx / cols));\n"
+      "      return texture(uInstTex0, (cell + clamp(fract(uv), 0.001, 0.999)) / vec2(float(cols), float(rows)));\n"
+      "   }\n"
+      "   int n = max(1, uInstTexCount);\n"
+      "   idx = ((idx % n) + n) % n;\n"
+      "   if (idx == 0) return texture(uInstTex0, uv);\n"
+      "   if (idx == 1) return texture(uInstTex1, uv);\n"
+      "   if (idx == 2) return texture(uInstTex2, uv);\n"
+      "   return texture(uInstTex3, uv);\n"
+      "}\n"
+      "\n"
       "void main() {\n"
       "   if (uIsSprite == 1 && uSpriteShape == 0) {\n"
       "      vec2 d = vUv * 2.0 - 1.0;\n"
       "      if (dot(d, d) > 1.0) discard;\n"
       "   }\n"
-      "   if (uAlphaCutoff > 0.0 && uOpacity < uAlphaCutoff) discard;\n"
+      "   vec4 instTexel = (uInstTexMode != 0) ? instanceTexel(vUv) : vec4(1.0);\n"
+      "   float alpha = uOpacity;\n"
+      "   if (uTextureAlpha == 1 && uHasTexture == 1) alpha *= sampleMap(uTexture, normalize(vNormal), computeMapUv(normalize(vNormal))).a;\n"
+      "   if (uTextureAlpha == 1 && uInstTexMode != 0) alpha *= instTexel.a;\n"
+      "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) discard;\n"
       "   vec3 n = normalize(vNormal);\n"
+      "   if (uRenderPass == 1) {\n"
+      "      float d = clamp((length(vWorldPos - uCamPos) - uNear) / max(0.001, uFar - uNear), 0.0, 1.0);\n"
+      "      fragColor = vec4(vec3(d), uOpacity);\n"
+      "      return;\n"
+      "   }\n"
+      "   if (uRenderPass == 2) {\n"
+      "      fragColor = vec4(vec3(gl_FragCoord.z), uOpacity);\n"
+      "      return;\n"
+      "   }\n"
+      "   if (uRenderPass == 3) {\n"
+      "      fragColor = vec4(n * 0.5 + 0.5, uOpacity);\n"
+      "      return;\n"
+      "   }\n"
+      "   if (uRenderPass == 4) {\n"
+      "      fragColor = vec4(vWorldPos, uOpacity);\n"
+      "      return;\n"
+      "   }\n"
       "   if (uShading == 1) { fragColor = vec4(n * 0.5 + 0.5, uOpacity); return; }\n"
       "   if (uShading == 2) { fragColor = vec4(vUv, 0.0, uOpacity); return; }\n"
       "\n"
       "   vec2 mapUv = computeMapUv(n);\n"
       "   vec3 base = toLinear(uBaseColor) * vInstanceColor * vVertexColor;\n"
       "   if (uHasTexture == 1) base *= toLinear(sampleMap(uTexture, n, mapUv).rgb);\n"
+      "   if (uInstTexMode != 0) base *= toLinear(instTexel.rgb);\n"
       "   if (uShading == 3) { fragColor = vec4(toSrgb(base), uOpacity); return; }\n"
       "\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
@@ -759,7 +902,7 @@ namespace
       "      }\n"
       "      col = mix(col, refracted, uTransmission);\n"
       "   }\n"
-      "   fragColor = vec4(col, uOpacity);\n"
+      "   fragColor = vec4(col, alpha);\n"
       "}\n";
 }
 
@@ -921,6 +1064,7 @@ void GeometryNode::CookIfNeeded(int frameId)
 // ================================================================= Render
 
 const std::vector<std::string>& Render3DNode::ProjectionNames() { return kProjectionNames; }
+const std::vector<std::string>& Render3DNode::RenderPassNames() { return kRenderPassNames; }
 const std::vector<std::string>& Render3DNode::SampleNames() { return kSampleNames; }
 const std::vector<std::string>& Render3DNode::TonemapNames() { return kTonemapNames; }
 const std::vector<std::string>& Render3DNode::ShadowQualityNames() { return kShadowQualityNames; }
@@ -1085,18 +1229,18 @@ bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
    outHi[0] = outHi[1] = outHi[2] = -1e30f;
    bool any = false;
 
-   for (int i = 0; i < kSlots; i++)
+   for (int i = 0; i < (int)mDraw.size(); i++)
    {
-      if (!mGpu[i].hasBounds)
+      if (i >= (int)mGpu.size() || !mGpu[i].hasBounds)
          continue;
-      if (geometry[i] == nullptr)
+      if (mDraw[i] == nullptr)
          continue;
       // A cloud slot's bounds are already world-space (drawCloudSlot bakes
       // its source's model matrix into every particle position before ever
-      // touching mGpu[i].lo/hi), so pushing them through geometry[i]'s model
+      // touching mGpu[i].lo/hi), so pushing them through mDraw[i]'s model
       // matrix here too would double-transform them.
-      const bool isCloud = geometry[i]->GetPointCloud() != nullptr;
-      const Mat4 model = isCloud ? Mat4::Identity() : geometry[i]->GetModelMatrix();
+      const bool isCloud = IsSpriteSource(mDraw[i]);
+      const Mat4 model = isCloud ? Mat4::Identity() : mDraw[i]->GetModelMatrix();
       // The eight corners through the matrix: a rotated box's true extent
       // cannot be had from transforming the min and max alone.
       for (int corner = 0; corner < 8; corner++)
@@ -1135,8 +1279,8 @@ Render3DNode::~Render3DNode()
 {
    ReleaseTargets();
    ReleaseShadowTargets();
-   for (int i = 0; i < kSlots; i++)
-      ReleaseGpuMesh(mGpu[i]);
+   for (GpuMesh& gpu : mGpu)
+      ReleaseGpuMesh(gpu);
    if (mProgram != 0) glDeleteProgram(mProgram);
    if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
    if (mEnvBgProgram != 0) glDeleteProgram(mEnvBgProgram);
@@ -1189,6 +1333,7 @@ bool Render3DNode::EnsureShader()
    glBindAttribLocation(mProgram, 3, "aInstance"); // occupies locations 3..6
    glBindAttribLocation(mProgram, 7, "aInstanceColor");
    glBindAttribLocation(mProgram, 8, "aVertexColor");
+   glBindAttribLocation(mProgram, 9, "aInstanceTex");
    glAttachShader(mProgram, vert);
    glAttachShader(mProgram, frag);
    glLinkProgram(mProgram);
@@ -1325,6 +1470,45 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
    return true;
 }
 
+namespace
+{
+   // Depth-first expansion of Group 3D containers into the sources they hold.
+   // Bounded twice over - the count cap and the depth cap - so a cycle (a group
+   // somehow patched into itself) cannot spin.
+   void FlattenGeometry(IGeometrySource* source, int depth, int maxCount,
+                        std::vector<IGeometrySource*>& out)
+   {
+      if (source == nullptr || (int)out.size() >= maxCount)
+         return;
+      const int children = source->GroupChildCount();
+      if (children > 0 && depth < 8)
+      {
+         for (int i = 0; i < children; i++)
+            FlattenGeometry(source->GroupChild(i), depth + 1, maxCount, out);
+         return;
+      }
+      out.push_back(source);
+   }
+}
+
+std::vector<IGeometrySource*> Render3DNode::FlattenedGeometry() const
+{
+   std::vector<IGeometrySource*> out;
+   for (int i = 0; i < kSlots; i++)
+      FlattenGeometry(geometry[i], 0, kMaxDraw, out);
+   return out;
+}
+
+const std::vector<IGeometrySource*>& Render3DNode::CollectDraw()
+{
+   mDraw = FlattenedGeometry();
+   // GPU buffers follow the draw list; a shrunk list gives its tail back.
+   for (size_t i = mDraw.size(); i < mGpu.size(); i++)
+      ReleaseGpuMesh(mGpu[i]);
+   mGpu.resize(mDraw.size());
+   return mDraw;
+}
+
 Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
 {
    SceneSignature sig;
@@ -1355,12 +1539,25 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
          sig.animated = true;
    }
 
-   for (int i = 0; i < kSlots; i++)
+   const size_t drawCount = mDraw.size();
+   sig.hasGeom.assign(drawCount, 0);
+   sig.meshRev.assign(drawCount, 0);
+   sig.cloudRev.assign(drawCount, 0);
+   sig.curveRev.assign(drawCount, 0);
+   sig.surfaceTexRev.assign(drawCount, 0);
+   sig.material.assign(drawCount, Material());
+   sig.pointBaseSize.assign(drawCount, 1.0f);
+   sig.modelMatrix.assign(drawCount, Mat4::Identity());
+   sig.instanceRev.assign(drawCount, 0);
+   sig.instanceCount.assign(drawCount, 0);
+   sig.instanceGroupMatrix.assign(drawCount, Mat4::Identity());
+
+   for (int i = 0; i < (int)drawCount; i++)
    {
-      IGeometrySource* source = geometry[i];
+      IGeometrySource* source = mDraw[i];
       if (source == nullptr)
          continue;
-      sig.hasGeom[i] = true;
+      sig.hasGeom[i] = 1;
       // Tracked as three separate fields, not XOR-folded - see the comment
       // on SceneSignature in Geometry3DNodes.h for why folding them silently
       // broke cache invalidation for several node types.
@@ -1419,9 +1616,10 @@ void Render3DNode::CookIfNeeded(int frameId)
       return;
 
    // Pull any textures the geometry wants before we start drawing.
-   for (int i = 0; i < kSlots; i++)
+   CollectDraw();
+   for (int i = 0; i < (int)mDraw.size(); i++)
    {
-      if (auto* node = dynamic_cast<INode*>(geometry[i]))
+      if (auto* node = dynamic_cast<INode*>(mDraw[i]))
          node->CookIfNeeded(frameId);
    }
 
@@ -1594,15 +1792,16 @@ void Render3DNode::CookIfNeeded(int frameId)
          glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uLightViewProj"),
                             1, GL_FALSE, mLightViewProj.m);
 
-         for (int i = 0; i < kSlots; i++)
+         for (int i = 0; i < (int)mDraw.size(); i++)
          {
-            IGeometrySource* source = geometry[i];
-            if (source == nullptr || mGpu[i].vao == 0 || mGpu[i].indexCount == 0)
+            IGeometrySource* source = mDraw[i];
+            if (source == nullptr || mGpu[i].vao == 0 || mGpu[i].indexCount == 0 ||
+                mGpu[i].primMode != GL_TRIANGLES)
                continue;
             glBindVertexArray(mGpu[i].vao);
             const Mat4 model = source->GetModelMatrix();
             auto* instancer = FindInstancer(source);
-            const bool instanced = instancer != nullptr && mGpu[i].instanceCount > 0 &&
+            const bool instanced = (instancer != nullptr || mGpu[i].popInstanced) && mGpu[i].instanceCount > 0 &&
                                    mGpu[i].instanceAttribsOn;
             glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uModel"), 1, GL_FALSE, model.m);
             glUniform1i(glGetUniformLocation(mShadowProgram, "uInstanced"), instanced ? 1 : 0);
@@ -1647,7 +1846,12 @@ void Render3DNode::CookIfNeeded(int frameId)
    const bool multisampling = mActiveSamples > 1 && mMsFbo != 0;
    glBindFramebuffer(GL_FRAMEBUFFER, multisampling ? mMsFbo : mFbo);
    glViewport(0, 0, w, h);
-   glClearColor(bgColor[0], bgColor[1], bgColor[2], bgOpacity);
+   if (renderPass == 1 || renderPass == 2)
+      glClearColor(1.0f, 1.0f, 1.0f, bgOpacity);
+   else if (renderPass == 3)
+      glClearColor(0.5f, 0.5f, 0.5f, bgOpacity);
+   else
+      glClearColor(bgColor[0], bgColor[1], bgColor[2], bgOpacity);
    glClearDepth(1.0);
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -1735,6 +1939,9 @@ void Render3DNode::CookIfNeeded(int frameId)
    glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
    glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
    glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), tonemap);
+   glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
+   glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
+   glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
    glActiveTexture(GL_TEXTURE1);
    glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
    glUniform1i(glGetUniformLocation(mProgram, "uShadowMap"), 1);
@@ -1768,7 +1975,9 @@ void Render3DNode::CookIfNeeded(int frameId)
    // different way of filling that buffer.
    auto drawCloudSlot = [&](int i, IGeometrySource* cloud)
    {
-      const std::vector<Particle>& points = *cloud->GetPointCloud();
+      const pop::PopData* popCloud = cloud->GetPop();
+      static const std::vector<Particle> kNoParticles;
+      const std::vector<Particle>& points = popCloud ? kNoParticles : *cloud->GetPointCloud();
       GpuMesh& gpu = mGpu[i];
 
       const bool sourceChanged = gpu.source != (const void*)cloud;
@@ -1820,9 +2029,61 @@ void Render3DNode::CookIfNeeded(int frameId)
       // Turbo 0.49: p.scale is relative to the source's PointBaseSize()
       // (1.0 for every source unless it opts in, so old patches draw as before).
       const float baseSize = cloud->PointBaseSize();
-      if (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model) ||
-          gpu.instanceBaseSize != baseSize)
+      if (popCloud != nullptr && (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model) ||
+                                  gpu.instanceBaseSize != baseSize || !gpu.popInstanced))
       {
+         // PointZ sprites: per-point transforms built on the GPU from P and
+         // PScale (0.02 when the PointZ has none), colour straight from Color.
+         std::vector<pop::BufferPtr> cols;
+         std::string err;
+         const float spriteScale = baseSize * (popCloud->Has(pop::attr::PScale) ? 1.0f : 0.02f);
+         gpu.popInstKeep.clear();
+         if (pop::InstanceMatrices(*popCloud, model.m, spriteScale, 0, cols, err) && cols.size() == 4)
+         {
+            for (int col = 0; col < 4; col++)
+            {
+               gpu.popInstKeep.push_back(cols[(size_t)col]);
+               glBindBuffer(GL_ARRAY_BUFFER, cols[(size_t)col]->Gpu());
+               glEnableVertexAttribArray(3 + col);
+               glVertexAttribPointer(3 + col, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+               glVertexAttribDivisor(3 + col, 1);
+            }
+            BindPopAttrib(7, *popCloud, pop::attr::Color, 3, gpu.popInstKeep, true);
+            gpu.instanceCount = popCloud->pointCount;
+         }
+         else
+            gpu.instanceCount = 0;
+         gpu.instanceAttribsOn = true;
+         gpu.instanceColored = true;
+         gpu.popInstanced = true;
+         gpu.instanceRevision = revision;
+         gpu.instanceGroupMatrix = model;
+         gpu.instanceBaseSize = baseSize;
+         // World-space bounds: the PointZ's own box through the model matrix.
+         float lo[3], hi[3];
+         gpu.hasBounds = PopSlotBounds(gpu, *popCloud, lo, hi);
+         if (gpu.hasBounds)
+         {
+            gpu.lo[0] = gpu.lo[1] = gpu.lo[2] = 1e30f;
+            gpu.hi[0] = gpu.hi[1] = gpu.hi[2] = -1e30f;
+            for (int corner = 0; corner < 8; corner++)
+            {
+               const float c[3] = { (corner & 1) ? hi[0] : lo[0], (corner & 2) ? hi[1] : lo[1], (corner & 4) ? hi[2] : lo[2] };
+               for (int k = 0; k < 3; k++)
+               {
+                  const float w = model.m[k] * c[0] + model.m[4 + k] * c[1] + model.m[8 + k] * c[2] + model.m[12 + k];
+                  gpu.lo[k] = std::min(gpu.lo[k], w - spriteScale);
+                  gpu.hi[k] = std::max(gpu.hi[k], w + spriteScale);
+               }
+            }
+         }
+         mLastUploads++;
+      }
+      else if (popCloud == nullptr && (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model) ||
+          gpu.instanceBaseSize != baseSize || gpu.popInstanced))
+      {
+         gpu.popInstanced = false;
+         gpu.popInstKeep.clear();
          // A billboard has no orientation of its own to carry the rest of the
          // matrix, so only a uniform-ish scale - the length of the model's
          // own X basis vector - survives a Scale node upstream.
@@ -1935,6 +2196,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
       glUniform1f(glGetUniformLocation(mProgram, "uDispersion"), 0.0f);
       glUniform1f(glGetUniformLocation(mProgram, "uAlphaCutoff"), material.alphaCutoff);
+      glUniform1i(glGetUniformLocation(mProgram, "uTextureAlpha"), material.textureAlpha ? 1 : 0);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), 0.0f);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), 0.0f);
 
@@ -1956,24 +2218,31 @@ void Render3DNode::CookIfNeeded(int frameId)
    // the transmissive pass below - see the two-pass driver after this lambda.
    auto drawSlot = [&](int i)
    {
-      IGeometrySource* source = geometry[i];
+      IGeometrySource* source = mDraw[i];
       if (source == nullptr)
          return;
 
       // A source with both a mesh and a point cloud (Mesh to Points, Image
-      // to Points) draws as sprites, not triangles - the cloud wins.
-      if (source->GetPointCloud() != nullptr)
+      // to Points) draws as sprites, not triangles - the cloud wins. A PointZ
+      // made only of points draws the same way, straight from its buffers.
+      if (IsSpriteSource(source))
       {
          drawCloudSlot(i, source);
          return;
       }
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 0);
 
-      const Mesh& mesh = source->GetMesh();
+      // PointZ sources are drawn from their GPU buffers: no CPU mesh is built.
+      const pop::PopData* popData = source->GetPop();
+      const pop::PopData* popInst = popData ? source->GetPopInstances() : nullptr;
+      static const Mesh kPopNoMesh;
+      const Mesh& mesh = popData ? kPopNoMesh : source->GetMesh();
       // HasGeometry(), not Empty(): a vertices-only mesh (Points to
       // Vertices' output, indices empty) has nothing to draw as triangles
       // but is still drawn below as GL_POINTS.
-      if (!mesh.HasGeometry())
+      if (popData == nullptr && !mesh.HasGeometry())
+         return;
+      if (popData != nullptr && popData->pointCount == 0)
          return;
 
       GpuMesh& gpu = mGpu[i];
@@ -1997,8 +2266,47 @@ void Render3DNode::CookIfNeeded(int frameId)
       }
 
       const unsigned long long revision = source->MeshRevision();
+      if (gpu.meshRevision != revision && popData != nullptr)
+      {
+         // PointZ: the VAO reads P / N / Tex / Color straight from the PointZ's
+         // buffers, and its faces (or lines) as the element buffer.
+         gpu.popKeep.clear();
+         gpu.popKeep.push_back(popData->topo);
+         BindPopAttrib(0, *popData, pop::attr::P, 3, gpu.popKeep, false);
+         BindPopAttrib(1, *popData, pop::attr::N, 3, gpu.popKeep, false);
+         BindPopAttrib(2, *popData, pop::attr::Tex, 2, gpu.popKeep, false);
+         gpu.hasVertexColor = popData->Has(pop::attr::Color);
+         if (gpu.hasVertexColor)
+            BindPopAttrib(8, *popData, pop::attr::Color, 3, gpu.popKeep, false);
+         else
+            glDisableVertexAttribArray(8);
+         const pop::PopTopology& topo = popData->Topo();
+         if (topo.HasFaces())
+         {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, topo.TriIbo());
+            gpu.primMode = GL_TRIANGLES;
+            gpu.indexCount = (int)topo.tris.size();
+         }
+         else if (topo.HasLines())
+         {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, topo.LineIbo());
+            gpu.primMode = GL_LINES;
+            gpu.indexCount = topo.LineIndexCount();
+         }
+         else
+         {
+            gpu.primMode = GL_TRIANGLES;
+            gpu.indexCount = 0;
+         }
+         gpu.vertexCount = popData->pointCount;
+         gpu.hasBounds = PopSlotBounds(gpu, *popData, gpu.lo, gpu.hi);
+         gpu.meshRevision = revision;
+         mLastUploads++;
+      }
       if (gpu.meshRevision != revision)
       {
+         gpu.primMode = GL_TRIANGLES;
+         gpu.popKeep.clear();
          glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
          glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex),
                       mesh.vertices.data(), GL_STATIC_DRAW);
@@ -2101,9 +2409,9 @@ void Render3DNode::CookIfNeeded(int frameId)
          glActiveTexture(GL_TEXTURE0);
       }
       {
-         auto* asMaterial = dynamic_cast<MaterialNode*>(source);
-         glUniform1f(glGetUniformLocation(mProgram, "uNormalStrength"),
-                     asMaterial ? asMaterial->normalStrength : 1.0f);
+         const Material mat = source->GetMaterial();
+         glUniform1f(glGetUniformLocation(mProgram, "uNormalStrength"), mat.normalStrength);
+         glUniform1i(glGetUniformLocation(mProgram, "uNormalBump"), mat.normalBump);
       }
 
       {
@@ -2125,10 +2433,102 @@ void Render3DNode::CookIfNeeded(int frameId)
 
       // Instanced sources upload a transform per copy and draw them all at
       // once; ten thousand instances stay a single draw call.
-      auto* instancer = FindInstancer(source);
-      const bool instanced = instancer != nullptr && instancer->InstanceCount() > 0;
+      auto* instancer = popInst ? nullptr : FindInstancer(source);
+      const bool popInstanced = popInst != nullptr && popInst->pointCount > 0;
+      const bool instanced = popInstanced || (instancer != nullptr && instancer->InstanceCount() > 0);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), instanced ? 1 : 0);
-      if (instanced)
+      if (gpu.popInstanced != popInstanced)
+      {
+         gpu.instanceRevision = 0; // switching between PointZ and CPU instances rebinds
+         gpu.popInstanced = popInstanced;
+         gpu.popInstKeep.clear();
+         glDisableVertexAttribArray(9);
+         glVertexAttribDivisor(9, 0);
+      }
+      // Instance textures (Instance PointZ, Geometry COMP style). Off for every
+      // other draw. The pins replace the material texture; the atlas grid cuts
+      // the first pin, or the material texture when no pin is connected.
+      {
+         const pop::PopData::InstanceLook* look = popInstanced ? &popInst->instanceLook : nullptr;
+         int mode = look ? look->texMode : 0;
+         unsigned int texUnits[4] = { 0, 0, 0, 0 };
+         if (mode != 0)
+         {
+            for (int k = 0; k < look->texCount && k < 4; k++)
+               texUnits[k] = look->tex[k];
+            if (look->texCount == 0)
+            {
+               if (mode == 2 && surface != 0)
+                  texUnits[0] = surface;
+               else
+                  mode = 0;
+            }
+         }
+         glUniform1i(glGetUniformLocation(mProgram, "uInstTexMode"), mode);
+         glUniform1i(glGetUniformLocation(mProgram, "uInstTexFrom"), mode != 0 ? look->texFrom : 0);
+         if (mode != 0)
+         {
+            glUniform1i(glGetUniformLocation(mProgram, "uInstTexCount"), std::max(1, look->texCount));
+            glUniform2f(glGetUniformLocation(mProgram, "uInstAtlas"), (float)look->atlasCols, (float)look->atlasRows);
+            glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), 0);
+            static const char* kInstTex[4] = { "uInstTex0", "uInstTex1", "uInstTex2", "uInstTex3" };
+            for (int k = 0; k < 4; k++)
+            {
+               glActiveTexture(GL_TEXTURE10 + (GLenum)k);
+               glBindTexture(GL_TEXTURE_2D, texUnits[k] != 0 ? texUnits[k] : texUnits[0]);
+               glUniform1i(glGetUniformLocation(mProgram, kInstTex[k]), 10 + k);
+            }
+            glActiveTexture(GL_TEXTURE0);
+         }
+      }
+      if (popInstanced)
+      {
+         // Instance PointZ: one transform per point built on the GPU (P, N aim,
+         // PScale, Rotate, Active), colours straight from the points' Color.
+         const Mat4 groupMatrix = source->GetModelMatrix();
+         if (gpu.instanceRevision != popInst->revision || !gpu.instanceAttribsOn ||
+             !(gpu.instanceGroupMatrix == groupMatrix))
+         {
+            std::vector<pop::BufferPtr> cols;
+            std::string err;
+            gpu.popInstKeep.clear();
+            if (pop::InstanceMatrices(*popInst, groupMatrix.m, popInst->instanceScale, popInst->instanceAlign, cols, err) &&
+                cols.size() == 4)
+            {
+               for (int col = 0; col < 4; col++)
+               {
+                  gpu.popInstKeep.push_back(cols[(size_t)col]);
+                  glBindBuffer(GL_ARRAY_BUFFER, cols[(size_t)col]->Gpu());
+                  glEnableVertexAttribArray(3 + col);
+                  glVertexAttribPointer(3 + col, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+                  glVertexAttribDivisor(3 + col, 1);
+               }
+               BindPopAttrib(9, *popInst, pop::attr::TexIndex, 1, gpu.popInstKeep, true);
+               gpu.instanceColored = popInst->Has(pop::attr::Color);
+               if (gpu.instanceColored)
+                  BindPopAttrib(7, *popInst, pop::attr::Color, 3, gpu.popInstKeep, true);
+               else
+               {
+                  glDisableVertexAttribArray(7);
+                  glVertexAttribDivisor(7, 0);
+               }
+               gpu.instanceCount = popInst->pointCount;
+            }
+            else
+               gpu.instanceCount = 0;
+            gpu.instanceRevision = popInst->revision;
+            gpu.instanceGroupMatrix = groupMatrix;
+            gpu.instanceAttribsOn = true;
+            float lo[3], hi[3];
+            if (PopSlotBounds(gpu, *popInst, lo, hi))
+            {
+               for (int k = 0; k < 3; k++) { gpu.lo[k] = lo[k]; gpu.hi[k] = hi[k]; }
+               gpu.hasBounds = true;
+            }
+            mLastUploads++;
+         }
+      }
+      else if (instanced)
       {
          if (gpu.instanceVbo == 0)
             glGenBuffers(1, &gpu.instanceVbo);
@@ -2236,6 +2636,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
       glUniform1f(glGetUniformLocation(mProgram, "uDispersion"), material.dispersion);
       glUniform1f(glGetUniformLocation(mProgram, "uAlphaCutoff"), material.alphaCutoff);
+      glUniform1i(glGetUniformLocation(mProgram, "uTextureAlpha"), material.textureAlpha ? 1 : 0);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), material.transmission);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), material.transmissionRoughness);
 
@@ -2250,14 +2651,16 @@ void Render3DNode::CookIfNeeded(int frameId)
       }
       else if (instanced)
       {
-         glDrawElementsInstanced(GL_TRIANGLES, gpu.indexCount, GL_UNSIGNED_INT,
+         glDrawElementsInstanced(gpu.primMode, gpu.indexCount, GL_UNSIGNED_INT,
                                  nullptr, (GLsizei)gpu.instanceCount);
-         mLastTriangles += (size_t)(gpu.indexCount / 3) * (size_t)gpu.instanceCount;
+         if (gpu.primMode == GL_TRIANGLES)
+            mLastTriangles += (size_t)(gpu.indexCount / 3) * (size_t)gpu.instanceCount;
       }
       else
       {
-         glDrawElements(GL_TRIANGLES, gpu.indexCount, GL_UNSIGNED_INT, nullptr);
-         mLastTriangles += gpu.indexCount / 3;
+         glDrawElements(gpu.primMode, gpu.indexCount, GL_UNSIGNED_INT, nullptr);
+         if (gpu.primMode == GL_TRIANGLES)
+            mLastTriangles += gpu.indexCount / 3;
       }
       mLastDrawCalls++;
 
@@ -2297,32 +2700,32 @@ void Render3DNode::CookIfNeeded(int frameId)
    // same reason as above.
    auto isTranslucentMesh = [&](IGeometrySource* s)
    {
-      if (s == nullptr || s->GetPointCloud() != nullptr)
+      if (s == nullptr || IsSpriteSource(s))
          return false;
       const Material m = s->GetMaterial();
-      return m.opacity < 0.999f && m.transmission <= 0.001f;
+      return (m.opacity < 0.999f || m.textureAlpha) && m.transmission <= 0.001f;
    };
 
    bool anyTransmissive = false;
-   for (int i = 0; i < kSlots; i++)
+   for (int i = 0; i < (int)mDraw.size(); i++)
    {
-      IGeometrySource* s = geometry[i];
-      if (s != nullptr && s->GetPointCloud() == nullptr && s->GetMaterial().transmission > 0.001f)
+      IGeometrySource* s = mDraw[i];
+      if (s != nullptr && !IsSpriteSource(s) && s->GetMaterial().transmission > 0.001f)
       {
          anyTransmissive = true;
          break;
       }
    }
 
-   for (int i = 0; i < kSlots; i++)
+   for (int i = 0; i < (int)mDraw.size(); i++)
    {
-      IGeometrySource* s = geometry[i];
+      IGeometrySource* s = mDraw[i];
       if (s == nullptr)
          continue;
       // Transmissive slots are deferred to the pass below, which needs a
       // snapshot of everything opaque drawn first - sampling the buffer this
       // same draw is writing to would be a feedback loop.
-      if (s->GetPointCloud() == nullptr && anyTransmissive && s->GetMaterial().transmission > 0.001f)
+      if (!IsSpriteSource(s) && anyTransmissive && s->GetMaterial().transmission > 0.001f)
          continue;
       // Translucent (opacity < 1) meshes wait for the sorted pass below: drawn
       // in slot order with depth write on, a nearer one drawn first hides a
@@ -2362,9 +2765,9 @@ void Render3DNode::CookIfNeeded(int frameId)
       // other correctly - the known thick/overlapping-glass limitation noted
       // on Material::transmission.
       glDepthMask(GL_FALSE);
-      for (int i = 0; i < kSlots; i++)
+      for (int i = 0; i < (int)mDraw.size(); i++)
       {
-         IGeometrySource* s = geometry[i];
+         IGeometrySource* s = mDraw[i];
          if (s == nullptr || s->GetMaterial().transmission <= 0.001f)
             continue;
          drawSlot(i);
@@ -2379,13 +2782,15 @@ void Render3DNode::CookIfNeeded(int frameId)
    {
       struct TranslucentDraw { float depth; int slot; };
       std::vector<TranslucentDraw> translucent;
-      for (int i = 0; i < kSlots; i++)
+      for (int i = 0; i < (int)mDraw.size(); i++)
       {
-         IGeometrySource* s = geometry[i];
+         IGeometrySource* s = mDraw[i];
          if (!isTranslucentMesh(s))
             continue;
-         const Mesh& mesh = s->GetMesh();
-         if (!mesh.HasGeometry())
+         const pop::PopData* sortPop = s->GetPop();
+         static const Mesh kNoSortMesh;
+         const Mesh& mesh = sortPop ? kNoSortMesh : s->GetMesh();
+         if (!sortPop && !mesh.HasGeometry())
             continue;
          const GpuMesh& gpu = mGpu[i];
          float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
@@ -2397,6 +2802,8 @@ void Render3DNode::CookIfNeeded(int frameId)
          {
             // Not uploaded yet (first frame, or edited since): a single-frame
             // render must sort correctly too, so walk the vertices here.
+            if (sortPop)
+               PopSlotBounds(mGpu[i], *sortPop, lo, hi);
             for (const Vertex& v : mesh.vertices)
             {
                const float pt[3] = { v.px, v.py, v.pz };

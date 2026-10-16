@@ -260,9 +260,14 @@ AudioDisplacementNode::Signature AudioDisplacementNode::CurrentSignature() const
 const Mesh& AudioDisplacementNode::GetMesh()
 {
    if (input == nullptr)
+   {
+      mCookWarning.clear();
       return kEmptyMesh;
+   }
    if (bypassed)
       return input->GetMesh();
+
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    const Signature sig = CurrentSignature();
    if (mHasBuilt && sig == mBuilt)

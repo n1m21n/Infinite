@@ -558,6 +558,8 @@ void ClothNode::CookIfNeeded(int frameId)
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
 
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
+
    // The rest state is rebuilt when the incoming *topology* changes: a
    // different vertex/index count invalidates every constraint index. A mesh
    // revision bump with the same counts (the input just moved its vertices -

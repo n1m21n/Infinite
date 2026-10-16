@@ -17,6 +17,7 @@ class AudioDisplaceAudioSink;
 class AudioDisplacementNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    enum Mode
    {
       kModeNormalWaveform = 0, // Pushes along vertex normal by oscilloscope waveform s(coord)
@@ -199,4 +200,7 @@ private:
    unsigned long long mBaseCachedUpstreamRevision = 0;
    int mBaseCachedSubdivide = -1;
    bool mBaseHasCache = false;
+private:
+   // Cook-time pin mismatch message (DescribeGeometryMismatch); empty = fine.
+   std::string mCookWarning;
 };

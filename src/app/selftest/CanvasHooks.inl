@@ -1550,6 +1550,285 @@
          printf("%s\n", ok ? "PHASE E OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_POPTEST") != nullptr && frameId == 4)
+      {
+         // PointZ family on the real GPU: every operator cooks (its kernels
+         // compile on this driver), GPU results match the CPU, Render 3D
+         // draws PointZ faces, lines, sprites and instances without GL errors.
+         bool all = true;
+         int cooked = 0, failed = 0;
+         auto report = [&](const std::string& what, bool ok)
+         {
+            printf("  %-62s %s\n", what.c_str(), ok ? "ok" : "FAIL");
+            all = all && ok;
+         };
+         while (glGetError() != GL_NO_ERROR) {}
+         std::unique_ptr<PopNode> sphere(static_cast<PopNode*>(PopNode::CreateFor("Sphere PointZ")));
+         std::unique_ptr<PopNode> cloud(static_cast<PopNode*>(PopNode::CreateFor("Point Generator PointZ")));
+         std::unique_ptr<PopNode> line(static_cast<PopNode*>(PopNode::CreateFor("Line PointZ")));
+         int frame = 1000;
+         sphere->CookIfNeeded(frame); cloud->CookIfNeeded(frame); line->CookIfNeeded(frame);
+         std::vector<std::unique_ptr<PopNode>> keep;
+         for (const pop::PopDef& def : pop::Registry())
+         {
+            for (int variant = 0; variant < 3; variant++)
+            {
+               std::unique_ptr<PopNode> n(new PopNode(&def));
+               PopNode* src = variant == 0 ? sphere.get() : (variant == 1 ? cloud.get() : line.get());
+               for (int i = 0; i < def.inputs && i < PopNode::kMaxInputs; i++)
+                  n->inputs[i] = src;
+               for (int f = 0; f < 3; f++)
+                  n->CookIfNeeded(++frame);
+               const GLenum glErr = glGetError();
+               cooked++;
+               if (!n->CookError().empty() || glErr != GL_NO_ERROR)
+               {
+                  failed++;
+                  printf("  FAIL %-24s v%d: %s (gl 0x%x)\n", def.name.c_str(), variant, n->CookError().substr(0, 240).c_str(), glErr);
+                  all = false;
+               }
+               if (def.inputs == 0)
+                  break;
+            }
+         }
+         printf("  %d cooks, %d with errors\n", cooked, failed);
+
+         // GPU kernel vs CPU: Transform PointZ translate on a known grid.
+         {
+            std::unique_ptr<PopNode> grid(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+            std::unique_ptr<PopNode> xf(static_cast<PopNode*>(PopNode::CreateFor("Transform PointZ")));
+            const pop::PopDef& d = xf->Def();
+            const int off = d.FloatOffset(d.ParamIndex("t"));
+            xf->Values().f[(size_t)off] = 1.0f; xf->Values().f[(size_t)off + 1] = 2.0f; xf->Values().f[(size_t)off + 2] = 3.0f;
+            xf->inputs[0] = grid.get();
+            xf->CookIfNeeded(++frame);
+            const std::vector<float> a = grid->GetPop()->Read(pop::attr::P, 3);
+            const std::vector<float> b = xf->GetPop()->Read(pop::attr::P, 3);
+            float maxErr = (a.size() == b.size() && !a.empty()) ? 0.0f : 1e9f;
+            for (size_t i = 0; i + 2 < a.size() && i + 2 < b.size(); i += 3)
+               maxErr = std::max(maxErr, std::max(std::fabs(b[i] - a[i] - 1.0f), std::max(std::fabs(b[i + 1] - a[i + 1] - 2.0f), std::fabs(b[i + 2] - a[i + 2] - 3.0f))));
+            printf("  transform kernel max error %.6f\n", maxErr);
+            report("Transform PointZ on the GPU matches the CPU", maxErr < 1e-4f);
+            // GPU bounds reduction vs the CPU.
+            float lo[3], hi[3];
+            const bool okB = pop::GpuBounds(xf->GetPop()->Find(pop::attr::P)->buffer->Gpu(), xf->GetPop()->pointCount, 3, lo, hi);
+            printf("  gpu bounds %.3f %.3f %.3f .. %.3f %.3f %.3f\n", lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]);
+            report("GPU bounds reduction finds the moved grid", okB && std::fabs(lo[0] + 0.0f) < 1e-3f && std::fabs(hi[0] - 2.0f) < 1e-3f &&
+                                                              std::fabs(lo[1] - 2.0f) < 1e-3f && std::fabs(lo[2] - 2.0f) < 1e-3f && std::fabs(hi[2] - 4.0f) < 1e-3f);
+         }
+
+         // Render 3D: faces, lines, sprites and Instance PointZ.
+         {
+            std::unique_ptr<PopNode> noise(static_cast<PopNode*>(PopNode::CreateFor("Noise PointZ")));
+            noise->inputs[0] = sphere.get();
+            std::unique_ptr<PopNode> inst(static_cast<PopNode*>(PopNode::CreateFor("Instance PointZ")));
+            std::unique_ptr<PopNode> box(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+            inst->inputs[0] = cloud.get();
+            inst->inputs[1] = box.get();
+            // 0.58: Geometry COMP style instances (per-axis scale, offsets,
+            // texture by instance number) and the GPU Trail drawn as lines.
+            {
+               auto setF = [](PopNode* n, const char* key, int comp, float v) {
+                  const int i = n->Def().ParamIndex(key);
+                  if (i >= 0) n->Values().f[(size_t)(n->Def().FloatOffset(i) + comp)] = v;
+               };
+               setF(inst.get(), "scaleXYZ", 1, 2.0f);
+               setF(inst.get(), "rotOffset", 2, 45.0f);
+               setF(inst.get(), "texMode", 2, 0.0f);
+               setF(inst.get(), "texMode", 0, 2.0f);
+               setF(inst.get(), "texFrom", 0, 1.0f);
+            }
+            std::unique_ptr<PopNode> trail(static_cast<PopNode*>(PopNode::CreateFor("Trail PointZ")));
+            trail->inputs[0] = noise.get();
+            Render3DNode render;
+            render.width = 128.0f; render.height = 128.0f;
+            render.geometry[0] = noise.get();
+            render.geometry[1] = line.get();
+            render.geometry[2] = cloud.get();
+            render.geometry[3] = inst.get();
+            for (int f = 0; f < 3; f++)
+               render.CookIfNeeded(++frame);
+            Render3DNode trailRender; // Render 3D has four geometry pins
+            trailRender.width = 64.0f; trailRender.height = 64.0f;
+            trailRender.geometry[0] = trail.get();
+            for (int f = 0; f < 3; f++)
+               trailRender.CookIfNeeded(++frame);
+            printf("  trail: %d points, %zu strips\n", trail->PointCount(),
+                   trail->GetPop() ? trail->GetPop()->Topo().StripCount() : 0);
+            const GLenum e1 = glGetError();
+            printf("  render: %zu triangles in %zu draw calls, gl 0x%x\n", render.LastTriangleCount(), render.LastDrawCalls(), e1);
+            const size_t boxTris = box->TriangleCount() * (size_t)cloud->PointCount();
+            report("Render 3D draws a PointZ mesh, line, cloud and instances", e1 == GL_NO_ERROR && render.LastDrawCalls() >= 4 &&
+                                                                         render.LastTriangleCount() >= boxTris);
+            report("Trail PointZ keeps its history on the GPU and draws as lines",
+                   trail->PointCount() == noise->PointCount() * 30 && trail->CookError().empty());
+            // Particle loop through a tagged Null with a radial force.
+            std::unique_ptr<PopNode> part(static_cast<PopNode*>(PopNode::CreateFor("Particle PointZ")));
+            std::unique_ptr<PopNode> force(static_cast<PopNode*>(PopNode::CreateFor("Force Radial PointZ")));
+            std::unique_ptr<PopNode> null(static_cast<PopNode*>(PopNode::CreateFor("Null PointZ")));
+            part->inputs[0] = cloud.get();
+            force->inputs[0] = part.get();
+            null->inputs[0] = force.get();
+            null->Values().s[(size_t)null->Def().ParamIndex("tag")] = "poptestloop";
+            part->Values().s[(size_t)part->Def().ParamIndex("target")] = "poptestloop";
+            for (int f = 0; f < 30; f++)
+            {
+               part->CookIfNeeded(++frame);
+               null->CookIfNeeded(frame);
+            }
+            printf("  particles alive after 30 frames: %d (warning '%s')\n", part->PointCount(), part->CookWarning().c_str());
+            report("Particle PointZ loop runs through a tagged Null", part->PointCount() > 0 && part->CookError().empty() &&
+                                                                     part->CookWarning().empty());
+         }
+         report("every PointZ operator cooks on this GPU", failed == 0);
+         printf("%s\n", all ? "POPTEST OK" : "POPTEST FAIL - BUG");
+      }
+
+      if (getenv("INFINITE_GEOWAVEUTEST") != nullptr && frameId == 4)
+      {
+         // Wave U (3D from Naman's upstream): Group 3D flattening, the pin
+         // contract warnings and the new geometry nodes, on probes with known
+         // answers.
+         bool all = true;
+         auto report = [&](const char* what, bool ok)
+         {
+            printf("  %-62s %s\n", what, ok ? "ok" : "FAIL");
+            all = all && ok;
+         };
+         struct CloudProbe : public IGeometrySource
+         {
+            std::vector<Particle> cloud;
+            const Mesh& GetMesh() override { static const Mesh kEmpty; return kEmpty; }
+            unsigned long long MeshRevision() override { return 0; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+            const std::vector<Particle>* GetPointCloud() override { return &cloud; }
+            unsigned long long PointCloudRevision() override { return 3; }
+         };
+         struct CurveProbe : public IGeometrySource
+         {
+            Polyline line;
+            const Mesh& GetMesh() override { static const Mesh kEmpty; return kEmpty; }
+            unsigned long long MeshRevision() override { return 0; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+            const Polyline* GetCurve() override { return &line; }
+            unsigned long long CurveStamp() override { return 7; }
+         };
+         struct VertsProbe : public IGeometrySource
+         {
+            Mesh mesh;
+            const Mesh& GetMesh() override { return mesh; }
+            unsigned long long MeshRevision() override { return 1; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+         };
+         CloudProbe pts;
+         for (int i = 0; i < 64; i++)
+         {
+            Particle p;
+            p.px = (float)(i % 8) + 0.13f * (float)((i * 7) % 5);
+            p.py = (float)(i / 8) + 0.11f * (float)((i * 3) % 4);
+            p.pz = 0.05f * (float)(i % 3);
+            pts.cloud.push_back(p);
+         }
+         CurveProbe curve;
+         for (int i = 0; i < 20; i++)
+         {
+            curve.line.points.push_back((float)i * 0.1f);
+            curve.line.points.push_back(std::sin((float)i * 0.5f));
+            curve.line.points.push_back(0.0f);
+         }
+         VertsProbe verts;
+         verts.mesh.vertices.resize(3);
+
+         report("vertices-only input reported as vertices, not nothing",
+                DescribeGeometryMismatch(&verts, GeometryRequirement::kMeshSurface).find("vertices only") != std::string::npos);
+         report("vertices-only input satisfies kMeshVertices",
+                DescribeGeometryMismatch(&verts, GeometryRequirement::kMeshVertices).empty());
+
+         DelaunayMeshNode dn;
+         dn.input = &verts;
+         report("Delaunay Mesh flags a mesh and ignores it",
+                dn.GetMesh().vertices.empty() && dn.CookWarning().find("point cloud") != std::string::npos);
+         dn.input = &pts;
+         const size_t delTris = dn.GetMesh().indices.size() / 3;
+         report("Delaunay Mesh triangulates a cloud without warning", dn.CookWarning().empty() && delTris > 64);
+         VoronoiCellsNode vn;
+         vn.input = &verts;
+         vn.GetMesh();
+         report("Voronoi Cells flags a mesh", !vn.CookWarning().empty());
+         vn.input = &pts;
+         const bool vorCells = !vn.GetMesh().indices.empty(); // rebuild first, then read its warning
+         report("Voronoi Cells builds cells from a cloud", vorCells && vn.CookWarning().empty());
+
+         CurveOpsNode cn;
+         cn.input = &verts;
+         report("Curve Ops flags a mesh and emits no curve",
+                cn.GetCurve() == nullptr && cn.CookWarning().find("curve") != std::string::npos);
+         cn.input = &curve;
+         cn.mode = 0; cn.count = 50;
+         const Polyline* resampled = cn.GetCurve();
+         report("Curve Ops resamples a curve to the asked count",
+                cn.CookWarning().empty() && resampled != nullptr && resampled->Count() == 50);
+
+         GeometryOpNode arr; arr.op = GeometryOpNode::kArray; arr.input = &pts; arr.CookIfNeeded(1001);
+         report("Array flags a point cloud", !arr.CookWarning().empty());
+         GeometryOpNode xf; xf.op = GeometryOpNode::kTransform; xf.input = &pts; xf.CookIfNeeded(1002);
+         report("Transform accepts a point cloud", xf.CookWarning().empty());
+         JoinGeometryNode jn; jn.inputs[0] = &pts; jn.GetMesh();
+         report("Join flags a non-surface input", !jn.CookWarning().empty());
+
+         // Decimate keeps roughly the asked fraction of a dense sphere.
+         GeometryNode sphere; sphere.shape = 2;
+         GeometryOpNode dec; dec.op = GeometryOpNode::kDecimate; dec.input = &sphere; dec.decimateRatio = 0.25f;
+         const size_t before = sphere.GetMesh().indices.size() / 3;
+         const size_t after = dec.GetMesh().indices.size() / 3;
+         printf("  decimate: %zu -> %zu triangles (keep 0.25)\n", before, after);
+         report("Decimate reduces a sphere to about a quarter",
+                before > 0 && after > 0 && after < before / 2);
+
+         // Group 3D: six cubes reach one Render 3D through one pin, one group nested.
+         std::vector<std::unique_ptr<GeometryNode>> cubes;
+         for (int i = 0; i < 6; i++)
+         {
+            cubes.emplace_back(new GeometryNode());
+            cubes.back()->shape = 1;
+         }
+         Group3DNode inner, outer;
+         Render3DNode render;
+         render.width = 64.0f; render.height = 64.0f;
+         for (int i = 0; i < 4; i++) outer.inputs[i] = cubes[i].get();
+         inner.inputs[0] = cubes[4].get();
+         inner.inputs[1] = cubes[5].get();
+         outer.inputs[4] = &inner;
+         render.geometry[0] = &outer;
+         const size_t perCube = cubes[0]->GetMesh().indices.size() / 3;
+         report("Group 3D flattens six objects through one pin", render.FlattenedGeometry().size() == 6);
+         render.CookIfNeeded(frameId);
+         printf("  group render: %zu triangles (expect %zu)\n", render.LastTriangleCount(), perCube * 6);
+         report("Render 3D draws every grouped object", perCube > 0 && render.LastTriangleCount() == perCube * 6);
+         Group3DNode loop;
+         loop.inputs[0] = &loop;
+         loop.inputs[1] = cubes[0].get();
+         Render3DNode loopRender;
+         loopRender.geometry[0] = &loop;
+         report("self-referencing group stays under the draw cap",
+                loopRender.FlattenedGeometry().size() <= (size_t)Render3DNode::kMaxDraw);
+
+         // Render passes: every pass renders without a GL error.
+         bool passOk = true;
+         for (int pass = 0; pass < (int)Render3DNode::RenderPassNames().size(); pass++)
+         {
+            render.renderPass = pass;
+            render.CookIfNeeded(frameId + 100 + pass);
+            passOk = passOk && glGetError() == GL_NO_ERROR && render.GetOutputTexture() != 0;
+         }
+         report("Render 3D renders every pass", passOk);
+
+         printf("%s\n", all ? "GEOWAVEUTEST OK" : "GEOWAVEUTEST FAIL - BUG");
+      }
+
       if (getenv("INFINITE_WRAPTEST") != nullptr && frameId == 4)
       {
          // The whole point of the cylindrical mode is that it is a coordinate

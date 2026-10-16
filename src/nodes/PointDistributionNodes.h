@@ -20,6 +20,7 @@
 class DistributePointsOnFacesNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    static INode* Create() { return new DistributePointsOnFacesNode(); }
    static const std::vector<std::string>& MethodNames();
 
@@ -116,6 +117,9 @@ private:
    float mBuiltTint[3] = { -1.0f, -1.0f, -1.0f };
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
+private:
+   // Cook-time pin mismatch message (DescribeGeometryMismatch); empty = fine.
+   std::string mCookWarning;
 };
 
 // --- Points to Vertices -----------------------------------------------------
@@ -269,6 +273,7 @@ private:
 class MergeByDistanceNode : public INode, public IGeometrySource
 {
 public:
+   const std::string& CookWarning() const override { return mCookWarning; }
    static INode* Create() { return new MergeByDistanceNode(); }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
@@ -318,4 +323,7 @@ private:
    float mBuiltThreshold = -1.0f;
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
+private:
+   // Cook-time pin mismatch message (DescribeGeometryMismatch); empty = fine.
+   std::string mCookWarning;
 };

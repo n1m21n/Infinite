@@ -887,7 +887,12 @@
       if (gLastAudioRecoveryAttemptMs >= 0.0 && nowMs - gLastAudioRecoveryAttemptMs < kAudioRecoveryMinIntervalMs)
          return;
 
-      if (gAudioRecoveryWindowStartMs < 0.0 || nowMs - gAudioRecoveryWindowStartMs > kAudioRecoveryWindowMs)
+      // The window closes after kAudioRecoveryWindowMs of calm since the last
+      // attempt ended, not since it opened: on Windows a WASAPI/ASIO restart
+      // can take a second or more, so five failing attempts would otherwise
+      // outlive a fixed 10 s window and recovery would never give up.
+      if (gAudioRecoveryWindowStartMs < 0.0 || gLastAudioRecoveryAttemptMs < 0.0 ||
+          nowMs - gLastAudioRecoveryAttemptMs > kAudioRecoveryWindowMs)
       {
          gAudioRecoveryWindowStartMs = nowMs;
          gAudioRecoveryAttemptsInWindow = 0;
@@ -922,6 +927,10 @@
       gAudioStartError.clear();
       if (!StartAudioEngine(gAudioStartError))
          fprintf(stderr, "audio device recovery: %s\n", gAudioStartError.c_str());
+      // Stamp again once the restart is done: the min interval runs from the
+      // end of an attempt. A slow restart fires its own config-change
+      // notifications, and those must be swallowed, not start another one.
+      gLastAudioRecoveryAttemptMs = glfwGetTime() * 1000.0;
    }
 
    void RemoveNodeByIndex(int index)

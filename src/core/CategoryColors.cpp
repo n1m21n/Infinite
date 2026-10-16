@@ -355,7 +355,7 @@ int FamilyRank(const std::string& category)
        category == "Resynth" || category == "Effects" || category == "Output" ||
        category == "Video" || category == "Utility" || category == "Shapes")
       return 0;
-   if (category == "3D" || category == "3DSource" || category == "3DScene")
+   if (category == "3D" || category == "3DSource" || category == "3DScene" || category == "PointZ")
       return 1;
    if (category == "Audio" || category == "Synths" || category == "AudioEffects" ||
        category == "AudioUtility" || category == "Notes" || category == "AudioIO" ||

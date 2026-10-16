@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.57.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.58.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -185,6 +185,9 @@ add_executable(Infinite WIN32
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
+    src/core/MeshDecimate.cpp
+    src/core/Delaunay.cpp
+    src/core/CurveOps.cpp
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/AudioDecodeCache.cpp
@@ -283,6 +286,21 @@ add_executable(Infinite WIN32
     src/nodes/FeedbackNodes.cpp
     src/nodes/SwitcherNode.cpp
     src/nodes/Switcher3DNode.cpp
+    src/nodes/DelaunayNodes.cpp
+    src/nodes/CurveOpsNode.cpp
+    src/nodes/PopNode.cpp
+    src/pop/PopData.cpp
+    src/pop/PopGpu.cpp
+    src/pop/PopKernelSource.cpp
+    src/pop/PopCpu.cpp
+    src/pop/PopOps.cpp
+    src/pop/PopOpsGen.cpp
+    src/pop/PopOpsA.cpp
+    src/pop/PopOpsA2.cpp
+    src/pop/PopOpsB.cpp
+    src/pop/PopOpsB2.cpp
+    src/pop/PopOpsB3.cpp
+    src/pop/PopOpsPlatform.cpp
     src/nodes/CurveNode.cpp
     src/nodes/OutputNode.cpp
     src/nodes/SyphonInNode.cpp

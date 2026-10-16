@@ -216,6 +216,42 @@
       ModSliderInt("material from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
    }
 
+   void DrawCurveOpsParams(CurveOpsNode* n)
+   {
+      if (n->input != nullptr)
+         ImGui::TextDisabled("%zu points out", n->PointCount());
+      DropdownButton("mode", CurveOpsNode::ModeNames(), n->mode,
+                     [n](int i) { PushUndoCheckpoint(); n->mode = i; });
+      switch (n->mode)
+      {
+         case CurveOpsNode::kSimplify:
+            ModSlider("tolerance", &n->tolerance, 0.0f, 0.5f, "%.3f");
+            break;
+         case CurveOpsNode::kSmooth:
+            ModSliderInt("iterations", &n->iterations, 0, 50);
+            ModSlider("strength", &n->strength, 0.0f, 1.0f);
+            break;
+         case CurveOpsNode::kOffset:
+            ModSlider("distance", &n->distance, -2.0f, 2.0f);
+            ModSliderInt("arc steps", &n->arcSteps, 1, 16);
+            break;
+         default:
+            ModSliderInt("count", &n->count, 2, 512);
+            break;
+      }
+      ModSlider("tube radius", &n->radius, 0.002f, 0.2f, "%.3f");
+   }
+   void DrawDelaunayParams(DelaunayMeshNode* n)
+   {
+      ImGui::TextDisabled("%zu triangles", n->TriangleCount());
+      DropdownButton("plane", DelaunayMeshNode::PlaneNames(), n->plane,
+                     [n](int i) { PushUndoCheckpoint(); n->plane = i; });
+      ModCheckbox("alive only", &n->aliveOnly);
+      ModSliderInt("max points", &n->maxPoints, 3, 5000);
+      if (dynamic_cast<VoronoiCellsNode*>(n) != nullptr)
+         ModSlider("inset", &n->inset, 0.0f, 0.95f);
+   }
+
    void DrawSwitcher3DParams(Switcher3DNode* n)
    {
       DropdownButton("unit", Switcher3DNode::UnitNames(), n->unit, [n](int i) { n->unit = i; });
@@ -338,7 +374,10 @@
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
       if (n->MapInput(kMapNormal).IsConnected())
+      {
          ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f);
+         ModCheckbox("bump (height map)##matNormalBump", &n->normalBump);
+      }
 
       const float colW = kParamWidth;
       const float gutter = 16.0f;
@@ -355,7 +394,8 @@
       ModSlider("specular", &n->specular, 0.0f, 1.0f, "%.3f", colW);
       ModSlider("ior", &n->ior, 1.0f, 3.0f, "%.3f", colW);
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f, "%.3f", colW);
-      if (n->opacity < 1.0f || n->alphaCutoff > 0.0f)
+      ModCheckbox("texture alpha", &n->textureAlpha);
+      if (n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha)
          ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f, "%.3f", colW);
 
       NodeSeparator("emission", colW);
@@ -1022,6 +1062,10 @@
                ImGui::TextDisabled("%zu of %zu faces selected", n->SelectedCount(), n->TriangleCount());
             ModCheckbox("keep selected instead", &n->keepSelected);
             break;
+         case GeometryOpNode::kDecimate:
+            ModSlider("keep", &n->decimateRatio, 0.01f, 1.0f, "%.2f");
+            ModCheckbox("lock border", &n->lockBorder);
+            break;
          case GeometryOpNode::kTransformSelected:
             ModCheckbox("move along normals", &n->moveAlongNormals);
             if (n->moveAlongNormals)
@@ -1430,9 +1474,8 @@
       float hi[3] = { -1e30f, -1e30f, -1e30f };
       bool any = false;
 
-      for (int i = 0; i < Render3DNode::kSlots; i++)
+      for (IGeometrySource* source : n->FlattenedGeometry())
       {
-         IGeometrySource* source = n->geometry[i];
          if (source == nullptr)
             continue;
          const Mesh& mesh = source->GetMesh();
@@ -1506,10 +1549,7 @@
 
    void DrawRender3DParams(Render3DNode* n)
    {
-      int connected = 0;
-      for (int i = 0; i < Render3DNode::kSlots; i++)
-         if (n->geometry[i] != nullptr)
-            connected++;
+      const int connected = (int)n->FlattenedGeometry().size();
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
       ImGui::SameLine(0.0f, 16.0f);
       ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
@@ -1524,6 +1564,8 @@
       ImGui::BeginGroup();
 
       NodeSeparator("output", colW);
+      DropdownButton("pass", Render3DNode::RenderPassNames(), n->renderPass,
+                     [n](int i) { n->renderPass = i; }, colW);
       // This is the export resolution: Output sizes its own buffer from whatever
       // its input hands it, so a 4000px PNG needs 4000 set here or it is an
       // upscale of a smaller render.

@@ -1,5 +1,62 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.58.0-turbo (2026-10-16)
+
+### PointZ nodes (new category)
+- 85 point operators after TouchDesigner's POP family, all one node class driven by an operator
+  table (`src/pop`): tier A (generators and GPU kernels: Noise, Transform, Twist, Math, Random,
+  ReRange, Quantize, Trig, Limit, Normalize, Projection, Texture Map, Field, Force Radial, Lookup
+  Attribute / Channel / Texture, Group, Blend, Dimension, Phaser, Point, Attribute, Attribute
+  Combine / Convert, Math Combine / Mix, GLSL, GLSL Select, Switch, Null, In, Out, SOP / TOP / CHOP
+  to PointZ) and tier B (Merge, Delete, Convert, Normal, Facet, Primitive, Select, Sort, Topology, Copy,
+  Extrude, Subdivide, Sprinkle, Revolve, Curve, Line Resample / Divide / Break / Metrics / Smooth /
+  Thick, Accumulate, Analyze, Histogram, Particle, Feedback, Trail, Cache, Cache Select, Cache Blend,
+  GLSL Create / Copy / Advanced, Point File In, File In, File Out, Table to PointZ, Text, Instance).
+- GPU kernels run as transform feedback (OpenGL 3.2), so the module also builds on macOS.
+- Render 3D draws PointZ nodes from the GPU (faces, lines, sprites) and instances with **Instance PointZ**.
+- Loops: Particle / Feedback PointZ read the Null PointZ whose `tag` matches their `target`.
+- Any existing 3D source plugs into a PointZ; every 3D node can read a PointZ back.
+
+### 3D from upstream (Naman)
+- Group 3D, Delaunay Mesh, Voronoi Cells, Curve Ops, Decimate op, Render 3D render passes, Material
+  bump (height map) and texture alpha, cook-time warnings on 3D pins (red border, also in `explain`).
+
+### MCP
+- The authoring guide now says to mix every multi-source patch in a Super Mixer (one channel per
+  source), lists the new 3D nodes and has a PointZ section; the server instructions say so too.
+
+- Instance PointZ works like the Geometry COMP: per-axis Scale attribute, scale X/Y/Z, rotate and translate
+  offsets for every instance, any attribute renamed, and per-instance textures (four image pins picked by
+  TexIndex, instance number or at random, or an atlas grid of one image or the Material's texture).
+- Noise PointZ: gradient, fractal, curl, ridged, turbulence, cells, value and random, translate 4D (time and
+  a W offset move through a fourth dimension), harmonics / spread / roughness, exponent, offset, frequency
+  per axis. Type and dimension are compiled into the kernel, so only the branch in use runs.
+- Speed: Render 3D reads PointZ bounds without stalling the GPU (a 1x1 read per cloud every frame waited
+  for the whole pipeline), missing attributes share one constant buffer instead of a new upload per frame,
+  kernel outputs reuse pooled GPU buffers, and Trail PointZ (points matched by index) keeps its history on
+  the GPU with a fixed topology instead of downloading every frame.
+- The PointZ menu sits between 3D Geometry and 3D Scene & Render.
+- Render 3D viewport: middle drag (or Shift + left) pans, right drag dollies, as in TouchDesigner; a drag
+  that starts on the viewport no longer pans the canvas.
+- Copy PointZ and GLSL Copy PointZ write every piece in place in one multithreaded pass and keep
+  their topology between frames (index buffers upload once): a box copied onto 7k animated points
+  went from ~29 ms to a few ms per frame.
+
+### Fixes
+- Audio device recovery: the minimum interval between restarts now counts from the end of a restart
+  (a slow WASAPI/ASIO restart fired its own config-change notifications straight into a second
+  restart) and the give-up window closes after 10 s of calm, so five slow failures still give up.
+- Clip Matrix no longer touches OpenGL when cooked without a window (crashed the headless audio sweep).
+- The startup example is never loaded during a self-test run.
+
+### Tests
+- `GEOWAVEUTEST` (upstream 3D) and `POPTEST` (every PointZ cooks on the GPU, GPU vs CPU, Render 3D,
+  Particle loop) in `test-windows.bat`.
+- DRAGTEST drags inside the graph's own rect (the docked module panel covered the old spot);
+  SAMPLERDRAG / MEDIADRAG compare files, not spellings (`C:\tmp\...` vs `/tmp/...`); PLUGINDRAG
+  uses one fake library row instead of a full VST3 scan (`INFINITE_PLUGINDRAG_REALSCAN=1` keeps the
+  real one).
+
 ## 0.57.0-turbo (2026-10-14)
 
 ### Pattern Player (new, Notes)

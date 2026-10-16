@@ -75,8 +75,9 @@ set INFINITE_UNDOTEST=1& set INFINITE_EXITAFTER=10& build\windows-vs2022\Release
 
 ## Windows-specific notes
 
-- PLUGINSCANTEST (Audio Units) was dropped. PLUGINDRAGTEST / MEDIADRAGTEST /
-  SAMPLERDRAGTEST need entries in the library panel (VST3 plugins, media,
-  samples); on an empty library they time out and FAIL.
+- PLUGINSCANTEST (Audio Units) was dropped. MEDIADRAGTEST / SAMPLERDRAGTEST
+  stage their own fixture file in C:\tmp. PLUGINDRAGTEST feeds the panel one
+  fake row (no VST3 needed); `INFINITE_PLUGINDRAG_REALSCAN=1` runs a real scan,
+  which can outlast the frame budget on a machine with many plugins.
 - Close Infinite-Turbo before running: the build refuses while it is open.
 - Screenshot resolution follows the fixture framebuffer and DPI scale.

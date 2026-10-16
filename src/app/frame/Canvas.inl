@@ -21,7 +21,16 @@
             gPanWithLeft = true;
          if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
             gPanWithLeft = false;
-         liveCfg.NavigateButtonIndex = gPanWithLeft ? 0 : 1;
+         // A right or middle drag that starts on a Render 3D viewport is that
+         // viewport's (dolly / pan); park the canvas pan on an unused button
+         // until it ends. gViewport3DHoveredNow is last frame's hover.
+         if (!ImGui::IsMouseDown(ImGuiMouseButton_Right) && !ImGui::IsMouseDown(ImGuiMouseButton_Middle))
+            gViewport3DOwnsDrag = false;
+         if ((ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) &&
+             gViewport3DHoveredNow)
+            gViewport3DOwnsDrag = true;
+         gViewport3DHoveredNow = false;
+         liveCfg.NavigateButtonIndex = gPanWithLeft ? 0 : (gViewport3DOwnsDrag ? 4 : 1);
       }
 
       const bool viewportPanelOpen = !gViewportPanelNodes.empty();
