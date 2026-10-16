@@ -587,8 +587,17 @@ class Engine:
             res["fails"].append(("canon-unstable", "canonicalizing the canonical file changes it again"))
 
 
+def _without_paths(v):
+    # frame_stats carries the written file's path, which differs between the two runs' output folders.
+    if isinstance(v, dict):
+        return {k: _without_paths(x) for k, x in v.items() if k != "file"}
+    if isinstance(v, list):
+        return [_without_paths(x) for x in v]
+    return v
+
+
 def nodiff_stats(j):
-    return json.dumps([j.get("frame_stats"), j.get("audio_summary"), j.get("frames"), j.get("size")], sort_keys=True)
+    return json.dumps(_without_paths([j.get("frame_stats"), j.get("audio_summary"), j.get("frames"), j.get("size")]), sort_keys=True)
 
 
 def first_error(j):
