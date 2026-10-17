@@ -1,5 +1,34 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.59.1-turbo (2026-10-17)
+
+### Audio: no blink when adding a module (upstream fix)
+- Every topology rebuild (adding a node, moving a cable) re-prepared every audio node, zeroing delay
+  lines, filters, reverb tails and smoothers of everything playing: the Audio Out blinked. A node is
+  now prepared only when it is new, its sample rate or block size changed, or the engine restarted.
+- Delay-compensation (PDC) lines live on the node and keep their contents across rebuilds; their
+  Prepare is a no-op when the amount is unchanged.
+
+### Show safety (after upstream v0.6)
+- **Panic** (Ctrl+. or VIEW > Show): output fades out in 5 ms, every MIDI Out sends all-notes-off,
+  plugins release their notes, the transport stops; again to resume. A red PANIC button shows it.
+- **Show lock** (Ctrl+Shift+L): no deleting nodes or cables, dragging nodes, new cables or undo/redo;
+  knobs, transport, Performance mode and the Set list keep working. A LOCKED badge shows it.
+- **Pre-show check** (VIEW > Show): closed audio device, plugins not loaded, missing media files,
+  absent MIDI devices and Outputs with nothing connected, each with a button to find the node.
+
+### Performance and safety fixes ported from upstream v0.6
+- Saving is atomic: Ctrl+S, the app settings and the recent list are written beside the file and
+  renamed over it, so a crash mid-save cannot damage the old copy (accented paths work too).
+- A plugin that crashed the app is named in `crash.log` and left unloaded when a patch brings it back
+  (the node passes sound through); picking it again in Plugins retries.
+- Adding an effect no longer compiles shaders in that frame: program binaries are cached in memory,
+  and effect shaders are built ahead, one per frame, from frame 30.
+- Particle System: the free-slot search is one pass per emission, not one per particle (same results).
+- One note output feeds up to 64 consumers (was 8; past that they stayed silent).
+- Node editor: a node with huge or non-finite bounds no longer crashes on reposition.
+- Random: the seed hash uses unsigned arithmetic (no undefined overflow; identical values).
+
 ## 0.59.0-turbo (2026-10-17)
 
 ### Set blocks (long performances)

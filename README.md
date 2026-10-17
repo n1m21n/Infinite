@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.59.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.59.1-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -141,6 +141,8 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 Every group is a block that can be switched off (power button on its header): its nodes stop completely. Put each song in its own group (or FILE > Import patch as a block), open VIEW > Set list (Shift+L) and press GO on a song: it switches on alone, the timeline rewinds and plays. Page Up / Page Down step through the set.
 
 In Performance mode a block is a Toggle: right-click a group's power button (or the faders icon on its Set list row) to add its on / off to the current page, or use Assign on an existing control and click the power button. It takes MIDI learn like any other control.
+
+On stage: **Ctrl+.** is the panic (output muted with a short fade, all notes off, transport stopped; again to resume), **Ctrl+Shift+L** the show lock (no deleting, dragging, new cables or undo, while knobs and the Set list keep working), and VIEW > Show > **Pre-show check** lists what would go wrong (audio closed, plugins not loaded, missing media, absent MIDI devices, unconnected Outputs).
 
 **From Claude Desktop**:
 

@@ -19,6 +19,12 @@ public:
    // `def` must outlive the node - defs live in the static vector returned by GetFilterDefs().
    static INode* CreateFor(const FilterDef& def) { return new FilterNode(def); }
 
+   // Turbo 0.59 (upstream's warm-up): builds one effect's shaders ahead of
+   // use, so the first time an effect is added it links from the in-memory
+   // cache instead of compiling in that frame. Main thread, GL current; call
+   // once a frame. Returns false once every effect has been warmed.
+   static bool WarmNextShader();
+
    explicit FilterNode(const FilterDef& def);
    ~FilterNode() override;
 

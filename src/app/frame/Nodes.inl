@@ -22,6 +22,7 @@
          for (const auto& t : el.targetsY)
             cullExemptNodes.insert(t.dstIndex);
       }
+      HoldShowLockPositions(); // Turbo 0.59: nodes stay put under the show lock
       const bool cullingAllowed = !MidiMap::LearnMode() && gPerfAssigningElemIdx < 0 && getenv("INFINITE_NO_CULL") == nullptr;
 
       for (GraphNode& gn : gNodes)

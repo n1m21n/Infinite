@@ -46,8 +46,11 @@ struct AudioTopologyEntry
    // already the slowest (or the node has only one connected pin) gets an
    // inactive (0-sample, unallocated) one. RunTopology applies these before
    // handing the node its inputs - see its comment.
-   CompensationDelay inputCompensation[kAudioMaxNodeInputs];
+   // Turbo 0.59: the delays themselves live on `node`
+   // (AudioNode::inputCompensation) so they persist across rebuilds.
 };
+static_assert(AudioNode::kMaxInputPins == kAudioMaxNodeInputs,
+              "AudioNode::inputCompensation needs one slot per input pin");
 
 // One connected Audio Out: the pooled buffer its source writes into, and
 // (unconditionally) that Audio Out's own capture ring - RunTopology writes
@@ -65,6 +68,11 @@ struct AudioTerminal
    // sum lands every terminal sample-aligned. Inactive for the common case
    // of one terminal, or several with equal (usually zero) latency.
    CompensationDelay compensation;
+   // Turbo 0.59 (upstream): when set (a real Audio Out, its capture ring's
+   // delay), used instead of `compensation`, which a rebuild would recreate
+   // empty. Hand-built test topologies leave it null.
+   CompensationDelay* externalCompensation = nullptr;
+   CompensationDelay& Compensation() { return externalCompensation != nullptr ? *externalCompensation : compensation; }
 
    // Turbo: a "live" Audio Out (input monitoring) stays audible while the
    // Arrangement Timeline owns the output; every other canvas terminal is
@@ -202,6 +210,12 @@ public:
 
    double SampleRate() const;
    uint64_t XrunCount() const;
+
+   // Turbo 0.59 (upstream's show safety): the panic mute. The device output
+   // fades to silence over 5 ms (and back the same way) - nothing else in the
+   // graph changes, so releasing it resumes exactly where the patch is.
+   void SetPanicMute(bool mute) { mPanicMute.store(mute, std::memory_order_relaxed); }
+   bool PanicMute() const { return mPanicMute.load(std::memory_order_relaxed); }
    // Turbo 0.47: audio callbacks finished so far. Once it has moved two past
    // a SetTopology, no callback can still be running the old process list,
    // so nodes dropped from it may be destroyed.
@@ -386,6 +400,8 @@ private:
    std::atomic<double> mSampleRate { 0.0 };
    std::atomic<uint64_t> mStartGeneration { 0 };
    std::atomic<uint64_t> mXrunCount { 0 };
+   std::atomic<bool> mPanicMute { false };
+   float mPanicGain = 1.0f; // audio thread: the ramped gain toward 0 / 1
    std::atomic<uint64_t> mBlocksDone { 0 };
    std::atomic<double> mLastCallbackMs { -1.0 };
    std::atomic<double> mLastBlockLoad { 0.0 };

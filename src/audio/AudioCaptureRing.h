@@ -3,6 +3,8 @@
 #include <atomic>
 #include <cstddef>
 
+#include "CompensationDelay.h"
+
 // Lock-free single-producer (audio thread) / single-consumer (main thread)
 // ring carrying interleaved float samples for one Audio Out's WAV capture -
 // same SPSC shape as MeterRing, but sized for real audio instead of a
@@ -28,6 +30,11 @@ public:
    // starting/stopping a recording. Plain bool, not gated behind topology -
    // starting a recording must not require a topology rebuild to take effect.
    std::atomic<bool> enabled { false };
+
+   // Turbo 0.59 (upstream): this Audio Out's terminal-level delay
+   // compensation, kept here so it survives topology rebuilds (see
+   // AudioTerminal::externalCompensation).
+   CompensationDelay compensation;
 
    // Incremented (audio thread) whenever the ring was full and samples were
    // dropped; read and reset by the consumer that reports it, so a stall

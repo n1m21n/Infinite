@@ -334,6 +334,10 @@
    };
    std::vector<LatencyWatch> gLatencyWatch;
 
+   // Turbo 0.59: bumped by StartAudioEngine, so the next rebuild prepares
+   // every node at the device it just opened (see AudioNode::preparedForEpoch).
+   int gAudioPrepareEpoch = 0;
+
    void RebuildAudioTopology()
    {
       gLatencyWatch.clear(); // never keep pointers past a rebuild (or a deferred one)
@@ -499,8 +503,23 @@
          if (blockFrames <= 0)
             blockFrames = gAudioBufferFrames;
          blockFrames = std::clamp(blockFrames, 64, kAudioMaxBlockFrames);
+         // Turbo 0.59 (upstream's fix): only a node that is new here, or whose
+         // rate / block size changed, or that has not been prepared since the
+         // engine (re)started, is prepared. PrepareToPlay zeroes DSP state, and
+         // re-running it on every live node made the Audio Out blink each time
+         // a module was added or a cable moved. See AudioNode::preparedForSampleRate.
          for (AudioTopologyEntry& entry : order)
-            entry.node->PrepareToPlay(sampleRate, blockFrames);
+         {
+            AudioNode* an = entry.node;
+            if (an->preparedForSampleRate != sampleRate || an->preparedForBlock != blockFrames ||
+                an->preparedForEpoch != gAudioPrepareEpoch)
+            {
+               an->PrepareToPlay(sampleRate, blockFrames);
+               an->preparedForSampleRate = sampleRate;
+               an->preparedForBlock = blockFrames;
+               an->preparedForEpoch = gAudioPrepareEpoch;
+            }
+         }
       }
 
       // Plugin/effect delay compensation (PDC). There is no compensation
@@ -545,8 +564,9 @@
       // every pin/terminal lands sample-aligned instead of comb-filtering
       // against its siblings. A branch already at (or past) the max, or a
       // node with only one connected pin, gets an inactive (unallocated)
-      // CompensationDelay - Prepare(0, ...) is the default-constructed
-      // state, so those pins are simply left untouched. Fixed capacity
+      // CompensationDelay. Turbo 0.59: the delays persist on the node now, so
+      // every pin is prepared every rebuild - Prepare(0, ...) clears a delay a
+      // pin no longer needs, and an unchanged amount is a no-op. Fixed capacity
       // (kAudioMaxChannels), matching PooledBuffer::Allocate's own
       // discipline, so a topology generation is never under-allocated if
       // the device's actual channel count changes mid-generation.
@@ -559,14 +579,11 @@
             if (idx >= 0)
                maxAmongConnected = std::max(maxAmongConnected, cumulativeLatency[(size_t)idx]);
          }
-         for (int i = 0; i < entry.numInputs; i++)
+         for (int i = 0; i < kAudioMaxNodeInputs; i++)
          {
-            const int idx = entry.inputBufferIndices[i];
-            if (idx < 0)
-               continue;
-            const int delay = maxAmongConnected - cumulativeLatency[(size_t)idx];
-            if (delay > 0)
-               entry.inputCompensation[i].Prepare(delay, kAudioMaxChannels);
+            const int idx = i < entry.numInputs ? entry.inputBufferIndices[i] : -1;
+            const int delay = idx < 0 ? 0 : maxAmongConnected - cumulativeLatency[(size_t)idx];
+            entry.node->inputCompensation[i].Prepare(std::max(0, delay), kAudioMaxChannels);
          }
       }
 
@@ -581,11 +598,12 @@
          for (size_t t = 0; t < terminals.size(); t++)
          {
             AudioTerminal& terminal = terminals[t];
-            if (terminal.bufferIndex < 0 || (t < terminalLive.size() && terminalLive[t]))
-               continue;
-            const int delay = maxAmongTerminals - cumulativeLatency[(size_t)terminal.bufferIndex];
-            if (delay > 0)
-               terminal.compensation.Prepare(delay, kAudioMaxChannels);
+            // Turbo 0.59: the Audio Out's own (persistent) delay, see AudioTerminal.
+            if (terminal.capture != nullptr)
+               terminal.externalCompensation = &terminal.capture->compensation;
+            const bool aligned = terminal.bufferIndex >= 0 && !(t < terminalLive.size() && terminalLive[t]);
+            const int delay = aligned ? maxAmongTerminals - cumulativeLatency[(size_t)terminal.bufferIndex] : 0;
+            terminal.Compensation().Prepare(std::max(0, delay), kAudioMaxChannels);
          }
       }
 
@@ -677,6 +695,7 @@
       AudioEngine::Instance().SetTopology(AudioTopology{});
       if (!AudioEngine::Instance().Start(outError))
          return false;
+      gAudioPrepareEpoch++; // Turbo 0.59: every node is prepared once more at the new device
       RebuildAudioTopology();
       return true;
    }

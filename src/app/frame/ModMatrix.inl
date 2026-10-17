@@ -23,6 +23,8 @@
       DrawClaudeChat();
       DrawAiConnections(); // Turbo 0.59: Setup > AI connections
       DrawSetList();       // Turbo 0.59: VIEW > Set list (Shift+L)
+      HandleShowSafetyKeys(); // Turbo 0.59: Ctrl+. panic, Ctrl+Shift+L show lock
+      DrawPreShowCheck();     // Turbo 0.59: VIEW > Pre-show check
       if (gModMatrixOpen)
       {
          ImGui::SetNextWindowSize(ImVec2(820, 420), ImGuiCond_FirstUseEver);

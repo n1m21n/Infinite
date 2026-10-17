@@ -263,6 +263,7 @@ namespace
    #include "app/graph/Rpc.inl" // MCP remote control (RPC) helpers
    #include "app/ui/AppWindows.inl" // minimap, save prompts, window title, projector windows
    #include "app/graph/SetBlocks.inl" // Turbo 0.59: Set blocks (groups that switch off) and the Set list
+   #include "app/ui/ShowSafety.inl" // Turbo 0.59: panic, show lock, pre-show check
    #include "app/bodies/LayoutVmpc.inl" // Layout and VMPC node bodies
 }
 

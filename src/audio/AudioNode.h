@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AudioBuffer.h"
+#include "CompensationDelay.h"
 #include "NoteEventQueue.h"
 
 // Audio-thread interface. ProcessBlock runs on the real-time render thread
@@ -24,6 +25,25 @@ class AudioNode
 public:
    virtual ~AudioNode() {}
    virtual void PrepareToPlay(double sampleRate, int maxBlockSize) {}
+
+   // Turbo 0.59 (upstream's fix): what this node was last PrepareToPlay'd
+   // with. Main thread only, owned by RebuildAudioTopology. A rebuild runs on
+   // every node add, cable edit or timeline change, and nearly every kernel's
+   // PrepareToPlay zeroes its state (delay lines, filters, reverb tails,
+   // smoothers) - doing that to nodes already playing made the Audio Out
+   // blink each time a module was added. Now only a node that is new, or
+   // whose rate / block size / engine start (epoch) changed, is prepared.
+   double preparedForSampleRate = -1.0;
+   int preparedForBlock = 0;
+   int preparedForEpoch = -1;
+
+   // Turbo 0.59 (upstream's fix): plugin/effect delay compensation per input
+   // pin, on the persistent node rather than in the AudioTopologyEntry that
+   // every rebuild makes from scratch - a fresh delay line restarts empty,
+   // which was a dropout on every rebuild for any compensated branch.
+   // Must match kAudioMaxNodeInputs (static_assert in AudioEngine.h).
+   static constexpr int kMaxInputPins = 16;
+   CompensationDelay inputCompensation[kMaxInputPins];
    virtual void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) = 0;
    virtual void Reset() {}
 

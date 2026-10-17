@@ -146,6 +146,25 @@ void FilterNode::OutputSizeFor(int inW, int inH, int& outW, int& outH) const
    outH = std::clamp(h, 1, 16384);
 }
 
+bool FilterNode::WarmNextShader()
+{
+   static size_t sNext = 0;
+   const std::vector<FilterDef>& defs = GetFilterDefs();
+   if (sNext >= defs.size())
+      return false;
+   const FilterDef& def = defs[sNext++];
+   if (!def.prePassBody.empty())
+   {
+      const std::string preSrc = std::string(kPreamble) + def.prePassBody;
+      if (unsigned int p = GLUtil::CompileProgram(preSrc.c_str()))
+         glDeleteProgram(p);
+   }
+   const std::string src = std::string(kPreamble) + kMaskPrologue + def.fragmentBody + kMaskEpilogue;
+   if (unsigned int p = GLUtil::CompileProgram(src.c_str()))
+      glDeleteProgram(p);
+   return true;
+}
+
 bool FilterNode::EnsureShader()
 {
    if (mShaderTried)

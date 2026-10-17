@@ -359,6 +359,56 @@ namespace GLUtil
 
       constexpr uint32_t kShaderCacheMagic = 0x43535449; // "ITSC"
 
+      // Turbo 0.59 (upstream's "adding a node no longer recompiles its
+      // shader"): program binaries already built or read this session, by
+      // source hash, so a second Blur / Shape / effect links from memory -
+      // no disk read and no compile in the frame the node is added.
+      struct MemBinary
+      {
+         uint32_t format = 0;
+         std::vector<char> blob;
+      };
+      std::unordered_map<uint64_t, MemBinary>& MemCache()
+      {
+         static std::unordered_map<uint64_t, MemBinary> cache;
+         return cache;
+      }
+
+      unsigned int ProgramFromBinary(uint32_t format, const std::vector<char>& blob)
+      {
+         if (blob.empty())
+            return 0;
+         unsigned int program = glCreateProgram();
+         glProgramBinary(program, (GLenum)format, blob.data(), (GLsizei)blob.size());
+         GLint linked = GL_FALSE;
+         glGetProgramiv(program, GL_LINK_STATUS, &linked);
+         if (linked != GL_TRUE)
+         {
+            glDeleteProgram(program);
+            glGetError(); // swallow GL_INVALID_ENUM from a stale format
+            return 0;
+         }
+         return program;
+      }
+
+      void RememberProgramBinary(uint64_t key, unsigned int program)
+      {
+         GLint length = 0;
+         glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
+         if (length <= 0)
+            return;
+         MemBinary mb;
+         mb.blob.resize((size_t)length);
+         GLenum format = 0;
+         GLsizei written = 0;
+         glGetProgramBinary(program, length, &written, &format, mb.blob.data());
+         if (written <= 0)
+            return;
+         mb.blob.resize((size_t)written);
+         mb.format = (uint32_t)format;
+         MemCache()[key] = std::move(mb);
+      }
+
       unsigned int LoadCachedProgram(const std::filesystem::path& file)
       {
          std::ifstream in(file, std::ios::binary);
@@ -417,11 +467,24 @@ namespace GLUtil
    unsigned int CompileProgram(const char* fragSrc, std::string* outError)
    {
       std::filesystem::path cacheFile;
-      if (!ShaderCacheDir().empty())
+      const uint64_t key = Fnv1a64(std::string(fragSrc), Fnv1a64(kVertSrc));
+      const bool binaries = !ShaderCacheDir().empty();
+      if (binaries)
       {
-         cacheFile = ShaderCacheDir() / (Hex64(Fnv1a64(std::string(fragSrc), Fnv1a64(kVertSrc))) + ".bin");
+         // Turbo 0.59: memory first, then the disk cache (kept in memory after).
+         auto hit = MemCache().find(key);
+         if (hit != MemCache().end())
+         {
+            if (unsigned int p = ProgramFromBinary(hit->second.format, hit->second.blob))
+               return p;
+            MemCache().erase(hit);
+         }
+         cacheFile = ShaderCacheDir() / (Hex64(key) + ".bin");
          if (unsigned int cached = LoadCachedProgram(cacheFile))
+         {
+            RememberProgramBinary(key, cached);
             return cached;
+         }
       }
 
       auto report = [outError](const char* prefix, const char* log)
@@ -487,6 +550,8 @@ namespace GLUtil
 
       if (!cacheFile.empty())
          SaveCachedProgram(cacheFile, program);
+      if (binaries)
+         RememberProgramBinary(key, program);
       return program;
    }
 

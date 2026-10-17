@@ -4,7 +4,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <sstream>
 
@@ -15,6 +17,60 @@ namespace Patch
 {
 namespace
 {
+   // Turbo 0.59 (upstream's atomic save): the file is written beside its
+   // target and renamed over it only once complete, so a crash, a full disk
+   // or a power cut mid-save leaves the previous version intact instead of a
+   // truncated patch. u8path: a plain std::ofstream(std::string) reads the
+   // path in the ANSI code page and fails on accented folder names.
+   bool WriteFileAtomic(const std::string& path, const std::function<bool(std::ostream&, std::string&)>& body,
+                        std::string& outError)
+   {
+      namespace fs = std::filesystem;
+      const fs::path target = fs::u8path(path);
+      const fs::path temp = fs::u8path(path + ".saving");
+      {
+         std::ofstream file(temp, std::ios::binary | std::ios::trunc);
+         if (!file)
+         {
+            outError = "could not open " + path + " for writing";
+            return false;
+         }
+         if (!body(file, outError))
+         {
+            file.close();
+            std::error_code rmEc;
+            fs::remove(temp, rmEc);
+            return false;
+         }
+         file.flush();
+         if (!file.good())
+         {
+            outError = "write failed while saving " + path;
+            file.close();
+            std::error_code rmEc;
+            fs::remove(temp, rmEc);
+            return false;
+         }
+      }
+      std::error_code ec;
+      fs::rename(temp, target, ec); // replaces the old file in one step
+      if (ec)
+      {
+         // A reader holding the old file open can refuse the replace: retry
+         // once after removing it (still never a half-written target).
+         ec.clear();
+         fs::remove(target, ec);
+         ec.clear();
+         fs::rename(temp, target, ec);
+      }
+      if (ec)
+      {
+         outError = "could not replace " + path + ": " + ec.message();
+         return false;
+      }
+      return true;
+   }
+
    const char* kMagic = "infinite-patch";
    const int kVersion = 1;
 
@@ -1252,9 +1308,12 @@ void SaveRecents()
    const std::string path = RecentsPath();
    if (path.empty())
       return;
-   std::ofstream file(path);
-   for (const std::string& entry : sRecents)
-      file << entry << "\n";
+   std::string error;
+   WriteFileAtomic(path, [](std::ostream& file, std::string&) {
+      for (const std::string& entry : sRecents)
+         file << entry << "\n";
+      return true;
+   }, error);
 }
 
 bool LoadAppSettings(SceneSettings& out)
@@ -1276,36 +1335,23 @@ bool LoadAppSettings(SceneSettings& out)
 
 bool SaveAppSettings(const SceneSettings& settings, std::string& outError)
 {
-   std::ofstream file(AppSettingsPath(), std::ios::trunc);
-   if (!file)
-   {
-      outError = "could not open app settings for writing";
-      return false;
-   }
-   WriteSettingsLines(file, settings, "");
-   if (!file.good())
-   {
-      outError = "write failed while saving app settings";
-      return false;
-   }
-   return true;
+   return WriteFileAtomic(AppSettingsPath(), [&settings](std::ostream& file, std::string&) {
+      WriteSettingsLines(file, settings, "");
+      return true;
+   }, outError);
 }
 
 // Turbo 0.45: file and text front ends for the stream reader / writer.
 bool Write(const std::string& path, const Data& data, std::string& outError)
 {
-   std::ofstream file(path);
-   if (!file)
-   {
-      outError = "could not open " + path + " for writing";
-      return false;
-   }
-   return WriteStream(file, data, outError, path);
+   return WriteFileAtomic(path, [&](std::ostream& file, std::string& err) {
+      return WriteStream(file, data, err, path);
+   }, outError);
 }
 
 bool Read(const std::string& path, Data& outData, std::string& outError)
 {
-   std::ifstream file(path);
+   std::ifstream file(std::filesystem::u8path(path)); // Turbo 0.59: accented paths
    if (!file)
    {
       outError = "could not open " + path;

@@ -47,7 +47,9 @@ class NoteEventQueue
 {
 public:
    static constexpr int kCapacity = 256;
-   static constexpr int kMaxConsumers = 8;
+   // Turbo 0.59 (upstream): 64, was 8 - a ninth synth / note tool on one
+   // note output registered no cursor and stayed silent without a word.
+   static constexpr int kMaxConsumers = 64;
 
    // Topology-rebuild thread only, never concurrent with Push/Pop. Drops
    // every registered cursor so ids don't leak across rebuild generations;

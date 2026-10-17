@@ -539,6 +539,17 @@ namespace Platform
    // unhandled exception (CrashHandlerWindows.cpp). Call once, first thing.
    void InstallCrashHandler();
    std::string CrashReportDirectory();
+
+   // Turbo 0.59 (upstream's PluginCrashGuard): which plugin this thread is
+   // inside right now (its identifier; nullptr = none), set around every call
+   // into a plugin. Returns the previous mark so scopes nest. When the app
+   // crashes inside one, the crash handler adds it to crash\crashed_plugins.txt
+   // and the next patch load leaves it unloaded (PluginCrashedBefore); picking
+   // it again from the Plugins panel retries (PluginCrashForget).
+   const char* PluginCrashMark(const char* identifier);
+   const char* PluginCrashCurrent(); // this thread's mark (the crash handler reads it)
+   bool PluginCrashedBefore(const std::string& identifier);
+   void PluginCrashForget(const std::string& identifier);
    void ClearVST3Blocklist();
 
    // Bundles the most recent EnumerateVST3Plugins() call could not describe

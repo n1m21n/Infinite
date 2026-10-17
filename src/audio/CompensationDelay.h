@@ -31,8 +31,16 @@ public:
    // within one topology generation's lifetime.
    void Prepare(int delaySamples, int numChannels)
    {
-      mDelay = std::max(0, delaySamples);
-      mChannels = std::max(0, numChannels);
+      // Turbo 0.59 (upstream): idempotent. These delays now persist across
+      // rebuilds (AudioNode::inputCompensation, AudioCaptureRing), and
+      // re-zeroing one a live signal passes through on every rebuild was a
+      // click. Only a real change of length or width re-prepares.
+      delaySamples = std::max(0, delaySamples);
+      numChannels = std::max(0, numChannels);
+      if (delaySamples == mDelay && numChannels == mChannels)
+         return;
+      mDelay = delaySamples;
+      mChannels = numChannels;
       mWritePos = 0;
       if (mDelay == 0 || mChannels == 0)
       {

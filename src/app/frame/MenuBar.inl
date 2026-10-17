@@ -200,6 +200,21 @@
             if (ImGui::MenuItem("MIDI map", nullptr, gMidiWindowOpen))
                gMidiWindowOpen = !gMidiWindowOpen;
 
+            // Turbo 0.59: show safety (ShowSafety.inl).
+            ImGui::SeparatorText("Show");
+            if (ImGui::MenuItem("Panic", "Ctrl+.", gPanicActive))
+               TogglePanic();
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Mutes the output (5 ms fade), sends all-notes-off, releases plugin notes\n"
+                                 "and stops the transport. Again to bring the sound back.");
+            if (ImGui::MenuItem("Show lock", "Ctrl+Shift+L", gShowLock))
+               SetShowLock(!gShowLock);
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("No deleting, dragging, new cables or undo while it is on.\n"
+                                 "Knobs, transport, Performance mode and the Set list keep working.");
+            if (ImGui::MenuItem("Pre-show check...", nullptr, gPreShowOpen))
+               gPreShowOpen = !gPreShowOpen;
+
             ImGui::SeparatorText("Canvas");
             if (ImGui::MenuItem("Fit view to content"))
                gRequestFitView = true;
@@ -887,6 +902,28 @@
                dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + cellW, y0 + cellH), col, 1.5f);
             }
             ImGui::Dummy(ImVec2(cells * (cellW + cellGap), ImGui::GetFrameHeight()));
+         }
+
+         // Turbo 0.59: show safety states, impossible to miss while on.
+         if (gPanicActive)
+         {
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.80f, 0.15f, 0.15f, 1.0f));
+            if (ImGui::Button("PANIC"))
+               TogglePanic();
+            ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Output muted: click (or Ctrl+.) to bring the sound back");
+         }
+         if (gShowLock)
+         {
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.55f, 0.42f, 0.10f, 1.0f));
+            if (ImGui::Button("LOCKED"))
+               SetShowLock(false);
+            ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Show lock: editing blocked. Click (or Ctrl+Shift+L) to unlock");
          }
 
          // ---- top bar, right: system monitors, then icon toggles ----------------

@@ -64,6 +64,11 @@ void ParticleSystemNode::Reset()
 void ParticleSystemNode::Emit(int count)
 {
    const int cap = std::max(0, std::min(maxParticles, 200000));
+   // Turbo 0.59 (upstream's particle fix): where the free-slot search goes on
+   // from. Every slot before it is alive (or was just filled), so the first
+   // dead slot is the same one a scan from 0 finds - same results - but one
+   // emission costs one pass over the array instead of one per particle.
+   size_t scan = 0;
    for (int i = 0; i < count; i++)
    {
       Particle p;
@@ -137,11 +142,12 @@ void ParticleSystemNode::Emit(int count)
       // Reuse a dead slot before growing: at steady state the array stops
       // reallocating entirely.
       bool placed = false;
-      for (size_t s = 0; s < mParticles.size(); s++)
+      for (; scan < mParticles.size(); scan++)
       {
-         if (!mParticles[s].alive)
+         if (!mParticles[scan].alive)
          {
-            mParticles[s] = p;
+            mParticles[scan] = p;
+            scan++;
             placed = true;
             break;
          }

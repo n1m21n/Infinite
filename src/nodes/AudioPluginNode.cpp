@@ -217,6 +217,8 @@ public:
 
    // Main thread only.
    void SetHandle(Platform::PluginHandle* handle) { mHandle.store(handle, std::memory_order_seq_cst); }
+   // Turbo 0.59 (panic): note-offs for everything held, on the next block.
+   void RequestFlush() { mFlushRequested.store(true, std::memory_order_release); }
    void SetBypass(bool bypass) { mBypass.store(bypass, std::memory_order_relaxed); }
    double SampleRate() const { return mSampleRate.load(std::memory_order_relaxed); }
    int MaxBlockSize() const { return mMaxBlockSize.load(std::memory_order_relaxed); }
@@ -557,6 +559,9 @@ void AudioPluginNode::PublishHandle(Platform::PluginHandle* handle)
 
 void AudioPluginNode::LoadPlugin(const Platform::PluginDesc& desc)
 {
+   // Turbo 0.59: an explicit load is the user's retry of a plugin that
+   // crashed before (ReloadFromIdentity has already skipped it otherwise).
+   Platform::PluginCrashForget(desc.identifier);
    // A different plugin's parameter addresses mean nothing to this one, so the
    // whole mapping list goes with it rather than silently re-pointing at
    // whatever happens to share an address.
@@ -621,6 +626,18 @@ void AudioPluginNode::ReloadFromIdentity()
    // off a reloaded instrument/music-effect patch.
    desc.acceptsNotes = mAcceptsNotes;
 
+   // Turbo 0.59 (upstream's PluginCrashGuard): this plugin took the app down
+   // last time - don't bring it straight back with the patch. The node keeps
+   // its identity, mappings and state (a save keeps them too) and passes the
+   // sound through; picking the plugin again in the Plugins panel retries.
+   if (Platform::PluginCrashedBefore(pluginId))
+   {
+      mLoadFailed = true;
+      mStatus = "crashed Infinite last time: not loaded (pick it again in Plugins to retry)";
+      mPendingStateRestore = false;
+      return;
+   }
+
    // Keep the restored mapping list and fullState - unlike LoadPlugin, this is
    // the *same* plugin coming back, so its addresses still mean what they did.
    const std::string savedState = mPluginState;
@@ -634,6 +651,12 @@ void AudioPluginNode::ReloadFromIdentity()
       mappings[i] = saved[i];
    mPluginState = savedState;
    mPendingStateRestore = !savedState.empty();
+}
+
+void AudioPluginNode::FlushNotes()
+{
+   if (mAudioNode)
+      mAudioNode->RequestFlush();
 }
 
 void AudioPluginNode::Unload()

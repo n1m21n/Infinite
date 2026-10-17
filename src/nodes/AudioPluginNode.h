@@ -120,6 +120,8 @@ public:
    void ReloadFromIdentity();
 
    void Unload();
+   // Turbo 0.59 (panic): releases every note the plugin is holding.
+   void FlushNotes();
 
    const std::string& PluginDisplayName() const { return pluginName; }
    const std::string& Status() const { return mStatus; }

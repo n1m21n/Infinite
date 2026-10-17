@@ -44,6 +44,12 @@ namespace Platform
       bool gBlocklistLoaded = false;
       std::atomic<bool> gScanChild { false };
       std::atomic<int> gOpenEditorCount { 0 };
+      // Turbo 0.59 (PluginCrashGuard): the plugin this thread is inside.
+      thread_local const char* tInsidePlugin = nullptr;
+      // Main thread: plugins still loading and plugins with an open editor.
+      // Their code runs inside the shared JUCE event pump, so a crash there
+      // can be pinned on a plugin only when exactly one is a candidate.
+      std::vector<const void*> gPumpCandidates;
       std::mutex gVstLogMutex;
 
       // v1/v2 were populated while scans launched the full Infinite app as the
@@ -487,6 +493,39 @@ namespace Platform
       void audioProcessorChanged(juce::AudioProcessor*, const juce::AudioProcessorListener::ChangeDetails&) override {}
    };
 
+   // Turbo 0.59 (upstream's PluginCrashGuard): see Platform.h.
+   const char* PluginCrashMark(const char* identifier)
+   {
+      const char* previous = tInsidePlugin;
+      tInsidePlugin = identifier;
+      return previous;
+   }
+   const char* PluginCrashCurrent() { return tInsidePlugin; }
+
+   namespace
+   {
+      // Marks this thread as inside `h` for the scope (nested scopes restore).
+      struct CrashScope
+      {
+         const char* previous;
+         explicit CrashScope(const PluginHandle* h)
+            : previous(PluginCrashMark(h != nullptr ? h->desc.identifier.c_str() : nullptr)) {}
+         ~CrashScope() { PluginCrashMark(previous); }
+         CrashScope(const CrashScope&) = delete;
+         CrashScope& operator=(const CrashScope&) = delete;
+      };
+      void AddPumpCandidate(const PluginHandle* h)
+      {
+         if (std::find(gPumpCandidates.begin(), gPumpCandidates.end(), (const void*)h) == gPumpCandidates.end())
+            gPumpCandidates.push_back(h);
+      }
+      void RemovePumpCandidate(const PluginHandle* h)
+      {
+         gPumpCandidates.erase(std::remove(gPumpCandidates.begin(), gPumpCandidates.end(), (const void*)h),
+                               gPumpCandidates.end());
+      }
+   }
+
    void EnumerateAudioUnits(std::vector<PluginDesc>&) {}
    bool DescribeAudioUnitBundle(const std::string&, std::vector<PluginDesc>&) { return false; }
 
@@ -622,6 +661,7 @@ namespace Platform
             VstLog("load success: " + handle->desc.name + " | " + handle->desc.path);
             handle->state.store(PluginLoadState::Ready, std::memory_order_release);
          });
+      AddPumpCandidate(handle); // its constructor runs inside the event pump
       return handle;
 #endif
    }
@@ -635,6 +675,8 @@ namespace Platform
       }
       PumpPluginEditorEvents();
       const auto state = handle->state.load(std::memory_order_acquire);
+      if (state != PluginLoadState::Pending && !handle->editor)
+         RemovePumpCandidate(handle);
       if (state == PluginLoadState::Failed)
       {
          std::lock_guard<std::mutex> lock(handle->loadMutex);
@@ -650,6 +692,7 @@ namespace Platform
          outError = "plugin is not ready";
          return false;
       }
+      CrashScope crashScope(handle); // Turbo 0.59: prepare runs plugin code
       handle->renderEnabled.store(false, std::memory_order_seq_cst);
       // The audio half unpublishes the handle before this call, but a block
       // that already loaded the old pointer may still be inside processBlock.
@@ -705,6 +748,7 @@ namespace Platform
          handle->asyncState->handle = nullptr;
       }
       PluginCloseEditor(handle);
+      RemovePumpCandidate(handle); // Turbo 0.59: never a dangling candidate
       // Turbo 0.49: wait for every audio-thread user (the plugin node's MIDI
       // writes too, not only the render). Deleting under one of them was a
       // use-after-free: a crash writing the pitch-bend RPN into a freed
@@ -720,6 +764,7 @@ namespace Platform
       }
       if (handle->instance)
       {
+         CrashScope crashScope(handle);
          handle->instance->removeListener(handle);
          handle->instance->releaseResources();
       }
@@ -791,6 +836,7 @@ namespace Platform
          // 32/48-frame block made the plugin run ahead of real time and
          // smear the pitch. The view refers to work's memory, no allocation.
          juce::AudioBuffer<float> block(work.getArrayOfWritePointers(), work.getNumChannels(), numFrames);
+         CrashScope crashScope(handle); // Turbo 0.59: a crash here names this plugin
          handle->instance->processBlock(block, handle->midi);
          // Turbo 0.59: after processBlock the buffer holds the plugin's own
          // MIDI output (JUCE swaps it in) - but only for a plugin that has
@@ -954,11 +1000,13 @@ namespace Platform
    {
       if (!handle || !handle->instance) { outError = "plugin is not ready"; return false; }
       GlContextKeeper keepGl;
+      CrashScope crashScope(handle);
       if (handle->editor) { handle->editor->toFront(true); return true; }
       auto* editor = handle->instance->createEditorIfNeeded();
       if (!editor) { outError = "plugin has no editor"; return false; }
       handle->editor = std::make_unique<EditorWindow>(handle->desc.name, editor, [handle]() { PluginCloseEditor(handle); });
       gOpenEditorCount.fetch_add(1);
+      AddPumpCandidate(handle); // its GUI runs inside the event pump
       return true;
    }
 
@@ -966,8 +1014,12 @@ namespace Platform
    {
       if (!handle || !handle->editor) return;
       GlContextKeeper keepGl;
-      handle->editor.reset();
+      {
+         CrashScope crashScope(handle);
+         handle->editor.reset();
+      }
       gOpenEditorCount.fetch_sub(1);
+      RemovePumpCandidate(handle);
    }
    bool PluginEditorIsOpen(PluginHandle* handle) { return handle && handle->editor != nullptr; }
    bool AnyPluginEditorOpen() { return gOpenEditorCount.load() > 0; }
@@ -977,6 +1029,9 @@ namespace Platform
       auto* mm = juce::MessageManager::getInstanceWithoutCreating();
       if (!mm || !mm->isThisTheMessageThread()) return false;
       GlContextKeeper keepGl;
+      // Turbo 0.59: plugin code (a constructor, an editor) runs in here; pin
+      // a crash on the plugin only when exactly one could be running.
+      CrashScope crashScope(gPumpCandidates.size() == 1 ? (const PluginHandle*)gPumpCandidates[0] : nullptr);
       mm->runDispatchLoopUntil(1);
       return true;
    }
@@ -984,6 +1039,7 @@ namespace Platform
    bool PluginSaveState(PluginHandle* handle, std::string& outBase64)
    {
       if (!handle || !handle->instance) return false;
+      CrashScope crashScope(handle);
       juce::MemoryBlock state;
       handle->instance->getStateInformation(state);
       if (state.getSize() == 0) return false;
@@ -996,6 +1052,7 @@ namespace Platform
       if (!handle || !handle->instance) return false;
       juce::MemoryBlock state;
       if (!state.fromBase64Encoding(juce::String::fromUTF8(base64.c_str()))) return false;
+      CrashScope crashScope(handle);
       handle->instance->setStateInformation(state.getData(), (int)state.getSize());
       return true;
    }

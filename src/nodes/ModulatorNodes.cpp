@@ -24,7 +24,10 @@ namespace
    // repeats identically after a rewind instead of drifting.
    float Hash01(long long n)
    {
-      unsigned long long x = (unsigned long long)(n * 2654435761u + 1013904223u);
+      // Turbo 0.59 (upstream): in unsigned arithmetic - `n * 2654435761u` was a
+      // signed long long multiply that overflows (undefined behaviour). Same
+      // bits for every n that did not overflow, so patches sound the same.
+      unsigned long long x = (unsigned long long)n * 2654435761ULL + 1013904223ULL;
       x ^= x >> 33;
       x *= 0xff51afd7ed558ccdULL;
       x ^= x >> 33;

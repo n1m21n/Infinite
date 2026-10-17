@@ -1010,6 +1010,15 @@
          }
       }
 
+      // Turbo 0.59: one effect's shaders built ahead per frame from frame 30,
+      // so adding an effect later never compiles in that frame (FilterNode::
+      // WarmNextShader). Not in self-test runs: their timings stay comparable.
+      {
+         static bool sWarmDone = getenv("INFINITE_EXITAFTER") != nullptr;
+         if (!sWarmDone && frameId >= 30)
+            sWarmDone = !FilterNode::WarmNextShader();
+      }
+
       {
          // Measured after the swap so the number includes GPU work the driver
          // blocks on there, which is where a heavy 3D render actually lands.

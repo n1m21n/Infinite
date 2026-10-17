@@ -320,7 +320,8 @@
       }
 
       // ---- handle new connections ----
-      if (ed::BeginCreate(isLight ? ImColor(55, 62, 78) : ImColor(255, 255, 255), 2.0f))
+      // Turbo 0.59: no new cables under the show lock.
+      if (!gShowLock && ed::BeginCreate(isLight ? ImColor(55, 62, 78) : ImColor(255, 255, 255), 2.0f))
       {
          ed::PinId startPin, endPin;
          if (ed::QueryNewLink(&startPin, &endPin))
@@ -579,9 +580,10 @@
       // Shift+Cmd+Z is the Mac convention for redo; Ctrl+Y also works for
       // anyone used to the Windows/Linux binding.
       // Undo/redo and Space keep working with the timeline focused.
-      if (!io.WantTextInput && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+      // Turbo 0.59: not under the show lock (an undo can delete or move nodes).
+      if (!gShowLock && !io.WantTextInput && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
          Undo();
-      if (!io.WantTextInput && ((cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
+      if (!gShowLock && !io.WantTextInput && ((cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
                       (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))))
          Redo();
 
@@ -627,7 +629,7 @@
           ImGui::IsKeyPressed(ImGuiKey_Space, false))
          Transport::Instance().TogglePlay();
 
-      if (!typing && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
+      if (!typing && !gShowLock && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
                       ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
       {
          int count = ed::GetSelectedObjectCount();
@@ -1022,7 +1024,18 @@
       }
 
       // ---- handle deletions raised by the editor itself ----
-      if (ed::BeginDelete())
+      // Turbo 0.59: the show lock refuses every deletion the editor raises.
+      if (gShowLock && ed::BeginDelete())
+      {
+         ed::LinkId lockedLink;
+         while (ed::QueryDeletedLink(&lockedLink))
+            ed::RejectDeletedItem();
+         ed::NodeId lockedNode;
+         while (ed::QueryDeletedNode(&lockedNode))
+            ed::RejectDeletedItem();
+         ed::EndDelete();
+      }
+      else if (!gShowLock && ed::BeginDelete())
       {
          ed::LinkId linkId;
          while (ed::QueryDeletedLink(&linkId))

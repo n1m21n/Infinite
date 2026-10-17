@@ -264,14 +264,14 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          {
             inputPtrs[i] = nullptr;
          }
-         else if (entry.inputCompensation[i].IsActive())
+         else if (entry.node->inputCompensation[i].IsActive())
          {
             AudioBuffer src = list->buffers[idx].View(numFrames, numChannels);
             AudioBuffer delayed;
             delayed.channels = mCompScratchChannels[i];
             delayed.numChannels = numChannels;
             delayed.numFrames = numFrames;
-            entry.inputCompensation[i].ProcessBlock(src, delayed);
+            entry.node->inputCompensation[i].ProcessBlock(src, delayed);
             inputViews[i] = delayed;
             inputPtrs[i] = &inputViews[i];
          }
@@ -290,13 +290,13 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
    for (AudioTerminal& terminal : list->topology.terminalBufferIndices)
    {
       AudioBuffer src = list->buffers[terminal.bufferIndex].View(numFrames, numChannels);
-      if (terminal.compensation.IsActive())
+      if (terminal.Compensation().IsActive())
       {
          AudioBuffer delayed;
          delayed.channels = mTerminalScratchChannels;
          delayed.numChannels = numChannels;
          delayed.numFrames = numFrames;
-         terminal.compensation.ProcessBlock(src, delayed);
+         terminal.Compensation().ProcessBlock(src, delayed);
          src = delayed;
       }
       // Turbo: the Arrangement Timeline owns the output in Timeline mode.
@@ -342,6 +342,23 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
             v = 0.0f;
          samples[i] = std::clamp(v, -kSafetyCeiling, kSafetyCeiling);
       }
+   }
+
+   // Turbo 0.59: the panic mute, a 5 ms ramp so it never clicks.
+   const float panicTarget = mPanicMute.load(std::memory_order_relaxed) ? 0.0f : 1.0f;
+   if (mPanicGain != panicTarget || panicTarget == 0.0f)
+   {
+      const double sr = mSampleRate.load(std::memory_order_relaxed);
+      const float step = sr > 0.0 ? (float)(1.0 / (0.005 * sr)) : 1.0f;
+      float g = mPanicGain;
+      for (int i = 0; i < numFrames; i++)
+      {
+         g = panicTarget > g ? std::min(panicTarget, g + step) : std::max(panicTarget, g - step);
+         for (int ch = 0; ch < numChannels; ch++)
+            if (deviceBuffer.channels[ch] != nullptr)
+               deviceBuffer.channels[ch][i] *= g;
+      }
+      mPanicGain = g;
    }
 }
 

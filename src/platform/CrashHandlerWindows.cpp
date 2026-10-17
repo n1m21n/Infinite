@@ -4,8 +4,12 @@
 // %LOCALAPPDATA%\Infinite\crash\ - enough to see where it died (open the
 // .dmp in Visual Studio with the matching .pdb). Not a recovery mechanism:
 // the default handler still terminates the process.
+#include <algorithm>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <string>
+#include <vector>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -74,6 +78,19 @@ namespace
       _snwprintf(logPath, MAX_PATH, L"%s\\crash.log", gCrashDir);
       logPath[MAX_PATH - 1] = 0;
       AppendLine(logPath, line);
+      // Turbo 0.59: name the plugin it died in, and remember it so the next
+      // patch load does not bring it straight back.
+      if (const char* plugin = Platform::PluginCrashCurrent())
+      {
+         char pline[600];
+         snprintf(pline, sizeof(pline), "   inside plugin %s\r\n", plugin);
+         AppendLine(logPath, pline);
+         snprintf(pline, sizeof(pline), "%s\r\n", plugin);
+         wchar_t listPath[MAX_PATH];
+         _snwprintf(listPath, MAX_PATH, L"%s\\crashed_plugins.txt", gCrashDir);
+         listPath[MAX_PATH - 1] = 0;
+         AppendLine(listPath, pline);
+      }
       return EXCEPTION_CONTINUE_SEARCH; // let Windows Error Reporting / the debugger see it too
    }
 }
@@ -101,5 +118,54 @@ namespace Platform
    std::string CrashReportDirectory()
    {
       return InfiniteSettingsDirectory().empty() ? std::string() : InfiniteSettingsDirectory() + "\\crash";
+   }
+
+   namespace
+   {
+      std::filesystem::path CrashedListPath()
+      {
+         const std::string dir = CrashReportDirectory();
+         return dir.empty() ? std::filesystem::path() : std::filesystem::u8path(dir) / "crashed_plugins.txt";
+      }
+
+      std::vector<std::string> ReadCrashedList()
+      {
+         std::vector<std::string> out;
+         const std::filesystem::path p = CrashedListPath();
+         if (p.empty())
+            return out;
+         std::ifstream in(p);
+         std::string line;
+         while (std::getline(in, line))
+         {
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
+               line.pop_back();
+            if (!line.empty())
+               out.push_back(line);
+         }
+         return out;
+      }
+   }
+
+   bool PluginCrashedBefore(const std::string& identifier)
+   {
+      if (identifier.empty())
+         return false;
+      for (const std::string& id : ReadCrashedList())
+         if (id == identifier)
+            return true;
+      return false;
+   }
+
+   void PluginCrashForget(const std::string& identifier)
+   {
+      std::vector<std::string> ids = ReadCrashedList();
+      const size_t before = ids.size();
+      ids.erase(std::remove(ids.begin(), ids.end(), identifier), ids.end());
+      if (ids.size() == before)
+         return;
+      std::ofstream out(CrashedListPath(), std::ios::trunc);
+      for (const std::string& id : ids)
+         out << id << "\n";
    }
 }
