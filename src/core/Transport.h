@@ -40,6 +40,7 @@ public:
       mAudioBeatsOffset.store(0.0, std::memory_order_relaxed);
       mAudioSecondsOffset.store(0.0, std::memory_order_relaxed);
       mPendingSeekBeats.store(-1.0, std::memory_order_relaxed);
+      mVisualValid.store(false, std::memory_order_relaxed); // the frame clock snaps to 0 too
       mSeekSerial.fetch_add(1, std::memory_order_release);
    }
 
@@ -154,6 +155,23 @@ private:
    // is open and live; that single flag is "the engine is open and its
    // sample counter is live" - no separate bool to keep in sync with it.
    std::atomic<uint64_t> mAudioSampleCounter { 0 };
+   // Turbo 0.59: smooth clock between audio blocks for every reader that is
+   // not the thread driving the clock (see Seconds()). The counter only moves
+   // once per block (10-20 ms), so a 60 fps frame used to see time stand
+   // still on one frame and jump two blocks on the next: a stuttering image.
+   // mBlockSeq is odd while a block's counter / frames / wall time change.
+   std::atomic<uint32_t> mBlockSeq { 0 };
+   std::atomic<uint32_t> mBlockFrames { 0 };
+   std::atomic<int64_t> mBlockWallNs { 0 };
+   std::atomic<int> mClockThread { 0 }; // the thread that last called AdvanceAudioClock
+   // Turbo 0.59: the frame clock the visuals read (see Tick): advances by each
+   // frame's real duration and leans gently toward the audio position, so it
+   // is smooth even when audio blocks arrive in bunches. Snaps on a jump
+   // (seek, loop, rewind) and is only used by the thread that calls Tick.
+   std::atomic<double> mVisualSeconds { 0.0 };
+   std::atomic<bool> mVisualValid { false };
+   std::atomic<int> mTickThread { 0 };
+   double LiveSeconds() const; // audio position + time since its last block
    std::atomic<double> mAudioSampleRate { 0.0 };
    std::atomic<double> mAudioBeatsOffset { 0.0 };
    std::atomic<double> mAudioSecondsOffset { 0.0 };

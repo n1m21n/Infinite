@@ -190,6 +190,8 @@ void PopNode::VisitParams(ParamVisitor& v)
 pop::DataPtr PopNode::InputData(int slot, int /*frameId*/)
 {
    IGeometrySource* s = inputs[slot];
+   if (auto* sn = dynamic_cast<INode*>(s); sn != nullptr && sn->blockOff)
+      s = nullptr; // Turbo 0.59: a switched-off Set block reads as nothing
    if (s == nullptr)
    {
       mConverted[slot] = Converted();

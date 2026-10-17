@@ -50,6 +50,8 @@ Copy-Item -LiteralPath (Join-Path $root 'assets\fonts\OFL-Inter.txt') -Destinati
 $exampleTarget = Join-Path $package 'assets\examples'
 New-Item -ItemType Directory -Path $exampleTarget -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'assets\examples\superSynthMCP.inf') -Destination $exampleTarget
+# Turbo 0.59: example projects (FILE > Examples).
+Copy-Item -LiteralPath (Join-Path $root 'examples') -Destination $package -Recurse -Force
 # Turbo 0.47: drum kit for the Drum Sequencer pattern library
 Copy-Item -LiteralPath (Join-Path $root 'assets\drumkits') -Destination (Join-Path $package 'assets') -Recurse -Force
 # Turbo 0.54: MIDI pattern packs (both builds); SLOOP kits only in the full build (GPL material).

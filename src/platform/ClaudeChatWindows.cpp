@@ -10,6 +10,7 @@
 #include <thread>
 
 #include "json.hpp"
+#include "stb_image_write.h"
 
 #include <windows.h>
 
@@ -28,6 +29,10 @@ namespace
    std::atomic<bool> gSawResult { false };
    std::atomic<bool> gSawText { false };
    std::string gLogPath; // %LOCALAPPDATA%\Infinite\chat\last-turn.log, rewritten every turn
+   // Turbo 0.59: which CLI runs the turn (ClaudeChat::Backend), read by the
+   // reader thread to pick the event parser.
+   std::atomic<int> gBackend { 0 };
+   const char* BackendName() { return gBackend.load() == 1 ? "Codex" : "Claude"; }
 
    void LogAppend(const std::string& text)
    {
@@ -147,11 +152,79 @@ namespace
       }
    }
 
+   // Turbo 0.59: one line of `codex exec --json` (JSON Lines events).
+   bool HandleCodexLine(const json& j)
+   {
+      const std::string type = j.value("type", std::string());
+      if (type == "thread.started")
+      {
+         if (j.contains("thread_id") && j["thread_id"].is_string())
+            Push(ClaudeChat::Event::kSession, j["thread_id"].get<std::string>());
+         return true;
+      }
+      if ((type == "item.started" || type == "item.completed") && j.contains("item") && j["item"].is_object())
+      {
+         const json& item = j["item"];
+         const std::string it = item.value("type", std::string());
+         if (it == "agent_message" && type == "item.completed" && item.contains("text") && item["text"].is_string())
+         {
+            gSawText.store(true);
+            const std::string text = item["text"].get<std::string>();
+            if (!text.empty())
+               Push(ClaudeChat::Event::kText, text);
+         }
+         else if (it == "mcp_tool_call" && type == "item.started")
+         {
+            std::string args = item.contains("arguments") && !item["arguments"].is_null() ? item["arguments"].dump() : std::string();
+            if (args == "{}")
+               args.clear();
+            Push(ClaudeChat::Event::kTool, item.value("tool", std::string("tool")) +
+                                              (args.empty() ? std::string() : " " + Shorten(args, 160)));
+         }
+         else if (it == "mcp_tool_call" && type == "item.completed" && item.value("status", std::string()) == "failed")
+         {
+            std::string why = "tool error";
+            if (item.contains("error") && item["error"].is_object() && item["error"].contains("message") &&
+                item["error"]["message"].is_string())
+               why = item["error"]["message"].get<std::string>();
+            Push(ClaudeChat::Event::kToolError, Shorten(why, 240));
+         }
+         else if (it == "command_execution" && type == "item.started" && item.contains("command") && item["command"].is_string())
+            Push(ClaudeChat::Event::kTool, "shell " + Shorten(item["command"].get<std::string>(), 160));
+         return true;
+      }
+      if (type == "turn.completed")
+      {
+         gSawResult.store(true);
+         return true;
+      }
+      if (type == "turn.failed")
+      {
+         gSawResult.store(true);
+         std::string why = "the turn failed";
+         if (j.contains("error") && j["error"].is_object() && j["error"].contains("message") && j["error"]["message"].is_string())
+            why = j["error"]["message"].get<std::string>();
+         Push(ClaudeChat::Event::kError, why);
+         return true;
+      }
+      if (type == "error")
+      {
+         const std::string msg = j.value("message", std::string());
+         // "Reconnecting... 1/5" and the like arrive here too and are not fatal.
+         if (!msg.empty() && msg.find("Reconnecting") == std::string::npos)
+            Push(ClaudeChat::Event::kError, Shorten(msg, 600));
+         return true;
+      }
+      return true;
+   }
+
    bool HandleLineUnsafe(const std::string& line)
    {
       json j = json::parse(line, nullptr, false);
       if (j.is_discarded() || !j.is_object())
          return false;
+      if (gBackend.load() == 1)
+         return HandleCodexLine(j);
       const std::string type = j.value("type", std::string());
       if (type == "system" && j.value("subtype", std::string()) == "init")
       {
@@ -283,7 +356,7 @@ namespace
       LogAppend("\n--- stderr ---\n" + errText + "\n--- exit code " + std::to_string(code) + " ---\n");
       const bool cancelled = gCancelled.load();
       if (!cancelled && !gSawText.load() && code == 0 && errText.empty() && stray.empty())
-         Push(ClaudeChat::Event::kError, "Claude ended without an answer. The full output is in " + gLogPath);
+         Push(ClaudeChat::Event::kError, std::string(BackendName()) + " ended without an answer. The full output is in " + gLogPath);
       // stderr (and stray stdout) only matters when the turn went wrong.
       if (!cancelled && (code != 0 || !gSawResult.load()))
       {
@@ -293,7 +366,7 @@ namespace
       }
       std::string done;
       if (!cancelled && code != 0)
-         done = "claude exited with code " + std::to_string(code);
+         done = std::string(gBackend.load() == 1 ? "codex" : "claude") + " exited with code " + std::to_string(code);
       gBusy.store(false);
       Push(ClaudeChat::Event::kDone, done);
    }
@@ -336,6 +409,35 @@ namespace ClaudeChat
       }
       return std::string();
    }
+
+   std::string FindCodex()
+   {
+      const std::string forced = Env("INFINITE_CODEX_PATH");
+      if (IsFile(forced))
+         return forced;
+      std::string found = SearchOnPath(L"codex", L".exe");
+      if (found.empty())
+         found = SearchOnPath(L"codex", L".cmd");
+      if (!found.empty())
+         return found;
+      const std::string appData = Env("APPDATA");
+      if (!appData.empty())
+      {
+         const std::string npm = (std::filesystem::u8path(appData) / "npm" / "codex.cmd").u8string();
+         if (IsFile(npm))
+            return npm;
+      }
+      const std::string local = Env("LOCALAPPDATA");
+      if (!local.empty())
+      {
+         const std::string prog = (std::filesystem::u8path(local) / "Programs" / "codex" / "codex.exe").u8string();
+         if (IsFile(prog))
+            return prog;
+      }
+      return std::string();
+   }
+
+   std::string FindCli(Backend backend) { return backend == kCodex ? FindCodex() : FindClaude(); }
 
    bool Busy() { return gBusy.load(); }
 
@@ -385,10 +487,11 @@ namespace ClaudeChat
       gSawResult.store(false);
       gSawText.store(false);
 
-      const std::string claude = options.claudePath.empty() ? FindClaude() : options.claudePath;
+      gBackend.store(options.backend == kCodex ? 1 : 0);
+      const std::string claude = options.claudePath.empty() ? FindCli(options.backend) : options.claudePath;
       if (claude.empty())
       {
-         error = "Claude Code is not installed";
+         error = options.backend == kCodex ? "the Codex CLI is not installed" : "Claude Code is not installed";
          return false;
       }
 
@@ -408,22 +511,61 @@ namespace ClaudeChat
          }
       }
 
-      std::vector<std::wstring> args = {
+      std::vector<std::wstring> args;
+      if (options.backend == kCodex)
+      {
+         // Turbo 0.59: OpenAI's Codex CLI, logged in with the user's ChatGPT
+         // account. Read-only sandbox, no approval prompts (there is no one
+         // to answer them), this exe's --mcp as an MCP server, the prompt on
+         // stdin ("-"). TOML literal strings ('...') survive a .cmd shim.
+         // With approval_policy never, Codex refuses every MCP tool call that
+         // would need approval ("MCP tool call requires approval, but approval
+         // policy is never"): our own server's tools are pre-approved
+         // (default_tools_approval_mode, Codex 0.16x: auto/prompt/writes/approve).
+         args = { L"exec", L"--json", L"--skip-git-repo-check", L"--sandbox", L"read-only",
+                  L"-c", L"approval_policy='never'",
+                  L"-c", L"mcp_servers.infinite-turbo.command='" + Wide(options.exePath) + L"'",
+                  L"-c", L"mcp_servers.infinite-turbo.args=['--mcp']",
+                  L"-c", L"mcp_servers.infinite-turbo.default_tools_approval_mode='approve'",
+                  L"-c", L"mcp_servers.infinite-turbo.startup_timeout_sec=30",
+                  L"-c", L"mcp_servers.infinite-turbo.tool_timeout_sec=120" };
+         if (!options.model.empty())
+         {
+            args.push_back(L"-m");
+            args.push_back(Wide(options.model));
+         }
+         for (const std::string& img : options.images)
+         {
+            args.push_back(L"-i");
+            args.push_back(Wide(img));
+         }
+         if (!options.sessionId.empty())
+         {
+            args.push_back(L"resume");
+            args.push_back(Wide(options.sessionId));
+         }
+         args.push_back(L"-");
+      }
+      else
+      args = {
          L"-p", L"--output-format", L"stream-json", L"--verbose",
          L"--mcp-config", configPath.wstring(), L"--strict-mcp-config",
          L"--allowedTools", L"mcp__infinite-turbo", L"mcp__infinite-turbo__*",
+         // Turbo 0.59: attachments (reference images, patches, text) are
+         // copied into the work dir and read with the Read tool.
+         L"Read",
       };
-      if (!options.systemPrompt.empty())
+      if (options.backend != kCodex && !options.systemPrompt.empty())
       {
          args.push_back(L"--append-system-prompt");
          args.push_back(Wide(options.systemPrompt));
       }
-      if (!options.sessionId.empty())
+      if (options.backend != kCodex && !options.sessionId.empty())
       {
          args.push_back(L"--resume");
          args.push_back(Wide(options.sessionId));
       }
-      if (!options.model.empty())
+      if (options.backend != kCodex && !options.model.empty())
       {
          args.push_back(L"--model");
          args.push_back(Wide(options.model));
@@ -527,5 +669,103 @@ namespace ClaudeChat
       // must not hold up the app's exit. It writes the prompt to stdin too.
       std::thread(ReaderThread, outRead, errRead, pi.hProcess, inWrite, prompt).detach();
       return true;
+   }
+
+   bool LooksLoggedIn(Backend backend)
+   {
+      const std::string profile = Env("USERPROFILE");
+      if (backend == kCodex)
+      {
+         if (!Env("OPENAI_API_KEY").empty() || !Env("CODEX_API_KEY").empty())
+            return true;
+         const std::string codexHome = Env("CODEX_HOME");
+         const std::filesystem::path dir = !codexHome.empty() ? std::filesystem::u8path(codexHome)
+                                         : profile.empty() ? std::filesystem::path() : std::filesystem::u8path(profile) / ".codex";
+         return dir.empty() || IsFile((dir / "auth.json").u8string());
+      }
+      if (!Env("ANTHROPIC_API_KEY").empty() || !Env("CLAUDE_CODE_OAUTH_TOKEN").empty())
+         return true;
+      if (profile.empty())
+         return true; // cannot tell: do not nag
+      const std::filesystem::path home = std::filesystem::u8path(profile) / ".claude";
+      return IsFile((home / ".credentials.json").u8string()) || IsFile((std::filesystem::u8path(profile) / ".claude.json").u8string());
+   }
+
+   bool OpenTerminal(const std::string& commandLine)
+   {
+      std::wstring cmd = L"cmd.exe /k " + Wide(commandLine);
+      STARTUPINFOW si = {};
+      si.cb = sizeof(si);
+      PROCESS_INFORMATION pi = {};
+      std::vector<wchar_t> buf(cmd.begin(), cmd.end());
+      buf.push_back(L'\0');
+      if (!CreateProcessW(nullptr, buf.data(), nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi))
+         return false;
+      CloseHandle(pi.hThread);
+      CloseHandle(pi.hProcess);
+      return true;
+   }
+
+   bool SaveClipboardImage(const std::string& pngPath, std::string& error)
+   {
+      if (!IsClipboardFormatAvailable(CF_DIB))
+      {
+         error = "no image on the clipboard";
+         return false;
+      }
+      if (!OpenClipboard(nullptr))
+      {
+         error = "the clipboard is busy";
+         return false;
+      }
+      bool ok = false;
+      HANDLE h = GetClipboardData(CF_DIB);
+      const unsigned char* base = h ? (const unsigned char*)GlobalLock(h) : nullptr;
+      if (base != nullptr)
+      {
+         const SIZE_T size = GlobalSize(h);
+         const BITMAPINFOHEADER* bih = (const BITMAPINFOHEADER*)base;
+         const int w = bih->biWidth;
+         const bool topDown = bih->biHeight < 0;
+         const int hgt = topDown ? -bih->biHeight : bih->biHeight;
+         const int bpp = bih->biBitCount;
+         size_t offset = bih->biSize;
+         if (bih->biCompression == BI_BITFIELDS && bih->biSize == sizeof(BITMAPINFOHEADER))
+            offset += 12; // three DWORD masks follow the header
+         offset += (size_t)bih->biClrUsed * 4;
+         const size_t stride = (((size_t)w * (size_t)bpp + 31) / 32) * 4;
+         if (w > 0 && hgt > 0 && (bpp == 24 || bpp == 32) && offset + stride * (size_t)hgt <= size)
+         {
+            std::vector<unsigned char> rgba((size_t)w * (size_t)hgt * 4);
+            bool anyAlpha = false;
+            for (int y = 0; y < hgt; y++)
+            {
+               const unsigned char* row = base + offset + stride * (size_t)(topDown ? y : hgt - 1 - y);
+               for (int x = 0; x < w; x++)
+               {
+                  const unsigned char* px = row + (size_t)x * (size_t)(bpp / 8);
+                  unsigned char* o = &rgba[((size_t)y * (size_t)w + (size_t)x) * 4];
+                  o[0] = px[2]; o[1] = px[1]; o[2] = px[0];
+                  o[3] = bpp == 32 ? px[3] : 255;
+                  anyAlpha = anyAlpha || (bpp == 32 && px[3] != 0);
+               }
+            }
+            if (bpp == 32 && !anyAlpha) // many apps leave the alpha byte at 0
+               for (size_t i = 3; i < rgba.size(); i += 4)
+                  rgba[i] = 255;
+            std::error_code ec;
+            std::filesystem::create_directories(std::filesystem::u8path(pngPath).parent_path(), ec);
+            ok = stbi_write_png(pngPath.c_str(), w, hgt, 4, rgba.data(), w * 4) != 0;
+            if (!ok)
+               error = "could not write " + pngPath;
+         }
+         else
+            error = "unsupported clipboard image format";
+         GlobalUnlock(h);
+      }
+      else
+         error = "could not read the clipboard image";
+      CloseClipboard();
+      return ok;
    }
 }

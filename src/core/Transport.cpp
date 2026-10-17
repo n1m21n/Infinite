@@ -1,5 +1,25 @@
 #include "Transport.h"
 
+#include <algorithm>
+#include <chrono>
+
+namespace
+{
+   // A small per-thread id (std::thread::id is not usable in an atomic).
+   int ThisThreadTag()
+   {
+      static std::atomic<int> sNext { 1 };
+      thread_local const int tTag = sNext.fetch_add(1, std::memory_order_relaxed);
+      return tTag;
+   }
+
+   int64_t NowNs()
+   {
+      return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+   }
+}
+
 Transport& Transport::Instance()
 {
    static Transport instance;
@@ -11,6 +31,43 @@ double Transport::Seconds() const
    const double sr = mAudioSampleRate.load(std::memory_order_relaxed);
    if (sr > 0.0)
    {
+      // The thread driving the clock (the audio callback, or the main thread
+      // during an offline render) reads the block-exact position.
+      if (!mPlaying.load(std::memory_order_relaxed) ||
+          mClockThread.load(std::memory_order_relaxed) == ThisThreadTag())
+         return mAudioSecondsOffset.load(std::memory_order_relaxed) +
+                (double)mAudioSampleCounter.load(std::memory_order_relaxed) / sr;
+      // Turbo 0.59: the frame thread reads the smooth frame clock (Tick).
+      if (mVisualValid.load(std::memory_order_relaxed) &&
+          mTickThread.load(std::memory_order_relaxed) == ThisThreadTag())
+         return mVisualSeconds.load(std::memory_order_relaxed);
+      return LiveSeconds();
+   }
+   return mSeconds;
+}
+
+double Transport::LiveSeconds() const
+{
+   const double sr = mAudioSampleRate.load(std::memory_order_relaxed);
+   if (sr > 0.0)
+   {
+      // The last block's start plus the real time since it arrived, capped
+      // at that block's length - continuous at the next block, never ahead.
+      for (int attempt = 0; attempt < 4; attempt++)
+      {
+         const uint32_t seq = mBlockSeq.load(std::memory_order_acquire);
+         if (seq & 1u)
+            continue;
+         const double offset = mAudioSecondsOffset.load(std::memory_order_relaxed);
+         const uint64_t counter = mAudioSampleCounter.load(std::memory_order_relaxed);
+         const uint32_t frames = mBlockFrames.load(std::memory_order_relaxed);
+         const int64_t wall = mBlockWallNs.load(std::memory_order_relaxed);
+         if (mBlockSeq.load(std::memory_order_acquire) != seq)
+            continue;
+         const double blockSec = (double)frames / sr;
+         const double since = wall > 0 ? (double)(NowNs() - wall) * 1e-9 : 0.0;
+         return offset + (double)counter / sr + std::clamp(since, 0.0, blockSec);
+      }
       return mAudioSecondsOffset.load(std::memory_order_relaxed) +
              (double)mAudioSampleCounter.load(std::memory_order_relaxed) / sr;
    }
@@ -63,8 +120,34 @@ void Transport::Tick(float deltaSeconds)
    if (deltaSeconds > 0.25f)
       deltaSeconds = 0.25f;
 
+   mTickThread.store(ThisThreadTag(), std::memory_order_relaxed);
    if (mAudioSampleRate.load(std::memory_order_relaxed) > 0.0)
-      return; // audio-driven: Beats()/Seconds() compute live, nothing to accumulate here
+   {
+      // Audio-driven: nothing to accumulate, but the frame clock moves.
+      // Turbo 0.59: by this frame's real duration, corrected by a small share
+      // of its distance to the audio position, so blocks that arrive unevenly
+      // (two at once, then a gap) never show as a stutter. A big distance is
+      // a jump (seek, loop wrap, tempo rebase): follow it at once.
+      if (!mPlaying.load(std::memory_order_relaxed))
+      {
+         mVisualValid.store(false, std::memory_order_relaxed);
+         return;
+      }
+      const double target = LiveSeconds();
+      double v = target;
+      if (mVisualValid.load(std::memory_order_relaxed))
+      {
+         v = mVisualSeconds.load(std::memory_order_relaxed) + (double)deltaSeconds;
+         const double err = target - v;
+         if (err > 0.1 || err < -0.1)
+            v = target;
+         else
+            v += err * 0.08;
+      }
+      mVisualSeconds.store(v, std::memory_order_relaxed);
+      mVisualValid.store(true, std::memory_order_relaxed);
+      return;
+   }
 
    if (!mPlaying.load(std::memory_order_relaxed))
       return;
@@ -90,6 +173,7 @@ void Transport::NotifyAudioEngineStarted(double sampleRate)
    mAudioSecondsOffset.store(mSeconds, std::memory_order_relaxed);
    mAudioBeatsOffset.store(mBeats, std::memory_order_relaxed);
    mAudioSampleCounter.store(0, std::memory_order_relaxed);
+   mVisualValid.store(false, std::memory_order_relaxed);
    mAudioSampleRate.store(sampleRate, std::memory_order_relaxed); // publish last
 }
 
@@ -99,6 +183,7 @@ void Transport::NotifyAudioEngineStopped()
    mSeconds = Seconds(); // read the still-live audio-driven value...
    mBeats = Beats();
    mAudioSampleRate.store(0.0, std::memory_order_relaxed); // ...then switch back to fallback
+   mVisualValid.store(false, std::memory_order_relaxed);
 }
 
 void Transport::AdvanceAudioClock(int numFrames)
@@ -115,8 +200,15 @@ void Transport::AdvanceAudioClock(int numFrames)
       if (end > start + 1e-6 && Beats() >= end)
          ApplySeek(start);
    }
+   mClockThread.store(ThisThreadTag(), std::memory_order_relaxed);
    if (mPlaying.load(std::memory_order_relaxed))
+   {
+      mBlockSeq.fetch_add(1, std::memory_order_acq_rel); // odd: changing
       mAudioSampleCounter.fetch_add((uint64_t)numFrames, std::memory_order_relaxed);
+      mBlockFrames.store((uint32_t)std::max(0, numFrames), std::memory_order_relaxed);
+      mBlockWallNs.store(NowNs(), std::memory_order_relaxed);
+      mBlockSeq.fetch_add(1, std::memory_order_release); // even: consistent
+   }
 }
 
 void Transport::ApplySeek(double beats)

@@ -177,6 +177,11 @@
             first = false;
          }
          gPendingSelect.clear();
+         if (gPendingNavigateToSelection) // Turbo 0.59: Set list "view"
+         {
+            ed::NavigateToSelection(false, 0.25f);
+            gPendingNavigateToSelection = false;
+         }
       }
 
       // Where a panel-spawned node should land. ScreenToCanvas is only valid
@@ -223,6 +228,9 @@
       // Dropping a file on the canvas spawns the matching source node, already
       // loaded, at the drop point.
       // Turbo 0.43: files dropped on the timeline panel become Sample clips.
+      // Turbo 0.59: files dropped on the AI chat window are attachments.
+      if (!gDroppedFiles.empty() && ChatTakeDrops(gDroppedFiles, gDropPos))
+         gDroppedFiles.clear();
       if (!gDroppedFiles.empty() && ArrangeHandleFileDrop(gDroppedFiles, gDropPos))
          gDroppedFiles.clear();
       // Turbo 0.44: a file dropped on a Clip Matrix cell loads into it

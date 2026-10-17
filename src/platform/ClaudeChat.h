@@ -32,9 +32,15 @@ namespace ClaudeChat
       std::string text;
    };
 
+   // Turbo 0.59: the chat runs either Claude Code or OpenAI's Codex CLI
+   // (logged in with a ChatGPT account); both get this app's MCP server.
+   enum Backend { kClaude = 0, kCodex = 1 };
+
    struct Options
    {
-      std::string claudePath; // claude.exe / claude.cmd; empty = FindClaude()
+      Backend backend = kClaude;
+      std::vector<std::string> images; // Codex: attached with -i (Claude reads files itself)
+      std::string claudePath; // the CLI (claude.exe / codex.cmd ...); empty = FindCli(backend)
       std::string exePath;    // Infinite-Turbo.exe (its --mcp is the MCP server)
       std::string workDir;    // cwd of the CLI and where the MCP config is written
       std::string sessionId;  // continue this conversation; empty = new one
@@ -46,10 +52,22 @@ namespace ClaudeChat
    // INFINITE_CLAUDE_PATH, %USERPROFILE%\.local\bin\claude.exe (native
    // installer), then claude.exe / claude.cmd on PATH, then %APPDATA%\npm.
    std::string FindClaude();
+   // Codex CLI: INFINITE_CODEX_PATH, codex.exe / codex.cmd on PATH, %APPDATA%\npm.
+   std::string FindCodex();
+   std::string FindCli(Backend backend);
 
    bool Send(const std::string& prompt, const Options& options, std::string& error);
    bool Busy();
    void Cancel(); // kills the CLI and everything it started
    void Drain(std::vector<Event>& out);
    void Discard(); // drops whatever arrived and was not drained yet
+
+   // Turbo 0.59 (chat setup and attachments).
+   // True when a Claude login is likely present (credentials file or an API
+   // key / OAuth token in the environment); a hint for the setup steps only.
+   bool LooksLoggedIn(Backend backend);
+   // Opens a new Command Prompt window running `commandLine` (it stays open).
+   bool OpenTerminal(const std::string& commandLine);
+   // Writes the clipboard's bitmap (Print Screen, a copied image) as a PNG.
+   bool SaveClipboardImage(const std::string& pngPath, std::string& error);
 }

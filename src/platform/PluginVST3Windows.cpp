@@ -466,6 +466,11 @@ namespace Platform
       std::atomic<bool> renderEnabled { true };
       juce::AudioBuffer<float> work;
       juce::MidiBuffer midi;
+      // Turbo 0.59: what the plugin sent out in the last render (audio
+      // thread only: written by PluginRender, read by PluginTakeMidiOutput).
+      static constexpr int kMidiOutCapacity = 256;
+      PluginMidiMessage midiOut[kMidiOutCapacity];
+      int midiOutCount = 0;
       double sampleRate = 44100.0;
       int maxFrames = 4096;
       int latencySamples = 0;
@@ -787,6 +792,23 @@ namespace Platform
          // smear the pitch. The view refers to work's memory, no allocation.
          juce::AudioBuffer<float> block(work.getArrayOfWritePointers(), work.getNumChannels(), numFrames);
          handle->instance->processBlock(block, handle->midi);
+         // Turbo 0.59: after processBlock the buffer holds the plugin's own
+         // MIDI output (JUCE swaps it in) - but only for a plugin that has
+         // one; otherwise it still holds what we sent in, never echoed back.
+         handle->midiOutCount = 0;
+         if (handle->instance->producesMidi())
+            for (const juce::MidiMessageMetadata meta : handle->midi)
+            {
+               if (handle->midiOutCount >= PluginHandle::kMidiOutCapacity)
+                  break;
+               if (meta.numBytes < 1 || meta.numBytes > 3 || meta.data == nullptr)
+                  continue; // sysex and the like: notes only travel on
+               PluginMidiMessage& m = handle->midiOut[handle->midiOutCount++];
+               m.frameOffset = std::clamp(meta.samplePosition, 0, std::max(0, numFrames - 1));
+               m.size = meta.numBytes;
+               for (int i = 0; i < 3; ++i)
+                  m.bytes[i] = i < meta.numBytes ? meta.data[i] : 0;
+            }
          handle->midi.clear();
          // Mono main output: copy it over the other channel(s), which the
          // plugin never wrote (they still hold the input or silence).
@@ -861,6 +883,22 @@ namespace Platform
    {
       if (!handle || !bytes || byteCount <= 0) return;
       handle->midi.addEvent(bytes, byteCount, std::max(0, frameOffset));
+   }
+
+   int PluginTakeMidiOutput(PluginHandle* handle, PluginMidiMessage* out, int maxCount)
+   {
+      if (!handle || !out || maxCount <= 0)
+         return 0;
+      const int n = std::min(handle->midiOutCount, maxCount);
+      for (int i = 0; i < n; ++i)
+         out[i] = handle->midiOut[i];
+      handle->midiOutCount = 0;
+      return n;
+   }
+
+   bool PluginProducesMidi(PluginHandle* handle)
+   {
+      return handle && handle->instance && handle->instance->producesMidi();
    }
 
    int PluginParameterCount(PluginHandle* handle)

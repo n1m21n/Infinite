@@ -27,7 +27,8 @@ public:
       INode* node = mSource;
       for (int hops = 0; node != nullptr && node->bypassed && hops < 64; hops++)
          node = node->BypassSource();
-      return (node != nullptr && node->bypassed) ? nullptr : node;
+      // Turbo 0.59: a node in a switched-off Set block reads as nothing.
+      return (node != nullptr && (node->bypassed || node->blockOff)) ? nullptr : node;
    }
 
    // Pulls the upstream node's output for this frame, cooking it if needed.

@@ -181,6 +181,11 @@ public:
    // one simply removes it from the chain.
    bool bypassed = false;
    virtual INode* BypassSource() { return nullptr; }
+   // Turbo 0.59: inside a Set block (a Group) that is switched off. Not saved:
+   // derived every frame from the groups (UpdateBlockStates). Such a node is
+   // not cooked, reads as nothing to every cable (ImageCable::Resolved) and is
+   // left out of the audio topology, so it costs nothing and is silent.
+   bool blockOff = false;
 
    // Label shown next to an input pin. Defaults to A, B, C... in the editor.
    virtual const char* InputLabel(int /*slot*/) const { return nullptr; }

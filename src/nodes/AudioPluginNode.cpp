@@ -84,6 +84,7 @@ public:
       // this widening is unverified against a real instrument AU.
       if (handle != mLastSeenHandle)
       {
+         ReleaseOutputNotes(0); // Turbo 0.59: notes the old plugin sent out
          mActiveVoiceCount = 0;
          mLastStartedVoiceId = 0;
          mWasBypassed = false;
@@ -107,10 +108,15 @@ public:
       // stays on - flush on the rising edge only, once, not every block.
       if (bypassed && !mWasBypassed && handle != nullptr)
       {
+         ReleaseOutputNotes(0);
          FlushPluginNotes(handle);
          mActiveVoiceCount = 0;
          mLastStartedVoiceId = 0;
       }
+      // Turbo 0.59: leaving bypass ends the MIDI thru below - close every
+      // note it let through, or the synth after the "midi" pin sticks.
+      if (!bypassed && mWasBypassed)
+         ReleaseThruNotes(0);
       mWasBypassed = bypassed;
 
       // Notes go through the note queue, not ParamMailbox - see the class
@@ -131,6 +137,11 @@ public:
             if (deliver)
                for (int i = 0; i < numEvts; i++)
                   DeliverNoteEvent(handle, evts[i], output.numFrames);
+            else if (bypassed)
+               // Turbo 0.59: bypassed = MIDI thru, like a hardware box
+               // switched off: the incoming notes leave by the "midi" pin.
+               for (int i = 0; i < numEvts; i++)
+                  ForwardThru(evts[i]);
          }
       }
 
@@ -151,7 +162,19 @@ public:
 
       Platform::PluginRender(handle, inCount > 0 ? inChannels : nullptr, inCount, output.channels,
                              output.numChannels, output.numFrames);
+
+      // Turbo 0.59: what the plugin sent out (an arpeggiator, a sequencer, a
+      // MIDI effect) leaves through the node's "midi" pin as note events, so
+      // it can drive another synth or a MIDI Out to external gear.
+      Platform::PluginMidiMessage msgs[128];
+      int count = 0;
+      while ((count = Platform::PluginTakeMidiOutput(handle, msgs, 128)) > 0)
+         for (int i = 0; i < count; i++)
+            EmitOutputMidi(msgs[i]);
    }
+
+   // Turbo 0.59: the plugin's MIDI output as a note source (see Emit...).
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
 
    // Deliberately no Reset() override: AudioNode::Reset means "clear DSP
    // state", and dropping the published plugin handle there would silently
@@ -325,6 +348,119 @@ private:
          }
       }
    }
+
+   // Turbo 0.59: note on / off from the plugin's MIDI output into mOutbox,
+   // one voice id per (channel, note) so the matching note-off closes it.
+   // Other messages (CC, bend, clock) are not note events and stay inside.
+   void EmitOutputMidi(const Platform::PluginMidiMessage& m)
+   {
+      if (m.size < 3)
+         return;
+      const int status = m.bytes[0] & 0xF0;
+      const int channel = m.bytes[0] & 0x0F;
+      const int note = m.bytes[1] & 0x7F;
+      const int velocity = m.bytes[2] & 0x7F;
+      if (status != 0x90 && status != 0x80)
+         return;
+      int& voice = mOutVoice[channel][note];
+      NoteEvent e;
+      e.note = note;
+      e.frameOffset = m.frameOffset;
+      e.source = this;
+      if (status == 0x90 && velocity > 0)
+      {
+         if (voice != 0) // retrigger: close the held one first
+         {
+            NoteEvent off = e;
+            off.voiceId = voice;
+            mOutbox.Push(off);
+         }
+         voice = NextVoiceId();
+         e.isNoteOn = true;
+         e.velocity = (float)velocity / 127.0f;
+         e.voiceId = voice;
+         mOutbox.Push(e);
+         mOutHeld++;
+      }
+      else if (voice != 0)
+      {
+         e.voiceId = voice;
+         mOutbox.Push(e);
+         voice = 0;
+         mOutHeld = std::max(0, mOutHeld - 1);
+      }
+   }
+
+   // Note-offs for every note the plugin left held (plugin swapped,
+   // unloaded or bypassed), so nothing downstream sticks.
+   void ReleaseOutputNotes(int frameOffset)
+   {
+      if (mOutHeld == 0)
+         return;
+      for (int ch = 0; ch < 16; ch++)
+         for (int n = 0; n < 128; n++)
+            if (mOutVoice[ch][n] != 0)
+            {
+               NoteEvent off;
+               off.note = n;
+               off.frameOffset = frameOffset;
+               off.source = this;
+               off.voiceId = mOutVoice[ch][n];
+               mOutbox.Push(off);
+               mOutVoice[ch][n] = 0;
+            }
+      mOutHeld = 0;
+   }
+
+   // Bypass thru: the event goes out unchanged (its own voice id), and held
+   // notes are remembered so leaving bypass can close them.
+   void ForwardThru(const NoteEvent& e)
+   {
+      mOutbox.Push(e);
+      if (e.bendUpdate)
+         return;
+      if (e.isNoteOn)
+      {
+         if (mThruCount < kMaxThru)
+         {
+            mThruVoice[mThruCount] = e.voiceId;
+            mThruNote[mThruCount] = e.note;
+            mThruCount++;
+         }
+      }
+      else
+         for (int i = 0; i < mThruCount; i++)
+            if (mThruVoice[i] == e.voiceId)
+            {
+               mThruVoice[i] = mThruVoice[mThruCount - 1];
+               mThruNote[i] = mThruNote[mThruCount - 1];
+               mThruCount--;
+               break;
+            }
+   }
+
+   void ReleaseThruNotes(int frameOffset)
+   {
+      for (int i = 0; i < mThruCount; i++)
+      {
+         NoteEvent off;
+         off.note = mThruNote[i];
+         off.voiceId = mThruVoice[i];
+         off.frameOffset = frameOffset;
+         off.source = this;
+         mOutbox.Push(off);
+      }
+      mThruCount = 0;
+   }
+
+   static constexpr int kMaxThru = 64;
+   int mThruVoice[kMaxThru] = {};
+   int mThruNote[kMaxThru] = {};
+   int mThruCount = 0;
+
+   NoteEventQueue mOutbox;
+   int mOutVoice[16][128] = {};
+   int mOutHeld = 0;
 
    std::atomic<Platform::PluginHandle*> mHandle { nullptr };
    std::atomic<bool> mBypass { false };
@@ -510,6 +646,7 @@ void AudioPluginNode::Unload()
    pluginId.clear();
    pluginName.clear();
    mAcceptsNotes = false;
+   mProducesMidi = false;
    noteInput.Disconnect();
    mPluginState.clear();
    mPendingStateRestore = false;
@@ -660,6 +797,7 @@ void AudioPluginNode::CookIfNeeded(int frameId)
       }
       mReady = true;
       mStatus = pluginName;
+      mProducesMidi = Platform::PluginProducesMidi(mHandle); // Turbo 0.59: the "midi" pin
       RefreshAvailableParams();
       if (mConfiguring)
          Platform::PluginBeginLearn(mHandle);

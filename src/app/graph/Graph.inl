@@ -388,6 +388,21 @@
          return outputIndex == 1;
       if (dynamic_cast<ClipMatrixOutNode*>(node) != nullptr)
          return (outputIndex & 1) == 1; // video, audio per row
+      if (dynamic_cast<AudioPluginNode*>(node) != nullptr)
+         return outputIndex == 0; // Turbo 0.59: output 1 is its "midi" pin
+      return true;
+   }
+
+   // Whether a node's output `outputIndex` carries note events. Every
+   // INoteSource's outputs do, except the plugin node's: its audio stays on
+   // output 0 and the plugin's own MIDI leaves through output 1 ("midi"),
+   // which only exists for a plugin that declares a MIDI output.
+   bool IsNoteOutput(INode* node, int outputIndex)
+   {
+      if (node == nullptr || dynamic_cast<INoteSource*>(node) == nullptr)
+         return false;
+      if (auto* plugin = dynamic_cast<AudioPluginNode*>(node))
+         return outputIndex == 1 && plugin->ProducesMidi();
       return true;
    }
 
@@ -708,7 +723,7 @@
       auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
       const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
       const bool srcIsAudioNode = IsAudioOutput(srcNode->node.get(), srcOutputIndex);
-      const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
+      const bool srcIsNoteSource = IsNoteOutput(srcNode->node.get(), srcOutputIndex);
 
       if (!IsInputSlotCompatible(dstNode, dstSlot, srcIsModulator, srcPalette, srcGeometry, srcCamera,
                                   srcLight, srcAudioFile, srcIsEnvironment, srcIsAudioNode, srcIsNoteSource))
@@ -762,7 +777,7 @@
       auto* srcAudioFile = dynamic_cast<AudioFileNode*>(srcNode->node.get());
       const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
       const bool srcIsAudioNode = IsAudioOutput(srcNode->node.get(), 0);
-      const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
+      const bool srcIsNoteSource = IsNoteOutput(srcNode->node.get(), 0);
 
       for (const std::string& category : NodeFactory::Instance().GetCategories())
       {

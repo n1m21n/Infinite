@@ -15,6 +15,8 @@
 #include "McpBridge.h"
 #include "AISkillContent.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <cstdio>
@@ -506,36 +508,18 @@ namespace
    }
 }
 
-int RunMcpBridge()
+namespace
 {
-   gIn = GetStdHandle(STD_INPUT_HANDLE);
-   gOut = GetStdHandle(STD_OUTPUT_HANDLE);
-   if (gIn == INVALID_HANDLE_VALUE || gIn == nullptr || gOut == INVALID_HANDLE_VALUE || gOut == nullptr)
-      return 2;
-   Log(std::string("Infinite-Turbo MCP bridge ") + kServerVersion + ", control port " + std::to_string(ControlPort()));
-
-   std::string line;
-   while (ReadLine(line))
+   // One JSON-RPC message in, its reply out (null for a notification or a
+   // stray response, which get none). Shared by the stdio and HTTP transports.
+   json HandleRpc(const json& msg)
    {
-      if (line.empty())
-         continue;
-      json msg;
-      try
-      {
-         msg = json::parse(line);
-      }
-      catch (const std::exception& e)
-      {
-         WriteMessage({ { "jsonrpc", "2.0" }, { "id", nullptr },
-                        { "error", { { "code", -32700 }, { "message", std::string("parse error: ") + e.what() } } } });
-         continue;
-      }
       if (!msg.is_object())
-         continue; // batches / junk: not used by MCP clients
+         return nullptr; // junk: MCP clients do not send it
       const std::string method = msg.contains("method") && msg["method"].is_string() ? msg["method"].get<std::string>() : "";
       const bool isRequest = msg.contains("id") && !method.empty();
       if (!isRequest)
-         continue; // notifications (initialized, cancelled, ...) and stray responses
+         return nullptr; // notifications (initialized, cancelled, ...) and stray responses
       const json id = msg["id"];
       const json params = msg.contains("params") && msg["params"].is_object() ? msg["params"] : json::object();
       json reply = { { "jsonrpc", "2.0" }, { "id", id } };
@@ -589,10 +573,190 @@ int RunMcpBridge()
          reply.erase("result");
          reply["error"] = { { "code", -32603 }, { "message", std::string("internal error: ") + e.what() } };
       }
-      WriteMessage(reply);
+      return reply;
+   }
+
+   // ------------------------------------------------------- HTTP (0.59) ---
+   // Streamable HTTP, the transport ChatGPT and other remote MCP clients use:
+   // POST <path> with one JSON-RPC message (or a batch), answered as plain
+   // JSON; no server-sent stream. The path carries a random token so a
+   // public tunnel URL is not an open door to the patch.
+   bool HttpRecvRequest(InfiniteSocket c, std::string& method, std::string& path, std::string& body,
+                        std::string& headers)
+   {
+      std::string buf;
+      char chunk[16384];
+      size_t headerEnd = std::string::npos;
+      while (headerEnd == std::string::npos)
+      {
+         const int n = recv(c, chunk, (int)sizeof(chunk), 0);
+         if (n <= 0)
+            return false;
+         buf.append(chunk, (size_t)n);
+         headerEnd = buf.find("\r\n\r\n");
+         if (buf.size() > (1u << 20) && headerEnd == std::string::npos)
+            return false;
+      }
+      headers = buf.substr(0, headerEnd);
+      std::istringstream first(headers.substr(0, headers.find("\r\n")));
+      first >> method >> path;
+      size_t length = 0;
+      {
+         std::string lower = headers;
+         for (char& ch : lower)
+            ch = (char)std::tolower((unsigned char)ch);
+         const size_t cl = lower.find("\r\ncontent-length:");
+         if (cl != std::string::npos)
+            length = (size_t)std::strtoull(lower.c_str() + cl + 17, nullptr, 10);
+      }
+      if (length > (64u << 20))
+         return false;
+      body = buf.substr(headerEnd + 4);
+      while (body.size() < length)
+      {
+         const int n = recv(c, chunk, (int)sizeof(chunk), 0);
+         if (n <= 0)
+            return false;
+         body.append(chunk, (size_t)n);
+      }
+      body.resize(std::min(body.size(), length));
+      return true;
+   }
+
+   void HttpSend(InfiniteSocket c, int status, const char* reason, const std::string& body,
+                 const char* contentType = "application/json")
+   {
+      std::string out = "HTTP/1.1 " + std::to_string(status) + " " + reason + "\r\n";
+      out += "Content-Type: " + std::string(contentType) + "\r\n";
+      out += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+      out += "Access-Control-Allow-Origin: *\r\n";
+      out += "Access-Control-Allow-Headers: content-type, mcp-session-id, mcp-protocol-version, authorization\r\n";
+      out += "Access-Control-Allow-Methods: POST, GET, OPTIONS, DELETE\r\n";
+      out += "Access-Control-Expose-Headers: mcp-session-id\r\n";
+      out += "Mcp-Session-Id: infinite-turbo\r\n";
+      if (status == 405)
+         out += "Allow: POST, OPTIONS, DELETE\r\n";
+      out += "Connection: close\r\n\r\n" + body;
+      size_t sent = 0;
+      while (sent < out.size())
+      {
+         const int n = send(c, out.data() + sent, (int)(out.size() - sent), 0);
+         if (n <= 0)
+            break;
+         sent += (size_t)n;
+      }
+   }
+}
+
+int RunMcpBridge()
+{
+   gIn = GetStdHandle(STD_INPUT_HANDLE);
+   gOut = GetStdHandle(STD_OUTPUT_HANDLE);
+   if (gIn == INVALID_HANDLE_VALUE || gIn == nullptr || gOut == INVALID_HANDLE_VALUE || gOut == nullptr)
+      return 2;
+   Log(std::string("Infinite-Turbo MCP bridge ") + kServerVersion + ", control port " + std::to_string(ControlPort()));
+
+   std::string line;
+   while (ReadLine(line))
+   {
+      if (line.empty())
+         continue;
+      json msg;
+      try
+      {
+         msg = json::parse(line);
+      }
+      catch (const std::exception& e)
+      {
+         WriteMessage({ { "jsonrpc", "2.0" }, { "id", nullptr },
+                        { "error", { { "code", -32700 }, { "message", std::string("parse error: ") + e.what() } } } });
+         continue;
+      }
+      const json reply = HandleRpc(msg);
+      if (!reply.is_null())
+         WriteMessage(reply);
    }
    Disconnect();
    return 0;
+}
+
+int RunMcpHttp(int port, const std::string& token)
+{
+   if (!InfiniteSocketsReady())
+      return 2;
+   InfiniteSocket server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+   if (server == kInfiniteInvalidSocket)
+      return 2;
+   sockaddr_in addr{};
+   addr.sin_family = AF_INET;
+   addr.sin_port = htons((u_short)port);
+   addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // only the tunnel (or this PC) reaches it
+   if (bind(server, (sockaddr*)&addr, sizeof(addr)) != 0 || listen(server, 16) != 0)
+   {
+      Log("could not listen on 127.0.0.1:" + std::to_string(port));
+      InfiniteCloseSocket(server);
+      return 3;
+   }
+   const std::string mcpPath = "/mcp/" + token;
+   Log("MCP over HTTP on http://127.0.0.1:" + std::to_string(port) + mcpPath);
+   for (;;)
+   {
+      InfiniteSocket c = accept(server, nullptr, nullptr);
+      if (c == kInfiniteInvalidSocket)
+         continue;
+      std::string method, path, body, headers;
+      if (!HttpRecvRequest(c, method, path, body, headers))
+      {
+         InfiniteCloseSocket(c);
+         continue;
+      }
+      const size_t q = path.find('?');
+      if (q != std::string::npos)
+         path.resize(q);
+      while (path.size() > 1 && path.back() == '/')
+         path.pop_back();
+      if (method == "OPTIONS")
+         HttpSend(c, 204, "No Content", std::string());
+      else if (path != mcpPath)
+         HttpSend(c, 404, "Not Found", R"({"error":"not found"})");
+      else if (method == "GET")
+         HttpSend(c, 405, "Method Not Allowed", std::string());
+      else if (method == "DELETE")
+         HttpSend(c, 200, "OK", std::string());
+      else if (method != "POST")
+         HttpSend(c, 405, "Method Not Allowed", std::string());
+      else
+      {
+         json msg = json::parse(body, nullptr, false);
+         if (msg.is_discarded())
+            HttpSend(c, 400, "Bad Request",
+                     json({ { "jsonrpc", "2.0" }, { "id", nullptr },
+                            { "error", { { "code", -32700 }, { "message", "parse error" } } } }).dump());
+         else if (msg.is_array())
+         {
+            json replies = json::array();
+            for (const json& m : msg)
+            {
+               json r = HandleRpc(m);
+               if (!r.is_null())
+                  replies.push_back(r);
+            }
+            if (replies.empty())
+               HttpSend(c, 202, "Accepted", std::string());
+            else
+               HttpSend(c, 200, "OK", replies.dump(-1, ' ', false, json::error_handler_t::replace));
+         }
+         else
+         {
+            const json r = HandleRpc(msg);
+            if (r.is_null())
+               HttpSend(c, 202, "Accepted", std::string());
+            else
+               HttpSend(c, 200, "OK", r.dump(-1, ' ', false, json::error_handler_t::replace));
+         }
+      }
+      InfiniteCloseSocket(c);
+   }
 }
 
 // `Infinite-Turbo.exe --mcp-install` (setup-mcp.bat): registers this exe as

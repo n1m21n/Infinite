@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.58.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.59.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -203,6 +203,7 @@ add_executable(Infinite WIN32
     src/core/RemoteControl.cpp
     src/platform/McpBridgeWindows.cpp
     src/platform/ClaudeChatWindows.cpp
+    src/platform/McpShareWindows.cpp
     src/core/RuntimeLog.cpp
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
@@ -565,6 +566,10 @@ add_custom_command(TARGET Infinite POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits"
         "$<TARGET_FILE_DIR:Infinite>/assets/drumkits"
+    # Turbo 0.59: example projects (FILE > Examples), shipped with every release.
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/examples"
+        "$<TARGET_FILE_DIR:Infinite>/examples"
     VERBATIM)
 # Turbo 0.54: bundled MIDI pattern packs (both builds) and, in the full build
 # only, SLOOP's kits rendered to samples (GPL-3.0 material, src/gpl/README.md).

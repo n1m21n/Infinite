@@ -1496,6 +1496,11 @@ std::vector<IGeometrySource*> Render3DNode::FlattenedGeometry() const
    std::vector<IGeometrySource*> out;
    for (int i = 0; i < kSlots; i++)
       FlattenGeometry(geometry[i], 0, kMaxDraw, out);
+   // Turbo 0.59: geometry from a switched-off Set block is not drawn.
+   out.erase(std::remove_if(out.begin(), out.end(), [](IGeometrySource* s) {
+                auto* n = dynamic_cast<INode*>(s);
+                return n != nullptr && n->blockOff;
+             }), out.end());
    return out;
 }
 

@@ -1,6 +1,10 @@
 // Part of src/main.cpp, included there in order (one translation unit).
 // expressions, modulation, cooking, rendering, swap
 
+      // Turbo 0.59: which nodes sit in a switched-off Set block (groups have
+      // just drawn, so membership is this frame's).
+      UpdateBlockStates();
+
       // ---- expression globals ----
       // A flat, ordered list of name/expression rows. Deliberately not a node:
       // a global is read by name from anywhere in the patch, and giving it a
@@ -37,7 +41,12 @@
                char nameBuf[64];
                snprintf(nameBuf, sizeof(nameBuf), "%s", g.name.c_str());
                ImGui::SetNextItemWidth(130.0f);
-               if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf)))
+               bool nameEdited = false;
+               {
+                  MixedCaseFontScope trueCase; // Turbo 0.59: names and formulas are case-sensitive
+                  nameEdited = ImGui::InputText("##name", nameBuf, sizeof(nameBuf));
+               }
+               if (nameEdited)
                {
                   PushUndoCheckpoint();
                   g.name = nameBuf;
@@ -51,7 +60,12 @@
                char exprBuf[512];
                snprintf(exprBuf, sizeof(exprBuf), "%s", g.expr.c_str());
                ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 150.0f);
-               if (ImGui::InputText("##expr", exprBuf, sizeof(exprBuf)))
+               bool exprEdited = false;
+               {
+                  MixedCaseFontScope trueCase; // Turbo 0.59: names and formulas are case-sensitive
+                  exprEdited = ImGui::InputText("##expr", exprBuf, sizeof(exprBuf));
+               }
+               if (exprEdited)
                {
                   PushUndoCheckpoint();
                   g.expr = exprBuf;
@@ -428,7 +442,7 @@
       // controls and have it land the same frame.
       for (GraphNode& gn : gNodes)
       {
-         if (dynamic_cast<IPaletteSource*>(gn.node.get()) != nullptr)
+         if (!gn.node->blockOff && dynamic_cast<IPaletteSource*>(gn.node.get()) != nullptr)
             gn.node->CookIfNeeded(frameId);
       }
 
@@ -455,6 +469,8 @@
 
       for (GraphNode& gn : gNodes)
       {
+         if (gn.node->blockOff)
+            continue; // Turbo 0.59: a switched-off Set block
          if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr ||
              dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr ||
              dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr ||
@@ -629,7 +645,8 @@
       }
 
       for (GraphNode& gn : gNodes)
-         gn.node->CookIfNeeded(frameId);
+         if (!gn.node->blockOff)
+            gn.node->CookIfNeeded(frameId);
       // Turbo 0.43: the timeline monitor shows this frame's textures.
       ArrangeCompositeMonitorIfRequested(frameId);
       ArrangeRenderPump(frameId); // Turbo 0.43.1: offline timeline render, one frame per iteration
@@ -1001,6 +1018,18 @@
          if (sPrevTime > 0.0)
             gLastFrameMs = (now - sPrevTime) * 1000.0;
          sPrevTime = now;
+
+         // Turbo 0.59: with the diagnostic log on, every frame much slower
+         // than the recent average is logged with its time, so a periodic
+         // hitch shows its period (0.5 s, 30 s autosave...) in Infinite.log.
+         {
+            static double sAvgMs = 0.0;
+            if (sAvgMs <= 0.0)
+               sAvgMs = gLastFrameMs;
+            if (RuntimeLog::Enabled() && gLastFrameMs > 20.0 && gLastFrameMs > sAvgMs * 1.8)
+               RuntimeLog::Write("slow frame: %.1f ms (average %.1f ms) at t=%.3f s", gLastFrameMs, sAvgMs, now);
+            sAvgMs = sAvgMs * 0.95 + gLastFrameMs * 0.05;
+         }
 
          static double sLastPerformanceLog = 0.0;
          if (RuntimeLog::Enabled() && gTargetFps > 0 && now - sLastPerformanceLog >= 5.0)

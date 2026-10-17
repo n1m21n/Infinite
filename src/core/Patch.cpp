@@ -74,6 +74,9 @@ namespace
          file << p << "uiFont " << s.uiFont << "\n";
       file << p << "updateCheck " << (s.updateCheck ? 1 : 0) << "\n";
       file << p << "startWithExample " << (s.startWithExample ? 1 : 0) << "\n";
+      file << p << "startupMode " << s.startupMode << "\n";
+      if (!s.startupPatch.empty())
+         file << p << "startupPatch " << s.startupPatch << "\n";
    }
 
    void ReadSettingValue(const std::string& key, std::istringstream& in, SceneSettings& s)
@@ -115,6 +118,13 @@ namespace
       else if (key == "uiFont") in >> s.uiFont;
       else if (key == "updateCheck") { int v = 1; in >> v; s.updateCheck = v != 0; }
       else if (key == "startWithExample") { int v = 1; in >> v; s.startWithExample = v != 0; }
+      else if (key == "startupMode") { in >> s.startupMode; s.hasStartupMode = true; }
+      else if (key == "startupPatch")
+      {
+         std::getline(in >> std::ws, s.startupPatch);
+         while (!s.startupPatch.empty() && (s.startupPatch.back() == '\r' || s.startupPatch.back() == ' '))
+            s.startupPatch.pop_back();
+      }
    }
 
    // Written with %.9g so a float survives the round trip exactly rather than

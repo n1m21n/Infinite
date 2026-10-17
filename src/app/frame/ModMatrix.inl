@@ -21,6 +21,8 @@
          gChatFocusInput = gChatOpen;
       }
       DrawClaudeChat();
+      DrawAiConnections(); // Turbo 0.59: Setup > AI connections
+      DrawSetList();       // Turbo 0.59: VIEW > Set list (Shift+L)
       if (gModMatrixOpen)
       {
          ImGui::SetNextWindowSize(ImVec2(820, 420), ImGuiCond_FirstUseEver);
@@ -801,7 +803,7 @@
                   const bool srcIsAudioNode =
                      IsAudioOutput(dragSrcNode->node.get(), dragOutputSlot);
                   const bool srcIsNoteSource =
-                     dynamic_cast<INoteSource*>(dragSrcNode->node.get()) != nullptr;
+                     IsNoteOutput(dragSrcNode->node.get(), dragOutputSlot);
 
                   const int slotCount = InputCountFor(*spawned);
                   for (int slot = 0; slot < slotCount; ++slot)

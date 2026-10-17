@@ -313,6 +313,22 @@
       size_t end = s.find_last_not_of(" \t");
       return s.substr(start, end - start + 1);
    }
+   // Turbo 0.59: whether committed field text is an expression, and which.
+   // Any '=' makes it one, not only a leading one: a double-click seeds the
+   // field with the old value, and when that seed is not replaced the typed
+   // formula lands after it ("0.500=t % 1"), which used to commit as the
+   // number 0.5 and silently drop the formula. A real number never holds '='.
+   bool TypedTextExpression(const std::string& trimmed, std::string& exprOut)
+   {
+      const size_t eq = trimmed.find('=');
+      if (eq == std::string::npos)
+         return false;
+      size_t from = eq;
+      while (from < trimmed.size() && trimmed[from] == '=')
+         from++; // "==t" reads as "t"
+      exprOut = TrimCopy(trimmed.substr(from));
+      return true;
+   }
    // Param pins declared this frame. A node with its params collapsed declares
    // none, and emitting a link to an undeclared pin makes the editor treat the
    // link as dead and delete it - which silently dropped the modulation.
@@ -1184,8 +1200,11 @@
          // over the neighbouring engine. This is the same defect the knob path
          // fixed; the slider path never got it.
          const std::string typedId = std::string("##typed") + label;
-         const bool entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf),
-                                               ImGuiInputTextFlags_EnterReturnsTrue);
+         bool entered = false;
+         {
+            MixedCaseFontScope trueCase; // Turbo 0.59: `t` and `T` must look different here
+            entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
+         }
          gTypedParamText[editKey] = buf;
          if (gTypedParamPendingInit.count(editKey) && ImGui::IsItemActive())
          {
@@ -1212,9 +1231,9 @@
          if (entered || ImGui::IsItemDeactivated())
          {
             const std::string trimmed = TrimCopy(gTypedParamText[editKey]);
-            if (!trimmed.empty() && trimmed[0] == '=')
+            std::string exprText;
+            if (TypedTextExpression(trimmed, exprText))
             {
-               const std::string exprText = TrimCopy(trimmed.substr(1));
                if (exprText.empty())
                   Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
                else
@@ -1352,6 +1371,16 @@
          }
          if (hovered && !ImGui::IsItemActive())
             HandleParamTypeHotkeys(editKey, value);
+         // Turbo 0.59: say so - a broken formula used to look exactly like no
+         // formula at all, so a typo read as "expressions don't work".
+         ImGui::SameLine(0.0f, 4.0f);
+         ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.40f, 1.0f), "fx!");
+         if (hovered || ImGui::IsItemHovered())
+         {
+            const std::string* exprText = Modulation::Instance().ExpressionFor(nodeIndex, paramIndex);
+            gLiveIssueTip = "expression error: " + *hasExprErr + "\n=" + (exprText != nullptr ? *exprText : std::string()) +
+                            "\n(double-click to fix it, or type a number to drop it)";
+         }
       }
       else
       {
@@ -2001,7 +2030,11 @@
          char buf[256];
          snprintf(buf, sizeof(buf), "%s", gTypedParamText[editKey].c_str());
          const std::string typedId = std::string("##typed") + label;
-         const bool entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
+         bool entered = false;
+         {
+            MixedCaseFontScope trueCase; // Turbo 0.59: `t` and `T` must look different here
+            entered = ImGui::InputText(typedId.c_str(), buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
+         }
          gTypedParamText[editKey] = buf;
          if (gTypedParamPendingInit.count(editKey) && ImGui::IsItemActive())
          {
@@ -2024,9 +2057,9 @@
          if (entered || ImGui::IsItemDeactivated())
          {
             const std::string trimmed = TrimCopy(gTypedParamText[editKey]);
-            if (!trimmed.empty() && trimmed[0] == '=')
+            std::string exprText;
+            if (TypedTextExpression(trimmed, exprText))
             {
-               const std::string exprText = TrimCopy(trimmed.substr(1));
                if (exprText.empty())
                   Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
                else

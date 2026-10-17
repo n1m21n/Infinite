@@ -91,4 +91,14 @@
             if (GraphNode* target = FindNodeByIndex(link.first.first))
                target->hasPaletteColors = true;
          }
+         // Turbo 0.59: an expression is evaluated only for params registered
+         // this frame, i.e. while its node draws. Off-screen culling skipped
+         // such a node on 29 frames of 30, so a `=t...` param scrolled out of
+         // view (or near the edge) updated twice a second and whatever it
+         // drove jumped. It is a binding like a cable: never culled.
+         for (const auto& expr : modulation.Expressions())
+         {
+            if (GraphNode* target = FindNodeByIndex(expr.first.first))
+               target->hasModulatedParams = true;
+         }
       }

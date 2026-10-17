@@ -64,6 +64,9 @@ public:
    float width = 320.0f;
    float height = 220.0f;
    float color[3] = { 0.45f, 0.65f, 0.95f };
+   // Turbo 0.59: a group is also a Set block. Off = every member stops (no
+   // cooking, no sound, no output) until it is switched on again.
+   bool active = true;
 
    // Rename-in-place state and the last measured header height. Neither is
    // saveable data - VisitParams deliberately leaves them out - they are UI
@@ -77,6 +80,7 @@ public:
       v.Text("label", label);
       v.Float("width", width); v.Float("height", height);
       v.Color("color", color);
+      v.Bool("active", active);
    }
 };
 

@@ -931,6 +931,61 @@
       return true;
    }
 
+   // Turbo 0.59: FILE > Examples. Every .inf in <app>/examples (and the
+   // bundled superSynthMCP), by name.
+   std::vector<std::pair<std::string, std::string>> ListExamplePatches()
+   {
+      std::vector<std::pair<std::string, std::string>> out; // menu name, path
+      const std::filesystem::path exeDir = std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
+      const std::filesystem::path dirs[] = { exeDir / "examples", exeDir / "assets" / "examples",
+                                             std::filesystem::u8path("examples") };
+      std::error_code ec;
+      for (const std::filesystem::path& dir : dirs)
+      {
+         if (!std::filesystem::is_directory(dir, ec))
+            continue;
+         for (const auto& entry : std::filesystem::recursive_directory_iterator(dir, ec))
+         {
+            if (!entry.is_regular_file(ec) || !HasExtension(entry.path().u8string(), std::vector<std::string> { "inf" }))
+               continue;
+            const std::string name = entry.path().stem().u8string();
+            if (dir.filename() == "examples" && dir.parent_path().filename() == "assets" && name != "superSynthMCP")
+               continue; // assets/examples holds test material besides the startup example
+            bool dup = false;
+            for (const auto& e : out)
+               dup = dup || e.first == name;
+            if (!dup)
+               out.push_back({ name, entry.path().u8string() });
+         }
+      }
+      std::sort(out.begin(), out.end());
+      return out;
+   }
+
+   // Opens a patch as an untitled document (examples: Save never overwrites them).
+   bool LoadPatchAsUntitled(const std::string& path)
+   {
+      Patch::Data data;
+      std::string error;
+      if (!Patch::Read(path, data, error))
+      {
+         gPatchStatus = "Could not open " + path + ": " + error;
+         return false;
+      }
+      ApplyPatchData(data, false);
+      Transport::Instance().SetTempo(data.transport.bpm);
+      Transport::Instance().SetTimeSignature(data.transport.timeSigNum, data.transport.timeSigDen);
+      Transport::Instance().SetKey(data.transport.key);
+      Transport::Instance().SetScale(data.transport.scale);
+      gUndoStack.clear();
+      gRedoStack.clear();
+      gPatchPath.clear();
+      gPatchDirty = false;
+      gPatchStatus = "Example: " + std::filesystem::u8path(path).stem().u8string() + " (Save As to keep your changes)";
+      gRequestFitView = true;
+      return true;
+   }
+
    bool RecoverAutosave()
    {
       Patch::Data data;

@@ -176,6 +176,12 @@ namespace Patch
       int autosaveSeconds = 30;
       bool audioAutoStart = false; // Turbo: start the audio engine when the app opens (app-level only)
       bool startWithExample = true; // Turbo 0.46: open the bundled example at startup (app-level only)
+      // Turbo 0.59: what opens at startup (app-level only): 0 an empty patch,
+      // 1 the last patch, 2 the bundled example, 3 startupPatch. Missing from a
+      // pre-0.59 settings file (hasStartupMode false): the new defaults apply.
+      int startupMode = 0;
+      std::string startupPatch;
+      bool hasStartupMode = false;
       bool updateCheck = true; // Turbo 0.46: look for a newer release at startup (app-level only)
       std::string uiFont; // Turbo 0.51: interface font id ("" = IBM Plex default, "atkinson"), app-level only
       float uiScale = 0.0f; // Turbo 0.46: 0 = follow Windows' display scale, else a fixed factor (app-level only)

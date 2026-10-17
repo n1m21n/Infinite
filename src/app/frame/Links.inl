@@ -351,7 +351,7 @@
                const bool srcIsAudioNode = srcNode != nullptr &&
                                            IsAudioOutput(srcNode->node.get(), srcOutputIndex);
                const bool srcIsNoteSource = srcNode != nullptr &&
-                                            dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
+                                            IsNoteOutput(srcNode->node.get(), srcOutputIndex);
 
                bool valid = false;
                const char* rejectReason = nullptr;

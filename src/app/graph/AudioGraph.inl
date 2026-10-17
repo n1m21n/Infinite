@@ -207,6 +207,10 @@
       if (node == nullptr || visited.count(node) != 0)
          return;
       visited.insert(node);
+      // Turbo 0.59: a switched-off Set block is left out entirely, so whatever
+      // it fed (a master mixer outside the block, say) reads silence.
+      if (node->blockOff)
+         return;
 
       AudioTopologyEntry entry;
       // No early break on the first null slot: audio and note pins share one
@@ -350,7 +354,7 @@
          // Output nodes are terminals, not processors, so they never pass
          // through CollectAudioChain's bypass branch. Excluding the terminal
          // here is what makes their bypass control actually mute the device.
-         if (gn.node->bypassed)
+         if (gn.node->bypassed || gn.node->blockOff)
             continue;
 
          AudioCaptureRing* ring = audioOut ? &audioOut->CaptureRing() : &outNode->CaptureRing();
@@ -712,6 +716,9 @@
       s.uiFont = gUiFontId;
       s.updateCheck = gUpdateCheckEnabled;
       s.startWithExample = gStartWithExample;
+      s.startupMode = gStartupMode;
+      s.startupPatch = gStartupPatch;
+      s.hasStartupMode = true;
       return s;
    }
 
@@ -756,6 +763,18 @@
          gAudioAutoStart = s.audioAutoStart;
          gUpdateCheckEnabled = s.updateCheck;
          gStartWithExample = s.startWithExample;
+         if (s.hasStartupMode)
+         {
+            gStartupMode = std::clamp(s.startupMode, 0, 3);
+            gStartupPatch = s.startupPatch;
+         }
+         else
+         {
+            // First run of 0.59 on this machine: open empty, audio off (the
+            // new defaults), whatever the older version was set to.
+            gStartupMode = 0;
+            gAudioAutoStart = false;
+         }
          const float wantScale = (s.uiScale >= 0.5f && s.uiScale <= 3.0f) ? s.uiScale : 0.0f;
          if (wantScale != gUiScaleSetting)
          {
@@ -809,7 +828,8 @@
              a.diagnosticLog == b.diagnosticLog && a.autosaveEnabled == b.autosaveEnabled &&
              a.autosaveSeconds == b.autosaveSeconds && a.audioAutoStart == b.audioAutoStart &&
              a.uiScale == b.uiScale && a.uiFont == b.uiFont && a.updateCheck == b.updateCheck &&
-             a.startWithExample == b.startWithExample;
+             a.startWithExample == b.startWithExample && a.startupMode == b.startupMode &&
+             a.startupPatch == b.startupPatch;
    }
 
    void PersistSceneSettingsIfChanged()

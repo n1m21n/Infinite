@@ -1,5 +1,79 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.59.0-turbo (2026-10-17)
+
+### Set blocks (long performances)
+- Every Group is now a block that switches off: its nodes stop cooking, leave the audio graph
+  (silent, no CPU) and read as nothing to cables from outside. Power button on the group header.
+- **Set list** window (VIEW > Set list, Shift+L, top-bar icon): GO starts a block (alone, by default),
+  rewinds and plays; Page Up / Page Down step through the set; All on / All off.
+- FILE > **Import patch as a block**: a whole .inf joins the open patch inside its own group, off
+  when the patch already has content, so several songs live in one patch.
+- Blocks in **Performance mode**: right-click a group's power button (or the faders icon in the Set
+  list) to add its on / off as a Toggle, or Assign an existing control and click the power button.
+
+### AI chat and AI connections
+- The chat talks to **Claude** (Claude Code) or **ChatGPT** (OpenAI's Codex CLI with a ChatGPT login).
+- Redesign: message bubbles, tool calls folded into one line per answer, input that grows and empties
+  on send, attachments (file button, Ctrl+V / paste image, files dropped on the window) with thumbnails.
+- Guided setup when the CLI is missing or not logged in, with buttons that run the commands.
+- **Select** shows the conversation as selectable text (drag, Ctrl+A, Ctrl+C); **Copy all** copies it;
+  right-click Copy also on errors and notices.
+- ChatGPT (Codex) can use the Infinite tools: the in-app MCP server is pre-approved for Codex
+  (`default_tools_approval_mode`), which refused every call with `approval_policy=never`.
+- SETUP > **AI connections**: ChatGPT on the web through a connector URL (`--mcp-http` plus a free
+  Cloudflare quick tunnel, secret path), Claude Desktop, Claude Code, Codex CLI and other MCP clients.
+
+### Menus and top bar
+- MENU is now **SETUP** (startup, AI, performance, interface, theme, audio, updates, diagnostics);
+  canvas, minimap and windows moved to VIEW, params and globals to EDIT, Quit to FILE, a new HELP.
+- Top bar with icons: play / pause, rewind and audio power; BPM drags, scrolls or takes a typed value;
+  the time signature is one button with a popup; the position reads bar, beat and one cell per beat.
+- CPU, audio, GPU, VRAM and FPS in one monitor group (icon + value, details on hover).
+
+### Plugins
+- A VST3 that sends MIDI out (arpeggiator, sequencer, MIDI effect) gets a **midi** output pin: its
+  note on / off leave as note events, to another synth, a note tool or a MIDI Out (external gear).
+  Notes it leaves held are released when it is bypassed, swapped or unloaded. Bypassed, it is a MIDI
+  thru: the notes coming in leave by the midi pin unchanged.
+
+### Transform
+- **edges** on the Transform node, under Translate: cut (empty), hold edge, repeat (tiles) or mirror,
+  for what fills the frame where a translate or a smaller scale uncovers it. It was already there as
+  common > more > extend, where nobody found it; both are the same setting.
+
+### Smooth motion
+- A node whose param holds an expression is no longer culled off-screen. Expressions only run for
+  params drawn that frame, so a `=t...` param out of view (or near the edge) updated twice a second
+  and whatever it drove (a looping translate) jumped at random, with the FPS steady.
+- With the audio engine running, the clock moved once per audio block (10-20 ms) and blocks arrive
+  unevenly, so `t` and the beats advanced in uneven steps from frame to frame. The frame now reads a
+  smooth clock that advances by each frame's real duration and leans gently toward the audio
+  position (it snaps on a seek, loop or rewind); the audio thread keeps the block-exact position.
+- The NVIDIA GPU / VRAM reading (NVML) runs on its own thread: its driver calls took several ms on the
+  frame thread twice a second (and nvmlInit far longer on the first frame).
+- With the diagnostic log on, frames much slower than the average are logged with their time
+  (`slow frame: ... at t=...` in Infinite.log), to find what a periodic hitch is.
+
+### Expressions
+- Typing a formula in a param field works however the field was opened: any `=` makes the text a
+  formula (a double-click seed left in front, `0.500=t % 1`, used to commit the number 0.5 and drop
+  the formula without a word).
+- A formula that fails to evaluate shows a red `fx!` next to the slider; hovering says why.
+- Param fields and the Expression globals window show what you type in its real case (the rest of
+  the UI stays all caps): expressions are case-sensitive, and `t` and `T` used to look the same.
+
+### Build
+- `build-windows.bat` only refuses when the app window is open: an MCP bridge (`--mcp`) kept running
+  by Claude has its exe renamed to `.old` and keeps working, so Claude needs no restart to build.
+- Link fix: the chat thumbnails decode from memory (the app's stb_image has no file I/O).
+
+### Startup and examples
+- Opens with an empty patch and the audio off by default. SETUP > Startup picks an empty patch, the
+  last patch, the example or a chosen .inf, and whether audio starts.
+- `examples/` folder, copied next to the app by the build and the package: FILE > Examples opens
+  them untitled.
+
 ## 0.58.0-turbo (2026-10-16)
 
 ### PointZ nodes (new category)

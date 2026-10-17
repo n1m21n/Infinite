@@ -420,20 +420,60 @@
    // width/height here exist purely to seed that first frame and to survive
    // save/load - every subsequent frame they are overwritten from the node's
    // actual measured size, the same pattern liveX/liveY use for position.
+   void AddBlockToPerformance(int groupIndex);  // SetBlocks.inl (Turbo 0.59)
+   bool BindPerfElementToBlock(int groupIndex); // SetBlocks.inl (Turbo 0.59)
+
    void DrawGroupNode(GraphNode& gn, GroupNode* n)
    {
       AutoFitGroupToMembers(gn, n);
 
       ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(0, 0, 0, 0));
       ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0, 0, 0, 0));
+      // Turbo 0.59: a switched-off Set block reads as faded.
       ed::PushStyleColor(ed::StyleColor_GroupBg,
-                         ImColor(n->color[0], n->color[1], n->color[2], 0.10f));
+                         ImColor(n->color[0], n->color[1], n->color[2], n->active ? 0.10f : 0.04f));
       ed::PushStyleColor(ed::StyleColor_GroupBorder,
-                         ImColor(n->color[0], n->color[1], n->color[2], 0.85f));
+                         ImColor(n->color[0], n->color[1], n->color[2], n->active ? 0.85f : 0.30f));
 
       ed::BeginNode(gn.NodeId());
       ImGui::PushID(gn.index);
       ImGui::BeginGroup();
+      // Turbo 0.59: the block's on / off switch (the Set list does the same).
+      {
+         const float sz = 16.0f;
+         ImGui::PushStyleColor(ImGuiCol_Button, n->active ? ImVec4(0.16f, 0.52f, 0.28f, 1.0f) : ImVec4(0.30f, 0.30f, 0.34f, 1.0f));
+         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+         const bool assigning = gPerfAssigningElemIdx >= 0 && gPerfAssigningElemIdx < (int)gPerfElements.size();
+         if (ImGui::Button("##blockpower", ImVec2(sz + 4.0f, sz)))
+         {
+            // Performance mode "Assign..." waiting: this click binds the
+            // control to the block instead of switching it.
+            if (!(assigning && BindPerfElementToBlock(gn.index)))
+            {
+               PushUndoCheckpoint();
+               n->active = !n->active;
+               gPatchDirty = true;
+            }
+         }
+         // Right-click: an on / off for this block in Performance mode.
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            AddBlockToPerformance(gn.index);
+         ImGui::PopStyleVar();
+         ImGui::PopStyleColor();
+         const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+         if (assigning)
+            ImGui::GetWindowDrawList()->AddRect(ImVec2(mn.x - 2, mn.y - 2), ImVec2(mx.x + 2, mx.y + 2),
+                                                IM_COL32(0, 230, 255, 220), 3.0f, 0, 2.0f);
+         DrawUiIcon(ImGui::GetWindowDrawList(), UiIcon::Power, ImVec2((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f), sz * 0.8f,
+                    IM_COL32(235, 235, 240, 255));
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(assigning ? "click: this block's on / off becomes the Performance control"
+                              : n->active ? "block on: click to switch it off (it stops: no processing, no sound)\n"
+                                            "right-click: add its on / off to Performance mode"
+                                          : "block off: click to switch it on (VIEW > Set list runs the show)\n"
+                                            "right-click: add its on / off to Performance mode");
+         ImGui::SameLine();
+      }
       if (ImGui::ColorButton("##groupcolor", ImVec4(n->color[0], n->color[1], n->color[2], 1.0f),
                              ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder,
                              ImVec2(14, 14)))
@@ -472,7 +512,13 @@
       else
       {
          ImGui::TextUnformatted(n->label.c_str());
-         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+         const bool labelHovered = ImGui::IsItemHovered();
+         if (!n->active)
+         {
+            ImGui::SameLine();
+            ImGui::TextDisabled("OFF");
+         }
+         if (labelHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          {
             PushUndoCheckpoint();
             n->renaming = true;

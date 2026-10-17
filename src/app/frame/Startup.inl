@@ -7,6 +7,9 @@
          return RunMcpBridge();
       else if (std::strcmp(argv[i], "--mcp-install") == 0)
          return InstallMcpConfig();
+      else if (std::strcmp(argv[i], "--mcp-http") == 0)
+         // Turbo 0.59: Streamable HTTP MCP for remote clients (ChatGPT), see McpShare.h.
+         return RunMcpHttp(i + 1 < argc ? std::atoi(argv[i + 1]) : 7780, i + 2 < argc ? std::string(argv[i + 2]) : std::string("local"));
    // Turbo 0.46 (upstream R500): one Infinite-Turbo at a time for opening
    // patches. A second launch with a .inf (double-click in Explorer) hands
    // the file to the running one and exits; without a file it opens a second
@@ -1966,8 +1969,22 @@
    // Never in a self-test run (test-windows.bat sets INFINITE_EXITAFTER): the
    // example would start audio, move the view and add nodes under the fixture.
    const bool selfTestRun = getenv("INFINITE_EXITAFTER") != nullptr || getenv("IMAGERESYNTH_SCREENSHOT") != nullptr;
-   if (gStartWithExample && !selfTestRun && gNodes.empty() && gPatchPath.empty() && !gRecoveryAvailable)
-      LoadExamplePatch(true);
+   // Turbo 0.59: Setup > Startup decides (empty by default; audio follows
+   // "Start audio when Infinite opens", off by default).
+   if (!selfTestRun && gNodes.empty() && gPatchPath.empty() && !gRecoveryAvailable)
+   {
+      std::error_code startEc;
+      if (gStartupMode == 2)
+         LoadExamplePatch(gAudioAutoStart);
+      else if (gStartupMode == 1 && !Patch::Recents().empty() &&
+               std::filesystem::exists(std::filesystem::u8path(Patch::Recents().front()), startEc))
+         LoadPatchFrom(Patch::Recents().front());
+      else if (gStartupMode == 3 && !gStartupPatch.empty() &&
+               std::filesystem::exists(std::filesystem::u8path(gStartupPatch), startEc))
+         LoadPatchFrom(gStartupPatch);
+      if (!gNodes.empty())
+         gRequestFitView = true;
+   }
    // Any launch-time Finder open is drained by the in-frame loop below, right
    // after the first glfwPollEvents() call.
 

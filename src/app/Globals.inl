@@ -279,6 +279,32 @@
       return DisplayName(visibleName) + "##" + role + ":" + category + ":" + registeredName;
    }
 
+   // Turbo 0.59: the same face again WITHOUT the uppercase remap below, for
+   // text people type and the app reads back exactly (param values and
+   // expressions, which are case-sensitive: `t` works, `T` does not - and in
+   // the all-caps face the two look the same). nullptr when only ImGui's
+   // default font loaded; MixedCaseFontScope then does nothing.
+   ImFont* gUiFontMixedCase = nullptr;
+   struct MixedCaseFontScope
+   {
+      bool pushed = false;
+      MixedCaseFontScope()
+      {
+         if (gUiFontMixedCase != nullptr)
+         {
+            ImGui::PushFont(gUiFontMixedCase);
+            pushed = true;
+         }
+      }
+      ~MixedCaseFontScope()
+      {
+         if (pushed)
+            ImGui::PopFont();
+      }
+      MixedCaseFontScope(const MixedCaseFontScope&) = delete;
+      MixedCaseFontScope& operator=(const MixedCaseFontScope&) = delete;
+   };
+
    // Present the entire ImGui layer in uppercase without changing stored
    // paths, patch text, plugin names or user input. Lowercase codepoints keep
    // their identity in the string, but render with the uppercase IBM Plex
@@ -326,7 +352,11 @@
    // at startup on a worker thread; a newer release shows an UPDATE badge in
    // the top bar. Off in Settings, or with INFINITE_NO_UPDATE_CHECK set.
    bool gUpdateCheckEnabled = true;
-   bool gStartWithExample = true; // Turbo 0.46: open superSynthMCP at startup
+   bool gStartWithExample = true; // Turbo 0.46: open superSynthMCP at startup (kept for old settings files)
+   // Turbo 0.59: Setup > Startup. 0 empty patch, 1 the last patch, 2 the
+   // example, 3 gStartupPatch.
+   int gStartupMode = 0;
+   std::string gStartupPatch;
    namespace TurboUpdate
    {
       constexpr const char* kReleasesApi = "https://api.github.com/repos/ricardopalmieri/Infinite/releases/latest";
@@ -456,11 +486,14 @@
          0x1E00, 0x1EFF, 0x2000, 0x206F, 0x20A0, 0x20CF, 0
       };
       ImFont* uiFont = nullptr;
+      gUiFontMixedCase = nullptr; // io.Fonts->Clear() above freed the old one
       for (const std::string& path : candidates)
       {
          uiFont = io.Fonts->AddFontFromFileTTF(path.c_str(), bakedPx, nullptr, kUiGlyphRanges);
          if (uiFont != nullptr)
          {
+            // Turbo 0.59: a second copy that keeps lowercase (see gUiFontMixedCase).
+            gUiFontMixedCase = io.Fonts->AddFontFromFileTTF(path.c_str(), bakedPx, nullptr, kUiGlyphRanges);
             io.FontGlobalScale = baseSize / bakedPx;
             RuntimeLog::Write("UI font loaded: %s (scale %.2f)", path.c_str(), scale);
             break;

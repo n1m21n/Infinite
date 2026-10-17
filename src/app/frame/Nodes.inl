@@ -107,6 +107,9 @@
             ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.5f);
 
          ed::BeginNode(gn.NodeId());
+         const bool dimForBlock = gn.node->blockOff; // Turbo 0.59: its Set block is off
+         if (dimForBlock)
+            ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.4f);
          ImGui::PushID(gn.index);
          const bool midiLearnLock = MidiMap::LearnMode() || gPerfAssigningElemIdx >= 0; // Turbo 0.46: assign mode too
          if (midiLearnLock)
@@ -183,7 +186,8 @@
          IGeometrySource* geoSourceForViewport = dynamic_cast<IGeometrySource*>(gn.node.get());
          const bool isAudioBodyNode = IsAudioBodyNode(gn.node.get());
          const bool canTogglePreview = CanToggleInlinePreview(gn);
-         const bool inlinePreviewEnabled = !canTogglePreview || InlinePreviewEnabled(gn);
+         // Turbo 0.59: nothing to show (and no GPU spent) while its Set block is off.
+         const bool inlinePreviewEnabled = !canTogglePreview || (InlinePreviewEnabled(gn) && !gn.node->blockOff);
          if (auto* scenesNode = dynamic_cast<ScenesNode*>(gn.node.get()))
             DrawScenesBody(scenesNode, gn.index); // Turbo 0.50
          else if (multiOutModulator)
@@ -905,6 +909,8 @@
          ImGui::PopID();
          if (midiLearnLock)
             ImGui::EndDisabled();
+         if (dimForBlock)
+            ImGui::PopStyleVar();
          ed::EndNode();
          gCurrentNodeIndex = -1;
          ed::PopStyleColor(2);

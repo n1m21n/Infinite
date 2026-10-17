@@ -23,6 +23,9 @@ namespace Platform
    // NVML dynamically when an NVIDIA driver provides it, so the executable
    // gains no new runtime dependency.
    bool ReadGpuStats(GpuStats& out);
+   // Turbo 0.59: this process's CPU use, 0..100 of the whole machine (all
+   // cores), sampled at most twice a second; -1 until the second sample.
+   float ReadProcessCpuPercent();
 
    // Windows projector policy: a normal decorated window while positioning,
    // then borderless/topmost on F11 without switching to exclusive fullscreen.
@@ -621,6 +624,22 @@ namespace Platform
    bool PluginAudioEnabled(PluginHandle* handle);
    void PluginScheduleMIDIEvent(PluginHandle* handle, int frameOffset, const unsigned char* bytes,
                                 int byteCount);
+
+   // Turbo 0.59: MIDI the plugin itself sent out during the last PluginRender
+   // (an arpeggiator, a sequencer, a chord or MIDI effect). Audio thread, right
+   // after PluginRender, inside the same Enter / Exit bracket. Copies up to
+   // `maxCount` messages (oldest first) and empties the list. Filled only for
+   // plugins that declare a MIDI output.
+   struct PluginMidiMessage
+   {
+      int frameOffset = 0;
+      unsigned char bytes[3] = { 0, 0, 0 };
+      int size = 0;
+   };
+   int PluginTakeMidiOutput(PluginHandle* handle, PluginMidiMessage* out, int maxCount);
+   // Main thread: true once a loaded plugin declares a MIDI output (what the
+   // plugin node's "midi" output pin is keyed off).
+   bool PluginProducesMidi(PluginHandle* handle);
 
    struct PluginParamInfo
    {

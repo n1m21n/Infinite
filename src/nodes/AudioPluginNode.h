@@ -40,7 +40,10 @@ class AudioPluginAudioNode;
 //    rather than destroying it immediately, mirroring
 //    AudioEngine::SetTopology's discipline: an in-flight render callback may
 //    still be inside the handle at the moment the atomic is overwritten.
-class AudioPluginNode : public INode, public IAudioSource
+// Turbo 0.59: also an INoteSource - a plugin that declares a MIDI output
+// (an arpeggiator, a sequencer, a MIDI effect) gets a second output pin,
+// "midi", carrying its note on / off as note events (ProducesMidi).
+class AudioPluginNode : public INode, public IAudioSource, public INoteSource
 {
 public:
    // Positional mapping slots. 32 is well past the point a node body stops
@@ -94,6 +97,12 @@ public:
    // True once the loaded plugin is an instrument or music effect - what the
    // note pin's visibility is keyed off. False with no plugin loaded.
    bool AcceptsNotes() const { return mAcceptsNotes; }
+
+   // Turbo 0.59: true once the loaded plugin declares a MIDI output; then the
+   // node has a second output, "midi" (output 1), for note cables.
+   bool ProducesMidi() const { return mProducesMidi; }
+   int OutputCount() const override { return mProducesMidi ? 2 : 1; }
+   const char* OutputLabel(int index) const override { return index == 1 ? "midi" : "out"; }
 
    // Mirrors AudioEffectNode::LatencySamples()'s shape: forwards to the
    // audio-half object, which reads it off the published plugin handle. 0
@@ -169,6 +178,7 @@ private:
    // (AcceptsNotes) and never changes without a different plugin being
    // loaded, so it's cheap to cache rather than re-derive every frame.
    bool mAcceptsNotes = false;
+   bool mProducesMidi = false; // Turbo 0.59: see ProducesMidi
 
    Platform::PluginHandle* mHandle = nullptr;  // the one being loaded / live
    Platform::PluginHandle* mLive = nullptr;    // currently published

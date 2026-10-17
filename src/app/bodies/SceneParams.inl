@@ -1927,6 +1927,29 @@
             ModSlider(p.label.c_str(), n->ParamPtr(i), p.minVal, p.maxVal);
          }
          ImGui::PopID();
+         // Turbo 0.59: what shows where a translate (or a smaller scale)
+         // uncovers the frame - cut (empty), stretched edge, tiled or
+         // mirror-tiled. The same setting as "common > more > extend", up
+         // here where you look for it when moving the image.
+         if (def.name == "transform" && i == 1)
+         {
+            static const std::vector<std::string> kEdges = { "Cut (empty)", "Hold edge", "Repeat", "Mirror" };
+            static const int kExtendOf[4] = { GLUtil::kExtendZero, GLUtil::kExtendHold, GLUtil::kExtendRepeat,
+                                              GLUtil::kExtendMirror };
+            int current = 0;
+            for (int k = 0; k < 4; k++)
+               if (kExtendOf[k] == n->EffectiveExtend())
+                  current = k;
+            DropdownButton("edges", kEdges, current, [n](int choice) {
+               const int want = kExtendOf[std::clamp(choice, 0, 3)] + 1; // common.extend: GLUtil::Extend + 1
+               if (n->common.extend == want)
+                  return;
+               if (!gApplyingDiscreteCv)
+                  PushUndoCheckpoint();
+               n->common.extend = want;
+               gPatchDirty = true;
+            });
+         }
       }
       if (def.params.empty())
          ImGui::TextDisabled("(no parameters)");

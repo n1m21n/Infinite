@@ -96,7 +96,31 @@ namespace Platform
 {
    void EnsureJuceInitialised();
 
-   bool ReadGpuStats(GpuStats& out)
+   float ReadProcessCpuPercent()
+   {
+      static ULONGLONG lastProc = 0, lastWall = 0;
+      static float cached = -1.0f;
+      static const unsigned cores = std::max(1u, std::thread::hardware_concurrency());
+      FILETIME now, create, exitT, kernel, user;
+      GetSystemTimeAsFileTime(&now);
+      const auto u64 = [](const FILETIME& f) { return ((ULONGLONG)f.dwHighDateTime << 32) | f.dwLowDateTime; };
+      const ULONGLONG wall = u64(now);
+      if (lastWall != 0 && wall - lastWall < 5000000ULL) // 100 ns units: 0.5 s
+         return cached;
+      if (!GetProcessTimes(GetCurrentProcess(), &create, &exitT, &kernel, &user))
+         return cached;
+      const ULONGLONG proc = u64(kernel) + u64(user);
+      if (lastWall != 0 && wall > lastWall)
+         cached = std::clamp((float)(100.0 * (double)(proc - lastProc) / ((double)(wall - lastWall) * cores)), 0.0f, 100.0f);
+      lastProc = proc;
+      lastWall = wall;
+      return cached;
+   }
+
+   // The NVML query itself. Turbo 0.59: called only from the poller thread
+   // below - NVML calls can take several ms (and nvmlInit far more), which on
+   // the frame thread showed as a hitch twice a second.
+   static bool PollGpuStatsNow(GpuStats& out)
    {
       using NvmlReturn = int;
       using NvmlDevice = void*;
@@ -117,7 +141,7 @@ namespace Platform
          GpuStats cached;
          std::chrono::steady_clock::time_point lastPoll {};
       };
-      static NvmlApi api;
+      static NvmlApi& api = *new NvmlApi(); // never destroyed: the poller may outlive statics
 
       if (!api.attempted)
       {
@@ -203,6 +227,39 @@ namespace Platform
       api.lastPoll = now;
       out = current;
       return true;
+   }
+
+   // Turbo 0.59: the frame reads the last poll; a background thread refreshes
+   // it twice a second, so a slow driver call never delays a frame.
+   bool ReadGpuStats(GpuStats& out)
+   {
+      struct Poller
+      {
+         std::mutex mutex;
+         GpuStats stats;
+         bool ok = false;
+      };
+      static Poller* poller = nullptr; // never destroyed (the thread is detached)
+      static std::once_flag started;
+      std::call_once(started, []() {
+         poller = new Poller();
+         std::thread([p = poller]() {
+            for (;;)
+            {
+               GpuStats s;
+               const bool ok = PollGpuStatsNow(s);
+               {
+                  std::lock_guard<std::mutex> lock(p->mutex);
+                  p->stats = s;
+                  p->ok = ok;
+               }
+               std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
+         }).detach();
+      });
+      std::lock_guard<std::mutex> lock(poller->mutex);
+      out = poller->stats;
+      return poller->ok;
    }
 
    namespace

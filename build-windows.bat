@@ -92,12 +92,27 @@ if not exist "!INFINITE_WINDOWSML_ROOT!\build\cmake" (
 echo Windows ML + DirectML: !INFINITE_WINDOWSML_ROOT!
 
 rem Um executavel antigo nao pode parecer resultado de uma compilacao que falhou.
-tasklist /FI "IMAGENAME eq %EXE_NAME%" 2>nul | find /I "%EXE_NAME%" >nul
-if not errorlevel 1 (
-  echo ERRO: feche o %EXE_NAME% antes de compilar.
+rem Turbo 0.59: so o app aberto impede a compilacao. A ponte MCP que o Claude
+rem (ou outro cliente) mantem rodando ("Infinite-Turbo.exe --mcp") nao: o exe
+rem em uso e renomeado para .old (o Windows deixa renomear um exe aberto), a
+rem ponte segue funcionando e o exe novo e gerado no lugar.
+set "APP_RUNNING=0"
+for /f %%N in ('powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq '%EXE_NAME%' -and $_.CommandLine -notmatch '--mcp' }).Count"') do set "APP_RUNNING=%%N"
+if not "%APP_RUNNING%"=="0" (
+  echo ERRO: feche o %EXE_NAME% ^(a janela do app^) antes de compilar.
   exit /b 1
 )
-if exist "%BUILD_DIR%\%CONFIG%\%EXE_NAME%" del /q "%BUILD_DIR%\%CONFIG%\%EXE_NAME%"
+set "OUT_EXE=%BUILD_DIR%\%CONFIG%\%EXE_NAME%"
+del /q "%BUILD_DIR%\%CONFIG%\%EXE_NAME%.*.old" >nul 2>&1
+if exist "%OUT_EXE%" del /q "%OUT_EXE%" >nul 2>&1
+if exist "%OUT_EXE%" (
+  move /y "%OUT_EXE%" "%OUT_EXE%.!RANDOM!.old" >nul 2>&1
+  if exist "%OUT_EXE%" (
+    echo ERRO: %OUT_EXE% esta em uso e nao pode ser substituido.
+    exit /b 1
+  )
+  echo Ponte MCP em uso: o exe antigo virou .old e continua atendendo o Claude.
+)
 
 rem Configura so quando necessario: primeira vez, "fresh", ou cache ausente.
 set "NEED_CONFIGURE="

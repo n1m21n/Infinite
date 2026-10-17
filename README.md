@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.58.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.59.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -102,7 +102,7 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **MIDI learn** | any parameter with a CV pin (Ctrl+M), per device and channel, soft takeover, ranges, saved with the patch |
 | **Range mapper** | right-click a modulated parameter: input range, output range, invert |
 | **OSC** | OSC Receive and OSC to CV (8 addresses to 8 CV outputs), on the LAN |
-| **VST3** | instruments and effects, plugin state saved with the patch, isolated scanner, GL editors that do not freeze the UI |
+| **VST3** | instruments and effects, plugin state saved with the patch, isolated scanner, GL editors that do not freeze the UI; a plugin that sends MIDI out (arpeggiator, sequencer, MIDI effect) gets a **midi** output pin whose notes drive another synth or a MIDI Out |
 | **Gesture recording** | hold Shift while moving a knob, release to loop the movement |
 
 ### Patching
@@ -130,9 +130,17 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | CoreText | native Windows text rasterizer |
 | ModelIO | Assimp (plus glTF / GLB) |
 
-## Build patches with Claude (MCP)
+## Build patches with Claude or ChatGPT (MCP)
 
-**Inside the app**: CLAUDE in the top bar (Shift+C) opens a chat that runs your own Claude Code (logged in with your Claude account, nothing extra to pay) with Infinite-Turbo's tools. If Claude Code is missing, the window shows the cmd line that installs it: `curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd`, then run `claude` once to log in.
+**Inside the app**: the chat icon in the top bar (Shift+C) opens a chat that runs your own Claude Code (Claude account) or OpenAI's Codex CLI (ChatGPT account), nothing extra to pay, with Infinite-Turbo's tools. Attach reference images or files with the + button, Ctrl+V or by dropping them on the window. **Select** shows the conversation as text you can select and copy; **Copy all** copies it whole. When the CLI is missing or not logged in, the window shows the setup steps with buttons that run them.
+
+**SETUP > AI connections** lists every other way in: ChatGPT on the web (a connector URL through a free Cloudflare tunnel; needs ChatGPT developer mode), Claude Desktop, Claude Code, Codex CLI and other MCP clients.
+
+## Long performances: Set blocks
+
+Every group is a block that can be switched off (power button on its header): its nodes stop completely. Put each song in its own group (or FILE > Import patch as a block), open VIEW > Set list (Shift+L) and press GO on a song: it switches on alone, the timeline rewinds and plays. Page Up / Page Down step through the set.
+
+In Performance mode a block is a Toggle: right-click a group's power button (or the faders icon on its Set list row) to add its on / off to the current page, or use Assign on an existing control and click the power button. It takes MIDI learn like any other control.
 
 **From Claude Desktop**:
 

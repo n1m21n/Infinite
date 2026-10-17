@@ -16,6 +16,7 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#include "stb_image.h" // declarations only: the implementation is in EnvironmentNode.cpp
 
 #include <algorithm>
 #include <cfloat>
@@ -67,6 +68,7 @@
 #include "platform/AISkillContent.h"
 #include "app/ui/design/TokenColors.h" // Turbo 0.57: upstream design tokens (Infinite Dark theme)
 #include "platform/ClaudeChat.h"
+#include "platform/McpShare.h"
 #include "core/RuntimeLog.h"
 #include "core/PatchJson.h"
 #include "platform/SettingsPaths.h"
@@ -237,6 +239,7 @@ namespace
 {
    #include "app/Globals.inl" // constants, globals and shared state
    #include "app/ui/Widgets.inl" // deferred dropdown, modulatable params, readouts, sliders, MIDI learn pins, knobs
+   #include "app/ui/Icons.inl" // Turbo 0.59: vector icons (top bar, Set list, block headers)
    #include "app/ui/PinsAndTheme.inl" // palette-bindable colours, pins, themes (incl. Infinite Dark)
    #include "app/graph/Graph.inl" // file dialogs, node lookup, pin counts, cable rules
    #include "app/bodies/VisualParams.inl" // per-node parameter UI of the visual nodes
@@ -259,6 +262,7 @@ namespace
    #include "app/graph/PatchIO.inl" // patch save / load / autosave / recovery, undo
    #include "app/graph/Rpc.inl" // MCP remote control (RPC) helpers
    #include "app/ui/AppWindows.inl" // minimap, save prompts, window title, projector windows
+   #include "app/graph/SetBlocks.inl" // Turbo 0.59: Set blocks (groups that switch off) and the Set list
    #include "app/bodies/LayoutVmpc.inl" // Layout and VMPC node bodies
 }
 
