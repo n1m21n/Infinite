@@ -1191,13 +1191,15 @@ static bool RunDrumSequencerFixture()
    {
       auto src = std::make_unique<DrumSequencerNode>();
       src->laneAccentPitch[5] = -7.5f;
+      src->laneAccentLevel[5] = 4.5f;
       src->patternName = "Test groove";
       src->patternPart = 2;
       std::vector<std::pair<std::string, std::string>> params;
       Patch::SaveParams(src.get(), params);
       auto dst = std::make_unique<DrumSequencerNode>();
       Patch::LoadParams(dst.get(), params);
-      bool rtOk = std::fabs(dst->laneAccentPitch[5] + 7.5f) < 1e-4f && dst->patternName == "Test groove" &&
+      bool rtOk = std::fabs(dst->laneAccentPitch[5] + 7.5f) < 1e-4f && std::fabs(dst->laneAccentLevel[5] - 4.5f) < 1e-4f &&
+                  dst->laneAccentLevel[4] == 0.0f && dst->patternName == "Test groove" &&
                   dst->patternPart == 2 && dst->laneAccentPitch[4] == 0.0f;
 
       auto held = std::make_unique<DrumSequencerNode>();

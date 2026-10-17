@@ -1615,15 +1615,20 @@ namespace app
          AudioSlider("volume", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", half);
          ImGui::SameLine();
          AudioSlider("pan", &n->lanePan[lane], -1.0f, 1.0f, "%.2f", half);
-         // Fourth row, full width: semitones added on full-velocity steps
-         // only (two-tone bells). Explicit param index 300 + lane keeps it out
-         // of the gParamCounter sequence, so the six sliders above (and every
-         // saved modulation binding on them) keep their ordinals; 300..307 sit
-         // between the float ordinals (< ~60) and kDiscreteParamBase (400).
-         char accentName[24];
+         // Fourth row: the accent pair (pitch + level on full-velocity steps
+         // only, for two-tone bells). Explicit param indices 300 + lane and
+         // 310 + lane keep both out of the gParamCounter sequence, so the six
+         // sliders above (and every saved modulation binding on them) keep
+         // their ordinals; 300..317 sit between the float ordinals (< ~60)
+         // and kDiscreteParamBase (400).
+         char accentName[24], levelName[24];
          snprintf(accentName, sizeof(accentName), "lane %d accent", lane + 1);
-         AudioSlider("accent", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%+.1f st", AudioFullWidth(), nullptr,
+         snprintf(levelName, sizeof(levelName), "lane %d accent vol", lane + 1);
+         AudioSlider("accent", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%+.1f st", half, nullptr,
                      nullptr, 300 + lane, accentName);
+         ImGui::SameLine();
+         AudioSlider("accent vol", &n->laneAccentLevel[lane], 0.0f, 12.0f, "%+.1f dB", half, nullptr,
+                     nullptr, 310 + lane, levelName);
       }
 
       EndAudioSection();

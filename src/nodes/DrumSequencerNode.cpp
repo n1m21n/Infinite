@@ -125,6 +125,7 @@ public:
    // (DrumSequencerNode::PushDirtyParams); TriggerLane adds it to the lane's
    // pitch for full-velocity steps only.
    void PushLaneAccent(int lane, float accent) { mLaneAccentPitch[lane].store(accent, std::memory_order_relaxed); }
+   void PushLaneAccentGain(int lane, float gain) { mLaneAccentGain[lane].store(gain - 1.0f, std::memory_order_relaxed); }
 
    void PushStep(int lane, int step, float vel) { mStepVel[lane][step].store(vel, std::memory_order_relaxed); }
 
@@ -438,7 +439,8 @@ private:
                                 ? buf->sampleRate / mSampleRate
                                 : 1.0;
       voice.rate = NoteRateForPitch(lanePitchNow[lane] + accent) * (float)srRatio;
-      voice.velocity = velocity * laneVolNow[lane];
+      const float accentGain = velocity >= 0.99f ? 1.0f + mLaneAccentGain[lane].load(std::memory_order_relaxed) : 1.0f;
+      voice.velocity = velocity * laneVolNow[lane] * accentGain;
       DspMath::EqualPowerPan(lanePanNow[lane], voice.panL, voice.panR);
       voice.attackLevel = 0.0f;
       voice.attackInc = mLaneAttackInc[lane].load(std::memory_order_relaxed);
@@ -480,6 +482,7 @@ private:
    std::atomic<bool> mLaneSolo[kNumLanes] = {};
    std::atomic<int> mLaneChoke[kNumLanes] = {};
    std::atomic<float> mLaneAccentPitch[kNumLanes] = {};
+   std::atomic<float> mLaneAccentGain[kNumLanes] = {}; // linear gain minus 1, so zero-init = no boost
    std::atomic<float> mStepVel[kNumLanes][kMaxSteps] = {};
    std::atomic<float> mLaneStart[kNumLanes] = {};
    std::atomic<float> mLaneEnd[kNumLanes] = {};
@@ -510,6 +513,7 @@ DrumSequencerNode::DrumSequencerNode()
       laneSolo[lane] = false;
       laneChoke[lane] = 0;
       laneAccentPitch[lane] = 0.0f;
+      laneAccentLevel[lane] = 0.0f;
 
       mLastLaneVolume[lane] = -1.0f;
       mLastLanePan[lane] = -99.0f;
@@ -523,6 +527,7 @@ DrumSequencerNode::DrumSequencerNode()
       mLastLaneSolo[lane] = false;
       mLastLaneChoke[lane] = -1;
       mLastLaneAccentPitch[lane] = -999.0f;
+      mLastLaneAccentLevel[lane] = -999.0f;
    }
 }
 DrumSequencerNode::~DrumSequencerNode() = default;
@@ -662,6 +667,13 @@ void DrumSequencerNode::PushDirtyParams()
          mLastLaneAccentPitch[lane] = laneAccentPitch[lane];
       }
 
+      if (mFirstCook || laneAccentLevel[lane] != mLastLaneAccentLevel[lane])
+      {
+         const float db = std::isfinite(laneAccentLevel[lane]) ? std::clamp(laneAccentLevel[lane], 0.0f, 12.0f) : 0.0f;
+         mAudioNode->PushLaneAccentGain(lane, std::pow(10.0f, db / 20.0f));
+         mLastLaneAccentLevel[lane] = laneAccentLevel[lane];
+      }
+
       for (int step = 0; step < kMaxSteps; step++)
       {
          if (mFirstCook || stepVel[lane][step] != mLastStepVel[lane][step])
@@ -724,6 +736,8 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
       v.Int(name, laneChoke[lane]);
       snprintf(name, sizeof(name), "lane%d_accentPitch", lane);
       v.Float(name, laneAccentPitch[lane]);
+      snprintf(name, sizeof(name), "lane%d_accentLevel", lane);
+      v.Float(name, laneAccentLevel[lane]);
       snprintf(name, sizeof(name), "lane%d_start", lane);
       v.Float(name, laneStart[lane]);
       snprintf(name, sizeof(name), "lane%d_end", lane);
