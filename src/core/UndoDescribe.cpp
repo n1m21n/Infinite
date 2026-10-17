@@ -114,10 +114,15 @@ std::string Change(const Patch::Data& before, const Patch::Data& after)
    {
       if (oneKey.size() > 2 && oneKey[1] == ' ')
          oneKey.erase(0, 2);
-      return oneKey + " " + Show(oneOld) + " \xE2\x86\x92 " + Show(oneNew);
+      if (!oneKey.empty() && oneKey[0] >= 'a' && oneKey[0] <= 'z')
+         oneKey[0] = (char)(oneKey[0] - 'a' + 'A');
+      // "Blur: Amount 0.2 -> 0.55" - node first so rows from different nodes stay distinguishable.
+      return oneType + ": " + oneKey + " " + Show(oneOld) + " \xE2\x86\x92 " + Show(oneNew);
    }
+   // Convention: "<Verb> <count> <noun> on <where>" - never a bare "Edit 24 settings".
    if (paramChanges > 1)
-      return paramNodes.size() == 1 ? "Edit " + oneType : "Edit " + std::to_string(paramChanges) + " settings";
+      return "Edit " + Plural(paramChanges, "1 setting", "settings") + " on " +
+             (paramNodes.size() == 1 ? oneType : std::to_string(paramNodes.size()) + " nodes");
    if (bypassChanges > 0)
       return bypassChanges == 1 ? (bypassOn ? "Bypass " : "Enable ") + bypassType : "Bypass " + std::to_string(bypassChanges) + " nodes";
    if (before.modulation.size() == after.modulation.size() && !before.modulation.empty())
@@ -136,6 +141,6 @@ std::string Change(const Patch::Data& before, const Patch::Data& after)
       return moved == 1 ? "Move node" : "Move " + std::to_string(moved) + " nodes";
    if (before.streams.size() != after.streams.size() || before.markers.size() != after.markers.size())
       return "Edit timeline";
-   return "Edit";
+   return "Edit patch";
 }
 }

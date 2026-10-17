@@ -834,7 +834,7 @@ namespace app
          const bool top = (i == 0);
          const std::string derived =
             top ? UndoDescribe::Change(e.patch, BuildPatchData())
-                : (gUndoStack[gUndoStack.size() - i].arrangeOnly ? std::string("Edit")
+                : (gUndoStack[gUndoStack.size() - i].arrangeOnly ? std::string("Edit timeline")
                                                                  : UndoDescribe::Change(e.patch, gUndoStack[gUndoStack.size() - i].patch));
          if (!top)
             e.label = derived;
@@ -849,7 +849,7 @@ namespace app
       if (i >= gRedoStack.size())
          return std::string();
       const UndoEntry& e = gRedoStack[gRedoStack.size() - 1 - i];
-      return e.label.empty() ? std::string("Edit") : e.label;
+      return e.label.empty() ? std::string("Edit patch") : e.label;
    }
 
 
