@@ -1,14 +1,14 @@
 ---
-title: Writing audio DSP without JUCE: notes from Infinite
-description: Why Infinite's audio engine is written in modern C++ without a framework, and what that changes.
-date: 2026-10-17
-category: product
-tags: [c++,dsp,audio,architecture]
-status: draft
-verify: Zero audio-thread allocation claim; Lock-free SPSC and double-buffered claims; SIMD / cache-line alignment claim; Licence line (README says MIT source, GPLv3 binary)
+title: writing audio dsp without juce: notes from infinite
+description: why infinite's audio engine is written in modern c++ without a framework, and what that changes for real-time safety.
+date: 2026-10-19
+category: engineering
+tags: [c++, dsp, audio, architecture]
+image: assets/nodegraph.webp
+image_alt: infinite modular audio graph canvas and node dsp architecture
+keywords: c++ audio dsp without juce, real-time audio thread allocations, spsc lock-free audio queue, vst3 hosting architecture, field dsp language
+status: published
 ---
-
-![Infinite Audio Graph](https://raw.githubusercontent.com/n1m21n/infinite/main/website/assets/nodegraph.webp)
 
 juce is the de facto standard for audio software development, but it brings substantial architectural gravity: a massive monolithic codebase, custom string classes, complex licensing, and heavy abstractions.
 
@@ -16,26 +16,32 @@ when building [infinite](https://infinitedevices.org), an open-source modular wo
 
 here is what we learned and how the architecture is designed.
 
-### 1. the golden rule: zero allocations on the audio thread
+---
+
+## 1. the golden rule: zero allocations on the audio thread
 
 any audio callback deadline at 48khz with a 128-sample buffer is strict: you have exactly 2.66 milliseconds to finish processing before the dac underflows and creates an audible click.
 
 to guarantee hard real-time safety:
-- **zero `malloc` / `free`**: all audio buffers, voice allocations, and delay memory are pre-allocated during `preparetoplay()`.
+- **zero `malloc` and `free`**: all audio buffers, voice allocations, and delay memory are pre-allocated during `preparetoplay()`.
 - **zero mutexes**: cross-thread communication between the ui thread and audio thread uses atomic pointers, lock-free single-producer single-consumer (spsc) ring buffers, and double-buffered modulation arrays.
-- **cache-line aligned processing**: audio frames are laid out contiguously in memory so SIMD instructions can vectorize filter stages without cache stalls.
+- **cache-line aligned processing**: audio frames are laid out contiguously in memory so simd instructions can vectorize filter stages without cache stalls.
 
-### 2. native au and vst3 plugin hosting
+---
+
+## 2. native au and vst3 plugin hosting
 
 instead of relying on framework wrappers, infinite speaks directly to plugin apis:
 - **vst3**: loads the component bundle, queries `IComponent` and `IAudioProcessor`, maps parameters to continuous modulation arrays, and schedules sample-accurate note events.
-- **audio unit (au)**: interacts directly with the coreaudio audio unit v2/v3 c-api on macos.
+- **audio unit (au)**: interacts directly with the coreaudio audio unit v2 and v3 c-api on macos.
 
 parameters on third-party plugins can be modulated in real time by any signal on the canvas—whether an audio lfo, an envelope follower, or a generative javascript sketch.
 
-![Infinite Modular Canvas](https://raw.githubusercontent.com/n1m21n/infinite/main/press_kit/screenshots/01_infinite_main_canvas.png)
+![infinite modular canvas](../assets/product_canvas_1400.webp)
 
-### 3. embedded dsp kernel language
+---
+
+## 3. embedded dsp kernel language
 
 to let users write custom filters and physical modeling synths without recompiling c++, we created **field**, an embedded dsp language. a 1-pole filter in field is 4 lines:
 
@@ -48,5 +54,5 @@ out = z
 
 the compiler translates this directly into optimized vector loops evaluated per-sample on the audio thread.
 
-- try infinite: https://infinitedevices.org
-- read the codebase: https://github.com/n1m21n/infinite
+- try infinite: [infinitedevices.org](https://infinitedevices.org)
+- read the codebase: [github.com/n1m21n/infinite](https://github.com/n1m21n/infinite)

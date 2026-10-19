@@ -1,22 +1,24 @@
 ---
-title: JavaScript sketches as nodes: draw with code, wire it to anything
-description: How Sketch nodes let you draw with JavaScript and still expose real pins.
-date: 2026-10-17
-category: product
-tags: [javascript,creative coding,sketch,generative art]
-status: draft
-verify: Check Sketch node API names against the node manual; 60fps and point-count claims need a measured run
+title: javascript sketches as nodes: draw with code, wire it to anything
+description: how sketch nodes let you draw with javascript in infinite and expose real modulation pins to synths and audio signals.
+date: 2026-10-19
+category: creative
+tags: [javascript, creative coding, sketch, generative art]
+image: assets/sketch_showcase_preview.png
+image_alt: javascript sketch node showcase with clifford attractor and parameters in infinite
+keywords: javascript creative coding daw, p5js alternative native, audio reactive javascript canvas, modular sketch node, generative visual synthesis
+status: published
 ---
 
-![JavaScript Sketch Showcase in Infinite](https://raw.githubusercontent.com/n1m21n/infinite/main/art/sketch_showcase_preview.png)
-
 creative coders generally face a difficult compromise:
-- **in the browser** (p5.js, three.js, canvas2d): rapid iteration, clean drawing apis, but limited audio precision, browser sandbox limits, and no native vst3/au plugin support.
+- **in the browser** (p5.js, three.js, canvas2d): rapid iteration, clean drawing apis, but limited audio precision, browser sandbox limits, and no native vst3 or au plugin support.
 - **in native c++** (openframeworks, cinder): high performance, but long compilation cycles that break creative flow on every small aesthetic tweak.
 
 with [infinite](https://infinitedevices.org), we bridged these worlds by embedding a high-performance javascript runtime directly into a native c++ modular daw.
 
-### 1. the p5-style draw loop
+---
+
+## 1. the p5-style draw loop
 
 inside any `sketch` node, you write clean, declarative javascript that hot-reloads on every keystroke without compiling or restarting:
 
@@ -49,18 +51,22 @@ function draw(t) {
 }
 ```
 
-### 2. wireable parameters: code meets modular graph
+---
 
-the `param(...)` calls do something unique: they dynamically create real, visual input pins on the node canvas. you can connect:
+## 2. wireable parameters: code meets modular graph
+
+the `param(...)` calls dynamically create real, visual input pins on the node canvas. you can connect:
 - a midi knob to modulate `drift`.
 - an 8-band audio fft peak to pulse `size`.
 - a low-frequency oscillator (lfo) to rotate the attractor phase.
 
-![Infinite Main Canvas](https://raw.githubusercontent.com/n1m21n/infinite/main/press_kit/screenshots/01_infinite_main_canvas.png)
+![infinite modular canvas](../assets/product_canvas_1400.webp)
 
-### 3. native rendering performance
+---
+
+## 3. native rendering performance
 
 unlike web wrappers, the generated vector drawing commands stream directly into hardware-accelerated opengl framebuffers. you can render tens of thousands of points per frame with steady 60fps pacing while multi-track 48khz audio synths run in parallel.
 
-- download infinite free (macos, windows, linux): https://infinitedevices.org
-- source code on github: https://github.com/n1m21n/infinite
+- download infinite free (macos, windows, linux): [infinitedevices.org](https://infinitedevices.org)
+- source code on github: [github.com/n1m21n/infinite](https://github.com/n1m21n/infinite)

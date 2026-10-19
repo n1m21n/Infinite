@@ -7,6 +7,7 @@ tags: [wave terrain, shape resonator, cymatics, sound design, creative coding]
 image: assets/blog_original_audiovisual_nodes.png
 image_alt: chladni cymatics and wave terrain standing wave resonance pattern in infinite
 keywords: wave terrain synthesis, shape resonator, 3d mesh to audio, audio displacement, cymatics simulation, desmos synth, equation oscillator
+weight: 100
 status: published
 ---
 

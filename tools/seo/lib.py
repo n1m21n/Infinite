@@ -99,7 +99,7 @@ def load_posts(include_drafts=False):
             continue  # scheduled: appears on its date
         if include_drafts or meta["status"] == "published":
             out.append(meta)
-    out.sort(key=lambda p: p.get("date", ""), reverse=True)
+    out.sort(key=lambda p: (p.get("date", ""), int(p.get("weight", 0))), reverse=True)
     return out
 
 

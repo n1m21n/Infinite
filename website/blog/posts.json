@@ -1,5 +1,14 @@
 [
  {
+  "slug": "original-audiovisual-nodes-wave-terrain-shape-resonator-cymatics",
+  "title": "unique nodes in infinite: wave terrain, shape resonator, cymatics",
+  "description": "explore infinite original nodes: convert images to sound with wave terrain, ring 3d geometry with shape resonator, and simulate chladni cymatics.",
+  "date": "2026-10-19",
+  "updated": "2026-10-19",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/original-audiovisual-nodes-wave-terrain-shape-resonator-cymatics.html"
+ },
+ {
   "slug": "ai-agent-mcp-audio-visual-engine-guide",
   "title": "AI agent MCP guide for audio and visual synthesis",
   "description": "Connect AI coding agents to Infinite via MCP and Python SDK for headless audio synthesis, 3D meshes, and video rendering.",
@@ -16,6 +25,15 @@
   "updated": "2026-10-19",
   "category": "product",
   "url": "https://infinitedevices.org/blog/ai-agents-make-music-art-3d-headless.html"
+ },
+ {
+  "slug": "dsp-without-juce",
+  "title": "writing audio dsp without juce: notes from infinite",
+  "description": "why infinite's audio engine is written in modern c++ without a framework, and what that changes for real-time safety.",
+  "date": "2026-10-19",
+  "updated": "2026-10-19",
+  "category": "engineering",
+  "url": "https://infinitedevices.org/blog/dsp-without-juce.html"
  },
  {
   "slug": "electronic-music-sound-design-sub-bass-pluck-pad",
@@ -36,13 +54,13 @@
   "url": "https://infinitedevices.org/blog/hardware-midi-and-controller-mapping-in-infinite.html"
  },
  {
-  "slug": "original-audiovisual-nodes-wave-terrain-shape-resonator-cymatics",
-  "title": "unique nodes in infinite: wave terrain, shape resonator, cymatics",
-  "description": "explore infinite original nodes: convert images to sound with wave terrain, ring 3d geometry with shape resonator, and simulate chladni cymatics.",
+  "slug": "javascript-sketches",
+  "title": "javascript sketches as nodes: draw with code, wire it to anything",
+  "description": "how sketch nodes let you draw with javascript in infinite and expose real modulation pins to synths and audio signals.",
   "date": "2026-10-19",
   "updated": "2026-10-19",
   "category": "creative",
-  "url": "https://infinitedevices.org/blog/original-audiovisual-nodes-wave-terrain-shape-resonator-cymatics.html"
+  "url": "https://infinitedevices.org/blog/javascript-sketches.html"
  },
  {
   "slug": "per-sample-dsp-audio-kernels-in-field-language",
