@@ -360,6 +360,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // breaking over it.
    if (getenv("INFINITE_PERFMATRIXTEST") != nullptr || getenv("INFINITE_PERFPANELTEST") != nullptr)
       return RunPerfPanelSelfTest() ? 0 : 1;
+   if (getenv("INFINITE_AUDIOCOSTSWEEPTEST") != nullptr)
+   {
+      // DSP cost of every audio node at its defaults; headless like the param sweep below.
+      RegisterNodes();
+      return RunAudioCostSweepTest();
+   }
    if (getenv("INFINITE_AUDIOPARAMSWEEPTEST") != nullptr)
    {
       // Needs the registry populated (DiscoverAudioSweepCandidates walks
