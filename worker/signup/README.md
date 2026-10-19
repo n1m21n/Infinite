@@ -12,7 +12,7 @@ Saved per person: address, audience, source page, timestamps, status. No IP, no 
 
 ## Turn it on (Naman, in the Cloudflare account)
 
-1. `cd worker/signup`, `npx wrangler d1 create infinite-signup`, paste the `database_id` into `wrangler.toml`, then `npx wrangler d1 execute infinite-signup --remote --file=schema.sql`.
+1. `cd worker/signup`, `npx wrangler d1 create infinite_signups`, paste the `database_id` into `wrangler.toml`, then `npx wrangler d1 execute infinite-signup --remote --file=schema.sql`.
 2. `npx wrangler secret put SIGNING_SECRET` (any long random string). Optional: a free Turnstile widget for infinitedevices.org, then `npx wrangler secret put TURNSTILE_SECRET`.
 3. Route it at `infinitedevices.org/api/*` (uncomment `routes` in `wrangler.toml`; the domain's DNS record must be proxied by Cloudflare), then `npx wrangler deploy`.
 4. Create `website/signup.json`: `{"endpoint": "/api/subscribe", "turnstile_site_key": "<site key, optional>"}`, run `python3 tools/website/sync_chrome.py`, commit. The footer box only appears once that file exists, so the site never shows a dead form.
@@ -20,8 +20,8 @@ Saved per person: address, audience, source page, timestamps, status. No IP, no 
 ## Reading and exporting the list
 
 ```
-npx wrangler d1 execute infinite-signup --remote --command "SELECT audience, status, COUNT(*) FROM subscribers GROUP BY 1, 2"
-npx wrangler d1 export infinite-signup --remote --output list.sql
+npx wrangler d1 execute infinite_signups --remote --command "SELECT audience, status, COUNT(*) FROM subscribers GROUP BY 1, 2"
+npx wrangler d1 export infinite_signups --remote --output list.sql
 ```
 
 ## Later: a sender
