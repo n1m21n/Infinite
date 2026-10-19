@@ -215,7 +215,7 @@
     document.querySelectorAll('[data-lab]').forEach(function (el) { var f = labs[el.dataset.lab]; if (f) f(el); });
     /* the reel scrolls by buttons as well as by touch */
     document.querySelectorAll('.reel-wrap').forEach(function (w) {
-      var r = w.querySelector('.reel'), prev = w.querySelector('.reel-prev'), nxt = w.querySelector('.reel-next');
+      var r = w.querySelector('.reel'), sec = w.parentNode, prev = sec.querySelector('.reel-prev'), nxt = sec.querySelector('.reel-next');
       if (!r) return;
       function step(d) { r.scrollBy({ left: d * Math.max(240, r.clientWidth * 0.8), behavior: still ? 'auto' : 'smooth' }); }
       function upd() { if (prev) prev.disabled = r.scrollLeft < 8; if (nxt) nxt.disabled = r.scrollLeft + r.clientWidth >= r.scrollWidth - 8; }

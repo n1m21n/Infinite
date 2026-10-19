@@ -16,6 +16,15 @@ from lib import BASE, BLOG, WEB, load_posts, render_md
 
 e = html.escape
 CATS = {"product": "Product", "creative": "Creative"}
+ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "art", "icons", "src")
+CHIP_ICON = {"all": "grid-dots", "product": "cube", "creative": "pencil"}
+
+
+def chip_icon(key):
+    """Brand glyph from art/icons/src, inlined so the chip needs no request."""
+    svg = open(os.path.join(ICON_DIR, CHIP_ICON[key] + "-20.svg"), encoding="utf-8").read().strip()
+    return svg.replace("<svg ", '<svg class="chip-ic" aria-hidden="true" ', 1).replace("\n", "")
+
 REQUIRED = ("title", "description", "date")
 
 
@@ -95,7 +104,7 @@ def head(title, desc, url, image, extra="", kind="website", depth="../"):
   <link rel="stylesheet" href="{depth}brand.css?v=3">
   <link rel="stylesheet" href="{depth}style.css?v=64">
   <link rel="stylesheet" href="{depth}glass.css?v=4">
-  <link rel="stylesheet" href="{depth}blog.css?v=1">
+  <link rel="stylesheet" href="{depth}blog.css?v=3">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -138,8 +147,8 @@ def card(p, i):
 
 def build_index(posts, header, footer):
     items = "\n".join(card(p, i) for i, p in enumerate(posts))
-    chips = '<button type="button" class="chip is-on" data-filter="all">All</button>' + "".join(
-        f'<button type="button" class="chip" data-filter="{k}">{v}</button>' for k, v in CATS.items() if any(p["category"] == k for p in posts))
+    chips = '<button type="button" class="chip is-on" data-filter="all">' + chip_icon("all") + 'All</button>' + "".join(
+        f'<button type="button" class="chip" data-filter="{k}">{chip_icon(k)}{v}</button>' for k, v in CATS.items() if any(p["category"] == k for p in posts))
     blog_ld = {"@context": "https://schema.org", "@type": "Blog", "name": "Infinite blog", "url": BASE + "blog/",
                "description": "Notes on building and using Infinite, the free open-source DAW for visuals, music and code.",
                "publisher": {"@type": "Person", "name": "Naman Soni", "url": "https://github.com/n1m21n"},

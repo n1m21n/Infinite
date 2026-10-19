@@ -206,7 +206,7 @@ strong { font-weight: 600; color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { .nav-trigger[aria-expanded="true"] + .nav-menu { animation: none; } }
 .nav-menu a { display: flex; align-items: center; padding: 10px 14px; border-radius: var(--r-sm); text-decoration: none; font-size: 0.92rem; font-weight: 600; color: var(--ink); }
 .nav-menu a:hover, .nav-menu a:focus-visible { background: var(--deep); }
-.nav-menu a[aria-current] { background: var(--deep); box-shadow: inset 3px 0 0 var(--accent); }
+.nav-menu a[aria-current] { background: var(--deep); }
 
 .nav-actions { display: flex; align-items: center; gap: 4px; }
 .nav-download { margin-left: 8px; }

@@ -108,7 +108,7 @@ def find_category(client, type_name):
 
 
 def capture_one(client, node_type, category, out_dir, padding=12, settle_seconds=1.0,
-                 keep_node=False, no_expand=False, no_wire=False):
+                 keep_node=False, no_expand=False, no_wire=False, zoom=False):
     """Spawn `node_type`, optionally auto-wire/expand it, screenshot it to
     `out_dir/<node_type>.png`, and clean up. Shared by the single-node CLI
     below and scripts/screenshot_all_nodes.py."""
@@ -129,7 +129,7 @@ def capture_one(client, node_type, category, out_dir, padding=12, settle_seconds
     if not no_expand:
         client.call("expand_node", index=index)
 
-    client.call("fit_view_node", index=index)
+    client.call("fit_view_node", index=index, zoom=zoom)
     time.sleep(settle_seconds)
 
     out_path = os.path.abspath(os.path.join(out_dir, f"{node_type}.png"))
@@ -164,6 +164,9 @@ def main():
                      help="don't force the node's collapsed params sections open before capture")
     ap.add_argument("--no-wire", action="store_true",
                      help="don't auto-connect feeder nodes into the node's unconnected input slots")
+    ap.add_argument("--zoom", action="store_true",
+                     help="zoom the view in on the node before capture, for a sharper, larger shot "
+                          "(use this for website and blog images)")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -187,7 +190,7 @@ def main():
     try:
         capture_one(client, args.node_type, args.category, args.out,
                     padding=args.padding, settle_seconds=args.settle_seconds,
-                    keep_node=args.keep_node, no_expand=args.no_expand, no_wire=args.no_wire)
+                    keep_node=args.keep_node, no_expand=args.no_expand, no_wire=args.no_wire, zoom=args.zoom)
     finally:
         client.close()
         if launched_here and not args.keep_open and proc is not None:

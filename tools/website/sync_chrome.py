@@ -16,7 +16,7 @@ import json, os, re, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 GH = "https://github.com/n1m21n/Infinite"
-CSS_VERSION = "85"   # style.css cache key; bump when the menu or footer CSS changes
+CSS_VERSION = "86"   # style.css cache key; bump when the menu or footer CSS changes
 JS_VERSION = "13"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
@@ -42,7 +42,6 @@ GROUPS = [
         ("assets/Infinite_Node_Reference_Manual.pdf", "Node reference", "Every node, PDF"),
         ("assets/Field_Language_Manual.pdf", "Field language", "Write what a node does, PDF"),
         ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide", "Run Infinite without a window, PDF"),
-        ("llms.txt", "llms.txt", "The site as plain text for agents"),
     ]),
 ]
 
@@ -60,7 +59,7 @@ FOOTER_COLS = [
         ("index.html#learn", "Get started"), ("philosophy.html", "Philosophy"), ("blog/", "Blog"),
         ("assets/Infinite_Node_Reference_Manual.pdf", "Node reference manual (PDF)"),
         ("assets/Field_Language_Manual.pdf", "Field language manual (PDF)"),
-        ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide (PDF)"), ("llms.txt", "llms.txt"),
+        ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide (PDF)"),
     ]),
     ("Open source", [
         (GH, "GitHub"), (GH + "/releases", "Releases"), (GH + "/tree/main/tools/mcp", "MCP server"),

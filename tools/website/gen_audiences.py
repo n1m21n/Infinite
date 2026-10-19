@@ -140,7 +140,7 @@ def check_links():
         for sl, _ in a["start"]:
             if not os.path.exists(os.path.join(W, "library", sl + ".html")):
                 bad.append("library/" + sl + ".html")
-        need = [a["extra"][0], "assets/3d/%s.webp" % a["hero"]["img"]]
+        need = [a["extra"][0]]
         need += ["assets/nodes/%s.png" % n for n, _, _ in a.get("bench", {}).get("items", [])]
         need += [r[0] for r in a.get("reel", {}).get("items", [])]
         for f in need:
@@ -195,8 +195,10 @@ def lab_html(a):
 
 
 def main_html(a, rel):
+    float3d = ""
+    if a["hero"]["img"] == "brand_ball":
+        float3d = f'          <span class="vstage-float"><img class="vstage-3d" src="assets/3d/brand_ball.webp" alt="{e(a["hero"]["alt"])}" width="700" height="700" decoding="async"></span>\n'
     facts = "".join(f"<li>{e(f)}</li>" for f in a["facts"])
-    h3 = {"brand_ball": 700, "logo_3d": 394, "node_field_pixel": 525, "node_hero": 438, "node_lfo": 525, "patch": 394}[a["hero"]["img"]]
     cards = "\n".join(f'          <article class="aud-card reveal" style="--i:{n}"><span class="num">{n + 1:02d}</span><h3>{e(t)}</h3><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
     bench = ""
     if a.get("bench"):
@@ -206,8 +208,7 @@ def main_html(a, rel):
       <section class="aud-section reveal">
         <h2>{e(B["title"])}</h2>
         <p class="sec-sub">{e(B["sub"])}</p>
-        <div class="bench"><div class="bench-row{" few" if len(B["items"]) < 4 else ""}">{figs}</div>
-          <p class="bench-note">screenshots from the app, shown at their own size</p></div>
+        <div class="bench"><div class="bench-row{" few" if len(B["items"]) < 4 else ""}">{figs}</div></div>
       </section>'''
     reel = ""
     if a.get("reel"):
@@ -228,7 +229,6 @@ def main_html(a, rel):
         <div class="aud-start">
 {links}
         </div>
-        <p class="aud-note">Each one is a free patch you can download and open.</p>
       </section>'''
     body = ""
     if a.get("body"):
@@ -251,8 +251,7 @@ def main_html(a, rel):
         </div>
         <div class="vstage">
           <canvas data-shader="{a["hero"]["shader"]}" aria-hidden="true"></canvas>
-          <span class="vstage-float"><img class="vstage-3d" src="assets/3d/{a["hero"]["img"]}.webp" alt="{e(a["hero"]["alt"])}" width="700" height="{h3}" decoding="async"></span>
-          <span class="vstage-tag">live shader · move the pointer</span>
+{float3d}          <span class="vstage-tag">live shader · move the pointer</span>
         </div>
       </div>
     </section>
@@ -333,7 +332,7 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
 
   {chrome.footer_html(rel)}
   <script src="site.js?v={chrome.JS_VERSION}" defer></script>
-  <script src="audience.js?v=5" defer></script>{extra_js}
+  <script src="audience.js?v=6" defer></script>{extra_js}
   <script>
     (function () {{
       var els = document.querySelectorAll('.reveal');

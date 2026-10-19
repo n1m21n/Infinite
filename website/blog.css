@@ -12,6 +12,8 @@ body.blog-page { overflow-x: clip; }
   font: 500 0.88rem/1 Geist, system-ui, sans-serif;
   transition: transform var(--spring-slab-ms) var(--spring-slab), background-color var(--dur-small), color var(--dur-small);
 }
+.chip { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.chip-ic { width: 18px; height: 18px; flex: none; }
 .chip:hover { color: var(--ink); }
 .chip:active { transform: scale(0.96); }
 .chip.is-on { background: var(--ink); color: var(--paper); }
@@ -106,7 +108,7 @@ body.blog-page { overflow-x: clip; }
 .snippet { width: 100%; resize: vertical; background: var(--deep); color: var(--ink2); border: 0; border-radius: var(--radius-media); padding: 12px 14px; font-size: 0.72rem; line-height: 1.5; box-shadow: none; height: 9.5rem; }
 .snippet:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .embed-grid .post-card { padding: 0; }
-.embed-grid .post-body { padding: 16px 16px 18px; gap: 12px; }
+.embed-grid .post-body { padding: 20px; gap: 12px; }
 
 /* developers page (website/developers.html) */
 .dev-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
@@ -122,3 +124,13 @@ body.blog-page { overflow-x: clip; }
 .dev-wide th { font: 500 0.72rem 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.05em; text-transform: lowercase; }
 .dev-list { padding-left: 1.2em; display: grid; gap: 8px; color: var(--ink2); line-height: 1.55; }
 .dev-wide a, .dev-card a { color: var(--signal); text-underline-offset: 3px; }
+
+/* embeds: equal cards, one inset, equal buttons, actions and code aligned across a row */
+.embed-grid { align-items: stretch; }
+.embed-grid .post-card { height: 100%; }
+.embed-grid .post-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+.embed-grid .post-body h2 { margin: 0; }
+.embed-grid .post-desc { flex: 1; margin: 0; }
+.embed-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.embed-actions .chip { justify-content: center; width: 100%; padding: 0 12px; }
+.snippet { display: block; box-sizing: border-box; }
