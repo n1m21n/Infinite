@@ -74,7 +74,7 @@ The Python SDK also ships an MCP server (`tools/mcp/infinite_mcp.py`, from a che
 
 ## Using the Python SDK
 
-If you are building your own autonomous agent, pipeline, or game dev tool, use the Python SDK directly:
+If you are building your own autonomous agent, pipeline, or game dev tool, install the Python SDK (`pip install infinite-daw`) and use it directly:
 
 ```python
 import infinite
