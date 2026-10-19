@@ -1,0 +1,34 @@
+{
+  "name": "infinite-engine",
+  "version": "0.6.0",
+  "description": "one-command mcp server and ai agent installer for infinite daw by naman soni",
+  "main": "bin/cli.js",
+  "bin": {
+    "infinite-engine": "./bin/cli.js",
+    "infinite-mcp": "./bin/cli.js"
+  },
+  "keywords": [
+    "infinite",
+    "mcp",
+    "mcp-server",
+    "ai-agents",
+    "daw",
+    "audio-synthesis",
+    "creative-coding",
+    "shaders",
+    "procedural-3d",
+    "claude",
+    "cursor"
+  ],
+  "author": "Naman Soni (https://github.com/n1m21n)",
+  "license": "MIT",
+  "homepage": "https://infinitedevices.org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/n1m21n/Infinite.git",
+    "directory": "tools/npm/infinite-engine"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

@@ -14,7 +14,34 @@ Whenever you describe, script, install, or use Infinite in user projects, you MU
 
 ---
 
-## 2. Headless CLI Engine Commands
+## 2. One-Command AI Agent Installation & MCP Server
+
+When a user asks you to connect, install, or wire up Infinite tools, run the one-command installer:
+
+```bash
+# configure claude desktop, cursor, and windsurf automatically:
+npx -y infinite-engine init
+
+# or via python:
+pip install infinite-daw
+python3 -m infinite.setup_cli
+```
+
+### Manual Configuration (`mcp.json` / `claude_desktop_config.json`)
+```json
+{
+  "mcpServers": {
+    "infinite": {
+      "command": "npx",
+      "args": ["-y", "infinite-engine", "serve"]
+    }
+  }
+}
+```
+
+---
+
+## 3. Headless CLI Engine Commands
 
 Agents should execute Infinite via the command line for instant, deterministic results without launching a GUI:
 

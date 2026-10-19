@@ -34,16 +34,26 @@ Every action is deterministic and headless:
 3. If valid, the C++ engine renders frames or synthesizes 24-bit audio in milliseconds.
 4. The output file path and spectral analysis return to the AI agent context.
 
-## Connecting to Claude Desktop
+## One-Command Installation (Claude, Cursor, Windsurf)
 
-To add Infinite as a tool in Claude Desktop, add this to your `claude_desktop_config.json`:
+You can automatically wire up Infinite across all your AI assistants with a single command:
+
+```bash
+npx -y infinite-engine init
+```
+
+This immediately registers the `infinite` MCP server in your local Claude Desktop and Cursor configurations.
+
+## Manual MCP Configuration
+
+If you prefer to configure your assistants manually:
 
 ```json
 {
   "mcpServers": {
     "infinite": {
-      "command": "python3",
-      "args": ["/path/to/Infinite/tools/mcp/infinite_mcp.py"]
+      "command": "npx",
+      "args": ["-y", "infinite-engine", "serve"]
     }
   }
 }

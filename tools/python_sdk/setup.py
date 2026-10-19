@@ -23,5 +23,11 @@ setup(
         "Topic :: Multimedia :: Sound/Audio",
         "Topic :: Multimedia :: Graphics",
     ],
+    entry_points={
+        "console_scripts": [
+            "infinite-mcp=infinite.mcp:main",
+            "infinite-init=infinite.setup_cli:main",
+        ],
+    },
     python_requires=">=3.8",
 )
