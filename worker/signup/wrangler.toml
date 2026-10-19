@@ -8,7 +8,7 @@ compatibility_date = "2026-10-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "infinite_signups"
-database_id = ""   # from `npx wrangler d1 create infinite_signups`
+database_id = "71e09526-debf-45b3-9fdb-4512526e77ab"   # from `npx wrangler d1 create infinite_signups`
 
 [vars]
 SITE_ORIGIN = "https://infinitedevices.org"
