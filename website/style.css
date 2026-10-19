@@ -231,13 +231,14 @@ strong { font-weight: 600; color: var(--ink); }
   letter-spacing: -0.035em;
   line-height: 0.98;
   display: flex; flex-direction: row; flex-wrap: nowrap; align-items: baseline; justify-content: center;
-  gap: 0.22em; white-space: nowrap;
+  gap: 0.2em; white-space: nowrap;
 }
 .hero-line { display: block; }
 .hero-word-slot {
   position: relative; display: block;
   height: 1.15em;
-  min-width: 4ch;
+  width: 4.7em; /* widest rotating word, so the first letter never moves */
+  text-align: left;
 }
 .hero-word {
   display: inline-block;
@@ -253,8 +254,8 @@ strong { font-weight: 600; color: var(--ink); }
   to   { clip-path: inset(-20% -10% -20% -10%); transform: none; }
 }
 .hand-underline {
-  position: absolute; left: 50%; bottom: -0.02em;
-  width: var(--u-w, 3.2em); height: 0.2em; transform: translateX(-50%);
+  position: absolute; left: 0; bottom: -0.02em;
+  width: var(--u-w, 3.2em); height: 0.2em;
   overflow: visible;
 }
 .hand-underline path {
@@ -271,8 +272,7 @@ strong { font-weight: 600; color: var(--ink); }
 }
 
 @media (max-width: 720px) {
-  .hero-title { flex-direction: column; align-items: center; gap: 0; }
-  .hero-word-slot { margin-top: 0.02em; }
+  .hero-title { font-size: min(var(--fs-display), 9vw); }
   .hero-br { display: none; }
 }
 
