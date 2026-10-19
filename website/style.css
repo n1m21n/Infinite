@@ -179,7 +179,6 @@ strong { font-weight: 600; color: var(--ink); }
 }
 .nav-links > a:hover { color: var(--ink); background: color-mix(in srgb, var(--shadow) 5%, transparent); }
 .nav-sheet-social { display: none; }
-.nav-sheet-only { display: none; }
 
 /* menu groups: Learn, Create, Build. Desktop opens a panel; phones show every group open in the sheet. */
 .nav-group { position: relative; }
@@ -210,7 +209,6 @@ strong { font-weight: 600; color: var(--ink); }
 
 .nav-actions { display: flex; align-items: center; gap: 4px; }
 .nav-download { margin-left: 8px; }
-.nav-actions .sm-only { display: none; }
 
 .menu-btn { display: none; width: 44px; height: 44px; border-radius: var(--r-pill); position: relative; }
 .menu-btn span {
@@ -762,18 +760,16 @@ html.over-bird body { cursor: pointer; }
   .nav-trigger[aria-expanded="true"] + .nav-menu { max-height: 520px; visibility: visible; padding-bottom: 12px; transition: max-height 333ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s; animation: none; }
   .nav-menu a { min-height: 48px; padding: 0 14px; font-size: 1.05rem; font-weight: 500; color: var(--ink2); border-radius: var(--r-sm); }
   .nav-menu a:active { background: var(--deep); }
-  .nav-sheet-only {
-    display: flex; align-items: center; justify-content: center; margin-top: auto; min-height: 52px; padding: 0 22px;
-    border-radius: var(--r-pill); background: var(--accent); color: var(--on-accent, #fff) !important; font-size: 1.05rem; font-weight: 600; text-decoration: none; border-bottom: 0 !important;
-  }
   .nav-links > .nav-group:last-of-type { margin-bottom: 20px; }
-  .nav-sheet-social { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding-top: 16px; }
-  .nav-sheet-social a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); background: var(--deep); font-size: 0.9rem; font-weight: 500; color: var(--ink2); text-decoration: none; }
+  .nav-sheet-social { display: flex; justify-content: center; gap: 12px; margin-top: auto; padding-top: 24px; }
+  .nav-sheet-social a { width: 48px; height: 48px; border-radius: var(--r-pill); display: grid; place-items: center; background: var(--deep); color: var(--ink2); transition: transform var(--spring-slab-ms) var(--spring-slab), color var(--dur-small), background-color var(--dur-small); }
+  .nav-sheet-social a:active { transform: scale(0.94); color: var(--ink); }
+  .nav-sheet-social svg { width: 22px; height: 22px; }
   @media (prefers-reduced-motion: no-preference) {
     .nav-open .nav-group { animation: sheet-in 333ms cubic-bezier(0.16, 1, 0.3, 1) both; }
     .nav-open .nav-group:nth-of-type(2) { animation-delay: 62ms; }
     .nav-open .nav-group:nth-of-type(3) { animation-delay: 124ms; }
-    .nav-open .nav-sheet-only, .nav-open .nav-sheet-social { animation: sheet-in 333ms 186ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .nav-open .nav-sheet-social { animation: sheet-in 333ms 186ms cubic-bezier(0.16, 1, 0.3, 1) both; }
   }
   /* hamburger, then the mark beside it, download on the right */
   .nav-container { gap: 6px; padding: 0 max(var(--gutter), env(safe-area-inset-left)); }
@@ -781,8 +777,7 @@ html.over-bird body { cursor: pointer; }
   .brand-name { display: none; }
   .brand-icon { width: 32px; height: 32px; }
   .nav-actions { margin-left: auto; }
-  .nav-download { display: none; }   /* phones: YouTube and Discord sit top right instead */
-  .nav-actions .sm-only { display: inline-flex; }
+  .nav-download, .nav-actions .icon-btn:not([data-mode-toggle]) { display: none; }   /* phones: the theme switch stays; Download and the social icons live in the sheet and footer */
   .hide-sm { display: none; }
 
   .predict-card { grid-template-columns: 1fr; }

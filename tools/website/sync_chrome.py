@@ -16,7 +16,7 @@ import json, os, re, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 GH = "https://github.com/n1m21n/Infinite"
-CSS_VERSION = "86"   # style.css cache key; bump when the menu or footer CSS changes
+CSS_VERSION = "87"   # style.css cache key; bump when the menu or footer CSS changes
 JS_VERSION = "13"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
@@ -78,6 +78,21 @@ SOCIAL = [
 ]
 
 
+ICONS = [  # name, url, svg inner markup, filled glyph (brand marks) or stroked (line icons)
+    ("GitHub", GH, '<path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/>', True),
+    ("Discord", "https://discord.gg/7cpQfCxnx", '<path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/>', True),
+] + [(n, u, d, False) for n, u, d in SOCIAL]
+
+
+def icon_links(indent, label_fmt):
+    """The round icon row used by the footer and the phone sheet: one definition."""
+    out = []
+    for n, u, d, filled in ICONS:
+        attrs = 'fill="currentColor"' if filled else 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'
+        out.append(f'{indent}<a href="{u}" target="_blank" rel="noopener" aria-label="{label_fmt.format(n=n)}" title="{n}"><svg viewBox="0 0 24 24" {attrs} aria-hidden="true">{d}</svg></a>')
+    return "\n".join(out)
+
+
 def depth_prefix(rel):
     return "../" * rel.count("/")
 
@@ -114,12 +129,8 @@ def nav_html(rel):
             out.append(f'          <a href="{href(path, p)}"{link_attrs(path)}{c}>{text}</a>')
         out.append("        </div>")
         out.append("      </div>")
-    out.append(f'      <a href="{p}index.html#setup" class="nav-sheet-only">Download</a>')
     out.append('      <div class="nav-sheet-social">')
-    out.append(f'        <a href="{GH}" target="_blank" rel="noopener">GitHub</a>')
-    out.append('        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>')
-    for name, url, _ in SOCIAL:
-        out.append(f'        <a href="{url}" target="_blank" rel="noopener">{name}</a>')
+    out.append(icon_links("        ", "{n}"))
     out.append("      </div>")
     out.append("    </nav>")
     return "\n".join(out)
@@ -159,9 +170,7 @@ def footer_html(rel):
         links = "\n".join(
             f'          <a href="{href(path, p)}"{link_attrs(path)}>{text}</a>' for path, text in items)
         cols.append(f'        <div class="footer-col">\n          <p class="footer-h">{title}</p>\n{links}\n        </div>')
-    social = "\n".join(
-        f'            <a href="{u}" target="_blank" rel="noopener" aria-label="Infinite on {n} (@infinite.devices)" title="{n}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{d}</svg></a>'
-        for n, u, d in SOCIAL)
+    social = icon_links("            ", "Infinite on {n}")
     return f'''<footer class="site-footer">
     <div class="container">
       <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
