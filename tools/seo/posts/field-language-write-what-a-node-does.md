@@ -4,7 +4,7 @@ description: Field is the language built into Infinite. One kernel can become a 
 date: 2026-10-17
 category: product
 tags: [field, shaders, dsp, creative coding]
-image: assets/field_pixel_editor.png
+image: assets/field_pixel_editor.webp
 image_alt: The Field Pixel code editor open inside Infinite
 keywords: kernel language for shaders and audio, glsl shader editor, audio dsp scripting, creative coding language
 status: published

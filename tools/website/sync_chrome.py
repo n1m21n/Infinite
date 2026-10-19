@@ -16,7 +16,7 @@ import json, os, re, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 GH = "https://github.com/n1m21n/Infinite"
-CSS_VERSION = "89"   # style.css cache key; bump when the menu or footer CSS changes
+CSS_VERSION = __import__("hashlib").md5(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "website", "style.css"), "rb").read()).hexdigest()[:8]   # style.css cache key: a hash, so it changes with the file
 JS_VERSION = "13"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
@@ -219,7 +219,7 @@ def sync(rel, text):
     s = re.sub(r'<nav class="nav-links" id="nav-links".*?</nav>', lambda m: nav_html(rel), s, count=1, flags=re.S)
     if '<footer class="site-footer">' in s:
         s = re.sub(r'<footer class="site-footer">.*?</footer>', lambda m: footer_html(rel), s, count=1, flags=re.S)
-    s = re.sub(r'(style\.css\?v=)\d+', r"\g<1>" + CSS_VERSION, s)
+    s = re.sub(r'(style\.css\?v=)[A-Za-z0-9]+', r"\g<1>" + CSS_VERSION, s)
     s = re.sub(r'(site\.js\?v=)\d+', r"\g<1>" + JS_VERSION, s)
     # the brand link goes home from any page
     if rel != "index.html":

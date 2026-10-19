@@ -26,7 +26,7 @@ AUDIENCES = [
     {"slug": "artists", "name": "artists", "hand": "paint",
      "title": "Infinite for artists: images that move, made on one canvas",
      "h1": "Infinite for artists", "desc": "Layer shapes, video and 3D, add trails and glitch, and let sound move it. Free for macOS, Windows and Linux.",
-     "lead": "Build images that move. Layer shapes, video and 3D, smear them with trails, and let a sound or an LFO move any knob. No code to start; code when you want it.",
+     "lead": "Build images that move. Layer shapes, video and 3D, add trails, and let a sound or an LFO move any knob. No code needed.",
      "facts": ["Free", "macOS, Windows, Linux", "No code to start"],
      "hero": {"shader": "ink", "img": "brand_ball", "alt": "A 3D iridescent ball, the Infinite brand ball", "tall": False},
      "cards": [("32 blend modes", "Stack any picture on any other: images, folders of stills, hardware-accelerated video, camera, paint and noise ramps."),
@@ -48,7 +48,7 @@ AUDIENCES = [
     {"slug": "musicians", "name": "musicians", "hand": "play",
      "title": "Infinite for musicians: synths, effects and plugins in one graph",
      "h1": "Infinite for musicians", "desc": "Wavetable, FM, analog and string synths, tape delay, convolution reverb, VST3 and AU hosting, and modulation on every knob.",
-     "lead": "Patch a sound the way you think about it. Notes go into a synth, the synth into effects, and any knob can be moved by an LFO, an envelope or something you can see.",
+     "lead": "Patch a sound the way you think about it. Notes go into a synth, then effects, and any knob can follow an LFO or an envelope.",
      "facts": ["VST3 and AU hosting", "MPE notes", "79 effect presets"],
      "hero": {"shader": "wave", "img": "node_lfo", "alt": "A 3D render of the LFO node", "tall": False},
      "cards": [("Synths with depth", "Wavetable, FM with four operators, Analog, a modelled String, Partials resynthesis and a Metallic resonator. Chords on Analog cost about a third of the CPU they did before v0.6."),
@@ -70,7 +70,7 @@ AUDIENCES = [
     {"slug": "vjs", "name": "VJs", "hand": "perform",
      "title": "Infinite for VJs: live visuals that follow the music",
      "h1": "Infinite for VJs", "desc": "Sound-driven visuals with Syphon, Spout and NDI out, Show Set patch switching on the bar, a show lock and a panic key. Free.",
-     "lead": "Run visuals that follow the sound, send them to a projector or another app, and switch patches on the bar without a black frame. Built to stay up for a whole set.",
+     "lead": "Run visuals that follow the sound, send them to a projector, and switch patches on the bar without a black frame.",
      "facts": ["Syphon, Spout, NDI", "Switch on the bar", "Show lock and panic"],
      "hero": {"shader": "pulse", "img": "node_hero", "alt": "A 3D render of an Infinite node with a cable", "tall": False},
      "cards": [("Send it anywhere", "Syphon on macOS, Spout on Windows and NDI over the network, in and out, so Infinite can feed a projector, a mixer or another app."),
@@ -92,7 +92,7 @@ AUDIENCES = [
     {"slug": "creative-coders", "name": "creative coders and technologists", "hand": "code",
      "title": "Infinite for creative coders and technologists: Field, sketches and shaders",
      "h1": "Infinite for creative coders", "desc": "Write shaders, per-sample audio kernels, 3D surfaces and JavaScript sketches in one node graph with live feedback. Free and open source.",
-     "lead": "Write what a node does. Field is Infinite's own small language: one program can be a shader, a synth, an effect, a note pattern or a mesh deformer, and the compiler works out where it runs.",
+     "lead": "Write what a node does. Field is Infinite's own small language: one program can be a shader, a synth, an effect or a mesh deformer.",
      "facts": ["Field language", "JavaScript sketches", "OSC on 127.0.0.1:9100"],
      "hero": {"shader": "dots", "img": "node_field_pixel", "alt": "A 3D render of the Field Pixel node", "tall": False},
      "cards": [("One language, many nodes", "Field Pixel, Field Synth, Field Effect, Field Notes, Field Primitive and Field Modifier share one syntax. Types and rates are inferred, so a sine reads the same on the GPU and at 48 kHz."),
@@ -114,7 +114,7 @@ AUDIENCES = [
     {"slug": "developers", "name": "developers", "hand": "headless", "body": "developers_body.html",
      "title": "Infinite for developers: headless CLI, Python SDK and MCP server",
      "h1": "Infinite for developers and agents", "desc": "Run Infinite without a window. Render video and audio from a text patch, call it from Python, or give an AI agent the nine MCP tools. Free and open source.",
-     "lead": "Every patch is a text file, and the app can render it with no window open. Use the command line, call it from Python, or hand the same tools to an AI agent over MCP.",
+     "lead": "Every patch is a text file the app can render with no window open. Use the command line, Python or an AI agent over MCP.",
      "facts": ["Headless", "Python SDK", "9 MCP tools"],
      "hero": {"shader": "sheet", "img": "patch", "alt": "A 3D render of two Infinite nodes joined by a cable", "tall": False},
      "cards": [("Text in, files out", "A patch is plain text. Validate it, print the graph that was built, then render stills, a contact sheet, video or an audio report."),
@@ -326,11 +326,11 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="brand.css?v=3">
+  <link rel="stylesheet" href="brand.css?v=e96b24bf">
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
-  <link rel="stylesheet" href="glass.css?v=4">
-  <link rel="stylesheet" href="blog.css?v=2">
-  <link rel="stylesheet" href="audience.css?v=8">
+  <link rel="stylesheet" href="glass.css?v=c25dae44">
+  <link rel="stylesheet" href="blog.css?v=41425334">
+  <link rel="stylesheet" href="audience.css?v=68a69cd7">
   {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>
 </head>

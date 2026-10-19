@@ -73,7 +73,7 @@ def page(packs):
     head = head.replace("library.html", "extensions.html")
     head = "\n".join(l for l in head.splitlines() if "assets/library/catalog.json" not in l)
     head = head.replace("</head>", '  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n'
-                                   '  <link rel="stylesheet" href="extensions.css?v=2">\n</head>')
+                                   '  <link rel="stylesheet" href="extensions.css?v=cb2bbbb0">\n</head>')
     header = t[t.index("  <header"):t.index("  <main>")].replace(' aria-current="page"', "")
     header = header.replace('<a href="extensions.html">', '<a href="extensions.html" aria-current="page">')
     return head + '<body class="extensions-page">\n' + header + f'''  <main>

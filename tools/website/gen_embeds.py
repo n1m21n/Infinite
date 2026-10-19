@@ -49,21 +49,21 @@ SHELL_HEAD = """<!DOCTYPE html>
     html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ground); font-family: Geist, system-ui, -apple-system, "Segoe UI", sans-serif; }
     canvas { width: 100%; height: 100%; display: block; }
     .badge, .btn {
-      position: absolute; bottom: 14px; z-index: 10; display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 14px;
-      border-radius: 999px; background: var(--glass); color: var(--ink); font-size: 12px; font-weight: 500; text-decoration: none;
+      position: absolute; bottom: 14px; z-index: 10; display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 16px;
+      border-radius: 999px; background: var(--glass); color: var(--ink); font-size: 11.5px; font-weight: 500; text-decoration: none;
       -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5); box-shadow: 0 6px 16px var(--shadow);
-      transition: transform 0.18s ease, background-color 0.18s ease;
+      transition: transform var(--dur-small) var(--ease-out), background-color var(--dur-small) var(--ease-out);
     }
     .badge { right: 14px; }
     .badge strong { font-weight: 700; }
     .badge-icon { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--ember), var(--signal)); }
     .controls { position: absolute; left: 14px; bottom: 14px; z-index: 10; }
-    .controls .btn { position: static; border: 0; cursor: pointer; font-family: inherit; }
+    .controls .btn { position: static; border: 0; cursor: pointer; font-family: inherit; min-height: 44px; }
     .badge:hover, .btn:hover { transform: translateY(-2px); background: rgba(52, 59, 94, 0.9); }
     .badge:focus-visible, .btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
     @media (prefers-reduced-motion: reduce) { .badge, .btn { transition: none; } .badge:hover, .btn:hover { transform: none; } }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-    .fallback { color: var(--ink); padding: 24px; font-size: 14px; }
+    .fallback { color: var(--ink); padding: 24px; font-size: 13.5px; }
   </style>
 </head>
 <body>
@@ -154,10 +154,10 @@ def build_gallery(items):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../brand.css?v=3">
-  <link rel="stylesheet" href="../style.css?v=81">
-  <link rel="stylesheet" href="../glass.css?v=4">
-  <link rel="stylesheet" href="../blog.css?v=4">
+  <link rel="stylesheet" href="../brand.css?v=e96b24bf">
+  <link rel="stylesheet" href="../style.css?v=77ae7f4c">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=41425334">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="blog-page">

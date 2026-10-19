@@ -27,10 +27,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../brand.css?v=3">
-  <link rel="stylesheet" href="../style.css?v=89">
-  <link rel="stylesheet" href="../glass.css?v=4">
-  <link rel="stylesheet" href="../blog.css?v=4">
+  <link rel="stylesheet" href="../brand.css?v=e96b24bf">
+  <link rel="stylesheet" href="../style.css?v=77ae7f4c">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=41425334">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -119,22 +119,22 @@
           <p class="post-by">By <a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a></p>
         </header>
         <figure class="post-hero"><img src="../assets/thumbs/blog_audio_dsp_kernel-1200.webp" alt="real-time 48khz audio dsp register waveform visualization in infinite" width="1200" height="675" decoding="async"></figure>
-        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#how-the-sample-register-machine-works">How the Sample Register Machine Works</a></li><li><a href="#a-1-pole-lowpass-filter-kernel">A 1-Pole Lowpass Filter Kernel</a></li><li><a href="#shipped-moog-4-pole-ladder-filter">Shipped Moog 4-Pole Ladder Filter</a></li><li><a href="#real-time-mod-matrix-integration">Real-Time Mod Matrix Integration</a></li><li><a href="#testing-and-verifying-headlessly">Testing and Verifying Headlessly</a></li></ol></details>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#how-the-sample-register-machine-works">How the sample register machine works</a></li><li><a href="#a-1-pole-lowpass-filter-kernel">A 1-pole lowpass filter kernel</a></li><li><a href="#shipped-moog-4-pole-ladder-filter">Shipped Moog 4-pole ladder filter</a></li><li><a href="#real-time-mod-matrix-integration">Real-time mod matrix integration</a></li><li><a href="#testing-and-verifying-headlessly">Testing and verifying headlessly</a></li></ol></details>
         <div class="prose">
 <p>Most modern digital audio workstations treat audio synthesis as a black box: you write a C++ plugin, compile a VST3 or AU bundle with JUCE or Dplug, restart your host, and attach a debugger.</p>
 <p>In Infinite, you can write audio DSP at the sample level directly inside the canvas using <strong>Field language</strong>. Your code runs on the audio thread once per sample (48,000 times per second), compiled to a register machine that executes with zero memory allocations.</p>
-<h2 id="how-the-sample-register-machine-works">How the Sample Register Machine Works</h2>
+<h2 id="how-the-sample-register-machine-works">How the sample register machine works</h2>
 <p>When you place a <strong>Field Synth</strong> (<code>Synths Field Synth</code>) or <strong>Field Effect</strong> (<code>AudioEffects Field Effect</code>) node, Infinite compiles the kernel expression to a compact bytecode representation that evaluates on register cells.</p>
-<h3 id="built-in-variables-available-on-the-audio-thread">Built-in Variables Available on the Audio Thread:</h3>
+<h3 id="built-in-variables-available-on-the-audio-thread">Built-in variables available on the audio thread</h3>
 <ul><li><code>sr</code>: Audio sample rate in Hz (typically <code>48000.0</code>).</li><li><code>in</code>: Incoming audio sample value (<code>[-1.0, 1.0]</code>) in Field Effect.</li><li><code>out</code>: Output audio sample to write.</li><li><code>freq</code>: Note frequency in Hz (voice pitch in Field Synth).</li><li><code>gate</code>: <code>1.0</code> while a MIDI note is held down, <code>0.0</code> when released.</li><li><code>noteVel</code>: Key velocity (<code>[0.0, 1.0]</code>).</li><li><code>state</code>: Declares per-voice persistent memory preserved across samples.</li><li><code>param</code>: Exposes a modulatable float knob on the node body with min/max bounds.</li></ul>
-<h2 id="a-1-pole-lowpass-filter-kernel">A 1-Pole Lowpass Filter Kernel</h2>
+<h2 id="a-1-pole-lowpass-filter-kernel">A 1-pole lowpass filter kernel</h2>
 <p>Here is a classic 1-pole lowpass filter written in 4 lines:</p>
 <pre><code class="language-field">param float cutoff = 0.25 [0.01, 0.99]
 state float z = 0
 z += (in - z) * cutoff
 out = z</code></pre>
 <p>Because <code>state float z = 0</code> allocates a persistent cell in the voice register, <code>z</code> retains its previous sample value, creating an analog RC filter response.</p>
-<h2 id="shipped-moog-4-pole-ladder-filter">Shipped Moog 4-Pole Ladder Filter</h2>
+<h2 id="shipped-moog-4-pole-ladder-filter">Shipped Moog 4-pole ladder filter</h2>
 <p>For aggressive saturation and self-oscillation, Infinite ships with a 4-pole cascaded non-linear filter:</p>
 <pre><code class="language-field">param float cutoff = 2200.0 [80.0, 14000.0]
 param float res = 0.70 [0.0, 0.98]
@@ -158,13 +158,13 @@ s4 = s4 + f * (s3 - s4)
 wet = s4
 out = in * (1.0 - mix) + wet * mix</code></pre>
 <p>Notice the dry/wet <code>mix</code> pattern at the end: every Field audio effect ends with <code>out = in * (1.0 - mix) + wet * mix</code>, giving you instant parallel processing.</p>
-<h2 id="real-time-mod-matrix-integration">Real-Time Mod Matrix Integration</h2>
+<h2 id="real-time-mod-matrix-integration">Real-time mod matrix integration</h2>
 <p>Unlike fixed DSP plugins, a Field Effect node can publish meter readings back to the visual and modulation canvas using <code>reduce.rms</code>:</p>
 <pre><code class="language-field">param float boost = 1.5 [0.5, 4.0]
 output frame float bass = reduce.rms(in, 20.0, 200.0)
 out = in * boost</code></pre>
 <p>The <code>bass</code> scalar automatically becomes a second output pin on the node. You can run a cable from that pin directly into a 3D geometry deformer, a light intensity slider, or a GLSL shader.</p>
-<h2 id="testing-and-verifying-headlessly">Testing and Verifying Headlessly</h2>
+<h2 id="testing-and-verifying-headlessly">Testing and verifying headlessly</h2>
 <p>You can test Field kernels without opening the GUI using Infinite's CLI or Python SDK:</p>
 <pre><code class="language-python">import infinite
 

@@ -14,7 +14,7 @@ AI coding assistants (Claude Desktop, Cursor, Antigravity, Devin) are exceptiona
 
 Infinite bridges this gap by exposing its entire C++20 engine through the **Model Context Protocol (MCP)** and a dedicated **Python SDK**.
 
-## The Architecture: How AI Agents Interact with Infinite
+## The architecture: how AI agents interact with Infinite
 
 ```
 [Claude / Cursor / Antigravity]
@@ -34,7 +34,7 @@ Every action is deterministic and headless:
 3. If valid, the C++ engine renders frames or synthesizes 24-bit audio in milliseconds.
 4. The output file path and spectral analysis return to the AI agent context.
 
-## One-Command Installation (Claude, Cursor, Windsurf)
+## One-command installation for Claude, Cursor and Windsurf
 
 You can automatically wire up Infinite across all your AI assistants with a single command:
 
@@ -109,7 +109,7 @@ Results from the SDK carry a small credit record:
 }
 ```
 
-## Embedding Interactive Widgets in Generated Sites
+## Embedding interactive widgets in generated sites
 
 When agents generate web pages, portfolios, or documentation, they can embed Infinite's responsive WebGL shaders with a single snippet:
 

@@ -27,10 +27,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../brand.css?v=3">
-  <link rel="stylesheet" href="../style.css?v=89">
-  <link rel="stylesheet" href="../glass.css?v=4">
-  <link rel="stylesheet" href="../blog.css?v=4">
+  <link rel="stylesheet" href="../brand.css?v=e96b24bf">
+  <link rel="stylesheet" href="../style.css?v=77ae7f4c">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=41425334">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -119,19 +119,19 @@
           <p class="post-by">By <a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a></p>
         </header>
         <figure class="post-hero"><img src="../assets/thumbs/blog_shadertoy_glsl-1200.webp" alt="audio reactive glsl shader visual running in infinite" width="1200" height="675" decoding="async"></figure>
-        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#the-coordinate-space-mapping">The Coordinate Space Mapping</a></li><li><a href="#adding-instant-audio-reactivity">Adding Instant Audio Reactivity</a></li><li><a href="#live-interactive-webgl-widget">Live Interactive WebGL Widget</a></li><li><a href="#exporting-high-resolution-video-headlessly">Exporting High-Resolution Video Headlessly</a></li><li><a href="#explore-more-embeds">Explore More Embeds</a></li></ol></details>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#the-coordinate-space-mapping">The coordinate space mapping</a></li><li><a href="#adding-instant-audio-reactivity">Adding instant audio reactivity</a></li><li><a href="#live-interactive-webgl-widget">Live interactive WebGL widget</a></li><li><a href="#exporting-high-resolution-video-headlessly">Exporting high-resolution video headlessly</a></li><li><a href="#explore-more-embeds">Explore more embeds</a></li></ol></details>
         <div class="prose">
 <p>Shadertoy is the world's greatest sketchbook for pixel shaders. But getting a Shadertoy shader to respond dynamically to your music, sync with MIDI, or render out to high-resolution MP4 video often involves clumsy workarounds, browser recording extensions, or complex OSC bridges.</p>
 <p>In Infinite, shaders are native first-class nodes that sit directly alongside polyphonic synthesizers, audio effects, and sequencers on one infinite canvas.</p>
-<h2 id="the-coordinate-space-mapping">The Coordinate Space Mapping</h2>
+<h2 id="the-coordinate-space-mapping">The coordinate space mapping</h2>
 <p>Shadertoy uses standard pixel coordinates:</p>
 <pre><code class="language-glsl">void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;
     // ...
 }</code></pre>
 <p>In Infinite's <strong>Field Pixel</strong> node (<code>Source FieldPixel</code>), coordinates are normalized and aspect-corrected by default:</p>
-<ul><li><code>uv</code>: normalized texture coordinate (<code>[0, 1] x [0, 1]</code>)</li><li><code>aspect</code>: screen width divided by screen height (<code>res.x / res.y</code>)</li><li><code>t</code>: elapsed time in seconds (equivalent to <code>iTime</code>)</li><li><code>p = (uv - 0.5) * aspect</code>: center-origin aspect-corrected coordinates</li></ul>
-<h2 id="adding-instant-audio-reactivity">Adding Instant Audio Reactivity</h2>
+<ul><li><code>uv</code>: normalized texture coordinate (<code>[0, 1] x [0, 1]</code>)</li><li><code>aspect</code>: screen width divided by screen height (<code>res.x / res.y</code>)</li><li><code>t</code>: elapsed time in seconds (equivalent to <code>iTime</code>)</li><li><code>p = (uv - 0.5) * aspect</code>: centre-origin aspect-corrected coordinates</li></ul>
+<h2 id="adding-instant-audio-reactivity">Adding instant audio reactivity</h2>
 <p>On Shadertoy, audio reactivity requires binding an audio texture input (<code>iChannel0</code>). In Infinite, audio reactivity is immediate and native:</p>
 <ol><li>Wire an <strong>Audio Analyze</strong> node to your incoming sound or synth output.</li><li>The node exposes 8 spectral bands: sub-bass, bass, low-mid, mid, high-mid, presence, brilliance, and onset pulses.</li><li>Wire any band pin directly into a parameter on your Field Pixel shader node.</li></ol>
 <p>Here is an authentic audio-reactive neon tunnel kernel in Field language:</p>
@@ -149,7 +149,7 @@ lines = smoothstep(0.42, 0.49, max(grid_u, grid_v));
 wire = vec3(lines) * vec3(0.1, 0.85, 1.0) * (0.8 + 0.6 * mid);
 center = vec3(0.95, 0.2, 0.6) * (1.0 - smoothstep(0.0, 0.6, r)) * (0.8 + 0.8 * bass);
 col = (wire + center) * (0.7 + 0.5 * bass);</code></pre>
-<h2 id="live-interactive-webgl-widget">Live Interactive WebGL Widget</h2>
+<h2 id="live-interactive-webgl-widget">Live interactive WebGL widget</h2>
 <p>You can test this exact visualizer running live in WebGL below:</p>
 <figure style="margin:24px 0;width:100%;max-width:720px;">
   <iframe src="https://infinitedevices.org/embeds/cyber-tunnel.html" title="Cyber Tunnel — Audio-Reactive Visualizer by Naman Soni (Infinite)" width="100%" height="400" frameborder="0" allow="microphone" style="border-radius:12px;border:1px solid #1f253d;display:block;"></iframe>
@@ -157,12 +157,12 @@ col = (wire + center) * (0.7 + 0.5 * bass);</code></pre>
     powered by <a href="https://infinitedevices.org" target="_blank" rel="noopener" style="color:#f57f66;text-decoration:none;">infinite by naman soni</a>
   </figcaption>
 </figure>
-<h2 id="exporting-high-resolution-video-headlessly">Exporting High-Resolution Video Headlessly</h2>
+<h2 id="exporting-high-resolution-video-headlessly">Exporting high-resolution video headlessly</h2>
 <p>Unlike web tools that drop frames during screen capture, Infinite renders every single frame deterministically through its headless C++ engine:</p>
 <pre><code class="language-bash"># Render a 1080p 60fps MP4 video with synced 24-bit audio
 ./Infinite --render /path/to/shader_patch.inf output.mp4 --duration 10 --fps 60</code></pre>
 <p>Every frame is rendered offscreen using OpenGL 3.2 framebuffers, guaranteeing zero dropped frames even on complex raymarchers.</p>
-<h2 id="explore-more-embeds">Explore More Embeds</h2>
+<h2 id="explore-more-embeds">Explore more embeds</h2>
 <p>Check out the full <a href="https://infinitedevices.org/embeds/">Interactive Embeds Gallery</a> to view 14 live shaders with one-click iframe embedding for your own website or portfolio.</p>
         </div>
         <aside class="post-cta" aria-label="Try Infinite">

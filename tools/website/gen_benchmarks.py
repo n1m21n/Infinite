@@ -322,23 +322,24 @@ def body_html():
 # ---------------------------------------------------------------------------------------------------- outputs
 SITE_CSS = """/* Benchmarks page (made by tools/website/gen_benchmarks.py): the report body on the site's own tokens. */
 .bm-wrap { max-width: 960px; margin: 0 auto; }
-.bm-wrap .lead { color: var(--ink2); font-size: 1.15rem; line-height: 1.5; }
+.bm-wrap p, .bm-wrap li, .bm-wrap .section-sub { max-width: 56ch; }
+.bm-wrap .lead { color: var(--ink2); font-size: 1.125rem; line-height: 1.5; }
 .bm-wrap h2 { font-size: var(--fs-h3); font-weight: 700; letter-spacing: -0.02em; margin: 56px 0 12px; scroll-margin-top: 90px; }
-.bm-wrap h3 { font-size: 1.05rem; font-weight: 600; margin: 28px 0 8px; }
+.bm-wrap h3 { font-size: 1rem; font-weight: 600; margin: 28px 0 8px; }
 .bm-wrap p, .bm-wrap li { color: var(--ink2); line-height: 1.6; }
 .bm-wrap li { margin: 4px 0; }
-.bm-wrap code { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.85em; background: var(--card); padding: 1px 6px; border-radius: 4px; }
-.bm-wrap pre { background: var(--card); border-radius: 12px; padding: 16px 18px; overflow-x: auto; }
+.bm-wrap code { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.8438em; background: var(--card); padding: 1px 8px; border-radius: 4px; }
+.bm-wrap pre { background: var(--card); border-radius: 12px; padding: 16px 16px; overflow-x: auto; }
 .bm-wrap pre code { background: none; padding: 0; }
-.bm-wrap .kick { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 48px; }
+.bm-wrap .kick { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.7188rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 48px; }
 .bm-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 24px 0; }
-.bm-card { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--shadow-1); padding: 20px; }
-.bm-card p { margin: 6px 0 0; font-size: 0.92rem; }
+.bm-card { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--shadow-1); padding: 24px; }
+.bm-card p { margin: 6px 0 0; font-size: 0.8438rem; }
 .bm-n { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); }
 .bm-scroll { overflow-x: auto; margin: 12px 0 20px; border-radius: 12px; }
-table.t { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--card); }
-table.t th { text-align: left; font-weight: 600; color: var(--ink); padding: 10px 12px; border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent); white-space: nowrap; }
-table.t td { padding: 9px 12px; color: var(--ink2); border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); vertical-align: top; }
+table.t { width: 100%; border-collapse: collapse; font-size: 0.8438rem; background: var(--card); }
+table.t th { text-align: left; font-weight: 600; color: var(--ink); padding: 12px 12px; border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent); white-space: nowrap; }
+table.t td { padding: 8px 12px; color: var(--ink2); border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); vertical-align: top; }
 table.t td:first-child { color: var(--ink); font-weight: 600; }
 .bm-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 8px; }
 """
@@ -389,7 +390,7 @@ def page(body, n):
     head = re.sub(r'(og:image" content=")[^"]*', lambda m: m.group(1) + BASE + "assets/og-image.jpg", head)
     head = re.sub(r'(twitter:image" content=")[^"]*', lambda m: m.group(1) + BASE + "assets/og-image.jpg", head)
     head = head.replace('  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n', "")
-    head = head.replace("extensions.css?v=2", "benchmarks.css?v=1")
+    head = head.replace("extensions.css?v=cb2bbbb0", "benchmarks.css?v=70dc99be")
     head += f'  <link rel="alternate" type="application/json" href="assets/benchmarks.json" title="Benchmark data">\n  <link rel="alternate" type="application/pdf" href="assets/{PDF_NAME}" title="Benchmark report (PDF)">\n'
     head += f'  <script type="application/ld+json">\n{jsonld(n)}\n  </script>\n'
     nav_start = rest.index("<body")
@@ -404,7 +405,7 @@ def page(body, n):
             f'          <div class="bm-actions"><a class="btn btn-primary" href="assets/{PDF_NAME}" download>Download the PDF</a>'
             '<a class="btn btn-ghost" href="assets/benchmarks.json">Raw data (JSON)</a>'
             '<a class="btn btn-ghost" href="https://github.com/n1m21n/Infinite/tree/main/tools/re-survey" target="_blank" rel="noopener">Test tools</a></div>\n'
-            f'          <p class="mono" style="color:var(--muted);font-size:.8rem">Version 0.6.0 &middot; Measured {DATE} &middot; Apple M2, 8 GB</p>\n        </div>\n'
+            f'          <p class="mono" style="color:var(--muted);font-size:.8438rem">Version 0.6.0 &middot; Measured {DATE} &middot; Apple M2, 8 GB</p>\n        </div>\n'
             f'{body_w}\n<h2 id="faq">Questions people ask</h2>{qa}\n      </div>\n    </section>\n  </main>\n')
     tail = rest[rest.index("</main>") + len("</main>"):]
     return head + "</head>" + header + main + tail
@@ -413,11 +414,11 @@ def page(body, n):
 def pdf(body, out):
     import paper_doc as P
     css = P.PILL_CSS + """
-.bm-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
-.bm-card{background:var(--surface);border-radius:16px;padding:12px 14px;break-inside:avoid}
-.bm-card p{font-size:9.6px;line-height:1.4;margin:4px 0 0;color:var(--ink-2)}
-.bm-n{font-weight:800;font-size:24px;letter-spacing:-0.03em}
-table.t th{white-space:normal} table.full{font-size:9px} .chap{margin-top:22px;break-after:avoid} table.t tr{break-inside:avoid}
+.bm-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}
+.bm-card{background:var(--surface);border-radius:16px;padding:12px 16px;break-inside:avoid}
+.bm-card p{font-size:11px;line-height:1.4;margin:4px 0 0;color:var(--ink-2)}
+.bm-n{font-weight:800;font-size:25px;letter-spacing:-0.03em}
+table.t th{white-space:normal} table.full{font-size:11px} .chap{margin-top:22px;break-after:avoid} table.t tr{break-inside:avoid}
 """
     cover = P.cover("BENCHMARK REPORT", "Measured,", "not", "claimed", "How Infinite v0.6 compares with the instruments, effects and creative tools you already use, on a base MacBook Air. "
                     "Including the parts where it is slower.", [("Version", "0.6.0"), ("Measured", DATE), ("Machine", "Apple M2, 8 GB"), ("Report", "infinitedevices.org/benchmarks.html")],

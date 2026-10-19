@@ -27,10 +27,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../brand.css?v=3">
-  <link rel="stylesheet" href="../style.css?v=89">
-  <link rel="stylesheet" href="../glass.css?v=4">
-  <link rel="stylesheet" href="../blog.css?v=4">
+  <link rel="stylesheet" href="../brand.css?v=e96b24bf">
+  <link rel="stylesheet" href="../style.css?v=77ae7f4c">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=41425334">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -144,7 +144,7 @@
 <p>the <strong>audio displacement</strong> node takes any 3d mesh and deforms its vertex topology in real time directly from incoming audio waveforms.</p>
 <figure><img src="../assets/nodes/audio-displacement.webp" alt="audio displacement node: 5 real-time deformation modes including chladni cymatics" width="219" height="658" loading="lazy" decoding="async"><figcaption>audio displacement node: 5 real-time deformation modes including chladni cymatics</figcaption></figure>
 <h3 id="five-real-time-modes">five real-time modes</h3>
-<ul><li><strong>normal waveform</strong>: pushes vertices outward along their surface normals proportionally to the raw oscilloscope audio signal.</li><li><strong>spectral bands</strong>: deforms vertices along the u/x axis based on real-time fft frequency bins.</li><li><strong>acoustic ripples</strong>: generates concentric radial wave rings expanding outward from the center.</li><li><strong>chladni cymatics</strong>: simulates ernst chladni's 2d and 3d acoustic standing wave nodal patterns:</li></ul>
+<ul><li><strong>normal waveform</strong>: pushes vertices outward along their surface normals proportionally to the raw oscilloscope audio signal.</li><li><strong>spectral bands</strong>: deforms vertices along the u/x axis based on real-time fft frequency bins.</li><li><strong>acoustic ripples</strong>: generates concentric radial wave rings expanding outward from the centre.</li><li><strong>chladni cymatics</strong>: simulates ernst chladni's 2d and 3d acoustic standing wave nodal patterns:</li></ul>
 <blockquote><p><code>w = sin(n π x) · sin(m π y) ± sin(m π x) · sin(n π y)</code></p></blockquote>
 <ul><li><strong>directional axis</strong>: displaces vertices along specific global or local cartesian axes.</li></ul>
 <hr>
@@ -159,10 +159,10 @@
 <p>unlike 2d flat oscilloscope lines, the audio ribbon is a true procedural polygonal mesh that can be lit with directional lights, cast shadows, and rendered with physically based metallic and emission materials.</p>
 <hr>
 <h2 id="6-audio-color-ramp-sound-driven-color-palettes">6. audio color ramp: sound-driven color palettes</h2>
-<p>the <strong>audio color ramp</strong> node analyzes live frequency spectrums and dynamically drives gradient color ramps used across 2d visuals, 3d materials, and shader backgrounds.</p>
-<figure><img src="../assets/nodes/audio-color-ramp.webp" alt="audio color ramp node: modulating color stops and gradients from live audio" width="221" height="658" loading="lazy" decoding="async"><figcaption>audio color ramp node: modulating color stops and gradients from live audio</figcaption></figure>
+<p>the <strong>audio color ramp</strong> node analyses live frequency spectrums and dynamically drives gradient color ramps used across 2d visuals, 3d materials, and shader backgrounds.</p>
+<figure><img src="../assets/nodes/audio-color-ramp.webp" alt="audio color ramp node: modulating colour stops and gradients from live audio" width="221" height="658" loading="lazy" decoding="async"><figcaption>audio color ramp node: modulating colour stops and gradients from live audio</figcaption></figure>
 <h3 id="operating-modes">operating modes</h3>
-<ul><li><strong>intensity mode</strong>: low frequencies cause deep color glow while high-frequency percussion triggers bright highlights.</li><li><strong>expansion mode</strong>: frequency band energies dynamically expand and contract the spatial boundaries of each color stop.</li><li><strong>spectrum mode</strong>: maps the continuous real-time fft spectrum directly onto the custom palette.</li></ul>
+<ul><li><strong>intensity mode</strong>: low frequencies cause deep colour glow while high-frequency percussion triggers bright highlights.</li><li><strong>expansion mode</strong>: frequency band energies dynamically expand and contract the spatial boundaries of each color stop.</li><li><strong>spectrum mode</strong>: maps the continuous real-time fft spectrum directly onto the custom palette.</li></ul>
 <hr>
 <h2 id="7-audio-texture-audio-rate-gpu-textures">7. audio texture: audio-rate gpu textures</h2>
 <p>the <strong>audio texture</strong> node converts audio streams directly into a 2d gpu texture at 60 fps.</p>

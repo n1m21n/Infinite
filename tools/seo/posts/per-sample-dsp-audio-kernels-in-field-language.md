@@ -14,11 +14,11 @@ Most modern digital audio workstations treat audio synthesis as a black box: you
 
 In Infinite, you can write audio DSP at the sample level directly inside the canvas using **Field language**. Your code runs on the audio thread once per sample (48,000 times per second), compiled to a register machine that executes with zero memory allocations.
 
-## How the Sample Register Machine Works
+## How the sample register machine works
 
 When you place a **Field Synth** (`Synths Field Synth`) or **Field Effect** (`AudioEffects Field Effect`) node, Infinite compiles the kernel expression to a compact bytecode representation that evaluates on register cells.
 
-### Built-in Variables Available on the Audio Thread:
+### Built-in variables available on the audio thread
 - `sr`: Audio sample rate in Hz (typically `48000.0`).
 - `in`: Incoming audio sample value (`[-1.0, 1.0]`) in Field Effect.
 - `out`: Output audio sample to write.
@@ -28,7 +28,7 @@ When you place a **Field Synth** (`Synths Field Synth`) or **Field Effect** (`Au
 - `state`: Declares per-voice persistent memory preserved across samples.
 - `param`: Exposes a modulatable float knob on the node body with min/max bounds.
 
-## A 1-Pole Lowpass Filter Kernel
+## A 1-pole lowpass filter kernel
 
 Here is a classic 1-pole lowpass filter written in 4 lines:
 
@@ -41,7 +41,7 @@ out = z
 
 Because `state float z = 0` allocates a persistent cell in the voice register, `z` retains its previous sample value, creating an analog RC filter response.
 
-## Shipped Moog 4-Pole Ladder Filter
+## Shipped Moog 4-pole ladder filter
 
 For aggressive saturation and self-oscillation, Infinite ships with a 4-pole cascaded non-linear filter:
 
@@ -71,7 +71,7 @@ out = in * (1.0 - mix) + wet * mix
 
 Notice the dry/wet `mix` pattern at the end: every Field audio effect ends with `out = in * (1.0 - mix) + wet * mix`, giving you instant parallel processing.
 
-## Real-Time Mod Matrix Integration
+## Real-time mod matrix integration
 
 Unlike fixed DSP plugins, a Field Effect node can publish meter readings back to the visual and modulation canvas using `reduce.rms`:
 
@@ -83,7 +83,7 @@ out = in * boost
 
 The `bass` scalar automatically becomes a second output pin on the node. You can run a cable from that pin directly into a 3D geometry deformer, a light intensity slider, or a GLSL shader.
 
-## Testing and Verifying Headlessly
+## Testing and verifying headlessly
 
 You can test Field kernels without opening the GUI using Infinite's CLI or Python SDK:
 

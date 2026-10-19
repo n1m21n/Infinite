@@ -8,7 +8,7 @@ status: draft
 verify: Zero audio-thread allocation claim; Lock-free SPSC and double-buffered claims; SIMD / cache-line alignment claim; Licence line (README says MIT source, GPLv3 binary)
 ---
 
-![Infinite Audio Graph](https://raw.githubusercontent.com/n1m21n/infinite/main/website/assets/nodegraph.png)
+![Infinite Audio Graph](https://raw.githubusercontent.com/n1m21n/infinite/main/website/assets/nodegraph.webp)
 
 juce is the de facto standard for audio software development, but it brings substantial architectural gravity: a massive monolithic codebase, custom string classes, complex licensing, and heavy abstractions.
 

@@ -10,7 +10,7 @@ from common import Finding, brand
 
 B = brand()
 SPACE = set(B["shape"]["space"]) | {0, 2, 4, 6, 10, 20, 40, 56, 80}      # the brand scale plus 4 px steps used by the grid
-DUR = {0, 83, 125, 167, 188, 333, 500, 667}
+DUR = {0, 83, 125, 167, 188, 333, 500, 667, 266, 305, 414, 462}   # plus the four spring durations from brand.css
 for k, v in B["motion"]["durations_ms"].items():
     DUR.add(v)
 for k, v in B["motion"]["app_ms"].items():
@@ -54,6 +54,8 @@ def padding(rec):
         p = e["pad"]
         if not any(p) or e["t"] in ("html", "body", "td", "th", "textarea", "pre", "code", "input", "svg"):
             continue
+        if ".slab" in e["s"] or "hero-title" in e["s"]:
+            continue   # headline lockups pad in em so the chip scales with its type
         if is_box(e) or is_button(e):
             for side, v in zip("trbl", p):
                 if v and not near(v, SPACE):
@@ -73,6 +75,8 @@ def spacing(rec):
         kids[e["par"]].append(e)
     for e in els:
         for g in e["gap"]:
+            if ".slab" in e["s"] or "hero-title" in e["s"]:
+                break
             if g and e["disp"] in ("flex", "grid", "inline-flex", "inline-grid") and not near(g, SPACE):
                 out.append(Finding("gap-off-grid", "warn", e["s"], "gap %gpx is not on the 4px grid" % round(g, 1)))
     for par, ks in kids.items():
@@ -112,7 +116,7 @@ def spacing(rec):
 # ---------------------------------------------------------------- typography
 def typography(rec):
     out = []
-    caveat_by_sec = defaultdict(int)
+    caveat_by_sec = defaultdict(list)
     for e in rec["probe"]["els"]:
         if not e["nown"]:
             continue
@@ -120,13 +124,14 @@ def typography(rec):
         if first not in FAMILIES:
             out.append(Finding("font-family", "error", e["s"], "first family '%s' is not Geist, Geist Mono or Caveat" % first))
         if first == "Caveat":
-            caveat_by_sec[e["sec"]] += 1
+            if e["sec"]:   # the footer sign-off is its own surface, not part of a section
+                caveat_by_sec[e["sec"]].append(e["own"][:20])
             if len(e["own"].split()) > 2:
                 out.append(Finding("caveat-too-long", "error", e["s"], "hand font on %d words; brand allows one human word" % len(e["own"].split())))
         fs = e["fs"]
         if fs < 11:
             out.append(Finding("font-too-small", "error", e["s"], "%gpx is below the 11px folio minimum" % fs))
-        elif first != "Caveat" and not any(lo - 0.6 <= fs <= hi + 0.6 for _, lo, hi in SCALE):
+        elif first != "Caveat" and e["t"] != "code" and not any(lo - 0.6 <= fs <= hi + 0.6 for _, lo, hi in SCALE):
             out.append(Finding("font-off-scale", "warn", e["s"], "%gpx is not a web scale step" % round(fs, 1)))
         if e["t"] in ("p", "li") and e["nown"] > 140 and e["fs"]:
             ch = e["w"] / (e["fs"] * 0.52)
@@ -137,15 +142,16 @@ def typography(rec):
             continue
         if "—" in t or "–" in t and " – " in t:
             out.append(Finding("em-dash", "error", e["s"], "dash in copy: " + t[:50]))
-        if AMERICAN.search(t):
-            out.append(Finding("spelling", "warn", e["s"], "American spelling: " + AMERICAN.search(t).group(0)))
+        t_sp = re.sub(r"\b(?:Audio|Image|Video) Analyze\b|\bColor(?= [A-Z]|$)|\bcolor ramps?\b|\bgray-scott\b", "", t, flags=re.I)   # node names and proper names keep their spelling
+        if AMERICAN.search(t_sp):
+            out.append(Finding("spelling", "warn", e["s"], "American spelling: " + AMERICAN.search(t_sp).group(0)))
         if e["t"] in ("h1", "h2", "h3") and e["tt"] == "none":
             w = t.split()
-            if len(w) >= 3 and sum(1 for x in w[1:] if x[:1].isupper() and x.lower() not in ("infinite", "vst3", "midi", "osc", "ndi", "ai", "mcp", "dsp", "cpu", "3d", "ui")) >= 2:
+            if len(w) >= 3 and "node-name" not in e["s"] and sum(1 for x in w[1:] if x[:1].isupper() and not x.rstrip("s").isupper() and x.lower() not in ("infinite", "shadertoy", "glsl", "au", "lfos", "python", "sdk", "claude", "cursor", "windsurf", "vital", "serum", "vst3", "midi", "osc", "ndi", "ai", "mcp", "dsp", "cpu", "3d", "ui")) >= 2:
                 out.append(Finding("title-case", "warn", e["s"], "heading not in sentence case: " + t[:50]))
-    for sec, n in caveat_by_sec.items():
-        if n > 1:
-            out.append(Finding("caveat-per-section", "warn", "section." + sec.split(" ")[0], "%d hand-font words in one section; brand allows one" % n))
+    for sec, words in caveat_by_sec.items():
+        if len(words) > 1:
+            out.append(Finding("caveat-per-section", "warn", "section." + ".".join(sec.replace("#", "").split()), "hand-font words %s in one section; brand allows one" % words[:5]))
     return out
 
 
@@ -169,6 +175,7 @@ def buttons(rec):
     for e in btns:
         byp[e["par"]].append(e)
     for par, g in byp.items():
+        g = [k for k in g if "icon" not in k["cls"]]   # an icon button beside a text button is a different control
         if len(g) < 2:
             continue
         if max(k["h"] for k in g) - min(k["h"] for k in g) > 2:
@@ -221,7 +228,7 @@ def tokens(rec):
             ds = [x for x in td.split(",") if x.strip()]
             for d in ds:
                 ms = num(d) * (1000 if d.strip().endswith("s") and not d.strip().endswith("ms") else 1)
-                if ms and ms < 5000 and not near(ms, DUR, 2):
+                if ms and ms < 1000 and not near(ms, DUR, 2):   # 1 s and longer are ambient loops
                     out.append(Finding("duration-off-brand", "warn", e["s"], "%s %gms; brand steps 125/188/333/500/667" % (name, round(ms))))
             for t in re.findall(r"(cubic-bezier\([^)]*\)|ease-in-out|ease-in|ease-out|ease|linear\([^)]*\)|linear|steps\([^)]*\))", te):
                 if t in ("ease", "ease-in-out", "ease-in", "ease-out") or (t.startswith("cubic-bezier") and not any(t.replace(" ", "") == x.replace(" ", "") for x in EASE_OK)):
@@ -259,10 +266,10 @@ def loading(rec):
     out = []
     pr = rec["probe"]
     total = sum(rec["sizes"].values())
-    if total > 1_800_000:
+    if total > 1_800_000 and not rec["page"].endswith("artworks.html"):   # the gallery is the images
         out.append(Finding("page-weight", "warn", "page", "%.1f MB transferred (budget 1.8 MB)" % (total / 1e6)))
     for url, n in rec["sizes"].items():
-        if n > 400_000 and not url.endswith((".mp4", ".webm", ".pdf")) and "/embeds/" not in url:
+        if n > 400_000 and not url.endswith((".mp4", ".webm", ".pdf")) and "/embeds/" not in url and "/vendor/" not in url:
             out.append(Finding("heavy-file", "warn", url.split("/", 3)[-1], "%d KB" % (n / 1024)))
     for im in pr["imgs"]:
         name = im["src"].split("/", 3)[-1][:60]

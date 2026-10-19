@@ -100,7 +100,7 @@ PROBE_JS = r"""
       ff: cs.fontFamily, fs: px(cs.fontSize), fw: cs.fontWeight, lh: cs.lineHeight, ls: cs.letterSpacing, tt: cs.textTransform,
       td: cs.transitionDuration, te: cs.transitionTimingFunction, ad: cs.animationDuration, ae: cs.animationTimingFunction,
       own: own.slice(0, 160), nown: own.length, cls: el.getAttribute('class') || '',
-      ov: cs.overflowX, sec: (el.closest('section') || {}).className || '', link: el.tagName === 'A' || el.tagName === 'BUTTON',
+      ov: cs.overflowX, sec: (function(x){ return x ? ((x.id ? '#' + x.id + ' ' : '') + x.className) : ''; })(el.closest('section')), link: el.tagName === 'A' || el.tagName === 'BUTTON',
       inpar: !!el.closest('p, li, h1, h2, h3, figcaption'),
     });
     n++;

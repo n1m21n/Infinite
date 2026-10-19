@@ -27,10 +27,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../brand.css?v=3">
-  <link rel="stylesheet" href="../style.css?v=89">
-  <link rel="stylesheet" href="../glass.css?v=4">
-  <link rel="stylesheet" href="../blog.css?v=4">
+  <link rel="stylesheet" href="../brand.css?v=e96b24bf">
+  <link rel="stylesheet" href="../style.css?v=77ae7f4c">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=41425334">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -38,7 +38,7 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "AI agent MCP guide for audio and visual synthesis", "description": "Connect AI coding agents to Infinite via MCP and Python SDK for headless audio synthesis, 3D meshes, and video rendering.", "datePublished": "2026-10-19", "dateModified": "2026-10-19", "mainEntityOfPage": "https://infinitedevices.org/blog/ai-agent-mcp-audio-visual-engine-guide.html", "url": "https://infinitedevices.org/blog/ai-agent-mcp-audio-visual-engine-guide.html", "image": ["https://infinitedevices.org/assets/blog_ai_agent_mcp.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "ai agents, mcp, python sdk, automation, headless engine", "wordCount": 635, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "AI agent MCP guide for audio and visual synthesis", "description": "Connect AI coding agents to Infinite via MCP and Python SDK for headless audio synthesis, 3D meshes, and video rendering.", "datePublished": "2026-10-19", "dateModified": "2026-10-19", "mainEntityOfPage": "https://infinitedevices.org/blog/ai-agent-mcp-audio-visual-engine-guide.html", "url": "https://infinitedevices.org/blog/ai-agent-mcp-audio-visual-engine-guide.html", "image": ["https://infinitedevices.org/assets/blog_ai_agent_mcp.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "ai agents, mcp, python sdk, automation, headless engine", "wordCount": 637, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "AI agent MCP guide for audio and visual synthesis", "item": "https://infinitedevices.org/blog/ai-agent-mcp-audio-visual-engine-guide.html"}]}</script>
 </head>
 <body class="blog-page blog-post">
@@ -119,11 +119,11 @@
           <p class="post-by">By <a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a></p>
         </header>
         <figure class="post-hero"><img src="../assets/thumbs/blog_ai_agent_mcp-1200.webp" alt="headless mcp audio-visual synthesis matrix in infinite" width="1200" height="675" decoding="async"></figure>
-        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#the-architecture-how-ai-agents-interact-with-infinite">The Architecture: How AI Agents Interact with Infinite</a></li><li><a href="#one-command-installation-claude-cursor-windsurf">One-Command Installation (Claude, Cursor, Windsurf)</a></li><li><a href="#manual-mcp-configuration">Manual MCP Configuration</a></li><li><a href="#using-the-python-sdk">Using the Python SDK</a></li><li><a href="#embedding-interactive-widgets-in-generated-sites">Embedding Interactive Widgets in Generated Sites</a></li></ol></details>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#the-architecture-how-ai-agents-interact-with-infinite">The architecture: how AI agents interact with Infinite</a></li><li><a href="#one-command-installation-for-claude-cursor-and-windsurf">One-command installation for Claude, Cursor and Windsurf</a></li><li><a href="#manual-mcp-configuration">Manual MCP Configuration</a></li><li><a href="#using-the-python-sdk">Using the Python SDK</a></li><li><a href="#embedding-interactive-widgets-in-generated-sites">Embedding interactive widgets in generated sites</a></li></ol></details>
         <div class="prose">
 <p>AI coding assistants (Claude Desktop, Cursor, Antigravity, Devin) are exceptionally good at writing code, but historically poor at producing interactive music and real-time 3D visuals. Desktop DAWs and visual engines require manual mouse interactions, proprietary project files, and heavy graphical interfaces that agents cannot operate.</p>
 <p>Infinite bridges this gap by exposing its entire C++20 engine through the <strong>Model Context Protocol (MCP)</strong> and a dedicated <strong>Python SDK</strong>.</p>
-<h2 id="the-architecture-how-ai-agents-interact-with-infinite">The Architecture: How AI Agents Interact with Infinite</h2>
+<h2 id="the-architecture-how-ai-agents-interact-with-infinite">The architecture: how AI agents interact with Infinite</h2>
 <pre><code>[Claude / Cursor / Antigravity]
                |
          (JSON-RPC stdio)
@@ -135,7 +135,7 @@
   [Audio .wav / Still .png / Video .mp4]</code></pre>
 <p>Every action is deterministic and headless:</p>
 <ol><li>The AI agent generates a formula or patch.</li><li>The MCP server pipes it into <code>./Infinite --validate</code>.</li><li>If valid, the C++ engine renders frames or synthesizes 24-bit audio in milliseconds.</li><li>The output file path and spectral analysis return to the AI agent context.</li></ol>
-<h2 id="one-command-installation-claude-cursor-windsurf">One-Command Installation (Claude, Cursor, Windsurf)</h2>
+<h2 id="one-command-installation-for-claude-cursor-and-windsurf">One-command installation for Claude, Cursor and Windsurf</h2>
 <p>You can automatically wire up Infinite across all your AI assistants with a single command:</p>
 <pre><code class="language-bash">npx -y infinite-engine init</code></pre>
 <p>It adds the <code>infinite</code> MCP server to Claude Desktop, Cursor and Windsurf, but only for apps that are already installed. It keeps a backup of each file it changes, and leaves a config alone if it contains comments. Add <code>--dry-run</code> to see what it would do first. The Infinite app itself must be installed; set <code>INFINITE_BIN</code> to its path if it is not found.</p>
@@ -181,7 +181,7 @@ function draw(t) {
   "author": "Naman Soni (n1m21n)",
   "homepage": "https://infinitedevices.org"
 }</code></pre>
-<h2 id="embedding-interactive-widgets-in-generated-sites">Embedding Interactive Widgets in Generated Sites</h2>
+<h2 id="embedding-interactive-widgets-in-generated-sites">Embedding interactive widgets in generated sites</h2>
 <p>When agents generate web pages, portfolios, or documentation, they can embed Infinite's responsive WebGL shaders with a single snippet:</p>
 <pre><code class="language-html">&lt;figure style="margin:0;width:100%;max-width:720px;"&gt;
   &lt;iframe src="https://infinitedevices.org/embeds/cyber-tunnel.html" title="Cyber Tunnel — Audio-Reactive Visualizer by Naman Soni (Infinite)" width="100%" height="400" frameborder="0" allow="microphone" style="border-radius:12px;border:none;display:block;"&gt;&lt;/iframe&gt;

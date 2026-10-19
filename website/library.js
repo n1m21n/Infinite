@@ -22,7 +22,7 @@
       '<p class="hand-cap">' + esc(it.kind === 'Filter' ? 'filters a picture' : it.category === 'Sketch' ? 'draws with code' : it.kind === 'Template' ? 'a whole patch' : it.kind === 'Skill' ? 'for your AI agent' : it.kind === 'Extension' ? 'installs inside the app' : it.kind === 'Patch' ? (it.author ? 'by ' + it.author : 'shared by the community') : 'makes its own') + '</p>' +
       '<div class="node">' +
       '<header class="node-head"><h2 class="node-name">' + esc(it.name) + '</h2><span class="node-cat">' + esc(cat) + '</span></header>' +
-      '<div class="node-view"><img src="' + esc(it.preview) + '" alt="' + esc(it.name) + ' preview" loading="lazy" width="900" height="600"></div>' +
+      '<div class="node-view"><img src="' + esc(it.preview) + '" alt="' + esc(it.name) + ' preview" loading="lazy" width="720" height="450"></div>' +
       '<p class="lib-desc">' + esc(it.description) + '</p>' +
       '<footer class="lib-foot"><span class="lib-price ctl">' + (it.price > 0 ? '$' + it.price : 'Free') + '</span>' +
       '<div class="lib-acts">' + (it.kind === 'Template' || it.kind === 'Patch' || it.kind === 'Skill' || it.kind === 'Extension' ? '' : '<button class="lib-copy ctl" type="button" data-file="' + esc(it.file) + '" aria-label="Copy code for ' + esc(it.name) + '">' + CP + '<span class="lib-copy-text">Copy</span></button>') +

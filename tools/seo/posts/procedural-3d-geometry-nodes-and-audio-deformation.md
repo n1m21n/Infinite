@@ -18,11 +18,11 @@ infinite brings 3d geometry generation, vertex shading, and per-sample audio dsp
 
 infinite includes native parametric mesh generators:
 - **mesh cube**: generates subdivisions with uv coordinates and normal vectors.
-- **mesh sphere**: uv sphere or icosphere with customizable geodesic resolution.
+- **mesh sphere**: uv sphere or icosphere with customisable geodesic resolution.
 - **mesh torus**: toroidal coordinates with major and minor radii controls.
 - **mesh grid**: high-density planar vertex grid ideal for terrain and landscape deformation.
 
-each mesh node outputs a geometry buffer containing position (`vec3 pos`), normal (`vec3 norm`), texture coordinates (`vec2 uv`), and vertex color (`vec4 color`).
+each mesh node outputs a geometry buffer containing position (`vec3 pos`), normal (`vec3 norm`), texture coordinates (`vec2 uv`), and vertex colour (`vec4 color`).
 
 ## 2. deforming vertex topology with field modifier
 

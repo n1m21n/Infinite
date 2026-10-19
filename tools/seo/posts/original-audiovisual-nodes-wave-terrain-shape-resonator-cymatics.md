@@ -59,7 +59,7 @@ the **audio displacement** node takes any 3d mesh and deforms its vertex topolog
 ### five real-time modes
 - **normal waveform**: pushes vertices outward along their surface normals proportionally to the raw oscilloscope audio signal.
 - **spectral bands**: deforms vertices along the u/x axis based on real-time fft frequency bins.
-- **acoustic ripples**: generates concentric radial wave rings expanding outward from the center.
+- **acoustic ripples**: generates concentric radial wave rings expanding outward from the centre.
 - **chladni cymatics**: simulates ernst chladni's 2d and 3d acoustic standing wave nodal patterns:
 
 > `w = sin(n π x) · sin(m π y) ± sin(m π x) · sin(n π y)`
@@ -90,12 +90,12 @@ unlike 2d flat oscilloscope lines, the audio ribbon is a true procedural polygon
 
 ## 6. audio color ramp: sound-driven color palettes
 
-the **audio color ramp** node analyzes live frequency spectrums and dynamically drives gradient color ramps used across 2d visuals, 3d materials, and shader backgrounds.
+the **audio color ramp** node analyses live frequency spectrums and dynamically drives gradient color ramps used across 2d visuals, 3d materials, and shader backgrounds.
 
-![audio color ramp node: modulating color stops and gradients from live audio](../assets/nodes/audio-color-ramp.webp)
+![audio color ramp node: modulating colour stops and gradients from live audio](../assets/nodes/audio-color-ramp.webp)
 
 ### operating modes
-- **intensity mode**: low frequencies cause deep color glow while high-frequency percussion triggers bright highlights.
+- **intensity mode**: low frequencies cause deep colour glow while high-frequency percussion triggers bright highlights.
 - **expansion mode**: frequency band energies dynamically expand and contract the spatial boundaries of each color stop.
 - **spectrum mode**: maps the continuous real-time fft spectrum directly onto the custom palette.
 

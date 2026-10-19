@@ -117,7 +117,7 @@ def main_html():
         <div class="ah-text">
           <span class="blog-hand hand">why</span>
           <h1 class="slab">Why Infinite exists</h1>
-          <p class="lead">Infinite is one canvas for pictures, sound and code. It is built so an idea can travel from your head to the screen or the speakers without you stopping to switch tools.</p>
+          <p class="lead">Infinite is one canvas for pictures, sound and code, so an idea can travel from your head to the screen or the speakers without switching tools.</p>
           <div class="aud-cta">
             <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
             <a href="#who" class="btn btn-ghost">Who it is for</a>
@@ -192,7 +192,7 @@ def main_html():
 
       <section class="aud-section reveal" id="machines">
         <h2>The machine follows you</h2>
-        <p class="sec-sub">A good instrument does what the hand means and then gets out of the way. We design the machine's part the same way: it listens, it carries the connections, it offers, and the person decides. Every result is a node you can open.</p>
+        <p class="sec-sub">A good instrument does what the hand means and then gets out of the way. The machine listens, carries the connections and offers; the person decides.</p>
         <div class="aud-grid">
 {mach}
         </div>
@@ -236,7 +236,7 @@ def ld():
 
 
 def build():
-    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=6">', extra_js='\n  <script src="philosophy.js?v=3" defer></script>')
+    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=57dcd6ad">', extra_js='\n  <script src="philosophy.js?v=3" defer></script>')
 
 
 def main():

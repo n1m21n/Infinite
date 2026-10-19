@@ -4,7 +4,7 @@ description: Infinite runs a pull-based audio graph and a GPU texture pipeline o
 date: 2026-10-17
 category: product
 tags: [architecture, audio, opengl, modulation]
-image: assets/nodegraph.png
+image: assets/nodegraph.webp
 image_alt: A node graph in Infinite with audio and image nodes connected by cables
 keywords: audio reactive visuals engine, node based audiovisual workstation, audio and video sync
 status: published

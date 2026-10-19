@@ -14,7 +14,7 @@ Shadertoy is the world's greatest sketchbook for pixel shaders. But getting a Sh
 
 In Infinite, shaders are native first-class nodes that sit directly alongside polyphonic synthesizers, audio effects, and sequencers on one infinite canvas.
 
-## The Coordinate Space Mapping
+## The coordinate space mapping
 
 Shadertoy uses standard pixel coordinates:
 ```glsl
@@ -28,9 +28,9 @@ In Infinite's **Field Pixel** node (`Source FieldPixel`), coordinates are normal
 - `uv`: normalized texture coordinate (`[0, 1] x [0, 1]`)
 - `aspect`: screen width divided by screen height (`res.x / res.y`)
 - `t`: elapsed time in seconds (equivalent to `iTime`)
-- `p = (uv - 0.5) * aspect`: center-origin aspect-corrected coordinates
+- `p = (uv - 0.5) * aspect`: centre-origin aspect-corrected coordinates
 
-## Adding Instant Audio Reactivity
+## Adding instant audio reactivity
 
 On Shadertoy, audio reactivity requires binding an audio texture input (`iChannel0`). In Infinite, audio reactivity is immediate and native:
 1. Wire an **Audio Analyze** node to your incoming sound or synth output.
@@ -55,7 +55,7 @@ center = vec3(0.95, 0.2, 0.6) * (1.0 - smoothstep(0.0, 0.6, r)) * (0.8 + 0.8 * b
 col = (wire + center) * (0.7 + 0.5 * bass);
 ```
 
-## Live Interactive WebGL Widget
+## Live interactive WebGL widget
 
 You can test this exact visualizer running live in WebGL below:
 
@@ -66,7 +66,7 @@ You can test this exact visualizer running live in WebGL below:
   </figcaption>
 </figure>
 
-## Exporting High-Resolution Video Headlessly
+## Exporting high-resolution video headlessly
 
 Unlike web tools that drop frames during screen capture, Infinite renders every single frame deterministically through its headless C++ engine:
 
@@ -77,6 +77,6 @@ Unlike web tools that drop frames during screen capture, Infinite renders every 
 
 Every frame is rendered offscreen using OpenGL 3.2 framebuffers, guaranteeing zero dropped frames even on complex raymarchers.
 
-## Explore More Embeds
+## Explore more embeds
 
 Check out the full [Interactive Embeds Gallery](https://infinitedevices.org/embeds/) to view 14 live shaders with one-click iframe embedding for your own website or portfolio.

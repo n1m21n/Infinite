@@ -59,7 +59,7 @@ def page(i):
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#151930">
   <script src="../theme.js?v=1"></script>
-  <link rel="stylesheet" href="../brand.css?v=3">
+  <link rel="stylesheet" href="../brand.css?v=e96b24bf">
   <title>{e(t)}</title>
   <meta name="description" content="{e(d)} Free to download for Infinite, the open-source audiovisual workstation.">
   <link rel="canonical" href="{url}">
