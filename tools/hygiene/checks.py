@@ -37,6 +37,8 @@ def is_box(e):
 
 
 def is_button(e):
+    if "chip.back" in e["s"]:
+        return False   # the museum's floating back chip is part of that page's own glass UI
     c = " " + e["cls"] + " "
     return e["t"] == "button" or " btn " in c or " chip " in c or " pill " in c or e["cls"].startswith(("btn", "chip")) or " reel-btn " in c
 
