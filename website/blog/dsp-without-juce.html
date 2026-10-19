@@ -133,7 +133,7 @@
 <h2 id="2-native-au-and-vst3-plugin-hosting">2. native au and vst3 plugin hosting</h2>
 <p>instead of relying on framework wrappers, infinite speaks directly to plugin apis:</p>
 <ul><li><strong>vst3</strong>: loads the component bundle, queries <code>IComponent</code> and <code>IAudioProcessor</code>, maps parameters to continuous modulation arrays, and schedules sample-accurate note events.</li><li><strong>audio unit (au)</strong>: interacts directly with the coreaudio audio unit v2 and v3 c-api on macos.</li></ul>
-<p>parameters on third-party plugins can be modulated in real time by any signal on the canvas—whether an audio lfo, an envelope follower, or a generative javascript sketch.</p>
+<p>parameters on third-party plugins can be modulated in real time by any signal on the canvas, whether an audio lfo, an envelope follower, or a generative javascript sketch.</p>
 <figure><img src="../assets/product_canvas_1400.webp" alt="infinite modular canvas" width="1400" height="780" loading="lazy" decoding="async"><figcaption>infinite modular canvas</figcaption></figure>
 <hr>
 <h2 id="3-embedded-dsp-kernel-language">3. embedded dsp kernel language</h2>
@@ -142,7 +142,7 @@
 state float z = 0
 z += (in - z) * cutoff
 out = z</code></pre>
-<p>the compiler translates this directly into optimized vector loops evaluated per-sample on the audio thread.</p>
+<p>the compiler translates this directly into optimised vector loops evaluated per-sample on the audio thread.</p>
 <ul><li>try infinite: <a href="https://infinitedevices.org" rel="noopener">infinitedevices.org</a></li><li>read the codebase: <a href="https://github.com/n1m21n/infinite" rel="noopener">github.com/n1m21n/infinite</a></li></ul>
         </div>
         <aside class="post-cta" aria-label="Try Infinite">
