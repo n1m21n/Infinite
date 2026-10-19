@@ -17,7 +17,9 @@ name: Build
 # desktop. See docs/WINDOWS_VERIFICATION.md for that half.
 
 # Website/docs-only pushes can't break the build, so they don't pay for one.
-# Keep this list in sync with the paths the Pages workflow deploys from.
+# That includes the site generators (tools/website, tools/seo), the signup
+# worker and the MCP package files: none of them is compiled or run by a job
+# below. Keep this list in sync with the paths the Pages workflow deploys from.
 on:
   push:
     branches: [main, 'feature/**', 'bugfix/**']
@@ -25,17 +27,32 @@ on:
       - 'website/**'
       - 'docs/**'
       - '**/*.md'
+      - 'tools/website/**'
+      - 'tools/seo/**'
+      - 'tools/npm/**'
+      - 'worker/**'
+      - 'smithery.yaml'
+      - '.cursorrules'
   pull_request:
     paths-ignore:
       - 'website/**'
       - 'docs/**'
       - '**/*.md'
+      - 'tools/website/**'
+      - 'tools/seo/**'
+      - 'tools/npm/**'
+      - 'worker/**'
+      - 'smithery.yaml'
+      - '.cursorrules'
   workflow_dispatch:
 
-# A force-push mid-run should cancel the superseded run, not queue behind it.
+# On branches, a force-push mid-run should cancel the superseded run, not
+# queue behind it. On main every run is allowed to finish: cancelling there
+# meant a burst of pushes left main with no finished build for days. A newer
+# push still waits as the one pending run behind the running one.
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # The Windows platform layer arrived as a fork PR and may not be present on
