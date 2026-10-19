@@ -1,12 +1,66 @@
 [
  {
+  "slug": "ai-agent-mcp-audio-visual-engine-guide",
+  "title": "AI agent MCP guide for audio and visual synthesis",
+  "description": "Connect AI coding agents to Infinite via MCP and Python SDK for headless audio synthesis, 3D meshes, and video rendering.",
+  "date": "2026-10-19",
+  "updated": "2026-10-19",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/ai-agent-mcp-audio-visual-engine-guide.html"
+ },
+ {
   "slug": "ai-agents-make-music-art-3d-headless",
-  "title": "Let an AI agent make music, art and 3D with Infinite's headless engine",
-  "description": "Infinite's headless engine lets an AI agent such as Claude write a text patch, check it, listen to it and render music, pictures and 3D from the command line.",
+  "title": "AI agents make music, art and 3D with Infinite headless engine",
+  "description": "Infinite headless engine lets AI agents write text patches, inspect signals, and render music, pictures and 3D from the command line.",
   "date": "2026-10-19",
   "updated": "2026-10-19",
   "category": "product",
   "url": "https://infinitedevices.org/blog/ai-agents-make-music-art-3d-headless.html"
+ },
+ {
+  "slug": "electronic-music-sound-design-sub-bass-pluck-pad",
+  "title": "Sound design in Infinite: sub bass, plucks, and pads",
+  "description": "Guide to modular sound design in Infinite DAW: subtractive sub bass, Karplus-Strong plucks, and ambient pads with Field kernels.",
+  "date": "2026-10-19",
+  "updated": "2026-10-19",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/electronic-music-sound-design-sub-bass-pluck-pad.html"
+ },
+ {
+  "slug": "hardware-midi-and-controller-mapping-in-infinite",
+  "title": "Hardware MIDI and controller mapping in Infinite",
+  "description": "Connect hardware synthesizers, MIDI controllers, and DMX lighting to Infinite with low latency routing and parameter modulation.",
+  "date": "2026-10-19",
+  "updated": "2026-10-19",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/hardware-midi-and-controller-mapping-in-infinite.html"
+ },
+ {
+  "slug": "per-sample-dsp-audio-kernels-in-field-language",
+  "title": "Writing 48kHz audio DSP kernels in Field language",
+  "description": "Breakdown of Infinite register machine for Field Synth and Effect nodes, compiling per-sample audio DSP kernels at 48kHz.",
+  "date": "2026-10-19",
+  "updated": "2026-10-19",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/per-sample-dsp-audio-kernels-in-field-language.html"
+ },
+ {
+  "slug": "procedural-3d-geometry-nodes-and-audio-deformation",
+  "title": "Procedural 3D geometry and audio mesh deformation",
+  "description": "Build procedural 3D meshes in Infinite DAW, deform topology with Field modifier kernels, and drive real-time geometric mutations.",
+  "date": "2026-10-19",
+  "updated": "2026-10-19",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/procedural-3d-geometry-nodes-and-audio-deformation.html"
+ },
+ {
+  "slug": "shadertoy-to-infinite-audio-reactive-glsl",
+  "title": "Bringing Shadertoy GLSL shaders into Infinite for audio reactivity",
+  "description": "How to convert any Shadertoy fragment shader into a native real-time node in Infinite, hook it up to audio analysis FFT bands, and export high-resolution video.",
+  "date": "2026-10-19",
+  "updated": "2026-10-19",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/shadertoy-to-infinite-audio-reactive-glsl.html"
  },
  {
   "slug": "field-language-write-what-a-node-does",

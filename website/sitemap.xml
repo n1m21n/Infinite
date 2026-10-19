@@ -3,7 +3,13 @@
   <url><loc>https://infinitedevices.org/</loc><lastmod>2026-10-19</lastmod><priority>1.0</priority></url>
   <url><loc>https://infinitedevices.org/library.html</loc><lastmod>2026-10-19</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/blog/</loc><lastmod>2026-10-19</lastmod><priority>0.8</priority></url>
+  <url><loc>https://infinitedevices.org/blog/ai-agent-mcp-audio-visual-engine-guide.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/ai-agents-make-music-art-3d-headless.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/electronic-music-sound-design-sub-bass-pluck-pad.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/hardware-midi-and-controller-mapping-in-infinite.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/per-sample-dsp-audio-kernels-in-field-language.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/procedural-3d-geometry-nodes-and-audio-deformation.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/shadertoy-to-infinite-audio-reactive-glsl.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/field-language-write-what-a-node-does.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/free-touchdesigner-alternative-for-audio-reactive-visuals.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/infinite-v0-6-benchmarks.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
@@ -12,12 +18,28 @@
   <url><loc>https://infinitedevices.org/blog/motion-tracking-hand-face-pose-modulators.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/render-video-and-audio-from-a-text-file.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/cyber-tunnel.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/iridescent-orb.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/hyperspace-tunnel.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/liquid-glass.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/hex-lattice.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/phyllotaxis-bloom.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/metaball-lens.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/ordered-dither.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/pixel-plate.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/harmonic-warp.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/hyper-torus.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/spectrum-bars.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/kaleidoscope-mirror.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/neon-matrix.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/audio-waveform.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/fractal-flame.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/musicians.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/vjs.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/creative-coders.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
-  <url><loc>https://infinitedevices.org/embeds/</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/</loc><lastmod>2026-10-19</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/extensions.html</loc><lastmod>2026-10-19</lastmod><priority>0.6</priority></url>
   <url><loc>https://infinitedevices.org/benchmarks.html</loc><lastmod>2026-10-19</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artworks.html</loc><lastmod>2026-10-19</lastmod><priority>0.6</priority></url>

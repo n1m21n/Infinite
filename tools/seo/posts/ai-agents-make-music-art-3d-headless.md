@@ -1,6 +1,6 @@
 ---
-title: Let an AI agent make music, art and 3D with Infinite's headless engine
-description: Infinite's headless engine lets an AI agent such as Claude write a text patch, check it, listen to it and render music, pictures and 3D from the command line.
+title: AI agents make music, art and 3D with Infinite headless engine
+description: Infinite headless engine lets AI agents write text patches, inspect signals, and render music, pictures and 3D from the command line.
 date: 2026-10-19
 category: product
 tags: [headless, ai agents, music, 3d]

@@ -4,8 +4,8 @@ description: An honest look at where Infinite fits next to TouchDesigner for aud
 date: 2026-10-17
 category: creative
 tags: [touchdesigner, audio reactive, vj, comparison]
-image: assets/howto_visual.webp
-image_alt: A generative visual built from nodes in Infinite
+image: assets/blog_touchdesigner_alternative.png
+image_alt: real-time audio reactive holographic orb visualizer in infinite
 keywords: touchdesigner alternative, free touchdesigner alternative, open source audio reactive visuals, vj software free
 status: published
 ---

@@ -110,7 +110,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 11 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 16 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -122,6 +122,11 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Pixel Plate](https://infinitedevices.org/embeds/pixel-plate.html): Stepped mosaic tiles. Sound steps the tile colours.
 - [Harmonic Warp](https://infinitedevices.org/embeds/harmonic-warp.html): Interfering sine ripples that displace one another with the harmonics.
 - [Hyper Torus](https://infinitedevices.org/embeds/hyper-torus.html): A wireframe slice of a rotating 4D torus. Ring frequency follows the sound.
+- [Spectrum Bars](https://infinitedevices.org/embeds/spectrum-bars.html): Perspective equaliser bars with a floor reflection. Each bar follows a band of the sound.
+- [Kaleidoscope Mirror](https://infinitedevices.org/embeds/kaleidoscope-mirror.html): An eight-fold mirrored crystal. Bass spins it, highs sharpen the facets.
+- [Neon Matrix](https://infinitedevices.org/embeds/neon-matrix.html): A synthwave perspective floor under a low sun. The sun swells with the bass.
+- [Audio Waveform](https://infinitedevices.org/embeds/audio-waveform.html): A circular oscilloscope ribbon ringed by spectrum bars.
+- [Fractal Flame](https://infinitedevices.org/embeds/fractal-flame.html): A recursive, folded flame. Sound drives the fold and the glow.
 
 ## For AI agents
 

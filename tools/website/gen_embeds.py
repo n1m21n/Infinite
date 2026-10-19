@@ -5,7 +5,7 @@ What: rewrites the <head> and the controls of each website/embeds/<slug>.html (b
       accessible title, canonical link; the WebGL script in the page is kept), and writes website/embeds/index.html,
       the gallery, with the site's own header and footer and one canonical copy-paste snippet per widget.
 Why:  the widgets and the gallery were hand-edited copies that used the retired coral, outlines and em dashes, and
-      the gallery had no site menu. One manifest and one template keep the 11 widgets and the snippet identical.
+      the gallery had no site menu. One manifest and one template keep the widgets and the snippet identical.
 Usage: python3 tools/website/gen_embeds.py            then python3 tools/website/sync_chrome.py
        python3 tools/website/gen_embeds.py --check    exit 1 if a file differs
 Exit codes: 0 written (or in sync), 1 differs under --check, 2 a widget file or its script is missing.
