@@ -6,13 +6,13 @@ Official Python interface for **Infinite**, the free, open-source modular audiov
 
 ## Installation
 
-The package is not on PyPI yet. Run it from a checkout:
-
 ```bash
-git clone https://github.com/n1m21n/Infinite
-cd Infinite/tools/python_sdk
+pip install infinite-daw
 python3 -c "import infinite"
+infinite-init --dry-run   # adds the MCP server to Claude Desktop, Cursor and Windsurf
 ```
+
+From a checkout instead: `pip install -e tools/python_sdk`.
 
 The SDK needs the Infinite app. It finds it through `$INFINITE_BIN`, `/Applications/Infinite.app`, a build folder in the checkout, or `PATH`; on Windows and Linux set `INFINITE_BIN` to `Infinite.exe` / `Infinite`.
 

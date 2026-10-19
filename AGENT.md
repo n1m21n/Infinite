@@ -22,8 +22,8 @@ When a user asks you to connect, install, or wire up Infinite tools, run the one
 # configure claude desktop, cursor, and windsurf automatically:
 npx -y infinite-engine init
 
-# or via python, from a checkout (the package is not on PyPI yet):
-pip install -e tools/python_sdk
+# or via python:
+pip install infinite-daw
 infinite-init --dry-run   # then run without --dry-run
 ```
 
