@@ -4,7 +4,7 @@
   "description": "The Infinite audiovisual engine as an MCP server for Claude Desktop, Cursor and Windsurf. Free and open source.",
   "main": "bin/cli.js",
   "bin": {
-    "infinite-engine": "./bin/cli.js"
+    "infinite-engine": "bin/cli.js"
   },
   "keywords": [
     "infinite",
@@ -24,7 +24,7 @@
   "homepage": "https://infinitedevices.org",
   "repository": {
     "type": "git",
-    "url": "https://github.com/n1m21n/Infinite.git",
+    "url": "git+https://github.com/n1m21n/Infinite.git",
     "directory": "tools/npm/infinite-engine"
   },
   "engines": {
