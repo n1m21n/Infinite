@@ -1,0 +1,34 @@
+<div class="dev-wide">
+          <h2>The nine MCP tools</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+            <tbody>
+            <tr><td><code>infinite_render_video</code></td><td>Synthesise audio and render an MP4 from GLSL or a 2D sketch</td></tr>
+            <tr><td><code>infinite_render_frame</code></td><td>Render one PNG from a shader, sketch or .inf patch</td></tr>
+            <tr><td><code>infinite_validate_patch</code></td><td>Check a .inf file and report every problem</td></tr>
+            <tr><td><code>infinite_field_synth</code></td><td>Per-sample Field synth to a WAV</td></tr>
+            <tr><td><code>infinite_field_effect</code></td><td>Run audio through a Field effect kernel</td></tr>
+            <tr><td><code>infinite_field_notes</code></td><td>Algorithmic notes, such as Euclidean rhythms</td></tr>
+            <tr><td><code>infinite_sketch_3d</code></td><td>Procedural 3D meshes from a JavaScript sketch</td></tr>
+            <tr><td><code>infinite_field_primitive</code></td><td>Parametric 3D surfaces from uv to P, N, Cd</td></tr>
+            <tr><td><code>infinite_field_modifier</code></td><td>Deform and shade a mesh with a Field modifier</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+
+        <div class="dev-wide">
+          <h2>What you need</h2>
+          <ul class="dev-list">
+            <li>The Infinite app installed. The SDK and the MCP server find it through the <code>INFINITE_BIN</code> environment variable, <code>/Applications/Infinite.app</code>, a build folder in the checkout, or your <code>PATH</code>. On Windows and Linux, set <code>INFINITE_BIN</code> to the path of <code>Infinite.exe</code> or <code>Infinite</code>.</li>
+            <li>Python 3.8 or newer. Nothing else to install: the SDK has no dependencies.</li>
+            <li>The Python package is not on PyPI yet, so <code>pip install</code> will not find it. Use the checkout.</li>
+            <li>Hardware inputs, such as a microphone or camera, are refused in headless mode.</li>
+          </ul>
+        </div>
+
+        <div class="dev-wide">
+          <h2>For web builders</h2>
+          <p>Putting a visual on a page needs no install. <a href="embeds/">Embeds</a> has 11 audio-reactive widgets and one iframe to copy for each. Agents can read the whole site as plain text in <a href="llms.txt">llms.txt</a>, and the repository carries an <a href="https://github.com/n1m21n/Infinite/blob/main/AGENT.md" target="_blank" rel="noopener">agent guide</a>.</p>
+        </div>
+
+        <p class="blog-feed">Credit when you share what you make: "Infinite, by Naman Soni (n1m21n), https://infinitedevices.org". Every tool result carries the same line.</p>

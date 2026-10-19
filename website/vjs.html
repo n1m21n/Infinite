@@ -24,10 +24,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="brand.css?v=3">
-  <link rel="stylesheet" href="style.css?v=84">
+  <link rel="stylesheet" href="style.css?v=85">
   <link rel="stylesheet" href="glass.css?v=4">
   <link rel="stylesheet" href="blog.css?v=2">
-  <link rel="stylesheet" href="audience.css?v=1">
+  <link rel="stylesheet" href="audience.css?v=7">
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite for VJs: live visuals that follow the music", "url": "https://infinitedevices.org/vjs.html", "description": "Sound-driven visuals with Syphon, Spout and NDI out, Show Set patch switching on the bar, a show lock and a panic key. Free.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}</script>
   <script>document.documentElement.classList.add('js-reveal')</script>
 </head>
@@ -67,6 +67,7 @@
         <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
         <div class="nav-menu" id="nav-menu-learn">
           <a href="index.html#learn">Get started</a>
+          <a href="philosophy.html">Philosophy</a>
           <a href="blog/">Blog</a>
           <a href="assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Node reference</a>
           <a href="assets/Field_Language_Manual.pdf" target="_blank" rel="noopener">Field language</a>
@@ -99,18 +100,24 @@
     </div>
   </header>
 
+
   <main>
-    <section class="section aud-hero">
-      <div class="container">
-        <span class="blog-hand hand">perform</span>
-        <h1 class="slab">Infinite for VJs</h1>
-        <p class="lead">Run visuals that follow the sound, send them to a projector or another app, and switch patches on the bar without a black frame. Built to stay up for a whole set.</p>
-        <div class="aud-cta">
-          <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
-          <a href="blog/free-touchdesigner-alternative-for-audio-reactive-visuals.html" class="btn btn-ghost">Coming from TouchDesigner?</a>
+    <section class="ah">
+      <div class="container ah-grid">
+        <div class="ah-text">
+          <span class="blog-hand hand">perform</span>
+          <h1 class="slab">Infinite for VJs</h1>
+          <p class="lead">Run visuals that follow the sound, send them to a projector or another app, and switch patches on the bar without a black frame. Built to stay up for a whole set.</p>
+          <div class="aud-cta">
+            <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
+            <a href="blog/free-touchdesigner-alternative-for-audio-reactive-visuals.html" class="btn btn-ghost">Coming from TouchDesigner?</a>
+          </div>
+          <ul class="facts"><li>Syphon, Spout, NDI</li><li>Switch on the bar</li><li>Show lock and panic</li></ul>
         </div>
-        <div class="patch" role="img" aria-label="A patch: Video into Trails into Colour into Syphon Out">
-          <div class="patch-node" style="--i:0;--c:#4ADE80"><span class="cat">Source</span><b>Video</b><span class="knob" aria-hidden="true"><i style="--r:-40deg;--i:0"></i><i style="--r:20deg;--i:1"></i><i style="--r:70deg;--i:2"></i></span></div><span class="cable" style="--i:1" aria-hidden="true"></span><div class="patch-node" style="--i:1;--c:#818CF8"><span class="cat">Compositing</span><b>Trails</b><span class="knob" aria-hidden="true"><i style="--r:-40deg;--i:1"></i><i style="--r:20deg;--i:2"></i><i style="--r:70deg;--i:3"></i></span></div><span class="cable" style="--i:2" aria-hidden="true"></span><div class="patch-node" style="--i:2;--c:#FACC15"><span class="cat">Effects</span><b>Colour</b><span class="knob" aria-hidden="true"><i style="--r:-40deg;--i:2"></i><i style="--r:20deg;--i:3"></i><i style="--r:70deg;--i:4"></i></span></div><span class="cable" style="--i:3" aria-hidden="true"></span><div class="patch-node" style="--i:3;--c:#A3A9BA"><span class="cat">Output</span><b>Syphon Out</b></div>
+        <div class="vstage">
+          <canvas data-shader="pulse" aria-hidden="true"></canvas>
+          <span class="vstage-float"><img class="vstage-3d" src="assets/3d/node_hero.webp" alt="A 3D render of an Infinite node with a cable" width="700" height="438" decoding="async"></span>
+          <span class="vstage-tag">live shader · move the pointer</span>
         </div>
       </div>
     </section>
@@ -119,10 +126,29 @@
       <section class="aud-section">
         <h2>What you get</h2>
         <div class="aud-grid">
-          <article class="aud-card reveal" style="--i:0"><h3>Send it anywhere</h3><p>Syphon on macOS, Spout on Windows and NDI over the network, in and out, so Infinite can feed a projector, a mixer or another app.</p></article>
-          <article class="aud-card reveal" style="--i:1"><h3>Switch on the bar</h3><p>Show Set steps through patches with PageDown and PageUp, a MIDI program change or OSC. The switch lands on the next bar, the old sound fades under the new, and the projector never goes black.</p></article>
-          <article class="aud-card reveal" style="--i:2"><h3>Safe on stage</h3><p>Show lock stops accidental deletes and drags while knobs still play. Panic silences everything and freezes the projectors. A pre-show check lists missing media, plugins and MIDI devices.</p></article>
+          <article class="aud-card reveal" style="--i:0"><span class="num">01</span><h3>Send it anywhere</h3><p>Syphon on macOS, Spout on Windows and NDI over the network, in and out, so Infinite can feed a projector, a mixer or another app.</p></article>
+          <article class="aud-card reveal" style="--i:1"><span class="num">02</span><h3>Switch on the bar</h3><p>Show Set steps through patches with PageDown and PageUp, a MIDI program change or OSC. The switch lands on the next bar, the old sound fades under the new, and the projector never goes black.</p></article>
+          <article class="aud-card reveal" style="--i:2"><span class="num">03</span><h3>Safe on stage</h3><p>Show lock stops accidental deletes and drags while knobs still play. Panic silences everything and freezes the projectors. A pre-show check lists missing media, plugins and MIDI devices.</p></article>
         </div>
+      </section>
+
+      <section class="aud-section reveal">
+        <h2>A rig in five nodes</h2>
+        <p class="sec-sub">Pictures in, sound to drive them, effects, then out to the projector.</p>
+        <div class="bench"><div class="bench-row"><figure class="bn"><img src="assets/nodes/video.png" alt="The Video node as it looks in Infinite" loading="lazy" decoding="async"><figcaption><b>Video</b><span>Hardware-accelerated video in.</span></figcaption></figure><figure class="bn"><img src="assets/nodes/audio-analyze.png" alt="The Audio Analyze node as it looks in Infinite" loading="lazy" decoding="async"><figcaption><b>Audio Analyze</b><span>Turns sound into numbers a knob can follow.</span></figcaption></figure><figure class="bn"><img src="assets/nodes/trails.png" alt="The Trails node as it looks in Infinite" loading="lazy" decoding="async"><figcaption><b>Trails</b><span>A fading trail on every beat.</span></figcaption></figure><figure class="bn"><img src="assets/nodes/syphon-out.png" alt="The Syphon Out node as it looks in Infinite" loading="lazy" decoding="async"><figcaption><b>Syphon Out</b><span>Send the picture to another app on macOS.</span></figcaption></figure><figure class="bn"><img src="assets/nodes/ndi-out.png" alt="The NDI Out node as it looks in Infinite" loading="lazy" decoding="async"><figcaption><b>NDI Out</b><span>Send it over the network.</span></figcaption></figure></div>
+          <p class="bench-note">screenshots from the app, shown at their own size</p></div>
+      </section>
+      <section class="aud-section reveal">
+        <div class="lab" data-lab="show">
+          <div class="lab-view"><canvas aria-label="Beat-driven visuals that switch scene on the bar" role="img"></canvas></div>
+          <div class="lab-side"><h3>Switch on the bar</h3><p>Tap a scene while the beat runs. It waits for the next bar and then fades in, the way Show Set switches patches. Change the tempo and the visuals follow.</p><div class="ctl"><label for="c-bpm">Tempo</label><output for="c-bpm"></output><input id="c-bpm" type="range" min="0" max="1000" step="1" value="500" data-fmt="1" data-lo="60" data-hi="180" data-dp="0" data-unit=" BPM"></div><div class="pads"><button class="pad live" type="button"><span>Tunnel</span><small>scene 1</small></button><button class="pad" type="button"><span>Kaleidoscope</span><small>scene 2</small></button><button class="pad" type="button"><span>Grid</span><small>scene 3</small></button></div>
+            <div class="beats" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><span class="bar-state" aria-live="polite">Playing scene 1</span></div><p class="lab-note">A browser demo of the idea. In the app each scene is a whole patch.</p></div></div>
+      </section>
+
+      <section class="aud-section reveal">
+        <div class="sec-head"><div><h2>Looks to start from</h2><p class="sec-sub">Free patches with a picture of the result.</p></div>
+          <div class="reel-ctl"><button class="reel-btn reel-prev" type="button" aria-label="Scroll back">&#8592;</button><button class="reel-btn reel-next" type="button" aria-label="Scroll forward">&#8594;</button></div></div>
+        <div class="reel-wrap"><div class="reel"><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/glitch-feedback.webp" alt="Glitch feedback" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Glitch feedback</figcaption></figure><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/trail-glitch.webp" alt="Trail glitch" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Trail glitch</figcaption></figure><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/occult-mandala.webp" alt="Occult mandala" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Occult mandala</figcaption></figure><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/lens-spectral.webp" alt="Lens spectral" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Lens spectral</figcaption></figure><figure><a class="frame" style="--ar:640 / 640" href="library.html"><img src="assets/community/terrain-mandala.webp" alt="Terrain mandala" width="640" height="640" loading="lazy" decoding="async"></a><figcaption>Terrain mandala</figcaption></figure><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/layered-blends.webp" alt="Layered blends" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Layered blends</figcaption></figure></div></div>
       </section>
 
       <section class="aud-section reveal">
@@ -140,13 +166,14 @@
       <section class="aud-section reveal">
         <h2>Infinite for everyone else</h2>
         <div class="aud-others">
-          <a href="developers.html">developers</a>
           <a href="artists.html">artists</a>
           <a href="musicians.html">musicians</a>
           <a href="creative-coders.html">creative coders and technologists</a>
+          <a href="developers.html">developers</a>
         </div>
       </section>
     </div>
+    
   </main>
 
   <footer class="site-footer">
@@ -197,6 +224,7 @@
         <div class="footer-col">
           <p class="footer-h">Learn</p>
           <a href="index.html#learn">Get started</a>
+          <a href="philosophy.html">Philosophy</a>
           <a href="blog/">Blog</a>
           <a href="assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Node reference manual (PDF)</a>
           <a href="assets/Field_Language_Manual.pdf" target="_blank" rel="noopener">Field language manual (PDF)</a>
@@ -221,6 +249,7 @@
     </div>
   </footer>
   <script src="site.js?v=13" defer></script>
+  <script src="audience.js?v=5" defer></script>
   <script>
     (function () {
       var els = document.querySelectorAll('.reveal');

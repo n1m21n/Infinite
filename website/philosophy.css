@@ -1,0 +1,106 @@
+/* Philosophy page (made by tools/website/gen_philosophy.py, behaviour in philosophy.js). Shares the hero with audience.css.
+   Midnight figures on a Paper page; Signal for structure; one Ember thing moving at a time. Cards 24 (20 on phones), pills for controls. */
+.phil .ptext { display: grid; gap: 14px; max-width: 40em; }
+.phil .ptext p, .phil .sec-sub { margin: 0; color: var(--ink2); line-height: 1.65; font-size: 1.02rem; }
+.phil .sec-sub { margin-bottom: 24px; }
+.phil #mission .blog-hand { display: block; font-size: clamp(1.8rem, 3.5vw, 2.4rem); }
+.phil #mission h2 { max-width: 20em; margin-bottom: 20px; }
+.phil .aud-grid.four { margin-top: clamp(24px, 4vw, 40px); }
+@media (min-width: 760px) { .phil .aud-grid.four { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1100px) { .phil .aud-grid.four { grid-template-columns: repeat(4, 1fr); } }
+.inline { color: var(--signal); text-underline-offset: 3px; font-weight: 600; }
+
+.who-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 640px) { .who-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1000px) { .who-grid { grid-template-columns: repeat(5, 1fr); } }
+.who-card { display: flex; flex-direction: column; gap: 6px; padding: 20px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-1); color: var(--ink); text-decoration: none; transition: transform 333ms var(--ease-out, ease), box-shadow 333ms; }
+.who-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+.who-card .hand { font-size: 1.5rem; line-height: 1; color: var(--accent-ink); }
+.who-card b { font-size: 1.05rem; letter-spacing: -0.02em; }
+.who-card span:last-child { color: var(--ink2); font-size: 0.88rem; line-height: 1.45; }
+@media (max-width: 600px) { .who-card { border-radius: 20px; } }
+
+.split { display: grid; gap: clamp(24px, 4vw, 56px); align-items: center; }
+@media (min-width: 900px) { .split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); } .split.flip { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+.split-text h2 { margin: 0 0 18px; font-size: var(--fs-h2); font-weight: 750; letter-spacing: -0.03em; }
+
+/* the mind that becomes a patch */
+.mind { margin: 0; position: relative; background: #0D1020; border-radius: var(--r-lg); box-shadow: var(--shadow-2); padding: clamp(14px, 2.4vw, 28px); color: #EEF1FA; }
+@media (max-width: 600px) { .mind { border-radius: 20px; } }
+.seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: var(--r-pill); background: #151930; margin-bottom: 8px; }
+.seg button { min-height: 40px; padding: 0 18px; border-radius: var(--r-pill); background: transparent; color: rgba(238, 241, 250, 0.7); font: 600 0.85rem 'Geist', system-ui, sans-serif; cursor: pointer; transition: background-color 188ms, color 188ms; }
+.seg button[aria-pressed=true] { background: #20263F; color: #EEF1FA; }
+.seg button:focus-visible, .mnode:focus-visible, .spring:focus-visible, .faq-item summary:focus-visible { outline: 2px solid #A7B1FF; outline-offset: 2px; }
+.mind-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.mind-svg .edge { fill: none; stroke: #A7B1FF; stroke-width: 2; stroke-linecap: round; opacity: 0.4; transition: opacity 333ms var(--ease-out, ease); }
+.mind-svg .mnode { cursor: pointer; outline: none; transition: opacity 333ms var(--ease-out, ease); }
+.mind-svg .mnode circle, .mind-svg .mnode rect { fill: #20263F; transition: opacity 333ms var(--ease-out, ease), fill 188ms; }
+.mind-svg .mnode text { font: 600 13.5px 'Geist', system-ui, sans-serif; fill: #EEF1FA; pointer-events: none; transition: opacity 333ms var(--ease-out, ease); }
+.mind-svg .mnode .sh-patch, .mind-svg .mnode .l-patch { opacity: 0; }
+.mind[data-view=patch] .mnode .sh-patch, .mind[data-view=patch] .mnode .l-patch { opacity: 1; }
+.mind[data-view=patch] .mnode .sh-mind, .mind[data-view=patch] .mnode .l-mind { opacity: 0; }
+.mind-svg .thought { fill: #FF6B35; filter: drop-shadow(0 0 6px rgba(255, 107, 53, 0.65)); }
+.mind-svg.focus .edge { opacity: 0.1; }
+.mind-svg.focus .mnode { opacity: 0.35; }
+.mind-svg.focus .edge.on { opacity: 0.95; }
+.mind-svg.focus .mnode.on { opacity: 1; }
+.mind-svg .mnode:hover circle, .mind-svg .mnode:hover rect, .mind-svg .mnode:focus-visible circle, .mind-svg .mnode:focus-visible rect { fill: #2A3052; }
+.mind-cap { margin: 8px 2px 0; height: 6em; overflow: hidden; font: 500 0.78rem/1.5 'Geist Mono', ui-monospace, monospace; color: rgba(167, 177, 255, 0.9); letter-spacing: 0.02em; }
+
+/* the loop from the mark */
+.loop-fig { margin: 0; background: #0D1020; border-radius: var(--r-lg); box-shadow: var(--shadow-2); padding: clamp(16px, 3vw, 32px); color: rgba(238, 241, 250, 0.8); }
+@media (max-width: 600px) { .loop-fig { border-radius: 20px; } }
+.loop-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.loop-line { fill: none; stroke: #A7B1FF; stroke-width: 3; stroke-linejoin: round; opacity: 0.85; }
+.loop-dot { fill: #FF6B35; filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.6)); }
+.loop-t { font: 500 13px 'Geist Mono', ui-monospace, monospace; letter-spacing: 0.06em; }
+.t-human { fill: #FF9878; }
+.t-struct { fill: #A7B1FF; }
+.loop-fig figcaption { margin-top: 14px; font-size: 0.88rem; line-height: 1.55; }
+
+/* principles and springs */
+.principles { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: p; }
+.principles li { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 18px 22px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-1); }
+@media (min-width: 760px) { .principles li { grid-template-columns: 12rem 1fr; align-items: baseline; gap: 24px; } }
+.principles b { font-size: 1.1rem; letter-spacing: -0.02em; }
+.principles span { color: var(--ink2); line-height: 1.55; }
+.springs-card { display: grid; gap: 20px; margin-top: 20px; padding: clamp(20px, 3vw, 32px); border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-1); }
+@media (min-width: 900px) { .springs-card { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); align-items: center; } }
+.springs-card h3 { margin: 0 0 8px; font-size: 1.2rem; letter-spacing: -0.02em; }
+.springs-card p { margin: 0; color: var(--ink2); line-height: 1.55; font-size: 0.95rem; }
+.springs { display: grid; gap: 8px; }
+.spring { display: grid; grid-template-columns: 4.5rem 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 12px; row-gap: 6px; min-height: 64px; padding: 8px 16px; border-radius: var(--r-pill); background: var(--deep); cursor: pointer; text-align: left; color: var(--ink); }
+.spring-name { grid-row: 1 / 3; font: 600 0.85rem 'Geist Mono', ui-monospace, monospace; }
+.spring-track { position: relative; height: 28px; display: block; }
+.spring-track::before { content: ""; position: absolute; left: 0; right: 0; top: 13px; height: 2px; border-radius: 2px; background: var(--signal); opacity: 0.35; }
+.spring-dot { position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); transition: left var(--spring-slab-ms, 462ms) var(--spring-slab, ease-out); }
+.spring[data-spring=letter] .spring-dot { transition-duration: var(--spring-letter-ms, 414ms); transition-timing-function: var(--spring-letter, ease-out); }
+.spring[data-spring=soft] .spring-dot { transition-duration: var(--spring-soft-ms, 305ms); transition-timing-function: var(--spring-soft, ease-out); }
+.spring[data-spring=press] .spring-dot { transition-duration: var(--spring-press-ms, 266ms); transition-timing-function: var(--spring-press, ease-out); }
+.spring.go .spring-dot { left: calc(100% - 28px); }
+.spring-note { grid-column: 2; font: 500 0.68rem/1 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.03em; }
+
+/* faq */
+.faq { display: grid; gap: 10px; max-width: 52em; }
+.faq-item { border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-1); padding: 0 22px; }
+.faq-item summary { list-style: none; cursor: pointer; min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-weight: 650; letter-spacing: -0.01em; }
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after { content: "+"; font: 500 1.4rem/1 'Geist Mono', ui-monospace, monospace; color: var(--signal); transition: transform 188ms var(--ease-out, ease); }
+.faq-item[open] summary::after { transform: rotate(45deg); }
+.faq-item p { margin: 0 0 20px; color: var(--ink2); line-height: 1.65; }
+.cta-end { text-align: center; }
+.cta-end .sec-sub { margin: 0 auto 20px; }
+.cta-end .aud-cta { justify-content: center; }
+@media (max-width: 600px) { .faq-item, .principles li, .springs-card { border-radius: 20px; } }
+@media (prefers-reduced-motion: reduce) { .mind-svg *, .spring-dot, .faq-item summary::after { transition: none !important; } }
+
+.pull { margin: 0; padding: clamp(24px, 4vw, 44px); border-radius: var(--r-lg); background: #0D1020; color: #EEF1FA; box-shadow: var(--shadow-2); }
+.pull p { margin: 0 0 20px; font-size: clamp(1.6rem, 3.2vw, 2.4rem); font-weight: 750; letter-spacing: -0.035em; line-height: 1.12; }
+.pull ul { margin: 0 0 24px; padding: 0; list-style: none; display: grid; gap: 8px; color: #A7B1FF; font: 500 0.9rem/1.4 'Geist Mono', ui-monospace, monospace; }
+.pull cite { font: 500 0.72rem/1 'Geist Mono', ui-monospace, monospace; letter-spacing: 0.06em; color: rgba(238, 241, 250, 0.6); font-style: normal; text-transform: lowercase; }
+@media (max-width: 600px) { .pull { border-radius: 20px; } }
+@media (max-width: 600px) {
+  .mind-svg .mnode text { font-size: 17px; }
+  .mind-svg .mnode circle, .mind-svg .mnode rect { transform-box: fill-box; transform-origin: center; transform: scale(1.25); }
+  .loop-t { font-size: 22px; }
+}

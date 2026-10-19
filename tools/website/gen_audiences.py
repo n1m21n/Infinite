@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Builds the audience pages: artists, musicians, VJs, creative coders (developers.html is hand-written).
+"""Builds the audience pages: artists, musicians, VJs, creative coders and developers.
 
-What: writes website/artists.html, musicians.html, vjs.html and creative-coders.html from the AUDIENCES table below:
-      a hero with a live patch strip (nodes, cables, a travelling dot), three cards of what the person gets,
-      starting points that link to real library pages, and the other audiences. Styles are website/audience.css.
+What: writes website/artists.html, musicians.html, vjs.html, creative-coders.html and developers.html from the AUDIENCES table below:
+      a hero with a live WebGL shader and a 3D render, three cards, a bench of real node screenshots, a lab you can play with,
+      a reel of real patches, starting points that link to library pages, and the other audiences.
+      Styles are website/audience.css and behaviour is website/audience.js; the developers page also reads tools/website/developers_body.html.
 Why:  one page per audience so people and agents land on their own use of Infinite. One template keeps motion,
       layout and brand identical; the facts live in one table that can be checked against the README.
 Usage: python3 tools/website/gen_audiences.py     then python3 tools/website/sync_chrome.py
@@ -26,44 +27,109 @@ AUDIENCES = [
      "title": "Infinite for artists: images that move, made on one canvas",
      "h1": "Infinite for artists", "desc": "Layer shapes, video and 3D, add trails and glitch, and let sound move it. Free for macOS, Windows and Linux.",
      "lead": "Build images that move. Layer shapes, video and 3D, smear them with trails, and let a sound or an LFO move any knob. No code to start; code when you want it.",
-     "flow": [("Source", "Shapes", "knobs"), ("Effects", "Glitch", "knobs"), ("Compositing", "Trails", "knobs"), ("Utility", "Output", "")],
+     "facts": ["Free", "macOS, Windows, Linux", "No code to start"],
+     "hero": {"shader": "ink", "img": "brand_ball", "alt": "A 3D iridescent ball, the Infinite brand ball", "tall": False},
      "cards": [("32 blend modes", "Stack any picture on any other: images, folders of stills, hardware-accelerated video, camera, paint and noise ramps."),
                ("3D with real materials", "Procedural geometry, lights and a Render 3D node, so a shape can turn, instance and throw shadows in real time."),
                ("Write a picture as a formula", "Field Pixel and the live GLSL editor turn a few lines into a shader. Presets show how, and every value can be modulated.")],
+     "bench": {"title": "Nodes you will patch first", "sub": "Each box is a node. Cables carry pictures from one to the next, and every number on it is a knob.",
+               "items": [("shape", "Shape", "Draw a shape with fill, stroke and feather."), ("blend", "Blend", "Stack one picture on another with 32 blend modes."), ("trails", "Trails", "Leave a fading trail: decay, zoom, rotate and hue shift."),
+                         ("glitch", "Glitch", "Tear the picture into slices. Amount, speed and seed."), ("kaleidoscope", "Kaleidoscope", "Mirror the picture into segments.")]},
+     "lab": {"kind": "shader", "shader": "orb", "s": 0, "title": "Turn a knob, change the picture",
+             "text": "This orb is the Iridescent Orb preset from the library, running here as a shader. In Infinite every value below is a knob you can also hand to an LFO or to a sound.",
+             "ctl": [("size", "Size", 455, 0.05, 0.6, 2, ""), ("wobble", "Wobble", 267, 0.0, 0.15, 2, "")],
+             "code": "param float size = 0.3 [0.05, 0.6];\nparam float wobble = 0.04 [0.0, 0.15];\n// ...\nrad = size * (1.0 + wobble * sin(3.0 * ang + t * 1.1)\n  + wobble * 0.5 * sin(5.0 * ang - t * 1.3));\nedge = 1.0 - smoothstep(rad - aa, rad, r);",
+             "note": "Field source from the Iridescent Orb preset. The canvas is the same formula as WebGL."},
+     "reel": {"title": "Made in Infinite", "sub": "Pieces from the art gallery and starting points from the library.", "href": "artworks.html",
+              "items": [("assets/museum/06.jpg", 720, 960, "From the art gallery"), ("assets/library/previews/iridescent-orb.jpg", 900, 600, "Iridescent orb, library"), ("assets/museum/10.jpg", 720, 960, "From the art gallery"),
+                        ("assets/library/previews/liquid-glass.jpg", 900, 600, "Liquid glass, library"), ("assets/museum/08.jpg", 720, 960, "From the art gallery"), ("assets/library/previews/ordered-dither.jpg", 900, 600, "Ordered dither, library"), ("assets/museum/02.jpg", 720, 960, "From the art gallery")]},
      "start": [("first-image", "First image"), ("layered-blends", "Layered blends"), ("glitch-feedback", "Glitch feedback"), ("iridescent-orb", "Iridescent orb"), ("trail-glitch", "Trail glitch")],
      "extra": ("artworks.html", "See the art gallery")},
     {"slug": "musicians", "name": "musicians", "hand": "play",
      "title": "Infinite for musicians: synths, effects and plugins in one graph",
      "h1": "Infinite for musicians", "desc": "Wavetable, FM, analog and string synths, tape delay, convolution reverb, VST3 and AU hosting, and modulation on every knob.",
      "lead": "Patch a sound the way you think about it. Notes go into a synth, the synth into effects, and any knob can be moved by an LFO, an envelope or something you can see.",
-     "flow": [("Notes", "MIDI Notes", "knobs"), ("Synths", "Wavetable", "knobs"), ("Audio FX", "Delay", "knobs"), ("Utility", "Audio Out", "")],
+     "facts": ["VST3 and AU hosting", "MPE notes", "79 effect presets"],
+     "hero": {"shader": "wave", "img": "node_lfo", "alt": "A 3D render of the LFO node", "tall": False},
      "cards": [("Synths with depth", "Wavetable, FM with four operators, Analog, a modelled String, Partials resynthesis and a Metallic resonator. Chords on Analog cost about a third of the CPU they did before v0.6."),
                ("Effects that colour", "Saturator with three stages, Convolution Reverb you design or load, tape Delay with wow and flutter, Dynamics in clean, bus, opto and FET styles, and 79 factory presets."),
                ("Your plugins, modulated", "Host VST3 and Audio Unit plugins, give them a sidechain, and move their knobs with LFOs, MSEG, envelopes or audio. MPE notes reach each voice.")],
+     "bench": {"title": "A signal chain, node by node", "sub": "Notes in, a voice, colour, then out. Each node is one job, and each knob can be modulated.",
+               "items": [("midi-notes", "MIDI Notes", "Notes go into the graph from here."), ("analog", "Analog", "Oscillators, a filter and an envelope in one voice."), ("fm", "FM", "Four operators."),
+                         ("delay", "Delay", "Tape delay with wow and flutter."), ("dynamics", "Dynamics", "Clean, bus, opto and FET styles."), ("lfo", "LFO", "Moves any knob in the patch.")]},
+     "lab": {"kind": "synth", "title": "Move the cutoff, then let an LFO move it",
+             "text": "A sawtooth through a low-pass filter. Drag the cutoff to hear the shape change, then raise the LFO and watch the knob move itself. In Infinite this is a Field Synth, a filter and an LFO node.",
+             "ctl": [("cut", "Cutoff", 550, 80, 7240, 0, " Hz"), ("lfo", "LFO amount", 400, 0, 100, 0, "%")],
+             "code": "state float phase = 0\nphase = (phase + freq / sr) % 1.0\nsaw = phase * 2.0 - 1.0\nout = saw * 0.4 * gate",
+             "note": "The four lines are a Field Synth. This demo uses your browser's audio, so you can hear the idea."},
+     "reel": {"title": "Patches to open", "sub": "Each is a free patch with a picture of the graph.", "href": "library.html",
+              "items": [("assets/community/pad-wash.webp", 960, 600, "Pad wash"), ("assets/community/delay-wash.webp", 960, 600, "Delay wash"), ("assets/community/drum-reverb.webp", 960, 600, "Drum reverb"),
+                        ("assets/community/stretched-sampler.webp", 960, 600, "Stretched sampler"), ("assets/community/oscillator-reverb.webp", 960, 600, "Oscillator reverb"), ("assets/community/filtered-mixer.webp", 960, 600, "Filtered mixer")]},
      "start": [("first-sound", "First sound"), ("synths", "Synths"), ("audio-effects", "Audio effects"), ("pad-wash", "Pad wash"), ("delay-wash", "Delay wash"), ("stretched-sampler", "Stretched sampler")],
      "extra": ("blog/modulate-vst3-plugins-with-visuals-and-lfos.html", "Modulate a plugin: the guide")},
     {"slug": "vjs", "name": "VJs", "hand": "perform",
      "title": "Infinite for VJs: live visuals that follow the music",
      "h1": "Infinite for VJs", "desc": "Sound-driven visuals with Syphon, Spout and NDI out, Show Set patch switching on the bar, a show lock and a panic key. Free.",
      "lead": "Run visuals that follow the sound, send them to a projector or another app, and switch patches on the bar without a black frame. Built to stay up for a whole set.",
-     "flow": [("Source", "Video", "knobs"), ("Compositing", "Trails", "knobs"), ("Effects", "Colour", "knobs"), ("Output", "Syphon Out", "")],
+     "facts": ["Syphon, Spout, NDI", "Switch on the bar", "Show lock and panic"],
+     "hero": {"shader": "pulse", "img": "node_hero", "alt": "A 3D render of an Infinite node with a cable", "tall": False},
      "cards": [("Send it anywhere", "Syphon on macOS, Spout on Windows and NDI over the network, in and out, so Infinite can feed a projector, a mixer or another app."),
                ("Switch on the bar", "Show Set steps through patches with PageDown and PageUp, a MIDI program change or OSC. The switch lands on the next bar, the old sound fades under the new, and the projector never goes black."),
                ("Safe on stage", "Show lock stops accidental deletes and drags while knobs still play. Panic silences everything and freezes the projectors. A pre-show check lists missing media, plugins and MIDI devices.")],
+     "bench": {"title": "A rig in five nodes", "sub": "Pictures in, sound to drive them, effects, then out to the projector.",
+               "items": [("video", "Video", "Hardware-accelerated video in."), ("audio-analyze", "Audio Analyze", "Turns sound into numbers a knob can follow."), ("trails", "Trails", "A fading trail on every beat."),
+                         ("syphon-out", "Syphon Out", "Send the picture to another app on macOS."), ("ndi-out", "NDI Out", "Send it over the network.")]},
+     "lab": {"kind": "show", "title": "Switch on the bar",
+             "text": "Tap a scene while the beat runs. It waits for the next bar and then fades in, the way Show Set switches patches. Change the tempo and the visuals follow.",
+             "ctl": [("bpm", "Tempo", 500, 60, 180, 0, " BPM")],
+             "pads": ["Tunnel", "Kaleidoscope", "Grid"],
+             "note": "A browser demo of the idea. In the app each scene is a whole patch."},
+     "reel": {"title": "Looks to start from", "sub": "Free patches with a picture of the result.", "href": "library.html",
+              "items": [("assets/community/glitch-feedback.webp", 960, 600, "Glitch feedback"), ("assets/community/trail-glitch.webp", 960, 600, "Trail glitch"), ("assets/community/occult-mandala.webp", 960, 600, "Occult mandala"),
+                        ("assets/community/lens-spectral.webp", 960, 600, "Lens spectral"), ("assets/community/terrain-mandala.webp", 640, 640, "Terrain mandala"), ("assets/community/layered-blends.webp", 960, 600, "Layered blends")]},
      "start": [("first-music-image", "Moves with the music"), ("glitch-feedback", "Glitch feedback"), ("trail-glitch", "Trail glitch"), ("occult-mandala", "Occult mandala"), ("lens-spectral", "Lens spectral")],
      "extra": ("blog/free-touchdesigner-alternative-for-audio-reactive-visuals.html", "Coming from TouchDesigner?")},
     {"slug": "creative-coders", "name": "creative coders and technologists", "hand": "code",
      "title": "Infinite for creative coders and technologists: Field, sketches and shaders",
      "h1": "Infinite for creative coders", "desc": "Write shaders, per-sample audio kernels, 3D surfaces and JavaScript sketches in one node graph with live feedback. Free and open source.",
      "lead": "Write what a node does. Field is Infinite's own small language: one program can be a shader, a synth, an effect, a note pattern or a mesh deformer, and the compiler works out where it runs.",
-     "flow": [("Field", "Field Pixel", "knobs"), ("Modulators", "LFO", "knobs"), ("3D", "Render 3D", ""), ("Utility", "Output", "")],
+     "facts": ["Field language", "JavaScript sketches", "OSC on 127.0.0.1:9100"],
+     "hero": {"shader": "dots", "img": "node_field_pixel", "alt": "A 3D render of the Field Pixel node", "tall": False},
      "cards": [("One language, many nodes", "Field Pixel, Field Synth, Field Effect, Field Notes, Field Primitive and Field Modifier share one syntax. Types and rates are inferred, so a sine reads the same on the GPU and at 48 kHz."),
                ("JavaScript sketches", "A Sketch node draws 2D images from JavaScript, and a 3D sketch builds meshes. The library has Lorenz and Clifford attractors, Lotka-Volterra and Rule 110, running live."),
                ("Everything can be driven", "Modulate any knob, script a patch over OSC on 127.0.0.1:9100, or render it headless from the command line. Patches are plain text.")],
-     "code": 'state float phase = 0\nphase = (phase + freq / sr) % 1.0\nsaw = phase * 2.0 - 1.0\nout = saw * 0.4 * gate',
-     "code_note": "A Field Synth: a per-sample sawtooth. The same four lines run in a Field Synth node and in headless renders.",
+     "bench": {"title": "Where your code runs", "sub": "Each of these nodes takes a few lines of Field or JavaScript.",
+               "items": [("fieldpixel", "Field Pixel", "A shader in a few lines."), ("field-synth", "Field Synth", "A per-sample audio kernel."), ("field-modifier", "Field Modifier", "Deform and shade a mesh."),
+                         ("sketch", "Sketch", "Draw from JavaScript."), ("render-3d", "Render 3D", "Lights, materials and shadows.")]},
+     "lab": {"kind": "shader", "shader": "dots", "s": 1, "title": "Change two numbers",
+             "text": "This is the Phyllotaxis Bloom preset from the library: each seed sits at the golden angle from the last. Change the seed count and the turn, the two params the preset exposes.",
+             "ctl": [("turn", "turn", 544, -90, 90, 0, " deg/s"), ("seeds", "seeds", 250, 60, 1500, 0, "")],
+             "code": "param float seeds = 420.0 [60.0, 1500.0];\nparam float turn = 8.0 [-90.0, 90.0];\n// ...\nsc = 0.46 / sqrt(seeds);\nrot = turn * 0.0174533 * t;\nsa0 = kk0 * 2.399963 + rot;   // golden angle",
+             "note": "Abridged Field source from the Phyllotaxis Bloom preset. The canvas is the same formula as WebGL."},
+     "reel": {"title": "Maths you can open", "sub": "Each one is a free patch that runs live.", "href": "library.html",
+              "items": [("assets/library/previews/lorenz-attractor.jpg", 900, 600, "Lorenz attractor"), ("assets/library/previews/clifford-attractor.jpg", 900, 600, "Clifford attractor"), ("assets/library/previews/rule-110.jpg", 900, 600, "Rule 110"),
+                        ("assets/library/previews/lotka-volterra.jpg", 900, 600, "Lotka-Volterra"), ("assets/library/previews/scale-free-network.jpg", 900, 600, "Scale-free network"), ("assets/library/previews/phyllotaxis-bloom.jpg", 900, 600, "Phyllotaxis bloom")]},
      "start": [("field", "Field templates"), ("lorenz-attractor", "Lorenz attractor"), ("clifford-attractor", "Clifford attractor"), ("rule-110", "Rule 110"), ("lotka-volterra", "Lotka-Volterra")],
      "extra": ("blog/field-language-write-what-a-node-does.html", "Read: Field in one post")},
+    {"slug": "developers", "name": "developers", "hand": "headless", "body": "developers_body.html",
+     "title": "Infinite for developers: headless CLI, Python SDK and MCP server",
+     "h1": "Infinite for developers and agents", "desc": "Run Infinite without a window. Render video and audio from a text patch, call it from Python, or give an AI agent the nine MCP tools. Free and open source.",
+     "lead": "Every patch is a text file, and the app can render it with no window open. Use the command line, call it from Python, or hand the same tools to an AI agent over MCP.",
+     "facts": ["Headless", "Python SDK", "9 MCP tools"],
+     "hero": {"shader": "sheet", "img": "patch", "alt": "A 3D render of two Infinite nodes joined by a cable", "tall": False},
+     "cards": [("Text in, files out", "A patch is plain text. Validate it, print the graph that was built, then render stills, a contact sheet, video or an audio report."),
+               ("No window, no display", "The renderer runs from the command line, so it fits a script, a cron job or a CI step. Hardware inputs are refused in headless mode."),
+               ("Built for agents", "Nine MCP tools let an agent write a shader, a synth or a mesh and see the result. Every tool result carries the credit line.")],
+     "lab": {"kind": "term", "title": "Three ways in",
+             "text": "Pick a way to call the same engine. The sheet on the right shows the idea: a patch rendered to frames, one after another.",
+             "tabs": [("Command line", 'Infinite --validate hello.inf\nInfinite --explain hello.inf\nInfinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png\nInfinite --render hello.inf hello.mp4 --duration 4 --fps 30\nInfinite --audio-summary hello.inf hello.json',
+                       'The <a href="assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener">headless guide (PDF)</a> covers every flag and exit code.'),
+                      ("Python", 'git clone https://github.com/n1m21n/Infinite\ncd Infinite/tools/python_sdk\npython3\n>>> import infinite\n>>> infinite.field_synth("state float phase = 0\\nphase = (phase + freq / sr) % 1.0\\nout = sin(6.28318 * phase) * 0.4 * gate", out_wav="synth.wav", duration=3)',
+                       'A thin wrapper over the same command line. <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Source and README</a>.'),
+                      ("MCP", '{\n  "mcpServers": {\n    "infinite": {\n      "command": "python3",\n      "args": ["/path/to/Infinite/tools/mcp/infinite_mcp.py"]\n    }\n  }\n}',
+                       'Add this to Claude Desktop, Cursor or any MCP client, with the path to your checkout. <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">Source and README</a>.')],
+             "note": "Illustration of the flow; the guide lists the real output files."},
+     "start": [], "extra": ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide (PDF)")},
 ]
 ALL = [(a["slug"] + ".html", a["name"]) for a in AUDIENCES]
 
@@ -71,36 +137,161 @@ ALL = [(a["slug"] + ".html", a["name"]) for a in AUDIENCES]
 def check_links():
     bad = []
     for a in AUDIENCES:
-        for s, _ in a["start"]:
-            if not os.path.exists(os.path.join(W, "library", s + ".html")):
-                bad.append("library/" + s + ".html")
-        if not os.path.exists(os.path.join(W, a["extra"][0])):
-            bad.append(a["extra"][0])
+        for sl, _ in a["start"]:
+            if not os.path.exists(os.path.join(W, "library", sl + ".html")):
+                bad.append("library/" + sl + ".html")
+        need = [a["extra"][0], "assets/3d/%s.webp" % a["hero"]["img"]]
+        need += ["assets/nodes/%s.png" % n for n, _, _ in a.get("bench", {}).get("items", [])]
+        need += [r[0] for r in a.get("reel", {}).get("items", [])]
+        for f in need:
+            if not os.path.exists(os.path.join(W, f)):
+                bad.append(f)
     return bad
+
+
+def hl(code):
+    out = []
+    for line in code.split("\n"):
+        t = e(line)
+        if "//" in t:
+            i = t.index("//"); t = t[:i] + '<span class="c">' + t[i:] + "</span>"
+        for k in ("param float", "state float"):
+            t = t.replace(k, '<span class="k">' + k + "</span>")
+        out.append(t)
+    return "\n".join(out)
+
+
+def ctl(c):
+    cid, label, val, lo, hi, dp, unit = c
+    return (f'<div class="ctl"><label for="c-{cid}">{e(label)}</label><output for="c-{cid}"></output>'
+            f'<input id="c-{cid}" type="range" min="0" max="1000" step="1" value="{val}"{"" if cid == "cut" else " data-fmt=\"1\""} data-lo="{lo}" data-hi="{hi}" data-dp="{dp}" data-unit="{e(unit)}"></div>')
+
+
+def lab_html(a):
+    L = a["lab"]; k = L["kind"]
+    side = f'<h3>{e(L["title"])}</h3><p>{e(L["text"])}</p>'
+    ctls = "".join(ctl(c) for c in L.get("ctl", []))
+    code = f'<pre class="aud-code"><code>{hl(L["code"])}</code></pre>' if L.get("code") else ""
+    note = f'<p class="lab-note">{e(L["note"])}</p>' if L.get("note") else ""
+    if k == "shader":
+        return f'''<div class="lab" data-lab="shader" data-shader="{L["shader"]}" data-s="{L.get("s", 0)}">
+          <div class="lab-view"><canvas aria-label="A live shader you can change with the sliders" role="img"></canvas></div>
+          <div class="lab-side">{side}{ctls}{code}{note}</div></div>'''
+    if k == "synth":
+        return f'''<div class="lab" data-lab="synth">
+          <div class="lab-view"><canvas aria-label="A sawtooth waveform through a low-pass filter" role="img"></canvas></div>
+          <div class="lab-side">{side}{ctls}<button class="play" type="button" aria-pressed="false">Play a note</button>{code}{note}</div></div>'''
+    if k == "show":
+        pads = "".join(f'<button class="pad{" live" if i == 0 else ""}" type="button"><span>{e(n)}</span><small>scene {i + 1}</small></button>' for i, n in enumerate(L["pads"]))
+        return f'''<div class="lab" data-lab="show">
+          <div class="lab-view"><canvas aria-label="Beat-driven visuals that switch scene on the bar" role="img"></canvas></div>
+          <div class="lab-side">{side}{ctls}<div class="pads">{pads}</div>
+            <div class="beats" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><span class="bar-state" aria-live="polite">Playing scene 1</span></div>{note}</div></div>'''
+    tabs = "".join(f'<button role="tab" type="button" id="t{i}" aria-controls="p{i}" aria-selected="{"true" if i == 0 else "false"}">{e(n)}</button>' for i, (n, _, _) in enumerate(L["tabs"]))
+    panels = "".join(f'<div role="tabpanel" id="p{i}" aria-labelledby="t{i}" class="term-panel"{"" if i == 0 else " hidden"}><div style="position:relative"><pre class="aud-code"><code>{e(c)}</code></pre><button class="copy" type="button">Copy</button></div><p>{h}</p></div>' for i, (_, c, h) in enumerate(L["tabs"]))
+    return f'''<div class="lab" data-lab="term">
+          <div class="lab-side">{side}<div class="cmd-tabs" role="tablist" aria-label="Ways to call Infinite">{tabs}</div>{panels}<button class="run" type="button">Render again</button>{note}</div>
+          <div class="lab-view"><canvas aria-label="A contact sheet of twelve frames filling in one by one" role="img"></canvas></div></div>'''
+
+
+def main_html(a, rel):
+    facts = "".join(f"<li>{e(f)}</li>" for f in a["facts"])
+    h3 = {"brand_ball": 700, "logo_3d": 394, "node_field_pixel": 525, "node_hero": 438, "node_lfo": 525, "patch": 394}[a["hero"]["img"]]
+    cards = "\n".join(f'          <article class="aud-card reveal" style="--i:{n}"><span class="num">{n + 1:02d}</span><h3>{e(t)}</h3><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
+    bench = ""
+    if a.get("bench"):
+        B = a["bench"]
+        figs = "".join(f'<figure class="bn"><img src="assets/nodes/{n}.png" alt="The {e(t)} node as it looks in Infinite" loading="lazy" decoding="async"><figcaption><b>{e(t)}</b><span>{e(d)}</span></figcaption></figure>' for n, t, d in B["items"])
+        bench = f'''
+      <section class="aud-section reveal">
+        <h2>{e(B["title"])}</h2>
+        <p class="sec-sub">{e(B["sub"])}</p>
+        <div class="bench"><div class="bench-row{" few" if len(B["items"]) < 4 else ""}">{figs}</div>
+          <p class="bench-note">screenshots from the app, shown at their own size</p></div>
+      </section>'''
+    reel = ""
+    if a.get("reel"):
+        R = a["reel"]
+        figs = "".join(f'<figure><a class="frame" style="--ar:{w} / {h}" href="{R["href"]}"><img src="{src}" alt="{e(c)}" width="{w}" height="{h}" loading="lazy" decoding="async"></a><figcaption>{e(c)}</figcaption></figure>' for src, w, h, c in R["items"])
+        reel = f'''
+      <section class="aud-section reveal">
+        <div class="sec-head"><div><h2>{e(R["title"])}</h2><p class="sec-sub">{e(R["sub"])}</p></div>
+          <div class="reel-ctl"><button class="reel-btn reel-prev" type="button" aria-label="Scroll back">&#8592;</button><button class="reel-btn reel-next" type="button" aria-label="Scroll forward">&#8594;</button></div></div>
+        <div class="reel-wrap"><div class="reel">{figs}</div></div>
+      </section>'''
+    start = ""
+    if a["start"]:
+        links = "\n".join(f'          <a href="library/{sl}.html">{e(t)}</a>' for sl, t in a["start"])
+        start = f'''
+      <section class="aud-section reveal">
+        <h2>Start with</h2>
+        <div class="aud-start">
+{links}
+        </div>
+        <p class="aud-note">Each one is a free patch you can download and open.</p>
+      </section>'''
+    body = ""
+    if a.get("body"):
+        body = '      <section class="aud-section reveal dev-body">\n' + open(os.path.join(os.path.dirname(os.path.abspath(__file__)), a["body"]), encoding="utf-8").read() + "      </section>"
+    lab = lab_html(a)
+    others = "\n".join(f'          <a href="{h}">{e(n)}</a>' for h, n in ALL if h != rel)
+    return f'''
+  <main>
+    <section class="ah">
+      <div class="container ah-grid">
+        <div class="ah-text">
+          <span class="blog-hand hand">{e(a["hand"])}</span>
+          <h1 class="slab">{e(a["h1"])}</h1>
+          <p class="lead">{e(a["lead"])}</p>
+          <div class="aud-cta">
+            <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
+            <a href="{a["extra"][0]}" class="btn btn-ghost">{e(a["extra"][1])}</a>
+          </div>
+          <ul class="facts">{facts}</ul>
+        </div>
+        <div class="vstage">
+          <canvas data-shader="{a["hero"]["shader"]}" aria-hidden="true"></canvas>
+          <span class="vstage-float"><img class="vstage-3d" src="assets/3d/{a["hero"]["img"]}.webp" alt="{e(a["hero"]["alt"])}" width="700" height="{h3}" decoding="async"></span>
+          <span class="vstage-tag">live shader · move the pointer</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+      <section class="aud-section">
+        <h2>What you get</h2>
+        <div class="aud-grid">
+{cards}
+        </div>
+      </section>
+{bench}
+      <section class="aud-section reveal">
+        {lab}
+      </section>
+{reel}
+{start}
+{body}
+      <section class="aud-section reveal">
+        <h2>Infinite for everyone else</h2>
+        <div class="aud-others">
+{others}
+        </div>
+      </section>
+    </div>
+    '''
 
 
 def page(a):
     rel = a["slug"] + ".html"
-    url = BASE + rel
-    nodes = []
-    for n, (cat, name, knobs) in enumerate(a["flow"]):
-        if n:
-            nodes.append(f'<span class="cable" style="--i:{n}" aria-hidden="true"></span>')
-        k = '<span class="knob" aria-hidden="true">' + "".join(f'<i style="--r:{r}deg;--i:{n + j}"></i>' for j, r in enumerate((-40, 20, 70))) + "</span>" if knobs else ""
-        nodes.append(f'<div class="patch-node" style="--i:{n};--c:{CAT.get(cat, "#818CF8")}"><span class="cat">{e(cat)}</span><b>{e(name)}</b>{k}</div>')
-    cards = "\n".join(f'          <article class="aud-card reveal" style="--i:{n}"><h3>{e(t)}</h3><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
-    start = "\n".join(f'          <a href="library/{s}.html">{e(t)}</a>' for s, t in a["start"])
-    code = ""
-    if a.get("code"):
-        code = f'''
-        <section class="aud-section reveal">
-          <h2>What it looks like</h2>
-          <pre class="aud-code"><code>{e(a["code"])}</code></pre>
-          <p class="aud-note">{e(a["code_note"])}</p>
-        </section>'''
-    others = "\n".join(f'          <a href="{h}">{e(n)}</a>' for h, n in [("developers.html", "developers")] + ALL if h != rel)
-    ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": url, "description": a["desc"],
+    ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
+    return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
+
+
+def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
+    """The whole document around a page's <main>: head, one header, one footer, reveal-on-scroll. Shared with gen_philosophy.py."""
+    url = BASE + rel
+    ldtags = "\n  ".join(f'<script type="application/ld+json">{json.dumps(x, ensure_ascii=False)}</script>' for x in lds)
     return f'''<!DOCTYPE html>
 <html lang="en" data-mode="paper">
 <head>
@@ -109,11 +300,11 @@ def page(a):
   <meta name="theme-color" content="#FBFAF6">
   <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
   <script src="theme.js?v=2"></script>
-  <title>{e(a["title"])}</title>
-  <meta name="description" content="{e(a["desc"])}">
+  <title>{e(title)}</title>
+  <meta name="description" content="{e(desc)}">
   <link rel="canonical" href="{url}">
-  <meta property="og:title" content="{e(a["title"])}">
-  <meta property="og:description" content="{e(a["desc"])}">
+  <meta property="og:title" content="{e(title)}">
+  <meta property="og:description" content="{e(desc)}">
   <meta property="og:image" content="{BASE}assets/og-image.jpg">
   <meta property="og:url" content="{url}">
   <meta property="og:type" content="website">
@@ -130,56 +321,19 @@ def page(a):
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=4">
   <link rel="stylesheet" href="blog.css?v=2">
-  <link rel="stylesheet" href="audience.css?v=1">
-  <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+  <link rel="stylesheet" href="audience.css?v=7">
+  {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>
 </head>
 <body class="blog-page">
   {chrome.header_html(rel)}
 
-  <main>
-    <section class="section aud-hero">
-      <div class="container">
-        <span class="blog-hand hand">{e(a["hand"])}</span>
-        <h1 class="slab">{e(a["h1"])}</h1>
-        <p class="lead">{e(a["lead"])}</p>
-        <div class="aud-cta">
-          <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
-          <a href="{a["extra"][0]}" class="btn btn-ghost">{e(a["extra"][1])}</a>
-        </div>
-        <div class="patch" role="img" aria-label="A patch: {e(' into '.join(n for _, n, _ in a['flow']))}">
-          {"".join(nodes)}
-        </div>
-      </div>
-    </section>
-
-    <div class="container">
-      <section class="aud-section">
-        <h2>What you get</h2>
-        <div class="aud-grid">
-{cards}
-        </div>
-      </section>
-{code}
-      <section class="aud-section reveal">
-        <h2>Start with</h2>
-        <div class="aud-start">
-{start}
-        </div>
-        <p class="aud-note">Each one is a free patch you can download and open.</p>
-      </section>
-
-      <section class="aud-section reveal">
-        <h2>Infinite for everyone else</h2>
-        <div class="aud-others">
-{others}
-        </div>
-      </section>
-    </div>
+{main}
   </main>
 
   {chrome.footer_html(rel)}
   <script src="site.js?v={chrome.JS_VERSION}" defer></script>
+  <script src="audience.js?v=5" defer></script>{extra_js}
   <script>
     (function () {{
       var els = document.querySelectorAll('.reveal');

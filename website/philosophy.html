@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="paper">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script src="theme.js?v=2"></script>
+  <title>Philosophy of Infinite: node-based creative software built for flow</title>
+  <meta name="description" content="Why Infinite is a node graph, how it protects flow state in art and music making, how machines should work with people, and the design principles behind it.">
+  <link rel="canonical" href="https://infinitedevices.org/philosophy.html">
+  <meta property="og:title" content="Philosophy of Infinite: node-based creative software built for flow">
+  <meta property="og:description" content="Why Infinite is a node graph, how it protects flow state in art and music making, how machines should work with people, and the design principles behind it.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/og-image.jpg">
+  <meta property="og:url" content="https://infinitedevices.org/philosophy.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="alternate" type="text/plain" href="llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="brand.css?v=3">
+  <link rel="stylesheet" href="style.css?v=85">
+  <link rel="stylesheet" href="glass.css?v=4">
+  <link rel="stylesheet" href="blog.css?v=2">
+  <link rel="stylesheet" href="audience.css?v=7">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "AboutPage", "name": "Philosophy of Infinite: node-based creative software built for flow", "url": "https://infinitedevices.org/philosophy.html", "description": "Why Infinite is a node graph, how it protects flow state in art and music making, how machines should work with people, and the design principles behind it.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Why is Infinite a node-based program?", "acceptedAnswer": {"@type": "Answer", "text": "A patch is a map of how things connect, and ideas connect in more than a line. Each node does one job and each cable says what feeds what, so you can see the whole shape of a piece at once, and anything can patch into anything: a sound can move a picture and a picture can move a sound."}}, {"@type": "Question", "name": "What does flow state mean for music and art software?", "acceptedAnswer": {"@type": "Answer", "text": "Flow is the state where doing and thinking are the same act. Software breaks it with dialogs, loading, deep menus and delay. Infinite keeps controls live while a patch plays, keeps pictures, sound, 3D and code in one graph, and lets any knob be moved by a controller, an LFO, an envelope or the audio itself."}}, {"@type": "Question", "name": "Who is Infinite for?", "acceptedAnswer": {"@type": "Answer", "text": "Artists, musicians, VJs, creative coders and technologists, and developers who want to render from a text file or give an AI agent the same tools. Each has its own page on this site."}}, {"@type": "Question", "name": "Is Infinite free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Infinite is free to download for macOS, Windows and Linux. The source is on GitHub under the MIT licence, and the binary is GPLv3 by default because it bundles VST3 hosting."}}, {"@type": "Question", "name": "Can AI agents use Infinite?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Patches are plain text, and Infinite can render them headless from the command line, from a Python SDK, or through nine MCP tools. The person decides what is kept."}}]}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Philosophy", "item": "https://infinitedevices.org/philosophy.html"}]}</script>
+  <link rel="stylesheet" href="philosophy.css?v=6">
+  <script>document.documentElement.classList.add('js-reveal')</script>
+</head>
+<body class="blog-page">
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="index.html" class="brand" aria-label="Infinite home">
+        <img src="assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="artists.html">Artists</a>
+          <a href="musicians.html">Musicians</a>
+          <a href="vjs.html">VJs</a>
+          <a href="creative-coders.html">Creative coders</a>
+          <a href="developers.html">Developers</a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="library.html">Library</a>
+          <a href="artworks.html">Art gallery</a>
+          <a href="embeds/">Embeds</a>
+          <a href="extensions.html">Extensions</a>
+          <a href="benchmarks.html">Benchmarks</a>
+        </div>
+      </div>
+      <div class="nav-group" data-current>
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="index.html#learn">Get started</a>
+          <a href="philosophy.html" aria-current="page">Philosophy</a>
+          <a href="blog/">Blog</a>
+          <a href="assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Node reference</a>
+          <a href="assets/Field_Language_Manual.pdf" target="_blank" rel="noopener">Field language</a>
+          <a href="assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener">Headless guide</a>
+          <a href="llms.txt">llms.txt</a>
+        </div>
+      </div>
+      <a href="index.html#setup" class="nav-sheet-only">Download</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener">Instagram</a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener">YouTube</a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn hide-sm" aria-label="View on GitHub" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn sm-only" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+
+  <main>
+    <section class="ah">
+      <div class="container ah-grid">
+        <div class="ah-text">
+          <span class="blog-hand hand">why</span>
+          <h1 class="slab">Why Infinite exists</h1>
+          <p class="lead">Infinite is one canvas for pictures, sound and code. It is built so an idea can travel from your head to the screen or the speakers without you stopping to switch tools.</p>
+          <div class="aud-cta">
+            <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
+            <a href="#who" class="btn btn-ghost">Who it is for</a>
+          </div>
+          <ul class="facts"><li>Free and open source</li><li>macOS, Windows, Linux</li><li>A DAW for you</li></ul>
+        </div>
+        <div class="vstage">
+          <canvas data-shader="mind" aria-hidden="true"></canvas>
+          <span class="vstage-float"><img class="vstage-3d" src="assets/3d/logo_3d.webp" alt="The Infinite mark as a 3D object" width="700" height="394" decoding="async"></span>
+          <span class="vstage-tag">live shader · move the pointer</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="container phil">
+      <section class="aud-section reveal" id="mission">
+        <div class="split">
+          <div class="split-text">
+            <span class="blog-hand hand">mission</span>
+            <h2>Creative liberation, through tools that stay out of the way</h2>
+            <div class="ptext">
+              <p>Making things should feel like thinking out loud. Too much creative software asks you to stop, change tool, export, import, and then remember what you were doing. Infinite exists to remove those stops.</p>
+              <p>The name is a promise about reach, not size. When connections are free, the number of things you can make has no obvious end.</p>
+              <p>It is free and open source, and it runs on macOS, Windows and Linux. A tool that frees people to make should not be a privilege.</p>
+            </div>
+          </div>
+          <blockquote class="pull"><p>Anything patches into anything.</p><ul><li>A sound moves a picture.</li><li>A picture moves a sound.</li><li>A line of code moves both.</li></ul><cite>The belief behind Infinite</cite></blockquote>
+        </div>
+      </section>
+
+      <section class="aud-section" id="who">
+        <h2>One canvas, many people</h2>
+        <p class="sec-sub">The same graph serves very different work. Pick the page that is closest to yours.</p>
+        <div class="who-grid">
+          <a class="who-card reveal" style="--i:0" href="artists.html"><span class="hand">paint</span><b>Artists</b><span>Images that move, on one canvas.</span></a>
+          <a class="who-card reveal" style="--i:1" href="musicians.html"><span class="hand">play</span><b>Musicians</b><span>Synths, effects and plugins in one graph.</span></a>
+          <a class="who-card reveal" style="--i:2" href="vjs.html"><span class="hand">perform</span><b>VJs</b><span>Visuals that follow the music, safe on stage.</span></a>
+          <a class="who-card reveal" style="--i:3" href="creative-coders.html"><span class="hand">code</span><b>Creative coders</b><span>Field, sketches and shaders.</span></a>
+          <a class="who-card reveal" style="--i:4" href="developers.html"><span class="hand">headless</span><b>Developers and agents</b><span>Render from a text file, with no window.</span></a>
+        </div>
+      </section>
+
+      <section class="aud-section reveal" id="graph">
+        <div class="split">
+          <div class="split-text">
+            <h2>A graph, because ideas connect</h2>
+            <div class="ptext">
+              <p>A timeline puts your work in a line. A stack of menus puts it in a hierarchy. Thinking does neither: one idea leads to three others, and two of those meet again later. A patch is a map of exactly that. Each node does one job, each cable says what feeds what, and you can see the whole shape of what you are making at once.</p>
+              <p>A node graph is also a mind map. Brains are not patches, and we do not claim they are, but the comparison is useful: parts that do different jobs, joined by many connections, where the interesting results come from what talks to what.</p>
+              <p>Switch between the two views. The connections stay the same; only the names change.</p>
+            </div>
+          </div>
+          <figure class="mind" data-view="mind">
+            <div class="seg" role="group" aria-label="View"><button type="button" data-v="mind" aria-pressed="true">A mind</button><button type="button" data-v="patch" aria-pressed="false">A patch</button></div>
+            <svg class="mind-svg" viewBox="0 0 600 410" role="group" aria-label="The same eight connections shown as ideas in a mind and as nodes in a patch"><g class="edges"><path class="edge" data-a="motion" data-b="memory" d="M300 208 Q329.7 133.0 300 58"/><path class="edge" data-a="motion" data-b="rhythm" d="M300 208 Q213.9 133.4 100 138"/><path class="edge" data-a="motion" data-b="colour" d="M300 208 Q413.9 212.6 500 138"/><path class="edge" data-a="motion" data-b="voice" d="M300 208 Q166.7 191.1 58 270"/><path class="edge" data-a="motion" data-b="texture" d="M300 208 Q410.7 287.7 546 270"/><path class="edge" data-a="motion" data-b="space" d="M300 208 Q216.9 257.2 190 350"/><path class="edge" data-a="motion" data-b="light" d="M300 208 Q326.9 300.8 410 350"/><path class="edge" data-a="memory" data-b="rhythm" d="M300 58 Q184.2 58.4 100 138"/><path class="edge" data-a="memory" data-b="colour" d="M300 58 Q384.2 137.6 500 138"/><path class="edge" data-a="rhythm" data-b="voice" d="M100 138 Q52.9 195.7 58 270"/><path class="edge" data-a="colour" data-b="texture" d="M500 138 Q496.9 213.1 546 270"/><path class="edge" data-a="voice" data-b="space" d="M58 270 Q108.2 336.1 190 350"/><path class="edge" data-a="space" data-b="light" d="M190 350 Q300.0 393.6 410 350"/><path class="edge" data-a="light" data-b="texture" d="M410 350 Q493.8 336.9 546 270"/></g><circle class="thought" r="6" cx="-20" cy="-20"/><g class="nodes"><g class="mnode" data-id="memory" tabindex="0" role="button" transform="translate(300 58)" data-mind="What you keep and replay." data-patch="Holds a sound you recorded and plays it back." aria-label="Memory, as a node: Sampler"><circle class="sh-mind" r="30"/><rect class="sh-patch" x="-42" y="-22" width="84" height="44" rx="12"/><text class="l-mind" y="5" text-anchor="middle">Memory</text><text class="l-patch" y="5" text-anchor="middle">Sampler</text></g><g class="mnode" data-id="rhythm" tabindex="0" role="button" transform="translate(100 138)" data-mind="The pulse the rest leans on." data-patch="Steps through a pattern of hits." aria-label="Rhythm, as a node: Drum Sequencer"><circle class="sh-mind" r="30"/><rect class="sh-patch" x="-72" y="-22" width="144" height="44" rx="12"/><text class="l-mind" y="5" text-anchor="middle">Rhythm</text><text class="l-patch" y="5" text-anchor="middle">Drum Sequencer</text></g><g class="mnode" data-id="colour" tabindex="0" role="button" transform="translate(500 138)" data-mind="How a feeling looks." data-patch="Maps a value to a run of colours." aria-label="Colour, as a node: Color Ramp"><circle class="sh-mind" r="30"/><rect class="sh-patch" x="-55" y="-22" width="110" height="44" rx="12"/><text class="l-mind" y="5" text-anchor="middle">Colour</text><text class="l-patch" y="5" text-anchor="middle">Color Ramp</text></g><g class="mnode" data-id="voice" tabindex="0" role="button" transform="translate(58 270)" data-mind="Who is speaking." data-patch="A synth voice with oscillators and a filter." aria-label="Voice, as a node: Analog"><circle class="sh-mind" r="30"/><rect class="sh-patch" x="-38" y="-22" width="76" height="44" rx="12"/><text class="l-mind" y="5" text-anchor="middle">Voice</text><text class="l-patch" y="5" text-anchor="middle">Analog</text></g><g class="mnode" data-id="motion" tabindex="0" role="button" transform="translate(300 208)" data-mind="What changes, and how fast." data-patch="A slow wave that moves any knob." aria-label="Motion, as a node: LFO"><circle class="sh-mind" r="30"/><rect class="sh-patch" x="-25" y="-22" width="50" height="44" rx="12"/><text class="l-mind" y="5" text-anchor="middle">Motion</text><text class="l-patch" y="5" text-anchor="middle">LFO</text></g><g class="mnode" data-id="texture" tabindex="0" role="button" transform="translate(546 270)" data-mind="The grain of a thing." data-patch="A source of controlled randomness." aria-label="Texture, as a node: Noise"><circle class="sh-mind" r="30"/><rect class="sh-patch" x="-34" y="-22" width="67" height="44" rx="12"/><text class="l-mind" y="5" text-anchor="middle">Texture</text><text class="l-patch" y="5" text-anchor="middle">Noise</text></g><g class="mnode" data-id="space" tabindex="0" role="button" transform="translate(190 350)" data-mind="Where it happens." data-patch="Puts a sound in a room." aria-label="Space, as a node: Reverb"><circle class="sh-mind" r="30"/><rect class="sh-patch" x="-38" y="-22" width="76" height="44" rx="12"/><text class="l-mind" y="5" text-anchor="middle">Space</text><text class="l-patch" y="5" text-anchor="middle">Reverb</text></g><g class="mnode" data-id="light" tabindex="0" role="button" transform="translate(410 350)" data-mind="What can be seen." data-patch="A light in a 3D scene." aria-label="Light, as a node: Light"><circle class="sh-mind" r="30"/><rect class="sh-patch" x="-34" y="-22" width="67" height="44" rx="12"/><text class="l-mind" y="5" text-anchor="middle">Light</text><text class="l-patch" y="5" text-anchor="middle">Light</text></g></g></svg>
+            <figcaption class="mind-cap" aria-live="polite">Tap or hover an idea to see what it connects to. One thought, in Ember, travels the connections.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="aud-section reveal" id="flow">
+        <div class="split flip">
+          <figure class="loop-fig"><svg class="loop-svg" viewBox="0 0 600 300" role="img" aria-label="A loop in the shape of the Infinite mark, with a point travelling around it"><path class="loop-line" d="M550.0 150.0 L545.9 175.7 L534.4 198.7 L517.0 217.1 L496.0 229.7 L473.2 236.6 L450.3 238.4 L428.3 235.9 L407.8 230.1 L388.8 221.9 L371.4 211.9 L355.4 200.6 L340.6 188.6 L326.6 176.0 L313.1 163.1 L300.0 150.0 L286.9 136.9 L273.4 124.0 L259.4 111.4 L244.6 99.4 L228.6 88.1 L211.2 78.1 L192.2 69.9 L171.7 64.1 L149.7 61.6 L126.8 63.4 L104.0 70.3 L83.0 82.9 L65.6 101.3 L54.1 124.3 L50.0 150.0 L54.1 175.7 L65.6 198.7 L83.0 217.1 L104.0 229.7 L126.8 236.6 L149.7 238.4 L171.7 235.9 L192.2 230.1 L211.2 221.9 L228.6 211.9 L244.6 200.6 L259.4 188.6 L273.4 176.0 L286.9 163.1 L300.0 150.0 L313.1 136.9 L326.6 124.0 L340.6 111.4 L355.4 99.4 L371.4 88.1 L388.8 78.1 L407.8 69.9 L428.3 64.1 L450.3 61.6 L473.2 63.4 L496.0 70.3 L517.0 82.9 L534.4 101.3 L545.9 124.3 L550.0 150.0Z"/><circle class="loop-dot" r="9" cx="550" cy="150"/><text class="loop-t t-human" x="425" y="156" text-anchor="middle">you</text><text class="loop-t t-struct" x="175" y="156" text-anchor="middle">structure</text></svg><figcaption>Two ends, one loop. Ember is the person acting, Signal is the structure that answers, and Midnight is the space between.</figcaption></figure>
+          <div class="split-text">
+            <h2>Flow, and what breaks it</h2>
+            <div class="ptext">
+              <p>Flow is the state where doing and thinking are the same act. It breaks easily: a dialog, a loading bar, a menu three levels deep, a sound that arrives late. A stream of ideas needs somewhere to land at the speed it arrives.</p>
+              <p>Infinite is designed around not breaking that stream, whether you are making music, an image or a live set. Four things are protected.</p>
+            </div>
+          </div>
+        </div>
+        <div class="aud-grid four">
+          <article class="aud-card reveal" style="--i:0"><span class="num">01</span><h3>Nothing between you and the result</h3><p>Controls stay live while a patch plays. You change a value and you see or hear it change.</p></article>
+          <article class="aud-card reveal" style="--i:1"><span class="num">02</span><h3>One canvas</h3><p>Pictures, sound, 3D and code are nodes in one graph, so nothing is exported from one tool to be imported into another.</p></article>
+          <article class="aud-card reveal" style="--i:2"><span class="num">03</span><h3>Hands before menus</h3><p>Any knob can be moved by a controller, an LFO, an envelope or the audio itself, so the instrument is played, not configured.</p></article>
+          <article class="aud-card reveal" style="--i:3"><span class="num">04</span><h3>Patch the way you think</h3><p>Start with one node, add whatever comes to mind next, and connect it. There is no fixed order you must follow.</p></article>
+        </div>
+      </section>
+
+      <section class="aud-section reveal" id="machines">
+        <h2>The machine follows you</h2>
+        <p class="sec-sub">A good instrument does what the hand means and then gets out of the way. We design the machine's part the same way: it listens, it carries the connections, it offers, and the person decides. Every result is a node you can open.</p>
+        <div class="aud-grid">
+          <article class="aud-card reveal" style="--i:0"><span class="num">01</span><h3>It listens</h3><p>Audio Analyze turns sound into numbers a knob can follow, so a picture can lean on a bassline without a single keyframe.</p></article>
+          <article class="aud-card reveal" style="--i:1"><span class="num">02</span><h3>It continues</h3><p>Predictive nodes such as Predictive Notes and Predictive Rhythm carry on a pattern you started. You keep what you like and patch away what you do not.</p></article>
+          <article class="aud-card reveal" style="--i:2"><span class="num">03</span><h3>It can use the same tools</h3><p>Patches are plain text, so an AI agent can read and write them. Headless rendering, a Python SDK and nine MCP tools give an agent the graph you work in. The person decides what stays.</p><p><a class="inline" href="developers.html">For developers and agents</a></p></article>
+        </div>
+      </section>
+
+      <section class="aud-section reveal" id="design">
+        <h2>How it is designed</h2>
+        <p class="sec-sub">The look can change. The movement and the beliefs do not.</p>
+        <ol class="principles">
+          <li class="reveal" style="--i:0"><b>Connection</b><span>Anything patches into anything. This is the belief the rest is built on.</span></li>
+          <li class="reveal" style="--i:1"><b>Live</b><span>Anything that shows a value keeps moving: meters fall, waveforms scroll, knobs breathe.</span></li>
+          <li class="reveal" style="--i:2"><b>Measured</b><span>Motion follows the music. Every duration is a note value at the transport tempo: 125, 188, 333, 500 and 667 ms at 120 BPM.</span></li>
+          <li class="reveal" style="--i:3"><b>Calm</b><span>One accent colour, used once in a frame. Plain words, no hype, no exclamation marks.</span></li>
+          <li class="reveal" style="--i:4"><b>Honest</b><span>Speeds are measured and published on the benchmarks page, and the facts about each node are generated from the code.</span></li>
+          <li class="reveal" style="--i:5"><b>Free</b><span>Free to use and open source, on macOS, Windows and Linux, so the tools are not a privilege.</span></li>
+        </ol>
+        <div class="springs-card">
+          <div><h3>Four springs, one family</h3><p>Press one. Each is a measured curve from the brand book, tuned so the peak of its overshoot lands on a beat at 120 BPM.</p></div>
+          <div class="springs"><button class="spring" type="button" data-spring="slab" aria-label="Play the slab spring"><span class="spring-name">slab</span><span class="spring-track"><i class="spring-dot"></i></span><span class="spring-note">12.6% overshoot</span></button><button class="spring" type="button" data-spring="letter" aria-label="Play the letter spring"><span class="spring-name">letter</span><span class="spring-track"><i class="spring-dot"></i></span><span class="spring-note">9.5%</span></button><button class="spring" type="button" data-spring="soft" aria-label="Play the soft spring"><span class="spring-name">soft</span><span class="spring-track"><i class="spring-dot"></i></span><span class="spring-note">0.2%</span></button><button class="spring" type="button" data-spring="press" aria-label="Play the press spring"><span class="spring-name">press</span><span class="spring-track"><i class="spring-dot"></i></span><span class="spring-note">none</span></button></div>
+        </div>
+      </section>
+
+      <section class="aud-section reveal" id="faq">
+        <h2>Questions</h2>
+        <div class="faq">
+          <details class="faq-item"><summary>Why is Infinite a node-based program?</summary><p>A patch is a map of how things connect, and ideas connect in more than a line. Each node does one job and each cable says what feeds what, so you can see the whole shape of a piece at once, and anything can patch into anything: a sound can move a picture and a picture can move a sound.</p></details>
+          <details class="faq-item"><summary>What does flow state mean for music and art software?</summary><p>Flow is the state where doing and thinking are the same act. Software breaks it with dialogs, loading, deep menus and delay. Infinite keeps controls live while a patch plays, keeps pictures, sound, 3D and code in one graph, and lets any knob be moved by a controller, an LFO, an envelope or the audio itself.</p></details>
+          <details class="faq-item"><summary>Who is Infinite for?</summary><p>Artists, musicians, VJs, creative coders and technologists, and developers who want to render from a text file or give an AI agent the same tools. Each has its own page on this site.</p></details>
+          <details class="faq-item"><summary>Is Infinite free?</summary><p>Yes. Infinite is free to download for macOS, Windows and Linux. The source is on GitHub under the MIT licence, and the binary is GPLv3 by default because it bundles VST3 hosting.</p></details>
+          <details class="faq-item"><summary>Can AI agents use Infinite?</summary><p>Yes. Patches are plain text, and Infinite can render them headless from the command line, from a Python SDK, or through nine MCP tools. The person decides what is kept.</p></details>
+        </div>
+      </section>
+
+      <section class="aud-section reveal cta-end">
+        <h2>Make the first thing</h2>
+        <p class="sec-sub">Download Infinite, open a library patch, and turn one knob.</p>
+        <div class="aud-cta"><a href="index.html#setup" class="btn btn-primary">Download Infinite</a><a href="library.html" class="btn btn-ghost">Open the library</a></div>
+      </section>
+    </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <label for="signup-email" class="signup-label">One email when something ships</label>
+            <div class="signup-row">
+              <input id="signup-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram (@infinite.devices)" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube (@infinite.devices)" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="artists.html">Artists</a>
+          <a href="musicians.html">Musicians</a>
+          <a href="vjs.html">VJs</a>
+          <a href="creative-coders.html">Creative coders</a>
+          <a href="developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="library.html">Library</a>
+          <a href="artworks.html">Art gallery</a>
+          <a href="embeds/">Embeds</a>
+          <a href="extensions.html">Extensions</a>
+          <a href="benchmarks.html">Benchmarks</a>
+          <a href="assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener">Benchmark report (PDF)</a>
+          <a href="index.html#listen">Listen</a>
+          <a href="index.html#nodes">Node library</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="index.html#learn">Get started</a>
+          <a href="philosophy.html">Philosophy</a>
+          <a href="blog/">Blog</a>
+          <a href="assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Node reference manual (PDF)</a>
+          <a href="assets/Field_Language_Manual.pdf" target="_blank" rel="noopener">Field language manual (PDF)</a>
+          <a href="assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener">Headless guide (PDF)</a>
+          <a href="llms.txt">llms.txt</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://github.com/n1m21n/Infinite/blob/main/AGENT.md" target="_blank" rel="noopener">Agent guide</a>
+          <a href="https://github.com/n1m21n/Infinite/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture guide</a>
+          <a href="https://github.com/n1m21n/Infinite/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+          <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>
+          <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener">YouTube tutorial</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom mono">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
+    </div>
+  </footer>
+  <script src="site.js?v=13" defer></script>
+  <script src="audience.js?v=5" defer></script>
+  <script src="philosophy.js?v=3" defer></script>
+  <script>
+    (function () {
+      var els = document.querySelectorAll('.reveal');
+      if (!('IntersectionObserver' in window)) { els.forEach(function (x) { x.classList.add('in'); }); return; }
+      var io = new IntersectionObserver(function (es) { es.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } }); }, { threshold: 0.15 });
+      els.forEach(function (x) { io.observe(x); });
+    })();
+  </script>
+</body>
+</html>

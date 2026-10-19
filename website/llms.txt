@@ -18,6 +18,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Blog](https://infinitedevices.org/blog/): guides on audio-reactive visuals, headless rendering, Field language, plugin modulation and motion tracking (feed: https://infinitedevices.org/blog/feed.xml)
 - [Art Gallery](https://infinitedevices.org/artworks.html): visuals and motion made with Infinite
 - [Developers](https://infinitedevices.org/developers.html): headless command line, Python SDK and the nine MCP tools, with what each needs
+- [Philosophy](https://infinitedevices.org/philosophy.html): why Infinite is a node graph, how it protects flow state, how machines should work with people, and its design principles
 - [Infinite for artists](https://infinitedevices.org/artists.html), [musicians](https://infinitedevices.org/musicians.html), [VJs](https://infinitedevices.org/vjs.html), [creative coders](https://infinitedevices.org/creative-coders.html): one page per audience with starting patches
 - [Embeds](https://infinitedevices.org/embeds/): audio-reactive WebGL visuals to put on any page with one iframe
 - [Download](https://github.com/n1m21n/Infinite/releases/latest): installers for macOS, Windows and Linux

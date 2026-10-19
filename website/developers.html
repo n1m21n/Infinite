@@ -10,7 +10,7 @@
   <meta name="description" content="Run Infinite without a window. Render video and audio from a text patch, call it from Python, or give an AI agent the nine MCP tools. Free and open source.">
   <link rel="canonical" href="https://infinitedevices.org/developers.html">
   <meta property="og:title" content="Infinite for developers: headless CLI, Python SDK and MCP server">
-  <meta property="og:description" content="Render video and audio from a text patch, from a script or from an AI agent.">
+  <meta property="og:description" content="Run Infinite without a window. Render video and audio from a text patch, call it from Python, or give an AI agent the nine MCP tools. Free and open source.">
   <meta property="og:image" content="https://infinitedevices.org/assets/og-image.jpg">
   <meta property="og:url" content="https://infinitedevices.org/developers.html">
   <meta property="og:type" content="website">
@@ -24,9 +24,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="brand.css?v=3">
-  <link rel="stylesheet" href="style.css?v=84">
+  <link rel="stylesheet" href="style.css?v=85">
   <link rel="stylesheet" href="glass.css?v=4">
   <link rel="stylesheet" href="blog.css?v=2">
+  <link rel="stylesheet" href="audience.css?v=7">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite for developers: headless CLI, Python SDK and MCP server", "url": "https://infinitedevices.org/developers.html", "description": "Run Infinite without a window. Render video and audio from a text patch, call it from Python, or give an AI agent the nine MCP tools. Free and open source.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}</script>
+  <script>document.documentElement.classList.add('js-reveal')</script>
 </head>
 <body class="blog-page">
   <header class="site-header" id="site-header">
@@ -64,6 +67,7 @@
         <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
         <div class="nav-menu" id="nav-menu-learn">
           <a href="index.html#learn">Get started</a>
+          <a href="philosophy.html">Philosophy</a>
           <a href="blog/">Blog</a>
           <a href="assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Node reference</a>
           <a href="assets/Field_Language_Manual.pdf" target="_blank" rel="noopener">Field language</a>
@@ -96,54 +100,62 @@
     </div>
   </header>
 
+
   <main>
-    <section class="section blog-hero">
-      <div class="container">
-        <header class="section-head center">
+    <section class="ah">
+      <div class="container ah-grid">
+        <div class="ah-text">
           <span class="blog-hand hand">headless</span>
           <h1 class="slab">Infinite for developers and agents</h1>
           <p class="lead">Every patch is a text file, and the app can render it with no window open. Use the command line, call it from Python, or hand the same tools to an AI agent over MCP.</p>
-        </header>
+          <div class="aud-cta">
+            <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
+            <a href="assets/Infinite_Headless_User_Guide.pdf" class="btn btn-ghost">Headless guide (PDF)</a>
+          </div>
+          <ul class="facts"><li>Headless</li><li>Python SDK</li><li>9 MCP tools</li></ul>
+        </div>
+        <div class="vstage">
+          <canvas data-shader="sheet" aria-hidden="true"></canvas>
+          <span class="vstage-float"><img class="vstage-3d" src="assets/3d/patch.webp" alt="A 3D render of two Infinite nodes joined by a cable" width="700" height="394" decoding="async"></span>
+          <span class="vstage-tag">live shader · move the pointer</span>
+        </div>
+      </div>
+    </section>
 
-        <div class="dev-grid">
-          <article class="dev-card">
-            <h2>Command line</h2>
-            <p>Validate a patch, print the graph that was built, then render stills, video or an audio report.</p>
-<pre><code>Infinite --validate hello.inf
+    <div class="container">
+      <section class="aud-section">
+        <h2>What you get</h2>
+        <div class="aud-grid">
+          <article class="aud-card reveal" style="--i:0"><span class="num">01</span><h3>Text in, files out</h3><p>A patch is plain text. Validate it, print the graph that was built, then render stills, a contact sheet, video or an audio report.</p></article>
+          <article class="aud-card reveal" style="--i:1"><span class="num">02</span><h3>No window, no display</h3><p>The renderer runs from the command line, so it fits a script, a cron job or a CI step. Hardware inputs are refused in headless mode.</p></article>
+          <article class="aud-card reveal" style="--i:2"><span class="num">03</span><h3>Built for agents</h3><p>Nine MCP tools let an agent write a shader, a synth or a mesh and see the result. Every tool result carries the credit line.</p></article>
+        </div>
+      </section>
+
+      <section class="aud-section reveal">
+        <div class="lab" data-lab="term">
+          <div class="lab-side"><h3>Three ways in</h3><p>Pick a way to call the same engine. The sheet on the right shows the idea: a patch rendered to frames, one after another.</p><div class="cmd-tabs" role="tablist" aria-label="Ways to call Infinite"><button role="tab" type="button" id="t0" aria-controls="p0" aria-selected="true">Command line</button><button role="tab" type="button" id="t1" aria-controls="p1" aria-selected="false">Python</button><button role="tab" type="button" id="t2" aria-controls="p2" aria-selected="false">MCP</button></div><div role="tabpanel" id="p0" aria-labelledby="t0" class="term-panel"><div style="position:relative"><pre class="aud-code"><code>Infinite --validate hello.inf
 Infinite --explain hello.inf
 Infinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png
 Infinite --render hello.inf hello.mp4 --duration 4 --fps 30
-Infinite --audio-summary hello.inf hello.json</code></pre>
-            <p><a href="assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener">Headless guide (PDF)</a> covers every flag and exit code.</p>
-          </article>
-
-          <article class="dev-card">
-            <h2>Python SDK</h2>
-            <p>A thin wrapper over the same command line. Run it from a checkout of the repository.</p>
-<pre><code>git clone https://github.com/n1m21n/Infinite
+Infinite --audio-summary hello.inf hello.json</code></pre><button class="copy" type="button">Copy</button></div><p>The <a href="assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener">headless guide (PDF)</a> covers every flag and exit code.</p></div><div role="tabpanel" id="p1" aria-labelledby="t1" class="term-panel" hidden><div style="position:relative"><pre class="aud-code"><code>git clone https://github.com/n1m21n/Infinite
 cd Infinite/tools/python_sdk
 python3
 &gt;&gt;&gt; import infinite
-&gt;&gt;&gt; infinite.field_synth("state float phase = 0\nphase = (phase + freq / sr) % 1.0\nout = sin(6.28318 * phase) * 0.4 * gate", out_wav="synth.wav", duration=3)</code></pre>
-            <p>Functions: <code>render_video</code>, <code>field_synth</code>, <code>field_effect</code>, <code>field_notes</code>, <code>sketch_3d</code>, <code>field_primitive</code>, <code>field_modifier</code>, <code>validate</code>. <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Source and README</a>.</p>
-          </article>
-
-          <article class="dev-card">
-            <h2>MCP server</h2>
-            <p>Nine tools over stdio for Claude Desktop, Cursor and other MCP clients. Add this to the client's config, with the path to your checkout.</p>
-<pre><code>{
-  "mcpServers": {
-    "infinite": {
-      "command": "python3",
-      "args": ["/path/to/Infinite/tools/mcp/infinite_mcp.py"]
+&gt;&gt;&gt; infinite.field_synth(&quot;state float phase = 0\nphase = (phase + freq / sr) % 1.0\nout = sin(6.28318 * phase) * 0.4 * gate&quot;, out_wav=&quot;synth.wav&quot;, duration=3)</code></pre><button class="copy" type="button">Copy</button></div><p>A thin wrapper over the same command line. <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Source and README</a>.</p></div><div role="tabpanel" id="p2" aria-labelledby="t2" class="term-panel" hidden><div style="position:relative"><pre class="aud-code"><code>{
+  &quot;mcpServers&quot;: {
+    &quot;infinite&quot;: {
+      &quot;command&quot;: &quot;python3&quot;,
+      &quot;args&quot;: [&quot;/path/to/Infinite/tools/mcp/infinite_mcp.py&quot;]
     }
   }
-}</code></pre>
-            <p><a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">Source and README</a>.</p>
-          </article>
-        </div>
+}</code></pre><button class="copy" type="button">Copy</button></div><p>Add this to Claude Desktop, Cursor or any MCP client, with the path to your checkout. <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">Source and README</a>.</p></div><button class="run" type="button">Render again</button><p class="lab-note">Illustration of the flow; the guide lists the real output files.</p></div>
+          <div class="lab-view"><canvas aria-label="A contact sheet of twelve frames filling in one by one" role="img"></canvas></div></div>
+      </section>
 
-        <div class="dev-wide">
+
+      <section class="aud-section reveal dev-body">
+<div class="dev-wide">
           <h2>The nine MCP tools</h2>
           <div class="table-wrap"><table>
             <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
@@ -177,8 +189,18 @@ python3
         </div>
 
         <p class="blog-feed">Credit when you share what you make: "Infinite, by Naman Soni (n1m21n), https://infinitedevices.org". Every tool result carries the same line.</p>
-      </div>
-    </section>
+      </section>
+      <section class="aud-section reveal">
+        <h2>Infinite for everyone else</h2>
+        <div class="aud-others">
+          <a href="artists.html">artists</a>
+          <a href="musicians.html">musicians</a>
+          <a href="vjs.html">VJs</a>
+          <a href="creative-coders.html">creative coders and technologists</a>
+        </div>
+      </section>
+    </div>
+    
   </main>
 
   <footer class="site-footer">
@@ -229,6 +251,7 @@ python3
         <div class="footer-col">
           <p class="footer-h">Learn</p>
           <a href="index.html#learn">Get started</a>
+          <a href="philosophy.html">Philosophy</a>
           <a href="blog/">Blog</a>
           <a href="assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener">Node reference manual (PDF)</a>
           <a href="assets/Field_Language_Manual.pdf" target="_blank" rel="noopener">Field language manual (PDF)</a>
@@ -253,5 +276,14 @@ python3
     </div>
   </footer>
   <script src="site.js?v=13" defer></script>
+  <script src="audience.js?v=5" defer></script>
+  <script>
+    (function () {
+      var els = document.querySelectorAll('.reveal');
+      if (!('IntersectionObserver' in window)) { els.forEach(function (x) { x.classList.add('in'); }); return; }
+      var io = new IntersectionObserver(function (es) { es.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } }); }, { threshold: 0.15 });
+      els.forEach(function (x) { io.observe(x); });
+    })();
+  </script>
 </body>
 </html>
