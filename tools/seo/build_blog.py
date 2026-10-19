@@ -70,6 +70,28 @@ def ensure_nav():
             print("nav: added Blog to", name)
 
 
+def thumb(img, width):
+    """A WebP copy of a local blog image, `width` px wide, written to website/assets/thumbs/. Returns the site path,
+    or the original when it is remote, already small, or Pillow is missing. Social cards keep using the original."""
+    if not img or img.startswith("http"):
+        return img
+    src = os.path.join(WEB, img.lstrip("/"))
+    name = os.path.splitext(os.path.basename(img))[0]
+    rel = "assets/thumbs/%s-%d.webp" % (name, width)
+    dst = os.path.join(WEB, rel)
+    try:
+        from PIL import Image
+        if not os.path.exists(dst) or os.path.getmtime(dst) < os.path.getmtime(src):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with Image.open(src) as im:
+                if im.width <= width:
+                    return img
+                im.convert("RGB").resize((width, round(im.height * width / im.width)), Image.LANCZOS).save(dst, "WEBP", quality=82, method=6)
+        return rel
+    except (ImportError, OSError):
+        return img
+
+
 def head(title, desc, url, image, extra="", kind="website", depth="../"):
     img = image if image.startswith("http") else BASE + image.lstrip("/")
     return f"""<!DOCTYPE html>
@@ -104,7 +126,7 @@ def head(title, desc, url, image, extra="", kind="website", depth="../"):
   <link rel="stylesheet" href="{depth}brand.css?v=3">
   <link rel="stylesheet" href="{depth}style.css?v=64">
   <link rel="stylesheet" href="{depth}glass.css?v=4">
-  <link rel="stylesheet" href="{depth}blog.css?v=3">
+  <link rel="stylesheet" href="{depth}blog.css?v=4">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -130,7 +152,7 @@ def fmt_date(d):
 
 def card(p, i):
     img = p.get("image", "")
-    media = (f'<div class="post-media"><img src="../{e(img)}" alt="" loading="lazy" width="1200" height="675"></div>' if img and not img.startswith("http")
+    media = (f'<div class="post-media"><img src="../{e(thumb(img, 720))}" alt="" loading="lazy" decoding="async" width="720" height="405"></div>' if img and not img.startswith("http")
              else f'<div class="post-media"><img src="{e(img)}" alt="" loading="lazy" width="1200" height="675"></div>' if img
              else '<div class="post-media post-media-empty" aria-hidden="true"><span class="mono">infinite</span></div>')
     return f"""        <article class="post-card" data-cat="{e(p['category'])}" style="--i:{i}">
@@ -205,7 +227,7 @@ def build_post(p, posts, header, footer):
     if len(h2) >= 3:
         toc = '<details class="toc" open><summary class="mono">on this page</summary><ol>' + "".join(f'<li><a href="#{i}">{e(t)}</a></li>' for _, i, t in h2) + "</ol></details>"
     img = p.get("image", "")
-    hero = (f'<figure class="post-hero"><img src="../{e(img)}" alt="{e(p.get("image_alt", p["title"]))}" width="1200" height="675"></figure>' if img and not img.startswith("http")
+    hero = (f'<figure class="post-hero"><img src="../{e(thumb(img, 1200))}" alt="{e(p.get("image_alt", p["title"]))}" width="1200" height="675" decoding="async"></figure>' if img and not img.startswith("http")
             else f'<figure class="post-hero"><img src="{e(img)}" alt="{e(p.get("image_alt", p["title"]))}" width="1200" height="675"></figure>' if img else "")
     related = [r for r in posts if r["slug"] != p["slug"]]
     related.sort(key=lambda r: (-(len(set(r["tags"]) & set(p["tags"]))), r["category"] != p["category"]))

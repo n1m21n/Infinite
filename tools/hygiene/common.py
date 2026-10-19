@@ -75,6 +75,7 @@ PROBE_JS = r"""
   const px = (v) => parseFloat(v) || 0;
   const all = document.body.querySelectorAll('*');
   let n = 0;
+  const idx = new Map();
   all.forEach((el) => {
     if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'PATH', 'CIRCLE', 'RECT', 'LINE', 'G', 'DEFS', 'POLYGON', 'POLYLINE', 'ELLIPSE', 'TSPAN', 'USE', 'STOP', 'LINEARGRADIENT', 'RADIALGRADIENT', 'CLIPPATH', 'MASK', 'FILTER', 'SYMBOL'].includes(el.tagName.toUpperCase())) return;
     if (el.closest('svg') && el.tagName.toLowerCase() !== 'svg') return;
@@ -86,9 +87,10 @@ PROBE_JS = r"""
     let own = '';
     el.childNodes.forEach((c) => { if (c.nodeType === 3) own += c.textContent; });
     own = own.replace(/\s+/g, ' ').trim();
+    idx.set(el, n);
     out.els.push({
       s: sel(el), t: el.tagName.toLowerCase(), p: el.parentElement ? sel(el.parentElement) : '',
-      i: n++, par: el.parentElement ? Array.prototype.indexOf.call(all, el.parentElement) : -1,
+      i: n, par: el.parentElement && idx.has(el.parentElement) ? idx.get(el.parentElement) : -1,
       x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height,
       pad: [px(cs.paddingTop), px(cs.paddingRight), px(cs.paddingBottom), px(cs.paddingLeft)],
       mar: [px(cs.marginTop), px(cs.marginRight), px(cs.marginBottom), px(cs.marginLeft)],
@@ -101,6 +103,7 @@ PROBE_JS = r"""
       ov: cs.overflowX, sec: (el.closest('section') || {}).className || '', link: el.tagName === 'A' || el.tagName === 'BUTTON',
       inpar: !!el.closest('p, li, h1, h2, h3, figcaption'),
     });
+    n++;
   });
   document.querySelectorAll('img').forEach((im) => {
     const r = im.getBoundingClientRect();
@@ -165,7 +168,7 @@ def run(checks, desc, want_load=False):
             w, h = VIEWPORTS[vp]
             ctx = b.new_context(viewport={"width": w, "height": h}, device_scale_factor=2 if vp == "phone" else 1, reduced_motion="no-preference")
             for rel in pl:
-                pg = ctx.new_page()
+                pg = ctx.new_page(); pg.set_default_timeout(20000)
                 sizes = {}
                 def _size(r, s=sizes):
                     try:

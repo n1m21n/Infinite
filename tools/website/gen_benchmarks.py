@@ -399,7 +399,7 @@ def page(body, n):
     body_w = re.sub(r"(<table class=\"t.*?</table>)", r'<div class="bm-scroll">\1</div>', body, flags=re.S)
     qa = "".join(f"<h3>{esc(q)}</h3><p>{esc(a)}</p>" for q, a in faq())
     main = (f'<main>\n    <section class="section lib-hero">\n      <div class="container bm-wrap">\n        <div class="section-head">\n'
-            '          <p class="lib-hand hand">measured, not claimed</p>\n          <h1 class="slab">Infinite benchmarks</h1>\n'
+            '          <p class="lib-hand hand">measured</p>\n          <h1 class="slab">Infinite benchmarks</h1>\n'
             '          <p class="section-sub">How Infinite v0.6 compares with the instruments, effects and creative tools you already use, on a base MacBook Air. Including the parts where it is slower.</p>\n'
             f'          <div class="bm-actions"><a class="btn btn-primary" href="assets/{PDF_NAME}" download>Download the PDF</a>'
             '<a class="btn btn-ghost" href="assets/benchmarks.json">Raw data (JSON)</a>'

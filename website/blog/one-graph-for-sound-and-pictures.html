@@ -28,9 +28,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css?v=3">
-  <link rel="stylesheet" href="../style.css?v=87">
+  <link rel="stylesheet" href="../style.css?v=89">
   <link rel="stylesheet" href="../glass.css?v=4">
-  <link rel="stylesheet" href="../blog.css?v=3">
+  <link rel="stylesheet" href="../blog.css?v=4">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -118,7 +118,7 @@
           <p class="post-lede">Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.</p>
           <p class="post-by">By <a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a></p>
         </header>
-        <figure class="post-hero"><img src="../assets/nodegraph.png" alt="A node graph in Infinite with audio and image nodes connected by cables" width="1200" height="675"></figure>
+        <figure class="post-hero"><img src="../assets/nodegraph.png" alt="A node graph in Infinite with audio and image nodes connected by cables" width="1200" height="675" decoding="async"></figure>
         <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#two-graphs-one-clock">Two graphs, one clock</a></li><li><a href="#modulation-crosses-the-boundary">Modulation crosses the boundary</a></li><li><a href="#why-one-canvas-helps">Why one canvas helps</a></li><li><a href="#try-it">Try it</a></li></ol></details>
         <div class="prose">
 <p>Video tools and audio tools usually live in separate programs. You wire them together with OSC, MIDI clock or a texture-sharing protocol, and you accept a little latency and jitter on the way. Infinite takes a different route: audio and visuals are two parts of one engine that share a transport.</p>
@@ -154,7 +154,7 @@
       <div class="footer-grid">
         <div class="footer-brand">
           <div class="brand">
-            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
             <span class="brand-name">Infinite</span>
           </div>
           <p>Visuals, music and code on one infinite canvas.</p>

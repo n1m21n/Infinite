@@ -80,7 +80,7 @@ def page(packs):
     <section class="section lib-hero">
       <div class="container">
         <div class="section-head">
-          <p class="lib-hand hand">more to play with</p>
+          <p class="lib-hand hand">more</p>
           <h1 class="slab">Extensions</h1>
           <p class="section-sub">Optional packs for the heavy things. Nothing extra ships in the app: install a pack from Settings while Infinite runs, only if you want it.</p>
         </div>

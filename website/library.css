@@ -112,3 +112,4 @@ body:has(.lib-hero) { overflow-x: clip; }
 .lib-opt[aria-selected="true"] { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink); }
 .lib-opt-n { font: 0.72rem var(--font-mono); color: var(--ink-3); }
 @media (max-width: 720px) { .lib-chips { width: auto; margin: 0; padding: 0; max-width: none; } .lib-menu { min-width: min(260px, calc(100vw - 32px)); } }
+.lib-grid:empty { min-height: 1600px; }   /* reserve the grid before the index loads, so the footer does not jump */

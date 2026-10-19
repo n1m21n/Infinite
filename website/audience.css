@@ -84,7 +84,7 @@
 
 .pads { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .pad { min-height: 52px; padding: 8px 12px; border-radius: var(--r-pill); background: var(--deep); color: var(--ink); font: 600 0.85rem/1.2 'Geist', system-ui, sans-serif; cursor: pointer; transition: transform 188ms var(--spring-press, ease), box-shadow 188ms; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.pad small { font: 500 0.64rem/1 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.04em; margin-top: 4px; }
+.pad small { font: 500 0.6875rem/1 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.04em; margin-top: 4px; }
 .pad:hover { transform: translateY(-2px); }
 .pad.live { box-shadow: inset 0 0 0 2px var(--signal); }
 .pad.queued { animation: queued 500ms steps(2, jump-none) infinite; }

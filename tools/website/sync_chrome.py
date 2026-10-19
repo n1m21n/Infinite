@@ -16,7 +16,7 @@ import json, os, re, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 GH = "https://github.com/n1m21n/Infinite"
-CSS_VERSION = "88"   # style.css cache key; bump when the menu or footer CSS changes
+CSS_VERSION = "89"   # style.css cache key; bump when the menu or footer CSS changes
 JS_VERSION = "13"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
@@ -178,7 +178,7 @@ def footer_html(rel):
       <div class="footer-grid">
         <div class="footer-brand">
           <div class="brand">
-            <img src="{p}assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+            <img src="{p}assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
             <span class="brand-name">Infinite</span>
           </div>
           <p>Visuals, music and code on one infinite canvas.</p>{signup_html(rel)}

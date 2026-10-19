@@ -20,9 +20,9 @@ here is an in-depth breakdown of seven standout original nodes in infinite that 
 
 ## 1. wave terrain: converting images and textures into sound
 
-wave terrain synthesis treats any 2d image—whether a drawn sketch, a webcam feed, a reaction-diffusion pattern, or procedural noise—as a continuous 3d topographic terrain surface `z = T(u, v)`.
+wave terrain synthesis treats any 2d image (a drawn sketch, a webcam feed, a reaction-diffusion pattern or procedural noise) as a continuous 3d topographic terrain surface `z = T(u, v)`.
 
-![wave terrain node: scanning continuous 2d image topography at audio rates](../assets/nodes/wave-terrain.png)
+![wave terrain node: scanning continuous 2d image topography at audio rates](../assets/nodes/wave-terrain.webp)
 
 ### how it works
 1. **orbital trajectories**: an audio-rate oscillator traces a closed parametric path `(u(t), v(t))` across the image (such as an ellipse, lissajous curve, lemniscate, or spiral).
@@ -37,7 +37,7 @@ what does a 3d torus sound like when struck? what does an icosphere sound like c
 
 the **shape resonator** node answers this by computing the acoustic standing waves and vibration modes of any input 3d geometry mesh.
 
-![shape resonator node: physical modal acoustic resonance of 3d geometry](../assets/nodes/shape-resonator.png)
+![shape resonator node: physical modal acoustic resonance of 3d geometry](../assets/nodes/shape-resonator.webp)
 
 ### how it works
 1. **laplace-beltrami modal solver**: on a dedicated worker thread, infinite solves the surface-laplacian eigenvalues `λ_i` of the mesh.
@@ -54,7 +54,7 @@ the **shape resonator** node answers this by computing the acoustic standing wav
 
 the **audio displacement** node takes any 3d mesh and deforms its vertex topology in real time directly from incoming audio waveforms.
 
-![audio displacement node: 5 real-time deformation modes including chladni cymatics](../assets/nodes/audio-displacement.png)
+![audio displacement node: 5 real-time deformation modes including chladni cymatics](../assets/nodes/audio-displacement.webp)
 
 ### five real-time modes
 - **normal waveform**: pushes vertices outward along their surface normals proportionally to the raw oscilloscope audio signal.
@@ -72,7 +72,7 @@ the **audio displacement** node takes any 3d mesh and deforms its vertex topolog
 
 for artists who think in mathematical formulas, **equation synth** provides an interactive cartesian graphing plane where any mathematical formula `y = f(x, a, b, c, d)` becomes an anti-aliased polyphonic synthesizer.
 
-![equation synth node: evaluating mathematical curves as anti-aliased wavetables](../assets/nodes/equation-synth.png)
+![equation synth node: evaluating mathematical curves as anti-aliased wavetables](../assets/nodes/equation-synth.webp)
 
 whether exploring chebyshev polynomials, weierstrass fractal curves, or phase-modulated gaussian wave packets, equation synth graphs the function visually and compiles it into bandlimited wavetable mipmaps for pristine audio playback.
 
@@ -82,7 +82,7 @@ whether exploring chebyshev polynomials, weierstrass fractal curves, or phase-mo
 
 the **audio ribbon** node extrudes incoming audio waveforms into a physical 3d ribbon geometry traveling through space.
 
-![audio ribbon node: extruded 3d waveform mesh with physical pbr materials](../assets/nodes/audio-ribbon.png)
+![audio ribbon node: extruded 3d waveform mesh with physical pbr materials](../assets/nodes/audio-ribbon.webp)
 
 unlike 2d flat oscilloscope lines, the audio ribbon is a true procedural polygonal mesh that can be lit with directional lights, cast shadows, and rendered with physically based metallic and emission materials.
 
@@ -92,7 +92,7 @@ unlike 2d flat oscilloscope lines, the audio ribbon is a true procedural polygon
 
 the **audio color ramp** node analyzes live frequency spectrums and dynamically drives gradient color ramps used across 2d visuals, 3d materials, and shader backgrounds.
 
-![audio color ramp node: modulating color stops and gradients from live audio](../assets/nodes/audio-color-ramp.png)
+![audio color ramp node: modulating color stops and gradients from live audio](../assets/nodes/audio-color-ramp.webp)
 
 ### operating modes
 - **intensity mode**: low frequencies cause deep color glow while high-frequency percussion triggers bright highlights.
@@ -105,7 +105,7 @@ the **audio color ramp** node analyzes live frequency spectrums and dynamically 
 
 the **audio texture** node converts audio streams directly into a 2d gpu texture at 60 fps.
 
-![audio texture node: streaming audio waveforms and spectrograms as gpu textures](../assets/nodes/audio-texture.png)
+![audio texture node: streaming audio waveforms and spectrograms as gpu textures](../assets/nodes/audio-texture.webp)
 
 this texture can be cabled directly into materials, raymarchers, and field pixel shader nodes, allowing custom glsl kernels to sample audio buffers as standard `sampler2D` textures with zero cpu overhead.
 

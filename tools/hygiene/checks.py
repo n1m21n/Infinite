@@ -100,6 +100,8 @@ def spacing(rec):
                 a, b = flow[i], flow[j]
                 ox = min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"])
                 oy = min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"])
+                if a["s"].startswith("div#nav-menu") or b["s"].startswith("div#nav-menu"):
+                    continue   # the phone sheet slides over the page by design
                 if ox > 6 and oy > 6 and not (a["mar"][2] < 0 or b["mar"][0] < 0):
                     out.append(Finding("siblings-overlap", "error", a["s"] + " / " + b["s"], "overlap %gx%g px" % (round(ox), round(oy))))
     return out
@@ -129,6 +131,8 @@ def typography(rec):
             if ch > PROSE_MAX + 14:
                 out.append(Finding("measure-too-wide", "warn", e["s"], "about %d characters a line; brand body measure is up to %d" % (ch, PROSE_MAX)))
         t = e["own"]
+        if e["t"] in ("code", "pre"):
+            continue
         if "—" in t or "–" in t and " – " in t:
             out.append(Finding("em-dash", "error", e["s"], "dash in copy: " + t[:50]))
         if AMERICAN.search(t):

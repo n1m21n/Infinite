@@ -46,6 +46,8 @@ def img_size_attrs(src):
                 return ""
         else:
             return ""
+        if "assets/nodes/" in src:
+            w, h = w // 2, h // 2   # 2x captures of the app: CSS pixels are half the file
         return f' width="{w}" height="{h}"'
     except (OSError, struct.error, TypeError):
         return ""

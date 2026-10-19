@@ -157,7 +157,7 @@ def build_gallery(items):
   <link rel="stylesheet" href="../brand.css?v=3">
   <link rel="stylesheet" href="../style.css?v=81">
   <link rel="stylesheet" href="../glass.css?v=4">
-  <link rel="stylesheet" href="../blog.css?v=3">
+  <link rel="stylesheet" href="../blog.css?v=4">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="blog-page">

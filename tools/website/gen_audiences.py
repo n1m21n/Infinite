@@ -141,7 +141,7 @@ def check_links():
             if not os.path.exists(os.path.join(W, "library", sl + ".html")):
                 bad.append("library/" + sl + ".html")
         need = [a["extra"][0]]
-        need += ["assets/nodes/%s.png" % n for n, _, _ in a.get("bench", {}).get("items", [])]
+        need += ["assets/nodes/%s.webp" % n for n, _, _ in a.get("bench", {}).get("items", [])]
         need += [r[0] for r in a.get("reel", {}).get("items", [])]
         for f in need:
             if not os.path.exists(os.path.join(W, f)):
@@ -195,10 +195,10 @@ def lab_html(a):
 
 
 def png_size(n):
-    import struct
-    with open(os.path.join(W, "assets", "nodes", n + ".png"), "rb") as f:
-        w, h = struct.unpack(">II", f.read(24)[16:24])
-    return f' width="{w}" height="{h}"'
+    from PIL import Image   # the shots are 2x captures: width and height are CSS pixels, half the file
+    with Image.open(os.path.join(W, "assets", "nodes", n + ".webp")) as im:
+        w, h = im.size
+    return f' width="{w // 2}" height="{h // 2}"'
 
 
 def main_html(a, rel):
@@ -210,7 +210,7 @@ def main_html(a, rel):
     bench = ""
     if a.get("bench"):
         B = a["bench"]
-        figs = "".join(f'<figure class="bn"><img src="assets/nodes/{n}.png" alt="The {e(t)} node as it looks in Infinite"{png_size(n)} loading="lazy" decoding="async"><figcaption><b>{e(t)}</b><span>{e(d)}</span></figcaption></figure>' for n, t, d in B["items"])
+        figs = "".join(f'<figure class="bn"><img src="assets/nodes/{n}.webp" alt="The {e(t)} node as it looks in Infinite"{png_size(n)} loading="lazy" decoding="async"><figcaption><b>{e(t)}</b><span>{e(d)}</span></figcaption></figure>' for n, t, d in B["items"])
         bench = f'''
       <section class="aud-section reveal">
         <h2>{e(B["title"])}</h2>

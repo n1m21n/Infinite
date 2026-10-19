@@ -49,4 +49,4 @@ infinite does not stop at audio and visuals; it also outputs dmx lighting frames
 - map the kick drum audio transient from **audio analyze** to dmx channel 1 (strobe intensity).
 - map the root note pitch from **midi in** to dmx rgb fixtures across your stage.
 
-with infinite, your entire live performance—audio synthesis, visual projection, hardware sequencing, and lighting—runs inside a single memory space, running rock solid at 60 fps without dropping a single audio buffer.
+with infinite, your entire live performance (audio synthesis, visual projection, hardware sequencing and lighting) runs inside a single memory space, running rock solid at 60 fps without dropping a single audio buffer.
