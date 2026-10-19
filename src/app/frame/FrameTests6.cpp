@@ -661,4 +661,237 @@ void FrameTest_TEXTMOVETEST(int frameId, GLFWwindow* window)
       glDeleteFramebuffers(1, &scratchFbo);
    printf("TEXTMOVETEST %s\n", ok ? "PASS" : "FAIL");
 }
+
+// Cook cost of every registered node type, one type per frame. Each is spawned
+// the way the editor spawns it, fed a 1920x1080 noise image on every image
+// input, and timed three ways, wall clock with glFinish so GPU
+// work counts:
+//   cold   - the first cook (includes shader compiles and allocations)
+//   idle   - median of 8 cooks on new frames with nothing changed (the feed
+//            holds one revision); well above zero means the node redraws
+//            every frame even in a static patch
+//   forced - median of 8 cooks with a fresh input revision on every pull and
+//            every float param nudged
+//            by a hair, i.e. what the node costs while something animates it
+// Geometry sources also have GetMesh() timed inside each cook. Hardware-driven
+// and outward-facing nodes (camera, NDI, Syphon, OSC, MIDI, projection, audio
+// out, plugins) are skipped. A measurement, not a gate: the verdict line is
+// DONE unless a type could not be spawned.
+namespace
+{
+   class CookSweepFeed : public INode
+   {
+   public:
+      unsigned int tex = 0;
+      int w = 1, h = 1;
+      unsigned int GetOutputTexture() override { return tex; }
+      int GetOutputWidth() const override { return w; }
+      int GetOutputHeight() const override { return h; }
+      void CookIfNeeded(int) override {}
+      // Held during the idle pass, a fresh stamp on every pull otherwise.
+      bool hold = false;
+      unsigned long long held = NextTextureRevision();
+      unsigned long long TextureRevision() const override { return hold ? held : NextTextureRevision(); }
+   };
+
+   class CookSweepNudge : public ParamVisitor
+   {
+   public:
+      std::vector<float> orig;
+      bool capture = true, up = false;
+      size_t i = 0;
+      void Float(const char*, float& v) override
+      {
+         if (capture) { orig.push_back(v); return; }
+         if (i < orig.size())
+            v = up ? orig[i] + std::max(1e-6f, std::fabs(orig[i]) * 1e-4f) : orig[i];
+         i++;
+      }
+      void Int(const char*, int&) override {}
+      void Bool(const char*, bool&) override {}
+      void Text(const char*, std::string&) override {}
+      void Color(const char*, float*) override {}
+   };
+
+   struct CookSweepRow
+   {
+      std::string category, name;
+      double cold = 0, idle = 0, forced = 0;
+      int idleWork = 0, forcedWork = 0;
+   };
+}
+
+void FrameTest_COOKSWEEPTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_COOKSWEEPTEST") == nullptr)
+      return;
+   struct Item { std::string name, category; };
+   static std::vector<Item> sItems;
+   static size_t sNext = 0;
+   static bool sListed = false;
+   static std::vector<CookSweepRow> sRows;
+   static std::vector<std::string> sSkipped, sFailed;
+   static std::unique_ptr<INode> sNoise;
+   static CookSweepFeed sFeed;
+   static int sCookId = 2000000;
+   if (frameId < 3)
+      return;
+
+   const char* only = getenv("INFINITE_COOKSWEEPTEST");
+   if (!sListed)
+   {
+      sListed = true;
+      for (const std::string& category : NodeFactory::Instance().GetCategories())
+         for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+            if (only[0] == '\0' || only[0] == '1' || name == only)
+               sItems.push_back({ name, category });
+      while (!gNodes.empty())
+         RemoveNodeByIndex(gNodes.back().index);
+      sNoise.reset(NodeFactory::Instance().MakeNode("Noise"));
+      if (auto* noise = dynamic_cast<NoiseNode*>(sNoise.get()))
+      {
+         noise->width = 1920.0f;
+         noise->height = 1080.0f;
+      }
+      if (sNoise != nullptr)
+      {
+         sNoise->CookIfNeeded(sCookId++);
+         glFinish();
+         sFeed.tex = sNoise->GetOutputTexture();
+         sFeed.w = sNoise->GetOutputWidth();
+         sFeed.h = sNoise->GetOutputHeight();
+      }
+      printf("COOKSWEEPTEST %zu node type(s), feed %dx%d\n", sItems.size(), sFeed.w, sFeed.h);
+      return;
+   }
+
+   auto median = [](std::vector<double> v) -> double
+   {
+      std::sort(v.begin(), v.end());
+      return v.empty() ? 0.0 : v[v.size() / 2];
+   };
+
+   if (sNext >= sItems.size())
+   {
+      std::vector<CookSweepRow> byForced = sRows;
+      std::sort(byForced.begin(), byForced.end(),
+                [](const CookSweepRow& a, const CookSweepRow& b) { return a.forced > b.forced; });
+      printf("COOKSWEEPTEST --- slowest while animated (forced ms) ---\n");
+      for (size_t i = 0; i < byForced.size() && i < 30; i++)
+         printf("COOKSWEEPTEST top %-12s %-28s forced %8.2f  idle %7.2f  cold %8.2f\n",
+                byForced[i].category.c_str(), byForced[i].name.c_str(),
+                byForced[i].forced, byForced[i].idle, byForced[i].cold);
+      printf("COOKSWEEPTEST --- redraws with nothing changed (idle >= 0.5 ms) ---\n");
+      for (const CookSweepRow& r : byForced)
+         if (r.idle >= 0.5)
+            printf("COOKSWEEPTEST idle %-12s %-28s idle %7.2f  (work %d/8)\n",
+                   r.category.c_str(), r.name.c_str(), r.idle, r.idleWork);
+      printf("COOKSWEEPTEST --- slow first cook (cold >= 100 ms) ---\n");
+      for (const CookSweepRow& r : byForced)
+         if (r.cold >= 100.0)
+            printf("COOKSWEEPTEST cold %-12s %-28s cold %8.2f\n", r.category.c_str(), r.name.c_str(), r.cold);
+      printf("COOKSWEEPTEST skipped %zu:", sSkipped.size());
+      for (const std::string& s : sSkipped)
+         printf(" [%s]", s.c_str());
+      printf("\n");
+      if (sFailed.empty())
+         printf("COOKSWEEPTEST %zu types timed  DONE\n", sRows.size());
+      else
+      {
+         printf("COOKSWEEPTEST FAIL: %zu type(s) could not be spawned:", sFailed.size());
+         for (const std::string& s : sFailed)
+            printf(" [%s]", s.c_str());
+         printf("\n");
+      }
+      fflush(stdout);
+      sNoise.reset();
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+      return;
+   }
+
+   const Item it = sItems[sNext++];
+   static const char* kSkipNames[] = { "Plugin", "Projection", "NDI Out", "Syphon Out", "OSC Send",
+                                       "OSC Receive", "MIDI Out", "Audio Out", "Output", "Comment" };
+   for (const char* s : kSkipNames)
+      if (it.name == s)
+      {
+         sSkipped.push_back(it.name);
+         return;
+      }
+   {
+      std::unique_ptr<INode> probe(NodeFactory::Instance().MakeNode(it.name));
+      if (probe != nullptr)
+      {
+         auto* audio = dynamic_cast<IAudioSource*>(probe.get());
+         if (probe->IsHardwareDriven() || (audio != nullptr && audio->IsHardwareDriven()))
+         {
+            sSkipped.push_back(it.name);
+            return;
+         }
+      }
+   }
+
+   // Stderr before touching the node, so a crash names the type that caused it.
+   fprintf(stderr, "[cooksweep] %s / %s\n", it.category.c_str(), it.name.c_str());
+   fflush(stderr);
+   GraphNode* gn = SpawnNode(it.name, it.category, 20.0f, 20.0f);
+   if (gn == nullptr)
+   {
+      sFailed.push_back(it.name);
+      return;
+   }
+   for (int slot = 0; slot < InputCountFor(*gn); slot++)
+      if (ImageCable* cable = CableFor(*gn, slot))
+         cable->Connect(&sFeed);
+
+   INode* node = gn->node.get();
+   auto* geo = dynamic_cast<IGeometrySource*>(node);
+   auto timedCook = [&](int& work) -> double
+   {
+      glFinish();
+      const unsigned long long w0 = NodeWorkCounter();
+      const auto t0 = std::chrono::steady_clock::now();
+      node->CookIfNeeded(sCookId++);
+      if (geo != nullptr)
+         (void)geo->GetMesh();
+      glFinish();
+      const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+      if (NodeWorkCounter() != w0)
+         work++;
+      return ms;
+   };
+
+   CookSweepRow row;
+   row.category = it.category;
+   row.name = it.name;
+   int coldWork = 0;
+   row.cold = timedCook(coldWork);
+   (void)timedCook(coldWork); // settle anything the first cook deferred
+   std::vector<double> idle, forced;
+   sFeed.hold = true;
+   (void)timedCook(coldWork); // let input-keyed caches see the held revision once
+   for (int i = 0; i < 8; i++)
+      idle.push_back(timedCook(row.idleWork));
+   sFeed.hold = false;
+   CookSweepNudge nudge;
+   node->VisitParams(nudge);
+   nudge.capture = false;
+   for (int i = 0; i < 8; i++)
+   {
+      nudge.i = 0;
+      nudge.up = (i % 2) == 0;
+      node->VisitParams(nudge);
+      forced.push_back(timedCook(row.forcedWork));
+   }
+   nudge.i = 0;
+   nudge.up = false;
+   node->VisitParams(nudge);
+   row.idle = median(idle);
+   row.forced = median(forced);
+   printf("COOKSWEEPTEST row %-12s %-28s cold %8.2f  idle %7.2f (work %d/8)  forced %8.2f (work %d/8)\n",
+          row.category.c_str(), row.name.c_str(), row.cold, row.idle, row.idleWork, row.forced, row.forcedWork);
+   fflush(stdout);
+   sRows.push_back(row);
+   RemoveNodeByIndex(gn->index);
+}
 }

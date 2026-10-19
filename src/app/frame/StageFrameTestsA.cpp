@@ -2439,6 +2439,9 @@ void DrawFrameTestsA(FrameCtx& fc)
       // and is drawn exactly again once it holds still.
       FrameTest_TEXTMOVETEST(frameId, window);
 
+      // Cook cost of every node type: cold, idle and while animated.
+      FrameTest_COOKSWEEPTEST(frameId, window);
+
       FrameTest_BYPASSRULETEST(frameId, window);
 
       FrameTest_BYPASSSWEEPTEST(frameId, window);
