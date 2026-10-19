@@ -30,7 +30,7 @@ def main():
                     "Everything you need to write real Field kernels and build real devices: the domains, the syntax, "
                     "the declarations, and the six node types that host them.",
                     [("Covers", "Field v1 and v1.1"), ("Style", "direct, example-driven"),
-                     ("Audience", "device builders and AI assistants")], P.LOGO_TILE)
+                     ("Audience", "device builders and AI assistants")], P.LOGO_TILE, art="node_field_pixel")
     cover = cover.rstrip()[:-len("</div>")] + """<div class="panel" style="position:absolute;left:0;right:0;bottom:0">
       <div class="kick">One primitive, five domains</div>
       <p style="color:var(--ink-2);margin:6px 0 10px">A Field kernel is a short body of code, run once per element of a domain. Whether it becomes a shader, a geometry deformer or a DSP effect falls out of which identifiers it touches and which node hosts it.</p>

@@ -12,7 +12,20 @@ import subprocess
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FONTS = os.path.join(ROOT, "art", "brand", "fonts")
 LOGO_TILE = os.path.join(ROOT, "docs", "brand", "img", "logo_tile.webp")
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+ART = os.path.join(ROOT, "website", "assets", "3d")
+
+
+def _chrome():
+    """INFINITE_CHROME, then Google Chrome on macOS, then any Chromium (Playwright's, or on PATH)."""
+    import glob
+    import shutil
+    for c in [os.environ.get("INFINITE_CHROME", ""), "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"] + sorted(glob.glob("/opt/pw-browsers/chromium-*/chrome-linux/chrome")):
+        if c and os.path.exists(c):
+            return c
+    return shutil.which("chromium") or shutil.which("google-chrome") or "chrome"
+
+
+CHROME = _chrome()
 
 # Cable colours are the app's default light theme (src/core/CategoryColors.cpp, DefaultCableColor).
 CABLES = [("Image", "#373E4E"), ("Modulator", "#D7780A"), ("Audio", "#1E64E6"), ("Notes", "#14963C"), ("Palette", "#AA28B4")]
@@ -35,7 +48,7 @@ CSS = (
     + _face("Caveat", 700, "Caveat-Bold.ttf")
     + """
 @page { size: 8.5in 11in; margin: 0; }
-:root { --ground:#FBFAF6; --deep:#EFF0F4; --surface:#FFFFFF; --surface-3:#F5F5F8; --line:#DAD8E6;
+:root { --lift: none; --well: #F1F2F8; --ground:#FBFAF6; --deep:#EFF0F4; --surface:#F6F7FB; --surface-3:#F5F5F8; --line:#DAD8E6;
         --ink:#12152A; --ink-2:#404660; --ink-3:#5A6180; --signal:#4A54D6; --accent:#D9430E; --accent-ink:#B53700; }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--ground); color: var(--ink);
@@ -47,7 +60,9 @@ table.w > tbody > tr > td, table.w > thead td, table.w > tfoot td { padding: 0 0
 .hand { font-family: "Caveat", cursive; font-weight: 700; color: var(--accent-ink); }
 .folio { font-family: "Geist Mono", monospace; font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
 .kick { font-family: "Geist Mono", monospace; font-size: 9px; letter-spacing: 0.12em; color: var(--signal); text-transform: uppercase; }
-h1 { font-weight: 750; font-size: 30px; line-height: 1.06; letter-spacing: -0.035em; margin: 6px 0 12px; break-after: avoid; }
+.chap { display: flex; align-items: center; gap: 10px; }
+.chap::before { content: ""; width: 28px; height: 4px; border-radius: 4px; background: var(--signal); }
+h1 { font-weight: 750; font-size: 32px; line-height: 1.06; letter-spacing: -0.035em; margin: 6px 0 12px; break-after: avoid; }
 h2 { font-weight: 700; font-size: 22px; line-height: 1.1; letter-spacing: -0.025em; margin: 22px 0 8px; break-after: avoid; }
 h3 { font-weight: 650; font-size: 14.5px; line-height: 1.2; letter-spacing: -0.015em; margin: 16px 0 6px; break-after: avoid; }
 p { font-size: 11.4px; line-height: 1.55; margin: 0 0 9px; color: var(--ink); }
@@ -55,16 +70,16 @@ p { font-size: 11.4px; line-height: 1.55; margin: 0 0 9px; color: var(--ink); }
 ul, ol { font-size: 11.4px; line-height: 1.55; margin: 0 0 10px; padding-left: 19px; }
 li { margin: 2px 0; } li::marker { color: var(--signal); }
 code { font-family: "Geist Mono", monospace; font-size: 9.6px; background: var(--deep); border-radius: 4px; padding: 1px 5px; }
-pre { background: var(--deep); border-radius: 10px; padding: 12px 15px; margin: 0 0 12px; break-inside: avoid; white-space: pre-wrap; }
-pre code { background: none; padding: 0; font-size: 9.3px; line-height: 1.55; }
+pre { background: #151930; color: #EEF1FA; border-radius: 14px; padding: 14px 18px; margin: 0 0 12px; break-inside: avoid; white-space: pre-wrap; }
+pre code { background: none; padding: 0; font-size: 9.3px; line-height: 1.6; color: #EEF1FA; }
 table.t { width: 100%; border-collapse: separate; border-spacing: 0; margin: 0 0 14px; font-size: 10.3px; background: var(--surface);
-  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  box-shadow: var(--lift); border-radius: 14px; overflow: hidden; }
 table.t th { text-align: left; font-family: "Geist Mono", monospace; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--ink-3); background: var(--surface-3); padding: 7px 10px; font-weight: 500; }
+  color: var(--signal); background: #E1E7FF; padding: 8px 10px; font-weight: 500; }
 table.t td { padding: 6px 10px; border-top: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
 table.t tr { break-inside: avoid; }
-.card { display: flex; gap: 18px; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
-  padding: 16px 18px; margin: 0 0 12px; break-inside: avoid; }
+.card { display: flex; gap: 18px; align-items: flex-start; background: var(--surface); box-shadow: var(--lift); border-radius: 20px;
+  padding: 18px 20px; margin: 0 0 12px; break-inside: avoid; }
 .card .txt { flex: 1; min-width: 0; }
 .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .card h2 { font-size: 15.5px; margin: 0 0 7px; letter-spacing: -0.015em; }
@@ -73,16 +88,16 @@ table.t tr { break-inside: avoid; }
 .try { border-top: 1px solid var(--line); padding-top: 8px; font-size: 10.6px; line-height: 1.45; color: var(--ink-2); }
 .try b { font-family: "Geist Mono", monospace; font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--signal); font-weight: 500; margin-right: 6px; }
 .chain { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
-.chip { font-family: "Geist Mono", monospace; font-size: 8.8px; color: var(--signal); border: 1px solid var(--signal); border-radius: 99px; padding: 2px 8px; }
+.chip { font-family: "Geist Mono", monospace; font-size: 8.8px; color: #3A3E9D; background: #E1E7FF; border-radius: 99px; padding: 3px 9px; }
 .arrow { color: var(--ink-3); font-size: 10px; }
-.shot { flex: none; background: var(--deep); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.shot { flex: none; background: #E6E8F2; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .shot img { display: block; image-rendering: auto; }
 .cap { font-family: "Geist Mono", monospace; font-size: 7.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); text-align: center; }
 .row { display: flex; gap: 14px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); break-inside: avoid; }
 .row .shot { padding: 6px; border-radius: 9px; }
 .row h3 { margin: 0 0 3px; font-size: 12.5px; }
 .row p { margin: 0; font-size: 10.6px; color: var(--ink-2); }
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; }
+.panel { background: var(--surface); box-shadow: var(--lift); border-radius: 20px; padding: 22px 24px; }
 .panel p:last-child { margin: 0; }
 .toc { list-style: none; padding: 0; margin: 10px 0 0; }
 .toc li { break-inside: avoid; display: flex; align-items: baseline; border-bottom: 1px solid var(--line); padding: 7px 0; font-size: 11.4px; margin: 0; }
@@ -93,7 +108,7 @@ table.t tr { break-inside: avoid; }
   border-top: 1px solid var(--line); padding-top: 7px; }
 .page { break-after: page; }
 .grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 6px 0 14px; }
-.cell { background: var(--deep); border-radius: 9px; padding: 7px 7px 6px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; break-inside: avoid; min-width: 58px; max-width: 150px; }
+.cell { background: #E6E8F2; border-radius: 9px; padding: 7px 7px 6px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; break-inside: avoid; min-width: 58px; max-width: 150px; }
 .cell img { display: block; }
 .cell .nm { font-size: 8.8px; font-weight: 600; text-align: center; line-height: 1.2; color: var(--ink); }
 .fig { display: inline-block; vertical-align: top; margin: 0 10px 14px 0; break-inside: avoid; }
@@ -116,29 +131,38 @@ def render(html_text, out_pdf, workdir):
     src = os.path.join(workdir, os.path.basename(out_pdf) + ".html")
     with open(src, "w", encoding="utf-8") as f:
         f.write(html_text)
-    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", "--virtual-time-budget=4000",
+    subprocess.run([CHROME, "--headless=new", "--disable-gpu"] + (["--no-sandbox"] if hasattr(os, "geteuid") and os.geteuid() == 0 else []) + [ "--no-pdf-header-footer", "--virtual-time-budget=4000",
                     "--allow-file-access-from-files", f"--print-to-pdf={out_pdf}", "file://" + src],
                    check=True, capture_output=True, timeout=300)
 
 
-def cover(kicker, title_a, hand_word, title_b, lead, pills, logo_png=None):
-    """Cover page HTML. One Caveat word, one Ember mark: the hand word."""
+def cover(kicker, title_a, hand_word, title_b, lead, pills, logo_png=None, art="node_hero"):
+    """Full-bleed Midnight cover. One Caveat word in Ember is the look-here; the 3D render is the instrument.
+    The caller may append a panel before the final </div>: it sits at the bottom of the page as a white card."""
     logo = f'<img src="file://{logo_png}" style="width:54px;height:54px;border-radius:12px">' if logo_png else ""
     pill_html = "".join(f'<span class="pill">{esc(k)} <b>{esc(v)}</b></span>' for k, v in pills)
+    img = os.path.join(ART, art + ".webp")
+    art_html = f'<img src="file://{img}" style="position:absolute;right:-0.15in;top:3.1in;width:5.6in;filter:drop-shadow(0 26px 30px rgba(4,5,14,.6))">' if os.path.exists(img) else ""
     return f"""
-<div class="page" style="padding-top:0.25in; height:9.45in; position:relative">
-  <div style="display:flex; align-items:center; gap:14px">{logo}<div class="folio">INFINITE &nbsp;/&nbsp; {esc(kicker)}</div></div>
-  <div style="font-weight:800; font-size:56px; letter-spacing:-0.04em; line-height:0.98; margin-top:1.1in">{esc(title_a)}</div>
-  <div style="display:flex; align-items:baseline; gap:16px; flex-wrap:wrap">
-    <span class="hand" style="font-size:84px; line-height:1">{esc(hand_word)}</span>
-    <span style="font-weight:800; font-size:56px; letter-spacing:-0.04em; line-height:0.98">{esc(title_b)}</span></div>
-  <p class="lead" style="margin-top:26px; max-width:5.3in">{esc(lead)}</p>
-  <div style="display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 0">{pill_html}</div>
+<div class="page" style="height:9.45in; position:relative">
+  <div style="position:absolute; left:-0.7in; top:-0.62in; width:8.5in; height:11in; background:#151930; overflow:hidden; color:#EEF1FA">
+    <div style="position:absolute;left:0;top:0;right:0;bottom:0;background-image:radial-gradient(rgba(167,177,255,.06) 1px, transparent 1.2px);background-size:22px 22px"></div>
+    <div style="position:absolute; left:0.7in; top:0.62in; display:flex; align-items:center; gap:14px">{logo}<div class="folio" style="color:#A7B1FF">INFINITE &nbsp;/&nbsp; {esc(kicker)}</div></div>
+    {art_html}
+    <div style="position:absolute; left:0.7in; top:1.5in; width:6.4in">
+      <div style="font-weight:800; font-size:60px; letter-spacing:-0.04em; line-height:0.98">{esc(title_a)}</div>
+      <div style="display:flex; align-items:baseline; gap:16px; flex-wrap:wrap">
+        <span class="hand" style="font-size:92px; line-height:1; color:#FF6B35">{esc(hand_word)}</span>
+        <span style="font-weight:800; font-size:60px; letter-spacing:-0.04em; line-height:0.98">{esc(title_b)}</span></div>
+      <p class="lead" style="margin-top:26px; max-width:4.4in; color:#C9CFE8">{esc(lead)}</p>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 0; max-width:5.2in">{pill_html}</div>
+    </div>
+  </div>
 </div>"""
 
 
-PILL_CSS = (".pill{font-family:'Geist Mono',monospace;font-size:8.8px;letter-spacing:.06em;color:var(--ink-3);border:1px solid var(--line);"
-            "border-radius:99px;padding:6px 12px;background:var(--surface)} .pill b{color:var(--ink);font-weight:500;margin-left:4px}")
+PILL_CSS = (".pill{font-family:'Geist Mono',monospace;font-size:8.8px;letter-spacing:.06em;color:#A7B1FF;"
+            "border-radius:99px;padding:7px 13px;background:#20263F} .pill b{color:#EEF1FA;font-weight:500;margin-left:4px}")
 
 
 def inline(t):

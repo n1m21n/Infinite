@@ -414,7 +414,7 @@ def pdf(body, out):
     import paper_doc as P
     css = P.PILL_CSS + """
 .bm-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
-.bm-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;break-inside:avoid}
+.bm-card{background:var(--surface);border-radius:16px;padding:12px 14px;break-inside:avoid}
 .bm-card p{font-size:9.6px;line-height:1.4;margin:4px 0 0;color:var(--ink-2)}
 .bm-n{font-weight:800;font-size:24px;letter-spacing:-0.03em}
 table.t th{white-space:normal} table.full{font-size:9px} .chap{margin-top:22px;break-after:avoid} table.t tr{break-inside:avoid}

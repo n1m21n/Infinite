@@ -31,12 +31,15 @@ def main():
     intro, body = rest.split("\n## ", 1)
     sections = []
     main_html = convert("## " + body, sections)
-    ver = subprocess.run([os.path.join(ROOT, "build/Infinite.app/Contents/MacOS/Infinite"), "--version"],
-                         capture_output=True, text=True).stdout.strip().splitlines()[-1:] or [""]
+    try:
+        ver = subprocess.run([os.path.join(ROOT, "build/Infinite.app/Contents/MacOS/Infinite"), "--version"],
+                             capture_output=True, text=True).stdout.strip().splitlines()[-1:] or [""]
+    except OSError:                       # no local build (cloud container): keep the version already printed in the guide
+        ver = ["v0.6.0"]
     cover = P.cover("AUDIOVISUAL NODE WORKSTATION", "The Headless", "Engine", "", 
                     "Render pictures, video and sound from a plain text file. No window, no mouse, same Infinite underneath. "
                     "A friendly guide to the command line, the patch format, and the loop that gets you from idea to picture.",
-                    [("Runs on", "macOS, Windows, Linux"), ("Version", ver[0]), ("Output", "PNG, MP4, MOV, WAV")], P.LOGO_TILE)
+                    [("Runs on", "macOS, Windows, Linux"), ("Version", ver[0]), ("Output", "PNG, MP4, MOV, WAV")], P.LOGO_TILE, art="patch")
     cables = "".join(f'<span><i style="display:inline-block;width:22px;height:6px;border-radius:3px;margin-right:9px;vertical-align:middle;background:{c}"></i><code>{k}</code> {n}</span>'
                      for (n, c), k in zip(P.CABLES, ["cable", "mod", "aud", "note", "pal"]))
     cover = cover.rstrip()[:-len("</div>")] + f"""<div class="panel" style="position:absolute;left:0;right:0;bottom:0">

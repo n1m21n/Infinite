@@ -114,7 +114,7 @@ def front_html():
                     "A friendly tour of Infinite's entire node palette: what each node does, why you would reach for it, "
                     "a quick recipe to start with, and a picture of the node itself. No engineering degree required.",
                     [("Platform", "macOS, Apple Silicon and Intel"), ("Coverage", f"Every node type, {CHAPTER_COUNT} chapters"),
-                     ("Pictures", "Real screenshots of every node")], P.LOGO_TILE)
+                     ("Pictures", "Real screenshots of every node")], P.LOGO_TILE, art="node_hero")
     cables = "".join(f'<span><i style="display:inline-block;width:22px;height:6px;border-radius:3px;margin-right:9px;vertical-align:middle;background:{c}"></i>{n}</span>'
                      for n, c in P.CABLES)
     legend = f"""<div class="panel" style="position:absolute;left:0;right:0;bottom:0">
