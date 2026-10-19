@@ -1,4 +1,4 @@
-/* Email sign-up (worker/signup). Posts to the Worker, shows the answer in the form's status line; works without Turnstile. */
+/* Email sign-up (worker/signup). Posts to the Worker and shows its answer in the status line; works without Turnstile. */
 (function () {
   var form = document.querySelector('[data-signup]');
   if (!form) return;
@@ -21,10 +21,10 @@
     if (siteKey && !token) { say('One moment, checking you are human, then press Sign up again.', true); return; }
     btn.disabled = true; say('Sending...');
     fetch(form.getAttribute('data-endpoint'), { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, audience: form.getAttribute('data-audience'), turnstile: token, company: form.elements.company.value }) })
+      body: JSON.stringify({ email: email, audience: form.getAttribute('data-audience'), turnstile: token, source: (location.pathname.split('/').pop() || 'index.html'), company: form.elements.company.value }) })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok && j.ok, j: j }; }); })
       .then(function (r) {
-        if (r.ok) { form.reset(); say('Check your inbox and press the link to confirm.'); }
+        if (r.ok) { form.reset(); say(r.j.message || 'You are on the list.'); }
         else { say(r.j.error || 'Something went wrong. Please try again.', true); if (window.turnstile && box) { window.turnstile.reset(box); token = ''; } }
       })
       .catch(function () { say('Could not reach the server. Please try again.', true); })

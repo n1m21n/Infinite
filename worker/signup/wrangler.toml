@@ -2,12 +2,15 @@ name = "infinite-signup"
 main = "index.js"
 compatibility_date = "2026-10-01"
 
-# Route the Worker on the site's own domain so the form posts same-origin paths (set in the Cloudflare dashboard or here):
+# Route the Worker on the site's own domain so the form posts a same-origin path:
 # routes = [{ pattern = "infinitedevices.org/api/*", zone_name = "infinitedevices.org" }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "infinite-signup"
+database_id = ""   # from `npx wrangler d1 create infinite-signup`
 
 [vars]
 SITE_ORIGIN = "https://infinitedevices.org"
 API_ORIGIN = "https://infinitedevices.org"
 FROM = "Infinite <hello@infinitedevices.org>"
-# persona -> Resend audience id (create one audience per persona in Resend, then paste the ids)
-AUDIENCES = '{"general":"","artists":"","musicians":"","vjs":"","creative-coders":"","developers":""}'
