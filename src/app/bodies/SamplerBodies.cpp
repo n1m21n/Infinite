@@ -2600,25 +2600,13 @@ namespace app
                n->SetPadHeld(pad, level, 1.0f);
 
                // A cable to an unselected pad's param has no slider on screen
-               // to land on: give each bound one a 1 px invisible pin on the
-               // tile's dot (as a collapsed node does), so the cable stays
-               // attached and visible. The selected pad's cables land on its
-               // real sliders below.
+               // to land on: anchor each bound one on the tile's dot, so the
+               // link draws as a dotted cable to the pad (the same look as
+               // the EQ's switched-away bands). The selected pad's cables
+               // land on its real sliders below.
                if (!isSel && anyMod && modDot.x != 0.0f)
-               {
-                  const ImVec2 restore = ImGui::GetCursorScreenPos();
                   for (int slot : boundPins[pad])
-                  {
-                     const int pinId = gn.index * GraphNode::kStride + GraphNode::kParamBase + slot;
-                     gDrawnParamPins.insert(pinId);
-                     ImGui::SetCursorScreenPos(ImVec2(modDot.x - 0.5f, modDot.y - 0.5f));
-                     ed::BeginPin(pinId, ed::PinKind::Input);
-                     ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-                     ImGui::Dummy(ImVec2(1.0f, 1.0f));
-                     ed::EndPin();
-                  }
-                  ImGui::SetCursorScreenPos(restore);
-               }
+                     NoteHiddenParamAnchor(gn.index, slot, modDot);
             }
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
