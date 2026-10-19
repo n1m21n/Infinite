@@ -62,11 +62,14 @@ SHELL_HEAD = """<!DOCTYPE html>
     .badge:hover, .btn:hover { transform: translateY(-2px); background: rgba(52, 59, 94, 0.9); }
     .badge:focus-visible, .btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
     @media (prefers-reduced-motion: reduce) { .badge, .btn { transition: none; } .badge:hover, .btn:hover { transform: none; } }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .fallback { color: var(--ink); padding: 24px; font-size: 14px; }
   </style>
 </head>
 <body>
-  <canvas id="gl" role="img" aria-label="@@TITLE@@, an audio-reactive visual"></canvas>
+  <main>
+    <h1 class="sr-only">@@TITLE@@</h1>
+    <canvas id="gl" role="img" aria-label="@@TITLE@@, an audio-reactive visual"></canvas>
 
   <div class="controls">
     <button class="btn" id="btn-audio" type="button" aria-live="polite">Enable microphone</button>
@@ -76,6 +79,7 @@ SHELL_HEAD = """<!DOCTYPE html>
     <span class="badge-icon" aria-hidden="true"></span>
     <span>made in <strong>infinite</strong></span>
   </a>
+  </main>
 
   """
 
@@ -151,7 +155,7 @@ def build_gallery(items):
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css?v=3">
-  <link rel="stylesheet" href="../style.css?v=79">
+  <link rel="stylesheet" href="../style.css?v=80">
   <link rel="stylesheet" href="../glass.css?v=4">
   <link rel="stylesheet" href="../blog.css?v=2">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>

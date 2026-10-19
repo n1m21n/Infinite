@@ -706,7 +706,7 @@ strong { font-weight: 600; color: var(--ink); }
 .footer-grid { display: grid; grid-template-columns: 1.3fr repeat(4, 1fr); gap: 28px; }
 .footer-brand p { color: var(--ink2); margin-top: 10px; font-size: 0.92rem; max-width: 22em; }
 .footer-col { display: flex; flex-direction: column; gap: 4px; }
-.footer-col h5 { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; text-transform: lowercase; margin-bottom: 6px; }
+.footer-col h5, .footer-col .footer-h { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; text-transform: lowercase; margin-bottom: 6px; }
 .footer-col a { color: var(--ink2); text-decoration: none; font-size: 0.9rem; padding: 3px 0; }
 .footer-col a:hover { color: var(--ink); }
 .footer-bottom { margin-top: 40px; font-size: 0.72rem; color: var(--muted); }

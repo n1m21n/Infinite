@@ -16,7 +16,7 @@ import os, re, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 GH = "https://github.com/n1m21n/Infinite"
-CSS_VERSION = "79"   # style.css cache key; bump when the menu or footer CSS changes
+CSS_VERSION = "80"   # style.css cache key; bump when the menu or footer CSS changes
 JS_VERSION = "11"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
@@ -130,7 +130,7 @@ def footer_html(rel):
     for title, items in FOOTER_COLS:
         links = "\n".join(
             f'          <a href="{href(path, p)}"{link_attrs(path)}>{text}</a>' for path, text in items)
-        cols.append(f'        <div class="footer-col">\n          <h5>{title}</h5>\n{links}\n        </div>')
+        cols.append(f'        <div class="footer-col">\n          <p class="footer-h">{title}</p>\n{links}\n        </div>')
     social = "\n".join(
         f'            <a href="{u}" target="_blank" rel="noopener" aria-label="Infinite on {n} (@infinite.devices)" title="{n}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{d}</svg></a>'
         for n, u, d in SOCIAL)
