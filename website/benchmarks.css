@@ -1,21 +1,21 @@
 /* Benchmarks page (made by tools/website/gen_benchmarks.py): the report body on the site's own tokens. */
 .bm-wrap { max-width: 960px; margin: 0 auto; }
-.bm-wrap .lead { color: var(--ink2); font-size: 1.15rem; line-height: 1.5; }
+.bm-wrap .lead { color: var(--ink2); font-size: 1.125rem; line-height: 1.5; }
 .bm-wrap h2 { font-size: var(--fs-h3); font-weight: 700; letter-spacing: -0.02em; margin: 56px 0 12px; scroll-margin-top: 90px; }
-.bm-wrap h3 { font-size: 1.05rem; font-weight: 600; margin: 28px 0 8px; }
+.bm-wrap h3 { font-size: 1rem; font-weight: 600; margin: 28px 0 8px; }
 .bm-wrap p, .bm-wrap li { color: var(--ink2); line-height: 1.6; }
 .bm-wrap li { margin: 4px 0; }
-.bm-wrap code { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.85em; background: var(--card); padding: 1px 6px; border-radius: 4px; }
-.bm-wrap pre { background: var(--card); border-radius: 12px; padding: 16px 18px; overflow-x: auto; }
+.bm-wrap code { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.85em; background: var(--card); padding: 1px 8px; border-radius: 4px; }
+.bm-wrap pre { background: var(--card); border-radius: 12px; padding: 16px 20px; overflow-x: auto; }
 .bm-wrap pre code { background: none; padding: 0; }
-.bm-wrap .kick { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 48px; }
+.bm-wrap .kick { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.71875rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 48px; }
 .bm-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 24px 0; }
 .bm-card { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--shadow-1); padding: 20px; }
-.bm-card p { margin: 6px 0 0; font-size: 0.92rem; }
+.bm-card p { margin: 6px 0 0; font-size: 1rem; }
 .bm-n { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); }
 .bm-scroll { overflow-x: auto; margin: 12px 0 20px; border-radius: 12px; }
-table.t { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--card); }
-table.t th { text-align: left; font-weight: 600; color: var(--ink); padding: 10px 12px; border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent); white-space: nowrap; }
-table.t td { padding: 9px 12px; color: var(--ink2); border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); vertical-align: top; }
+table.t { width: 100%; border-collapse: collapse; font-size: 1rem; background: var(--card); }
+table.t th { text-align: left; font-weight: 600; color: var(--ink); padding: 12px 12px; border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent); white-space: nowrap; }
+table.t td { padding: 8px 12px; color: var(--ink2); border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); vertical-align: top; }
 table.t td:first-child { color: var(--ink); font-weight: 600; }
 .bm-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 8px; }

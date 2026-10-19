@@ -35,7 +35,7 @@ instead of relying on framework wrappers, infinite speaks directly to plugin api
 - **vst3**: loads the component bundle, queries `IComponent` and `IAudioProcessor`, maps parameters to continuous modulation arrays, and schedules sample-accurate note events.
 - **audio unit (au)**: interacts directly with the coreaudio audio unit v2 and v3 c-api on macos.
 
-parameters on third-party plugins can be modulated in real time by any signal on the canvas—whether an audio lfo, an envelope follower, or a generative javascript sketch.
+parameters on third-party plugins can be modulated in real time by any signal on the canvas, whether an audio lfo, an envelope follower, or a generative javascript sketch.
 
 ![infinite modular canvas](../assets/product_canvas_1400.webp)
 

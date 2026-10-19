@@ -86,7 +86,7 @@
     const setOpen = (g, open) => trig(g).setAttribute('aria-expanded', String(open));
     const closeAll = (except) => groups.forEach((g) => { if (g !== except) setOpen(g, false); });
     const sync = () => groups.forEach((g) => {
-      setOpen(g, phone.matches && g === groups[0]);   // phone: the first group starts open, the rest fold away
+      setOpen(g, phone.matches && g === (groups.find((x) => x.hasAttribute('data-current')) || groups[0]));   // phone: the group you are in starts open, the rest fold away
     });
     sync();
     (phone.addEventListener ? phone.addEventListener('change', sync) : phone.addListener(sync));

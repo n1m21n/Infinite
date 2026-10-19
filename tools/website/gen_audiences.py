@@ -26,7 +26,7 @@ AUDIENCES = [
     {"slug": "artists", "name": "artists", "hand": "paint",
      "title": "Infinite for artists: images that move, made on one canvas",
      "h1": "Infinite for artists", "desc": "Layer shapes, video and 3D, add trails and glitch, and let sound move it. Free for macOS, Windows and Linux.",
-     "lead": "Build images that move. Layer shapes, video and 3D, smear them with trails, and let a sound or an LFO move any knob. No code to start; code when you want it.",
+     "lead": "Build images that move. Layer shapes, video and 3D, add trails, and let a sound or an LFO move any knob. No code needed.",
      "facts": ["Free", "macOS, Windows, Linux", "No code to start"],
      "hero": {"shader": "ink", "img": "brand_ball", "alt": "A 3D iridescent ball, the Infinite brand ball", "tall": False},
      "cards": [("32 blend modes", "Stack any picture on any other: images, folders of stills, hardware-accelerated video, camera, paint and noise ramps."),
@@ -92,7 +92,7 @@ AUDIENCES = [
     {"slug": "creative-coders", "name": "creative coders and technologists", "hand": "code",
      "title": "Infinite for creative coders and technologists: Field, sketches and shaders",
      "h1": "Infinite for creative coders", "desc": "Write shaders, per-sample audio kernels, 3D surfaces and JavaScript sketches in one node graph with live feedback. Free and open source.",
-     "lead": "Write what a node does. Field is Infinite's own small language: one program can be a shader, a synth, an effect, a note pattern or a mesh deformer, and the compiler works out where it runs.",
+     "lead": "Write what a node does. Field is Infinite's small language: one program can be a shader, a synth, an effect or a mesh deformer.",
      "facts": ["Field language", "JavaScript sketches", "OSC on 127.0.0.1:9100"],
      "hero": {"shader": "dots", "img": "node_field_pixel", "alt": "A 3D render of the Field Pixel node", "tall": False},
      "cards": [("One language, many nodes", "Field Pixel, Field Synth, Field Effect, Field Notes, Field Primitive and Field Modifier share one syntax. Types and rates are inferred, so a sine reads the same on the GPU and at 48 kHz."),
@@ -114,7 +114,7 @@ AUDIENCES = [
     {"slug": "developers", "name": "developers", "hand": "headless", "body": "developers_body.html",
      "title": "Infinite for developers: headless CLI, Python SDK and MCP server",
      "h1": "Infinite for developers and agents", "desc": "Run Infinite without a window. Render video and audio from a text patch, call it from Python, or give an AI agent the nine MCP tools. Free and open source.",
-     "lead": "Every patch is a text file, and the app can render it with no window open. Use the command line, call it from Python, or hand the same tools to an AI agent over MCP.",
+     "lead": "Every patch is a text file, and the app renders it with no window open. Use the command line, Python, or an AI agent over MCP.",
      "facts": ["Headless", "Python SDK", "9 MCP tools"],
      "hero": {"shader": "sheet", "img": "patch", "alt": "A 3D render of two Infinite nodes joined by a cable", "tall": False},
      "cards": [("Text in, files out", "A patch is plain text. Validate it, print the graph that was built, then render stills, a contact sheet, video or an audio report."),
@@ -132,6 +132,13 @@ AUDIENCES = [
      "start": [], "extra": ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide (PDF)")},
 ]
 ALL = [(a["slug"] + ".html", a["name"]) for a in AUDIENCES]
+AUD_ICON = {"artists": "family-compositing", "musicians": "family-notes", "vjs": "perform", "creative-coders": "edit", "developers": "cube"}
+
+
+def icon(name):
+    """Brand glyph from art/icons/src, inlined so a pill needs no request (BRAND.md section 7: icon beside a label)."""
+    svg = open(os.path.join(chrome.ROOT, "art", "icons", "src", name + "-20.svg"), encoding="utf-8").read().strip()
+    return svg.replace("<svg ", '<svg class="ic" aria-hidden="true" ', 1).replace("\n", "")
 
 
 def check_links():
@@ -163,8 +170,9 @@ def hl(code):
 
 def ctl(c):
     cid, label, val, lo, hi, dp, unit = c
+    fmt = "" if cid == "cut" else ' data-fmt="1"'
     return (f'<div class="ctl"><label for="c-{cid}">{e(label)}</label><output for="c-{cid}"></output>'
-            f'<input id="c-{cid}" type="range" min="0" max="1000" step="1" value="{val}"{"" if cid == "cut" else " data-fmt=\"1\""} data-lo="{lo}" data-hi="{hi}" data-dp="{dp}" data-unit="{e(unit)}"></div>')
+            f'<input id="c-{cid}" type="range" min="0" max="1000" step="1" value="{val}"{fmt} data-lo="{lo}" data-hi="{hi}" data-dp="{dp}" data-unit="{e(unit)}"></div>')
 
 
 def lab_html(a):
@@ -229,7 +237,7 @@ def main_html(a, rel):
       </section>'''
     start = ""
     if a["start"]:
-        links = "\n".join(f'          <a href="library/{sl}.html">{e(t)}</a>' for sl, t in a["start"])
+        links = "\n".join(f'          <a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
         start = f'''
       <section class="aud-section reveal">
         <h2>Start with</h2>
@@ -241,7 +249,7 @@ def main_html(a, rel):
     if a.get("body"):
         body = '      <section class="aud-section reveal dev-body">\n' + open(os.path.join(os.path.dirname(os.path.abspath(__file__)), a["body"]), encoding="utf-8").read() + "      </section>"
     lab = lab_html(a)
-    others = "\n".join(f'          <a href="{h}">{e(n)}</a>' for h, n in ALL if h != rel)
+    others = "\n".join(f'          <a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
     return f'''
   <main>
     <section class="ah">

@@ -1,6 +1,6 @@
 /* Extensions page (made by tools/website/gen_extensions.py): one card per pack, built on the site's own tokens. */
 .ext-list { display: grid; gap: var(--gap, 24px); max-width: 900px; margin: 0 auto; }
-.ext-card { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--shadow-1); padding: clamp(20px, 4vw, 32px); min-width: 0; }
+.ext-card { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--shadow-1); padding: round(clamp(20px, 4vw, 32px), 8px); min-width: 0; }
 .ext-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
 .ext-head h2 { font-size: var(--fs-h3); font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .ext-install summary { list-style: none; cursor: pointer; display: inline-flex; }
@@ -8,8 +8,8 @@
 .ext-install[open] { flex-basis: 100%; }
 .ext-steps { margin-top: 16px; color: var(--ink2); }
 .ext-steps p { margin: 0 0 12px; }
-.ext-offline { font-size: 0.9rem; }
+.ext-offline { font-size: 1rem; }
 .ext-file { display: inline-block; margin: 4px 12px 0 0; color: var(--ink); font-weight: 600; }
 .ext-purpose { color: var(--ink2); margin: 16px 0 8px; }
-.ext-nodes { color: var(--muted); font-size: 0.8rem; margin: 0; }
+.ext-nodes { color: var(--muted); font-size: 0.84375rem; margin: 0; }
 .ext-card .specs { justify-content: flex-start; margin-top: 20px; }
