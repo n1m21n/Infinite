@@ -10,6 +10,12 @@ namespace BlendModes
 {
    const std::vector<std::string>& Names();
 
+   // Names a dropdown should offer for a layer whose current mode is `current`:
+   // the 32 live modes, plus the three "(old)" ones only while one of them is
+   // already selected (so a patch saved before the fix still shows its look but
+   // nobody can pick them fresh).
+   const std::vector<std::string>& NamesFor(int current);
+
    // Defines: float Lum(vec3), vec3 blendMode(int mode, vec3 base, vec3 top)
    // Mode index 30 (Erase) and mode index 31 (Anti-Erase, the exact complement
    // of Erase) are both alpha-only and must be handled by the caller.

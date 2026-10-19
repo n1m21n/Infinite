@@ -1795,7 +1795,7 @@ namespace app
 
    void DrawBlendParams(BlendNode* n)
    {
-      DropdownButton("mode", BlendNode::ModeNames(), n->ModeIndex(),
+      DropdownButton("mode", BlendModes::NamesFor(n->ModeIndex()), n->ModeIndex(),
                      [n](int i) { n->ModeIndex() = i; });
       ModSlider("opacity", &n->Mix(), 0.0f, 1.0f);
       ModCheckbox("linear light", &n->Linear());
@@ -1867,7 +1867,7 @@ namespace app
 
          char modeLabel[32];
          snprintf(modeLabel, sizeof(modeLabel), "mode##%d", slot);
-         DropdownButton(modeLabel, BlendModes::Names(), n->modes[slot],
+         DropdownButton(modeLabel, BlendModes::NamesFor(n->modes[slot]), n->modes[slot],
                         [n, slot](int i) { n->modes[slot] = i; });
          ModSlider("opacity", &n->opacities[slot], 0.0f, 1.0f);
          ImGui::PopID();

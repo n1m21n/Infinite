@@ -591,7 +591,7 @@ namespace app
          if (isVideo)
          {
             SectionHeader(T("Compositing & Video"));
-            const std::vector<std::string>& modes = BlendModes::Names();
+            const std::vector<std::string>& modes = BlendModes::NamesFor(clip->blendMode);
             const char* curBlendName = (clip->blendMode >= 0 && clip->blendMode < (int)modes.size())
                ? modes[clip->blendMode].c_str() : "Normal";
             RowLabel("Blend");
