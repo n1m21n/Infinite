@@ -78,7 +78,7 @@
 .spring[data-spring=soft] .spring-dot { transition-duration: var(--spring-soft-ms, 305ms); transition-timing-function: var(--spring-soft, ease-out); }
 .spring[data-spring=press] .spring-dot { transition-duration: var(--spring-press-ms, 266ms); transition-timing-function: var(--spring-press, ease-out); }
 .spring.go .spring-dot { left: calc(100% - 28px); }
-.spring-note { grid-column: 2; font: 500 0.68rem/1 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.03em; }
+.spring-note { grid-column: 2; font: 500 0.6875rem/1 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.03em; }
 
 /* faq */
 .faq { display: grid; gap: 10px; max-width: 52em; }

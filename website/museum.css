@@ -191,7 +191,7 @@ body.nogl .plain img { width: 100%; height: auto; display: block; border-radius:
   .plaque-title { font-size: 34px; }
   .focus-ui { left: 14px; right: 14px; justify-content: space-between; }
   .focus-ui .close { order: 3; }
-  .hint { font-size: 10px; white-space: normal; width: 80vw; }
+  .hint { font-size: 11px; white-space: normal; width: 80vw; }
 }
 
 @media (prefers-reduced-motion: reduce) {

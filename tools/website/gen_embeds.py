@@ -138,7 +138,7 @@ def build_gallery(items):
   <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
   <script src="../theme.js?v=2"></script>
   <title>Infinite embeds: {len(items)} audio-reactive visuals for any page</title>
-  <meta name="description" content="{len(items)} free audio-reactive WebGL visuals made in Infinite. Copy one iframe into a portfolio, blog or landing page. They react to the microphone if the visitor allows it.">
+  <meta name="description" content="Free audio-reactive WebGL visuals made in Infinite. Copy one iframe into a portfolio, blog or landing page.">
   <link rel="canonical" href="{BASE}embeds/">
   <meta property="og:title" content="Infinite embeds: audio-reactive visuals for any page">
   <meta property="og:description" content="Copy one iframe into any page. Free, made in Infinite.">

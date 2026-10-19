@@ -37,7 +37,7 @@ body:has(.lib-hero) { overflow-x: clip; }
 .lib-card { container-type: inline-size; position: relative; display: flex; flex-direction: column; min-width: 0; }
 .lib-card[hidden] { display: none; }
 .lib-card .node { display: flex; flex-direction: column; flex: 1; }
-.lib-card .hand-cap { font-size: 0.68rem; margin: 0 0 8px 4px; white-space: nowrap; }
+.lib-card .hand-cap { font-size: 0.6875rem; margin: 0 0 8px 4px; white-space: nowrap; }
 .lib-card .node-head { padding: 12px calc(var(--pad) + 4px) 10px; }
 .lib-card .node-name { font-size: inherit; font-weight: inherit; letter-spacing: 0; }
 .lib-card .node-view { aspect-ratio: 3 / 2; margin: 0 8px; }

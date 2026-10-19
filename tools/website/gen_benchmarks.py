@@ -380,8 +380,8 @@ def jsonld(n):
 def page(body, n):
     tpl = open(os.path.join(W, "extensions.html")).read()
     head, rest = tpl.split("</head>", 1)
-    head = re.sub(r"<title>.*?</title>", "<title>Infinite benchmarks: audio, video and speed against Vital, Blender, Ableton and more</title>", head, flags=re.S)
-    desc = "Open, reproducible benchmarks of Infinite against Vital, Serum 2, Diva, Blender, Ableton, Bitwig, Logic and TouchDesigner on a base MacBook Air M2, including where Infinite is slower."
+    head = re.sub(r"<title>.*?</title>", "<title>Infinite benchmarks: audio, video and speed against Vital, Blender and more</title>", head, flags=re.S)
+    desc = "Open, reproducible benchmarks of Infinite against Vital, Serum 2, Blender, Ableton and TouchDesigner on a MacBook Air M2, including where it is slower."
     head = re.sub(r'(<meta name="description" content=")[^"]*', lambda m: m.group(1) + desc, head)
     head = head.replace("https://infinitedevices.org/extensions.html", BASE + "benchmarks.html")
     head = re.sub(r'(<meta (?:property="og:title"|name="twitter:title") content=")[^"]*', lambda m: m.group(1) + "Infinite benchmarks", head)

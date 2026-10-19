@@ -194,6 +194,13 @@ def lab_html(a):
           <div class="lab-view"><canvas aria-label="A contact sheet of twelve frames filling in one by one" role="img"></canvas></div></div>'''
 
 
+def png_size(n):
+    import struct
+    with open(os.path.join(W, "assets", "nodes", n + ".png"), "rb") as f:
+        w, h = struct.unpack(">II", f.read(24)[16:24])
+    return f' width="{w}" height="{h}"'
+
+
 def main_html(a, rel):
     float3d = ""
     if a["hero"]["img"] == "brand_ball":
@@ -203,7 +210,7 @@ def main_html(a, rel):
     bench = ""
     if a.get("bench"):
         B = a["bench"]
-        figs = "".join(f'<figure class="bn"><img src="assets/nodes/{n}.png" alt="The {e(t)} node as it looks in Infinite" loading="lazy" decoding="async"><figcaption><b>{e(t)}</b><span>{e(d)}</span></figcaption></figure>' for n, t, d in B["items"])
+        figs = "".join(f'<figure class="bn"><img src="assets/nodes/{n}.png" alt="The {e(t)} node as it looks in Infinite"{png_size(n)} loading="lazy" decoding="async"><figcaption><b>{e(t)}</b><span>{e(d)}</span></figcaption></figure>' for n, t, d in B["items"])
         bench = f'''
       <section class="aud-section reveal">
         <h2>{e(B["title"])}</h2>
@@ -320,7 +327,7 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=4">
   <link rel="stylesheet" href="blog.css?v=2">
-  <link rel="stylesheet" href="audience.css?v=7">
+  <link rel="stylesheet" href="audience.css?v=8">
   {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>
 </head>

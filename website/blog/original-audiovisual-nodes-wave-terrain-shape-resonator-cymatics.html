@@ -127,14 +127,14 @@
 <hr>
 <h2 id="1-wave-terrain-converting-images-and-textures-into-sound">1. wave terrain: converting images and textures into sound</h2>
 <p>wave terrain synthesis treats any 2d image—whether a drawn sketch, a webcam feed, a reaction-diffusion pattern, or procedural noise—as a continuous 3d topographic terrain surface <code>z = T(u, v)</code>.</p>
-<figure><img src="../assets/nodes/wave-terrain.png" alt="wave terrain node: scanning continuous 2d image topography at audio rates" loading="lazy" decoding="async"><figcaption>wave terrain node: scanning continuous 2d image topography at audio rates</figcaption></figure>
+<figure><img src="../assets/nodes/wave-terrain.png" alt="wave terrain node: scanning continuous 2d image topography at audio rates" width="254" height="620" loading="lazy" decoding="async"><figcaption>wave terrain node: scanning continuous 2d image topography at audio rates</figcaption></figure>
 <h3 id="how-it-works">how it works</h3>
 <ol><li><strong>orbital trajectories</strong>: an audio-rate oscillator traces a closed parametric path <code>(u(t), v(t))</code> across the image (such as an ellipse, lissajous curve, lemniscate, or spiral).</li><li><strong>topographic sampling</strong>: as the orbital point scans across pixels, the surface height <code>z</code> becomes the instantaneous audio amplitude.</li><li><strong>10-level fourier mip pyramid</strong>: raw pixel sampling produces harsh digital aliasing. infinite solves this by computing a real discrete fourier transform (rdft) mip pyramid across 10 octaves, ensuring completely alias-free polyphonic synthesis across all 8 octaves.</li></ol>
 <hr>
 <h2 id="2-shape-resonator-converting-3d-geometry-into-physical-sound">2. shape resonator: converting 3d geometry into physical sound</h2>
 <p>what does a 3d torus sound like when struck? what does an icosphere sound like compared to a long cylindrical tube?</p>
 <p>the <strong>shape resonator</strong> node answers this by computing the acoustic standing waves and vibration modes of any input 3d geometry mesh.</p>
-<figure><img src="../assets/nodes/shape-resonator.png" alt="shape resonator node: physical modal acoustic resonance of 3d geometry" loading="lazy" decoding="async"><figcaption>shape resonator node: physical modal acoustic resonance of 3d geometry</figcaption></figure>
+<figure><img src="../assets/nodes/shape-resonator.png" alt="shape resonator node: physical modal acoustic resonance of 3d geometry" width="254" height="262" loading="lazy" decoding="async"><figcaption>shape resonator node: physical modal acoustic resonance of 3d geometry</figcaption></figure>
 <h3 id="how-it-works">how it works</h3>
 <ol><li><strong>laplace-beltrami modal solver</strong>: on a dedicated worker thread, infinite solves the surface-laplacian eigenvalues <code>λ_i</code> of the mesh.</li><li><strong>dispersion law</strong>: mode frequencies follow the dispersion of a physical membrane or thin plate:</li></ol>
 <blockquote><p><code>f_i = tune × √(λ_i / λ_0)</code></p></blockquote>
@@ -142,7 +142,7 @@
 <hr>
 <h2 id="3-audio-displacement-cymatics-and-mesh-deformation">3. audio displacement: cymatics and mesh deformation</h2>
 <p>the <strong>audio displacement</strong> node takes any 3d mesh and deforms its vertex topology in real time directly from incoming audio waveforms.</p>
-<figure><img src="../assets/nodes/audio-displacement.png" alt="audio displacement node: 5 real-time deformation modes including chladni cymatics" loading="lazy" decoding="async"><figcaption>audio displacement node: 5 real-time deformation modes including chladni cymatics</figcaption></figure>
+<figure><img src="../assets/nodes/audio-displacement.png" alt="audio displacement node: 5 real-time deformation modes including chladni cymatics" width="128" height="354" loading="lazy" decoding="async"><figcaption>audio displacement node: 5 real-time deformation modes including chladni cymatics</figcaption></figure>
 <h3 id="five-real-time-modes">five real-time modes</h3>
 <ul><li><strong>normal waveform</strong>: pushes vertices outward along their surface normals proportionally to the raw oscilloscope audio signal.</li><li><strong>spectral bands</strong>: deforms vertices along the u/x axis based on real-time fft frequency bins.</li><li><strong>acoustic ripples</strong>: generates concentric radial wave rings expanding outward from the center.</li><li><strong>chladni cymatics</strong>: simulates ernst chladni's 2d and 3d acoustic standing wave nodal patterns:</li></ul>
 <blockquote><p><code>w = sin(n π x) · sin(m π y) ± sin(m π x) · sin(n π y)</code></p></blockquote>
@@ -150,23 +150,23 @@
 <hr>
 <h2 id="4-equation-synth-desmos-style-mathematical-synthesis">4. equation synth: desmos-style mathematical synthesis</h2>
 <p>for artists who think in mathematical formulas, <strong>equation synth</strong> provides an interactive cartesian graphing plane where any mathematical formula <code>y = f(x, a, b, c, d)</code> becomes an anti-aliased polyphonic synthesizer.</p>
-<figure><img src="../assets/nodes/equation-synth.png" alt="equation synth node: evaluating mathematical curves as anti-aliased wavetables" loading="lazy" decoding="async"><figcaption>equation synth node: evaluating mathematical curves as anti-aliased wavetables</figcaption></figure>
+<figure><img src="../assets/nodes/equation-synth.png" alt="equation synth node: evaluating mathematical curves as anti-aliased wavetables" width="254" height="480" loading="lazy" decoding="async"><figcaption>equation synth node: evaluating mathematical curves as anti-aliased wavetables</figcaption></figure>
 <p>whether exploring chebyshev polynomials, weierstrass fractal curves, or phase-modulated gaussian wave packets, equation synth graphs the function visually and compiles it into bandlimited wavetable mipmaps for pristine audio playback.</p>
 <hr>
 <h2 id="5-audio-ribbon-3d-physical-waveform-extrusion">5. audio ribbon: 3d physical waveform extrusion</h2>
 <p>the <strong>audio ribbon</strong> node extrudes incoming audio waveforms into a physical 3d ribbon geometry traveling through space.</p>
-<figure><img src="../assets/nodes/audio-ribbon.png" alt="audio ribbon node: extruded 3d waveform mesh with physical pbr materials" loading="lazy" decoding="async"><figcaption>audio ribbon node: extruded 3d waveform mesh with physical pbr materials</figcaption></figure>
+<figure><img src="../assets/nodes/audio-ribbon.png" alt="audio ribbon node: extruded 3d waveform mesh with physical pbr materials" width="128" height="534" loading="lazy" decoding="async"><figcaption>audio ribbon node: extruded 3d waveform mesh with physical pbr materials</figcaption></figure>
 <p>unlike 2d flat oscilloscope lines, the audio ribbon is a true procedural polygonal mesh that can be lit with directional lights, cast shadows, and rendered with physically based metallic and emission materials.</p>
 <hr>
 <h2 id="6-audio-color-ramp-sound-driven-color-palettes">6. audio color ramp: sound-driven color palettes</h2>
 <p>the <strong>audio color ramp</strong> node analyzes live frequency spectrums and dynamically drives gradient color ramps used across 2d visuals, 3d materials, and shader backgrounds.</p>
-<figure><img src="../assets/nodes/audio-color-ramp.png" alt="audio color ramp node: modulating color stops and gradients from live audio" loading="lazy" decoding="async"><figcaption>audio color ramp node: modulating color stops and gradients from live audio</figcaption></figure>
+<figure><img src="../assets/nodes/audio-color-ramp.png" alt="audio color ramp node: modulating color stops and gradients from live audio" width="134" height="366" loading="lazy" decoding="async"><figcaption>audio color ramp node: modulating color stops and gradients from live audio</figcaption></figure>
 <h3 id="operating-modes">operating modes</h3>
 <ul><li><strong>intensity mode</strong>: low frequencies cause deep color glow while high-frequency percussion triggers bright highlights.</li><li><strong>expansion mode</strong>: frequency band energies dynamically expand and contract the spatial boundaries of each color stop.</li><li><strong>spectrum mode</strong>: maps the continuous real-time fft spectrum directly onto the custom palette.</li></ul>
 <hr>
 <h2 id="7-audio-texture-audio-rate-gpu-textures">7. audio texture: audio-rate gpu textures</h2>
 <p>the <strong>audio texture</strong> node converts audio streams directly into a 2d gpu texture at 60 fps.</p>
-<figure><img src="../assets/nodes/audio-texture.png" alt="audio texture node: streaming audio waveforms and spectrograms as gpu textures" loading="lazy" decoding="async"><figcaption>audio texture node: streaming audio waveforms and spectrograms as gpu textures</figcaption></figure>
+<figure><img src="../assets/nodes/audio-texture.png" alt="audio texture node: streaming audio waveforms and spectrograms as gpu textures" width="128" height="240" loading="lazy" decoding="async"><figcaption>audio texture node: streaming audio waveforms and spectrograms as gpu textures</figcaption></figure>
 <p>this texture can be cabled directly into materials, raymarchers, and field pixel shader nodes, allowing custom glsl kernels to sample audio buffers as standard <code>sampler2D</code> textures with zero cpu overhead.</p>
 <hr>
 <h2 id="more-standout-nodes-to-explore">more standout nodes to explore</h2>

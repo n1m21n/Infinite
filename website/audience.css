@@ -50,7 +50,7 @@
 .bench { background: var(--mid-deep); border-radius: var(--card-r); padding: clamp(18px, 3vw, 36px); box-shadow: var(--shadow-2); color: var(--mid-ink); }
 .bench-row { display: flex; gap: clamp(16px, 2.4vw, 32px); align-items: flex-start; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 6px; scrollbar-width: thin; scrollbar-color: rgba(167, 177, 255, 0.35) transparent; -webkit-overflow-scrolling: touch; }
 .bench-row.few { justify-content: center; }
-.bn { flex: 0 0 auto; margin: 0; scroll-snap-align: start; min-width: 168px; max-width: 260px; display: flex; flex-direction: column; gap: 12px; }
+.bn { flex: 0 0 auto; margin: 0; scroll-snap-align: start; min-width: 168px; max-width: 260px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 .bn img { display: block; width: auto; height: auto; max-width: 100%; border-radius: var(--r-md); box-shadow: 0 12px 28px rgba(4, 5, 14, 0.5); }
 .bn b { display: block; font-size: 0.95rem; letter-spacing: -0.01em; }
 .bn span { display: block; margin-top: 4px; font-size: 0.82rem; line-height: 1.45; color: rgba(238, 241, 250, 0.72); }

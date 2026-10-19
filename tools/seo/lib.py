@@ -17,6 +17,40 @@ ENV_FILE = os.path.expanduser("~/.config/infinite-seo.env")   # secrets live out
 UA = "InfiniteSEO/1.0 (+https://infinitedevices.org)"
 
 
+def img_size_attrs(src):
+    """' width="W" height="H"' for a local PNG, JPEG or WebP so the browser reserves the space (no layout shift)."""
+    import struct
+    path = os.path.normpath(os.path.join(BLOG, src)) if not src.startswith(("http", "/")) else None
+    try:
+        with open(path, "rb") as f:
+            d = f.read(65536)
+        if d[:8] == b"\x89PNG\r\n\x1a\n":
+            w, h = struct.unpack(">II", d[16:24])
+        elif d[:4] == b"RIFF" and d[8:12] == b"WEBP":
+            if d[12:16] == b"VP8X":
+                w = 1 + int.from_bytes(d[24:27], "little"); h = 1 + int.from_bytes(d[27:30], "little")
+            elif d[12:16] == b"VP8 ":
+                w, h = struct.unpack("<HH", d[26:30]); w &= 0x3FFF; h &= 0x3FFF
+            else:
+                b = int.from_bytes(d[21:25], "little"); w = (b & 0x3FFF) + 1; h = ((b >> 14) & 0x3FFF) + 1
+        elif d[:2] == b"\xff\xd8":
+            i = 2
+            while i < len(d) - 9:
+                if d[i] != 0xFF:
+                    i += 1; continue
+                m = d[i + 1]
+                if m in (0xC0, 0xC1, 0xC2):
+                    h, w = struct.unpack(">HH", d[i + 5:i + 9]); break
+                i += 2 + struct.unpack(">H", d[i + 2:i + 4])[0]
+            else:
+                return ""
+        else:
+            return ""
+        return f' width="{w}" height="{h}"'
+    except (OSError, struct.error, TypeError):
+        return ""
+
+
 def load_env():
     """Read KEY=VALUE lines from ~/.config/infinite-seo.env into os.environ (never overrides real env)."""
     if os.path.exists(ENV_FILE):
@@ -93,7 +127,7 @@ def inline(s):
     def stash(m):
         codes.append(m.group(1)); return f"\x00{len(codes)-1}\x00"
     s = re.sub(r"`([^`]+)`", stash, s)
-    s = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)\)", lambda m: f'<img src="{m.group(2)}" alt="{html.escape(m.group(1))}" loading="lazy" decoding="async">', s)
+    s = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)\)", lambda m: f'<img src="{m.group(2)}" alt="{html.escape(m.group(1))}"{img_size_attrs(m.group(2))} loading="lazy" decoding="async">', s)
     s = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: f'<a href="{m.group(2)}"' + ('' if m.group(2).startswith(("/", "#", BASE, "../", "index", "library")) else ' rel="noopener"') + f'>{m.group(1)}</a>', s)
     s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
     s = re.sub(r"(?<![*\w])\*([^*\n]+)\*(?!\w)", r"<em>\1</em>", s)
@@ -167,7 +201,7 @@ def render_md(body):
             if m:
                 alt = html.escape(m.group(1))
                 cap = f"<figcaption>{alt}</figcaption>" if alt else ""
-                out.append(f'<figure><img src="{m.group(2)}" alt="{alt}" loading="lazy" decoding="async">{cap}</figure>')
+                out.append(f'<figure><img src="{m.group(2)}" alt="{alt}"{img_size_attrs(m.group(2))} loading="lazy" decoding="async">{cap}</figure>')
             else:
                 out.append(f"<p>{inline(para)}</p>")
     return "\n".join(out), heads
