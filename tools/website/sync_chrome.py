@@ -16,8 +16,8 @@ import json, os, re, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 GH = "https://github.com/n1m21n/Infinite"
-CSS_VERSION = "81"   # style.css cache key; bump when the menu or footer CSS changes
-JS_VERSION = "11"    # site.js cache key; bump when the menu script changes
+CSS_VERSION = "82"   # style.css cache key; bump when the menu or footer CSS changes
+JS_VERSION = "12"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
 GROUPS = [
@@ -111,7 +111,7 @@ def nav_html(rel):
         out.append(f'        <div class="nav-menu" id="nav-menu-{gid}">')
         for path, text, hint in items:
             c = ' aria-current="page"' if is_current(path, rel) else ""
-            out.append(f'          <a href="{href(path, p)}"{link_attrs(path)}{c}>{text}<span>{hint}</span></a>')
+            out.append(f'          <a href="{href(path, p)}"{link_attrs(path)}{c}>{text}</a>')
         out.append("        </div>")
         out.append("      </div>")
     out.append(f'      <a href="{p}index.html#setup" class="nav-sheet-only">Download</a>')

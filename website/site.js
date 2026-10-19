@@ -99,8 +99,9 @@
         const open = Date.now() - enteredAt < 600 ? true : t.getAttribute('aria-expanded') !== 'true';
         closeAll(g); setOpen(g, open);
       });
-      g.addEventListener('mouseenter', () => { if (!phone.matches && hover.matches) { enteredAt = Date.now(); closeAll(g); setOpen(g, true); } });
-      g.addEventListener('mouseleave', () => { if (!phone.matches && hover.matches) setOpen(g, false); });
+      let closeTimer = 0;   // a short grace period so a pointer drifting off the edge can still reach a link
+      g.addEventListener('mouseenter', () => { clearTimeout(closeTimer); if (!phone.matches && hover.matches) { enteredAt = Date.now(); closeAll(g); setOpen(g, true); } });
+      g.addEventListener('mouseleave', () => { if (!phone.matches && hover.matches) { clearTimeout(closeTimer); closeTimer = setTimeout(() => setOpen(g, false), 180); } });
       g.addEventListener('focusout', (e) => { if (!phone.matches && !g.contains(e.relatedTarget)) setOpen(g, false); });
       g.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !phone.matches) { setOpen(g, false); t.focus(); e.stopPropagation(); } });
     });

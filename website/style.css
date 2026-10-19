@@ -195,13 +195,15 @@ strong { font-weight: 600; color: var(--ink); }
 .nav-trigger[aria-expanded="true"]::after { transform: rotate(225deg); margin-top: 3px; }
 .nav-trigger:hover, .nav-trigger[aria-expanded="true"], .nav-group[data-current] > .nav-trigger { color: var(--ink); background: var(--glass); box-shadow: var(--glass-hi); }
 .nav-menu {
-  position: absolute; top: calc(100% + 8px); left: 0; min-width: 260px; padding: 8px;
+  position: absolute; top: 100%; margin-top: 10px; left: 0; min-width: 220px; padding: 8px;
   display: none; flex-direction: column; gap: 2px;
   background: var(--surface-1); border-radius: var(--r-md); box-shadow: var(--shadow-2);
 }
-.nav-trigger[aria-expanded="true"] + .nav-menu { display: flex; }
-.nav-menu a { display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; border-radius: var(--r-sm); text-decoration: none; font-size: 0.92rem; font-weight: 600; color: var(--ink); }
-.nav-menu a span { font-size: 0.78rem; font-weight: 400; color: var(--muted); }
+.nav-trigger[aria-expanded="true"] + .nav-menu { display: flex; animation: nav-pop var(--dur-small, 160ms) ease-out; }
+.nav-menu::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 12px; } /* keeps the pointer inside the group while it crosses the gap */
+@keyframes nav-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nav-trigger[aria-expanded="true"] + .nav-menu { animation: none; } }
+.nav-menu a { display: flex; align-items: center; padding: 10px 14px; border-radius: var(--r-sm); text-decoration: none; font-size: 0.92rem; font-weight: 600; color: var(--ink); }
 .nav-menu a:hover, .nav-menu a:focus-visible { background: var(--deep); }
 .nav-menu a[aria-current] { background: var(--deep); box-shadow: inset 3px 0 0 var(--accent); }
 
@@ -748,8 +750,7 @@ html.over-bird body { cursor: pointer; }
   .nav-trigger { pointer-events: none; padding: 4px 6px; background: none !important; box-shadow: none !important; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: lowercase; color: var(--muted); }
   .nav-trigger::after { display: none; }
   .nav-menu, .nav-trigger[aria-expanded] + .nav-menu { display: flex; position: static; min-width: 0; padding: 0; background: none; box-shadow: none; }
-  .nav-menu a { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 6px; font-size: 1.05rem; border-radius: 0; }
-  .nav-menu a span { font-size: 0.78rem; text-align: right; }
+  .nav-menu a { padding: 12px 6px; font-size: 1.05rem; border-radius: 0; }
   .nav-sheet-only { display: block; padding: 14px 6px; font-size: 1.1rem; font-weight: 600; color: var(--accent-ink); text-decoration: none; }
   .nav-sheet-social { display: flex; gap: 18px; padding-top: 14px; }
   .nav-sheet-social a { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink2); text-decoration: none; padding: 8px 6px; }
