@@ -14,6 +14,8 @@ cd Infinite/tools/python_sdk
 python3 -c "import infinite"
 ```
 
+The SDK needs the Infinite app. It finds it through `$INFINITE_BIN`, `/Applications/Infinite.app`, a build folder in the checkout, or `PATH`; on Windows and Linux set `INFINITE_BIN` to `Infinite.exe` / `Infinite`.
+
 ---
 
 ## Quickstart

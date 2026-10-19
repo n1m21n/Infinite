@@ -18,7 +18,7 @@ Nine tools over stdio:
 - `infinite_field_primitive`: parametric 3D surfaces (`uv` to `P`, `N`, `Cd`).
 - `infinite_field_modifier`: deform and shade a mesh with a Field modifier.
 
-Needs the Infinite app installed (`/Applications/Infinite.app`, a build folder in the checkout, or `Infinite` on your `PATH`) and Python 3.8 or newer.
+Needs the Infinite app installed. It is found through `$INFINITE_BIN`, `/Applications/Infinite.app`, a build folder in the checkout, or `PATH`; on Windows and Linux set `INFINITE_BIN` to the executable. Python 3.8 or newer is also needed.
 
 ---
 

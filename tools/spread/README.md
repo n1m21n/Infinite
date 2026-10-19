@@ -2,6 +2,10 @@
 
 This toolkit contains creative, programmatic mechanisms designed to spread **Infinite** ([infinitedevices.org](https://infinitedevices.org)) across the internet without reliance on ad spend or generic promotional posts.
 
+> **Rules that bind every tool here.** Nothing is posted automatically. The sentinel and radar only find threads and prepare drafts; a person writes and sends each reply, one thread at a time, mentioning Infinite only where it fits and naming one honest limit. Articles are written in `tools/seo/posts/`, linted, and go live on infinitedevices.org first; syndication creates drafts, and going live on another site needs Naman's yes per post. Caps, tone and account rules: `tools/seo/RULES.md`. The shader porter's tagging template below is a starting point for a hand-written message, never to be sent as is. `syndicate.py` is deprecated in favour of `tools/seo/publish.py`.
+>
+> **Finding the app.** The SDK, MCP server and these tools look for the Infinite executable in `$INFINITE_BIN`, the checkout's `build` folders, then `PATH`. On Windows and Linux set `INFINITE_BIN` to the installed `Infinite.exe` / `Infinite`.
+
 ---
 
 ## 1. 📡 Intent Radar (`tools/spread/radar.py`)

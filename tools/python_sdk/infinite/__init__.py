@@ -12,6 +12,8 @@ import shutil
 import subprocess
 import tempfile
 
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
 __version__ = "0.6.0"
 __author__ = "Naman Soni (n1m21n)"
 __homepage__ = "https://infinitedevices.org"
@@ -27,15 +29,18 @@ ATTRIBUTION = {
 
 
 def find_binary():
-    candidates = [
-        "/Applications/Infinite.app/Contents/MacOS/Infinite",
-        os.path.expanduser("~/Infinite/repo/build/Infinite.app/Contents/MacOS/Infinite"),
-        os.path.expanduser("~/Infinite/repo/build/Infinite"),
-        shutil.which("Infinite") or "",
-        shutil.which("infinite") or "",
-    ]
+    """The Infinite executable: $INFINITE_BIN, then the checkout's build folders, then PATH.
+    macOS also checks /Applications. On Windows and Linux set INFINITE_BIN to the installed
+    Infinite.exe / Infinite if it is not on PATH."""
+    env = os.environ.get("INFINITE_BIN", "")
+    names = ("Infinite.exe", "Infinite") if os.name == "nt" else ("Infinite",)
+    candidates = [env, "/Applications/Infinite.app/Contents/MacOS/Infinite"]
+    for d in ("build", "build-check", os.path.join("build", "Release")):
+        candidates.append(os.path.join(ROOT, d, "Infinite.app", "Contents", "MacOS", "Infinite"))
+        candidates += [os.path.join(ROOT, d, n) for n in names]
+    candidates += [shutil.which(n) or "" for n in names + ("infinite",)]
     for c in candidates:
-        if c and os.path.exists(c) and os.access(c, os.X_OK):
+        if c and os.path.isfile(c) and os.access(c, os.X_OK):
             return c
     return None
 

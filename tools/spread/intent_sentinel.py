@@ -4,7 +4,7 @@
 what: background daemon that monitors hacker news, github issues, and developer
       channels for creators seeking touchdesigner alternatives, audio-reactive
       visualizers, modular daws, and glsl tools.
-      prepares bespoke, value-first technical answers and queues them for distribution.
+      prepares value-first draft answers and queues them for a person to review, rewrite and send; it never posts anything (tools/seo/RULES.md).
 """
 
 import argparse

@@ -327,7 +327,7 @@ def publish_devto(article_key, api_key):
     payload = {
         "article": {
             "title": art["title"],
-            "published": True,
+            "published": False,  # draft; going live on dev.to needs Naman's yes per post (tools/seo/RULES.md)
             "body_markdown": art["content"],
             "tags": art["tags"],
             "canonical_url": art["canonical_url"],
