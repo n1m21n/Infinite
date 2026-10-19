@@ -1,0 +1,16 @@
+{
+  "base": "https://infinitedevices.org/embeds/",
+  "items": [
+    {"slug": "cyber-tunnel", "title": "Cyber Tunnel", "description": "Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow."},
+    {"slug": "iridescent-orb", "title": "Iridescent Orb", "description": "A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble."},
+    {"slug": "hyperspace-tunnel", "title": "Hyperspace Tunnel", "description": "Radial stars and light streaks. The warp speeds up on the beat."},
+    {"slug": "liquid-glass", "title": "Liquid Glass", "description": "A frosted glass panel with chromatic dispersion. Sound pulses the refraction."},
+    {"slug": "hex-lattice", "title": "Hex Lattice", "description": "An isometric honeycomb grid, warm at the centre. Ripples run out across the hexagons."},
+    {"slug": "phyllotaxis-bloom", "title": "Phyllotaxis Bloom", "description": "Seeds on a golden-angle spiral. Sound pushes the orbits outward."},
+    {"slug": "metaball-lens", "title": "Metaball Lens", "description": "Three liquid blobs with a specular rim. Their radii breathe with the sound."},
+    {"slug": "ordered-dither", "title": "Ordered Dither", "description": "A 4x4 Bayer halftone in one colour. Sound ripples the threshold."},
+    {"slug": "pixel-plate", "title": "Pixel Plate", "description": "Stepped mosaic tiles. Sound steps the tile colours."},
+    {"slug": "harmonic-warp", "title": "Harmonic Warp", "description": "Interfering sine ripples that displace one another with the harmonics."},
+    {"slug": "hyper-torus", "title": "Hyper Torus", "description": "A wireframe slice of a rotating 4D torus. Ring frequency follows the sound."}
+  ]
+}

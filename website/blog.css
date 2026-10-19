@@ -94,3 +94,29 @@ body.blog-page { overflow-x: clip; }
 
 @media (prefers-reduced-motion: reduce) { .post-card, .rel-card, .chip { transition: none; } .post-card:hover, .rel-card:hover { transform: none; } }
 .post-media-empty { aspect-ratio: 3 / 1; }
+
+/* embeds gallery (made by tools/website/gen_embeds.py): a card per widget, live preview on top, snippet below */
+.embed-card { display: flex; flex-direction: column; }
+.embed-frame { aspect-ratio: 16 / 9; background: #151930; border-radius: var(--radius-media) var(--radius-media) 0 0; overflow: hidden; }
+.embed-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+.embed-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.embed-actions .chip { display: inline-flex; align-items: center; text-decoration: none; cursor: pointer; }
+.snippet { width: 100%; resize: vertical; background: var(--deep); color: var(--ink2); border: 0; border-radius: var(--radius-media); padding: 12px 14px; font-size: 0.72rem; line-height: 1.5; box-shadow: none; height: 9.5rem; }
+.snippet:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.embed-grid .post-card { padding: 0; }
+.embed-grid .post-body { padding: 16px 16px 18px; gap: 12px; }
+
+/* developers page (website/developers.html) */
+.dev-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 900px) { .dev-grid { grid-template-columns: repeat(3, 1fr); gap: 24px; } }
+.dev-card { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--shadow-1); padding: clamp(18px, 2.4vw, 28px); min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.dev-card h2, .dev-wide h2 { font-size: var(--fs-h3); font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.dev-card p, .dev-wide p { margin: 0; color: var(--ink2); line-height: 1.55; }
+.dev-card pre { margin: 0; background: var(--deep); color: var(--ink); border-radius: var(--radius-media); padding: 14px 16px; white-space: pre-wrap; overflow-wrap: anywhere; font: 500 0.78rem/1.55 'Geist Mono', ui-monospace, monospace; }
+.dev-card code, .dev-wide code, .dev-list code { font: 500 0.85em 'Geist Mono', ui-monospace, monospace; }
+.dev-wide { margin-top: clamp(28px, 4vw, 48px); display: flex; flex-direction: column; gap: 12px; }
+.dev-wide table { border-collapse: collapse; width: 100%; font-size: 0.92rem; min-width: 460px; }
+.dev-wide th, .dev-wide td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.dev-wide th { font: 500 0.72rem 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.05em; text-transform: lowercase; }
+.dev-list { padding-left: 1.2em; display: grid; gap: 8px; color: var(--ink2); line-height: 1.55; }
+.dev-wide a, .dev-card a { color: var(--signal); text-underline-offset: 3px; }

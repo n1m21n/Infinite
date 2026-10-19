@@ -6,9 +6,19 @@ A Model Context Protocol (MCP) server that enables AI agents (Claude, Cursor, An
 
 ## Capabilities
 
-- `infinite_render_video`: Synthesize modular audio and render high-resolution MP4 video from GLSL or 2D JavaScript code in seconds.
-- `infinite_render_frame`: Render a still PNG frame from shaders, sketches, or `.inf` patches.
-- `infinite_validate_patch`: Headless syntax and graph validation for `.inf` files.
+Nine tools over stdio:
+
+- `infinite_render_video`: synthesize modular audio and render an MP4 from GLSL or 2D JavaScript code.
+- `infinite_render_frame`: render a still PNG from shaders, sketches, or `.inf` patches.
+- `infinite_validate_patch`: headless syntax and graph validation for `.inf` files.
+- `infinite_field_synth`: per-sample Field audio synth to a WAV.
+- `infinite_field_effect`: run audio through a Field effect kernel.
+- `infinite_field_notes`: algorithmic notes (Euclidean rhythms and similar) from a Field Notes kernel.
+- `infinite_sketch_3d`: procedural 3D meshes from a JavaScript sketch.
+- `infinite_field_primitive`: parametric 3D surfaces (`uv` to `P`, `N`, `Cd`).
+- `infinite_field_modifier`: deform and shade a mesh with a Field modifier.
+
+Needs the Infinite app installed (`/Applications/Infinite.app`, a build folder in the checkout, or `Infinite` on your `PATH`) and Python 3.8 or newer.
 
 ---
 
@@ -21,7 +31,7 @@ Add the following to your `claude_desktop_config.json` or Cursor MCP settings:
   "mcpServers": {
     "infinite": {
       "command": "python3",
-      "args": ["/Users/namansoni/Infinite/repo/tools/mcp/infinite_mcp.py"]
+      "args": ["/path/to/Infinite/tools/mcp/infinite_mcp.py"]
     }
   }
 }

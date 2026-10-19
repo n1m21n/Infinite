@@ -75,6 +75,38 @@
     });
   }
 
+  /* Learn / Create / Build groups: click or hover opens a panel on desktop; Esc and outside click close it.
+     On phones every group is shown open inside the sheet, so the triggers are inert labels. */
+  function initMenuGroups(header, closeSheet) {
+    const groups = $$('.nav-group', header);
+    if (!groups.length) return;
+    const phone = window.matchMedia('(max-width: 900px)');
+    const hover = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const trig = (g) => $('.nav-trigger', g);
+    const setOpen = (g, open) => trig(g).setAttribute('aria-expanded', String(open));
+    const closeAll = (except) => groups.forEach((g) => { if (g !== except) setOpen(g, false); });
+    const sync = () => groups.forEach((g) => {
+      trig(g).tabIndex = phone.matches ? -1 : 0;
+      if (phone.matches) setOpen(g, true); else setOpen(g, false);
+    });
+    sync();
+    (phone.addEventListener ? phone.addEventListener('change', sync) : phone.addListener(sync));
+    groups.forEach((g) => {
+      const t = trig(g);
+      let enteredAt = 0;   // a click right after the pointer arrived must not close the panel the hover just opened
+      t.addEventListener('click', () => {
+        if (phone.matches) return;
+        const open = Date.now() - enteredAt < 600 ? true : t.getAttribute('aria-expanded') !== 'true';
+        closeAll(g); setOpen(g, open);
+      });
+      g.addEventListener('mouseenter', () => { if (!phone.matches && hover.matches) { enteredAt = Date.now(); closeAll(g); setOpen(g, true); } });
+      g.addEventListener('mouseleave', () => { if (!phone.matches && hover.matches) setOpen(g, false); });
+      g.addEventListener('focusout', (e) => { if (!phone.matches && !g.contains(e.relatedTarget)) setOpen(g, false); });
+      g.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !phone.matches) { setOpen(g, false); t.focus(); e.stopPropagation(); } });
+    });
+    document.addEventListener('click', (e) => { if (!phone.matches && !e.target.closest('.nav-group')) closeAll(); });
+  }
+
   /* ------------------------------------------------------------ header + menu */
   function initHeader() {
     const header = $('#site-header');
@@ -90,6 +122,7 @@
       btn.setAttribute('aria-expanded', String(open));
       btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
     };
+    initMenuGroups(header, set);
     btn.addEventListener('click', () => set(!header.classList.contains('nav-open')));
     $$('a', links).forEach((a) => a.addEventListener('click', () => set(false)));
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });

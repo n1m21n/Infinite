@@ -6,8 +6,12 @@ Official Python interface for **Infinite**, the free, open-source modular audiov
 
 ## Installation
 
+The package is not on PyPI yet. Run it from a checkout:
+
 ```bash
-pip install infinite-daw
+git clone https://github.com/n1m21n/Infinite
+cd Infinite/tools/python_sdk
+python3 -c "import infinite"
 ```
 
 ---

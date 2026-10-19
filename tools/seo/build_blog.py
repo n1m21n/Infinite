@@ -288,6 +288,9 @@ def main():
     build_feed(posts)
     json.dump([{"slug": p["slug"], "title": p["title"], "description": p["description"], "date": p["date"], "updated": p.get("updated", p["date"]),
                 "category": p["category"], "url": p["url"]} for p in posts], open(os.path.join(BLOG, "posts.json"), "w"), indent=1)
+    # the menu and footer come from one definition; this marks the current page in them
+    import subprocess
+    subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "website", "sync_chrome.py")], check=True)
     print(f"blog: {len(posts)} post(s) -> website/blog/")
 
 

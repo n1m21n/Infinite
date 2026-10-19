@@ -1,0 +1,57 @@
+/* Audience pages (made by tools/website/gen_audiences.py). Built on the site tokens; one Ember look-here per screen, Signal for structure. */
+.aud-hero { padding-top: clamp(24px, 5vw, 64px); text-align: center; }
+.aud-hero .blog-hand { font-size: clamp(2rem, 4vw, 2.8rem); }
+.aud-hero h1.slab { font-size: clamp(2.2rem, 6vw, 4rem); }
+.aud-hero .lead { max-width: 40em; margin: 0 auto; }
+.aud-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 24px; }
+
+/* the patch strip: nodes joined by cables, a dot travels along them */
+.patch { position: relative; display: flex; align-items: stretch; justify-content: center; gap: 0; margin: clamp(32px, 5vw, 56px) auto 0; max-width: 980px; }
+.patch-node { flex: 0 1 190px; min-width: 0; background: var(--surface-1); border-radius: var(--r-md); box-shadow: var(--shadow-2); padding: 12px 14px 14px; text-align: left;
+  opacity: 0; transform: translateY(18px) scale(0.97); animation: node-in var(--spring-slab-ms, 500ms) var(--spring-slab, cubic-bezier(.2,1.3,.4,1)) forwards; animation-delay: calc(var(--i) * 110ms + 150ms); }
+.patch-node .cat { display: flex; align-items: center; gap: 6px; font: 500 0.68rem/1 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.06em; text-transform: lowercase; }
+.patch-node .cat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--signal)); }
+.patch-node b { display: block; margin: 8px 0 10px; font-size: 1rem; letter-spacing: -0.02em; }
+.patch-node .knob { display: flex; gap: 8px; }
+.patch-node .knob i { width: 22px; height: 22px; border-radius: 50%; background: var(--deep); position: relative; box-shadow: inset 0 0 0 2px var(--surface-3); }
+.patch-node .knob i::after { content: ""; position: absolute; left: 50%; top: 3px; width: 2px; height: 8px; margin-left: -1px; border-radius: 2px; background: var(--ink-2); transform-origin: 50% 8px; transform: rotate(var(--r, 0deg)); animation: knob-turn 6s ease-in-out infinite; animation-delay: calc(var(--i) * -1.3s); }
+.cable { flex: 0 0 clamp(18px, 4vw, 56px); align-self: center; height: 12px; position: relative; opacity: 0; animation: fade-in 400ms forwards; animation-delay: calc(var(--i) * 110ms + 400ms); }
+.cable::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 2px; border-radius: 2px; background: var(--signal); opacity: 0.55; }
+.cable::after { content: ""; position: absolute; top: 2px; left: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse-run 2.4s linear infinite; animation-delay: calc(var(--i) * 0.5s); }
+@keyframes node-in { to { opacity: 1; transform: none; } }
+@keyframes fade-in { to { opacity: 1; } }
+@keyframes pulse-run { 0% { left: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { left: calc(100% - 8px); opacity: 0; } }
+@keyframes knob-turn { 0%, 100% { transform: rotate(-50deg); } 50% { transform: rotate(60deg); } }
+@media (max-width: 720px) {
+  .patch { flex-direction: column; align-items: center; }
+  .patch-node { flex-basis: auto; width: min(260px, 100%); }
+  .cable { flex-basis: 22px; width: 12px; height: 22px; }
+  .cable::before { left: 5px; right: auto; top: 0; bottom: 0; width: 2px; height: auto; }
+  .cable::after { left: 2px; top: 0; animation-name: pulse-down; }
+  @keyframes pulse-down { 0% { top: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { top: calc(100% - 8px); opacity: 0; } }
+}
+
+/* sections that rise when scrolled into view */
+.aud-section { margin-top: clamp(40px, 6vw, 80px); }
+.aud-section > h2 { font-size: var(--fs-h2); font-weight: 750; letter-spacing: -0.03em; margin: 0 0 20px; }
+.js-reveal .reveal { opacity: 0; transform: translateY(22px); transition: opacity 500ms ease, transform var(--spring-slab-ms, 500ms) var(--spring-slab, cubic-bezier(.2,1.3,.4,1)); transition-delay: calc(var(--i, 0) * 80ms); }
+.js-reveal .reveal.in { opacity: 1; transform: none; }
+.aud-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 760px) { .aud-grid { grid-template-columns: repeat(3, 1fr); gap: 20px; } }
+.aud-card { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow-1); padding: clamp(18px, 2.4vw, 26px); }
+.aud-card h3 { margin: 0 0 8px; font-size: 1.12rem; font-weight: 700; letter-spacing: -0.02em; }
+.aud-card p { margin: 0; color: var(--ink2); line-height: 1.55; font-size: 0.95rem; }
+.aud-card code { font: 500 0.85em 'Geist Mono', ui-monospace, monospace; }
+.aud-start { display: flex; flex-wrap: wrap; gap: 10px; }
+.aud-start a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: var(--r-pill); background: var(--card); color: var(--ink); box-shadow: var(--shadow-1); text-decoration: none; font-weight: 600; font-size: 0.92rem; transition: transform var(--spring-slab-ms, 500ms) var(--spring-slab, ease), box-shadow var(--dur-medium, 300ms); }
+.aud-start a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+.aud-code { margin: 0; background: var(--deep); color: var(--ink); border-radius: var(--r-md); padding: 16px 18px; overflow-x: auto; font: 500 0.82rem/1.6 'Geist Mono', ui-monospace, monospace; box-shadow: var(--shadow-1); }
+.aud-note { color: var(--muted); font-size: 0.88rem; margin-top: 12px; }
+.aud-others { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
+.aud-others a { padding: 8px 16px; border-radius: var(--r-pill); background: var(--card); color: var(--ink2); box-shadow: var(--shadow-1); text-decoration: none; font-size: 0.88rem; font-weight: 500; }
+.aud-others a:hover { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) {
+  .patch-node, .cable { animation: none; opacity: 1; transform: none; }
+  .cable::after, .patch-node .knob i::after { animation: none; }
+  .js-reveal .reveal { opacity: 1; transform: none; transition: none; }
+}
