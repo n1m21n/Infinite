@@ -201,6 +201,7 @@ strong { font-weight: 600; color: var(--ink); }
 }
 .nav-trigger[aria-expanded="true"] + .nav-menu { display: flex; animation: nav-pop var(--dur-small, 160ms) ease-out; }
 .nav-menu::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 12px; } /* keeps the pointer inside the group while it crosses the gap */
+@keyframes sheet-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes nav-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .nav-trigger[aria-expanded="true"] + .nav-menu { animation: none; } }
 .nav-menu a { display: flex; align-items: center; padding: 10px 14px; border-radius: var(--r-sm); text-decoration: none; font-size: 0.92rem; font-weight: 600; color: var(--ink); }
@@ -733,27 +734,47 @@ html.over-bird body { cursor: pointer; }
 }
 
 @media (max-width: 900px) {
-        .nav-links {
-    position: fixed; left: 0; right: 0; top: var(--header-h);
-    flex-direction: column; gap: 0; margin: 0; padding: 8px max(var(--gutter), env(safe-area-inset-left)) 20px;
-    background: color-mix(in srgb, var(--ground) 98%, transparent);
-    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-    border-bottom: 1px solid var(--line);
-    box-shadow: 0 30px 50px color-mix(in srgb, var(--shadow) 10%, transparent);
-    transform: translateY(-12px); opacity: 0; visibility: hidden;
-    transition: transform var(--spring-slab-ms) var(--spring-slab), opacity var(--dur-small), visibility 0s 0.5s;
+  /* The phone sheet: full height under the header, one open group at a time, Download and social pinned to the foot. */
+  .nav-links {
+    position: fixed; left: 0; right: 0; top: var(--header-h); height: calc(100vh - var(--header-h)); height: calc(100dvh - var(--header-h));   /* the header blurs its backdrop, so fixed boxes inside it size to the header: no bottom:0 */
+    flex-direction: column; gap: 0; margin: 0; padding: 8px max(var(--gutter), env(safe-area-inset-left)) max(24px, env(safe-area-inset-bottom));
+    background: var(--ground); overflow-y: auto; overscroll-behavior: contain;
+    transform: translateY(-8px); opacity: 0; visibility: hidden;
+    transition: transform var(--spring-slab-ms) var(--spring-slab), opacity var(--dur-small), visibility 0s 0.4s;
   }
   .nav-open .nav-links { transform: none; opacity: 1; visibility: visible; transition: transform var(--spring-slab-ms) var(--spring-slab), opacity var(--dur-small), visibility 0s; }
-  .nav-links > a { padding: 14px 6px; font-size: 1.1rem; color: var(--ink); border-radius: 0; border-bottom: 1px solid var(--line-soft); font-weight: 600; }
+  html.nav-locked { overflow: hidden; }
+  .nav-links > a { padding: 14px 6px; font-size: 1.1rem; color: var(--ink); font-weight: 600; }
   .nav-links > a:hover { background: none; }
-  .nav-group { border-bottom: 1px solid var(--line-soft); padding: 10px 0 6px; }
-  .nav-trigger { pointer-events: none; padding: 4px 6px; background: none !important; box-shadow: none !important; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: lowercase; color: var(--muted); }
-  .nav-trigger::after { display: none; }
-  .nav-menu, .nav-trigger[aria-expanded] + .nav-menu { display: flex; position: static; min-width: 0; padding: 0; background: none; box-shadow: none; }
-  .nav-menu a { padding: 12px 6px; font-size: 1.05rem; border-radius: 0; }
-  .nav-sheet-only { display: block; padding: 14px 6px; font-size: 1.1rem; font-weight: 600; color: var(--accent-ink); text-decoration: none; }
-  .nav-sheet-social { display: flex; gap: 18px; padding-top: 14px; }
-  .nav-sheet-social a { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink2); text-decoration: none; padding: 8px 6px; }
+  .nav-group { border-bottom: 1px solid var(--line-soft); }
+  .nav-trigger {
+    width: 100%; justify-content: space-between; min-height: 60px; padding: 0 6px; border-radius: 0;
+    background: none !important; box-shadow: none !important; font-size: 1.3rem; font-weight: 600; letter-spacing: -0.01em; color: var(--ink);
+  }
+  .nav-trigger::after { width: 9px; height: 9px; margin-top: -4px; }
+  .nav-trigger[aria-expanded="true"]::after { margin-top: 4px; }
+  .nav-menu {
+    display: flex; position: static; min-width: 0; margin: 0; padding: 0; background: none; box-shadow: none; border-radius: 0;
+    max-height: 0; overflow: hidden; visibility: hidden; animation: none;
+    transition: max-height 333ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s 333ms;
+  }
+  .nav-menu::before { display: none; }
+  .nav-trigger[aria-expanded="true"] + .nav-menu { max-height: 520px; visibility: visible; padding-bottom: 12px; transition: max-height 333ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s; animation: none; }
+  .nav-menu a { min-height: 48px; padding: 0 14px; font-size: 1.05rem; font-weight: 500; color: var(--ink2); border-radius: var(--r-sm); }
+  .nav-menu a:active { background: var(--deep); }
+  .nav-sheet-only {
+    display: flex; align-items: center; justify-content: center; margin-top: auto; min-height: 52px; padding: 0 22px;
+    border-radius: var(--r-pill); background: var(--accent); color: var(--on-accent, #fff) !important; font-size: 1.05rem; font-weight: 600; text-decoration: none; border-bottom: 0 !important;
+  }
+  .nav-links > .nav-group:last-of-type { margin-bottom: 20px; }
+  .nav-sheet-social { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding-top: 16px; }
+  .nav-sheet-social a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); background: var(--deep); font-size: 0.9rem; font-weight: 500; color: var(--ink2); text-decoration: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .nav-open .nav-group { animation: sheet-in 333ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .nav-open .nav-group:nth-of-type(2) { animation-delay: 62ms; }
+    .nav-open .nav-group:nth-of-type(3) { animation-delay: 124ms; }
+    .nav-open .nav-sheet-only, .nav-open .nav-sheet-social { animation: sheet-in 333ms 186ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  }
   /* hamburger, then the mark beside it, download on the right */
   .nav-container { gap: 6px; padding: 0 max(var(--gutter), env(safe-area-inset-left)); }
   .menu-btn { display: block; margin-left: -10px; }

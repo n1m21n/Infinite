@@ -16,8 +16,8 @@ import json, os, re, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 GH = "https://github.com/n1m21n/Infinite"
-CSS_VERSION = "82"   # style.css cache key; bump when the menu or footer CSS changes
-JS_VERSION = "12"    # site.js cache key; bump when the menu script changes
+CSS_VERSION = "84"   # style.css cache key; bump when the menu or footer CSS changes
+JS_VERSION = "13"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
 GROUPS = [
@@ -118,7 +118,8 @@ def nav_html(rel):
     out.append('      <div class="nav-sheet-social">')
     out.append(f'        <a href="{GH}" target="_blank" rel="noopener">GitHub</a>')
     out.append('        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>')
-    out.append('        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener">YouTube tutorial</a>')
+    for name, url, _ in SOCIAL:
+        out.append(f'        <a href="{url}" target="_blank" rel="noopener">{name}</a>')
     out.append("      </div>")
     out.append("    </nav>")
     return "\n".join(out)
