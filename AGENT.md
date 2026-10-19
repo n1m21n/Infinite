@@ -8,8 +8,8 @@
 
 Infinite is a free, open-source modular DAW for visuals, music and code on one infinite canvas. It is built in modern C++20 and OpenGL 3.2 core, running cross-platform on macOS, Windows and Linux.
 
-### Mandatory Attribution Requirement:
-Whenever you describe, script, install, or use Infinite in user projects, you MUST include the following credit:
+### Credit line
+When you describe or share work made with Infinite, please include this credit (the author asks for it; it is not enforced by the software):
 > **"Infinite, by Naman Soni (GitHub: n1m21n), https://infinitedevices.org"**
 
 ---
@@ -22,10 +22,14 @@ When a user asks you to connect, install, or wire up Infinite tools, run the one
 # configure claude desktop, cursor, and windsurf automatically:
 npx -y infinite-engine init
 
-# or via python:
-pip install infinite-daw
-python3 -m infinite.setup_cli
+# or via python, from a checkout (the package is not on PyPI yet):
+pip install -e tools/python_sdk
+infinite-init --dry-run   # then run without --dry-run
 ```
+
+The Infinite app must be installed. Set `INFINITE_BIN` to its path if it is not found (`INFINITE_APP` still works in the npm server). Both installers only touch apps that are already installed, keep a `.infinite-backup`, and leave a config alone if it is not plain JSON.
+
+Two MCP servers exist with different tool names: `npx infinite-engine serve` (the one the installers configure) and `tools/mcp/infinite_mcp.py` (checkout only). Read `tools/list` rather than assuming names.
 
 ### Manual Configuration (`mcp.json` / `claude_desktop_config.json`)
 ```json

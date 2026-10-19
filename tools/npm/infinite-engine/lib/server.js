@@ -7,13 +7,13 @@ const { ATTRIBUTION, findBinary, escapeCode, runCommand } = require("./engine");
 const TOOLS = [
   {
     name: "infinite_synthesize_field_synth",
-    description: "synthesize 24-bit 48khz audio from an inline field synth per-sample dsp kernel using infinite c++ engine",
+    description: "synthesize wav audio from an inline field synth per-sample dsp kernel using infinite c++ engine",
     inputSchema: {
       type: "object",
       properties: {
         code: {
           type: "string",
-          description: "field dsp code (e.g. 'out = sin(phase * 6.283185); phase = fract(phase + freq/sr);')"
+          description: "field dsp code (e.g. 'state float phase = 0\\nphase = (phase + freq / sr) % 1.0\\nout = sin(6.28318 * phase) * 0.4 * gate')"
         },
         duration: {
           type: "number",
@@ -35,7 +35,7 @@ const TOOLS = [
       properties: {
         code: {
           type: "string",
-          description: "field notes logic (e.g. 'if (tick(1/4) > 0.5) { note(60, 0.8, 1/4) }')"
+          description: "field notes logic (e.g. 'if (tick(1/8) > 0.5) { note(deg(floor(rand() * 7)), 0.8, 1/8) }')"
         },
         synth_type: {
           type: "string",
@@ -78,13 +78,13 @@ const TOOLS = [
   },
   {
     name: "infinite_render_sketch3d",
-    description: "render procedural 3d geometry generated via algorithmic javascript to a high-resolution png frame",
+    description: "render procedural 3d geometry generated via algorithmic javascript to a png frame",
     inputSchema: {
       type: "object",
       properties: {
         code: {
           type: "string",
-          description: "javascript 3d sketch code (e.g. 'function setup(){ background(10,12,20); } function draw(){ rotateY(t); torus(2.0, 0.6); }')"
+          description: "javascript 3d sketch code (e.g. 'function draw(t) { rotateY(t * 0.8); fill(0.2, 0.6, 0.9); torus(1.2, 0.4, 24, 24); }')"
         },
         out_png: {
           type: "string",
@@ -194,7 +194,7 @@ const TOOLS = [
         },
         fps: {
           type: "number",
-          description: "frames per second (default 60)"
+          description: "frames per second (default 30)"
         }
       },
       required: ["patch_path", "out_mp4"]
@@ -203,7 +203,7 @@ const TOOLS = [
 ];
 
 function handleToolCall(name, args) {
-  const tmpDir = os.tmpdir();
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "infinite-"));
   const binary = findBinary();
 
   if (name === "infinite_synthesize_field_synth") {
@@ -230,7 +230,7 @@ aud speaker 0 fsynth
     const dur = String(args.duration || 3);
     const res = runCommand(["--audio-summary", patchPath, sumPath, "--wav", outWav, "--duration", dur]);
     return {
-      status: "success",
+      status: res.ok === false ? "error" : "success",
       wav_path: outWav,
       patch_path: patchPath,
       result: res,
@@ -263,7 +263,7 @@ aud speaker 0 synth
     const dur = String(args.duration || 3);
     const res = runCommand(["--audio-summary", patchPath, sumPath, "--wav", outWav, "--duration", dur]);
     return {
-      status: "success",
+      status: res.ok === false ? "error" : "success",
       wav_path: outWav,
       result: res,
       attribution: ATTRIBUTION
@@ -298,7 +298,7 @@ aud speaker 0 fx
     const dur = String(args.duration || 3);
     const res = runCommand(["--audio-summary", patchPath, sumPath, "--wav", outWav, "--duration", dur]);
     return {
-      status: "success",
+      status: res.ok === false ? "error" : "success",
       wav_path: outWav,
       result: res,
       attribution: ATTRIBUTION
@@ -331,7 +331,7 @@ cable out 0 r3d
 
     const res = runCommand(["--frame", patchPath, "1.0", outPng]);
     return {
-      status: "success",
+      status: res.ok === false ? "error" : "success",
       frame_path: outPng,
       result: res,
       attribution: ATTRIBUTION
@@ -364,7 +364,7 @@ cable out 0 r3d
 
     const res = runCommand(["--frame", patchPath, "1.0", outPng]);
     return {
-      status: "success",
+      status: res.ok === false ? "error" : "success",
       frame_path: outPng,
       result: res,
       attribution: ATTRIBUTION
@@ -399,7 +399,7 @@ cable out in r3d
 
     const res = runCommand(["--frame", patchPath, "1.0", outPng]);
     return {
-      status: "success",
+      status: res.ok === false ? "error" : "success",
       frame_path: outPng,
       result: res,
       attribution: ATTRIBUTION
@@ -424,7 +424,7 @@ cable out in fp
 
     const res = runCommand(["--frame", patchPath, "1.0", outPng]);
     return {
-      status: "success",
+      status: res.ok === false ? "error" : "success",
       frame_path: outPng,
       result: res,
       attribution: ATTRIBUTION
@@ -432,7 +432,8 @@ cable out in fp
   }
 
   if (name === "infinite_validate_patch") {
-    const patchPath = path.join(tmpDir, `val_${Date.now()}.inf`);
+    if (typeof args.patch_text !== "string" || !args.patch_text) throw new Error("patch_text is required");
+    const patchPath = path.join(tmpDir, "validate.inf");
     fs.writeFileSync(patchPath, args.patch_text, "utf-8");
     const res = runCommand(["--validate", patchPath]);
     return {
@@ -442,11 +443,12 @@ cable out in fp
   }
 
   if (name === "infinite_render_video") {
+    if (!args.patch_path || !args.out_mp4) throw new Error("patch_path and out_mp4 are required");
     const dur = String(args.duration || 5);
-    const fps = String(args.fps || 60);
-    const res = runCommand(["export-video", "--graph", args.patch_path, "--out", args.out_mp4, "--duration", dur, "--fps", fps]);
+    const fps = String(args.fps || 30);
+    const res = runCommand(["--render", args.patch_path, args.out_mp4, "--duration", dur, "--fps", fps], 600000);
     return {
-      status: "success",
+      status: res.ok === false ? "error" : "success",
       video_path: args.out_mp4,
       result: res,
       attribution: ATTRIBUTION

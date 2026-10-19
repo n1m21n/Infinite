@@ -42,7 +42,7 @@ You can automatically wire up Infinite across all your AI assistants with a sing
 npx -y infinite-engine init
 ```
 
-This immediately registers the `infinite` MCP server in your local Claude Desktop and Cursor configurations.
+It adds the `infinite` MCP server to Claude Desktop, Cursor and Windsurf, but only for apps that are already installed. It keeps a backup of each file it changes, and leaves a config alone if it contains comments. Add `--dry-run` to see what it would do first. The Infinite app itself must be installed; set `INFINITE_BIN` to its path if it is not found.
 
 ## Manual MCP Configuration
 
@@ -59,16 +59,18 @@ If you prefer to configure your assistants manually:
 }
 ```
 
-Now Claude has access to 9 native tools:
-- `infinite_render_video`: Synthesizes audio and renders MP4 videos.
-- `infinite_render_frame`: Renders PNG still frames from shaders or JavaScript sketches.
-- `infinite_field_synth`: Generates polyphonic synthesizer voices.
-- `infinite_field_effect`: Processes audio through custom filter kernels.
-- `infinite_field_notes`: Builds algorithmic Euclidean MIDI sequences.
-- `infinite_sketch_3d`: Generates procedural 3D meshes in JavaScript.
-- `infinite_field_primitive`: Maps math formulas to 3D surfaces.
-- `infinite_field_modifier`: Deforms 3D meshes with vertex shaders.
-- `infinite_validate_patch`: Checks graph topology for errors.
+Now your assistant has nine tools (ask the server for `tools/list` to see their exact schemas):
+- `infinite_render_video`: renders a patch to MP4.
+- `infinite_render_field_pixel`: renders a still frame from a Field Pixel preset.
+- `infinite_synthesize_field_synth`: renders a synth voice to audio.
+- `infinite_synthesize_field_notes`: builds an algorithmic note sequence.
+- `infinite_process_field_effect`: runs audio through a Field effect.
+- `infinite_render_sketch3d`: renders a 3D sketch written in JavaScript.
+- `infinite_render_field_primitive`: maps a formula to a 3D surface.
+- `infinite_render_field_modifier`: deforms a mesh with a Field modifier.
+- `infinite_validate_patch`: checks a patch for errors.
+
+The Python SDK also ships an MCP server (`tools/mcp/infinite_mcp.py`, from a checkout) with its own tool names.
 
 ## Using the Python SDK
 
@@ -98,7 +100,7 @@ function draw(t) {
 """, out_png="torus.png")
 ```
 
-Every function automatically stamps attribution metadata:
+Results from the SDK carry a small credit record:
 ```json
 {
   "engine": "infinite",

@@ -1,0 +1,52 @@
+# Publishes infinite-engine (npm) and infinite-daw (PyPI). Manual only: run it from the Actions tab.
+# One-time setup by the owner (never put tokens in chat or in the repo):
+#   npm:  repo secret NPM_TOKEN (an npm "automation" token for the account that will own infinite-engine)
+#   PyPI: add this repo and workflow as a trusted publisher at pypi.org (project infinite-daw), environment "pypi"
+name: publish-packages
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "What to publish"
+        type: choice
+        options: [dry-run-both, npm, pypi, both]
+        default: dry-run-both
+
+jobs:
+  npm:
+    if: inputs.target != 'pypi'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    defaults: { run: { working-directory: tools/npm/infinite-engine } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, registry-url: "https://registry.npmjs.org" }
+      - run: npm test
+      - run: npm pack --dry-run
+      - if: inputs.target == 'npm' || inputs.target == 'both'
+        run: npm publish --provenance --access public
+        env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
+
+  pypi-build:
+    if: inputs.target != 'npm'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python -m unittest discover -s tools/python_sdk/tests
+      - run: pip install build twine && python -m build tools/python_sdk && twine check tools/python_sdk/dist/*
+      - uses: actions/upload-artifact@v4
+        with: { name: dist, path: tools/python_sdk/dist }
+
+  pypi-publish:
+    needs: pypi-build
+    if: inputs.target == 'pypi' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions: { id-token: write }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+      - uses: pypa/gh-action-pypi-publish@release/v1

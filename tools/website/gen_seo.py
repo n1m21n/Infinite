@@ -165,7 +165,7 @@ def main():
     L += ["## Embeds", "", f"- [Embed gallery]({BASE}embeds/): {len(emb)} live audio-reactive WebGL visuals, each with a copy-paste iframe"] + \
          [f"- [{i['title']}]({BASE}embeds/{i['slug']}.html): {i['description']}" for i in emb] + [""]
     L += ["## For AI agents", "",
-          "- One-Command Installation: `npx -y infinite-engine init` (auto-configures Claude Desktop, Cursor, and Windsurf) or `pip install infinite-daw`.",
+          "- One-Command Installation: `npx -y infinite-engine init` (auto-configures Claude Desktop, Cursor, and Windsurf) (the Python package `infinite-daw` is not on PyPI yet).",
           f"- [Developers]({BASE}developers.html): the headless command line, Python SDK and MCP server, with what each needs",
           "- [MCP server](https://github.com/n1m21n/Infinite/tree/main/tools/npm/infinite-engine): stdio server (`npx -y infinite-engine serve`), nine tools for audio, 3D, notes and video",
           "- [Python SDK](https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk): headless Python wrappers (`infinite.field_synth`, `infinite.sketch_3d`)",

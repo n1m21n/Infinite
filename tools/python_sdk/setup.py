@@ -1,16 +1,20 @@
+import os
 from setuptools import setup, find_packages
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+README = os.path.join(HERE, "README.md")
 
 setup(
     name="infinite-daw",
     version="0.6.0",
     description="Python interface for Infinite: real-time modular audiovisual workstation by Naman Soni",
-    long_description=open("README.md").read() if open("README.md", "r") else "",
+    long_description=open(README, encoding="utf-8").read() if os.path.exists(README) else "",
     long_description_content_type="text/markdown",
     author="Naman Soni",
     author_email="contact@infinitedevices.org",
     url="https://infinitedevices.org",
     project_urls={
-        "Source": "https://github.com/n1m21n/infinite",
+        "Source": "https://github.com/n1m21n/Infinite",
         "Documentation": "https://infinitedevices.org",
     },
     license="MIT",

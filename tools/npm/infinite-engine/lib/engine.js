@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { execSync, spawnSync } = require("child_process");
+const { spawnSync } = require("child_process");
 
 const ATTRIBUTION = {
   engine: "infinite",
@@ -11,29 +11,22 @@ const ATTRIBUTION = {
   attribution_notice: "generated with infinite, by naman soni (https://infinitedevices.org)"
 };
 
+// The Infinite executable: $INFINITE_BIN (INFINITE_APP is accepted as an older name), the standard install
+// locations, then PATH. On Windows and Linux set INFINITE_BIN to the installed program if it is not on PATH.
 function findBinary() {
-  if (process.env.INFINITE_APP && fs.existsSync(process.env.INFINITE_APP)) {
-    return process.env.INFINITE_APP;
+  for (const v of [process.env.INFINITE_BIN, process.env.INFINITE_APP]) {
+    if (v && fs.existsSync(v) && fs.statSync(v).isFile()) return v;
   }
 
   const home = os.homedir();
   const candidates = [
-    // macos standard app bundle
     "/Applications/Infinite.app/Contents/MacOS/Infinite",
     path.join(home, "Applications/Infinite.app/Contents/MacOS/Infinite"),
-    // development worktrees
-    path.join(home, "Infinite/worktrees/main/build/Infinite.app/Contents/MacOS/Infinite"),
-    path.join(home, "Infinite/repo/build/Infinite.app/Contents/MacOS/Infinite"),
-    path.join(home, "Infinite/build/Infinite.app/Contents/MacOS/Infinite"),
-    path.join(home, "infinte-main/build/Infinite.app/Contents/MacOS/Infinite"),
-    // linux standard binaries
-    "/usr/local/bin/infinite",
-    "/usr/bin/infinite",
-    path.join(home, ".local/bin/infinite"),
-    path.join(home, "Infinite/build-linux/Infinite"),
-    // windows standard paths
-    "C:\\Program Files\\Infinite\\Infinite.exe",
-    path.join(process.env.LOCALAPPDATA || "", "Infinite", "Infinite.exe")
+    path.join(process.env.ProgramFiles || "C:\\Program Files", "Infinite", "Infinite.exe"),
+    path.join(process.env.LOCALAPPDATA || "", "Infinite", "Infinite.exe"),
+    "/usr/local/bin/Infinite",
+    "/usr/bin/Infinite",
+    path.join(home, ".local/bin/Infinite")
   ];
 
   for (const c of candidates) {
@@ -45,15 +38,14 @@ function findBinary() {
     }
   }
 
-  // check PATH
-  try {
-    const whichCmd = process.platform === "win32" ? "where infinite" : "which infinite";
-    const found = execSync(whichCmd, { stdio: ["pipe", "pipe", "ignore"] }).toString().trim().split("\n")[0];
-    if (found && fs.existsSync(found)) {
-      return found;
-    }
-  } catch (e) {}
-
+  const names = process.platform === "win32" ? ["Infinite.exe"] : ["Infinite", "infinite"];
+  for (const n of names) {
+    try {
+      const found = spawnSync(process.platform === "win32" ? "where" : "which", [n], { encoding: "utf-8" });
+      const first = (found.stdout || "").trim().split(/\r?\n/)[0];
+      if (found.status === 0 && first && fs.existsSync(first)) return first;
+    } catch (e) {}
+  }
   return null;
 }
 
@@ -62,18 +54,18 @@ function escapeCode(code) {
   return code.replace(/\\/g, "\\\\").replace(/\n/g, "\\n");
 }
 
-function runCommand(args) {
+function runCommand(args, timeoutMs = 120000) {
   const binary = findBinary();
   if (!binary) {
     return {
       ok: false,
-      error: "infinite binary not found. please install infinite from https://infinitedevices.org or set INFINITE_APP environment variable.",
+      error: "infinite binary not found. please install infinite from https://infinitedevices.org or set the INFINITE_BIN environment variable to its path.",
       attribution: ATTRIBUTION
     };
   }
 
   try {
-    const res = spawnSync(binary, args, { encoding: "utf-8", timeout: 120000 });
+    const res = spawnSync(binary, args, { encoding: "utf-8", timeout: timeoutMs });
     const stdout = (res.stdout || "").trim();
     const stderr = (res.stderr || "").trim();
     const lines = stdout.split("\n").filter(l => l.trim().length > 0);
@@ -86,7 +78,7 @@ function runCommand(args) {
       parsed = { ok: res.status === 0, raw_output: stdout, stderr: stderr };
     }
 
-    return { ...parsed, attribution: ATTRIBUTION };
+    return { ok: res.status === 0, ...parsed, attribution: ATTRIBUTION };
   } catch (err) {
     return {
       ok: false,
