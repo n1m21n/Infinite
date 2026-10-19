@@ -198,18 +198,6 @@ def main_html():
         </div>
       </section>
 
-      <section class="aud-section reveal" id="design">
-        <h2>How it is designed</h2>
-        <p class="sec-sub">The look can change. The movement and the beliefs do not.</p>
-        <ol class="principles">
-{prin}
-        </ol>
-        <div class="springs-card">
-          <div><h3>Four springs, one family</h3><p>Press one. Each is a measured curve from the brand book, tuned so the peak of its overshoot lands on a beat at 120 BPM.</p></div>
-          <div class="springs">{springs}</div>
-        </div>
-      </section>
-
       <section class="aud-section reveal" id="faq">
         <h2>Questions</h2>
         <div class="faq">
