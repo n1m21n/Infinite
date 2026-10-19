@@ -1,5 +1,14 @@
 [
  {
+  "slug": "ai-agents-make-music-art-3d-headless",
+  "title": "Let an AI agent make music, art and 3D with Infinite's headless engine",
+  "description": "Infinite's headless engine lets an AI agent such as Claude write a text patch, check it, listen to it and render music, pictures and 3D from the command line.",
+  "date": "2026-10-19",
+  "updated": "2026-10-19",
+  "category": "product",
+  "url": "https://infinitedevices.org/blog/ai-agents-make-music-art-3d-headless.html"
+ },
+ {
   "slug": "field-language-write-what-a-node-does",
   "title": "Field: write a short kernel and let the node decide where it runs",
   "description": "Field is the language built into Infinite. One kernel can become a shader, a geometry deformer or an audio effect, depending on the node it lives in.",

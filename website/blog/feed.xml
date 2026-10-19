@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
   <title>Infinite blog</title><link>https://infinitedevices.org/blog/</link><description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
-  <language>en-gb</language><lastBuildDate>Sat, 17 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <language>en-gb</language><lastBuildDate>Mon, 19 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item><title>Let an AI agent make music, art and 3D with Infinite&#x27;s headless engine</title><link>https://infinitedevices.org/blog/ai-agents-make-music-art-3d-headless.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/ai-agents-make-music-art-3d-headless.html</guid>
+    <pubDate>Mon, 19 Oct 2026 09:00:00 +0000</pubDate><category>product</category><description>Infinite&#x27;s headless engine lets an AI agent such as Claude write a text patch, check it, listen to it and render music, pictures and 3D from the command line.</description></item>
   <item><title>Field: write a short kernel and let the node decide where it runs</title><link>https://infinitedevices.org/blog/field-language-write-what-a-node-does.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/field-language-write-what-a-node-does.html</guid>
     <pubDate>Sat, 17 Oct 2026 09:00:00 +0000</pubDate><category>product</category><description>Field is the language built into Infinite. One kernel can become a shader, a geometry deformer or an audio effect, depending on the node it lives in.</description></item>
   <item><title>A free TouchDesigner alternative for audio-reactive visuals?</title><link>https://infinitedevices.org/blog/free-touchdesigner-alternative-for-audio-reactive-visuals.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/free-touchdesigner-alternative-for-audio-reactive-visuals.html</guid>
