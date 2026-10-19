@@ -59,7 +59,12 @@ def indexnow():
     load_env(); key = os.environ.get("INDEXNOW_KEY")
     if not key:
         sys.exit("set INDEXNOW_KEY (any 8-64 char hex) in ~/.config/infinite-seo.env, and publish website/<key>.txt containing it")
-    urls = [BASE + "blog/"] + [p["url"] for p in load_posts()]
+    sitemap_path = os.path.join(os.path.dirname(BLOG), "sitemap.xml")
+    if os.path.exists(sitemap_path):
+        raw = re.findall(r'<loc>(https://infinitedevices\.org/[^<]+)</loc>', open(sitemap_path).read())
+        urls = sorted(list(set([u for u in raw if not u.endswith(('.json', '.xml', '.txt', '.pdf'))])))
+    else:
+        urls = [BASE + "blog/"] + [p["url"] for p in load_posts()]
     body = json.dumps({"host": "infinitedevices.org", "key": key, "keyLocation": BASE + key + ".txt", "urlList": urls}).encode()
     req = urllib.request.Request("https://api.indexnow.org/indexnow", data=body, headers={"Content-Type": "application/json; charset=utf-8", "User-Agent": UA})
     try: print("IndexNow", urllib.request.urlopen(req, timeout=20).status, len(urls), "urls")

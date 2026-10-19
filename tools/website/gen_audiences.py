@@ -298,6 +298,9 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
     """The whole document around a page's <main>: head, one header, one footer, reveal-on-scroll. Shared with gen_philosophy.py."""
     url = BASE + rel
     ldtags = "\n  ".join(f'<script type="application/ld+json">{json.dumps(x, ensure_ascii=False)}</script>' for x in lds)
+    faq = os.path.join(os.path.dirname(os.path.abspath(__file__)), "faq_%s.html" % a["slug"])
+    if os.path.exists(faq):   # FAQPage schema kept as a file per audience page, so a regenerate does not drop it
+        ldtags += "\n" + open(faq, encoding="utf-8").read().rstrip("\n")
     return f'''<!DOCTYPE html>
 <html lang="en" data-mode="paper">
 <head>
