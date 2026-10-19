@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "INode.h"
+#include "GLUtil.h"
 
 // Text/typography node. Renders via macOS CoreText/CoreGraphics into an
 // offscreen bitmap, then uploads to a GL texture - a leaf node like
@@ -18,15 +19,26 @@ public:
    static INode* Create() { return new TextNode(); }
    ~TextNode() override;
 
-   unsigned int GetOutputTexture() override { return mTex; }
+   unsigned int GetOutputTexture() override { return mShowingMoved ? mMoved.tex : mTex; }
    int GetOutputWidth() const override { return mWidth; }
    int GetOutputHeight() const override { return mHeight; }
    void CookIfNeeded(int frameId) override;
-   // Only bumped when CookIfNeeded actually re-rasterizes, so downstream
-   // FilterNode chains can skip re-rendering while the text is idle.
+   // Only bumped when CookIfNeeded actually re-rasterizes or moves the text,
+   // so downstream FilterNode chains can skip re-rendering while it is idle.
    unsigned long long TextureRevision() const override { return mRevision; }
 
    static const std::vector<std::string>& AvailableFonts();
+
+   // Moving the text (posX/posY) with nothing else changing does not redraw
+   // it: the text is drawn once onto a sheet twice the canvas size, centred
+   // on its anchor, and each move only shifts that sheet on the GPU. Once
+   // the position has held still for a few frames it is drawn exactly
+   // again, so a still frame matches a fresh rasterize. Same rule as Audio Filter's curve
+   // cache: approximate while moving, exact as soon as it stops.
+   // Diagnostic counters for TEXTMOVETEST.
+   unsigned long long RasterCount() const { return mRasterCount; }
+   unsigned long long SheetCount() const { return mSheetCount; }
+   bool ShowingMoved() const { return mShowingMoved; }
 
    // Public - the ImGui params panel writes into these directly (InputText, sliders, etc).
    std::string text = "Text";
@@ -68,6 +80,12 @@ public:
    }
 
 private:
+   void Rasterize();
+   bool StyleMatchesBuilt() const;
+   bool SheetCovers() const;
+   bool EnsureSheet();
+   void DrawMoved();
+
    unsigned int mTex = 0;
    int mWidth = 512;
    int mHeight = 512;
@@ -105,6 +123,28 @@ private:
    float mBuiltWidth = 0.0f;
    float mBuiltHeight = 0.0f;
    bool mHasBuilt = false;
+
+   // The moved-text path. mSheetTex holds only the drawn part of the sheet
+   // (its bounding box, padded by one clear pixel), at mSheetBox* in sheet
+   // pixels, top row first. Valid for the style mBuilt* describes while
+   // mSheetValid; any style change drops it.
+   GLUtil::Fbo mMoved;
+   unsigned int mMoveProgram = 0;
+   bool mMoveShaderTried = false;
+   unsigned int mSheetTex = 0;
+   bool mSheetValid = false;
+   bool mSheetEmpty = false;
+   int mSheetBoxX = 0;
+   int mSheetBoxY = 0;
+   int mSheetBoxW = 0;
+   int mSheetBoxH = 0;
+   bool mShowingMoved = false;
+   float mPrevPosX = 0.0f;
+   float mPrevPosY = 0.0f;
+   int mStillFrames = 0;
+   static constexpr int kSettleFrames = 3;
+   unsigned long long mRasterCount = 0;
+   unsigned long long mSheetCount = 0;
 
 public:
    // Point size actually used after fitting, so the UI can show what happened.

@@ -483,4 +483,182 @@ void FrameTest_CACHETEST(int frameId, GLFWwindow* window)
                 frameId, work, idle ? 1 : 0, sIdleStreak);
       }
 }
+
+// Text node moved by posX/posY (TextNode's sheet path). The oct19.inf case:
+// a large outlined, fitted, stretched text whose position is animated every
+// frame used to re-rasterize on the CPU each frame (43 ms on an M1 Air).
+// Checks: moving draws no new raster after the one sheet; it costs well under
+// the full redraw it replaces; moved text lands where an exact draw puts it,
+// near an edge too; holding still returns a bit-identical exact draw; an
+// off-canvas anchor still draws exactly.
+void FrameTest_TEXTMOVETEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_TEXTMOVETEST") == nullptr)
+      return;
+   if (frameId == 4)
+   {
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+      return;
+   }
+   if (frameId != 3)
+      return;
+
+   bool ok = true;
+   int cookId = 1000000;
+   auto setup = [](TextNode& t)
+   {
+      t.text = "women of desire";
+      t.fontName = TextNode::AvailableFonts().front();
+      t.fontSize = 297.0f;
+      t.tracking = -10.0f;
+      t.align = 2;
+      t.scaleY = 4.0f;
+      t.wordWrap = true;
+      t.fitToBox = true;
+      t.outlineWidth = 7.36f;
+      t.outlineColor[0] = 1.0f; t.outlineColor[1] = 0.06f; t.outlineColor[2] = 0.06f;
+      t.outlineOnly = true;
+      t.width = 1440.0f;
+      t.height = 1920.0f;
+      t.posX = 0.49f;
+      t.posY = 0.54f;
+   };
+   auto timedCook = [&](TextNode& t) -> double
+   {
+      const auto t0 = std::chrono::steady_clock::now();
+      t.CookIfNeeded(cookId++);
+      glFinish();
+      return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+   };
+   auto median = [](std::vector<double> v) -> double
+   {
+      std::sort(v.begin(), v.end());
+      return v.empty() ? 0.0 : v[v.size() / 2];
+   };
+   unsigned int scratchFbo = 0;
+   auto read = [&](TextNode& t, std::vector<float>& out) -> bool
+   {
+      return GLUtil::ReadTexturePixels(scratchFbo, t.GetOutputTexture(), t.GetOutputWidth(),
+                                       t.GetOutputHeight(), out);
+   };
+   // Alpha-weighted centroid and total coverage, to compare placement.
+   struct Mass { double sum = 0, cx = 0, cy = 0; };
+   auto mass = [](const std::vector<float>& px, int w, int h) -> Mass
+   {
+      Mass m;
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            const double a = px[((size_t)y * w + x) * 4 + 3];
+            m.sum += a; m.cx += a * x; m.cy += a * y;
+         }
+      if (m.sum > 0) { m.cx /= m.sum; m.cy /= m.sum; }
+      return m;
+   };
+   // Moved output at the node's current pos against a fresh exact draw there.
+   auto checkPlacement = [&](TextNode& moved, const char* what)
+   {
+      TextNode exact;
+      setup(exact);
+      exact.posX = moved.posX;
+      exact.posY = moved.posY;
+      exact.CookIfNeeded(cookId++);
+      std::vector<float> a, b;
+      if (!moved.ShowingMoved() || !read(moved, a) || !read(exact, b))
+      {
+         printf("TEXTMOVETEST placement %s: moved=%d readback failed  FAIL\n", what, moved.ShowingMoved() ? 1 : 0);
+         ok = false;
+         return;
+      }
+      const int w = moved.GetOutputWidth(), h = moved.GetOutputHeight();
+      const Mass ma = mass(a, w, h), mb = mass(b, w, h);
+      const double drift = std::hypot(ma.cx - mb.cx, ma.cy - mb.cy);
+      const double cover = mb.sum > 0 ? ma.sum / mb.sum : 0.0;
+      const bool pass = mb.sum > 0 && drift <= 1.0 && cover > 0.97 && cover < 1.03;
+      printf("TEXTMOVETEST placement %s: centroid off by %.2f px, coverage %.3f of exact  %s\n", what, drift,
+             cover, pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   };
+
+   // 1) The old cost: every move a full raster (forced here by a style change).
+   TextNode t;
+   setup(t);
+   t.CookIfNeeded(cookId++);
+   std::vector<double> exactMs;
+   for (int i = 0; i < 12; i++)
+   {
+      t.color[1] = (i % 2) ? 1.0f : 0.999f;
+      t.posX = 0.3f + 0.01f * (float)i;
+      exactMs.push_back(timedCook(t));
+   }
+   t.color[1] = 1.0f;
+   t.CookIfNeeded(cookId++);
+
+   // 2) Position only, every cook, like a gesture or LFO.
+   const unsigned long long rastersBefore = t.RasterCount();
+   std::vector<double> movedMs;
+   for (int i = 0; i < 60; i++)
+   {
+      t.posX = 0.5f + 0.3f * sinf((float)i * 0.13f);
+      t.posY = 0.5f + 0.2f * cosf((float)i * 0.09f);
+      const double ms = timedCook(t);
+      if (i > 0) // the first builds the sheet
+         movedMs.push_back(ms);
+   }
+   const unsigned long long rastersWhileMoving = t.RasterCount() - rastersBefore;
+   const double exactMed = median(exactMs), movedMed = median(movedMs);
+   {
+      const bool pass = rastersWhileMoving == 0 && t.SheetCount() == 1 && t.ShowingMoved();
+      printf("TEXTMOVETEST moving: %llu rasters, %llu sheet over 60 moves  %s\n", rastersWhileMoving,
+             t.SheetCount(), pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+   {
+      const bool pass = movedMed * 2.0 < exactMed;
+      printf("TEXTMOVETEST cost: move %.2f ms vs full redraw %.2f ms (median)  %s\n", movedMed, exactMed,
+             pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+   checkPlacement(t, "mid-move");
+
+   // 3) Near the left edge, so part of the text is off the canvas.
+   t.posX = 0.03f;
+   t.posY = 0.97f;
+   t.CookIfNeeded(cookId++);
+   checkPlacement(t, "at the edge");
+
+   // 4) Holding still: exact again, bit for bit.
+   for (int i = 0; i < 4; i++)
+      t.CookIfNeeded(cookId++);
+   {
+      TextNode fresh;
+      setup(fresh);
+      fresh.posX = t.posX;
+      fresh.posY = t.posY;
+      fresh.CookIfNeeded(cookId++);
+      std::vector<float> a, b;
+      const bool readOk = read(t, a) && read(fresh, b);
+      const bool pass = readOk && !t.ShowingMoved() && a == b;
+      printf("TEXTMOVETEST settled: moved=%d bit-identical to a fresh draw=%s  %s\n", t.ShowingMoved() ? 1 : 0,
+             readOk && a == b ? "yes" : "no", pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 5) An anchor off the canvas is outside the sheet: drawn exactly.
+   {
+      const unsigned long long before = t.RasterCount();
+      t.posX = 1.2f;
+      t.CookIfNeeded(cookId++);
+      t.posX = 1.25f;
+      t.CookIfNeeded(cookId++);
+      const bool pass = t.RasterCount() - before == 2 && !t.ShowingMoved();
+      printf("TEXTMOVETEST off-canvas: %llu exact draws for 2 moves  %s\n", t.RasterCount() - before,
+             pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   if (scratchFbo != 0)
+      glDeleteFramebuffers(1, &scratchFbo);
+   printf("TEXTMOVETEST %s\n", ok ? "PASS" : "FAIL");
+}
 }
