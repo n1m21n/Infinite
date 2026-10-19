@@ -769,15 +769,27 @@ void DisplacementNode::CookIfNeeded(int frameId)
       const unsigned int tex = mTextureInput.Pull(frameId);
       const int w = mTextureInput.Width();
       const int h = mTextureInput.Height();
+      // The readback is a full GPU->CPU copy of the input (tens of ms at
+      // 1080p), so it is skipped while the input still carries the revision
+      // it was read at. A source that stamps a fresh revision on every pull
+      // never matches and keeps reading, with the hash below as its guard.
+      const unsigned long long rev = mTextureInput.Revision();
+      if (rev != 0 && rev == mTexReadRev && tex == mTexReadTex && w == mTexW && h == mTexH &&
+          !mTexPixels.empty())
+         return;
       if (tex != 0 && w > 0 && h > 0 &&
           GLUtil::ReadTexturePixels(mReadFbo, tex, w, h, mTexPixels))
       {
          mTexW = w; mTexH = h;
+         mTexReadRev = rev;
+         mTexReadTex = tex;
       }
       else
       {
          mTexPixels.clear();
          mTexW = mTexH = 0;
+         mTexReadRev = 0;
+         mTexReadTex = 0;
       }
       // Bumped only when the pixels actually differ from last frame - there is
       // no per-texture revision stamp to compare against instead, so content
@@ -800,6 +812,8 @@ void DisplacementNode::CookIfNeeded(int frameId)
       mTexW = mTexH = 0;
       mTexGeneration++;
       mHasTexHash = false;
+      mTexReadRev = 0;
+      mTexReadTex = 0;
    }
 }
 
@@ -1455,15 +1469,27 @@ void SetColorNode::CookIfNeeded(int frameId)
       const unsigned int tex = mTextureInput.Pull(frameId);
       const int w = mTextureInput.Width();
       const int h = mTextureInput.Height();
+      // The readback is a full GPU->CPU copy of the input (tens of ms at
+      // 1080p), so it is skipped while the input still carries the revision
+      // it was read at. A source that stamps a fresh revision on every pull
+      // never matches and keeps reading, with the hash below as its guard.
+      const unsigned long long rev = mTextureInput.Revision();
+      if (rev != 0 && rev == mTexReadRev && tex == mTexReadTex && w == mTexW && h == mTexH &&
+          !mTexPixels.empty())
+         return;
       if (tex != 0 && w > 0 && h > 0 &&
           GLUtil::ReadTexturePixels(mReadFbo, tex, w, h, mTexPixels))
       {
          mTexW = w; mTexH = h;
+         mTexReadRev = rev;
+         mTexReadTex = tex;
       }
       else
       {
          mTexPixels.clear();
          mTexW = mTexH = 0;
+         mTexReadRev = 0;
+         mTexReadTex = 0;
       }
       const unsigned long long hash = HashFloats(mTexPixels);
       if (!mHasTexHash || hash != mTexHash)
@@ -1479,6 +1505,8 @@ void SetColorNode::CookIfNeeded(int frameId)
       mTexW = mTexH = 0;
       mTexGeneration++;
       mHasTexHash = false;
+      mTexReadRev = 0;
+      mTexReadTex = 0;
    }
 }
 
