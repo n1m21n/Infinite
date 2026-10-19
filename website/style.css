@@ -852,3 +852,13 @@ html.over-bird body { cursor: pointer; }
 .footer-social a:hover { color: var(--ink); background: var(--surface-3); transform: translateY(-2px); }
 .footer-social svg { width: 20px; height: 20px; }
 @media (prefers-reduced-motion: reduce) { .footer-social a { transition: none; } .footer-social a:hover { transform: none; } }
+.signup { margin-top: 18px; max-width: 22em; }
+.signup-label { display: block; font-weight: 600; font-size: 0.92rem; margin-bottom: 8px; }
+.signup-row { display: flex; gap: 8px; }
+.signup-row input[type="email"] { flex: 1; min-width: 0; min-height: 44px; padding: 0 16px; border-radius: var(--r-pill); background: var(--deep); color: var(--ink); font: inherit; font-size: 0.92rem; }
+.signup-row input[type="email"]::placeholder { color: var(--muted); }
+.signup-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.signup-row .btn { min-height: 44px; }
+.signup-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.signup-note { margin-top: 8px !important; font-size: 0.78rem !important; color: var(--muted) !important; }
+.signup-note.is-bad { color: var(--accent-ink) !important; }

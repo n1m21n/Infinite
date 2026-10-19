@@ -11,12 +11,12 @@ Usage: python3 tools/website/sync_chrome.py            rewrite the pages
        from sync_chrome import header_html, footer_html   (gen_embeds.py builds its own page with these)
 Exit codes: 0 in sync (or written), 1 a page differs under --check.
 """
-import os, re, sys
+import json, os, re, sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 GH = "https://github.com/n1m21n/Infinite"
-CSS_VERSION = "80"   # style.css cache key; bump when the menu or footer CSS changes
+CSS_VERSION = "81"   # style.css cache key; bump when the menu or footer CSS changes
 JS_VERSION = "11"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
@@ -124,6 +124,33 @@ def nav_html(rel):
     return "\n".join(out)
 
 
+AUDIENCE_PAGES = {"artists.html": "artists", "musicians.html": "musicians", "vjs.html": "vjs",
+                  "creative-coders.html": "creative-coders", "developers.html": "developers"}
+
+
+def signup_html(rel):
+    """The email sign-up box. Only drawn when website/signup.json exists ({"endpoint": ..., "turnstile_site_key": ...}),
+    so the site never ships a form that does nothing. The Worker is worker/signup/."""
+    path = os.path.join(W, "signup.json")
+    if not os.path.exists(path):
+        return ""
+    cfg = json.load(open(path, encoding="utf-8"))
+    p = depth_prefix(rel)
+    aud = AUDIENCE_PAGES.get(rel, "general")
+    ts = f' data-turnstile="{cfg["turnstile_site_key"]}"' if cfg.get("turnstile_site_key") else ""
+    return f'''
+          <form class="signup" data-signup data-endpoint="{cfg["endpoint"]}" data-audience="{aud}"{ts} novalidate>
+            <label for="signup-email" class="signup-label">One email when something ships</label>
+            <div class="signup-row">
+              <input id="signup-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="{p}signup.js?v=1" defer></script>'''
+
+
 def footer_html(rel):
     p = depth_prefix(rel)
     cols = []
@@ -144,7 +171,7 @@ def footer_html(rel):
             <img src="{p}assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
             <span class="brand-name">Infinite</span>
           </div>
-          <p>Visuals, music and code on one infinite canvas.</p>
+          <p>Visuals, music and code on one infinite canvas.</p>{signup_html(rel)}
           <div class="footer-social">
 {social}
           </div>
