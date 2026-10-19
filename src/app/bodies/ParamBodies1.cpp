@@ -834,7 +834,8 @@ namespace app
       }
       else
       {
-         RegisterHiddenParam(rateBeats, 0.05f, 32.0f, "rate", gParamCounter++);
+         const int beatsOrdinal = gParamCounter++;
+         RegisterHiddenParam(rateBeats, 0.05f, 32.0f, "rate", beatsOrdinal);
          if (*rateMode == LFONode::kRateSynced)
          {
             const int div = MusicTime::NearestRateDivision(*rateBeats);
@@ -843,6 +844,8 @@ namespace app
                *rateBeats = (float)MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(i, 0, (int)MusicTime::kNumRateDivisions - 1));
             });
          }
+         // Dotted cable to whatever replaced the hidden beats slider.
+         NoteHiddenParamAnchorAtLastItem(beatsOrdinal);
       }
       if (*rateMode == LFONode::kRateHz)
       {
@@ -853,6 +856,7 @@ namespace app
       else
       {
          RegisterHiddenParam(rateHz, 0.01f, 40.0f, "rate (Hz)", hzOrdinal);
+         NoteHiddenParamAnchorAtLastItem(hzOrdinal);
       }
    }
 

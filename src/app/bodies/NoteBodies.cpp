@@ -948,6 +948,8 @@ namespace app
          rateSlot.maxValue = 2.0f;
          rateSlot.name = "rate";
          Modulation::Instance().RegisterParam(rateSlot);
+         // A cable into the hidden rate shows dotted, ending on the division dropdown.
+         NoteHiddenParamAnchorAtLastItem(rateSlot.paramIndex);
       }
       else
       {
