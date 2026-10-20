@@ -145,7 +145,7 @@ def ld():
 
 
 def build():
-    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=' + __import__("hashlib").md5(open(os.path.join(W, "philosophy.css"), "rb").read()).hexdigest()[:8] + '">', extra_js='\n  <script src="philosophy.js?v=9" defer></script>')
+    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=' + __import__("hashlib").md5(open(os.path.join(W, "philosophy.css"), "rb").read()).hexdigest()[:8] + '">', extra_js='\n  <script src="philosophy.js?v=10" defer></script>')
 
 
 def main():

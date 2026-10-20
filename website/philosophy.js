@@ -35,12 +35,12 @@
     var cw = sec.querySelector('.ph-caps'); if (cw) { var ch = 0; caps.forEach(function (c) { ch = Math.max(ch, c.offsetHeight); }); top = Math.max(top, cw.offsetTop + ch + 16); }   // the figure starts below the tallest caption, whatever the width
     var hu = H - top - 96; portrait = W < H * 0.9;
     bs = W < 680 ? 0.78 : 1;                                                    // phones: smaller icons
-    var yTop = top + 36 * bs + 8, yBot = H - (W < 680 ? 200 : 120), span = Math.max(160, yBot - yTop);   // the figure lives between the caption and the controls below
+    var yTop = top + 36 * bs + 8, yBot = H - (W < 680 ? 300 : 120), span = Math.max(160, yBot - yTop);   // the figure lives between the caption and the controls below
     cx = W / 2; cy = yTop + span / 2;
     A = portrait ? W * 0.34 : Math.min(W * 0.27, hu * 0.62);
     var sc = portrait ? Math.min(W * 0.78 / 410, span / 500) : Math.min(W * 0.8 / 600, span / 310);
     mindPts = MIND.map(function (p) { var x = p[0] - 300, y = p[1] - 205; return portrait ? [cx + y * sc, cy + x * sc] : [cx + x * sc, cy + y * sc]; });
-    scatterPts = bubs.map(function (b, i) { return [W * (0.12 + 0.76 * hash(i + 1)), top + 40 + (H - top - (W < 680 ? 210 : 140)) * hash(i + 21)]; });
+    scatterPts = bubs.map(function (b, i) { return [W * (0.12 + 0.76 * hash(i + 1)), top + 40 + (H - top - (W < 680 ? 310 : 140)) * hash(i + 21)]; });
     loopTs = bubs.map(function (b, i) { return i * Math.PI * 2 / N + 0.4; });
     // the mark: a lemniscate path sized to the loop
     var d = '', k;
