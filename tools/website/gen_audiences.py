@@ -316,10 +316,15 @@ def main_html(a, rel):
     '''
 
 
-def artists_main(a, rel):
+def artists_main(a, rel, hero="blob"):
     """Immersive artists page: a live iridescent blob you steer, three glass bubbles that morph it, a swipe strip of nodes, knobs, a reel."""
     L = a["lab"]
-    bub = [("layers", "family-compositing", "Layer", a["cards"][0][0]), ("solid", "cube", "3D", a["cards"][1][0]), ("formula", "edit", "Formula", a["cards"][2][0])]
+    if hero == "cables":
+        bub = [("synth", "family-synths", "Synths", a["cards"][0][0]), ("fx", "family-audio-effects", "Effects", a["cards"][1][0]), ("plug", "mod-matrix", "Plugins", a["cards"][2][0])]
+        tag, caps, ghost = "Pull a cable.", "|".join(c[0] for c in a["cards"]), ("Guide", "library")
+    else:
+        bub = [("layers", "family-compositing", "Layer", a["cards"][0][0]), ("solid", "cube", "3D", a["cards"][1][0]), ("formula", "edit", "Formula", a["cards"][2][0])]
+        tag, caps, ghost = "Images that move.", "32 blend modes|3D with real materials|A picture from a formula", ("Gallery", "viewport")
     bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(c)}: {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
     nodes = "".join(f'<figure class="ax-node"><img src="assets/nodes/{n}.webp" alt="{e(t)}: {e(d)}" loading="lazy" decoding="async"><figcaption>{e(t)}</figcaption></figure>' for n, t, d in a["bench"]["items"])
     figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{a["reel"]["href"]}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"></a>' for src, w, h, al in a["reel"]["items"])
@@ -333,12 +338,12 @@ def artists_main(a, rel):
   <main class="ax-main">
     <section class="ax">
       <div class="container">
-        <div class="ax-stage" data-k="0">
+        <div class="ax-stage" data-k="0" data-hero="{hero}" data-caps="{e(caps)}">
           <canvas class="ax-gl" aria-hidden="true"></canvas>
           <div class="ax-copy">
             <span class="blog-hand hand">{e(a["hand"])}</span>
             <h1>{e(a["h1"])}</h1>
-            <p>Images that move.</p>
+            <p>{e(tag)}</p>
           </div>
           <div class="ax-hint" aria-hidden="true">{icon("pointer")}<span>Drag</span></div>
           <div class="ax-low">
@@ -347,7 +352,7 @@ def artists_main(a, rel):
           </div>
           <div class="ax-cta">
             <a href="index.html#setup" class="btn btn-primary">Download</a>
-            <a href="{a["extra"][0]}" class="ax-ghost" aria-label="{e(a["extra"][1])}">{icon("viewport")}<span>Gallery</span></a>
+            <a href="{a["extra"][0]}" class="ax-ghost" aria-label="{e(a["extra"][1])}">{icon(ghost[1])}<span>{ghost[0]}</span></a>
           </div>
         </div>
       </div>
@@ -382,7 +387,9 @@ def page(a):
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=a1cb8947">', extra_js='\n  <script src="artists.js?v=7" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=5567efcb">', extra_js='\n  <script src="artists.js?v=8" defer></script>')
+    if a["slug"] == "musicians":
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=5567efcb">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script type="module" src="musicians.js?v=2"></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 

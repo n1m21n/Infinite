@@ -30,6 +30,7 @@
   <link rel="stylesheet" href="audience.css?v=beb744f0">
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite for musicians: synths, effects and plugins in one graph", "url": "https://infinitedevices.org/musicians.html", "description": "Wavetable, FM, analog and string synths, tape delay, convolution reverb, VST3 and AU hosting, and modulation on every knob.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is Infinite a full digital audio workstation (DAW)?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Infinite is an open-source, modular digital audio workstation (DAW) and sound design environment combining polyphonic synthesis, VST3 and AU plugin hosting, mixing effects, and real-time visual generation on a single unified execution graph."}}, {"@type": "Question", "name": "Can I use VST3 and AU plugins in Infinite?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Infinite hosts 64-bit VST3 and Audio Unit (AU) plugins with low latency, full sidechain routing, MPE polyphonic expression, and external modulation on any plugin parameter."}}, {"@type": "Question", "name": "How does Infinite compare to Ableton Live and Bitwig?", "acceptedAnswer": {"@type": "Answer", "text": "Infinite is lightweight and modular: 45 MB download size (compared to 8 GB for Ableton Suite), 342 ms cold launch time, and 244 MB idle memory footprint. Furthermore, audio signals and visual shaders share the same execution graph for seamless audio-reactive visuals."}}, {"@type": "Question", "name": "Can I write custom synths and audio DSP in Infinite?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Infinite features the Field language, which lets you write per-sample DSP audio code, custom oscillators, and filters with live feedback and instant audio rate execution."}}, {"@type": "Question", "name": "Is Infinite free for music production?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Infinite is free to download for macOS, Windows, and Linux. The core source code is MIT licensed, and the binary release is GPLv3 due to bundled VST3 hosting."}}]}</script>
+  <link rel="stylesheet" href="artists.css?v=5567efcb">
   <script>document.documentElement.classList.add('js-reveal')</script>
   <link rel="stylesheet" href="scale.css?v=79e759ce">
 </head>
@@ -98,79 +99,56 @@
   </header>
 
 
-  <main>
-    <section class="ah">
-      <div class="container ah-grid">
-        <div class="ah-text">
-          <span class="blog-hand hand">play</span>
-          <h1 class="slab">Infinite for musicians</h1>
-          <p class="lead">Patch a sound the way you think about it. Notes go into a synth, then effects, and any knob can follow an LFO or an envelope.</p>
-          <div class="aud-cta">
-            <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
-            <a href="blog/modulate-vst3-plugins-with-visuals-and-lfos.html" class="btn btn-ghost">Modulate a plugin: the guide</a>
+  <main class="ax-main">
+    <section class="ax">
+      <div class="container">
+        <div class="ax-stage" data-k="0" data-hero="cables" data-caps="Synths with depth|Effects that colour|Your plugins, modulated">
+          <canvas class="ax-gl" aria-hidden="true"></canvas>
+          <div class="ax-copy">
+            <span class="blog-hand hand">play</span>
+            <h1>Infinite for musicians</h1>
+            <p>Pull a cable.</p>
           </div>
-          <ul class="facts"><li>VST3 and AU hosting</li><li>MPE notes</li><li>79 effect presets</li></ul>
-        </div>
-        <div class="vstage">
-          <canvas data-shader="wave" aria-hidden="true"></canvas>
-          <span class="vstage-tag">live shader · move the pointer</span>
+          <div class="ax-hint" aria-hidden="true"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Drag</span></div>
+          <div class="ax-low">
+            <div class="ax-bubs" role="tablist" aria-label="What you can do"><button type="button" class="ax-bub on" role="tab" aria-selected="true" data-k="0" aria-label="Synths with depth: Wavetable, FM with four operators, Analog, a modelled String, Partials resynthesis and a Metallic resonator. Chords on Analog cost about a third of the CPU they did before v0.6."><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="10" rx="2"/><path d="M7.7 5v10M12.3 5v10"/><path d="M7.7 10h0M12.3 10h0" stroke="none"/></svg><span>Synths</span></button><button type="button" class="ax-bub" role="tab" aria-selected="false" data-k="1" aria-label="Effects that colour: Saturator with three stages, Convolution Reverb you design or load, tape Delay with wow and flutter, Dynamics in clean, bus, opto and FET styles, and 79 factory presets."><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8v4M7 5v10M10 3v14M13 6v8M16 8.5v3"/></svg><span>Effects</span></button><button type="button" class="ax-bub" role="tab" aria-selected="false" data-k="2" aria-label="Your plugins, modulated: Host VST3 and Audio Unit plugins, give them a sidechain, and move their knobs with LFOs, MSEG, envelopes or audio. MPE notes reach each voice."><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M3 10h14M10 3v14"/><circle cx="6.5" cy="6.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13.5" r="1.4" fill="currentColor" stroke="none"/></svg><span>Plugins</span></button></div>
+            <p class="ax-cap" aria-live="polite">Synths with depth</p>
+          </div>
+          <div class="ax-cta">
+            <a href="index.html#setup" class="btn btn-primary">Download</a>
+            <a href="blog/modulate-vst3-plugins-with-visuals-and-lfos.html" class="ax-ghost" aria-label="Modulate a plugin: the guide"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Guide</span></a>
+          </div>
         </div>
       </div>
     </section>
-
     <div class="container">
-      <section class="aud-section">
-        <h2>What you get</h2>
-        <div class="aud-grid">
-          <article class="aud-card reveal" style="--i:0"><span class="num">01</span><h3>Synths with depth</h3><p>Wavetable, FM with four operators, Analog, a modelled String, Partials resynthesis and a Metallic resonator. Chords on Analog cost about a third of the CPU they did before v0.6.</p></article>
-          <article class="aud-card reveal" style="--i:1"><span class="num">02</span><h3>Effects that colour</h3><p>Saturator with three stages, Convolution Reverb you design or load, tape Delay with wow and flutter, Dynamics in clean, bus, opto and FET styles, and 79 factory presets.</p></article>
-          <article class="aud-card reveal" style="--i:2"><span class="num">03</span><h3>Your plugins, modulated</h3><p>Host VST3 and Audio Unit plugins, give them a sidechain, and move their knobs with LFOs, MSEG, envelopes or audio. MPE notes reach each voice.</p></article>
-        </div>
-      </section>
-
       <section class="aud-section reveal">
-        <h2>A signal chain, node by node</h2>
-        <p class="sec-sub">Notes in, a voice, colour, then out. Each node is one job, and each knob can be modulated.</p>
-        <div class="bench"><img class="bench-img" src="assets/nodes/bench-musicians.webp" alt="MIDI Notes: Notes go into the graph from here.; Analog: Oscillators, a filter and an envelope in one voice.; FM: Four operators.; Delay: Tape delay with wow and flutter.; Dynamics: Clean, bus, opto and FET styles.; LFO: Moves any knob in the patch." width="1757" height="396" loading="lazy" decoding="async"></div>
+        <h2 class="ax-h">Nodes</h2>
+        <div class="ax-strip"><div class="ax-nodes"><figure class="ax-node"><img src="assets/nodes/midi-notes.webp" alt="MIDI Notes: Notes go into the graph from here." loading="lazy" decoding="async"><figcaption>MIDI Notes</figcaption></figure><figure class="ax-node"><img src="assets/nodes/analog.webp" alt="Analog: Oscillators, a filter and an envelope in one voice." loading="lazy" decoding="async"><figcaption>Analog</figcaption></figure><figure class="ax-node"><img src="assets/nodes/fm.webp" alt="FM: Four operators." loading="lazy" decoding="async"><figcaption>FM</figcaption></figure><figure class="ax-node"><img src="assets/nodes/delay.webp" alt="Delay: Tape delay with wow and flutter." loading="lazy" decoding="async"><figcaption>Delay</figcaption></figure><figure class="ax-node"><img src="assets/nodes/dynamics.webp" alt="Dynamics: Clean, bus, opto and FET styles." loading="lazy" decoding="async"><figcaption>Dynamics</figcaption></figure><figure class="ax-node"><img src="assets/nodes/lfo.webp" alt="LFO: Moves any knob in the patch." loading="lazy" decoding="async"><figcaption>LFO</figcaption></figure></div></div>
       </section>
-      <section class="aud-section reveal">
+      <section class="aud-section reveal ax-lab">
+        <h2 class="ax-h">Knobs</h2>
         <div class="lab" data-lab="synth">
           <div class="lab-view"><canvas aria-label="A sawtooth waveform through a low-pass filter" role="img"></canvas></div>
-          <div class="lab-side"><h3>Move the cutoff, then let an LFO move it</h3><div class="ctl"><label for="c-cut">Cutoff</label><output for="c-cut"></output><input id="c-cut" type="range" min="0" max="1000" step="1" value="550" data-lo="80" data-hi="7240" data-dp="0" data-unit=" Hz"></div><div class="ctl"><label for="c-lfo">LFO amount</label><output for="c-lfo"></output><input id="c-lfo" type="range" min="0" max="1000" step="1" value="400" data-fmt="1" data-lo="0" data-hi="100" data-dp="0" data-unit="%"></div><button class="play" type="button" aria-pressed="false">Play a note</button><pre class="aud-code"><code><span class="k">state float</span> phase = 0
+          <div class="lab-side"><div class="ctl"><label for="c-cut">Cutoff</label><output for="c-cut"></output><input id="c-cut" type="range" min="0" max="1000" step="1" value="550" data-lo="80" data-hi="7240" data-dp="0" data-unit=" Hz"></div><div class="ctl"><label for="c-lfo">LFO amount</label><output for="c-lfo"></output><input id="c-lfo" type="range" min="0" max="1000" step="1" value="400" data-fmt="1" data-lo="0" data-hi="100" data-dp="0" data-unit="%"></div><button class="play" type="button" aria-pressed="false">Play a note</button><details class="ax-code"><summary><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Code</span></summary><pre class="aud-code"><code><span class="k">state float</span> phase = 0
 phase = (phase + freq / sr) % 1.0
 saw = phase * 2.0 - 1.0
-out = saw * 0.4 * gate</code></pre></div></div>
+out = saw * 0.4 * gate</code></pre></details></div></div>
       </section>
-
       <section class="aud-section reveal">
-        <div class="sec-head"><div><h2>Patches to open</h2><p class="sec-sub">Each is a free patch with a picture of the graph.</p></div>
-          <div class="reel-ctl"><button class="reel-btn reel-prev" type="button" aria-label="Scroll back">&#8592;</button><button class="reel-btn reel-next" type="button" aria-label="Scroll forward">&#8594;</button></div></div>
-        <div class="reel-wrap"><div class="reel"><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/pad-wash.webp" alt="Pad wash" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Pad wash</figcaption></figure><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/delay-wash.webp" alt="Delay wash" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Delay wash</figcaption></figure><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/drum-reverb.webp" alt="Drum reverb" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Drum reverb</figcaption></figure><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/stretched-sampler.webp" alt="Stretched sampler" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Stretched sampler</figcaption></figure><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/oscillator-reverb.webp" alt="Oscillator reverb" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Oscillator reverb</figcaption></figure><figure><a class="frame" style="--ar:960 / 600" href="library.html"><img src="assets/community/filtered-mixer.webp" alt="Filtered mixer" width="960" height="600" loading="lazy" decoding="async"></a><figcaption>Filtered mixer</figcaption></figure></div></div>
+        <h2 class="ax-h">Made in Infinite</h2>
+        <div class="ax-strip"><div class="ax-reel"><a class="ax-shot" style="--ar:960 / 600" href="library.html"><img src="assets/community/pad-wash.webp" alt="Pad wash" width="960" height="600" loading="lazy" decoding="async"></a><a class="ax-shot" style="--ar:960 / 600" href="library.html"><img src="assets/community/delay-wash.webp" alt="Delay wash" width="960" height="600" loading="lazy" decoding="async"></a><a class="ax-shot" style="--ar:960 / 600" href="library.html"><img src="assets/community/drum-reverb.webp" alt="Drum reverb" width="960" height="600" loading="lazy" decoding="async"></a><a class="ax-shot" style="--ar:960 / 600" href="library.html"><img src="assets/community/stretched-sampler.webp" alt="Stretched sampler" width="960" height="600" loading="lazy" decoding="async"></a><a class="ax-shot" style="--ar:960 / 600" href="library.html"><img src="assets/community/oscillator-reverb.webp" alt="Oscillator reverb" width="960" height="600" loading="lazy" decoding="async"></a><a class="ax-shot" style="--ar:960 / 600" href="library.html"><img src="assets/community/filtered-mixer.webp" alt="Filtered mixer" width="960" height="600" loading="lazy" decoding="async"></a></div></div>
       </section>
-
       <section class="aud-section reveal">
-        <h2>Start with</h2>
-        <div class="aud-start">
-          <a href="library/first-sound.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>First sound</a>
-          <a href="library/synths.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Synths</a>
-          <a href="library/audio-effects.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Audio effects</a>
-          <a href="library/pad-wash.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Pad wash</a>
-          <a href="library/delay-wash.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Delay wash</a>
-          <a href="library/stretched-sampler.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Stretched sampler</a>
-        </div>
+        <h2 class="ax-h">Start with</h2>
+        <div class="aud-start"><a href="library/first-sound.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>First sound</a><a href="library/synths.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Synths</a><a href="library/audio-effects.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Audio effects</a><a href="library/pad-wash.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Pad wash</a><a href="library/delay-wash.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Delay wash</a><a href="library/stretched-sampler.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Stretched sampler</a></div>
       </section>
-
       <section class="aud-section reveal">
-        <h2>Infinite for everyone else</h2>
-        <div class="aud-others">
-          <a href="artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg>artists</a>
-          <a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg>VJs</a>
-          <a href="creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg>creative coders and technologists</a>
-          <a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg>developers</a>
-        </div>
+        <h2 class="ax-h">For everyone else</h2>
+        <div class="aud-others"><a href="artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg>artists</a><a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg>VJs</a><a href="creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg>creative coders and technologists</a><a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg>developers</a></div>
       </section>
     </div>
-    
+
   </main>
 
   <footer class="site-footer">
@@ -238,6 +216,8 @@ out = saw * 0.4 * gate</code></pre></div></div>
   </footer>
   <script src="site.js?v=18" defer></script>
   <script src="audience.js?v=6" defer></script>
+  <script src="artists.js?v=8" defer></script>
+  <script type="module" src="musicians.js?v=2"></script>
   <script>
     (function () {
       var els = document.querySelectorAll('.reveal');

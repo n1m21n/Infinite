@@ -84,3 +84,9 @@
 @media (max-width: 900px) { .ax-stage { height: clamp(500px, calc(100svh - var(--header-h, 60px) - 112px), 720px); } .ax-low { bottom: 84px; } }
 .ax-lab .ctl { flex: 1 1 140px; padding: 10px 14px; }
 @media (max-width: 600px) { .ax-lab .lab-view { aspect-ratio: 1 / 0.85; } .ax-lab .ctl { gap: 8px; } }
+
+/* musicians: the patch bay. Grab handles are invisible 56px discs over each plug, so a finger can drag a plug while the rest of the stage still scrolls the page. */
+.ax-stage[data-hero="cables"] { background: radial-gradient(ellipse at 62% 45%, #232a55, var(--mid) 70%); cursor: default; }
+.mx-grab { position: absolute; left: 0; top: 0; width: 56px; height: 56px; border-radius: 50%; touch-action: none; cursor: grab; z-index: 2; will-change: transform; }
+.mx-grab.on { cursor: grabbing; }
+.ax-stage.no-gl .mx-grab { display: none; }

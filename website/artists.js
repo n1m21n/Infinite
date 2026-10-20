@@ -6,7 +6,8 @@
   var stage = document.querySelector('.ax-stage');
   if (!stage) return;
   var canvas = stage.querySelector('.ax-gl');
-  var caps = ['32 blend modes', '3D with real materials', 'A picture from a formula'];
+  var hero = stage.getAttribute('data-hero') || 'blob';   // 'cables' hands the canvas to musicians.js and only shares the bubbles and strips
+  var caps = (stage.getAttribute('data-caps') || '32 blend modes|3D with real materials|A picture from a formula').split('|');
 
   var FRAG = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' +
     'uniform vec2 u_res; uniform float u_t; uniform vec2 u_m; uniform float u_p; uniform float u_k; uniform float u_scroll; uniform vec3 u_view;\n' +
@@ -46,7 +47,7 @@
     ' gl_FragColor = vec4(mix(bg, body, inside), 1.0);\n' +
     '}\n';
 
-  var g = canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' });
+  var g = hero === 'blob' ? canvas.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' }) : null;
   var st = { m: [0.5, 0.5], tm: [0.5, 0.5], p: 0, tp: 0, k: 0, tk: 0, last: 0, idle: 0, vis: true, scroll: 0 };
   var U = {};
   function compile(type, src) { var s = g.createShader(type); g.shaderSource(s, src); g.compileShader(s); if (!g.getShaderParameter(s, g.COMPILE_STATUS)) { if (window.console) console.warn(g.getShaderInfoLog(s)); return null; } return s; }
@@ -60,8 +61,8 @@
     ['u_res', 'u_t', 'u_m', 'u_p', 'u_k', 'u_scroll', 'u_view'].forEach(function (k) { U[k] = g.getUniformLocation(pr, k); });
     return true;
   }
-  var ok = init(); 
-  if (!ok) stage.classList.add('no-gl');
+  var ok = hero === 'blob' ? init() : false;
+  if (hero === 'blob' && !ok) stage.classList.add('no-gl');
 
   /* the blob lives in the free area: below the headline and above the bubbles on phones, right of the headline on desktop */
   var view = [0, 0, 0.8];
@@ -114,6 +115,7 @@
     st.tk = k; stage.setAttribute('data-k', k); st.idle = 0;
     bubs.forEach(function (b, i) { var on = i === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
     if (cap) { cap.classList.remove('swap'); void cap.offsetWidth; cap.textContent = caps[k]; cap.classList.add('swap'); }
+    stage.dispatchEvent(new CustomEvent('ax:pick', { detail: k }));
     if (still) { st.k = k; if (ok) draw(performance.now()); }
   }
   bubs.forEach(function (b, i) {
