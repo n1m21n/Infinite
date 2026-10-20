@@ -243,10 +243,10 @@
    "radius": 10
   },
   "style.css": {
-   "duration": 15,
+   "duration": 18,
    "font-size": 46,
-   "hex": 18,
-   "radius": 12
+   "hex": 20,
+   "radius": 13
   }
  }
 }

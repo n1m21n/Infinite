@@ -83,7 +83,7 @@
 
   <link rel="stylesheet" href="brand.css?v=7eb5c13f">
 
-  <link rel="stylesheet" href="style.css?v=da19e273">
+  <link rel="stylesheet" href="style.css?v=203607a0">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
 
   <!-- Google tag (gtag.js) -->
@@ -239,12 +239,15 @@
           <h2 class="slab perch"><span>built like an</span><em class="hand">instrument</em></h2>
         </div>
 
-        <div class="stage reveal">
-          <model-viewer class="stage-model" id="stage-model" src="assets/brand3d/node_chain_wide.glb?v=4" alt="Two Audio Filter nodes patched in a row, drawn as 3D instrument panels: drag sideways to tilt them"
-            camera-controls touch-action="pan-y" autoplay animation-name="" loading="lazy" reveal="auto" disable-zoom disable-pan interaction-prompt="none"
-            camera-orbit="0deg 90deg 1.55m" camera-target="0m 0m 0m" field-of-view="30deg" min-camera-orbit="-28deg 70deg 1.55m" max-camera-orbit="28deg 105deg 1.55m"
-            shadow-intensity="0" exposure="1"></model-viewer>
-        </div>
+        <div class="stage wt-stage reveal" aria-label="The Wavetable synth node, floating">
+          <div class="wt-drift">
+            <div class="wt-body">
+              <span class="wt-edge" aria-hidden="true"></span><span class="wt-edge wt-e2" aria-hidden="true"></span><span class="wt-edge wt-e3" aria-hidden="true"></span>
+              <img class="wt-face" src="assets/nodes/wavetable.webp" alt="The Wavetable synth node: two oscillators, envelopes, filter and a keyboard, drawn as one instrument panel" width="516" height="652" decoding="async" fetchpriority="low" onload="this.classList.add('in')">
+            </div>
+            <span class="wt-shadow" aria-hidden="true"></span>
+          </div>
+</div>
       </div>
     </section>
 
@@ -667,6 +670,6 @@
     <a href="blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
   </div>
 </nav>
-  <script src="bird.js?v=92f8320a" defer></script>
+  <script src="bird.js?v=944b5376" defer></script>
 </body>
 </html>

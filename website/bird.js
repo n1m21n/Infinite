@@ -16,7 +16,7 @@
     let cv = $('#bird');
     if (!cv) { cv = document.createElement('canvas'); cv.id = 'bird'; cv.setAttribute('aria-hidden', 'true'); cv.title = 'hello'; document.body.appendChild(cv); }
     /* the slabs of the home page, else the section headings of any other page, and the footer line */
-    const perches = $$('.perch').concat($$('main h2, .aud-section h2, .footer-line, main h1')).filter((el, i, a) => a.indexOf(el) === i && !el.closest('[hidden]'));
+    const perches = $$('.perch').concat($$('main h2, .aud-section h2, .footer-line, main h1')).filter((el, i, a) => a.indexOf(el) === i && !el.closest('[hidden], .deck-card, .lib-card, .post-card, .ax-bento, .ax-shot, .nd-card, .reel-card, .ph-stage, [class*="-card"]'));
     if (!perches.length) return;
     const g = cv.getContext('2d');
     const COLS = 34, ROWS = 24, X0 = -1.25, X1 = 1.25, Y0 = -0.95, Y1 = 0.85, FX = 0.08, FY = 0.80;
@@ -119,12 +119,11 @@
     let pos = { x: 0, y: 0 };  // feet point in page coords
     let face = 1, flight = null, hop = null, lastTick = -1, raf = 0;
 
+    // the bird sits in the far corner of a heading's row (the right edge of the column), never mid-content
     const perchPoint = (el) => {
       const r = el.getBoundingClientRect();
-      let right = r.right;
-      if (!el.classList.contains('perch')) { const rg = document.createRange(); rg.selectNodeContents(el); right = Math.min(right, rg.getBoundingClientRect().right); }   // headings: the end of the text, not the end of the column
-      const w = right - r.left, inset = Math.min(w * 0.25, 70);
-      return { x: right - inset + window.scrollX, y: r.top + window.scrollY + 1 };
+      const x = Math.min(r.right - 14, document.documentElement.clientWidth - 40);
+      return { x: x + window.scrollX, y: r.top + window.scrollY + 1 };
     };
     const place = () => {
       cv.style.transform = `translate3d(${(pos.x - CW / 2).toFixed(1)}px, ${(pos.y - (CH - PAD * 0.5)).toFixed(1)}px, 0)`;

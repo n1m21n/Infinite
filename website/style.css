@@ -945,3 +945,21 @@ p.mono { font-size: 0.84375rem; }
 @media (prefers-reduced-motion: reduce) { .dock-thumb, .dock-sheet:not([hidden]) { transition: none; animation: none; } }
 
 /* footer: a little narrower than the page, and clear of the desktop rail */
+
+/* Instruments: the Wavetable node floats across the stage. The panel shape is there before the image loads, and only transforms move (GPU, no layout), so it never looks like it is loading. */
+.wt-stage { --wh: clamp(380px, 46vw, 600px); position: relative; height: var(--wh); perspective: 1400px; }
+.wt-drift { position: absolute; left: 0; right: 0; top: 11%; margin: 0 auto; height: 78%; width: calc(var(--wh) * 0.78 * 516 / 652); transform-style: preserve-3d; animation: wt-drift-x 17s ease-in-out infinite alternate, wt-drift-y 6.5s ease-in-out infinite alternate; will-change: transform; }
+.wt-body { position: absolute; inset: 0; transform-style: preserve-3d; animation: wt-turn 11s ease-in-out infinite alternate; }
+.wt-face, .wt-edge { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 14px; }
+.wt-face { object-fit: cover; opacity: 0; transition: opacity var(--dur-large, 500ms) ease; box-shadow: 0 0 0 1px rgb(120 160 255 / 0.28), 0 24px 60px rgb(0 0 0 / 0.45); transform: translateZ(0); backface-visibility: hidden; }
+.wt-face.in { opacity: 1; }
+.wt-edge { background: linear-gradient(160deg, #2a3a63, #151c36); box-shadow: inset 0 0 0 1px rgb(120 160 255 / 0.3); transform: translateZ(-6px); opacity: 1; }
+.wt-e2 { transform: translateZ(-12px); filter: brightness(0.8); }
+.wt-e3 { transform: translateZ(-18px); filter: brightness(0.62); }
+.wt-shadow { position: absolute; left: 8%; right: 8%; bottom: -9%; height: 7%; border-radius: 50%; background: radial-gradient(closest-side, rgb(0 0 0 / 0.5), transparent); filter: blur(8px); animation: wt-shadow 6.5s ease-in-out infinite alternate; }
+@keyframes wt-drift-x { from { translate: -22vw 0; } to { translate: 22vw 0; } }
+@keyframes wt-drift-y { from { transform: translateY(-14px); } to { transform: translateY(14px); } }
+@keyframes wt-turn { from { transform: rotateY(-24deg) rotateX(4deg) rotateZ(-2deg); } to { transform: rotateY(24deg) rotateX(-3deg) rotateZ(2deg); } }
+@keyframes wt-shadow { from { opacity: 0.9; transform: scaleX(1); } to { opacity: 0.5; transform: scaleX(0.82); } }
+@media (max-width: 680px) { .wt-stage { --wh: clamp(340px, 98vw, 460px); } @keyframes wt-drift-x { from { translate: -14vw 0; } to { translate: 14vw 0; } } }
+@media (prefers-reduced-motion: reduce) { .wt-drift, .wt-body, .wt-shadow { animation: none; } .wt-body { transform: rotateY(-12deg); } }
