@@ -29,6 +29,7 @@
   <link rel="stylesheet" href="blog.css?v=61bae151">
   <link rel="stylesheet" href="audience.css?v=beb744f0">
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite for creative coders and technologists: Field, sketches and shaders", "url": "https://infinitedevices.org/creative-coders.html", "description": "Write shaders, per-sample audio kernels, 3D surfaces and JavaScript sketches in one node graph with live feedback. Free and open source.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}</script>
+  <link rel="stylesheet" href="artists.css?v=2a025c8c">
   <script>document.documentElement.classList.add('js-reveal')</script>
   <link rel="stylesheet" href="scale.css?v=79e759ce">
 </head>
@@ -97,80 +98,58 @@
   </header>
 
 
-  <main>
-    <section class="ah">
-      <div class="container ah-grid">
-        <div class="ah-text">
-          <span class="blog-hand hand">code</span>
-          <h1 class="slab">Infinite for creative coders</h1>
-          <p class="lead">Write what a node does. Field is Infinite&#x27;s own small language: one program can be a shader, a synth, an effect or a mesh deformer.</p>
-          <div class="aud-cta">
-            <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
-            <a href="blog/field-language-write-what-a-node-does.html" class="btn btn-ghost">Read: Field in one post</a>
+  <main class="ax-main">
+    <section class="ax">
+      <div class="container">
+        <div class="ax-stage" data-k="0" data-hero="math" data-caps="Lorenz attractor|Phyllotaxis bloom|Rule 110">
+          <canvas class="ax-gl" aria-hidden="true"></canvas>
+          <div class="ax-copy">
+            <span class="blog-hand hand">code</span>
+            <h1>Infinite for creative coders</h1>
+            <p>Change two numbers.</p>
           </div>
-          <ul class="facts"><li>Field language</li><li>JavaScript sketches</li><li>OSC on 127.0.0.1:9100</li></ul>
-        </div>
-        <div class="vstage">
-          <canvas data-shader="dots" aria-hidden="true"></canvas>
-          <span class="vstage-tag">live shader · move the pointer</span>
+          <div class="ax-hint" aria-hidden="true"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Drag</span></div>
+          <div class="ax-low">
+            <div class="ax-bubs" role="tablist" aria-label="What you can do"><button type="button" class="ax-bub on" role="tab" aria-selected="true" data-k="0" aria-label="One language, many nodes: Field Pixel, Field Synth, Field Effect, Field Notes, Field Primitive and Field Modifier share one syntax. Types and rates are inferred, so a sine reads the same on the GPU and at 48 kHz."><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Orbit</span></button><button type="button" class="ax-bub" role="tab" aria-selected="false" data-k="1" aria-label="JavaScript sketches: A Sketch node draws 2D images from JavaScript, and a 3D sketch builds meshes. The library has Lorenz and Clifford attractors, Lotka-Volterra and Rule 110, running live."><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.6l1.9 4.1 4.4.5-3.3 3 .9 4.4L10 13.3l-3.9 2.3.9-4.4-3.3-3 4.4-.5Z"/></svg><span>Bloom</span></button><button type="button" class="ax-bub" role="tab" aria-selected="false" data-k="2" aria-label="Everything can be driven: Modulate any knob, script a patch over OSC on 127.0.0.1:9100, or render it headless from the command line. Patches are plain text."><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Cells</span></button></div>
+            <p class="ax-cap" aria-live="polite">Lorenz attractor</p>
+          </div>
+          <div class="ax-cta">
+            <a href="index.html#setup" class="btn btn-primary">Download</a>
+            <a href="blog/field-language-write-what-a-node-does.html" class="ax-ghost" aria-label="Read: Field in one post"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          </div>
         </div>
       </div>
     </section>
-
     <div class="container">
-      <section class="aud-section">
-        <h2>What you get</h2>
-        <div class="aud-grid">
-          <article class="aud-card reveal" style="--i:0"><span class="num">01</span><h3>One language, many nodes</h3><p>Field Pixel, Field Synth, Field Effect, Field Notes, Field Primitive and Field Modifier share one syntax. Types and rates are inferred, so a sine reads the same on the GPU and at 48 kHz.</p></article>
-          <article class="aud-card reveal" style="--i:1"><span class="num">02</span><h3>JavaScript sketches</h3><p>A Sketch node draws 2D images from JavaScript, and a 3D sketch builds meshes. The library has Lorenz and Clifford attractors, Lotka-Volterra and Rule 110, running live.</p></article>
-          <article class="aud-card reveal" style="--i:2"><span class="num">03</span><h3>Everything can be driven</h3><p>Modulate any knob, script a patch over OSC on 127.0.0.1:9100, or render it headless from the command line. Patches are plain text.</p></article>
-        </div>
-      </section>
-
       <section class="aud-section reveal">
-        <h2>Where your code runs</h2>
-        <p class="sec-sub">Each of these nodes takes a few lines of Field or JavaScript.</p>
-        <div class="bench"><img class="bench-img" src="assets/nodes/bench-creative-coders.webp" alt="Field Pixel: A shader in a few lines.; Field Synth: A per-sample audio kernel.; Field Modifier: Deform and shade a mesh.; Sketch: Draw from JavaScript.; Render 3D: Lights, materials and shadows." width="965" height="396" loading="lazy" decoding="async"></div>
+        <h2 class="ax-h">Nodes</h2>
+        <div class="ax-strip"><div class="ax-nodes"><figure class="ax-node"><img src="assets/nodes/fieldpixel.webp" alt="Field Pixel: A shader in a few lines." loading="lazy" decoding="async"><figcaption>Field Pixel</figcaption></figure><figure class="ax-node"><img src="assets/nodes/field-synth.webp" alt="Field Synth: A per-sample audio kernel." loading="lazy" decoding="async"><figcaption>Field Synth</figcaption></figure><figure class="ax-node"><img src="assets/nodes/field-modifier.webp" alt="Field Modifier: Deform and shade a mesh." loading="lazy" decoding="async"><figcaption>Field Modifier</figcaption></figure><figure class="ax-node"><img src="assets/nodes/sketch.webp" alt="Sketch: Draw from JavaScript." loading="lazy" decoding="async"><figcaption>Sketch</figcaption></figure><figure class="ax-node"><img src="assets/nodes/render-3d.webp" alt="Render 3D: Lights, materials and shadows." loading="lazy" decoding="async"><figcaption>Render 3D</figcaption></figure></div></div>
       </section>
-      <section class="aud-section reveal">
+      <section class="aud-section reveal ax-lab">
+        <h2 class="ax-h">Tweak</h2>
         <div class="lab" data-lab="shader" data-shader="dots" data-s="1">
           <div class="lab-view"><canvas aria-label="A live shader you can change with the sliders" role="img"></canvas></div>
-          <div class="lab-side"><h3>Change two numbers</h3><div class="ctl"><label for="c-turn">turn</label><output for="c-turn"></output><input id="c-turn" type="range" min="0" max="1000" step="1" value="544" data-fmt="1" data-lo="-90" data-hi="90" data-dp="0" data-unit=" deg/s"></div><div class="ctl"><label for="c-seeds">seeds</label><output for="c-seeds"></output><input id="c-seeds" type="range" min="0" max="1000" step="1" value="250" data-fmt="1" data-lo="60" data-hi="1500" data-dp="0" data-unit=""></div><pre class="aud-code"><code><span class="k">param float</span> seeds = 420.0 [60.0, 1500.0];
+          <div class="lab-side"><div class="ctl"><label for="c-turn">turn</label><output for="c-turn"></output><input id="c-turn" type="range" min="0" max="1000" step="1" value="544" data-fmt="1" data-lo="-90" data-hi="90" data-dp="0" data-unit=" deg/s"></div><div class="ctl"><label for="c-seeds">seeds</label><output for="c-seeds"></output><input id="c-seeds" type="range" min="0" max="1000" step="1" value="250" data-fmt="1" data-lo="60" data-hi="1500" data-dp="0" data-unit=""></div><details class="ax-code"><summary><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Code</span></summary><pre class="aud-code"><code><span class="k">param float</span> seeds = 420.0 [60.0, 1500.0];
 <span class="k">param float</span> turn = 8.0 [-90.0, 90.0];
 <span class="c">// ...</span>
 sc = 0.46 / sqrt(seeds);
 rot = turn * 0.0174533 * t;
-sa0 = kk0 * 2.399963 + rot;   <span class="c">// golden angle</span></code></pre></div></div>
+sa0 = kk0 * 2.399963 + rot;   <span class="c">// golden angle</span></code></pre></details></div></div>
       </section>
-
       <section class="aud-section reveal">
-        <div class="sec-head"><div><h2>Maths you can open</h2><p class="sec-sub">Each one is a free patch that runs live.</p></div>
-          <div class="reel-ctl"><button class="reel-btn reel-prev" type="button" aria-label="Scroll back">&#8592;</button><button class="reel-btn reel-next" type="button" aria-label="Scroll forward">&#8594;</button></div></div>
-        <div class="reel-wrap"><div class="reel"><figure><a class="frame" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/lorenz-attractor.jpg" alt="Lorenz attractor" width="900" height="600" loading="lazy" decoding="async"></a><figcaption>Lorenz attractor</figcaption></figure><figure><a class="frame" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/clifford-attractor.jpg" alt="Clifford attractor" width="900" height="600" loading="lazy" decoding="async"></a><figcaption>Clifford attractor</figcaption></figure><figure><a class="frame" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/rule-110.jpg" alt="Rule 110" width="900" height="600" loading="lazy" decoding="async"></a><figcaption>Rule 110</figcaption></figure><figure><a class="frame" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/lotka-volterra.jpg" alt="Lotka-Volterra" width="900" height="600" loading="lazy" decoding="async"></a><figcaption>Lotka-Volterra</figcaption></figure><figure><a class="frame" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/scale-free-network.jpg" alt="Scale-free network" width="900" height="600" loading="lazy" decoding="async"></a><figcaption>Scale-free network</figcaption></figure><figure><a class="frame" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/phyllotaxis-bloom.jpg" alt="Phyllotaxis bloom" width="900" height="600" loading="lazy" decoding="async"></a><figcaption>Phyllotaxis bloom</figcaption></figure></div></div>
+        <h2 class="ax-h">Made in Infinite</h2>
+        <div class="ax-strip"><div class="ax-reel"><a class="ax-shot" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/lorenz-attractor.jpg" alt="Lorenz attractor" width="900" height="600" loading="lazy" decoding="async"><span class="ax-ttl">Lorenz attractor</span></a><a class="ax-shot" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/clifford-attractor.jpg" alt="Clifford attractor" width="900" height="600" loading="lazy" decoding="async"><span class="ax-ttl">Clifford attractor</span></a><a class="ax-shot" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/rule-110.jpg" alt="Rule 110" width="900" height="600" loading="lazy" decoding="async"><span class="ax-ttl">Rule 110</span></a><a class="ax-shot" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/lotka-volterra.jpg" alt="Lotka-Volterra" width="900" height="600" loading="lazy" decoding="async"><span class="ax-ttl">Lotka-Volterra</span></a><a class="ax-shot" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/scale-free-network.jpg" alt="Scale-free network" width="900" height="600" loading="lazy" decoding="async"><span class="ax-ttl">Scale-free network</span></a><a class="ax-shot" style="--ar:900 / 600" href="library.html"><img src="assets/library/previews/phyllotaxis-bloom.jpg" alt="Phyllotaxis bloom" width="900" height="600" loading="lazy" decoding="async"><span class="ax-ttl">Phyllotaxis bloom</span></a></div></div>
       </section>
-
       <section class="aud-section reveal">
-        <h2>Start with</h2>
-        <div class="aud-start">
-          <a href="library/field.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Field templates</a>
-          <a href="library/lorenz-attractor.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Lorenz attractor</a>
-          <a href="library/clifford-attractor.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Clifford attractor</a>
-          <a href="library/rule-110.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Rule 110</a>
-          <a href="library/lotka-volterra.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Lotka-Volterra</a>
-        </div>
+        <h2 class="ax-h">Start with</h2>
+        <div class="aud-start"><a href="library/field.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Field templates</a><a href="library/lorenz-attractor.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Lorenz attractor</a><a href="library/clifford-attractor.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Clifford attractor</a><a href="library/rule-110.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Rule 110</a><a href="library/lotka-volterra.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Lotka-Volterra</a></div>
       </section>
-
       <section class="aud-section reveal">
-        <h2>Infinite for everyone else</h2>
-        <div class="aud-others">
-          <a href="artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg>artists</a>
-          <a href="musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg>musicians</a>
-          <a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg>VJs</a>
-          <a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg>developers</a>
-        </div>
+        <h2 class="ax-h">For everyone else</h2>
+        <div class="aud-others"><a href="artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg>artists</a><a href="musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg>musicians</a><a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg>VJs</a><a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg>developers</a></div>
       </section>
     </div>
-    
+
   </main>
 
   <footer class="site-footer">
@@ -238,6 +217,8 @@ sa0 = kk0 * 2.399963 + rot;   <span class="c">// golden angle</span></code></pre
   </footer>
   <script src="site.js?v=18" defer></script>
   <script src="audience.js?v=6" defer></script>
+  <script src="artists.js?v=8" defer></script>
+  <script src="ccode.js?v=2" defer></script>
   <script>
     (function () {
       var els = document.querySelectorAll('.reveal');

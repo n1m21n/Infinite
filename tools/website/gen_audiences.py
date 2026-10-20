@@ -41,8 +41,8 @@ AUDIENCES = [
              "code": "param float size = 0.3 [0.05, 0.6];\nparam float wobble = 0.04 [0.0, 0.15];\n// ...\nrad = size * (1.0 + wobble * sin(3.0 * ang + t * 1.1)\n  + wobble * 0.5 * sin(5.0 * ang - t * 1.3));\nedge = 1.0 - smoothstep(rad - aa, rad, r);",
              "note": "Field source from the Iridescent Orb preset. The canvas is the same formula as WebGL."},
      "reel": {"title": "Made in Infinite", "sub": "Pieces from the art gallery and starting points from the library.", "href": "artworks.html",
-              "items": [("assets/museum/06.jpg", 720, 960, "From the art gallery"), ("assets/library/previews/iridescent-orb.jpg", 900, 600, "Iridescent orb, library"), ("assets/museum/10.jpg", 720, 960, "From the art gallery"),
-                        ("assets/library/previews/liquid-glass.jpg", 900, 600, "Liquid glass, library"), ("assets/museum/08.jpg", 720, 960, "From the art gallery"), ("assets/library/previews/ordered-dither.jpg", 900, 600, "Ordered dither, library"), ("assets/museum/02.jpg", 720, 960, "From the art gallery")]},
+              "items": [("assets/museum/06.jpg", 720, 960, "Neon mushroom"), ("assets/library/previews/iridescent-orb.jpg", 900, 600, "Iridescent orb, library"), ("assets/museum/10.jpg", 720, 960, "Rainbow spiral"),
+                        ("assets/library/previews/liquid-glass.jpg", 900, 600, "Liquid glass, library"), ("assets/museum/08.jpg", 720, 960, "Halftone face"), ("assets/library/previews/ordered-dither.jpg", 900, 600, "Ordered dither, library"), ("assets/museum/02.jpg", 720, 960, "Mirrored portrait")]},
      "start": [("first-image", "First image"), ("layered-blends", "Layered blends"), ("glitch-feedback", "Glitch feedback"), ("iridescent-orb", "Iridescent orb"), ("trail-glitch", "Trail glitch")],
      "extra": ("artworks.html", "See the art gallery")},
     {"slug": "musicians", "name": "musicians", "hand": "play",
@@ -322,6 +322,9 @@ def artists_main(a, rel, hero="blob"):
     if hero == "cables":
         bub = [("synth", "family-synths", "Synths", a["cards"][0][0]), ("fx", "family-audio-effects", "Effects", a["cards"][1][0]), ("plug", "mod-matrix", "Plugins", a["cards"][2][0])]
         tag, caps, ghost = "Pull a cable.", "|".join(c[0] for c in a["cards"]), ("Guide", "library")
+    elif hero == "math":
+        bub = [("orbit", "loop", "Orbit", a["cards"][0][0]), ("bloom", "star", "Bloom", a["cards"][1][0]), ("cells", "grid-dots", "Cells", a["cards"][2][0])]
+        tag, caps, ghost = "Change two numbers.", "Lorenz attractor|Phyllotaxis bloom|Rule 110", ("Library", "library")
     elif hero == "shader":
         bub = [("out", "viewport", "Output", a["cards"][0][0]), ("beat", "metronome", "Beat", a["cards"][1][0]), ("safe", "power", "Safe", a["cards"][2][0])]
         tag, caps, ghost = "Play the room.", "|".join(c[0] for c in a["cards"]), ("Guide", "library")
@@ -330,7 +333,7 @@ def artists_main(a, rel, hero="blob"):
         tag, caps, ghost = "Images that move.", "32 blend modes|3D with real materials|A picture from a formula", ("Gallery", "viewport")
     bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(c)}: {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
     nodes = "".join(f'<figure class="ax-node"><img src="assets/nodes/{n}.webp" alt="{e(t)}: {e(d)}" loading="lazy" decoding="async"><figcaption>{e(t)}</figcaption></figure>' for n, t, d in a["bench"]["items"])
-    figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{a["reel"]["href"]}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"></a>' for src, w, h, al in a["reel"]["items"])
+    figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{a["reel"]["href"]}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="ax-ttl">{e(al.replace(", library", ""))}</span></a>' for src, w, h, al in a["reel"]["items"])
     start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
     others = "".join(f'<a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
     lab = lab_html(a)
@@ -355,7 +358,7 @@ def artists_main(a, rel, hero="blob"):
           <div class="ax-hint" aria-hidden="true">{icon("pointer")}<span>Drag</span></div>
           <div class="ax-low">
             <div class="ax-bubs" role="tablist" aria-label="What you can do">{bubbles}</div>
-            <p class="ax-cap" aria-live="polite">{e(a["cards"][0][0])}</p>
+            <p class="ax-cap" aria-live="polite">{e(caps.split("|")[0])}</p>
           </div>
           <div class="ax-cta">
             <a href="index.html#setup" class="btn btn-primary">Download</a>
@@ -370,7 +373,7 @@ def artists_main(a, rel, hero="blob"):
         <div class="ax-strip"><div class="ax-nodes">{nodes}</div></div>
       </section>
       <section class="aud-section reveal ax-lab">
-        <h2 class="ax-h">{"Play" if hero == "cables" else "Perform" if hero == "shader" else "Knobs"}</h2>
+        <h2 class="ax-h">{"Play" if hero == "cables" else "Perform" if hero == "shader" else "Tweak" if hero == "math" else "Knobs"}</h2>
         {lab}
       </section>
       <section class="aud-section reveal">
@@ -394,11 +397,13 @@ def page(a):
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=5f17f821">', extra_js='\n  <script src="artists.js?v=8" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=2a025c8c">', extra_js='\n  <script src="artists.js?v=8" defer></script>')
+    if a["slug"] == "creative-coders":
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=2a025c8c">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script src="ccode.js?v=2" defer></script>')
     if a["slug"] == "vjs":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=5f17f821">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script src="vjs.js?v=3" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=2a025c8c">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script src="vjs.js?v=3" defer></script>')
     if a["slug"] == "musicians":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=5f17f821">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=1" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=2a025c8c">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=1" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 

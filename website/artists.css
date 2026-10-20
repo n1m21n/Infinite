@@ -123,3 +123,9 @@
   .ax-cta .ax-ghost span { display: none; }
   .ax-low { bottom: 18px; }
 }
+
+/* Made in Infinite: a short title on every piece */
+.ax-shot { position: relative; }
+.ax-ttl { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 6px 12px; border-radius: var(--r-pill); font: 500 0.8125rem/1.2 'Geist', system-ui, sans-serif; color: var(--mid-ink); background: rgba(21, 25, 48, 0.55); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+
+.ax-stage[data-hero="math"] { background: radial-gradient(ellipse at 62% 48%, #1f2650, var(--mid) 72%); cursor: crosshair; }

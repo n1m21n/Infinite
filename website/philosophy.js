@@ -19,7 +19,7 @@
   // the mind map, in the page's original 600 x 410 coordinates, one point per bubble (same order as the generator's NODES)
   var MIND = [[300, 58], [100, 138], [500, 138], [58, 270], [300, 208], [546, 270], [190, 350], [410, 350]];
 
-  var markLen = 1, portrait = false, W = 0, H = 0, top = 0, cx = 0, cy = 0, A = 0, mindPts = [], scatterPts = [], loopTs = [];
+  var bs = 1, markLen = 1, portrait = false, W = 0, H = 0, top = 0, cx = 0, cy = 0, A = 0, mindPts = [], scatterPts = [], loopTs = [];
   var s = 0, sT = 0, orbit = 0, time = 0, clock = 0, running = false, vis = true;
   var offs = bubs.map(function () { return { x: 0, y: 0, vx: 0, vy: 0 }; });
   var drag = null, focus = -1, focusT = 0;
@@ -34,9 +34,11 @@
     var hd = document.querySelector('.site-header'); top = (hd ? hd.offsetHeight : 60) + (W < 680 ? 140 : 120);
     var cw = sec.querySelector('.ph-caps'); if (cw) { var ch = 0; caps.forEach(function (c) { ch = Math.max(ch, c.offsetHeight); }); top = Math.max(top, cw.offsetTop + ch + 16); }   // the figure starts below the tallest caption, whatever the width
     var hu = H - top - 96; portrait = W < H * 0.9;
-    cx = W / 2; cy = top + 8 + (H - top - 64) / 2 - (W < 680 ? 96 : 0);   // phones: lift the figure so the audience pills and Download below never sit on it
+    bs = W < 680 ? 0.78 : 1;                                                    // phones: smaller icons
+    var yTop = top + 36 * bs + 8, yBot = H - (W < 680 ? 200 : 120), span = Math.max(160, yBot - yTop);   // the figure lives between the caption and the controls below
+    cx = W / 2; cy = yTop + span / 2;
     A = portrait ? W * 0.34 : Math.min(W * 0.27, hu * 0.62);
-    var sc = portrait ? Math.min(W * 0.78 / 410, hu * 0.8 / 600) : Math.min(W * 0.8 / 600, hu * 0.9 / 410);
+    var sc = portrait ? Math.min(W * 0.78 / 410, span / 500) : Math.min(W * 0.8 / 600, span / 310);
     mindPts = MIND.map(function (p) { var x = p[0] - 300, y = p[1] - 205; return portrait ? [cx + y * sc, cy + x * sc] : [cx + x * sc, cy + y * sc]; });
     scatterPts = bubs.map(function (b, i) { return [W * (0.12 + 0.76 * hash(i + 1)), top + 40 + (H - top - (W < 680 ? 210 : 140)) * hash(i + 21)]; });
     loopTs = bubs.map(function (b, i) { return i * Math.PI * 2 / N + 0.4; });
@@ -88,7 +90,7 @@
       var x = p[0] + dx + o.x, y = p[1] + dy + o.y;
       cur[i] = [x, y];
       var rad = mix(50, 24, sm(1 - Math.abs(s - 3) * 2.4));
-      b.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0) scale(' + p[2].toFixed(3) + ')';
+      b.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0) scale(' + (p[2] * bs).toFixed(3) + ')';
       b.style.opacity = p[3].toFixed(3); b.style.borderRadius = rad.toFixed(1) + '%';
       b.style.pointerEvents = p[3] > 0.5 && sceneMove ? 'auto' : 'none';
     });
@@ -157,6 +159,6 @@
   });
 
   new IntersectionObserver(function (es) { vis = es[0].isIntersecting; if (vis) start(); }, { rootMargin: '200px' }).observe(sec);
-  addEventListener('resize', measure);
+  addEventListener('resize', measure); if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure); if (window.ResizeObserver) new ResizeObserver(measure).observe(sec.querySelector('.ph-caps') || stage);
   measure(); s = sT = 0; start();
 })();
