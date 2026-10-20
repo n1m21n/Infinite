@@ -896,7 +896,7 @@ async function boot() {
 
   let loaded = 0;
   await Promise.all(pieces.map((p) => new Promise((res) => {
-    loader.load(`assets/museum/${p.def.file}.jpg`, (t) => {
+    loader.load(`assets/museum/${p.def.file}.webp`, (t) => {
       t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso;
       p.poster = t; p.setMap(t); res();
     }, undefined, () => res());

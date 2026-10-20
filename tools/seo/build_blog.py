@@ -141,7 +141,7 @@ def head(title, desc, url, image, extra="", kind="website", depth="../"):
   <link rel="stylesheet" href="{depth}style.css?v=da19e273">
   <link rel="stylesheet" href="{depth}glass.css?v=c25dae44">
   <link rel="stylesheet" href="{depth}blog.css?v=823c9183">
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
+  <script>addEventListener('load',function(){{setTimeout(function(){{var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)}},2500)}})</script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){{dataLayer.push(arguments);}}
