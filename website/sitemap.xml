@@ -46,6 +46,7 @@
   <url><loc>https://infinitedevices.org/embeds/neural-synapse.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/aurora-borealis.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/cosmic-nebula.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/spectral-caustics.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
@@ -83,6 +84,8 @@
   <url><loc>https://infinitedevices.org/library/formant-filter-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/wavetable-morph-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/wavefolder-drive-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/additive-harmonic-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/comb-resonator-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
@@ -154,4 +157,9 @@
   <url><loc>https://infinitedevices.org/library/wavetable-morph-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/wavefolder-drive-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/cosmic-nebula.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/svensson-attractor.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bour-surface-3d.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/additive-harmonic-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/comb-resonator-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spectral-caustics.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
 </urlset>

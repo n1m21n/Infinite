@@ -401,6 +401,38 @@
     "Field Effect",
     "Audio Out"
    ]
+  },
+  {
+   "id": "additive-harmonic-synth",
+   "name": "Additive Harmonic Synth",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "Synths",
+   "description": "Eight-partial additive harmonic overtone generator with continuous spectral tilt, odd/even balance, shimmer emphasis and analog saturation.",
+   "price": 0,
+   "preview": "assets/templates/additive-harmonic-synth.webp",
+   "file": "assets/templates/additive-harmonic-synth.inf",
+   "nodes": [
+    "Random Note Generator",
+    "Field Synth",
+    "Audio Out"
+   ]
+  },
+  {
+   "id": "comb-resonator-fx",
+   "name": "Comb Resonator FX",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "Audio effects",
+   "description": "Dual-coupled harmonic tuned resonator with adjustable resonance Q, acoustic decay damping, overdrive saturation and wet/dry mix.",
+   "price": 0,
+   "preview": "assets/templates/comb-resonator-fx.webp",
+   "file": "assets/templates/comb-resonator-fx.inf",
+   "nodes": [
+    "Oscillator",
+    "Field Effect",
+    "Audio Out"
+   ]
   }
  ]
 }

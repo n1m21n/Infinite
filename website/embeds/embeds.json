@@ -110,6 +110,11 @@
       "slug": "cosmic-nebula",
       "title": "Cosmic Nebula",
       "description": "Deep interstellar emission nebula with audio-reactive volumetric dust filaments, ionized stellar core ionization and radiant cluster flare."
+    },
+    {
+      "slug": "spectral-caustics",
+      "title": "Spectral Caustics",
+      "description": "Deep aquatic light caustics with audio-reactive chromatic dispersion, fluid wave refraction and incandescent focal flare."
     }
   ]
 }

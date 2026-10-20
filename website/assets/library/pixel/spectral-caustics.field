@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spectral Caustics",
+    "author": "Infinite",
+    "description": "Deep aquatic light caustics with audio-reactive chromatic dispersion, fluid wave refraction and incandescent focal flare.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 1.1 [0.2, 4.0];\nparam float intensity = 2.4 [0.5, 6.0];\nparam float dispersion = 0.55 [0.0, 1.5];\nparam float colorShift = 0.45 [0.0, 1.0];\n\np = (uv - 0.5) * 2.2;\np.x = p.x * aspect;\n\nr = length(p);\ntCur = t * speed * 0.32;\n\nw1 = sin(p.x * 3.4 + p.y * 2.1 + tCur * 1.2);\nw2 = sin(-p.x * 2.5 + p.y * 3.8 - tCur * 0.9);\nw3 = cos(p.x * 4.6 - p.y * 3.1 + tCur * 1.5);\nw4 = sin(p.x * 6.8 + p.y * 6.2 - tCur * 1.9);\n\nwave = w1 * 0.38 + w2 * 0.32 + w3 * 0.22 + w4 * 0.12;\ncaustic = pow(max(0.0, 1.0 - abs(wave)), 6.0) * intensity;\n\ncoreGlow = exp(-r * r * 1.8) * 1.4;\n\nground = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.21);\n\ncausticGrad = mix(emerald, signal, clamp(r * 1.2 + sin(tCur * 0.8) * 0.3, 0.0, 1.0));\ncausticCol = mix(causticGrad, ember, colorShift * 0.4);\n\ncol = ground;\ncol = col + causticCol * caustic * 1.6;\ncol = col + mix(emerald, signal, 0.5) * coreGlow * 0.8;\nalpha = 1.0;\n",
+    "params": {
+      "speed": 1.1,
+      "intensity": 2.4,
+      "dispersion": 0.55,
+      "colorShift": 0.45
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

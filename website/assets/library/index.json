@@ -690,6 +690,99 @@
       "file": "assets/library/pixel/cosmic-nebula.field",
       "preview": "assets/library/previews/cosmic-nebula.jpg",
       "bytes": 1646
+    },
+    {
+      "id": "svensson-attractor",
+      "name": "Svensson Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math"
+      ],
+      "description": "Chaotic Svensson attractor with continuous coefficient modulation, woven fractal filaments and phase density mapping.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/svensson-attractor.js",
+      "preview": "assets/library/previews/svensson-attractor.jpg",
+      "bytes": 1204
+    },
+    {
+      "id": "bour-surface-3d",
+      "name": "Bour's Minimal Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "minimal-surface"
+      ],
+      "description": "Parametric Bour minimal surface with three-fold rotational petal symmetry, coordinate wireframe mesh and orbiting quanta.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 6,
+      "file": "assets/library/sketch/bour-surface-3d.js",
+      "preview": "assets/library/previews/bour-surface-3d.jpg",
+      "bytes": 2651
+    },
+    {
+      "id": "additive-harmonic-synth",
+      "name": "Additive Harmonic Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "additive",
+        "harmonics",
+        "dsp"
+      ],
+      "description": "Eight-partial additive harmonic overtone generator with continuous spectral tilt, odd/even balance, shimmer emphasis and analog saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/additive-harmonic-synth.inf",
+      "preview": "assets/library/previews/additive-harmonic-synth.jpg",
+      "bytes": 2366
+    },
+    {
+      "id": "comb-resonator-fx",
+      "name": "Comb Resonator FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "resonator",
+        "filter",
+        "dsp"
+      ],
+      "description": "Dual-coupled harmonic tuned resonator with adjustable resonance Q, acoustic decay damping, overdrive saturation and wet/dry mix.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/comb-resonator-fx.inf",
+      "preview": "assets/library/previews/comb-resonator-fx.jpg",
+      "bytes": 1669
+    },
+    {
+      "id": "spectral-caustics",
+      "name": "Spectral Caustics",
+      "kind": "Generator",
+      "tags": [
+        "caustics",
+        "water",
+        "reactive",
+        "visuals"
+      ],
+      "description": "Deep aquatic light caustics with audio-reactive chromatic dispersion, fluid wave refraction and incandescent focal flare.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/spectral-caustics.field",
+      "preview": "assets/library/previews/spectral-caustics.jpg",
+      "bytes": 1549
     }
   ]
 }

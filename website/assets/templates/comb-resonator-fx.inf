@@ -1,0 +1,43 @@
+infinite-patch 1
+# Comb Resonator FX: dual-coupled harmonic tuned resonator Field Effect
+node 1 Synths Oscillator
+  id osc
+  pos 0 1024
+  f freq 110.0
+  i waveform 0
+end
+node 2 Effects Field Effect
+  id fx
+  pos 480 1024
+  s code param float tune = 440.0 [65.0, 2200.0]\nparam float q = 8.5 [0.5, 24.0]\nparam float decay = 1.8 [0.2, 5.0]\nparam float drive = 1.5 [1.0, 4.0]\nparam float mix = 0.65 [0.0, 1.0]\nstate float s1 = 0\nstate float s2 = 0\nstate float s3 = 0\nstate float s4 = 0\nstate float lp = 0\nstate float fb = 0\n\nw1 = clamp(6.2831853 * tune / sr, 0.01, 1.8)\nw2 = clamp(6.2831853 * (tune * 1.5) / sr, 0.015, 2.2)\nkRes = clamp(1.0 - (1.0 / q), 0.05, 0.98)\n\nu = (in * drive) + fb * (kRes * 0.38)\nsatU = u / (1.0 + abs(u) * 0.22)\n\ns1 = s1 + w1 * s2\ns2 = satU - s1 - (1.0 - kRes) * s2\nres1 = s2\n\ns3 = s3 + w2 * s4\ns4 = res1 * 0.75 - s3 - (1.0 - kRes * 0.92) * s4\nres2 = s4\n\nwet = res1 * 0.65 + res2 * 0.45\nsatWet = wet / (1.0 + abs(wet) * 0.18)\n\nfDamp = clamp(0.35 / decay, 0.02, 0.45)\nlp = lp + fDamp * (satWet - lp)\nfb = lp\n\nout = in * (1.0 - mix) + lp * mix\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.306 0.949 0.722
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Comb Resonator FX. Dual-coupled harmonic tuned resonator with resonance Q and decay damping.
+  f width 360
+  f height 120
+end
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.16 0.46
+mod pic sizeY ana 0 0 1 0.5 0.16 0.46

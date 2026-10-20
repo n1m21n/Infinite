@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Comb Resonator FX",
+    "author": "Infinite",
+    "description": "Dual-coupled harmonic tuned resonator with adjustable resonance Q, acoustic decay damping, overdrive saturation and wet/dry mix.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float tune = 440.0 [65.0, 2200.0];\nparam float q = 8.5 [0.5, 24.0];\nparam float decay = 1.8 [0.2, 5.0];\nparam float drive = 1.5 [1.0, 4.0];\nparam float mix = 0.65 [0.0, 1.0];\nstate float s1 = 0;\nstate float s2 = 0;\nstate float s3 = 0;\nstate float s4 = 0;\nstate float lp = 0;\nstate float fb = 0;\n\nw1 = clamp(6.2831853 * tune / sr, 0.01, 1.8);\nw2 = clamp(6.2831853 * (tune * 1.5) / sr, 0.015, 2.2);\nkRes = clamp(1.0 - (1.0 / q), 0.05, 0.98);\n\nu = (in * drive) + fb * (kRes * 0.38);\nsatU = u / (1.0 + abs(u) * 0.22);\n\ns1 = s1 + w1 * s2;\ns2 = satU - s1 - (1.0 - kRes) * s2;\nres1 = s2;\n\ns3 = s3 + w2 * s4;\ns4 = res1 * 0.75 - s3 - (1.0 - kRes * 0.92) * s4;\nres2 = s4;\n\nwet = res1 * 0.65 + res2 * 0.45;\nsatWet = wet / (1.0 + abs(wet) * 0.18);\n\nfDamp = clamp(0.35 / decay, 0.02, 0.45);\nlp = lp + fDamp * (satWet - lp);\nfb = lp;\n\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "tune": 440.0,
+      "q": 8.5,
+      "decay": 1.8,
+      "drive": 1.5,
+      "mix": 0.65
+    },
+    "nodeSettings": {}
+  }
+}
