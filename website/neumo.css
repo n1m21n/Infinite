@@ -110,7 +110,7 @@ html .ax-key:active .ax-key-top { transform: translateY(1px); background: var(--
 html .ax-key .ic { color: var(--signal); }
 @media (prefers-reduced-motion: reduce) { html .btn, html .btn-ghost, html .icon-btn, html .ax-key-top { transition: none; } }
 /* picture captions: one size and weight for the title on any picture (reel, bento, cards) */
-html .ax-ttl, html .ax-bento-l, html .lib-card-title, html .nd-name, html .post-card h2 { font-size: var(--ui-t-media-title); font-weight: 600; line-height: 1.2; }
+html .ax-ttl, html .ax-bento-l, html .lib-card-title, html .nd-name, html .post-card h2, html .ax-key b { font-size: var(--ui-t-media-title); font-weight: 600; line-height: 1.2; }
 /* sliders: one look everywhere. A pocket groove, a pearl fill (set with --p by the page, else empty), a raised round thumb. */
 html input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; height: var(--ui-ctl-h-lg); cursor: pointer; }
 html input[type=range]::-webkit-slider-runnable-track { height: var(--ui-sl-track); border-radius: 999px; background: var(--nm-pearl) 0 0 / max(var(--ui-sl-track), var(--p, 0%)) 100% no-repeat, var(--nm-down); box-shadow: var(--nm-pocket); }

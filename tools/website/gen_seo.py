@@ -83,7 +83,7 @@ def page(i, embeds=frozenset()):
   <meta name="theme-color" content="#151930">
   <script src="../theme.js?v=1"></script>
   <link rel="stylesheet" href="../brand.css?v=7eb5c13f">
-  <link rel="stylesheet" href="../neumo.css?v=4ff24fd0">
+  <link rel="stylesheet" href="../neumo.css?v=3a020cee">
   <title>{e(t)}</title>
   <meta name="description" content="{e(meta_desc(d))}">
   <link rel="canonical" href="{url}">
