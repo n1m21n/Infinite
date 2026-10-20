@@ -68,9 +68,9 @@
 
 /* knobs: the lab as one stage with the sliders as glass on top */
 .ax-lab .lab { position: relative; display: block; padding: 0; background: var(--mid); overflow: hidden; }
-.ax-lab .lab-view { aspect-ratio: 4 / 5; border-radius: 0; }
-@media (min-width: 900px) { .ax-lab .lab-view { aspect-ratio: 16 / 9; } }
-.ax-lab .lab-side { position: absolute; left: 12px; right: 12px; bottom: 12px; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 8px; pointer-events: none; }
+.ax-lab .lab-view { aspect-ratio: 1 / 1; border-radius: 0; }
+@media (min-width: 900px) { .ax-lab .lab-view { aspect-ratio: 21 / 9; } }
+.ax-lab .lab-side { position: static; padding: 0 12px 12px; flex-direction: row; flex-wrap: wrap; align-items: stretch; gap: 8px; }   /* below the picture, never over it */
 .ax-lab .ctl { pointer-events: auto; flex: 1 1 200px; margin: 0; padding: 12px 16px; border-radius: 20px; background: rgba(32, 38, 63, 0.55); -webkit-backdrop-filter: blur(20px) saturate(1.7); backdrop-filter: blur(20px) saturate(1.7); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); color: var(--mid-ink); }
 .ax-lab .ctl label { color: var(--mid-ink); font: 500 0.8438rem/1 'Geist', system-ui, sans-serif; letter-spacing: 0; }
 .ax-lab .ctl output { color: rgba(238, 241, 250, 0.78); }
@@ -83,4 +83,4 @@
 @media (min-width: 901px) { .ax > .container, .ax-main > .container { padding-left: max(var(--gutter), 88px); } }
 @media (max-width: 900px) { .ax-stage { height: clamp(500px, calc(100svh - var(--header-h, 60px) - 112px), 720px); } .ax-low { bottom: 84px; } }
 .ax-lab .ctl { flex: 1 1 140px; padding: 10px 14px; }
-@media (max-width: 600px) { .ax-lab .lab-view { aspect-ratio: 1 / 1.1; } .ax-lab .ctl { gap: 8px; } }
+@media (max-width: 600px) { .ax-lab .lab-view { aspect-ratio: 1 / 0.85; } .ax-lab .ctl { gap: 8px; } }

@@ -32,12 +32,13 @@
   function measure() {
     W = stage.clientWidth; H = stage.clientHeight;
     var hd = document.querySelector('.site-header'); top = (hd ? hd.offsetHeight : 60) + (W < 680 ? 140 : 120);
+    var cw = sec.querySelector('.ph-caps'); if (cw) { var ch = 0; caps.forEach(function (c) { ch = Math.max(ch, c.offsetHeight); }); top = Math.max(top, cw.offsetTop + ch + 16); }   // the figure starts below the tallest caption, whatever the width
     var hu = H - top - 96; portrait = W < H * 0.9;
     cx = W / 2; cy = top + 8 + (H - top - 64) / 2 - (W < 680 ? 96 : 0);   // phones: lift the figure so the audience pills and Download below never sit on it
     A = portrait ? W * 0.34 : Math.min(W * 0.27, hu * 0.62);
     var sc = portrait ? Math.min(W * 0.78 / 410, hu * 0.8 / 600) : Math.min(W * 0.8 / 600, hu * 0.9 / 410);
     mindPts = MIND.map(function (p) { var x = p[0] - 300, y = p[1] - 205; return portrait ? [cx + y * sc, cy + x * sc] : [cx + x * sc, cy + y * sc]; });
-    scatterPts = bubs.map(function (b, i) { return [W * (0.12 + 0.76 * hash(i + 1)), top + 40 + (H - top - 120) * hash(i + 21)]; });
+    scatterPts = bubs.map(function (b, i) { return [W * (0.12 + 0.76 * hash(i + 1)), top + 40 + (H - top - (W < 680 ? 210 : 140)) * hash(i + 21)]; });
     loopTs = bubs.map(function (b, i) { return i * Math.PI * 2 / N + 0.4; });
     // the mark: a lemniscate path sized to the loop
     var d = '', k;

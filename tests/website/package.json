@@ -1,1 +1,1 @@
-{ "name": "infinite-website-tests", "private": true, "type": "module", "scripts": { "audit": "node ui_audit.mjs" }, "dependencies": { "puppeteer-core": "24.2.1" } }
+{"name":"infinite-website-tests","private":true,"type":"module","scripts":{"audit":"node ui_audit.mjs"},"dependencies":{"pngjs":"^7.0.0","puppeteer-core":"24.2.1"}}

@@ -382,7 +382,7 @@ def page(a):
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=fe6c5f4e">', extra_js='\n  <script src="artists.js?v=4" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=a1cb8947">', extra_js='\n  <script src="artists.js?v=7" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 

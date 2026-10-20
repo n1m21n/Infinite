@@ -1,0 +1,31 @@
+/* Device scale: one place that sets how big controls and type are on each device. Loaded last on every page
+   (injected by tools/website/sync_chrome.py), so it wins over page sheets. Checked by tests/website/ui_scale.mjs.
+   Desktop keeps the brand sizes (pill 40, button 44). Phones step everything down one notch:
+   pill 36 / button 40, 13px label, 12px side padding, 18px glyph. */
+:root { --ctl-h: 40px; --ctl-fs: 0.8438rem; --btn-h: 44px; }
+@media (max-width: 640px) {
+  :root { --ctl-h: 36px; --ctl-fs: 0.8125rem; --btn-h: 40px; --pill-h: 36px; --pill-px: 12px; }
+  .btn, .signup-row .btn, .signup-row input[type="email"] { min-height: var(--btn-h); padding-left: 18px; padding-right: 18px; font-size: 0.875rem; }
+  .hero-cta .btn, .aud-cta .btn { flex: 0 1 auto; }
+  .btn-sm, .tabs button, .bm-full > summary, .blog-select, .ax-bub, .ax-ghost, .ax-hint, .ax-code summary, .pill, .seg button, .cmd-tabs [role=tab], .copy, .run, .play, .pad,
+  .aud-start a, .aud-others a, .counter, .modal-doc-link, .blog-opt, .lib-opt, .pw, .lib-dock-pill, .lib-select, .lib-icon-pill {
+    min-height: var(--ctl-h); font-size: var(--ctl-fs);
+  }
+  .ax-bub, .ax-ghost, .ax-code summary, .pw { height: var(--ctl-h); padding: 0 12px 0 10px; gap: 6px; }
+  .ax-hint { height: var(--ctl-h); }
+  .ax-bub .ic, .ax-ghost .ic, .ax-code summary .ic { width: 18px; height: 18px; }
+  .ax-cap { font-size: 0.9375rem; }
+  .ax-copy h1 { font-size: clamp(1.9rem, 9vw, 2.4rem); }
+  .ax-copy p { font-size: 0.9375rem; }
+  .ax-ghost { height: var(--btn-h); }
+  .view-pill, .lib-view-btn, .reel-btn, .footer-social a, .menu-btn, .modal-close, .pn { width: 40px; height: 40px; }
+  .btn-dl { min-height: 52px; padding: 0 18px; gap: 10px; }
+  .btn-dl svg { width: 20px; height: 20px; }
+  .btn-dl b { font-size: 0.9375rem; }
+  .ax-lab .ctl label { font-size: 0.8125rem; }
+  .ax-lab .ctl input[type=range] { height: 32px; }
+}
+@media (min-width: 641px) {
+  .run, .play, .copy, .cmd-tabs [role=tab] { min-height: var(--ctl-h); }
+  .lib-view-btn, .view-pill { width: 36px; height: 36px; }
+}

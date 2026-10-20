@@ -55,3 +55,6 @@ Forms (the sign-up field), empty and loading states, focus and keyboard order, t
 
 ## UI audit
 `tests/website/ui_audit.mjs` (puppeteer-core, system Chrome) loads every page at phone and desktop sizes and fails on overlapping controls, clipped dropdowns, dead clicks (controls that do nothing), look-alike non-interactive pills and footer collisions. Run: `cd tests/website && npm install && node ui_audit.mjs [page.html ...]`.
+
+## Device scale
+`website/scale.css` (loaded last on every page by `sync_chrome.py`) is the one place that sets control and type size per device. Desktop: pill 40, button 44. Phones step down one notch: pill 36, button 40, 13px labels, 12px side padding, 18px glyphs. `tests/website/ui_scale.mjs` fails when a pill or button leaves those ranges, when a phone control spans most of the screen, and when moving art (WebGL canvases, philosophy bubbles) covers a headline, caption or control. Glass labels over art are allowed. Run: `cd tests/website && node ui_scale.mjs [page.html ...]`.

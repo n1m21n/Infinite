@@ -9,7 +9,7 @@
   var caps = ['32 blend modes', '3D with real materials', 'A picture from a formula'];
 
   var FRAG = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' +
-    'uniform vec2 u_res; uniform float u_t; uniform vec2 u_m; uniform float u_p; uniform float u_k; uniform float u_scroll;\n' +
+    'uniform vec2 u_res; uniform float u_t; uniform vec2 u_m; uniform float u_p; uniform float u_k; uniform float u_scroll; uniform vec3 u_view;\n' +
     'const vec3 DEEP = vec3(0.051, 0.063, 0.125); const vec3 GROUND = vec3(0.082, 0.098, 0.188); const vec3 SIG5 = vec3(0.412, 0.455, 0.863); const vec3 SIG = vec3(0.655, 0.694, 1.0);\n' +
     'float field(vec2 p, vec2 c, float t) {\n' +
     ' float f = 0.0; float pr = 0.15 * (1.0 + 0.4 * u_p); f += pr * pr / (dot(p - c, p - c) + 0.0008);\n' +
@@ -19,7 +19,7 @@
     'float height(float f) { return f / (f + 3.0); }\n' +
     'void main() {\n' +
     ' vec2 res = u_res; vec2 uv = (gl_FragCoord.xy - 0.5 * res) / res.y; float asp = res.x / res.y; float t = u_t;\n' +
-    ' vec2 c = (u_m - 0.5) * vec2(asp, 1.0) * 0.9; vec2 p = uv / clamp(asp * 1.15, 0.55, 1.0); p.y -= 0.02;\n' +
+    ' vec2 c = (u_m - 0.5) * vec2(1.0, 0.8) * 0.3; vec2 p = (uv - u_view.xy) / u_view.z;\n' +
     ' float e = 1.2 / res.y; float f = field(p, c, t);\n' +
     ' float hx = height(field(p + vec2(e, 0.0), c, t)) - height(field(p - vec2(e, 0.0), c, t));\n' +
     ' float hy = height(field(p + vec2(0.0, e), c, t)) - height(field(p - vec2(0.0, e), c, t));\n' +
@@ -57,12 +57,26 @@
     var pr = g.createProgram(); g.attachShader(pr, vs); g.attachShader(pr, fs); g.linkProgram(pr); g.useProgram(pr);
     var buf = g.createBuffer(); g.bindBuffer(g.ARRAY_BUFFER, buf); g.bufferData(g.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), g.STATIC_DRAW);
     var loc = g.getAttribLocation(pr, 'a'); g.enableVertexAttribArray(loc); g.vertexAttribPointer(loc, 2, g.FLOAT, false, 0, 0);
-    ['u_res', 'u_t', 'u_m', 'u_p', 'u_k', 'u_scroll'].forEach(function (k) { U[k] = g.getUniformLocation(pr, k); });
+    ['u_res', 'u_t', 'u_m', 'u_p', 'u_k', 'u_scroll', 'u_view'].forEach(function (k) { U[k] = g.getUniformLocation(pr, k); });
     return true;
   }
-  var ok = init();
+  var ok = init(); 
   if (!ok) stage.classList.add('no-gl');
 
+  /* the blob lives in the free area: below the headline and above the bubbles on phones, right of the headline on desktop */
+  var view = [0, 0, 0.8];
+  function fit() {
+    var W = stage.clientWidth, H = stage.clientHeight; if (!W || !H) return;
+    var sr = stage.getBoundingClientRect(), copy = stage.querySelector('.ax-copy'), low = stage.querySelector('.ax-low'), cta = stage.querySelector('.ax-cta');
+    var x0 = 12, x1 = W - 12, y0, y1;
+    if (W >= 900) { x0 = W * 0.42; y0 = 64; y1 = (cta ? cta.getBoundingClientRect().top - sr.top : H) - 16; }
+    else { y0 = (copy ? copy.getBoundingClientRect().bottom - sr.top : 0) + 8; y1 = (low ? low.getBoundingClientRect().top - sr.top : H) - 8; }
+    y1 = Math.max(y1, y0 + 120);
+    view[0] = ((x0 + x1) / 2 - W / 2) / H; view[1] = (H / 2 - (y0 + y1) / 2) / H;
+    view[2] = Math.max(0.2, Math.min(((x1 - x0) / H) * 0.96 / 1.3, ((y1 - y0) / H) * 0.96 / 0.95));
+    if (still && ok) draw(performance.now());
+  }
+  addEventListener('resize', fit); if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
   function draw(now) {
     var dt = Math.min(0.05, (now - st.last) / 1000 || 0.016); st.last = now;
     var a = 1 - Math.exp(-dt * 5);                       // ease toward the target: the blob trails the finger like something with weight
@@ -74,9 +88,11 @@
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; g.viewport(0, 0, w, h); }
     g.uniform2f(U.u_res, w, h); g.uniform1f(U.u_t, still ? 3.2 : now / 1000); g.uniform2f(U.u_m, st.m[0], st.m[1]);
     g.uniform1f(U.u_p, st.p); g.uniform1f(U.u_k, st.k); g.uniform1f(U.u_scroll, st.scroll);
+    g.uniform3f(U.u_view, view[0], view[1], view[2]);
     g.drawArrays(g.TRIANGLES, 0, 3);
   }
   function loop(now) { if (st.vis && !document.hidden) draw(now); requestAnimationFrame(loop); }
+  fit();
   if (ok) {
     if (still) { draw(performance.now()); }
     else requestAnimationFrame(loop);
