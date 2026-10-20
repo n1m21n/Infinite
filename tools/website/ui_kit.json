@@ -1,0 +1,179 @@
+{
+ "_doc": "The site's UI kit registry. Edit a token or move a selector between groups, run python3 tools/website/ui_kit.py, and every page follows (it writes website/neumo.css).",
+ "tokens": {
+  "dark": {
+   "up": "linear-gradient(160deg, #3a4272 0%, #2a3052 50%, #20263f 100%)",
+   "down": "linear-gradient(160deg, #181c36, #222849)",
+   "pearl": "linear-gradient(160deg, #ffffff 0%, #e4e8f7 60%, #cfd5ec 100%)",
+   "raise": "inset 0 1px 0 rgb(255 255 255 / 0.2), inset 0 -2px 3px rgb(4 5 14 / 0.32), 0 0 0 1px rgb(255 255 255 / 0.05), -3px -3px 9px rgb(255 255 255 / 0.05), 5px 8px 16px rgb(4 5 14 / 0.5)",
+   "pearl-raise": "inset 0 1px 0 #fff, inset 0 -3px 5px rgb(21 25 48 / 0.16), 0 0 0 1px rgb(255 255 255 / 0.5), 4px 8px 16px rgb(4 5 14 / 0.45)",
+   "pocket": "inset 3px 5px 10px rgb(4 5 14 / 0.6), inset -2px -2px 6px rgb(255 255 255 / 0.05), 0 0 0 1px rgb(255 255 255 / 0.04)",
+   "ink": "#eef1fa",
+   "ink-on-pearl": "#151930"
+  },
+  "light": {
+   "up": "linear-gradient(160deg, #ffffff 0%, #f1f2f8 55%, #e3e5f0 100%)",
+   "down": "linear-gradient(160deg, #dcdfec, #eceef6)",
+   "pearl": "linear-gradient(160deg, #3a4272 0%, #232a4f 60%, #151930 100%)",
+   "raise": "inset 0 1px 0 #fff, inset 0 -2px 3px rgb(21 25 48 / 0.08), 0 0 0 1px rgb(21 25 48 / 0.05), -4px -4px 10px #fff, 5px 8px 16px rgb(21 25 48 / 0.16)",
+   "pearl-raise": "inset 0 1px 0 rgb(255 255 255 / 0.25), inset 0 -3px 5px rgb(4 5 14 / 0.4), 0 0 0 1px rgb(21 25 48 / 0.4), 4px 8px 16px rgb(21 25 48 / 0.28)",
+   "pocket": "inset 3px 5px 10px rgb(21 25 48 / 0.18), inset -3px -3px 7px #fff, 0 0 0 1px rgb(21 25 48 / 0.04)",
+   "ink": "#12152a",
+   "ink-on-pearl": "#eef1fa"
+  }
+ },
+ "raised": [
+  ".btn-ghost",
+  ".btn.alt",
+  ".btn-dl",
+  ".sys-btn",
+  ".sys-ctl",
+  ".copy",
+  ".copy-inline-btn",
+  ".run",
+  ".mx-play",
+  ".play-btn",
+  ".chip-action",
+  ".view-pill",
+  ".icon-btn",
+  ".nd-btn",
+  ".deck-nav-btn",
+  ".deck-icon-btn",
+  ".lib-hud-nav",
+  ".lib-hud-act",
+  ".lib-icon-pill",
+  ".lib-view-btn",
+  ".lib-select",
+  ".blog-select",
+  ".round",
+  ".reel-btn",
+  "button.col",
+  ".pw",
+  ".pn",
+  ".cmd-tabs [role=\"tab\"]",
+  ".tabs button",
+  ".seg button",
+  ".ax-key-top"
+ ],
+ "primary": [
+  ".btn-primary",
+  ".btn-dl.primary",
+  ".sys-btn.primary",
+  ".btn:not(.alt):not(.btn-ghost):not(.btn-dl):not(.btn-primary)"
+ ],
+ "selected": [
+  ".cmd-tabs [role=\"tab\"][aria-selected=\"true\"]",
+  ".tabs button[aria-selected=\"true\"]",
+  ".seg button[aria-selected=\"true\"]",
+  ".seg button.on",
+  ".pn.is-on",
+  "button.col.sel",
+  ".view-pill.on",
+  ".chip-action[aria-pressed=\"true\"]",
+  ".lib-view-btn.on",
+  ".lib-view-btn[aria-pressed=\"true\"]"
+ ],
+ "pressable": [
+  ".btn",
+  ".btn-ghost",
+  ".btn-dl",
+  ".sys-btn",
+  ".sys-ctl",
+  ".copy",
+  ".run",
+  ".mx-play",
+  ".icon-btn",
+  ".nd-btn",
+  ".deck-nav-btn",
+  ".deck-icon-btn",
+  ".lib-hud-nav",
+  ".lib-hud-act",
+  ".round",
+  ".reel-btn",
+  ".pw",
+  ".pn",
+  ".cmd-tabs [role=\"tab\"]",
+  ".tabs button",
+  ".seg button"
+ ],
+ "catalog": [
+  {
+   "category": "Buttons: primary",
+   "what": "Download, Sign up, Go to library, Download .inf",
+   "where": "neumo.css (this registry), style.css .btn-primary",
+   "central": true
+  },
+  {
+   "category": "Buttons: secondary / ghost",
+   "what": "Headless guide, Back to the Library, Copy, Render again, Play",
+   "where": "neumo.css (this registry)",
+   "central": true
+  },
+  {
+   "category": "Buttons: icon and nav arrows",
+   "what": "Theme toggle, deck arrows, library HUD, shuffle, reel arrows",
+   "where": "neumo.css (this registry)",
+   "central": true
+  },
+  {
+   "category": "Tabs and segmented controls",
+   "what": "Command line / Python / MCP, view toggles",
+   "where": "neumo.css (this registry)",
+   "central": true
+  },
+  {
+   "category": "Keycaps",
+   "what": "For everyone else: Artists, Musicians, VJs ...",
+   "where": "neumo.css (this registry), audience.css",
+   "central": true
+  },
+  {
+   "category": "Hero bubbles, pads, picture tiles",
+   "what": "Layer / 3D / Formula, VJ pads, Orb / Rings",
+   "where": "scale.css (uses the --nm tokens)",
+   "central": "partly"
+  },
+  {
+   "category": "Pills and tags",
+   "what": "Headless, Python SDK, 9 MCP tools, ticker",
+   "where": "style.css, audience.css, dev.css",
+   "central": false
+  },
+  {
+   "category": "Cards and glass panels",
+   "what": "Library deck cards, blog cards, bento tiles, glass HUD",
+   "where": "glass.css, deck.css, library-deck.css, audience.css",
+   "central": false
+  },
+  {
+   "category": "Thumbnails",
+   "what": "Library cards, Start with, Made in Infinite, patch pages",
+   "where": "tools/website/gen_library_thumbs.py (BG, palette, 3D shading)",
+   "central": true
+  },
+  {
+   "category": "Navigation: top bar, dock, footer",
+   "what": "Menu, bottom dock, footer columns",
+   "where": "tools/website/sync_chrome.py",
+   "central": true
+  },
+  {
+   "category": "Code blocks and terminals",
+   "what": "ax-code, term-panel, dv-cmd",
+   "where": "artists.css, dev.css, style.css",
+   "central": false
+  },
+  {
+   "category": "Inputs and sliders",
+   "what": "Email sign-up, knobs, selects",
+   "where": "style.css, mxrack.js, library.css",
+   "central": false
+  },
+  {
+   "category": "Headings and type",
+   "what": "h1-h3, hand script, captions",
+   "where": "brand.css (generated from docs/brand/brand.json)",
+   "central": true
+  }
+ ]
+}

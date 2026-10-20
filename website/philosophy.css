@@ -90,11 +90,11 @@
 .pw, .pw:hover { text-decoration: none; color: var(--ink); }
 .ph-who { max-width: min(760px, calc(100% - 32px)); }
 .ph-dl { background: var(--ink); color: var(--ground); }
-.ph-prin .ic { width: 22px; height: 22px; }
+
 
 /* page title: the same size and weight as the Blog and Library titles */
-.ph-title { position: absolute; z-index: 3; left: 0; right: 0; top: calc(var(--header-h, 60px) + 4px); margin: 0; text-align: center; font: 800 clamp(2rem, 6vw, 3rem)/1.05 var(--font-sans, Geist, system-ui, sans-serif); letter-spacing: -0.035em; color: var(--ink); }
-.ph-caps { top: calc(var(--header-h, 60px) + 72px); }
+.ph-title { position: absolute; z-index: 3; left: 0; right: 0; top: calc(var(--header-h, 60px) + 28px); margin: 0; text-align: center; font: 800 clamp(2rem, 6vw, 3rem)/1.05 var(--font-sans, Geist, system-ui, sans-serif); letter-spacing: -0.035em; color: var(--ink); }
+.ph-caps { top: calc(var(--header-h, 60px) + 96px); }
 /* light modes: the scene follows the page tokens */
 :root[data-mode="paper"] .ph-lines line, :root[data-mode="mist"] .ph-lines line { stroke: color-mix(in srgb, var(--ink) 28%, transparent); }
 :root[data-mode="paper"] .ph-lines line.on, :root[data-mode="mist"] .ph-lines line.on, :root[data-mode="paper"] .ph-flow, :root[data-mode="mist"] .ph-flow { stroke: var(--accent, #E2531C); fill: var(--accent, #E2531C); }
@@ -103,3 +103,17 @@
 :root[data-mode="paper"] .ph-lobe, :root[data-mode="mist"] .ph-lobe { color: var(--accent, #E2531C); }
 :root[data-mode="paper"] .ph-lobe-b, :root[data-mode="mist"] .ph-lobe-b { color: var(--ink2); }
 :root[data-mode="paper"] .ph-prin .ic, :root[data-mode="mist"] .ph-prin .ic, :root[data-mode="paper"] .pw .ic, :root[data-mode="mist"] .pw .ic { color: var(--ink2); }
+
+/* the four pillars: one Midnight tile each, a 3D render of the brand kit floating above the words */
+.ph-prin { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; width: min(1120px, 100%); }
+.ph-prin li { position: relative; padding: 20px 20px 24px; border-radius: 24px; gap: 6px; justify-items: start; align-content: start; overflow: hidden; isolation: isolate; color: #EEF1FA;
+  background: radial-gradient(120% 70% at 50% 18%, color-mix(in srgb, #A7B1FF 26%, #151930), #0D1020 78%); box-shadow: 0 16px 40px color-mix(in srgb, #000 30%, transparent), inset 0 1px 0 rgb(255 255 255 / 0.12); }
+.ph-prin .pp-n { font: 500 0.75rem/1 'Geist Mono', ui-monospace, monospace; letter-spacing: 0.12em; color: rgb(238 241 250 / 0.6); }
+.ph-prin .pp-img { width: 100%; height: 200px; object-fit: contain; margin: 0 0 8px; filter: drop-shadow(0 18px 22px rgb(0 0 0 / 0.5)); transition: transform var(--dur-page, 667ms) var(--ease-out, ease); }
+.ph-prin li:hover .pp-img { transform: translateY(-4px) scale(1.04); }
+.ph-prin li > b { display: inline-flex; align-items: center; gap: 8px; font: 750 1.25rem/1.2 Geist, system-ui, sans-serif; color: #EEF1FA; }
+.ph-prin li > b .ic { width: 20px; height: 20px; color: #A7B1FF; flex: none; }
+.ph-prin .pp-d { color: rgb(238 241 250 / 0.74); line-height: 1.5; font-size: 0.9375rem; }
+@media (max-width: 960px) { .ph-prin { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .ph-prin { grid-template-columns: 1fr; gap: 12px; } .ph-prin li { grid-template-columns: 112px 1fr; column-gap: 16px; align-items: center; padding: 16px; } .ph-prin .pp-n { display: none; } .ph-prin .pp-img { grid-row: 1 / span 2; height: 96px; margin: 0; } .ph-prin li > b { align-self: end; font-size: 1.0625rem; } .ph-prin .pp-d { align-self: start; font-size: 0.875rem; } }
+:root[data-mode="paper"] .ph-prin .ic, :root[data-mode="mist"] .ph-prin .ic { color: #A7B1FF; }

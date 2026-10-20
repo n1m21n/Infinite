@@ -7,7 +7,7 @@
   if (!stage) return;
   var canvas = stage.querySelector('.ax-gl');
   var hero = stage.getAttribute('data-hero') || 'blob';   // 'cables' hands the canvas to musicians.js and only shares the bubbles and strips
-  var caps = (stage.getAttribute('data-caps') || '32 blend modes|3D with real materials|A picture from a formula').split('|');
+  var caps = (stage.getAttribute('data-caps') || 'Layers|3D with real materials|A picture from a formula').split('|');
 
   var FRAG = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' +
     'uniform vec2 u_res; uniform float u_t; uniform vec2 u_m; uniform float u_p; uniform float u_k; uniform float u_scroll; uniform vec3 u_view; uniform float u_lt; uniform vec3 u_bg;\n' +

@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Aurora Borealis",
+    "author": "Infinite",
+    "description": "Luminous polar aurora borealis ionospheric curtains with audio-reactive magnetic fold undulations, spectral ray striations and stellar corona flare.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float curtainSpeed = 1.8 [0.4, 5.0];\nparam float foldDensity = 2.2 [0.5, 5.0];\nparam float rayBrightness = 1.4 [0.2, 3.5];\nparam float colorShift = 0.5 [0.0, 1.0];\n\np = (uv - 0.5) * 2.2;\np.x = p.x * aspect;\n\ntCur = t * curtainSpeed * 0.35;\n\nwarp1 = sin(p.x * foldDensity + tCur * 1.8) * 0.28;\nwarp2 = cos(p.x * (foldDensity * 1.6) - tCur * 1.2) * 0.16;\nwarpY = p.y + warp1 + warp2;\n\ncurtain = exp(-abs(warpY) * (6.0 + sin(p.x * 3.0 + tCur) * 2.0));\n\nrays = sin(p.x * 24.0 + tCur * 3.0 + warpY * 8.0);\nraySparks = pow(max(0.0, rays), 4.5) * rayBrightness * exp(-abs(p.y) * 1.8);\n\nground = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.21);\n\nionGrad = mix(emerald, signal, clamp(p.y * 1.2 + 0.5, 0.0, 1.0));\nauroraCol = mix(ionGrad, ember, colorShift * 0.4 + sin(tCur + p.x) * 0.2);\n\ncol = ground;\ncol = col + auroraCol * curtain * 1.6;\ncol = col + mix(emerald, vec3(1.0), 0.5) * raySparks * 1.3;\nalpha = 1.0;\n",
+    "params": {
+      "curtainSpeed": 1.8,
+      "foldDensity": 2.2,
+      "rayBrightness": 1.4,
+      "colorShift": 0.5
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

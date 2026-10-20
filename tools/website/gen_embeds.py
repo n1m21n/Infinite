@@ -184,7 +184,7 @@ def build_gallery(items):
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css?v=42bdb72d">
-  <link rel="stylesheet" href="../style.css?v=dbecff2d">
+  <link rel="stylesheet" href="../style.css?v=eec8d63d">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=36138f21">
   <link rel="stylesheet" href="../reels.css?v=e6e2aeaf">
@@ -319,7 +319,7 @@ def main():
     man = json.load(open(os.path.join(E, "embeds.json"), encoding="utf-8"))
     items = man["items"]
     out = {os.path.join(E, i["slug"] + ".html"): build_widget(i) for i in items}
-    out[os.path.join(E, "index.html")] = build_gallery(items)
+    out[os.path.join(E, "index.html")] = chrome.sync("embeds/index.html", build_gallery(items))
     bad = []
     for p, new in out.items():
         old = open(p, encoding="utf-8").read() if os.path.exists(p) else ""

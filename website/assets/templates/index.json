@@ -337,6 +337,38 @@
     "Field Effect",
     "Audio Out"
    ]
+  },
+  {
+   "id": "phase-distortion-synth",
+   "name": "Phase Distortion Synth",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "Synths",
+   "description": "Casio CZ-style phase distortion synthesizer with resonant formant windowing and analog saturation.",
+   "price": 0,
+   "preview": "assets/templates/phase-distortion-synth.webp",
+   "file": "assets/templates/phase-distortion-synth.inf",
+   "nodes": [
+    "Random Note Generator",
+    "Field Synth",
+    "Audio Out"
+   ]
+  },
+  {
+   "id": "formant-filter-fx",
+   "name": "Formant Filter FX",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "Audio effects",
+   "description": "Dual-cavity resonant vocal formant filter with vowel cavity morphing and driven saturator.",
+   "price": 0,
+   "preview": "assets/templates/formant-filter-fx.webp",
+   "file": "assets/templates/formant-filter-fx.inf",
+   "nodes": [
+    "Oscillator",
+    "Field Effect",
+    "Audio Out"
+   ]
   }
  ]
 }

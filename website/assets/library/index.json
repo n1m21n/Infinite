@@ -500,6 +500,101 @@
       "file": "assets/library/pixel/neural-synapse.field",
       "preview": "assets/library/previews/neural-synapse.jpg",
       "bytes": 1531
+    },
+    {
+      "id": "gumowski-mira",
+      "name": "Gumowski-Mira",
+      "kind": "Generator",
+      "tags": [
+        "math",
+        "chaos",
+        "attractor",
+        "drawing"
+      ],
+      "description": "Gumowski-Mira chaotic attractor generating intricate organic feathers, biological wings and non-linear accelerator trajectories.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 7,
+      "file": "assets/library/sketch/gumowski-mira.js",
+      "preview": "assets/library/previews/gumowski-mira.jpg",
+      "bytes": 1184
+    },
+    {
+      "id": "enneper-surface-3d",
+      "name": "Enneper Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "minimal",
+        "parametric"
+      ],
+      "description": "Parametric 3D Alfred Enneper minimal surface with zero mean curvature, self-intersecting saddle wings and orbiting quanta.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 6,
+      "file": "assets/library/sketch/enneper-surface-3d.js",
+      "preview": "assets/library/previews/enneper-surface-3d.jpg",
+      "bytes": 2467
+    },
+    {
+      "id": "phase-distortion-synth",
+      "name": "Phase Distortion Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "phase",
+        "cz",
+        "dsp"
+      ],
+      "description": "Casio CZ-style phase distortion synthesizer with resonant formant windowing, exponential decay envelopes and analog saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/phase-distortion-synth.inf",
+      "preview": "assets/library/previews/phase-distortion-synth.jpg",
+      "bytes": 1965
+    },
+    {
+      "id": "formant-filter-fx",
+      "name": "Formant Filter FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "filter",
+        "formant",
+        "dsp"
+      ],
+      "description": "Dual-cavity resonant vocal formant filter with vowel cavity morphing, driven non-linear saturator, resonance Q and LFO modulation.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/formant-filter-fx.inf",
+      "preview": "assets/library/previews/formant-filter-fx.jpg",
+      "bytes": 1774
+    },
+    {
+      "id": "aurora-borealis",
+      "name": "Aurora Borealis",
+      "kind": "Generator",
+      "tags": [
+        "aurora",
+        "reactive",
+        "ionosphere",
+        "visuals"
+      ],
+      "description": "Luminous polar aurora borealis ionospheric curtains with audio-reactive magnetic fold undulations, spectral ray striations and stellar corona flare.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/aurora-borealis.field",
+      "preview": "assets/library/previews/aurora-borealis.jpg",
+      "bytes": 1588
     }
   ]
 }

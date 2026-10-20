@@ -16,7 +16,7 @@
 .ax-copy p { margin: 0; font-size: clamp(1rem, 1.6vw, 1.25rem); color: rgba(238, 241, 250, 0.78); }
 
 /* glass: short labels only */
-.ax-bub, .ax-ghost, .ax-hint, .ax-nodes figcaption, .ax-code summary {
+.ax-bub, .ax-ghost, .ax-hint, .ax-nodes figcaption {
   background: rgba(32, 38, 63, 0.55); -webkit-backdrop-filter: blur(20px) saturate(1.7); backdrop-filter: blur(20px) saturate(1.7);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(255, 255, 255, 0.04); color: var(--mid-ink);
 }
@@ -25,26 +25,20 @@
 .ax-hint .ic { width: 20px; height: 20px; animation: ax-nudge 2s var(--ease-io, ease-in-out) infinite; }
 @keyframes ax-nudge { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
 
-.ax-low { position: absolute; left: 0; right: 0; bottom: clamp(88px, 10vw, 96px); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 0 12px; pointer-events: none; }
+.ax-low { position: absolute; left: clamp(12px, 4vw, 48px); right: clamp(12px, 4vw, 48px); bottom: clamp(16px, 3vw, 36px); display: flex; align-items: center; justify-content: space-between; gap: 10px; pointer-events: none; }
 .ax-bubs { display: flex; gap: 8px; pointer-events: auto; max-width: 100%; }
-.ax-bub { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; border: 0; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; cursor: pointer; transition: background var(--dur-short, 188ms) var(--ease-out, ease), transform var(--dur-short, 188ms) var(--ease-out, ease); }
+.ax-bub { display: inline-flex; align-items: center; gap: 8px; height: var(--ctl-h, 40px); padding: 0 16px 0 12px; border: 0; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; cursor: pointer; transition: background var(--dur-short, 188ms) var(--ease-out, ease), transform var(--dur-short, 188ms) var(--ease-out, ease); }
 .ax-bub .ic { width: 20px; height: 20px; flex: none; }
 .ax-bub:hover { background: rgba(64, 70, 96, 0.6); }
 .ax-bub:active { transform: scale(0.96); }
 .ax-bub.on { background: var(--mid-ink); color: var(--mid-deep); -webkit-backdrop-filter: none; backdrop-filter: none; }
-.ax-cap { margin: 0; font: 600 1.0625rem/1.2 'Geist', system-ui, sans-serif; letter-spacing: -0.01em; text-shadow: 0 1px 12px rgba(4, 5, 14, 0.6); }
-.ax-cap.swap { animation: ax-swap var(--dur-med, 333ms) var(--ease-out, ease) both; }
-@keyframes ax-swap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-.ax-cta { position: absolute; left: 0; right: 0; bottom: clamp(20px, 3vw, 32px); display: flex; justify-content: center; gap: 8px; padding: 0 12px; }
-.ax-ghost { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; text-decoration: none; transition: background var(--dur-short, 188ms) var(--ease-out, ease); }
+.ax-cta { display: flex; align-items: center; gap: 8px; pointer-events: auto; flex: none; }
+.ax-cta .btn { min-height: var(--ctl-h, 40px); height: var(--ctl-h, 40px); padding: 0 20px; }
+.ax-ghost { display: inline-flex; align-items: center; gap: 8px; height: var(--ctl-h, 40px); padding: 0 18px 0 14px; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; text-decoration: none; transition: background var(--dur-short, 188ms) var(--ease-out, ease); }
 .ax-ghost:hover { background: rgba(64, 70, 96, 0.6); }
 .ax-ghost .ic { width: 20px; height: 20px; }
 
-@media (min-width: 900px) {
-  .ax-low { align-items: flex-start; left: clamp(20px, 4vw, 48px); bottom: clamp(24px, 3vw, 40px); padding: 0; }
-  .ax-cta { left: auto; right: clamp(16px, 3vw, 28px); bottom: clamp(24px, 3vw, 40px); padding: 0; }
-}
 @media (max-width: 600px) {
   .ax-stage { --card-r: 20px; }
   .ax-copy { right: 12px; }
@@ -75,12 +69,11 @@
 .ax-lab .ctl label { color: var(--mid-ink); font: 500 0.8438rem/1 'Geist', system-ui, sans-serif; letter-spacing: 0; }
 .ax-lab .ctl output { color: rgba(238, 241, 250, 0.78); }
 .ax-code { pointer-events: auto; flex: 1 1 100%; }
-.ax-code summary { list-style: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; cursor: pointer; }
-.ax-code summary::-webkit-details-marker { display: none; }
-.ax-code summary .ic { width: 20px; height: 20px; }
+.ax-code-h { display: flex; align-items: center; gap: 8px; margin: 0; font: 500 0.8438rem/1 'Geist', system-ui, sans-serif; color: var(--mid-ink); opacity: 0.8; }   /* the code is always shown: a label, not a toggle */
+.ax-code-h .ic { width: 18px; height: 18px; }
 .ax-code .aud-code { margin: 8px 0 0; border-radius: 16px; max-height: 40svh; overflow: auto; }
 
-@media (max-width: 900px) { .ax-stage { height: clamp(500px, calc(100svh - var(--header-h, 60px) - 112px), 720px); } .ax-low { bottom: 84px; } }
+@media (max-width: 900px) { .ax-stage { height: clamp(500px, calc(100svh - var(--header-h, 60px) - 112px), 720px); } }
 .ax-lab .ctl { flex: 1 1 140px; padding: 10px 14px; }
 @media (max-width: 600px) { .ax-lab .lab-view { aspect-ratio: 1 / 0.85; } .ax-lab .ctl { gap: 8px; } }
 
@@ -138,13 +131,11 @@
 @media (min-width: 900px) { .mx-rack { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; padding: 24px; gap: 32px; } .mx-top { flex-direction: column; align-items: stretch; } .mx-scope { height: 96px; } .mx-play { justify-content: center; } .mx-dial { width: 76px; height: 76px; } }
 @media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); } .mx-dial { width: 72px; height: 72px; } .mx-rack { padding: 14px; } }
 
-/* phones: Download and Guide sit top-right (small), so the bubbles drop to the bottom and the art gets the middle */
+/* phones: the Download button goes; the Gallery/Guide icon stays in the same row as the bubbles */
 @media (max-width: 899px) {
-  .ax-cta { left: auto; right: 14px; top: 14px; bottom: auto; padding: 0; gap: 6px; }
-  .ax-cta .btn { min-height: 36px; height: 36px; padding: 0 14px; font-size: 0.8125rem; }
-  .ax-cta .ax-ghost { width: 36px; min-width: 36px; height: 36px; padding: 0; justify-content: center; }
+  .ax-cta .btn { display: none; }
+  .ax-cta .ax-ghost { width: var(--ctl-h, 40px); min-width: var(--ctl-h, 40px); height: var(--ctl-h, 40px); padding: 0; justify-content: center; }
   .ax-cta .ax-ghost span { display: none; }
-  .ax-low { bottom: 18px; }
 }
 
 /* Made in Infinite: a short title on every piece */
@@ -219,8 +210,6 @@ html:not([data-mode="midnight"]) .ax-node img { box-shadow: 0 10px 24px rgb(21 2
 html:not([data-mode="midnight"]) .ax-ttl, .ax-bento-t { color: #EEF1FA; }
 .ax-bento-t { background: #151930; }   /* a media frame: dark in every mode, like the pictures it holds */
 .ax-bento-l small { color: #A7B1FF; }
-.ax-bento-t:not(.big) img { transform: scale(1.7); }
-.ax-bento-t:not(.big):hover img { transform: scale(1.78); }
 .pr-cap { background: color-mix(in srgb, var(--mid) 82%, transparent); color: var(--mid-ink); }
 .pr-tile { background: var(--glass); }
 .pr-tile:hover { background: var(--glass-2); }
@@ -264,7 +253,7 @@ html:not([data-mode="midnight"]) .mx-rack { background: repeating-linear-gradien
   box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgb(21 25 48 / 0.12), 0 14px 30px rgb(21 25 48 / 0.14); }
 html:not([data-mode="midnight"]) .mx-cap { box-shadow: 0 9px 14px -2px rgb(21 25 48 / 0.45), 0 3px 4px rgb(21 25 48 / 0.4), inset 0 0 0 1px rgb(255 255 255 / 0.07), 0 0 0 3px rgb(21 25 48 / 0.18); }
 .ax-bento-t:last-child:nth-child(even) { grid-column: 1 / -1; }   /* an even count leaves one over: it becomes the closing banner */
-.ax-main .aud-section .ax-code summary, .ax-main .aud-section .ax-nodes figcaption { background: var(--glass-2); color: var(--mid-ink); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+.ax-main .aud-section .ax-nodes figcaption { background: var(--glass-2); color: var(--mid-ink); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
 .ax-print .lab-view { margin: 12px 12px 0; border-radius: 16px; }   /* the print sits on the panel like a sheet */
 .ax-main .aud-section .ax-shot { background: #0D1020; }   /* media frame, dark in every mode */
 
@@ -276,6 +265,45 @@ html:not([data-mode="midnight"]) .ax-stage .ax-bub, html:not([data-mode="midnigh
   background: color-mix(in srgb, var(--surface-1) 72%, transparent); color: var(--ink); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(21 25 48 / 0.08), 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent); }
 html:not([data-mode="midnight"]) .ax-stage .ax-bub:hover, html:not([data-mode="midnight"]) .ax-stage .ax-ghost:hover { background: color-mix(in srgb, var(--ink) 8%, var(--surface-1)); }
 html:not([data-mode="midnight"]) .ax-stage .ax-bub.on { background: var(--ink); color: var(--surface-1); box-shadow: 0 4px 12px rgb(21 25 48 / 0.18); }
-html:not([data-mode="midnight"]) .ax-cap { text-shadow: none; }
-html:not([data-mode="midnight"]) .ax-stage.no-gl { background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--signal) 18%, var(--surface-1)), var(--surface-1) 62%); }
+html:not([data-mode="midnight"]) html:not([data-mode="midnight"]) .ax-stage.no-gl { background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--signal) 18%, var(--surface-1)), var(--surface-1) 62%); }
 html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radial-gradient(circle, color-mix(in srgb, var(--ink) 14%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--surface-1); }   /* graph paper */
+
+/* ---- labs on desktop: the picture on the left, the controls and the code on the right (a wide strip of sliders reads badly) ---- */
+@media (min-width: 900px) {
+  .ax-lab .lab { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr); align-items: stretch; }
+  .ax-lab .lab-view { aspect-ratio: auto; min-height: 420px; height: 100%; }
+  .ax-lab .lab-view canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ax-lab .lab-side { flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: center; gap: 12px; padding: 24px; }
+  .ax-lab .ctl { flex: 0 0 auto; }
+  .ax-lab .pr-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 0 0 auto; }
+  .ax-lab .pads { align-self: flex-start; }
+  .ax-lab .beats { margin-left: 0; padding: 0 4px; }
+  .ax-lab .ax-code { flex: 0 0 auto; }
+  .ax-lab .ax-code .aud-code { max-height: 220px; }
+  .ax-lab .lab[data-lab="term"] { grid-template-columns: minmax(300px, 1fr) minmax(0, 1.45fr); }
+}
+
+/* shorter, centred buttons: tiles, pads and pills are one control height with the label in the middle */
+.pr-tile { min-height: var(--btn-h, 44px); align-items: center; justify-content: center; text-align: center; padding: 6px 14px; }
+.ax-lab .pad { display: inline-flex; align-items: center; justify-content: center; min-height: var(--ctl-h, 40px); }
+.ax-lab .pad small { display: none; }
+@media (max-width: 640px) { .pr-tile { flex-direction: row; padding: 6px 10px; } }
+
+/* ---- Nodes deck: zoomed node pictures in a looping fan (nodedeck.js, deck.js) ---- */
+.nd { position: relative; overflow-x: clip; --card-r: var(--r-lg); }
+.nd-grid { position: relative; height: 440px; perspective: 1400px; perspective-origin: 50% 36%; touch-action: pan-y pinch-zoom; outline: none; cursor: grab; }
+.nd.is-dragging .nd-grid { cursor: grabbing; }
+.nd-card { position: absolute; left: 50%; top: 50%; width: 300px; height: 390px; margin: -195px 0 0 -150px; border-radius: var(--card-r); overflow: hidden; display: grid; place-items: center; transform-origin: 50% 50%;
+  background: radial-gradient(120% 80% at 50% 28%, color-mix(in srgb, var(--cat, #818CF8) 38%, #0D1020), #0D1020 72%); box-shadow: 0 18px 44px rgb(4 5 14 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.14); user-select: none; -webkit-user-select: none; }
+.nd-card::after { content: ""; position: absolute; inset: 0; background: #04050E; opacity: var(--card-dim, 0); pointer-events: none; }
+.nd-card img { position: absolute; left: 50%; top: 56%; height: 80%; width: auto; max-width: 86%; transform: translate(-50%, -50%); object-fit: contain; filter: drop-shadow(0 16px 24px rgb(0 0 0 / 0.5)); pointer-events: none; }
+.nd-cat { position: absolute; left: 12px; top: 12px; height: 28px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: var(--r-pill); color: #EEF1FA; font: 500 0.75rem/1 'Geist Mono', ui-monospace, monospace; background: rgb(32 38 63 / 0.55); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2); }
+.nd-hud { display: flex; align-items: center; justify-content: center; gap: 4px; width: fit-content; max-width: calc(100% - 16px); margin: 8px auto 0; padding: 5px; border-radius: var(--r-pill); background: var(--mid); color: var(--mid-ink); box-shadow: var(--shadow-2); }
+.nd-btn { width: 40px; height: 40px; border: 0; border-radius: 50%; flex: none; display: inline-grid; place-items: center; cursor: pointer; color: var(--mid-ink); background: rgb(238 241 250 / 0.1); transition: background var(--dur-short, 188ms) var(--ease-out, ease), transform 120ms ease; }
+.nd-btn:hover { background: rgb(238 241 250 / 0.2); }
+.nd-btn:active { transform: scale(0.92); }
+.nd-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.nd-info { display: grid; gap: 2px; width: clamp(180px, 40vw, 320px); padding: 0 8px; text-align: center; min-width: 0; }
+.nd-t { font: 600 0.9375rem/1.2 'Geist', system-ui, sans-serif; }
+.nd-d { font: 400 0.8125rem/1.3 'Geist', system-ui, sans-serif; color: rgb(238 241 250 / 0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 680px) { .nd-grid { height: 380px; } .nd-card { width: 244px; height: 330px; margin: -165px 0 0 -122px; border-radius: 20px; } .nd-info { width: clamp(140px, 46vw, 220px); } }

@@ -6,7 +6,7 @@ ratchet baseline. A file may hold its count or go down; it may not go up.
   token_lint.py --update     write the current counts as the new baseline (only after a count went down)
   token_lint.py --show FILE  list the raw values in one file with line numbers
 
-What counts as raw (in website/*.css and <style> blocks of website/**/*.html; brand.css, system.css and scale.css,
+What counts as raw (in website/*.css and <style> blocks of website/**/*.html; brand.css, system.css, scale.css and neumo.css,
 which define the tokens, are exempt):
   font-size   a px/rem/em/clamp value instead of var(--size-*), var(--fs-*) or inherit/em-relative 1em/100%
   radius      border-radius in px other than 0, 50% and 999px, instead of var(--r-*) / var(--web-*-radius)
@@ -20,7 +20,7 @@ import glob, json, os, re, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 WEB = os.environ.get("SITE_DIR") or os.path.join(ROOT, "website")
 BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "token_baseline.json")
-EXEMPT = {"brand.css", "system.css", "scale.css"}
+EXEMPT = {"brand.css", "system.css", "scale.css", "neumo.css"}
 B = json.load(open(os.path.join(ROOT, "docs", "brand", "brand.json")))
 DURS = {int(v) for v in B["motion"]["durations_ms"].values()}
 

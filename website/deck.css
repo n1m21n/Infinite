@@ -175,3 +175,11 @@
 .deck-card:not([data-slot="active"]) .post-chip, .deck-card:not([data-slot="active"]) .lib-chip-cat, .deck-card:not([data-slot="active"]) .lib-chip-open, .deck-card:not([data-slot="active"]) .lib-acts button,
 .deck-card[data-slot="active"] .post-chip { -webkit-backdrop-filter: none; backdrop-filter: none; }
 @media (max-width: 680px) { .lib-card *, .post-card * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; } }
+
+/* ---- title bar: a compact pill that hugs its content (arrows, a short title, one action), never the full column ---- */
+.deck-hud-wrap { width: fit-content; max-width: calc(100% - 32px); }
+.deck-hud-pill { width: auto; gap: 4px; padding: 5px; }
+.deck-hud-info { flex: 0 1 auto; width: clamp(96px, 26vw, 148px); padding: 0 4px; text-align: center; }
+.deck-hud-title { text-align: center; }
+.deck-nav-btn, .deck-icon-btn { width: 36px; height: 36px; }
+.deck-progress-row { max-width: 280px; }

@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 82,
+ "count": 89,
  "items": [
   {
    "id": "first-sound",
@@ -254,6 +254,30 @@
    "file": "https://infinitedevices.org/assets/templates/shimmer-delay-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/shimmer-delay-fx.webp",
    "page": "https://infinitedevices.org/library/shimmer-delay-fx.html"
+  },
+  {
+   "id": "phase-distortion-synth",
+   "name": "Phase Distortion Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Casio CZ-style phase distortion synthesizer with resonant formant windowing and analog saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/phase-distortion-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/phase-distortion-synth.webp",
+   "page": "https://infinitedevices.org/library/phase-distortion-synth.html"
+  },
+  {
+   "id": "formant-filter-fx",
+   "name": "Formant Filter FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Dual-cavity resonant vocal formant filter with vowel cavity morphing and driven saturator.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/formant-filter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/formant-filter-fx.webp",
+   "page": "https://infinitedevices.org/library/formant-filter-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -986,6 +1010,66 @@
    "file": "https://infinitedevices.org/assets/library/pixel/neural-synapse.field",
    "preview": "https://infinitedevices.org/assets/library/previews/neural-synapse.jpg",
    "page": "https://infinitedevices.org/library/neural-synapse.html"
+  },
+  {
+   "id": "gumowski-mira",
+   "name": "Gumowski-Mira",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Gumowski-Mira chaotic attractor generating intricate organic feathers, biological wings and non-linear accelerator trajectories.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/gumowski-mira.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/gumowski-mira.jpg",
+   "page": "https://infinitedevices.org/library/gumowski-mira.html"
+  },
+  {
+   "id": "enneper-surface-3d",
+   "name": "Enneper Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Parametric 3D Alfred Enneper minimal surface with zero mean curvature, self-intersecting saddle wings and orbiting quanta.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/enneper-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/enneper-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/enneper-surface-3d.html"
+  },
+  {
+   "id": "phase-distortion-synth",
+   "name": "Phase Distortion Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Casio CZ-style phase distortion synthesizer with resonant formant windowing, exponential decay envelopes and analog saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/phase-distortion-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/phase-distortion-synth.jpg",
+   "page": "https://infinitedevices.org/library/phase-distortion-synth.html"
+  },
+  {
+   "id": "formant-filter-fx",
+   "name": "Formant Filter FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Dual-cavity resonant vocal formant filter with vowel cavity morphing, driven non-linear saturator, resonance Q and LFO modulation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/formant-filter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/formant-filter-fx.jpg",
+   "page": "https://infinitedevices.org/library/formant-filter-fx.html"
+  },
+  {
+   "id": "aurora-borealis",
+   "name": "Aurora Borealis",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Luminous polar aurora borealis ionospheric curtains with audio-reactive magnetic fold undulations, spectral ray striations and stellar corona flare.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/aurora-borealis.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/aurora-borealis.jpg",
+   "page": "https://infinitedevices.org/library/aurora-borealis.html"
   }
  ]
 }

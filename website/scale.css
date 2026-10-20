@@ -7,17 +7,15 @@
   :root { --ctl-h: 36px; --ctl-fs: 0.8125rem; --btn-h: 40px; --pill-h: 36px; --pill-px: 12px; }
   .btn, .signup-row .btn, .signup-row input[type="email"] { min-height: var(--btn-h); padding-left: 18px; padding-right: 18px; font-size: 0.875rem; }
   .hero-cta .btn, .aud-cta .btn { flex: 0 1 auto; }
-  .btn-sm, .tabs button, .bm-full > summary, .blog-select, .ax-bub, .ax-ghost, .ax-hint, .ax-code summary, .pill, .seg button, .cmd-tabs [role=tab], .copy, .run, .play, .pad,
+  .btn-sm, .tabs button, .bm-full > summary, .blog-select, .ax-bub, .ax-ghost, .ax-hint, .pill, .seg button, .cmd-tabs [role=tab], .copy, .run, .play, .pad,
   .aud-start a, .aud-others a, .counter, .modal-doc-link, .blog-opt, .lib-opt, .pw, .lib-dock-pill, .lib-select, .lib-icon-pill {
     min-height: var(--ctl-h); font-size: var(--ctl-fs);
   }
-  .ax-bub, .ax-ghost, .ax-code summary, .pw { height: var(--ctl-h); padding: 0 12px 0 10px; gap: 6px; }
+  .ax-bub, .ax-ghost, .pw { height: var(--ctl-h); padding: 0 12px 0 10px; gap: 6px; }
   .ax-hint { height: var(--ctl-h); }
-  .ax-bub .ic, .ax-ghost .ic, .ax-code summary .ic { width: 18px; height: 18px; }
-  .ax-cap { font-size: 0.9375rem; }
+  .ax-bub .ic, .ax-ghost .ic .ic { width: 18px; height: 18px; }
   .ax-copy h1 { font-size: clamp(1.9rem, 9vw, 2.4rem); }
   .ax-copy p { font-size: 0.9375rem; }
-  .ax-ghost { height: var(--btn-h); }
   .view-pill, .lib-view-btn, .reel-btn, .footer-social a, .menu-btn, .modal-close, .pn { width: 40px; height: 40px; }
   .btn-dl { min-height: 52px; padding: 0 18px; gap: 10px; }
   .btn-dl svg { width: 20px; height: 20px; }
@@ -34,3 +32,22 @@
 .yt-label, .node-foot, .app-title, span.mono, small, dt, dd, .copy-inline-btn, .dl-card code, .dl-card small, .node-name, .node-cat, .doc-s, .doc-m, code { font-size: 0.75rem !important; }
 /* Code inside running text scales with it (mono reads a step smaller), never under the floor. */
 p code, li code, td code, pre code { font-size: max(var(--web-floor), 0.875em) !important; }
+
+/* brand-lint: off */
+/* ---- soft, raised buttons (neumorphism): a lit top-left edge, a dark drop at the bottom right, a pocket when pressed (refs: soft chrome UI kits) ---- */
+.ax-main .ax-bub, .ax-main .ax-ghost, .ax-main .pr-tile, .ax-main .ax-lab .pad {
+  background: var(--nm-up); color: var(--mid-ink); box-shadow: var(--nm-raise); -webkit-backdrop-filter: none; backdrop-filter: none; border: 0;
+  transition: box-shadow 160ms var(--ease-out, ease), transform 160ms var(--ease-out, ease), background 160ms var(--ease-out, ease);
+}
+.ax-main .ax-bub:hover, .ax-main .ax-ghost:hover, .ax-main .pr-tile:hover, .ax-main .ax-lab .pad:hover { background: var(--nm-up); transform: translateY(-1px); }
+.ax-main .ax-bub:active, .ax-main .ax-ghost:active, .ax-main .pr-tile:active, .ax-main .ax-lab .pad:active, .ax-main .ax-cta .btn:active { transform: translateY(1px); background: var(--nm-down); box-shadow: var(--nm-pocket); }
+.ax-main .ax-bub.on, .ax-main .pr-tile[aria-checked="true"], .ax-main .ax-lab .pad.live { background: var(--nm-pearl); color: var(--mid-deep); box-shadow: var(--nm-pearl-raise); }
+html:not([data-mode="midnight"]) .ax-main .ax-bub.on, html:not([data-mode="midnight"]) .ax-main .pr-tile[aria-checked="true"], html:not([data-mode="midnight"]) .ax-main .ax-lab .pad.live { color: #EEF1FA; }
+.ax-main .ax-lab .pads { background: var(--nm-down); box-shadow: var(--nm-pocket); gap: 6px; padding: 5px; }   /* the pads sit in a pocket */
+.ax-main .ax-lab .pad.queued { background: var(--nm-down); box-shadow: var(--nm-pocket); animation: none; }
+.ax-main .ax-cta .btn { background: linear-gradient(160deg, #ff9a70 0%, #ee6a3a 58%, #d4532a 100%); color: #fff; border: 0; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), inset 0 -3px 5px rgb(120 30 5 / 0.35), 0 0 0 1px rgb(255 255 255 / 0.12), 4px 8px 16px rgb(4 5 14 / 0.45); }
+.ax-main .ax-cta .btn:hover { transform: translateY(-1px); background: linear-gradient(160deg, #ffa57e 0%, #f1703f 58%, #d9582f 100%); }
+.ax-main .ax-cta .btn:active { background: linear-gradient(160deg, #d4532a, #e5622f); box-shadow: inset 3px 5px 10px rgb(90 20 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.08); }
+.ax-main .ax-nodes figcaption { box-shadow: var(--nm-raise); background: var(--nm-up); }
+@media (prefers-reduced-motion: reduce) { .ax-main .ax-bub, .ax-main .ax-ghost, .ax-main .pr-tile, .ax-main .ax-lab .pad { transition: none; } }
+/* brand-lint: on */

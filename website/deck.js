@@ -196,7 +196,7 @@
     }, { passive: false });
 
     window.addEventListener('keydown', function (e) {
-      if (mode === 'grid' || e.defaultPrevented) return;
+      if (mode === 'grid' || e.defaultPrevented || o.keys === false) return;
       var t = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
       if (t === 'input' || t === 'textarea' || t === 'select') return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); step(1); }

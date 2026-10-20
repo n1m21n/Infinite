@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Formant Filter FX",
+    "author": "Infinite",
+    "description": "Dual-cavity resonant vocal formant filter with vowel cavity morphing, driven non-linear saturator, resonance Q and LFO modulation.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float vowel = 0.5 [0.0, 1.0];\nparam float resonance = 0.82 [0.1, 0.98];\nparam float morphRate = 0.6 [0.05, 5.0];\nparam float drive = 1.8 [1.0, 4.0];\nparam float mix = 0.65 [0.0, 1.0];\nstate float lfoP = 0;\nstate float bp1_x1 = 0;\nstate float bp1_y1 = 0;\nstate float bp1_y2 = 0;\nstate float bp2_x1 = 0;\nstate float bp2_y1 = 0;\nstate float bp2_y2 = 0;\n\nlfoP = (lfoP + morphRate / sr) % 1.0;\nlfo = sin(6.2831853 * lfoP) * 0.25;\ncurVowel = clamp(vowel + lfo, 0.0, 1.0);\n\nf1 = 300.0 + curVowel * 550.0;\nf2 = 800.0 + (1.0 - abs(curVowel - 0.5) * 2.0) * 1600.0;\n\nw1 = 6.2831853 * f1 / sr;\nw2 = 6.2831853 * f2 / sr;\nr = resonance;\n\nu = in * drive;\nsatIn = u / (1.0 + abs(u) * 0.2);\n\ny1 = satIn * (1.0 - r) + 2.0 * r * cos(w1) * bp1_y1 - r * r * bp1_y2;\nbp1_y2 = bp1_y1;\nbp1_y1 = y1;\n\ny2 = satIn * (1.0 - r) + 2.0 * r * cos(w2) * bp2_y1 - r * r * bp2_y2;\nbp2_y2 = bp2_y1;\nbp2_y1 = y2;\n\nwet = (y1 + y2 * 0.7) * 1.4;\nwetSat = wet / (1.0 + abs(wet) * 0.25);\nout = in * (1.0 - mix) + wetSat * mix;\n",
+    "params": {
+      "vowel": 0.5,
+      "resonance": 0.82,
+      "morphRate": 0.6,
+      "drive": 1.8,
+      "mix": 0.65
+    },
+    "nodeSettings": {}
+  }
+}

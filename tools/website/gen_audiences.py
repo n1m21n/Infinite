@@ -29,11 +29,11 @@ AUDIENCES = [
      "lead": "Build images that move. Layer shapes, video and 3D, add trails, and let a sound or an LFO move any knob. No code needed.",
      "facts": ["Free", "macOS, Windows, Linux", "No code to start"],
      "hero": {"shader": "ink", "img": "brand_ball", "alt": "A 3D iridescent ball, the Infinite brand ball", "tall": False},
-     "cards": [("32 blend modes", "Stack any picture on any other: images, folders of stills, hardware-accelerated video, camera, paint and noise ramps."),
+     "cards": [("Layers and blends", "Stack any picture on any other: images, folders of stills, hardware-accelerated video, camera, paint and noise ramps."),
                ("3D with real materials", "Procedural geometry, lights and a Render 3D node, so a shape can turn, instance and throw shadows in real time."),
                ("Write a picture as a formula", "Field Pixel and the live GLSL editor turn a few lines into a shader. Presets show how, and every value can be modulated.")],
      "bench": {"title": "Nodes you will patch first", "sub": "Each box is a node. Cables carry pictures from one to the next, and every number on it is a knob.",
-               "items": [("shape", "Shape", "Draw a shape with fill, stroke and feather."), ("blend", "Blend", "Stack one picture on another with 32 blend modes."), ("trails", "Trails", "Leave a fading trail: decay, zoom, rotate and hue shift."),
+               "items": [("shape", "Shape", "Draw a shape with fill, stroke and feather."), ("blend", "Blend", "Stack one picture on another with a blend mode."), ("trails", "Trails", "Leave a fading trail: decay, zoom, rotate and hue shift."),
                          ("glitch", "Glitch", "Tear the picture into slices. Amount, speed and seed."), ("kaleidoscope", "Kaleidoscope", "Mirror the picture into segments.")]},
      "lab": {"kind": "print", "title": "Print it in dots",
              "text": "A halftone screen, the way a poster is printed: each dot's size is the brightness under it. Pick a picture, change the dot and the angle, and move the light with your pointer.",
@@ -358,13 +358,27 @@ def others_html(rel):
                    for i, (h, n) in enumerate([x for x in ALL if x[0] != rel]))
 
 
+def reel_href(a, src):
+    """Where a reel tile goes: a library thumbnail opens that patch's page; art from the gallery opens the gallery."""
+    return "library/%s.html" % os.path.splitext(os.path.basename(src.split("?")[0]))[0] if src.startswith("assets/library/thumbs/") else a["reel"]["href"]
+
+
+def lib_thumb(name):
+    """The library's own thumbnail for a preset id or an old picture path (assets/.../<id>.ext): the render for art presets, knobs and cables for the rest. None if there is none."""
+    i = os.path.splitext(os.path.basename(name))[0]
+    for ext in ("webp", "svg"):
+        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i + "." + ext)): return "assets/library/thumbs/%s.%s?v=4" % (i, ext)
+    return None
+
+
 def start_html(start):
     """Start-with patches as a bento of their preview pictures; the first is the big tile (refs: units. and UNLOCKED bentos)."""
     import re as _re
     tiles = []
     for i, (sl, t) in enumerate(start):
         m = _re.search(r'og:image" content="https://infinitedevices\.org/([^"]+)"', open(os.path.join(W, "library", sl + ".html")).read())
-        img = f'<img src="{m.group(1)}" alt="" loading="lazy" decoding="async">' if m and os.path.exists(os.path.join(W, m.group(1))) else ""
+        src = lib_thumb(sl) or (m.group(1) if m and os.path.exists(os.path.join(W, m.group(1))) else "")
+        img = f'<img src="{src}" alt="" width="720" height="450" loading="lazy" decoding="async">' if src else ""
         tiles.append(f'<a class="ax-bento-t{" big" if i == 0 else ""}" href="library/{sl}.html">{img}<span class="ax-bento-l">{e(t)}</span></a>')
     return f'<div class="ax-bento">{"".join(tiles)}</div>'
 
@@ -389,6 +403,65 @@ def number_heads(html):
     return _re.sub(r'<h2 class="ax-h">', f, html)
 
 
+# The Nodes deck on each audience page: (file in assets/nodes/hd/, title, one line, category). Pictures come from scripts/node_screenshot.py
+# (zoomed captures of the running app), compressed to webp by tools/website/node_shots_to_webp.py.
+NODE_DECK = {
+    "artists": [("render-3d", "Render 3D", "Lights, materials and shadows, drawn in real time.", "3D"), ("sphere", "Sphere", "A procedural sphere to light and instance.", "3D"),
+                ("torus-knot", "Torus Knot", "A knotted ring with p and q knobs.", "3D"), ("supershape", "Supershape", "One formula, hundreds of organic forms.", "3D"),
+                ("metaballs", "Metaballs", "Blobs that merge as they touch.", "3D"), ("cloth", "Cloth", "A surface that drapes and moves.", "3D"),
+                ("light", "Light", "A light with colour, falloff and shadow.", "3D"), ("material", "Material", "Colour, metal and roughness for a surface.", "3D"),
+                ("text-3d", "Text 3D", "Type with depth, ready to turn.", "3D"), ("projection", "Projection", "Wrap a picture onto geometry.", "3D"),
+                ("displacement", "Displacement", "Push a mesh with a picture.", "3D"), ("layer-stack", "Layer Stack", "Stack many pictures in one node.", "Compositing"),
+                ("blend", "Blend", "Stack one picture on another with a blend mode.", "Compositing"), ("color-ramp", "Color Ramp", "Map brightness to a gradient you design.", "Compositing"),
+                ("curves", "Curves", "Shape tone with a drawn curve.", "Compositing"), ("trails", "Trails", "A fading trail: decay, zoom, rotate, hue.", "Effects"),
+                ("glitch", "Glitch", "Tear the picture into slices.", "Effects"), ("bloom", "Bloom", "Let bright parts glow.", "Effects"),
+                ("halftone", "Halftone", "Turn a picture into a screen of dots.", "Effects"), ("kaleidoscope", "Kaleidoscope", "Mirror the picture into segments.", "Effects")],
+    "musicians": [("midi-notes", "MIDI Notes", "Notes go into the graph from here.", "Notes"), ("arpeggiator", "Arpeggiator", "Turn a chord into a pattern.", "Notes"),
+                  ("drum-sequencer", "Drum Sequencer", "Steps, swing and velocity.", "Notes"), ("analog", "Analog", "Oscillators, a filter and an envelope in one voice.", "Synths"),
+                  ("fm", "FM", "Four operators.", "Synths"), ("wavetable", "Wavetable", "Scan through a table of shapes.", "Synths"),
+                  ("string", "String", "A modelled plucked string.", "Synths"), ("partials", "Partials", "Resynthesis from a handful of partials.", "Synths"),
+                  ("metallic", "Metallic", "A resonator for bells and plates.", "Synths"), ("equation-synth", "Equation Synth", "A voice from a formula.", "Synths"),
+                  ("sampler", "Sampler", "Play recordings across the keys.", "Synths"), ("granular", "Granular", "Clouds of tiny grains.", "Synths"),
+                  ("paulstretch", "PaulStretch", "Stretch a sound into a drone.", "Audio FX"), ("delay", "Delay", "Tape delay with wow and flutter.", "Audio FX"),
+                  ("reverb", "Reverb", "A room you can size and colour.", "Audio FX"), ("convolution-reverb", "Convolution Reverb", "Design a space or load one.", "Audio FX"),
+                  ("chorus", "Chorus", "Thicken a sound with moving copies.", "Audio FX"), ("phaser", "Phaser", "Sweeping notches in the spectrum.", "Audio FX"),
+                  ("eq", "EQ", "Cut and lift bands.", "Audio FX"), ("saturator", "Saturator", "Three stages of warmth and grit.", "Audio FX"),
+                  ("dynamics", "Dynamics", "Clean, bus, opto and FET styles.", "Audio FX"), ("lfo", "LFO", "Moves any knob in the patch.", "Modulators"),
+                  ("envelope", "Envelope", "A shape over time for any knob.", "Modulators")],
+    "vjs": [("video", "Video", "Hardware-accelerated video in.", "Source"), ("camera", "Camera", "A live camera feed.", "Source"),
+            ("audio-analyze", "Audio Analyze", "Turns sound into numbers a knob can follow.", "Audio"), ("audio-to-cv", "Audio to CV", "Make a level drive any knob.", "Audio"),
+            ("audio-displacement", "Audio Displacement", "Let the music push the picture.", "Audio"), ("audio-ribbon", "Audio Ribbon", "A ribbon drawn by the waveform.", "Audio"),
+            ("audio-texture", "Audio Texture", "Sound as a texture.", "Audio"), ("audio-color-ramp", "Audio Color Ramp", "Colour that follows the level.", "Audio"),
+            ("trails", "Trails", "A fading trail on every beat.", "Effects"), ("feedback", "Feedback", "Feed the output back into itself.", "Effects"),
+            ("kaleidoscope", "Kaleidoscope", "Mirror the picture into segments.", "Effects"), ("glitch", "Glitch", "Tear the picture into slices.", "Effects"),
+            ("bloom", "Bloom", "Let bright parts glow.", "Effects"), ("particle-system", "Particle System", "Thousands of points with forces.", "3D"),
+            ("syphon-out", "Syphon Out", "Send the picture to another app on macOS.", "Output"), ("ndi-out", "NDI Out", "Send it over the network.", "Output")],
+    "creative-coders": [("sketch", "Sketch", "Draw from JavaScript.", "Code"), ("sketch-3d", "Sketch 3D", "Build meshes from JavaScript.", "Code"),
+                        ("fieldpixel", "Field Pixel", "A shader in a few lines.", "Field"), ("field-effect", "Field Effect", "An audio or picture effect in Field.", "Field"),
+                        ("field-synth", "Field Synth", "A per-sample audio kernel.", "Field"), ("field-notes", "Field Notes", "Generate notes with code.", "Field"),
+                        ("field-primitive", "Field Primitive", "A mesh from a formula.", "Field"), ("field-modifier", "Field Modifier", "Deform and shade a mesh.", "Field"),
+                        ("field-graph", "Field Graph", "Plot a function as it runs.", "Field"), ("formula", "Formula", "One expression, one output.", "Field"),
+                        ("render-3d", "Render 3D", "Lights, materials and shadows.", "3D"), ("reaction-diffusion", "Reaction Diffusion", "Chemistry that draws spots and stripes.", "Simulation"),
+                        ("klein-bottle", "Klein Bottle", "A surface with no inside.", "Simulation"), ("wave-terrain", "Wave Terrain", "Read a landscape as a sound.", "Simulation"),
+                        ("particle-system", "Particle System", "Thousands of points with forces.", "Simulation")],
+}
+
+
+def node_deck(a):
+    """The Nodes section: a fan deck of zoomed node pictures. Swipe, drag, wheel, arrow keys or tap; it loops (website/nodedeck.js, engine deck.js)."""
+    from PIL import Image
+    cards = []
+    for i, (f, t, d, c) in enumerate(NODE_DECK[a["slug"]]):
+        im = Image.open(os.path.join(W, "assets", "nodes", "hd", f + ".webp"))
+        src = f"assets/nodes/hd/{f}.webp"
+        img = f'src="{src}"' if i < 5 else f'data-src="{src}"'
+        cards.append(f'<figure class="nd-card" data-title="{e(t)}" data-desc="{e(d)}" style="--cat:{CAT.get(c, "#818CF8")}"><span class="nd-cat">{e(c)}</span><img {img} alt="{e(t)} node: {e(d)}" width="{im.size[0]}" height="{im.size[1]}" decoding="async" draggable="false"></figure>')
+    return (f'<div class="nd" data-nodedeck><div class="nd-grid" tabindex="0" aria-roledescription="carousel" aria-label="Nodes. Swipe or use the arrow keys.">{"".join(cards)}</div>'
+            f'<div class="nd-hud"><button type="button" class="nd-btn" data-nd="-1" aria-label="Previous node"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5"/></svg></button>'
+            f'<div class="nd-info" aria-live="polite"><b class="nd-t"></b><span class="nd-d"></span></div>'
+            f'<button type="button" class="nd-btn" data-nd="1" aria-label="Next node"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5"/></svg></button></div></div>')
+
+
 def artists_main(a, rel, hero="blob"):
     """Immersive artists page: a live iridescent blob you steer, three glass bubbles that morph it, a swipe strip of nodes, knobs, a reel."""
     L = a["lab"]
@@ -403,17 +476,17 @@ def artists_main(a, rel, hero="blob"):
         tag, caps, ghost = "Play the room.", "|".join(c[0] for c in a["cards"]), ("Guide", "library")
     else:
         bub = [("layers", "family-compositing", "Layer", a["cards"][0][0]), ("solid", "cube", "3D", a["cards"][1][0]), ("formula", "edit", "Formula", a["cards"][2][0])]
-        tag, caps, ghost = "Images that move.", "32 blend modes|3D with real materials|A picture from a formula", ("Gallery", "viewport")
+        tag, caps, ghost = "Images that move.", "Layers|3D with real materials|A picture from a formula", ("Gallery", "viewport")
     bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(c)}: {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
-    nodes = "".join(f'<figure class="ax-node"><img src="assets/nodes/{n}.webp" alt="{e(t)}: {e(d)}"{png_size(n)} loading="lazy" decoding="async"><figcaption>{e(t)}</figcaption></figure>' for n, t, d in a["bench"]["items"])
     watch = f'      <section class="aud-section reveal">\n        <h2 class="ax-h">Watch</h2>\n        {film_poster(*MUSIC_FILM)}\n      </section>\n' if hero == "cables" else ""
-    figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{a["reel"]["href"]}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="ax-ttl">{e(al.replace(", library", ""))}</span></a>' for src, w, h, al in a["reel"]["items"])
+    items = [((lib_thumb(src), 720, 450, al) if "assets/museum" not in src and lib_thumb(src) else (src, w, h, al)) for src, w, h, al in a["reel"]["items"]]
+    figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{reel_href(a, src)}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="ax-ttl">{e(al.replace(", library", ""))}</span></a>' for src, w, h, al in items)
     start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
     others = "".join(f'<a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
     lab = lab_html(a)
     lab = lab.replace('<h3>' + e(L["title"]) + '</h3>', '')
     import re
-    lab = re.sub(r'(<pre class="aud-code">.*?</pre>)', lambda m: '<details class="ax-code"><summary>' + icon("edit") + '<span>Code</span></summary>' + m.group(1) + '</details>', lab, flags=re.S)
+    lab = re.sub(r'(<pre class="aud-code">.*?</pre>)', lambda m: '<div class="ax-code"><p class="ax-code-h">' + icon("edit") + '<span>Code</span></p>' + m.group(1) + '</div>', lab, flags=re.S)
     if hero == "cables":
         knob = lambda key, label, val: f'<div class="mx-knob" data-k="{key}" data-v="{val}"><div class="mx-dial" role="slider" tabindex="0" aria-label="{label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{round(val * 100)}"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mx-track" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/><path class="mx-arc" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/></svg><span class="mx-cap"></span><span class="mx-shine"></span></div><span>{label}</span><output>{round(val * 100)}</output></div>'
         lab = (f'<div class="mx-rack"><div class="mx-top"><button type="button" class="mx-play" aria-pressed="false" aria-label="Play a chord">{icon("play")}<span>Play</span></button><canvas class="mx-scope" width="600" height="120" aria-hidden="true"></canvas></div>'
@@ -432,11 +505,10 @@ def artists_main(a, rel, hero="blob"):
           <div class="ax-hint" aria-hidden="true">{icon("pointer")}<span>Drag</span></div>
           <div class="ax-low">
             <div class="ax-bubs" role="tablist" aria-label="What you can do">{bubbles}</div>
-            <p class="ax-cap" aria-live="polite">{e(caps.split("|")[0])}</p>
-          </div>
-          <div class="ax-cta">
-            <a href="index.html#setup" class="btn btn-primary">Download</a>
-            <a href="{a["extra"][0]}" class="ax-ghost" aria-label="{e(a["extra"][1])}">{icon(ghost[1])}<span>{ghost[0]}</span></a>
+            <div class="ax-cta">
+              <a href="index.html#setup" class="btn btn-primary">Download</a>
+              <a href="{a["extra"][0]}" class="ax-ghost" aria-label="{e(a["extra"][1])}">{icon(ghost[1])}<span>{ghost[0]}</span></a>
+            </div>
           </div>
         </div>
       </div>
@@ -444,7 +516,7 @@ def artists_main(a, rel, hero="blob"):
     <div class="container">
       <section class="aud-section reveal">
         <h2 class="ax-h">Nodes</h2>
-        <div class="ax-strip"><div class="ax-nodes">{nodes}</div></div>
+        {node_deck(a)}
       </section>
       <section class="aud-section reveal ax-lab">
         <h2 class="ax-h">{"Play" if hero == "cables" else "Perform" if hero == "shader" else "Tweak" if hero == "math" else "Halftone"}</h2>
@@ -515,13 +587,13 @@ def page(a):
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="artists.js?v=10" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>')
     if a["slug"] == "creative-coders":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="artists.js?v=10" defer></script>\n  <script src="ccode.js?v=4" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="ccode.js?v=4" defer></script>')
     if a["slug"] == "vjs":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="artists.js?v=10" defer></script>\n  <script src="vjs.js?v=5" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="vjs.js?v=5" defer></script>')
     if a["slug"] == "musicians":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="artists.js?v=10" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=3" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script type="module" src="musicians.js?v=4"></script>\n  <script src="mxrack.js?v=3" defer></script>')
     if a["slug"] == "developers":
         return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=' + chrome._hash("dev.css") + '">', extra_js='\n  <script src="dev.js?v=2" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
@@ -563,7 +635,7 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
   <link rel="stylesheet" href="blog.css?v=36138f21">
-  <link rel="stylesheet" href="audience.css?v=1051e212">
+  <link rel="stylesheet" href="audience.css?v=247fdf47">
   {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>
 </head>

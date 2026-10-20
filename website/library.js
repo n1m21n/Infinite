@@ -70,6 +70,7 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
+  var ART = { 'Pixel': 1, 'Sketch': 1, 'Sketch 3D': 1 };   /* their own render is the thumbnail; the rest are knobs and cables */
   function normCat(cat) {
     if (!cat) return 'Pixel';
     if (cat === 'Audio Effects') return 'Audio FX';
@@ -87,7 +88,7 @@
     var detailHref = 'library/' + esc(it.id) + '.html';
     return '<article class="lib-card deck-card" data-cat="' + esc(cat) + '" data-raw-cat="' + esc(rawCat) + '" data-name="' + esc(it.name) + '" data-file="' + esc(it.file) + '" data-has-copy="' + (hasCopy ? '1' : '0') + '" data-ext="' + (isExt ? '1' : '0') + '" style="--cat:' + (COLOUR[rawCat] || COLOUR[cat] || 'var(--accent)') + '">' +
       '<a class="lib-media-link" href="' + detailHref + '" aria-label="Open ' + esc(it.name) + '">' +
-        '<img data-src="' + esc(it.preview) + '" alt="" decoding="async" width="720" height="450">' +
+        '<img data-src="assets/library/thumbs/' + esc(it.id) + (ART[rawCat] ? '.webp' : '.svg') + '?v=4" alt="" decoding="async" width="720" height="450">' +
       '</a>' +
       '<span class="lib-chip lib-chip-cat" title="' + esc(rawCat) + '">' + catIcon(rawCat) + '</span>' +
       '<span class="lib-chip lib-chip-open" aria-hidden="true">' + IC_OPEN + '</span>' +
@@ -97,7 +98,7 @@
           ? '<a class="lib-chip lib-act-btn lib-dl" href="' + esc(it.file) + '" aria-label="Install ' + esc(it.name) + '" title="Install">' + IC_OPEN + '</a>'
           : '<a class="lib-chip lib-act-btn lib-dl" href="' + esc(it.file) + '" download aria-label="Download ' + esc(it.name) + '" title="Download">' + IC_DL + '</a>') +
       '</div>' +
-      '<h2 class="lib-card-title">' + esc(it.name) + '</h2>' +
+      '<h2 class="lib-card-title"><b>' + esc(it.name) + '</b>' + (it.description ? '<span>' + esc(it.description) + '</span>' : '') + '</h2>' +
     '</article>';
   }
 
@@ -270,7 +271,7 @@
 
   Promise.all([
     fetch('assets/library/index.json?v=4').then(function (r) { return r.json(); }),
-    fetch('assets/templates/index.json?v=3').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
+    fetch('assets/templates/index.json?v=4').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
     fetch('assets/community/index.json?v=2').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
     fetch('assets/skills/index.json?v=2').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; }),
     fetch('assets/extensions/index.json?v=1').then(function (r) { return r.json(); }).catch(function () { return { items: [] }; })

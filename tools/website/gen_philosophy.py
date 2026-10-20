@@ -98,8 +98,8 @@ CAPS = [("Why Infinite exists", "One canvas for pictures, sound and code, so an 
         ("Anything patches into anything", "Each node does one job and each cable says what feeds what. A sound can move a picture and a picture can move a sound."),
         ("Flow, with a machine that follows you", "Controls stay live while a patch plays. It listens, it continues, and you decide what stays."),
         ("Free, for everyone", "Free and open source on macOS, Windows and Linux, so the tools are not a privilege.")]
-PRINCIPLES = [("Performance", "power", "Fast, light and efficient, measured and published."), ("Accuracy", "snap", "Maths from the formula, never by eye."),
-              ("Innovation", "star", "New ways to make, tried in the open."), ("Connection", "loop", "Anything patches into anything.")]
+PRINCIPLES = [("Performance", "power", "Fast, light and efficient, measured and published.", "node-lfo-cut", 5), ("Accuracy", "snap", "Maths from the formula, never by eye.", "node-field-pixel-cut", 5),
+              ("Innovation", "star", "New ways to make, tried in the open.", "brand-ball-cut", 1), ("Connection", "loop", "Anything patches into anything.", "patch-cut", 3)]   # 3D renders of the brand kit (tools/brand/build_3d.py), cut out and compressed in assets/3d
 
 
 def main_html():
@@ -110,7 +110,7 @@ def main_html():
     ids = [n[0] for n in NODES]
     edges = ",".join(f"{ids.index(a)}-{ids.index(b)}" for a, b in EDGES)
     caps = "".join(f'<div class="ph-cap" data-k="{i}"><h2>{e(t)}</h2><p>{e(d)}</p></div>' for i, (t, d) in enumerate(CAPS))
-    prin = "".join(f'<li>{ga.icon(ic)}<b>{e(t)}</b><span>{e(d)}</span></li>' for t, ic, d in PRINCIPLES)
+    prin = "".join(f'<li><span class="pp-n" aria-hidden="true">0{i + 1}</span><img class="pp-img" src="assets/3d/{img}.webp" alt="" width="640" height="{h}" loading="lazy" decoding="async"><b>{ga.icon(ic)}{e(t)}</b><span class="pp-d">{e(d)}</span></li>' for i, (t, ic, d, img, _) in enumerate(PRINCIPLES) for h in [{"node-lfo-cut": 480, "node-field-pixel-cut": 480, "brand-ball-cut": 640, "patch-cut": 360}[img]])
     faq = "".join(f'<details class="ph-q"><summary>{e(q)}</summary><p>{e(a)}</p></details>' for q, a in FAQ)
     return f'''
   <main>
@@ -145,7 +145,7 @@ def ld():
 
 
 def build():
-    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=abcd9ab7">', extra_js='\n  <script src="philosophy.js?v=9" defer></script>')
+    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=' + __import__("hashlib").md5(open(os.path.join(W, "philosophy.css"), "rb").read()).hexdigest()[:8] + '">', extra_js='\n  <script src="philosophy.js?v=9" defer></script>')
 
 
 def main():

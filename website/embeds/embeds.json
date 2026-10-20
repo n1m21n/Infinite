@@ -100,6 +100,11 @@
       "slug": "neural-synapse",
       "title": "Neural Synapse",
       "description": "A lattice of glowing dendrites. Sound fires pulses along the branches and flares at the synapses."
+    },
+    {
+      "slug": "aurora-borealis",
+      "title": "Aurora Borealis",
+      "description": "Luminous polar aurora borealis ionospheric curtains with audio-reactive magnetic fold undulations and spectral ray striations."
     }
   ]
 }

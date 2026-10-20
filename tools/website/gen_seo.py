@@ -55,6 +55,13 @@ def embed_slugs():
     except (OSError, ValueError, KeyError):
         return set()
 
+def thumb_src(i):
+    """The page picture: the library's own thumbnail (the render for art presets, knobs and cables otherwise), else the preview."""
+    for ext in ("webp", "svg"):
+        if os.path.exists(os.path.join(W, "assets", "library", "thumbs", i["id"] + "." + ext)):
+            return "../assets/library/thumbs/%s.%s?v=4" % (i["id"], ext)   # ?v= : bump when gen_library_thumbs.py changes the pictures
+    return i["preview"]
+
 def page(i, embeds=frozenset()):
     """One standalone, crawlable page for a library item: /library/<id>.html"""
     url = f'{BASE}library/{i["id"]}.html'
@@ -67,7 +74,7 @@ def page(i, embeds=frozenset()):
           "isPartOf": {"@type": "CollectionPage", "name": "Infinite Library", "url": BASE + "library.html"},
           "author": {"@type": "Person", "name": i["author"] or "n1m21n", "url": "https://github.com/" + (i["author"] or "n1m21n"), "sameAs": ["https://github.com/n1m21n"] if not i["author"] or i["author"] == "n1m21n" else []}}
     by = f' by {e(i["author"])}' if i["author"] else ""
-    live = f'  <a class="btn alt" href="../embeds/{e(i["id"])}.html">Play it live in your browser</a>\n' if i["id"] in embeds else ""
+    live = f'  <a class="btn btn-ghost" href="../embeds/{e(i["id"])}.html">Play it live in your browser</a>\n' if i["id"] in embeds else ""
     return f"""<!DOCTYPE html>
 <html lang="en" data-mode="midnight">
 <head>
@@ -76,6 +83,7 @@ def page(i, embeds=frozenset()):
   <meta name="theme-color" content="#151930">
   <script src="../theme.js?v=1"></script>
   <link rel="stylesheet" href="../brand.css?v=42bdb72d">
+  <link rel="stylesheet" href="../neumo.css?v=35c766da">
   <title>{e(t)}</title>
   <meta name="description" content="{e(meta_desc(d))}">
   <link rel="canonical" href="{url}">
@@ -96,8 +104,7 @@ def page(i, embeds=frozenset()):
     img{{width:100%;height:auto;border-radius:12px;border:1px solid var(--line);margin:20px 0}}
     h1{{font-size:32px;line-height:1.15;margin:8px 0}}
     .meta{{color:var(--mute);font-size:14px}}
-    .btn{{display:inline-block;background:var(--acc);color:var(--bg);padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:600;margin:8px 8px 0 0}}
-    .btn.alt{{background:none;color:var(--ink);border:1px solid var(--line)}}
+    .btn{{margin:12px 12px 0 0}}   /* the look comes from neumo.css */
   </style>
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
@@ -106,12 +113,12 @@ def page(i, embeds=frozenset()):
   <nav><a href="../index.html">Infinite</a> / <a href="../library.html">Library</a> / {e(i["name"])}</nav>
   <h1>{e(i["name"])}</h1>
   <p class="meta">{e(i["category"] or "Library")} · {e(i["type"])}{by} · free</p>
-  <img src="{e(i["preview"])}" alt="Preview of {e(i["name"])}" loading="eager" width="1200" height="675">
+  <img src="{e(thumb_src(i))}" alt="Preview of {e(i["name"])}" loading="eager" width="720" height="450">
   <p>{e(d)}</p>
   <p>Download the file, then open it in Infinite (File, Open for patches; import it into a Field or Sketch node for devices). Infinite is free, open source and runs on macOS, Windows and Linux.</p>
-  <a class="btn" href="{e(i["file"])}" download>Download .{e(ext)}</a>
-{live}  <a class="btn alt" href="../library.html">Back to the Library</a>
-  <a class="btn alt" href="https://github.com/n1m21n/Infinite/releases/latest">Get Infinite</a>
+  <a class="btn btn-primary" href="{e(i["file"])}" download>Download .{e(ext)}</a>
+{live}  <a class="btn btn-ghost" href="../library.html">Back to the Library</a>
+  <a class="btn btn-ghost" href="https://github.com/n1m21n/Infinite/releases/latest">Get Infinite</a>
 </main>
 </body>
 </html>

@@ -142,3 +142,17 @@
 .deck-card:not([data-slot="active"]) .post-chip, .deck-card:not([data-slot="active"]) .lib-chip-cat, .deck-card:not([data-slot="active"]) .lib-chip-open, .deck-card:not([data-slot="active"]) .lib-acts button,
 .deck-card[data-slot="active"] .post-chip { -webkit-backdrop-filter: none; backdrop-filter: none; }
 @media (max-width: 680px) { .lib-card *, .post-card * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; } }
+
+/* title bar: a compact pill that hugs its content (arrows, a short title, two actions), never the full column */
+.lib-hud-wrap { width: fit-content; max-width: calc(100% - 32px); }
+.lib-hud-pill { width: auto; gap: 4px; padding: 5px; }
+.lib-hud-info { flex: 0 1 auto; width: clamp(96px, 26vw, 148px); padding: 0 4px; }
+.lib-hud-text { align-items: center; text-align: center; }
+.lib-hud-cat-ic { display: none; }
+.lib-hud-nav, .lib-hud-act { width: 36px; height: 36px; }
+
+/* ---- card caption: the title with a short line about the preset under it, on one glass plate ---- */
+.lib-card .lib-card-title { display: flex !important; flex-direction: column; gap: 3px; max-height: none !important; -webkit-line-clamp: unset; }
+.lib-card .lib-card-title b { display: block; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-card .lib-card-title span { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 400 0.75rem/1.4 var(--font-sans); letter-spacing: 0; opacity: 0.74; text-wrap: pretty; }
+.lib-stage[data-deck-mode="grid"] .lib-card:not([data-bento="big"]) .lib-card-title span { -webkit-line-clamp: 1; line-clamp: 1; }
