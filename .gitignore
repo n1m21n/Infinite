@@ -41,3 +41,6 @@ bench/media/
 __pycache__/
 tools/agentlang/out/
 tests/website/ui_type_shots/
+
+_site/
+node_modules/

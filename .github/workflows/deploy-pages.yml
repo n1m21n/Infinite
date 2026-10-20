@@ -25,10 +25,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install esbuild
+        run: npm install --prefix "$RUNNER_TEMP/esb" esbuild@0.24.0
+
+      - name: Build optimised site
+        run: python3 tools/website/build_site.py _site
+        env:
+          ESBUILD: ${{ runner.temp }}/esb/node_modules/.bin/esbuild
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'website'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment

@@ -204,3 +204,6 @@
 }
 @media (min-width: 640px) { :root { --web-control: 40px; --web-button: 44px; --web-button-lg: 52px; --web-control-pad: 16px; --web-hit: 40px; --web-icon: 20px; --web-icon-nav: 24px; --web-header: 60px; --web-dock: 56px; --web-card-radius: 24px; --web-media-radius: 16px; } }
 @media (prefers-reduced-motion: reduce) { :root { --dur-instant: 0ms; --dur-micro: 0ms; --dur-small: 0ms; --dur-medium: 0ms; --dur-large: 0ms; --dur-page: 0ms; } }
+
+/* the bird canvas must be out of flow before bird.js runs, or it pushes the page down then snaps back (CLS) */
+#bird{position:absolute;left:0;top:0;width:68px;height:52px;pointer-events:none;opacity:0}

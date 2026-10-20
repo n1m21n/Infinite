@@ -600,7 +600,7 @@ def page(a):
     if a["slug"] == "musicians":
         return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script type="module" src="musicians.js?v=4"></script>\n  <script src="mxrack.js?v=3" defer></script>')
     if a["slug"] == "developers":
-        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=' + chrome._hash("dev.css") + '">', extra_js='\n  <script src="dev.js?v=3" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=' + chrome._hash("dev.css") + '">', extra_js='\n  <script src="dev.js?v=4" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 
@@ -636,7 +636,7 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="brand.css?v=42bdb72d">
+  <link rel="stylesheet" href="brand.css?v=7eb5c13f">
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
   <link rel="stylesheet" href="blog.css?v=d7c115a7">
