@@ -105,7 +105,7 @@ const SCALE_FN = (phone) => {
     const rad = parseFloat(cs.borderTopLeftRadius); if (!(rad >= r.height / 2 - 1) || r.height > 52 || r.height < 24) return;   // taller ones are cards (download tiles), not controls   // pill-shaped controls only
     const label = (e.textContent || '').trim(); const iconOnly = !label || (r.width - r.height) < 6;
     const name = e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/)[0] : '') + ' "' + label.slice(0, 14) + '"';
-    const big = e.matches('.btn, .btn-primary, .ax-ghost, .signup-row .btn');
+    const big = e.matches('.btn, .btn-primary, .ax-ghost, .mx-play, .signup-row .btn');
     out.push({ name, h: r.height, w: r.width, fs: parseFloat(cs.fontSize), big, iconOnly });
   });
   return out;

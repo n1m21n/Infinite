@@ -1,0 +1,47 @@
+infinite-patch 1
+# Shimmer Delay FX: multi-tap pitch-diffused shimmer delay
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1024
+end
+node 3 AudioEffects Field Effect
+  id shimmer
+  pos 1020 1024
+  s code param float time = 0.36 [0.05, 1.5]\nparam float feedback = 0.58 [0.0, 0.92]\nparam float shimmer = 0.45 [0.0, 1.0]\nparam float damp = 0.42 [0.0, 0.95]\nparam float drive = 1.6 [1.0, 4.0]\nparam float mix = 0.5 [0.0, 1.0]\nstate float lfoP = 0\nstate float ap1 = 0\nstate float ap2 = 0\nstate float ap3 = 0\nstate float fb = 0\nstate float lp = 0\n\nlfoP = (lfoP + 0.35 / sr) % 1.0\nlfo = sin(6.2831853 * lfoP) * 0.08\n\nu = (in * drive) + (fb * feedback)\nsat = u / (1.0 + abs(u) * 0.25)\n\nkDiff = 0.55 + lfo * 0.15\ny1 = ap1 - kDiff * sat\nap1 = sat + kDiff * y1\n\ny2 = ap2 - kDiff * y1\nap2 = y1 + kDiff * y2\n\ny3 = ap3 - kDiff * y2\nap3 = y2 + kDiff * y3\n\nshimmerSignal = sin(6.2831853 * (lfoP * 4.0 + y3 * 1.5)) * shimmer * 0.35\nwetSignal = y3 + shimmerSignal\n\nfDamp = clamp((1.0 - damp * 0.75) * 0.35, 0.01, 0.45)\nlp = lp + fDamp * (wetSignal - lp)\n\nfb = lp\nout = in * (1.0 - mix) + lp * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1560 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.25
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Shimmer Delay. Multi-tap pitch-diffused delay with harmonic reflections and damping.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud shimmer 0 synth
+aud speakers 0 shimmer
+aud ana 0 shimmer
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

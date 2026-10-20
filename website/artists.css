@@ -90,3 +90,27 @@
 .mx-grab { position: absolute; left: 0; top: 0; width: 56px; height: 56px; border-radius: 50%; touch-action: none; cursor: grab; z-index: 2; will-change: transform; }
 .mx-grab.on { cursor: grabbing; }
 .ax-stage.no-gl .mx-grab { display: none; }
+
+/* musicians: the knob rack. One Midnight card; glass only on the Play pill; knobs are drawn, not boxed. */
+.mx-rack { border-radius: var(--card-r); background: var(--mid); box-shadow: var(--shadow-2); color: var(--mid-ink); padding: 16px; display: grid; gap: 16px; }
+.mx-top { display: flex; align-items: center; gap: 12px; }
+.mx-play { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px 0 16px; border: 0; border-radius: var(--r-pill); background: var(--mid-ink); color: var(--mid-deep); font: 600 0.9375rem/1 'Geist', system-ui, sans-serif; cursor: pointer; transition: transform var(--dur-short, 188ms) var(--ease-out, ease); }
+.mx-play .ic { width: 20px; height: 20px; }
+.mx-play:active { transform: scale(0.96); }
+.mx-play[aria-pressed="true"] { background: rgba(32, 38, 63, 0.55); color: var(--mid-ink); -webkit-backdrop-filter: blur(20px) saturate(1.7); backdrop-filter: blur(20px) saturate(1.7); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+.mx-scope { flex: 1 1 auto; min-width: 0; height: 56px; width: 100%; display: block; opacity: 0.9; }
+.mx-knobs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.mx-knob { display: grid; justify-items: center; gap: 4px; }
+.mx-dial { width: 64px; height: 64px; border-radius: 50%; touch-action: none; cursor: grab; outline: none; }
+.mx-dial.on { cursor: grabbing; }
+.mx-dial svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.mx-dial path { fill: none; stroke-width: 5; stroke-linecap: round; }
+.mx-track { stroke: rgba(238, 241, 250, 0.14); }
+.mx-arc { stroke: var(--mid-sig); }
+.mx-tick { stroke: var(--mid-ink); stroke-width: 4; stroke-linecap: round; transform-origin: 32px 32px; transform-box: view-box; }
+.mx-dial:focus-visible { box-shadow: 0 0 0 3px var(--mid-sig); }
+.mx-knob span { font: 500 0.8125rem/1.2 'Geist', system-ui, sans-serif; color: var(--mid-ink); }
+.mx-knob output { font: 500 0.75rem/1 'Geist Mono', ui-monospace, monospace; color: rgba(238, 241, 250, 0.7); }
+.mx-rack.live .mx-arc { filter: drop-shadow(0 0 6px rgba(167, 177, 255, 0.7)); }
+@media (min-width: 900px) { .mx-rack { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; padding: 24px; gap: 32px; } .mx-top { flex-direction: column; align-items: stretch; } .mx-scope { height: 96px; } .mx-play { justify-content: center; } .mx-dial { width: 76px; height: 76px; } }
+@media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); } .mx-dial { width: 56px; height: 56px; } .mx-rack { padding: 14px; } }

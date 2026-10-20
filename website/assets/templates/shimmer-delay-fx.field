@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Shimmer Delay FX",
+    "author": "Infinite",
+    "description": "Multi-tap pitch-diffused shimmer delay with cross-fed harmonic reflections, tape saturation and damping filter.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float time = 0.36 [0.05, 1.5];\nparam float feedback = 0.58 [0.0, 0.92];\nparam float shimmer = 0.45 [0.0, 1.0];\nparam float damp = 0.42 [0.0, 0.95];\nparam float drive = 1.6 [1.0, 4.0];\nparam float mix = 0.5 [0.0, 1.0];\nstate float lfoP = 0;\nstate float ap1 = 0;\nstate float ap2 = 0;\nstate float ap3 = 0;\nstate float fb = 0;\nstate float lp = 0;\n\nlfoP = (lfoP + 0.35 / sr) % 1.0;\nlfo = sin(6.2831853 * lfoP) * 0.08;\n\nu = (in * drive) + (fb * feedback);\nsat = u / (1.0 + abs(u) * 0.25);\n\nkDiff = 0.55 + lfo * 0.15;\ny1 = ap1 - kDiff * sat;\nap1 = sat + kDiff * y1;\n\ny2 = ap2 - kDiff * y1;\nap2 = y1 + kDiff * y2;\n\ny3 = ap3 - kDiff * y2;\nap3 = y2 + kDiff * y3;\n\nshimmerSignal = sin(6.2831853 * (lfoP * 4.0 + y3 * 1.5)) * shimmer * 0.35;\nwetSignal = y3 + shimmerSignal;\n\nfDamp = clamp((1.0 - damp * 0.75) * 0.35, 0.01, 0.45);\nlp = lp + fDamp * (wetSignal - lp);\n\nfb = lp;\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "time": 0.36,
+      "feedback": 0.58,
+      "shimmer": 0.45,
+      "damp": 0.42,
+      "drive": 1.6,
+      "mix": 0.5
+    },
+    "nodeSettings": {}
+  }
+}

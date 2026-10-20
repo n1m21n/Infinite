@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "FM Bell Synth",
+    "author": "Infinite",
+    "description": "Dual-operator phase modulation FM chime and bell synthesizer with exponential index envelope, feedback self-oscillation and resonant formant damping.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float ratio = 2.756 [0.5, 12.0];\nparam float modIndex = 3.4 [0.0, 10.0];\nparam float decay = 2.2 [0.2, 8.0];\nparam float feedback = 0.38 [0.0, 0.95];\nparam float brightness = 3400.0 [200.0, 16000.0];\nparam float damping = 0.65 [0.0, 0.98];\nstate float carrierPhase = 0;\nstate float modPhase = 0;\nstate float modEnv = 0;\nstate float ampEnv = 0;\nstate float prevMod = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\nampDecayRate = clamp(1.0 / (sr * decay), 0.00002, 0.015);\nmodDecayRate = clamp(1.0 / (sr * (decay * 0.55)), 0.00004, 0.025);\nampEnv = if(target > ampEnv, ampEnv + (target - ampEnv) * 0.15, ampEnv - ampEnv * ampDecayRate);\nmodEnv = if(target > modEnv, modEnv + (target - modEnv) * 0.20, modEnv - modEnv * modDecayRate);\n\nf0 = clamp(freq, 20.0, 6000.0);\ncarrierStep = f0 / sr;\nmodStep = (f0 * ratio) / sr;\n\ncarrierPhase = (carrierPhase + carrierStep) % 1.0;\nmodPhase = (modPhase + modStep) % 1.0;\n\nmodOut = sin(6.2831853 * modPhase + prevMod * feedback * 0.85);\nprevMod = modOut;\n\ncurIndex = modIndex * (0.08 + modEnv * 0.92);\npm = modOut * curIndex;\ncarrier = sin(6.2831853 * carrierPhase + pm);\n\nfCut = clamp(brightness / sr * 2.0, 0.005, 0.48);\nq = 1.0 - damping * 0.88;\nhp = carrier - lp1 - q * lp2;\nlp2 = lp2 + fCut * hp;\nlp1 = lp1 + fCut * lp2;\n\nsat = lp1 / (1.0 + abs(lp1) * 0.2);\nout = sat * ampEnv * 0.45;\n",
+    "params": {
+      "ratio": 2.756,
+      "modIndex": 3.4,
+      "decay": 2.2,
+      "feedback": 0.38,
+      "brightness": 3400.0,
+      "damping": 0.65
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

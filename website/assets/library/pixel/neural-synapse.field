@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Neural Synapse",
+    "author": "Infinite",
+    "description": "Bio-electric neural dendritic lattice with audio-reactive action potential pulses, synaptic neurotransmitter flares and synaptic vesicle nodes.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float pulseSpeed = 2.2 [0.5, 6.0];\nparam float density = 1.4 [0.5, 3.5];\nparam float sparkle = 1.3 [0.2, 3.0];\nparam float glow = 1.25 [0.4, 3.0];\n\np = (uv - 0.5) * 2.4;\np.x = p.x * aspect;\nr = length(p);\na = atan2(p.y, p.x);\n\nrot = t * pulseSpeed * 0.2;\np1 = vec2(p.x * cos(rot) - p.y * sin(rot), p.x * sin(rot) + p.y * cos(rot));\n\ngrid = sin(p1 * density * 3.14159 + vec2(sin(t * 0.6), cos(t * 0.7)));\naxon = exp(-abs(grid.x * grid.y) * 16.0);\n\nwave = sin(r * 12.0 - t * pulseSpeed * 3.0 + a * 2.0);\npulses = pow(max(0.0, wave), 6.0) * exp(-r * 0.8) * sparkle;\n\nsoma = exp(-r * r * 4.5) * 1.8;\nring = exp(-abs(r - 0.55) * 8.0) * 0.9;\n\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.21);\nground = vec3(0.082, 0.098, 0.188);\n\ncol = ground;\ncol = col + signal * axon * 0.85;\ncol = col + mix(signal, ember, sin(t + r * 5.0) * 0.5 + 0.5) * pulses * 1.6;\ncol = col + mix(ember, vec3(1.0, 0.96, 0.9), 0.75) * (soma + ring) * glow;\nalpha = 1.0;\n",
+    "params": {
+      "pulseSpeed": 2.2,
+      "density": 1.4,
+      "sparkle": 1.3,
+      "glow": 1.25
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}
