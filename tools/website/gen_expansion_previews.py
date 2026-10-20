@@ -894,6 +894,313 @@ def render_spectral_caustics():
     print("spectral-caustics.jpg saved")
 
 
+def render_tinkerbell_map():
+    """Tinkerbell chaotic attractor density plot."""
+    w, h = 900, 600
+    acc = np.zeros((h, w), dtype=np.float32)
+    a = 0.90
+    b = -0.6013
+    c = 2.0
+    d = 0.50
+    x, y = -0.72, -0.64
+    cx, cy = w * 0.5 + 40, h * 0.5 + 25
+    k = min(w, h) * 0.23
+
+    n_points = 2000000
+    for _ in range(n_points):
+        nx = x * x - y * y + a * x + b * y
+        ny = 2.0 * x * y + c * x + d * y
+        x, y = nx, ny
+
+        if abs(x) > 10.0 or abs(y) > 10.0:
+            x, y = -0.72, -0.64
+            continue
+
+        px = int(cx + x * k)
+        py = int(cy + y * k)
+        if 0 <= px < w and 0 <= py < h:
+            acc[py, px] += 1.0
+
+    acc = np.log1p(acc * 0.6)
+    max_val = np.percentile(acc[acc > 0], 99.7) if np.any(acc > 0) else 1.0
+    norm = np.clip(acc / max_val, 0.0, 1.0)
+
+    # Slight blur for luminescence
+    img_glow = Image.fromarray((norm * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.4))
+    glow_arr = np.array(img_glow, dtype=np.float32) / 255.0
+
+    out = np.zeros((h, w, 3), dtype=np.float32)
+    for c_idx in range(3):
+        out[:, :, c_idx] = GROUND[c_idx]
+
+    for y_idx in range(h):
+        for x_idx in range(w):
+            v = norm[y_idx, x_idx]
+            g_val = glow_arr[y_idx, x_idx]
+            if v > 0 or g_val > 0:
+                dist = math.sqrt((x_idx - cx)**2 + (y_idx - cy)**2) / (min(w, h) * 0.46)
+                mix_col = SIGNAL * (1.0 - min(1.0, dist * 0.70)) + EMBER * min(1.0, dist * 0.70)
+                col = mix_col * (v * 1.35 + g_val * 0.75) + WHITE * (v**2.2 * 1.6)
+                out[y_idx, x_idx] = np.clip(GROUND * (1.0 - min(1.0, v + g_val)) + col, 0, 255)
+
+    im = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+    im.save(os.path.join(PREVIEWS_DIR, "tinkerbell-map.jpg"), quality=94)
+    print("tinkerbell-map.jpg saved")
+
+
+def render_kuen_surface():
+    """Parametric Alfred Kuen pseudospherical surface 3D projection."""
+    w, h = 900, 600
+    im = Image.new("RGB", (w, h), (21, 25, 48))
+    draw = ImageDraw.Draw(im, "RGBA")
+
+    rotY = 0.68
+    rotX = 0.50
+    cy, cx = h / 2, w / 2
+
+    def point(u, v):
+        sinV = math.sin(v)
+        cosV = math.cos(v)
+        sinU = math.sin(u)
+        cosU = math.cos(u)
+
+        denom = 1.0 + u * u * sinV * sinV
+        sc = 1.15
+        x = sc * (2.0 * (cosU + u * sinU) * sinV) / denom
+        z = sc * (2.0 * (sinU - u * cosU) * sinV) / denom
+        v_clamped = max(0.04, min(math.pi - 0.04, v))
+        zCoord = math.log(math.tan(v_clamped * 0.5)) + (2.0 * cosV) / denom
+        y = sc * zCoord * 0.68
+
+        # Rotate Y
+        x1 = x * math.cos(rotY) + z * math.sin(rotY)
+        z1 = -x * math.sin(rotY) + z * math.cos(rotY)
+        # Rotate X
+        y2 = y * math.cos(rotX) - z1 * math.sin(rotX)
+        z2 = y * math.sin(rotX) + z1 * math.cos(rotX)
+
+        fov = 3.6
+        pz = z2 + 3.8
+        f = fov / pz if pz > 0.05 else 1.0
+        sx = cx + x1 * f * 240.0
+        sy = cy + y2 * f * 240.0
+        return (sx, sy, z2)
+
+    u_min, u_max = -3.8, 3.8
+    v_min, v_max = 0.12, math.pi - 0.12
+    u_count = 36
+    v_count = 46
+
+    lines = []
+    # Longitudinal ribs
+    for i in range(0, u_count + 1, 2):
+        frac_u = i / u_count
+        u = u_min + frac_u * (u_max - u_min)
+        pts = [point(u, v_min + (j / v_count) * (v_max - v_min)) for j in range(v_count + 1)]
+        avg_z = sum(p[2] for p in pts) / len(pts)
+        lines.append((avg_z, frac_u, pts, True))
+
+    # Transversal rings
+    for j in range(1, v_count + 1, 3):
+        frac_v = j / v_count
+        v = v_min + frac_v * (v_max - v_min)
+        pts = [point(u_min + (i / u_count) * (u_max - u_min), v) for i in range(u_count + 1)]
+        avg_z = sum(p[2] for p in pts) / len(pts)
+        lines.append((avg_z, frac_v, pts, False))
+
+    lines.sort(key=lambda r: r[0])
+
+    for avg_z, frac, pts, is_long in lines:
+        alpha = int(np.clip(140 + avg_z * 85, 45, 255))
+        if is_long:
+            col_mix = SIGNAL * (1.0 - frac * 0.45) + EMERALD * (frac * 0.45)
+        else:
+            col_mix = EMBER * (1.0 - frac * 0.55) + WHITE * (frac * 0.55)
+        r, g, b = [int(np.clip(c, 0, 255)) for c in col_mix]
+        w_line = 2 if is_long else 1
+        for idx in range(len(pts) - 1):
+            p1, p2 = pts[idx], pts[idx + 1]
+            draw.line([(p1[0], p1[1]), (p2[0], p2[1])], fill=(r, g, b, alpha), width=w_line)
+
+    # Orbiting quanta
+    for q in range(8):
+        frac_k = q / 8.0
+        orb_u = u_min + frac_k * (u_max - u_min)
+        orb_v = v_min + (0.5 + 0.38 * math.sin(q * 1.8)) * (v_max - v_min)
+        pos = point(orb_u, orb_v)
+        draw.ellipse([pos[0] - 6, pos[1] - 6, pos[0] + 6, pos[1] + 6], fill=(255, 240, 225, 245), outline=(78, 242, 184, 255))
+
+    im.save(os.path.join(PREVIEWS_DIR, "kuen-surface-3d.jpg"), quality=94)
+    print("kuen-surface-3d.jpg saved")
+
+
+def render_hard_sync_synth():
+    """Render Hard Sync Synth preview and webp template."""
+    w, h = 900, 600
+    im = Image.new("RGB", (w, h), (21, 25, 48))
+    draw = ImageDraw.Draw(im, "RGBA")
+
+    for gy in range(80, h, 80):
+        draw.line([(0, gy), (w, gy)], fill=(32, 38, 70, 100), width=1)
+    for gx in range(90, w, 90):
+        draw.line([(gx, 0), (gx, h)], fill=(32, 38, 70, 100), width=1)
+
+    cy = h / 2 - 20
+
+    # Draw hard-sync oscillator waveform with sharp resets
+    pts = []
+    sync_ratio = 3.2
+    for i in range(w):
+        frac = i / w
+        cycle = (frac * 4.0) % 1.0
+        env = math.exp(-frac * 1.4)
+
+        # Master reset forces slave phase reset
+        slave_phase = (cycle * sync_ratio) % 1.0
+        saw_slave = 2.0 * slave_phase - 1.0
+        sub_wave = math.sin(cycle * 0.5 * math.tau) * 0.35
+
+        sig = (saw_slave * 0.75 + sub_wave) * env * 155.0
+        pts.append((i, cy + sig))
+
+    for i in range(len(pts) - 1):
+        # Don't draw across master reset jumps
+        if abs(pts[i][1] - pts[i + 1][1]) < 110.0:
+            draw.line([pts[i], pts[i + 1]], fill=(167, 177, 255, 90), width=6)
+            draw.line([pts[i], pts[i + 1]], fill=(255, 107, 53, 160), width=3)
+            draw.line([pts[i], pts[i + 1]], fill=(255, 250, 240, 240), width=1)
+
+    # Draw sync formant peak response in corner box
+    cx_box = 720
+    cy_box = cy + 130
+    draw.rectangle([cx_box - 100, cy_box - 70, cx_box + 100, cy_box + 70], outline=(78, 242, 184, 180), width=1)
+    c_pts = []
+    for bx in range(-90, 91):
+        freq_ratio = (bx + 90) / 180.0 * 6.0
+        sync_peak = math.exp(-((freq_ratio - 3.2) ** 2) / 0.8) * 110.0
+        sub_peak = math.exp(-((freq_ratio - 0.5) ** 2) / 0.3) * 60.0
+        c_pts.append((cx_box + bx, cy_box + 60 - (sync_peak + sub_peak)))
+    for i in range(len(c_pts) - 1):
+        draw.line([c_pts[i], c_pts[i + 1]], fill=(78, 242, 184, 230), width=2)
+
+    im.save(os.path.join(PREVIEWS_DIR, "hard-sync-synth.jpg"), quality=94)
+    print("hard-sync-synth.jpg saved")
+
+    im_webp = im.resize((960, 600), Image.Resampling.LANCZOS)
+    im_webp.save(os.path.join(TEMPLATES_DIR, "hard-sync-synth.webp"), "WEBP", quality=90)
+    print("hard-sync-synth.webp saved")
+
+
+def render_ring_modulator_fx():
+    """Render Ring Modulator FX preview and webp template."""
+    w, h = 900, 600
+    im = Image.new("RGB", (w, h), (21, 25, 48))
+    draw = ImageDraw.Draw(im, "RGBA")
+
+    for gy in range(80, h, 80):
+        draw.line([(0, gy), (w, gy)], fill=(32, 38, 70, 100), width=1)
+    for gx in range(90, w, 90):
+        draw.line([(gx, 0), (gx, h)], fill=(32, 38, 70, 100), width=1)
+
+    cy = h / 2 - 20
+
+    # Draw diode ring modulated waveform (carrier x input beat envelopes)
+    pts = []
+    for i in range(w):
+        frac = i / w
+        time_ms = frac * 20.0
+        env = math.exp(-frac * 1.8)
+        carrier = math.sin(time_ms * 7.5 * math.tau)
+        in_sig = math.sin(time_ms * 1.2 * math.tau)
+
+        # Diode bridge ring multiplication
+        ring = (in_sig * carrier) * 1.3
+        sat_ring = ring / (1.0 + abs(ring) * 0.25)
+        sig = sat_ring * env * 150.0
+        pts.append((i, cy + sig))
+
+    for i in range(len(pts) - 1):
+        draw.line([pts[i], pts[i + 1]], fill=(78, 242, 184, 90), width=6)
+        draw.line([pts[i], pts[i + 1]], fill=(167, 177, 255, 160), width=3)
+        draw.line([pts[i], pts[i + 1]], fill=(255, 255, 255, 240), width=1)
+
+    # Draw sum and difference sideband peaks in corner box
+    cx_box = 720
+    cy_box = cy + 130
+    draw.rectangle([cx_box - 100, cy_box - 70, cx_box + 100, cy_box + 70], outline=(255, 107, 53, 180), width=1)
+    c_pts = []
+    for bx in range(-90, 91):
+        freq_ratio = (bx + 90) / 180.0 * 6.0
+        # Sideband peaks at fc - fm (2.1) and fc + fm (3.9)
+        sb1 = math.exp(-((freq_ratio - 2.1) ** 2) / 0.15) * 105.0
+        sb2 = math.exp(-((freq_ratio - 3.9) ** 2) / 0.15) * 105.0
+        c_pts.append((cx_box + bx, cy_box + 60 - (sb1 + sb2)))
+    for i in range(len(c_pts) - 1):
+        draw.line([c_pts[i], c_pts[i + 1]], fill=(255, 107, 53, 230), width=2)
+
+    im.save(os.path.join(PREVIEWS_DIR, "ring-modulator-fx.jpg"), quality=94)
+    print("ring-modulator-fx.jpg saved")
+
+    im_webp = im.resize((960, 600), Image.Resampling.LANCZOS)
+    im_webp.save(os.path.join(TEMPLATES_DIR, "ring-modulator-fx.webp"), "WEBP", quality=90)
+    print("ring-modulator-fx.webp saved")
+
+
+def render_plasma_filament():
+    """Shader-accurate 900x600 render of Plasma Filament."""
+    w, h = 900, 600
+    aspect = w / h
+    x = np.linspace(-1.1 * aspect, 1.1 * aspect, w, dtype=np.float32)
+    y = np.linspace(-1.1, 1.1, h, dtype=np.float32)
+    xx, yy = np.meshgrid(x, y)
+
+    r = np.sqrt(xx**2 + yy**2)
+    angle = np.arctan2(yy, xx)
+    t_cur = 2.4 * 0.35
+
+    twist = 2.4
+    filaments = 5.0
+    spiral1 = np.sin(angle * filaments + r * twist - t_cur * 2.5)
+    spiral2 = np.cos(-angle * (filaments * 0.8) + r * (twist * 1.3) + t_cur * 1.9)
+    filament_arc = np.maximum(0.0, 1.0 - np.abs(spiral1 * 0.6 + spiral2 * 0.4))**6.5
+
+    core_glow = np.exp(-r * r * 2.2) * 1.6
+    shockwave = np.sin(r * 22.0 - t_cur * 5.0) * np.exp(-r * 1.5) * 0.5
+    micro_sparks = np.maximum(0.0, np.sin(xx * 40.0 + t_cur * 4.0) * np.sin(yy * 40.0 - t_cur * 3.5))**8.0
+    micro_sparks *= np.exp(-r * 1.2) * 1.8
+
+    out = np.zeros((h, w, 3), dtype=np.float32)
+    for c in range(3):
+        out[:, :, c] = GROUND[c]
+
+    for y_idx in range(h):
+        for x_idx in range(w):
+            rad = r[y_idx, x_idx]
+            ang = angle[y_idx, x_idx]
+            arc = filament_arc[y_idx, x_idx]
+            core = core_glow[y_idx, x_idx]
+            sw = shockwave[y_idx, x_idx]
+            sp = micro_sparks[y_idx, x_idx]
+            s2 = spiral2[y_idx, x_idx]
+
+            mix_t = np.clip(rad * 0.9 + math.sin(ang * 3.0 + t_cur) * 0.2, 0.0, 1.0)
+            plasma_grad = EMBER * (1.0 - mix_t) + SIGNAL * mix_t
+            s2_clamped = np.clip(s2, 0.0, 1.0) * 0.45
+            fil_col = plasma_grad * (1.0 - s2_clamped) + EMERALD * s2_clamped
+
+            col = fil_col * arc * 2.4
+            col += (EMBER * 0.5 + SIGNAL * 0.5) * core * 1.1
+            col += SIGNAL * max(0.0, sw) * 1.4
+            col += WHITE * sp * 1.8
+
+            rad_falloff = np.clip((2.3 - rad) / 1.1, 0.0, 1.0)
+            out[y_idx, x_idx] = np.clip(GROUND * (1.0 - np.clip(arc * 0.8 + core * 0.5, 0, 1)) + col, 0, 255) * rad_falloff + GROUND * (1.0 - rad_falloff)
+
+    im = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+    im.save(os.path.join(PREVIEWS_DIR, "plasma-filament.jpg"), quality=94)
+    print("plasma-filament.jpg saved")
+
+
 if __name__ == "__main__":
     render_gumowski_mira()
     render_enneper()
@@ -910,4 +1217,9 @@ if __name__ == "__main__":
     render_additive_harmonic()
     render_comb_resonator()
     render_spectral_caustics()
+    render_tinkerbell_map()
+    render_kuen_surface()
+    render_hard_sync_synth()
+    render_ring_modulator_fx()
+    render_plasma_filament()
     print("All previews rendered successfully!")

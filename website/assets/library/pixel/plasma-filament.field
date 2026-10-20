@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Plasma Filament",
+    "author": "Infinite",
+    "description": "High-energy electrical plasma arcs with audio-reactive magnetic twist undulations, helical flux filaments and incandescent core discharge.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 1.15 [0.2, 4.0];\nparam float twist = 2.4 [0.5, 6.0];\nparam float filaments = 5.0 [2.0, 12.0];\nparam float arcPulse = 0.50 [0.0, 1.0];\n\np = (uv - 0.5) * 2.2;\np.x = p.x * aspect;\n\nr = length(p);\nangle = atan(p.y, p.x);\ntCur = t * speed * 0.40;\n\nspiral1 = sin(angle * filaments + r * twist - tCur * 2.4);\nspiral2 = cos(-angle * (filaments * 0.8) + r * (twist * 1.3) + tCur * 1.8);\nfilamentArc = pow(max(0.0, 1.0 - abs(spiral1 * 0.6 + spiral2 * 0.4)), 6.5);\n\ncoreGlow = exp(-r * r * 2.2) * 1.6;\nshockwave = sin(r * 22.0 - tCur * 5.0) * exp(-r * 1.5) * arcPulse;\n\nground = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.21);\n\nplasmaGrad = mix(ember, signal, clamp(r * 0.9 + sin(angle * 3.0 + tCur) * 0.2, 0.0, 1.0));\nfilamentCol = mix(plasmaGrad, emerald, clamp(spiral2, 0.0, 1.0) * 0.45);\n\ncol = ground;\ncol = col + filamentCol * filamentArc * 2.2;\ncol = col + mix(ember, signal, 0.5) * coreGlow * 1.1;\ncol = col + signal * max(0.0, shockwave) * 1.4;\nalpha = 1.0;\n",
+    "params": {
+      "speed": 1.15,
+      "twist": 2.4,
+      "filaments": 5.0,
+      "arcPulse": 0.50
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,438 +1,470 @@
 {
- "version": 1,
- "items": [
-  {
-   "id": "first-sound",
-   "name": "First sound",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "First patches",
-   "description": "Press play and hear notes.",
-   "price": 0,
-   "preview": "assets/templates/first-sound.webp",
-   "file": "assets/templates/first-sound.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Analog",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "first-image",
-   "name": "First image",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "First patches",
-   "description": "A shape on a colour wash.",
-   "price": 0,
-   "preview": "assets/templates/first-image.webp",
-   "file": "assets/templates/first-image.inf",
-   "nodes": [
-    "Ramp",
-    "Layer Stack"
-   ]
-  },
-  {
-   "id": "first-music-image",
-   "name": "Moves with the music",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "First patches",
-   "description": "The shape grows with the sound.",
-   "price": 0,
-   "preview": "assets/templates/first-music-image.webp",
-   "file": "assets/templates/first-music-image.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Analog",
-    "Audio Out",
-    "bloom"
-   ]
-  },
-  {
-   "id": "source",
-   "name": "Source",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Pictures from nothing.",
-   "price": 0,
-   "preview": "assets/templates/source.webp",
-   "file": "assets/templates/source.inf",
-   "nodes": [
-    "Noise",
-    "Ring",
-    "Blend"
-   ]
-  },
-  {
-   "id": "compositing",
-   "name": "Compositing",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Layers, trails and feedback.",
-   "price": 0,
-   "preview": "assets/templates/compositing.webp",
-   "file": "assets/templates/compositing.inf",
-   "nodes": [
-    "Trails",
-    "Layer Stack",
-    "Ramp",
-    "LFO"
-   ]
-  },
-  {
-   "id": "effects",
-   "name": "Effects",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Change a picture.",
-   "price": 0,
-   "preview": "assets/templates/effects.webp",
-   "file": "assets/templates/effects.inf",
-   "nodes": [
-    "Noise",
-    "kaleidoscope",
-    "bloom",
-    "Color Ramp"
-   ]
-  },
-  {
-   "id": "3d",
-   "name": "3D",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "A shape seen from any side.",
-   "price": 0,
-   "preview": "assets/templates/3d.webp",
-   "file": "assets/templates/3d.inf",
-   "nodes": [
-    "Torus Knot",
-    "Camera",
-    "Light",
-    "Render 3D"
-   ]
-  },
-  {
-   "id": "modulators",
-   "name": "Modulators",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Numbers that move other controls.",
-   "price": 0,
-   "preview": "assets/templates/modulators.webp",
-   "file": "assets/templates/modulators.inf",
-   "nodes": [
-    "LFO",
-    "Random"
-   ]
-  },
-  {
-   "id": "macros",
-   "name": "Macros",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "One knob that moves several things.",
-   "price": 0,
-   "preview": "assets/templates/macros.webp",
-   "file": "assets/templates/macros.inf",
-   "nodes": [
-    "Macro Knob"
-   ]
-  },
-  {
-   "id": "notes",
-   "name": "Notes",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Notes that make patterns.",
-   "price": 0,
-   "preview": "assets/templates/notes.webp",
-   "file": "assets/templates/notes.inf",
-   "nodes": [
-    "Note Sequencer",
-    "Arpeggiator",
-    "Analog",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "synths",
-   "name": "Synths",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Sounds from notes.",
-   "price": 0,
-   "preview": "assets/templates/synths.webp",
-   "file": "assets/templates/synths.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Wavetable",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "audio-effects",
-   "name": "Audio Effects",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Shape the sound.",
-   "price": 0,
-   "preview": "assets/templates/audio-effects.webp",
-   "file": "assets/templates/audio-effects.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Analog",
-    "Delay",
-    "Reverb"
-   ]
-  },
-  {
-   "id": "prediction",
-   "name": "Prediction",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Notes that keep going on their own.",
-   "price": 0,
-   "preview": "assets/templates/prediction.webp",
-   "file": "assets/templates/prediction.inf",
-   "nodes": [
-    "Predictive Notes",
-    "Analog",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "utility",
-   "name": "Utility",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Mix and meter sound.",
-   "price": 0,
-   "preview": "assets/templates/utility.webp",
-   "file": "assets/templates/utility.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Analog",
-    "Mixer",
-    "Audio Meter"
-   ]
-  },
-  {
-   "id": "field",
-   "name": "Field",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "By node family",
-   "description": "Write a picture as a formula.",
-   "price": 0,
-   "preview": "assets/templates/field.webp",
-   "file": "assets/templates/field.inf",
-   "nodes": [
-    "FieldPixel"
-   ]
-  },
-  {
-   "id": "acid-bass-synth",
-   "name": "Acid Bass Synth",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Synths",
-   "description": "Resonant transistor-style acid bass synthesizer with saturated diode ladder filter.",
-   "price": 0,
-   "preview": "assets/templates/acid-bass-synth.webp",
-   "file": "assets/templates/acid-bass-synth.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Field Synth",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "space-tape-fx",
-   "name": "Space Tape FX",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Audio effects",
-   "description": "Dual-peak resonant formant filter with LFO vowel morphing and warm saturation.",
-   "price": 0,
-   "preview": "assets/templates/space-tape-fx.webp",
-   "file": "assets/templates/space-tape-fx.inf",
-   "nodes": [
-    "Analog",
-    "Field Effect",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "supersaw-lead-synth",
-   "name": "Supersaw Lead Synth",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Synths",
-   "description": "Multi-oscillator detuned hypersaw lead synthesizer with resonant filter.",
-   "price": 0,
-   "preview": "assets/templates/supersaw-lead-synth.webp",
-   "file": "assets/templates/supersaw-lead-synth.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Field Synth",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "tape-phaser-fx",
-   "name": "Tape Phaser FX",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Audio effects",
-   "description": "4-stage optical tape phaser with swept allpass notches and feedback saturation.",
-   "price": 0,
-   "preview": "assets/templates/tape-phaser-fx.webp",
-   "file": "assets/templates/tape-phaser-fx.inf",
-   "nodes": [
-    "Analog",
-    "Field Effect",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "fm-bell-synth",
-   "name": "FM Bell Synth",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Synths",
-   "description": "Dual-operator phase modulation FM chime and bell synthesizer with resonant formant damping.",
-   "price": 0,
-   "preview": "assets/templates/fm-bell-synth.webp",
-   "file": "assets/templates/fm-bell-synth.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Field Synth",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "shimmer-delay-fx",
-   "name": "Shimmer Delay FX",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Audio effects",
-   "description": "Multi-tap pitch-diffused shimmer delay with cross-fed harmonic reflections and damping filter.",
-   "price": 0,
-   "preview": "assets/templates/shimmer-delay-fx.webp",
-   "file": "assets/templates/shimmer-delay-fx.inf",
-   "nodes": [
-    "Analog",
-    "Field Effect",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "phase-distortion-synth",
-   "name": "Phase Distortion Synth",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Synths",
-   "description": "Casio CZ-style phase distortion synthesizer with resonant formant windowing and analog saturation.",
-   "price": 0,
-   "preview": "assets/templates/phase-distortion-synth.webp",
-   "file": "assets/templates/phase-distortion-synth.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Field Synth",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "formant-filter-fx",
-   "name": "Formant Filter FX",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Audio effects",
-   "description": "Dual-cavity resonant vocal formant filter with vowel cavity morphing and driven saturator.",
-   "price": 0,
-   "preview": "assets/templates/formant-filter-fx.webp",
-   "file": "assets/templates/formant-filter-fx.inf",
-   "nodes": [
-    "Oscillator",
-    "Field Effect",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "wavetable-morph-synth",
-   "name": "Wavetable Morph Synth",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Synths",
-   "description": "Multi-profile wavetable oscillator with continuous morphing across warm sine, folded triangle, saw and pulsed harmonics.",
-   "price": 0,
-   "preview": "assets/templates/wavetable-morph-synth.webp",
-   "file": "assets/templates/wavetable-morph-synth.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Field Synth",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "wavefolder-drive-fx",
-   "name": "Wavefolder Drive FX",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Audio effects",
-   "description": "West Coast multi-stage analog wavefolder with continuous folding thresholds, DC symmetry bias and tone filter.",
-   "price": 0,
-   "preview": "assets/templates/wavefolder-drive-fx.webp",
-   "file": "assets/templates/wavefolder-drive-fx.inf",
-   "nodes": [
-    "Oscillator",
-    "Field Effect",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "additive-harmonic-synth",
-   "name": "Additive Harmonic Synth",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Synths",
-   "description": "Eight-partial additive harmonic overtone generator with continuous spectral tilt, odd/even balance, shimmer emphasis and analog saturation.",
-   "price": 0,
-   "preview": "assets/templates/additive-harmonic-synth.webp",
-   "file": "assets/templates/additive-harmonic-synth.inf",
-   "nodes": [
-    "Random Note Generator",
-    "Field Synth",
-    "Audio Out"
-   ]
-  },
-  {
-   "id": "comb-resonator-fx",
-   "name": "Comb Resonator FX",
-   "category": "Templates",
-   "kind": "Template",
-   "group": "Audio effects",
-   "description": "Dual-coupled harmonic tuned resonator with adjustable resonance Q, acoustic decay damping, overdrive saturation and wet/dry mix.",
-   "price": 0,
-   "preview": "assets/templates/comb-resonator-fx.webp",
-   "file": "assets/templates/comb-resonator-fx.inf",
-   "nodes": [
-    "Oscillator",
-    "Field Effect",
-    "Audio Out"
-   ]
-  }
- ]
+  "version": 1,
+  "items": [
+    {
+      "id": "first-sound",
+      "name": "First sound",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "First patches",
+      "description": "Press play and hear notes.",
+      "price": 0,
+      "preview": "assets/templates/first-sound.webp",
+      "file": "assets/templates/first-sound.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "first-image",
+      "name": "First image",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "First patches",
+      "description": "A shape on a colour wash.",
+      "price": 0,
+      "preview": "assets/templates/first-image.webp",
+      "file": "assets/templates/first-image.inf",
+      "nodes": [
+        "Ramp",
+        "Layer Stack"
+      ]
+    },
+    {
+      "id": "first-music-image",
+      "name": "Moves with the music",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "First patches",
+      "description": "The shape grows with the sound.",
+      "price": 0,
+      "preview": "assets/templates/first-music-image.webp",
+      "file": "assets/templates/first-music-image.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Audio Out",
+        "bloom"
+      ]
+    },
+    {
+      "id": "source",
+      "name": "Source",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Pictures from nothing.",
+      "price": 0,
+      "preview": "assets/templates/source.webp",
+      "file": "assets/templates/source.inf",
+      "nodes": [
+        "Noise",
+        "Ring",
+        "Blend"
+      ]
+    },
+    {
+      "id": "compositing",
+      "name": "Compositing",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Layers, trails and feedback.",
+      "price": 0,
+      "preview": "assets/templates/compositing.webp",
+      "file": "assets/templates/compositing.inf",
+      "nodes": [
+        "Trails",
+        "Layer Stack",
+        "Ramp",
+        "LFO"
+      ]
+    },
+    {
+      "id": "effects",
+      "name": "Effects",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Change a picture.",
+      "price": 0,
+      "preview": "assets/templates/effects.webp",
+      "file": "assets/templates/effects.inf",
+      "nodes": [
+        "Noise",
+        "kaleidoscope",
+        "bloom",
+        "Color Ramp"
+      ]
+    },
+    {
+      "id": "3d",
+      "name": "3D",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "A shape seen from any side.",
+      "price": 0,
+      "preview": "assets/templates/3d.webp",
+      "file": "assets/templates/3d.inf",
+      "nodes": [
+        "Torus Knot",
+        "Camera",
+        "Light",
+        "Render 3D"
+      ]
+    },
+    {
+      "id": "modulators",
+      "name": "Modulators",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Numbers that move other controls.",
+      "price": 0,
+      "preview": "assets/templates/modulators.webp",
+      "file": "assets/templates/modulators.inf",
+      "nodes": [
+        "LFO",
+        "Random"
+      ]
+    },
+    {
+      "id": "macros",
+      "name": "Macros",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "One knob that moves several things.",
+      "price": 0,
+      "preview": "assets/templates/macros.webp",
+      "file": "assets/templates/macros.inf",
+      "nodes": [
+        "Macro Knob"
+      ]
+    },
+    {
+      "id": "notes",
+      "name": "Notes",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Notes that make patterns.",
+      "price": 0,
+      "preview": "assets/templates/notes.webp",
+      "file": "assets/templates/notes.inf",
+      "nodes": [
+        "Note Sequencer",
+        "Arpeggiator",
+        "Analog",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "synths",
+      "name": "Synths",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Sounds from notes.",
+      "price": 0,
+      "preview": "assets/templates/synths.webp",
+      "file": "assets/templates/synths.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Wavetable",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "audio-effects",
+      "name": "Audio Effects",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Shape the sound.",
+      "price": 0,
+      "preview": "assets/templates/audio-effects.webp",
+      "file": "assets/templates/audio-effects.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Delay",
+        "Reverb"
+      ]
+    },
+    {
+      "id": "prediction",
+      "name": "Prediction",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Notes that keep going on their own.",
+      "price": 0,
+      "preview": "assets/templates/prediction.webp",
+      "file": "assets/templates/prediction.inf",
+      "nodes": [
+        "Predictive Notes",
+        "Analog",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "utility",
+      "name": "Utility",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Mix and meter sound.",
+      "price": 0,
+      "preview": "assets/templates/utility.webp",
+      "file": "assets/templates/utility.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Analog",
+        "Mixer",
+        "Audio Meter"
+      ]
+    },
+    {
+      "id": "field",
+      "name": "Field",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "By node family",
+      "description": "Write a picture as a formula.",
+      "price": 0,
+      "preview": "assets/templates/field.webp",
+      "file": "assets/templates/field.inf",
+      "nodes": [
+        "FieldPixel"
+      ]
+    },
+    {
+      "id": "acid-bass-synth",
+      "name": "Acid Bass Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Resonant transistor-style acid bass synthesizer with saturated diode ladder filter.",
+      "price": 0,
+      "preview": "assets/templates/acid-bass-synth.webp",
+      "file": "assets/templates/acid-bass-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "space-tape-fx",
+      "name": "Space Tape FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-peak resonant formant filter with LFO vowel morphing and warm saturation.",
+      "price": 0,
+      "preview": "assets/templates/space-tape-fx.webp",
+      "file": "assets/templates/space-tape-fx.inf",
+      "nodes": [
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "supersaw-lead-synth",
+      "name": "Supersaw Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Multi-oscillator detuned hypersaw lead synthesizer with resonant filter.",
+      "price": 0,
+      "preview": "assets/templates/supersaw-lead-synth.webp",
+      "file": "assets/templates/supersaw-lead-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "tape-phaser-fx",
+      "name": "Tape Phaser FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "4-stage optical tape phaser with swept allpass notches and feedback saturation.",
+      "price": 0,
+      "preview": "assets/templates/tape-phaser-fx.webp",
+      "file": "assets/templates/tape-phaser-fx.inf",
+      "nodes": [
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "fm-bell-synth",
+      "name": "FM Bell Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Dual-operator phase modulation FM chime and bell synthesizer with resonant formant damping.",
+      "price": 0,
+      "preview": "assets/templates/fm-bell-synth.webp",
+      "file": "assets/templates/fm-bell-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "shimmer-delay-fx",
+      "name": "Shimmer Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Multi-tap pitch-diffused shimmer delay with cross-fed harmonic reflections and damping filter.",
+      "price": 0,
+      "preview": "assets/templates/shimmer-delay-fx.webp",
+      "file": "assets/templates/shimmer-delay-fx.inf",
+      "nodes": [
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "phase-distortion-synth",
+      "name": "Phase Distortion Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Casio CZ-style phase distortion synthesizer with resonant formant windowing and analog saturation.",
+      "price": 0,
+      "preview": "assets/templates/phase-distortion-synth.webp",
+      "file": "assets/templates/phase-distortion-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "formant-filter-fx",
+      "name": "Formant Filter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-cavity resonant vocal formant filter with vowel cavity morphing and driven saturator.",
+      "price": 0,
+      "preview": "assets/templates/formant-filter-fx.webp",
+      "file": "assets/templates/formant-filter-fx.inf",
+      "nodes": [
+        "Oscillator",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "wavetable-morph-synth",
+      "name": "Wavetable Morph Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Multi-profile wavetable oscillator with continuous morphing across warm sine, folded triangle, saw and pulsed harmonics.",
+      "price": 0,
+      "preview": "assets/templates/wavetable-morph-synth.webp",
+      "file": "assets/templates/wavetable-morph-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "wavefolder-drive-fx",
+      "name": "Wavefolder Drive FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "West Coast multi-stage analog wavefolder with continuous folding thresholds, DC symmetry bias and tone filter.",
+      "price": 0,
+      "preview": "assets/templates/wavefolder-drive-fx.webp",
+      "file": "assets/templates/wavefolder-drive-fx.inf",
+      "nodes": [
+        "Oscillator",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "additive-harmonic-synth",
+      "name": "Additive Harmonic Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Eight-partial additive harmonic overtone generator with continuous spectral tilt, odd/even balance, shimmer emphasis and analog saturation.",
+      "price": 0,
+      "preview": "assets/templates/additive-harmonic-synth.webp",
+      "file": "assets/templates/additive-harmonic-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "comb-resonator-fx",
+      "name": "Comb Resonator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Dual-coupled harmonic tuned resonator with adjustable resonance Q, acoustic decay damping, overdrive saturation and wet/dry mix.",
+      "price": 0,
+      "preview": "assets/templates/comb-resonator-fx.webp",
+      "file": "assets/templates/comb-resonator-fx.inf",
+      "nodes": [
+        "Oscillator",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "hard-sync-synth",
+      "name": "Hard Sync Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Master/slave oscillator with dynamic formant sync sweep, sub-oscillator and analog diode saturation.",
+      "price": 0,
+      "preview": "assets/templates/hard-sync-synth.webp",
+      "file": "assets/templates/hard-sync-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "ring-modulator-fx",
+      "name": "Ring Modulator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Diode ring modulator with variable carrier frequency, carrier wave shaping, LFO tremolo and wet/dry mix.",
+      "price": 0,
+      "preview": "assets/templates/ring-modulator-fx.webp",
+      "file": "assets/templates/ring-modulator-fx.inf",
+      "nodes": [
+        "Oscillator",
+        "Field Effect",
+        "Audio Out"
+      ]
+    }
+  ]
 }

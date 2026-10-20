@@ -1,0 +1,43 @@
+infinite-patch 1
+# Ring Modulator FX: diode ring modulator Field Effect
+node 1 Synths Oscillator
+  id osc
+  pos 0 1024
+  f freq 110.0
+  i waveform 0
+end
+node 2 Effects Field Effect
+  id fx
+  pos 480 1024
+  s code param float carrierFreq = 380.0 [20.0, 2400.0]\nparam float lfoRate = 1.8 [0.1, 10.0]\nparam float lfoDepth = 0.35 [0.0, 1.0]\nparam float drive = 1.6 [1.0, 4.0]\nparam float mix = 0.70 [0.0, 1.0]\nstate float cPhase = 0\nstate float lfoPhase = 0\nstate float lp = 0\n\nlfoStep = lfoRate / sr\nlfoPhase = (lfoPhase + lfoStep) % 1.0\nlfoMod = sin(6.2831853 * lfoPhase)\n\nfMod = carrierFreq * (1.0 + lfoMod * lfoDepth * 0.45)\ncStep = clamp(fMod / sr, 0.0001, 0.45)\ncPhase = (cPhase + cStep) % 1.0\n\ncarrierSine = sin(6.2831853 * cPhase)\ncarrier = carrierSine * 0.85 + (2.0 * abs(2.0 * cPhase - 1.0) - 1.0) * 0.25\n\nuIn = in * drive\nsumSig = uIn + carrier\ndiffSig = uIn - carrier\nrectSum = abs(sumSig) / (1.0 + abs(sumSig) * 0.28)\nrectDiff = abs(diffSig) / (1.0 + abs(diffSig) * 0.28)\nringMod = (rectSum - rectDiff) * 0.78\n\nlp = lp + 0.52 * (ringMod - lp)\nout = in * (1.0 - mix) + lp * mix\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.306 0.949 0.722
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Ring Modulator FX. Diode ring modulator with variable carrier frequency, LFO tremolo and harmonic drive.
+  f width 360
+  f height 120
+end
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.16 0.46
+mod pic sizeY ana 0 0 1 0.5 0.16 0.46

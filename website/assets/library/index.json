@@ -783,6 +783,99 @@
       "file": "assets/library/pixel/spectral-caustics.field",
       "preview": "assets/library/previews/spectral-caustics.jpg",
       "bytes": 1549
+    },
+    {
+      "id": "tinkerbell-map",
+      "name": "Tinkerbell Map",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math"
+      ],
+      "description": "Chaotic Tinkerbell attractor with sweeping dynamical orbital plumes, fractal dust filament trails and parameter drift.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/tinkerbell-map.js",
+      "preview": "assets/library/previews/tinkerbell-map.jpg",
+      "bytes": 1366
+    },
+    {
+      "id": "kuen-surface-3d",
+      "name": "Kuen's Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "minimal-surface"
+      ],
+      "description": "Parametric Alfred Kuen pseudospherical surface of constant negative curvature with twisting spire lobes and orbiting quanta.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 6,
+      "file": "assets/library/sketch/kuen-surface-3d.js",
+      "preview": "assets/library/previews/kuen-surface-3d.jpg",
+      "bytes": 2786
+    },
+    {
+      "id": "hard-sync-synth",
+      "name": "Hard Sync Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "sync",
+        "formant",
+        "dsp"
+      ],
+      "description": "Master/slave oscillator with dynamic formant sync sweep, sub-oscillator and analog diode saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/hard-sync-synth.inf",
+      "preview": "assets/library/previews/hard-sync-synth.jpg",
+      "bytes": 2290
+    },
+    {
+      "id": "ring-modulator-fx",
+      "name": "Ring Modulator FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "ring-mod",
+        "carrier",
+        "dsp"
+      ],
+      "description": "Diode ring modulator with variable carrier frequency, carrier wave shaping, LFO tremolo and wet/dry mix.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/ring-modulator-fx.inf",
+      "preview": "assets/library/previews/ring-modulator-fx.jpg",
+      "bytes": 1697
+    },
+    {
+      "id": "plasma-filament",
+      "name": "Plasma Filament",
+      "kind": "Generator",
+      "tags": [
+        "plasma",
+        "energy",
+        "reactive",
+        "visuals"
+      ],
+      "description": "High-energy electrical plasma arcs with audio-reactive magnetic twist undulations, helical flux filaments and incandescent core discharge.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/plasma-filament.field",
+      "preview": "assets/library/previews/plasma-filament.jpg",
+      "bytes": 1627
     }
   ]
 }

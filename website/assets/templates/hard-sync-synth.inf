@@ -1,0 +1,44 @@
+infinite-patch 1
+# Hard Sync Synth: master/slave oscillator with dynamic formant sync sweep Field Synth
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 40
+  i rangeHigh 68
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float syncRatio = 2.4 [1.0, 8.0]\nparam float syncEnvAmt = 2.8 [0.0, 8.0]\nparam float subLevel = 0.35 [0.0, 1.0]\nparam float decay = 1.8 [0.1, 5.0]\nparam float warmth = 1.4 [1.0, 3.5]\nstate float masterPhase = 0\nstate float slavePhase = 0\nstate float subPhase = 0\nstate float ampEnv = 0\nstate float syncEnv = 0\nstate float lp = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nampDecayRate = clamp(1.0 / (sr * decay), 0.00002, 0.02)\nsyncDecayRate = clamp(1.0 / (sr * (decay * 0.5)), 0.00003, 0.025)\nampEnv = if(target > ampEnv, ampEnv + (target - ampEnv) * 0.20, ampEnv - ampEnv * ampDecayRate)\nsyncEnv = if(target > syncEnv, syncEnv + (target - syncEnv) * 0.24, syncEnv - syncEnv * syncDecayRate)\n\nf0 = clamp(freq, 20.0, 5000.0)\nmStep = f0 / sr\nmasterPhase = masterPhase + mStep\nsyncTrigger = if(masterPhase >= 1.0, 1.0, 0.0)\nmasterPhase = masterPhase % 1.0\n\neffectiveSync = clamp(syncRatio + syncEnv * syncEnvAmt, 1.0, 12.0)\nsStep = (f0 * effectiveSync) / sr\nslavePhase = if(syncTrigger > 0.5, 0.0, (slavePhase + sStep) % 1.0)\n\nsubStep = (f0 * 0.5) / sr\nsubPhase = (subPhase + subStep) % 1.0\nsubWave = sin(6.2831853 * subPhase)\n\nsawSlave = 2.0 * slavePhase - 1.0\nsineSlave = sin(6.2831853 * slavePhase)\nslaveWave = sawSlave * 0.75 + sineSlave * 0.35\n\nraw = (slaveWave + subWave * subLevel) * (warmth * 0.6)\nsat = raw / (1.0 + abs(raw) * 0.25)\n\nlp = lp + 0.45 * (sat - lp)\nout = lp * ampEnv * 0.54\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Hard Sync Synth. Master/slave oscillator with dynamic formant sync sweep and sub-oscillator.
+  f width 360
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.18 0.5
+mod pic sizeY ana 0 0 1 0.5 0.18 0.5

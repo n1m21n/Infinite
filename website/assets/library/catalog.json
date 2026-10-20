@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 103,
+ "count": 110,
  "items": [
   {
    "id": "first-sound",
@@ -326,6 +326,30 @@
    "file": "https://infinitedevices.org/assets/templates/comb-resonator-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/comb-resonator-fx.webp",
    "page": "https://infinitedevices.org/library/comb-resonator-fx.html"
+  },
+  {
+   "id": "hard-sync-synth",
+   "name": "Hard Sync Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Master/slave oscillator with dynamic formant sync sweep, sub-oscillator and analog diode saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/hard-sync-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/hard-sync-synth.webp",
+   "page": "https://infinitedevices.org/library/hard-sync-synth.html"
+  },
+  {
+   "id": "ring-modulator-fx",
+   "name": "Ring Modulator FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Diode ring modulator with variable carrier frequency, carrier wave shaping, LFO tremolo and wet/dry mix.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/ring-modulator-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/ring-modulator-fx.webp",
+   "page": "https://infinitedevices.org/library/ring-modulator-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -1238,6 +1262,66 @@
    "file": "https://infinitedevices.org/assets/library/pixel/spectral-caustics.field",
    "preview": "https://infinitedevices.org/assets/library/previews/spectral-caustics.jpg",
    "page": "https://infinitedevices.org/library/spectral-caustics.html"
+  },
+  {
+   "id": "tinkerbell-map",
+   "name": "Tinkerbell Map",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Chaotic Tinkerbell attractor with sweeping dynamical orbital plumes, fractal dust filament trails and parameter drift.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/tinkerbell-map.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/tinkerbell-map.jpg",
+   "page": "https://infinitedevices.org/library/tinkerbell-map.html"
+  },
+  {
+   "id": "kuen-surface-3d",
+   "name": "Kuen's Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Parametric Alfred Kuen pseudospherical surface of constant negative curvature with twisting spire lobes and orbiting quanta.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/kuen-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/kuen-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/kuen-surface-3d.html"
+  },
+  {
+   "id": "hard-sync-synth",
+   "name": "Hard Sync Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Master/slave oscillator with dynamic formant sync sweep, sub-oscillator and analog diode saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/hard-sync-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/hard-sync-synth.jpg",
+   "page": "https://infinitedevices.org/library/hard-sync-synth.html"
+  },
+  {
+   "id": "ring-modulator-fx",
+   "name": "Ring Modulator FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Diode ring modulator with variable carrier frequency, carrier wave shaping, LFO tremolo and wet/dry mix.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/ring-modulator-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/ring-modulator-fx.jpg",
+   "page": "https://infinitedevices.org/library/ring-modulator-fx.html"
+  },
+  {
+   "id": "plasma-filament",
+   "name": "Plasma Filament",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "High-energy electrical plasma arcs with audio-reactive magnetic twist undulations, helical flux filaments and incandescent core discharge.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/plasma-filament.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/plasma-filament.jpg",
+   "page": "https://infinitedevices.org/library/plasma-filament.html"
   }
  ]
 }

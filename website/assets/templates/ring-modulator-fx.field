@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ring Modulator FX",
+    "author": "Infinite",
+    "description": "Diode ring modulator with variable carrier frequency, carrier wave shaping, LFO tremolo and wet/dry mix.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float carrierFreq = 380.0 [20.0, 2400.0];\nparam float lfoRate = 1.8 [0.1, 10.0];\nparam float lfoDepth = 0.35 [0.0, 1.0];\nparam float drive = 1.6 [1.0, 4.0];\nparam float mix = 0.70 [0.0, 1.0];\nstate float cPhase = 0;\nstate float lfoPhase = 0;\nstate float lp = 0;\n\nlfoStep = lfoRate / sr;\nlfoPhase = (lfoPhase + lfoStep) % 1.0;\nlfoMod = sin(6.2831853 * lfoPhase);\n\nfMod = carrierFreq * (1.0 + lfoMod * lfoDepth * 0.45);\ncStep = clamp(fMod / sr, 0.0001, 0.45);\ncPhase = (cPhase + cStep) % 1.0;\n\ncarrierSine = sin(6.2831853 * cPhase);\ncarrier = carrierSine * 0.85 + (2.0 * abs(2.0 * cPhase - 1.0) - 1.0) * 0.25;\n\nuIn = in * drive;\nsumSig = uIn + carrier;\ndiffSig = uIn - carrier;\nrectSum = abs(sumSig) / (1.0 + abs(sumSig) * 0.28);\nrectDiff = abs(diffSig) / (1.0 + abs(diffSig) * 0.28);\nringMod = (rectSum - rectDiff) * 0.78;\n\nlp = lp + 0.52 * (ringMod - lp);\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "carrierFreq": 380.0,
+      "lfoRate": 1.8,
+      "lfoDepth": 0.35,
+      "drive": 1.6,
+      "mix": 0.70
+    },
+    "nodeSettings": {}
+  }
+}

@@ -115,6 +115,11 @@
       "slug": "spectral-caustics",
       "title": "Spectral Caustics",
       "description": "Deep aquatic light caustics with audio-reactive chromatic dispersion, fluid wave refraction and incandescent focal flare."
+    },
+    {
+      "slug": "plasma-filament",
+      "title": "Plasma Filament",
+      "description": "High-energy electrical plasma arcs with audio-reactive magnetic twist undulations, helical flux filaments and incandescent core discharge."
     }
   ]
 }
