@@ -57,7 +57,7 @@ html, body {
   background: var(--bg);
   transition: opacity 1.1s var(--ease-io) 0.15s, visibility 0s linear 1.3s;
 }
-.intro-eyebrow { font: 500 12px/1 var(--font-mono); letter-spacing: 0.04em; text-transform: lowercase; color: var(--muted); }
+.intro-eyebrow { font: 500 0.8438rem/1 var(--font-sans); color: var(--muted); }
 .intro-title { font: 600 clamp(2.6rem, 9vw, 5.4rem)/1 var(--font-sans); letter-spacing: -0.04em; color: var(--ink); }
 .intro-bar { width: 120px; height: 2px; border-radius: 2px; background: var(--line); overflow: hidden; margin-top: 18px; }
 .intro-bar i { display: block; width: 100%; height: 100%; background: var(--brand-grad); transform: scaleX(0); transform-origin: left; transition: transform var(--dur-medium) var(--ease-out); }
@@ -123,7 +123,7 @@ body.is-focus .modes { opacity: 0; pointer-events: none; transform: translate(-5
 .hint {
   position: fixed; z-index: 9; left: 50%; bottom: max(30px, calc(env(safe-area-inset-bottom) + 18px));
   transform: translate(-50%, 6px);
-  font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.04em; text-transform: lowercase;
+  font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.04em;
   color: var(--ink); text-align: center; white-space: nowrap;
   padding: 8px 16px; border-radius: 999px; background: var(--glass); border: 0; box-shadow: var(--shadow);
   -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
@@ -144,7 +144,7 @@ body.is-focus .hint { opacity: 0 !important; }
   opacity: 0; transform: translateY(14px); pointer-events: none;
   transition: opacity var(--dur-large) var(--ease-io), transform var(--dur-page) var(--ease-out);
 }
-.plaque-no { font: 500 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.plaque-no { font: 500 0.8438rem/1 var(--font-sans); color: var(--accent); }
 .plaque-title { font: 700 40px/0.9 var(--hand); margin-top: 8px; }
 .plaque-meta { font: 400 12px/1.4 var(--font-mono); color: var(--muted); margin-top: 8px; letter-spacing: 0.02em; }
 body.is-focus .plaque { opacity: 1; transform: none; transition-delay: 0.25s, 0.25s; }
@@ -208,10 +208,3 @@ body.nogl .plain img { width: 100%; height: auto; display: block; border-radius:
   .sitenav a { padding: 8px 12px; }
 }
 
-/* the bottom dock sits over the viewport on phones: lift every bottom control above it */
-@media (max-width: 900px) {
-  .modes { bottom: calc(92px + env(safe-area-inset-bottom)); }
-  .hint { bottom: calc(150px + env(safe-area-inset-bottom)); }
-  .focus-ui { bottom: calc(92px + env(safe-area-inset-bottom)); }
-  .plaque { bottom: calc(150px + env(safe-area-inset-bottom)); }
-}

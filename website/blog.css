@@ -443,7 +443,7 @@ body.blog-page { overflow-x: clip; font-family: var(--font-sans); }
 .crumbs a:hover { color: var(--ink); }
 @media (max-width: 600px) { .crumbs { display: none; } }
 
-.post-head .post-kicker { margin: 0; font-size: 0.7188rem; color: var(--signal); text-transform: uppercase; letter-spacing: 0.08em; }
+.post-head .post-kicker { margin: 0; font: 500 0.8438rem/1.2 var(--font-sans); color: var(--signal); }
 .post-head h1 { font-size: clamp(1.9rem, 5.2vw, 3rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.08; margin: 10px 0 16px; overflow-wrap: anywhere; text-wrap: balance; }
 .post-lede { font-size: 1.25rem; line-height: 1.45; color: var(--ink2); margin: 0 0 24px; }
 .post-by { display: flex; align-items: center; gap: 12px; font-size: 0.8438rem; color: var(--muted); margin: 0 0 32px; }
@@ -483,7 +483,7 @@ body.blog-page { overflow-x: clip; font-family: var(--font-sans); }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-media); box-shadow: var(--shadow-1); background: var(--card); }
 .prose table { border-collapse: collapse; width: 100%; font-size: 0.8438rem; min-width: 480px; }
 .prose th, .prose td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
-.prose th { font: 500 0.7188rem 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.05em; text-transform: lowercase; }
+.prose th { font: 500 0.7188rem 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.05em; }
 
 .post-cta { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--shadow-2); padding: round(clamp(24px, 4vw, 32px), 8px); margin-top: clamp(36px, 6vw, 56px); }
 .post-cta .hand { display: block; margin: 0 0 4px; transform: rotate(-2deg); transform-origin: left; }
@@ -535,7 +535,7 @@ body.blog-page { overflow-x: clip; font-family: var(--font-sans); }
 .dev-wide { margin-top: clamp(28px, 4vw, 48px); display: flex; flex-direction: column; gap: 12px; }
 .dev-wide table { border-collapse: collapse; width: 100%; font-size: 0.8438rem; min-width: 460px; }
 .dev-wide th, .dev-wide td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
-.dev-wide th { font: 500 0.7188rem 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.05em; text-transform: lowercase; }
+.dev-wide th { font: 500 0.7188rem 'Geist Mono', ui-monospace, monospace; color: var(--muted); letter-spacing: 0.05em; }
 .dev-list { padding-left: 1.2em; display: grid; gap: 8px; color: var(--ink2); line-height: 1.55; }
 .dev-wide a, .dev-card a { color: var(--signal); text-underline-offset: 3px; }
 .dev-list li, .dev-wide p { max-width: 56ch; }

@@ -332,7 +332,7 @@ SITE_CSS = """/* Benchmarks page (made by tools/website/gen_benchmarks.py): the 
 .bm-wrap code { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.8438em; background: var(--card); padding: 1px 8px; border-radius: 4px; }
 .bm-wrap pre { background: var(--card); border-radius: 12px; padding: 16px 16px; overflow-x: auto; }
 .bm-wrap pre code { background: none; padding: 0; }
-.bm-wrap .kick { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.7188rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-top: 48px; }
+.bm-wrap .kick { font-size: 0.8438rem; font-weight: 500; color: var(--muted); margin-top: 48px; }
 .bm-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 24px 0; }
 .bm-card { background: var(--card); border-radius: var(--radius-card); box-shadow: var(--shadow-1); padding: 24px; }
 .bm-card p { margin: 6px 0 0; font-size: 0.8438rem; }
@@ -390,7 +390,7 @@ table.t td:first-child { color: var(--ink); font-weight: 600; }
 .key i { width: 10px; height: 10px; border-radius: 50%; } .key .a, .ro-n .a { color: var(--accent); } .key i.a { background: var(--accent); } .key i.b { background: var(--signal); }
 .view { display: none; } .view.on { display: block; }
 .ro { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 24px 0 8px; }
-.ro-t { flex: 1 0 100%; font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.7188rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.ro-t { flex: 1 0 100%; font-size: 0.8438rem; font-weight: 500; color: var(--muted); }
 .ro-n { display: flex; align-items: baseline; gap: 16px; } .ro-n b { font-size: 2.75rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: var(--ink); }
 .ro-n .a { color: var(--accent); } .ro-n .b { color: var(--signal); }
 .ro-p { min-height: 32px; padding: 0 12px; font-size: 0.8125rem; }
@@ -627,7 +627,7 @@ def page(body, n):
     head = re.sub(r'(og:image" content=")[^"]*', lambda m: m.group(1) + BASE + "assets/og-image.jpg", head)
     head = re.sub(r'(twitter:image" content=")[^"]*', lambda m: m.group(1) + BASE + "assets/og-image.jpg", head)
     head = head.replace('  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n', "")
-    head = head.replace("extensions.css?v=e791dc75", "benchmarks.css?v=0db9760e")
+    head = head.replace("extensions.css?v=e791dc75", "benchmarks.css?v=655797c0")
     head += f'  <link rel="alternate" type="application/json" href="assets/benchmarks.json" title="Benchmark data">\n  <link rel="alternate" type="application/pdf" href="assets/{PDF_NAME}" title="Benchmark report (PDF)">\n'
     head += f'  <script type="application/ld+json">\n{jsonld(n)}\n  </script>\n'
     nav_start = rest.index("<body")

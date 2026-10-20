@@ -414,7 +414,7 @@ strong { font-weight: 600; color: var(--ink); }
 
 .node-card { position: relative; z-index: 1; display: flex; flex-direction: column; min-width: 0; }
 .hand-cap {
-  font-family: var(--font-mono); font-weight: 500; font-size: 0.7188rem; letter-spacing: 0.06em; line-height: 1;
+  font-family: var(--font-sans); font-weight: 500; font-size: 0.8438rem; line-height: 1;
   color: var(--ink2); margin: 0 0 10px 6px;
 }
 .node {
@@ -717,10 +717,10 @@ strong { font-weight: 600; color: var(--ink); }
 .footer-grid { display: grid; grid-template-columns: 1.3fr repeat(4, 1fr); gap: 32px; }
 .footer-brand p { color: var(--ink2); margin-top: 10px; font-size: 0.8438rem; max-width: 22em; }
 .footer-col { display: flex; flex-direction: column; gap: 4px; }
-.footer-col h5, .footer-col .footer-h { font-family: var(--font-mono); font-size: 0.7188rem; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; text-transform: lowercase; margin-bottom: 6px; }
+.footer-col h5, .footer-col .footer-h { font-family: var(--font-sans); font-size: 0.8438rem; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
 .footer-col a { color: var(--ink2); text-decoration: none; font-size: 0.8438rem; padding: 4px 0; }
 .footer-col a:hover { color: var(--ink); }
-.footer-bottom { margin-top: 40px; font-size: 0.7188rem; color: var(--muted); }
+.footer-bottom { margin-top: 40px; font-size: 0.8438rem; color: var(--muted); }
 
 /* --------------------------------------------------------------------------
    The digit bird
@@ -871,7 +871,7 @@ html.over-bird body { cursor: pointer; }
   .doc-s { display: none; }
   .doc-f { display: inline; }
   .doc-d { display: block; color: var(--ink2); font-size: var(--fs-small); line-height: 1.45; }
-  .doc-m { display: block; font-family: var(--font-mono); font-weight: 500; font-size: var(--fs-micro); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .doc-m { display: block; font-family: var(--font-sans); font-weight: 500; font-size: var(--fs-micro); color: var(--muted); }
 }
 @media (min-width: 980px) { .docs-grid { grid-template-columns: repeat(4, 1fr); } }
 .nav-group:nth-of-type(n+2) .nav-menu { left: auto; right: 0; }
@@ -920,7 +920,6 @@ p.mono { font-size: 0.84375rem; }
     box-shadow: var(--shadow-3, 0 24px 64px rgba(0,0,0,.35)), var(--shadow-2); transform: translateX(-14px) scale(0.98); transform-origin: top left; }
   .nav-open .nav-links { transform: none; }
   .nav-group { border: 0; }
-  .nav-trigger { min-height: 0 !important; padding: 12px 14px 6px !important; font: 500 0.6875rem/1 "Geist Mono", ui-monospace, monospace !important; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted) !important; pointer-events: none !important; }
   .nav-trigger::after { display: none; }
   .nav-menu { max-height: none; visibility: inherit; transition: none; padding-bottom: 4px; gap: 2px; }
   .nav-open .nav-trigger[aria-expanded="true"] + .nav-menu { max-height: none; padding-bottom: 4px; }
@@ -941,6 +940,7 @@ p.mono { font-size: 0.84375rem; }
 .dock-thumb { position: absolute; left: 0; top: 0; width: var(--w, 0); height: var(--h, 0); transform: translate(var(--x, 0), var(--y, 0)); border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--ink) 14%, transparent); box-shadow: var(--dock-hi); opacity: 0; transition: transform var(--dur-medium, 333ms) var(--ease-out), width var(--dur-medium, 333ms) var(--ease-out), height var(--dur-medium, 333ms) var(--ease-out), opacity var(--dur-small) var(--ease-out); }
 .dock.ready .dock-thumb { opacity: 1; }
+.dock:not(.ready) .dock-thumb { transition: none; }
 .dock-dl { display: none !important; }
 .dock-stop { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 14px; border-radius: var(--r-pill);
   font: 500 0.8438rem/1 "Geist", system-ui, sans-serif; color: var(--ink2); text-decoration: none; cursor: pointer; background: none; transition: color var(--dur-small) var(--ease-out); }

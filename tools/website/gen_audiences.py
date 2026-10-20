@@ -358,7 +358,7 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="stylesheet" href="brand.css?v=e96b24bf">
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
-  <link rel="stylesheet" href="blog.css?v=df40576c">
+  <link rel="stylesheet" href="blog.css?v=38d8ed23">
   <link rel="stylesheet" href="audience.css?v=56776286">
   {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>

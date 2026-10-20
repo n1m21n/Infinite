@@ -92,10 +92,9 @@
 .ph-dl { background: var(--ink); color: var(--ground); }
 .ph-prin .ic { width: 22px; height: 22px; }
 
-/* page title */
-.ph-title { position: absolute; z-index: 3; left: 50%; top: calc(var(--header-h, 60px) + 6px); transform: translateX(-50%); margin: 0; padding: 0 16px; border-radius: var(--r-pill, 999px); min-height: 32px; display: inline-flex; align-items: center;
-  background: var(--glass, color-mix(in srgb, var(--ink) 8%, transparent)); box-shadow: var(--dock-hi); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); font: 600 0.8438rem/1 Geist, system-ui, sans-serif; color: var(--ink2); }
-.ph-caps { top: calc(var(--header-h, 60px) + 52px); }
+/* page title: the same size and weight as the Blog and Library titles */
+.ph-title { position: absolute; z-index: 3; left: 0; right: 0; top: calc(var(--header-h, 60px) + 4px); margin: 0; text-align: center; font: 800 clamp(2rem, 6vw, 3rem)/1.05 var(--font-sans, Geist, system-ui, sans-serif); letter-spacing: -0.035em; color: var(--ink); }
+.ph-caps { top: calc(var(--header-h, 60px) + 72px); }
 /* light modes: the scene follows the page tokens */
 :root[data-mode="paper"] .ph-lines line, :root[data-mode="mist"] .ph-lines line { stroke: color-mix(in srgb, var(--ink) 28%, transparent); }
 :root[data-mode="paper"] .ph-lines line.on, :root[data-mode="mist"] .ph-lines line.on, :root[data-mode="paper"] .ph-flow, :root[data-mode="mist"] .ph-flow { stroke: var(--accent, #E2531C); fill: var(--accent, #E2531C); }
