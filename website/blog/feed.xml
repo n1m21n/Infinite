@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
   <title>Infinite blog</title><link>https://infinitedevices.org/blog/</link><description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
-  <language>en-gb</language><lastBuildDate>Tue, 20 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <language>en-gb</language><lastBuildDate>Wed, 21 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item><title>Lorenz attractor interactive simulation in creative coding</title><link>https://infinitedevices.org/blog/lorenz-attractor-interactive-simulation.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/lorenz-attractor-interactive-simulation.html</guid>
+    <pubDate>Wed, 21 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>How to build a Lorenz attractor interactive simulation in real time using differential equations, interactive Sketch code, and audio modulation.</description></item>
   <item><title>Euclidean rhythm sequencer algorithms for modular music</title><link>https://infinitedevices.org/blog/euclidean-rhythm-sequencer-algorithm.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/euclidean-rhythm-sequencer-algorithm.html</guid>
     <pubDate>Tue, 20 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>How to generate Euclidean rhythm sequencer algorithms using Bjorklund integer distribution, modular arithmetic, and audio-reactive triggers in Infinite.</description></item>
   <item><title>Embedding interactive audio-reactive WebGL visuals on any website</title><link>https://infinitedevices.org/blog/interactive-audio-reactive-webgl-embeds-for-websites.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/interactive-audio-reactive-webgl-embeds-for-websites.html</guid>

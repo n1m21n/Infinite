@@ -1,5 +1,14 @@
 [
  {
+  "slug": "lorenz-attractor-interactive-simulation",
+  "title": "Lorenz attractor interactive simulation in creative coding",
+  "description": "How to build a Lorenz attractor interactive simulation in real time using differential equations, interactive Sketch code, and audio modulation.",
+  "date": "2026-10-21",
+  "updated": "2026-10-21",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/lorenz-attractor-interactive-simulation.html"
+ },
+ {
   "slug": "euclidean-rhythm-sequencer-algorithm",
   "title": "Euclidean rhythm sequencer algorithms for modular music",
   "description": "How to generate Euclidean rhythm sequencer algorithms using Bjorklund integer distribution, modular arithmetic, and audio-reactive triggers in Infinite.",
