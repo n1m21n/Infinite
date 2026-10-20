@@ -62,7 +62,7 @@
   color: #fff; background: color-mix(in srgb, #fff 20%, transparent);
   -webkit-backdrop-filter: blur(14px) saturate(1.6); backdrop-filter: blur(14px) saturate(1.6);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 38%, transparent), 0 4px 14px color-mix(in srgb, #000 18%, transparent);
-  font: 500 0.7188rem/1 'Geist Mono', ui-monospace, monospace;
+  font: 500 var(--size-micro-mono)/1 'Geist Mono', ui-monospace, monospace;
 }
 .post-chip .chip-ic { width: 16px; height: 16px; }
 .post-chip b { font-weight: 500; }

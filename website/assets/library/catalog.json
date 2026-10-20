@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 75,
+ "count": 82,
  "items": [
   {
    "id": "first-sound",
@@ -230,6 +230,30 @@
    "file": "https://infinitedevices.org/assets/templates/tape-phaser-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/tape-phaser-fx.webp",
    "page": "https://infinitedevices.org/library/tape-phaser-fx.html"
+  },
+  {
+   "id": "fm-bell-synth",
+   "name": "FM Bell Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Dual-operator phase modulation FM chime and bell synthesizer with resonant formant damping.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/fm-bell-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/fm-bell-synth.webp",
+   "page": "https://infinitedevices.org/library/fm-bell-synth.html"
+  },
+  {
+   "id": "shimmer-delay-fx",
+   "name": "Shimmer Delay FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Multi-tap pitch-diffused shimmer delay with cross-fed harmonic reflections and damping filter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/shimmer-delay-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/shimmer-delay-fx.webp",
+   "page": "https://infinitedevices.org/library/shimmer-delay-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -902,6 +926,66 @@
    "file": "https://infinitedevices.org/assets/library/pixel/pulsar-beam.field",
    "preview": "https://infinitedevices.org/assets/library/previews/pulsar-beam.jpg",
    "page": "https://infinitedevices.org/library/pulsar-beam.html"
+  },
+  {
+   "id": "hopalong-attractor",
+   "name": "Hopalong Attractor",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Barry Martin's Hopalong chaotic map generating glowing fractal filaments and cosmic web filaments.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/hopalong-attractor.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/hopalong-attractor.jpg",
+   "page": "https://infinitedevices.org/library/hopalong-attractor.html"
+  },
+  {
+   "id": "klein-bottle-3d",
+   "name": "Klein Bottle 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Parametric 4D topological Klein bottle immersed in 3D with transverse wireframe ribs, spine rails and orbiting energy quanta.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/klein-bottle-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/klein-bottle-3d.jpg",
+   "page": "https://infinitedevices.org/library/klein-bottle-3d.html"
+  },
+  {
+   "id": "fm-bell-synth",
+   "name": "FM Bell Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Dual-operator phase modulation FM chime and bell synthesizer with exponential index envelope and resonant formant damping.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/fm-bell-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/fm-bell-synth.jpg",
+   "page": "https://infinitedevices.org/library/fm-bell-synth.html"
+  },
+  {
+   "id": "shimmer-delay-fx",
+   "name": "Shimmer Delay FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Multi-tap pitch-diffused shimmer delay with cross-fed harmonic reflections, tape saturation and damping filter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/shimmer-delay-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/shimmer-delay-fx.jpg",
+   "page": "https://infinitedevices.org/library/shimmer-delay-fx.html"
+  },
+  {
+   "id": "neural-synapse",
+   "name": "Neural Synapse",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Bio-electric neural dendritic lattice with audio-reactive action potential pulses, synaptic neurotransmitter flares and synaptic vesicle nodes.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/neural-synapse.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/neural-synapse.jpg",
+   "page": "https://infinitedevices.org/library/neural-synapse.html"
   }
  ]
 }

@@ -46,7 +46,7 @@ AUDIENCES = [
      "start": [("first-image", "First image"), ("layered-blends", "Layered blends"), ("glitch-feedback", "Glitch feedback"), ("iridescent-orb", "Iridescent orb"), ("trail-glitch", "Trail glitch")],
      "extra": ("artworks.html", "See the art gallery")},
     {"slug": "musicians", "name": "musicians", "hand": "play",
-     "title": "Infinite for musicians: synths, effects and plugins in one graph",
+     "title": "Infinite for musicians: synths, effects and plugins",
      "h1": "Infinite for musicians", "desc": "Wavetable, FM, analog and string synths, tape delay, convolution reverb, VST3 and AU hosting, and modulation on every knob.",
      "lead": "Patch a sound the way you think about it. Notes go into a synth, then effects, and any knob can follow an LFO or an envelope.",
      "facts": ["VST3 and AU hosting", "MPE notes", "79 effect presets"],
@@ -90,7 +90,7 @@ AUDIENCES = [
      "start": [("first-music-image", "Moves with the music"), ("glitch-feedback", "Glitch feedback"), ("trail-glitch", "Trail glitch"), ("occult-mandala", "Occult mandala"), ("lens-spectral", "Lens spectral")],
      "extra": ("blog/free-touchdesigner-alternative-for-audio-reactive-visuals.html", "Coming from TouchDesigner?")},
     {"slug": "creative-coders", "name": "creative coders and technologists", "hand": "code",
-     "title": "Infinite for creative coders and technologists: Field, sketches and shaders",
+     "title": "Infinite for creative coders: Field, sketches and shaders",
      "h1": "Infinite for creative coders", "desc": "Write shaders, per-sample audio kernels, 3D surfaces and JavaScript sketches in one node graph with live feedback. Free and open source.",
      "lead": "Write what a node does. Field is Infinite's own small language: one program can be a shader, a synth, an effect or a mesh deformer.",
      "facts": ["Field language", "JavaScript sketches", "OSC on 127.0.0.1:9100"],
@@ -112,7 +112,7 @@ AUDIENCES = [
      "start": [("field", "Field templates"), ("lorenz-attractor", "Lorenz attractor"), ("clifford-attractor", "Clifford attractor"), ("rule-110", "Rule 110"), ("lotka-volterra", "Lotka-Volterra")],
      "extra": ("blog/field-language-write-what-a-node-does.html", "Read: Field in one post")},
     {"slug": "developers", "name": "developers", "hand": "headless", "body": "developers_body.html",
-     "title": "Infinite for developers: headless CLI, Python SDK and MCP server",
+     "title": "Infinite for developers: CLI, Python SDK and MCP",
      "h1": "Infinite for developers and agents", "desc": "Run Infinite without a window. Render video and audio from a text patch, call it from Python, or give an AI agent the nine MCP tools. Free and open source.",
      "lead": "Every patch is a text file the app can render with no window open. Use the command line, Python or an AI agent over MCP.",
      "facts": ["Headless", "Python SDK", "9 MCP tools"],
@@ -237,7 +237,7 @@ def main_html(a, rel):
     if a["hero"]["img"] == "brand_ball":
         float3d = f'          <span class="vstage-float"><img class="vstage-3d" src="assets/3d/brand_ball.webp" alt="{e(a["hero"]["alt"])}" width="700" height="700" decoding="async"></span>\n'
     facts = "".join(f"<li>{e(f)}</li>" for f in a["facts"])
-    cards = "\n".join(f'          <article class="aud-card reveal" style="--i:{n}"><span class="num">{n + 1:02d}</span><h3>{e(t)}</h3><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
+    cards = "\n".join(f'          <article class="aud-card reveal" style="--i:{n}"><span class="num">{n + 1:02d}</span><h2>{e(t)}</h2><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
     bench = ""
     if a.get("bench"):
         B = a["bench"]
@@ -336,7 +336,7 @@ def artists_main(a, rel, hero="blob"):
         bub = [("layers", "family-compositing", "Layer", a["cards"][0][0]), ("solid", "cube", "3D", a["cards"][1][0]), ("formula", "edit", "Formula", a["cards"][2][0])]
         tag, caps, ghost = "Images that move.", "32 blend modes|3D with real materials|A picture from a formula", ("Gallery", "viewport")
     bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(c)}: {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
-    nodes = "".join(f'<figure class="ax-node"><img src="assets/nodes/{n}.webp" alt="{e(t)}: {e(d)}" loading="lazy" decoding="async"><figcaption>{e(t)}</figcaption></figure>' for n, t, d in a["bench"]["items"])
+    nodes = "".join(f'<figure class="ax-node"><img src="assets/nodes/{n}.webp" alt="{e(t)}: {e(d)}"{png_size(n)} loading="lazy" decoding="async"><figcaption>{e(t)}</figcaption></figure>' for n, t, d in a["bench"]["items"])
     watch = f'      <section class="aud-section reveal">\n        <h2 class="ax-h">Watch</h2>\n        {video_embed()}\n      </section>\n' if hero == "cables" else ""
     figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{a["reel"]["href"]}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="ax-ttl">{e(al.replace(", library", ""))}</span></a>' for src, w, h, al in a["reel"]["items"])
     start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
@@ -412,7 +412,7 @@ def dev_main(a, rel):
     toc_items = [("start", "Quick start", "play")] + [(i, t, ic) for (i, t, _), ic in zip(secs, ("power", "edit", "family-utility", "settings", "browser"))]
     toc = "".join(f'<a href="#{i}">{icon(ic)}<span>{e(t)}</span></a>' for i, t, ic in toc_items)
     facts = "".join(f"<li>{e(f)}</li>" for f in a["facts"])
-    cards = "".join(f'<article class="dv-card"><span class="num">{n + 1:02d}</span><h3>{e(t)}</h3><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
+    cards = "".join(f'<article class="dv-card"><span class="num">{n + 1:02d}</span><h2>{e(t)}</h2><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
     sections = "".join(f'<section class="dv-sec" id="{i}"><h2>{e(t)}</h2>{b}</section>' for i, t, b in secs)
     others = "\n".join(f'          <a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
     return f'''

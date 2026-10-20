@@ -421,7 +421,7 @@ body:has(.lib-hero) { overflow-x: clip; font-family: var(--font-sans); }
   letter-spacing: -0.01em;
 }
 .lib-hud-meta {
-  font: 500 0.7188rem/1.35 var(--font-sans); color: var(--muted);
+  font: 500 var(--size-micro-mono)/1.35 var(--font-sans); color: var(--muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .lib-hud-right {
@@ -484,7 +484,7 @@ body:has(.lib-hero) { overflow-x: clip; font-family: var(--font-sans); }
   font: 600 0.8438rem/1.2 var(--font-sans); color: var(--ink);
 }
 .lib-dock-sub {
-  font: 500 0.7188rem/1.2 var(--font-sans); color: var(--muted);
+  font: 500 var(--size-micro-mono)/1.2 var(--font-sans); color: var(--muted);
 }
 .lib-dock-sep {
   display: inline-grid; place-items: center;

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="midnight">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#151930">
+  <script src="theme.js?v=1"></script>
+  <title>Infinite website design system</title>
+  <meta name="description" content="The Infinite website design system: type, numerals, kinetic type, controls, cards, reels and space, built from brand.json tokens.">
+  <link rel="canonical" href="https://infinitedevices.org/system.html">
+  <meta property="og:title" content="Infinite website design system">
+  <meta property="og:description" content="The Infinite website design system: type, numerals, kinetic type, controls, cards, reels and space, built from brand.json tokens.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/og-image.jpg">
+  <meta property="og:url" content="https://infinitedevices.org/system.html">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Infinite website design system">
+  <meta name="twitter:description" content="The Infinite website design system: type, numerals, kinetic type, controls, cards, reels and space, built from brand.json tokens.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/og-image.jpg">
+  <link rel="alternate" type="text/plain" href="llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="brand.css?v=e96b24bf">
+  <link rel="stylesheet" href="style.css?v=5518e9f5">
+  <link rel="stylesheet" href="glass.css?v=c25dae44">
+  <style>
+    .sys-hero { min-height: min(80vh, 720px); display: grid; align-items: end; }
+    /* the field is the art; the words sit on clear ground beside it (desktop) or under it (phone) */
+    .sys-hero > .pfield-canvas { -webkit-mask-image: linear-gradient(90deg, transparent 0 48%, black 82%); mask-image: linear-gradient(90deg, transparent 0 48%, black 82%); }
+    @media (max-width: 640px) { .sys-hero > .pfield-canvas { -webkit-mask-image: linear-gradient(180deg, black 0 30%, transparent 62%); mask-image: linear-gradient(180deg, black 0 30%, transparent 62%); } }
+    .sys-hero .sys-head { max-width: 40rem; }
+    .sys-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--web-stack-m); }
+    .sys-specimen > p { overflow-wrap: anywhere; }
+    .sys-tokens { display: grid; gap: var(--web-stack-s); grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+    .sys-tokens > div { display: flex; justify-content: space-between; gap: var(--web-stack-m); padding: var(--web-stack-m) var(--web-card-pad);
+      border-radius: var(--r-sm); background: var(--surface-1); }
+    .loop-type { max-width: 640px; margin-bottom: var(--web-stack-m); }
+    .loop-type path { stroke: var(--line); }
+  </style>
+  <link rel="stylesheet" href="system.css?v=23625436">
+  <link rel="stylesheet" href="scale.css?v=6d378b5a">
+</head><body class="benchmarks-page">
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="index.html" class="brand" aria-label="Infinite home">
+        <img src="assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+          <a href="extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+          <a href="benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+        </div>
+      </div>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn hide-sm" aria-label="View on GitHub" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn sm-only" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="sys-section pfield sys-hero" data-seed="1962" data-cell="24" data-strength="0.9">
+      <div class="container">
+        <div class="sys-head">
+          <span class="folio">00 / design system v3</span>
+          <h1 class="t-display kt-slab">A programme, not a <span class="kt-draw t-hand">layout</span></h1>
+          <p class="t-lead">How infinitedevices.org is built: tokens from <code>brand.json</code>, primitives in <code>system.css</code>, the rules in <code>WEBSITE_SYSTEM.md</code>. Move the pointer over this field; it is the brand's signature.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sys-section" id="type">
+      <div class="container">
+        <div class="sys-head">
+          <span class="folio">01 / type</span>
+          <h2 class="t-h1">Geist for reading, mono for <span class="t-hand" style="color: var(--accent)">values</span></h2>
+          <p class="t-lead">Every step is fluid from 375 to 1440 px. Nothing a visitor reads is under 12 px.</p>
+        </div>
+        <div class="sys-specimen stack-l">
+          <p class="t-display">Display 40 to 96</p>
+          <p class="t-h1">H1 32 to 61</p>
+          <p class="t-h2">H2 25 to 39</p>
+          <p class="t-h3">H3 20 to 25</p>
+          <p class="t-lead">Lead 18 to 20. One or two sentences under a headline, at most 30 words.</p>
+          <p class="t-body">Body 16. Everything people read at length, 60 to 72 characters a line.</p>
+          <p class="t-caption">Caption 13.5. Under media, beside controls, in card text.</p>
+          <p class="t-micro">Micro mono 12 · 48 kHz · -6.0 dB · node.blend</p>
+          <p class="t-folio">Folio mono caps 12 · inside infinite / 03 the patch</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sys-section" id="numbers">
+      <div class="container">
+        <div class="sys-head">
+          <span class="folio">02 / numerals</span>
+          <h2 class="t-h1">Numbers are a voice</h2>
+          <p class="t-lead">Big figure in Geist 800, unit in mono at the cap top. Every figure is measured; it counts up once.</p>
+        </div>
+        <p class="fig fig-xl" data-count="170">170<span class="fig-unit">fps</span></p>
+        <p class="t-caption" style="margin: 8px 0 32px">ProRes 4444 export at 720p on a base MacBook Air M2 (benchmarks).</p>
+        <div class="stat-row">
+          <div class="stat"><span class="fig fig-l" data-count="120">120<span class="fig-unit">BPM</span></span><span class="t-caption">The house tempo: every duration is a note value.</span></div>
+          <div class="stat"><span class="fig fig-l" data-count="1.45">1.45<span class="fig-unit">ms</span></span><span class="t-caption">Wavetable CPU per second of audio per voice.</span></div>
+          <div class="stat"><span class="fig fig-l">05<span class="ratio-sep">/</span>09</span><span class="t-caption">A pair: a slash in ink-3 with a space each side.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sys-section" id="motion">
+      <div class="container">
+        <div class="sys-head">
+          <span class="folio">03 / kinetic type</span>
+          <h2 class="t-h1">A DAW for <span class="kt-swap t-hand" style="color: var(--accent)" data-words="you,designers,musicians,VJs,coders">you</span></h2>
+          <p class="t-lead">Slab-in, swap, draw, count and loop. Each runs once except the swap, which changes every 2 bars. Reduced motion shows the final state.</p>
+        </div>
+        <svg class="loop-type" viewBox="0 0 400 140" aria-hidden="true">
+          <path id="sys-lemniscate" fill="none" d="M380.0 70.0 L377.1 86.7 L368.8 101.6 L356.3 113.5 L341.1 121.7 L324.7 126.1 L308.2 127.3 L292.4 125.6 L277.6 121.9 L263.9 116.6 L251.4 110.1 L239.9 102.8 L229.2 95.0 L219.1 86.8 L209.5 78.5 L200.0 70.0 L190.5 61.5 L180.9 53.2 L170.8 45.0 L160.1 37.2 L148.6 29.9 L136.1 23.4 L122.4 18.1 L107.6 14.4 L91.8 12.7 L75.3 13.9 L58.9 18.3 L43.7 26.5 L31.2 38.4 L22.9 53.3 L20.0 70.0 L22.9 86.7 L31.2 101.6 L43.7 113.5 L58.9 121.7 L75.3 126.1 L91.8 127.3 L107.6 125.6 L122.4 121.9 L136.1 116.6 L148.6 110.1 L160.1 102.8 L170.8 95.0 L180.9 86.8 L190.5 78.5 L200.0 70.0 L209.5 61.5 L219.1 53.2 L229.2 45.0 L239.9 37.2 L251.4 29.9 L263.9 23.4 L277.6 18.1 L292.4 14.4 L308.2 12.7 L324.7 13.9 L341.1 18.3 L356.3 26.5 L368.8 38.4 L377.1 53.3 L380.0 70.0 Z"/>
+          <text><textPath href="#sys-lemniscate" startOffset="0%">two ends one loop · a daw for you · two ends one loop ·<animate attributeName="startOffset" from="0%" to="-50%" dur="16s" repeatCount="indefinite"/></textPath></text>
+        </svg>
+        <p class="t-caption">Two ends, one loop. A DAW for you.</p>
+      </div>
+    </section>
+
+    <section class="sys-section" id="controls">
+      <div class="container">
+        <div class="sys-head">
+          <span class="folio">04 / controls</span>
+          <h2 class="t-h1">One geometry for every control</h2>
+          <p class="t-lead">Controls are pills: 36 on phones, 40 on desktop. Buttons are 40 and 44. The touch target is 44 even when the pill looks smaller.</p>
+        </div>
+        <div class="sys-row">
+          <a class="sys-btn primary lg" href="index.html#download">Download Infinite</a>
+          <a class="sys-btn" href="library.html">Open the library</a>
+          <button class="sys-ctl is-on" type="button" aria-pressed="true">Layer</button>
+          <button class="sys-ctl" type="button" aria-pressed="false">3D</button>
+          <button class="sys-ctl icon-only" type="button" aria-label="Play"><svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5v11l9-5.5z"/></svg></button>
+          <span class="sys-chip"><span class="dot" style="--cat: var(--cat-synths)"></span>audio</span>
+          <span class="sys-chip"><span class="dot" style="--cat: var(--cat-compositing)"></span>visual</span>
+        </div>
+        <div class="sys-row" style="margin-top: 24px">
+          <div class="sys-pop" id="sys-pop">
+            <button class="sys-ctl" type="button" aria-haspopup="listbox" aria-expanded="false">Sort: newest <svg class="ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg></button>
+            <div role="listbox" aria-label="Sort" hidden>
+              <div role="option" aria-selected="true" tabindex="0">Newest</div>
+              <div role="option" aria-selected="false" tabindex="-1">Most used</div>
+              <div role="option" aria-selected="false" tabindex="-1">A to Z</div>
+            </div>
+          </div>
+          <span class="t-caption">A popover on desktop, a bottom sheet on phones.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="sys-section" id="cards">
+      <div class="container">
+        <div class="sys-head">
+          <span class="folio">05 / cards</span>
+          <h2 class="t-h1">Cards: one title, one sentence</h2>
+          <p class="t-lead">Media 16:10 inside, folio and chips, a title of two lines at most, one sentence, then meta left and action right. The whole card is one target.</p>
+        </div>
+        <div class="card-grid">
+          <article class="card">
+            <div class="card-media pfield" data-seed="3" data-cell="12" data-strength="0.7"></div>
+            <div class="card-top"><span class="folio">01</span><span class="sys-chip"><span class="dot" style="--cat: var(--cat-synths)"></span>audio</span></div>
+            <h3 class="card-title"><a class="card-link" href="library.html">FM bell synth</a></h3>
+            <p class="card-text">Two operators and a ratio knob; patch the envelope into anything.</p>
+            <div class="card-foot"><span class="t-micro">free</span><span class="sys-ctl">Open</span></div>
+          </article>
+          <article class="card">
+            <div class="card-media pfield" data-seed="62" data-cell="16" data-strength="0.7"></div>
+            <div class="card-top"><span class="folio">02</span><span class="sys-chip"><span class="dot" style="--cat: var(--cat-compositing)"></span>visual</span></div>
+            <h3 class="card-title"><a class="card-link" href="blog/">Make your first audio-reactive visual</a></h3>
+            <p class="card-text">From an empty canvas to a shader that listens, in six nodes.</p>
+            <div class="card-foot"><span class="t-micro">6 min read</span><span class="sys-ctl">Read</span></div>
+          </article>
+          <article class="card">
+            <div class="card-media pfield" data-seed="1964" data-cell="24" data-strength="0.7"></div>
+            <div class="card-top"><span class="folio">03</span><span class="sys-chip"><span class="dot" style="--cat: var(--cat-utility)"></span>code</span></div>
+            <h3 class="card-title"><a class="card-link" href="developers.html">Render a patch without a window</a></h3>
+            <p class="card-text">The headless engine reads a text file and writes frames and audio.</p>
+            <div class="card-foot"><span class="t-micro">developers</span><span class="sys-ctl">Start</span></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sys-section" id="reels">
+      <div class="container">
+        <div class="sys-head">
+          <span class="folio">06 / reels and video</span>
+          <h2 class="t-h1">Reels scroll sideways</h2>
+          <p class="t-lead">Vertical 9:16 cards snap one at a time with a peek of the next. A video is a 16:9 poster; the player loads on tap, from youtube-nocookie.</p>
+        </div>
+        <div class="reel-track" tabindex="0" aria-label="Reel">
+          <div class="pfield" data-seed="11" data-cell="16" data-strength="0.8"></div>
+          <div class="pfield" data-seed="12" data-cell="12" data-strength="0.8"></div>
+          <div class="pfield" data-seed="13" data-cell="24" data-strength="0.8"></div>
+          <div class="pfield" data-seed="14" data-cell="16" data-strength="0.8"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sys-section" id="space">
+      <div class="container">
+        <div class="sys-head">
+          <span class="folio">07 / space</span>
+          <h2 class="t-h1">Space on the 4 px grid</h2>
+          <p class="t-lead">Margin 16 to 48, section 64 to 96, card padding 20 to 24, card radius 20 and 24, media 12 and 16. Resize the window: the values move between the phone and desktop ends.</p>
+        </div>
+        <div class="sys-tokens" id="sys-tokens"></div>
+      </div>
+    </section>
+  </main>
+
+<footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <label for="signup-email" class="signup-label">One email when something ships</label>
+            <div class="signup-row">
+              <input id="signup-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="artists.html">Artists</a>
+          <a href="musicians.html">Musicians</a>
+          <a href="vjs.html">VJs</a>
+          <a href="creative-coders.html">Creative coders</a>
+          <a href="developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="library.html">Library</a>
+          <a href="artworks.html">Art gallery</a>
+          <a href="embeds/">Embeds</a>
+          <a href="extensions.html">Extensions</a>
+          <a href="benchmarks.html">Benchmarks</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="index.html#learn">Get started</a>
+          <a href="philosophy.html">Philosophy</a>
+          <a href="blog/">Blog</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
+    </div>
+  </footer>
+  <script src="kinetic.js?v=1" defer></script>
+<script src="field.js?v=1" defer></script>
+<script>
+  (function () {
+    var pop = document.getElementById('sys-pop'), btn = pop.querySelector('button'), list = pop.querySelector('[role=listbox]');
+    function set(open) { list.hidden = !open; btn.setAttribute('aria-expanded', open); if (open) list.querySelector('[aria-selected=true]').focus(); }
+    btn.addEventListener('click', function () { set(list.hidden); });
+    list.addEventListener('click', function (e) {
+      var o = e.target.closest('[role=option]'); if (!o) return;
+      list.querySelectorAll('[role=option]').forEach(function (x) { x.setAttribute('aria-selected', x === o); x.tabIndex = x === o ? 0 : -1; });
+      btn.firstChild.textContent = 'Sort: ' + o.textContent.toLowerCase() + ' '; set(false); btn.focus();
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !list.hidden) { set(false); btn.focus(); } });
+    document.addEventListener('click', function (e) { if (!pop.contains(e.target)) set(false); });
+    var names = ['margin', 'gutter', 'section', 'card-pad', 'card-radius', 'media-radius', 'control', 'button', 'hit', 'icon', 'header', 'dock'];
+    var box = document.getElementById('sys-tokens'), probe = document.createElement('div');
+    probe.style.position = 'absolute'; probe.style.visibility = 'hidden'; document.body.appendChild(probe);
+    function show() {
+      box.innerHTML = names.map(function (n) {
+        probe.style.width = 'var(--web-' + n + ')';
+        return '<div><span class="t-micro">--web-' + n + '</span><span class="t-micro tnum">' + Math.round(probe.getBoundingClientRect().width) + ' px</span></div>';
+      }).join('');
+    }
+    show(); addEventListener('resize', show);
+  })();
+</script>
+  <script src="site.js?v=18" defer></script>
+<nav class="dock" id="dock" aria-label="Main">
+  <div class="dock-bar">
+    <span class="dock-thumb" aria-hidden="true"></span>
+    <a class="dock-stop" href="index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+    <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+    <a href="artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+    <a href="musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+    <a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+    <a href="creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+    <a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+    <a href="library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+    <a href="artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+    <a href="embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+    <a href="extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+    <a href="benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+    <a href="index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+    <a href="philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+  </div>
+</nav>
+</body>
+</html>

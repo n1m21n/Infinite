@@ -8,7 +8,7 @@
 .ext-install[open] { flex-basis: 100%; }
 .ext-steps { margin-top: 16px; color: var(--ink2); }
 .ext-steps p { margin: 0 0 12px; }
-.ext-offline { font-size: 0.8438rem; }
+.ext-offline { font-size: 0.8438rem; line-height: 1.7; }
 .ext-file { display: inline-block; margin: 4px 12px 0 0; color: var(--ink); font-weight: 600; }
 .ext-purpose { color: var(--ink2); margin: 16px 0 8px; }
 .ext-nodes { color: var(--muted); font-size: 0.8438rem; margin: 0; }

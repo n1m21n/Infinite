@@ -80,7 +80,6 @@
 .ax-code summary .ic { width: 20px; height: 20px; }
 .ax-code .aud-code { margin: 8px 0 0; border-radius: 16px; max-height: 40svh; overflow: auto; }
 
-@media (min-width: 901px) { .ax > .container, .ax-main > .container { padding-left: max(var(--gutter), 88px); } }
 @media (max-width: 900px) { .ax-stage { height: clamp(500px, calc(100svh - var(--header-h, 60px) - 112px), 720px); } .ax-low { bottom: 84px; } }
 .ax-lab .ctl { flex: 1 1 140px; padding: 10px 14px; }
 @media (max-width: 600px) { .ax-lab .lab-view { aspect-ratio: 1 / 0.85; } .ax-lab .ctl { gap: 8px; } }

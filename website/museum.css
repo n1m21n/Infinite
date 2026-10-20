@@ -73,10 +73,11 @@ body:not(.is-loading) .intro { opacity: 0; visibility: hidden; }
   box-shadow: var(--shadow);
   color: var(--ink); text-decoration: none;
   font: 500 13px/1 var(--font-sans);
-  padding: 8px 16px 8px 12px;
+  min-height: 36px; padding: 0 16px 0 12px;   /* control pill: 36 phone, 40 desktop (brand.json web.control) */
   transition: transform var(--dur-medium) var(--ease-out), background var(--dur-medium) var(--ease-out), opacity var(--dur-large) var(--ease-io);
 }
-.chip svg { width: 15px; height: 15px; }
+.chip svg { width: 16px; height: 16px; }
+@media (min-width: 641px) { .chip { min-height: 40px; } }
 .back { top: max(18px, env(safe-area-inset-top)); left: 18px; }
 .back:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.2); }
 
@@ -157,7 +158,7 @@ body.is-focus .plaque { opacity: 1; transform: none; transition-delay: 0.25s, 0.
 }
 body.is-focus .focus-ui { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0.25s, 0.25s; }
 .round {
-  width: 46px; height: 46px; border-radius: 50%;
+  width: 44px; height: 44px; border-radius: 50%;   /* web.button desktop */
   display: grid; place-items: center; cursor: pointer;
   background: var(--glass);
   -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
@@ -191,7 +192,7 @@ body.nogl .plain img { width: 100%; height: auto; display: block; border-radius:
   .plaque-title { font-size: 32px; }
   .focus-ui { left: 14px; right: 14px; justify-content: space-between; }
   .focus-ui .close { order: 3; }
-  .hint { font-size: 11px; white-space: normal; width: 80vw; }
+  .hint { font-size: 12px; white-space: normal; width: 80vw; }
 }
 
 @media (prefers-reduced-motion: reduce) {

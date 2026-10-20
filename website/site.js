@@ -472,7 +472,7 @@
       const step = () => {
         i++;
         type.textContent = TEXT.slice(0, i);
-        if (i < TEXT.length) setTimeout(step, TEXT[i - 1] === ',' ? 260 : 60);
+        if (i < TEXT.length) setTimeout(step, TEXT[i - 1] === ',' ? 260 : 67);
         else {
           // the aside rests, then the headline types itself in pixels
           setTimeout(() => {

@@ -95,6 +95,11 @@
       "slug": "pulsar-beam",
       "title": "Pulsar Beam",
       "description": "Rotating magnetized neutron star with relativistic synchrotron light cones, dipole magnetic flux arcs and audio-reactive horizon flare."
+    },
+    {
+      "slug": "neural-synapse",
+      "title": "Neural Synapse",
+      "description": "A lattice of glowing dendrites. Sound fires pulses along the branches and flares at the synapses."
     }
   ]
 }

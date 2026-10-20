@@ -20,7 +20,7 @@ W = chrome.W
 BASE = ga.BASE
 e = html.escape
 
-TITLE = "Philosophy of Infinite: node-based creative software built for flow"
+TITLE = "Philosophy of Infinite: creative software built for flow"
 DESC = "Why Infinite is a node graph, how it protects flow state in art and music making, how machines should work with people, and the design principles behind it."
 
 # (id, x, y, mind label, patch label, mind sentence, patch sentence)

@@ -18,7 +18,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../w
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 const SIZES = [{ name: 'phone', width: 375, height: 812, mobile: true }, { name: 'desktop', width: 1280, height: 800, mobile: false }];
-const DEFAULT_PAGES = ['index.html', 'library.html', 'philosophy.html', 'benchmarks.html', 'artists.html', 'musicians.html', 'vjs.html', 'creative-coders.html', 'developers.html', 'blog/index.html'];
+import { pageList } from './pages.mjs';
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]); if (p.endsWith('/')) p += 'index.html';
   const f = path.join(ROOT, p);
@@ -30,7 +30,7 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 const problems = [];
 const report = (pg, sz, kind, msg) => problems.push(`${pg} [${sz}] ${kind}: ${msg}`);
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'] });
-const pages = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_PAGES;
+const pages = pageList(process.argv.slice(2));
 
 /* in page: text/control boxes that sit over a canvas */
 const OVER_FN = () => {

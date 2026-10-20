@@ -72,7 +72,11 @@ def page(packs):
     head = re.sub(r'(<meta (?:property|name)="(?:og|twitter):title" content=")[^"]*', r"\g<1>Infinite Extensions", head)
     head = head.replace("library.html", "extensions.html")
     head = "\n".join(l for l in head.splitlines() if "assets/library/catalog.json" not in l)
-    head = head.replace("</head>", '  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n'
+    ld = json.dumps({"@context": "https://schema.org", "@type": "CollectionPage", "name": "Infinite Extensions", "description": desc,
+                     "url": "https://infinitedevices.org/extensions.html",
+                     "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}})
+    head = head.replace("</head>", f'  <script type="application/ld+json">{ld}</script>\n'
+                                   '  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n'
                                    '  <link rel="stylesheet" href="extensions.css?v=e791dc75">\n</head>')
     header = t[t.index("  <header"):t.index("  <main>")].replace(' aria-current="page"', "")
     header = header.replace('<a href="extensions.html">', '<a href="extensions.html" aria-current="page">')

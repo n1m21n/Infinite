@@ -22,7 +22,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../w
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.mp4': 'video/mp4', '.zip': 'application/zip' };
 const SIZES = [{ name: 'phone', width: 375, height: 812, mobile: true }, { name: 'desktop', width: 1280, height: 800, mobile: false }];
-const DEFAULT_PAGES = ['index.html', 'library.html', 'philosophy.html', 'benchmarks.html', 'artists.html', 'musicians.html', 'vjs.html', 'creative-coders.html', 'developers.html', 'blog/index.html', 'embeds.html'];
+import { pageList } from './pages.mjs';
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]); if (p.endsWith('/')) p += 'index.html';
@@ -38,6 +38,7 @@ const PAGE_FN = () => {
   const SEL = 'a[href], button, input, select, textarea, summary, [role=button], [role=tab], [role=option]';
   const vis = (el) => {
     const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) return null;
+    if (el.checkVisibility && !el.checkVisibility({ contentVisibilityAuto: true })) return null;   // e.g. inside a closed <details>
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity < 0.05 || cs.pointerEvents === 'none') return null;
     for (let n = el.parentElement; n; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden' || n.hidden || (+c.opacity < 0.05)) return null; }
     return r;
@@ -53,7 +54,7 @@ const PAGE_FN = () => {
 const problems = [];
 const report = (page, size, kind, msg) => problems.push(`${page} [${size}] ${kind}: ${msg}`);
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
-const pages = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_PAGES;
+const pages = pageList(process.argv.slice(2));
 
 for (const pg of pages) {
   if (!fs.existsSync(path.join(ROOT, pg))) continue;
@@ -91,6 +92,7 @@ for (const pg of pages) {
         for (const e of document.querySelectorAll(SEL)) {
           if (e.closest('.deck-card, .post-card, .lib-card, .dock, .site-header, .pb, [aria-hidden="true"], .sr-only')) continue;
           const r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2 || r.bottom < 0 || r.top > innerHeight) continue;
+          if (e.checkVisibility && !e.checkVisibility({ contentVisibilityAuto: true })) continue;   // inside a closed <details>
           const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || cs.pointerEvents === 'none' || +cs.opacity < 0.05) continue;
           const cx = r.left + r.width / 2, cy = r.top + r.height / 2; if (cy < 0 || cy > innerHeight || cx < 0 || cx > innerWidth) continue;
           const top = document.elementFromPoint(cx, cy); if (!top) continue;

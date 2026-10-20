@@ -1,5 +1,5 @@
 /* Benchmarks page (made by tools/website/gen_benchmarks.py): the report body on the site's own tokens. */
-.bm-wrap { max-width: 960px; margin: 0 auto; }
+.bm-wrap { margin: 0 auto; }   /* width: --wrap 960px in system.css */
 .bm-wrap p, .bm-wrap li, .bm-wrap .section-sub { max-width: 56ch; }
 .bm-wrap .lead { color: var(--ink2); font-size: 1.125rem; line-height: 1.5; }
 .bm-wrap h2 { font-size: var(--fs-h3); font-weight: 700; letter-spacing: -0.02em; margin: 56px 0 12px; scroll-margin-top: 90px; }
@@ -72,7 +72,7 @@ table.t td:first-child { color: var(--ink); font-weight: 600; }
 .ro-n .a { color: var(--accent); } .ro-n .b { color: var(--signal); }
 .ro-p { min-height: 32px; padding: 0 12px; font-size: 0.8125rem; }
 .cols { position: relative; display: flex; align-items: flex-end; gap: 6px; height: 200px; margin: 16px 0 28px; }
-.cl { position: absolute; left: 0; right: 0; top: 100%; margin-top: 8px; font-style: normal; font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.6875rem; color: var(--muted); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.cl { position: absolute; left: 0; right: 0; top: 100%; margin-top: 8px; font-style: normal; font-family: "Geist Mono", ui-monospace, monospace; font-size: var(--size-micro-mono); color: var(--muted); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .md { position: absolute; left: 0; right: 0; bottom: var(--md, 50%); height: 0; border-top: 2px dashed color-mix(in srgb, var(--ink) 20%, transparent); pointer-events: none; }
 .col, .grp { position: relative; flex: 1; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; gap: 3px; border-radius: 12px; -webkit-tap-highlight-color: transparent; transition: background var(--dur-small, 188ms); }
 .grp.sel, .col.sel { background: color-mix(in srgb, var(--ink) 5%, transparent); }

@@ -157,7 +157,7 @@ body.reels-page {
   border: 0;
   border-radius: var(--r-pill, 999px);
   color: #EEF1FA;
-  font: 500 0.7188rem/1 'Geist Mono', ui-monospace, monospace;
+  font: 500 var(--size-micro-mono)/1 'Geist Mono', ui-monospace, monospace;
   text-decoration: none;
   cursor: pointer;
 }

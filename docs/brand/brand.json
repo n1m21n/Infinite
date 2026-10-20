@@ -1,7 +1,7 @@
 {
  "_doc": "Infinite brand tokens v2 for brand surfaces (website, films, thumbnails, social, docs, installers, 3D). The app's own UI values live in src/app/ui/design/tokens.json and src/core/CategoryColors.cpp. Edit here, then run python3 tools/brand/build_brand_book.py (book, brand.css, DTCG tokens, contrast gate) and the Blender kit tools/brand/build_3d.py.",
- "version": "2.0",
- "updated": "2026-10-10",
+ "version": "2.1",
+ "updated": "2026-10-20",
  "idea": {
   "belief": "connection",
   "line": "A DAW for you.",
@@ -466,16 +466,16 @@
    },
    {
     "step": "Micro mono",
-    "min": 11.5,
-    "max": 11.5,
+    "min": 12,
+    "max": 12,
     "weight": 500,
     "leading": 1.35,
     "tracking": 0.04
    },
    {
     "step": "Folio mono caps",
-    "min": 11,
-    "max": 11,
+    "min": 12,
+    "max": 12,
     "weight": 500,
     "leading": 1.2,
     "tracking": 0.12
@@ -551,6 +551,101 @@
     45
    ],
    "film_chars_per_second": 15
+  },
+  "web_floor_px": 12,
+  "numerals": {
+   "_doc": "Numbers are a voice of their own (after Giovanni Pintori's Olivetti posters built from figures). Big figures in Geist, the unit small in mono beside them.",
+   "family": "Geist",
+   "weight": 800,
+   "tracking": -0.05,
+   "leading": 0.86,
+   "features": "tnum, lnum",
+   "unit": {
+    "family": "Geist Mono",
+    "weight": 500,
+    "scale": 0.25,
+    "min_px": 12,
+    "align": "cap top",
+    "colour": "ink-3"
+   },
+   "web_scale": [
+    {
+     "step": "Num XL",
+     "min": 64,
+     "max": 160,
+     "role": "One hero figure per page: a benchmark, a count, a price."
+    },
+    {
+     "step": "Num L",
+     "min": 40,
+     "max": 72,
+     "role": "Stat tiles in a row of two to four."
+    },
+    {
+     "step": "Num M",
+     "min": 28,
+     "max": 40,
+     "role": "Figures inside cards and tables."
+    }
+   ],
+   "index": "Section and card indexes are two-digit mono folios (01, 02): 'Folio mono caps' step, ink-3, never Ember.",
+   "rules": [
+    "Tabular, lining figures on anything that changes or lines up.",
+    "Value, thin space, unit: 120 BPM, -6.0 dB, 48 kHz. The unit never wraps away from its value.",
+    "Ratios and pairs use a slash in ink-3 with a space each side: 05 / 09, 3871 / 03:12.",
+    "A figure counts up once, on first view, over a page duration (667 ms) with ease-out; reduced motion shows the final value.",
+    "Never a fake or rounded-up figure; every number on the site is measured or counted (BRAND.md section 11)."
+   ]
+  },
+  "kinetic": {
+   "_doc": "Type that moves on the web. Moves come from the motion laws (section 8); this lists which ones type may use.",
+   "allowed": [
+    {
+     "move": "slab-in",
+     "what": "A headline's words rise 0.5 em into place on the slab spring, word stagger 42 ms (1/32 triplet).",
+     "when": "Once, the first time the headline is seen."
+    },
+    {
+     "move": "swap",
+     "what": "One word cycles through a list (the 'A DAW for you' line). Out with ease-in 125 ms, in with the letter spring.",
+     "when": "Every 2 bars (4 s at 120 BPM). Stops when the tab is hidden."
+    },
+    {
+     "move": "draw",
+     "what": "The Caveat word's hand underline draws pin to pin with ease-out over 500 ms.",
+     "when": "Once, after its headline lands."
+    },
+    {
+     "move": "count",
+     "what": "A numeral counts to its value (type.numerals).",
+     "when": "Once, on first view."
+    },
+    {
+     "move": "loop",
+     "what": "A short mono line travels along a programme path (circle or lemniscate), one lap per 8 bars (16 s).",
+     "when": "Decoration only, one per page, aria-hidden, the words repeated as real text nearby."
+    }
+   ],
+   "never": [
+    "Infinite animation on body text or anything people have to read.",
+    "More than 15 characters per second on screen.",
+    "Scroll-jacked type, per-letter wobble loops, blur-in on body copy, typewriter on headlines longer than 3 words.",
+    "Kinetic type under prefers-reduced-motion: it appears in its final state."
+   ]
+  },
+  "curved": {
+   "_doc": "Curved type sits on a path the brand already owns.",
+   "paths": [
+    "circle (badge)",
+    "lemniscate from the logo formula (never drawn as the mark itself)"
+   ],
+   "style": "Folio mono caps, 12 px minimum, ink-2, tracking +0.12 em",
+   "max_chars": 48,
+   "rules": [
+    "Decoration only; the same words appear as real text.",
+    "Never on a headline, a button or body copy.",
+    "One curved line per page."
+   ]
   }
  },
  "logo": {
@@ -1238,6 +1333,222 @@
     "mode": "midnight",
     "layout": "hero"
    }
+  ]
+ },
+ "lineage": {
+  "_doc": "The art movement the brand descends from, and what each idea becomes on a brand surface. Section 16 of BRAND.md.",
+  "movement": "Arte Programmata (programmed and kinetic art), Milan, 1962",
+  "people": "Bruno Munari and Giorgio Soavi (organisers), Umberto Eco (catalogue), Gruppo T (Milan), Gruppo N (Padua), Enzo Mari; shown in the Olivetti showroom",
+  "method": "Karl Gerstner, Designing Programmes (1964): a design is a programme, a set of rules with variables, not a fixed layout",
+  "why": "Infinite is a programme you play. Arte Programmata made art from rules, motors and chance that a visitor completes by watching or touching; a patch is the same thing with cables. Gerstner turned the same idea into a method for grids and type, which is how a website can carry it.",
+  "principles": [
+   {
+    "name": "Programme, not layout",
+    "from": "Gerstner: the grid as a programme for x unknown items; the maximum of constants with the greatest variability",
+    "rule": "Every component is a rule with variables: tokens and fluid clamps, never one-off sizes. The 12-column grid divides into 1, 2, 3, 4 and 6."
+   },
+   {
+    "name": "The open work",
+    "from": "Eco's catalogue: a work the viewer completes",
+    "rule": "Every page has one thing to touch that answers within a 1/16 note (125 ms). The visitor finishes the piece. A DAW for you."
+   },
+   {
+    "name": "Programmed, not predictable",
+    "from": "Munari and Gruppo T: motors and rules that give results no one fully foresees",
+    "rule": "Variation comes from a seed and the phase law (L5): siblings never move in step, and the same seed gives the same frame."
+   },
+   {
+    "name": "The thing itself",
+    "from": "Gruppo N: the work is to be observed as the thing itself, not a picture of something else",
+    "rule": "Show the real product, real node names and real values. No stock images, no device mockups, no fake figures."
+   },
+   {
+    "name": "Signed together",
+    "from": "Gruppo N signed works as a collective",
+    "rule": "Open source: credit community patches by name, link the code, publish the measurements."
+   }
+  ],
+  "signature": {
+   "name": "Programmed field",
+   "what": "A grid of unit marks (dot, ring, square, cross, plus, and the Pixel 5x7 digits) whose choice and size are driven by a signal: audio, noise or the pointer.",
+   "colour": "Signal on the mode ground; at most one Ember cell (the look-here).",
+   "density": "Texture at 6% opacity or less (BRAND.md section 12), or a hero field at full strength once per page.",
+   "cell_px": [
+    12,
+    16,
+    24
+   ],
+   "motion": "Cells change on the beat (L1), never faster than a 1/16 note; static under reduced motion."
+  },
+  "borrow_not": [
+   "Op-art moire and flicker (photosensitive risk, and it fights reading).",
+   "Lime or neon palettes from current glyph-matrix posters: the field takes the brand's Signal and Ember.",
+   "Chrome and liquid-metal blobs: the iridescent ball is the one hero object.",
+   "Full-page neo-brutalist borders: the brand has no outlines; structure comes from surfaces and the grid."
+  ],
+  "sources": [
+   "Lindsay Caplan, 'From Collective Creation to Creating Collectives: Arte programmata and the Open Work, 1962', Grey Room 73 (2018)",
+   "Karl Gerstner, Designing Programmes (Niggli 1964; Lars Mueller 2007)",
+   "Umberto Eco, Opera aperta (1962)"
+  ]
+ },
+ "web": {
+  "_doc": "The website's device programme. Each token is [phone, desktop]. Space tokens interpolate between 375 and 1440 px with clamp() and snap to the 4 px grid; tokens in 'stepped' are controls and radii, which change in one step at the phone breakpoint (640 px) so a control never sits at an odd size. Emitted to brand.css as --web-*; website/system.css maps them onto components.",
+  "breakpoints": {
+   "phone": 640,
+   "tablet": 1024,
+   "wide": 1440
+  },
+  "fluid_from_to": [
+   375,
+   1440
+  ],
+  "tokens": {
+   "margin": [
+    16,
+    48
+   ],
+   "gutter": [
+    16,
+    24
+   ],
+   "section": [
+    64,
+    96
+   ],
+   "section-tight": [
+    48,
+    64
+   ],
+   "card-pad": [
+    20,
+    24
+   ],
+   "card-pad-lg": [
+    24,
+    32
+   ],
+   "card-radius": [
+    20,
+    24
+   ],
+   "media-radius": [
+    12,
+    16
+   ],
+   "stack-xs": [
+    4,
+    4
+   ],
+   "stack-s": [
+    8,
+    8
+   ],
+   "stack-m": [
+    12,
+    16
+   ],
+   "stack-l": [
+    16,
+    24
+   ],
+   "stack-xl": [
+    24,
+    32
+   ],
+   "control": [
+    36,
+    40
+   ],
+   "button": [
+    40,
+    44
+   ],
+   "button-lg": [
+    48,
+    52
+   ],
+   "control-pad": [
+    12,
+    16
+   ],
+   "hit": [
+    44,
+    40
+   ],
+   "icon": [
+    18,
+    20
+   ],
+   "icon-inline": [
+    16,
+    16
+   ],
+   "icon-nav": [
+    20,
+    24
+   ],
+   "header": [
+    56,
+    60
+   ],
+   "dock": [
+    64,
+    56
+   ],
+   "max": [
+    1200,
+    1200
+   ],
+   "measure": [
+    68,
+    68
+   ]
+  },
+  "z": {
+   "base": 0,
+   "raised": 10,
+   "sticky": 40,
+   "dock": 50,
+   "header": 60,
+   "sheet": 70,
+   "modal": 80,
+   "toast": 90
+  },
+  "cards": {
+   "columns": {
+    "phone": 1,
+    "tablet": 2,
+    "desktop": 3,
+    "wide": 4
+   },
+   "min_px": 260,
+   "media_ratio": "16 / 10",
+   "title_lines": 2,
+   "body_lines": 2
+  },
+  "reels": {
+   "ratio": "9 / 16",
+   "card_px": [
+    240,
+    300
+   ],
+   "peek": 0.15,
+   "video": "16 / 9 with a poster; the player loads on tap (youtube-nocookie)"
+  },
+  "stepped": [
+   "control",
+   "button",
+   "button-lg",
+   "control-pad",
+   "hit",
+   "icon",
+   "icon-inline",
+   "icon-nav",
+   "header",
+   "dock",
+   "card-radius",
+   "media-radius"
   ]
  }
 }

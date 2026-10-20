@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
+import { pageList } from './pages.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../website');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -23,7 +24,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const args = process.argv.slice(2);
 const OUT = args[0] && !args[0].endsWith('.html') ? path.resolve(args.shift()) : path.resolve('ui_type_shots');
 const SIZES = [{ name: 'phone', width: 375, height: 812, mobile: true }, { name: 'desktop', width: 1280, height: 800, mobile: false }];
-const PAGES = args.length ? args : ['index.html', 'library.html', 'philosophy.html', 'artists.html', 'musicians.html', 'vjs.html', 'creative-coders.html', 'developers.html'];
+const PAGES = pageList(args);
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]); if (p.endsWith('/')) p += 'index.html';
@@ -35,10 +36,12 @@ await new Promise(r => server.listen(0, r));
 const base = 'http://localhost:' + server.address().port + '/';
 fs.mkdirSync(OUT, { recursive: true });
 
-const MEASURE_FN = (phone) => {
+const BRAND = JSON.parse(fs.readFileSync(path.resolve(ROOT, '../docs/brand/brand.json'), 'utf8'));
+const CAPTION_PX = BRAND.type.web_scale.find((s) => s.step === 'Caption').min;
+const MEASURE_FN = ([phone, CAPTION]) => {
   const out = { font: [], leading: [], measure: [], clip: [], edge: [], gaps: 0, motion: [] };
-  const vis = (e, cs, r) => cs.display !== 'none' && cs.visibility !== 'hidden' && +cs.opacity > 0.1 && r.width > 4 && r.height > 4;
-  const inScroll = (e) => { for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) { const o = getComputedStyle(a).overflowX; if ((o === 'auto' || o === 'scroll') && a.scrollWidth > a.clientWidth + 2) return true; } return false; };
+  const vis = (e, cs, r) => cs.display !== 'none' && cs.visibility !== 'hidden' && +cs.opacity > 0.1 && r.width > 4 && r.height > 4 && e.getBoundingClientRect().width > 2 && cs.clip === 'auto' && !/inset\(50%/.test(cs.clipPath);  // visually-hidden labels are for screen readers
+  const inScroll = (e) => { for (let a = e; a && a !== document.body; a = a.parentElement) { const o = getComputedStyle(a).overflowX; if ((o === 'auto' || o === 'scroll') && a.scrollWidth > a.clientWidth + 2) return true; } return false; };
   const skip = (e) => inScroll(e) || e.closest('.visually-hidden, canvas, svg, [aria-hidden="true"], .ax-stage, .vstage, .dock, script, style, .sr-only');
   const seen = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -50,11 +53,12 @@ const MEASURE_FN = (phone) => {
     const fs = parseFloat(cs.fontSize), lh = cs.lineHeight === 'normal' ? 1.2 : parseFloat(cs.lineHeight) / fs;
     const label = e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/)[0] : '') + ' "' + t.slice(0, 22) + '"';
     if (fs < 12) out.font.push(`${label} is ${fs.toFixed(1)}px`);
-    else if (phone && fs < 14 && t.length > 60) out.font.push(`${label} body copy is ${fs.toFixed(1)}px on a phone`);
+    else if (phone && fs < CAPTION - 0.1 && t.length > 60) out.font.push(`${label} body copy is ${fs.toFixed(1)}px on a phone`);
     const lines = Math.round(r.height / (fs * Math.max(lh, 1.15)));
-    if (lines >= 2 && !/^(hero-word|hand)$/.test(e.className.toString().split(' ')[0]) && (lh < 1.15 || lh > 2)) out.leading.push(`${label} line-height ${lh.toFixed(2)}`);
+    const minLh = fs >= 24 ? 0.95 : 1.15;  // brand.json type.web_scale: display 0.98, H1 1.04, H2 1.1; text 1.15+
+    if (lines >= 2 && !/^(hero-word|hand)$/.test(e.className.toString().split(' ')[0]) && (lh < minLh || lh > 2)) out.leading.push(`${label} line-height ${lh.toFixed(2)}`);
     if (lines >= 2 && e.tagName === 'P') { const cpl = t.length / lines; if (cpl > 80) out.measure.push(`${label} ~${cpl.toFixed(0)} characters per line`); }
-    if ((r.left >= 0 && r.left < 8) || (r.right <= innerWidth && r.right > innerWidth - 8) || (r.left < 0 && r.right > 0 && r.right < innerWidth)) { if (!e.closest('.dv-toc, .reel, .ax-reel, .strip, .ax-strip, [class*="scroll"], nav')) out.edge.push(`${label} at ${r.left.toFixed(0)}..${r.right.toFixed(0)}`); }
+    if ((r.left >= 0 && r.left < 8) || (r.right <= innerWidth && r.right > innerWidth - 8) || (r.left < 0 && r.right > 0 && r.right < innerWidth)) { if (!e.closest('.dv-toc, .reel, .ax-reel, .strip, .ax-strip, [class*="scroll"], [class*="ticker"], .marquee, nav')) out.edge.push(`${label} at ${r.left.toFixed(0)}..${r.right.toFixed(0)}`); }
     if ((cs.overflow === 'hidden' || cs.overflowX === 'hidden') && cs.textOverflow !== 'ellipsis' && e.scrollWidth > e.clientWidth + 2 && e.clientWidth > 0 && cs.whiteSpace === 'nowrap') out.clip.push(label);
   }
   document.querySelectorAll('.container > *, main section > *').forEach(e => {
@@ -87,7 +91,7 @@ for (const pg of PAGES) for (const sz of SIZES) {
     const y = Math.round(i * Math.max(0, H - sz.height) / Math.max(1, stops - 1));
     await page.evaluate(y => window.scrollTo(0, y), y); await new Promise(r => setTimeout(r, 450));
     await page.screenshot({ path: path.join(OUT, `${tag}-${sz.name}-${i + 1}.png`) });
-    const m = await page.evaluate(MEASURE_FN, sz.mobile);
+    const m = await page.evaluate(MEASURE_FN, [sz.mobile, CAPTION_PX]);
     for (const k of ['font', 'leading', 'measure', 'clip', 'edge', 'motion']) m[k].forEach(x => agg[k].add(x));
     agg.gaps = Math.max(agg.gaps, m.gaps);
   }

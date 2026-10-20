@@ -405,6 +405,101 @@
       "file": "assets/library/pixel/pulsar-beam.field",
       "preview": "assets/library/previews/pulsar-beam.jpg",
       "bytes": 1571
+    },
+    {
+      "id": "hopalong-attractor",
+      "name": "Hopalong Attractor",
+      "kind": "Generator",
+      "tags": [
+        "math",
+        "chaos",
+        "attractor",
+        "drawing"
+      ],
+      "description": "Barry Martin's Hopalong chaotic map generating glowing fractal filaments and cosmic web filaments.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 8,
+      "file": "assets/library/sketch/hopalong-attractor.js",
+      "preview": "assets/library/previews/hopalong-attractor.jpg",
+      "bytes": 1103
+    },
+    {
+      "id": "klein-bottle-3d",
+      "name": "Klein Bottle 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "topology",
+        "parametric"
+      ],
+      "description": "Parametric 4D topological Klein bottle immersed in 3D with transverse wireframe ribs, spine rails and orbiting energy quanta.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 7,
+      "file": "assets/library/sketch/klein-bottle-3d.js",
+      "preview": "assets/library/previews/klein-bottle-3d.jpg",
+      "bytes": 2334
+    },
+    {
+      "id": "fm-bell-synth",
+      "name": "FM Bell Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "fm",
+        "bell",
+        "dsp"
+      ],
+      "description": "Dual-operator phase modulation FM chime and bell synthesizer with exponential index envelope and resonant formant damping.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 6,
+      "file": "assets/templates/fm-bell-synth.inf",
+      "preview": "assets/library/previews/fm-bell-synth.jpg",
+      "bytes": 2194
+    },
+    {
+      "id": "shimmer-delay-fx",
+      "name": "Shimmer Delay FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "delay",
+        "shimmer",
+        "dsp"
+      ],
+      "description": "Multi-tap pitch-diffused shimmer delay with cross-fed harmonic reflections, tape saturation and damping filter.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 6,
+      "file": "assets/templates/shimmer-delay-fx.inf",
+      "preview": "assets/library/previews/shimmer-delay-fx.jpg",
+      "bytes": 1787
+    },
+    {
+      "id": "neural-synapse",
+      "name": "Neural Synapse",
+      "kind": "Generator",
+      "tags": [
+        "neural",
+        "reactive",
+        "network",
+        "visuals"
+      ],
+      "description": "Bio-electric neural dendritic lattice with audio-reactive action potential pulses, synaptic neurotransmitter flares and synaptic vesicle nodes.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/neural-synapse.field",
+      "preview": "assets/library/previews/neural-synapse.jpg",
+      "bytes": 1531
     }
   ]
 }

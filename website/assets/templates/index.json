@@ -305,6 +305,38 @@
     "Field Effect",
     "Audio Out"
    ]
+  },
+  {
+   "id": "fm-bell-synth",
+   "name": "FM Bell Synth",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "Synths",
+   "description": "Dual-operator phase modulation FM chime and bell synthesizer with resonant formant damping.",
+   "price": 0,
+   "preview": "assets/templates/fm-bell-synth.webp",
+   "file": "assets/templates/fm-bell-synth.inf",
+   "nodes": [
+    "Random Note Generator",
+    "Field Synth",
+    "Audio Out"
+   ]
+  },
+  {
+   "id": "shimmer-delay-fx",
+   "name": "Shimmer Delay FX",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "Audio effects",
+   "description": "Multi-tap pitch-diffused shimmer delay with cross-fed harmonic reflections and damping filter.",
+   "price": 0,
+   "preview": "assets/templates/shimmer-delay-fx.webp",
+   "file": "assets/templates/shimmer-delay-fx.inf",
+   "nodes": [
+    "Analog",
+    "Field Effect",
+    "Audio Out"
+   ]
   }
  ]
 }

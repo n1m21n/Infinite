@@ -74,7 +74,7 @@
 .ph-q { border-radius: 20px; background: color-mix(in srgb, var(--ink) 6%, transparent); padding: 4px 20px; }
 .ph-q summary { cursor: pointer; padding: 16px 0; font: 600 1rem/1.4 Geist, system-ui, sans-serif; list-style: none; }
 .ph-q summary::-webkit-details-marker { display: none; }
-.ph-q p { margin: 0 0 16px; color: color-mix(in srgb, var(--ink) 72%, transparent); line-height: 1.55; }
+.ph-q p { max-width: var(--web-measure); margin: 0 0 16px; color: color-mix(in srgb, var(--ink) 72%, transparent); line-height: 1.55; }
 @media (max-width: 680px) { .ph-caps { height: 132px; } .ph-cap { inset: 0 16px auto; } }
 
 .ph-prin { grid-template-columns: repeat(4, 1fr); }

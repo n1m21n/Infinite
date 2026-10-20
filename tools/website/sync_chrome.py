@@ -17,6 +17,8 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 GH = "https://github.com/n1m21n/Infinite"
 CSS_VERSION = __import__("hashlib").md5(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "website", "style.css"), "rb").read()).hexdigest()[:8]   # style.css cache key: a hash, so it changes with the file
+_hash = lambda f: __import__("hashlib").md5(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "website", f), "rb").read()).hexdigest()[:8]
+SYSTEM_VERSION, SCALE_VERSION = _hash("system.css"), _hash("scale.css")
 JS_VERSION = "18"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
@@ -255,8 +257,10 @@ def sync(rel, text):
         s = re.sub(r'\n(\s*<script[^>]*src=)', lambda m: '\n  ' + footer_html(rel).lstrip() + '\n\n' + m.group(1), s, count=1)
     s = re.sub(r'\n?<nav class="dock".*?</nav>\n?', "\n", s, flags=re.S)
     s = s.replace('</body>', dock_html(rel) + '\n</body>', 1)
-    s = re.sub(r'\n?[ \t]*<link rel="stylesheet" href="(?:\.\./)*scale\.css[^"]*">', '', s)
-    s = s.replace('</head>', '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'scale.css?v=09f74155">\n</head>', 1)
+    # system.css (design system primitives) then scale.css (device scale) close the head, so they win over page sheets
+    s = re.sub(r'\n?[ \t]*<link rel="stylesheet" href="(?:\.\./)*(?:system|scale)\.css[^"]*">', '', s)
+    s = s.replace('</head>', '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'system.css?v=' + SYSTEM_VERSION + '">\n'
+                  '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'scale.css?v=' + SCALE_VERSION + '">\n</head>', 1)
     s = re.sub(r'(style\.css\?v=)[A-Za-z0-9]+', r"\g<1>" + CSS_VERSION, s)
     s = re.sub(r'(site\.js\?v=)\d+', r"\g<1>" + JS_VERSION, s)
     # the brand link goes home from any page

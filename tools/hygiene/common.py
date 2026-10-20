@@ -9,7 +9,7 @@ import argparse, functools, glob, http.server, json, os, socketserver, sys, thre
 from collections import defaultdict
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-WEB = os.path.join(ROOT, "website")
+WEB = os.environ.get("SITE_DIR") or os.path.join(ROOT, "website")  # SITE_DIR: shoot or check another copy (a before snapshot)
 CHROME = os.environ.get("CHROME_PATH") or next(iter(glob.glob("/opt/pw-browsers/chromium-*/chrome-linux/chrome")), None)
 VIEWPORTS = {"phone": (390, 844), "tablet": (768, 1024), "desktop": (1440, 900)}
 SKIP_DIRS = ("library/", "assets/")  # generated per-patch pages are covered by --all
@@ -83,6 +83,10 @@ PROBE_JS = r"""
     if (r.width < 1 || r.height < 1) return;
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none') return;
+    for (let a = el; a; a = a.parentElement) {   // screen-reader-only boxes (and what is inside them) are never seen
+      const ar = a === el ? r : a.getBoundingClientRect();
+      if (ar.width <= 2 && ar.height <= 2 && getComputedStyle(a).overflow === 'hidden') return;
+    }
     if (el.closest('[hidden], .reveal:not(.in)') && false) return;
     let own = '';
     el.childNodes.forEach((c) => { if (c.nodeType === 3) own += c.textContent; });
@@ -109,7 +113,7 @@ PROBE_JS = r"""
     const r = im.getBoundingClientRect();
     out.imgs.push({src: im.currentSrc || im.src, nw: im.naturalWidth, nh: im.naturalHeight, dw: r.width, dh: r.height,
       wa: im.hasAttribute('width') && im.hasAttribute('height'), lazy: im.loading === 'lazy', alt: im.hasAttribute('alt'),
-      of: getComputedStyle(im).objectFit, top: r.top + scrollY, vis: r.width > 0 && r.height > 0});
+      of: getComputedStyle(im).objectFit, top: r.top + scrollY, vis: r.width > 0 && r.height > 0 && !im.closest('.sr-only, .visually-hidden, .plain:not(body.nogl .plain)')});
   });
   return out;
 }

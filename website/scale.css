@@ -31,4 +31,6 @@
 }
 
 /* Type floor: nothing the visitor reads is under 12px. */
-.yt-label, .node-foot, .signup-note, .app-title, span.mono, small, dt, dd, .copy-inline-btn, .dl-card code, .dl-card small, .node-name, .node-cat, .doc-s, .doc-m, code { font-size: 0.75rem !important; }
+.yt-label, .node-foot, .app-title, span.mono, small, dt, dd, .copy-inline-btn, .dl-card code, .dl-card small, .node-name, .node-cat, .doc-s, .doc-m, code { font-size: 0.75rem !important; }
+/* Code inside running text scales with it (mono reads a step smaller), never under the floor. */
+p code, li code, td code, pre code { font-size: max(var(--web-floor), 0.875em) !important; }

@@ -128,6 +128,7 @@ def write_css():
         fam = "'Geist Mono', ui-monospace, monospace" if "mono" in s["step"].lower() else "Geist, system-ui, sans-serif"
         L.append(f"  --type-{slug(s['step'])}: {s['weight']} {fluid(s['min'], s['max'])}/{s['leading']} {fam};")
         L.append(f"  --track-{slug(s['step'])}: {s['tracking']}em;")
+        L.append(f"  --size-{slug(s['step'])}: {fluid(s['min'], s['max'])};")
     for r in B["shape"]["brand_radius"]:
         L.append(f"  --radius-{slug(r['name'])}: {r['px']}px;")
     for i, sp in enumerate(B["shape"]["space"]):
@@ -139,7 +140,27 @@ def write_css():
         L.append(f"  --spring-{s['name']}-ms: {s['css_ms']}ms;  /* settles within 2% at {s['settle_ms']}ms */")
     for k, v in B["motion"]["durations_ms"].items():
         L.append(f"  --dur-{k}: {v}ms;")
+    N = B["type"]["numerals"]
+    for s in N["web_scale"]:
+        L.append(f"  --type-{slug(s['step'])}: {N['weight']} {fluid(s['min'], s['max'])}/{N['leading']} Geist, system-ui, sans-serif;")
+        L.append(f"  --size-{slug(s['step'])}: {fluid(s['min'], s['max'])};")
+    L.append(f"  --track-num: {N['tracking']}em;")
+    W = B["web"]
+    lo, hi = W["fluid_from_to"]
+    for k, (ph, dt) in W["tokens"].items():  # [phone, desktop]; space is fluid and snaps to 4 px, controls step
+        if k == "measure":
+            continue
+        if k in W["stepped"] or ph == dt:
+            L.append(f"  --web-{k}: {ph}px;")
+        else:
+            L.append(f"  --web-{k}: round(nearest, {fluid(ph, dt, lo, hi)}, 4px);")
+    # characters per line: Geist averages about 0.5em a character (1ch is the wider "0"), so 68 characters is 34em
+    L.append(f"  --web-measure: {W['tokens']['measure'][0] / 2:g}em;")
+    L += [f"  --z-{k}: {v};" for k, v in W["z"].items()]
+    L.append(f"  --web-floor: {B['type']['web_floor_px'] / 16:g}rem;")
     L.append("}")
+    L.append(f"@media (min-width: {W['breakpoints']['phone']}px) {{ :root {{ "
+             + " ".join(f"--web-{k}: {W['tokens'][k][1]}px;" for k in W["stepped"] if W["tokens"][k][0] != W["tokens"][k][1]) + " } }")
     L.append("@media (prefers-reduced-motion: reduce) { :root { " + " ".join(f"--dur-{k}: 0ms;" for k in B["motion"]["durations_ms"]) + " } }")
     open(os.path.join(DOC, "brand.css"), "w").write("\n".join(L) + "\n")
     open(os.path.join(ROOT, "website", "brand.css"), "w").write("\n".join(L) + "\n")  # the site links its own copy

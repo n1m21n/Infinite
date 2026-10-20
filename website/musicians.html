@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#FBFAF6">
   <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
   <script src="theme.js?v=2"></script>
-  <title>Infinite for musicians: synths, effects and plugins in one graph</title>
+  <title>Infinite for musicians: synths, effects and plugins</title>
   <meta name="description" content="Wavetable, FM, analog and string synths, tape delay, convolution reverb, VST3 and AU hosting, and modulation on every knob.">
   <link rel="canonical" href="https://infinitedevices.org/musicians.html">
-  <meta property="og:title" content="Infinite for musicians: synths, effects and plugins in one graph">
+  <meta property="og:title" content="Infinite for musicians: synths, effects and plugins">
   <meta property="og:description" content="Wavetable, FM, analog and string synths, tape delay, convolution reverb, VST3 and AU hosting, and modulation on every knob.">
   <meta property="og:image" content="https://infinitedevices.org/assets/og-image.jpg">
   <meta property="og:url" content="https://infinitedevices.org/musicians.html">
@@ -24,15 +24,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="brand.css?v=e96b24bf">
-  <link rel="stylesheet" href="style.css?v=7782a9e6">
+  <link rel="stylesheet" href="style.css?v=5518e9f5">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
   <link rel="stylesheet" href="blog.css?v=61bae151">
   <link rel="stylesheet" href="audience.css?v=beb744f0">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite for musicians: synths, effects and plugins in one graph", "url": "https://infinitedevices.org/musicians.html", "description": "Wavetable, FM, analog and string synths, tape delay, convolution reverb, VST3 and AU hosting, and modulation on every knob.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite for musicians: synths, effects and plugins", "url": "https://infinitedevices.org/musicians.html", "description": "Wavetable, FM, analog and string synths, tape delay, convolution reverb, VST3 and AU hosting, and modulation on every knob.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}</script>
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is Infinite a full digital audio workstation (DAW)?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Infinite is an open-source, modular digital audio workstation (DAW) and sound design environment combining polyphonic synthesis, VST3 and AU plugin hosting, mixing effects, and real-time visual generation on a single unified execution graph."}}, {"@type": "Question", "name": "Can I use VST3 and AU plugins in Infinite?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Infinite hosts 64-bit VST3 and Audio Unit (AU) plugins with low latency, full sidechain routing, MPE polyphonic expression, and external modulation on any plugin parameter."}}, {"@type": "Question", "name": "How does Infinite compare to Ableton Live and Bitwig?", "acceptedAnswer": {"@type": "Answer", "text": "Infinite is lightweight and modular: 45 MB download size (compared to 8 GB for Ableton Suite), 342 ms cold launch time, and 244 MB idle memory footprint. Furthermore, audio signals and visual shaders share the same execution graph for seamless audio-reactive visuals."}}, {"@type": "Question", "name": "Can I write custom synths and audio DSP in Infinite?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Infinite features the Field language, which lets you write per-sample DSP audio code, custom oscillators, and filters with live feedback and instant audio rate execution."}}, {"@type": "Question", "name": "Is Infinite free for music production?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Infinite is free to download for macOS, Windows, and Linux. The core source code is MIT licensed, and the binary release is GPLv3 due to bundled VST3 hosting."}}]}</script>
   <link rel="stylesheet" href="artists.css?v=36bf82b2">
   <script>document.documentElement.classList.add('js-reveal')</script>
-  <link rel="stylesheet" href="scale.css?v=09f74155">
+  <link rel="stylesheet" href="system.css?v=23625436">
+  <link rel="stylesheet" href="scale.css?v=6d378b5a">
 </head>
 <body class="blog-page">
   <header class="site-header" id="site-header">
@@ -124,7 +125,7 @@
     <div class="container">
       <section class="aud-section reveal">
         <h2 class="ax-h">Nodes</h2>
-        <div class="ax-strip"><div class="ax-nodes"><figure class="ax-node"><img src="assets/nodes/midi-notes.webp" alt="MIDI Notes: Notes go into the graph from here." loading="lazy" decoding="async"><figcaption>MIDI Notes</figcaption></figure><figure class="ax-node"><img src="assets/nodes/analog.webp" alt="Analog: Oscillators, a filter and an envelope in one voice." loading="lazy" decoding="async"><figcaption>Analog</figcaption></figure><figure class="ax-node"><img src="assets/nodes/fm.webp" alt="FM: Four operators." loading="lazy" decoding="async"><figcaption>FM</figcaption></figure><figure class="ax-node"><img src="assets/nodes/delay.webp" alt="Delay: Tape delay with wow and flutter." loading="lazy" decoding="async"><figcaption>Delay</figcaption></figure><figure class="ax-node"><img src="assets/nodes/dynamics.webp" alt="Dynamics: Clean, bus, opto and FET styles." loading="lazy" decoding="async"><figcaption>Dynamics</figcaption></figure><figure class="ax-node"><img src="assets/nodes/lfo.webp" alt="LFO: Moves any knob in the patch." loading="lazy" decoding="async"><figcaption>LFO</figcaption></figure></div></div>
+        <div class="ax-strip"><div class="ax-nodes"><figure class="ax-node"><img src="assets/nodes/midi-notes.webp" alt="MIDI Notes: Notes go into the graph from here." width="390" height="411" loading="lazy" decoding="async"><figcaption>MIDI Notes</figcaption></figure><figure class="ax-node"><img src="assets/nodes/analog.webp" alt="Analog: Oscillators, a filter and an envelope in one voice." width="329" height="658" loading="lazy" decoding="async"><figcaption>Analog</figcaption></figure><figure class="ax-node"><img src="assets/nodes/fm.webp" alt="FM: Four operators." width="363" height="658" loading="lazy" decoding="async"><figcaption>FM</figcaption></figure><figure class="ax-node"><img src="assets/nodes/delay.webp" alt="Delay: Tape delay with wow and flutter." width="390" height="504" loading="lazy" decoding="async"><figcaption>Delay</figcaption></figure><figure class="ax-node"><img src="assets/nodes/dynamics.webp" alt="Dynamics: Clean, bus, opto and FET styles." width="390" height="426" loading="lazy" decoding="async"><figcaption>Dynamics</figcaption></figure><figure class="ax-node"><img src="assets/nodes/lfo.webp" alt="LFO: Moves any knob in the patch." width="310" height="658" loading="lazy" decoding="async"><figcaption>LFO</figcaption></figure></div></div>
       </section>
       <section class="aud-section reveal ax-lab">
         <h2 class="ax-h">Play</h2>

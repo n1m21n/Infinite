@@ -18,7 +18,8 @@ for k, v in B["motion"]["app_ms"].items():
 EASE_OK = ("cubic-bezier(0.16, 1, 0.3, 1)", "cubic-bezier(0.65, 0, 0.35, 1)", "cubic-bezier(0.7, 0, 0.84, 0)", "linear", "linear(")
 RADII = {r["px"] for r in B["shape"]["brand_radius"]} | {20, 12, 8}   # card 24 (20 phone), media 16 (12 phone), chip 10, pill
 FAMILIES = [f["name"] for f in B["type"]["families"] if f["name"] != "Pixel 5x7"]
-SCALE = [(s["step"], s["min"], s["max"]) for s in B["type"]["web_scale"]]
+SCALE = [(s["step"], s["min"], s["max"]) for s in B["type"]["web_scale"] + B["type"]["numerals"]["web_scale"]]
+FLOOR = B["type"]["web_floor_px"]
 PROSE_MAX = B["type"]["measure"]["body_ch"][1]
 AMERICAN = re.compile(r"\b(color|colors|colored|center|centered|optimiz\w+|behavior|analyz\w+|favorite|gray|license[sd]? (?:the)|customiz\w+|organiz\w+|recogniz\w+|artifact)\b", re.I)
 
@@ -40,7 +41,7 @@ def is_button(e):
     if "chip.back" in e["s"]:
         return False   # the museum's floating back chip is part of that page's own glass UI
     c = " " + e["cls"] + " "
-    return e["t"] == "button" or " btn " in c or " chip " in c or " pill " in c or e["cls"].startswith(("btn", "chip")) or " reel-btn " in c
+    return e["t"] == "button" or " btn " in c or " chip " in c or " pill " in c or re.match(r"(btn|chip)(-|\s|$)", e["cls"]) is not None or " reel-btn " in c
 
 
 def is_cardlike(e):
@@ -84,7 +85,7 @@ def spacing(rec):
         # siblings of the same class laid in one row must have equal gaps and equal heights; in one column equal gaps
         groups = defaultdict(list)
         for k in flow:
-            groups[k["cls"] or k["t"]].append(k)
+            groups[(k["cls"] or "").split(" ")[0] or k["t"]].append(k)   # state classes (is-on, sel) stay in their row
         for cls, g in groups.items():
             if len(g) < 3 or not (g[0]["cls"] or g[0]["t"] in ("li", "article", "figure")):
                 continue
@@ -129,8 +130,8 @@ def typography(rec):
             if len(e["own"].split()) > 2:
                 out.append(Finding("caveat-too-long", "error", e["s"], "hand font on %d words; brand allows one human word" % len(e["own"].split())))
         fs = e["fs"]
-        if fs < 11:
-            out.append(Finding("font-too-small", "error", e["s"], "%gpx is below the 11px folio minimum" % fs))
+        if fs < FLOOR - 0.1:
+            out.append(Finding("font-too-small", "error", e["s"], "%gpx is below the %gpx web floor" % (fs, FLOOR)))
         elif first != "Caveat" and e["t"] != "code" and not any(lo - 0.6 <= fs <= hi + 0.6 for _, lo, hi in SCALE):
             out.append(Finding("font-off-scale", "warn", e["s"], "%gpx is not a web scale step" % round(fs, 1)))
         if e["t"] in ("p", "li") and e["nown"] > 140 and e["fs"]:
@@ -162,11 +163,13 @@ def buttons(rec):
     btns = [e for e in els if is_button(e) and e["h"] > 20 and not e["inpar"] and e["pos"] != "absolute"]
     for e in btns:
         r = num(e["rad"])
-        if r < min(e["h"] / 2 - 1, 999) and r < 999 and not e["cls"].startswith("icon"):
+        # controls are pills; a button taller than the large button (52) is a tile or a chart mark, which uses the card or media radius
+        if e["h"] <= 64 and r < min(e["h"] / 2 - 1, 999) and r < 999 and not e["cls"].startswith("icon"):
             out.append(Finding("button-not-pill", "error", e["s"], "radius %gpx on a %gpx tall button; brand controls are pills" % (r, round(e["h"]))))
         if rec["vp"] == "phone" and (e["h"] < 40 or e["w"] < 40):
             out.append(Finding("touch-target", "warn", e["s"], "%gx%g px; phones need 44 (40 minimum)" % (round(e["w"]), round(e["h"]))))
-        if e["pad"][1] and abs(e["pad"][1] - e["pad"][3]) > 1:
+        # equal sides, or the optical inset for a leading glyph: left up to 4px less than right (WEBSITE_SYSTEM.md, Controls)
+        if e["pad"][1] and abs(e["pad"][1] - e["pad"][3]) > 1 and not 0 < e["pad"][1] - e["pad"][3] <= 4:
             out.append(Finding("button-padding-asymmetric", "error", e["s"], "left/right padding differ"))
         if e["bw"] > 0 and e["bc"] != "rgba(0, 0, 0, 0)":
             out.append(Finding("button-outline", "warn", e["s"], "border %gpx; brand has no outlines" % e["bw"]))

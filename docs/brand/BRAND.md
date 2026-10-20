@@ -1,4 +1,4 @@
-# Infinite brand book v2
+# Infinite brand book v2.1
 
 The rules for every brand surface: website, films, thumbnails, social, docs, installers, press, 3D.
 
@@ -54,6 +54,7 @@ The book build fails if any colour pair in the contrast gate misses its WCAG rat
 | Shape | Card 24, media 16, controls are pills. No outlines anywhere. |
 | Motion | Four measured springs, three eases. Everything that shows a value stays live. |
 | 3D | The node is an instrument: real slab, recessed wells, raised controls, printed type, one key light. |
+| Lineage | Arte Programmata and Gerstner's programmes (section 16): a programme, not a layout. Signature: the programmed field. |
 
 ## 1. What changed from v1, and why
 
@@ -166,8 +167,10 @@ Web scale (fluid from 375 to 1440 px; text steps × 1.25, display × 1.5):
 | Lead | 18 → 20 | 450 | 1.45 | -0.005 em |
 | Body | 16 | 400 | 1.55 | 0 |
 | Caption | 13.5 | 500 | 1.45 | +0.005 em |
-| Micro mono | 11.5 | 500 | 1.35 | +0.04 em |
-| Folio mono caps | 11 | 500 | 1.2 | +0.12 em |
+| Micro mono | 12 | 500 | 1.35 | +0.04 em |
+| Folio mono caps | 12 | 500 | 1.2 | +0.12 em |
+
+Nothing a visitor reads on the web is under 12 px (`type.web_floor_px`). v2.1 raised the two mono steps from 11.5 and 11 to meet it.
 
 | Rule | Detail |
 |---|---|
@@ -177,6 +180,32 @@ Web scale (fluid from 375 to 1440 px; text steps × 1.25, display × 1.5):
 | Folio | Mono caps, left "INSIDE INFINITE / 03 THE PATCH", right "BAR 05 / 160 BPM" |
 | Slabs | Patch Type slabs are lowercase, tracking -0.03 em |
 | Figures | Tabular figures for any value that changes |
+
+### 3.1 Numerals
+
+Numbers are a voice of their own, after Giovanni Pintori's Olivetti posters built from figures. A big figure in Geist 800 (tracking -0.05 em, leading 0.86, tabular lining figures) with its unit in Geist Mono 500 at a quarter of the size, top-aligned to the cap height, in ink-3.
+
+| Step | Size px | Use |
+|---|---|---|
+| Num XL | 64 → 160 | One hero figure per page: a benchmark, a count, a price |
+| Num L | 40 → 72 | Stat tiles in a row of two to four |
+| Num M | 28 → 40 | Figures inside cards and tables |
+
+Value, thin space, unit (120 BPM, -6.0 dB); the unit never wraps away from its value. Pairs use a slash in ink-3 (05 / 09). Indexes are two-digit mono folios, never Ember. A figure counts up once on first view over 667 ms; reduced motion shows the final value. Every number is measured or counted, never rounded up.
+
+### 3.2 Kinetic and curved type
+
+| Move | What | When |
+|---|---|---|
+| Slab-in | Words rise 0.5 em on the slab spring, 42 ms apart | Once, first view |
+| Swap | One word cycles (the "A DAW for you" line): out ease-in 125 ms, in on the letter spring | Every 2 bars (4 s); stops when the tab is hidden |
+| Draw | The Caveat word's underline draws pin to pin over 500 ms | Once, after its headline lands |
+| Count | A numeral counts to its value | Once, first view |
+| Loop | A short mono line travels a programme path (circle or lemniscate), one lap per 8 bars | Decoration only, one per page, aria-hidden, words repeated as real text |
+
+Never: infinite animation on text people read, more than 15 characters a second, scroll-jacked type, per-letter wobble loops, blur-in on body copy, typewriter on headlines over 3 words. Under reduced motion all type appears in its final state.
+
+Curved type sits only on a circle or the lemniscate path (never drawn as the mark itself), in Folio mono caps at 12 px or more, up to 48 characters, one line per page, decoration only.
 
 ## 4. Mark
 
@@ -480,6 +509,7 @@ Audit after Romaniuk, *Building Distinctive Brand Assets* (2018): spend where an
 | Surface | State (2026-10-10) |
 |---|---|
 | `website/` | Done: links `brand.css`, palette aliases brand roles, springs by name, no retired colours (`brand_lint.py` guards it; illustration colours are baselined) |
+| `website/` design system v3 | Done (2026-10-20): `brand.json web` emits `--web-*` (device programme), `--size-*` and numeral tokens; `website/system.css` maps them onto components; `tools/website/token_lint.py` ratchets raw values; `screens.py` and `tools/seo/site_audit.py` review every page. Rules: `WEBSITE_SYSTEM.md` |
 | `website/glass.css` | Done: cards are solid surface-1, glass only behind labels at 76 to 78%, no outline rings, reduced transparency handled |
 | motion-film skills | Done: colours migrated, house style points at `brand.json` and the 3D kit |
 | `~/films/inside-infinite` palette | Open: Moon `#EEF1FA` ink |
@@ -498,3 +528,24 @@ Audit after Romaniuk, *Building Distinctive Brand Assets* (2018): spend where an
 7. A 3D node matches its app screenshot side by side.
 8. Copy: plain, specific, no em dashes, no hype.
 9. `python3 tools/brand/brand_lint.py <path>` passes.
+10. It is a programme, not a layout (section 16): sizes come from tokens, the visitor has one thing to touch, and what it shows is the real thing.
+
+## 16. Lineage
+
+Infinite descends from **Arte Programmata**, the programmed and kinetic art shown in Olivetti's Milan showroom in 1962: Bruno Munari and Giorgio Soavi organised it, Umberto Eco wrote the catalogue, and Gruppo T (Milan), Gruppo N (Padua) and Enzo Mari showed works made of rules, motors and chance that a visitor completes by watching or touching. Karl Gerstner's *Designing Programmes* (1964) turned the same idea into a method for grids and type: design the rules, not the single layout.
+
+Why this movement: Infinite is a programme you play. A patch is a set of rules with variables, wired by hand, that gives results no one fully foresees. That is what the 1962 works were, with cables instead of motors.
+
+| Principle | From | Rule on a brand surface |
+|---|---|---|
+| Programme, not layout | Gerstner: the grid as a programme for unknown items; the most constants with the most variability | Every component is a rule with variables: tokens and fluid clamps, never one-off sizes. The 12-column grid divides into 1, 2, 3, 4 and 6 |
+| The open work | Eco: a work the viewer completes | Every page has one thing to touch that answers within a 1/16 note (125 ms) |
+| Programmed, not predictable | Munari, Gruppo T: motors and rules with unforeseen results | Variation comes from a seed and the phase law (L5): siblings never move in step, the same seed gives the same frame |
+| The thing itself | Gruppo N: the work is observed as itself | Show the real product, node names and values. No stock images, device mockups or invented figures |
+| Signed together | Gruppo N signed as a collective | Open source: credit community patches by name, link the code, publish the measurements |
+
+**Signature: the programmed field.** A grid of unit marks (dot, ring, square, cross, plus and the Pixel 5x7 digits) whose choice and size are driven by a signal: audio, noise or the pointer. Signal on the mode ground with at most one Ember cell; texture at 6% or less, or a full-strength hero field once per page; cells of 12, 16 or 24 px change on the beat, never faster than a 1/16 note, and stand still under reduced motion. On the website it is `.pfield` with `field.js`.
+
+**What we do not borrow:** op-art moiré and flicker (photosensitive risk; it fights reading), the lime and neon palettes of current glyph-matrix posters (the field takes Signal and Ember), chrome and liquid-metal blobs (the iridescent ball is the one hero object), and full-page neo-brutalist borders (the brand has no outlines).
+
+Sources: Lindsay Caplan, "From Collective Creation to Creating Collectives: Arte programmata and the Open Work, 1962", *Grey Room* 73 (2018); Karl Gerstner, *Designing Programmes* (Niggli 1964; Lars Müller 2007); Umberto Eco, *Opera aperta* (1962). Values: `brand.json` `lineage`.

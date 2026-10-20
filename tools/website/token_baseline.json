@@ -1,0 +1,237 @@
+{
+ "_doc": "Ratchet for tools/website/token_lint.py: per-file counts of raw values. Lower it, never raise it.",
+ "counts": {
+  "artists.css": {
+   "duration": 1,
+   "font-size": 18,
+   "hex": 13,
+   "radius": 5
+  },
+  "audience.css": {
+   "duration": 2,
+   "font-size": 25,
+   "hex": 4,
+   "radius": 1
+  },
+  "benchmarks.css": {
+   "duration": 3,
+   "font-size": 22,
+   "radius": 8
+  },
+  "blog.css": {
+   "font-size": 23,
+   "hex": 1,
+   "radius": 3
+  },
+  "deck.css": {
+   "font-size": 6,
+   "hex": 18,
+   "radius": 4
+  },
+  "dev.css": {
+   "font-size": 9,
+   "hex": 5,
+   "radius": 2
+  },
+  "embeds/analog_crt.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/audio-waveform.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/chavetta_montage.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/chladni-cymatics.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cyber-tunnel.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/ditherpunk.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/fractal-flame.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/glitch_datamosh.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/harmonic-warp.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/hex-lattice.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/hyper-torus.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/hyperspace-tunnel.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/indie_psychedelic.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/iridescent-orb.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/kaleidoscope-mirror.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/lilliputian_surreal.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/liminal_void.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/liquid-glass.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/metaball-lens.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/neo_brutalist.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/neon-matrix.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/neural-synapse.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/op_art.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/ordered-dither.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/phyllotaxis-bloom.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/pixel-plate.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/pulsar-beam.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/quantum-vortex.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/retro_surreal.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/riso_manga_zine.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/spectrum-bars.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/technical_blueprint.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/thundr_brutalist.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/ukiyoe_cartography.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "embeds/y2k_acid.html": {
+   "font-size": 2,
+   "hex": 5,
+   "radius": 1
+  },
+  "extensions.css": {
+   "font-size": 2
+  },
+  "library-deck.css": {
+   "font-size": 4,
+   "hex": 18,
+   "radius": 4
+  },
+  "library.css": {
+   "font-size": 8,
+   "radius": 3
+  },
+  "library/*.html": {
+   "font-size": 4,
+   "radius": 2
+  },
+  "museum.css": {
+   "duration": 3,
+   "font-size": 13,
+   "hex": 12,
+   "radius": 3
+  },
+  "philosophy.css": {
+   "duration": 1,
+   "font-size": 9,
+   "hex": 26,
+   "radius": 2
+  },
+  "reels.css": {
+   "duration": 1,
+   "font-size": 1,
+   "hex": 7,
+   "radius": 1
+  },
+  "slides.html": {
+   "font-size": 19,
+   "hex": 11,
+   "radius": 10
+  },
+  "style.css": {
+   "duration": 15,
+   "font-size": 47,
+   "hex": 19,
+   "radius": 13
+  }
+ }
+}

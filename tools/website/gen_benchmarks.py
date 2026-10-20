@@ -322,7 +322,7 @@ def body_html():
 
 # ---------------------------------------------------------------------------------------------------- outputs
 SITE_CSS = """/* Benchmarks page (made by tools/website/gen_benchmarks.py): the report body on the site's own tokens. */
-.bm-wrap { max-width: 960px; margin: 0 auto; }
+.bm-wrap { margin: 0 auto; }   /* width: --wrap 960px in system.css */
 .bm-wrap p, .bm-wrap li, .bm-wrap .section-sub { max-width: 56ch; }
 .bm-wrap .lead { color: var(--ink2); font-size: 1.125rem; line-height: 1.5; }
 .bm-wrap h2 { font-size: var(--fs-h3); font-weight: 700; letter-spacing: -0.02em; margin: 56px 0 12px; scroll-margin-top: 90px; }
@@ -395,7 +395,7 @@ table.t td:first-child { color: var(--ink); font-weight: 600; }
 .ro-n .a { color: var(--accent); } .ro-n .b { color: var(--signal); }
 .ro-p { min-height: 32px; padding: 0 12px; font-size: 0.8125rem; }
 .cols { position: relative; display: flex; align-items: flex-end; gap: 6px; height: 200px; margin: 16px 0 28px; }
-.cl { position: absolute; left: 0; right: 0; top: 100%; margin-top: 8px; font-style: normal; font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.6875rem; color: var(--muted); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.cl { position: absolute; left: 0; right: 0; top: 100%; margin-top: 8px; font-style: normal; font-family: "Geist Mono", ui-monospace, monospace; font-size: var(--size-micro-mono); color: var(--muted); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .md { position: absolute; left: 0; right: 0; bottom: var(--md, 50%); height: 0; border-top: 2px dashed color-mix(in srgb, var(--ink) 20%, transparent); pointer-events: none; }
 .col, .grp { position: relative; flex: 1; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; gap: 3px; border-radius: 12px; -webkit-tap-highlight-color: transparent; transition: background var(--dur-small, 188ms); }
 .grp.sel, .col.sel { background: color-mix(in srgb, var(--ink) 5%, transparent); }
@@ -618,7 +618,7 @@ def visual_html():
 def page(body, n):
     tpl = open(os.path.join(W, "extensions.html")).read()
     head, rest = tpl.split("</head>", 1)
-    head = re.sub(r"<title>.*?</title>", "<title>Infinite benchmarks: audio, video and speed against Vital, Blender and more</title>", head, flags=re.S)
+    head = re.sub(r"<title>.*?</title>", "<title>Infinite benchmarks: audio, video and speed</title>", head, flags=re.S)
     desc = "Open, reproducible benchmarks of Infinite against Vital, Serum 2, Blender, Ableton and TouchDesigner on a MacBook Air M2, including where it is slower."
     head = re.sub(r'(<meta name="description" content=")[^"]*', lambda m: m.group(1) + desc, head)
     head = head.replace("https://infinitedevices.org/extensions.html", BASE + "benchmarks.html")
@@ -627,6 +627,7 @@ def page(body, n):
     head = re.sub(r'(og:image" content=")[^"]*', lambda m: m.group(1) + BASE + "assets/og-image.jpg", head)
     head = re.sub(r'(twitter:image" content=")[^"]*', lambda m: m.group(1) + BASE + "assets/og-image.jpg", head)
     head = head.replace('  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n', "")
+    head = re.sub(r'  <script type="application/ld\+json">.*?</script>\n', "", head, flags=re.S)   # the template's own JSON-LD
     head = head.replace("extensions.css?v=e791dc75", "benchmarks.css?v=655797c0")
     head += f'  <link rel="alternate" type="application/json" href="assets/benchmarks.json" title="Benchmark data">\n  <link rel="alternate" type="application/pdf" href="assets/{PDF_NAME}" title="Benchmark report (PDF)">\n'
     head += f'  <script type="application/ld+json">\n{jsonld(n)}\n  </script>\n'

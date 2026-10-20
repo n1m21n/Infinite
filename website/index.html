@@ -83,7 +83,7 @@
 
   <link rel="stylesheet" href="brand.css?v=e96b24bf">
 
-  <link rel="stylesheet" href="style.css?v=7782a9e6">
+  <link rel="stylesheet" href="style.css?v=5518e9f5">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
 
   <!-- Google tag (gtag.js) -->
@@ -94,7 +94,8 @@
     gtag('js', new Date());
     gtag('config', 'G-ZC4TYX1WCL');
   </script>
-  <link rel="stylesheet" href="scale.css?v=09f74155">
+  <link rel="stylesheet" href="system.css?v=23625436">
+  <link rel="stylesheet" href="scale.css?v=6d378b5a">
 </head>
 <body>
   <canvas id="cosmic-canvas" aria-hidden="true"></canvas>
@@ -225,7 +226,7 @@
           </div>
           <img class="product-shot" decoding="async" fetchpriority="high" src="assets/product_canvas_1400.webp"
                srcset="assets/product_canvas_1400.webp 1400w, assets/product_canvas.webp 2628w"
-               sizes="(max-width: 1100px) 100vw, 1080px"
+               sizes="(max-width: 1240px) 100vw, 1200px"
                alt="The Infinite canvas: visual nodes on the left, synths, sequencers and a mixer on the right, live previews in the side panel" width="2628" height="1464">
         </div>
       </div>
@@ -418,17 +419,17 @@
             <ol class="steps">
               <li class="step">
                 <span class="step-num mono">1</span>
-                <h4>Double-click the app</h4>
+                <h3>Double-click the app</h3>
                 <p>Drag <code>Infinite.app</code> to Applications and double-click it. macOS says it is from an unverified developer.</p>
               </li>
               <li class="step">
                 <span class="step-num mono">2</span>
-                <h4>Open anyway</h4>
+                <h3>Open anyway</h3>
                 <p>Open <strong>System Settings, Privacy &amp; Security</strong>, scroll to Security, and click <strong>Open Anyway</strong>.</p>
               </li>
               <li class="step">
                 <span class="step-num mono">3</span>
-                <h4>Or one line in Terminal</h4>
+                <h3>Or one line in Terminal</h3>
                 <p>Remove the quarantine flag instantly:</p>
                 <div class="code-pill">
                   <code>xattr -dr com.apple.quarantine /Applications/Infinite.app</code>
@@ -450,17 +451,17 @@
             <ol class="steps">
               <li class="step">
                 <span class="step-num mono">1</span>
-                <h4>Unblock the ZIP</h4>
+                <h3>Unblock the ZIP</h3>
                 <p>Right-click the ZIP, choose <strong>Properties</strong>, tick <strong>Unblock</strong>, then <strong>OK</strong>. Then extract it. Doing this first saves you a prompt for every file inside.</p>
               </li>
               <li class="step">
                 <span class="step-num mono">2</span>
-                <h4>Run anyway</h4>
+                <h3>Run anyway</h3>
                 <p>Run <code>Infinite.exe</code>. If SmartScreen appears, click <strong>More info</strong>, then <strong>Run anyway</strong>. Keep the folder together: <code>Infinite.exe</code> loads its assets from beside itself.</p>
               </li>
               <li class="step">
                 <span class="step-num mono">3</span>
-                <h4>Opening patches</h4>
+                <h3>Opening patches</h3>
                 <p>Patches save as <code>.infinite</code> files. Right-click one, <strong>Open with, Choose another app</strong>, pick <code>Infinite.exe</code> and tick <strong>Always</strong>. Dragging a patch onto the canvas works with no setup.</p>
               </li>
             </ol>
@@ -476,7 +477,7 @@
             <ol class="steps">
               <li class="step">
                 <span class="step-num mono">1</span>
-                <h4>Make it executable</h4>
+                <h3>Make it executable</h3>
                 <p>Download <code>Infinite-x86_64.AppImage</code>, then:</p>
                 <div class="code-pill">
                   <code>chmod +x Infinite-x86_64.AppImage</code>
@@ -485,7 +486,7 @@
               </li>
               <li class="step">
                 <span class="step-num mono">2</span>
-                <h4>Run it</h4>
+                <h3>Run it</h3>
                 <p>Double-click it, or run it from a terminal. Inside a container, or with no <code>/dev/fuse</code>, extract and run instead:</p>
                 <div class="code-pill">
                   <code>./Infinite-x86_64.AppImage --appimage-extract-and-run</code>
