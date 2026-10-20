@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#FBFAF6">
+  <meta name="theme-color" content="#151930">
   <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
   <script src="theme.js?v=2"></script>
   <title>Infinite for artists: images that move, made on one canvas</title>
@@ -23,13 +23,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="brand.css?v=e96b24bf">
-  <link rel="stylesheet" href="style.css?v=5518e9f5">
+  <link rel="stylesheet" href="brand.css?v=42bdb72d">
+  <link rel="stylesheet" href="style.css?v=eec8d63d">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
-  <link rel="stylesheet" href="blog.css?v=61bae151">
-  <link rel="stylesheet" href="audience.css?v=beb744f0">
+  <link rel="stylesheet" href="blog.css?v=36138f21">
+  <link rel="stylesheet" href="audience.css?v=1051e212">
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite for artists: images that move, made on one canvas", "url": "https://infinitedevices.org/artists.html", "description": "Layer shapes, video and 3D, add trails and glitch, and let sound move it. Free for macOS, Windows and Linux.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}</script>
-  <link rel="stylesheet" href="artists.css?v=36bf82b2">
+  <link rel="stylesheet" href="artists.css?v=29df5989">
   <script>document.documentElement.classList.add('js-reveal')</script>
   <link rel="stylesheet" href="system.css?v=23625436">
   <link rel="stylesheet" href="scale.css?v=6d378b5a">
@@ -127,15 +127,18 @@
         <div class="ax-strip"><div class="ax-nodes"><figure class="ax-node"><img src="assets/nodes/shape.webp" alt="Shape: Draw a shape with fill, stroke and feather." width="210" height="658" loading="lazy" decoding="async"><figcaption>Shape</figcaption></figure><figure class="ax-node"><img src="assets/nodes/blend.webp" alt="Blend: Stack one picture on another with 32 blend modes." width="347" height="658" loading="lazy" decoding="async"><figcaption>Blend</figcaption></figure><figure class="ax-node"><img src="assets/nodes/trails.webp" alt="Trails: Leave a fading trail: decay, zoom, rotate and hue shift." width="266" height="658" loading="lazy" decoding="async"><figcaption>Trails</figcaption></figure><figure class="ax-node"><img src="assets/nodes/glitch.webp" alt="Glitch: Tear the picture into slices. Amount, speed and seed." width="293" height="658" loading="lazy" decoding="async"><figcaption>Glitch</figcaption></figure><figure class="ax-node"><img src="assets/nodes/kaleidoscope.webp" alt="Kaleidoscope: Mirror the picture into segments." width="309" height="658" loading="lazy" decoding="async"><figcaption>Kaleidoscope</figcaption></figure></div></div>
       </section>
       <section class="aud-section reveal ax-lab">
-        <h2 class="ax-h">Knobs</h2>
-        <div class="lab" data-lab="shader" data-shader="orb" data-s="0">
-          <div class="lab-view"><canvas aria-label="A live shader you can change with the sliders" role="img"></canvas></div>
-          <div class="lab-side"><div class="ctl"><label for="c-size">Size</label><output for="c-size"></output><input id="c-size" type="range" min="0" max="1000" step="1" value="455" data-fmt="1" data-lo="0.05" data-hi="0.6" data-dp="2" data-unit=""></div><div class="ctl"><label for="c-wobble">Wobble</label><output for="c-wobble"></output><input id="c-wobble" type="range" min="0" max="1000" step="1" value="267" data-fmt="1" data-lo="0.0" data-hi="0.15" data-dp="2" data-unit=""></div><details class="ax-code"><summary><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Code</span></summary><pre class="aud-code"><code><span class="k">param float</span> size = 0.3 [0.05, 0.6];
-<span class="k">param float</span> wobble = 0.04 [0.0, 0.15];
-<span class="c">// ...</span>
-rad = size * (1.0 + wobble * sin(3.0 * ang + t * 1.1)
-  + wobble * 0.5 * sin(5.0 * ang - t * 1.3));
-edge = 1.0 - smoothstep(rad - aa, rad, r);</code></pre></details></div></div>
+        <h2 class="ax-h">Halftone</h2>
+        <div class="lab ax-print" data-lab="print">
+          <div class="lab-view"><canvas aria-label="A picture printed as a halftone screen of dots" role="img"></canvas>
+            <p class="pr-cap" aria-live="polite">Orb</p></div>
+          <div class="lab-side"><div class="pr-tiles" role="radiogroup" aria-label="Picture"><button class="pr-tile" type="button" role="radio" aria-checked="true" data-name="Orb"><span>Orb</span></button><button class="pr-tile" type="button" role="radio" aria-checked="false" data-name="Rings"><span>Rings</span></button><button class="pr-tile" type="button" role="radio" aria-checked="false" data-name="Clouds"><span>Clouds</span></button></div><div class="ctl"><label for="c-dot">Dot</label><output for="c-dot"></output><input id="c-dot" type="range" min="0" max="1000" step="1" value="400" data-fmt="1" data-lo="4" data-hi="24" data-dp="0" data-unit=" px"></div><div class="ctl"><label for="c-angle">Angle</label><output for="c-angle"></output><input id="c-angle" type="range" min="0" max="1000" step="1" value="500" data-fmt="1" data-lo="0" data-hi="90" data-dp="0" data-unit="°"></div><details class="ax-code"><summary><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Code</span></summary><pre class="aud-code"><code><span class="k">param float</span> dot = 12 [4, 24];
+<span class="k">param float</span> angle = 45 [0, 90];
+<span class="c">// one dot per cell of a turned grid</span>
+q = rotate(P, angle);
+cell = floor(q / dot);
+L = luma(sample(centre(cell)));
+r = sqrt(L) * dot * 0.62;
+out = d &lt; r ? ink : ground;</code></pre></details></div></div>
       </section>
       <section class="aud-section reveal">
         <h2 class="ax-h">Made in Infinite</h2>
@@ -143,11 +146,11 @@ edge = 1.0 - smoothstep(rad - aa, rad, r);</code></pre></details></div></div>
       </section>
       <section class="aud-section reveal">
         <h2 class="ax-h">Start with</h2>
-        <div class="aud-start"><a href="library/first-image.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>First image</a><a href="library/layered-blends.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Layered blends</a><a href="library/glitch-feedback.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Glitch feedback</a><a href="library/iridescent-orb.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Iridescent orb</a><a href="library/trail-glitch.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg>Trail glitch</a></div>
+        <div class="ax-bento"><a class="ax-bento-t big" href="library/first-image.html"><img src="assets/templates/first-image.webp" alt="" loading="lazy" decoding="async"><span class="ax-bento-l">First image</span></a><a class="ax-bento-t" href="library/layered-blends.html"><img src="assets/community/layered-blends.webp" alt="" loading="lazy" decoding="async"><span class="ax-bento-l">Layered blends</span></a><a class="ax-bento-t" href="library/glitch-feedback.html"><img src="assets/community/glitch-feedback.webp" alt="" loading="lazy" decoding="async"><span class="ax-bento-l">Glitch feedback</span></a><a class="ax-bento-t" href="library/iridescent-orb.html"><img src="assets/library/previews/iridescent-orb.jpg" alt="" loading="lazy" decoding="async"><span class="ax-bento-l">Iridescent orb</span></a><a class="ax-bento-t" href="library/trail-glitch.html"><img src="assets/community/trail-glitch.webp" alt="" loading="lazy" decoding="async"><span class="ax-bento-l">Trail glitch</span></a></div>
       </section>
       <section class="aud-section reveal">
         <h2 class="ax-h">For everyone else</h2>
-        <div class="aud-others"><a href="musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg>musicians</a><a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg>VJs</a><a href="creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg>creative coders and technologists</a><a href="developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg>developers</a></div>
+        <div class="ax-keys"><a class="ax-key" href="musicians.html"><span class="ax-key-top"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><b>Musicians</b></span></a><a class="ax-key" href="vjs.html"><span class="ax-key-top"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><b>VJs</b></span></a><a class="ax-key" href="creative-coders.html"><span class="ax-key-top"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><b>Creative coders</b></span></a><a class="ax-key" href="developers.html"><span class="ax-key-top"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><b>Developers</b></span></a></div>
       </section>
     </div>
 
@@ -204,6 +207,13 @@ edge = 1.0 - smoothstep(rad - aa, rad, r);</code></pre></details></div></div>
           <a href="blog/">Blog</a>
         </div>
         <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
+          <a href="assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
+          <a href="assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
           <p class="footer-h">Open source</p>
           <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
           <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
@@ -216,9 +226,9 @@ edge = 1.0 - smoothstep(rad - aa, rad, r);</code></pre></details></div></div>
       <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
     </div>
   </footer>
-  <script src="site.js?v=18" defer></script>
-  <script src="audience.js?v=6" defer></script>
-  <script src="artists.js?v=9" defer></script>
+  <script src="site.js?v=19" defer></script>
+  <script src="audience.js?v=9" defer></script>
+  <script src="artists.js?v=10" defer></script>
   <script>
     (function () {
       var els = document.querySelectorAll('.reveal');

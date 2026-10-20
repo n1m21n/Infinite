@@ -20,7 +20,12 @@ UA = "InfiniteSEO/1.0 (+https://infinitedevices.org)"
 def img_size_attrs(src):
     """' width="W" height="H"' for a local PNG, JPEG or WebP so the browser reserves the space (no layout shift)."""
     import struct
-    path = os.path.normpath(os.path.join(BLOG, src)) if not src.startswith(("http", "/")) else None
+    if src.startswith(BASE):
+        path = os.path.join(WEB, src[len(BASE):])  # an absolute link to this site's own file
+    elif src.startswith("/"):
+        path = os.path.join(WEB, src.lstrip("/"))
+    else:
+        path = os.path.normpath(os.path.join(BLOG, src)) if not src.startswith("http") else None
     try:
         with open(path, "rb") as f:
             d = f.read(65536)

@@ -478,7 +478,11 @@ body.blog-page { overflow-x: clip; font-family: var(--font-sans); }
 .prose img { max-width: 100%; height: auto; border-radius: var(--radius-media); box-shadow: var(--shadow-1); }
 .prose figure { margin: 2em 0; text-align: center; }
 .prose figure img { max-width: 100%; width: auto; height: auto; max-height: 560px; border-radius: var(--radius-media); box-shadow: var(--shadow-1); display: inline-block; }
-.prose figcaption { font-size: 0.8438rem; color: var(--muted); margin-top: 8px; text-align: center; line-height: 1.4; }
+.prose figcaption { font-size: var(--size-caption); color: var(--muted); margin-top: 8px; text-align: center; line-height: 1.4; }
+.prose .post-embed { width: 100%; max-width: 720px; margin: 24px 0; }
+.prose .post-embed iframe { display: block; width: 100%; border: 1px solid var(--line-soft); border-radius: var(--radius-media); }
+.prose .post-embed figcaption { font-size: var(--size-micro-mono); text-align: right; }
+.prose .post-embed figcaption a { text-decoration: none; }
 .prose blockquote { margin-left: 0; padding: 4px 0 4px 16px; border-left: 3px solid var(--signal); color: var(--ink2); }
 .prose hr { border: 0; height: 1px; background: var(--line-soft); margin: 2em 0; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-media); box-shadow: var(--shadow-1); background: var(--card); }

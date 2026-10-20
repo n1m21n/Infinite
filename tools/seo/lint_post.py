@@ -12,6 +12,7 @@ from __future__ import annotations
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import load_posts
+from build_blog import page_title
 
 HYPE = ["revolutionary", "world's first", "world-first", "game-changing", "game changer", "game-changer", "cutting-edge", "unleash", "supercharge",
         "blazing", "next-level", "next level", "groundbreaking", "ultimate", "the best ", "killer feature", "mind-blowing", "effortless"]
@@ -32,6 +33,8 @@ def lint(p):
     err, warn, b = [], [], p["body"]
     t = prose(b)
     if len(p.get("title", "")) > 70: warn.append(f"title is {len(p['title'])} chars; aim for 70 or fewer")
+    st = page_title(p) if p.get("title") else ""
+    if not 30 <= len(st) <= 60: warn.append(f"page title is {len(st)} chars; set seo_title to 30-60 characters")
     d = p.get("description", "")
     if not 70 <= len(d) <= 175: err.append(f"description is {len(d)} chars; use 70 to 175")
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", p.get("date", "")): err.append("date must be YYYY-MM-DD")

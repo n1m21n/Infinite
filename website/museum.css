@@ -124,7 +124,7 @@ body.is-focus .modes { opacity: 0; pointer-events: none; transform: translate(-5
 .hint {
   position: fixed; z-index: 9; left: 50%; bottom: max(30px, calc(env(safe-area-inset-bottom) + 18px));
   transform: translate(-50%, 6px);
-  font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.04em;
+  font: 500 12px/1.4 var(--font-mono); letter-spacing: 0.04em;
   color: var(--ink); text-align: center; white-space: nowrap;
   padding: 8px 16px; border-radius: 999px; background: var(--glass); border: 0; box-shadow: var(--shadow);
   -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);

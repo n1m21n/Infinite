@@ -77,7 +77,7 @@ def page(packs):
                      "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}})
     head = head.replace("</head>", f'  <script type="application/ld+json">{ld}</script>\n'
                                    '  <link rel="alternate" type="application/json" href="assets/extensions/extensions.json" title="Extensions">\n'
-                                   '  <link rel="stylesheet" href="extensions.css?v=e791dc75">\n</head>')
+                                   '  <link rel="stylesheet" href="extensions.css?v=4f22d1ae">\n</head>')
     header = t[t.index("  <header"):t.index("  <main>")].replace(' aria-current="page"', "")
     header = header.replace('<a href="extensions.html">', '<a href="extensions.html" aria-current="page">')
     return head + '<body class="extensions-page">\n' + header + f'''  <main>

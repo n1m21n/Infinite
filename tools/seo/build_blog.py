@@ -33,6 +33,15 @@ def chip_icon(key):
 REQUIRED = ("title", "description", "date")
 
 
+def page_title(p):
+    """The <title> and social title: `seo_title` when the post sets one, else the title with " | Infinite" when that
+    fits in 60 characters (the site audit's limit), else the bare title."""
+    if p.get("seo_title"):
+        return p["seo_title"]
+    t = f"{p['title']} | Infinite"
+    return t if len(t) <= 60 else p["title"]
+
+
 def read(name):
     return open(os.path.join(WEB, name), encoding="utf-8").read()
 
@@ -128,10 +137,10 @@ def head(title, desc, url, image, extra="", kind="website", depth="../"):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{depth}brand.css?v=e96b24bf">
-  <link rel="stylesheet" href="{depth}style.css?v=7782a9e6">
+  <link rel="stylesheet" href="{depth}brand.css?v=42bdb72d">
+  <link rel="stylesheet" href="{depth}style.css?v=dbecff2d">
   <link rel="stylesheet" href="{depth}glass.css?v=c25dae44">
-  <link rel="stylesheet" href="{depth}blog.css?v=61bae151">
+  <link rel="stylesheet" href="{depth}blog.css?v=36138f21">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -208,11 +217,11 @@ def build_index(posts, header, footer):
                "blogPost": [{"@type": "BlogPosting", "headline": p["title"], "url": p["url"], "datePublished": p["date"]} for p in posts]}
     crumbs = {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Infinite", "item": BASE}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": BASE + "blog/"}]}
-    s = head("Infinite blog: audio-reactive visuals, node-based music and code",
+    s = head("Infinite blog: audio-reactive visuals, music and code",
              "Notes on building and using Infinite, the free open-source DAW for visuals, music and code on one canvas. Tutorials, engineering write-ups and ideas.",
              BASE + "blog/", "assets/og-image.jpg", ld(blog_ld) + ld(crumbs))
     s = s.replace('blog.css?v=', 'blog.css?v=', 1)
-    s = re.sub(r'(<link rel="stylesheet" href="\.\./blog\.css\?v=[A-Za-z0-9]+">)', r'\1\n  <link rel="stylesheet" href="../deck.css?v=784414d2">', s, count=1)
+    s = re.sub(r'(<link rel="stylesheet" href="\.\./blog\.css\?v=[A-Za-z0-9]+">)', r'\1\n  <link rel="stylesheet" href="../deck.css?v=d88e5465">', s, count=1)
     s += f"""<body class="blog-page blog-index">
   {header}
 
@@ -315,7 +324,7 @@ def build_post(p, posts, header, footer):
     crumbs = {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Infinite", "item": BASE}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": BASE + "blog/"},
         {"@type": "ListItem", "position": 3, "name": p["title"], "item": p["url"]}]}
-    s = head(f"{p['title']} | Infinite", p["description"], p["url"], img or "assets/og-image.jpg", ld(art) + ld(crumbs), kind="article")
+    s = head(page_title(p), p["description"], p["url"], img or "assets/og-image.jpg", ld(art) + ld(crumbs), kind="article")
     s += f"""<body class="blog-page blog-post">
   {header}
 

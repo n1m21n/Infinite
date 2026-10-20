@@ -1,5 +1,6 @@
 ---
 title: Infinite v0.6 benchmarks: where it is fast and where it is not
+seo_title: Infinite v0.6 benchmarks: where it is fast, where it is not
 description: Infinite benchmarks on a base MacBook Air M2 against Blender, Vital, Serum 2 and popular DAWs, with the results published, including where Infinite is slower.
 date: 2026-10-17
 category: product

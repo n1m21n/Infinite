@@ -163,7 +163,7 @@ def build_gallery(items):
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#FBFAF6">
+  <meta name="theme-color" content="#151930">
   <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
   <script src="../theme.js?v=2"></script>
   <title>Infinite embeds: audio-reactive visuals for any page</title>
@@ -183,11 +183,11 @@ def build_gallery(items):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../brand.css?v=e96b24bf">
-  <link rel="stylesheet" href="../style.css?v=7782a9e6">
+  <link rel="stylesheet" href="../brand.css?v=42bdb72d">
+  <link rel="stylesheet" href="../style.css?v=dbecff2d">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
-  <link rel="stylesheet" href="../blog.css?v=61bae151">
-  <link rel="stylesheet" href="../reels.css?v=b4253cfc">
+  <link rel="stylesheet" href="../blog.css?v=36138f21">
+  <link rel="stylesheet" href="../reels.css?v=e6e2aeaf">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="blog-page reels-page">

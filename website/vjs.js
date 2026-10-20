@@ -1,5 +1,6 @@
-/* VJs page hero: a small "projector window" in the free area of the stage, running one shader in three scenes
-   (tunnel, kaleidoscope, LED grid) on a 120 BPM clock. Steer it with the pointer or a finger; press to punch. The bubbles (artists.js) send 'ax:pick'
+/* VJs page hero: a "projector window" in the free area of the stage, three scenes (tunnel, kaleidoscope, LED grid) drawn as a glyph
+   matrix: every cell a character picked by the scene's brightness, blocks of cells flipping to solid colour on the beat
+   (refs: the ASCII colour-block matrix, the dot-matrix glyph field). Ink on paper in the light modes. Scenes run on a 120 BPM clock. Steer it with the pointer or a finger; press to punch. The bubbles (artists.js) send 'ax:pick'
    to switch scene. The beat is a smooth swell, never a hard strobe. Plain WebGL. Reduced motion draws one still frame. */
 (function () {
   'use strict';
@@ -7,33 +8,38 @@
   var canvas = stage.querySelector('.ax-gl');
   var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var FRAG = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' +
-    'uniform vec2 u_res; uniform float u_t; uniform vec2 u_m; uniform float u_p; uniform float u_k; uniform vec4 u_win;\n' +
-    'const vec3 DEEP = vec3(0.051, 0.063, 0.125); const vec3 SIG5 = vec3(0.412, 0.455, 0.863); const vec3 SIG = vec3(0.655, 0.694, 1.0);\n' +
+    'uniform vec2 u_res; uniform float u_t; uniform vec2 u_m; uniform float u_p; uniform float u_k; uniform vec4 u_win; uniform float u_lt; uniform vec3 u_bg; uniform sampler2D u_atlas;\n' +
+    'const vec3 DEEP = vec3(0.051, 0.063, 0.125); const vec3 SIG5 = vec3(0.412, 0.455, 0.863); const vec3 SIG = vec3(0.655, 0.694, 1.0); const vec3 EMBER = vec3(1.0, 0.42, 0.208);\n' +
     'float hash(vec2 c) { return fract(sin(dot(c, vec2(127.1, 311.7))) * 43758.5453); }\n' +
+    'float glyph(float i, vec2 f) { return texture2D(u_atlas, vec2((clamp(i, 0.0, 15.0) + clamp(f.x, 0.02, 0.98)) / 16.0, 1.0 - f.y)).a; }\n' +
+    /* the brightness of the three scenes at one point: tunnel, kaleidoscope, LED grid */
+    'float scene(vec2 q, float t, float b, vec2 m, float kA, float kB, float kC) {\n' +
+    ' vec2 p = q - m * 0.5; float r = length(p) + 0.001; float a = atan(p.y, p.x); float z = 0.35 / r;\n' +
+    ' float vA = smoothstep(0.2, 0.95, abs(sin(z * 4.0 - t * 2.0 + b * 1.5) * sin(a * 6.0 + z * 1.2 + t * 0.6 + m.x * 2.0))) * smoothstep(0.0, 0.35, r);\n' +
+    ' vec2 k = q - m * 0.4; float ka = atan(k.y, k.x), kr = length(k); float seg = 6.2832 / 8.0; ka = abs(mod(ka, seg) - seg * 0.5);\n' +
+    ' vec2 kp = kr * vec2(cos(ka), sin(ka)) * 3.2 + vec2(t * 0.25, 0.0); float f = sin(kp.x * 3.0 + sin(kp.y * 2.4 + t * 0.8)) + sin(kp.y * 3.2 + t * 0.6 + b);\n' +
+    ' float vB = smoothstep(-1.0, 1.6, f);\n' +
+    ' vec2 gq = q * 4.0 + m * 1.5; vec2 id = floor(gq); vec2 gf = fract(gq) - 0.5; float lv = 0.5 + 0.5 * sin(id.x * 0.9 + id.y * 1.3 + t * 2.0 + hash(id) * 6.0 + b * 3.0);\n' +
+    ' float vC = smoothstep(0.5, 0.3, max(abs(gf.x), abs(gf.y)) / (0.2 + 0.35 * lv)) * (0.35 + 0.65 * lv);\n' +
+    ' return vA * kA + vB * kB + vC * kC; }\n' +
     'void main() {\n' +
     ' vec2 fc = gl_FragCoord.xy; vec2 hf = u_win.zw; vec2 d = abs(fc - u_win.xy) - hf + vec2(u_win.w * 0.12);\n' +
     ' float sd = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - u_win.w * 0.12;\n' +
     ' float mask = 1.0 - smoothstep(-1.0, 1.0, sd);\n' +
     ' if (mask <= 0.0) { gl_FragColor = vec4(0.0); return; }\n' +
-    ' vec2 q = (fc - u_win.xy) / u_win.w; float t = u_t;\n' +
-    ' float b = pow(1.0 - fract(t * 2.0), 3.0); b = b * 0.8 + u_p * 0.6;\n' +
+    ' float ch = max(11.0, u_win.w / 15.0); vec2 cs = vec2(ch * 0.62, ch); vec2 o = fc - (u_win.xy - u_win.zw);\n' +
+    ' vec2 cid = floor(o / cs); vec2 f = fract(o / cs); vec2 q = ((u_win.xy - u_win.zw) + (cid + 0.5) * cs - u_win.xy) / u_win.w; float t = u_t;\n' +
+    ' float bn = floor(t * 2.0); float b = pow(1.0 - fract(t * 2.0), 3.0); b = b * 0.8 + u_p * 0.6;\n' +
     ' q *= 1.0 - 0.12 * u_p; vec2 m = (u_m - 0.5) * vec2(1.4, 1.0);\n' +
     ' float kA = clamp(1.0 - abs(u_k), 0.0, 1.0), kB = clamp(1.0 - abs(u_k - 1.0), 0.0, 1.0), kC = clamp(1.0 - abs(u_k - 2.0), 0.0, 1.0);\n' +
-    ' /* tunnel */\n' +
-    ' vec2 p = q - m * 0.5; float r = length(p) + 0.001; float a = atan(p.y, p.x); float z = 0.35 / r;\n' +
-    ' float v = sin(z * 4.0 - t * 2.0 + b * 1.5) * sin(a * 6.0 + z * 1.2 + t * 0.6 + m.x * 2.0);\n' +
-    ' float g = smoothstep(0.15, 0.9, abs(v)); vec3 cA = mix(DEEP, SIG5, g) + SIG * pow(g, 4.0) * (0.25 + b * 0.7); cA *= smoothstep(0.0, 0.3, r);\n' +
-    ' /* kaleidoscope */\n' +
-    ' vec2 k = q - m * 0.4; float ka = atan(k.y, k.x), kr = length(k); float seg = 6.2832 / 8.0; ka = abs(mod(ka, seg) - seg * 0.5);\n' +
-    ' vec2 kp = kr * vec2(cos(ka), sin(ka)) * 3.2 + vec2(t * 0.25, 0.0);\n' +
-    ' float f = sin(kp.x * 3.0 + sin(kp.y * 2.4 + t * 0.8)) + sin(kp.y * 3.2 + t * 0.6 + b);\n' +
-    ' vec3 cB = mix(DEEP, SIG5, smoothstep(-1.2, 1.2, f)); cB += SIG * smoothstep(0.55, 1.0, sin(f * 3.0 + b * 2.5)) * (0.35 + b * 0.5);\n' +
-    ' /* LED grid */\n' +
-    ' vec2 gq = q * vec2(7.0, 7.0) + m * 1.5; vec2 id = floor(gq); vec2 gf = fract(gq) - 0.5;\n' +
-    ' float lv = 0.5 + 0.5 * sin(id.x * 0.9 + id.y * 1.3 + t * 2.0 + hash(id) * 6.0 + b * 3.0);\n' +
-    ' float dot_ = smoothstep(0.5, 0.2, length(gf) / (0.22 + 0.4 * lv)); vec3 cC = mix(DEEP, mix(SIG5, SIG, lv), dot_ * (0.5 + 0.5 * lv));\n' +
-    ' vec3 col = cA * kA + cB * kB + cC * kC;\n' +
-    ' col *= 0.82 + 0.18 * smoothstep(1.6, 0.2, length(q)); col += SIG * 0.05 * b;\n' +
+    ' float l = clamp(scene(q, t, b, m, kA, kB, kC) * (0.85 + 0.15 * smoothstep(1.6, 0.2, length(q))), 0.0, 1.0);\n' +
+    ' float gl = glyph(floor(l * 10.99), f);\n' +
+    /* on each beat a few blocks of cells flip to solid colour with the type knocked out; one of them is Ember */
+    ' vec2 bid = floor(cid / vec2(6.0, 2.0)); float blk = step(0.93 - 0.05 * u_p, hash(bid + vec2(bn * 0.731, bn * 0.177))) * step(0.12, l);\n' +
+    ' vec2 nb = ceil(u_win.zw * 2.0 / (cs * vec2(6.0, 2.0))); vec2 eb = floor(vec2(hash(vec2(bn, 1.3)), hash(vec2(2.1, bn))) * nb); float emb = 1.0 - step(0.5, length(bid - eb));\n' +
+    ' vec3 bg = DEEP, ink = SIG, blc = SIG5; if (u_lt > 0.5) { bg = u_bg; ink = vec3(0.235, 0.275, 0.62); blc = vec3(0.29, 0.33, 0.84); }\n' +
+    ' blc = mix(blc, EMBER, emb); blk = max(blk, emb);\n' +
+    ' vec3 col = mix(bg, mix(bg, ink, 0.3 + 0.7 * l), gl); col = mix(col, mix(blc, bg, gl), blk);\n' +
     ' gl_FragColor = vec4(col * mask, mask);\n' +
     '}\n';
   var g = canvas.getContext('webgl', { antialias: false, alpha: true, premultipliedAlpha: true, powerPreference: 'low-power' });
@@ -46,7 +52,8 @@
     var pr = g.createProgram(); g.attachShader(pr, vs); g.attachShader(pr, fs); g.linkProgram(pr); g.useProgram(pr);
     var buf = g.createBuffer(); g.bindBuffer(g.ARRAY_BUFFER, buf); g.bufferData(g.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), g.STATIC_DRAW);
     var loc = g.getAttribLocation(pr, 'a'); g.enableVertexAttribArray(loc); g.vertexAttribPointer(loc, 2, g.FLOAT, false, 0, 0);
-    ['u_res', 'u_t', 'u_m', 'u_p', 'u_k', 'u_win'].forEach(function (k) { U[k] = g.getUniformLocation(pr, k); });
+    ['u_res', 'u_t', 'u_m', 'u_p', 'u_k', 'u_win', 'u_lt', 'u_bg', 'u_atlas'].forEach(function (k) { U[k] = g.getUniformLocation(pr, k); });
+    if (window.InfMode) { window.InfMode.atlas(g, function () { if (still) draw(performance.now()); }); window.InfMode.watch(function () { if (still) draw(performance.now()); }); }
     return true;
   }
   var ok = init(); if (!ok) { stage.classList.add('no-gl'); return; }
@@ -79,6 +86,7 @@
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; g.viewport(0, 0, w, h); }
     var s = w / cw;
     g.uniform2f(U.u_res, w, h); g.uniform1f(U.u_t, still ? 3.2 : now / 1000); g.uniform2f(U.u_m, st.m[0], st.m[1]); g.uniform1f(U.u_p, st.p); g.uniform1f(U.u_k, st.k);
+    var md = window.InfMode ? window.InfMode.get() : { lt: 0, bg: [1, 1, 1] }; g.uniform1f(U.u_lt, md.lt); g.uniform3f(U.u_bg, md.bg[0], md.bg[1], md.bg[2]); g.uniform1i(U.u_atlas, 0);
     g.uniform4f(U.u_win, box.cx * s, (ch - box.cy) * s, box.hw * s, box.hh * s);   // pixels: centre x, centre y (gl up), half width, half height; the shader uses half height as its unit
     g.clearColor(0, 0, 0, 0); g.clear(g.COLOR_BUFFER_BIT); g.drawArrays(g.TRIANGLES, 0, 3);
   }

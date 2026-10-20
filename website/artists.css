@@ -29,7 +29,7 @@
 .ax-bubs { display: flex; gap: 8px; pointer-events: auto; max-width: 100%; }
 .ax-bub { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; border: 0; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; cursor: pointer; transition: background var(--dur-short, 188ms) var(--ease-out, ease), transform var(--dur-short, 188ms) var(--ease-out, ease); }
 .ax-bub .ic { width: 20px; height: 20px; flex: none; }
-.ax-bub:hover { background: rgba(60, 68, 108, 0.6); }
+.ax-bub:hover { background: rgba(64, 70, 96, 0.6); }
 .ax-bub:active { transform: scale(0.96); }
 .ax-bub.on { background: var(--mid-ink); color: var(--mid-deep); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .ax-cap { margin: 0; font: 600 1.0625rem/1.2 'Geist', system-ui, sans-serif; letter-spacing: -0.01em; text-shadow: 0 1px 12px rgba(4, 5, 14, 0.6); }
@@ -38,7 +38,7 @@
 
 .ax-cta { position: absolute; left: 0; right: 0; bottom: clamp(20px, 3vw, 32px); display: flex; justify-content: center; gap: 8px; padding: 0 12px; }
 .ax-ghost { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; text-decoration: none; transition: background var(--dur-short, 188ms) var(--ease-out, ease); }
-.ax-ghost:hover { background: rgba(60, 68, 108, 0.6); }
+.ax-ghost:hover { background: rgba(64, 70, 96, 0.6); }
 .ax-ghost .ic { width: 20px; height: 20px; }
 
 @media (min-width: 900px) {
@@ -85,7 +85,7 @@
 @media (max-width: 600px) { .ax-lab .lab-view { aspect-ratio: 1 / 0.85; } .ax-lab .ctl { gap: 8px; } }
 
 /* musicians: the patch bay. Grab handles are invisible 56px discs over each plug, so a finger can drag a plug while the rest of the stage still scrolls the page. */
-.ax-stage[data-hero="cables"] { background: radial-gradient(ellipse at 62% 45%, #232a55, var(--mid) 70%); cursor: default; }
+.ax-stage[data-hero="cables"] { background: radial-gradient(ellipse at 62% 45%, #232A4A, var(--mid) 70%); cursor: default; }
 .mx-grab { position: absolute; left: 0; top: 0; width: 56px; height: 56px; border-radius: 50%; touch-action: none; cursor: grab; z-index: 2; will-change: transform; }
 .mx-grab.on { cursor: grabbing; }
 .ax-stage.no-gl .mx-grab { display: none; }
@@ -100,19 +100,43 @@
 .mx-scope { flex: 1 1 auto; min-width: 0; height: 56px; width: 100%; display: block; opacity: 0.9; }
 .mx-knobs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .mx-knob { display: grid; justify-items: center; gap: 4px; }
-.mx-dial { width: 64px; height: 64px; border-radius: 50%; touch-action: none; cursor: grab; outline: none; }
+/* a real knob, the product's: a knurled skirt and a brushed, anodised indigo cap that turn; the light (sheen, highlight, shade) stays put, as it would */
+.mx-dial { position: relative; width: 88px; height: 88px; border-radius: 50%; touch-action: none; cursor: grab; outline: none; --a: 0deg; }
 .mx-dial.on { cursor: grabbing; }
-.mx-dial svg { width: 100%; height: 100%; display: block; overflow: visible; }
-.mx-dial path { fill: none; stroke-width: 5; stroke-linecap: round; }
+.mx-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+.mx-dial path { fill: none; stroke-width: 3; stroke-linecap: round; }
 .mx-track { stroke: rgba(238, 241, 250, 0.14); }
 .mx-arc { stroke: var(--mid-sig); }
-.mx-tick { stroke: var(--mid-ink); stroke-width: 4; stroke-linecap: round; transform-origin: 32px 32px; transform-box: view-box; }
+.mx-cap, .mx-shine { position: absolute; inset: 18%; border-radius: 50%; pointer-events: none; }
+.mx-cap {
+  transform: rotate(var(--a)); transition: transform 60ms linear;
+  background: repeating-conic-gradient(#151930 0deg 2.2deg, #4d5264 2.2deg 3.4deg, #0D1020 3.4deg 6deg);   /* knurled skirt */
+  box-shadow: 0 9px 14px -2px rgb(0 0 0 / 0.6), 0 3px 4px rgb(0 0 0 / 0.55), inset 0 0 0 1px rgb(255 255 255 / 0.07), 0 0 0 3px rgb(4 5 14 / 0.55);
+}
+.mx-cap::before {   /* the cap: concentric brushing, so it reads the same at any angle */
+  content: ""; position: absolute; inset: 15%; border-radius: 50%;
+  background: repeating-radial-gradient(circle, rgb(255 255 255 / 0.07) 0 0.6px, rgb(0 0 0 / 0.06) 0.6px 1.4px), radial-gradient(circle at 50% 38%, #4a5280, #2A3052 62%, #20263F);
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.35), inset 0 -2px 3px rgb(0 0 0 / 0.35), 0 1px 2px rgb(0 0 0 / 0.5);
+}
+.mx-cap::after {    /* the pointer, engraved into the cap */
+  content: ""; position: absolute; left: calc(50% - 1.5px); top: 18%; width: 3px; height: 26%; border-radius: 2px;
+  background: #EEF1FA; box-shadow: 0 0 6px rgb(238 241 250 / 0.5);
+}
+.mx-shine {   /* fixed light: a soft key top-left, shade bottom-right, two anisotropic streaks across the brushed cap */
+  background: radial-gradient(110% 110% at 28% 18%, rgb(255 255 255 / 0.28), transparent 42%), radial-gradient(90% 90% at 76% 88%, rgb(0 0 0 / 0.38), transparent 55%);
+}
+.mx-shine::before {
+  content: ""; position: absolute; inset: 15%; border-radius: 50%; mix-blend-mode: soft-light;
+  background: conic-gradient(from 0deg, transparent 0 6%, rgb(255 255 255 / 0.9) 12%, transparent 20% 50%, rgb(255 255 255 / 0.7) 62%, transparent 70%);
+}
+.mx-dial.on .mx-cap { box-shadow: 0 5px 8px -2px rgb(0 0 0 / 0.6), 0 2px 3px rgb(0 0 0 / 0.55), inset 0 0 0 1px rgb(255 255 255 / 0.07), 0 0 0 3px rgb(4 5 14 / 0.55); }
 .mx-dial:focus-visible { box-shadow: 0 0 0 3px var(--mid-sig); }
+@media (prefers-reduced-motion: reduce) { .mx-cap { transition: none; } }
 .mx-knob span { font: 500 0.8125rem/1.2 'Geist', system-ui, sans-serif; color: var(--mid-ink); }
 .mx-knob output { font: 500 0.75rem/1 'Geist Mono', ui-monospace, monospace; color: rgba(238, 241, 250, 0.7); }
 .mx-rack.live .mx-arc { filter: drop-shadow(0 0 6px rgba(167, 177, 255, 0.7)); }
 @media (min-width: 900px) { .mx-rack { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; padding: 24px; gap: 32px; } .mx-top { flex-direction: column; align-items: stretch; } .mx-scope { height: 96px; } .mx-play { justify-content: center; } .mx-dial { width: 76px; height: 76px; } }
-@media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); } .mx-dial { width: 56px; height: 56px; } .mx-rack { padding: 14px; } }
+@media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); } .mx-dial { width: 72px; height: 72px; } .mx-rack { padding: 14px; } }
 
 /* phones: Download and Guide sit top-right (small), so the bubbles drop to the bottom and the art gets the middle */
 @media (max-width: 899px) {
@@ -127,26 +151,131 @@
 .ax-shot { position: relative; }
 .ax-ttl { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 6px 12px; border-radius: var(--r-pill); font: 500 0.8125rem/1.2 'Geist', system-ui, sans-serif; color: var(--mid-ink); background: rgba(21, 25, 48, 0.55); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 
-.ax-stage[data-hero="math"] { background: radial-gradient(ellipse at 62% 48%, #1f2650, var(--mid) 72%); cursor: crosshair; }
+.ax-stage[data-hero="math"] { background: radial-gradient(ellipse at 62% 48%, #232A4A, var(--mid) 72%); cursor: crosshair; }
 
 /* Premium glass controls for every .ax-lab: one frosted panel per slider, a segmented glass switch for the pads, a glass thumb on a lit track. No outlines, no rings. */
 .ax-lab .lab-side { align-items: center; gap: 10px; padding: 14px 16px 16px; }
-.ax-lab .ctl { --p: 50%; position: relative; flex: 1 1 220px; min-width: 0; padding: 14px 18px 4px; border-radius: 22px; background: linear-gradient(180deg, rgba(238, 241, 250, 0.13), rgba(238, 241, 250, 0.06)); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 28px rgba(5, 7, 20, 0.35); row-gap: 0; }
+.ax-lab .ctl { --p: 50%; position: relative; flex: 1 1 220px; min-width: 0; padding: 14px 18px 4px; border-radius: 22px; background: linear-gradient(180deg, rgba(238, 241, 250, 0.13), rgba(238, 241, 250, 0.06)); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 28px rgba(4, 5, 14, 0.35); row-gap: 0; }
 .ax-lab .ctl label { font: 500 0.8125rem/1 'Geist', system-ui, sans-serif; color: var(--mid-ink); }
 .ax-lab .ctl output { min-width: 0; padding: 5px 10px; border-radius: var(--r-pill); background: rgba(13, 16, 32, 0.45); color: var(--mid-ink); font: 500 0.75rem/1 'Geist Mono', ui-monospace, monospace; }
 .ax-lab .ctl input[type=range] { height: 40px; }
 .ax-lab .ctl input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: var(--r-pill); background: linear-gradient(90deg, rgba(167, 177, 255, 0.5), #A7B1FF) 0 / var(--p) 100% no-repeat, rgba(13, 16, 32, 0.55); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); }
 .ax-lab .ctl input[type=range]::-moz-range-track { height: 6px; border-radius: var(--r-pill); background: rgba(13, 16, 32, 0.55); }
 .ax-lab .ctl input[type=range]::-moz-range-progress { height: 6px; border-radius: var(--r-pill); background: #A7B1FF; }
-.ax-lab .ctl input[type=range]::-webkit-slider-thumb { width: 26px; height: 26px; margin-top: -10px; background: linear-gradient(180deg, #fff, #dfe3f7); box-shadow: 0 6px 16px rgba(5, 7, 20, 0.5), inset 0 -2px 3px rgba(105, 116, 220, 0.25), 0 0 0 5px rgba(167, 177, 255, 0.18); }
-.ax-lab .ctl input[type=range]::-moz-range-thumb { width: 26px; height: 26px; background: #fff; box-shadow: 0 6px 16px rgba(5, 7, 20, 0.5); }
-.ax-lab .ctl input[type=range]:active::-webkit-slider-thumb { transform: scale(1.1); box-shadow: 0 6px 16px rgba(5, 7, 20, 0.5), 0 0 0 8px rgba(167, 177, 255, 0.22); }
+.ax-lab .ctl input[type=range]::-webkit-slider-thumb { width: 26px; height: 26px; margin-top: -10px; background: linear-gradient(180deg, #fff, #E4E2EF); box-shadow: 0 6px 16px rgba(4, 5, 14, 0.5), inset 0 -2px 3px rgba(105, 116, 220, 0.25), 0 0 0 5px rgba(167, 177, 255, 0.18); }
+.ax-lab .ctl input[type=range]::-moz-range-thumb { width: 26px; height: 26px; background: #fff; box-shadow: 0 6px 16px rgba(4, 5, 14, 0.5); }
+.ax-lab .ctl input[type=range]:active::-webkit-slider-thumb { transform: scale(1.1); box-shadow: 0 6px 16px rgba(4, 5, 14, 0.5), 0 0 0 8px rgba(167, 177, 255, 0.22); }
 .ax-lab .pads { display: inline-flex; gap: 2px; padding: 4px; border-radius: var(--r-pill); background: rgba(238, 241, 250, 0.1); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); }
 .ax-lab .pad { min-height: 40px; padding: 0 16px; background: transparent; color: rgba(238, 241, 250, 0.8); box-shadow: none; transition: background var(--dur-short, 188ms) var(--ease-out, ease), color var(--dur-short, 188ms) var(--ease-out, ease); }
 .ax-lab .pad:hover { transform: none; color: var(--mid-ink); }
-.ax-lab .pad.live { background: rgba(238, 241, 250, 0.94); color: #151930; box-shadow: 0 4px 12px rgba(5, 7, 20, 0.35); }
+.ax-lab .pad.live { background: rgba(238, 241, 250, 0.94); color: #151930; box-shadow: 0 4px 12px rgba(4, 5, 14, 0.35); }
 .ax-lab .pad.queued { animation: none; background: rgba(238, 241, 250, 0.28); color: var(--mid-ink); box-shadow: none; }
 .ax-lab .beats { margin-left: auto; padding: 0 6px; }
 @media (max-width: 600px) { .ax-lab .lab-side { padding: 10px 10px 12px; } .ax-lab .pads { width: 100%; } .ax-lab .pad { flex: 1 1 0; padding: 0 8px; min-height: 36px; } .ax-lab .beats { margin: 0 auto; } }
 .ax-video, .dv-sec .yt-embed { border-radius: var(--r-card, 24px); box-shadow: none; }
 @media (max-width: 899px) { .ax-video, .dv-sec .yt-embed { border-radius: 20px; } }
+
+/* artists lab: a halftone print (refs: Marathon and Matrix halftone posters; Dennis Ferrer's big "05 / 09" numerals) */
+.ax-print .lab-view { cursor: crosshair; }
+  color: var(--mid-ink); font: 700 clamp(3.5rem, 9vw, 7.5rem)/0.85 'Geist', system-ui, sans-serif; letter-spacing: -0.06em; font-variant-numeric: tabular-nums; text-shadow: 0 2px 24px rgb(13 16 32 / 0.6); }
+.pr-cap { position: absolute; right: clamp(16px, 3vw, 32px); bottom: clamp(12px, 2.4vw, 24px); margin: 0; pointer-events: none;
+  font: 500 0.8125rem/1 'Geist Mono', ui-monospace, monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mid-ink);
+  padding: 8px 12px; border-radius: var(--r-pill); background: rgb(13 16 32 / 0.72); }
+.pr-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; flex: 1 1 100%; }
+.pr-tile { display: flex; align-items: baseline; gap: 10px; min-height: 56px; padding: 10px 16px; border: 0; border-radius: 16px; cursor: pointer;
+  background: rgb(238 241 250 / 0.06); color: var(--mid-ink); text-align: left; transition: background var(--dur-fast, 160ms) ease, transform 120ms ease; }
+.pr-tile b { font: 700 1.75rem/1 'Geist', system-ui, sans-serif; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; opacity: 0.5; }
+.pr-tile span { font: 500 0.9375rem/1.2 'Geist', system-ui, sans-serif; }
+.pr-tile:hover { background: rgb(238 241 250 / 0.11); }
+.pr-tile:active { transform: scale(0.97); }
+.pr-tile[aria-checked="true"] { background: var(--mid-ink); color: var(--mid-deep); }
+.pr-tile[aria-checked="true"] b { opacity: 1; }
+.pr-tile:focus-visible { outline: 3px solid var(--mid-sig); outline-offset: 2px; }
+@media (max-width: 640px) { .pr-tile { flex-direction: column; gap: 4px; padding: 10px 12px; } .pr-tile b { font-size: 1.375rem; } }
+
+/* section index: 01 / 06 before each heading (ref: Dennis Ferrer gallery poster numerals) */
+
+/* start with: a bento of the patches' own pictures (refs: units., UNLOCKED bentos) */
+.ax-bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: clamp(140px, 15vw, 200px); gap: 12px; }
+.ax-bento-t { position: relative; overflow: hidden; border-radius: 20px; background: var(--mid); color: var(--mid-ink); text-decoration: none; isolation: isolate; }
+.ax-bento-t.big { grid-column: span 2; grid-row: span 2; }
+.ax-bento-t img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 600ms var(--ease-out, cubic-bezier(.2,.8,.2,1)); z-index: -1; }
+.ax-bento-t::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgb(13 16 32 / 0.85), rgb(13 16 32 / 0) 55%); z-index: -1; }
+.ax-bento-t:hover img { transform: scale(1.05); }
+.ax-bento-l { position: absolute; left: 16px; right: 16px; bottom: 14px; display: flex; flex-direction: column; gap: 4px; font: 600 1rem/1.2 'Geist', system-ui, sans-serif; }
+.ax-bento-t.big .ax-bento-l { font-size: clamp(1.25rem, 2.2vw, 1.75rem); letter-spacing: -0.02em; left: 24px; bottom: 22px; }
+.ax-bento-l small { font: 500 0.75rem/1 'Geist Mono', ui-monospace, monospace; letter-spacing: 0.08em; color: var(--mid-sig); }
+.ax-bento-t:focus-visible { outline: 3px solid var(--signal); outline-offset: 3px; }
+@media (max-width: 640px) { .ax-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 132px; gap: 8px; } }
+
+@media (prefers-reduced-motion: reduce) { .ax-bento-t img { transition: none; } }
+
+/* ---------- every mode: the sections take the page's mode; only the hero stage and media frames stay dark screens ---------- */
+.ax-main .aud-section, .ax-main .ax-lab .lab { --glass: rgb(238 241 250 / 0.06); --glass-2: rgb(238 241 250 / 0.12); --key-top: #232A4A; }
+html:not([data-mode="midnight"]) .ax-main .aud-section, html:not([data-mode="midnight"]) .ax-main .ax-lab .lab { --mid: var(--surface-1); --mid-deep: var(--surface-2); --mid-ink: var(--ink); --mid-sig: var(--signal);
+  --glass: color-mix(in srgb, var(--ink) 5%, transparent); --glass-2: color-mix(in srgb, var(--ink) 10%, transparent); --key-top: var(--surface-1); }
+html:not([data-mode="midnight"]) .ax-lab .lab, html:not([data-mode="midnight"]) .ax-node { box-shadow: var(--shadow-1); }
+html:not([data-mode="midnight"]) .ax-node img { box-shadow: 0 10px 24px rgb(21 25 48 / 0.22); }
+html:not([data-mode="midnight"]) .ax-ttl, .ax-bento-t { color: #EEF1FA; }
+.ax-bento-t { background: #151930; }   /* a media frame: dark in every mode, like the pictures it holds */
+.ax-bento-l small { color: #A7B1FF; }
+.ax-bento-t:not(.big) img { transform: scale(1.7); }
+.ax-bento-t:not(.big):hover img { transform: scale(1.78); }
+.pr-cap { background: color-mix(in srgb, var(--mid) 82%, transparent); color: var(--mid-ink); }
+.pr-tile { background: var(--glass); }
+.pr-tile:hover { background: var(--glass-2); }
+.pr-tile[aria-checked="true"] { background: var(--mid-ink); color: var(--mid); }
+.ax-lab .pads { background: var(--glass); box-shadow: none; }
+.ax-lab .pad { color: color-mix(in srgb, var(--mid-ink) 78%, transparent); }
+.ax-lab .pad.live { background: var(--mid-ink); color: var(--mid); box-shadow: 0 4px 12px rgb(4 5 14 / 0.2); }
+.ax-lab .pad.queued { background: var(--glass-2); }
+
+/* sliders: small and quiet. A hairline track, the filled part in Signal, a 14px thumb; label and value on one line above. */
+.ax-lab .ctl { --p: 50%; flex: 1 1 200px; padding: 4px 2px 0; gap: 0 12px; border-radius: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.ax-lab .ctl label { font: 500 0.8125rem/1 'Geist', system-ui, sans-serif; letter-spacing: 0; color: var(--mid-ink); }
+.ax-lab .ctl output { padding: 0; min-width: 0; background: none; font: 500 0.75rem/1 'Geist Mono', ui-monospace, monospace; color: color-mix(in srgb, var(--mid-ink) 62%, transparent); }
+/* sliders, 3D (ref: the soft 3D slider sheet): a recessed groove with ticks, a glossy pill fill, a ringed thumb with a lit centre */
+.ax-lab .ctl { --sl-hi: color-mix(in srgb, var(--mid-ink) 70%, #fff); --sl-lo: color-mix(in srgb, var(--mid-ink) 82%, #000); --sl-tick: color-mix(in srgb, var(--mid-ink) 26%, transparent); --sl-groove: color-mix(in srgb, var(--mid-ink) 7%, transparent); }
+.ax-lab .ctl input[type=range] { height: 40px; }
+.ax-lab .ctl input[type=range]::-webkit-slider-runnable-track { height: 14px; border-radius: 999px;
+  background: linear-gradient(180deg, var(--sl-hi), var(--mid-ink) 55%, var(--sl-lo)) 0 0 / max(14px, var(--p)) 100% no-repeat,
+    repeating-linear-gradient(90deg, var(--sl-tick) 0 1.5px, transparent 1.5px 6px) right 9px center / calc(100% - 18px) 6px no-repeat, var(--sl-groove);
+  box-shadow: inset 0 1px 2px rgb(13 16 32 / 0.18), 0 1px 0 color-mix(in srgb, #fff 50%, transparent); }
+.ax-lab .ctl input[type=range]::-moz-range-track { height: 14px; border-radius: 999px; background: repeating-linear-gradient(90deg, var(--sl-tick) 0 1.5px, transparent 1.5px 6px) right 9px center / calc(100% - 18px) 6px no-repeat, var(--sl-groove); box-shadow: inset 0 1px 2px rgb(13 16 32 / 0.18); }
+.ax-lab .ctl input[type=range]::-moz-range-progress { height: 14px; border-radius: 999px; background: linear-gradient(180deg, var(--sl-hi), var(--mid-ink) 55%, var(--sl-lo)); }
+.ax-lab .ctl input[type=range]::-webkit-slider-thumb { width: 26px; height: 26px; margin-top: -6px; border-radius: 50%; border: 0;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--mid) 70%, #fff) 0 18%, var(--mid) 30%, transparent 33%), radial-gradient(circle at 50% 28%, var(--sl-hi), var(--mid-ink) 50%, var(--sl-lo));
+  box-shadow: 0 6px 14px rgb(13 16 32 / 0.32), 0 2px 3px rgb(13 16 32 / 0.2), inset 0 1px 0 rgb(255 255 255 / 0.25); transition: transform 160ms var(--ease-out, ease); }
+.ax-lab .ctl input[type=range]::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; border: 0;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--mid) 70%, #fff) 0 18%, var(--mid) 30%, transparent 33%), radial-gradient(circle at 50% 28%, var(--sl-hi), var(--mid-ink) 50%, var(--sl-lo));
+  box-shadow: 0 6px 14px rgb(13 16 32 / 0.32), 0 2px 3px rgb(13 16 32 / 0.2); }
+.ax-lab .ctl input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.06); }
+.ax-lab .ctl input[type=range]:active::-webkit-slider-thumb { transform: scale(0.94); }
+.ax-lab .ctl input[type=range]:focus-visible { outline: none; }
+.ax-lab .ctl input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 6px 14px rgb(13 16 32 / 0.32), 0 0 0 3px var(--mid), 0 0 0 5px var(--mid-sig); }
+@media (pointer: coarse) { .ax-lab .ctl input[type=range] { height: 44px; } }
+
+/* the rack: in the light modes a brushed silver faceplate, same indigo knobs */
+.mx-scope { color: var(--mid-sig); }
+.mx-track { stroke: color-mix(in srgb, var(--mid-ink) 14%, transparent); }
+.mx-knob output { color: color-mix(in srgb, var(--mid-ink) 66%, transparent); }
+.mx-play[aria-pressed="true"] { background: var(--glass-2); color: var(--mid-ink); }
+html:not([data-mode="midnight"]) .mx-rack { background: repeating-linear-gradient(90deg, rgb(255 255 255 / 0.22) 0 1px, transparent 1px 3px), linear-gradient(180deg, #F5F5F8, #DAD8E6);
+  box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgb(21 25 48 / 0.12), 0 14px 30px rgb(21 25 48 / 0.14); }
+html:not([data-mode="midnight"]) .mx-cap { box-shadow: 0 9px 14px -2px rgb(21 25 48 / 0.45), 0 3px 4px rgb(21 25 48 / 0.4), inset 0 0 0 1px rgb(255 255 255 / 0.07), 0 0 0 3px rgb(21 25 48 / 0.18); }
+.ax-bento-t:last-child:nth-child(even) { grid-column: 1 / -1; }   /* an even count leaves one over: it becomes the closing banner */
+.ax-main .aud-section .ax-code summary, .ax-main .aud-section .ax-nodes figcaption { background: var(--glass-2); color: var(--mid-ink); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+.ax-print .lab-view { margin: 12px 12px 0; border-radius: 16px; }   /* the print sits on the panel like a sheet */
+.ax-main .aud-section .ax-shot { background: #0D1020; }   /* media frame, dark in every mode */
+
+/* ---------- hero stages in the light modes: the stage takes the page's ground and the art turns to ink (refs: the soft 3D objects on pale grounds) ---------- */
+.ax-copy p { color: color-mix(in srgb, var(--mid-ink) 78%, transparent); }
+html:not([data-mode="midnight"]) .ax-stage { --mid: var(--surface-1); --mid-deep: var(--surface-2); --mid-ink: var(--ink); --mid-sig: var(--signal); box-shadow: var(--shadow-1), inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent); }
+html:not([data-mode="midnight"]) .ax-stage[data-hero="cables"] { background: radial-gradient(ellipse at 62% 45%, var(--surface-1), var(--surface-2) 75%); }
+html:not([data-mode="midnight"]) .ax-stage .ax-bub, html:not([data-mode="midnight"]) .ax-stage .ax-ghost, html:not([data-mode="midnight"]) .ax-stage .ax-hint {
+  background: color-mix(in srgb, var(--surface-1) 72%, transparent); color: var(--ink); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(21 25 48 / 0.08), 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent); }
+html:not([data-mode="midnight"]) .ax-stage .ax-bub:hover, html:not([data-mode="midnight"]) .ax-stage .ax-ghost:hover { background: color-mix(in srgb, var(--ink) 8%, var(--surface-1)); }
+html:not([data-mode="midnight"]) .ax-stage .ax-bub.on { background: var(--ink); color: var(--surface-1); box-shadow: 0 4px 12px rgb(21 25 48 / 0.18); }
+html:not([data-mode="midnight"]) .ax-cap { text-shadow: none; }
+html:not([data-mode="midnight"]) .ax-stage.no-gl { background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--signal) 18%, var(--surface-1)), var(--surface-1) 62%); }
+html:not([data-mode="midnight"]) .ax-stage[data-hero="math"] { background: radial-gradient(circle, color-mix(in srgb, var(--ink) 14%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--surface-1); }   /* graph paper */

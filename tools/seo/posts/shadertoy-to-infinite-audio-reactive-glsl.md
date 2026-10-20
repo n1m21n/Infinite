@@ -1,5 +1,6 @@
 ---
 title: Bringing Shadertoy GLSL shaders into Infinite for audio reactivity
+seo_title: Shadertoy GLSL shaders in Infinite, made audio-reactive
 description: How to convert any Shadertoy fragment shader into a native real-time node in Infinite, hook it up to audio analysis FFT bands, and export high-resolution video.
 date: 2026-10-19
 category: creative
@@ -59,10 +60,10 @@ col = (wire + center) * (0.7 + 0.5 * bass);
 
 You can test this exact visualizer running live in WebGL below:
 
-<figure style="margin:24px 0;width:100%;max-width:720px;">
-  <iframe src="https://infinitedevices.org/embeds/cyber-tunnel.html" title="Cyber Tunnel — Audio-Reactive Visualizer by Naman Soni (Infinite)" width="100%" height="400" frameborder="0" allow="microphone" style="border-radius:12px;border:1px solid #20263f;display:block;"></iframe>
-  <figcaption style="font-size:11px;color:#8890b1;text-align:right;margin-top:6px;">
-    powered by <a href="https://infinitedevices.org" target="_blank" rel="noopener" style="color:#ff6b35;text-decoration:none;">infinite by naman soni</a>
+<figure class="post-embed">
+  <iframe src="https://infinitedevices.org/embeds/cyber-tunnel.html" title="Cyber Tunnel — Audio-Reactive Visualizer by Naman Soni (Infinite)" width="100%" height="400" frameborder="0" allow="microphone"></iframe>
+  <figcaption>
+    powered by <a href="https://infinitedevices.org" target="_blank" rel="noopener">infinite by naman soni</a>
   </figcaption>
 </figure>
 

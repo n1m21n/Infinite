@@ -953,18 +953,18 @@
 
   /* ------------------------------------------------------------ YouTube click-to-load */
   function initYouTube() {
-    const box = $('#yt-embed');
-    if (!box) return;
-    const btn = $('.yt-poster', box);
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-      const f = document.createElement('iframe');
-      f.src = `https://www.youtube-nocookie.com/embed/${box.dataset.id}?autoplay=1&rel=0`;
-      f.title = 'Getting started with Infinite';
-      f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-      f.allowFullscreen = true;
-      box.innerHTML = '';
-      box.appendChild(f);
+    document.querySelectorAll('.yt-embed[data-id]').forEach((box) => {
+      const btn = $('.yt-poster', box);
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const f = document.createElement('iframe');
+        f.src = `https://www.youtube-nocookie.com/embed/${box.dataset.id}?autoplay=1&rel=0`;
+        f.title = box.dataset.title || 'Getting started with Infinite';
+        f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+        f.allowFullscreen = true;
+        box.innerHTML = '';
+        box.appendChild(f);
+      });
     });
   }
 

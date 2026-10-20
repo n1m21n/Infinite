@@ -27,6 +27,9 @@ body.reels-page {
   pointer-events: auto;
 }
 
+/* The reel is always a dark stage, whatever the mode: the header reads light over it. */
+.reels-page header.site-header .brand-name { color: white; text-shadow: 0 1px 8px rgb(0 0 0 / 0.5); }
+
 .reels-page footer.site-footer {
   display: none !important;
 }

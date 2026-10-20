@@ -10,7 +10,7 @@
   var caps = (stage.getAttribute('data-caps') || '32 blend modes|3D with real materials|A picture from a formula').split('|');
 
   var FRAG = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' +
-    'uniform vec2 u_res; uniform float u_t; uniform vec2 u_m; uniform float u_p; uniform float u_k; uniform float u_scroll; uniform vec3 u_view;\n' +
+    'uniform vec2 u_res; uniform float u_t; uniform vec2 u_m; uniform float u_p; uniform float u_k; uniform float u_scroll; uniform vec3 u_view; uniform float u_lt; uniform vec3 u_bg;\n' +
     'const vec3 DEEP = vec3(0.051, 0.063, 0.125); const vec3 GROUND = vec3(0.082, 0.098, 0.188); const vec3 SIG5 = vec3(0.412, 0.455, 0.863); const vec3 SIG = vec3(0.655, 0.694, 1.0);\n' +
     'float field(vec2 p, vec2 c, float t) {\n' +
     ' float f = 0.0; float pr = 0.15 * (1.0 + 0.4 * u_p); f += pr * pr / (dot(p - c, p - c) + 0.0008);\n' +
@@ -44,6 +44,11 @@
     ' vec3 bg = mix(DEEP, GROUND, smoothstep(-0.6, 0.7, uv.y + 0.2 * sin(uv.x * 2.0 + t * 0.1)));\n' +
     ' bg += SIG5 * 0.16 * smoothstep(0.15, 1.2, f) * (0.6 + 0.4 * sin(t * 0.4));\n' +
     ' bg *= 1.0 - 0.35 * dot(uv, uv);\n' +
+    ' if (u_lt > 0.5) {\n' +
+    /* light modes: the glossy object on a pale ground (refs: the soft 3D objects on light grounds), a soft contact shadow, the dots in ink */
+    '  bg = u_bg * (1.0 - 0.05 * dot(uv, uv)) - vec3(0.09, 0.085, 0.04) * smoothstep(0.35, 1.0, f) * (1.0 - inside);\n' +
+    '  cC = mix(u_bg, vec3(0.235, 0.275, 0.62), dotr * (0.5 + 0.6 * height(f)));\n' +
+    '  body = cA * kA + cB * kB + cC * kC; }\n' +
     ' gl_FragColor = vec4(mix(bg, body, inside), 1.0);\n' +
     '}\n';
 
@@ -58,10 +63,11 @@
     var pr = g.createProgram(); g.attachShader(pr, vs); g.attachShader(pr, fs); g.linkProgram(pr); g.useProgram(pr);
     var buf = g.createBuffer(); g.bindBuffer(g.ARRAY_BUFFER, buf); g.bufferData(g.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), g.STATIC_DRAW);
     var loc = g.getAttribLocation(pr, 'a'); g.enableVertexAttribArray(loc); g.vertexAttribPointer(loc, 2, g.FLOAT, false, 0, 0);
-    ['u_res', 'u_t', 'u_m', 'u_p', 'u_k', 'u_scroll', 'u_view'].forEach(function (k) { U[k] = g.getUniformLocation(pr, k); });
+    ['u_res', 'u_t', 'u_m', 'u_p', 'u_k', 'u_scroll', 'u_view', 'u_lt', 'u_bg'].forEach(function (k) { U[k] = g.getUniformLocation(pr, k); });
     return true;
   }
   var ok = hero === 'blob' ? init() : false;
+  if (ok && window.InfMode) window.InfMode.watch(function () { if (still) draw(performance.now()); });
   if (hero === 'blob' && !ok) stage.classList.add('no-gl');
 
   /* the blob lives in the free area: below the headline and above the bubbles on phones, right of the headline on desktop */
@@ -89,6 +95,7 @@
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; g.viewport(0, 0, w, h); }
     g.uniform2f(U.u_res, w, h); g.uniform1f(U.u_t, still ? 3.2 : now / 1000); g.uniform2f(U.u_m, st.m[0], st.m[1]);
     g.uniform1f(U.u_p, st.p); g.uniform1f(U.u_k, st.k); g.uniform1f(U.u_scroll, st.scroll);
+    var md = window.InfMode ? window.InfMode.get() : { lt: 0, bg: [1, 1, 1] }; g.uniform1f(U.u_lt, md.lt); g.uniform3f(U.u_bg, md.bg[0], md.bg[1], md.bg[2]);
     g.uniform3f(U.u_view, view[0], view[1], view[2]);
     g.drawArrays(g.TRIANGLES, 0, 3);
   }

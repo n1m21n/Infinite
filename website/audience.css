@@ -30,6 +30,7 @@
 
 /* ---- sections ---- */
 .aud-section { margin-top: clamp(44px, 7vw, 96px); }
+.ax-main { padding-bottom: var(--web-section); }   /* the last section ends a full section-space before the footer */
 .aud-section > h2, .sec-head h2 { font-size: var(--fs-h2); font-weight: 750; letter-spacing: -0.03em; margin: 0 0 8px; }
 .sec-sub { margin: 0 0 24px; color: var(--ink2); max-width: 44em; line-height: 1.55; }
 .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
@@ -207,3 +208,21 @@
 
 @media (hover: none) { .pad:hover, .play:hover, .run:hover, .reel a.frame:hover, .reel-btn:hover:not(:disabled), .aud-start a:hover { transform: none; } }
 .run.busy { transform: scale(0.96); }
+
+/* ---------- shared by every audience page (artists, musicians, VJs, creative coders, developers) ---------- */
+
+/* the other audiences as keycaps: a pressable top on a deep base (refs: Swapper Arcade tiles, Writtl 3D buttons, the dot-matrix glyph sheet) */
+.ax-keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.ax-key { display: block; border-radius: 22px; background: var(--mid-deep); padding-bottom: 8px; text-decoration: none; box-shadow: 0 10px 24px rgb(13 16 32 / 0.25); }
+.ax-key-top { display: flex; align-items: center; gap: 10px; min-height: 72px; padding: 0 18px; border-radius: 22px;
+  background: linear-gradient(180deg, var(--key-top, #232A4A), var(--mid)); color: var(--mid-ink); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1);
+  transition: transform 140ms cubic-bezier(.3,.7,.4,1.4); }
+.ax-key .ic { width: 20px; height: 20px; color: var(--mid-sig); }
+.ax-key b { font: 600 1.0625rem/1.25 'Geist', system-ui, sans-serif; }
+.ax-key:hover .ax-key-top { transform: translateY(3px); }
+.ax-key:active .ax-key-top { transform: translateY(8px); transition-duration: 60ms; }
+.ax-key:focus-visible { outline: 3px solid var(--signal); outline-offset: 3px; }
+@media (max-width: 640px) { .ax-keys { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .ax-key-top { min-height: 64px; padding: 0 14px; gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { .ax-key-top { transition: none; } }
+html:not([data-mode="midnight"]) .ax-key { background: var(--surface-3); box-shadow: 0 8px 20px rgb(21 25 48 / 0.12); }
+html:not([data-mode="midnight"]) .ax-key-top { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 0 rgb(21 25 48 / 0.06); }

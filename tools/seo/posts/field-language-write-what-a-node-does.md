@@ -1,5 +1,6 @@
 ---
 title: Field: write a short kernel and let the node decide where it runs
+seo_title: Field: write a kernel, the node decides where it runs
 description: Field is the language built into Infinite. One kernel can become a shader, a geometry deformer or an audio effect, depending on the node it lives in.
 date: 2026-10-17
 category: product

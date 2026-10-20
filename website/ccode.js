@@ -1,5 +1,5 @@
 /* Creative coders hero: three maths scenes drawn live on one 2D canvas in the free area of the stage.
-   Orbit = Lorenz attractor, Bloom = phyllotaxis, Cells = Rule 110 family. Pointer x / y change the two numbers that matter in each scene;
+   Orbit = Lorenz attractor, Bloom = phyllotaxis, Cells = Rule 110 family; Bloom and Cells are drawn in the brand's unit marks. Ink on paper in the light modes. Pointer x / y change the two numbers that matter in each scene;
    press to kick it. The bubbles (artists.js) send 'ax:pick' to switch scene. Reduced motion draws one still frame. */
 (function () {
   'use strict';
@@ -7,6 +7,15 @@
   var canvas = stage.querySelector('.ax-gl'), c = canvas.getContext('2d'); if (!c) return;
   var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var SIG = '167,177,255', SIG5 = '105,116,220', EMBER = '255,122,89';
+  function palette() { var lt = window.InfMode && window.InfMode.get().lt; SIG = lt ? '60,70,158' : '167,177,255'; SIG5 = lt ? '74,84,214' : '105,116,220'; }   // Signal light on Midnight, indigo ink on paper
+  /* the brand's unit marks (field.js): 0 dot, 1 ring, 2 square, 3 cross, 4 plus */
+  function mark(k, x, y, sz, col) {
+    var h = sz / 2; c.fillStyle = col; c.strokeStyle = col; c.lineWidth = Math.max(1, sz * 0.18);
+    if (k === 0) { c.beginPath(); c.arc(x, y, h * 0.62, 0, 6.2832); c.fill(); }
+    else if (k === 1) { c.beginPath(); c.arc(x, y, h * 0.6, 0, 6.2832); c.stroke(); }
+    else if (k === 2) c.fillRect(x - h * 0.55, y - h * 0.55, h * 1.1, h * 1.1);
+    else { var e = h * 0.62; c.beginPath(); if (k === 3) { c.moveTo(x - e, y - e); c.lineTo(x + e, y + e); c.moveTo(x + e, y - e); c.lineTo(x - e, y + e); } else { c.moveTo(x - e, y); c.lineTo(x + e, y); c.moveTo(x, y - e); c.lineTo(x, y + e); } c.stroke(); }
+  }
   var st = { m: [0.5, 0.5], tm: [0.5, 0.5], p: 0, scene: 0, last: 0, idle: 9, vis: true, t: 0 };
   var box = { x: 0, y: 0, w: 100, h: 100 }, dpr = 1;
 
@@ -35,18 +44,18 @@
 
   function drawBloom() {
     var N = 520, turn = 137.5 + (st.m[0] - 0.5) * 8 + (still ? 0 : Math.sin(st.t * 0.4) * 0.15), seeds = Math.round(160 + st.m[1] * 360 + st.p * 80);
-    var R = Math.min(box.w, box.h) / 2 - 6, cx = box.x + box.w / 2, cy = box.y + box.h / 2, ga = turn * Math.PI / 180, rot = still ? 0 : st.t * 0.08;
+    var R = Math.min(box.w, box.h) / 2 - 6, cx = box.x + box.w / 2, cy = box.y + box.h / 2, ga = turn * Math.PI / 180, rot = still ? 0 : st.t * 0.08, beat = still ? 0 : Math.floor(st.t * 2);
+    c.lineCap = 'butt';
     for (var i = 1; i < Math.min(N, seeds); i++) {
-      var r = R * Math.sqrt(i / seeds), a = i * ga + rot, f = i / seeds;
-      c.fillStyle = (i === 1 || i === 2) ? 'rgb(' + EMBER + ')' : 'rgba(' + (f > 0.6 ? SIG : SIG5) + ',' + (0.35 + f * 0.6).toFixed(2) + ')';
-      c.beginPath(); c.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 1.2 + f * 3.4 * (R / 150), 0, 6.2832); c.fill();
+      var r = R * Math.sqrt(i / seeds), a = i * ga + rot, f = i / seeds, band = Math.floor(6 * Math.sqrt(f));   // rings of seeds share a mark; the marks step on the beat
+      mark(i === 1 ? 0 : (band + beat) % 5, cx + Math.cos(a) * r, cy + Math.sin(a) * r, (3 + f * 7) * (R / 150), i === 1 ? 'rgb(' + EMBER + ')' : 'rgba(' + (band % 2 ? SIG5 : SIG) + ',' + (0.55 + f * 0.45).toFixed(2) + ')');
     }
   }
 
   /* Rule 110 family: rows scroll upward, x picks the rule */
   var RULES = [110, 30, 90, 150], COLS = 0, ROWS = 0, grid = [], acc = 0, cell = 6;
   function seed() {
-    cell = box.w < 330 ? 6 : 7; COLS = Math.max(20, Math.floor(box.w / cell)); ROWS = Math.max(12, Math.floor(box.h / cell)); grid = [];
+    cell = box.w < 330 ? 8 : 10; COLS = Math.max(20, Math.floor(box.w / cell)); ROWS = Math.max(12, Math.floor(box.h / cell)); grid = [];
     var row = new Uint8Array(COLS); row[COLS - 2] = 1; row[COLS >> 1] = 1; grid.push(row);
     for (var i = 1; i < ROWS; i++) grid.push(next(grid[i - 1]));
   }
@@ -63,7 +72,10 @@
     var ox = box.x + (box.w - COLS * cell) / 2, oy = box.y + (box.h - ROWS * cell) / 2;
     for (var y = 0; y < grid.length; y++) {
       var al = 0.25 + 0.75 * (y / grid.length), row = grid[y];
-      for (var x = 0; x < COLS; x++) if (row[x]) { c.fillStyle = 'rgba(' + (y === grid.length - 1 ? EMBER : SIG) + ',' + (y === grid.length - 1 ? 1 : al).toFixed(2) + ')'; c.fillRect(ox + x * cell + 0.5, oy + y * cell + 0.5, cell - 1.5, cell - 1.5); }
+      for (var x = 0; x < COLS; x++) if (row[x]) {   // live cells as unit marks: a square, a cross where the left neighbour is dead, a ring where the right one is (ref: the dot-matrix glyph field)
+        var k = y === grid.length - 1 ? 2 : !row[(x + COLS - 1) % COLS] ? 3 : !row[(x + 1) % COLS] ? 1 : 2;
+        mark(k, ox + x * cell + cell / 2, oy + y * cell + cell / 2, cell - 0.5, 'rgba(' + (y === grid.length - 1 ? EMBER : SIG) + ',' + (y === grid.length - 1 ? 1 : al).toFixed(2) + ')');
+      }
     }
   }
 
@@ -89,7 +101,7 @@
     st.p += ((st.tp || 0) - st.p) * (1 - Math.exp(-dt * 10));
     dpr = Math.min(window.devicePixelRatio || 1, 2); var cw = canvas.clientWidth, ch = canvas.clientHeight, w = Math.round(cw * dpr), h = Math.round(ch * dpr);
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-    c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, cw, ch);
+    c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, cw, ch); palette();
     if (st.scene === 0) drawLorenz(dt); else if (st.scene === 1) drawBloom(); else drawCells(dt);
   }
   function loop(now) { var dt = Math.min(0.05, (now - st.last) / 1000 || 0.016); st.last = now; if (st.vis && !document.hidden) draw(dt); requestAnimationFrame(loop); }
@@ -106,5 +118,6 @@
   stage.addEventListener('pointerdown', function (e) { if (e.target.closest('button, a')) return; st.tp = 1; aim(e); }, { passive: true });
   addEventListener('pointerup', function () { st.tp = 0; }, { passive: true });
   addEventListener('pointercancel', function () { st.tp = 0; }, { passive: true });
+  if (window.InfMode) window.InfMode.watch(function () { if (still) draw(0.016); });
   stage.addEventListener('ax:pick', function (e) { st.scene = e.detail; st.idle = 0; grid = []; if (still) draw(0.016); });
 })();

@@ -9,6 +9,7 @@
      clip     text cut off by its own box (scrollWidth > clientWidth with overflow hidden and no ellipsis)
      edge     visible text closer than 8px to the screen edge
      gap      sibling cards or controls whose gap is not a multiple of 4px (reported as a count per page, not a failure)
+     end      the last content of the page closer than 32px to the footer (a full-width band with its own ground is exempt)
      motion   infinite animations running on text, animation durations over 6s, and whether prefers-reduced-motion stops them
    Exit code: 0 clean, 1 problems found. */
 import http from 'node:http';
@@ -97,6 +98,22 @@ for (const pg of PAGES) for (const sz of SIZES) {
   }
   for (const k of ['font', 'leading', 'measure', 'clip', 'edge', 'motion']) for (const x of agg[k]) report(`${k}: ${x}`);
   if (agg.gaps) console.log(`  · ${agg.gaps} section gaps off the 4px grid (info)`);
+  const endGap = await page.evaluate(() => {   // the page must breathe before the footer
+    document.querySelectorAll('.reveal').forEach(e => e.classList.add('in'));
+    const ft = document.querySelector('body > footer, footer.site-footer'); const main = document.querySelector('main');
+    if (!ft || !main || getComputedStyle(ft).display === 'none') return null;
+    const top = ft.getBoundingClientRect().top; let last = -1, who = '';
+    for (const el of main.querySelectorAll('*')) {
+      const r = el.getBoundingClientRect(); if (r.height < 2 || r.width < 2 || r.bottom > top + 1) continue;
+      const cs = getComputedStyle(el);
+      const painted = [...el.childNodes].some(c => c.nodeType === 3 && c.textContent.trim()) || cs.backgroundColor !== 'rgba(0, 0, 0, 0)' || cs.boxShadow !== 'none' || ['IMG', 'VIDEO', 'CANVAS', 'IFRAME'].includes(el.tagName);
+      if (!painted || r.bottom <= last) continue;
+      const band = r.width >= innerWidth - 2 && cs.backgroundColor !== 'rgba(0, 0, 0, 0)';
+      last = r.bottom; who = band ? '' : el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.split(' ')[0] : '');
+    }
+    return who && top - last < 32 ? `${who} ends ${Math.round(top - last)}px before the footer` : null;
+  });
+  if (endGap) report('end: ' + endGap);
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]); await page.reload({ waitUntil: 'networkidle2' }).catch(() => {}); await new Promise(r => setTimeout(r, 800));
   const run = await page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running' && a.effect && a.effect.getComputedTiming().iterations === Infinity && !(a.effect.target && a.effect.target.closest('canvas'))).length);
   if (run > 3) report(`motion: ${run} infinite animations still running under prefers-reduced-motion`);

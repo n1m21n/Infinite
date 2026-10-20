@@ -1,5 +1,6 @@
 ---
 title: javascript sketches as nodes: draw with code, wire it to anything
+seo_title: javascript sketches as nodes: draw with code, wire anything
 description: how sketch nodes let you draw with javascript in infinite and expose real modulation pins to synths and audio signals.
 date: 2026-10-19
 category: creative

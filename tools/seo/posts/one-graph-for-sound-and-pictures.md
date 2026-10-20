@@ -1,5 +1,6 @@
 ---
 title: One graph for sound and pictures: how Infinite keeps them in step
+seo_title: One graph for sound and pictures: how Infinite syncs them
 description: Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.
 date: 2026-10-17
 category: product

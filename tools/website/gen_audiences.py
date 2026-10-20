@@ -35,11 +35,12 @@ AUDIENCES = [
      "bench": {"title": "Nodes you will patch first", "sub": "Each box is a node. Cables carry pictures from one to the next, and every number on it is a knob.",
                "items": [("shape", "Shape", "Draw a shape with fill, stroke and feather."), ("blend", "Blend", "Stack one picture on another with 32 blend modes."), ("trails", "Trails", "Leave a fading trail: decay, zoom, rotate and hue shift."),
                          ("glitch", "Glitch", "Tear the picture into slices. Amount, speed and seed."), ("kaleidoscope", "Kaleidoscope", "Mirror the picture into segments.")]},
-     "lab": {"kind": "shader", "shader": "orb", "s": 0, "title": "Turn a knob, change the picture",
-             "text": "This orb is the Iridescent Orb preset from the library, running here as a shader. In Infinite every value below is a knob you can also hand to an LFO or to a sound.",
-             "ctl": [("size", "Size", 455, 0.05, 0.6, 2, ""), ("wobble", "Wobble", 267, 0.0, 0.15, 2, "")],
-             "code": "param float size = 0.3 [0.05, 0.6];\nparam float wobble = 0.04 [0.0, 0.15];\n// ...\nrad = size * (1.0 + wobble * sin(3.0 * ang + t * 1.1)\n  + wobble * 0.5 * sin(5.0 * ang - t * 1.3));\nedge = 1.0 - smoothstep(rad - aa, rad, r);",
-             "note": "Field source from the Iridescent Orb preset. The canvas is the same formula as WebGL."},
+     "lab": {"kind": "print", "title": "Print it in dots",
+             "text": "A halftone screen, the way a poster is printed: each dot's size is the brightness under it. Pick a picture, change the dot and the angle, and move the light with your pointer.",
+             "pics": ["Orb", "Rings", "Clouds"],
+             "ctl": [("dot", "Dot", 400, 4, 24, 0, " px"), ("angle", "Angle", 500, 0, 90, 0, "°")],
+             "code": "param float dot = 12 [4, 24];\nparam float angle = 45 [0, 90];\n// one dot per cell of a turned grid\nq = rotate(P, angle);\ncell = floor(q / dot);\nL = luma(sample(centre(cell)));\nr = sqrt(L) * dot * 0.62;\nout = d < r ? ink : ground;",
+             "note": "The same idea as the Halftone and Ordered Dither presets in the library."},
      "reel": {"title": "Made in Infinite", "sub": "Pieces from the art gallery and starting points from the library.", "href": "artworks.html",
               "items": [("assets/museum/06.jpg", 720, 960, "Neon mushroom"), ("assets/library/previews/iridescent-orb.jpg", 900, 600, "Iridescent orb, library"), ("assets/museum/10.jpg", 720, 960, "Rainbow spiral"),
                         ("assets/library/previews/liquid-glass.jpg", 900, 600, "Liquid glass, library"), ("assets/museum/08.jpg", 720, 960, "Halftone face"), ("assets/library/previews/ordered-dither.jpg", 900, 600, "Ordered dither, library"), ("assets/museum/02.jpg", 720, 960, "Mirrored portrait")]},
@@ -195,6 +196,12 @@ def lab_html(a):
           <div class="lab-view"><canvas aria-label="Beat-driven visuals that switch scene on the bar" role="img"></canvas></div>
           <div class="lab-side">{side}{ctls}<div class="pads">{pads}</div>
             <div class="beats" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><span class="bar-state" aria-live="polite">Playing scene 1</span></div>{note}</div></div>'''
+    if k == "print":
+        tiles = "".join(f'<button class="pr-tile" type="button" role="radio" aria-checked="{"true" if i == 0 else "false"}" data-name="{e(n)}"><span>{e(n)}</span></button>' for i, n in enumerate(L["pics"]))
+        return f'''<div class="lab ax-print" data-lab="print">
+          <div class="lab-view"><canvas aria-label="A picture printed as a halftone screen of dots" role="img"></canvas>
+            <p class="pr-cap" aria-live="polite">{e(L["pics"][0])}</p></div>
+          <div class="lab-side">{side}<div class="pr-tiles" role="radiogroup" aria-label="Picture">{tiles}</div>{ctls}{code}{note}</div></div>'''
     tabs = "".join(f'<button role="tab" type="button" id="t{i}" aria-controls="p{i}" aria-selected="{"true" if i == 0 else "false"}">{e(n)}</button>' for i, (n, _, _) in enumerate(L["tabs"]))
     panels = "".join(f'<div role="tabpanel" id="p{i}" aria-labelledby="t{i}" class="term-panel"{"" if i == 0 else " hidden"}><div style="position:relative"><pre class="aud-code"><code>{e(c)}</code></pre><button class="copy" type="button">Copy</button></div><p>{h}</p></div>' for i, (_, c, h) in enumerate(L["tabs"]))
     return f'''<div class="lab" data-lab="term">
@@ -229,15 +236,24 @@ def bench_image(slug, items):
 
 
 VIDEO_ID = "PoqHY7yMIyQ"
+DEV_FILM = (VIDEO_ID, "your coding agent can now work with this DAW.")
 def video_embed():
     return f'<div class="yt-embed ax-video"><iframe src="https://www.youtube-nocookie.com/embed/{VIDEO_ID}?rel=0" title="Infinite video" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>'
+
+MUSIC_FILM = ("n2ASWDUIW-4", "sound design just better.")   # the musicians film (youtube.com/@n1m21n)
+def film_poster(vid, title):
+    """Click-to-load: a thumbnail and a play button; site.js swaps in the player, so YouTube loads nothing until asked."""
+    return (f'<div class="yt-embed ax-video" data-id="{vid}" data-title="{e(title)}"><button class="yt-poster" type="button" aria-label="Play the film: {e(title)}">'
+            f'<img src="https://i.ytimg.com/vi/{vid}/maxresdefault.jpg" alt="{e(title)}, a film made in Infinite" width="1280" height="720" loading="lazy" decoding="async">'
+            f'<span class="yt-play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>'
+            f'<span class="yt-label">{e(title)}</span></button></div>')
 
 def main_html(a, rel):
     float3d = ""
     if a["hero"]["img"] == "brand_ball":
         float3d = f'          <span class="vstage-float"><img class="vstage-3d" src="assets/3d/brand_ball.webp" alt="{e(a["hero"]["alt"])}" width="700" height="700" decoding="async"></span>\n'
     facts = "".join(f"<li>{e(f)}</li>" for f in a["facts"])
-    cards = "\n".join(f'          <article class="aud-card reveal" style="--i:{n}"><span class="num">{n + 1:02d}</span><h2>{e(t)}</h2><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
+    cards = "\n".join(f'          <article class="aud-card reveal" style="--i:{n}"><h2>{e(t)}</h2><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
     bench = ""
     if a.get("bench"):
         B = a["bench"]
@@ -274,7 +290,6 @@ def main_html(a, rel):
     if a.get("body"):
         body = '      <section class="aud-section reveal dev-body">\n' + open(os.path.join(os.path.dirname(os.path.abspath(__file__)), a["body"]), encoding="utf-8").read() + "      </section>"
     lab = lab_html(a)
-    others = "\n".join(f'          <a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
     return f'''
   <main>
     <section class="ah">
@@ -320,6 +335,60 @@ def main_html(a, rel):
     '''
 
 
+DIGITS = ["01110100011001110101110011000101110", "00100011000010000100001000010001110", "01110100010000100010001000100011111",
+          "11111000100010000010000011000101110", "00010001100101010010111110001000010", "11111100001111000001000011000101110"]   # field.js 5x7 digits
+
+
+def dot_digits(n):
+    """A two-digit number as a 5x7 dot matrix (the programmed field's digits; ref: the lime dot-matrix glyph sheet)."""
+    out, x0 = [], 0
+    for ch in f"{n:02d}":
+        g = DIGITS[int(ch)]
+        out += [f'<circle cx="{x0 + (k % 5) * 4 + 2}" cy="{(k // 5) * 4 + 2}" r="1.5"/>' for k in range(35) if g[k] == "1"]
+        x0 += 24
+    return f'<svg class="dm" viewBox="0 0 44 28" aria-hidden="true">{"".join(out)}</svg>'
+
+
+SHORT = {"artists": "Artists", "musicians": "Musicians", "vjs": "VJs", "creative-coders": "Creative coders", "developers": "Developers"}   # as the nav names them
+
+
+def others_html(rel):
+    """The other audiences as keycaps: a dot-matrix number, the icon, the name (refs: Swapper Arcade tiles, Writtl's 3D buttons)."""
+    return "".join(f'<a class="ax-key" href="{h}"><span class="ax-key-top">{icon(AUD_ICON[h[:-5]])}<b>{SHORT[h[:-5]]}</b></span></a>'
+                   for i, (h, n) in enumerate([x for x in ALL if x[0] != rel]))
+
+
+def start_html(start):
+    """Start-with patches as a bento of their preview pictures; the first is the big tile (refs: units. and UNLOCKED bentos)."""
+    import re as _re
+    tiles = []
+    for i, (sl, t) in enumerate(start):
+        m = _re.search(r'og:image" content="https://infinitedevices\.org/([^"]+)"', open(os.path.join(W, "library", sl + ".html")).read())
+        img = f'<img src="{m.group(1)}" alt="" loading="lazy" decoding="async">' if m and os.path.exists(os.path.join(W, m.group(1))) else ""
+        tiles.append(f'<a class="ax-bento-t{" big" if i == 0 else ""}" href="library/{sl}.html">{img}<span class="ax-bento-l">{e(t)}</span></a>')
+    return f'<div class="ax-bento">{"".join(tiles)}</div>'
+
+
+def dv_number(html):
+    """The developers docs sections get the same poster numerals as the other audience pages."""
+    import re as _re
+    n = len(_re.findall(r'<section class="dv-sec[^"]*"[^>]*><h2>', html)); k = [0]
+    def f(m):
+        k[0] += 1
+        return m.group(0) + f'<span class="ax-n" aria-hidden="true">{k[0]:02d}<i>/ {n:02d}</i></span>'
+    return _re.sub(r'<section class="dv-sec[^"]*"[^>]*><h2>', f, html)
+
+
+def number_heads(html):
+    """Index every section heading poster-style: 01 / 06 (ref: the Dennis Ferrer gallery poster)."""
+    import re as _re
+    n = len(_re.findall(r'<h2 class="ax-h">', html)); k = [0]
+    def f(m):
+        k[0] += 1
+        return f'<h2 class="ax-h"><span class="ax-n" aria-hidden="true">{k[0]:02d}<i>/ {n:02d}</i></span>'
+    return _re.sub(r'<h2 class="ax-h">', f, html)
+
+
 def artists_main(a, rel, hero="blob"):
     """Immersive artists page: a live iridescent blob you steer, three glass bubbles that morph it, a swipe strip of nodes, knobs, a reel."""
     L = a["lab"]
@@ -337,7 +406,7 @@ def artists_main(a, rel, hero="blob"):
         tag, caps, ghost = "Images that move.", "32 blend modes|3D with real materials|A picture from a formula", ("Gallery", "viewport")
     bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(c)}: {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
     nodes = "".join(f'<figure class="ax-node"><img src="assets/nodes/{n}.webp" alt="{e(t)}: {e(d)}"{png_size(n)} loading="lazy" decoding="async"><figcaption>{e(t)}</figcaption></figure>' for n, t, d in a["bench"]["items"])
-    watch = f'      <section class="aud-section reveal">\n        <h2 class="ax-h">Watch</h2>\n        {video_embed()}\n      </section>\n' if hero == "cables" else ""
+    watch = f'      <section class="aud-section reveal">\n        <h2 class="ax-h">Watch</h2>\n        {film_poster(*MUSIC_FILM)}\n      </section>\n' if hero == "cables" else ""
     figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{a["reel"]["href"]}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="ax-ttl">{e(al.replace(", library", ""))}</span></a>' for src, w, h, al in a["reel"]["items"])
     start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
     others = "".join(f'<a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
@@ -346,10 +415,10 @@ def artists_main(a, rel, hero="blob"):
     import re
     lab = re.sub(r'(<pre class="aud-code">.*?</pre>)', lambda m: '<details class="ax-code"><summary>' + icon("edit") + '<span>Code</span></summary>' + m.group(1) + '</details>', lab, flags=re.S)
     if hero == "cables":
-        knob = lambda key, label, val: f'<div class="mx-knob" data-k="{key}" data-v="{val}"><div class="mx-dial" role="slider" tabindex="0" aria-label="{label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{round(val * 100)}"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mx-track" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/><path class="mx-arc" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/><line class="mx-tick" x1="32" y1="32" x2="32" y2="13"/></svg></div><span>{label}</span><output>{round(val * 100)}</output></div>'
+        knob = lambda key, label, val: f'<div class="mx-knob" data-k="{key}" data-v="{val}"><div class="mx-dial" role="slider" tabindex="0" aria-label="{label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{round(val * 100)}"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mx-track" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/><path class="mx-arc" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/></svg><span class="mx-cap"></span><span class="mx-shine"></span></div><span>{label}</span><output>{round(val * 100)}</output></div>'
         lab = (f'<div class="mx-rack"><div class="mx-top"><button type="button" class="mx-play" aria-pressed="false" aria-label="Play a chord">{icon("play")}<span>Play</span></button><canvas class="mx-scope" width="600" height="120" aria-hidden="true"></canvas></div>'
                f'<div class="mx-knobs">{knob("cut", "Cutoff", 0.55)}{knob("res", "Resonance", 0.25)}{knob("rev", "Reverb", 0.4)}{knob("lfo", "Wobble", 0.2)}</div></div>')
-    return f'''
+    return (f'''
   <main class="ax-main">
     <section class="ax">
       <div class="container">
@@ -378,7 +447,7 @@ def artists_main(a, rel, hero="blob"):
         <div class="ax-strip"><div class="ax-nodes">{nodes}</div></div>
       </section>
       <section class="aud-section reveal ax-lab">
-        <h2 class="ax-h">{"Play" if hero == "cables" else "Perform" if hero == "shader" else "Tweak" if hero == "math" else "Knobs"}</h2>
+        <h2 class="ax-h">{"Play" if hero == "cables" else "Perform" if hero == "shader" else "Tweak" if hero == "math" else "Halftone"}</h2>
         {lab}
       </section>
 {watch}      <section class="aud-section reveal">
@@ -387,14 +456,14 @@ def artists_main(a, rel, hero="blob"):
       </section>
       <section class="aud-section reveal">
         <h2 class="ax-h">Start with</h2>
-        <div class="aud-start">{start}</div>
+        {start_html(a["start"])}
       </section>
       <section class="aud-section reveal">
         <h2 class="ax-h">For everyone else</h2>
-        <div class="aud-others">{others}</div>
+        <div class="ax-keys">{others_html(rel)}</div>
       </section>
     </div>
-'''
+''')
 
 
 def dev_main(a, rel):
@@ -412,10 +481,9 @@ def dev_main(a, rel):
     toc_items = [("start", "Quick start", "play")] + [(i, t, ic) for (i, t, _), ic in zip(secs, ("power", "edit", "family-utility", "settings", "browser"))]
     toc = "".join(f'<a href="#{i}">{icon(ic)}<span>{e(t)}</span></a>' for i, t, ic in toc_items)
     facts = "".join(f"<li>{e(f)}</li>" for f in a["facts"])
-    cards = "".join(f'<article class="dv-card"><span class="num">{n + 1:02d}</span><h2>{e(t)}</h2><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
+    cards = "".join(f'<article class="dv-card"><h2>{e(t)}</h2><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
     sections = "".join(f'<section class="dv-sec" id="{i}"><h2>{e(t)}</h2>{b}</section>' for i, t, b in secs)
-    others = "\n".join(f'          <a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
-    return f'''
+    return (f'''
   <main class="dv">
     <section class="dv-hero">
       <div class="container">
@@ -432,16 +500,14 @@ def dev_main(a, rel):
       <div class="dv-main">
         <div class="dv-cards">{cards}</div>
         <section class="dv-sec dv-lab" id="start"><h2>Quick start</h2>{lab_html(a)}</section>
-        <section class="dv-sec" id="watch"><h2>Watch</h2>{video_embed()}</section>
+        <section class="dv-sec" id="watch"><h2>Watch</h2>{film_poster(*DEV_FILM)}</section>
         {sections}
         {feed.group(0) if feed else ""}
-        <section class="dv-sec"><h2>For everyone else</h2><div class="aud-others">
-{others}
-        </div></section>
+        <section class="dv-sec"><h2>For everyone else</h2><div class="ax-keys">{others_html(rel)}</div></section>
       </div>
     </div>
   </main>
-'''
+''')
 
 
 def page(a):
@@ -449,15 +515,15 @@ def page(a):
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=36bf82b2">', extra_js='\n  <script src="artists.js?v=9" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="artists.js?v=10" defer></script>')
     if a["slug"] == "creative-coders":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=36bf82b2">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script src="ccode.js?v=3" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="artists.js?v=10" defer></script>\n  <script src="ccode.js?v=4" defer></script>')
     if a["slug"] == "vjs":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=36bf82b2">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script src="vjs.js?v=4" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="artists.js?v=10" defer></script>\n  <script src="vjs.js?v=5" defer></script>')
     if a["slug"] == "musicians":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=36bf82b2">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=1" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="artists.js?v=10" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=3" defer></script>')
     if a["slug"] == "developers":
-        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=505c23d1">', extra_js='\n  <script src="dev.js?v=2" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=' + chrome._hash("dev.css") + '">', extra_js='\n  <script src="dev.js?v=2" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 
@@ -473,7 +539,7 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#FBFAF6">
+  <meta name="theme-color" content="#151930">
   <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
   <script src="theme.js?v=2"></script>
   <title>{e(title)}</title>
@@ -493,11 +559,11 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="brand.css?v=e96b24bf">
+  <link rel="stylesheet" href="brand.css?v=42bdb72d">
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
-  <link rel="stylesheet" href="blog.css?v=61bae151">
-  <link rel="stylesheet" href="audience.css?v=beb744f0">
+  <link rel="stylesheet" href="blog.css?v=36138f21">
+  <link rel="stylesheet" href="audience.css?v=1051e212">
   {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>
 </head>
@@ -509,7 +575,7 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
 
   {chrome.footer_html(rel)}
   <script src="site.js?v={chrome.JS_VERSION}" defer></script>
-  <script src="audience.js?v=6" defer></script>{extra_js}
+  <script src="audience.js?v=9" defer></script>{extra_js}
   <script>
     (function () {{
       var els = document.querySelectorAll('.reveal');

@@ -145,7 +145,7 @@ def ld():
 
 
 def build():
-    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=b4d7db93">', extra_js='\n  <script src="philosophy.js?v=9" defer></script>')
+    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=abcd9ab7">', extra_js='\n  <script src="philosophy.js?v=9" defer></script>')
 
 
 def main():

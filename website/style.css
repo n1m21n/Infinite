@@ -115,6 +115,7 @@ strong { font-weight: 600; color: var(--ink); }
 }
 
 .section { padding: round(clamp(32px, 5vw, 64px), 8px) 0 0; position: relative; }
+main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the page breathes before the footer */
 
 /* --------------------------------------------------------------------------
    Buttons (rounded, anticipation on press, spring on release)
@@ -477,7 +478,7 @@ strong { font-weight: 600; color: var(--ink); }
 .predict-copy p { color: var(--ink2); }
 .eq {
   display: inline-block; margin-top: 14px; padding: 8px 12px; border-radius: var(--r-sm);
-  background: var(--inner); color: var(--accent-ink); font-size: 0.8438rem;
+  background: var(--inner); color: var(--ink); font-size: 0.8438rem;
 }
 
 /* --------------------------------------------------------------------------
@@ -523,8 +524,8 @@ strong { font-weight: 600; color: var(--ink); }
 .yt-poster:hover img { transform: scale(1.03); }
 .yt-play {
   position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px;
-  border-radius: 50%; background: var(--paper); color: var(--ink); display: grid; place-items: center;
-  box-shadow: var(--shadow-2); transition: transform var(--spring-slab-ms) var(--spring-slab);
+  border-radius: 50%; background: #FBFAF6; color: #151930; display: grid; place-items: center;   /* fixed: it sits on a film, not on the mode ground */
+  box-shadow: 0 0 0 8px rgb(251 250 246 / 0.22), 0 10px 30px rgb(0 0 0 / 0.45); transition: transform var(--spring-slab-ms) var(--spring-slab);
 }
 .yt-play svg { width: 22px; height: 22px; margin-left: 2px; }
 .yt-poster:hover .yt-play { transform: scale(1.08); }
@@ -717,7 +718,9 @@ strong { font-weight: 600; color: var(--ink); }
   display: inline-block; font-size: clamp(2.4rem, 7vw, 4.8rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1;
   margin-bottom: clamp(36px, 6vw, 64px);
 }
-.footer-grid { display: grid; grid-template-columns: 1.3fr repeat(4, 1fr); gap: 32px; }
+.footer-grid { display: grid; grid-template-columns: 1.3fr repeat(5, 1fr); gap: 32px; }
+@media (max-width: 1100px) and (min-width: 641px) { .footer-grid { grid-template-columns: repeat(5, 1fr); } .footer-brand { grid-column: 1 / -1; } }
+
 .footer-brand p { color: var(--ink2); margin-top: 10px; font-size: 0.8438rem; max-width: 22em; }
 .footer-col { display: flex; flex-direction: column; gap: 4px; }
 .footer-col h5, .footer-col .footer-h { font-family: var(--font-sans); font-size: 0.8438rem; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
@@ -931,13 +934,15 @@ p.mono { font-size: 0.84375rem; }
   font: 500 0.8438rem/1 "Geist", system-ui, sans-serif; color: var(--ink2); text-decoration: none; cursor: pointer; background: none; transition: color var(--dur-small) var(--ease-out); }
 .dock-stop .ic { width: 20px; height: 20px; flex: none; }
 .dock-stop.is-on { color: var(--ink); }
-.dock-stop:focus-visible, .dock-dl:focus-visible, .dock-sheet a:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--signal); }
+.dock-stop:focus-visible, .dock-dl:focus-visible, .dock-sheet a:focus-visible { outline: 0; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--signal) 70%, transparent); }
+.dock-stop:focus:not(:focus-visible) { box-shadow: none; }
 .dock-dl { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 18px; border-radius: var(--r-pill); background: var(--ink); color: var(--ground); font: 600 0.8438rem/1 "Geist", system-ui, sans-serif; text-decoration: none; }
 .dock-sheet { position: absolute; display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: var(--r-lg); background: color-mix(in srgb, var(--surface-1) 86%, transparent); backdrop-filter: saturate(1.8) blur(28px); -webkit-backdrop-filter: saturate(1.8) blur(24px); box-shadow: var(--dock-hi), var(--shadow-2); }
 .dock-sheet[hidden] { display: none; }
 .dock-sheet:not([hidden]) { animation: sheet-in 333ms var(--ease-out) both; }
 .dock-sheet a { display: flex; align-items: center; gap: 14px; min-height: 44px; padding: 0 16px; border-radius: var(--r-pill); color: var(--ink); text-decoration: none; font: 600 1rem/1 "Geist", system-ui, sans-serif; }
-.dock-sheet a:active, .dock-sheet a:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.dock-sheet a:active { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+@media (hover: hover) { .dock-sheet a:hover:not([aria-current]) { background: color-mix(in srgb, var(--ink) 6%, transparent); } }
 .dock-sheet a[aria-current] { background: color-mix(in srgb, var(--ink) 14%, transparent); box-shadow: var(--dock-hi); }
 .dock-sheet .ic { width: 20px; height: 20px; flex: none; color: var(--ink2); }
 .dock-sheet a[aria-current] .ic { color: var(--ink); }

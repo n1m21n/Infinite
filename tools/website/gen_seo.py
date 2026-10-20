@@ -40,7 +40,22 @@ def library_block(its):
     return ('<!-- seo:start -->\n  <script type="application/ld+json">\n' + json.dumps(ld, indent=1, ensure_ascii=False) +
             '\n  </script>\n  <noscript>\n    <h2>All library items</h2>\n    <ul>\n' + lis + '\n    </ul>\n  </noscript>\n  <!-- seo:end -->')
 
-def page(i):
+def meta_desc(d):
+    """The meta description: the item's line plus a download note, using the longest note that keeps it within the
+    site audit's 160 characters."""
+    for tail in (" Free to download for Infinite, the open-source audiovisual workstation.", " Free to download for Infinite.", ""):
+        if len(d + tail) <= 160:
+            return d + tail
+    return d[:157].rsplit(" ", 1)[0] + "..."
+
+def embed_slugs():
+    """Slugs of the live WebGL embeds (website/embeds/<slug>.html), so an item page can link to its live version."""
+    try:
+        return {i["slug"] for i in json.load(open(os.path.join(W, "embeds/embeds.json")))["items"]}
+    except (OSError, ValueError, KeyError):
+        return set()
+
+def page(i, embeds=frozenset()):
     """One standalone, crawlable page for a library item: /library/<id>.html"""
     url = f'{BASE}library/{i["id"]}.html'
     ext = os.path.splitext(i["file"])[1].lstrip(".")
@@ -52,6 +67,7 @@ def page(i):
           "isPartOf": {"@type": "CollectionPage", "name": "Infinite Library", "url": BASE + "library.html"},
           "author": {"@type": "Person", "name": i["author"] or "n1m21n", "url": "https://github.com/" + (i["author"] or "n1m21n"), "sameAs": ["https://github.com/n1m21n"] if not i["author"] or i["author"] == "n1m21n" else []}}
     by = f' by {e(i["author"])}' if i["author"] else ""
+    live = f'  <a class="btn alt" href="../embeds/{e(i["id"])}.html">Play it live in your browser</a>\n' if i["id"] in embeds else ""
     return f"""<!DOCTYPE html>
 <html lang="en" data-mode="midnight">
 <head>
@@ -59,9 +75,9 @@ def page(i):
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#151930">
   <script src="../theme.js?v=1"></script>
-  <link rel="stylesheet" href="../brand.css?v=e96b24bf">
+  <link rel="stylesheet" href="../brand.css?v=42bdb72d">
   <title>{e(t)}</title>
-  <meta name="description" content="{e(d)} Free to download for Infinite, the open-source audiovisual workstation.">
+  <meta name="description" content="{e(meta_desc(d))}">
   <link rel="canonical" href="{url}">
   <meta property="og:title" content="{e(t)}">
   <meta property="og:description" content="{e(d)}">
@@ -94,7 +110,7 @@ def page(i):
   <p>{e(d)}</p>
   <p>Download the file, then open it in Infinite (File, Open for patches; import it into a Field or Sketch node for devices). Infinite is free, open source and runs on macOS, Windows and Linux.</p>
   <a class="btn" href="{e(i["file"])}" download>Download .{e(ext)}</a>
-  <a class="btn alt" href="../library.html">Back to the Library</a>
+{live}  <a class="btn alt" href="../library.html">Back to the Library</a>
   <a class="btn alt" href="https://github.com/n1m21n/Infinite/releases/latest">Get Infinite</a>
 </main>
 </body>
@@ -106,8 +122,9 @@ def main():
     os.makedirs(os.path.join(W, "library"), exist_ok=True)
     for f in os.listdir(os.path.join(W, "library")):
         os.remove(os.path.join(W, "library", f))
+    embeds = embed_slugs()
     for i in its:
-        open(os.path.join(W, "library", i["id"] + ".html"), "w").write(page(i))
+        open(os.path.join(W, "library", i["id"] + ".html"), "w").write(page(i, embeds))
         i["page"] = f'{BASE}library/{i["id"]}.html'
     json.dump({"name": "Infinite Library", "url": BASE + "library.html", "count": len(its), "items": its},
               open(os.path.join(W, "assets/library/catalog.json"), "w"), indent=1, ensure_ascii=False)

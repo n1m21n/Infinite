@@ -1,5 +1,6 @@
 ---
 title: unique nodes in infinite: wave terrain, shape resonator, cymatics
+seo_title: unique Infinite nodes: wave terrain, resonator, cymatics
 description: explore infinite original nodes: convert images to sound with wave terrain, ring 3d geometry with shape resonator, and simulate chladni cymatics.
 date: 2026-10-19
 category: creative

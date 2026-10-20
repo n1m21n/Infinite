@@ -45,7 +45,7 @@
   /* scope */
   function draw() {
     raf = 0; var w = scope.width, h = scope.height; ctx2.clearRect(0, 0, w, h);
-    ctx2.lineWidth = 3; ctx2.lineCap = 'round'; ctx2.lineJoin = 'round'; ctx2.strokeStyle = '#A7B1FF'; ctx2.shadowColor = 'rgba(167,177,255,0.7)'; ctx2.shadowBlur = 12;
+    ctx2.lineWidth = 3; ctx2.lineCap = 'round'; ctx2.lineJoin = 'round'; var sc = getComputedStyle(scope).color; ctx2.strokeStyle = sc; ctx2.shadowColor = sc; ctx2.shadowBlur = 12;
     ctx2.beginPath();
     if (A && on) {
       var buf = new Uint8Array(A.an.fftSize); A.an.getByteTimeDomainData(buf);
@@ -56,15 +56,16 @@
     if (on && !document.hidden) raf = requestAnimationFrame(draw);
   }
   draw();
+  new MutationObserver(function () { if (!raf) draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode'] });
 
   /* knobs */
   function paint(k) {
-    var e = knobs[k], v = V[k]; e.arc.style.strokeDashoffset = (1 - v) * e.len; e.tick.style.transform = 'rotate(' + (-135 + v * 270) + 'deg)';
+    var e = knobs[k], v = V[k]; e.arc.style.strokeDashoffset = (1 - v) * e.len; e.dial.style.setProperty('--a', (-135 + v * 270) + 'deg');
     e.out.textContent = Math.round(v * 100); e.dial.setAttribute('aria-valuenow', Math.round(v * 100));
   }
   Array.prototype.forEach.call(rack.querySelectorAll('.mx-knob'), function (el) {
     var k = el.getAttribute('data-k'), dial = el.querySelector('.mx-dial'), arc = el.querySelector('.mx-arc'), len = arc.getTotalLength ? arc.getTotalLength() : 120;
-    arc.style.strokeDasharray = len; knobs[k] = { dial: dial, arc: arc, len: len, tick: el.querySelector('.mx-tick'), out: el.querySelector('output') };
+    arc.style.strokeDasharray = len; knobs[k] = { dial: dial, arc: arc, len: len, out: el.querySelector('output') };
     var drag = null;
     function set(v) { V[k] = Math.max(0, Math.min(1, v)); paint(k); apply(); }
     dial.addEventListener('pointerdown', function (e) { drag = { y: e.clientY, v: V[k], id: e.pointerId }; try { dial.setPointerCapture(e.pointerId); } catch (x) { } dial.classList.add('on'); });

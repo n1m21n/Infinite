@@ -1,5 +1,6 @@
 ---
 title: Embedding interactive audio-reactive WebGL visuals on any website
+seo_title: Embed interactive audio-reactive WebGL visuals on any site
 description: How to embed responsive, microphone-reactive 3D WebGL visualisers into portfolios, documentation, and blogs using self-contained HTML iframes.
 date: 2026-10-20
 category: creative

@@ -19,7 +19,7 @@ GH = "https://github.com/n1m21n/Infinite"
 CSS_VERSION = __import__("hashlib").md5(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "website", "style.css"), "rb").read()).hexdigest()[:8]   # style.css cache key: a hash, so it changes with the file
 _hash = lambda f: __import__("hashlib").md5(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "website", f), "rb").read()).hexdigest()[:8]
 SYSTEM_VERSION, SCALE_VERSION = _hash("system.css"), _hash("scale.css")
-JS_VERSION = "18"    # site.js cache key; bump when the menu script changes
+JS_VERSION = "19"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
 GROUPS = [
@@ -55,6 +55,12 @@ FOOTER_COLS = [
     ]),
     ("Learn", [
         ("index.html#learn", "Get started"), ("philosophy.html", "Philosophy"), ("blog/", "Blog"),
+    ]),
+    ("Docs", [   # PDFs in website/assets
+        ("assets/Infinite_Node_Reference_Manual.pdf", "Node reference"),
+        ("assets/Field_Language_Manual.pdf", "Field language"),
+        ("assets/Infinite_Headless_User_Guide.pdf", "Headless guide"),
+        ("assets/Infinite_Benchmark_Report.pdf", "Benchmark report"),
     ]),
     ("Open source", [
         (GH, "GitHub"), (GH + "/releases", "Releases"), (GH + "/tree/main/tools/mcp", "MCP server"),
@@ -99,7 +105,7 @@ def link_attrs(path):
     if path.startswith("http"):
         a = ' target="_blank" rel="noopener"'
     elif path.endswith(".pdf"):
-        a = ' target="_blank" rel="noopener"'
+        a = ' target="_blank" rel="noopener" type="application/pdf"'
     return a
 
 
