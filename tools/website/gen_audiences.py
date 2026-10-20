@@ -322,6 +322,9 @@ def artists_main(a, rel, hero="blob"):
     if hero == "cables":
         bub = [("synth", "family-synths", "Synths", a["cards"][0][0]), ("fx", "family-audio-effects", "Effects", a["cards"][1][0]), ("plug", "mod-matrix", "Plugins", a["cards"][2][0])]
         tag, caps, ghost = "Pull a cable.", "|".join(c[0] for c in a["cards"]), ("Guide", "library")
+    elif hero == "shader":
+        bub = [("out", "viewport", "Output", a["cards"][0][0]), ("beat", "metronome", "Beat", a["cards"][1][0]), ("safe", "power", "Safe", a["cards"][2][0])]
+        tag, caps, ghost = "Play the room.", "|".join(c[0] for c in a["cards"]), ("Guide", "library")
     else:
         bub = [("layers", "family-compositing", "Layer", a["cards"][0][0]), ("solid", "cube", "3D", a["cards"][1][0]), ("formula", "edit", "Formula", a["cards"][2][0])]
         tag, caps, ghost = "Images that move.", "32 blend modes|3D with real materials|A picture from a formula", ("Gallery", "viewport")
@@ -334,6 +337,10 @@ def artists_main(a, rel, hero="blob"):
     lab = lab.replace('<h3>' + e(L["title"]) + '</h3>', '')
     import re
     lab = re.sub(r'(<pre class="aud-code">.*?</pre>)', lambda m: '<details class="ax-code"><summary>' + icon("edit") + '<span>Code</span></summary>' + m.group(1) + '</details>', lab, flags=re.S)
+    if hero == "cables":
+        knob = lambda key, label, val: f'<div class="mx-knob" data-k="{key}" data-v="{val}"><div class="mx-dial" role="slider" tabindex="0" aria-label="{label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{round(val * 100)}"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mx-track" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/><path class="mx-arc" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/><line class="mx-tick" x1="32" y1="32" x2="32" y2="13"/></svg></div><span>{label}</span><output>{round(val * 100)}</output></div>'
+        lab = (f'<div class="mx-rack"><div class="mx-top"><button type="button" class="mx-play" aria-pressed="false" aria-label="Play a chord">{icon("play")}<span>Play</span></button><canvas class="mx-scope" width="600" height="120" aria-hidden="true"></canvas></div>'
+               f'<div class="mx-knobs">{knob("cut", "Cutoff", 0.55)}{knob("res", "Resonance", 0.25)}{knob("rev", "Reverb", 0.4)}{knob("lfo", "Wobble", 0.2)}</div></div>')
     return f'''
   <main class="ax-main">
     <section class="ax">
@@ -363,7 +370,7 @@ def artists_main(a, rel, hero="blob"):
         <div class="ax-strip"><div class="ax-nodes">{nodes}</div></div>
       </section>
       <section class="aud-section reveal ax-lab">
-        <h2 class="ax-h">Knobs</h2>
+        <h2 class="ax-h">{"Play" if hero == "cables" else "Perform" if hero == "shader" else "Knobs"}</h2>
         {lab}
       </section>
       <section class="aud-section reveal">
@@ -388,8 +395,10 @@ def page(a):
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
         return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=5f17f821">', extra_js='\n  <script src="artists.js?v=8" defer></script>')
+    if a["slug"] == "vjs":
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=5f17f821">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script src="vjs.js?v=3" defer></script>')
     if a["slug"] == "musicians":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=5f17f821">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script type="module" src="musicians.js?v=2"></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=5f17f821">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=1" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 
