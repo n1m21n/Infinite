@@ -980,3 +980,7 @@ p.mono { font-size: 0.84375rem; }
   .dock-sheet::before { content: ""; position: absolute; top: 0; bottom: 0; left: -24px; width: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { .dock-thumb, .dock-sheet:not([hidden]) { transition: none; animation: none; } }
+
+/* footer: a little narrower than the page, and clear of the desktop rail */
+.site-footer .container { max-width: min(1040px, 100%); }
+@media (min-width: 901px) { .site-footer .container { padding-left: max(var(--gutter), 24px); } .site-footer { padding-left: 72px; } }

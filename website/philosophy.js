@@ -33,7 +33,7 @@
     W = stage.clientWidth; H = stage.clientHeight;
     var hd = document.querySelector('.site-header'); top = (hd ? hd.offsetHeight : 60) + (W < 680 ? 140 : 120);
     var hu = H - top - 96; portrait = W < H * 0.9;
-    cx = W / 2; cy = top + 8 + (H - top - 64) / 2;
+    cx = W / 2; cy = top + 8 + (H - top - 64) / 2 - (W < 680 ? 96 : 0);   // phones: lift the figure so the audience pills and Download below never sit on it
     A = portrait ? W * 0.34 : Math.min(W * 0.27, hu * 0.62);
     var sc = portrait ? Math.min(W * 0.78 / 410, hu * 0.8 / 600) : Math.min(W * 0.8 / 600, hu * 0.9 / 410);
     mindPts = MIND.map(function (p) { var x = p[0] - 300, y = p[1] - 205; return portrait ? [cx + y * sc, cy + x * sc] : [cx + x * sc, cy + y * sc]; });

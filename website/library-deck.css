@@ -19,9 +19,10 @@
 .lib-bar { justify-content: center; }
 .lib-select-val { display: none; }
 .lib-select { padding: 0 12px; }
-.lib-menu { min-width: 0; display: flex; gap: 4px; left: 50%; transform: translateX(-50%); }
-.lib-opt { width: 40px; padding: 0; justify-content: center; }
-.lib-opt span { display: none; }
+/* the category menu is a short list: icon and name, anchored under the button, never wider than the screen */
+.lib-menu { min-width: 200px; max-width: calc(100vw - 32px); max-height: min(60svh, 420px); overflow-y: auto; overscroll-behavior: contain; left: 0; transform: none; display: grid; gap: 2px; }
+.lib-opt { width: 100%; min-height: 44px; padding: 0 14px 0 12px; justify-content: flex-start; }
+.lib-opt svg { width: 20px; height: 20px; flex: none; }
 @media (max-width: 680px) { .lib-view-btn { width: 44px; height: 44px; } .lib-icon-pill, .lib-select { min-width: 44px; min-height: 44px; } }
 
 /* stage */

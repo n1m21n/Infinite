@@ -206,3 +206,4 @@
 }
 
 @media (hover: none) { .pad:hover, .play:hover, .run:hover, .reel a.frame:hover, .reel-btn:hover:not(:disabled), .aud-start a:hover { transform: none; } }
+.run.busy { transform: scale(0.96); }

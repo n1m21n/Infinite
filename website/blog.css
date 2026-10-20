@@ -39,6 +39,7 @@ body.blog-page { overflow-x: clip; font-family: var(--font-sans); }
 
 .blog-menu {
   position: absolute; top: calc(100% + 8px); left: 0; z-index: 40;
+  max-width: calc(100vw - 32px); max-height: min(60svh, 420px); overflow-y: auto; overscroll-behavior: contain;
   min-width: 196px; padding: 8px; border-radius: var(--r-md);
   background: var(--glass);
   -webkit-backdrop-filter: blur(24px) saturate(1.7); backdrop-filter: blur(24px) saturate(1.7);

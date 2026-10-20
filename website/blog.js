@@ -66,7 +66,7 @@
   if (filterBtn && filterMenu) {
     filterBtn.addEventListener('click', function (e) { e.stopPropagation(); menu(filterMenu.hidden); });
     var opts = filterMenu.querySelectorAll('.blog-opt');
-    opts.forEach(function (o) { o.setAttribute('aria-label', o.getAttribute('data-label') || ''); });
+    opts.forEach(function (o) { o.setAttribute('aria-label', o.getAttribute('data-label') || ''); if (!o.querySelector('span')) { var sp = document.createElement('span'); sp.textContent = o.getAttribute('data-label') || ''; o.appendChild(sp); } });
     opts.forEach(function (o) {
       o.addEventListener('click', function () {
         filter = o.getAttribute('data-filter') || 'all';

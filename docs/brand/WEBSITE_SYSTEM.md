@@ -22,7 +22,7 @@ Motto: inventive and intuitive. Inventive is the patch-cable, slab and spring la
 - **Cards**: surface `--card`, radius 24, shadow-1, one title, at most two lines of body. Library cards: label above, preview, one sentence, price pill left and action pill right.
 - **Lists**: no bullets in marketing sections. Use numbered cards (`01`), glyph rows or pills. Prose lists in blog posts keep a muted marker.
 - **Categorisation**: pills with a glyph. Audience glyphs: artists family-compositing, musicians family-notes, VJs perform, creative coders edit, developers cube.
-- **Navigation**: a dock. Phones get a bottom bar, desktop an icon rail that opens into labels on hover, tap or arrow keys. Stops are Home, For you, Explore, Learn; each opens a small sheet of that group's pages, with the current page a filled pill. Download is the pill at the end of the phone dock and sits in the top bar on desktop.
+- **Navigation**: a dock. Phones get a bottom bar, desktop an icon rail that opens into labels on hover, tap or arrow keys. Stops are Home, For you, Explore, Learn; each opens a small sheet of that group's pages, with the current page a filled pill. Download lives in the page content (hero or CTA), not in the dock.
 - **Links**: inline links in the accent ink with an underline on hover; link-like controls are pills, never bare text with arrows.
 - **Iconography**: glyphs from `art/icons/src`, 20px grid, 1.5 stroke, always beside a label, inlined with `class="ic"`.
 - **Calls to action**: one verb, sentence case (Download Infinite, Copy code, Full screen). Never two lines.
@@ -52,3 +52,6 @@ Blog and library cards share one picture standard, built in CSS only. Never bake
 ## Not yet covered (candidates)
 
 Forms (the sign-up field), empty and loading states, focus and keyboard order, the sound design of the demos, and the voice of copy. Each should get a section here before it is changed.
+
+## UI audit
+`tests/website/ui_audit.mjs` (puppeteer-core, system Chrome) loads every page at phone and desktop sizes and fails on overlapping controls, clipped dropdowns, dead clicks (controls that do nothing), look-alike non-interactive pills and footer collisions. Run: `cd tests/website && npm install && node ui_audit.mjs [page.html ...]`.

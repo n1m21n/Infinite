@@ -27,9 +27,10 @@
 .blog-toolbar { justify-content: center; }
 .blog-select-val { display: none; }
 .blog-select { padding: 0 12px; }
-.blog-menu { min-width: 0; display: flex; gap: 4px; left: 50%; transform: translateX(-50%); }
-.blog-opt { width: 40px; padding: 0; justify-content: center; }
-.blog-opt span { display: none; }
+/* the category menu is a short list: icon and name, anchored under the button, never wider than the screen */
+.blog-menu { min-width: 200px; max-width: calc(100vw - 32px); max-height: min(60svh, 420px); overflow-y: auto; overscroll-behavior: contain; left: 0; transform: none; display: grid; gap: 2px; }
+.blog-opt { width: 100%; min-height: 44px; padding: 0 14px 0 12px; justify-content: flex-start; }
+.blog-opt svg { width: 20px; height: 20px; flex: none; }
 
 /* ---- stage ---- */
 .blog-book-stage:not([data-deck-mode="grid"]) .post-grid { height: 480px; perspective: 1400px; perspective-origin: 50% 36%; }

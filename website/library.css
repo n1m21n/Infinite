@@ -508,3 +508,6 @@ body:has(.lib-hero) { overflow-x: clip; font-family: var(--font-sans); }
 @media (hover: none) {
   .lib-stage[data-deck-mode="grid"] .lib-card:hover { transform: none; }
 }
+a.lib-dock-pill { color: inherit; text-decoration: none; transition: transform var(--dur-small) var(--ease-out), box-shadow var(--dur-small) var(--ease-out); }
+a.lib-dock-pill:hover { transform: translateY(-2px); box-shadow: var(--glass-hi), var(--shadow-2); }
+a.lib-dock-pill:active { transform: scale(0.97); }

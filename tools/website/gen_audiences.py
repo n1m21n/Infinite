@@ -382,7 +382,7 @@ def page(a):
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=6">', extra_js='\n  <script src="artists.js?v=4" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=fe6c5f4e">', extra_js='\n  <script src="artists.js?v=4" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 
@@ -421,8 +421,8 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="stylesheet" href="brand.css?v=e96b24bf">
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
-  <link rel="stylesheet" href="blog.css?v=38d8ed23">
-  <link rel="stylesheet" href="audience.css?v=56776286">
+  <link rel="stylesheet" href="blog.css?v=61bae151">
+  <link rel="stylesheet" href="audience.css?v=beb744f0">
   {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>
 </head>

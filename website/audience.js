@@ -191,7 +191,7 @@
         t.addEventListener('keydown', function (e) { var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (d) { var k = (i + d + tabs.length) % tabs.length; show(k); tabs[k].focus(); } });
       });
       function go() {
-        clearInterval(timer); n = 0; if (still) { n = 12; stage && stage.draw(); return; }
+        clearInterval(timer); n = 0; if (run) { run.classList.add('busy'); setTimeout(function () { run.classList.remove('busy'); }, 500); } if (still) { n = 12; stage && stage.draw(); return; }
         timer = setInterval(function () { n++; if (n >= 12) clearInterval(timer); }, 500);
       }
       if (run) run.addEventListener('click', go);
