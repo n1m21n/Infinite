@@ -41,10 +41,6 @@
 
 .ph-end { position: absolute; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 16px; opacity: 0; pointer-events: none; }
 .ph-end.is-on { pointer-events: auto; }
-.ph-who { display: flex; gap: 12px; padding: 8px; border-radius: var(--r-pill, 999px); background: color-mix(in srgb, var(--ink) 8%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
-.pw { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); transition: background var(--dur-fast, 188ms), transform var(--dur-fast, 188ms); }
-.pw:hover { background: color-mix(in srgb, var(--ink) 16%, transparent); transform: translateY(-2px); }
-.pw .ic { width: 22px; height: 22px; }
 .ph-hint { position: absolute; left: 50%; bottom: 28px; width: 28px; height: 28px; margin-left: -14px; color: var(--ink); animation: ph-bob 1.333s ease-in-out infinite; }
 .ph-hint .ic { width: 28px; height: 28px; }
 @keyframes ph-bob { 0%, 100% { transform: translateY(0); opacity: 0.5; } 50% { transform: translateY(8px); opacity: 1; } }
@@ -83,12 +79,7 @@
 @media (max-width: 760px) { .ph-prin { grid-template-columns: 1fr 1fr; } .ph-prin li { padding: 20px 16px; } .ph-prin b { font-size: var(--size-body); } .ph-prin span { font-size: var(--size-caption); } }
 
 /* the closing dock: who it is for, in words, then one button */
-.ph-who { flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0; max-width: min(560px, calc(100% - 32px)); background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.pw { width: auto; height: 40px; padding: 0 16px 0 12px; gap: 8px; display: inline-flex; border-radius: var(--r-pill, 999px); background: color-mix(in srgb, var(--ink) 9%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); font: 600 var(--size-caption)/1 Geist, system-ui, sans-serif; }
-.pw .ic { width: 16px; height: 16px; color: var(--signal-300); }
 @media (max-width: 680px) { .ph[data-s="5"] .ph-nav { opacity: 0; pointer-events: none; } .ph-end { bottom: calc(88px + env(safe-area-inset-bottom)); } }
-.pw, .pw:hover { text-decoration: none; color: var(--ink); }
-.ph-who { max-width: min(760px, calc(100% - 32px)); }
 .ph-dl { background: var(--ink); color: var(--ground); }
 
 
@@ -102,7 +93,7 @@
 :root[data-mode="paper"] .ph-glow, :root[data-mode="mist"] .ph-glow { opacity: 0.35; }
 :root[data-mode="paper"] .ph-lobe, :root[data-mode="mist"] .ph-lobe { color: var(--accent, #E2531C); }
 :root[data-mode="paper"] .ph-lobe-b, :root[data-mode="mist"] .ph-lobe-b { color: var(--ink2); }
-:root[data-mode="paper"] .ph-prin .ic, :root[data-mode="mist"] .ph-prin .ic, :root[data-mode="paper"] .pw .ic, :root[data-mode="mist"] .pw .ic { color: var(--ink2); }
+:root[data-mode="paper"] .ph-prin .ic, :root[data-mode="mist"] .ph-prin .ic, :root[data-mode="mist"] .pw .ic { color: var(--ink2); }
 
 /* the four pillars: one Midnight tile each, a 3D render of the brand kit floating above the words */
 .ph-prin { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; width: min(1120px, 100%); }
@@ -125,3 +116,7 @@
 :root[data-mode="paper"] .ph-prin .pp-d, :root[data-mode="mist"] .ph-prin .pp-d { color: color-mix(in srgb, var(--ink) 72%, transparent); }
 :root[data-mode="paper"] .ph-prin li > b .ic, :root[data-mode="mist"] .ph-prin li > b .ic { color: var(--accent-ink); }
 :root[data-mode="paper"] .ph-prin .pp-img, :root[data-mode="mist"] .ph-prin .pp-img { filter: drop-shadow(0 14px 16px rgb(26 31 54 / 0.28)); }
+
+.ph-for { width: 100%; max-width: 960px; }
+.ph-for .ax-keys { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 900px) { .ph-for .ax-keys { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

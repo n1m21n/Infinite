@@ -106,7 +106,7 @@ def main_html():
     bub = "".join(f'<button class="pb" type="button" data-id="{nid}" style="--i:{i}" aria-label="{e(mind)}">{ga.icon(ICONS[nid])}</button>' for i, (nid, x, y, mind, patch, ms, ps) in enumerate(NODES))
     bub += f'<span class="pb pb-x" data-id="human" aria-hidden="true">{ga.icon("hand")}</span><span class="pb pb-x" data-id="machine" aria-hidden="true">{ga.icon("family-prediction")}</span>'
     nav = "".join(f'<button class="pn" type="button" data-go="{i}" aria-label="{e(lab)}">{ga.icon(ic)}</button>' for i, (sid, ic, lab) in enumerate(SCENES))
-    who = "".join(f'<a class="pw" href="{s}.html">{ga.icon(ga.AUD_ICON[s])}<span>{e(n.replace("Developers and agents", "Developers"))}</span></a>' for s, h, n, d in AUD)
+    who = "".join(f'<a class="ax-key" href="{s}.html"><span class="ax-key-top">{ga.icon(ga.AUD_ICON[s])}<b>{e(n.replace("Developers and agents", "Developers"))}</b></span></a>' for s, h, n, d in AUD)
     ids = [n[0] for n in NODES]
     edges = ",".join(f"{ids.index(a)}-{ids.index(b)}" for a, b in EDGES)
     caps = "".join(f'<div class="ph-cap" data-k="{i}"><h2>{e(t)}</h2><p>{e(d)}</p></div>' for i, (t, d) in enumerate(CAPS))
@@ -124,12 +124,13 @@ def main_html():
         <div class="ph-caps">{caps}</div>
         <span class="ph-lobe ph-lobe-a" aria-hidden="true">structure</span><span class="ph-lobe ph-lobe-b" aria-hidden="true">you</span>
         <nav class="ph-nav" aria-label="Chapters">{nav}</nav>
-        <div class="ph-end"><div class="ph-who">{who}</div><a class="btn btn-primary ph-dl" href="index.html#setup">Download</a></div>
+        <div class="ph-end"><a class="btn btn-primary ph-dl" href="index.html#setup">Download</a></div>
         <span class="ph-hint" aria-hidden="true">{ga.icon("chevron-down")}</span>
       </div>
     </section>
     <section class="ph-after">
       <ul class="ph-prin">{prin}</ul>
+      <div class="ph-for"><h2 class="ax-h">Who it's for</h2><div class="ax-keys">{who}</div></div>
       <div class="ph-faq">{faq}</div>
     </section>
 '''
@@ -145,7 +146,7 @@ def ld():
 
 
 def build():
-    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=' + __import__("hashlib").md5(open(os.path.join(W, "philosophy.css"), "rb").read()).hexdigest()[:8] + '">', extra_js='\n  <script src="philosophy.js?v=10" defer></script>')
+    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=' + __import__("hashlib").md5(open(os.path.join(W, "philosophy.css"), "rb").read()).hexdigest()[:8] + '">', extra_js='\n  <script src="philosophy.js?v=11" defer></script>')
 
 
 def main():
