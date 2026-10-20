@@ -150,12 +150,12 @@
     var f = el('div', 'sr-field'); f.appendChild(svg('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>'));
     input = el('input', 'sr-input'); input.type = 'search'; input.placeholder = 'Search Infinite'; input.autocomplete = 'off'; input.spellcheck = false;
     input.setAttribute('aria-label', 'Search'); input.setAttribute('role', 'combobox'); input.setAttribute('aria-controls', 'sr-list'); input.setAttribute('aria-expanded', 'true');
-    var esc = el('button', 'sr-esc', 'esc'); esc.type = 'button'; esc.setAttribute('aria-label', 'Close search'); esc.addEventListener('click', close);
+    var esc = el('button', 'sr-esc'); esc.appendChild(svg('<path d="M6 6l12 12M18 6 6 18"/>')); esc.type = 'button'; esc.setAttribute('aria-label', 'Close search'); esc.addEventListener('click', close);
     f.appendChild(input); f.appendChild(esc);
     chips = el('div', 'sr-chips'); chips.setAttribute('role', 'group'); chips.setAttribute('aria-label', 'Filter by type');
     list = el('ul', 'sr-list'); list.id = 'sr-list'; list.setAttribute('role', 'listbox');
     var hint = el('div', 'sr-hint'); hint.innerHTML = '<span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span>';
-    box.appendChild(f); box.appendChild(chips); box.appendChild(list); box.appendChild(hint);
+    box.appendChild(f); box.appendChild(chips); box.appendChild(list);
     dlg.appendChild(scrim); dlg.appendChild(box); document.body.appendChild(dlg);
     input.addEventListener('input', update);
     input.addEventListener('keydown', function (ev) {

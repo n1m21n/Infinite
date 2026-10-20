@@ -239,9 +239,9 @@
   },
   "search.css": {
    "duration": 3,
-   "font-size": 11,
+   "font-size": 10,
    "hex": 5,
-   "radius": 8
+   "radius": 7
   },
   "slides.html": {
    "font-size": 19,

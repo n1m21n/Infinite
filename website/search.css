@@ -34,7 +34,8 @@
 .sr-field svg { width: 20px; height: 20px; flex: none; color: var(--ink2); }
 .sr-input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 1.0625rem; outline: 0; box-shadow: none; }
 .sr-input::placeholder { color: var(--ink3, var(--ink2)); }
-.sr-esc { font: 500 0.6875rem/1 var(--font-mono, ui-monospace, monospace); padding: 5px 8px; border-radius: 6px; color: var(--ink2); background: color-mix(in srgb, var(--shadow, #000) 14%, transparent); border: 0; cursor: pointer; }
+.sr-esc svg { width: 14px; height: 14px; display: block; }
+.sr-esc { padding: 7px; border-radius: 50%; line-height: 0; color: var(--ink2); background: color-mix(in srgb, var(--shadow, #000) 14%, transparent); border: 0; cursor: pointer; }
 .sr-field, .sr-chips, .sr-hint { flex: none; }
 .sr-input::-webkit-search-cancel-button, .sr-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
 .sr-chips { display: flex; gap: 6px; padding: 12px 14px 4px; overflow-x: auto; scrollbar-width: none; }

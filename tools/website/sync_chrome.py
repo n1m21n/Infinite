@@ -243,9 +243,9 @@ def header_html(rel, brand_href=None):
     return re.sub(r'<nav class="nav-links".*?</nav>', lambda m: nav_html(rel), h, count=1, flags=re.S)
 
 
-SEARCH_BTN = ('<button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false" title="Search (Ctrl K)">'
+SEARCH_BTN = ('<button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false">'
               '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>'
-              '<span class="search-label">Search</span><kbd aria-hidden="true">\u2318K</kbd></button>')
+              '<span class="search-label">Search</span></button>')
 
 
 def pages():
