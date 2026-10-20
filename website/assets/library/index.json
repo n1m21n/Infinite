@@ -595,6 +595,101 @@
       "file": "assets/library/pixel/aurora-borealis.field",
       "preview": "assets/library/previews/aurora-borealis.jpg",
       "bytes": 1588
+    },
+    {
+      "id": "ikeda-attractor",
+      "name": "Ikeda Attractor",
+      "kind": "Generator",
+      "tags": [
+        "math",
+        "chaos",
+        "laser",
+        "drawing"
+      ],
+      "description": "Ikeda chaotic laser cavity attractor simulating non-linear optical resonator phase drift and swirling electromagnetic trajectory filaments.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 8,
+      "file": "assets/library/sketch/ikeda-attractor.js",
+      "preview": "assets/library/previews/ikeda-attractor.jpg",
+      "bytes": 1251
+    },
+    {
+      "id": "dini-surface-3d",
+      "name": "Dini Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "helicoid",
+        "parametric"
+      ],
+      "description": "Parametric Dini pseudospherical surface of constant negative curvature with twisting helicoid horn contours, ribbon tubes and orbiting quanta.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 8,
+      "file": "assets/library/sketch/dini-surface-3d.js",
+      "preview": "assets/library/previews/dini-surface-3d.jpg",
+      "bytes": 2555
+    },
+    {
+      "id": "wavetable-morph-synth",
+      "name": "Wavetable Morph Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "wavetable",
+        "morph",
+        "dsp"
+      ],
+      "description": "Multi-profile wavetable oscillator with continuous morphing across warm sine, folded triangle, saw and pulsed harmonics, sub-oscillator and analog warmth.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/wavetable-morph-synth.inf",
+      "preview": "assets/library/previews/wavetable-morph-synth.jpg",
+      "bytes": 2348
+    },
+    {
+      "id": "wavefolder-drive-fx",
+      "name": "Wavefolder Drive FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "wavefolder",
+        "drive",
+        "dsp"
+      ],
+      "description": "West Coast multi-stage analog wavefolder with continuous folding thresholds, DC symmetry bias, tone filter and warm saturator.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/wavefolder-drive-fx.inf",
+      "preview": "assets/library/previews/wavefolder-drive-fx.jpg",
+      "bytes": 1544
+    },
+    {
+      "id": "cosmic-nebula",
+      "name": "Cosmic Nebula",
+      "kind": "Generator",
+      "tags": [
+        "nebula",
+        "space",
+        "reactive",
+        "visuals"
+      ],
+      "description": "Deep interstellar emission nebula with audio-reactive volumetric dust filaments, ionized stellar core ionization and radiant cluster flare.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/cosmic-nebula.field",
+      "preview": "assets/library/previews/cosmic-nebula.jpg",
+      "bytes": 1646
     }
   ]
 }

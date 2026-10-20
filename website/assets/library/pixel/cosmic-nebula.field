@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cosmic Nebula",
+    "author": "Infinite",
+    "description": "Deep interstellar emission nebula with audio-reactive volumetric dust filaments, ionized stellar core ionization and radiant cluster flare.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float swirlSpeed = 1.2 [0.2, 4.0];\nparam float dustDensity = 2.6 [0.5, 6.0];\nparam float coreGlow = 1.6 [0.2, 4.0];\nparam float colorShift = 0.5 [0.0, 1.0];\n\np = (uv - 0.5) * 2.2;\np.x = p.x * aspect;\n\nr = length(p);\nang = atan2(p.y, p.x);\ntCur = t * swirlSpeed * 0.3;\n\nswirl = ang + r * 1.8 - tCur;\npSwirl = vec2(cos(swirl), sin(swirl)) * r;\n\nf1 = sin(pSwirl.x * dustDensity + tCur * 1.4) * cos(pSwirl.y * dustDensity - tCur * 0.9);\nf2 = sin(pSwirl.x * (dustDensity * 2.1) - tCur * 1.8) * cos(pSwirl.y * (dustDensity * 2.1) + tCur * 1.2);\nfilaments = exp(-abs(f1 + f2 * 0.5) * 3.5);\n\ncore = exp(-r * r * (3.8 - coreGlow * 0.5)) * coreGlow;\n\nground = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.21);\n\nnebulaGrad = mix(signal, ember, clamp(r * 1.1 + sin(ang * 3.0 + tCur) * 0.3, 0.0, 1.0));\nnebulaCol = mix(nebulaGrad, emerald, colorShift * 0.45);\n\ncol = ground;\ncol = col + nebulaCol * filaments * 1.7;\ncol = col + mix(ember, vec3(1.0, 0.95, 0.88), 0.6) * core * 1.4;\nalpha = 1.0;\n",
+    "params": {
+      "swirlSpeed": 1.2,
+      "dustDensity": 2.6,
+      "coreGlow": 1.6,
+      "colorShift": 0.5
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

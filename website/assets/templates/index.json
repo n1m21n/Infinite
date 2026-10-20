@@ -369,6 +369,38 @@
     "Field Effect",
     "Audio Out"
    ]
+  },
+  {
+   "id": "wavetable-morph-synth",
+   "name": "Wavetable Morph Synth",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "Synths",
+   "description": "Multi-profile wavetable oscillator with continuous morphing across warm sine, folded triangle, saw and pulsed harmonics.",
+   "price": 0,
+   "preview": "assets/templates/wavetable-morph-synth.webp",
+   "file": "assets/templates/wavetable-morph-synth.inf",
+   "nodes": [
+    "Random Note Generator",
+    "Field Synth",
+    "Audio Out"
+   ]
+  },
+  {
+   "id": "wavefolder-drive-fx",
+   "name": "Wavefolder Drive FX",
+   "category": "Templates",
+   "kind": "Template",
+   "group": "Audio effects",
+   "description": "West Coast multi-stage analog wavefolder with continuous folding thresholds, DC symmetry bias and tone filter.",
+   "price": 0,
+   "preview": "assets/templates/wavefolder-drive-fx.webp",
+   "file": "assets/templates/wavefolder-drive-fx.inf",
+   "nodes": [
+    "Oscillator",
+    "Field Effect",
+    "Audio Out"
+   ]
   }
  ]
 }

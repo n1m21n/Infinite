@@ -105,6 +105,11 @@
       "slug": "aurora-borealis",
       "title": "Aurora Borealis",
       "description": "Luminous polar aurora borealis ionospheric curtains with audio-reactive magnetic fold undulations and spectral ray striations."
+    },
+    {
+      "slug": "cosmic-nebula",
+      "title": "Cosmic Nebula",
+      "description": "Deep interstellar emission nebula with audio-reactive volumetric dust filaments, ionized stellar core ionization and radiant cluster flare."
     }
   ]
 }

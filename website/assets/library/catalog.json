@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 89,
+ "count": 96,
  "items": [
   {
    "id": "first-sound",
@@ -278,6 +278,30 @@
    "file": "https://infinitedevices.org/assets/templates/formant-filter-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/formant-filter-fx.webp",
    "page": "https://infinitedevices.org/library/formant-filter-fx.html"
+  },
+  {
+   "id": "wavetable-morph-synth",
+   "name": "Wavetable Morph Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Multi-profile wavetable oscillator with continuous morphing across warm sine, folded triangle, saw and pulsed harmonics.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/wavetable-morph-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/wavetable-morph-synth.webp",
+   "page": "https://infinitedevices.org/library/wavetable-morph-synth.html"
+  },
+  {
+   "id": "wavefolder-drive-fx",
+   "name": "Wavefolder Drive FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "West Coast multi-stage analog wavefolder with continuous folding thresholds, DC symmetry bias and tone filter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/wavefolder-drive-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/wavefolder-drive-fx.webp",
+   "page": "https://infinitedevices.org/library/wavefolder-drive-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -1070,6 +1094,66 @@
    "file": "https://infinitedevices.org/assets/library/pixel/aurora-borealis.field",
    "preview": "https://infinitedevices.org/assets/library/previews/aurora-borealis.jpg",
    "page": "https://infinitedevices.org/library/aurora-borealis.html"
+  },
+  {
+   "id": "ikeda-attractor",
+   "name": "Ikeda Attractor",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Ikeda chaotic laser cavity attractor simulating non-linear optical resonator phase drift and swirling electromagnetic trajectory filaments.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/ikeda-attractor.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/ikeda-attractor.jpg",
+   "page": "https://infinitedevices.org/library/ikeda-attractor.html"
+  },
+  {
+   "id": "dini-surface-3d",
+   "name": "Dini Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Parametric Dini pseudospherical surface of constant negative curvature with twisting helicoid horn contours, ribbon tubes and orbiting quanta.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/dini-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/dini-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/dini-surface-3d.html"
+  },
+  {
+   "id": "wavetable-morph-synth",
+   "name": "Wavetable Morph Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Multi-profile wavetable oscillator with continuous morphing across warm sine, folded triangle, saw and pulsed harmonics, sub-oscillator and analog warmth.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/wavetable-morph-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/wavetable-morph-synth.jpg",
+   "page": "https://infinitedevices.org/library/wavetable-morph-synth.html"
+  },
+  {
+   "id": "wavefolder-drive-fx",
+   "name": "Wavefolder Drive FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "West Coast multi-stage analog wavefolder with continuous folding thresholds, DC symmetry bias, tone filter and warm saturator.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/wavefolder-drive-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/wavefolder-drive-fx.jpg",
+   "page": "https://infinitedevices.org/library/wavefolder-drive-fx.html"
+  },
+  {
+   "id": "cosmic-nebula",
+   "name": "Cosmic Nebula",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Deep interstellar emission nebula with audio-reactive volumetric dust filaments, ionized stellar core ionization and radiant cluster flare.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/cosmic-nebula.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/cosmic-nebula.jpg",
+   "page": "https://infinitedevices.org/library/cosmic-nebula.html"
   }
  ]
 }

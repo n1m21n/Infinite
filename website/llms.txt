@@ -56,6 +56,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Shimmer Delay FX](https://infinitedevices.org/library/shimmer-delay-fx.html): Multi-tap pitch-diffused shimmer delay with cross-fed harmonic reflections and damping filter. (file: https://infinitedevices.org/assets/templates/shimmer-delay-fx.inf)
 - [Phase Distortion Synth](https://infinitedevices.org/library/phase-distortion-synth.html): Casio CZ-style phase distortion synthesizer with resonant formant windowing and analog saturation. (file: https://infinitedevices.org/assets/templates/phase-distortion-synth.inf)
 - [Formant Filter FX](https://infinitedevices.org/library/formant-filter-fx.html): Dual-cavity resonant vocal formant filter with vowel cavity morphing and driven saturator. (file: https://infinitedevices.org/assets/templates/formant-filter-fx.inf)
+- [Wavetable Morph Synth](https://infinitedevices.org/library/wavetable-morph-synth.html): Multi-profile wavetable oscillator with continuous morphing across warm sine, folded triangle, saw and pulsed harmonics. (file: https://infinitedevices.org/assets/templates/wavetable-morph-synth.inf)
+- [Wavefolder Drive FX](https://infinitedevices.org/library/wavefolder-drive-fx.html): West Coast multi-stage analog wavefolder with continuous folding thresholds, DC symmetry bias and tone filter. (file: https://infinitedevices.org/assets/templates/wavefolder-drive-fx.inf)
 
 ## Library: Community
 
@@ -113,6 +115,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Pulsar Beam](https://infinitedevices.org/library/pulsar-beam.html): Rotating magnetized neutron star with relativistic synchrotron light cones, dipole magnetic flux arcs and audio-reactive horizon flare. (file: https://infinitedevices.org/assets/library/pixel/pulsar-beam.field)
 - [Neural Synapse](https://infinitedevices.org/library/neural-synapse.html): Bio-electric neural dendritic lattice with audio-reactive action potential pulses, synaptic neurotransmitter flares and synaptic vesicle nodes. (file: https://infinitedevices.org/assets/library/pixel/neural-synapse.field)
 - [Aurora Borealis](https://infinitedevices.org/library/aurora-borealis.html): Luminous polar aurora borealis ionospheric curtains with audio-reactive magnetic fold undulations, spectral ray striations and stellar corona flare. (file: https://infinitedevices.org/assets/library/pixel/aurora-borealis.field)
+- [Cosmic Nebula](https://infinitedevices.org/library/cosmic-nebula.html): Deep interstellar emission nebula with audio-reactive volumetric dust filaments, ionized stellar core ionization and radiant cluster flare. (file: https://infinitedevices.org/assets/library/pixel/cosmic-nebula.field)
 
 ## Library: Sketch
 
@@ -125,6 +128,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [De Jong Attractor](https://infinitedevices.org/library/de-jong-attractor.html): Peter de Jong chaotic map accumulating glowing density filaments from four sinusoidal phase terms. (file: https://infinitedevices.org/assets/library/sketch/de-jong-attractor.js)
 - [Hopalong Attractor](https://infinitedevices.org/library/hopalong-attractor.html): Barry Martin's Hopalong chaotic map generating glowing fractal filaments and cosmic web filaments. (file: https://infinitedevices.org/assets/library/sketch/hopalong-attractor.js)
 - [Gumowski-Mira](https://infinitedevices.org/library/gumowski-mira.html): Gumowski-Mira chaotic attractor generating intricate organic feathers, biological wings and non-linear accelerator trajectories. (file: https://infinitedevices.org/assets/library/sketch/gumowski-mira.js)
+- [Ikeda Attractor](https://infinitedevices.org/library/ikeda-attractor.html): Ikeda chaotic laser cavity attractor simulating non-linear optical resonator phase drift and swirling electromagnetic trajectory filaments. (file: https://infinitedevices.org/assets/library/sketch/ikeda-attractor.js)
 
 ## Library: Sketch 3D
 
@@ -132,6 +136,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Möbius Strip 3D](https://infinitedevices.org/library/mobius-strip-3d.html): Parametric non-orientable Möbius ribbon with transverse tubular rungs, edge rails and orbiting satellites. (file: https://infinitedevices.org/assets/library/sketch/mobius-strip-3d.js)
 - [Klein Bottle 3D](https://infinitedevices.org/library/klein-bottle-3d.html): Parametric 4D topological Klein bottle immersed in 3D with transverse wireframe ribs, spine rails and orbiting energy quanta. (file: https://infinitedevices.org/assets/library/sketch/klein-bottle-3d.js)
 - [Enneper Surface 3D](https://infinitedevices.org/library/enneper-surface-3d.html): Parametric 3D Alfred Enneper minimal surface with zero mean curvature, self-intersecting saddle wings and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/enneper-surface-3d.js)
+- [Dini Surface 3D](https://infinitedevices.org/library/dini-surface-3d.html): Parametric Dini pseudospherical surface of constant negative curvature with twisting helicoid horn contours, ribbon tubes and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/dini-surface-3d.js)
 
 ## Library: Synths
 
@@ -139,6 +144,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Supersaw Lead Synth](https://infinitedevices.org/library/supersaw-lead-synth.html): Multi-oscillator detuned hypersaw lead synthesizer with sub-octave support, resonant filter and snappy ADSR envelope. (file: https://infinitedevices.org/assets/templates/supersaw-lead-synth.inf)
 - [FM Bell Synth](https://infinitedevices.org/library/fm-bell-synth.html): Dual-operator phase modulation FM chime and bell synthesizer with exponential index envelope and resonant formant damping. (file: https://infinitedevices.org/assets/templates/fm-bell-synth.inf)
 - [Phase Distortion Synth](https://infinitedevices.org/library/phase-distortion-synth.html): Casio CZ-style phase distortion synthesizer with resonant formant windowing, exponential decay envelopes and analog saturation. (file: https://infinitedevices.org/assets/templates/phase-distortion-synth.inf)
+- [Wavetable Morph Synth](https://infinitedevices.org/library/wavetable-morph-synth.html): Multi-profile wavetable oscillator with continuous morphing across warm sine, folded triangle, saw and pulsed harmonics, sub-oscillator and analog warmth. (file: https://infinitedevices.org/assets/templates/wavetable-morph-synth.inf)
 
 ## Library: Audio Effects
 
@@ -146,10 +152,11 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Tape Phaser FX](https://infinitedevices.org/library/tape-phaser-fx.html): 4-stage optical tape phaser with swept allpass notches, feedback resonance and warm diode saturation. (file: https://infinitedevices.org/assets/templates/tape-phaser-fx.inf)
 - [Shimmer Delay FX](https://infinitedevices.org/library/shimmer-delay-fx.html): Multi-tap pitch-diffused shimmer delay with cross-fed harmonic reflections, tape saturation and damping filter. (file: https://infinitedevices.org/assets/templates/shimmer-delay-fx.inf)
 - [Formant Filter FX](https://infinitedevices.org/library/formant-filter-fx.html): Dual-cavity resonant vocal formant filter with vowel cavity morphing, driven non-linear saturator, resonance Q and LFO modulation. (file: https://infinitedevices.org/assets/templates/formant-filter-fx.inf)
+- [Wavefolder Drive FX](https://infinitedevices.org/library/wavefolder-drive-fx.html): West Coast multi-stage analog wavefolder with continuous folding thresholds, DC symmetry bias, tone filter and warm saturator. (file: https://infinitedevices.org/assets/templates/wavefolder-drive-fx.inf)
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 21 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 22 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -171,6 +178,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Pulsar Beam](https://infinitedevices.org/embeds/pulsar-beam.html): Rotating magnetized neutron star with relativistic synchrotron light cones, dipole magnetic flux arcs and audio-reactive horizon flare.
 - [Neural Synapse](https://infinitedevices.org/embeds/neural-synapse.html): A lattice of glowing dendrites. Sound fires pulses along the branches and flares at the synapses.
 - [Aurora Borealis](https://infinitedevices.org/embeds/aurora-borealis.html): Luminous polar aurora borealis ionospheric curtains with audio-reactive magnetic fold undulations and spectral ray striations.
+- [Cosmic Nebula](https://infinitedevices.org/embeds/cosmic-nebula.html): Deep interstellar emission nebula with audio-reactive volumetric dust filaments, ionized stellar core ionization and radiant cluster flare.
 
 ## For AI agents
 

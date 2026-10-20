@@ -1,0 +1,43 @@
+infinite-patch 1
+# Wavefolder Drive FX: West Coast multi-stage analog wavefolder Field Effect
+node 1 Synths Oscillator
+  id osc
+  pos 0 1024
+  f freq 110.0
+  i waveform 0
+end
+node 2 Effects Field Effect
+  id fx
+  pos 480 1024
+  s code param float drive = 2.8 [1.0, 8.0]\nparam float folds = 2.4 [1.0, 5.0]\nparam float symmetry = 0.5 [0.0, 1.0]\nparam float tone = 8500.0 [800.0, 18000.0]\nparam float mix = 0.75 [0.0, 1.0]\nstate float lp = 0\n\nbias = (symmetry - 0.5) * 1.2\nu = in * drive + bias\n\nfold1 = sin(u * 1.5707963)\nfold2 = sin(fold1 * 2.3561945 + u * 0.785398)\nfold3 = sin(fold2 * 3.1415926 + fold1 * 0.5)\n\nfracFold = clamp(folds - 1.0, 0.0, 3.0)\nm1 = clamp(fracFold, 0.0, 1.0)\ns1 = fold1 * (1.0 - m1) + fold2 * m1\nm2 = clamp(fracFold - 1.0, 0.0, 1.0)\nfolded = s1 * (1.0 - m2) + fold3 * m2\n\nsat = folded / (1.0 + abs(folded) * 0.18)\n\nfCut = clamp(6.2831853 * tone / sr, 0.02, 0.85)\nlp = lp + fCut * (sat - lp)\n\nout = in * (1.0 - mix) + lp * mix\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1.0 0.42 0.21
+  f size 0.24
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Wavefolder Drive FX. West Coast multi-stage analog wavefolding with symmetry and tone control.
+  f width 360
+  f height 120
+end
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.16 0.46
+mod pic sizeY ana 0 0 1 0.5 0.16 0.46

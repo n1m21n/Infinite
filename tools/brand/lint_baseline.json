@@ -1,6 +1,5 @@
 {
- "website/app.js": 37,
- "website/artists.css": 11,
+ "website/app.js": 38,
  "website/deck.css": 2,
  "website/dev.js": 2,
  "website/embeds/analog_crt.html": 4,
@@ -22,7 +21,6 @@
  "website/museum.css": 2,
  "website/museum.js": 8,
  "website/philosophy.css": 6,
- "website/site.js": 1,
  "website/slides.html": 23,
  "website/style.css": 1
 }

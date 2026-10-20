@@ -231,6 +231,10 @@
    "font-size": 46,
    "hex": 18,
    "radius": 12
+  },
+  "embeds/cosmic-nebula.html": {
+   "font-size": 2,
+   "hex": 6
   }
  }
 }
