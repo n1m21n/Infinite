@@ -237,6 +237,12 @@
    "hex": 3,
    "radius": 1
   },
+  "search.css": {
+   "duration": 3,
+   "font-size": 11,
+   "hex": 5,
+   "radius": 8
+  },
   "slides.html": {
    "font-size": 19,
    "hex": 11,

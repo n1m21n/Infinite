@@ -20,6 +20,7 @@ CSS_VERSION = __import__("hashlib").md5(open(os.path.join(os.path.dirname(os.pat
 _hash = lambda f: __import__("hashlib").md5(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "website", f), "rb").read()).hexdigest()[:8]
 SYSTEM_VERSION, SCALE_VERSION, NEUMO_VERSION = _hash("system.css"), _hash("scale.css"), _hash("neumo.css")
 BIRD_VERSION = _hash("bird.js")
+SEARCH_CSS_VERSION, SEARCH_JS_VERSION = _hash("search.css"), _hash("search.js")
 JS_VERSION = "21"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
@@ -242,6 +243,11 @@ def header_html(rel, brand_href=None):
     return re.sub(r'<nav class="nav-links".*?</nav>', lambda m: nav_html(rel), h, count=1, flags=re.S)
 
 
+SEARCH_BTN = ('<button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false" title="Search (Ctrl K)">'
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>'
+              '<span class="search-label">Search</span><kbd aria-hidden="true">\u2318K</kbd></button>')
+
+
 def pages():
     for dp, dn, fn in os.walk(W):
         dn[:] = [d for d in dn if d not in ("vendor", "assets")]
@@ -268,6 +274,13 @@ def sync(rel, text):
     s = s.replace('</head>', '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'system.css?v=' + SYSTEM_VERSION + '">\n'
                   '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'scale.css?v=' + SCALE_VERSION + '">\n'
                   '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'neumo.css?v=' + NEUMO_VERSION + '">\n</head>', 1)
+    # the search button sits right after the brand: left on desktop, centred on phones (search.css)
+    s = re.sub(r'\n?[ \t]*<button type="button" class="search-btn".*?</button>', '', s, flags=re.S)
+    s = re.sub(r'(<a href="[^"]*" class="brand"[^>]*>.*?</a>)', lambda m: m.group(1) + '\n      ' + SEARCH_BTN, s, count=1, flags=re.S)
+    s = re.sub(r'\n?[ \t]*<link rel="stylesheet" href="(?:\.\./)*search\.css[^"]*">', '', s)
+    s = s.replace('</head>', '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'search.css?v=' + SEARCH_CSS_VERSION + '">\n</head>', 1)
+    s = re.sub(r'\n?[ \t]*<script src="(?:\.\./)*search\.js[^"]*" defer></script>', '', s)
+    s = s.replace('</body>', '  <script src="' + depth_prefix(rel) + 'search.js?v=' + SEARCH_JS_VERSION + '" defer></script>\n</body>', 1)
     s = re.sub(r'(style\.css\?v=)[A-Za-z0-9]+', r"\g<1>" + CSS_VERSION, s)
     s = re.sub(r'(site\.js\?v=)\d+', r"\g<1>" + JS_VERSION, s)
     # the digit bird is on every page
