@@ -457,7 +457,7 @@ def page(a):
     if a["slug"] == "musicians":
         return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=36bf82b2">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=1" defer></script>')
     if a["slug"] == "developers":
-        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=bf9bacd4">', extra_js='\n  <script src="dev.js?v=2" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=505c23d1">', extra_js='\n  <script src="dev.js?v=2" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 
