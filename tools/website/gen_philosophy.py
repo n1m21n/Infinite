@@ -114,9 +114,9 @@ def main_html():
     faq = "".join(f'<details class="ph-q"><summary>{e(q)}</summary><p>{e(a)}</p></details>' for q, a in FAQ)
     return f'''
   <main>
-    <h1 class="ph-sr">Why Infinite exists</h1>
     <section class="ph" id="journey" aria-label="A journey through the ideas behind Infinite" data-edges="{e(edges)}">
       <div class="ph-stage">
+        <h1 class="ph-title">Philosophy</h1>
         <div class="ph-glow" aria-hidden="true"></div>
         <svg class="ph-edges" aria-hidden="true"><g class="ph-lines"></g><circle class="ph-flow" r="5"/></svg>
         <svg class="ph-loop" viewBox="-300 -80 600 160" aria-hidden="true" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="phg" x1="0" x2="1"><stop offset="0" stop-color="#F57F66"/><stop offset=".5" stop-color="#C7AFC0"/><stop offset="1" stop-color="#A9CDF1"/></linearGradient><radialGradient id="phb" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".35" stop-color="#FF9878"/><stop offset="1" stop-color="#B53700"/></radialGradient></defs><path class="ph-mark" d="" pathLength="1"/><circle class="ph-ball" r="9" fill="url(#phb)" cx="0" cy="0"/></svg>
@@ -145,7 +145,7 @@ def ld():
 
 
 def build():
-    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=3e7cec5b">', extra_js='\n  <script src="philosophy.js?v=5" defer></script>')
+    return ga.shell("philosophy.html", TITLE, DESC, ld(), main_html(), extra_head='\n  <link rel="stylesheet" href="philosophy.css?v=d89d4a25">', extra_js='\n  <script src="philosophy.js?v=5" defer></script>')
 
 
 def main():
