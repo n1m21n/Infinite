@@ -1,0 +1,86 @@
+/* Artists page (made by tools/website/gen_audiences.py, behaviour in artists.js).
+   One Midnight stage with a live blob, glass bubbles, swipe strips. Cards 24 (20 on phones), media 16, pills, no outlines.
+   Ember appears once: the Download pill. Durations 125 / 188 / 333 / 500 / 667 ms. */
+.ax, .ax-stage, .aud-section, .ax-lab .lab { --mid: #151930; --mid-deep: #0D1020; --mid-ink: #EEF1FA; --mid-sig: #A7B1FF; --card-r: var(--r-lg); }
+@media (max-width: 600px) { .ax, .ax-stage, .aud-section, .ax-lab .lab { --card-r: 20px; } }
+.ax { padding-top: 8px; }
+.ax-stage { position: relative; height: clamp(520px, calc(100svh - var(--header-h, 60px) - 40px), 760px); border-radius: var(--card-r); overflow: hidden; background: var(--mid); box-shadow: var(--shadow-2); isolation: isolate; color: var(--mid-ink); touch-action: pan-y; cursor: grab; }
+.ax-stage:active { cursor: grabbing; }
+.ax-gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: -1; }
+.ax-stage.no-gl .ax-gl { display: none; }
+.ax-stage.no-gl { background: radial-gradient(circle at 50% 45%, #3a4290, var(--mid) 62%); }
+
+.ax-copy { position: absolute; left: clamp(20px, 4vw, 48px); top: clamp(20px, 4vw, 44px); right: 20px; pointer-events: none; }
+.ax-copy .hand { display: block; font-size: clamp(1.8rem, 3.4vw, 2.4rem); color: var(--mid-sig); line-height: 1; }
+.ax-copy h1 { margin: 4px 0 6px; font: 800 clamp(2.1rem, 5.6vw, 4rem)/1.02 'Geist', system-ui, sans-serif; letter-spacing: -0.035em; color: var(--mid-ink); max-width: 9em; }
+.ax-copy p { margin: 0; font-size: clamp(1rem, 1.6vw, 1.25rem); color: rgba(238, 241, 250, 0.78); }
+
+/* glass: short labels only */
+.ax-bub, .ax-ghost, .ax-hint, .ax-nodes figcaption, .ax-code summary {
+  background: rgba(32, 38, 63, 0.55); -webkit-backdrop-filter: blur(20px) saturate(1.7); backdrop-filter: blur(20px) saturate(1.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(255, 255, 255, 0.04); color: var(--mid-ink);
+}
+.ax-hint { position: absolute; right: clamp(16px, 3vw, 28px); top: clamp(20px, 4vw, 44px); display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 12px; border-radius: var(--r-pill); font: 500 0.8438rem/1 'Geist', system-ui, sans-serif; pointer-events: none; transition: opacity var(--dur-med, 333ms) var(--ease-out, ease); }
+.ax-stage.touched .ax-hint { opacity: 0; }
+.ax-hint .ic { width: 20px; height: 20px; animation: ax-nudge 2s var(--ease-io, ease-in-out) infinite; }
+@keyframes ax-nudge { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+
+.ax-low { position: absolute; left: 0; right: 0; bottom: clamp(88px, 10vw, 96px); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 0 12px; pointer-events: none; }
+.ax-bubs { display: flex; gap: 8px; pointer-events: auto; max-width: 100%; }
+.ax-bub { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; border: 0; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; cursor: pointer; transition: background var(--dur-short, 188ms) var(--ease-out, ease), transform var(--dur-short, 188ms) var(--ease-out, ease); }
+.ax-bub .ic { width: 20px; height: 20px; flex: none; }
+.ax-bub:hover { background: rgba(60, 68, 108, 0.6); }
+.ax-bub:active { transform: scale(0.96); }
+.ax-bub.on { background: var(--mid-ink); color: var(--mid-deep); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.ax-cap { margin: 0; font: 600 1.0625rem/1.2 'Geist', system-ui, sans-serif; letter-spacing: -0.01em; text-shadow: 0 1px 12px rgba(4, 5, 14, 0.6); }
+.ax-cap.swap { animation: ax-swap var(--dur-med, 333ms) var(--ease-out, ease) both; }
+@keyframes ax-swap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.ax-cta { position: absolute; left: 0; right: 0; bottom: clamp(20px, 3vw, 32px); display: flex; justify-content: center; gap: 8px; padding: 0 12px; }
+.ax-ghost { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px 0 14px; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; text-decoration: none; transition: background var(--dur-short, 188ms) var(--ease-out, ease); }
+.ax-ghost:hover { background: rgba(60, 68, 108, 0.6); }
+.ax-ghost .ic { width: 20px; height: 20px; }
+
+@media (min-width: 900px) {
+  .ax-low { align-items: flex-start; left: clamp(20px, 4vw, 48px); bottom: clamp(24px, 3vw, 40px); padding: 0; }
+  .ax-cta { left: auto; right: clamp(16px, 3vw, 28px); bottom: clamp(24px, 3vw, 40px); padding: 0; }
+}
+@media (max-width: 600px) {
+  .ax-stage { --card-r: 20px; }
+  .ax-copy { right: 12px; }
+  .ax-hint { display: none; }
+  .ax-bub { padding: 0 14px 0 10px; }
+}
+
+/* section headers: a quiet label, not a headline */
+.ax-h { margin: 0 0 16px; font: 600 1rem/1.2 'Geist', system-ui, sans-serif; letter-spacing: 0; color: var(--ink2); }
+
+/* swipe strips: edge to edge on phones, the middle card lifts, nothing dims */
+.ax-strip { margin: 0 calc(var(--gutter, 16px) * -1); }
+.ax-nodes, .ax-reel { --f: 0; display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 12px var(--gutter, 16px) 20px; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.ax-nodes::-webkit-scrollbar, .ax-reel::-webkit-scrollbar { display: none; }
+.ax-node { --f: 0; position: relative; flex: 0 0 auto; margin: 0; scroll-snap-align: center; padding: 24px 24px 56px; border-radius: var(--card-r); background: var(--mid-deep); box-shadow: var(--shadow-1); display: grid; place-items: center; min-width: 200px; transform: translateY(calc((1 - var(--f)) * 10px)) scale(calc(0.95 + var(--f) * 0.05)); transition: box-shadow var(--dur-med, 333ms) var(--ease-out, ease); will-change: transform; }
+.ax-node img { display: block; height: clamp(190px, 34vw, 280px); width: auto; border-radius: var(--r-md); box-shadow: 0 12px 28px rgba(4, 5, 14, 0.5); }
+.ax-node figcaption { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: var(--r-pill); font: 500 0.8438rem/1 'Geist', system-ui, sans-serif; white-space: nowrap; }
+.ax-shot { --f: 0; flex: 0 0 auto; scroll-snap-align: center; display: block; height: clamp(220px, 34vw, 340px); aspect-ratio: var(--ar, 16 / 10); border-radius: var(--r-md); overflow: hidden; background: var(--mid-deep); box-shadow: var(--shadow-1); transform: translateY(calc((1 - var(--f)) * 10px)) scale(calc(0.95 + var(--f) * 0.05)); will-change: transform; }
+.ax-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+@media (min-width: 900px) { .ax-strip { margin: 0; } .ax-nodes, .ax-reel { padding-left: 4px; padding-right: 4px; scroll-snap-type: x proximity; } }
+
+/* knobs: the lab as one stage with the sliders as glass on top */
+.ax-lab .lab { position: relative; display: block; padding: 0; background: var(--mid); overflow: hidden; }
+.ax-lab .lab-view { aspect-ratio: 4 / 5; border-radius: 0; }
+@media (min-width: 900px) { .ax-lab .lab-view { aspect-ratio: 16 / 9; } }
+.ax-lab .lab-side { position: absolute; left: 12px; right: 12px; bottom: 12px; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 8px; pointer-events: none; }
+.ax-lab .ctl { pointer-events: auto; flex: 1 1 200px; margin: 0; padding: 12px 16px; border-radius: 20px; background: rgba(32, 38, 63, 0.55); -webkit-backdrop-filter: blur(20px) saturate(1.7); backdrop-filter: blur(20px) saturate(1.7); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); color: var(--mid-ink); }
+.ax-lab .ctl label { color: var(--mid-ink); font: 500 0.8438rem/1 'Geist', system-ui, sans-serif; letter-spacing: 0; }
+.ax-lab .ctl output { color: rgba(238, 241, 250, 0.78); }
+.ax-code { pointer-events: auto; flex: 1 1 100%; }
+.ax-code summary { list-style: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; border-radius: var(--r-pill); font: 500 0.9375rem/1 'Geist', system-ui, sans-serif; cursor: pointer; }
+.ax-code summary::-webkit-details-marker { display: none; }
+.ax-code summary .ic { width: 20px; height: 20px; }
+.ax-code .aud-code { margin: 8px 0 0; border-radius: 16px; max-height: 40svh; overflow: auto; }
+
+@media (min-width: 901px) { .ax > .container, .ax-main > .container { padding-left: max(var(--gutter), 88px); } }
+@media (max-width: 900px) { .ax-stage { height: clamp(500px, calc(100svh - var(--header-h, 60px) - 112px), 720px); } .ax-low { bottom: 84px; } }
+.ax-lab .ctl { flex: 1 1 140px; padding: 10px 14px; }
+@media (max-width: 600px) { .ax-lab .lab-view { aspect-ratio: 1 / 1.1; } .ax-lab .ctl { gap: 8px; } }

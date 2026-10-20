@@ -316,10 +316,73 @@ def main_html(a, rel):
     '''
 
 
+def artists_main(a, rel):
+    """Immersive artists page: a live iridescent blob you steer, three glass bubbles that morph it, a swipe strip of nodes, knobs, a reel."""
+    L = a["lab"]
+    bub = [("layers", "family-compositing", "Layer", a["cards"][0][0]), ("solid", "cube", "3D", a["cards"][1][0]), ("formula", "edit", "Formula", a["cards"][2][0])]
+    bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(c)}: {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
+    nodes = "".join(f'<figure class="ax-node"><img src="assets/nodes/{n}.webp" alt="{e(t)}: {e(d)}" loading="lazy" decoding="async"><figcaption>{e(t)}</figcaption></figure>' for n, t, d in a["bench"]["items"])
+    figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{a["reel"]["href"]}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"></a>' for src, w, h, al in a["reel"]["items"])
+    start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
+    others = "".join(f'<a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
+    lab = lab_html(a)
+    lab = lab.replace('<h3>' + e(L["title"]) + '</h3>', '')
+    import re
+    lab = re.sub(r'(<pre class="aud-code">.*?</pre>)', lambda m: '<details class="ax-code"><summary>' + icon("edit") + '<span>Code</span></summary>' + m.group(1) + '</details>', lab, flags=re.S)
+    return f'''
+  <main class="ax-main">
+    <section class="ax">
+      <div class="container">
+        <div class="ax-stage" data-k="0">
+          <canvas class="ax-gl" aria-hidden="true"></canvas>
+          <div class="ax-copy">
+            <span class="blog-hand hand">{e(a["hand"])}</span>
+            <h1>{e(a["h1"])}</h1>
+            <p>Images that move.</p>
+          </div>
+          <div class="ax-hint" aria-hidden="true">{icon("pointer")}<span>Drag</span></div>
+          <div class="ax-low">
+            <div class="ax-bubs" role="tablist" aria-label="What you can do">{bubbles}</div>
+            <p class="ax-cap" aria-live="polite">{e(a["cards"][0][0])}</p>
+          </div>
+          <div class="ax-cta">
+            <a href="index.html#setup" class="btn btn-primary">Download</a>
+            <a href="{a["extra"][0]}" class="ax-ghost" aria-label="{e(a["extra"][1])}">{icon("viewport")}<span>Gallery</span></a>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div class="container">
+      <section class="aud-section reveal">
+        <h2 class="ax-h">Nodes</h2>
+        <div class="ax-strip"><div class="ax-nodes">{nodes}</div></div>
+      </section>
+      <section class="aud-section reveal ax-lab">
+        <h2 class="ax-h">Knobs</h2>
+        {lab}
+      </section>
+      <section class="aud-section reveal">
+        <h2 class="ax-h">Made in Infinite</h2>
+        <div class="ax-strip"><div class="ax-reel">{figs}</div></div>
+      </section>
+      <section class="aud-section reveal">
+        <h2 class="ax-h">Start with</h2>
+        <div class="aud-start">{start}</div>
+      </section>
+      <section class="aud-section reveal">
+        <h2 class="ax-h">For everyone else</h2>
+        <div class="aud-others">{others}</div>
+      </section>
+    </div>
+'''
+
+
 def page(a):
     rel = a["slug"] + ".html"
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
+    if a["slug"] == "artists":
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=6">', extra_js='\n  <script src="artists.js?v=4" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 
