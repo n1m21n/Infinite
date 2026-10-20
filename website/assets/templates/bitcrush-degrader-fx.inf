@@ -1,0 +1,43 @@
+infinite-patch 1
+# Bitcrush Degrader FX: sample rate decimation and bit-depth reduction Field Effect
+node 1 Synths Oscillator
+  id osc
+  pos 0 1024
+  f frequency 220
+  i waveform 1
+end
+node 2 Effects Field Effect
+  id fx
+  pos 480 1024
+  s code param float decimRate = 8.0 [1.0, 32.0]\nparam float bitDepth = 6.0 [2.0, 16.0]\nparam float jitter = 0.20 [0.0, 1.0]\nparam float drive = 1.5 [1.0, 4.0]\nparam float mix = 0.75 [0.0, 1.0]\nstate float holdAccum = 0\nstate float heldSample = 0\nstate float noiseState = 0.12345\nstate float lp = 0\n\nnoiseState = (noiseState * 196314.165 + 90763.3) % 1.0\nrnd = noiseState * 2.0 - 1.0\n\nstepThreshold = max(1.0, decimRate * (1.0 + rnd * jitter * 0.4))\nholdAccum = holdAccum + 1.0\nheldSample = if(holdAccum >= stepThreshold, in * drive, heldSample)\nholdAccum = if(holdAccum >= stepThreshold, 0.0, holdAccum)\n\nbits = clamp(bitDepth, 2.0, 16.0)\nlevels = pow(2.0, bits)\nquantized = round(heldSample * levels) / levels\n\ncrushed = quantized / (1.0 + abs(quantized) * 0.18)\nlp = lp + 0.55 * (crushed - lp)\n\nout = in * (1.0 - mix) + lp * mix\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Bitcrush Degrader FX. Sample rate decimation and bit-depth quantization with analog drive.
+  f width 360
+  f height 120
+end
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.18 0.5
+mod pic sizeY ana 0 0 1 0.5 0.18 0.5

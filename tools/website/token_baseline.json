@@ -172,6 +172,10 @@
    "hex": 5,
    "radius": 1
   },
+  "embeds/solar-flare.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/spectral-caustics.html": {
    "font-size": 2,
    "hex": 6

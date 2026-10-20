@@ -876,6 +876,99 @@
       "file": "assets/library/pixel/plasma-filament.field",
       "preview": "assets/library/previews/plasma-filament.jpg",
       "bytes": 1627
+    },
+    {
+      "id": "halvorsen-attractor",
+      "name": "Halvorsen Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math"
+      ],
+      "description": "3-fold cyclically symmetric chaotic strange attractor with looping orbital ribbons, parameter drift and luminous particle trails.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/halvorsen-attractor.js",
+      "preview": "assets/library/previews/halvorsen-attractor.jpg",
+      "bytes": 1680
+    },
+    {
+      "id": "boy-surface-3d",
+      "name": "Boy's Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "minimal-surface"
+      ],
+      "description": "Parametric non-orientable immersion of the projective plane in 3-space with 3-fold symmetry, central triple point and orbiting quanta.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 6,
+      "file": "assets/library/sketch/boy-surface-3d.js",
+      "preview": "assets/library/previews/boy-surface-3d.jpg",
+      "bytes": 2917
+    },
+    {
+      "id": "subharmonic-synth",
+      "name": "Subharmonic Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "subharmonic",
+        "pwm",
+        "dsp"
+      ],
+      "description": "Subharmonic division oscillator with dual quantized sub-octave generators (1/2, 1/3, 1/4), pulse-width modulation and warm low-pass saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 6,
+      "file": "assets/templates/subharmonic-synth.inf",
+      "preview": "assets/library/previews/subharmonic-synth.jpg",
+      "bytes": 2462
+    },
+    {
+      "id": "bitcrush-degrader-fx",
+      "name": "Bitcrush Degrader FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "bitcrush",
+        "decimate",
+        "dsp"
+      ],
+      "description": "Sample-rate decimation and variable bit-depth reduction with jitter noise, analog pre-drive and wet/dry mix.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/bitcrush-degrader-fx.inf",
+      "preview": "assets/library/previews/bitcrush-degrader-fx.jpg",
+      "bytes": 1658
+    },
+    {
+      "id": "solar-flare",
+      "name": "Solar Flare",
+      "kind": "Generator",
+      "tags": [
+        "plasma",
+        "solar",
+        "reactive",
+        "visuals"
+      ],
+      "description": "Blinding coronal solar flares with twisting magnetic loop prominences, turbulent convection granulation and audio-reactive coronal mass ejections.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/solar-flare.field",
+      "preview": "assets/library/previews/solar-flare.jpg",
+      "bytes": 1703
     }
   ]
 }

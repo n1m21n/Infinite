@@ -62,6 +62,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Comb Resonator FX](https://infinitedevices.org/library/comb-resonator-fx.html): Dual-coupled harmonic tuned resonator with adjustable resonance Q, acoustic decay damping, overdrive saturation and wet/dry mix. (file: https://infinitedevices.org/assets/templates/comb-resonator-fx.inf)
 - [Hard Sync Synth](https://infinitedevices.org/library/hard-sync-synth.html): Master/slave oscillator with dynamic formant sync sweep, sub-oscillator and analog diode saturation. (file: https://infinitedevices.org/assets/templates/hard-sync-synth.inf)
 - [Ring Modulator FX](https://infinitedevices.org/library/ring-modulator-fx.html): Diode ring modulator with variable carrier frequency, carrier wave shaping, LFO tremolo and wet/dry mix. (file: https://infinitedevices.org/assets/templates/ring-modulator-fx.inf)
+- [Subharmonic Synth](https://infinitedevices.org/library/subharmonic-synth.html): Subharmonic division oscillator with dual quantized sub-octave generators (1/2, 1/3, 1/4), pulse-width modulation and warm low-pass saturation. (file: https://infinitedevices.org/assets/templates/subharmonic-synth.inf)
+- [Bitcrush Degrader FX](https://infinitedevices.org/library/bitcrush-degrader-fx.html): Sample-rate decimation and variable bit-depth reduction with jitter noise, analog pre-drive and wet/dry mix. (file: https://infinitedevices.org/assets/templates/bitcrush-degrader-fx.inf)
 
 ## Library: Community
 
@@ -122,6 +124,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Cosmic Nebula](https://infinitedevices.org/library/cosmic-nebula.html): Deep interstellar emission nebula with audio-reactive volumetric dust filaments, ionized stellar core ionization and radiant cluster flare. (file: https://infinitedevices.org/assets/library/pixel/cosmic-nebula.field)
 - [Spectral Caustics](https://infinitedevices.org/library/spectral-caustics.html): Deep aquatic light caustics with audio-reactive chromatic dispersion, fluid wave refraction and incandescent focal flare. (file: https://infinitedevices.org/assets/library/pixel/spectral-caustics.field)
 - [Plasma Filament](https://infinitedevices.org/library/plasma-filament.html): High-energy electrical plasma arcs with audio-reactive magnetic twist undulations, helical flux filaments and incandescent core discharge. (file: https://infinitedevices.org/assets/library/pixel/plasma-filament.field)
+- [Solar Flare](https://infinitedevices.org/library/solar-flare.html): Blinding coronal solar flares with twisting magnetic loop prominences, turbulent convection granulation and audio-reactive coronal mass ejections. (file: https://infinitedevices.org/assets/library/pixel/solar-flare.field)
 
 ## Library: Sketch
 
@@ -137,6 +140,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Ikeda Attractor](https://infinitedevices.org/library/ikeda-attractor.html): Ikeda chaotic laser cavity attractor simulating non-linear optical resonator phase drift and swirling electromagnetic trajectory filaments. (file: https://infinitedevices.org/assets/library/sketch/ikeda-attractor.js)
 - [Svensson Attractor](https://infinitedevices.org/library/svensson-attractor.html): Chaotic Svensson attractor with continuous coefficient modulation, woven fractal filaments and phase density mapping. (file: https://infinitedevices.org/assets/library/sketch/svensson-attractor.js)
 - [Tinkerbell Map](https://infinitedevices.org/library/tinkerbell-map.html): Chaotic Tinkerbell attractor with sweeping dynamical orbital plumes, fractal dust filament trails and parameter drift. (file: https://infinitedevices.org/assets/library/sketch/tinkerbell-map.js)
+- [Halvorsen Attractor](https://infinitedevices.org/library/halvorsen-attractor.html): 3-fold cyclically symmetric chaotic strange attractor with looping orbital ribbons, parameter drift and luminous particle trails. (file: https://infinitedevices.org/assets/library/sketch/halvorsen-attractor.js)
 
 ## Library: Sketch 3D
 
@@ -147,6 +151,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Dini Surface 3D](https://infinitedevices.org/library/dini-surface-3d.html): Parametric Dini pseudospherical surface of constant negative curvature with twisting helicoid horn contours, ribbon tubes and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/dini-surface-3d.js)
 - [Bour's Minimal Surface 3D](https://infinitedevices.org/library/bour-surface-3d.html): Parametric Bour minimal surface with three-fold rotational petal symmetry, coordinate wireframe mesh and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/bour-surface-3d.js)
 - [Kuen's Surface 3D](https://infinitedevices.org/library/kuen-surface-3d.html): Parametric Alfred Kuen pseudospherical surface of constant negative curvature with twisting spire lobes and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/kuen-surface-3d.js)
+- [Boy's Surface 3D](https://infinitedevices.org/library/boy-surface-3d.html): Parametric non-orientable immersion of the projective plane in 3-space with 3-fold symmetry, central triple point and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/boy-surface-3d.js)
 
 ## Library: Synths
 
@@ -157,6 +162,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Wavetable Morph Synth](https://infinitedevices.org/library/wavetable-morph-synth.html): Multi-profile wavetable oscillator with continuous morphing across warm sine, folded triangle, saw and pulsed harmonics, sub-oscillator and analog warmth. (file: https://infinitedevices.org/assets/templates/wavetable-morph-synth.inf)
 - [Additive Harmonic Synth](https://infinitedevices.org/library/additive-harmonic-synth.html): Eight-partial additive harmonic overtone generator with continuous spectral tilt, odd/even balance, shimmer emphasis and analog saturation. (file: https://infinitedevices.org/assets/templates/additive-harmonic-synth.inf)
 - [Hard Sync Synth](https://infinitedevices.org/library/hard-sync-synth.html): Master/slave oscillator with dynamic formant sync sweep, sub-oscillator and analog diode saturation. (file: https://infinitedevices.org/assets/templates/hard-sync-synth.inf)
+- [Subharmonic Synth](https://infinitedevices.org/library/subharmonic-synth.html): Subharmonic division oscillator with dual quantized sub-octave generators (1/2, 1/3, 1/4), pulse-width modulation and warm low-pass saturation. (file: https://infinitedevices.org/assets/templates/subharmonic-synth.inf)
 
 ## Library: Audio Effects
 
@@ -167,10 +173,11 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Wavefolder Drive FX](https://infinitedevices.org/library/wavefolder-drive-fx.html): West Coast multi-stage analog wavefolder with continuous folding thresholds, DC symmetry bias, tone filter and warm saturator. (file: https://infinitedevices.org/assets/templates/wavefolder-drive-fx.inf)
 - [Comb Resonator FX](https://infinitedevices.org/library/comb-resonator-fx.html): Dual-coupled harmonic tuned resonator with adjustable resonance Q, acoustic decay damping, overdrive saturation and wet/dry mix. (file: https://infinitedevices.org/assets/templates/comb-resonator-fx.inf)
 - [Ring Modulator FX](https://infinitedevices.org/library/ring-modulator-fx.html): Diode ring modulator with variable carrier frequency, carrier wave shaping, LFO tremolo and wet/dry mix. (file: https://infinitedevices.org/assets/templates/ring-modulator-fx.inf)
+- [Bitcrush Degrader FX](https://infinitedevices.org/library/bitcrush-degrader-fx.html): Sample-rate decimation and variable bit-depth reduction with jitter noise, analog pre-drive and wet/dry mix. (file: https://infinitedevices.org/assets/templates/bitcrush-degrader-fx.inf)
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 24 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 25 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -195,6 +202,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Cosmic Nebula](https://infinitedevices.org/embeds/cosmic-nebula.html): Deep interstellar emission nebula with audio-reactive volumetric dust filaments, ionized stellar core ionization and radiant cluster flare.
 - [Spectral Caustics](https://infinitedevices.org/embeds/spectral-caustics.html): Deep aquatic light caustics with audio-reactive chromatic dispersion, fluid wave refraction and incandescent focal flare.
 - [Plasma Filament](https://infinitedevices.org/embeds/plasma-filament.html): High-energy electrical plasma arcs with audio-reactive magnetic twist undulations, helical flux filaments and incandescent core discharge.
+- [Solar Flare](https://infinitedevices.org/embeds/solar-flare.html): Blinding coronal solar flares with twisting magnetic loop prominences, turbulent convection granulation and audio-reactive coronal mass ejections.
 
 ## For AI agents
 

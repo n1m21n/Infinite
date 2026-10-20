@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Bitcrush Degrader FX",
+    "author": "Infinite",
+    "description": "Sample-rate decimation and variable bit-depth reduction with jitter noise, analog pre-drive and wet/dry mix.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float decimRate = 8.0 [1.0, 32.0];\nparam float bitDepth = 6.0 [2.0, 16.0];\nparam float jitter = 0.20 [0.0, 1.0];\nparam float drive = 1.5 [1.0, 4.0];\nparam float mix = 0.75 [0.0, 1.0];\nstate float holdAccum = 0;\nstate float heldSample = 0;\nstate float noiseState = 0.12345;\nstate float lp = 0;\n\nnoiseState = (noiseState * 196314.165 + 90763.3) % 1.0;\nrnd = noiseState * 2.0 - 1.0;\n\nstepThreshold = max(1.0, decimRate * (1.0 + rnd * jitter * 0.4));\nholdAccum = holdAccum + 1.0;\nheldSample = if(holdAccum >= stepThreshold, in * drive, heldSample);\nholdAccum = if(holdAccum >= stepThreshold, 0.0, holdAccum);\n\nbits = clamp(bitDepth, 2.0, 16.0);\nlevels = pow(2.0, bits);\nquantized = round(heldSample * levels) / levels;\n\ncrushed = quantized / (1.0 + abs(quantized) * 0.18);\nlp = lp + 0.55 * (crushed - lp);\n\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "decimRate": 8.0,
+      "bitDepth": 6.0,
+      "jitter": 0.20,
+      "drive": 1.5,
+      "mix": 0.75
+    },
+    "nodeSettings": {}
+  }
+}

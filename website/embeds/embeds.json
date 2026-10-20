@@ -120,6 +120,11 @@
       "slug": "plasma-filament",
       "title": "Plasma Filament",
       "description": "High-energy electrical plasma arcs with audio-reactive magnetic twist undulations, helical flux filaments and incandescent core discharge."
+    },
+    {
+      "slug": "solar-flare",
+      "title": "Solar Flare",
+      "description": "Blinding coronal solar flares with twisting magnetic loop prominences, turbulent convection granulation and audio-reactive coronal mass ejections."
     }
   ]
 }

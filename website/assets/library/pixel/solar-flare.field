@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Solar Flare",
+    "author": "Infinite",
+    "description": "Blinding coronal solar flares with twisting magnetic loop prominences, turbulent convection granulation and audio-reactive coronal mass ejections.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 1.20 [0.2, 4.0];\nparam float turbulence = 2.8 [0.5, 6.0];\nparam float flareCount = 6.0 [2.0, 12.0];\nparam float ejectionPulse = 0.55 [0.0, 1.0];\n\np = (uv - 0.5) * 2.2;\np.x = p.x * aspect;\n\nr = length(p);\nangle = atan(p.y, p.x);\ntCur = t * speed * 0.38;\n\nloop1 = sin(angle * flareCount + sin(r * turbulence - tCur * 2.2) * 2.5);\nloop2 = cos(-angle * (flareCount * 0.7) + cos(r * (turbulence * 1.4) + tCur * 1.7) * 2.0);\nprominence = pow(max(0.0, 1.0 - abs(loop1 * 0.55 + loop2 * 0.45)), 5.5);\n\ncorona = exp(-r * r * 1.8) * 1.8;\nsunDisc = smoothstep(0.42, 0.38, r);\n\ncmeWave = sin(r * 24.0 - tCur * 6.0) * exp(-r * 1.4) * ejectionPulse;\n\nground = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.21);\nsunCore = vec3(1.0, 0.94, 0.85);\n\nsolarGrad = mix(ember, sunCore, clamp(corona * 0.7 + sunDisc * 0.5, 0.0, 1.0));\nflareCol = mix(solarGrad, signal, clamp(loop2 * 0.5 + 0.5, 0.0, 1.0) * 0.4);\n\ncol = ground;\ncol = col + flareCol * prominence * 2.4;\ncol = col + mix(ember, sunCore, 0.6) * corona * 1.2;\ncol = col + signal * max(0.0, cmeWave) * 1.5;\nalpha = 1.0;\n",
+    "params": {
+      "speed": 1.20,
+      "turbulence": 2.8,
+      "flareCount": 6.0,
+      "ejectionPulse": 0.55
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

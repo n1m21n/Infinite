@@ -1,0 +1,44 @@
+infinite-patch 1
+# Subharmonic Synth: subharmonic division oscillator with pulse-width modulation Field Synth
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 36
+  i rangeHigh 64
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float sub1Div = 2.0 [1.0, 8.0]\nparam float sub2Div = 3.0 [1.0, 8.0]\nparam float subLevel = 0.45 [0.0, 1.0]\nparam float pwm = 0.40 [0.0, 1.0]\nparam float decay = 2.2 [0.1, 6.0]\nparam float warmth = 1.40 [1.0, 3.5]\nstate float mainPhase = 0\nstate float sub1Phase = 0\nstate float sub2Phase = 0\nstate float ampEnv = 0\nstate float filterEnv = 0\nstate float lp = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nampDecayRate = clamp(1.0 / (sr * decay), 0.00002, 0.02)\nfilterDecayRate = clamp(1.0 / (sr * (decay * 0.7)), 0.00003, 0.025)\nampEnv = if(target > ampEnv, ampEnv + (target - ampEnv) * 0.18, ampEnv - ampEnv * ampDecayRate)\nfilterEnv = if(target > filterEnv, filterEnv + (target - filterEnv) * 0.22, filterEnv - filterEnv * filterDecayRate)\n\nf0 = clamp(freq, 20.0, 5000.0)\ndiv1 = max(1.0, floor(sub1Div + 0.5))\ndiv2 = max(1.0, floor(sub2Div + 0.5))\nfSub1 = f0 / div1\nfSub2 = f0 / div2\n\nstep0 = f0 / sr\nstep1 = fSub1 / sr\nstep2 = fSub2 / sr\n\nmainPhase = (mainPhase + step0) % 1.0\nsub1Phase = (sub1Phase + step1) % 1.0\nsub2Phase = (sub2Phase + step2) % 1.0\n\npulseWidth = 0.5 + 0.38 * pwm * sin(mainPhase * 6.2831853)\nmainPulse = if(mainPhase < pulseWidth, 1.0, -1.0)\nmainSaw = 2.0 * mainPhase - 1.0\nmainWave = mainSaw * 0.65 + mainPulse * 0.35\n\nsub1Wave = 2.0 * sub1Phase - 1.0\nsub2Tri = 2.0 * abs(2.0 * sub2Phase - 1.0) - 1.0\nsub2Wave = sub2Tri\n\nraw = (mainWave + sub1Wave * subLevel + sub2Wave * (subLevel * 0.8)) * (warmth * 0.52)\nsat = raw / (1.0 + abs(raw) * 0.24)\n\nlp = lp + clamp(0.25 + filterEnv * 0.45, 0.05, 0.95) * (sat - lp)\nout = lp * ampEnv * 0.54\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Subharmonic Synth. Dual subharmonic division oscillators with PWM and ladder saturation.
+  f width 360
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.18 0.5
+mod pic sizeY ana 0 0 1 0.5 0.18 0.5

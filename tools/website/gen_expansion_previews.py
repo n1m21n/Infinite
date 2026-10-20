@@ -1201,6 +1201,321 @@ def render_plasma_filament():
     print("plasma-filament.jpg saved")
 
 
+def render_halvorsen_attractor():
+    """Halvorsen chaotic strange attractor density plot."""
+    w, h = 900, 600
+    acc = np.zeros((h, w), dtype=np.float32)
+    a = 1.89
+    x, y, z = -1.48, -0.22, 0.54
+    cx, cy = w * 0.5, h * 0.5
+    k = min(w, h) * 0.038
+    dt = 0.0075
+
+    rotY = 0.65
+    rotX = 0.52
+    cosY, sinY = math.cos(rotY), math.sin(rotY)
+    cosX, sinX = math.cos(rotX), math.sin(rotX)
+
+    n_points = 1800000
+    for _ in range(n_points):
+        dx = -a * x - 4.0 * y - 4.0 * z - y * y
+        dy = -a * y - 4.0 * z - 4.0 * x - z * z
+        dz = -a * z - 4.0 * x - 4.0 * y - x * x
+        x += dx * dt
+        y += dy * dt
+        z += dz * dt
+
+        if abs(x) > 50.0 or abs(y) > 50.0 or abs(z) > 50.0:
+            x, y, z = -1.48, -0.22, 0.54
+            continue
+
+        x1 = x * cosY + z * sinY
+        z1 = -x * sinY + z * cosY
+        y2 = y * cosX - z1 * sinX
+
+        px = int(cx + x1 * k)
+        py = int(cy + y2 * k)
+        if 0 <= px < w and 0 <= py < h:
+            acc[py, px] += 1.0
+
+    acc = np.log1p(acc * 0.5)
+    max_val = np.percentile(acc[acc > 0], 99.7) if np.any(acc > 0) else 1.0
+    norm = np.clip(acc / max_val, 0.0, 1.0)
+
+    img_glow = Image.fromarray((norm * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.4))
+    glow_arr = np.array(img_glow, dtype=np.float32) / 255.0
+
+    out = np.zeros((h, w, 3), dtype=np.float32)
+    for c_idx in range(3):
+        out[:, :, c_idx] = GROUND[c_idx]
+
+    for y_idx in range(h):
+        for x_idx in range(w):
+            v = norm[y_idx, x_idx]
+            g_val = glow_arr[y_idx, x_idx]
+            if v > 0 or g_val > 0:
+                dist = math.sqrt((x_idx - cx)**2 + (y_idx - cy)**2) / (min(w, h) * 0.46)
+                mix_col = SIGNAL * (1.0 - min(1.0, dist * 0.70)) + EMBER * min(1.0, dist * 0.70)
+                col = mix_col * (v * 1.35 + g_val * 0.75) + WHITE * (v**2.2 * 1.6)
+                out[y_idx, x_idx] = np.clip(GROUND * (1.0 - min(1.0, v + g_val)) + col, 0, 255)
+
+    im = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+    im.save(os.path.join(PREVIEWS_DIR, "halvorsen-attractor.jpg"), quality=94)
+    print("halvorsen-attractor.jpg saved")
+
+
+def render_boy_surface():
+    """Parametric Boy's surface 3D projection."""
+    w, h = 900, 600
+    im = Image.new("RGB", (w, h), (21, 25, 48))
+    draw = ImageDraw.Draw(im, "RGBA")
+
+    rotY = 0.72
+    rotX = 0.48
+    cy, cx = h / 2, w / 2
+
+    def point(u, v):
+        sinV = math.sin(v)
+        cosV = math.cos(v)
+        sin2V = math.sin(2.0 * v)
+        cosV2 = cosV * cosV
+        sin3U = math.sin(3.0 * u)
+        cosU = math.cos(u)
+        sinU = math.sin(u)
+        cos2U = math.cos(2.0 * u)
+        sin2U = math.sin(2.0 * u)
+
+        sqrt2 = 1.41421356
+        denom = max(0.25, 2.0 - sqrt2 * sin3U * sin2V)
+
+        sc = 0.72
+        x = sc * (sqrt2 * cosV2 * cos2U + cosU * sin2V) / denom
+        y = sc * (sqrt2 * cosV2 * sin2U - sinU * sin2V) / denom
+        z = sc * (3.0 * cosV2 / denom - 1.0)
+
+        # Rotate Y
+        x1 = x * math.cos(rotY) + y * math.sin(rotY)
+        z1 = -x * math.sin(rotY) + y * math.cos(rotY)
+        # Rotate X
+        y2 = z * math.cos(rotX) - z1 * math.sin(rotX)
+        z2 = z * math.sin(rotX) + z1 * math.cos(rotX)
+
+        fov = 3.2
+        dist = 3.8 - z2
+        px = cx + (x1 / dist) * fov * 230
+        py = cy - (y2 / dist) * fov * 230
+        return px, py, z2
+
+    ribs_u = 40
+    segs_v = 40
+
+    lines = []
+    for i in range(ribs_u + 1):
+        frac_u = i / ribs_u
+        u = frac_u * math.pi
+        pts = [point(u, (j / segs_v) * (math.pi - 0.08) + 0.04) for j in range(segs_v + 1)]
+        avg_z = sum(p[2] for p in pts) / len(pts)
+        lines.append((avg_z, frac_u, pts, False))
+
+    for j in range(0, segs_v + 1, 2):
+        frac_v = j / segs_v
+        v = 0.04 + frac_v * (math.pi - 0.08)
+        pts = [point((i / ribs_u) * math.pi, v) for i in range(ribs_u + 1)]
+        avg_z = sum(p[2] for p in pts) / len(pts)
+        lines.append((avg_z, frac_v, pts, True))
+
+    lines.sort(key=lambda r: r[0])
+
+    for avg_z, frac, pts, is_v in lines:
+        alpha = int(np.clip(135 + avg_z * 85, 40, 255))
+        if is_v:
+            col_mix = EMBER * (1.0 - frac * 0.5) + WHITE * (frac * 0.5)
+        else:
+            col_mix = SIGNAL * (1.0 - frac) + EMBER * frac
+        r, g, b = [int(np.clip(c, 0, 255)) for c in col_mix]
+        w_line = 2 if not is_v else 1
+        for idx in range(len(pts) - 1):
+            p1, p2 = pts[idx], pts[idx + 1]
+            draw.line([(p1[0], p1[1]), (p2[0], p2[1])], fill=(r, g, b, alpha), width=w_line)
+
+    for q in range(12):
+        ang = (q / 12.0) * math.tau
+        qu = (q / 12.0) * math.pi
+        qv = 0.5 * math.pi + 0.35 * math.sin(ang * 2.0)
+        pos = point(qu, qv)
+        draw.ellipse([pos[0] - 5, pos[1] - 5, pos[0] + 5, pos[1] + 5], fill=(255, 235, 220, 245), outline=(255, 107, 53, 255))
+
+    im.save(os.path.join(PREVIEWS_DIR, "boy-surface-3d.jpg"), quality=94)
+    print("boy-surface-3d.jpg saved")
+
+
+def render_subharmonic_synth():
+    """Render Subharmonic Synth preview and webp template."""
+    w, h = 900, 600
+    im = Image.new("RGB", (w, h), (21, 25, 48))
+    draw = ImageDraw.Draw(im, "RGBA")
+
+    for gy in range(80, h, 80):
+        draw.line([(0, gy), (w, gy)], fill=(32, 38, 70, 100), width=1)
+    for gx in range(90, w, 90):
+        draw.line([(gx, 0), (gx, h)], fill=(32, 38, 70, 100), width=1)
+
+    cy = h / 2 - 20
+
+    pts = []
+    for i in range(w):
+        frac = i / w
+        cycle = (frac * 6.0) % 1.0
+        env = math.exp(-frac * 1.5)
+
+        pw = 0.5 + 0.25 * math.sin(frac * 8.0)
+        p_main = 1.0 if cycle < pw else -1.0
+        saw_main = 2.0 * cycle - 1.0
+        w_main = saw_main * 0.6 + p_main * 0.4
+
+        sub1_cyc = (frac * 3.0) % 1.0
+        w_sub1 = (2.0 * sub1_cyc - 1.0) * 0.45
+
+        sub2_cyc = (frac * 2.0) % 1.0
+        w_sub2 = (2.0 * abs(2.0 * sub2_cyc - 1.0) - 1.0) * 0.35
+
+        sig = (w_main + w_sub1 + w_sub2) * env * 145.0
+        pts.append((i, cy + sig))
+
+    for i in range(len(pts) - 1):
+        if abs(pts[i][1] - pts[i + 1][1]) < 120.0:
+            draw.line([pts[i], pts[i + 1]], fill=(167, 177, 255, 90), width=6)
+            draw.line([pts[i], pts[i + 1]], fill=(255, 107, 53, 160), width=3)
+            draw.line([pts[i], pts[i + 1]], fill=(255, 250, 240, 240), width=1)
+
+    cx_box = 720
+    cy_box = cy + 130
+    draw.rectangle([cx_box - 100, cy_box - 70, cx_box + 100, cy_box + 70], outline=(78, 242, 184, 180), width=1)
+    bars = [
+        (-60, 45),
+        (-20, 65),
+        (40, 95),
+        (70, 35)
+    ]
+    for bx, b_h in bars:
+        draw.line([(cx_box + bx, cy_box + 60), (cx_box + bx, cy_box + 60 - b_h)], fill=(78, 242, 184, 230), width=5)
+        draw.ellipse([cx_box + bx - 4, cy_box + 60 - b_h - 4, cx_box + bx + 4, cy_box + 60 - b_h + 4], fill=(255, 255, 255, 255))
+
+    im.save(os.path.join(PREVIEWS_DIR, "subharmonic-synth.jpg"), quality=94)
+    print("subharmonic-synth.jpg saved")
+
+    im_webp = im.resize((960, 600), Image.Resampling.LANCZOS)
+    im_webp.save(os.path.join(TEMPLATES_DIR, "subharmonic-synth.webp"), "WEBP", quality=90)
+    print("subharmonic-synth.webp saved")
+
+
+def render_bitcrush_degrader():
+    """Render Bitcrush Degrader FX preview and webp template."""
+    w, h = 900, 600
+    im = Image.new("RGB", (w, h), (21, 25, 48))
+    draw = ImageDraw.Draw(im, "RGBA")
+
+    for gy in range(80, h, 80):
+        draw.line([(0, gy), (w, gy)], fill=(32, 38, 70, 100), width=1)
+    for gx in range(90, w, 90):
+        draw.line([(gx, 0), (gx, h)], fill=(32, 38, 70, 100), width=1)
+
+    cy = h / 2 - 20
+
+    pts = []
+    step_size = 14
+    levels = 8
+    held_val = 0
+    for i in range(w):
+        frac = i / w
+        time_ms = frac * 16.0
+        env = math.exp(-frac * 1.6)
+        in_sig = math.sin(time_ms * 1.8 * math.tau) + 0.3 * math.sin(time_ms * 4.2 * math.tau)
+        if i % step_size == 0:
+            q = round(in_sig * levels) / levels
+            held_val = q * env * 155.0
+        pts.append((i, cy + held_val))
+
+    for i in range(len(pts) - 1):
+        draw.line([pts[i], pts[i + 1]], fill=(167, 177, 255, 90), width=5)
+        draw.line([pts[i], pts[i + 1]], fill=(255, 107, 53, 170), width=3)
+        draw.line([pts[i], pts[i + 1]], fill=(255, 250, 240, 240), width=1)
+
+    cx_box = 720
+    cy_box = cy + 130
+    draw.rectangle([cx_box - 100, cy_box - 70, cx_box + 100, cy_box + 70], outline=(78, 242, 184, 180), width=1)
+    c_pts = []
+    for bx in range(-90, 91):
+        f = (bx + 90) / 180.0 * 5.0
+        nyq_alias = abs(math.sin(f * 3.14159)) * 75.0 * math.exp(-f * 0.3)
+        c_pts.append((cx_box + bx, cy_box + 60 - nyq_alias))
+    for i in range(len(c_pts) - 1):
+        draw.line([c_pts[i], c_pts[i + 1]], fill=(78, 242, 184, 230), width=2)
+
+    im.save(os.path.join(PREVIEWS_DIR, "bitcrush-degrader-fx.jpg"), quality=94)
+    print("bitcrush-degrader-fx.jpg saved")
+
+    im_webp = im.resize((960, 600), Image.Resampling.LANCZOS)
+    im_webp.save(os.path.join(TEMPLATES_DIR, "bitcrush-degrader-fx.webp"), "WEBP", quality=90)
+    print("bitcrush-degrader-fx.webp saved")
+
+
+def render_solar_flare():
+    """Shader-accurate 900x600 render of Solar Flare."""
+    w, h = 900, 600
+    aspect = w / h
+    x = np.linspace(-1.1 * aspect, 1.1 * aspect, w, dtype=np.float32)
+    y = np.linspace(-1.1, 1.1, h, dtype=np.float32)
+    xx, yy = np.meshgrid(x, y)
+
+    r = np.sqrt(xx**2 + yy**2)
+    angle = np.arctan2(yy, xx)
+    t_cur = 2.4 * 0.38
+
+    turbulence = 2.8
+    flare_count = 6.0
+    loop1 = np.sin(angle * flare_count + np.sin(r * turbulence - t_cur * 2.2) * 2.5)
+    loop2 = np.cos(-angle * (flare_count * 0.7) + np.cos(r * (turbulence * 1.4) + t_cur * 1.7) * 2.0)
+    prominence = np.maximum(0.0, 1.0 - np.abs(loop1 * 0.55 + loop2 * 0.45))**5.5
+
+    corona = np.exp(-r * r * 1.8) * 1.8
+    sun_disc = np.clip((0.46 - r) / 0.10, 0.0, 1.0)
+    cme_wave = np.sin(r * 24.0 - t_cur * 6.0) * np.exp(-r * 1.4) * 0.55
+    granulation = np.maximum(0.0, np.sin(xx * 32.0 + t_cur * 3.5) * np.sin(yy * 32.0 - t_cur * 2.8))**6.0
+    granulation *= np.exp(-r * 1.5) * 1.6
+
+    SUN_CORE = np.array([255, 240, 217], dtype=np.float32)
+
+    out = np.zeros((h, w, 3), dtype=np.float32)
+    for c in range(3):
+        out[:, :, c] = GROUND[c]
+
+    for y_idx in range(h):
+        for x_idx in range(w):
+            rad = r[y_idx, x_idx]
+            prom = prominence[y_idx, x_idx]
+            cor = corona[y_idx, x_idx]
+            disc = sun_disc[y_idx, x_idx]
+            cme = cme_wave[y_idx, x_idx]
+            gran = granulation[y_idx, x_idx]
+            l2 = loop2[y_idx, x_idx]
+
+            solar_grad = EMBER * (1.0 - np.clip(cor * 0.7 + disc * 0.5, 0.0, 1.0)) + SUN_CORE * np.clip(cor * 0.7 + disc * 0.5, 0.0, 1.0)
+            flare_col = solar_grad * (1.0 - np.clip(l2 * 0.5 + 0.5, 0.0, 1.0) * 0.4) + SIGNAL * (np.clip(l2 * 0.5 + 0.5, 0.0, 1.0) * 0.4)
+
+            col = flare_col * prom * 2.4
+            col += (EMBER * 0.4 + SUN_CORE * 0.6) * cor * 1.2
+            col += SIGNAL * max(0.0, cme) * 1.5
+            col += SUN_CORE * gran * 1.6
+
+            rad_falloff = np.clip((2.3 - rad) / 1.1, 0.0, 1.0)
+            out[y_idx, x_idx] = np.clip(GROUND * (1.0 - np.clip(prom * 0.8 + cor * 0.5, 0, 1)) + col, 0, 255) * rad_falloff + GROUND * (1.0 - rad_falloff)
+
+    im = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+    im.save(os.path.join(PREVIEWS_DIR, "solar-flare.jpg"), quality=94)
+    print("solar-flare.jpg saved")
+
+
 if __name__ == "__main__":
     render_gumowski_mira()
     render_enneper()
@@ -1222,4 +1537,9 @@ if __name__ == "__main__":
     render_hard_sync_synth()
     render_ring_modulator_fx()
     render_plasma_filament()
+    render_halvorsen_attractor()
+    render_boy_surface()
+    render_subharmonic_synth()
+    render_bitcrush_degrader()
+    render_solar_flare()
     print("All previews rendered successfully!")
