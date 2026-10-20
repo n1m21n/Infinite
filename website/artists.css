@@ -114,3 +114,12 @@
 .mx-rack.live .mx-arc { filter: drop-shadow(0 0 6px rgba(167, 177, 255, 0.7)); }
 @media (min-width: 900px) { .mx-rack { grid-template-columns: minmax(220px, 1fr) 2fr; align-items: center; padding: 24px; gap: 32px; } .mx-top { flex-direction: column; align-items: stretch; } .mx-scope { height: 96px; } .mx-play { justify-content: center; } .mx-dial { width: 76px; height: 76px; } }
 @media (max-width: 640px) { .mx-play { height: var(--btn-h, 40px); } .mx-dial { width: 56px; height: 56px; } .mx-rack { padding: 14px; } }
+
+/* phones: Download and Guide sit top-right (small), so the bubbles drop to the bottom and the art gets the middle */
+@media (max-width: 899px) {
+  .ax-cta { left: auto; right: 14px; top: 14px; bottom: auto; padding: 0; gap: 6px; }
+  .ax-cta .btn { min-height: 36px; height: 36px; padding: 0 14px; font-size: 0.8125rem; }
+  .ax-cta .ax-ghost { width: 36px; min-width: 36px; height: 36px; padding: 0; justify-content: center; }
+  .ax-cta .ax-ghost span { display: none; }
+  .ax-low { bottom: 18px; }
+}
