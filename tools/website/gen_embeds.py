@@ -167,7 +167,7 @@ def build_gallery(items):
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css?v=e96b24bf">
-  <link rel="stylesheet" href="../style.css?v=ae6b05ea">
+  <link rel="stylesheet" href="../style.css?v=7782a9e6">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=61bae151">
   <link rel="stylesheet" href="../reels.css?v=b4253cfc">
