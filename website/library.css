@@ -433,19 +433,7 @@ body:has(.lib-hero) { overflow-x: clip; font-family: var(--font-sans); }
 }
 
 .lib-dots {
-  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px;
-}
-.lib-dot {
-  width: 7px; height: 7px; border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--ink) 22%, transparent);
-  transition: width var(--spring-slab-ms) var(--spring-slab), background-color var(--dur-small) var(--ease-out);
-}
-.lib-dot:hover {
-  background: color-mix(in srgb, var(--ink) 45%, transparent);
-}
-.lib-dot.is-on {
-  width: 28px;
-  background: var(--ink);
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0;
 }
 
 .lib-empty {
@@ -511,3 +499,10 @@ body:has(.lib-hero) { overflow-x: clip; font-family: var(--font-sans); }
 a.lib-dock-pill { color: inherit; text-decoration: none; transition: transform var(--dur-small) var(--ease-out), box-shadow var(--dur-small) var(--ease-out); }
 a.lib-dock-pill:hover { transform: translateY(-2px); box-shadow: var(--glass-hi), var(--shadow-2); }
 a.lib-dock-pill:active { transform: scale(0.97); }
+
+/* 24px hit area per dot (WCAG 2.5.8); the visible dot is the pseudo-element */
+.lib-dot { width: 24px; height: 24px; position: relative; background: none; transition: width var(--spring-slab-ms) var(--spring-slab); }
+.lib-dot::before { content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; transform: translate(-50%, -50%); border-radius: var(--r-pill); background: color-mix(in srgb, var(--ink) 22%, transparent); transition: width var(--spring-slab-ms) var(--spring-slab), background-color var(--dur-small) var(--ease-out); }
+.lib-dot:hover::before { background: color-mix(in srgb, var(--ink) 45%, transparent); }
+.lib-dot.is-on { width: 44px; background: none; }
+.lib-dot.is-on::before { width: 28px; background: var(--ink); }

@@ -131,7 +131,7 @@
     dotsWrap.innerHTML = '';
     var total = visibleCards.length;
     if (!total) return;
-    var maxDots = Math.min(total, 16);
+    var maxDots = Math.min(total, 12);
     for (var i = 0; i < maxDots; i++) {
       (function (slotIdx) {
         var b = document.createElement('button');

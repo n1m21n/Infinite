@@ -29,7 +29,7 @@
   function dots() {
     if (!dotsWrap) return;
     dotsWrap.innerHTML = '';
-    visible.forEach(function (c, i) {
+    visible.slice(0, 12).forEach(function (c, i) {
       var b = document.createElement('button');
       b.type = 'button'; b.className = 'deck-dot'; b.setAttribute('aria-label', c.getAttribute('data-title') || 'Note');
       b.addEventListener('click', function () { deck.goTo(i); });

@@ -140,7 +140,7 @@ def head(title, desc, url, image, extra="", kind="website", depth="../"):
   <link rel="stylesheet" href="{depth}brand.css?v=7eb5c13f">
   <link rel="stylesheet" href="{depth}style.css?v=da19e273">
   <link rel="stylesheet" href="{depth}glass.css?v=c25dae44">
-  <link rel="stylesheet" href="{depth}blog.css?v=d7c115a7">
+  <link rel="stylesheet" href="{depth}blog.css?v=823c9183">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -184,7 +184,7 @@ def card(p, i):
     open_ic = '<svg class="expand-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 13.5 13.5 6.5M8 6.5h5.5V12"/></svg>'
     cat_ic = chip_icon(p['category']) if p['category'] in CHIP_ICON else chip_icon("all")
     return f"""        <article class="post-card deck-card" data-cat="{e(p['category'])}" data-title="{e(p['title'])}" data-cat-label="{cat_label}" data-read="{read_label}" style="--i:{i}">
-          <a class="post-link" href="{p['slug']}.html" aria-label="{e(p['title'])}">
+          <a class="post-link" href="{p['slug']}.html">
             <div class="post-media">
               {media_img}
               <span class="post-chip post-chip-cat" title="{cat_label}">{cat_ic}</span>
@@ -280,7 +280,7 @@ def build_index(posts, header, footer):
               </div>
             </div>
             <div class="deck-progress-row">
-              <div class="deck-progress-dots" id="deck-progress-dots" role="tablist" aria-label="Jump to note"></div>
+              <div class="deck-progress-dots" id="deck-progress-dots" role="group" aria-label="Jump to note"></div>
             </div>
           </div>
         </div>
@@ -293,8 +293,8 @@ def build_index(posts, header, footer):
 
   {footer}
   <script src="../site.js?v=9" defer></script>
-  <script src="../deck.js?v=1" defer></script>
-  <script src="../blog.js?v=2" defer></script>
+  <script src="../deck.js?v=4" defer></script>
+  <script src="../blog.js?v=3" defer></script>
 </body>
 </html>
 """

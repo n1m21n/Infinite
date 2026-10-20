@@ -482,10 +482,11 @@ def artists_main(a, rel, hero="blob"):
     else:
         bub = [("layers", "family-compositing", "Layer", a["cards"][0][0]), ("solid", "cube", "3D", a["cards"][1][0]), ("formula", "edit", "Formula", a["cards"][2][0])]
         tag, caps, ghost = "Images that move.", "Layers|3D with real materials|A picture from a formula", ("Gallery", "viewport")
-    bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(c)}: {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
+    bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(t)}: {e(c)}. {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
     watch = f'      <section class="aud-section reveal">\n        <h2 class="ax-h">Watch</h2>\n        {film_poster(*MUSIC_FILM)}\n      </section>\n' if hero == "cables" else ""
     items = [((lib_thumb(src), 720, 450, al) if "assets/museum" not in src and lib_thumb(src) else (src, w, h, al)) for src, w, h, al in a["reel"]["items"]]
-    figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{reel_href(a, src)}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="ax-ttl">{e(al.replace(", library", ""))}</span></a>' for src, w, h, al in items)
+    # museum shots show small in the strip: serve a 400px webp, and leave alt empty because the caption beside it says the same thing
+    figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{reel_href(a, src)}"><img src="{src.replace("assets/museum/", "assets/museum/thumb/").replace(".jpg", ".webp") if "assets/museum/" in src else src}" alt="{"" if "assets/museum/" in src else e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="ax-ttl">{e(al.replace(", library", ""))}</span></a>' for src, w, h, al in items)
     start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
     others = "".join(f'<a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
     lab = lab_html(a)
@@ -592,13 +593,13 @@ def page(a):
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=4" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>')
     if a["slug"] == "creative-coders":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="ccode.js?v=4" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=4" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="ccode.js?v=4" defer></script>')
     if a["slug"] == "vjs":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="vjs.js?v=5" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=4" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script src="vjs.js?v=5" defer></script>')
     if a["slug"] == "musicians":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script type="module" src="musicians.js?v=4"></script>\n  <script src="mxrack.js?v=3" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=4" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script type="module" src="musicians.js?v=4"></script>\n  <script src="mxrack.js?v=3" defer></script>')
     if a["slug"] == "developers":
         return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=' + chrome._hash("dev.css") + '">', extra_js='\n  <script src="dev.js?v=4" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
@@ -639,7 +640,7 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="stylesheet" href="brand.css?v=7eb5c13f">
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
-  <link rel="stylesheet" href="blog.css?v=d7c115a7">
+  <link rel="stylesheet" href="blog.css?v=823c9183">
   <link rel="stylesheet" href="audience.css?v=dd614df4">
   {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>

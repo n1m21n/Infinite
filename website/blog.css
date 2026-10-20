@@ -412,19 +412,7 @@ body.blog-page { overflow-x: clip; font-family: var(--font-sans); }
   display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
 .deck-progress-dots {
-  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px;
-}
-.deck-dot {
-  width: 7px; height: 7px; border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--ink) 22%, transparent);
-  transition: width var(--spring-slab-ms) var(--spring-slab), background-color var(--dur-small) var(--ease-out);
-}
-.deck-dot:hover {
-  background: color-mix(in srgb, var(--ink) 45%, transparent);
-}
-.deck-dot.is-on {
-  width: 28px;
-  background: var(--ink);
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0;
 }
 
 .blog-empty, .blog-feed {
@@ -560,3 +548,10 @@ body.blog-page { overflow-x: clip; font-family: var(--font-sans); }
 @media (hover: none) {
   .blog-book-stage[data-deck-mode="grid"] .post-card:hover, .rel-card:hover { transform: none; }
 }
+
+/* 24px hit area per dot (WCAG 2.5.8); the visible dot is the pseudo-element */
+.deck-dot { width: 24px; height: 24px; position: relative; background: none; transition: width var(--spring-slab-ms) var(--spring-slab); }
+.deck-dot::before { content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; transform: translate(-50%, -50%); border-radius: var(--r-pill); background: color-mix(in srgb, var(--ink) 22%, transparent); transition: width var(--spring-slab-ms) var(--spring-slab), background-color var(--dur-small) var(--ease-out); }
+.deck-dot:hover::before { background: color-mix(in srgb, var(--ink) 45%, transparent); }
+.deck-dot.is-on { width: 44px; background: none; }
+.deck-dot.is-on::before { width: 28px; background: var(--ink); }

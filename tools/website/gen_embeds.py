@@ -186,7 +186,7 @@ def build_gallery(items):
   <link rel="stylesheet" href="../brand.css?v=7eb5c13f">
   <link rel="stylesheet" href="../style.css?v=da19e273">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
-  <link rel="stylesheet" href="../blog.css?v=d7c115a7">
+  <link rel="stylesheet" href="../blog.css?v=823c9183">
   <link rel="stylesheet" href="../reels.css?v=a77dd34f">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
