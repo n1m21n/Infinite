@@ -119,7 +119,7 @@
 :root[data-mode="paper"] .ph-prin .ic, :root[data-mode="mist"] .ph-prin .ic { color: var(--signal-300); }
 
 /* Light mode: the principle cards turn pale, text and glyphs go dark */
-:root[data-mode="paper"] .ph-prin li, :root[data-mode="mist"] .ph-prin li { color: var(--ink); background: linear-gradient(160deg, #fff, var(--nm-up, #E9ECF6)); box-shadow: var(--nm-raise, 0 12px 30px rgb(26 31 54 / 0.12)); }
+:root[data-mode="paper"] .ph-prin li, :root[data-mode="mist"] .ph-prin li { color: var(--ink); background: var(--card); box-shadow: var(--nm-raise); }
 :root[data-mode="paper"] .ph-prin li > b, :root[data-mode="mist"] .ph-prin li > b { color: var(--ink); }
 :root[data-mode="paper"] .ph-prin .pp-n, :root[data-mode="mist"] .ph-prin .pp-n { color: color-mix(in srgb, var(--ink) 55%, transparent); }
 :root[data-mode="paper"] .ph-prin .pp-d, :root[data-mode="mist"] .ph-prin .pp-d { color: color-mix(in srgb, var(--ink) 72%, transparent); }

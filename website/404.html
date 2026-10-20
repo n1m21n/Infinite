@@ -17,11 +17,11 @@
   <style>
     .nf { min-height: 100svh; display: grid; place-content: center; justify-items: center; text-align: center; gap: var(--ui-sp-4, 16px); padding: 96px var(--ui-sp-4, 16px) 64px; }
     .nf-home { position: fixed; top: 16px; left: 16px; display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
-    .nf-home img { width: 36px; height: 36px; border-radius: 10px; }
+    .nf-home img { width: 36px; height: 36px; border-radius: var(--web-media-radius); }
     .nf-graph { width: min(420px, 86vw); height: auto; margin-bottom: var(--ui-sp-2, 8px); }
-    .nf-node { fill: var(--card, #2A3150); stroke: color-mix(in srgb, var(--ink) 14%, transparent); }
-    .nf-bar-a { fill: var(--signal-300, #7E86FF); } .nf-bar-b { fill: #22D388; }
-    .nf-t { fill: var(--ink); font: 700 13px Geist, system-ui, sans-serif; } .nf-s { fill: var(--muted); font: 500 8px 'Geist Mono', ui-monospace, monospace; letter-spacing: .1em; }
+    .nf-node { fill: var(--card); stroke: color-mix(in srgb, var(--ink) 14%, transparent); }
+    .nf-bar-a { fill: var(--signal-300); } .nf-bar-b { fill: var(--cat-prediction); }
+    .nf-t { fill: var(--ink); font-weight: 700; font-size: var(--size-caption); } .nf-s { fill: var(--muted); font-family: 'Geist Mono', ui-monospace, monospace; font-size: var(--size-micro-mono); letter-spacing: .1em; }
     .nf-cable { fill: none; stroke: var(--accent-ink); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 2 8; }
     .nf-port { fill: var(--accent-ink); }
     .nf-404 { display: inline-block; margin-bottom: 8px; font: 500 var(--size-micro-mono, 0.75rem)/1 'Geist Mono', ui-monospace, monospace; letter-spacing: .14em; color: var(--muted); }
