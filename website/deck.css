@@ -179,7 +179,7 @@
 /* ---- title bar: a compact pill that hugs its content (arrows, a short title, one action), never the full column ---- */
 .deck-hud-wrap { width: fit-content; max-width: calc(100% - 32px); }
 .deck-hud-pill { width: auto; gap: 4px; padding: 5px; }
-.deck-hud-info { flex: 0 1 auto; width: clamp(96px, 26vw, 148px); padding: 0 4px; text-align: center; }
+.deck-hud-info { flex: 0 0 0; width: 0; padding: 0; overflow: hidden; }   /* the title stays for screen readers; the pill is icons only, the cards carry the titles */
 .deck-hud-title { text-align: center; }
 .deck-nav-btn, .deck-icon-btn { width: 36px; height: 36px; }
 .deck-progress-row { max-width: 280px; }

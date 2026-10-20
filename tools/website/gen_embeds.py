@@ -184,10 +184,10 @@ def build_gallery(items):
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../brand.css?v=42bdb72d">
-  <link rel="stylesheet" href="../style.css?v=eec8d63d">
+  <link rel="stylesheet" href="../style.css?v=f1d3e640">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
-  <link rel="stylesheet" href="../blog.css?v=36138f21">
-  <link rel="stylesheet" href="../reels.css?v=e6e2aeaf">
+  <link rel="stylesheet" href="../blog.css?v=d7c115a7">
+  <link rel="stylesheet" href="../reels.css?v=a77dd34f">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="blog-page reels-page">

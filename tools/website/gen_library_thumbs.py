@@ -10,7 +10,7 @@ Rules : the knob count is the preset's own param count, or its node count for pa
         at both ends. Colours: brand only: the category's brand colour (ember, mint, pink or signal) for cables and value arcs, ink for pointers, ground #151930 to deep #0D1020 with the brand dot grid. Knobs and cables are shaded as 3D (bezel, domed cap, tube highlights, blurred shadows).
 Run   : python3 tools/website/gen_library_thumbs.py          (write)
         python3 tools/website/gen_library_thumbs.py --check  (exit 1 if a file would change)
-Art   : presets of the Pixel, Sketch and Sketch 3D categories are pictures, so their card shows their own render instead: the
+Art   : any preset with a preview image (Pixel, Sketch, Sketch 3D, synths, effects ...) shows its own render instead: the
         preview jpg is cropped to the card ratio and written as thumbs/<id>.webp (about 20 KB). Everything else gets the knobs and cables.
 Used  : website/library.js shows thumbs/<id>.svg on every deck card; the preset page keeps its real render.
 """
@@ -23,7 +23,7 @@ W, H = 720, 450
 COLOUR = {"Pixel": "#FF9878", "Audio FX": "#8FE3D0", "Audio Effects": "#8FE3D0", "Synths": "#8795F4", "Notes": "#F6B4C8", "Sketch": "#A7B1FF", "Sketch 3D": "#8795F4", "Templates": "#FF9878", "Community": "#8FE3D0", "AI Skills": "#F6B4C8", "Extensions": "#A7B1FF"}   # brand: ember-300, iridescence mint and pink, signal
 
 
-BG = "plain"   # "plain": flat brand ground with a soft glow. "textured": ground with a vignette and the brand dot grid. Change this one word and rerun.
+BG = "plain"   # "plain": one flat brand colour (surface #20263F), no gradient. "textured": the same colour with the brand dot grid. Change this one word and rerun.
 
 
 ART = {"Pixel", "Sketch", "Sketch 3D"}   # categories whose own render is the thumbnail
@@ -126,8 +126,7 @@ def thumb(item):
              '<radialGradient id="jack" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#D5DAF0"/><stop offset=".6" stop-color="#6F77A3"/><stop offset="1" stop-color="#2A3052"/></radialGradient>',
              '<filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>',
              '<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>',
-             ('<rect width="%d" height="%d" fill="url(#vig)"/><rect width="%d" height="%d" fill="url(#dots)" opacity=".55"/><rect width="%d" height="%d" fill="url(#bg)"/>' % (W, H, W, H, W, H)) if BG == "textured" else
-             ('<rect width="%d" height="%d" fill="#151930"/><rect width="%d" height="%d" fill="url(#bg)"/>' % (W, H, W, H))]
+             '<rect width="%d" height="%d" fill="#20263F"/>' % (W, H)] + (['<rect width="%d" height="%d" fill="url(#dots)" opacity=".7"/>' % (W, H)] if BG == "textured" else [])
     parts += [cable(a, b, rng, col, 7) for a, b in links]
     parts += [knob(i, k, rng, col) for i, k in enumerate(ks)]
     parts.append("</svg>")
@@ -140,7 +139,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     check = "--check" in sys.argv; diff = []
     for it in items:
-        if it.get("category") in ART:
+        if True:   # any preset that has its own render shows it; only presets without one get the knobs and cables
             data = art_webp(it)
             if data is not None:
                 p = os.path.join(OUT, it["id"] + ".webp")

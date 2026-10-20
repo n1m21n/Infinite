@@ -517,7 +517,7 @@ body.blog-page { overflow-x: clip; font-family: var(--font-sans); }
    Embeds gallery & Developers page (shared stylesheet)
    ========================================================================== */
 .embed-card { display: flex; flex-direction: column; position: relative; }
-.embed-frame { aspect-ratio: 16 / 9; background: #151930; border-radius: var(--radius-media) var(--radius-media) 0 0; overflow: hidden; }
+.embed-frame { aspect-ratio: 16 / 9; background: var(--midnight-900); border-radius: var(--radius-media) var(--radius-media) 0 0; overflow: hidden; }
 .embed-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
 .embed-grid { align-items: stretch; }
 .embed-grid .post-card { padding: 0; height: 100%; background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; }

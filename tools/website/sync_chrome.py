@@ -19,7 +19,8 @@ GH = "https://github.com/n1m21n/Infinite"
 CSS_VERSION = __import__("hashlib").md5(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "website", "style.css"), "rb").read()).hexdigest()[:8]   # style.css cache key: a hash, so it changes with the file
 _hash = lambda f: __import__("hashlib").md5(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "website", f), "rb").read()).hexdigest()[:8]
 SYSTEM_VERSION, SCALE_VERSION, NEUMO_VERSION = _hash("system.css"), _hash("scale.css"), _hash("neumo.css")
-JS_VERSION = "19"    # site.js cache key; bump when the menu script changes
+BIRD_VERSION = _hash("bird.js")
+JS_VERSION = "21"    # site.js cache key; bump when the menu script changes
 
 # (group id, label, [(page path, label, hint, external)])
 GROUPS = [
@@ -270,6 +271,9 @@ def sync(rel, text):
                   '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'neumo.css?v=' + NEUMO_VERSION + '">\n</head>', 1)
     s = re.sub(r'(style\.css\?v=)[A-Za-z0-9]+', r"\g<1>" + CSS_VERSION, s)
     s = re.sub(r'(site\.js\?v=)\d+', r"\g<1>" + JS_VERSION, s)
+    # the digit bird is on every page
+    s = re.sub(r'\n?[ \t]*<script src="(?:\.\./)*bird\.js[^"]*" defer></script>', '', s)
+    s = s.replace('</body>', '  <script src="' + depth_prefix(rel) + 'bird.js?v=' + BIRD_VERSION + '" defer></script>\n</body>', 1)
     # the brand link goes home from any page
     if rel != "index.html":
         s = re.sub(r'(<a href=")(?:\.\./)*#top(" class="brand")', lambda m: m.group(1) + depth_prefix(rel) + "index.html" + m.group(2), s)

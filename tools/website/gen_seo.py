@@ -83,7 +83,7 @@ def page(i, embeds=frozenset()):
   <meta name="theme-color" content="#151930">
   <script src="../theme.js?v=1"></script>
   <link rel="stylesheet" href="../brand.css?v=42bdb72d">
-  <link rel="stylesheet" href="../neumo.css?v=35c766da">
+  <link rel="stylesheet" href="../neumo.css?v=4ff24fd0">
   <title>{e(t)}</title>
   <meta name="description" content="{e(meta_desc(d))}">
   <link rel="canonical" href="{url}">
@@ -120,6 +120,7 @@ def page(i, embeds=frozenset()):
 {live}  <a class="btn btn-ghost" href="../library.html">Back to the Library</a>
   <a class="btn btn-ghost" href="https://github.com/n1m21n/Infinite/releases/latest">Get Infinite</a>
 </main>
+<script src="../bird.js" defer></script>
 </body>
 </html>
 """

@@ -35,7 +35,7 @@
 @media (max-width: 680px) {
   .lib-stage:not([data-deck-mode="grid"]) .lib-grid { height: 400px; }
   .lib-stage[data-deck-mode="stack"] .lib-grid { height: 440px; }
-  .lib-stage:not([data-deck-mode="grid"]) .lib-card { width: 264px; height: 336px; margin-left: -132px; margin-top: -168px; border-radius: 20px; }
+  .lib-stage:not([data-deck-mode="grid"]) .lib-card { width: 264px; height: 336px; margin-left: -132px; margin-top: -168px; border-radius: var(--web-card-radius); }
 }
 
 /* a card is a picture */
@@ -80,9 +80,9 @@
 .lib-stage[data-deck-mode="grid"] .lib-acts .lib-chip { position: static; }
 .lib-stage[data-deck-mode="grid"] .lib-acts .lib-copy.done { background: var(--accent); color: var(--on-accent); }
 .lib-stage[data-deck-mode="grid"] .lib-card-title {
-  display: block; position: absolute; z-index: 3; left: 8px; right: 8px; bottom: 8px; margin: 0; padding: 12px 16px; border-radius: 16px; color: #fff;
+  display: block; position: absolute; z-index: 3; left: 8px; right: 8px; bottom: 8px; margin: 0; padding: 12px 16px; border-radius: var(--web-media-radius); color: #fff;
   background: color-mix(in srgb, #000 30%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.5); backdrop-filter: blur(16px) saturate(1.5);
-  font: 600 0.8438rem/1.3 var(--font-sans); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+  font: 600 var(--size-caption)/1.3 var(--font-sans); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
 }
 @media (max-width: 639px) { .lib-stage[data-deck-mode="grid"] .lib-card:not([data-bento="big"]) .lib-card-title { display: none; } }
 @media (hover: hover) {
@@ -104,13 +104,13 @@
 .blog-head-bar, .lib-head-bar { flex-direction: column; }
 
 .post-card .post-title, .lib-card .lib-card-title {
-  display: -webkit-box; position: absolute; z-index: 3; left: 8px; right: 8px; bottom: 8px; margin: 0; padding: 12px 16px; border-radius: 16px; color: #fff;
+  display: -webkit-box; position: absolute; z-index: 3; left: 8px; right: 8px; bottom: 8px; margin: 0; padding: 12px 16px; border-radius: var(--web-media-radius); color: #fff;
   background: color-mix(in srgb, #000 42%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.5); backdrop-filter: blur(16px) saturate(1.5);
-  font: 600 0.9375rem/1.3 var(--font-sans); letter-spacing: -0.01em; white-space: normal; overflow: hidden; pointer-events: none;
+  font: 600 var(--size-body)/1.3 var(--font-sans); letter-spacing: -0.01em; white-space: normal; overflow: hidden; pointer-events: none;
   -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; text-wrap: balance;
 }
 .blog-book-stage[data-deck-mode="grid"] .post-card:not([data-bento="big"]) .post-title,
-.lib-stage[data-deck-mode="grid"] .lib-card:not([data-bento="big"]) .lib-card-title { display: -webkit-box !important; font-size: 0.8438rem; padding: 8px 12px; }
+.lib-stage[data-deck-mode="grid"] .lib-card:not([data-bento="big"]) .lib-card-title { display: -webkit-box !important; font-size: var(--size-caption); padding: 8px 12px; }
 .post-card .post-media::after, .lib-card .lib-media-link::after { background: linear-gradient(180deg, color-mix(in srgb, #fff 12%, transparent), transparent 24%, transparent 50%, color-mix(in srgb, #000 52%, transparent)); }
 .post-card .post-title, .lib-card .lib-card-title { max-height: calc(2.6em + 24px); transition: opacity var(--dur-medium) var(--ease-out); }
 .post-card[data-slot]:not([data-slot="active"]) .post-title, .lib-card[data-slot]:not([data-slot="active"]) .lib-card-title { opacity: 0; }
@@ -129,7 +129,7 @@
 .post-card, .lib-card { background: radial-gradient(130% 75% at 50% 30%, color-mix(in srgb, var(--cat, var(--signal)) 42%, #0b0d18), #0b0d18 72%); }
 .post-card .post-media img, .lib-card .lib-media-link img {
   position: absolute; left: 14px; right: 14px; top: 22.5%; width: calc(100% - 28px); height: auto; aspect-ratio: 16 / 10;
-  object-fit: cover; border-radius: 16px; box-shadow: 0 18px 40px color-mix(in srgb, #000 55%, transparent), 0 0 0 1px color-mix(in srgb, #fff 10%, transparent);
+  object-fit: cover; border-radius: var(--web-media-radius); box-shadow: 0 18px 40px color-mix(in srgb, #000 55%, transparent), 0 0 0 1px color-mix(in srgb, #fff 10%, transparent);
 }
 .post-card .post-media::after, .lib-card .lib-media-link::after { background: linear-gradient(180deg, transparent 55%, color-mix(in srgb, #000 40%, transparent)); }
 .blog-book-stage[data-deck-mode="grid"] .post-media img, .lib-stage[data-deck-mode="grid"] .lib-media-link img {
@@ -146,7 +146,7 @@
 /* title bar: a compact pill that hugs its content (arrows, a short title, two actions), never the full column */
 .lib-hud-wrap { width: fit-content; max-width: calc(100% - 32px); }
 .lib-hud-pill { width: auto; gap: 4px; padding: 5px; }
-.lib-hud-info { flex: 0 1 auto; width: clamp(96px, 26vw, 148px); padding: 0 4px; }
+.lib-hud-info { flex: 0 0 0; width: 0; padding: 0; overflow: hidden; }   /* the title stays for screen readers; the pill is icons only, the cards carry the titles */
 .lib-hud-text { align-items: center; text-align: center; }
 .lib-hud-cat-ic { display: none; }
 .lib-hud-nav, .lib-hud-act { width: 36px; height: 36px; }
@@ -154,5 +154,5 @@
 /* ---- card caption: the title with a short line about the preset under it, on one glass plate ---- */
 .lib-card .lib-card-title { display: flex !important; flex-direction: column; gap: 3px; max-height: none !important; -webkit-line-clamp: unset; }
 .lib-card .lib-card-title b { display: block; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lib-card .lib-card-title span { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 400 0.75rem/1.4 var(--font-sans); letter-spacing: 0; opacity: 0.74; text-wrap: pretty; }
+.lib-card .lib-card-title span { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 400 var(--size-micro-mono)/1.4 var(--font-sans); letter-spacing: 0; opacity: 0.74; text-wrap: pretty; }
 .lib-stage[data-deck-mode="grid"] .lib-card:not([data-bento="big"]) .lib-card-title span { -webkit-line-clamp: 1; line-clamp: 1; }

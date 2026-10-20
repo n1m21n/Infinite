@@ -31,7 +31,7 @@
   --accent: var(--accent-ink);           /* Ember 600: passes 4.5:1 for the small mono labels that use it */
 
   /* App chrome (node cards are the app's own dark UI) */
-  --app-window: #151930;
+  --app-window: var(--midnight-900);
   --app-panel: #20263F;  /* brand surface Midnight 1, not the app's grey */
   --app-raised: #2A3052;
   --app-text: #EEF1FA;
@@ -270,7 +270,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 .hero-line { display: block; }
 .hero-word-slot {
   position: relative; display: block;
-  height: 1.15em; width: 5.4em;   /* fits the longest rotating word, so 'A DAW for' never moves */
+  height: 1.15em; width: auto; min-width: 2.4em;   /* hugs the word so the whole line stays centred */
   text-align: left;
 }
 .hero-word {
@@ -351,12 +351,6 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
   box-shadow: var(--shadow-1);
   font-size: var(--fs-h2); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1;
 }
-.slab::before, .slab::after {
-  content: ''; position: absolute; top: 50%; width: 10px; height: 10px; margin-top: -5px;
-  border-radius: 50%; background: var(--card); box-shadow: 0 0 0 2px var(--ink);
-}
-.slab::before { left: -5px; }
-.slab::after { right: -5px; background: var(--accent); box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--accent); }
 .slab b { font-weight: 800; font-variant-numeric: tabular-nums; }
 
 .hand { font-family: var(--font-hand); font-weight: 700; font-style: normal; color: var(--hand, var(--accent)); font-size: 1.4em; line-height: 0.7; letter-spacing: 0; }
@@ -437,7 +431,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 .node-cat { margin-left: auto; font-family: var(--font-mono); font-size: var(--size-micro-mono); color: var(--app-dim); font-weight: 500; letter-spacing: 0.03em; }
 .node-view {
   margin: 8px; border-radius: var(--r-md); overflow: hidden;
-  aspect-ratio: 1 / 1; background: #0D1020; position: relative;
+  aspect-ratio: 1 / 1; background: var(--midnight-950); position: relative;
   touch-action: pan-y; user-select: none; -webkit-user-select: none;
 }
 .node-view canvas { width: 100%; height: 100%; display: block; }
@@ -524,7 +518,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 .yt-poster:hover img { transform: scale(1.03); }
 .yt-play {
   position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px;
-  border-radius: 50%; background: #FBFAF6; color: #151930; display: grid; place-items: center;   /* fixed: it sits on a film, not on the mode ground */
+  border-radius: 50%; background: #FBFAF6; color: var(--midnight-900); display: grid; place-items: center;   /* fixed: it sits on a film, not on the mode ground */
   box-shadow: 0 0 0 8px rgb(251 250 246 / 0.22), 0 10px 30px rgb(0 0 0 / 0.45); transition: transform var(--spring-slab-ms) var(--spring-slab);
 }
 .yt-play svg { width: 22px; height: 22px; margin-left: 2px; }
@@ -603,7 +597,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 }
 .tabs {
   position: relative; display: inline-flex; padding: 4px; border-radius: var(--r-pill);
-  background: var(--inner); margin-bottom: 20px; max-width: 100%;
+  background: none; margin-bottom: 20px; max-width: 100%; gap: 8px;
 }
 .tabs button {
   position: relative; z-index: 1; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill);
@@ -632,15 +626,8 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
   display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 8px 8px 12px;
   background: var(--ink); border-radius: var(--r-sm); min-width: 0;
 }
-.code-pill code { flex: 1; min-width: 0; background: none; color: var(--paper); font-size: var(--size-micro-mono); overflow-x: auto; white-space: nowrap; scrollbar-width: none; padding: 0; }
+.code-pill code { flex: 1; min-width: 0; background: none; color: var(--nm-ink); font-size: var(--size-micro-mono); overflow-x: auto; white-space: nowrap; scrollbar-width: none; padding: 0; }
 .code-pill code::-webkit-scrollbar { display: none; }
-.copy-inline-btn {
-  flex: none; min-height: 32px; padding: 0 12px; border-radius: 8px;
-  background: color-mix(in srgb, var(--paper) 14%, transparent); color: var(--paper); font-size: var(--size-micro-mono); font-weight: 600;
-  transition: transform var(--spring-slab-ms) var(--spring-slab), background-color var(--dur-small) var(--ease-out);
-}
-.copy-inline-btn:hover { background: color-mix(in srgb, var(--paper) 24%, transparent); }
-.copy-inline-btn:active { transform: scale(0.92); }
 
 /* --------------------------------------------------------------------------
    Download
@@ -728,17 +715,6 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
 .footer-col a:hover { color: var(--ink); }
 .footer-bottom { margin-top: 40px; font-size: 0.8438rem; color: var(--muted); }
 
-/* --------------------------------------------------------------------------
-   The digit bird
-   -------------------------------------------------------------------------- */
-#bird {
-  position: absolute; left: 0; top: 0; z-index: 60;
-  width: 68px; height: 52px; pointer-events: none;
-  opacity: 0; transition: opacity var(--dur-medium) var(--ease-out);
-  -webkit-tap-highlight-color: transparent;
-}
-#bird.ready { opacity: 1; }
-html.over-bird body { cursor: pointer; }
 
 /* --------------------------------------------------------------------------
    Responsive

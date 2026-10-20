@@ -12,12 +12,12 @@
    "ink-on-pearl": "#151930"
   },
   "light": {
-   "up": "linear-gradient(160deg, #ffffff 0%, #f1f2f8 55%, #e3e5f0 100%)",
-   "down": "linear-gradient(160deg, #dcdfec, #eceef6)",
+   "up": "linear-gradient(160deg, #fdfdff 0%, #eceef7 55%, #d9dcec 100%)",
+   "down": "linear-gradient(160deg, #cfd3e6, #e4e7f2)",
    "pearl": "linear-gradient(160deg, #3a4272 0%, #232a4f 60%, #151930 100%)",
-   "raise": "inset 0 1px 0 #fff, inset 0 -2px 3px rgb(21 25 48 / 0.08), 0 0 0 1px rgb(21 25 48 / 0.05), -4px -4px 10px #fff, 5px 8px 16px rgb(21 25 48 / 0.16)",
+   "raise": "inset 0 1px 0 #fff, inset 0 -2px 4px rgb(21 25 48 / 0.14), 0 0 0 1px rgb(21 25 48 / 0.09), -4px -4px 10px #fff, 5px 8px 16px rgb(21 25 48 / 0.24)",
    "pearl-raise": "inset 0 1px 0 rgb(255 255 255 / 0.25), inset 0 -3px 5px rgb(4 5 14 / 0.4), 0 0 0 1px rgb(21 25 48 / 0.4), 4px 8px 16px rgb(21 25 48 / 0.28)",
-   "pocket": "inset 3px 5px 10px rgb(21 25 48 / 0.18), inset -3px -3px 7px #fff, 0 0 0 1px rgb(21 25 48 / 0.04)",
+   "pocket": "inset 3px 5px 10px rgb(21 25 48 / 0.28), inset -3px -3px 7px #fff, 0 0 0 1px rgb(21 25 48 / 0.06)",
    "ink": "#12152a",
    "ink-on-pearl": "#eef1fa"
   }
@@ -28,8 +28,6 @@
   ".btn-dl",
   ".sys-btn",
   ".sys-ctl",
-  ".copy",
-  ".copy-inline-btn",
   ".run",
   ".mx-play",
   ".play-btn",
@@ -53,7 +51,8 @@
   ".cmd-tabs [role=\"tab\"]",
   ".tabs button",
   ".seg button",
-  ".ax-key-top"
+  ".ax-key-top",
+  ".copy"
  ],
  "primary": [
   ".btn-primary",
@@ -174,6 +173,112 @@
    "what": "h1-h3, hand script, captions",
    "where": "brand.css (generated from docs/brand/brand.json)",
    "central": true
+  },
+  {
+   "category": "Spacing scale",
+   "what": "gaps, padding, margins (--ui-sp-1..8: 4 8 12 16 24 32 48 64)",
+   "where": "neumo.css (this registry: layout.space)",
+   "central": true
+  },
+  {
+   "category": "Card padding, radius, gap",
+   "what": "every card and panel (--ui-card-pad, --ui-card-radius)",
+   "where": "neumo.css (this registry: layout.card)",
+   "central": true
+  },
+  {
+   "category": "Control size",
+   "what": "button, pill and icon heights (--ui-ctl-h*)",
+   "where": "neumo.css (layout.control) and scale.css for phones",
+   "central": true
+  },
+  {
+   "category": "Text roles",
+   "what": "label, body, caption, mono (--ui-t-*)",
+   "where": "neumo.css (layout.type) over brand.css sizes",
+   "central": true
+  },
+  {
+   "category": "Sliders",
+   "what": "every input[type=range]: pocket groove, pearl fill, raised thumb",
+   "where": "neumo.css (this registry: slider)",
+   "central": true
   }
- ]
+ ],
+ "pocket": [
+  ".aud-code",
+  ".ax-code pre",
+  ".dv-cmd",
+  ".term-panel pre",
+  ".signup input[type=\"email\"]",
+  ".signup input[type=\"text\"]",
+  "html input[type=\"email\"]",
+  "html input[type=\"text\"]",
+  "html input[type=\"search\"]",
+  "html textarea",
+  ".pill",
+  ".chip:not(.chip-action)",
+  ".post-chip",
+  ".lib-chip",
+  ".platform-chip",
+  ".sys-chip",
+  ".code-pill",
+  ".ticker-pill"
+ ],
+ "card_flat": [
+  ".aud-card",
+  ".dev-card",
+  ".bm-card",
+  ".dl-card",
+  ".rel-card",
+  ".predict-card",
+  ".sys-card"
+ ],
+ "card_shadow": [
+  ".post-card",
+  ".reel-card",
+  ".nd-card",
+  ".lib-card",
+  ".ax-bento-t",
+  ".ax-shot",
+  ".bench"
+ ],
+ "dark_surfaces": [],
+ "layout": {
+  "space": {
+   "1": "4px",
+   "2": "8px",
+   "3": "12px",
+   "4": "16px",
+   "5": "24px",
+   "6": "32px",
+   "7": "48px",
+   "8": "64px"
+  },
+  "card": {
+   "pad": "var(--ui-sp-5)",
+   "pad-lg": "var(--ui-sp-6)",
+   "radius": "20px",
+   "gap": "var(--ui-sp-4)"
+  },
+  "control": {
+   "h": "40px",
+   "h-sm": "36px",
+   "h-lg": "48px",
+   "px": "24px",
+   "icon": "36px",
+   "gap": "var(--ui-sp-2)"
+  },
+  "type": {
+   "label": "var(--size-caption)",
+   "body": "var(--size-body)",
+   "caption": "var(--size-caption)",
+   "mono": "var(--size-micro-mono)",
+   "media-title": "var(--size-body)"
+  },
+  "slider": {
+   "track": "14px",
+   "thumb": "26px"
+  }
+ }
 }

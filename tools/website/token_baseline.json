@@ -3,15 +3,13 @@
  "counts": {
   "artists.css": {
    "duration": 1,
-   "font-size": 18,
-   "hex": 13,
-   "radius": 5
+   "font-size": 6,
+   "radius": 2
   },
   "audience.css": {
    "duration": 2,
-   "font-size": 25,
-   "hex": 4,
-   "radius": 1
+   "font-size": 14,
+   "hex": 2
   },
   "benchmarks.css": {
    "duration": 3,
@@ -19,19 +17,17 @@
    "radius": 8
   },
   "blog.css": {
-   "font-size": 23,
-   "hex": 1,
+   "font-size": 22,
    "radius": 3
   },
   "deck.css": {
    "font-size": 6,
-   "hex": 18,
+   "hex": 16,
    "radius": 4
   },
   "dev.css": {
-   "font-size": 9,
-   "hex": 5,
-   "radius": 2
+   "font-size": 4,
+   "hex": 2
   },
   "embeds/analog_crt.html": {
    "font-size": 2,
@@ -39,6 +35,10 @@
    "radius": 1
   },
   "embeds/audio-waveform.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/aurora-borealis.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -192,9 +192,8 @@
    "font-size": 2
   },
   "library-deck.css": {
-   "font-size": 4,
-   "hex": 18,
-   "radius": 4
+   "font-size": 1,
+   "hex": 18
   },
   "library.css": {
    "font-size": 8,
@@ -202,7 +201,7 @@
   },
   "library/*.html": {
    "font-size": 4,
-   "radius": 2
+   "radius": 1
   },
   "museum.css": {
    "duration": 3,
@@ -212,14 +211,14 @@
   },
   "philosophy.css": {
    "duration": 1,
-   "font-size": 9,
-   "hex": 26,
+   "font-size": 6,
+   "hex": 17,
    "radius": 2
   },
   "reels.css": {
    "duration": 1,
    "font-size": 1,
-   "hex": 7,
+   "hex": 3,
    "radius": 1
   },
   "slides.html": {
@@ -230,8 +229,8 @@
   "style.css": {
    "duration": 15,
    "font-size": 47,
-   "hex": 19,
-   "radius": 13
+   "hex": 18,
+   "radius": 12
   }
  }
 }

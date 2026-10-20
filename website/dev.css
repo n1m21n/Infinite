@@ -1,12 +1,12 @@
 /* Developers: a docs layout. Short hero, sticky contents on the left, every section a solid card. Dense text is the point here. */
-.dv { --mid: #151930; --mid-deep: #0D1020; --mid-ink: #EEF1FA; --mid-sig: #A7B1FF; }
+.dv { --mid: var(--midnight-900); --mid-deep: var(--midnight-950); --mid-ink: #EEF1FA; --mid-sig: var(--signal-300); }
 .dv-hero { padding: clamp(24px, 4vw, 56px) 0 clamp(8px, 2vw, 24px); }
-.dv-hero h1 { margin: 4px 0 12px; }
+.dv-hero h1 { margin: 4px 0 12px; font-size: clamp(2rem, 4.5vw, 3rem); }
 .dv-hero .lead { max-width: 60ch; }
 .dv-cmd { display: flex; align-items: center; gap: 8px; max-width: 520px; margin: 20px 0 12px; padding: 6px 6px 6px 18px; border-radius: var(--r-pill); background: var(--mid); color: var(--mid-ink); box-shadow: var(--shadow-1); }
 .dv-cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; font: 500 0.875rem/1 'Geist Mono', ui-monospace, monospace; color: var(--mid-ink); background: none; padding: 0; }
 .dv-cmd code::before { content: "$ "; color: var(--mid-sig); }
-.dv-cmd .copy { position: static; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; border-radius: var(--r-pill); background: rgba(238, 241, 250, 0.12); color: var(--mid-ink); font: 500 0.8125rem/1 'Geist', system-ui, sans-serif; }
+.dv-cmd .copy { position: static; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; border-radius: var(--r-pill); }
 .dv-cmd .copy .ic { width: 18px; height: 18px; }
 .dv-grid { display: grid; gap: 24px; padding-top: 16px; padding-bottom: 48px; }
 .dv-toc { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; position: sticky; top: var(--header-h, 60px); z-index: 5; margin: 0 calc(var(--gutter, 16px) * -1); padding: 8px var(--gutter, 16px); background: color-mix(in srgb, var(--ground) 88%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
@@ -17,11 +17,11 @@
 .dv-toc a.on { background: var(--mid); color: var(--mid-ink); }
 .dv-main { display: grid; gap: 16px; min-width: 0; align-content: start; }
 .dv-cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-.dv-card { padding: 20px; border-radius: var(--card-r, 24px); background: var(--mid); color: var(--mid-ink); box-shadow: var(--shadow-1); }
-.dv-card h2 { margin: 0 0 6px; font-size: 1.0625rem; letter-spacing: -0.01em; color: var(--mid-ink); }
-.dv-card p { margin: 0; font-size: 0.9375rem; line-height: 1.5; color: color-mix(in srgb, var(--mid-ink) 78%, transparent); }
-.dv-sec { scroll-margin-top: calc(var(--header-h, 60px) + 64px); padding: clamp(18px, 3vw, 32px); border-radius: var(--card-r, 24px); background: var(--card); box-shadow: var(--shadow-1); min-width: 0; }
-.dv-sec h2 { margin: 0 0 12px; font-size: clamp(1.25rem, 2.4vw, 1.625rem); letter-spacing: -0.02em; }
+.dv-card { padding: 20px; border-radius: var(--web-card-radius); background: var(--mid); color: var(--mid-ink); box-shadow: var(--shadow-1); }
+.dv-card h2 { margin: 0 0 6px; font-size: var(--ui-t-media-title); letter-spacing: -0.01em; color: var(--mid-ink); }
+.dv-card p { margin: 0; font-size: var(--size-body); line-height: 1.5; color: color-mix(in srgb, var(--mid-ink) 78%, transparent); }
+.dv-sec { scroll-margin-top: calc(var(--header-h, 60px) + 64px); padding: clamp(18px, 3vw, 32px); border-radius: var(--web-card-radius); background: var(--card); box-shadow: var(--shadow-1); min-width: 0; }
+.dv-sec h2 { margin: 0 0 12px; font-size: var(--fs-h3); letter-spacing: -0.02em; }
 .dv-sec p { max-width: 72ch; line-height: 1.6; }
 .dv-sec .aud-code { max-width: 100%; overflow-x: auto; }
 .dv-sec .table-wrap { overflow-x: auto; }
@@ -39,9 +39,9 @@
 .dv-rain { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
 .dv-hero, .dv-grid { position: relative; z-index: 1; }
 .dv-sec .yt-embed { margin-top: 12px; }
-.dv-hero .facts li { font-size: 0.75rem; }
+.dv-hero .facts li { font-size: var(--size-micro-mono); }
 
 /* light modes: the docs cards take the page's surfaces; code, the film and the render stay dark screens */
 .dv { --key-top: #232A4A; }
 html:not([data-mode="midnight"]) .dv { --mid: var(--surface-1); --mid-deep: var(--surface-2); --mid-ink: var(--ink); --mid-sig: var(--signal); --key-top: var(--surface-1); }
-.dv-sec .yt-embed { border-radius: var(--r-card, 24px); box-shadow: none; }
+.dv-sec .yt-embed { border-radius: var(--web-card-radius); box-shadow: none; }

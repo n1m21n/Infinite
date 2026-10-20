@@ -1739,18 +1739,13 @@ function escapeHtml(str) {
 
 // Copy inline helpers
 function initCopyButtons() {
-  document.querySelectorAll('.copy-inline-btn').forEach(btn => {
+  document.querySelectorAll('.copy[data-code]').forEach(btn => {
     btn.addEventListener('click', () => {
       const text = btn.dataset.code;
       if (!text) return;
       navigator.clipboard.writeText(text).then(() => {
-        const original = btn.innerText;
-        btn.innerText = 'Copied!';
-        btn.style.color = 'var(--pastel-terracotta)';
-        setTimeout(() => {
-          btn.innerText = original;
-          btn.style.color = '';
-        }, 2000);
+        btn.classList.add('done'); btn.setAttribute('aria-label', 'Copied');
+        setTimeout(() => { btn.classList.remove('done'); btn.setAttribute('aria-label', 'Copy'); }, 1600);
       });
     });
   });

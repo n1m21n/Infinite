@@ -3,6 +3,31 @@
  * a pearl face when selected or primary. Brand colours only. Exempt from the token lint like brand.css. */
 /* brand-lint: off */
 :root {
+  --ui-sp-1: 4px;
+  --ui-sp-2: 8px;
+  --ui-sp-3: 12px;
+  --ui-sp-4: 16px;
+  --ui-sp-5: 24px;
+  --ui-sp-6: 32px;
+  --ui-sp-7: 48px;
+  --ui-sp-8: 64px;
+  --ui-card-pad: var(--ui-sp-5);
+  --ui-card-pad-lg: var(--ui-sp-6);
+  --ui-card-radius: 20px;
+  --ui-card-gap: var(--ui-sp-4);
+  --ui-ctl-h: 40px;
+  --ui-ctl-h-sm: 36px;
+  --ui-ctl-h-lg: 48px;
+  --ui-ctl-px: 24px;
+  --ui-ctl-icon: 36px;
+  --ui-ctl-gap: var(--ui-sp-2);
+  --ui-t-label: var(--size-caption);
+  --ui-t-body: var(--size-body);
+  --ui-t-caption: var(--size-caption);
+  --ui-t-mono: var(--size-micro-mono);
+  --ui-t-media-title: var(--size-body);
+  --ui-sl-track: 14px;
+  --ui-sl-thumb: 26px;
   --nm-up: linear-gradient(160deg, #3a4272 0%, #2a3052 50%, #20263f 100%);
   --nm-down: linear-gradient(160deg, #181c36, #222849);
   --nm-pearl: linear-gradient(160deg, #ffffff 0%, #e4e8f7 60%, #cfd5ec 100%);
@@ -13,18 +38,18 @@
   --nm-ink-on-pearl: #151930;
 }
 html:not([data-mode="midnight"]) {
-  --nm-up: linear-gradient(160deg, #ffffff 0%, #f1f2f8 55%, #e3e5f0 100%);
-  --nm-down: linear-gradient(160deg, #dcdfec, #eceef6);
+  --nm-up: linear-gradient(160deg, #fdfdff 0%, #eceef7 55%, #d9dcec 100%);
+  --nm-down: linear-gradient(160deg, #cfd3e6, #e4e7f2);
   --nm-pearl: linear-gradient(160deg, #3a4272 0%, #232a4f 60%, #151930 100%);
-  --nm-raise: inset 0 1px 0 #fff, inset 0 -2px 3px rgb(21 25 48 / 0.08), 0 0 0 1px rgb(21 25 48 / 0.05), -4px -4px 10px #fff, 5px 8px 16px rgb(21 25 48 / 0.16);
+  --nm-raise: inset 0 1px 0 #fff, inset 0 -2px 4px rgb(21 25 48 / 0.14), 0 0 0 1px rgb(21 25 48 / 0.09), -4px -4px 10px #fff, 5px 8px 16px rgb(21 25 48 / 0.24);
   --nm-pearl-raise: inset 0 1px 0 rgb(255 255 255 / 0.25), inset 0 -3px 5px rgb(4 5 14 / 0.4), 0 0 0 1px rgb(21 25 48 / 0.4), 4px 8px 16px rgb(21 25 48 / 0.28);
-  --nm-pocket: inset 3px 5px 10px rgb(21 25 48 / 0.18), inset -3px -3px 7px #fff, 0 0 0 1px rgb(21 25 48 / 0.04);
+  --nm-pocket: inset 3px 5px 10px rgb(21 25 48 / 0.28), inset -3px -3px 7px #fff, 0 0 0 1px rgb(21 25 48 / 0.06);
   --nm-ink: #12152a;
   --nm-ink-on-pearl: #eef1fa;
 }
 
 /* raised: secondary buttons, icon buttons, arrows, tabs that are not selected */
-html .btn-ghost, html .btn.alt, html .btn-dl, html .sys-btn, html .sys-ctl, html .copy, html .copy-inline-btn, html .run, html .mx-play, html .play-btn, html .chip-action, html .view-pill, html .icon-btn, html .nd-btn, html .deck-nav-btn, html .deck-icon-btn, html .lib-hud-nav, html .lib-hud-act, html .lib-icon-pill, html .lib-view-btn, html .lib-select, html .blog-select, html .round, html .reel-btn, html button.col, html .pw, html .pn, html .cmd-tabs [role="tab"], html .tabs button, html .seg button, html .ax-key-top {
+html .btn-ghost, html .btn.alt, html .btn-dl, html .sys-btn, html .sys-ctl, html .run, html .mx-play, html .play-btn, html .chip-action, html .view-pill, html .icon-btn, html .nd-btn, html .deck-nav-btn, html .deck-icon-btn, html .lib-hud-nav, html .lib-hud-act, html .lib-icon-pill, html .lib-view-btn, html .lib-select, html .blog-select, html .round, html .reel-btn, html button.col, html .pw, html .pn, html .cmd-tabs [role="tab"], html .tabs button, html .seg button, html .ax-key-top, html .copy {
   background: var(--nm-up); color: var(--nm-ink); border: 0; box-shadow: var(--nm-raise); -webkit-backdrop-filter: none; backdrop-filter: none; opacity: 1;
   transition: box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
 }
@@ -47,8 +72,36 @@ html .btn:active, html .btn-ghost:active, html .btn-dl:active, html .sys-btn:act
   transform: translateY(1px); background: var(--nm-down); color: var(--nm-ink); box-shadow: var(--nm-pocket);
 }
 
+/* pocket: inputs, code blocks and tags sit in a recess */
+html .aud-code, html .ax-code pre, html .dv-cmd, html .term-panel pre, html .signup input[type="email"], html .signup input[type="text"], html html input[type="email"], html html input[type="text"], html html input[type="search"], html html textarea, html .pill, html .chip:not(.chip-action), html .post-chip, html .lib-chip, html .platform-chip, html .sys-chip, html .code-pill, html .ticker-pill {
+  background: var(--nm-down); box-shadow: var(--nm-pocket); border: 0;
+}
+
+/* cards: text cards are a raised face, picture cards only get the raised shadow so the picture stays whole */
+html .aud-card, html .dev-card, html .bm-card, html .dl-card, html .rel-card, html .predict-card, html .sys-card {
+  background: var(--nm-up); box-shadow: var(--nm-raise); border: 0;
+}
+html .post-card, html .reel-card, html .nd-card, html .lib-card, html .ax-bento-t, html .ax-shot, html .bench {
+  box-shadow: var(--nm-raise);
+}
+
+/* every card and panel shares one radius; text cards share one padding */
+html .aud-card, html .dev-card, html .bm-card, html .dl-card, html .rel-card, html .predict-card, html .sys-card, html .post-card, html .reel-card, html .nd-card, html .lib-card, html .ax-bento-t, html .ax-shot, html .bench { border-radius: var(--ui-card-radius); }
+html .aud-card, html .dev-card, html .bm-card, html .dl-card, html .rel-card, html .predict-card, html .sys-card { padding: var(--ui-card-pad); }
+
+/* mode switches (macOS / Windows / Linux, view toggles): no recess behind the buttons, the selected one is the pearl */
+html .tabs, html .seg, html .cmd-tabs { background: none; box-shadow: none; gap: var(--ui-sp-2); }
+html .tab-pill { display: none; }
+
 /* the shape of a patch page's button (those pages load no other stylesheet) */
-.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 24px; border-radius: 999px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+:where(.btn) { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 24px; border-radius: 999px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+/* the copy control on code is always an icon: copy, then a tick for a moment */
+html .copy { width: 36px; height: 36px; min-height: 0; padding: 0; gap: 0; justify-content: center; align-items: center; font-size: 0; }
+html .copy > span { display: none; }
+html .copy .ic { width: 18px; height: 18px; }
+html .copy .ic-done, html .copy.done .ic-copy { display: none; }
+html .copy.done .ic-done { display: block; color: var(--signal); }
+html .dv-cmd .copy { width: 36px; padding: 0; }
 /* the keycap: the old deep base layer goes, the top is the raised face */
 html .ax-key { background: none; box-shadow: none; padding-bottom: 0; }
 html .ax-key-top { color: var(--nm-ink); }
@@ -56,4 +109,16 @@ html .ax-key:hover .ax-key-top { transform: translateY(-1px); }
 html .ax-key:active .ax-key-top { transform: translateY(1px); background: var(--nm-down); box-shadow: var(--nm-pocket); }
 html .ax-key .ic { color: var(--signal); }
 @media (prefers-reduced-motion: reduce) { html .btn, html .btn-ghost, html .icon-btn, html .ax-key-top { transition: none; } }
+/* picture captions: one size and weight for the title on any picture (reel, bento, cards) */
+html .ax-ttl, html .ax-bento-l, html .lib-card-title, html .nd-name, html .post-card h2 { font-size: var(--ui-t-media-title); font-weight: 600; line-height: 1.2; }
+/* sliders: one look everywhere. A pocket groove, a pearl fill (set with --p by the page, else empty), a raised round thumb. */
+html input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; height: var(--ui-ctl-h-lg); cursor: pointer; }
+html input[type=range]::-webkit-slider-runnable-track { height: var(--ui-sl-track); border-radius: 999px; background: var(--nm-pearl) 0 0 / max(var(--ui-sl-track), var(--p, 0%)) 100% no-repeat, var(--nm-down); box-shadow: var(--nm-pocket); }
+html input[type=range]::-moz-range-track { height: var(--ui-sl-track); border-radius: 999px; background: var(--nm-down); box-shadow: var(--nm-pocket); }
+html input[type=range]::-moz-range-progress { height: var(--ui-sl-track); border-radius: 999px; background: var(--nm-pearl); }
+html input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: var(--ui-sl-thumb); height: var(--ui-sl-thumb); margin-top: calc((var(--ui-sl-track) - var(--ui-sl-thumb)) / 2); border: 0; border-radius: 50%; background: var(--nm-up); box-shadow: var(--nm-raise); transition: transform 160ms ease; }
+html input[type=range]::-moz-range-thumb { width: var(--ui-sl-thumb); height: var(--ui-sl-thumb); border: 0; border-radius: 50%; background: var(--nm-up); box-shadow: var(--nm-raise); }
+html input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.06); }
+html input[type=range]:active::-webkit-slider-thumb { transform: scale(0.94); background: var(--nm-down); box-shadow: var(--nm-pocket); }
+html input[type=range]:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 999px; }
 /* brand-lint: on */

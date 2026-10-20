@@ -10,7 +10,7 @@
   }
   on(secs[0] ? secs[0].id : 'start');
   var c = document.querySelector('.dv-cmd .copy');
-  if (c) c.addEventListener('click', function () { var t = c.getAttribute('data-copy'), l = c.querySelector('span'); function done() { if (l) { l.textContent = 'Copied'; setTimeout(function () { l.textContent = 'Copy'; }, 1400); } } if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, done); else done(); });
+  if (c) c.addEventListener('click', function () { var t = c.getAttribute('data-copy'), function done() { c.classList.add('done'); c.setAttribute('aria-label', 'Copied'); setTimeout(function () { c.classList.remove('done'); c.setAttribute('aria-label', 'Copy'); }, 1400); } if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, done); else done(); });
 })();
 /* Binary rain: 0s and 1s fall from the pointer as it moves, then fade. Decorative, behind the content. */
 (function () {

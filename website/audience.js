@@ -257,7 +257,7 @@
       root.querySelectorAll('.copy').forEach(function (b) {
         b.addEventListener('click', function () {
           var code = b.parentNode.querySelector('code'); if (!code) return;
-          var done = function () { var o = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = o; }, 1500); };
+          var done = function () { b.classList.add('done'); b.setAttribute('aria-label', 'Copied'); setTimeout(function () { b.classList.remove('done'); b.setAttribute('aria-label', 'Copy'); }, 1500); };
           if (navigator.clipboard) navigator.clipboard.writeText(code.textContent).then(done, function () {}); else { var r = document.createRange(); r.selectNodeContents(code); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); try { document.execCommand('copy'); done(); } catch (e) {} }
         });
       });
@@ -282,3 +282,10 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
+
+/* the copy icon on a lab's code block */
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest && ev.target.closest('.ax-code .copy'); if (!b) return;
+  var code = b.parentNode.querySelector('code'); if (!code || !navigator.clipboard) return;
+  navigator.clipboard.writeText(code.textContent).then(function () { b.classList.add('done'); b.setAttribute('aria-label', 'Copied'); setTimeout(function () { b.classList.remove('done'); b.setAttribute('aria-label', 'Copy'); }, 1500); });
+});

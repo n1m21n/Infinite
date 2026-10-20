@@ -138,9 +138,9 @@ def head(title, desc, url, image, extra="", kind="website", depth="../"):
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{depth}brand.css?v=42bdb72d">
-  <link rel="stylesheet" href="{depth}style.css?v=eec8d63d">
+  <link rel="stylesheet" href="{depth}style.css?v=f1d3e640">
   <link rel="stylesheet" href="{depth}glass.css?v=c25dae44">
-  <link rel="stylesheet" href="{depth}blog.css?v=36138f21">
+  <link rel="stylesheet" href="{depth}blog.css?v=d7c115a7">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -221,7 +221,7 @@ def build_index(posts, header, footer):
              "Notes on building and using Infinite, the free open-source DAW for visuals, music and code on one canvas. Tutorials, engineering write-ups and ideas.",
              BASE + "blog/", "assets/og-image.jpg", ld(blog_ld) + ld(crumbs))
     s = s.replace('blog.css?v=', 'blog.css?v=', 1)
-    s = re.sub(r'(<link rel="stylesheet" href="\.\./blog\.css\?v=[A-Za-z0-9]+">)', r'\1\n  <link rel="stylesheet" href="../deck.css?v=4a383477">', s, count=1)
+    s = re.sub(r'(<link rel="stylesheet" href="\.\./blog\.css\?v=[A-Za-z0-9]+">)', r'\1\n  <link rel="stylesheet" href="../deck.css?v=2b385582">', s, count=1)
     s += f"""<body class="blog-page blog-index">
   {header}
 

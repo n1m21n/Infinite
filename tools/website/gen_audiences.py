@@ -136,6 +136,11 @@ ALL = [(a["slug"] + ".html", a["name"]) for a in AUDIENCES]
 AUD_ICON = {"artists": "family-compositing", "musicians": "family-notes", "vjs": "perform", "creative-coders": "edit", "developers": "cube"}
 
 
+COPY_ICON = ('<svg class="ic ic-copy" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="9" height="9" rx="2"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4h-6A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></svg>'
+             '<svg class="ic ic-done" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5 8.5 14.5 15.5 6"/></svg>')
+COPY_BTN = '<button class="copy" type="button" aria-label="Copy"%s>' + COPY_ICON + '</button>'   # the one standard copy control: an icon, never a text button
+
+
 def icon(name):
     """Brand glyph from art/icons/src, inlined so a pill needs no request (BRAND.md section 7: icon beside a label)."""
     svg = open(os.path.join(chrome.ROOT, "art", "icons", "src", name + "-20.svg"), encoding="utf-8").read().strip()
@@ -203,7 +208,7 @@ def lab_html(a):
             <p class="pr-cap" aria-live="polite">{e(L["pics"][0])}</p></div>
           <div class="lab-side">{side}<div class="pr-tiles" role="radiogroup" aria-label="Picture">{tiles}</div>{ctls}{code}{note}</div></div>'''
     tabs = "".join(f'<button role="tab" type="button" id="t{i}" aria-controls="p{i}" aria-selected="{"true" if i == 0 else "false"}">{e(n)}</button>' for i, (n, _, _) in enumerate(L["tabs"]))
-    panels = "".join(f'<div role="tabpanel" id="p{i}" aria-labelledby="t{i}" class="term-panel"{"" if i == 0 else " hidden"}><div style="position:relative"><pre class="aud-code"><code>{e(c)}</code></pre><button class="copy" type="button">Copy</button></div><p>{h}</p></div>' for i, (_, c, h) in enumerate(L["tabs"]))
+    panels = "".join(f'<div role="tabpanel" id="p{i}" aria-labelledby="t{i}" class="term-panel"{"" if i == 0 else " hidden"}><div style="position:relative"><pre class="aud-code"><code>{e(c)}</code></pre>{COPY_BTN % ""}</div><p>{h}</p></div>' for i, (_, c, h) in enumerate(L["tabs"]))
     return f'''<div class="lab" data-lab="term">
           <div class="lab-side">{side}<div class="cmd-tabs" role="tablist" aria-label="Ways to call Infinite">{tabs}</div>{panels}<button class="run" type="button">Render again</button>{note}</div>
           <div class="lab-view"><canvas aria-label="A contact sheet of twelve frames filling in one by one" role="img"></canvas></div></div>'''
@@ -486,7 +491,7 @@ def artists_main(a, rel, hero="blob"):
     lab = lab_html(a)
     lab = lab.replace('<h3>' + e(L["title"]) + '</h3>', '')
     import re
-    lab = re.sub(r'(<pre class="aud-code">.*?</pre>)', lambda m: '<div class="ax-code"><p class="ax-code-h">' + icon("edit") + '<span>Code</span></p>' + m.group(1) + '</div>', lab, flags=re.S)
+    lab = re.sub(r'(<pre class="aud-code">.*?</pre>)', lambda m: '<div class="ax-code">' + m.group(1) + COPY_BTN % "" + '</div>', lab, flags=re.S)
     if hero == "cables":
         knob = lambda key, label, val: f'<div class="mx-knob" data-k="{key}" data-v="{val}"><div class="mx-dial" role="slider" tabindex="0" aria-label="{label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{round(val * 100)}"><svg viewBox="0 0 64 64" aria-hidden="true"><path class="mx-track" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/><path class="mx-arc" d="M14.5 49.5A25 25 0 1 1 49.5 49.5"/></svg><span class="mx-cap"></span><span class="mx-shine"></span></div><span>{label}</span><output>{round(val * 100)}</output></div>'
         lab = (f'<div class="mx-rack"><div class="mx-top"><button type="button" class="mx-play" aria-pressed="false" aria-label="Play a chord">{icon("play")}<span>Play</span></button><canvas class="mx-scope" width="600" height="120" aria-hidden="true"></canvas></div>'
@@ -562,7 +567,7 @@ def dev_main(a, rel):
         <span class="blog-hand hand">{e(a["hand"])}</span>
         <h1 class="slab">{e(a["h1"])}</h1>
         <p class="lead">{e(a["lead"])}</p>
-        <div class="dv-cmd"><code>npx -y infinite-engine init</code><button class="copy" type="button" data-copy="npx -y infinite-engine init">{icon("edit")}<span>Copy</span></button></div>
+        <div class="dv-cmd"><code>npx -y infinite-engine init</code>{COPY_BTN % ' data-copy="npx -y infinite-engine init"'}</div>
         <ul class="facts">{facts}</ul>
         <div class="aud-cta"><a href="index.html#setup" class="btn btn-primary">Download Infinite</a><a href="{a["extra"][0]}" class="btn btn-ghost">{e(a["extra"][1])}</a></div>
       </div>
@@ -595,7 +600,7 @@ def page(a):
     if a["slug"] == "musicians":
         return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=' + chrome._hash("artists.css") + '">', extra_js='\n  <script src="deck.js?v=2" defer></script>\n  <script src="nodedeck.js?v=1" defer></script>\n  <script src="artists.js?v=11" defer></script>\n  <script type="module" src="musicians.js?v=4"></script>\n  <script src="mxrack.js?v=3" defer></script>')
     if a["slug"] == "developers":
-        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=' + chrome._hash("dev.css") + '">', extra_js='\n  <script src="dev.js?v=2" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=' + chrome._hash("dev.css") + '">', extra_js='\n  <script src="dev.js?v=3" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 
@@ -634,8 +639,8 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
   <link rel="stylesheet" href="brand.css?v=42bdb72d">
   <link rel="stylesheet" href="style.css?v={chrome.CSS_VERSION}">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
-  <link rel="stylesheet" href="blog.css?v=36138f21">
-  <link rel="stylesheet" href="audience.css?v=247fdf47">
+  <link rel="stylesheet" href="blog.css?v=d7c115a7">
+  <link rel="stylesheet" href="audience.css?v=dd614df4">
   {ldtags}{extra_head}
   <script>document.documentElement.classList.add('js-reveal')</script>
 </head>
@@ -647,7 +652,7 @@ def shell(rel, title, desc, lds, main, extra_head="", extra_js=""):
 
   {chrome.footer_html(rel)}
   <script src="site.js?v={chrome.JS_VERSION}" defer></script>
-  <script src="audience.js?v=9" defer></script>{extra_js}
+  <script src="audience.js?v=11" defer></script>{extra_js}
   <script>
     (function () {{
       var els = document.querySelectorAll('.reveal');

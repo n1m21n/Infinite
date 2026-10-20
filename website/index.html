@@ -83,7 +83,7 @@
 
   <link rel="stylesheet" href="brand.css?v=42bdb72d">
 
-  <link rel="stylesheet" href="style.css?v=eec8d63d">
+  <link rel="stylesheet" href="style.css?v=f1d3e640">
   <link rel="stylesheet" href="glass.css?v=c25dae44">
 
   <!-- Google tag (gtag.js) -->
@@ -96,7 +96,7 @@
   </script>
   <link rel="stylesheet" href="system.css?v=23625436">
   <link rel="stylesheet" href="scale.css?v=f0c66d50">
-  <link rel="stylesheet" href="neumo.css?v=35c766da">
+  <link rel="stylesheet" href="neumo.css?v=4ff24fd0">
 </head>
 <body>
   <canvas id="cosmic-canvas" aria-hidden="true"></canvas>
@@ -261,7 +261,7 @@
           <article class="node-card reveal" style="--cat:#4ADE80; --i:0">
             <p class="hand-cap">design visuals</p>
             <div class="node">
-              <header class="node-head"><span class="cat-dot"></span><span class="node-name">Formula</span><span class="node-cat">Source</span></header>
+              <header class="node-head"><span class="node-name">Formula</span><span class="node-cat">Source</span></header>
               <div class="node-view cap-canvas-box"><canvas id="anim-waves"></canvas></div>
               <footer class="node-foot">drag to swirl the shader</footer>
               <span class="port port-out" data-port="0-out"></span>
@@ -271,7 +271,7 @@
           <article class="node-card reveal" style="--cat:#6992F6; --i:1">
             <p class="hand-cap">make music</p>
             <div class="node">
-              <header class="node-head"><span class="cat-dot"></span><span class="node-name">Wavetable</span><span class="node-cat">Synths</span></header>
+              <header class="node-head"><span class="node-name">Wavetable</span><span class="node-cat">Synths</span></header>
               <div class="node-view cap-canvas-box"><canvas id="anim-wavetable"></canvas></div>
               <footer class="node-foot">scrub the table position</footer>
               <span class="port port-in" data-port="1-in"></span>
@@ -282,7 +282,7 @@
           <article class="node-card reveal" style="--cat:#38BDF8; --i:2">
             <p class="hand-cap">shape 3D</p>
             <div class="node">
-              <header class="node-head"><span class="cat-dot"></span><span class="node-name">Render 3D</span><span class="node-cat">3D</span></header>
+              <header class="node-head"><span class="node-name">Render 3D</span><span class="node-cat">3D</span></header>
               <div class="node-view cap-canvas-box"><canvas id="anim-particles"></canvas></div>
               <footer class="node-foot">drag to orbit</footer>
               <span class="port port-in" data-port="2-in"></span>
@@ -293,7 +293,7 @@
           <article class="node-card reveal" style="--cat:#A3E635; --i:3">
             <p class="hand-cap">move anything</p>
             <div class="node">
-              <header class="node-head"><span class="cat-dot"></span><span class="node-name">LFO</span><span class="node-cat">Modulators</span></header>
+              <header class="node-head"><span class="node-name">LFO</span><span class="node-cat">Modulators</span></header>
               <div class="node-view cap-canvas-box"><canvas id="anim-knobs"></canvas></div>
               <footer class="node-foot">turn a knob, follow the cable</footer>
               <span class="port port-in" data-port="3-in"></span>
@@ -433,7 +433,7 @@
                 <p>Remove the quarantine flag instantly:</p>
                 <div class="code-pill">
                   <code>xattr -dr com.apple.quarantine /Applications/Infinite.app</code>
-                  <button class="copy-inline-btn" data-code="xattr -dr com.apple.quarantine /Applications/Infinite.app">Copy</button>
+                  <button class="copy" type="button" aria-label="Copy" data-code="xattr -dr com.apple.quarantine /Applications/Infinite.app"><svg class="ic ic-copy" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="9" height="9" rx="2"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4h-6A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></svg><svg class="ic ic-done" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5 8.5 14.5 15.5 6"/></svg></button>
                 </div>
               </li>
             </ol>
@@ -481,7 +481,7 @@
                 <p>Download <code>Infinite-x86_64.AppImage</code>, then:</p>
                 <div class="code-pill">
                   <code>chmod +x Infinite-x86_64.AppImage</code>
-                  <button class="copy-inline-btn" data-code="chmod +x Infinite-x86_64.AppImage">Copy</button>
+                  <button class="copy" type="button" aria-label="Copy" data-code="chmod +x Infinite-x86_64.AppImage"><svg class="ic ic-copy" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="9" height="9" rx="2"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4h-6A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></svg><svg class="ic ic-done" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5 8.5 14.5 15.5 6"/></svg></button>
                 </div>
               </li>
               <li class="step">
@@ -490,7 +490,7 @@
                 <p>Double-click it, or run it from a terminal. Inside a container, or with no <code>/dev/fuse</code>, extract and run instead:</p>
                 <div class="code-pill">
                   <code>./Infinite-x86_64.AppImage --appimage-extract-and-run</code>
-                  <button class="copy-inline-btn" data-code="./Infinite-x86_64.AppImage --appimage-extract-and-run">Copy</button>
+                  <button class="copy" type="button" aria-label="Copy" data-code="./Infinite-x86_64.AppImage --appimage-extract-and-run"><svg class="ic ic-copy" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="9" height="9" rx="2"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4h-6A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></svg><svg class="ic ic-done" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5 8.5 14.5 15.5 6"/></svg></button>
                 </div>
               </li>
             </ol>
@@ -642,8 +642,8 @@
     })();
   </script>
   <script src="nodes.js?v=2" defer></script>
-  <script src="app.js?v=31" defer></script>
-  <script src="site.js?v=19" defer></script>
+  <script src="app.js?v=32" defer></script>
+  <script src="site.js?v=21" defer></script>
 <nav class="dock" id="dock" aria-label="Main">
   <div class="dock-bar">
     <span class="dock-thumb" aria-hidden="true"></span>
@@ -672,5 +672,6 @@
     <a href="blog/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
   </div>
 </nav>
+  <script src="bird.js?v=92f8320a" defer></script>
 </body>
 </html>

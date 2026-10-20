@@ -89,7 +89,7 @@ body.reels-page {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #0D1020;
+  background: var(--midnight-950);
   isolation: isolate;
 }
 
@@ -183,8 +183,8 @@ body.reels-page {
 }
 
 .rail-btn.is-done .ic {
-  background: var(--ember, #FF6B35);
-  color: #151930;
+  background: var(--ember, var(--ember-400));
+  color: var(--midnight-900);
 }
 
 .rail-btn:focus-visible {
@@ -192,7 +192,7 @@ body.reels-page {
 }
 
 .rail-btn:focus-visible .ic {
-  box-shadow: 0 0 0 2px var(--signal, #A7B1FF);
+  box-shadow: 0 0 0 2px var(--signal, var(--signal-300));
 }
 
 .reels .snippet {
