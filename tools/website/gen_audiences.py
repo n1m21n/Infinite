@@ -228,6 +228,10 @@ def bench_image(slug, items):
     return out.size
 
 
+VIDEO_ID = "PoqHY7yMIyQ"
+def video_embed():
+    return f'<div class="yt-embed ax-video"><iframe src="https://www.youtube-nocookie.com/embed/{VIDEO_ID}?rel=0" title="Infinite video" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>'
+
 def main_html(a, rel):
     float3d = ""
     if a["hero"]["img"] == "brand_ball":
@@ -333,6 +337,7 @@ def artists_main(a, rel, hero="blob"):
         tag, caps, ghost = "Images that move.", "32 blend modes|3D with real materials|A picture from a formula", ("Gallery", "viewport")
     bubbles = "".join(f'<button type="button" class="ax-bub{" on" if i == 0 else ""}" role="tab" aria-selected="{"true" if i == 0 else "false"}" data-k="{i}" aria-label="{e(c)}: {e(a["cards"][i][1])}">{icon(ic)}<span>{e(t)}</span></button>' for i, (_, ic, t, c) in enumerate(bub))
     nodes = "".join(f'<figure class="ax-node"><img src="assets/nodes/{n}.webp" alt="{e(t)}: {e(d)}" loading="lazy" decoding="async"><figcaption>{e(t)}</figcaption></figure>' for n, t, d in a["bench"]["items"])
+    watch = f'      <section class="aud-section reveal">\n        <h2 class="ax-h">Watch</h2>\n        {video_embed()}\n      </section>\n' if hero == "cables" else ""
     figs = "".join(f'<a class="ax-shot" style="--ar:{w} / {h}" href="{a["reel"]["href"]}"><img src="{src}" alt="{e(al)}" width="{w}" height="{h}" loading="lazy" decoding="async"><span class="ax-ttl">{e(al.replace(", library", ""))}</span></a>' for src, w, h, al in a["reel"]["items"])
     start = "".join(f'<a href="library/{sl}.html">{icon("play")}{e(t)}</a>' for sl, t in a["start"])
     others = "".join(f'<a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
@@ -376,7 +381,7 @@ def artists_main(a, rel, hero="blob"):
         <h2 class="ax-h">{"Play" if hero == "cables" else "Perform" if hero == "shader" else "Tweak" if hero == "math" else "Knobs"}</h2>
         {lab}
       </section>
-      <section class="aud-section reveal">
+{watch}      <section class="aud-section reveal">
         <h2 class="ax-h">Made in Infinite</h2>
         <div class="ax-strip"><div class="ax-reel">{figs}</div></div>
       </section>
@@ -427,6 +432,7 @@ def dev_main(a, rel):
       <div class="dv-main">
         <div class="dv-cards">{cards}</div>
         <section class="dv-sec dv-lab" id="start"><h2>Quick start</h2>{lab_html(a)}</section>
+        <section class="dv-sec" id="watch"><h2>Watch</h2>{video_embed()}</section>
         {sections}
         {feed.group(0) if feed else ""}
         <section class="dv-sec"><h2>For everyone else</h2><div class="aud-others">
@@ -443,15 +449,15 @@ def page(a):
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=b43fe55b">', extra_js='\n  <script src="artists.js?v=9" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=36bf82b2">', extra_js='\n  <script src="artists.js?v=9" defer></script>')
     if a["slug"] == "creative-coders":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=b43fe55b">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script src="ccode.js?v=3" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=36bf82b2">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script src="ccode.js?v=3" defer></script>')
     if a["slug"] == "vjs":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=b43fe55b">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script src="vjs.js?v=4" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=36bf82b2">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script src="vjs.js?v=4" defer></script>')
     if a["slug"] == "musicians":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=b43fe55b">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=1" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=36bf82b2">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=1" defer></script>')
     if a["slug"] == "developers":
-        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=c2c59bad">', extra_js='\n  <script src="dev.js?v=2" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=bf9bacd4">', extra_js='\n  <script src="dev.js?v=2" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 

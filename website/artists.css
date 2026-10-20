@@ -149,3 +149,5 @@
 .ax-lab .pad.queued { animation: none; background: rgba(238, 241, 250, 0.28); color: var(--mid-ink); box-shadow: none; }
 .ax-lab .beats { margin-left: auto; padding: 0 6px; }
 @media (max-width: 600px) { .ax-lab .lab-side { padding: 10px 10px 12px; } .ax-lab .pads { width: 100%; } .ax-lab .pad { flex: 1 1 0; padding: 0 8px; min-height: 36px; } .ax-lab .beats { margin: 0 auto; } }
+.ax-video, .dv-sec .yt-embed { border-radius: var(--r-card, 24px); box-shadow: none; }
+@media (max-width: 899px) { .ax-video, .dv-sec .yt-embed { border-radius: 20px; } }

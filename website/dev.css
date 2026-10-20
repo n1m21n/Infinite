@@ -40,3 +40,4 @@
 @media (min-width: 901px) { .dv-hero > .container, .dv-grid { padding-left: max(var(--gutter, 16px), 88px); } }
 .dv-rain { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
 .dv-hero, .dv-grid { position: relative; z-index: 1; }
+.dv-sec .yt-embed { margin-top: 12px; }
