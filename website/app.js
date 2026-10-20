@@ -1555,6 +1555,18 @@ function initMinimalAudioPlayer() {
     });
   }
 
+  // unplayed bars take the text colour at low alpha, so they read in both modes
+  let idleKey = '', idleFill = 'rgba(128,128,128,0.3)';
+  function idleInk() {
+    const mode = document.documentElement.getAttribute('data-mode') || '';
+    if (mode !== idleKey) {
+      idleKey = mode;
+      const m = getComputedStyle(waveCanvas).color.match(/[\d.]+/g);
+      if (m) idleFill = 'rgba(' + m[0] + ',' + m[1] + ',' + m[2] + ',0.3)';
+    }
+    return idleFill;
+  }
+
   let waveTime = 0;
   function renderWaveform() {
     waveTime += 0.035;
@@ -1610,7 +1622,7 @@ function initMinimalAudioPlayer() {
       } else if (isHoverScrub) {
         ctx.fillStyle = 'rgba(181, 55, 0, 0.45)';
       } else {
-        ctx.fillStyle = 'rgba(26, 31, 54, 0.16)';
+        ctx.fillStyle = idleInk();
       }
 
       ctx.beginPath();
