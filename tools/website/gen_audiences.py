@@ -392,18 +392,66 @@ def artists_main(a, rel, hero="blob"):
 '''
 
 
+def dev_main(a, rel):
+    """Developers: a docs layout. Short hero with the one-line install, a sticky contents column, and every section a solid card."""
+    import re
+    raw = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), a["body"]), encoding="utf-8").read()
+    feed = re.search(r'<p class="blog-feed">.*?</p>', raw, re.S)
+    chunks = [c for c in raw.split('<div class="dev-wide">')[1:]]
+    secs = []
+    for c in chunks:
+        c = c.rsplit("</div>", 1)[0] if c.count("<table") == 0 or c.count("</div>") > 1 else c
+        m = re.search(r"<h2>(.*?)</h2>", c, re.S); title = re.sub("<[^>]+>", "", m.group(1)); body = c.replace(m.group(0), "", 1)
+        body = re.sub(r"</div>\s*$", "", body.strip()) if body.strip().endswith("</div>") and body.count("</div>") > body.count("<div") else body
+        secs.append((re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-"), title, body))
+    toc_items = [("start", "Quick start", "play")] + [(i, t, ic) for (i, t, _), ic in zip(secs, ("power", "edit", "family-utility", "settings", "browser"))]
+    toc = "".join(f'<a href="#{i}">{icon(ic)}<span>{e(t)}</span></a>' for i, t, ic in toc_items)
+    facts = "".join(f"<li>{e(f)}</li>" for f in a["facts"])
+    cards = "".join(f'<article class="dv-card"><span class="num">{n + 1:02d}</span><h3>{e(t)}</h3><p>{e(d)}</p></article>' for n, (t, d) in enumerate(a["cards"]))
+    sections = "".join(f'<section class="dv-sec" id="{i}"><h2>{e(t)}</h2>{b}</section>' for i, t, b in secs)
+    others = "\n".join(f'          <a href="{h}">{icon(AUD_ICON[h[:-5]])}{e(n)}</a>' for h, n in ALL if h != rel)
+    return f'''
+  <main class="dv">
+    <section class="dv-hero">
+      <div class="container">
+        <span class="blog-hand hand">{e(a["hand"])}</span>
+        <h1 class="slab">{e(a["h1"])}</h1>
+        <p class="lead">{e(a["lead"])}</p>
+        <div class="dv-cmd"><code>npx -y infinite-engine init</code><button class="copy" type="button" data-copy="npx -y infinite-engine init">{icon("edit")}<span>Copy</span></button></div>
+        <ul class="facts">{facts}</ul>
+        <div class="aud-cta"><a href="index.html#setup" class="btn btn-primary">Download Infinite</a><a href="{a["extra"][0]}" class="btn btn-ghost">{e(a["extra"][1])}</a></div>
+      </div>
+    </section>
+    <div class="container dv-grid">
+      <nav class="dv-toc" aria-label="On this page">{toc}</nav>
+      <div class="dv-main">
+        <div class="dv-cards">{cards}</div>
+        <section class="dv-sec dv-lab" id="start"><h2>Quick start</h2>{lab_html(a)}</section>
+        {sections}
+        {feed.group(0) if feed else ""}
+        <section class="dv-sec"><h2>For everyone else</h2><div class="aud-others">
+{others}
+        </div></section>
+      </div>
+    </div>
+  </main>
+'''
+
+
 def page(a):
     rel = a["slug"] + ".html"
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": a["title"], "url": BASE + rel, "description": a["desc"],
           "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": BASE}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}
     if a["slug"] == "artists":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=2a025c8c">', extra_js='\n  <script src="artists.js?v=8" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel), extra_head='\n  <link rel="stylesheet" href="artists.css?v=b43fe55b">', extra_js='\n  <script src="artists.js?v=9" defer></script>')
     if a["slug"] == "creative-coders":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=2a025c8c">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script src="ccode.js?v=2" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "math"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=b43fe55b">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script src="ccode.js?v=3" defer></script>')
     if a["slug"] == "vjs":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=2a025c8c">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script src="vjs.js?v=3" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "shader"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=b43fe55b">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script src="vjs.js?v=4" defer></script>')
     if a["slug"] == "musicians":
-        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=2a025c8c">', extra_js='\n  <script src="artists.js?v=8" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=1" defer></script>')
+        return shell(rel, a["title"], a["desc"], [ld], artists_main(a, rel, "cables"), extra_head='\n  <link rel="stylesheet" href="artists.css?v=b43fe55b">', extra_js='\n  <script src="artists.js?v=9" defer></script>\n  <script type="module" src="musicians.js?v=3"></script>\n  <script src="mxrack.js?v=1" defer></script>')
+    if a["slug"] == "developers":
+        return shell(rel, a["title"], a["desc"], [ld], dev_main(a, rel), extra_head='\n  <link rel="stylesheet" href="dev.css?v=c2c59bad">', extra_js='\n  <script src="dev.js?v=2" defer></script>')
     return shell(rel, a["title"], a["desc"], [ld], main_html(a, rel))
 
 

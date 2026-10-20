@@ -145,3 +145,11 @@
     row.addEventListener('scroll', sched, { passive: true }); addEventListener('resize', sched); upd();
   });
 })();
+/* glass sliders: --p is how far the lit part of the track runs */
+(function () {
+  var ranges = [].slice.call(document.querySelectorAll('.ax-lab input[type=range]')); if (!ranges.length) return;
+  var last = ranges.map(function () { return null; });
+  function sync(i) { var r = ranges[i], v = r.value + '|' + r.min + '|' + r.max; if (v === last[i]) return; last[i] = v; var lo = +r.min || 0, hi = +r.max || 100, p = hi > lo ? (r.value - lo) / (hi - lo) : 0; r.parentNode.style.setProperty('--p', (p * 100).toFixed(1) + '%'); }
+  function tick() { for (var i = 0; i < ranges.length; i++) sync(i); requestAnimationFrame(tick); }
+  requestAnimationFrame(tick);
+})();

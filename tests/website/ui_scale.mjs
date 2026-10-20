@@ -101,7 +101,7 @@ const SCALE_FN = (phone) => {
   const inDock = (e) => e.closest('.dock, .site-header');
   document.querySelectorAll('a[href], button, summary, [role=tab]').forEach(e => {
     const r = e.getBoundingClientRect(); if (r.width < 8 || r.height < 8 || inDock(e)) return;
-    const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05 || e.matches('.btn-dl') || e.closest('.pb, .ph-bubbles, .play-btn, .yt-play, [aria-hidden="true"], .deck-card, .lib-card, .post-card, .ax-node, .ax-shot, .reel')) return;
+    const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05 || e.matches('.btn-dl') || e.closest('.pb, .ph-bubbles, .play-btn, .yt-play, [aria-hidden="true"], .dv-sec, .deck-card, .lib-card, .post-card, .ax-node, .ax-shot, .reel')) return;
     const rad = parseFloat(cs.borderTopLeftRadius); if (!(rad >= r.height / 2 - 1) || r.height > 52 || r.height < 24) return;   // taller ones are cards (download tiles), not controls   // pill-shaped controls only
     const label = (e.textContent || '').trim(); const iconOnly = !label || (r.width - r.height) < 6;
     const name = e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/)[0] : '') + ' "' + label.slice(0, 14) + '"';

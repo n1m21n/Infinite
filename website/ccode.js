@@ -71,7 +71,12 @@
     var W = stage.clientWidth, H = stage.clientHeight; if (!W || !H) return;
     var sr = stage.getBoundingClientRect(), copy = stage.querySelector('.ax-copy'), low = stage.querySelector('.ax-low'), cta = stage.querySelector('.ax-cta');
     var x0 = 16, x1 = W - 16, y0, y1;
-    if (W >= 900) { x0 = Math.max(W * 0.38, (copy ? copy.getBoundingClientRect().right - sr.left : 0) + 24); x1 = W - 28; y0 = 72; y1 = (cta ? cta.getBoundingClientRect().top - sr.top : H) - 20; }
+    if (W >= 900) {
+      var h1 = copy && copy.querySelector('h1'), rg = document.createRange(); if (h1) rg.selectNodeContents(h1);
+      var tr = h1 ? rg.getBoundingClientRect().right - sr.left : 0, lowTop = Math.min(low ? low.getBoundingClientRect().top - sr.top : H, cta ? cta.getBoundingClientRect().top - sr.top : H) - 16;
+      if (W - 28 - (tr + 32) >= 340) { x0 = tr + 32; x1 = W - 28; y0 = 72; y1 = lowTop; }                       // beside the headline
+      else { x0 = 24; x1 = W - 24; y0 = (copy ? copy.getBoundingClientRect().bottom - sr.top : 0) + 12; y1 = lowTop; }   // headline too wide: under it
+    }
     else { y0 = (copy ? copy.getBoundingClientRect().bottom - sr.top : 0) + 10; y1 = (low ? low.getBoundingClientRect().top - sr.top : H) - 12; }
     y1 = Math.max(y1, y0 + 120);
     box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }; grid = [];

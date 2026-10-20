@@ -129,3 +129,23 @@
 .ax-ttl { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 6px 12px; border-radius: var(--r-pill); font: 500 0.8125rem/1.2 'Geist', system-ui, sans-serif; color: var(--mid-ink); background: rgba(21, 25, 48, 0.55); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 
 .ax-stage[data-hero="math"] { background: radial-gradient(ellipse at 62% 48%, #1f2650, var(--mid) 72%); cursor: crosshair; }
+
+/* Premium glass controls for every .ax-lab: one frosted panel per slider, a segmented glass switch for the pads, a glass thumb on a lit track. No outlines, no rings. */
+.ax-lab .lab-side { align-items: center; gap: 10px; padding: 14px 16px 16px; }
+.ax-lab .ctl { --p: 50%; position: relative; flex: 1 1 220px; min-width: 0; padding: 14px 18px 4px; border-radius: 22px; background: linear-gradient(180deg, rgba(238, 241, 250, 0.13), rgba(238, 241, 250, 0.06)); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 28px rgba(5, 7, 20, 0.35); row-gap: 0; }
+.ax-lab .ctl label { font: 500 0.8125rem/1 'Geist', system-ui, sans-serif; color: var(--mid-ink); }
+.ax-lab .ctl output { min-width: 0; padding: 5px 10px; border-radius: var(--r-pill); background: rgba(13, 16, 32, 0.45); color: var(--mid-ink); font: 500 0.75rem/1 'Geist Mono', ui-monospace, monospace; }
+.ax-lab .ctl input[type=range] { height: 40px; }
+.ax-lab .ctl input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: var(--r-pill); background: linear-gradient(90deg, rgba(167, 177, 255, 0.5), #A7B1FF) 0 / var(--p) 100% no-repeat, rgba(13, 16, 32, 0.55); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); }
+.ax-lab .ctl input[type=range]::-moz-range-track { height: 6px; border-radius: var(--r-pill); background: rgba(13, 16, 32, 0.55); }
+.ax-lab .ctl input[type=range]::-moz-range-progress { height: 6px; border-radius: var(--r-pill); background: #A7B1FF; }
+.ax-lab .ctl input[type=range]::-webkit-slider-thumb { width: 26px; height: 26px; margin-top: -10px; background: linear-gradient(180deg, #fff, #dfe3f7); box-shadow: 0 6px 16px rgba(5, 7, 20, 0.5), inset 0 -2px 3px rgba(105, 116, 220, 0.25), 0 0 0 5px rgba(167, 177, 255, 0.18); }
+.ax-lab .ctl input[type=range]::-moz-range-thumb { width: 26px; height: 26px; background: #fff; box-shadow: 0 6px 16px rgba(5, 7, 20, 0.5); }
+.ax-lab .ctl input[type=range]:active::-webkit-slider-thumb { transform: scale(1.1); box-shadow: 0 6px 16px rgba(5, 7, 20, 0.5), 0 0 0 8px rgba(167, 177, 255, 0.22); }
+.ax-lab .pads { display: inline-flex; gap: 2px; padding: 4px; border-radius: var(--r-pill); background: rgba(238, 241, 250, 0.1); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+.ax-lab .pad { min-height: 40px; padding: 0 16px; background: transparent; color: rgba(238, 241, 250, 0.8); box-shadow: none; transition: background var(--dur-short, 188ms) var(--ease-out, ease), color var(--dur-short, 188ms) var(--ease-out, ease); }
+.ax-lab .pad:hover { transform: none; color: var(--mid-ink); }
+.ax-lab .pad.live { background: rgba(238, 241, 250, 0.94); color: #151930; box-shadow: 0 4px 12px rgba(5, 7, 20, 0.35); }
+.ax-lab .pad.queued { animation: none; background: rgba(238, 241, 250, 0.28); color: var(--mid-ink); box-shadow: none; }
+.ax-lab .beats { margin-left: auto; padding: 0 6px; }
+@media (max-width: 600px) { .ax-lab .lab-side { padding: 10px 10px 12px; } .ax-lab .pads { width: 100%; } .ax-lab .pad { flex: 1 1 0; padding: 0 8px; min-height: 36px; } .ax-lab .beats { margin: 0 auto; } }

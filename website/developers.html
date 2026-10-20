@@ -29,6 +29,7 @@
   <link rel="stylesheet" href="blog.css?v=61bae151">
   <link rel="stylesheet" href="audience.css?v=beb744f0">
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebPage", "name": "Infinite for developers: headless CLI, Python SDK and MCP server", "url": "https://infinitedevices.org/developers.html", "description": "Run Infinite without a window. Render video and audio from a text patch, call it from Python, or give an AI agent the nine MCP tools. Free and open source.", "isPartOf": {"@type": "WebSite", "name": "Infinite", "url": "https://infinitedevices.org/"}, "about": {"@type": "SoftwareApplication", "name": "Infinite", "applicationCategory": "MultimediaApplication", "operatingSystem": "macOS, Windows, Linux", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}}</script>
+  <link rel="stylesheet" href="dev.css?v=c2c59bad">
   <script>document.documentElement.classList.add('js-reveal')</script>
   <link rel="stylesheet" href="scale.css?v=79e759ce">
 </head>
@@ -97,38 +98,22 @@
   </header>
 
 
-  <main>
-    <section class="ah">
-      <div class="container ah-grid">
-        <div class="ah-text">
-          <span class="blog-hand hand">headless</span>
-          <h1 class="slab">Infinite for developers and agents</h1>
-          <p class="lead">Every patch is a text file the app can render with no window open. Use the command line, Python or an AI agent over MCP.</p>
-          <div class="aud-cta">
-            <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
-            <a href="assets/Infinite_Headless_User_Guide.pdf" class="btn btn-ghost">Headless guide (PDF)</a>
-          </div>
-          <ul class="facts"><li>Headless</li><li>Python SDK</li><li>9 MCP tools</li></ul>
-        </div>
-        <div class="vstage">
-          <canvas data-shader="sheet" aria-hidden="true"></canvas>
-          <span class="vstage-tag">live shader · move the pointer</span>
-        </div>
+  <main class="dv">
+    <section class="dv-hero">
+      <div class="container">
+        <span class="blog-hand hand">headless</span>
+        <h1 class="slab">Infinite for developers and agents</h1>
+        <p class="lead">Every patch is a text file the app can render with no window open. Use the command line, Python or an AI agent over MCP.</p>
+        <div class="dv-cmd"><code>npx -y infinite-engine init</code><button class="copy" type="button" data-copy="npx -y infinite-engine init"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Copy</span></button></div>
+        <ul class="facts"><li>Headless</li><li>Python SDK</li><li>9 MCP tools</li></ul>
+        <div class="aud-cta"><a href="index.html#setup" class="btn btn-primary">Download Infinite</a><a href="assets/Infinite_Headless_User_Guide.pdf" class="btn btn-ghost">Headless guide (PDF)</a></div>
       </div>
     </section>
-
-    <div class="container">
-      <section class="aud-section">
-        <h2>What you get</h2>
-        <div class="aud-grid">
-          <article class="aud-card reveal" style="--i:0"><span class="num">01</span><h3>Text in, files out</h3><p>A patch is plain text. Validate it, print the graph that was built, then render stills, a contact sheet, video or an audio report.</p></article>
-          <article class="aud-card reveal" style="--i:1"><span class="num">02</span><h3>No window, no display</h3><p>The renderer runs from the command line, so it fits a script, a cron job or a CI step. Hardware inputs are refused in headless mode.</p></article>
-          <article class="aud-card reveal" style="--i:2"><span class="num">03</span><h3>Built for agents</h3><p>Nine MCP tools let an agent write a shader, a synth or a mesh and see the result. Every tool result carries the credit line.</p></article>
-        </div>
-      </section>
-
-      <section class="aud-section reveal">
-        <div class="lab" data-lab="term">
+    <div class="container dv-grid">
+      <nav class="dv-toc" aria-label="On this page"><a href="#start"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Quick start</span></a><a href="#one-command-ai-agent-setup"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><path d="M7.3 7.1A4.2 4.2 0 1 0 12.7 7.1"/><path d="M10 5.6V9.6"/></svg><span>One-command AI agent setup</span></a><a href="#teach-cursor-and-windsurf-your-syntax"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Teach Cursor and Windsurf your syntax</span></a><a href="#the-nine-mcp-tools"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h7M14.5 6h2M3.5 14h2M9.5 14h7"/><circle cx="12.5" cy="6" r="1.9" fill="currentColor" stroke="none"/><circle cx="7.5" cy="14" r="1.9" fill="currentColor" stroke="none"/></svg><span>The nine MCP tools</span></a><a href="#what-you-need"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15.19 8.49 L16.91 8.85 L16.91 11.15 L15.19 11.51 L14.73 12.60 L15.70 14.07 L14.07 15.70 L12.60 14.73 L11.51 15.19 L11.15 16.91 L8.85 16.91 L8.49 15.19 L7.40 14.73 L5.93 15.70 L4.30 14.07 L5.27 12.60 L4.81 11.51 L3.09 11.15 L3.09 8.85 L4.81 8.49 L5.27 7.40 L4.30 5.93 L5.93 4.30 L7.40 5.27 L8.49 4.81 L8.85 3.09 L11.15 3.09 L11.51 4.81 L12.60 5.27 L14.07 4.30 L15.70 5.93 L14.73 7.40 Z"/><circle cx="10" cy="10" r="2.4"/></svg><span>What you need</span></a><a href="#for-web-builders-and-chat-artifacts"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="3.4" width="13.2" height="13.2" rx="1.7"/><path d="M7.5 4.2v11.6"/></svg><span>For web builders and chat artifacts</span></a></nav>
+      <div class="dv-main">
+        <div class="dv-cards"><article class="dv-card"><span class="num">01</span><h3>Text in, files out</h3><p>A patch is plain text. Validate it, print the graph that was built, then render stills, a contact sheet, video or an audio report.</p></article><article class="dv-card"><span class="num">02</span><h3>No window, no display</h3><p>The renderer runs from the command line, so it fits a script, a cron job or a CI step. Hardware inputs are refused in headless mode.</p></article><article class="dv-card"><span class="num">03</span><h3>Built for agents</h3><p>Nine MCP tools let an agent write a shader, a synth or a mesh and see the result. Every tool result carries the credit line.</p></article></div>
+        <section class="dv-sec dv-lab" id="start"><h2>Quick start</h2><div class="lab" data-lab="term">
           <div class="lab-side"><h3>Three ways in</h3><div class="cmd-tabs" role="tablist" aria-label="Ways to call Infinite"><button role="tab" type="button" id="t0" aria-controls="p0" aria-selected="true">Command line</button><button role="tab" type="button" id="t1" aria-controls="p1" aria-selected="false">Python</button><button role="tab" type="button" id="t2" aria-controls="p2" aria-selected="false">MCP</button></div><div role="tabpanel" id="p0" aria-labelledby="t0" class="term-panel"><div style="position:relative"><pre class="aud-code"><code>Infinite --validate hello.inf
 Infinite --explain hello.inf
 Infinite --frame hello.inf 0,1,2 pics/ --contact-sheet sheet.png
@@ -147,20 +132,14 @@ python3
     }
   }
 }</code></pre><button class="copy" type="button">Copy</button></div><p>One command configures Claude Desktop, Cursor and Windsurf. <a href="https://www.npmjs.com/package/infinite-engine" target="_blank" rel="noopener">npm package</a> and <a href="https://smithery.ai" target="_blank" rel="noopener">Smithery registry</a>.</p></div><button class="run" type="button">Render again</button></div>
-          <div class="lab-view"><canvas aria-label="A contact sheet of twelve frames filling in one by one" role="img"></canvas></div></div>
-      </section>
-
-
-      <section class="aud-section reveal dev-body">
-<div class="dev-wide">
-          <h2>One-command AI agent setup</h2>
+          <div class="lab-view"><canvas aria-label="A contact sheet of twelve frames filling in one by one" role="img"></canvas></div></div></section>
+        <section class="dv-sec" id="one-command-ai-agent-setup"><h2>One-command AI agent setup</h2>
+          
           <p>Connect Infinite's nine MCP tools to Claude Desktop, Cursor and Windsurf with one terminal command:</p>
           <pre class="aud-code"><code>npx -y infinite-engine init</code></pre>
           <p>Or install via the <a href="https://smithery.ai" target="_blank" rel="noopener">Smithery</a> registry: <code>npx -y @smithery/cli install infinite-engine --client claude</code>. For Python environments, run <code>pip install infinite-daw</code>.</p>
-        </div>
-
-        <div class="dev-wide">
-          <h2>Teach Cursor and Windsurf your syntax</h2>
+        </section><section class="dv-sec" id="teach-cursor-and-windsurf-your-syntax"><h2>Teach Cursor and Windsurf your syntax</h2>
+          
           <p>Place a <code>.cursorrules</code> or <code>.windsurfrules</code> file in your workspace to teach any coding assistant the seven Tongue verbs (<code>ask</code>, <code>add</code>, <code>set</code>, <code>wire</code>, <code>cut</code>, <code>del</code>, <code>field</code>) and zero-sigil Field language rules:</p>
           <pre class="aud-code"><code># Tongue v0: write a patch as declarative sentences
 add Shape as s
@@ -173,10 +152,8 @@ wire blur out.in
 # Field: per-sample DSP with bare names (zero sigils)
 field synth state float p = 0; p = (p + freq / sr) % 1.0; out = sin(6.28318 * p) * gate * 0.3;</code></pre>
           <p>The full grammar and node reference are documented in <a href="https://infinitedevices.org/llms.txt" target="_blank" rel="noopener">llms.txt</a> and the <a href="assets/Field_Language_Manual.pdf" target="_blank" rel="noopener">Field manual (PDF)</a>.</p>
-        </div>
-
-        <div class="dev-wide">
-          <h2>The nine MCP tools</h2>
+        </section><section class="dv-sec" id="the-nine-mcp-tools"><h2>The nine MCP tools</h2>
+          
           <div class="table-wrap"><table>
             <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
             <tbody>
@@ -191,36 +168,29 @@ field synth state float p = 0; p = (p + freq / sr) % 1.0; out = sin(6.28318 * p)
             <tr><td><code>infinite_field_modifier</code></td><td>Deform and shade a mesh with a Field modifier</td></tr>
             </tbody>
           </table></div>
-        </div>
-
-        <div class="dev-wide">
-          <h2>What you need</h2>
+        </section><section class="dv-sec" id="what-you-need"><h2>What you need</h2>
+          
           <ul class="dev-list">
             <li>The Infinite app installed. The SDK and the MCP server find it through the <code>INFINITE_BIN</code> environment variable, <code>/Applications/Infinite.app</code>, a build folder in the checkout, or your <code>PATH</code>. On Windows and Linux, set <code>INFINITE_BIN</code> to the path of <code>Infinite.exe</code> or <code>Infinite</code>.</li>
             <li>Python 3.8 or newer: <code>pip install infinite-daw</code>. Nothing else to install: the SDK has zero third-party dependencies.</li>
             <li>Node 18 or newer: <code>npx -y infinite-engine init</code>.</li>
             <li>Hardware inputs, such as a microphone or camera, are refused in headless mode.</li>
           </ul>
-        </div>
-
-        <div class="dev-wide">
-          <h2>For web builders and chat artifacts</h2>
+        </section><section class="dv-sec" id="for-web-builders-and-chat-artifacts"><h2>For web builders and chat artifacts</h2>
+          
           <p>Putting an audio-reactive visual on a page or inside a Claude / ChatGPT chat artifact needs no local installation. <a href="embeds/">Embeds</a> provides 18 standalone WebGL visualizers with responsive iframe snippets. The repository carries an <a href="https://github.com/n1m21n/Infinite/blob/main/AGENT.md" target="_blank" rel="noopener">agent guide</a>.</p>
-        </div>
-
+        </section>
         <p class="blog-feed">Credit when you share what you make: "Infinite, by Naman Soni (n1m21n), https://infinitedevices.org". Every tool result carries the same line.</p>
-      </section>
-      <section class="aud-section reveal">
-        <h2>Infinite for everyone else</h2>
-        <div class="aud-others">
+        <section class="dv-sec"><h2>For everyone else</h2><div class="aud-others">
           <a href="artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg>artists</a>
           <a href="musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg>musicians</a>
           <a href="vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg>VJs</a>
           <a href="creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg>creative coders and technologists</a>
-        </div>
-      </section>
+        </div></section>
+      </div>
     </div>
-    
+  </main>
+
   </main>
 
   <footer class="site-footer">
@@ -288,6 +258,7 @@ field synth state float p = 0; p = (p + freq / sr) % 1.0; out = sin(6.28318 * p)
   </footer>
   <script src="site.js?v=18" defer></script>
   <script src="audience.js?v=6" defer></script>
+  <script src="dev.js?v=2" defer></script>
   <script>
     (function () {
       var els = document.querySelectorAll('.reveal');
