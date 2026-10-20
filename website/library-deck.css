@@ -54,7 +54,7 @@
 /* glass chips */
 .lib-chip {
   position: absolute; z-index: 3; top: 12px; height: 32px; width: 32px; padding: 0; border-radius: var(--r-pill);
-  display: inline-grid; place-items: center; color: #fff; text-decoration: none; border: 0; cursor: pointer;
+  display: inline-grid; place-items: center; color: var(--nm-ink, #fff); text-decoration: none; border: 0; cursor: pointer;
   background: color-mix(in srgb, #fff 20%, transparent);
   -webkit-backdrop-filter: blur(14px) saturate(1.6); backdrop-filter: blur(14px) saturate(1.6);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 38%, transparent), 0 4px 14px color-mix(in srgb, #000 18%, transparent);

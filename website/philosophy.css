@@ -117,3 +117,11 @@
 @media (max-width: 960px) { .ph-prin { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .ph-prin { grid-template-columns: 1fr; gap: 12px; } .ph-prin li { grid-template-columns: 112px 1fr; column-gap: 16px; align-items: center; padding: 16px; } .ph-prin .pp-n { display: none; } .ph-prin .pp-img { grid-row: 1 / span 2; height: 96px; margin: 0; } .ph-prin li > b { align-self: end; font-size: var(--size-body); } .ph-prin .pp-d { align-self: start; font-size: 0.875rem; } }
 :root[data-mode="paper"] .ph-prin .ic, :root[data-mode="mist"] .ph-prin .ic { color: var(--signal-300); }
+
+/* Light mode: the principle cards turn pale, text and glyphs go dark */
+:root[data-mode="paper"] .ph-prin li, :root[data-mode="mist"] .ph-prin li { color: var(--ink); background: linear-gradient(160deg, #fff, var(--nm-up, #E9ECF6)); box-shadow: var(--nm-raise, 0 12px 30px rgb(26 31 54 / 0.12)); }
+:root[data-mode="paper"] .ph-prin li > b, :root[data-mode="mist"] .ph-prin li > b { color: var(--ink); }
+:root[data-mode="paper"] .ph-prin .pp-n, :root[data-mode="mist"] .ph-prin .pp-n { color: color-mix(in srgb, var(--ink) 55%, transparent); }
+:root[data-mode="paper"] .ph-prin .pp-d, :root[data-mode="mist"] .ph-prin .pp-d { color: color-mix(in srgb, var(--ink) 72%, transparent); }
+:root[data-mode="paper"] .ph-prin li > b .ic, :root[data-mode="mist"] .ph-prin li > b .ic { color: var(--accent-ink); }
+:root[data-mode="paper"] .ph-prin .pp-img, :root[data-mode="mist"] .ph-prin .pp-img { filter: drop-shadow(0 14px 16px rgb(26 31 54 / 0.28)); }

@@ -8,20 +8,49 @@
   <meta name="robots" content="noindex">
   <link rel="canonical" href="https://infinitedevices.org/">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-  <script>try{var m=localStorage.getItem('infinite-mode');document.documentElement.dataset.mode=m||(matchMedia('(prefers-color-scheme: dark)').matches?'midnight':'paper')}catch(e){}</script>
+  <link rel="icon" href="/assets/favicon-32.png" sizes="32x32">
+  <script>try{var m=localStorage.getItem('infinite-mode');document.documentElement.dataset.mode=m||(matchMedia('(prefers-color-scheme: light)').matches?'paper':'midnight')}catch(e){document.documentElement.dataset.mode='midnight'}</script>
+  <link rel="stylesheet" href="/brand.css">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/scale.css">
   <link rel="stylesheet" href="/neumo.css">
+  <style>
+    .nf { min-height: 100svh; display: grid; place-content: center; justify-items: center; text-align: center; gap: var(--ui-sp-4, 16px); padding: 96px var(--ui-sp-4, 16px) 64px; }
+    .nf-home { position: fixed; top: 16px; left: 16px; display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+    .nf-home img { width: 36px; height: 36px; border-radius: 10px; }
+    .nf-graph { width: min(420px, 86vw); height: auto; margin-bottom: var(--ui-sp-2, 8px); }
+    .nf-node { fill: var(--card, #2A3150); stroke: color-mix(in srgb, var(--ink) 14%, transparent); }
+    .nf-bar-a { fill: var(--signal-300, #7E86FF); } .nf-bar-b { fill: #22D388; }
+    .nf-t { fill: var(--ink); font: 700 13px Geist, system-ui, sans-serif; } .nf-s { fill: var(--muted); font: 500 8px 'Geist Mono', ui-monospace, monospace; letter-spacing: .1em; }
+    .nf-cable { fill: none; stroke: var(--accent-ink); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 2 8; }
+    .nf-port { fill: var(--accent-ink); }
+    .nf-404 { display: inline-block; margin-bottom: 8px; font: 500 var(--size-micro-mono, 0.75rem)/1 'Geist Mono', ui-monospace, monospace; letter-spacing: .14em; color: var(--muted); }
+    .nf h1 { margin: 0; font-size: var(--size-h1); font-weight: 800; letter-spacing: -0.035em; line-height: 1.05; }
+    .nf h1 em { font-style: italic; color: var(--accent-ink); }
+    .nf p { margin: 0; max-width: 36ch; color: var(--muted); font-size: var(--size-body); }
+    .nf-links { display: flex; gap: var(--ui-sp-3, 12px); flex-wrap: wrap; justify-content: center; margin-top: var(--ui-sp-2, 8px); }
+  </style>
 </head>
 <body>
-  <main style="min-height:100vh;display:grid;place-content:center;text-align:center;gap:16px;padding:24px">
-    <h1 style="font-size:var(--size-h1);margin:0">Nothing here</h1>
-    <p>The page you wanted is not on this canvas. Try one of these.</p>
-    <p style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
-      <a class="btn" href="/">Home</a>
+  <a class="nf-home" href="/" aria-label="Infinite home"><img src="/assets/icon-96.png" alt="" width="36" height="36"><span>Infinite</span></a>
+  <main class="nf">
+    <svg class="nf-graph" viewBox="0 0 420 150" role="img" aria-label="Two nodes with a cable that connects to nothing">
+      <rect class="nf-node" x="14" y="40" width="130" height="62" rx="12"/><rect class="nf-bar-b" x="14" y="52" width="5" height="38" rx="2.5"/>
+      <text class="nf-t" x="34" y="68">Page</text><text class="nf-s" x="34" y="84">SOURCE</text>
+      <rect class="nf-node" x="276" y="40" width="130" height="62" rx="12" opacity=".55" stroke-dasharray="4 5"/><rect class="nf-bar-a" x="276" y="52" width="5" height="38" rx="2.5" opacity=".55"/>
+      <text class="nf-t" x="296" y="68" opacity=".55">You</text><text class="nf-s" x="296" y="84" opacity=".55">OUTPUT</text>
+      <path class="nf-cable" d="M148 71 C190 71 196 112 226 112"/>
+      <circle class="nf-port" cx="148" cy="71" r="5"/><circle class="nf-port" cx="230" cy="112" r="5" opacity=".5"/>
+    </svg>
+    <h1 class="perch">Nothing <em>here</em></h1>
+    <p><span class="nf-404">404</span><br>This page is not on the canvas. The cable stops short, so pick a place to plug back in.</p>
+    <div class="nf-links">
+      <a class="btn btn-primary" href="/">Home</a>
       <a class="btn" href="/library.html">Library</a>
       <a class="btn" href="/blog/">Blog</a>
       <a class="btn" href="/developers.html">Developers</a>
-    </p>
+    </div>
   </main>
+  <script src="/bird.js" defer></script>
 </body>
 </html>

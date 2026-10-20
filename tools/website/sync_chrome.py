@@ -191,9 +191,8 @@ def signup_html(rel):
     ts = f' data-turnstile="{cfg["turnstile_site_key"]}"' if cfg.get("turnstile_site_key") else ""
     return f'''
           <form class="signup" data-signup data-endpoint="{cfg["endpoint"]}" data-audience="{aud}"{ts} novalidate>
-            <label for="signup-email" class="signup-label">One email when something ships</label>
             <div class="signup-row">
-              <input id="signup-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
               <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
               <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
             </div>
