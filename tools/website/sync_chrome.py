@@ -256,7 +256,7 @@ def sync(rel, text):
     s = re.sub(r'\n?<nav class="dock".*?</nav>\n?', "\n", s, flags=re.S)
     s = s.replace('</body>', dock_html(rel) + '\n</body>', 1)
     s = re.sub(r'\n?[ \t]*<link rel="stylesheet" href="(?:\.\./)*scale\.css[^"]*">', '', s)
-    s = s.replace('</head>', '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'scale.css?v=79e759ce">\n</head>', 1)
+    s = s.replace('</head>', '  <link rel="stylesheet" href="' + depth_prefix(rel) + 'scale.css?v=09f74155">\n</head>', 1)
     s = re.sub(r'(style\.css\?v=)[A-Za-z0-9]+', r"\g<1>" + CSS_VERSION, s)
     s = re.sub(r'(site\.js\?v=)\d+', r"\g<1>" + JS_VERSION, s)
     # the brand link goes home from any page

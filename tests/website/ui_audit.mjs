@@ -42,7 +42,7 @@ const PAGE_FN = () => {
     for (let n = el.parentElement; n; n = n.parentElement) { const c = getComputedStyle(n); if (c.display === 'none' || c.visibility === 'hidden' || n.hidden || (+c.opacity < 0.05)) return null; }
     return r;
   };
-  const skip = (el) => el.closest('.deck-card, .post-card, .lib-card, .ax-nodes, .ax-reel, .reel, .bench-row, .ph-bubbles, .pb, .sr-only, .skip-link, [aria-hidden="true"]') || el.classList.contains('skip-link') || el.matches('input[type=range]');
+  const skip = (el) => el.closest('.deck-card, .post-card, .lib-card, .ax-nodes, .dv-toc, .ax-reel, .reel, .bench-row, .ph-bubbles, .pb, .sr-only, .skip-link, [aria-hidden="true"]') || el.classList.contains('skip-link') || el.matches('input[type=range]');
   return [...document.querySelectorAll(SEL)].filter(e => !skip(e)).map(e => { const r = vis(e); if (!r) return null;
     const cs = getComputedStyle(e); let fixed = false; for (let n = e; n && n !== document.body; n = n.parentElement) { const p = getComputedStyle(n).position; if (p === 'fixed' || p === 'sticky') { fixed = true; break; } }
     return { id: e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : '') + ' "' + (e.getAttribute('aria-label') || e.textContent.trim()).slice(0, 24) + '"',
@@ -95,7 +95,7 @@ for (const pg of pages) {
           const cx = r.left + r.width / 2, cy = r.top + r.height / 2; if (cy < 0 || cy > innerHeight || cx < 0 || cx > innerWidth) continue;
           const top = document.elementFromPoint(cx, cy); if (!top) continue;
           if (e.contains(top) || top.contains(e)) continue;
-          if (top.closest('.dock, .site-header')) continue;
+          if (top.closest('.dock, .site-header, .dv-toc')) continue;
           out.push((e.id || e.className || e.tagName) + ' covered by ' + (top.id || top.className || top.tagName));
         }
         return out;

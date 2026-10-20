@@ -29,3 +29,6 @@
   .run, .play, .copy, .cmd-tabs [role=tab] { min-height: var(--ctl-h); }
   .lib-view-btn, .view-pill { width: 36px; height: 36px; }
 }
+
+/* Type floor: nothing the visitor reads is under 12px. */
+.yt-label, .node-foot, .signup-note, .app-title, span.mono, small, dt, dd, .copy-inline-btn, .dl-card code, .dl-card small, .node-name, .node-cat, .doc-s, .doc-m, code { font-size: 0.75rem !important; }
