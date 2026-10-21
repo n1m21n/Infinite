@@ -194,6 +194,84 @@ namespace
 
    // Same escaping as Writer::Text/Reader::Text below, factored out for the
    // "expr" record - free text on a single line, outside of any node.
+   // Turbo 0.60 (upstream): a reference that is either a number or an
+   // authoring word (a node `id`, a slot or output name, a control key).
+   bool ReadRef(std::istringstream& in, int& num, std::string& word, bool& named)
+   {
+      std::string tok;
+      if (!(in >> tok))
+         return false;
+      char* end = nullptr;
+      const long v = std::strtol(tok.c_str(), &end, 10);
+      if (end != tok.c_str() && *end == '\0')
+         num = (int)v;
+      else
+      {
+         word = tok;
+         named = true;
+      }
+      return true;
+   }
+
+   // Turbo 0.60: the tokens after <centre> on a `mod` line mean different
+   // things in the two formats - Turbo writes its range mapper (inMin inMax
+   // outMin outMax), upstream writes lo hi [enabled [curve [smoothMs]]] in the
+   // destination's units. A Turbo file says so with kTurboModMarker; without
+   // it (older Turbo files, every upstream file) the shape of the lines
+   // decides, once the whole file is read - see ApplyModTails.
+   const char* kTurboModMarker = "# turbo-mod-range";
+
+   bool IsUnit(float v) { return v >= -0.0001f && v <= 1.0001f; }
+
+   void ApplyModTails(Data& data, const std::vector<std::vector<float>>& tails,
+                      const std::vector<std::vector<std::string>>& tailText, bool turboMarker)
+   {
+      bool upstream = false;
+      if (!turboMarker)
+      {
+         for (size_t i = 0; i < tails.size(); i++)
+         {
+            const size_t n = tails[i].size();
+            if (n == 2 || n == 3 || n >= 5)
+               upstream = true; // only upstream writes these lengths
+            else if (n == 4)
+            {
+               // Turbo: four values in 0..1. Upstream: lo hi enabled curve,
+               // enabled written as a bare 0 or 1.
+               const std::vector<float>& t = tails[i];
+               const bool unitRange = IsUnit(t[0]) && IsUnit(t[1]) && IsUnit(t[2]) && IsUnit(t[3]);
+               const bool flag = tailText[i][2] == "0" || tailText[i][2] == "1";
+               if (!unitRange && flag)
+                  upstream = true;
+            }
+         }
+      }
+      for (size_t i = 0; i < tails.size() && i < data.modulation.size(); i++)
+      {
+         ModRecord& m = data.modulation[i];
+         const std::vector<float>& t = tails[i];
+         if (upstream)
+         {
+            if (t.size() >= 2)
+            {
+               m.lo = t[0];
+               m.hi = t[1];
+               m.hasRange = true;
+            }
+            if (t.size() >= 3)
+               m.enabled = t[2] != 0.0f;
+            if (t.size() >= 4)
+               m.curve = t[3];
+            if (t.size() >= 5)
+               m.smoothMs = std::max(0.0f, t[4]);
+         }
+         else if (t.size() >= 4)
+         {
+            m.inMin = t[0]; m.inMax = t[1]; m.outMin = t[2]; m.outMax = t[3];
+         }
+      }
+   }
+
    std::string EscapeLine(const std::string& value)
    {
       std::string clean;
@@ -341,6 +419,7 @@ void LoadParams(INode* node, const std::vector<std::pair<std::string, std::strin
 static bool WriteStream(std::ostream& file, const Data& data, std::string& outError, const std::string& path)
 {
    file << kMagic << " " << kVersion << "\n";
+   file << kTurboModMarker << "\n"; // Turbo 0.60: how to read `mod` tails, see ApplyModTails
    for (const NodeRecord& node : data.nodes)
    {
       const float px = (std::isfinite(node.x) && std::abs(node.x) <= 1e6f && node.x > -2e9f) ? node.x : 0.0f;
@@ -616,11 +695,18 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
 
    NodeRecord current;
    bool inNode = false;
+   int lineNo = 1;
+   bool turboModMarker = false;
+   std::vector<std::vector<float>> modTails; // parallel to outData.modulation
+   std::vector<std::vector<std::string>> modTailText;
 
    while (std::getline(file, line))
    {
+      lineNo++;
       if (!line.empty() && line.back() == '\r')
          line.pop_back();
+      if (line.compare(0, 17, kTurboModMarker) == 0)
+         turboModMarker = true;
       // Leading whitespace is cosmetic in the file, so strip it before parsing.
       size_t start = line.find_first_not_of(" \t");
       if (start == std::string::npos)
@@ -634,6 +720,7 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
       if (tag == "node")
       {
          current = NodeRecord();
+         current.line = lineNo;
          current.hasPos = false; // set again by a `pos` line
          in >> current.index >> current.category;
          std::getline(in, current.typeName);
@@ -650,6 +737,12 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
       else if (tag == "uid" && inNode)
       {
          in >> current.uid;
+      }
+      else if (tag == "id" && inNode)
+      {
+         in >> current.id;
+         current.idLine = lineNo;
+         outData.hasNamedRefs = true;
       }
       else if (tag == "pos" && inNode)
       {
@@ -676,6 +769,7 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          current.showMiniViewport = miniViewport != 0;
          current.showAdvancedParams = advanced != 0;
          current.showPreview = preview != 0;
+         current.hasFlags = true;
          int tag = 0;
          if (in >> tag)
             current.colorTag = tag;
@@ -688,13 +782,24 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          std::getline(in, value);
          if (!value.empty() && value[0] == ' ')
             value.erase(0, 1);
+         if (tag == "i")
+         {
+            // Upstream: a hand-written patch may give a dropdown its option name.
+            char* end = nullptr;
+            std::strtod(value.c_str(), &end);
+            if (!value.empty() && (end == value.c_str() || *end != '\0'))
+               outData.hasKeyRefs = true;
+         }
          current.params.push_back({ tag + " " + name, value });
+         current.paramLines.push_back(lineNo);
       }
       else if (tag == "cable" || tag == "geo")
       {
          CableRecord c;
-         in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
-         if (!(in >> c.srcOutput) || c.srcOutput < 0)
+         c.line = lineNo;
+         ReadRef(in, c.dstIndex, c.dstRef, outData.hasNamedRefs) && ReadRef(in, c.dstSlot, c.slotRef, outData.hasNamedRefs) &&
+            ReadRef(in, c.srcIndex, c.srcRef, outData.hasNamedRefs);
+         if (!ReadRef(in, c.srcOutput, c.outRef, outData.hasNamedRefs) || c.srcOutput < 0)
             c.srcOutput = 0;
          if (tag == "cable")
             outData.cables.push_back(c);
@@ -704,10 +809,12 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
       else if (tag == "aud" || tag == "note")
       {
          CableRecord c;
-         in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
+         c.line = lineNo;
+         ReadRef(in, c.dstIndex, c.dstRef, outData.hasNamedRefs) && ReadRef(in, c.dstSlot, c.slotRef, outData.hasNamedRefs) &&
+            ReadRef(in, c.srcIndex, c.srcRef, outData.hasNamedRefs);
          if (tag == "aud")
          {
-            if (!(in >> c.srcOutput) || c.srcOutput < 0)
+            if (!ReadRef(in, c.srcOutput, c.outRef, outData.hasNamedRefs) || c.srcOutput < 0)
                c.srcOutput = 0;
             outData.audio.push_back(c);
          }
@@ -716,7 +823,7 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
             // srcOutput is a later addition (Note Router); missing on older
             // patches, where >>'s failed-extraction behaviour leaves it 0 -
             // every note source but Router only ever has output 0 anyway.
-            in >> c.srcOutput;
+            ReadRef(in, c.srcOutput, c.outRef, outData.hasNamedRefs);
             outData.notes.push_back(c);
          }
       }
@@ -729,24 +836,39 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          m.polarity = 0;
          m.depth = 1.0f;
          m.centre = 0.0f;
-         in >> m.dstIndex >> m.dstParam >> m.srcIndex >> m.srcOutput >> m.polarity >> m.depth >> m.centre;
-         float a = 0.0f, b = 1.0f, cc = 0.0f, d = 1.0f;
-         if (in >> a >> b >> cc >> d)
+         m.line = lineNo;
+         if (ReadRef(in, m.dstIndex, m.dstRef, outData.hasNamedRefs) &&
+             ReadRef(in, m.dstParam, m.dstKey, outData.hasKeyRefs) &&
+             ReadRef(in, m.srcIndex, m.srcRef, outData.hasNamedRefs) &&
+             ReadRef(in, m.srcOutput, m.outRef, outData.hasNamedRefs))
+            in >> m.polarity >> m.depth >> m.centre;
+         // The rest is read once the format is known (ApplyModTails).
+         std::vector<float> tail;
+         std::vector<std::string> tailText;
+         std::string tok;
+         while (in >> tok)
          {
-            m.inMin = a; m.inMax = b; m.outMin = cc; m.outMax = d;
+            tailText.push_back(tok);
+            tail.push_back((float)std::atof(tok.c_str()));
          }
+         modTails.push_back(tail);
+         modTailText.push_back(tailText);
          outData.modulation.push_back(m);
       }
       else if (tag == "pal")
       {
          PaletteRecord p;
-         in >> p.dstIndex >> p.dstColor >> p.srcIndex >> p.srcSwatch;
+         if (ReadRef(in, p.dstIndex, p.dstRef, outData.hasNamedRefs) && (in >> p.dstColor) &&
+             ReadRef(in, p.srcIndex, p.srcRef, outData.hasNamedRefs))
+            in >> p.srcSwatch;
          outData.palette.push_back(p);
       }
       else if (tag == "expr")
       {
          ExprRecord e;
-         in >> e.dstIndex >> e.dstParam;
+         e.line = lineNo;
+         if (ReadRef(in, e.dstIndex, e.dstRef, outData.hasNamedRefs))
+            ReadRef(in, e.dstParam, e.dstKey, outData.hasKeyRefs);
          std::string raw;
          std::getline(in, raw);
          if (!raw.empty() && raw[0] == ' ')
@@ -754,6 +876,8 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          e.text = UnescapeLine(raw);
          outData.expressions.push_back(e);
       }
+      else if (tag == "rev")
+         in >> outData.revision; // upstream: what a missing key means (see Data::revision)
       else if (tag == "midismooth")
       {
          int dst = 0, param = 0;
@@ -1243,6 +1367,8 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
       }
       // Anything else is from a newer version and is deliberately ignored.
    }
+
+   ApplyModTails(outData, modTails, modTailText, turboModMarker);
 
    for (StreamRecord& st : outData.streams)
       std::stable_sort(st.clips.begin(), st.clips.end(),

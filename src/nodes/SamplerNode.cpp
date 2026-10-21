@@ -176,6 +176,7 @@ public:
    // buffer; the previously active one (if any) is retired through
    // mSampleSlot rather than freed here.
    void PushBuffer(Platform::SampleBuffer* buf) { mSampleSlot.Push(buf); }
+   void SetRateFix(bool on) { mRateFix.store(on, std::memory_order_relaxed); }
 
    // Main thread only, called once per frame from CookIfNeeded.
    void DrainRetired() { mSampleSlot.DrainRetired(); }
@@ -305,6 +306,13 @@ public:
          return;
       }
 
+      // Source frames per output frame at speed 1: the buffer's own rate over
+      // the device rate, so a 44.1 kHz file plays at its pitch on a 48 kHz
+      // device. 1 for patches saved before the fix (rateFix 0).
+      const float srRatio = (mRateFix.load(std::memory_order_relaxed) && mActiveBuffer->sampleRate > 0.0 && mSampleRate > 0.0)
+                                ? (float)(mActiveBuffer->sampleRate / mSampleRate)
+                                : 1.0f;
+
       // Turbo 0.48 (upstream port): note voices decay to silence over `decay` seconds.
       // 0 keeps the old held envelope (fixed 2 ms attack, full sustain, 15 ms release).
       const float decaySec = mDecay.load(std::memory_order_relaxed);
@@ -428,7 +436,7 @@ public:
             if (!pingpong)
                mVoiceDir[v] = reverseOn ? -1 : 1;
 
-            const float rate = NoteToRate(mVoices.NoteAt(v), pitchSemis + mVoiceBend[v]) * std::fabs(speed);
+            const float rate = NoteToRate(mVoices.NoteAt(v), pitchSemis + mVoiceBend[v]) * std::fabs(speed) * srRatio;
             const float env = mVoices.EnvelopeAt(v).Process();
             // Turbo 0.48: decay > 0 (sustain 0) has faded the voice out, free it
             // without waiting for a note-off.
@@ -454,7 +462,7 @@ public:
             if (!pingpong)
                mSelfDir = reverseOn ? -1 : 1;
 
-            const float rate = NoteToRate(kReferenceNote, pitchSemis) * std::fabs(speed);
+            const float rate = NoteToRate(kReferenceNote, pitchSemis) * std::fabs(speed) * srRatio;
             const float env = mSelfEnv.Process();
             const float s = ReadSample(*mActiveBuffer, mSelfPos) *
                             FadeGain(mSelfPos, startPos, endPos, (float)mSelfDir * speedSign, fadeInMs, fadeOutMs,
@@ -675,6 +683,7 @@ private:
    std::atomic<float> mStart { 0.0f };
    std::atomic<float> mEnd { 1.0f };
    std::atomic<bool> mLoop { false };
+   std::atomic<bool> mRateFix { true };
    std::atomic<bool> mReverse { false };
    std::atomic<bool> mPingpong { false };
 
@@ -697,6 +706,7 @@ void SamplerNode::CookIfNeeded(int frameId)
    // (with end >= start + 0.001) and scrubs only when the raw value changes.
    mAudioNode->PushParams(pitch, finetune, speed, volume, start, end, position, decay, fadeIn,
                           fadeOut, loop, reverse, pingpong);
+   mAudioNode->SetRateFix(rateFix != 0);
    mAudioNode->DrainRetired();
 
    float playhead = 0.0f;
@@ -720,6 +730,7 @@ void SamplerNode::VisitParams(ParamVisitor& v)
    v.Float("fadeIn", fadeIn);   // the old loop "xfade" key is ignored on load
    v.Float("fadeOut", fadeOut);
    v.Bool("loop", loop);
+   v.Int("rateFix", rateFix); // not a control: 0 = plays the file at the device rate (saved before the fix)
    v.Bool("reverse", reverse);
    v.Bool("pingpong", pingpong);
    v.Float("position", position); // Turbo 0.48: appended, save-compat

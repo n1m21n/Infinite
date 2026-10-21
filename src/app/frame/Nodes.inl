@@ -67,7 +67,7 @@
          {
             constexpr int kCullRefresh = 30;
             constexpr float kCullMargin = 64.0f;
-            const bool mustDraw = gn.hasModulatedParams || gn.hasPaletteColors ||
+            const bool mustDraw = NodeIsParamDriven(gn) || gn.hasPaletteColors ||
                                   cullExemptNodes.count(gn.index) > 0 ||
                                   ImGui::GetCurrentContext()->OpenPopupStack.Size > 0 ||
                                   dynamic_cast<KeyboardNode*>(gn.node.get()) != nullptr ||
@@ -478,7 +478,25 @@
 
          // BeginNodeParams(gn.index) already ran above, ahead of the preview/
          // body dispatch - see the comment at that call site.
-         if (!isAudioBody && gn.showParams)
+         //
+         // Turbo 0.60 (upstream fix): a parameter only exists in the frames its
+         // control registers, so collapsing a node froze every modulator,
+         // expression, MIDI mapping and gesture driving it. A collapsed node
+         // that something drives still runs the params dispatch with the UI
+         // suppressed: gParamRegisterOnly makes the Mod* widgets register and
+         // skip their pin (CollapsedBindingPins gives the cables their landing),
+         // SkipItems makes every plain ImGui widget a no-op so the node keeps its
+         // size, and an empty clip rect swallows any raw draw-list work.
+         const bool registerOnlyParams = !isAudioBody && !gn.showParams && NodeIsParamDriven(gn);
+         ImGuiWindow* paramsWindow = ImGui::GetCurrentWindow();
+         const bool savedSkipItems = paramsWindow->SkipItems;
+         if (registerOnlyParams)
+         {
+            gParamRegisterOnly = true;
+            paramsWindow->SkipItems = true;
+            ImGui::GetWindowDrawList()->PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(0.0f, 0.0f), false);
+         }
+         if (!isAudioBody && (gn.showParams || registerOnlyParams))
          {
             if (auto* n = dynamic_cast<ImageSourceNode*>(gn.node.get()))
                DrawImageSourceParams(n);
@@ -880,6 +898,12 @@
             }
             else if (auto* n = dynamic_cast<SyphonOutNode*>(gn.node.get()))
                DrawSyphonOutParams(n);
+         }
+         if (registerOnlyParams)
+         {
+            ImGui::GetWindowDrawList()->PopClipRect();
+            paramsWindow->SkipItems = savedSkipItems;
+            gParamRegisterOnly = false;
          }
 
          ImGui::EndGroup();

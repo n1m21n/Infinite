@@ -38,6 +38,9 @@ def load_json(d, name):
 
 def node_diffs(a, b, img_tol, mod_tol):
     out = []
+    for k in ("links", "mods"):
+        if k in a and k in b and a[k] != b[k]:
+            out.append("%s %s -> %s" % (k, a[k], b[k]))
     if [n["type"] for n in a["nodes"]] != [n["type"] for n in b["nodes"]]:
         ta = collections.Counter(n["type"] for n in a["nodes"])
         tb = collections.Counter(n["type"] for n in b["nodes"])

@@ -62,6 +62,7 @@
          }
       }
 
+      PollPendingNamed(); // Turbo 0.60: before the clear - last frame's controls are still registered
       Modulation::Instance().ClearFrameParams();
       gCurrentNodeIndex = -1;
       PaletteBinding::Instance().ClearFrameColors();

@@ -59,6 +59,7 @@
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
+#include "core/PatchSchema.h" // Turbo 0.60: upstream named-ref patches
 #include "core/NodeViewport.h"
 #include "core/AudioCable.h"
 #include "core/NoteCable.h"
@@ -280,6 +281,7 @@ namespace
    #include "app/ui/Mapping.inl" // colour tags, MIDI mapping and modulation range editors
    #include "app/ui/Help.inl" // node help texts and the help window
    #include "app/graph/AudioGraph.inl" // audio topology, engine start, scene settings, device recovery
+   #include "app/graph/PatchNames.inl" // Turbo 0.60: upstream patches with names, keys, lo/hi
    #include "app/graph/PatchIO.inl" // patch save / load / autosave / recovery, undo
    #include "app/graph/Rpc.inl" // MCP remote control (RPC) helpers
    #include "app/ui/AppWindows.inl" // minimap, save prompts, window title, projector windows

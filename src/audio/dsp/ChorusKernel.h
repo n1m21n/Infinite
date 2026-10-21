@@ -34,6 +34,7 @@ public:
    {
       mSampleRate = sampleRate;
       mMailbox.PrepareToPlay(sampleRate);
+      mDelaySlew.SetTimeConstant(0.05f, sampleRate);
       const int maxSamples = (int)std::ceil(kMaxDelayMs * 0.001 * sampleRate) + 8;
       mLineL.Prepare(maxSamples);
       mLineR.Prepare(maxSamples);
@@ -52,6 +53,7 @@ public:
       mLineL.Reset();
       mLineR.Reset();
       mPhase = 0.0;
+      mDelaySlewInit = false;
       mDriftLfo.Reset();
       for (int i = 0; i < 2; i++)
       {
@@ -75,6 +77,9 @@ private:
    std::atomic<int> mRateDiv { MusicTime::kQuarter };
    std::atomic<int> mAnalog { 0 };
 
+   // A jump in the delay time would sweep the line at many samples per sample, a pitch whoop; this slews it.
+   DspMath::OnePole mDelaySlew;
+   bool mDelaySlewInit = false;
    DelayLine mLineL, mLineR;
    double mPhase = 0.0;
 

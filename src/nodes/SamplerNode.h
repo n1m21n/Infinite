@@ -154,6 +154,8 @@ public:
    float position = 0.0f;
    float decay = 0.0f;
    bool loop = false;
+   int rateFix = 1; // not a control: 0 = plays the file at the device rate, not its own (saved before the fix)
+   void BeforeLoadParams() override { rateFix = 0; }
    bool reverse = false;  // plays start<-end instead of start->end
    bool pingpong = false; // with loop on, bounces direction at each edge instead of wrapping
 

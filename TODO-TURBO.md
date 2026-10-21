@@ -36,13 +36,14 @@ CHANGELOG-TURBO.md when it ships.
   console launcher for cmd exit codes.
 - Upstream gesture learning: Moves and Predictive Modulator need upstream's MovementLog (binding
   callbacks and per-param tapers in Modulation, the CookFrame hooks) and its IPredictor Drift.
-- Upstream patch format with names (93 of 493 upstream patches): node `id` words, `mod hub0
-  scaleX ...`, `geo hub0 0 hubsrc0`, slot / output words. Turbo reads only numbers, so those patches
-  open without their cables and modulation. Needs upstream's PatchSchema (Resolve / ResolveKeys)
-  and the control-to-key join; then upstream's lo / hi / curve / smooth on `mod` lines.
-- Upstream interop, keys Turbo does not read yet (from the compat report): Mixer 12 channels + solo
-  (keep the 8-channel slider ordinals for Turbo patches), Looper take / thru, Drift's new modes,
-  Output offline render settings, MIDI File speed / position, Pitch Shifter spectral.
+- Save bindings by control key (`mod 5 cutoff ...`, which upstream reads too) instead of the slider
+  ordinal, so a body that reorders its controls no longer moves saved modulation. Upstream's own
+  bodies were reordered (Delay, Dynamics, ...): its numeric `mod` lines on those land on other knobs.
+- Upstream `mod` curve and smoothing (read, not applied yet); dropdowns given an option name.
+- Upstream interop, keys Turbo does not read yet (from the compat report): Looper take / thru
+  (Turbo's Looper is its own rewrite), Drift's new modes (with the gesture-learning item), Output
+  offline render settings (headless), MIDI File speed / position, Audio File pitch, Note Capturer
+  scale, Random Note step timing (NoteNodes.cpp differs a lot on both sides).
 - Bug: tests/headless/topology/g8_geo_cycle.inf crashes (access violation) in 0.59.1 and 0.60.
 - Rest of the audio engine from upstream (multi-output nodes, Splitter crossover, worker pool,
   ParamMailbox frame stamps) - Turbo's AudioEngine is kept for now.

@@ -133,6 +133,8 @@ public:
 
    void PushStep(int lane, int step, float vel) { mStepVel[lane][step].store(vel, std::memory_order_relaxed); }
 
+   void SetRateFix(bool on) { mRateFix.store(on, std::memory_order_relaxed); }
+
    void PushGlobals(int rate, int numSteps, float swing, float masterVolume, bool run)
    {
       mRate.store(rate, std::memory_order_relaxed);
@@ -393,7 +395,12 @@ private:
       voice.readPos = (double)startFrac * buf->numFrames;
       voice.endFrame = (double)endFrac * buf->numFrames;
       const float accentSemis = velocity >= 0.99f ? mLaneAccentPitch[lane].load(std::memory_order_relaxed) : 0.0f;
-      voice.rate = NoteRateForPitch(lanePitchNow[lane] + accentSemis);
+      // Scaled by the sample's own rate over the device rate, so a 44.1 kHz
+      // hit plays at its pitch on a 48 kHz device (1 when rateFix is 0).
+      const double srRatio = (mRateFix.load(std::memory_order_relaxed) && buf->sampleRate > 0.0 && mSampleRate > 0.0)
+                                ? buf->sampleRate / mSampleRate
+                                : 1.0;
+      voice.rate = NoteRateForPitch(lanePitchNow[lane] + accentSemis) * (float)srRatio;
       const float accentGain = velocity >= 0.99f ? 1.0f + mLaneAccentGain[lane].load(std::memory_order_relaxed) : 1.0f;
       voice.velocity = velocity * laneVolNow[lane] * accentGain;
       DspMath::EqualPowerPan(lanePanNow[lane], voice.panL, voice.panR);
@@ -448,6 +455,7 @@ private:
    std::atomic<float> mSwing { 0.0f };
    std::atomic<float> mMasterVolume { 0.8f };
    std::atomic<bool> mRun { true };
+   std::atomic<bool> mRateFix { true };
 
    friend class ::DrumSequencerNode;
 };
@@ -527,6 +535,7 @@ void DrumSequencerNode::PushDirtyParams()
    // two cooks, so a coefficient already pushed this session might have
    // been computed against the pre-PrepareToPlay default rate. Force one
    // corrective re-push, for every lane, the cook after that happens.
+   mAudioNode->SetRateFix(rateFix != 0);
    const double currentSr = mAudioNode->mSampleRate;
    const bool srChanged = currentSr != mLastCoeffSampleRate;
    mLastCoeffSampleRate = currentSr;
@@ -707,6 +716,7 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
       }
    }
    v.Int("rate", rate);
+   v.Int("rateFix", rateFix); // not a control: 0 = plays samples at the device rate (saved before the fix)
    v.Int("steps", numSteps);
    v.Float("swing", swing);
    v.Float("volume", volume);

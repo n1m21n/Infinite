@@ -1578,6 +1578,23 @@
 
       DrawAnalogToggle(n, "analog##dynAnalog");
 
+      // Turbo 0.60 (upstream): the compressor's style (clean / bus / opto /
+      // FET) and a detector-only 90 Hz high-pass, so bass stops pumping.
+      {
+         const int style = std::clamp((int)(n->Param("style") + 0.5f), 0, DynamicsDsp::kNumStyles - 1);
+         DropdownButton("style##dynStyle", DynamicsDsp::StyleList(), style, [n](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr("style") = (float)i;
+         });
+         ImGui::SameLine();
+         bool scHpf = n->Param("scHpf") != 0.0f;
+         if (ModCheckbox("sc hpf##dynScHpf", &scHpf))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("scHpf") = scHpf ? 1.0f : 0.0f;
+         }
+      }
+
       EndAudioBody();
    }
 
@@ -1796,6 +1813,19 @@
       }
 
       DrawAnalogToggle(n, "analog##delayAnalog");
+
+      // Turbo 0.60 (upstream): the tape character, live with analog on.
+      // After every older control, so saved modulation ordinals keep their target.
+      {
+         ImGui::BeginDisabled(n->Param("analog") == 0.0f && !gParamRegisterOnly);
+         AudioKnobRow row(4);
+         row.Knob("wow", n->ParamPtr("wow"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("flutter", n->ParamPtr("flutter"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("saturation", n->ParamPtr("saturation"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("diffusion", n->ParamPtr("diffusion"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+         ImGui::EndDisabled();
+      }
 
       EndAudioBody();
    }
@@ -2288,6 +2318,15 @@
       row.End();
 
       DrawAnalogToggle(n, "analog##psAnalog");
+      // Turbo 0.60 (upstream): phase-vocoder mode - keeps chords and mixes
+      // intact, at ~85 ms of latency (compensated). Grain only shapes the default mode.
+      ImGui::SameLine();
+      bool spectral = n->Param("spectral") != 0.0f;
+      if (ModCheckbox("spectral##pitchShiftSpectral", &spectral))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("spectral") = spectral ? 1.0f : 0.0f;
+      }
 
       EndAudioBody();
    }
@@ -2763,6 +2802,14 @@
       row.End();
 
       DrawAnalogToggle(n, "analog##bitcrushAnalog");
+      // Turbo 0.60 (upstream): dither before the bit reduction (softer, noisier steps).
+      ImGui::SameLine();
+      bool dither = n->Param("dither") != 0.0f;
+      if (ModCheckbox("dither##bitcrushDither", &dither))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("dither") = dither ? 1.0f : 0.0f;
+      }
 
       EndAudioBody();
    }

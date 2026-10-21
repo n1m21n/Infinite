@@ -67,8 +67,14 @@ private:
       void Init();
    };
 
-   void Analyse(Side& side, const float* fifo, Spectrum& sp);
+   // Windowed forward FFT of `fifo` into sp.re/sp.im.
+   void Transform(const float* fifo, Spectrum& sp);
+   // Magnitude / phase / instantaneous frequency / cumulative energy of
+   // sp.re/sp.im, tracking phase in `side`.
+   void AnalyseBins(Side& side, Spectrum& sp);
    void ProcessFrame(ChannelState& st);
+   // One channel's output from the mid's decided frame (see mMid).
+   void ApplyToChannel(const Spectrum& chA, const Spectrum& chB);
 
    double mSampleRate = 44100.0;
    PortableFft::RealFft mFft;
@@ -78,6 +84,16 @@ private:
    // Per output bin: transported energy, summed instantaneous frequency (bins)
    // weighted by energy, and the source bins that fed it.
    std::vector<float> mHist, mInstNum, mSrcA, mSrcB, mOutMag, mOutInst;
+
+   // Stereo link. The transport and the synthesis phases are decided once a
+   // frame on the mid (the average of the channels' spectra, with its own
+   // phase state in mMid); each channel then gets the mid's output scaled by
+   // its own level and offset by its own phase relative to the mid at the
+   // bins that fed it - so the stereo image passes through. Deciding per
+   // channel let each side's synthesis phases random-walk apart (DSPTEST:
+   // L/R correlation 0.89 in, -0.01 out - it cancelled in mono).
+   ChannelState mMid;
+   Spectrum mChA[kMaxChannels], mChB[kMaxChannels];
 
    std::atomic<float> mSlide { 0.5f };
 

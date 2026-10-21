@@ -3,17 +3,13 @@
 #include <cstdio>
 
 #include "dsp/AudioFilterKernel.h"
-#include "dsp/CycleShaperKernel.h"
-#include "dsp/ResonatorBankKernel.h"
-#include "dsp/SpecBlurKernel.h"
-#include "dsp/KeySnapKernel.h"
-#include "dsp/SpectrumSlideKernel.h"
 #include "dsp/EqKernel.h"
 #include "dsp/DynamicsKernel.h"
 #include "dsp/LimiterKernel.h"
 #include "dsp/DelayKernel.h"
 #include "dsp/ReverbKernel.h"
 #include "dsp/DriveKernel.h"
+#include "dsp/SaturatorKernel.h"
 #include "dsp/StereoKernel.h"
 #include "dsp/PitchShiftKernel.h"
 #include "dsp/ChorusKernel.h"
@@ -27,10 +23,14 @@
 #include "dsp/TremoloKernel.h"
 #include "dsp/FormantFilterKernel.h"
 #include "dsp/WavetableShaperKernel.h"
-#include "MusicTime.h"
-#include "dsp/SaturatorKernel.h"
-#include "dsp/ShapeResonatorKernel.h"
+#include "dsp/ResonatorBankKernel.h"
+#include "dsp/CycleShaperKernel.h"
+#include "dsp/SpecBlurKernel.h"
+#include "dsp/KeySnapKernel.h"
+#include "dsp/SpectrumSlideKernel.h"
 #include "dsp/ConvolutionKernel.h"
+#include "dsp/ShapeResonatorKernel.h"
+#include "MusicTime.h"
 
 namespace
 {
@@ -90,6 +90,7 @@ namespace
       {
          EffectDef def;
          def.name = "EQ";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kEqCurve;
@@ -156,13 +157,25 @@ namespace
                                     { { bandGain, 12.0f }, { bandFreq, 1000.0f } } });
          }
 
-         def.params.push_back({ "outputGainDb", -24.0f, 12.0f, 0.0f });
+         // Kept declared (name-keyed save/load, so an old patch's stored
+         // value still round-trips harmlessly) but marked uiOnly: the
+         // "output" section (this knob + the universal `mix` field) was
+         // removed from DrawEqBody per user request, and EqKernel::
+         // ProcessBlock now hardcodes 0 dB output gain regardless of this
+         // value - see EffectDef::forceFullyWet below for the matching mix
+         // story. No audio-thread effect by design, same as selectedBand.
+         def.params.push_back({ "outputGainDb", -24.0f, 12.0f, 0.0f, true });
          // UI-only: which band the Tier 1 knob row currently follows. No
          // audio-thread effect by design - the sweep reports it pass-with-a-
          // note rather than FAIL (EffectParamDef::uiOnly's whole purpose).
          def.params.push_back({ "selectedBand", 0.0f, 4.0f, 0.0f, true });
 
          def.makeKernel = []() { return std::make_unique<EqKernel>(); };
+         // No mix knob on the body either (removed with the output
+         // section) - always run fully wet so a saved patch's stored `mix`
+         // can't silently blend in dry signal with no control to see or fix
+         // it. See EffectDef::forceFullyWet's comment.
+         def.forceFullyWet = true;
          defs.push_back(std::move(def));
       }
 
@@ -178,17 +191,24 @@ namespace
       {
          EffectDef def;
          def.name = "Dynamics";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kDynamicsTransfer;
          def.hasSidechain = true;
 
-         def.params.push_back({ "threshold", -60.0f, 0.0f, -18.0f });
-         def.params.push_back({ "ratio", 1.0f, 20.0f, 4.0f });
-         def.params.push_back({ "attack", 0.05f, 200.0f, 10.0f });
-         def.params.push_back({ "release", 5.0f, 2000.0f, 100.0f });
+         // Threshold opens at 0 dB so inserting a compressor leaves loudness
+         // alone (v0.6 1.9: -18 dB took 2.7 dB off pink noise at -18 dBFS);
+         // pulling it down is the first move. Saved patches keep their own
+         // threshold. The sweep's probe (~-8 dBFS) never crosses 0 dB, so
+         // the detector-side params are tested with the threshold pulled down.
+         static const std::vector<EffectParamPrereq> kBelowProbe = { { "threshold", -30.0f } };
+         def.params.push_back({ "threshold", -60.0f, 0.0f, 0.0f, false, {}, { -20.0f, -30.0f, -10.0f, -15.0f } });
+         def.params.push_back({ "ratio", 1.0f, 20.0f, 4.0f, false, kBelowProbe });
+         def.params.push_back({ "attack", 0.05f, 200.0f, 10.0f, false, kBelowProbe });
+         def.params.push_back({ "release", 5.0f, 2000.0f, 100.0f, false, kBelowProbe });
          def.params.push_back({ "makeup", -12.0f, 24.0f, 0.0f });
-         def.params.push_back({ "detectorRms", 0.0f, 1.0f, 0.0f }); // 0 = peak, 1 = RMS
+         def.params.push_back({ "detectorRms", 0.0f, 1.0f, 0.0f, false, kBelowProbe }); // 0 = peak, 1 = RMS
          // Sidechain HP/audition are gone with the rest of Tier 2 - external
          // sidechain now just feeds the detector raw, unfiltered. That
          // simplicity is exactly why `sidechainExternal` is a confirmed (by
@@ -202,11 +222,16 @@ namespace
          // this file's minimalism pass. `ProcessBlock`'s
          // `useSidechain ? sidechain : in` ternary is the entire
          // implementation; correct by inspection.
-         def.params.push_back({ "sidechainExternal", 0.0f, 1.0f, 0.0f });
+         def.params.push_back({ "sidechainExternal", 0.0f, 1.0f, 0.0f, false, kBelowProbe });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, kBelowProbe });
+         // Appended (saved patches' param order). Detector-only 90 Hz high-pass,
+         // off by default so existing patches compress exactly as before.
+         def.params.push_back({ "scHpf", 0.0f, 1.0f, 0.0f, false, kBelowProbe });
+         // v0.6 2.21: clean / bus / opto / FET (DynamicsDsp::Style). `analog`
+         // is now the warm switch that colours any of them.
+         def.params.push_back({ "style", 0.0f, (float)(DynamicsDsp::kNumStyles - 1), 0.0f, false, kBelowProbe });
          // mix is AudioEffectNode's universal field, not a second param here.
 
-         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
-         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<DynamicsKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -220,6 +245,7 @@ namespace
       {
          EffectDef def;
          def.name = "Limiter";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kLimiterMeter;
@@ -300,22 +326,34 @@ namespace
          def.params.push_back({ "tone", -1.0f, 1.0f, 0.0f, false, kShortPathPrereq });
          def.params.push_back({ "pan", -1.0f, 1.0f, 0.0f, false, kShortPathPrereq });
          def.params.push_back({ "ducking", 0.0f, 1.0f, 0.0f, false, kShortPathPrereq });
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, kShortPathPrereq });
+         // Tape mode (2.20): only heard with `analog` on, so they gate on it
+         // as well as on the short free-ms path.
+         static const std::vector<EffectParamPrereq> kTapePrereq = { { "sync", 0.0f }, { "analog", 1.0f } };
+         def.params.push_back({ "wow", 0.0f, 1.0f, 0.5f, false, kTapePrereq });
+         def.params.push_back({ "flutter", 0.0f, 1.0f, 0.2f, false, kTapePrereq });
+         def.params.push_back({ "saturation", 0.0f, 1.0f, 0.0f, false, kTapePrereq });
+         def.params.push_back({ "diffusion", 0.0f, 1.0f, 0.0f, false, kTapePrereq });
          // mix is AudioEffectNode's universal field (defaultMix above), not
          // a table row.
 
-         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
-         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, kShortPathPrereq });
          def.makeKernel = []() { return std::make_unique<DelayKernel>(); };
          defs.push_back(std::move(def));
       }
 
       // ---------------------------------------------------------------- Reverb
       // Algorithmic only - the design doc's `engine` dropdown (algorithmic /
-      // convolution) and its whole Tier 2 table (diffusion, mod, early/late
-      // balance, tone shaping, freeze, and convolution's own IR-file
-      // sub-panel) are cut per .claude/skills/new-audio-node/SKILL.md's
-      // minimalism rule - see ReverbKernel.h's class comment. Tier 1: size,
-      // decay, damping, predelay, width - 5 params + the universal mix.
+      // convolution) and convolution's own IR-file sub-panel are still cut.
+      // The rest of the old Tier 2 table (diffusion, mod, early/late
+      // balance, tone shaping, freeze) is no longer a UI cut so much as an
+      // internal-only upgrade: as of 2026-09-18 the kernel runs real 4-stage
+      // Schroeder diffusion and always-on delay-length modulation (see
+      // ReverbKernel.h's class comment) for Valhalla Vintage Verb-grade
+      // lushness, but none of that is exposed as its own knob - the 5 Tier 1
+      // params below (+ analog, + the universal mix) still drive it all.
+      // Reverb is explicitly exempted from the KHS-simple control-count rule
+      // (.claude/skills/new-audio-node/SKILL.md) while its sound quality is
+      // being actively improved; see the audio-node-minimalism feedback memory.
       {
          EffectDef def;
          def.name = "Reverb";
@@ -327,9 +365,9 @@ namespace
          def.params.push_back({ "size", 0.0f, 1.0f, 0.5f });
          // decay/damping/predelay are confirmed (by hand) AUDIOPARAMSWEEPTEST
          // blind spots, structurally, not from a missing prerequisite: all
-         // three only change what the FDN's 8 lines *write*, and a line's
+         // three only change what the FDN's 16 lines *write*, and a line's
          // own read is always its own activeLen samples behind its write
-         // (~600-1100 samples at this param's default `size`, see
+         // (~520-1960 samples at this param's default `size`, see
          // ReverbKernel.h's class comment) - `size` passes because it moves
          // the read position directly and so is audible on the very next
          // sample, but the sweep's post-alteration measurement window (one
@@ -343,14 +381,13 @@ namespace
          // predelay landing and the damping-shortens-decay effect directly
          // and passes for all three.
          def.params.push_back({ "decay", 0.1f, 20.0f, 2.0f });
-         def.params.push_back({ "damping", 0.0f, 1.0f, 0.4f });
+         def.params.push_back({ "damping", 0.0f, 1.0f, 0.155f });
          def.params.push_back({ "predelay", 0.0f, 500.0f, 20.0f });
          // Stereo width: blends the FDN's even/odd-line L/R split back toward
          // mono. Default 1.0 reproduces the fixed 0.6 cross-mix the kernel
          // used before this param existed (see ReverbKernel.cpp), so adding
          // it doesn't change any existing patch's sound.
          def.params.push_back({ "width", 0.0f, 1.0f, 1.0f });
-         // Appended (never inserted: saved patches index params by position).
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          // mix is AudioEffectNode's universal field (defaultMix above), not
          // a table row.
@@ -368,6 +405,7 @@ namespace
       {
          EffectDef def;
          def.name = "Drive";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kDriveCurve;
@@ -393,6 +431,38 @@ namespace
          defs.push_back(std::move(def));
       }
 
+      // ------------------------------------------------------------ Saturator
+      // v0.6 2.17: three stages, a curve and an amount each, and a routing
+      // (serial / parallel / mid-side / 3-band / feedback). Drive stays the
+      // one-knob unit. See SaturatorKernel.h.
+      {
+         EffectDef def;
+         def.name = "Saturator";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kSaturatorCurves;
+
+         const float lastModel = (float)(SaturatorDsp::kNumModels - 1);
+         def.params.push_back({ "model1", 0.0f, lastModel, (float)SaturatorDsp::kTube });
+         def.params.push_back({ "amount1", 0.0f, 1.0f, 0.3f, false, { { "model1", (float)SaturatorDsp::kTube } } });
+         def.params.push_back({ "model2", 0.0f, lastModel, (float)SaturatorDsp::kOff });
+         def.params.push_back({ "amount2", 0.0f, 1.0f, 0.3f, false, { { "model2", (float)SaturatorDsp::kTube } } });
+         def.params.push_back({ "model3", 0.0f, lastModel, (float)SaturatorDsp::kOff });
+         def.params.push_back({ "amount3", 0.0f, 1.0f, 0.3f, false, { { "model3", (float)SaturatorDsp::kTube } } });
+         // With only stage 1 on (the default), serial and parallel sound
+         // the same, so the sweep tries 3-band, where stage 1 sees only the
+         // low band.
+         def.params.push_back({ "routing", 0.0f, (float)(SaturatorDsp::kNumRoutings - 1), (float)SaturatorDsp::kSerial,
+                                false, {}, { (float)SaturatorDsp::kBands } });
+         def.params.push_back({ "feedback", 0.0f, 0.95f, 0.5f, false, { { "routing", (float)SaturatorDsp::kFeedback } } });
+         def.params.push_back({ "output", -24.0f, 12.0f, 0.0f });
+         // mix is AudioEffectNode's universal field, not a table row.
+
+         def.makeKernel = []() { return std::make_unique<SaturatorKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
       // ---------------------------------------------------------------- Stereo
       // Replaces stereo/panning/mono. Cut from the design doc's `mode`
       // dropdown (stereo/mono/mid-side/swap) down to one always-on M/S
@@ -401,6 +471,7 @@ namespace
       {
          EffectDef def;
          def.name = "Stereo";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kStereoGoniometer;
@@ -420,7 +491,7 @@ namespace
       }
 
       // ---------------------------------------------------------- Pitch Shifter
-      // The two-tap crossfaded delay-line pitch shifter (see
+      // The correlation-spliced delay-line pitch shifter (see
       // PitchShiftKernel.h). `pitch`/`grain` matches the KHS Audio Pitch
       // Shifter module's big display + Grain Size knob; `jitter`/
       // `correlate` from the reference image are cut per
@@ -432,9 +503,13 @@ namespace
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kPitchShiftDisplay;
          def.params.push_back({ "pitch", -24.0f, 24.0f, 0.0f });
-         def.params.push_back({ "grain", 10.0f, 250.0f, 80.0f });
-         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         // At 0 st the shifter is a transparent 1-sample delay, so `grain` (the
+         // splice distance) only has anything to act on once there is a shift.
+         def.params.push_back({ "grain", 10.0f, 250.0f, 80.0f, false, { { "pitch", 7.0f } } });
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, { { "pitch", 7.0f } } });
+         // Appended, never inserted (saved patches' param order). Phase-vocoder
+         // mode for chords/mixes; adds 4096 samples of latency (see the kernel).
+         def.params.push_back({ "spectral", 0.0f, 1.0f, 0.0f, false, { { "pitch", 7.0f } } });
          def.makeKernel = []() { return std::make_unique<PitchShiftKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -466,7 +541,6 @@ namespace
          // window). `sync`/`rateDiv` stay confirmed (by hand) blind spots,
          // same as Delay's.
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.5f, false, { { "sync", 0.0f } } });
-         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<ChorusKernel>(); };
          defs.push_back(std::move(def));
@@ -482,6 +556,7 @@ namespace
       {
          EffectDef def;
          def.name = "Flanger";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kFlangerScatter;
@@ -493,7 +568,6 @@ namespace
          def.params.push_back(
             { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.2f, false, { { "sync", 0.0f } } });
-         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.params.push_back({ "spread", 0.0f, 1.0f, 0.5f });
          def.makeKernel = []() { return std::make_unique<FlangerKernel>(); };
@@ -505,6 +579,10 @@ namespace
       // Spread/Mix control set, plus the same sync-to-tempo rate mode
       // Chorus/Flanger/Delay/Stutter share. See PhaserKernel.h's class
       // comment.
+      // As of 2026-09-18 the kernel wraps its allpass cascade in a fixed
+      // internal feedback loop (see PhaserKernel.h's class comment) for a
+      // real resonant swoosh instead of a shallow EQ sweep - no new param,
+      // still driven entirely by the params below + analog + mix.
       {
          EffectDef def;
          def.name = "Phaser";
@@ -537,13 +615,17 @@ namespace
       {
          EffectDef def;
          def.name = "Bitcrush";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kBitcrushWave;
          def.params.push_back({ "rate", 200.0f, 44100.0f, 6000.0f });
          def.params.push_back({ "bits", 1.0f, 16.0f, 8.0f });
-         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
+         // Appended (saved patches' param order). TPDF dither, off by default:
+         // undithered crush is the classic character; dither trades its
+         // distortion for a clean noise floor (BitcrushKernel.h).
+         def.params.push_back({ "dither", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<BitcrushKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -556,6 +638,7 @@ namespace
       {
          EffectDef def;
          def.name = "Transient Shaper";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kTransientEnvelope;
@@ -617,7 +700,6 @@ namespace
          def.visualizerId = EffectVisualizerId::kRingModWave;
          def.params.push_back({ "freq", 1.0f, 5000.0f, 220.0f });
          def.params.push_back({ "waveform", 0.0f, (float)DspMath::kWaveSquare, (float)DspMath::kWaveSine });
-         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<RingModKernel>(); };
          defs.push_back(std::move(def));
@@ -638,7 +720,6 @@ namespace
          def.params.push_back({ "feedback", 0.0f, 0.95f, 0.0f });
          def.params.push_back({ "spread", 0.0f, 100.0f, 0.0f });
          def.params.push_back({ "range", 0.0f, 1.0f, 0.0f, true /* uiOnly */ });
-         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, { { "shift", 200.0f } } });
          def.makeKernel = []() { return std::make_unique<FrequencyShifterKernel>(); };
          defs.push_back(std::move(def));
@@ -657,6 +738,7 @@ namespace
       {
          EffectDef def;
          def.name = "Tremolo";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kTremoloWave;
@@ -691,6 +773,7 @@ namespace
       {
          EffectDef def;
          def.name = "Wavetable Shaper";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kWavetableShaperCurve;
@@ -710,13 +793,17 @@ namespace
          static const std::vector<EffectParamPrereq> kSmoothPrereq = { { "position", 0.5f } };
          def.params.push_back({ "smooth", 0.0f, 1.0f, 0.0f, false, kSmoothPrereq });
          def.params.push_back({ "output", -24.0f, 12.0f, 0.0f });
-         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         // Appended after the existing params, never inserted - see
+         // WavetableShaperKernel.h's class comment. At the default 0.0 both
+         // channels read the same frame, so this is a no-op for every patch
+         // saved before it existed.
          def.params.push_back({ "stereo", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<WavetableShaperKernel>(); };
          defs.push_back(std::move(def));
       }
 
-      // ---- ported from upstream Infinite (Turbo 0.40) ----
+      // -------------------------------------------------------- Resonator Bank
+      // A bank of up to 16 parallel bandpass resonators (DspMath::TptSvf).
       {
          EffectDef def;
          def.name = "Resonator Bank";
@@ -738,21 +825,26 @@ namespace
          defs.push_back(std::move(def));
       }
 
+      // ---------------------------------------------------------- Cycle Shaper
       {
          EffectDef def;
          def.name = "Cycle Shaper";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
          def.category = "AudioEffects";
          def.bodyWidth = 440.0f;
          def.visualizerId = EffectVisualizerId::kCycleShaperWave;
          def.defaultMix = 1.0f;
          def.params.push_back({ "waveform",   0.0f,   2.0f,   0.0f });
          def.params.push_back({ "threshold", -60.0f,   0.0f, -36.0f, false, {}, { 0.0f, -3.0f, -6.0f, -60.0f } });
-         def.params.push_back({ "smooth",     0.0f,  32.0f,   8.0f });
+         // `smooth` is the edge length of the square/triangle (CycleShaperKernel.h);
+         // a sine has no edges, so it is only observable on those two.
+         def.params.push_back({ "smooth",     0.0f,  32.0f,   8.0f, false, { { "waveform", 1.0f } } });
          def.params.push_back({ "analog",     0.0f,   1.0f,   0.0f });
          def.makeKernel = []() { return std::make_unique<CycleShaperKernel>(); };
          defs.push_back(std::move(def));
       }
 
+      // -------------------------------------------------------------- Spec Blur
       {
          EffectDef def;
          def.name = "Spec Blur";
@@ -769,7 +861,7 @@ namespace
          defs.push_back(std::move(def));
       }
 
-      // ---------------------------------------------- Key-Snap (Turbo 0.57, upstream)
+      // -------------------------------------------------------------- Key-Snap
       {
          EffectDef def;
          def.name = "Key-Snap";
@@ -788,7 +880,7 @@ namespace
          defs.push_back(std::move(def));
       }
 
-      // ---------------------------------------- Spectrum Slide (Turbo 0.57, upstream)
+      // -------------------------------------------------------------- Spectrum Slide
       {
          EffectDef def;
          def.name = "Spectrum Slide";
@@ -798,41 +890,14 @@ namespace
          def.defaultMix = 1.0f;
          def.hasSidechain = true;
          def.sidechainLabel = "to";
+         // The generic rig drives both inputs with the same tone, so slide
+         // has nothing to move; see audio-param-sweep-expected.txt.
          def.params.push_back({ "slide", 0.0f, 1.0f, 0.5f });
          def.makeKernel = []() { return std::make_unique<SpectrumSlideKernel>(); };
          defs.push_back(std::move(def));
       }
 
-
-      // ------------------------- Turbo 0.60 (from upstream v0.6+): Saturator, Shape Resonator, Convolution Reverb
-      {
-         EffectDef def;
-         def.name = "Saturator";
-         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
-         def.category = "AudioEffects";
-         def.bodyWidth = 440.0f;
-         def.visualizerId = EffectVisualizerId::kSaturatorCurves;
-
-         const float lastModel = (float)(SaturatorDsp::kNumModels - 1);
-         def.params.push_back({ "model1", 0.0f, lastModel, (float)SaturatorDsp::kTube });
-         def.params.push_back({ "amount1", 0.0f, 1.0f, 0.3f, false, { { "model1", (float)SaturatorDsp::kTube } } });
-         def.params.push_back({ "model2", 0.0f, lastModel, (float)SaturatorDsp::kOff });
-         def.params.push_back({ "amount2", 0.0f, 1.0f, 0.3f, false, { { "model2", (float)SaturatorDsp::kTube } } });
-         def.params.push_back({ "model3", 0.0f, lastModel, (float)SaturatorDsp::kOff });
-         def.params.push_back({ "amount3", 0.0f, 1.0f, 0.3f, false, { { "model3", (float)SaturatorDsp::kTube } } });
-         // With only stage 1 on (the default), serial and parallel sound
-         // the same, so the sweep tries 3-band, where stage 1 sees only the
-         // low band.
-         def.params.push_back({ "routing", 0.0f, (float)(SaturatorDsp::kNumRoutings - 1), (float)SaturatorDsp::kSerial,
-                                false, {}, { (float)SaturatorDsp::kBands } });
-         def.params.push_back({ "feedback", 0.0f, 0.95f, 0.5f, false, { { "routing", (float)SaturatorDsp::kFeedback } } });
-         def.params.push_back({ "output", -24.0f, 12.0f, 0.0f });
-         // mix is AudioEffectNode's universal field, not a table row.
-
-         def.makeKernel = []() { return std::make_unique<SaturatorKernel>(); };
-         defs.push_back(std::move(def));
-      }
-
+      // -------------------------------------------------------------- Shape Resonator
       {
          EffectDef def;
          def.name = "Shape Resonator";
@@ -850,6 +915,7 @@ namespace
          defs.push_back(std::move(def));
       }
 
+      // ---------------------------------------------------------- Convolution Reverb
       {
          EffectDef def;
          def.name = "Convolution Reverb";
@@ -882,11 +948,18 @@ const std::vector<EffectDef>& GetEffectDefs()
 
 namespace
 {
-   // Sweep-only prerequisite/candidate declarations for nodes that are NOT
-   // AudioEffectNode instances (Note Filter, and any future note-only node) -
-   // kept out of BuildEffectDefs() because every entry there gets registered
-   // as a spawnable AudioEffectNode (see main.cpp's GetEffectDefs() loop),
-   // which these node types must never be.
+   // Sweep-only prerequisite/candidate/uiOnly declarations for a param name
+   // that FindEffectParamDef can't find inside any EffectDef::params list -
+   // either because the node type isn't an AudioEffectNode instance at all
+   // (Note Filter, and any future note-only node - kept out of
+   // BuildEffectDefs() because every entry there gets registered as a
+   // spawnable AudioEffectNode, see main.cpp's GetEffectDefs() loop, which
+   // these node types must never be), or because the param is one of
+   // AudioEffectNode's *universal* fields (declared once on the C++ class,
+   // not per-EffectDef - e.g. `mix`, AudioEffectNode.h) for an effect that
+   // needs to override that field's normally-generic sweep behavior - EQ's
+   // `mix` below, forced fully-wet in the kernel with no body knob to drive
+   // it, same reasoning as outputGainDb's uiOnly entry in BuildEffectDefs().
    const std::vector<std::pair<std::string, EffectParamDef>>& ExtraParamDefs()
    {
       static const std::vector<std::pair<std::string, EffectParamDef>> extra = {
@@ -899,6 +972,18 @@ namespace
          // note (69) - none of them push rangeLow above it, so the note
          // never actually gets blocked and no difference is ever observed.
          { "Note Filter", { "rangeLow", 0.0f, 127.0f, 0.0f, false, {}, { 90.0f } } },
+         // EQ's "output" section (output gain + mix) was removed from the
+         // body entirely - AudioEffectNode::CookIfNeeded now always pushes
+         // 1.0 to the runtime for EQ (EffectDef::forceFullyWet) regardless
+         // of whatever value the universal `mix` field holds, so it
+         // legitimately has no audio-thread effect for EQ specifically
+         // (every other effect's `mix` still does, and stays generically
+         // testable - this entry is scoped to "EQ" only).
+         { "EQ", { "mix", 0.0f, 1.0f, 1.0f, true } },
+         // Dynamics opens at threshold 0 dB (v0.6 1.9), where wet equals dry
+         // on the sweep's probe, so `mix` only shows with the threshold
+         // pulled down - same prerequisite as its detector-side params.
+         { "Dynamics", { "mix", 0.0f, 1.0f, 1.0f, false, { { "threshold", -30.0f } } } },
       };
       return extra;
    }
@@ -913,7 +998,12 @@ const EffectParamDef* FindEffectParamDef(const std::string& nodeName, const std:
       for (const EffectParamDef& p : def.params)
          if (p.name == paramName)
             return &p;
-      return nullptr;
+      // Found the def but not this param among its declared params - fall
+      // through to ExtraParamDefs, which also covers a universal field
+      // (`mix`) that a specific EffectDef needs to override for the sweep,
+      // not just params for non-AudioEffectNode node types (see
+      // ExtraParamDefs' comment).
+      break;
    }
    for (const auto& entry : ExtraParamDefs())
       if (entry.first == nodeName && entry.second.name == paramName)

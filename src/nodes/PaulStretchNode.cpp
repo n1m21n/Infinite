@@ -238,6 +238,7 @@ public:
    std::atomic<float> mEnd { 1.0f };
    std::atomic<float> mPosition { 0.0f };
    std::atomic<bool> mLoop { true };
+   std::atomic<bool> mRateFix { true };
 
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
    {
@@ -356,7 +357,14 @@ public:
       // 5. Overlap-add hop processing loop
       const int hopSize = currentFFTSize / 4; // 75% overlap
       mHopAccumulator += (float)numFrames;
-      const float readStep = (float)hopSize / stretchFactor;
+      // Source frames per output frame: the buffer's own rate over the device
+      // rate. The window is read at this stride so its bins land at the
+      // file's pitch, not the device's. 1 for patches saved before the fix
+      // (rateFix 0), which keeps the old whole-frame read exactly.
+      const double srRatio = (mRateFix.load(std::memory_order_relaxed) && activeSample->sampleRate > 0.0 && mSampleRate > 0.0)
+                                ? activeSample->sampleRate / mSampleRate
+                                : 1.0;
+      const float readStep = (float)((double)hopSize * srRatio / stretchFactor);
 
       const float* window = mWindows[winIdx].data();
       const int numSpectrumBins = currentFFTSize / 2; // split complex size
@@ -371,9 +379,7 @@ public:
             const int intPlayPos = (int)mSamplePlayPosition;
 
             // Extract input window with boundary / loop wrapping
-            for (int i = 0; i < currentFFTSize; ++i)
-            {
-               int sampleIdx = intPlayPos + i;
+            auto wrapIdx = [&](int sampleIdx) {
                if ((double)sampleIdx >= loopEnd)
                {
                   if (loop && loopEnd > loopStart)
@@ -388,8 +394,24 @@ public:
                }
                if (sampleIdx < 0) sampleIdx = 0;
                if (sampleIdx >= sampleFrames) sampleIdx = sampleFrames - 1;
-
-               mFftInput[i] = srcChannelData[sampleIdx] * window[i];
+               return sampleIdx;
+            };
+            if (srRatio == 1.0)
+            {
+               for (int i = 0; i < currentFFTSize; ++i)
+                  mFftInput[i] = srcChannelData[wrapIdx(intPlayPos + i)] * window[i];
+            }
+            else
+            {
+               for (int i = 0; i < currentFFTSize; ++i)
+               {
+                  const double p = (double)i * srRatio;
+                  const int k = (int)p;
+                  const float frac = (float)(p - (double)k);
+                  const float a = srcChannelData[wrapIdx(intPlayPos + k)];
+                  const float b = srcChannelData[wrapIdx(intPlayPos + k + 1)];
+                  mFftInput[i] = (a + (b - a) * frac) * window[i];
+               }
             }
 
             // Real-to-complex FFT. Keep Accelerate on macOS and use JUCE's
@@ -595,6 +617,7 @@ void PaulStretchNode::CookIfNeeded(int frameId)
    position = std::clamp(position, std::min(start, end), std::max(start, end));
    mAudioNode->mPosition.store(position, std::memory_order_relaxed);
    mAudioNode->mLoop.store(loop, std::memory_order_relaxed);
+   mAudioNode->mRateFix.store(rateFix != 0, std::memory_order_relaxed);
 
    float ph = 0.0f;
    if (mAudioNode->PlayheadRing().ReadLatest(ph))
@@ -621,6 +644,7 @@ void PaulStretchNode::VisitParams(ParamVisitor& v)
    v.Float("end", end);
    v.Float("position", position);
    v.Bool("loop", loop);
+   v.Int("rateFix", rateFix); // not a control: 0 = plays the file at the device rate (saved before the fix)
 }
 
 AudioNode* PaulStretchNode::GetAudioNode()

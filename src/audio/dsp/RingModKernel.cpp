@@ -18,13 +18,21 @@ void RingModKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
    const int waveform = mWaveform.load(std::memory_order_relaxed);
    const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
 
+   const int factor = mOversampler.Factor();
+   const double innerRate = mSampleRate * factor;
+
    for (int i = 0; i < out.numFrames; i++)
    {
       const float freqHz = std::max(0.0f, mMailbox.SmoothedValue(kFreqHz));
-      mOsc.SetFrequency(freqHz, mSampleRate);
-      const float mod = mOsc.Generate(waveform);
-      mOsc.Advance();
+      mOsc.SetFrequency(freqHz, innerRate);
+      float mod[Oversampler::kMaxFactor];
+      for (int k = 0; k < factor; k++)
+      {
+         mod[k] = mOsc.Generate(waveform);
+         mOsc.Advance();
+      }
 
+      float carrierBleedScale = 0.0f;
       if (analog)
       {
          float inMax = 0.0f;
@@ -33,22 +41,24 @@ void RingModKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
          const float envCoef = inMax > mEnvFollower ? 0.05f : 0.001f;
          mEnvFollower += envCoef * (inMax - mEnvFollower);
          mEnvFollower = DspMath::FlushDenormal(mEnvFollower);
-
-         const float carrierBleed = mod * 0.008f * std::min(1.0f, mEnvFollower * 4.0f);
-         for (int ch = 0; ch < numChannels; ch++)
-         {
-            float x = in.channels[ch][i];
-            x = AnalogDsp::AsymTanh(x, 0.08f);
-            float rawMult = x * mod;
-            float ringOut = AnalogDsp::DiodeDeadZone(rawMult, 0.10f);
-            float combined = ringOut + carrierBleed;
-            out.channels[ch][i] = AnalogDsp::AsymTanh(combined, 0.05f);
-         }
+         carrierBleedScale = 0.008f * std::min(1.0f, mEnvFollower * 4.0f);
       }
-      else
+
+      for (int ch = 0; ch < numChannels; ch++)
       {
-         for (int ch = 0; ch < numChannels; ch++)
-            out.channels[ch][i] = in.channels[ch][i] * mod;
+         float os[Oversampler::kMaxFactor];
+         mOversampler.Up(ch, in.channels[ch][i], os);
+         if (analog)
+            for (int k = 0; k < factor; k++)
+            {
+               const float x = AnalogDsp::AsymTanh(os[k], 0.08f);
+               const float ringOut = AnalogDsp::DiodeDeadZone(x * mod[k], 0.10f);
+               os[k] = AnalogDsp::AsymTanh(ringOut + mod[k] * carrierBleedScale, 0.05f);
+            }
+         else
+            for (int k = 0; k < factor; k++)
+               os[k] *= mod[k];
+         out.channels[ch][i] = mOversampler.Down(ch, os);
       }
    }
 }

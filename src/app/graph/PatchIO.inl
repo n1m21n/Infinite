@@ -393,7 +393,26 @@
    // disk) and Undo/Redo (from the in-memory stacks). Callers decide what
    // happens to gPatchPath/gUndoStack/gRedoStack afterwards; a loaded file is
    // a new document boundary, an undo is not.
+   void ApplyPatchDataImpl(const Patch::Data& data, bool applySceneSettings);
+
+   // Turbo 0.60: an upstream patch with names, control keys or lo/hi ranges
+   // is resolved on a copy first; what needs drawn nodes attaches later
+   // (PatchNames.inl). Every other patch takes the path it always took.
    void ApplyPatchData(const Patch::Data& data, bool applySceneSettings = false)
+   {
+      if (!NeedsNamedPrep(data))
+      {
+         gPendingNamed = PendingNamed();
+         ApplyPatchDataImpl(data, applySceneSettings);
+         return;
+      }
+      Patch::Data local = data;
+      PrepareNamedPatch(local);
+      ApplyPatchDataImpl(local, applySceneSettings);
+      FinishNamedPatch();
+   }
+
+   void ApplyPatchDataImpl(const Patch::Data& data, bool applySceneSettings)
    {
       gSuppressUndoCheckpoints = true;
       // Loopers respawned here re-adopt their loop audio by id (Turbo).
@@ -449,7 +468,11 @@
          spawned->showAdvancedParams = rec.showAdvancedParams;
          spawned->showPreview = rec.showPreview;
          spawned->colorTag = rec.colorTag;
-         spawned->node->BeforeLoadParams(); // Turbo 0.60 (upstream): missing keys = the older behaviour
+         // Turbo 0.60 (upstream Patch::SavedBefore): a missing key on a node the GUI saved before
+         // rev 2 means the older behaviour; a hand-written node (no flags line) or a rev 2 file
+         // keeps the defaults.
+         if (data.revision < 2 && (rec.hasFlags || rec.line == 0))
+            spawned->node->BeforeLoadParams();
          Patch::LoadParams(spawned->node.get(), rec.params);
          ReloadDerivedState(spawned->node.get());
          // Phase 4 (selection as an input): rewrites a saved kDeleteSelected/
@@ -472,6 +495,7 @@
       }
       NoteGraphEditedForLiveIssues(); // Turbo 0.45
 
+      gLastApplyRemap = remap; // Turbo 0.60: for bindings that attach later (PatchNames.inl)
       auto resolve = [&](int savedIndex) -> GraphNode*
       {
          auto it = remap.find(savedIndex);

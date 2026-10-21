@@ -273,6 +273,10 @@
    // locks the slider) while something is patched in.
    int gCurrentNodeIndex = -1;
    int gParamCounter = 0;
+   // Turbo 0.60 (upstream): set while a collapsed node that something drives
+   // runs its params body only to register them (Nodes.inl) - the widgets
+   // register their ParamRef and skip their pin.
+   bool gParamRegisterOnly = false;
    // Buttons, checkboxes and dropdowns live in a separate, label-derived
    // parameter range. Numeric parameter ordinals are part of the patch format;
    // mixing new discrete controls into gParamCounter would silently retarget
@@ -731,31 +735,35 @@
       Modulation::Instance().RegisterParam(ref);
 
       const int pinId = result.nodeIndex * GraphNode::kStride + GraphNode::kParamBase + result.paramIndex;
-      gDrawnParamPins.insert(pinId);
+      if (!gParamRegisterOnly)
+         gDrawnParamPins.insert(pinId);
       ImGui::PushID(result.paramIndex + 15000);
-      ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-      const ImVec2 p = ImGui::GetCursorScreenPos();
-      constexpr float box = 14.0f;
-      ImGui::Dummy(ImVec2(box, box));
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
-      const bool isLight = IsThemeLight();
-      const ImU32 pinColor = result.modulated
-         ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
-         : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
-      if (CategoryColors::IsDesignTheme())
-         DrawDesignParamPin(dl, c, result.modulated ? 1 : 0);
-      else
+      if (!gParamRegisterOnly) // Turbo 0.60: register-only pass of a collapsed node, no pin
       {
-         dl->AddCircleFilled(c, 4.0f, pinColor);
-         dl->AddCircle(c, 4.0f,
-                       isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255),
-                       0, 1.0f);
+         ed::BeginPin(pinId, ed::PinKind::Input);
+         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         constexpr float box = 14.0f;
+         ImGui::Dummy(ImVec2(box, box));
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
+         const bool isLight = IsThemeLight();
+         const ImU32 pinColor = result.modulated
+            ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
+            : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
+         if (CategoryColors::IsDesignTheme())
+            DrawDesignParamPin(dl, c, result.modulated ? 1 : 0);
+         else
+         {
+            dl->AddCircleFilled(c, 4.0f, pinColor);
+            dl->AddCircle(c, 4.0f,
+                          isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255),
+                          0, 1.0f);
+         }
+         DecorateParamPin(dl, c, result.nodeIndex, result.paramIndex, label);
+         ed::EndPin();
+         ImGui::SameLine(0.0f, 4.0f);
       }
-      DecorateParamPin(dl, c, result.nodeIndex, result.paramIndex, label);
-      ed::EndPin();
-      ImGui::SameLine(0.0f, 4.0f);
 
       result.value = &slot;
       result.valid = true;
@@ -1134,33 +1142,37 @@
       const std::string* hasExprErr = hasExpr ? Modulation::Instance().ExpressionErrorFor(nodeIndex, paramIndex)
                                                : nullptr;
       const bool exprErrored = hasExprErr != nullptr && !hasExprErr->empty();
-      gDrawnParamPins.insert(pinId);
+      if (!gParamRegisterOnly)
+         gDrawnParamPins.insert(pinId);
 
       ImGui::PushID(paramIndex + 5000);
 
-      ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-      ImVec2 p = ImGui::GetCursorScreenPos();
       const float box = 14.0f;
-      ImGui::Dummy(ImVec2(box, box));
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
-      const bool isLight = IsThemeLight();
-      const ImU32 pinColor = modulated
-         ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
-         : hasExpr && !exprErrored
-            ? (isLight ? IM_COL32(130, 80, 230, 255) : IM_COL32(170, 130, 255, 255))
-            : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
-      if (CategoryColors::IsDesignTheme())
-         DrawDesignParamPin(dl, c, modulated ? 1 : (hasExpr && !exprErrored ? 2 : 0));
-      else
+      if (!gParamRegisterOnly) // Turbo 0.60: register-only pass of a collapsed node, no pin
       {
-         dl->AddCircleFilled(c, 4.0f, pinColor);
-         dl->AddCircle(c, 4.0f, isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255), 0, 1.0f);
+         ed::BeginPin(pinId, ed::PinKind::Input);
+         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+         ImVec2 p = ImGui::GetCursorScreenPos();
+         ImGui::Dummy(ImVec2(box, box));
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
+         const bool isLight = IsThemeLight();
+         const ImU32 pinColor = modulated
+            ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
+            : hasExpr && !exprErrored
+               ? (isLight ? IM_COL32(130, 80, 230, 255) : IM_COL32(170, 130, 255, 255))
+               : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
+         if (CategoryColors::IsDesignTheme())
+            DrawDesignParamPin(dl, c, modulated ? 1 : (hasExpr && !exprErrored ? 2 : 0));
+         else
+         {
+            dl->AddCircleFilled(c, 4.0f, pinColor);
+            dl->AddCircle(c, 4.0f, isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255), 0, 1.0f);
+         }
+         DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
+         ed::EndPin();
+         ImGui::SameLine(0.0f, 4.0f);
       }
-      DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
-      ed::EndPin();
-      ImGui::SameLine(0.0f, 4.0f);
 
       // Double-clicking swaps the slider for a text field so an exact value
       // (or, prefixed with '=', an expression) can be typed. ImGui's built-in
@@ -1991,7 +2003,8 @@
       const std::string* hasExprErr = hasExpr ? Modulation::Instance().ExpressionErrorFor(nodeIndex, paramIndex)
                                                : nullptr;
       const bool exprErrored = hasExprErr != nullptr && !hasExprErr->empty();
-      gDrawnParamPins.insert(pinId);
+      if (!gParamRegisterOnly)
+         gDrawnParamPins.insert(pinId);
 
       ImGui::PushID(paramIndex + 5000);
 
@@ -2172,36 +2185,39 @@
       // turning the knob. Same pin id, same ed::BeginPin/EndPin pair, same
       // Modulation registration as before: only where it is drawn changed.
       {
-         const ImVec2 cursorAfter = ImGui::GetCursorScreenPos();
-         const float box = 12.0f;
-         // Immediately to the left of the knob, not at the far edge of the
-         // cell: in a wide cell a pin parked at the cell boundary reads as
-         // belonging to the gap between two knobs rather than to either one.
-         // 8px of clear space between the pin's ring and the widget's outer
-         // arc. At the old 2px the two visually touched and read as one
-         // control with a wart on it rather than as a knob and its pin.
-         const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - 8.0f);
-         const ImVec2 pinTL(pinX, cellOrigin.y + diameter - box);
-         ImGui::SetCursorScreenPos(pinTL);
-         ed::BeginPin(pinId, ed::PinKind::Input);
-         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-         ImGui::Dummy(ImVec2(box, box));
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImVec2 c(pinTL.x + box * 0.5f, pinTL.y + box * 0.5f);
-         // A ring rather than a bare dot: at 4px a filled dot beside a 56px
-         // knob reads as a rendering artifact, not an affordance.
-         if (CategoryColors::IsDesignTheme())
-            DrawDesignParamPin(dl, c, modulated ? 1 : (hasExpr ? 2 : 0));
-         else
+         if (!gParamRegisterOnly) // Turbo 0.60: register-only pass of a collapsed node, no pin
          {
-            dl->AddCircleFilled(c, 4.0f, IM_COL32(18, 19, 25, 255));
-            dl->AddCircle(c, modulated || hasExpr ? 4.0f : 4.5f, pinColor, 12, 2.0f);
-            if (modulated || hasExpr)
-               dl->AddCircleFilled(c, 2.0f, pinColor);
+            const ImVec2 cursorAfter = ImGui::GetCursorScreenPos();
+            const float box = 12.0f;
+            // Immediately to the left of the knob, not at the far edge of the
+            // cell: in a wide cell a pin parked at the cell boundary reads as
+            // belonging to the gap between two knobs rather than to either one.
+            // 8px of clear space between the pin's ring and the widget's outer
+            // arc. At the old 2px the two visually touched and read as one
+            // control with a wart on it rather than as a knob and its pin.
+            const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - 8.0f);
+            const ImVec2 pinTL(pinX, cellOrigin.y + diameter - box);
+            ImGui::SetCursorScreenPos(pinTL);
+            ed::BeginPin(pinId, ed::PinKind::Input);
+            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            ImGui::Dummy(ImVec2(box, box));
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 c(pinTL.x + box * 0.5f, pinTL.y + box * 0.5f);
+            // A ring rather than a bare dot: at 4px a filled dot beside a 56px
+            // knob reads as a rendering artifact, not an affordance.
+            if (CategoryColors::IsDesignTheme())
+               DrawDesignParamPin(dl, c, modulated ? 1 : (hasExpr ? 2 : 0));
+            else
+            {
+               dl->AddCircleFilled(c, 4.0f, IM_COL32(18, 19, 25, 255));
+               dl->AddCircle(c, modulated || hasExpr ? 4.0f : 4.5f, pinColor, 12, 2.0f);
+               if (modulated || hasExpr)
+                  dl->AddCircleFilled(c, 2.0f, pinColor);
+            }
+            DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
+            ed::EndPin();
+            ImGui::SetCursorScreenPos(cursorAfter);
          }
-         DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
-         ed::EndPin();
-         ImGui::SetCursorScreenPos(cursorAfter);
       }
 
       ImGui::PopID();

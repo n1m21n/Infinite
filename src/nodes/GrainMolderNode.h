@@ -103,6 +103,8 @@ public:
    float end = 1.0f;        // 0..1
    float position = 0.0f;   // 0..1 playback start anchor in [start, end]
    bool loop = false;
+   int rateFix = 1; // not a control: 0 = plays the file at the device rate, not its own (saved before the fix)
+   void BeforeLoadParams() override { rateFix = 0; }
    bool reverse = false;
    bool pingpong = false;
 

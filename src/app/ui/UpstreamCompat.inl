@@ -76,9 +76,8 @@
    inline void PopTextWrapWidth() { ImGui::PopTextWrapPos(); }
 
    // Upstream folds rarely used rows behind "show more" while still
-   // registering them (gParamRegisterOnly). Turbo shows them all, so the fold
-   // always reports open and the register-only flag stays off.
-   bool gParamRegisterOnly = false;
+   // registering them (gParamRegisterOnly, Widgets.inl). Turbo shows them all,
+   // so the fold always reports open.
    inline bool BeginAdvancedFold(const char* /*id*/, int /*floatCount*/, int /*colorCount*/, bool& saved)
    {
       saved = gParamRegisterOnly;

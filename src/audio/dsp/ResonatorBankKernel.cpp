@@ -109,18 +109,23 @@ void ResonatorBankKernel::PushParams(const AudioEffectNode& node, double sampleR
       const float g_i = tanf((float)M_PI * f_i / (float)sampleRate);
       const float k_i = 1.0f / q_i;
 
-      tempPoles[i] = { g_i, k_i, panL, panR };
+      // Per-pole normalisation. DspMath::TptSvf's band output peaks at q_i
+      // (its unity-peak bandpass is k*band), and with q_i ~ f_i * decay the
+      // bank's upper partials rang hundreds of times louder than its root:
+      // +8 dB on noise at the defaults, and a mono input leaning 4 dB right
+      // because spread pans the high partials there. The band output's
+      // white-noise power gain is about pi * f * q / fs, so
+      // sqrt(48000 / (pi * f_i * q_i)) gives every pole the same energy -
+      // per mode equal for noise, and a hit's energy independent of decay,
+      // the same law as ShapeResonatorKernel's modes. Referenced to 48 kHz,
+      // not the running rate, so a real signal (fixed spectral density)
+      // comes out at the same level at 44.1, 48 or 96 kHz.
+      const float norm_i = sqrtf(48000.0f / ((float)M_PI * f_i * q_i));
+
+      tempPoles[i] = { g_i, k_i, panL * norm_i, panR * norm_i };
    }
 
-   // Energy-normalise for pole count only (uncorrelated bandpass sums add in
-   // quadrature). DspMath::TptSvf's band output has unity peak gain at
-   // resonance independent of Q - that's the point of the TPT topology - so
-   // there is nothing for a Q-dependent term to compensate for; a qMean-based
-   // factor here only cuts level on exactly the high-decay/high-Q settings
-   // that make a resonator interesting (at this node's own defaults - 8
-   // poles, 2.5s decay - it used to attenuate by -28 dB before the mix knob
-   // even gets involved). Matches how Ableton's Resonators and modal-synth
-   // devices like Rings keep output level decay/Q-independent.
+   // Pole count: uncorrelated per-pole energies add in quadrature.
    const float gainScale = 1.0f / sqrtf((float)numPolesRequested);
 
    // Seqlock write
@@ -236,6 +241,13 @@ void ResonatorBankKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer*
       {
          sumL = AnalogDsp::AsymTanh(sumL);
          sumR = AnalogDsp::AsymTanh(sumR);
+      }
+      else
+      {
+         // Safety ceiling only (bit-identical below the knee): a tone parked
+         // on a long-decay pole still builds by ~sqrt(q).
+         sumL = DspMath::SoftCeiling(sumL);
+         sumR = DspMath::SoftCeiling(sumR);
       }
 
       if (out.numChannels > 0)

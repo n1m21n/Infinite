@@ -103,70 +103,124 @@
    // the same signal drawn across the strips' own space.
    void DrawMixerBody(GraphNode& gn, MixerNode* n)
    {
+      // Turbo 0.60 (upstream): 0..12 channels with solo. The strips keep
+      // Turbo's 100 px each (800 at the default eight).
+      const int count = std::clamp(n->numChannels, 0, (int)MixerNode::kMaxSlots);
+      const float bodyW = std::max(280.0f, (float)count * 100.0f);
       char stat[64];
-      snprintf(stat, sizeof(stat), "8 in -> 1 out   sum %+.1f dB",
-               DspMath::LinearToDb(std::max(n->Level(), 1e-5f)));
-      BeginAudioBody(gn.index, gn.category, kAudioMixerWidth, stat);
+      if (count > 0)
+         snprintf(stat, sizeof(stat), "%d in -> 1 out   sum %+.1f dB", count,
+                  DspMath::LinearToDb(std::max(n->Level(), 1e-5f)));
+      else
+         snprintf(stat, sizeof(stat), "0 in -> 0 out   idle");
+      BeginAudioBody(gn.index, gn.category, bodyW, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      const float cellW = gAudioContentW / (float)MixerNode::kSlots;
-      const float faderH = 138.0f;
-      const float stripTop = ImGui::GetCursorScreenPos().y;
-
-      // Meters first, drawn straight to the draw list so they cost no layout
-      // and sit inside each fader's own cell.
-      for (int i = 0; i < MixerNode::kSlots; i++)
+      // Channel count: a stepper, not a modulatable slider - it rebuilds the
+      // audio topology, so a cable driving it would rebuild it every block.
+      // The counter still advances (upstream's ordinals: channels 0, then the
+      // faders and pans); Turbo patches saved before it are shifted on load.
       {
-         const float cx = gAudioContentX + ((float)i + 0.5f) * cellW;
-         DrawStripMeter(cx + 14.0f, stripTop + 6.0f, 8.0f, faderH - 12.0f, n->ChannelLevel(i));
-      }
-
-      {
-         // See DrawGainBody: the row's maxDiameter has to be the fader height.
-         AudioKnobRow row(MixerNode::kSlots, faderH);
-         for (int i = 0; i < MixerNode::kSlots; i++)
+         int ch = n->numChannels;
+         gParamCounter++;
+         const float btnH = ImGui::GetFrameHeight();
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         ImGui::AlignTextToFramePadding();
+         ImGui::TextDisabled("channels");
+         ImGui::SameLine();
+         int next = ch;
+         if (ActionButton::Draw("-##mixCh", ImVec2(btnH * 1.4f, btnH)))
+            next = ch - 1;
+         ImGui::SameLine(0.0f, gap);
+         ImGui::AlignTextToFramePadding();
+         ImGui::Text("%d", ch);
+         ImGui::SameLine(0.0f, gap);
+         if (ActionButton::Draw("+##mixCh", ImVec2(btnH * 1.4f, btnH)))
+            next = ch + 1;
+         next = std::clamp(next, 0, (int)MixerNode::kMaxSlots);
+         if (next != ch)
          {
-            char label[8];
-            snprintf(label, sizeof(label), "%d", i + 1);
-            row.Fader(label, &n->gainDb[i], -60.0f, 12.0f, "%.1f dB", faderH, /*dbTaper=*/true);
+            PushUndoCheckpoint();
+            n->numChannels = next;
+            RebuildAudioTopology();
          }
-         row.End();
+         ImGui::Dummy(ImVec2(0.0f, 4.0f));
       }
 
-      // Mute row, aligned to the same cells. A mute that isn't directly under
-      // its own fader belongs to no channel in particular.
+      if (count > 0)
       {
-         const float btnW = std::min(cellW - 6.0f, 34.0f);
-         const float rowY = ImGui::GetCursorScreenPos().y;
-         for (int i = 0; i < MixerNode::kSlots; i++)
+         const float cellW = gAudioContentW / (float)count;
+         const float faderH = 138.0f;
+         const float stripTop = ImGui::GetCursorScreenPos().y;
+
+         // Meters first, drawn straight to the draw list so they cost no layout
+         // and sit inside each fader's own cell.
+         for (int i = 0; i < count; i++)
          {
             const float cx = gAudioContentX + ((float)i + 0.5f) * cellW;
-            ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, rowY));
-            ImGui::PushID(9200 + i);
-            ImGui::PushStyleColor(ImGuiCol_Button, n->mute[i] ? ImVec4(0.52f, 0.16f, 0.16f, 1.0f)
-                                                              : ImVec4(0.13f, 0.14f, 0.18f, 1.0f));
-            bool muted = n->mute[i];
-            if (AudioToggleButton("M##mixerMute", &muted, btnW))
-            {
-               PushUndoCheckpoint();
-               n->mute[i] = muted;
-            }
-            ImGui::PopStyleColor();
-            ImGui::PopID();
+            DrawStripMeter(cx + 14.0f, stripTop + 6.0f, 8.0f, faderH - 12.0f, n->ChannelLevel(i));
          }
-         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
-         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight() + 4.0f));
-      }
 
-      {
-         AudioKnobRow row(MixerNode::kSlots, kKnobStd);
-         for (int i = 0; i < MixerNode::kSlots; i++)
          {
-            char label[8];
-            snprintf(label, sizeof(label), "pan %d", i + 1);
-            row.Knob(label, &n->pan[i], -1.0f, 1.0f, "%.2f", kKnobStd);
+            // See DrawGainBody: the row's maxDiameter has to be the fader height.
+            AudioKnobRow row(count, faderH);
+            for (int i = 0; i < count; i++)
+            {
+               char label[8];
+               snprintf(label, sizeof(label), "%d", i + 1);
+               row.Fader(label, &n->gainDb[i], -60.0f, 12.0f, "%.1f dB", faderH, /*dbTaper=*/true);
+            }
+            row.End();
          }
-         row.End();
+
+         // Solo and mute row, aligned to the same cells. A button that isn't
+         // directly under its own fader belongs to no channel in particular.
+         {
+            const float btnW = std::min((cellW - 8.0f) * 0.5f, 30.0f);
+            const float rowY = ImGui::GetCursorScreenPos().y;
+            for (int i = 0; i < count; i++)
+            {
+               const float cx = gAudioContentX + ((float)i + 0.5f) * cellW;
+               ImGui::SetCursorScreenPos(ImVec2(cx - btnW - 2.0f, rowY));
+               ImGui::PushID(9100 + i);
+               ImGui::PushStyleColor(ImGuiCol_Button, n->solo[i] ? ImVec4(0.62f, 0.52f, 0.12f, 1.0f)
+                                                                 : ImVec4(0.13f, 0.14f, 0.18f, 1.0f));
+               bool soloed = n->solo[i];
+               if (AudioToggleButton("S##mixerSolo", &soloed, btnW))
+               {
+                  PushUndoCheckpoint();
+                  n->solo[i] = soloed;
+               }
+               ImGui::PopStyleColor();
+               ImGui::PopID();
+
+               ImGui::SetCursorScreenPos(ImVec2(cx + 2.0f, rowY));
+               ImGui::PushID(9200 + i);
+               ImGui::PushStyleColor(ImGuiCol_Button, n->mute[i] ? ImVec4(0.52f, 0.16f, 0.16f, 1.0f)
+                                                                 : ImVec4(0.13f, 0.14f, 0.18f, 1.0f));
+               bool muted = n->mute[i];
+               if (AudioToggleButton("M##mixerMute", &muted, btnW))
+               {
+                  PushUndoCheckpoint();
+                  n->mute[i] = muted;
+               }
+               ImGui::PopStyleColor();
+               ImGui::PopID();
+            }
+            ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
+            ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight() + 4.0f));
+         }
+
+         {
+            AudioKnobRow row(count, kKnobStd);
+            for (int i = 0; i < count; i++)
+            {
+               char label[8];
+               snprintf(label, sizeof(label), "pan %d", i + 1);
+               row.Knob(label, &n->pan[i], -1.0f, 1.0f, "%.2f", kKnobStd);
+            }
+            row.End();
+         }
       }
 
       EndAudioBody();

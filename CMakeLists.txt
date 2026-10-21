@@ -199,6 +199,8 @@ add_executable(Infinite WIN32
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp
+    src/core/PatchSchema.cpp
+    src/core/HeadlessJob.cpp
     src/arrange/ArrangeModel.cpp
     src/core/RemoteControl.cpp
     src/platform/McpBridgeWindows.cpp
@@ -224,6 +226,7 @@ add_executable(Infinite WIN32
     src/audio/dsp/DriveKernel.cpp
     src/audio/dsp/StereoKernel.cpp
     src/audio/dsp/PitchShiftKernel.cpp
+    src/audio/dsp/SpectralPitchShifter.cpp
     src/audio/dsp/ChorusKernel.cpp
     src/audio/dsp/FlangerKernel.cpp
     src/audio/dsp/PhaserKernel.cpp

@@ -81,6 +81,9 @@
                first = false;
             }
             js += "\n ],\n";
+            // Wiring as loaded: cables drawn on the canvas and modulation bindings.
+            js += " \"links\": " + std::to_string(gLinks.size()) + ", \"mods\": " +
+                  std::to_string(Modulation::Instance().Links().size()) + ",\n";
 
             // Types and saved keys this build does not read.
             std::string unknownTypes, unknownKeys;

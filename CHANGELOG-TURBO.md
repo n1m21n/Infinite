@@ -39,6 +39,26 @@ them. Old patches open unchanged.
   Analog or Wavetable, each note gets its own cycle; Voice Spread and Note Expression are per note
   too (MPE pressure and slide carried on each note).
 
+### Opening upstream patches
+- **Patches with names** (upstream's hand-written format, 93 of its 493 patches): nodes named by an
+  `id` line, cables and bindings that name nodes, inputs and outputs, `mod` / `expr` lines that name
+  the control by its key. These used to open with no cables and no modulation; they open wired now
+  (upstream's PatchSchema, verbatim). Bindings by name attach once their nodes have drawn.
+- Upstream's `mod` range (lo / hi, the destination's own units) becomes Turbo's range mapper; Turbo
+  files carry a marker line so the two `mod` layouts are never confused. A file with `rev 2` keeps
+  the defaults for keys it does not write, as upstream reads it.
+- **Modulation on a collapsed node** no longer freezes (upstream fix): a collapsed node that a cable,
+  expression, MIDI mapping or gesture drives still registers its controls, without drawing them.
+- **Mixer**: 0 to 12 channels (the channels stepper) and solo per channel, as upstream. A Mixer saved
+  by an older Turbo keeps its cables and modulation (its bindings move up one slot on load).
+- Sampler, Molder, Grain Molder, PaulStretch and Drum Sequencer play a file at its own sample rate
+  (a 44.1 kHz file is no longer sharp on a 48 kHz device); older patches keep the old pitch.
+- Effects on upstream's current kernels: Delay wow / flutter / saturation / diffusion (tape, with
+  analog on), Dynamics style (clean / bus / opto / FET) and sidechain high-pass, Pitch Shifter
+  spectral mode, Bitcrush dither, and the kernels' other fixes. Audio Filter (Turbo's LFO), Phaser
+  (Turbo's feedback) and EQ keep Turbo's own. New controls sit after the old ones, so saved
+  modulation keeps its target.
+
 ### Prediction and geometry (from the to-do)
 - **Predictive Coloring**: learns what graded footage looks like and grades incoming frames toward it.
 - Null 3D, Material, Mapping and Cloth forward the point cloud and curve riding with the mesh

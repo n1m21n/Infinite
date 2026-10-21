@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 #include "IEffectKernel.h"
 #include "audio/DspMath.h"
@@ -44,8 +45,9 @@ public:
 
    void Reset() override
    {
-      mPhase = 0.0f;
+      mPhase = 0.0;
       mHoldL = mHoldR = 0.0f;
+      mPrevL = mPrevR = 0.0f;
       for (int i = 0; i < 2; i++)
       {
          mPreFilterL[i].Reset();
@@ -63,9 +65,29 @@ private:
    ParamMailbox mMailbox;
    double mSampleRate = 44100.0;
    std::atomic<int> mAnalog { 0 };
+   std::atomic<int> mDither { 0 };
 
-   float mPhase = 0.0f;
+   // TPDF dither source: the difference of two uniform draws is triangular
+   // on (-1, 1) LSB - the standard dither, which makes the quantisation error
+   // independent of the signal (no harmonic distortion on quiet material) at
+   // the cost of a flat noise floor. Seeded, so renders are deterministic.
+   uint32_t mRng = 0x9E3779B9u;
+   float Tpdf()
+   {
+      auto next = [this]() {
+         mRng ^= mRng << 13;
+         mRng ^= mRng >> 17;
+         mRng ^= mRng << 5;
+         return (float)(mRng >> 8) * (1.0f / 16777216.0f);
+      };
+      return next() - next();
+   }
+
+   // The hold clock, in double so its instants stay on the same times at
+   // every device rate over a long render (F14).
+   double mPhase = 0.0;
    float mHoldL = 0.0f, mHoldR = 0.0f;
+   float mPrevL = 0.0f, mPrevR = 0.0f; // last input sample, for the fractional hold instant
 
    // Analog mode: 11kHz reconstruction pre-filter stages
    DspMath::TptSvf mPreFilterL[2];
