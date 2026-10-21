@@ -440,7 +440,7 @@ def head(title, desc, url, image, ld, rel="nodes/x.html", bodyclass="blog-page b
   <link rel="stylesheet" href="../style.css?v=60c68394">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
-  <link rel="stylesheet" href="../nodepage.css?v=00f92b8a">
+  <link rel="stylesheet" href="../nodepage.css?v=d007f6ff">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="{bodyclass}">
@@ -548,7 +548,7 @@ def io_sentence(t):
 
 def _jsv():
     import hashlib
-    return hashlib.md5(open(os.path.join(W, "nodesphere.js"), "rb").read()).hexdigest()[:8]
+    return hashlib.md5(open(os.path.join(W, "nodebrowser.js"), "rb").read()).hexdigest()[:8]
 
 
 def index_page(items):
@@ -562,6 +562,7 @@ def index_page(items):
           "mainEntity": {"@type": "ItemList", "numberOfItems": len(items), "itemListElement": [
               {"@type": "ListItem", "position": n + 1, "url": BASE + "nodes/" + i["slug"] + ".html", "name": i["name"]} for n, i in enumerate(items)]}}
     h = head(title, desc, url, BASE + "assets/og-image.jpg", ld, rel, "blog-page np-page np-index")
+    h = h.replace("</head>", '  <link rel="stylesheet" href="../nodedeck.css">\n</head>', 1)
     secs = []
     for c in order:
         xs = sorted([i for i in items if i["cat"] == c], key=lambda i: i["name"].lower())
@@ -577,8 +578,20 @@ def index_page(items):
         % (slug(c), e(CAT_LABEL[c]), len([i for i in items if i["cat"] == c])) for c in fams)
     chips = ('<div class="ns-sel"><button type="button" class="ns-select" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by family">%s<span class="ns-select-val">All</span>%s</button>'
              '<div class="ns-menu" role="listbox" aria-label="Family" hidden>%s</div></div>' % (SEL_IC, CHEV, opts))
-    cloud = "".join('<a class="ns-a" data-fam="%s" data-fl="%s" data-n="%s"%s href="%s.html">%s</a>' % (slug(i["cat"]), e(CAT_LABEL[i["cat"]]), e(i["name"]), (' data-img="../assets/nodes/ring/%s"' % i["shot"][0]) if i["shot"] else "", i["slug"], e(i["name"]))
-                    for i in sorted(items, key=lambda i: (order.index(i["cat"]), i["name"].lower())))
+    cards = []
+    for n, i in enumerate(sorted(items, key=lambda i: (order.index(i["cat"]), i["name"].lower()))):
+        sh = i["shot"]
+        img = ""
+        if sh:
+            w = max(1, round(sh[1] * 560 / sh[2]))
+            img = '<img data-src="../assets/nodes/ring/%s" alt="The %s node in Infinite." width="%d" height="560" decoding="async" draggable="false">' % (sh[0], e(i["name"]), w)
+        cards.append('<figure class="nd-card" data-fam="%s" data-title="%s" data-desc="%s" data-href="%s.html" style="--cat:%s"><span class="nd-cat">%s</span>%s</figure>'
+                     % (slug(i["cat"]), e(i["name"]), e(i["desc"]), i["slug"], CAT_COLOR[i["cat"]], e(CAT_LABEL[i["cat"]]), img))
+    cloud = "".join(cards)
+    deck = ('<div class="nd" data-nodedeck><div class="nd-grid" tabindex="0" aria-roledescription="carousel" aria-label="Nodes. Swipe or use the arrow keys.">%s</div>'
+            '<div class="nd-hud"><button type="button" class="nd-btn" data-nd="-1" aria-label="Previous node"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5"/></svg></button>'
+            '<div class="nd-info" aria-live="polite"><a class="nd-t" href="#"></a><span class="nd-d"></span></div>'
+            '<button type="button" class="nd-btn" data-nd="1" aria-label="Next node"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5"/></svg></button></div></div>' % cloud)
     body = f"""  {chrome.header_html(rel)}
 
   <main>
@@ -588,17 +601,18 @@ def index_page(items):
         <h1>Every node in Infinite</h1>
       </header>
       <div class="ns" id="ns">
-        <div class="ns-bar">{chips}<button type="button" class="ns-view" aria-pressed="false" aria-label="Show as a list" title="List"><svg class="ns-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5.5h9M7 10h9M7 14.5h9M3.5 5.5h.01M3.5 10h.01M3.5 14.5h.01"/></svg></button></div>
-        <div class="ns-stage" id="ns-stage">{cloud}</div>
+        <div class="ns-bar">{chips}</div>
+        {deck}
       </div>
-      <div class="ns-list" id="ns-list">{"".join(secs)}</div>
+      <noscript><div class="ns-list">{"".join(secs)}</div></noscript>
     </div>
   </main>
 
   {chrome.footer_html(rel)}
 
   <script src="../site.js?v={chrome.JS_VERSION}" defer></script>
-  <script src="../nodesphere.js?v={_jsv()}" defer></script>
+  <script src="../deck.js?v=4" defer></script>
+  <script src="../nodebrowser.js?v={_jsv()}" defer></script>
 </body>
 </html>
 """
