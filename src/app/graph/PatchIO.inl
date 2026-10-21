@@ -166,11 +166,17 @@
                                      link.second.polarity, link.second.depth, link.second.centre,
                                      link.second.inMin, link.second.inMax,
                                      link.second.outMin, link.second.outMax });
+      // Turbo 0.60: the file names each bound control by its saved key.
+      for (Patch::ModRecord& m : data.modulation)
+         m.saveKey = SavedKeyOfParam(m.dstIndex, m.dstParam);
       for (const auto& link : PaletteBinding::Instance().Links())
          data.palette.push_back({ link.first.first, link.first.second,
                                   link.second.nodeIndex, link.second.swatchIndex });
       for (const auto& expr : Modulation::Instance().Expressions())
+      {
          data.expressions.push_back({ expr.first.first, expr.first.second, expr.second });
+         data.expressions.back().saveKey = SavedKeyOfParam(expr.first.first, expr.first.second);
+      }
       for (const MidiMap::Mapping& m : MidiMap::All())
       {
          Patch::MidiMapRecord rec;

@@ -59,6 +59,15 @@ them. Old patches open unchanged.
   (Turbo's feedback) and EQ keep Turbo's own. New controls sit after the old ones, so saved
   modulation keeps its target.
 
+### Gesture learning (upstream)
+- **Moves**, **Predictive Modulator** and upstream's **Drift** (replacing Turbo's older Drift; its
+  `home` knob is gone, every other key reads the same): they learn from how you move the knobs.
+  Upstream's movement log records every param change and who made it (hand, modulator, expression,
+  gesture, prediction); predictors write each destination in its own 0..1. Self-tests MOVELOGTEST
+  and MOVESTATSTEST.
+- Saved modulation and expressions name their control by key (`mod 5 cutoff ...`, upstream's own
+  format), so a node whose body reorders its controls no longer moves a saved binding.
+
 ### Prediction and geometry (from the to-do)
 - **Predictive Coloring**: learns what graded footage looks like and grades incoming frames toward it.
 - Null 3D, Material, Mapping and Cloth forward the point cloud and curve riding with the mesh

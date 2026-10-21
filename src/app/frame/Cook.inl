@@ -315,6 +315,19 @@
             if (auto* sc = dynamic_cast<ScenesNode*>(gn.node.get()))
                sc->Tick(ImGui::GetFrameCount());
 
+         // Turbo 0.60 (upstream): every predictor advances exactly once a frame,
+         // before the apply loop reads it (wall clock: it learns while paused too).
+         {
+            static double sLastTick = -1.0;
+            const double nowWall = ImGui::GetTime();
+            const double tickDt = sLastTick < 0.0 ? 0.0 : std::clamp(nowWall - sLastTick, 0.0, 0.25);
+            sLastTick = nowWall;
+            for (GraphNode& gn : gNodes)
+               if (gn.node != nullptr && !gn.node->bypassed)
+                  if (auto* pred = dynamic_cast<IPredictor*>(gn.node.get()))
+                     pred->Tick(frameId, tickDt);
+         }
+
          const double t = Transport::Instance().Seconds();
          // Patch-wide named values, evaluated once before any parameter reads
          // them so every expression in the frame sees the same globals - see
@@ -425,6 +438,21 @@
                // docs/plans/modulators/00-modulation-polarity.md §4. So,
                // unlike before, v01 is not force-clamped here.
                float v01 = modulator->Value01();
+               // Turbo 0.60 (upstream): a predictor answers per destination, in
+               // the param's 0..1, starting from where the param already is.
+               auto* pred = dynamic_cast<IPredictor*>(modNode->node.get());
+               if (pred != nullptr)
+               {
+                  if (ref.isEnum || ref.isBool)
+                     continue;
+                  const float span = ref.maxValue - ref.minValue;
+                  const float cur = std::fabs(span) > 1e-9f ? (*ref.value - ref.minValue) / span : 0.0f;
+                  const GraphNode* dstGn = FindNodeByIndex(ref.nodeIndex);
+                  const ParamKey pk{ dstGn != nullptr ? dstGn->uid : 0, ref.paramIndex };
+                  v01 = std::clamp(pred->ValuePos01For(pk, std::clamp(cur, 0.0f, 1.0f)), 0.0f, 1.0f);
+               }
+               MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex,
+                                       pred != nullptr ? MovementLog::Source::Prediction : MovementLog::Source::Modulator);
                // Turbo range mapper (see Modulation::Source::HasRange).
                if (src.HasRange())
                {
@@ -479,6 +507,7 @@
             if (evaluated)
             {
                *ref.value = std::min(std::max(result, ref.minValue), ref.maxValue);
+               MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Expression);
                modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, std::string());
             }
             else
@@ -512,7 +541,10 @@
             continue;
          float v = 0.0f;
          if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex, gestureNow, v))
+         {
             *ref.value = std::clamp(v, std::min(ref.minValue, ref.maxValue), std::max(ref.minValue, ref.maxValue));
+            MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Gesture);
+         }
       }
 
       // A Palette is not an Output, so nothing downstream pulls it, and both its

@@ -580,8 +580,6 @@
                DrawMacroStepGateParams(n);
             else if (auto* n = dynamic_cast<ScenesNode*>(gn.node.get()))
                DrawScenesParams(n); // Turbo 0.50
-            else if (auto* n = dynamic_cast<DriftNode*>(gn.node.get()))
-               DrawDriftParams(n);
             else if (auto* n = dynamic_cast<UIButtonNode*>(gn.node.get()))
                DrawUIButtonOptions(n);
             else if (auto* n = dynamic_cast<UISliderNode*>(gn.node.get()))

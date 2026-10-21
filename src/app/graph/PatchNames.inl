@@ -342,6 +342,68 @@
       return false;
    }
 
+   // Saved key of each bound control, refreshed once a frame while the
+   // controls are registered (RefreshParamKeyCache), so a save from the menu
+   // - before the nodes draw - still has them. Only floats: a key's address
+   // has to be the ParamRef's own value (discrete controls write a proxy).
+   std::map<std::pair<int, int>, std::string> gParamKeyCache;
+
+   class KeyOfAddr : public ParamVisitor
+   {
+   public:
+      std::map<const void*, std::string> keys;
+      std::set<std::string> seen, dup;
+      void Float(const char* n, float& v) override
+      {
+         if (!seen.insert(n).second)
+            dup.insert(n);
+         keys[&v] = n;
+      }
+      void Int(const char*, int&) override {}
+      void Bool(const char*, bool&) override {}
+      void Text(const char*, std::string&) override {}
+      void Color(const char*, float*) override {}
+   };
+
+   void RefreshParamKeyCache()
+   {
+      const Modulation& mod = Modulation::Instance();
+      std::set<std::pair<int, int>> bound;
+      for (const auto& link : mod.Links())
+         bound.insert(link.first);
+      for (const auto& expr : mod.Expressions())
+         bound.insert(expr.first);
+      for (auto it = gParamKeyCache.begin(); it != gParamKeyCache.end();)
+         it = bound.count(it->first) ? std::next(it) : gParamKeyCache.erase(it);
+      if (bound.empty())
+         return;
+      std::map<int, KeyOfAddr> perNode;
+      for (const ParamRef& r : mod.FrameParams())
+      {
+         const std::pair<int, int> k(r.nodeIndex, r.paramIndex);
+         if (bound.count(k) == 0 || gParamKeyCache.count(k) != 0)
+            continue;
+         auto pn = perNode.find(r.nodeIndex);
+         if (pn == perNode.end())
+         {
+            GraphNode* gn = FindNodeByIndex(r.nodeIndex);
+            if (gn == nullptr || gn->node == nullptr)
+               continue;
+            pn = perNode.emplace(r.nodeIndex, KeyOfAddr()).first;
+            gn->node->VisitParams(pn->second);
+         }
+         auto a = pn->second.keys.find((const void*)r.value);
+         if (a != pn->second.keys.end() && pn->second.dup.count(a->second) == 0)
+            gParamKeyCache[k] = a->second;
+      }
+   }
+
+   std::string SavedKeyOfParam(int nodeIndex, int paramIndex)
+   {
+      auto it = gParamKeyCache.find({ nodeIndex, paramIndex });
+      return it == gParamKeyCache.end() ? std::string() : it->second;
+   }
+
    // Once a frame, before ClearFrameParams (last frame's controls are still
    // registered): attaches keyed bindings once their nodes have drawn, and
    // turns upstream lo/hi into the range mapper once the range is known.

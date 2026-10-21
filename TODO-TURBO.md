@@ -34,11 +34,12 @@ CHANGELOG-TURBO.md when it ships.
 - Headless engine from upstream: --render / --frame / --frames-dir / --node / --stems / --notes /
   --set / --audio-summary / --contact-sheet / --explain / --describe / --validate, plus the
   console launcher for cmd exit codes.
-- Upstream gesture learning: Moves and Predictive Modulator need upstream's MovementLog (binding
-  callbacks and per-param tapers in Modulation, the CookFrame hooks) and its IPredictor Drift.
-- Save bindings by control key (`mod 5 cutoff ...`, which upstream reads too) instead of the slider
-  ordinal, so a body that reorders its controls no longer moves saved modulation. Upstream's own
-  bodies were reordered (Delay, Dynamics, ...): its numeric `mod` lines on those land on other knobs.
+- Gesture learning, rest of upstream: Shift-grab of a predicted knob (OnGrab / OnRelease), the
+  Drift meter in the node header, the movement-log settings page (folder, size cap), fader tapers
+  on ParamRef (Turbo logs linear), patch load / undo marks.
+- Upstream's own bodies were reordered (Delay, Dynamics, ...): its numeric `mod` lines on those land
+  on other knobs (keyed ones are fine). MIDI learn, gestures and Performance targets still save
+  ordinals.
 - Upstream `mod` curve and smoothing (read, not applied yet); dropdowns given an option name.
 - Upstream interop, keys Turbo does not read yet (from the compat report): Looper take / thru
   (Turbo's Looper is its own rewrite), Drift's new modes (with the gesture-learning item), Output

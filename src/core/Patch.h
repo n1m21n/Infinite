@@ -123,6 +123,10 @@ namespace Patch
       int line = 0;
       std::string dstRef, srcRef, outRef; // authoring names, see CableRecord
       std::string dstKey;                 // a control key in place of dstParam (`mod 5 radius ...`)
+      // Turbo 0.60, writer only: the key the file names the control by (empty =
+      // the ordinal). A key survives a body reordering its controls; dstParam
+      // stays filled for in-memory use (undo, clipboard).
+      std::string saveKey;
    };
 
    // A palette node driving one colour swatch on another node.
@@ -146,6 +150,7 @@ namespace Patch
       int line = 0;
       std::string dstRef; // authoring name, see CableRecord
       std::string dstKey; // a control key in place of dstParam
+      std::string saveKey; // writer only, see ModRecord::saveKey
    };
 
    // One patch-wide named value an expression can read - see

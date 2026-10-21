@@ -62,6 +62,20 @@
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return HeadlessExit(RunDspTest());
 
+   // Turbo 0.60: upstream's movement log / stats tests (gesture learning).
+   if (getenv("INFINITE_MOVELOGTEST") != nullptr)
+   {
+      const bool ok = MovementLog::RunMovementLogTest();
+      printf("MOVELOGTEST %s\n", ok ? "OK" : "FAIL");
+      return HeadlessExit(0);
+   }
+   if (getenv("INFINITE_MOVESTATSTEST") != nullptr)
+   {
+      const bool ok = MovementStats::RunMovementStatsTest();
+      printf("MOVESTATSTEST %s\n", ok ? "OK" : "FAIL");
+      return HeadlessExit(0);
+   }
+
    // Turbo 0.60: upstream's per-voice modulation fixture. Exit 0 always - the
    // printed VOICEMODTEST verdict is the driver's signal, as for AUDIOPDCTEST.
    if (getenv("INFINITE_VOICEMODTEST") != nullptr)
@@ -332,6 +346,20 @@
    }
 
    RegisterNodes();
+   // Turbo 0.60 (upstream): the movement log Moves / Drift / Predictive
+   // Modulator learn from, keyed by stable node uids.
+   MovementLog::SetNodeUidLookup([](int idx) -> uint64_t {
+      if (GraphNode* gn = FindNodeByIndex(idx))
+         return gn->uid;
+      return 0;
+   });
+   MovementLog::SetNodeTypeLookup([](int idx) -> std::string {
+      if (GraphNode* gn = FindNodeByIndex(idx))
+         return gn->typeName;
+      return std::string();
+   });
+   if (getenv("INFINITE_EXITAFTER") == nullptr) // self-tests neither read nor write the learned profiles
+      MovementLog::Start();
    StartupTrace("startup: nodes registered");
    ApplyTheme();
    StartupTrace("startup: theme applied");

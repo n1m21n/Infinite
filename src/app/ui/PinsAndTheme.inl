@@ -487,6 +487,8 @@
       REGISTER_NODE(MacroStepGateNode, Macro Step Gate, "Macros");
       REGISTER_NODE(ScenesNode, Scenes, "Macros"); // Turbo 0.50
       REGISTER_NODE(DriftNode, Drift, "Modulators");
+      REGISTER_NODE(MovesNode, Moves, "Modulators"); // Turbo 0.60 (upstream)
+      REGISTER_NODE(PredictiveModulatorNode, Predictive Modulator, "Modulators");
       NodeFactory::Instance().Register("Button", &UIButtonNode::Create, "UI");
       NodeFactory::Instance().Register("Horizontal Slider", &UISliderNode::CreateHorizontal, "UI");
       NodeFactory::Instance().Register("Vertical Slider", &UISliderNode::CreateVertical, "UI");

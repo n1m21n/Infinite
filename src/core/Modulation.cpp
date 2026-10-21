@@ -24,6 +24,8 @@ void Modulation::Bind(int nodeIndex, int paramIndex, int modulatorNodeIndex, int
       }
    }
    mLinks[Key(nodeIndex, paramIndex)] = source;
+   if (mBindingCallback)
+      mBindingCallback(nodeIndex, paramIndex, BindingEvent::Bind, modulatorNodeIndex, source.outMin, source.outMax);
 }
 
 void Modulation::RestoreLink(int nodeIndex, int paramIndex, const Source& source)
@@ -49,6 +51,8 @@ void Modulation::SetRange(int nodeIndex, int paramIndex, float inMin, float inMa
    it->second.inMax = inMax;
    it->second.outMin = outMin;
    it->second.outMax = outMax;
+   if (mBindingCallback)
+      mBindingCallback(nodeIndex, paramIndex, BindingEvent::SetRange, it->second.nodeIndex, outMin, outMax);
 }
 
 void Modulation::Unbind(int nodeIndex, int paramIndex)
@@ -72,7 +76,9 @@ void Modulation::Unbind(int nodeIndex, int paramIndex)
          }
       }
    }
-   mLinks.erase(key);
+   const bool had = mLinks.erase(key) != 0;
+   if (had && mBindingCallback)
+      mBindingCallback(nodeIndex, paramIndex, BindingEvent::Unbind, -1, 0.0f, 0.0f);
 }
 
 void Modulation::UnbindAllFor(int nodeIndex)
@@ -81,7 +87,11 @@ void Modulation::UnbindAllFor(int nodeIndex)
    for (auto it = mLinks.begin(); it != mLinks.end();)
    {
       if (it->first.first == nodeIndex || it->second.nodeIndex == nodeIndex)
+      {
+         if (mBindingCallback)
+            mBindingCallback(it->first.first, it->first.second, BindingEvent::Unbind, -1, 0.0f, 0.0f);
          it = mLinks.erase(it);
+      }
       else
          ++it;
    }

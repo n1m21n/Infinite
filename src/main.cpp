@@ -88,7 +88,10 @@
 #include "nodes/ResynthNode.h"
 #include "nodes/MacroNodes.h"
 #include "nodes/ScenesNode.h" // Turbo 0.50
-#include "nodes/DriftNode.h"
+#include "nodes/PredictionNodes.h" // Turbo 0.60: upstream Drift / Moves
+#include "nodes/PredictiveModulatorNode.h"
+#include "core/MovementLog.h"
+#include "core/MovementStats.h"
 #include "nodes/SlideshowNode.h"
 #include "nodes/AudioMeterNode.h"
 #include "nodes/UINodes.h"
@@ -276,6 +279,7 @@ namespace
    #include "app/bodies/AudioBody.inl" // DrawAudioNodeBody: the audio body dispatcher
    #include "app/bodies/SceneParams.inl" // media, geometry, 3D, material, blend and filter params
    #include "app/bodies/PopParams.inl" // the PointZ family's generic parameter body
+   #include "app/bodies/PredictionParams.inl" // Turbo 0.60: upstream Drift / Moves / Predictive Modulator
    #include "app/bodies/PortedParams.inl" // Turbo 0.60: bodies of the nodes ported from upstream
    #include "app/ui/Preview.inl" // previews, comments, groups, mini viewport, viewport panel
    #include "app/ui/Mapping.inl" // colour tags, MIDI mapping and modulation range editors

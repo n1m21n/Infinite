@@ -1123,6 +1123,9 @@
    {
       INode* node = gn.node.get();
       if (auto* n = dynamic_cast<OpticalFlowNode*>(node)) DrawOpticalFlowParams(n);
+      else if (auto* n = dynamic_cast<DriftNode*>(node)) DrawDriftParams(gn, n);
+      else if (auto* n = dynamic_cast<MovesNode*>(node)) DrawMovesParams(n);
+      else if (auto* n = dynamic_cast<PredictiveModulatorNode*>(node)) DrawPredictiveModulatorParams(n);
       else if (auto* n = dynamic_cast<TimeMachineNode*>(node)) DrawTimeMachineParams(n);
       else if (auto* n = dynamic_cast<FluidNode*>(node)) DrawFluidParams(n);
       else if (auto* n = dynamic_cast<VolumeNode*>(node)) DrawVolumeParams(n);

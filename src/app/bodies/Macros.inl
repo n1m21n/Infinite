@@ -205,27 +205,6 @@
       MacroCaption(origin, kMacroWideCell, stepH, n->label.empty() ? std::string("step gate") : n->label);
    }
 
-   void DrawDriftParams(DriftNode* n)
-   {
-      ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2f");
-      ModSlider("stray", &n->stray, 0.25f, 4.0f, "%.2f");
-      ModSlider("momentum", &n->momentum, 0.0f, 4.0f, "%.2f s");
-      ModSlider("home", &n->home, 0.0f, 1.0f, "%.2f");
-      ModSlider("range lo", &n->rangeLo, 0.0f, 1.0f, "%.2f");
-      ModSlider("range hi", &n->rangeHi, 0.0f, 1.0f, "%.2f");
-      ModSlider("depth", &n->depth, 0.0f, 1.0f, "%.2f");
-      static std::vector<std::string> kQuant;
-      if (kQuant.empty())
-      {
-         kQuant.push_back("off");
-         for (const std::string& d : MusicTime::RateDivisionList())
-            kQuant.push_back(d);
-      }
-      DropdownButton("quantize", kQuant, n->quantizeRate, [n](int i) { n->quantizeRate = i; });
-      ModSlider("smoothing", &n->smoothness, 0.0f, 0.95f, "%.2f");
-      ModSliderInt("seed", &n->seed, 1, 999);
-   }
-
    // Slideshow (upstream, originally contributed from this fork).
    void DrawCVRecorderParams(CVRecorderNode* n)
    {

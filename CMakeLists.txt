@@ -254,7 +254,11 @@ add_executable(Infinite WIN32
     src/nodes/TextureNode.cpp
     src/nodes/ResynthNode.cpp
     src/nodes/MacroNodes.cpp
-    src/nodes/DriftNode.cpp
+    src/nodes/PredictionNodes.cpp
+    src/nodes/PredictiveModulatorNode.cpp
+    src/core/MovementLog.cpp
+    src/core/MovementStats.cpp
+    external/miniz.c
     src/nodes/AudioMeterNode.cpp
     src/nodes/SlideshowNode.cpp
     src/audio/dsp/CycleShaperKernel.cpp

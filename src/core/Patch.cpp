@@ -464,7 +464,7 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
    for (const CableRecord& c : data.notes)
       file << "note " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const ModRecord& m : data.modulation)
-      file << "mod " << m.dstIndex << " " << m.dstParam << " "
+      file << "mod " << m.dstIndex << " " << (m.saveKey.empty() ? std::to_string(m.dstParam) : m.saveKey) << " "
            << m.srcIndex << " " << m.srcOutput << " "
            << m.polarity << " " << FloatToString(m.depth) << " " << FloatToString(m.centre) << " "
            << FloatToString(m.inMin) << " " << FloatToString(m.inMax) << " "
@@ -473,7 +473,8 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
       file << "pal " << p.dstIndex << " " << p.dstColor << " "
            << p.srcIndex << " " << p.srcSwatch << "\n";
    for (const ExprRecord& e : data.expressions)
-      file << "expr " << e.dstIndex << " " << e.dstParam << " " << EscapeLine(e.text) << "\n";
+      file << "expr " << e.dstIndex << " " << (e.saveKey.empty() ? std::to_string(e.dstParam) : e.saveKey) << " "
+           << EscapeLine(e.text) << "\n";
    for (const GlobalRecord& g : data.globals)
       file << "glob " << g.name << " " << EscapeLine(g.expr) << "\n";
    for (const MidiMapRecord& m : data.midi)
