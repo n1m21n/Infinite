@@ -1,6 +1,5 @@
 /* Node pages (website/nodes/*) and the node index. Built by tools/website/gen_nodes.py. Tokens only. */
 .np-cat { color: var(--cat, var(--ink2)); }
-.np-cat::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--cat, var(--ink2)); }
 .np-shot { margin: var(--web-stack-xl, 24px) 0; padding: var(--web-card-pad-lg, 24px); display: grid; place-items: center; border-radius: var(--web-card-radius, 24px); background: var(--nm-down); box-shadow: var(--nm-pocket); }
 .np-shot img { display: block; width: auto; height: auto; max-width: 100%; max-height: 440px; border-radius: var(--web-media-radius, 12px); }
 .np-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 0; }
@@ -33,7 +32,6 @@ a.np-step:hover { transform: translateY(-1px); }
 .np-chip:active, .np-step:active, .np-pill:active { box-shadow: var(--nm-pocket); }
 .np-sec { margin: var(--web-section-tight, 48px) 0 0; scroll-margin-top: 80px; }
 .np-sec h2 { display: flex; align-items: baseline; gap: 10px; }
-.np-sec h2::before { content: ""; align-self: center; width: 10px; height: 10px; border-radius: 50%; background: var(--cat); }
 .np-sec h2 small { color: var(--ink2); font-size: 0.75rem; }
 .np-sec p { color: var(--ink2); }
 .np-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
