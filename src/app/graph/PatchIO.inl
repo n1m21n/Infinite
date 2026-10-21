@@ -305,9 +305,18 @@
       }).detach();
    }
 
-   bool SavePatchTo(const std::string& path)
+   bool SavePatchTo(const std::string& path, bool collectMedia = false)
    {
       Patch::Data data = BuildPatchData();
+      // Turbo 0.61: media next to the patch is written relative; "Save with
+      // media" copies the rest there first (CollectMedia.inl).
+      if (collectMedia)
+      {
+         gCollectReport = CollectPatchMedia(data, path);
+         gCollectReportOpen = true;
+      }
+      else
+         MakeMediaRelative(data, path);
       std::string error;
       if (!Patch::Write(path, data, error))
       {
@@ -723,6 +732,7 @@
          gPatchStatus = "Open failed: " + error;
          return false;
       }
+      ResolveRelativeMedia(data, path); // Turbo 0.61: relative media paths
 
       ApplyPatchData(data, true);
       // Turbo: a Transport Control with "audio on open" starts the engine.
@@ -785,6 +795,7 @@
          }
          return false;
       }
+      ResolveRelativeMedia(data, gPatchPath); // Turbo 0.61: relative media paths
       gWatchReadFailures = 0;
       PushUndoCheckpoint();
       const bool wasSuppressed = gSuppressUndoCheckpoints;
@@ -943,7 +954,8 @@
       bool ok = false;
       std::error_code ec;
       for (const std::filesystem::path& p : candidates)
-         if (std::filesystem::exists(p, ec) && Patch::Read(p.u8string(), data, error))
+         if (std::filesystem::exists(p, ec) && Patch::Read(p.u8string(), data, error) &&
+             (ResolveRelativeMedia(data, p.u8string()), true))
          {
             ok = true;
             break;
@@ -1013,6 +1025,7 @@
          gPatchStatus = "Could not open " + path + ": " + error;
          return false;
       }
+      ResolveRelativeMedia(data, path); // Turbo 0.61: relative media paths
       ApplyPatchData(data, false);
       Transport::Instance().SetTempo(data.transport.bpm);
       Transport::Instance().SetTimeSignature(data.transport.timeSigNum, data.transport.timeSigDen);
@@ -1038,6 +1051,7 @@
          RuntimeLog::Write("recovery failed: %s", error.c_str());
          return false;
       }
+      ResolveRelativeMedia(data, path); // Turbo 0.61: relative media paths
       ApplyPatchData(data, true);
       gUndoStack.clear();
       gRedoStack.clear();

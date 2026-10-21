@@ -119,7 +119,7 @@
 
    // `afterSaved` runs once the patch was written (right away, or when the
    // Save As dialog - which no longer blocks the frame - returns a path).
-   void SavePatchInteractive(bool forceDialog, std::function<void()> afterSaved = {})
+   void SavePatchInteractive(bool forceDialog, std::function<void()> afterSaved = {}, bool collectMedia = false)
    {
       if (!gPatchPath.empty() && !forceDialog)
       {
@@ -134,7 +134,7 @@
          suggested = (slash == std::string::npos) ? gPatchPath : gPatchPath.substr(slash + 1);
       }
       StartFileDialog([suggested] { return Platform::SavePatchDialog(suggested); },
-                      [afterSaved](const std::string& chosen) {
+                      [afterSaved, collectMedia](const std::string& chosen) {
                          // Same .inf extension and text format as upstream Infinite.
                          std::string path = chosen;
                          std::string lower = path;
@@ -142,7 +142,7 @@
                                         [](unsigned char c) { return (char)std::tolower(c); });
                          if (lower.size() < 4 || lower.compare(lower.size() - 4, 4, ".inf") != 0)
                             path += ".inf";
-                         if (SavePatchTo(path) && afterSaved)
+                         if (SavePatchTo(path, collectMedia) && afterSaved)
                             afterSaved();
                       });
    }

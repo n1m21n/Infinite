@@ -114,6 +114,13 @@
                SavePatchInteractive(false);
             if (ImGui::MenuItem("Save As...", kShortcutSaveAs))
                SavePatchInteractive(true);
+            // Turbo 0.61: Collect Media - the patch plus every file it uses, in one folder.
+            if (ImGui::MenuItem("Save with media..."))
+               SavePatchInteractive(true, {}, true);
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Saves the patch and copies every file it uses (samples, video, images,\n"
+                                 "3D models, MIDI, LUTs, fonts, presets) into <name>_media next to it,\n"
+                                 "with relative paths - the folder opens on any machine.");
 
             ImGui::Separator();
             const bool recoveryOnDisk = gRecoveryAvailable ||
@@ -1211,3 +1218,4 @@
 
          ImGui::EndMenuBar();
       }
+      DrawCollectMediaReport(); // Turbo 0.61

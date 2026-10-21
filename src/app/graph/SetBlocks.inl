@@ -152,6 +152,7 @@
          gPatchStatus = "Import failed: " + error;
          return false;
       }
+      ResolveRelativeMedia(add, path); // Turbo 0.61: relative media paths
       PushUndoCheckpoint();
       Patch::Data cur = BuildPatchData();
       const bool hadContent = !cur.nodes.empty();

@@ -62,6 +62,58 @@
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return HeadlessExit(RunDspTest());
 
+   // Turbo 0.61: Collect Media, headless, in a temp folder of its own.
+   if (getenv("INFINITE_COLLECTMEDIATEST") != nullptr)
+   {
+      namespace fs = std::filesystem;
+      std::error_code ec;
+      const fs::path root = fs::temp_directory_path(ec) / "infinite_collect_test";
+      fs::remove_all(root, ec);
+      fs::create_directories(root / "a", ec);
+      fs::create_directories(root / "b", ec);
+      fs::create_directories(root / "c", ec);
+      fs::create_directories(root / "out", ec);
+      auto put = [](const fs::path& p, const char* bytes) { std::ofstream(p, std::ios::binary) << bytes; };
+      put(root / "a" / "photo.png", "same-bytes");
+      put(root / "b" / "photo.png", "same-bytes"); // same content: reused
+      put(root / "c" / "photo.png", "other-bytes"); // same name, other content: photo_2
+      Patch::Data data;
+      const char* files[4] = { "a", "b", "c", nullptr };
+      for (int i = 0; i < 4; i++)
+      {
+         Patch::NodeRecord rec;
+         rec.index = i + 1;
+         rec.typeName = "Image Source";
+         rec.category = "Source";
+         const std::string v = files[i] ? (root / files[i] / "photo.png").u8string() : std::string("C:/nope/missing.wav");
+         rec.params.push_back({ "s path", v });
+         rec.params.push_back({ "s label", "just a label" });
+         data.nodes.push_back(rec);
+      }
+      const std::string inf = (root / "out" / "test.inf").u8string();
+      const CollectReport rep = CollectPatchMedia(data, inf);
+      bool ok = rep.copied == 2 && rep.reused == 1 && rep.missing.size() == 1;
+      ok = ok && fs::exists(root / "out" / "test_media" / "images" / "photo.png", ec) &&
+           fs::exists(root / "out" / "test_media" / "images" / "photo_2.png", ec);
+      ok = ok && data.nodes[0].params[0].second == "test_media/images/photo.png" &&
+           data.nodes[1].params[0].second == "test_media/images/photo.png" &&
+           data.nodes[2].params[0].second == "test_media/images/photo_2.png" &&
+           data.nodes[0].params[1].second == "just a label";
+      std::string err;
+      Patch::Data back;
+      ok = ok && Patch::Write(inf, data, err) && Patch::Read(inf, back, err);
+      if (ok)
+      {
+         ResolveRelativeMedia(back, inf);
+         fs::path p0 = fs::u8path(back.nodes[0].params[0].second);
+         ok = p0.is_absolute() && fs::exists(p0, ec);
+      }
+      printf("COLLECTMEDIATEST copied=%d reused=%d missing=%d  %s\n", rep.copied, rep.reused, (int)rep.missing.size(),
+             ok ? "OK" : "FAIL");
+      fs::remove_all(root, ec);
+      return HeadlessExit(0);
+   }
+
    // Turbo 0.60: upstream's movement log / stats tests (gesture learning).
    if (getenv("INFINITE_MOVELOGTEST") != nullptr)
    {

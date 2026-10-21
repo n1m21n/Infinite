@@ -1,5 +1,34 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.61.0-turbo (2026-10-21)
+
+3D quality and 360 output, and patches that travel with their media.
+
+### Render 3D
+- **Linear HDR**: the scene is lit and blended in 16-bit float and finished in one pass - **bloom**
+  (threshold, radius) from what is brighter than white, tonemaps **ACES**, Reinhard, **AgX** and
+  **Khronos PBR Neutral**, sRGB and dither. The plain background colour stays exactly as chosen;
+  depth / normals / position passes are untouched.
+- **HDRI lighting done properly**: a GGX-prefiltered copy of the HDRI (one roughness per mip), a
+  diffuse irradiance map and the BRDF table (split-sum, as the Khronos glTF-Sample-Viewer) replace
+  the mip-blur approximation - metals and rough surfaces read correctly.
+- **Path traced** mode: a progressive GPU path tracer over the same meshes, materials, lights and
+  HDRI - soft shadows, light bouncing between objects, real glass. Noisy at first, clean after
+  `samples` frames; any change restarts it. Meshes only (no point sprites), surface texture only.
+- **360 output**: equirectangular (2:1) or cubemap 3x2, from the camera's position. Raster renders
+  six faces through the normal pipeline (cached when nothing moves); path traced traces the
+  panorama directly.
+
+### Files
+- **FILE > Save with media...** (Collect Media): the patch plus every file it uses (samples, video,
+  images, 3D models with their glTF buffers, MIDI, LUTs, fonts, presets) copied into
+  `<name>_media/<type>/` next to it, same content once, with a report of what was copied and what
+  is missing. Paths inside the patch's folder are saved relative and resolved on open, so the folder
+  opens on any machine.
+
+### Tests
+- PATHTRACETEST, PANORAMATEST, COLLECTMEDIATEST.
+
 ## 0.60.0-turbo (2026-10-21)
 
 Catch-up with upstream (Naman's Infinite) after v0.6: 30 nodes and operators, taken as upstream wrote

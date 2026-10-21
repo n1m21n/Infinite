@@ -5,7 +5,11 @@ CHANGELOG-TURBO.md when it ships.
 
 ## Next revision
 
-- Collect files: "Save with media" (Save As option) copies every file the patch uses (samples, drum kits and MIDI, video / images / 3D models, plugin presets, LUTs, fonts) into a folder next to the .inf (e.g. <name>_media/ by type), rewrites the paths to relative ones, skips duplicates by content, and shows a report of missing files. Needs: one central list of path params per node, relative path resolution on load, and a "missing files" relink dialog.
+- Collect Media, what 0.61 left: a relink dialog for missing files (pick a folder, match by name);
+  folders as media (a drum kit given as a folder); files that live outside text params (plugin
+  state, Looper takes in the app folder).
+- Render 3D: GTAO / SSAO (needs a normals buffer), cascaded shadows, point-light shadows; path
+  traced: point sprites, normal / roughness maps, a denoiser (OIDN), HDRI importance sampling.
 
 ## Later
 
@@ -43,7 +47,8 @@ CHANGELOG-TURBO.md when it ships.
 - Upstream interop, keys Turbo does not read yet (from the compat report): Looper take / thru
   (Turbo's Looper is its own rewrite), Drift's new modes (with the gesture-learning item), Output
   offline render settings (headless), MIDI File speed / position, Audio File pitch, Note Capturer
-  scale, Random Note step timing (NoteNodes.cpp differs a lot on both sides).
+  scale, Random Note step timing (NoteNodes.cpp differs a lot on both sides). (Drift's new modes
+  arrived in 0.60 with upstream's Drift.)
 - Rest of the audio engine from upstream (multi-output nodes, Splitter crossover, worker pool,
   ParamMailbox frame stamps) - Turbo's AudioEngine is kept for now.
 - Upstream UI parity for modulators: FixedParamOrdinal / RegisterHiddenParam (stable slider

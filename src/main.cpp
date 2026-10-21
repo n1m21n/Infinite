@@ -285,6 +285,7 @@ namespace
    #include "app/ui/Mapping.inl" // colour tags, MIDI mapping and modulation range editors
    #include "app/ui/Help.inl" // node help texts and the help window
    #include "app/graph/AudioGraph.inl" // audio topology, engine start, scene settings, device recovery
+   #include "app/graph/CollectMedia.inl" // Turbo 0.61: Save with media, portable relative paths
    #include "app/graph/PatchNames.inl" // Turbo 0.60: upstream patches with names, keys, lo/hi
    #include "app/graph/PatchIO.inl" // patch save / load / autosave / recovery, undo
    #include "app/graph/Rpc.inl" // MCP remote control (RPC) helpers
