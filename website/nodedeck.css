@@ -21,3 +21,4 @@
 .nd-t:hover { text-decoration: underline; text-underline-offset: 3px; }
 .np-index .nd { --mid: var(--surface-1); --mid-ink: var(--ink); margin-top: 8px; }
 .nd-hud, .nd-hud *, .ns-bar, .ns-bar * { touch-action: manipulation; }   /* rapid arrow taps never trigger double-tap zoom */
+.np-index .nd { width: 100vw; margin-left: calc(50% - 50vw); }   /* the fan runs edge to edge like the blog and library decks, not clipped to the text column */
