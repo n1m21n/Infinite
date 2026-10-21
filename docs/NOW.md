@@ -12,6 +12,15 @@ Process: `.claude/skills/infinite-lifecycle/SKILL.md` (follow it in every decisi
 | Makes right | Quality lead over the re-survey peers: audio correctness, first run, DSP lead (plan: `docs/plans/v0.6-quality/README.md`); every escaped v0.5.0 fix lands with a regression test |
 | Done when | Plan blocks 1-3 merged (63 items, nothing planned past v0.6); scoreboard 0 unmeasured, F1/F13/F14 gone; fewer escaped fixes than v0.5.0; known failures don't grow; 0 reverts |
 
+## Laptops (roles are fixed; `hostname -s` tells you which one you are)
+
+| Hostname | Role | May | May not |
+|---|---|---|---|
+| `Namans-MacBook-Pro-366` | **Primary** (account 1) | merge `main`, push `origin`, build, bench, release; v0.6 blocks | - |
+| `Namans-MacBook-Air` | **Secondary + Marketing** (account 2) | edit code in its own worktree `~/infinte-wt/<slug>`, commit on `air/<slug>`; marketing lane (website, brand, films, video, social) | merge to `main`, push `origin`, build/bench/release |
+
+Claims from the Air start with `air-`. Full rules, sync and dispatch: `docs/plans/two-laptops/README.md`.
+
 ## Claims (add a row before touching anything; remove it when done)
 
 | Session | Branch / worktree | Quest | Uses | Since |
