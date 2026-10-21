@@ -1,5 +1,14 @@
 [
  {
+  "slug": "audio-reactive-glsl-shaders",
+  "title": "Audio-reactive GLSL shaders: writing real-time visuals in Infinite",
+  "description": "Learn how to write real-time audio-reactive GLSL shaders in Infinite, map FFT frequency bands to shader uniforms, and generate responsive visuals on the GPU.",
+  "date": "2026-10-21",
+  "updated": "2026-10-21",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html"
+ },
+ {
   "slug": "lorenz-attractor-interactive-simulation",
   "title": "Lorenz attractor interactive simulation in creative coding",
   "description": "How to build a Lorenz attractor interactive simulation in real time using differential equations, interactive Sketch code, and audio modulation.",

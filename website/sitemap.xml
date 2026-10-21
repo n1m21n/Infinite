@@ -3,6 +3,7 @@
   <url><loc>https://infinitedevices.org/</loc><lastmod>2026-10-21</lastmod><priority>1.0</priority></url>
   <url><loc>https://infinitedevices.org/library.html</loc><lastmod>2026-10-21</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/blog/</loc><lastmod>2026-10-21</lastmod><priority>0.8</priority></url>
+  <url><loc>https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/lorenz-attractor-interactive-simulation.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/euclidean-rhythm-sequencer-algorithm.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/interactive-audio-reactive-webgl-embeds-for-websites.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
