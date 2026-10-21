@@ -434,7 +434,7 @@ def head(title, desc, url, image, ld, rel="nodes/x.html", bodyclass="blog-page b
   <link rel="stylesheet" href="../style.css?v=60c68394">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
-  <link rel="stylesheet" href="../nodepage.css?v=47e4a6c8">
+  <link rel="stylesheet" href="../nodepage.css?v=2bc833fd">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="{bodyclass}">
@@ -540,6 +540,11 @@ def io_sentence(t):
     return "It takes %s in and ends the chain." % io_phrase(ins, "in")
 
 
+def _jsv():
+    import hashlib
+    return hashlib.md5(open(os.path.join(W, "nodesphere.js"), "rb").read()).hexdigest()[:8]
+
+
 def index_page(items):
     import sync_chrome as chrome
     rel = "nodes/index.html"
@@ -582,7 +587,7 @@ def index_page(items):
   {chrome.footer_html(rel)}
 
   <script src="../site.js?v={chrome.JS_VERSION}" defer></script>
-  <script src="../nodesphere.js?v=1" defer></script>
+  <script src="../nodesphere.js?v={_jsv()}" defer></script>
 </body>
 </html>
 """
