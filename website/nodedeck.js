@@ -14,4 +14,9 @@
   grid.addEventListener('keydown', function (e) {
     if (e.key === 'ArrowRight') { e.preventDefault(); deck.step(1); } else if (e.key === 'ArrowLeft') { e.preventDefault(); deck.step(-1); }
   });
+  grid.addEventListener('click', function (e) {       // a tap on the front card opens its node page (a tap on another card just brings it forward)
+    if (e.defaultPrevented) return;
+    var c = e.target.closest('.nd-card');
+    if (c && c === cards[deck.index]) { var n = c.getAttribute('data-node'); location.href = n ? 'nodes/' + n + '.html' : 'nodes/'; }
+  });
 })();
