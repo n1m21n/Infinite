@@ -386,6 +386,12 @@ def shots(items):
             im.save(dst, "WEBP", quality=82, method=6)
         im = Image.open(dst)
         it["shot"] = (fs + ".webp", im.size[0], im.size[1])
+        rg = os.path.join(W, "assets/nodes/ring", fs + ".webp")       # small copy for the ring, so a phone never decodes the big one
+        if not os.path.exists(rg):
+            os.makedirs(os.path.dirname(rg), exist_ok=True)
+            th = im.convert("RGBA")
+            th = th.resize((max(1, round(th.size[0] * 560 / th.size[1])), 560), Image.LANCZOS)
+            th.save(rg, "WEBP", quality=80, method=6)
 
 
 def chain_html(it, bynorm, prefix=""):
@@ -434,7 +440,7 @@ def head(title, desc, url, image, ld, rel="nodes/x.html", bodyclass="blog-page b
   <link rel="stylesheet" href="../style.css?v=60c68394">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
-  <link rel="stylesheet" href="../nodepage.css?v=cea194f1">
+  <link rel="stylesheet" href="../nodepage.css?v=00f92b8a">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="{bodyclass}">
@@ -571,7 +577,7 @@ def index_page(items):
         % (slug(c), e(CAT_LABEL[c]), len([i for i in items if i["cat"] == c])) for c in fams)
     chips = ('<div class="ns-sel"><button type="button" class="ns-select" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by family">%s<span class="ns-select-val">All</span>%s</button>'
              '<div class="ns-menu" role="listbox" aria-label="Family" hidden>%s</div></div>' % (SEL_IC, CHEV, opts))
-    cloud = "".join('<a class="ns-a" data-fam="%s" data-fl="%s" data-n="%s"%s href="%s.html">%s</a>' % (slug(i["cat"]), e(CAT_LABEL[i["cat"]]), e(i["name"]), (' data-img="../assets/nodes/hd/%s"' % i["shot"][0]) if i["shot"] else "", i["slug"], e(i["name"]))
+    cloud = "".join('<a class="ns-a" data-fam="%s" data-fl="%s" data-n="%s"%s href="%s.html">%s</a>' % (slug(i["cat"]), e(CAT_LABEL[i["cat"]]), e(i["name"]), (' data-img="../assets/nodes/ring/%s"' % i["shot"][0]) if i["shot"] else "", i["slug"], e(i["name"]))
                     for i in sorted(items, key=lambda i: (order.index(i["cat"]), i["name"].lower())))
     body = f"""  {chrome.header_html(rel)}
 

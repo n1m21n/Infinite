@@ -23,6 +23,10 @@
     stage.style.height = (ch + 40) + 'px';
     PX = (cw / (2 * Math.tan(STEP / 2))) * Math.sin(STEP);
   }
+  function unload(a) {                                // give the memory back once a card is far away
+    if (!a.getAttribute('data-ld')) return;
+    a.removeAttribute('data-ld'); a.textContent = a.getAttribute('data-n');
+  }
   function load(a) {
     if (a.getAttribute('data-ld')) return;
     a.setAttribute('data-ld', '1');
@@ -32,12 +36,12 @@
     a.textContent = ''; a.appendChild(im);
   }
   function render() {
-    var R = cw / (2 * Math.tan(STEP / 2)), cur = ((Math.round(pos) % m) + m) % m, i;
+    var R = cw / (2 * Math.tan(STEP / 2)), cur = ((Math.round(pos) % m) + m) % m, i, calm = Math.abs(target - pos) < 6;
     for (i = 0; i < m; i++) {
       var a = act[i], d = wrapd(i - pos), ad = Math.abs(d);
-      if (ad > 3.5) { if (a._v !== 0) { a.style.visibility = 'hidden'; a._v = 0; } continue; }
+      if (ad > 3.5) { if (a._v !== 0) { a.style.visibility = 'hidden'; a.style.transform = 'none'; a._v = 0; } if (ad > 6) unload(a); continue; }
       if (a._v !== 1) { a.style.visibility = 'visible'; a._v = 1; }
-      if (ad < 4.5) load(a);
+      if (ad < 1.5 || (calm && ad < 4.5)) load(a);   // cards flying past during a fast spin stay text until they settle
       var th = d * STEP, o = ad < 0.6 ? 1 : Math.max(0, 1 - (ad - 0.6) * 0.36);
       a.style.transform = 'translate3d(' + (R * Math.sin(th)).toFixed(1) + 'px,0,' + (R * (Math.cos(th) - 1)).toFixed(1) + 'px) rotateY(' + (-th * 57.2958).toFixed(2) + 'deg)';
       a.style.opacity = o.toFixed(3); a.style.zIndex = 1000 - Math.round(ad * 20);
