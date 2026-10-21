@@ -2165,6 +2165,7 @@ namespace app
          rateSlot.maxValue = rateHi;
          rateSlot.name = "rate";
          Modulation::Instance().RegisterParam(rateSlot);
+         NoteHiddenParamAnchorAtLastItem(rateSlot.paramIndex);
       }
       else
       {

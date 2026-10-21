@@ -1102,6 +1102,13 @@ bool gHeadlessNeedProbe = false;
    {
       gPinAnchors[nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex] = screenPos;
    }
+   void NoteHiddenParamAnchorAtLastItem(int paramIndex)
+   {
+      if (gParamRegisterOnly || ImGui::GetCurrentContext() == nullptr || ImGui::GetCurrentContext()->CurrentWindow == nullptr)
+         return;
+      const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+      NoteHiddenParamAnchor(gCurrentNodeIndex, paramIndex, ImVec2(mn.x, (mn.y + mx.y) * 0.5f));
+   }
 
    // Set while a collapsed node runs its parameter dispatch purely to
    // re-register its params (see the params block in the node loop). Every

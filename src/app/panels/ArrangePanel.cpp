@@ -3923,7 +3923,7 @@ namespace app
                // How this clip lays over the lanes below it. Applies to every
                // selected video clip, like Color Tint.
                const int curMode = Arrange::FindClip(gArrange, cid)->blendMode;
-               const std::vector<std::string>& modes = BlendModes::Names();
+               const std::vector<std::string>& modes = BlendModes::NamesFor(curMode);
                for (int m = 0; m < (int)modes.size(); m++)
                {
                   ImGui::PushID(m + 900);

@@ -972,6 +972,8 @@ namespace app
          rateSlot.maxValue = 2.0f;
          rateSlot.name = "rate";
          Modulation::Instance().RegisterParam(rateSlot);
+         // A cable into the hidden rate shows dotted, ending on the division dropdown.
+         NoteHiddenParamAnchorAtLastItem(rateSlot.paramIndex);
       }
       else
       {
@@ -1480,7 +1482,10 @@ namespace app
       }
 
       {
-         AudioKnobRow row(2);
+         // Synced mode is two dropdowns that carry their names inside the
+         // face, so no caption strip is reserved under them (it left a gap
+         // above the manual checkbox); Free mode has a captioned knob.
+         AudioKnobRow row(2, kKnobSmall, 0.0f, n->rateMode != 0);
          DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
          row.End();
       }

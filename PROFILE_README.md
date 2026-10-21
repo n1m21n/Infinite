@@ -20,6 +20,12 @@
     <a href="https://instagram.com/n1m21n"><img src="https://img.shields.io/badge/Instagram-@n1m21n-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
   </p>
 
+  <p align="center">
+    <a href="https://infinitedevices.org">
+      <img src="https://raw.githubusercontent.com/n1m21n/Infinite/main/website/assets/badges/visualizer.svg" alt="infinite visualizer" width="460" />
+    </a>
+  </p>
+
 </div>
 
 ---

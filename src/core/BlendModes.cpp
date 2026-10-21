@@ -21,6 +21,12 @@ namespace BlendModes
       return kNames;
    }
 
+   const std::vector<std::string>& NamesFor(int current)
+   {
+      static const std::vector<std::string> kLive(kNames.begin(), kNames.begin() + kAntiEraseMode + 1);
+      return current > kAntiEraseMode ? kNames : kLive;
+   }
+
    const char* kBlendGLSL =
       "float Lum(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }\n"
       "vec3 ClipColor(vec3 c) {\n"
