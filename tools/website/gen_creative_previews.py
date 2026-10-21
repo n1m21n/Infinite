@@ -383,3 +383,9 @@ if __name__ == "__main__":
     render_supernova()
     render_hyperbolic_kaleidoscope()
     print("All 10 preview images successfully generated!")
+
+    # Automatically generate corresponding WebP thumbnails for library deck
+    thumbs_script = os.path.join(ROOT, "tools", "website", "gen_library_thumbs.py")
+    if os.path.exists(thumbs_script):
+        import subprocess, sys
+        subprocess.run([sys.executable, thumbs_script], check=True)
