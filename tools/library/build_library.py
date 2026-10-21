@@ -216,6 +216,11 @@ def main():
             z.write(os.path.join(ROOT, "website", it["file"]), f"{it['domain']}/{os.path.basename(it['file'])}")
     print(f"wrote {len(items)} devices, index.json and infinite-library.zip in {os.path.relpath(OUT, ROOT)}")
 
+    # ensure library thumbnails match
+    thumbs_script = os.path.join(ROOT, "tools", "website", "gen_library_thumbs.py")
+    if os.path.exists(thumbs_script) and not a.no_preview:
+        subprocess.run([sys.executable, thumbs_script], check=True)
+
 
 if __name__ == "__main__":
     main()
