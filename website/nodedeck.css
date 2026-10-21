@@ -17,7 +17,7 @@
 .nd-d { font: 400 var(--size-caption)/1.3 'Geist', system-ui, sans-serif; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 680px) { .nd-grid { height: 380px; } .nd-card { width: 244px; height: 330px; margin: -165px 0 0 -122px; border-radius: var(--web-card-radius); } .nd-info { width: clamp(140px, 46vw, 220px); } }
 
-.nd-t { color: inherit; text-decoration: none; }
+.nd-t { color: inherit; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* one line each, so the HUD never changes height */
 .nd-t:hover, .nd-go:hover { text-decoration: underline; text-underline-offset: 3px; }
 .nd-go { font: 500 var(--size-caption)/1.3 'Geist', system-ui, sans-serif; color: var(--ink-2); text-decoration: none; justify-self: center; }
 .nd-go::after { content: " \2192"; }
