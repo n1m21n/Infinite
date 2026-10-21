@@ -183,3 +183,6 @@
 .deck-hud-title { text-align: center; }
 .deck-nav-btn, .deck-icon-btn { width: 36px; height: 36px; }
 .deck-progress-row { max-width: 280px; }
+
+/* fast repeated taps on the arrows must never trigger the browser's double-tap zoom */
+.deck-hud-wrap, .deck-hud-wrap *, .lib-hud-wrap, .lib-hud-wrap *, .view-pill, .lib-hud-nav, .lib-hud-act { touch-action: manipulation; }

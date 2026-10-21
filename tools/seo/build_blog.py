@@ -221,7 +221,7 @@ def build_index(posts, header, footer):
              "Notes on building and using Infinite, the free open-source DAW for visuals, music and code on one canvas. Tutorials, engineering write-ups and ideas.",
              BASE + "blog/", "assets/og-image.jpg", ld(blog_ld) + ld(crumbs))
     s = s.replace('blog.css?v=', 'blog.css?v=', 1)
-    s = re.sub(r'(<link rel="stylesheet" href="\.\./blog\.css\?v=[A-Za-z0-9]+">)', r'\1\n  <link rel="stylesheet" href="../deck.css?v=2b385582">', s, count=1)
+    s = re.sub(r'(<link rel="stylesheet" href="\.\./blog\.css\?v=[A-Za-z0-9]+">)', r'\1\n  <link rel="stylesheet" href="../deck.css?v=e7678fc1">', s, count=1)
     s += f"""<body class="blog-page blog-index">
   {header}
 
