@@ -480,7 +480,7 @@ main > .section:last-of-type { padding-bottom: var(--web-section); }   /* the pa
    Nature
    -------------------------------------------------------------------------- */
 .nature-canvas-wrapper { width: 100%; height: 460px; position: relative; }
-#nature-branch-canvas { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+#nature-branch-canvas { width: 100%; height: 100%; display: block; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; }
 
 /* --------------------------------------------------------------------------
    Listen: white waveform card (film act IV)

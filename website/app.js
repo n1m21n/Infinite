@@ -328,6 +328,13 @@ function getCanvasPoint(clientX, clientY) {
 
 // Interactive Modern Pointer & Drag Events (Instant Touch & Mouse Tracking)
 if (natureCanvas) {
+  // a finger that lands on empty space scrolls the page; only a finger on a node holds the page still to drag it
+  natureCanvas.addEventListener('touchstart', (e) => {
+    const t = e.touches[0]; if (!t) return;
+    updateNatureCanvasRect();
+    const pt = getCanvasPoint(t.clientX, t.clientY);
+    if (getNodeAtPoint(pt.x, pt.y, Math.min(window.devicePixelRatio || 1, 2.5))) e.preventDefault();
+  }, { passive: false });
   natureCanvas.addEventListener('pointerdown', (e) => {
     updateNatureCanvasRect();
     const pt = getCanvasPoint(e.clientX, e.clientY);

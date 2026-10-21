@@ -28,7 +28,7 @@
   <!-- Direct Website Stylesheet -->
   <link rel="stylesheet" href="brand.css?v=36336012">
   <script src="theme.js?v=1"></script>
-  <link rel="stylesheet" href="style.css?v=097b68e2">
+  <link rel="stylesheet" href="style.css?v=d046c735">
 
   <style>
     /* ==========================================================================
@@ -858,6 +858,16 @@
 
   </div>
 
+  <script>
+    // phones and narrow windows: shrink the 1080px slides to fit the screen (print and export keep full size)
+    (function () {
+      var box = document.querySelector('.deck-container');
+      function fit() { if (box) box.style.zoom = Math.min(1, document.documentElement.clientWidth / 1080); }
+      fit(); window.addEventListener('resize', fit);
+      window.addEventListener('beforeprint', function () { if (box) box.style.zoom = 1; });
+      window.addEventListener('afterprint', fit);
+    })();
+  </script>
   <!-- Live Dynamic Canvas Scripts directly borrowed from website/app.js -->
   <script>
     // 1. Connected by Nature: Dynamic Connected Network Graph
