@@ -120,7 +120,7 @@ in addition to these seven audiovisual transformers, infinite includes over 300 
 - **klein bottle & mobius strip**: non-orientable 4d and 3d topological manifold surfaces.
 - **fluid**: real-time 2d navier-stokes grid fluid dynamics with velocity advection and dye injection.
 - **cloth**: verlet particle-spring physics simulation responding to audio wind and turbulence.
-- **paulstretch**: extreme 64-bit spectral phase vocoder stretching audio by 10x to 1000x into lush ambient drones.
+- **[paulstretch](https://infinitedevices.org/blog/paulstretch-extreme-spectral-time-stretching.html)**: extreme 64-bit spectral phase vocoder stretching audio by 10x to 1000x into lush ambient drones.
 - **face, hand, & pose track**: on-device neural vision modulators turning physical movement into modulation cables.
 
 all of these nodes run natively on macos, windows, and linux, and can be inspected in the [node reference manual](https://infinitedevices.org/assets/Infinite_Node_Reference_Manual.pdf) and [library gallery](https://infinitedevices.org/library.html).
