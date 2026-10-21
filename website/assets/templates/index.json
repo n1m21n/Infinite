@@ -497,6 +497,38 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "karplus-strong-synth",
+      "name": "Karplus-Strong Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical modeling plucked string synthesizer using the Karplus-Strong algorithm with noise burst excitation, low-pass loss filter and body resonance.",
+      "price": 0,
+      "preview": "assets/templates/karplus-strong-synth.webp",
+      "file": "assets/templates/karplus-strong-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "frequency-shifter-fx",
+      "name": "Frequency Shifter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Bode-style single-sideband frequency shifter with quadrature Hilbert phase-shifting, through-zero shift modulation and harmonic ring modulation.",
+      "price": 0,
+      "preview": "assets/templates/frequency-shifter-fx.webp",
+      "file": "assets/templates/frequency-shifter-fx.inf",
+      "nodes": [
+        "Oscillator",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

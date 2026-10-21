@@ -1,0 +1,44 @@
+infinite-patch 1
+# Karplus-Strong Synth: physical modeling plucked string synthesizer Field Synth
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 38
+  i rangeHigh 68
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float pluck = 0.85 [0.1, 1.0]\nparam float damping = 0.35 [0.0, 0.95]\nparam float decay = 2.8 [0.2, 8.0]\nparam float body = 0.45 [0.0, 1.0]\nparam float warmth = 1.25 [1.0, 3.0]\nparam float release = 0.35 [0.05, 2.0]\nstate float p0 = 0\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float pluckEnv = 0\nstate float lastGate = 0\nstate float noiseState = 0.41829\nstate float bodyState = 0\nstate float ampEnv = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nisTrig = if(target > 0.5 && lastGate <= 0.5, 1.0, 0.0)\nlastGate = target\n\npluckEnv = if(isTrig > 0.5, 1.0, max(0.0, pluckEnv - 1.0 / (sr * (0.003 + (1.0 - pluck) * 0.015))))\n\nnoiseState = (noiseState * 196314.165 + 90763.3) % 1.0\nnoise = (noiseState * 2.0 - 1.0) * pluckEnv\n\nampDecay = clamp(1.0 / (sr * decay), 0.00001, 0.01)\nrelDecay = clamp(1.0 / (sr * release), 0.00005, 0.02)\nampEnv = if(target > ampEnv, ampEnv + (target - ampEnv) * 0.25, if(target > 0.5, ampEnv - ampEnv * ampDecay, ampEnv - ampEnv * relDecay))\n\nf0 = clamp(freq, 20.0, 4800.0)\nstep0 = f0 / sr\np0 = (p0 + step0) % 1.0\np1 = (p1 + step0 * 2.0) % 1.0\np2 = (p2 + step0 * 3.0) % 1.0\np3 = (p3 + step0 * 4.0) % 1.0\n\nw0 = sin(p0 * 6.2831853)\nw1 = sin(p1 * 6.2831853) * exp(-damping * 1.2)\nw2 = sin(p2 * 6.2831853) * exp(-damping * 2.4)\nw3 = sin(p3 * 6.2831853) * exp(-damping * 3.8)\n\nstringSig = (w0 + w1 * 0.65 + w2 * 0.42 + w3 * 0.25 + noise * 0.85 * pluck) * warmth\nsat = stringSig / (1.0 + abs(stringSig) * 0.22)\n\nfBody = clamp(240.0 / sr * 3.14159, 0.01, 0.45)\nbodyState = bodyState + fBody * (sat - bodyState)\n\nout = (sat * (1.0 - body * 0.5) + bodyState * (body * 0.8)) * ampEnv * 0.62\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Karplus-Strong Synth. Physical modeling plucked string with excitation burst and body resonance.
+  f width 360
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.18 0.5
+mod pic sizeY ana 0 0 1 0.5 0.18 0.5

@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 117,
+ "count": 124,
  "items": [
   {
    "id": "first-sound",
@@ -374,6 +374,30 @@
    "file": "https://infinitedevices.org/assets/templates/bitcrush-degrader-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/bitcrush-degrader-fx.webp",
    "page": "https://infinitedevices.org/library/bitcrush-degrader-fx.html"
+  },
+  {
+   "id": "karplus-strong-synth",
+   "name": "Karplus-Strong Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Physical modeling plucked string synthesizer using the Karplus-Strong algorithm with noise burst excitation, low-pass loss filter and body resonance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/karplus-strong-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/karplus-strong-synth.webp",
+   "page": "https://infinitedevices.org/library/karplus-strong-synth.html"
+  },
+  {
+   "id": "frequency-shifter-fx",
+   "name": "Frequency Shifter FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Bode-style single-sideband frequency shifter with quadrature Hilbert phase-shifting, through-zero shift modulation and harmonic ring modulation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/frequency-shifter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/frequency-shifter-fx.webp",
+   "page": "https://infinitedevices.org/library/frequency-shifter-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -1406,6 +1430,66 @@
    "file": "https://infinitedevices.org/assets/library/pixel/solar-flare.field",
    "preview": "https://infinitedevices.org/assets/library/previews/solar-flare.jpg",
    "page": "https://infinitedevices.org/library/solar-flare.html"
+  },
+  {
+   "id": "dejong-attractor",
+   "name": "De Jong Attractor",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Peter de Jong 4-parameter chaotic trigonometric attractor with high-density particle accumulation, luminous gossamer folds and phase drift.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/dejong-attractor.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/dejong-attractor.jpg",
+   "page": "https://infinitedevices.org/library/dejong-attractor.html"
+  },
+  {
+   "id": "breather-surface-3d",
+   "name": "Breather Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Parametric Breather soliton surface from the sine-Gordon equation with transverse wireframe ribs, breathing helical lobes and orbiting quanta.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/breather-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/breather-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/breather-surface-3d.html"
+  },
+  {
+   "id": "karplus-strong-synth",
+   "name": "Karplus-Strong Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Physical modeling plucked string synthesizer using the Karplus-Strong algorithm with noise burst excitation, low-pass loss filter and body resonance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/karplus-strong-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/karplus-strong-synth.jpg",
+   "page": "https://infinitedevices.org/library/karplus-strong-synth.html"
+  },
+  {
+   "id": "frequency-shifter-fx",
+   "name": "Frequency Shifter FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Bode-style single-sideband frequency shifter with quadrature Hilbert phase-shifting, through-zero shift modulation and harmonic ring modulation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/frequency-shifter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/frequency-shifter-fx.jpg",
+   "page": "https://infinitedevices.org/library/frequency-shifter-fx.html"
+  },
+  {
+   "id": "gravitational-lensing",
+   "name": "Gravitational Lensing",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Relativistic black hole gravitational lensing with Einstein rings, warped starfield caustics, Doppler-boosted accretion disk and audio-reactive photon sphere.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/gravitational-lensing.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/gravitational-lensing.jpg",
+   "page": "https://infinitedevices.org/library/gravitational-lensing.html"
   }
  ]
 }

@@ -969,6 +969,101 @@
       "file": "assets/library/pixel/solar-flare.field",
       "preview": "assets/library/previews/solar-flare.jpg",
       "bytes": 1703
+    },
+    {
+      "id": "dejong-attractor",
+      "name": "De Jong Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math",
+        "drawing"
+      ],
+      "description": "Peter de Jong 4-parameter chaotic trigonometric attractor with high-density particle accumulation, luminous gossamer folds and phase drift.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 8,
+      "file": "assets/library/sketch/dejong-attractor.js",
+      "preview": "assets/library/previews/dejong-attractor.jpg",
+      "bytes": 1760
+    },
+    {
+      "id": "breather-surface-3d",
+      "name": "Breather Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "parametric",
+        "soliton"
+      ],
+      "description": "Parametric Breather soliton surface from the sine-Gordon equation with transverse wireframe ribs, breathing helical lobes and orbiting quanta.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 7,
+      "file": "assets/library/sketch/breather-surface-3d.js",
+      "preview": "assets/library/previews/breather-surface-3d.jpg",
+      "bytes": 3211
+    },
+    {
+      "id": "karplus-strong-synth",
+      "name": "Karplus-Strong Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "karplus-strong",
+        "physical-modeling",
+        "dsp"
+      ],
+      "description": "Physical modeling plucked string synthesizer using the Karplus-Strong algorithm with noise burst excitation, low-pass loss filter and body resonance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 6,
+      "file": "assets/templates/karplus-strong-synth.inf",
+      "preview": "assets/library/previews/karplus-strong-synth.jpg",
+      "bytes": 2525
+    },
+    {
+      "id": "frequency-shifter-fx",
+      "name": "Frequency Shifter FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "frequency-shifter",
+        "hilbert",
+        "dsp"
+      ],
+      "description": "Bode-style single-sideband frequency shifter with quadrature Hilbert phase-shifting, through-zero shift modulation and harmonic ring modulation.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 6,
+      "file": "assets/templates/frequency-shifter-fx.inf",
+      "preview": "assets/library/previews/frequency-shifter-fx.jpg",
+      "bytes": 2185
+    },
+    {
+      "id": "gravitational-lensing",
+      "name": "Gravitational Lensing",
+      "kind": "Generator",
+      "tags": [
+        "black-hole",
+        "lensing",
+        "reactive",
+        "visuals"
+      ],
+      "description": "Relativistic black hole gravitational lensing with Einstein rings, warped starfield caustics, Doppler-boosted accretion disk and audio-reactive photon sphere.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/gravitational-lensing.field",
+      "preview": "assets/library/previews/gravitational-lensing.jpg",
+      "bytes": 2219
     }
   ]
 }

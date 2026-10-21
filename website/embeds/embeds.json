@@ -125,6 +125,11 @@
       "slug": "solar-flare",
       "title": "Solar Flare",
       "description": "Blinding coronal solar flares with twisting magnetic loop prominences, turbulent convection granulation and audio-reactive coronal mass ejections."
+    },
+    {
+      "slug": "gravitational-lensing",
+      "title": "Gravitational Lensing",
+      "description": "Relativistic black hole gravitational lensing with Einstein rings, warped starfield caustics, Doppler-boosted accretion disk and audio-reactive photon sphere."
     }
   ]
 }

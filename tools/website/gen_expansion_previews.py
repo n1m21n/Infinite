@@ -1516,30 +1516,312 @@ def render_solar_flare():
     print("solar-flare.jpg saved")
 
 
+def render_dejong_attractor():
+    """Peter de Jong chaotic attractor density plot."""
+    w, h = 900, 600
+    acc = np.zeros((h, w), dtype=np.float32)
+    a, b, c, d = -2.24, -1.65, 0.43, -2.43
+    x, y = 0.1, 0.1
+    cx, cy = w / 2, h / 2
+    k = min(w, h) * 0.22
+
+    n_points = 1800000
+    for _ in range(n_points):
+        nx = math.sin(a * y) - math.cos(b * x)
+        ny = math.sin(c * x) - math.cos(d * y)
+        x, y = nx, ny
+
+        px = int(cx + x * k)
+        py = int(cy + y * k)
+        if 0 <= px < w and 0 <= py < h:
+            acc[py, px] += 1.0
+
+    acc = np.log1p(acc * 0.7)
+    max_val = np.percentile(acc[acc > 0], 99.7) if np.any(acc > 0) else 1.0
+    norm = np.clip(acc / max_val, 0.0, 1.0)
+
+    img_glow = Image.fromarray((norm * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.4))
+    glow_arr = np.array(img_glow, dtype=np.float32) / 255.0
+
+    out = np.zeros((h, w, 3), dtype=np.float32)
+    for c_idx in range(3):
+        out[:, :, c_idx] = GROUND[c_idx]
+
+    for y_idx in range(h):
+        for x_idx in range(w):
+            v = norm[y_idx, x_idx]
+            g_val = glow_arr[y_idx, x_idx]
+            if v > 0 or g_val > 0:
+                dist = math.sqrt((x_idx - cx)**2 + (y_idx - cy)**2) / (min(w, h) * 0.48)
+                mix_col = SIGNAL * (1.0 - min(1.0, dist * 0.8)) + EMBER * min(1.0, dist * 0.8)
+                col = mix_col * (v * 1.3 + g_val * 0.7) + WHITE * (v**2.2 * 1.7)
+                out[y_idx, x_idx] = np.clip(GROUND * (1.0 - min(1.0, v + g_val)) + col, 0, 255)
+
+    im = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+    im.save(os.path.join(PREVIEWS_DIR, "dejong-attractor.jpg"), quality=94)
+    print("dejong-attractor.jpg saved")
+
+
+def render_breather_surface():
+    """Parametric Breather soliton surface 3D projection."""
+    w, h = 900, 600
+    im = Image.new("RGB", (w, h), (21, 25, 48))
+    draw = ImageDraw.Draw(im, "RGBA")
+
+    rotY = 0.68
+    rotX = 0.50
+    cy, cx = h / 2, w / 2
+
+    aa = 0.44
+    ww = 1.0 - aa * aa
+    b = math.sqrt(max(0.01, ww))
+
+    def point(u, v):
+        coshAU = math.cosh(aa * u)
+        sinhAU = math.sinh(aa * u)
+        sinBV = math.sin(b * v)
+        cosBV = math.cos(b * v)
+
+        denom = max(0.08, aa * ((b * coshAU)**2 + (aa * sinBV)**2))
+
+        sc = 0.38
+        x = sc * (-u + (2.0 * ww * coshAU * sinhAU) / denom)
+        y = sc * ((2.0 * b * coshAU * (-b * math.cos(v) * cosBV - math.sin(v) * sinBV)) / denom)
+        z = sc * ((2.0 * b * coshAU * (-b * math.sin(v) * cosBV + math.cos(v) * sinBV)) / denom)
+
+        # Rotate Y
+        x1 = x * math.cos(rotY) + z * math.sin(rotY)
+        z1 = -x * math.sin(rotY) + z * math.cos(rotY)
+        # Rotate X
+        y2 = y * math.cos(rotX) - z1 * math.sin(rotX)
+        z2 = y * math.sin(rotX) + z1 * math.cos(rotX)
+
+        fov = 3.6
+        dist = 4.8 - z2
+        px = cx + (x1 / dist) * fov * 230
+        py = cy - (y2 / dist) * fov * 230
+        return px, py, z2
+
+    ribs_u = 36
+    segs_v = 40
+    u_range = 8.0
+    v_range = 16.0
+
+    lines = []
+    for i in range(ribs_u + 1):
+        frac_u = i / ribs_u
+        u = -u_range + frac_u * 2.0 * u_range
+        pts = [point(u, -v_range + (j / segs_v) * 2.0 * v_range) for j in range(segs_v + 1)]
+        avg_z = sum(p[2] for p in pts) / len(pts)
+        lines.append((avg_z, frac_u, pts, False))
+
+    for j in range(0, segs_v + 1, 2):
+        frac_v = j / segs_v
+        v = -v_range + frac_v * 2.0 * v_range
+        pts = [point(-u_range + (i / ribs_u) * 2.0 * u_range, v) for i in range(ribs_u + 1)]
+        avg_z = sum(p[2] for p in pts) / len(pts)
+        lines.append((avg_z, frac_v, pts, True))
+
+    lines.sort(key=lambda r: r[0])
+
+    for avg_z, frac, pts, is_v in lines:
+        alpha = int(np.clip(130 + avg_z * 85, 40, 255))
+        if is_v:
+            col_mix = EMBER * (1.0 - frac * 0.5) + WHITE * (frac * 0.5)
+        else:
+            col_mix = SIGNAL * (1.0 - frac) + EMBER * frac
+        r, g, b_c = [int(np.clip(c, 0, 255)) for c in col_mix]
+        w_line = 2 if not is_v else 1
+        for idx in range(len(pts) - 1):
+            p1, p2 = pts[idx], pts[idx + 1]
+            draw.line([(p1[0], p1[1]), (p2[0], p2[1])], fill=(r, g, b_c, alpha), width=w_line)
+
+    im.save(os.path.join(PREVIEWS_DIR, "breather-surface-3d.jpg"), quality=94)
+    print("breather-surface-3d.jpg saved")
+
+
+def render_karplus_strong():
+    """Render Karplus-Strong synth preview and webp template."""
+    w, h = 900, 600
+    im = Image.new("RGB", (w, h), (21, 25, 48))
+    draw = ImageDraw.Draw(im, "RGBA")
+
+    for gy in range(80, h, 80):
+        draw.line([(0, gy), (w, gy)], fill=(32, 38, 70, 100), width=1)
+    for gx in range(90, w, 90):
+        draw.line([(gx, 0), (gx, h)], fill=(32, 38, 70, 100), width=1)
+
+    cy = h / 2 - 20
+
+    # Draw plucked string decaying waveform with harmonics
+    pts = []
+    f0 = 220.0
+    for i in range(w):
+        frac = i / w
+        t_sec = frac * 0.05
+        env = math.exp(-frac * 3.8)
+        burst = (math.sin(i * 19.3) * math.exp(-frac * 24.0)) if frac < 0.1 else 0.0
+        w0 = math.sin(t_sec * f0 * math.tau)
+        w1 = math.sin(t_sec * f0 * 2.0 * math.tau) * math.exp(-frac * 6.0) * 0.65
+        w2 = math.sin(t_sec * f0 * 3.0 * math.tau) * math.exp(-frac * 11.0) * 0.40
+        w3 = math.sin(t_sec * f0 * 4.0 * math.tau) * math.exp(-frac * 18.0) * 0.22
+        sig = (w0 + w1 + w2 + w3 + burst * 1.5) * env * 155.0
+        pts.append((i, cy + sig))
+
+    for i in range(len(pts) - 1):
+        draw.line([pts[i], pts[i + 1]], fill=(167, 177, 255, 90), width=6)
+        draw.line([pts[i], pts[i + 1]], fill=(78, 242, 184, 160), width=3)
+        draw.line([pts[i], pts[i + 1]], fill=(255, 255, 255, 240), width=1)
+
+    # Corner box: string harmonic spectrum envelope
+    cx_box = 720
+    cy_box = cy + 130
+    draw.rectangle([cx_box - 100, cy_box - 70, cx_box + 100, cy_box + 70], outline=(255, 107, 53, 180), width=1)
+    for h_idx in range(1, 9):
+        bx = cx_box - 80 + (h_idx - 1) * 22
+        amp = math.exp(-(h_idx - 1) * 0.45) * 110.0
+        draw.line([(bx, cy_box + 60), (bx, cy_box + 60 - amp)], fill=(255, 107, 53, 230), width=4)
+
+    im.save(os.path.join(PREVIEWS_DIR, "karplus-strong-synth.jpg"), quality=94)
+    print("karplus-strong-synth.jpg saved")
+
+    im_webp = im.resize((960, 600), Image.Resampling.LANCZOS)
+    im_webp.save(os.path.join(TEMPLATES_DIR, "karplus-strong-synth.webp"), "WEBP", quality=90)
+    print("karplus-strong-synth.webp saved")
+
+
+def render_frequency_shifter():
+    """Render Frequency Shifter FX preview and webp template."""
+    w, h = 900, 600
+    im = Image.new("RGB", (w, h), (21, 25, 48))
+    draw = ImageDraw.Draw(im, "RGBA")
+
+    for gy in range(80, h, 80):
+        draw.line([(0, gy), (w, gy)], fill=(32, 38, 70, 100), width=1)
+    for gx in range(90, w, 90):
+        draw.line([(gx, 0), (gx, h)], fill=(32, 38, 70, 100), width=1)
+
+    cy = h / 2 - 20
+
+    # Draw frequency shifted beating envelope
+    pts = []
+    shift_freq = 120.0
+    carrier = 340.0
+    for i in range(w):
+        frac = i / w
+        t_sec = frac * 0.04
+        env = math.exp(-frac * 1.5)
+        # Shifted sum: f + df produces characteristic SSB amplitude trajectory
+        s1 = math.sin(t_sec * (carrier + shift_freq) * math.tau)
+        s2 = math.sin(t_sec * (carrier * 2.0 + shift_freq) * math.tau) * 0.45
+        sig = (s1 + s2) * env * 155.0
+        pts.append((i, cy + sig))
+
+    for i in range(len(pts) - 1):
+        draw.line([pts[i], pts[i + 1]], fill=(255, 107, 53, 90), width=6)
+        draw.line([pts[i], pts[i + 1]], fill=(167, 177, 255, 160), width=3)
+        draw.line([pts[i], pts[i + 1]], fill=(255, 255, 255, 240), width=1)
+
+    # Corner box: Hilbert I/Q phase trajectory spiral
+    cx_box = 720
+    cy_box = cy + 130
+    draw.rectangle([cx_box - 100, cy_box - 70, cx_box + 100, cy_box + 70], outline=(78, 242, 184, 180), width=1)
+    q_pts = []
+    for deg in range(0, 360 * 3, 5):
+        rad = math.radians(deg)
+        r_spiral = (deg / (360.0 * 3)) * 60.0
+        qx = cx_box + r_spiral * math.cos(rad)
+        qy = cy_box + r_spiral * math.sin(rad)
+        q_pts.append((qx, qy))
+    for i in range(len(q_pts) - 1):
+        draw.line([q_pts[i], q_pts[i + 1]], fill=(78, 242, 184, 230), width=2)
+
+    im.save(os.path.join(PREVIEWS_DIR, "frequency-shifter-fx.jpg"), quality=94)
+    print("frequency-shifter-fx.jpg saved")
+
+    im_webp = im.resize((960, 600), Image.Resampling.LANCZOS)
+    im_webp.save(os.path.join(TEMPLATES_DIR, "frequency-shifter-fx.webp"), "WEBP", quality=90)
+    print("frequency-shifter-fx.webp saved")
+
+
+def render_gravitational_lensing():
+    """Shader-accurate 900x600 render of Gravitational Lensing."""
+    w, h = 900, 600
+    aspect = w / h
+    x = np.linspace(-1.1 * aspect, 1.1 * aspect, w, dtype=np.float32)
+    y = np.linspace(-1.1, 1.1, h, dtype=np.float32)
+    xx, yy = np.meshgrid(x, y)
+
+    r = np.sqrt(xx**2 + yy**2)
+    angle = np.arctan2(yy, xx)
+    t_cur = 2.4 * 0.45
+
+    einstein_r = 0.48
+    rs = einstein_r * 0.44
+
+    deflect = (rs * rs) / np.maximum(0.015, r * r)
+    warped_x = xx * (1.0 - deflect)
+    warped_y = yy * (1.0 - deflect)
+
+    # Stars
+    star_grid = np.sin(warped_x * 48.0) * np.sin(warped_y * 48.0)
+    stars = np.maximum(0.0, star_grid)**30.0 * 2.2
+
+    # Photon ring
+    photon_ring = np.maximum(0.0, 1.0 - np.abs(r - einstein_r) * 6.5)**4.0
+
+    # Accretion disk
+    disk_tilt = 0.65
+    disk_x = xx * 1.2
+    disk_y = (yy * math.cos(disk_tilt) - xx * math.sin(disk_tilt) * 0.25) * 2.8
+    disk_r = np.sqrt(disk_x**2 + disk_y**2)
+    disk_angle = np.arctan2(disk_y, disk_x)
+
+    disk_swirl = np.sin(disk_angle * 4.0 + disk_r * 12.0 - t_cur * 4.8)
+    disk_mask = np.clip((disk_r - einstein_r * 0.55) / (einstein_r * 0.4), 0.0, 1.0) * np.clip((einstein_r * 2.8 - disk_r) / (einstein_r * 1.45), 0.0, 1.0)
+    disk_density = np.maximum(0.0, disk_swirl * 0.5 + 0.5)**2.5 * disk_mask
+
+    doppler = np.clip(1.0 - xx * 0.85, 0.25, 2.4)
+    event_horizon = np.clip((rs * 1.08 - r) / (rs * 0.18), 0.0, 1.0)
+
+    HOT_CORE = np.array([255, 245, 230], dtype=np.float32)
+
+    out = np.zeros((h, w, 3), dtype=np.float32)
+    for c in range(3):
+        out[:, :, c] = GROUND[c]
+
+    for y_idx in range(h):
+        for x_idx in range(w):
+            rad = r[y_idx, x_idx]
+            dr = disk_r[y_idx, x_idx]
+            dd = disk_density[y_idx, x_idx]
+            dop = doppler[y_idx, x_idx]
+            pr = photon_ring[y_idx, x_idx]
+            eh = event_horizon[y_idx, x_idx]
+            st = stars[y_idx, x_idx]
+
+            disk_mix = np.clip(0.5 / (dr + 0.2), 0.0, 1.0)
+            d_col = (EMBER * (1.0 - disk_mix) + SIGNAL * disk_mix)
+            d_col = (d_col * (1.0 - dd * 0.7) + HOT_CORE * (dd * 0.7)) * dop
+
+            col = GROUND.copy()
+            col += SIGNAL * st * (1.0 - eh)
+            col += d_col * dd * 2.2
+            col += (SIGNAL * 0.5 + HOT_CORE * 0.5) * pr * 2.6
+            col = col * (1.0 - eh) + np.array([5, 5, 10], dtype=np.float32) * eh
+
+            rad_falloff = np.clip((2.4 - rad) / 1.5, 0.0, 1.0)
+            out[y_idx, x_idx] = np.clip(col * rad_falloff + GROUND * (1.0 - rad_falloff), 0, 255)
+
+    im = Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+    im.save(os.path.join(PREVIEWS_DIR, "gravitational-lensing.jpg"), quality=94)
+    print("gravitational-lensing.jpg saved")
+
+
 if __name__ == "__main__":
-    render_gumowski_mira()
-    render_enneper()
-    render_phase_distortion()
-    render_formant_filter()
-    render_aurora_borealis()
-    render_ikeda_attractor()
-    render_dini_surface()
-    render_wavetable_morph()
-    render_wavefolder_drive()
-    render_cosmic_nebula()
-    render_svensson_attractor()
-    render_bour_surface()
-    render_additive_harmonic()
-    render_comb_resonator()
-    render_spectral_caustics()
-    render_tinkerbell_map()
-    render_kuen_surface()
-    render_hard_sync_synth()
-    render_ring_modulator_fx()
-    render_plasma_filament()
-    render_halvorsen_attractor()
-    render_boy_surface()
-    render_subharmonic_synth()
-    render_bitcrush_degrader()
-    render_solar_flare()
-    print("All previews rendered successfully!")
+    render_dejong_attractor()
+    render_breather_surface()
+    render_karplus_strong()
+    render_frequency_shifter()
+    render_gravitational_lensing()
+    print("All 5 new previews rendered successfully!")

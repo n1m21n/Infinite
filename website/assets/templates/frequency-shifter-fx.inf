@@ -1,0 +1,43 @@
+infinite-patch 1
+# Frequency Shifter FX: single-sideband frequency shifting and quadrature ring modulation Field Effect
+node 1 Synths Oscillator
+  id osc
+  pos 0 1024
+  f frequency 220
+  i waveform 1
+end
+node 2 Effects Field Effect
+  id fx
+  pos 480 1024
+  s code param float shift = 120.0 [-500.0, 1000.0]\nparam float feedback = 0.25 [0.0, 0.92]\nparam float lfoRate = 0.5 [0.0, 8.0]\nparam float lfoDepth = 0.15 [0.0, 1.0]\nparam float drive = 1.25 [1.0, 3.5]\nparam float mix = 0.85 [0.0, 1.0]\nstate float phase = 0\nstate float lfoPhase = 0\nstate float fbState = 0\nstate float a1_x = 0\nstate float a1_y = 0\nstate float a2_x = 0\nstate float a2_y = 0\nstate float b1_x = 0\nstate float b1_y = 0\nstate float b2_x = 0\nstate float b2_y = 0\n\nlfoPhase = (lfoPhase + clamp(lfoRate, 0.0, 20.0) / sr) % 1.0\nlfoMod = sin(lfoPhase * 6.2831853) * lfoDepth * 180.0\ntotalShift = shift + lfoMod\n\nphaseStep = totalShift / sr\nphase = (phase + phaseStep) % 1.0\ncarCos = cos(phase * 6.2831853)\ncarSin = sin(phase * 6.2831853)\n\nxIn = (in + fbState * feedback) * drive\n\n// Quadrature allpass network (Hilbert 90-degree phase shift)\ncA1 = 0.6923878\ncA2 = 0.9360654\ncB1 = 0.4021921\ncB2 = 0.8561729\n\nyA1 = cA1 * (xIn - a1_y) + a1_x\na1_x = xIn\na1_y = yA1\nyA2 = cA2 * (yA1 - a2_y) + a2_x\na2_x = yA1\na2_y = yA2\nsigI = yA2\n\nyB1 = cB1 * (xIn - b1_y) + b1_x\nb1_x = xIn\nb1_y = yB1\nyB2 = cB2 * (yB1 - b2_y) + b2_x\nb2_x = yB1\nb2_y = yB2\nsigQ = yB2\n\nshifted = sigI * carCos - sigQ * carSin\nsatShift = shifted / (1.0 + abs(shifted) * 0.18)\nfbState = satShift\n\nout = in * (1.0 - mix) + satShift * mix\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Frequency Shifter FX. Bode single-sideband frequency shifting with quadrature Hilbert network.
+  f width 360
+  f height 120
+end
+aud fx 0 osc
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.18 0.5
+mod pic sizeY ana 0 0 1 0.5 0.18 0.5

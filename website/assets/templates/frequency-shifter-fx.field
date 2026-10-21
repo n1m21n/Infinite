@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Frequency Shifter FX",
+    "author": "Infinite",
+    "description": "Bode-style single-sideband frequency shifter with quadrature Hilbert phase-shifting, through-zero shift modulation and harmonic ring modulation.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float shift = 120.0 [-500.0, 1000.0];\nparam float feedback = 0.25 [0.0, 0.92];\nparam float lfoRate = 0.5 [0.0, 8.0];\nparam float lfoDepth = 0.15 [0.0, 1.0];\nparam float drive = 1.25 [1.0, 3.5];\nparam float mix = 0.85 [0.0, 1.0];\nstate float phase = 0;\nstate float lfoPhase = 0;\nstate float fbState = 0;\nstate float a1_x = 0;\nstate float a1_y = 0;\nstate float a2_x = 0;\nstate float a2_y = 0;\nstate float b1_x = 0;\nstate float b1_y = 0;\nstate float b2_x = 0;\nstate float b2_y = 0;\n\nlfoPhase = (lfoPhase + clamp(lfoRate, 0.0, 20.0) / sr) % 1.0;\nlfoMod = sin(lfoPhase * 6.2831853) * lfoDepth * 180.0;\ntotalShift = shift + lfoMod;\n\nphaseStep = totalShift / sr;\nphase = (phase + phaseStep) % 1.0;\ncarCos = cos(phase * 6.2831853);\ncarSin = sin(phase * 6.2831853);\n\nxIn = (in + fbState * feedback) * drive;\n\n// Quadrature allpass network (Hilbert 90-degree phase shift)\ncA1 = 0.6923878;\ncA2 = 0.9360654;\ncB1 = 0.4021921;\ncB2 = 0.8561729;\n\nyA1 = cA1 * (xIn - a1_y) + a1_x;\na1_x = xIn;\na1_y = yA1;\nyA2 = cA2 * (yA1 - a2_y) + a2_x;\na2_x = yA1;\na2_y = yA2;\nsigI = yA2;\n\nyB1 = cB1 * (xIn - b1_y) + b1_x;\nb1_x = xIn;\nb1_y = yB1;\nyB2 = cB2 * (yB1 - b2_y) + b2_x;\nb2_x = yB1;\nb2_y = yB2;\nsigQ = yB2;\n\nshifted = sigI * carCos - sigQ * carSin;\nsatShift = shifted / (1.0 + abs(shifted) * 0.18);\nfbState = satShift;\n\nout = in * (1.0 - mix) + satShift * mix;\n",
+    "params": {
+      "shift": 120.0,
+      "feedback": 0.25,
+      "lfoRate": 0.5,
+      "lfoDepth": 0.15,
+      "drive": 1.25,
+      "mix": 0.85
+    },
+    "nodeSettings": {}
+  }
+}

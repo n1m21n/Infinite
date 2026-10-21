@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Karplus-Strong Synth",
+    "author": "Infinite",
+    "description": "Physical modeling plucked string synthesizer using the Karplus-Strong algorithm with noise burst excitation, low-pass loss filter and body resonance.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float pluck = 0.85 [0.1, 1.0];\nparam float damping = 0.35 [0.0, 0.95];\nparam float decay = 2.8 [0.2, 8.0];\nparam float body = 0.45 [0.0, 1.0];\nparam float warmth = 1.25 [1.0, 3.0];\nparam float release = 0.35 [0.05, 2.0];\nstate float p0 = 0;\nstate float p1 = 0;\nstate float p2 = 0;\nstate float p3 = 0;\nstate float pluckEnv = 0;\nstate float lastGate = 0;\nstate float noiseState = 0.41829;\nstate float bodyState = 0;\nstate float ampEnv = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\nisTrig = if(target > 0.5 && lastGate <= 0.5, 1.0, 0.0);\nlastGate = target;\n\npluckEnv = if(isTrig > 0.5, 1.0, max(0.0, pluckEnv - 1.0 / (sr * (0.003 + (1.0 - pluck) * 0.015))));\n\nnoiseState = (noiseState * 196314.165 + 90763.3) % 1.0;\nnoise = (noiseState * 2.0 - 1.0) * pluckEnv;\n\nampDecay = clamp(1.0 / (sr * decay), 0.00001, 0.01);\nrelDecay = clamp(1.0 / (sr * release), 0.00005, 0.02);\nampEnv = if(target > ampEnv, ampEnv + (target - ampEnv) * 0.25, if(target > 0.5, ampEnv - ampEnv * ampDecay, ampEnv - ampEnv * relDecay));\n\nf0 = clamp(freq, 20.0, 4800.0);\nstep0 = f0 / sr;\np0 = (p0 + step0) % 1.0;\np1 = (p1 + step0 * 2.0) % 1.0;\np2 = (p2 + step0 * 3.0) % 1.0;\np3 = (p3 + step0 * 4.0) % 1.0;\n\nw0 = sin(p0 * 6.2831853);\nw1 = sin(p1 * 6.2831853) * exp(-damping * 1.2);\nw2 = sin(p2 * 6.2831853) * exp(-damping * 2.4);\nw3 = sin(p3 * 6.2831853) * exp(-damping * 3.8);\n\nstringSig = (w0 + w1 * 0.65 + w2 * 0.42 + w3 * 0.25 + noise * 0.85 * pluck) * warmth;\nsat = stringSig / (1.0 + abs(stringSig) * 0.22);\n\nfBody = clamp(240.0 / sr * 3.14159, 0.01, 0.45);\nbodyState = bodyState + fBody * (sat - bodyState);\n\nout = (sat * (1.0 - body * 0.5) + bodyState * (body * 0.8)) * ampEnv * 0.62;\n",
+    "params": {
+      "pluck": 0.85,
+      "damping": 0.35,
+      "decay": 2.8,
+      "body": 0.45,
+      "warmth": 1.25,
+      "release": 0.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Gravitational Lensing",
+    "author": "Infinite",
+    "description": "Relativistic black hole gravitational lensing with Einstein rings, warped starfield caustics, Doppler-boosted accretion disk and audio-reactive photon sphere.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float speed = 0.85 [0.1, 3.0];\nparam float spin = 1.2 [0.2, 4.0];\nparam float einsteinRadius = 0.48 [0.1, 1.2];\nparam float diskTilt = 0.65 [0.1, 1.5];\n\np = (uv - 0.5) * 2.2;\np.x = p.x * aspect;\n\nr = length(p);\nangle = atan(p.y, p.x);\ntCur = t * speed * 0.45;\n\nrs = einsteinRadius * 0.44;\ndeflect = rs * rs / max(0.02, r * r);\nwarpedP = p * (1.0 - deflect);\n\nstarGrid = sin(warpedP.x * 45.0) * sin(warpedP.y * 45.0);\nstars = pow(max(0.0, starGrid), 32.0) * 1.8;\n\nphotonRing = pow(max(0.0, 1.0 - abs(r - einsteinRadius) * 6.5), 4.0);\n\ndiskCoordY = (p.y * cos(diskTilt) - p.x * sin(diskTilt) * 0.25) * 2.8;\ndiskCoordX = p.x * 1.2;\ndiskR = length(vec2(diskCoordX, diskCoordY));\ndiskAngle = atan(diskCoordY, diskCoordX);\n\ndiskSwirl = sin(diskAngle * 4.0 + diskR * 12.0 - tCur * spin * 4.0);\ndiskMask = smoothstep(einsteinRadius * 0.6, einsteinRadius * 0.95, diskR) * smoothstep(einsteinRadius * 2.6, einsteinRadius * 1.4, diskR);\ndiskDensity = pow(max(0.0, diskSwirl * 0.5 + 0.5), 2.5) * diskMask;\n\ndoppler = clamp(1.0 - p.x * 0.85, 0.25, 2.4);\neventHorizon = smoothstep(rs * 1.08, rs * 0.92, r);\n\nground = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.21);\nhotCore = vec3(1.0, 0.96, 0.90);\n\ndiskCol = mix(ember, signal, clamp(1.0 / (diskR + 0.2) * 0.5, 0.0, 1.0));\ndiskCol = mix(diskCol, hotCore, diskDensity * 0.7) * doppler;\n\ncol = ground;\ncol = col + signal * stars * (1.0 - eventHorizon);\ncol = col + diskCol * diskDensity * 2.2;\ncol = col + mix(signal, hotCore, 0.5) * photonRing * 2.6;\ncol = mix(col, vec3(0.02, 0.02, 0.04), eventHorizon);\nalpha = 1.0;\n",
+    "params": {
+      "speed": 0.85,
+      "spin": 1.2,
+      "einsteinRadius": 0.48,
+      "diskTilt": 0.65
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}
