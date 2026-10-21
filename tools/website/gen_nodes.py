@@ -434,7 +434,7 @@ def head(title, desc, url, image, ld, rel="nodes/x.html", bodyclass="blog-page b
   <link rel="stylesheet" href="../style.css?v=60c68394">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
-  <link rel="stylesheet" href="../nodepage.css?v=2bc833fd">
+  <link rel="stylesheet" href="../nodepage.css?v=be1f691d">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="{bodyclass}">
@@ -566,7 +566,7 @@ def index_page(items):
     fams = [c for c in order if any(i["cat"] == c for i in items)]
     chips = '<button type="button" class="np-chip" data-fam="" aria-pressed="true">All</button>' + "".join(
         '<button type="button" class="np-chip" data-fam="%s" aria-pressed="false">%s</button>' % (slug(c), e(CAT_LABEL[c])) for c in fams)
-    cloud = "".join('<a class="ns-a" data-fam="%s" href="%s.html">%s</a>' % (slug(i["cat"]), i["slug"], e(i["name"]))
+    cloud = "".join('<a class="ns-a" data-fam="%s" data-fl="%s" data-n="%s"%s href="%s.html">%s</a>' % (slug(i["cat"]), e(CAT_LABEL[i["cat"]]), e(i["name"]), (' data-img="../assets/nodes/hd/%s"' % i["shot"][0]) if i["shot"] else "", i["slug"], e(i["name"]))
                     for i in sorted(items, key=lambda i: (order.index(i["cat"]), i["name"].lower())))
     body = f"""  {chrome.header_html(rel)}
 
@@ -578,7 +578,7 @@ def index_page(items):
       </header>
       <div class="ns" id="ns">
         <div class="np-jump ns-bar" role="group" aria-label="Filter by family">{chips}<button type="button" class="np-chip ns-view" aria-pressed="false">List</button></div>
-        <div class="ns-stage" id="ns-stage"><span class="ns-orb" aria-hidden="true"></span>{cloud}</div>
+        <div class="ns-stage" id="ns-stage">{cloud}</div>
       </div>
       <div class="ns-list" id="ns-list">{"".join(secs)}</div>
     </div>

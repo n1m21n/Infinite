@@ -230,10 +230,10 @@
    "radius": 3
   },
   "nodepage.css": {
-   "duration": 2,
-   "font-size": 9,
+   "duration": 1,
+   "font-size": 7,
    "hex": 5,
-   "radius": 5
+   "radius": 4
   },
   "philosophy.css": {
    "duration": 1,

@@ -1,120 +1,141 @@
-/* The node sphere on nodes/: every node is a real link on a turning sphere. Labels never overlap (the nearest win), drag to turn it, tap a name to open its page. */
+/* The node ring on nodes/: a swipeable carousel of node screenshots. Swipe or drag to turn it, tap the front card (or the button under it) to open that node's page. */
 (function () {
   var root = document.getElementById('ns'), stage = document.getElementById('ns-stage');
   if (!root || !stage) return;
   document.documentElement.classList.add('js');
-  var anchors = Array.prototype.slice.call(stage.querySelectorAll('.ns-a')), n = anchors.length;
+  var all = Array.prototype.slice.call(stage.querySelectorAll('.ns-a')), act = all.slice(), m = act.length;
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var pts = anchors.map(function (_, i) {            // Fibonacci sphere: an even spread
-    var y = 1 - (i + 0.5) * 2 / n, r = Math.sqrt(1 - y * y), t = i * Math.PI * (3 - Math.sqrt(5));
-    return [Math.cos(t) * r, y, Math.sin(t) * r];
-  });
-  var wid = anchors.map(function (a) { return a.textContent.length * 7.2 + 16; });
-  var fam = anchors.map(function (a) { return a.getAttribute('data-fam'); });
-  var on = anchors.map(function () { return 0; });
-  var xs = new Float32Array(n), ys = new Float32Array(n), zs = new Float32Array(n), order = [];
-  for (var k = 0; k < n; k++) order.push(k);
-  var yaw = 0.4, pitch = -0.2, vyaw = 0, vpitch = 0, R = 300, filter = '';
-  var AUTO = reduce ? 0 : 0.00011;                    // radians per ms
-  var drag = null, moved = 0, hover = false, visible = true, raf = 0, last = 0, rect = [];
+  var pos = 0, target = 0, cw = 260, ch = 380, STEP = 0.5, PX = 140, raf = 0, last = 0, shown = -1;
+  var drag = null, suppress = false, wheelAcc = 0;
 
+  var info = document.createElement('div'); info.className = 'ns-info'; info.setAttribute('aria-live', 'polite');
+  info.innerHTML = '<span class="ns-fam mono"></span><span class="ns-name"></span><a class="ns-open np-chip" href="#">Open node page</a><input class="ns-range" type="range" min="0" value="0" step="1" aria-label="Browse nodes" autocomplete="off"><span class="ns-count mono"></span>';
+  stage.parentNode.insertBefore(info, stage.nextSibling);
+  var fam = info.querySelector('.ns-fam'), nm = info.querySelector('.ns-name'), open = info.querySelector('.ns-open'),
+      rng = info.querySelector('.ns-range'), cnt = info.querySelector('.ns-count');
+
+  function wrapd(d) { return m > 1 ? d - m * Math.round(d / m) : d; }
   function size() {
     var w = stage.clientWidth, narrow = w < 560;
-    R = narrow ? Math.min(w * 0.33, 150) : Math.min(w * 0.34, 380);
-    stage.style.setProperty('--ns-size', Math.round(R * 2 + (narrow ? 70 : 90)) + 'px');
-    stage.style.setProperty('--ns-r', R + 'px');
+    cw = narrow ? Math.min(Math.round(w * 0.5), 210) : 270; ch = Math.round(cw * (narrow ? 1.45 : 1.4));
+    STEP = narrow ? 0.56 : 0.46;
+    stage.style.setProperty('--cw', cw + 'px'); stage.style.setProperty('--ch', ch + 'px');
+    stage.style.height = (ch + 40) + 'px';
+    PX = (cw / (2 * Math.tan(STEP / 2))) * Math.sin(STEP);
   }
-  function draw() {
-    var cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch), i;
-    for (i = 0; i < n; i++) {
-      var p = pts[i], x = p[0] * cy + p[2] * sy, z = -p[0] * sy + p[2] * cy;
-      ys[i] = p[1] * cp - z * sp; zs[i] = p[1] * sp + z * cp; xs[i] = x;
+  function load(a) {
+    if (a.getAttribute('data-ld')) return;
+    a.setAttribute('data-ld', '1');
+    var s = a.getAttribute('data-img');
+    if (!s) return;
+    var im = new Image(); im.alt = ''; im.decoding = 'async'; im.draggable = false; im.src = s;
+    a.textContent = ''; a.appendChild(im);
+  }
+  function render() {
+    var R = cw / (2 * Math.tan(STEP / 2)), cur = ((Math.round(pos) % m) + m) % m, i;
+    for (i = 0; i < m; i++) {
+      var a = act[i], d = wrapd(i - pos), ad = Math.abs(d);
+      if (ad > 3.5) { if (a._v !== 0) { a.style.visibility = 'hidden'; a._v = 0; } continue; }
+      if (a._v !== 1) { a.style.visibility = 'visible'; a._v = 1; }
+      if (ad < 4.5) load(a);
+      var th = d * STEP, o = ad < 0.6 ? 1 : Math.max(0, 1 - (ad - 0.6) * 0.36);
+      a.style.transform = 'translate3d(' + (R * Math.sin(th)).toFixed(1) + 'px,0,' + (R * (Math.cos(th) - 1)).toFixed(1) + 'px) rotateY(' + (-th * 57.2958).toFixed(2) + 'deg)';
+      a.style.opacity = o.toFixed(3); a.style.zIndex = 1000 - Math.round(ad * 20);
     }
-    order.sort(function (a, b) { return zs[b] - zs[a]; });
-    rect.length = 0;
-    var h = 22, pad = 6;
-    for (var j = 0; j < n; j++) {
-      i = order[j];
-      var want = 0;
-      if (zs[i] > 0.12 && (!filter || fam[i] === filter)) {
-        var cx = xs[i] * R, cyy = ys[i] * R, w = wid[i] + pad, ok = true;
-        for (var q = 0; q < rect.length; q++) {
-          var r = rect[q];
-          if (Math.abs(cx - r[0]) < (w + r[2]) / 2 && Math.abs(cyy - r[1]) < h) { ok = false; break; }
-        }
-        if (ok) { rect.push([cx, cyy, w]); want = zs[i] > 0.62 ? 2 : 1; anchors[i].style.transform = 'translate3d(' + (cx - wid[i] / 2).toFixed(1) + 'px,' + (cyy - h / 2).toFixed(1) + 'px,0)'; }
-      }
-      if (want !== on[i]) {
-        var a = anchors[i];
-        if (want && !on[i]) a.style.transform = 'translate3d(' + ((xs[i] * R) - wid[i] / 2).toFixed(1) + 'px,' + ((ys[i] * R) - h / 2).toFixed(1) + 'px,0)';
-        a.classList.toggle('on', want > 0); a.classList.toggle('near', want === 2);
-        a.tabIndex = want ? 0 : -1;
-        on[i] = want;
-      }
+    if (cur !== shown) {
+      shown = cur;
+      var f = act[cur];
+      fam.textContent = f.getAttribute('data-fl'); nm.textContent = f.getAttribute('data-n');
+      open.href = f.getAttribute('href'); open.setAttribute('aria-label', 'Open the ' + f.getAttribute('data-n') + ' node page');
+      cnt.textContent = (cur + 1) + ' / ' + m; rng.value = cur;
+      for (i = 0; i < m; i++) act[i].tabIndex = i === cur ? 0 : -1;
     }
   }
-  function tick(t) {
+  function loop(t) {
     raf = 0;
-    var dt = last ? Math.min(48, t - last) : 16; last = t;
+    var dt = last ? Math.min(t - last, 50) : 16; last = t;
     if (!drag) {
-      yaw += vyaw * dt + (hover ? 0 : AUTO * dt); pitch += vpitch * dt;
-      var f = Math.pow(0.0025, dt / 1000);              // inertia decays to nothing in about a second
-      vyaw *= f; vpitch *= f;
-      if (Math.abs(vyaw) < 1e-6) vyaw = 0; if (Math.abs(vpitch) < 1e-6) vpitch = 0;
+      var diff = target - pos;
+      if (reduce || Math.abs(diff) < 0.002) { pos = target; last = 0; }
+      else { pos += diff * (1 - Math.exp(-dt / 120)); }
     }
-    pitch = Math.max(-1.2, Math.min(1.2, pitch));
-    draw();
-    if (drag || vyaw || vpitch || (visible && !hover && AUTO)) raf = requestAnimationFrame(tick); else last = 0;
+    render();
+    if (drag || pos !== target) raf = requestAnimationFrame(loop); else last = 0;
   }
-  function go() { if (!raf) raf = requestAnimationFrame(tick); }
+  function go() { if (!raf) raf = requestAnimationFrame(loop); }
+  function to(t) {
+    if (Math.abs(t - pos) > 5) pos = t - (t > pos ? 5 : -5);
+    target = t; go();
+  }
 
   stage.addEventListener('pointerdown', function (e) {
-    drag = { x: e.clientX, y: e.clientY, id: e.pointerId, t: performance.now() };
-    moved = 0; vyaw = 0; vpitch = 0; go();
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    drag = { x: e.clientX, y: e.clientY, p: pos, lx: e.clientX, lt: e.timeStamp, v: 0, moved: 0 };
+    stage.classList.add('is-drag'); suppress = false;
   });
   window.addEventListener('pointermove', function (e) {
-    if (!drag || e.pointerId !== drag.id) return;
-    var now = performance.now(), dt = Math.max(1, now - drag.t), dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    moved += Math.abs(dx) + Math.abs(dy);
-    if (moved > 6) stage.classList.add('is-drag');
-    var k = 1.15 / R;                                    // the surface follows the finger
-    yaw += dx * k; pitch += dy * k;
-    vyaw = vyaw * 0.6 + (dx * k / dt) * 0.4; vpitch = vpitch * 0.6 + (dy * k / dt) * 0.4;
-    drag.x = e.clientX; drag.y = e.clientY; drag.t = now;
-  });
-  function up() {
     if (!drag) return;
-    if (performance.now() - drag.t > 90) { vyaw = 0; vpitch = 0; }   // held still before letting go: no throw
-    drag = null; setTimeout(function () { moved = 0; }, 0); stage.classList.remove('is-drag'); last = 0; go();
-  }
-  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
-  stage.addEventListener('click', function (e) { if (moved > 6) { e.preventDefault(); e.stopPropagation(); } }, true);
-  stage.addEventListener('mouseover', function (e) { if (e.target.closest && e.target.closest('.ns-a')) hover = true; });
-  stage.addEventListener('mouseout', function (e) { if (e.target.closest && e.target.closest('.ns-a')) { hover = false; go(); } });
-  stage.addEventListener('focusin', function () { hover = true; });
-  stage.addEventListener('focusout', function () { hover = false; go(); });
-  stage.addEventListener('keydown', function (e) {
-    var d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-    if (d && e.target === stage) { yaw += d[0] * 0.2; pitch += d[1] * 0.2; draw(); e.preventDefault(); }
+    var dx = e.clientX - drag.x; drag.moved = Math.max(drag.moved, Math.abs(dx));
+    if (drag.moved > 6) suppress = true;
+    pos = drag.p - dx / PX; target = pos;
+    var dt = e.timeStamp - drag.lt;
+    if (dt > 0) { drag.v = 0.8 * drag.v + 0.2 * (-(e.clientX - drag.lx) / PX / dt); drag.lx = e.clientX; drag.lt = e.timeStamp; }
+    go();
   });
-  stage.tabIndex = 0; stage.setAttribute('aria-label', 'Node sphere: drag or use the arrow keys to turn it');
-  if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { visible = es[0].isIntersecting; last = 0; go(); }).observe(stage);
-  window.addEventListener('resize', function () { size(); draw(); });
+  function release(e) {
+    if (!drag) return;
+    var v = drag.v, ended = e && e.timeStamp - drag.lt;
+    if (ended > 90) v = 0;
+    drag = null; stage.classList.remove('is-drag');
+    target = Math.round(pos + Math.max(-12, Math.min(12, v * 260)));
+    last = 0; go();
+  }
+  window.addEventListener('pointerup', release); window.addEventListener('pointercancel', release);
+  stage.addEventListener('click', function (e) {
+    if (suppress) { e.preventDefault(); suppress = false; return; }
+    var a = e.target.closest && e.target.closest('.ns-a');
+    if (!a) return;
+    var d = wrapd(act.indexOf(a) - pos);
+    if (Math.abs(d) > 0.5) { e.preventDefault(); to(Math.round(pos + d)); }
+  });
+  stage.addEventListener('dragstart', function (e) { e.preventDefault(); });
+  stage.addEventListener('wheel', function (e) {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    e.preventDefault(); wheelAcc += e.deltaX;
+    if (Math.abs(wheelAcc) > 60) { to(Math.round(target) + (wheelAcc > 0 ? 1 : -1)); wheelAcc = 0; }
+  }, { passive: false });
+  stage.addEventListener('keydown', function (e) {
+    var d = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    if (d) { to(Math.round(target) + d); e.preventDefault(); }
+  });
+  stage.setAttribute('role', 'group'); stage.setAttribute('aria-label', 'Node screenshots: swipe, drag or use the arrow keys, then open the front one');
+  rng.addEventListener('input', function () {
+    var v = +rng.value; to(v + m * Math.round((pos - v) / m));
+  });
+  window.addEventListener('resize', function () { size(); render(); });
 
   var chips = root.querySelectorAll('.np-chip[data-fam]'), view = root.querySelector('.ns-view');
+  function refilter(f) {
+    act = all.filter(function (a) {
+      var ok = !f || a.getAttribute('data-fam') === f;
+      a.style.display = ok ? '' : 'none'; a._v = -1; return ok;
+    });
+    m = act.length; rng.max = Math.max(0, m - 1); rng.disabled = m < 2;
+    pos = target = 0; shown = -1; render();
+  }
   Array.prototype.forEach.call(chips, function (c) {
     c.addEventListener('click', function () {
       Array.prototype.forEach.call(chips, function (o) { o.setAttribute('aria-pressed', o === c ? 'true' : 'false'); });
-      filter = c.getAttribute('data-fam') || '';
       root.removeAttribute('data-view'); view.setAttribute('aria-pressed', 'false'); view.textContent = 'List';
-      draw(); go();
+      refilter(c.getAttribute('data-fam') || '');
     });
   });
   view.addEventListener('click', function () {
     var list = root.getAttribute('data-view') !== 'list';
     if (list) root.setAttribute('data-view', 'list'); else root.removeAttribute('data-view');
-    view.setAttribute('aria-pressed', list ? 'true' : 'false'); view.textContent = list ? 'Sphere' : 'List';
-    if (!list) { size(); draw(); go(); }
+    view.setAttribute('aria-pressed', list ? 'true' : 'false'); view.textContent = list ? 'Ring' : 'List';
+    if (!list) { size(); render(); }
   });
-  size(); draw(); go();
+  rng.max = m - 1;
+  size(); render();
 })();
