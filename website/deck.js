@@ -16,7 +16,7 @@
     var stage = o.stage, grid = o.grid, cardSel = o.cardSel || '.deck-card';
     var mode = o.mode || 'fan';
     var pos = 0, target = 0, vel = 0;   // continuous position in card units (unwrapped), its target, its velocity
-    var raf = 0, last = 0;
+    var raf = 0, last = 0, glide = false;   // glide: a finger just let go, so settle more softly
     var drag = null, moved = false, wheelT = 0, wheelIdle = 0;
     var lastIdx = -1;
     var io = 'IntersectionObserver' in window ? new IntersectionObserver(function (es) {
@@ -74,7 +74,7 @@
       stage.setAttribute('data-deck-mode', mode);
       if (mode === 'grid' || !n) {
         list.forEach(function (c) {
-          c.style.display = '';
+          c.style.display = ''; c.__far = 0; c.__off = undefined;
           c.style.transform = ''; c.style.opacity = ''; c.style.zIndex = ''; c.style.pointerEvents = '';
           c.style.setProperty('--card-dim', '0');
           c.removeAttribute('data-slot'); c.removeAttribute('aria-hidden'); c.removeAttribute('inert');
@@ -83,7 +83,13 @@
         return;
       }
       list.forEach(function (c, i) {
-        var d = delta(i, n), p = pose(d);
+        var d = delta(i, n);
+        if (Math.abs(d) > 4.6) {                         // far away: hide once, then skip all the per-frame style writes
+          if (c.__far !== mode) { c.style.display = 'none'; c.setAttribute('aria-hidden', 'true'); c.setAttribute('inert', ''); c.__far = mode; }
+          return;
+        }
+        c.__far = 0;
+        var p = pose(d);
         c.style.transform = 'translate3d(' + p.tx.toFixed(1) + 'px,' + p.ty.toFixed(1) + 'px,' + p.tz.toFixed(1) + 'px) rotateY(' + p.ry.toFixed(2) + 'deg) rotateZ(' + p.rz.toFixed(2) + 'deg) scale(' + p.sc.toFixed(3) + ')';
         c.style.display = p.ab > 4.6 ? 'none' : '';
         c.style.opacity = p.op.toFixed(3);
@@ -93,8 +99,10 @@
         var slot = p.ab < 0.35 ? 'active' : (p.ab < 1.35 ? 'near' : (p.ab < 2.45 ? 'mid' : 'far'));
         if (c.getAttribute('data-slot') !== slot) c.setAttribute('data-slot', slot);
         var off = p.ab > 3.4;
-        c.setAttribute('aria-hidden', off ? 'true' : 'false');
-        if (off) c.setAttribute('inert', ''); else c.removeAttribute('inert');
+        if (c.__off !== off) {
+          c.__off = off; c.setAttribute('aria-hidden', off ? 'true' : 'false');
+          if (off) c.setAttribute('inert', ''); else c.removeAttribute('inert');
+        }
         if (p.ab <= 4.4) wake(c, p.ab < 0.35);
       });
       var ix = index();
@@ -114,14 +122,14 @@
       var dt = Math.min(0.05, (now - last) / 1000 || 0.016); last = now;
       if (drag) { pos = target; vel = 0; }
       else {
-        var om = 2 / 0.17, x = om * dt, ex = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+        var om = 2 / (glide && coarse() ? 0.24 : 0.17), x = om * dt, ex = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
         var ch = pos - target, tmp = (vel + om * ch) * dt;
         vel = (vel - om * tmp) * ex;
         pos = target + (ch + tmp) * ex;
         if (Math.abs(pos - target) < 0.0008 && Math.abs(vel) < 0.002) { pos = target; vel = 0; }
       }
       paint();
-      if (drag || pos !== target) raf = requestAnimationFrame(tick); else raf = 0;
+      if (drag || pos !== target) raf = requestAnimationFrame(tick); else { raf = 0; glide = false; }
     }
     function run() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); } }
 
@@ -163,6 +171,7 @@
         if (Math.abs(dy) > Math.abs(dx) * 1.2 && Math.abs(dy) > 10) { drag = null; return; } // a page scroll, not a swipe
         if (Math.abs(dx) < 6) return;
         drag.live = true; moved = true; stage.classList.add('is-dragging');
+        drag.x = e.clientX; dx = 0; drag.lx = e.clientX; drag.lt = performance.now();
         try { grid.setPointerCapture(e.pointerId); } catch (x) {}
       }
       var now = performance.now();
@@ -178,7 +187,7 @@
       // release: carry the flick, settle on a card
       var fling = -was.vx * 0.32;                  // px/ms to card units
       target = Math.round(clamp(target + fling * 2.2, was.base - 4, was.base + 4));
-      pos = pos; vel = reduce ? 0 : -was.vx / stepPx() * 1000 * 0.35;
+      glide = true; vel = reduce ? 0 : -was.vx / stepPx() * 1000 * 0.35;
       setTimeout(function () { moved = false; }, 60);
       run();
     }

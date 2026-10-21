@@ -611,7 +611,7 @@ def index_page(items):
   {chrome.footer_html(rel)}
 
   <script src="../site.js?v={chrome.JS_VERSION}" defer></script>
-  <script src="../deck.js?v=4" defer></script>
+  <script src="../deck.js?v=5" defer></script>
   <script src="../nodebrowser.js?v={_jsv()}" defer></script>
 </body>
 </html>

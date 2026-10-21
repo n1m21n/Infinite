@@ -293,7 +293,7 @@ def build_index(posts, header, footer):
 
   {footer}
   <script src="../site.js?v=9" defer></script>
-  <script src="../deck.js?v=4" defer></script>
+  <script src="../deck.js?v=5" defer></script>
   <script src="../blog.js?v=3" defer></script>
 </body>
 </html>
