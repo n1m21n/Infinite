@@ -273,6 +273,8 @@ github: https://github.com/n1m21n/infinite
             print(f"[!] youtube dispatch skipped: {e}")
 
     # 10. optional auto-commit & push to live website via main worktree
+    # Note: Only publish the specific new embed file; NEVER overwrite or touch website/embeds/index.html
+    # so the website's original design, branding, and layout are strictly preserved.
     if auto_push:
         main_wt = os.path.abspath(os.path.join(ROOT, "..", "worktrees", "main"))
         if os.path.exists(main_wt):
@@ -280,11 +282,9 @@ github: https://github.com/n1m21n/infinite
                 wt_embeds = os.path.join(main_wt, "website", "embeds")
                 os.makedirs(wt_embeds, exist_ok=True)
                 shutil.copy2(embed_file, wt_embeds)
-                local_index = os.path.join(website_embed_dir, "index.html")
-                if os.path.exists(local_index):
-                    shutil.copy2(local_index, wt_embeds)
 
-                subprocess.run(["git", "-C", main_wt, "add", "website/embeds/"], check=True)
+                rel_embed = os.path.join("website", "embeds", f"{style_id}.html")
+                subprocess.run(["git", "-C", main_wt, "add", rel_embed], check=True)
                 commit_msg = f"site: publish daily generative embed ({style_id})"
                 c_res = subprocess.run(["git", "-C", main_wt, "commit", "-m", commit_msg], capture_output=True, text=True)
                 if c_res.returncode == 0:
