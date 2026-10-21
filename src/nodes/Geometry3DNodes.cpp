@@ -118,15 +118,7 @@ namespace
       return d.BoundsAsync(*static_cast<pop::AsyncBounds*>(gpu.popBounds.get()), lo, hi);
    }
 
-   InstanceOnPointsNode* FindInstancer(IGeometrySource* source)
-   {
-      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
-      {
-         if (auto* instancer = dynamic_cast<InstanceOnPointsNode*>(s))
-            return instancer;
-      }
-      return nullptr;
-   }
+   // FindInstancer is shared now (GeometryOpNodes.h).
 
    // Depth-only pass from the light's point of view. Shares the instancing
    // attribute layout with the main shader so an instanced source casts shadows
@@ -1268,7 +1260,7 @@ void Render3DNode::ReleaseTargets()
    if (mSceneColorTex != 0) { glDeleteTextures(1, &mSceneColorTex); mSceneColorTex = 0; }
    if (mSceneColorFbo != 0) { glDeleteFramebuffers(1, &mSceneColorFbo); mSceneColorFbo = 0; }
    if (mColorTex != 0) { glDeleteTextures(1, &mColorTex); mColorTex = 0; }
-   if (mDepthBuffer != 0) { glDeleteRenderbuffers(1, &mDepthBuffer); mDepthBuffer = 0; }
+   if (mDepthBuffer != 0) { glDeleteTextures(1, &mDepthBuffer); mDepthBuffer = 0; }
    if (mFbo != 0) { glDeleteFramebuffers(1, &mFbo); mFbo = 0; }
    if (mMsColor != 0) { glDeleteRenderbuffers(1, &mMsColor); mMsColor = 0; }
    if (mMsDepth != 0) { glDeleteRenderbuffers(1, &mMsDepth); mMsDepth = 0; }
@@ -1372,14 +1364,20 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
 
    // A depth renderbuffer is the piece the 2D pipeline never needed: without it
    // triangles composite in draw order instead of by distance.
-   glGenRenderbuffers(1, &mDepthBuffer);
-   glBindRenderbuffer(GL_RENDERBUFFER, mDepthBuffer);
-   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
+   // A texture rather than a renderbuffer so Volume can read the scene's depth.
+   glGenTextures(1, &mDepthBuffer);
+   glBindTexture(GL_TEXTURE_2D, mDepthBuffer);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glBindTexture(GL_TEXTURE_2D, mColorTex);
 
    glGenFramebuffers(1, &mFbo);
    glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mColorTex, 0);
-   glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, mDepthBuffer);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mDepthBuffer, 0);
 
    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
    glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1687,6 +1685,10 @@ void Render3DNode::CookIfNeeded(int frameId)
          : Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
    }
    const Mat4 viewProj = Mat4::Multiply(proj, view);
+   mLastCamera.view = view;
+   mLastCamera.proj = proj;
+   mLastCamera.eye[0] = eye[0]; mLastCamera.eye[1] = eye[1]; mLastCamera.eye[2] = eye[2];
+   mLastCamera.valid = true;
    // Camera basis in world space for billboarding point-cloud sprites - rows
    // of the view matrix's rotation part (see Mat4::LookAt), not columns.
    const float camRight[3] = { view.m[0], view.m[4], view.m[8] };
@@ -2094,6 +2096,30 @@ void Render3DNode::CookIfNeeded(int frameId)
          // own X basis vector - survives a Scale node upstream.
          const float scaleX = std::sqrt(model.m[0]*model.m[0] + model.m[1]*model.m[1] + model.m[2]*model.m[2]);
 
+         // Upstream's backstop against Windows' GPU watchdog (TDR): estimate
+         // the shaded fragments this cloud costs (points x screen-space sprite
+         // area x MSAA samples) and, past a budget, shrink the sprite radius
+         // rather than drop points. A TDR hard-resets the driver, and the
+         // process with it, after ~2 s of an unresponsive frame.
+         const float kDeg2Rad = 3.14159265358979323846f / 180.0f;
+         const float visibleHeight = 2.0f * camDistance * std::tan(fov * 0.5f * kDeg2Rad);
+         const float pixelsPerUnit = visibleHeight > 1e-6f ? (float)mHeight / visibleHeight : 0.0f;
+         static const double kSampleMultiplier[4] = { 1.0, 2.0, 4.0, 8.0 };
+         const double sampleMult = kSampleMultiplier[std::max(0, std::min(3, samples))];
+         const float spriteRadiusPixels = baseSize * scaleX * pixelsPerUnit;
+         const double perSpriteArea = 4.0 * (double)spriteRadiusPixels * (double)spriteRadiusPixels;
+         const double estimatedFill = (double)points.size() * perSpriteArea * sampleMult;
+         const double kFillBudget = 5.0e8; // shaded samples per frame
+         float clampScale = 1.0f;
+         if (estimatedFill > kFillBudget && perSpriteArea > 0.0)
+         {
+            clampScale = (float)std::sqrt(kFillBudget / estimatedFill);
+            if (std::fabs(clampScale - mLastFillClamp) > 0.01f * std::max(clampScale, 1e-3f))
+               fprintf(stderr, "Render3D: point cloud sprite fill ~%.3g px/frame (budget %.3g) - "
+                               "clamping sprite radius by %.4fx\n", estimatedFill, kFillBudget, clampScale);
+         }
+         mLastFillClamp = clampScale;
+
          std::vector<Mat4> xforms;
          std::vector<float> colors;
          xforms.reserve(points.size());
@@ -2105,7 +2131,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             const float wx = model.m[0]*p.px + model.m[4]*p.py + model.m[8]*p.pz + model.m[12];
             const float wy = model.m[1]*p.px + model.m[5]*p.py + model.m[9]*p.pz + model.m[13];
             const float wz = model.m[2]*p.px + model.m[6]*p.py + model.m[10]*p.pz + model.m[14];
-            const float s = p.scale * baseSize * scaleX;
+            const float s = p.scale * baseSize * scaleX * clampScale;
             xforms.push_back(Mat4::Multiply(Mat4::Translation(wx, wy, wz), Mat4::Scale(s, s, s)));
             colors.push_back(p.r); colors.push_back(p.g); colors.push_back(p.b);
          }
@@ -2854,9 +2880,12 @@ void Render3DNode::CookIfNeeded(int frameId)
       glBindFramebuffer(GL_READ_FRAMEBUFFER, mMsFbo);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
       glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      if (mDepthWanted)
+         glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
+   mDepthResolved = !multisampling || mDepthWanted;
 
    // --- restore, or every 2D node after this draws wrongly ------------
    if (!prevDepth) glDisable(GL_DEPTH_TEST);

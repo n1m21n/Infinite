@@ -43,3 +43,8 @@ Windows builds of it are GPL); it is not linked into Infinite-Turbo.
 | `assets/fonts` | IBM Plex Sans, Atkinson Hyperlegible, Inter (Infinite Dark theme) | SIL OFL 1.1 (`OFL-Inter.txt` for Inter) |
 | `src/audio/dsp/HrtfKemarData.cpp` | MIT Media Lab KEMAR HRTF measurements (Gardner and Martin, 1994) | no usage restrictions; cite the authors |
 | `assets/note-patterns`, built-in Pattern Player bank | Infinite-Turbo | MIT |
+
+## NDI SDK headers
+
+`external/ndi/include` - NDI(R) SDK headers, used to load the NDI runtime at run time (never bundled).
+License: `external/ndi/SDK-LICENSE.txt`. NDI(R) is a registered trademark of Vizrt NDI AB.

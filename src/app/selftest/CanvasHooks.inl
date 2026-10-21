@@ -4439,6 +4439,47 @@
          printf("%s\n", ok ? "PALETTE OK" : "SUSPECT");
       }
 
+#include "app/selftest/PatchCompat.inl" // Turbo 0.60: INFINITE_PATCHCOMPAT probe
+      if (getenv("INFINITE_PORTEDTEST") != nullptr && frameId == 8)
+      {
+         int failed = 0;
+         auto report = [&failed](bool ok, const std::string& what)
+         {
+            printf("  %-48s %s\n", what.c_str(), ok ? "ok" : "FAIL");
+            failed += ok ? 0 : 1;
+         };
+         auto name = [](int i) { return gNodes[i].typeName; };
+         printf("ported from upstream:\n");
+         for (int i : { 1, 2, 3, 4, 26 })
+         {
+            gNodes[i].node->CookIfNeeded(frameId + 1000);
+            report(gNodes[i].node->GetOutputTexture() != 0 && gNodes[i].node->GetOutputWidth() > 0,
+                   name(i) + " renders " + std::to_string(gNodes[i].node->GetOutputWidth()) + "x" +
+                      std::to_string(gNodes[i].node->GetOutputHeight()));
+         }
+         for (int i : { 5, 6 })
+         {
+            gNodes[i].node->CookIfNeeded(frameId + 1000);
+            report(true, name(i) + " survives without the NDI runtime (" + Ndi::StatusLine() + ")");
+         }
+         for (int i : { 8, 9, 10, 12, 14, 15, 16 })
+         {
+            gNodes[i].node->CookIfNeeded(frameId + 1000);
+            auto* g = dynamic_cast<IGeometrySource*>(gNodes[i].node.get());
+            const size_t tris = g ? g->GetMesh().indices.size() / 3 : 0;
+            report(tris > 0, name(i) + " builds " + std::to_string(tris) + " triangles");
+         }
+         for (int i : { 17, 18, 19 })
+         {
+            auto* m = dynamic_cast<IModulator*>(gNodes[i].node.get());
+            const float v = m ? m->Value01() : -1.0f;
+            report(v >= 0.0f && v <= 1.0f, name(i) + " gives " + std::to_string(v));
+         }
+         for (int i : { 20, 21, 22, 23, 24, 25 })
+            report(AudioNodeOfAny(gNodes[i].node.get()) != nullptr, name(i) + " has its audio node");
+         printf("%s\n", failed == 0 ? "PORTED NODES OK" : "PORTED NODES FAIL");
+      }
+
       if (getenv("INFINITE_TOPPARITYTEST") != nullptr && frameId == 4)
       {
          std::vector<std::string> failed;

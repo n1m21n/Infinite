@@ -198,6 +198,8 @@ public:
    // Turbo 0.47: semitones added to this lane's accented (velocity 1.0)
    // steps, on top of pitch - a two-tone bell (agogo low/high) on one lane.
    float laneAccentPitch[kNumLanes];
+   // Upstream: dB added to the same full-velocity steps (0..12). 0 = off, so older patches sound unchanged.
+   float laneAccentLevel[kNumLanes];
 
    // Decimated min/max waveform for each lane card's visualizer, filled
    // once at load time (see FinishLaneBuffer) - mirrors SamplerNode's
@@ -216,6 +218,8 @@ public:
    // ---- global ---------------------------------------------------------
    int rate = 12;      // MusicTime::RateDivision, stored as plain int (see Transport.h's mScale for why)
    int numSteps = 8;    // 1..kMaxSteps
+   int rateFix = 1;     // not a control: 0 = plays samples at the device rate, not their own (saved before the fix)
+   void BeforeLoadParams() override { rateFix = 0; }
    int editPage = 0;     // UI page, 16 steps at a time
    float swing = 0.0f;  // 0..1
    float volume = 0.8f; // node output level
@@ -337,6 +341,7 @@ private:
    bool mLastLaneSolo[kNumLanes];
    int mLastLaneChoke[kNumLanes];
    float mLastLaneAccentPitch[kNumLanes];
+   float mLastLaneAccentLevel[kNumLanes];
    int mLastRate = -1;
    int mLastNumSteps = -1;
    float mLastSwing = -1.0f;

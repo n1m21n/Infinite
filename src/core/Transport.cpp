@@ -26,6 +26,12 @@ Transport& Transport::Instance()
    return instance;
 }
 
+double Transport::FreeSeconds() const
+{
+   static const auto t0 = std::chrono::steady_clock::now();
+   return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+}
+
 double Transport::Seconds() const
 {
    const double sr = mAudioSampleRate.load(std::memory_order_relaxed);

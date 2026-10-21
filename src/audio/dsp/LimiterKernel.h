@@ -6,29 +6,25 @@
 #include <vector>
 
 #include "IEffectKernel.h"
+#include "PeakLimiter.h"
 #include "audio/DspMath.h"
 #include "audio/ParamMailbox.h"
 
-// A brick-wall peak limiter - four knobs (Threshold, Release, In gain, Out
-// gain) per .claude/skills/new-audio-node/SKILL.md's minimalism rule: no
-// ceiling-vs-threshold split, no true-peak/oversampling, no mode selector,
-// no lookahead knob. Lookahead is a fixed internal constant, the same way
-// DynamicsKernel fixes its knee width rather than exposing it.
+// A brick-wall true-peak limiter - four knobs (Threshold, Release, In gain,
+// Out gain). Threshold is the ceiling: no output sample, and no inter-sample
+// peak the 4x detector can see, goes above it (before Out gain).
 //
-// Standard lookahead-limiter topology: delay the audio by a small fixed
-// window, and drive the gain from a peak detector that reads *ahead* of the
-// delayed output by that same window, so gain reduction is already in place
-// by the time the loud sample the detector saw actually arrives at the
-// output - the attack is therefore governed by the lookahead time itself
-// (see e.g. Zölzer, "DAFX: Digital Audio Effects", the peak-limiter section),
-// not a separate attack control. Release remains a knob, same
-// attack/release-coupled one-pole smoothing as DynamicsKernel (Giannoulis,
-// Massberg & Reiss, JAES 2012, §III) - reduction always jumps toward more
-// limiting instantly (attack), and eases back per the release knob.
+// The processing is PeakLimiter (see its header for why the ceiling holds by
+// construction): a 1.5 ms look-ahead hold, a straight-line attack ramp across
+// that window, and a one-pole release on the knob. Look-ahead is a fixed
+// internal constant, not a control. All channels share one gain, so the
+// stereo image never moves.
+class AudioEffectNode;
+
 class LimiterKernel : public IEffectKernel
 {
 public:
-   static constexpr int kMaxChannels = 8;
+   static constexpr int kMaxChannels = PeakLimiter::kMaxChannels;
    static constexpr float kLookaheadMs = 1.5f; // fixed internal constant, not a control
 
    enum ParamSlot
@@ -44,20 +40,14 @@ public:
    {
       mSampleRate = sampleRate;
       mMailbox.PrepareToPlay(sampleRate);
-      mLookaheadSamples = std::max(1, (int)std::ceil(kLookaheadMs * 0.001 * sampleRate));
-      for (int ch = 0; ch < kMaxChannels; ch++)
-         mDelay[ch].assign((size_t)mLookaheadSamples, 0.0f);
-      mLevelWindow.assign((size_t)mLookaheadSamples, 0.0f);
+      mLimiter.Prepare(sampleRate, kLookaheadMs);
+      mCachedReleaseMs = -1.0f;
       Reset();
    }
 
    void Reset() override
    {
-      for (int ch = 0; ch < kMaxChannels; ch++)
-         std::fill(mDelay[ch].begin(), mDelay[ch].end(), 0.0f);
-      std::fill(mLevelWindow.begin(), mLevelWindow.end(), 0.0f);
-      mWritePos = 0;
-      mSmoothedGain = 1.0f;
+      mLimiter.Reset();
       mLastGrDb = 0.0f;
       mLastOutPeakDb = -100.0f;
    }
@@ -67,60 +57,34 @@ public:
    void ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out) override
    {
       const int numChannels = std::min(in.numChannels, std::min(out.numChannels, kMaxChannels));
-      const int window = (int)mLevelWindow.size();
-      if (window <= 0)
-         return;
-
-      const float attackCoeff = expf(-1.0f / (kLookaheadMs * 0.001f * (float)mSampleRate));
 
       float outPeak = 0.0f;
       for (int i = 0; i < out.numFrames; i++)
       {
-         const float thresholdLin = DspMath::DbToLinear(mMailbox.SmoothedValue(kThreshold));
+         const float ceiling = DspMath::DbToLinear(mMailbox.SmoothedValue(kThreshold));
          const float releaseMs = std::max(1.0f, mMailbox.SmoothedValue(kReleaseMs));
          const float inGainLin = DspMath::DbToLinear(mMailbox.SmoothedValue(kInGainDb));
          const float outGainLin = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutGainDb));
-         const float releaseCoeff = expf(-1.0f / (releaseMs * 0.001f * (float)mSampleRate));
-
-         // Post-inGain samples go into the delay line; the window's peak
-         // (this new sample plus everything already in flight) drives the
-         // gain that will apply once this same sample reaches the output.
-         float gained[kMaxChannels];
-         float levelAtN = 0.0f;
-         for (int ch = 0; ch < numChannels; ch++)
+         if (releaseMs != mCachedReleaseMs)
          {
-            gained[ch] = in.channels[ch][i] * inGainLin;
-            levelAtN = std::max(levelAtN, std::fabs(gained[ch]));
+            mCachedReleaseMs = releaseMs;
+            mReleaseCoeff = std::exp(-1.0f / (releaseMs * 0.001f * (float)mSampleRate));
          }
 
-         float delayed[kMaxChannels];
+         float frame[kMaxChannels];
          for (int ch = 0; ch < numChannels; ch++)
-         {
-            delayed[ch] = mDelay[ch][mWritePos];
-            mDelay[ch][mWritePos] = gained[ch];
-         }
-         mLevelWindow[mWritePos] = levelAtN;
-         mWritePos++;
-         if (mWritePos >= window)
-            mWritePos = 0;
+            frame[ch] = in.channels[ch][i] * inGainLin;
 
-         float windowMax = 0.0f;
-         for (int k = 0; k < window; k++)
-            windowMax = std::max(windowMax, mLevelWindow[k]);
-
-         const float targetGain = (windowMax > thresholdLin && windowMax > 1.0e-9f) ? thresholdLin / windowMax : 1.0f;
-         const float coeff = (targetGain < mSmoothedGain) ? attackCoeff : releaseCoeff;
-         mSmoothedGain = targetGain + (mSmoothedGain - targetGain) * coeff;
+         mLimiter.ProcessFrame(frame, numChannels, ceiling, mReleaseCoeff);
 
          for (int ch = 0; ch < numChannels; ch++)
          {
-            const float v = delayed[ch] * mSmoothedGain * outGainLin;
+            const float v = frame[ch] * outGainLin;
             out.channels[ch][i] = v + 1.0e-20f; // denormal guard
             outPeak = std::max(outPeak, std::fabs(v));
          }
-
-         mLastGrDb = -DspMath::LinearToDb(std::max(1.0e-9f, mSmoothedGain));
       }
+      mLastGrDb = -DspMath::LinearToDb(std::max(1.0e-9f, mLimiter.LastGain()));
       mLastOutPeakDb = DspMath::LinearToDb(std::max(1.0e-9f, outPeak));
 
       // {gain reduction in dB, output peak in dB} - the GR meter's bar and
@@ -129,19 +93,17 @@ public:
       mGrMeter.Write(payload, 2);
    }
 
-   int LatencySamples() const override { return mLookaheadSamples; }
+   int LatencySamples() const override { return mLimiter.Latency(); }
    MeterRing* ExtraMeter() override { return &mGrMeter; }
 
 private:
    ParamMailbox mMailbox;
-   double mSampleRate = 44100.0;
-   int mLookaheadSamples = 1;
+   double mSampleRate = 44100.0; // written by PrepareToPlay only (audio-thread owned)
 
-   std::vector<float> mDelay[kMaxChannels];
-   std::vector<float> mLevelWindow;
-   int mWritePos = 0;
+   PeakLimiter mLimiter;
+   float mCachedReleaseMs = -1.0f;
+   float mReleaseCoeff = 0.0f;
 
-   float mSmoothedGain = 1.0f;
    float mLastGrDb = 0.0f;
    float mLastOutPeakDb = -100.0f;
 

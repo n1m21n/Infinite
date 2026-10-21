@@ -53,10 +53,14 @@ void StereoKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       float outL = mid + side;
       float outR = mid - side;
 
+      // Equal-power pan, normalised so centre is unity (EqualPowerPan gives
+      // 0.707 a side there; the old 2x made a width-1 centred Stereo node a
+      // flat +3 dB boost). Hard left/right is +3 dB on the kept side, the
+      // usual constant-power law.
       float leftGain, rightGain;
       DspMath::EqualPowerPan(pan, leftGain, rightGain);
-      outL *= 2.0f * leftGain;
-      outR *= 2.0f * rightGain;
+      outL *= (float)M_SQRT2 * leftGain;
+      outR *= (float)M_SQRT2 * rightGain;
 
       out.channels[0][i] = outL;
       out.channels[1][i] = outR;

@@ -166,11 +166,17 @@
                                      link.second.polarity, link.second.depth, link.second.centre,
                                      link.second.inMin, link.second.inMax,
                                      link.second.outMin, link.second.outMax });
+      // Turbo 0.60: the file names each bound control by its saved key.
+      for (Patch::ModRecord& m : data.modulation)
+         m.saveKey = SavedKeyOfParam(m.dstIndex, m.dstParam);
       for (const auto& link : PaletteBinding::Instance().Links())
          data.palette.push_back({ link.first.first, link.first.second,
                                   link.second.nodeIndex, link.second.swatchIndex });
       for (const auto& expr : Modulation::Instance().Expressions())
+      {
          data.expressions.push_back({ expr.first.first, expr.first.second, expr.second });
+         data.expressions.back().saveKey = SavedKeyOfParam(expr.first.first, expr.first.second);
+      }
       for (const MidiMap::Mapping& m : MidiMap::All())
       {
          Patch::MidiMapRecord rec;
@@ -393,7 +399,26 @@
    // disk) and Undo/Redo (from the in-memory stacks). Callers decide what
    // happens to gPatchPath/gUndoStack/gRedoStack afterwards; a loaded file is
    // a new document boundary, an undo is not.
+   void ApplyPatchDataImpl(const Patch::Data& data, bool applySceneSettings);
+
+   // Turbo 0.60: an upstream patch with names, control keys or lo/hi ranges
+   // is resolved on a copy first; what needs drawn nodes attaches later
+   // (PatchNames.inl). Every other patch takes the path it always took.
    void ApplyPatchData(const Patch::Data& data, bool applySceneSettings = false)
+   {
+      if (!NeedsNamedPrep(data))
+      {
+         gPendingNamed = PendingNamed();
+         ApplyPatchDataImpl(data, applySceneSettings);
+         return;
+      }
+      Patch::Data local = data;
+      PrepareNamedPatch(local);
+      ApplyPatchDataImpl(local, applySceneSettings);
+      FinishNamedPatch();
+   }
+
+   void ApplyPatchDataImpl(const Patch::Data& data, bool applySceneSettings)
    {
       gSuppressUndoCheckpoints = true;
       // Loopers respawned here re-adopt their loop audio by id (Turbo).
@@ -449,6 +474,11 @@
          spawned->showAdvancedParams = rec.showAdvancedParams;
          spawned->showPreview = rec.showPreview;
          spawned->colorTag = rec.colorTag;
+         // Turbo 0.60 (upstream Patch::SavedBefore): a missing key on a node the GUI saved before
+         // rev 2 means the older behaviour; a hand-written node (no flags line) or a rev 2 file
+         // keeps the defaults.
+         if (data.revision < 2 && (rec.hasFlags || rec.line == 0))
+            spawned->node->BeforeLoadParams();
          Patch::LoadParams(spawned->node.get(), rec.params);
          ReloadDerivedState(spawned->node.get());
          // Phase 4 (selection as an input): rewrites a saved kDeleteSelected/
@@ -471,6 +501,7 @@
       }
       NoteGraphEditedForLiveIssues(); // Turbo 0.45
 
+      gLastApplyRemap = remap; // Turbo 0.60: for bindings that attach later (PatchNames.inl)
       auto resolve = [&](int savedIndex) -> GraphNode*
       {
          auto it = remap.find(savedIndex);
@@ -490,8 +521,18 @@
       {
          GraphNode* dst = resolve(c.dstIndex);
          GraphNode* src = resolve(c.srcIndex);
-         if (dst != nullptr && src != nullptr)
-            ConnectGeometrySlot(*dst, c.dstSlot, *src, c.srcOutput);
+         if (dst == nullptr || src == nullptr)
+            continue;
+         // Turbo 0.60: a file can describe a geometry loop the canvas refuses;
+         // the cable that would close it is dropped instead of crashing the cook.
+         if (dst->node->GeometryInputSlot(c.dstSlot) != nullptr &&
+             WouldCreateGeometryCycle(src->node.get(), dst->node.get()))
+         {
+            fprintf(stderr, "patch: geometry cable %d -> %d dropped (it would close a loop)\n", c.srcIndex, c.dstIndex);
+            gPatchStatus = "Opened; a geometry cable that closed a loop was dropped";
+            continue;
+         }
+         ConnectGeometrySlot(*dst, c.dstSlot, *src, c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.audio)
       {

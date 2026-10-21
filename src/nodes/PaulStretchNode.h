@@ -87,6 +87,8 @@ public:
    float end = 1.0f;              // 0.0 .. 1.0 playback/loop end
    float position = 0.0f;         // 0.0 .. 1.0 playhead/scrub position within [start, end]
    bool loop = true;              // loop playback within [start, end]
+   int rateFix = 1; // not a control: 0 = plays the file at the device rate, not its own (saved before the fix)
+   void BeforeLoadParams() override { rateFix = 0; }
 
    AudioCable audioInput;         // record source
 

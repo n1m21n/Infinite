@@ -89,8 +89,11 @@ enum class EffectVisualizerId
    kResonatorBankSpectrum,
    kCycleShaperWave,
    kSpecBlurSpectrum,
-   kKeySnapScale,   // Turbo 0.57 (from upstream)
-   kSpectrumSlide,  // Turbo 0.57 (from upstream)
+   kKeySnapScale,
+   kSpectrumSlide,
+   kShapeResonator,
+   kConvolutionSpace,
+   kSaturatorCurves,
 };
 
 struct EffectDef
@@ -116,6 +119,28 @@ struct EffectDef
    // audio-rate cutoff input, so this is table-driven rather than a name
    // special-case in AudioEffectNode::InputLabel.
    const char* sidechainLabel = "sidechain";
+   // True if this effect has no wet/dry mix control on its body (EQ - its
+   // "output" section, output gain + mix, was removed entirely per user
+   // request) and must therefore always run fully wet regardless of
+   // whatever value happens to be sitting in the universal `mix` field
+   // (e.g. a value carried over from an older save). AudioEffectNode::
+   // CookIfNeeded pushes 1.0 to the runtime instead of `mix` when this is
+   // set, rather than clamping/ignoring `mix` itself, so a saved patch's
+   // stored value is left untouched (VisitParams still round-trips it) -
+   // only its audio-thread effect is suppressed.
+   bool forceFullyWet = false;
+   // True if slot 1 is a geometry input ("shape") instead of a sidechain.
+   bool hasGeometryInput = false;
+   // True if the node carries an audio file path (AudioEffectNode::filePath,
+   // saved as "file"): Convolution Reverb's loaded impulse response.
+   bool hasFile = false;
+   // Mix law. False (the default) is an equal-power crossfade, right when the
+   // wet signal is decorrelated from the dry (reverb, delay, pitch, spectral
+   // effects). True is a linear crossfade, for effects whose wet signal is
+   // still essentially the dry one processed - dynamics, saturation,
+   // filtering, comb-style modulation - where equal power would make mix 0.5
+   // up to +3 dB louder than either end of the knob.
+   bool linearMix = false;
 };
 
 const std::vector<EffectDef>& GetEffectDefs();

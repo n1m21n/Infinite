@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "audio/SynthModes.h"
+#include "audio/VoiceMod.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
@@ -101,10 +102,10 @@ struct WavetableSynthParams
    float glide = 0.0f;
    float pitchBend = 0.0f;
    float fmDepth = 0.0f;
-   int fmMode = 0; // 0: Phase Modulation / Linear FM, 1: Exponential FM
+   int fmMode = 0; // 0: Phase Modulation, 1: Linear Through-Zero FM
 };
 
-class WavetableNode : public INode, public IAudioSource
+class WavetableNode : public INode, public IAudioSource, public VoiceMod::IVoiceModTarget
 {
 public:
    static constexpr int kEngines = 2;
@@ -135,6 +136,12 @@ public:
    // read back through DebugMailboxSampleRate's mailbox path - this mirrors
    // that accessor for the atomic instead.
    int DebugFmMode() const;
+
+   // Per-voice modulation (audio/VoiceMod.h): the engine params each voice
+   // evaluates for itself, plus mix and FM depth.
+   int VoiceParamFor(const float* member) const override;
+   void PublishVoicePlan(const VoiceMod::Plan& plan) override;
+   float DebugVoiceSource(int voice, int source) const;
 
    AudioCable* AudioInputSlot(int slot) override { return slot == 1 ? &fmInput : nullptr; }
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
@@ -174,7 +181,7 @@ public:
    // range +/-2 st matches the standard MIDI wheel range.
    float pitchBend = 0.0f;   // -2..2 semitones
    float fmDepth = 0.0f;     // audio-rate FM / PM modulation depth
-   int fmMode = 0;           // 0 = Phase Modulation, 1 = Exponential FM
+   int fmMode = 0;           // 0 = Phase Modulation, 1 = Linear Through-Zero FM
 
    NoteCable noteInput;
    AudioCable fmInput;

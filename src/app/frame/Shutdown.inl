@@ -58,6 +58,7 @@
    ed::DestroyEditor(gEditor);
    shutdownStep("update checker");
    TurboUpdate::Shutdown(); // Turbo 0.46
+   MovementLog::Stop(); // Turbo 0.60
    shutdownStep("ui and window");
    ImGui_ImplOpenGL3_Shutdown();
    ImGui_ImplGlfw_Shutdown();

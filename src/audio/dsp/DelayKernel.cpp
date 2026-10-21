@@ -22,6 +22,10 @@ void DelayKernel::PushParams(const AudioEffectNode& node, double sampleRate)
    mMailbox.Push(kFreeMs, node.Param("timeMs"));
    mMailbox.Push(kPan, node.Param("pan"));
    mMailbox.Push(kDucking, node.Param("ducking"));
+   mMailbox.Push(kWow, node.Param("wow"));
+   mMailbox.Push(kFlutter, node.Param("flutter"));
+   mMailbox.Push(kSaturation, node.Param("saturation"));
+   mMailbox.Push(kDiffusion, node.Param("diffusion"));
 }
 
 namespace
@@ -32,6 +36,24 @@ namespace
    inline float SoftClipOutput(float x)
    {
       return DspMath::FastTanh(x * 0.5f) * 2.0f;
+   }
+
+   // What is written back into a clean line. Feedback above 100% grows the
+   // line by that factor every pass, so with nothing in the loop it ran away
+   // without bound (to inf, then NaN, after a few minutes of self-
+   // oscillation) while SoftClipOutput hid it at +6 dBFS. A soft ceiling,
+   // bit-identical below the knee, makes it settle near 0 dBFS instead -
+   // the analog path's AsymTanh already does this job there.
+   inline float LineCeiling(float x) { return DspMath::SoftCeiling(x, 0.9f); }
+
+   // Tape saturation in the loop: the drive goes in and comes back out, and
+   // the bias grows with it, so a hot tape rounds the peaks and also takes
+   // up to ~3 dB off each pass. Saturation 0 is the analog curve this mode
+   // always had.
+   inline float TapeSaturate(float x, float saturation)
+   {
+      const float drive = 1.0f + 7.0f * saturation; // up to +18 dB
+      return AnalogDsp::AsymTanh(x * drive, 0.15f + 0.45f * saturation) / drive;
    }
 }
 
@@ -70,16 +92,24 @@ void DelayKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidec
       const float targetSamples = std::clamp(baseSeconds * (float)mSampleRate, 1.0f, (float)lineCapacitySamples);
 
       float delaySamples;
+      float wow = 0.0f, flutter = 0.0f, saturation = 0.0f, diffusion = 0.0f;
       if (analog)
       {
+         wow = std::clamp(mMailbox.SmoothedValue(kWow), 0.0f, 1.0f);
+         flutter = std::clamp(mMailbox.SmoothedValue(kFlutter), 0.0f, 1.0f);
+         saturation = std::clamp(mMailbox.SmoothedValue(kSaturation), 0.0f, 1.0f);
+         diffusion = std::clamp(mMailbox.SmoothedValue(kDiffusion), 0.0f, 1.0f);
          if (!mDelaySmootherAnalogInit)
          {
             mDelaySmootherAnalog.SetImmediate(targetSamples);
             mDelaySmootherAnalogInit = true;
          }
          const float rawDelaySamples = mDelaySmootherAnalog.Process(targetSamples);
-         const float wow = mWowFlutter.Advance(0.5f, 0.4f, 4.2f, mSampleRate);
-         const float modSamples = wow * 0.0025f * (float)mSampleRate;
+         // Wow 0.5 is the 2.5 ms this mode always swung by; flutter adds up
+         // to 0.25 ms at the capstan's ~6.5 Hz.
+         const float wowMod = mWowFlutter.Advance(0.5f, 0.4f, 4.2f, mSampleRate) * wow * 0.005f;
+         const float flutterMod = mFlutter.Advance(6.5f, 0.2f, 0.7f, mSampleRate) * flutter * 0.00025f;
+         const float modSamples = (wowMod + flutterMod) * (float)mSampleRate;
          delaySamples = std::clamp(rawDelaySamples + modSamples, 1.0f, (float)lineCapacitySamples);
       }
       else
@@ -91,6 +121,9 @@ void DelayKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidec
          }
          delaySamples = mDelaySmoother.Process(targetSamples);
       }
+      // The diffused tap is read early by the chain's length, so the loop
+      // through it is still `delaySamples` long.
+      const float loopSamples = std::max(1.0f, delaySamples - (float)mDiffuseSamples);
 
       const float inMono = numChannels >= 2 ? 0.5f * (in.channels[0][i] + in.channels[1][i]) : in.channels[0][i];
 
@@ -107,16 +140,23 @@ void DelayKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidec
       float wetL, wetR;
       if (analog)
       {
+         // Diffusion fades the plain tap into one smeared by the allpass
+         // chain; the chain always runs so turning it up never clicks.
+         auto diffuse = [diffusion](DelayAllpass* chain, float plain, float early) {
+            for (int k = 0; k < kDiffuseStages; k++)
+               early = chain[k].Process(early, kDiffuseGain);
+            return plain + diffusion * (early - plain);
+         };
          if (bounce)
          {
             const float outA = mLineA.Read(delaySamples);
             const float outB = mLineB.Read(delaySamples);
-            float fbA = mFilterA.Process(outA * feedbackFrac, tone, (float)mSampleRate);
-            float fbB = mFilterB.Process(outB * feedbackFrac, tone, (float)mSampleRate);
-            fbA = mAnalogLpA.Process(mAnalogHpA.Process(fbA));
-            fbB = mAnalogLpB.Process(mAnalogHpB.Process(fbB));
-            fbA = AnalogDsp::AsymTanh(fbA, 0.15f);
-            fbB = AnalogDsp::AsymTanh(fbB, 0.15f);
+            const float tapA = diffuse(mDiffuseA, outA, mLineA.Read(loopSamples));
+            const float tapB = diffuse(mDiffuseB, outB, mLineB.Read(loopSamples));
+            float fbA = mFilterA.Process(tapA * feedbackFrac, tone, (float)mSampleRate);
+            float fbB = mFilterB.Process(tapB * feedbackFrac, tone, (float)mSampleRate);
+            fbA = TapeSaturate(mAnalogLpA.Process(mAnalogHpA.Process(fbA)), saturation);
+            fbB = TapeSaturate(mAnalogLpB.Process(mAnalogHpB.Process(fbB)), saturation);
             mLineA.Write(inMono + fbB);
             mLineB.Write(fbA);
             wetL = SoftClipOutput(outA);
@@ -125,9 +165,9 @@ void DelayKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidec
          else
          {
             const float delayed = mLine.Read(delaySamples);
-            float fb = mLineFilter.Process(delayed * feedbackFrac, tone, (float)mSampleRate);
-            fb = mAnalogLp.Process(mAnalogHp.Process(fb));
-            fb = AnalogDsp::AsymTanh(fb, 0.15f);
+            const float tap = diffuse(mDiffuse, delayed, mLine.Read(loopSamples));
+            float fb = mLineFilter.Process(tap * feedbackFrac, tone, (float)mSampleRate);
+            fb = TapeSaturate(mAnalogLp.Process(mAnalogHp.Process(fb)), saturation);
             mLine.Write(inMono + fb);
             wetL = wetR = SoftClipOutput(delayed);
          }
@@ -140,8 +180,8 @@ void DelayKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidec
             const float outB = mLineB.Read(delaySamples);
             const float fbA = mFilterA.Process(outA * feedbackFrac, tone, (float)mSampleRate);
             const float fbB = mFilterB.Process(outB * feedbackFrac, tone, (float)mSampleRate);
-            mLineA.Write(inMono + fbB);
-            mLineB.Write(fbA);
+            mLineA.Write(LineCeiling(inMono + fbB));
+            mLineB.Write(LineCeiling(fbA));
             wetL = SoftClipOutput(outA);
             wetR = SoftClipOutput(outB);
          }
@@ -149,7 +189,7 @@ void DelayKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidec
          {
             const float delayed = mLine.Read(delaySamples);
             const float fb = mLineFilter.Process(delayed * feedbackFrac, tone, (float)mSampleRate);
-            mLine.Write(inMono + fb);
+            mLine.Write(LineCeiling(inMono + fb));
             wetL = wetR = SoftClipOutput(delayed);
          }
       }

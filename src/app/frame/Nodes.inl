@@ -67,7 +67,7 @@
          {
             constexpr int kCullRefresh = 30;
             constexpr float kCullMargin = 64.0f;
-            const bool mustDraw = gn.hasModulatedParams || gn.hasPaletteColors ||
+            const bool mustDraw = NodeIsParamDriven(gn) || gn.hasPaletteColors ||
                                   cullExemptNodes.count(gn.index) > 0 ||
                                   ImGui::GetCurrentContext()->OpenPopupStack.Size > 0 ||
                                   dynamic_cast<KeyboardNode*>(gn.node.get()) != nullptr ||
@@ -213,6 +213,10 @@
             DrawMacroRadioSelectorBody(m);
          else if (auto* m = dynamic_cast<MacroStepGateNode*>(gn.node.get()))
             DrawMacroStepGateBody(m);
+         // Turbo 0.60 (upstream): Drift drives one value per destination, so the
+         // single-history meter would have to pick one; this draws every line.
+         else if (!isAudioBodyNode && dynamic_cast<DriftNode*>(gn.node.get()) != nullptr)
+            DrawDriftMeter(dynamic_cast<DriftNode*>(gn.node.get()), gn.index);
          else if (!isAudioBodyNode && dynamic_cast<IModulator*>(gn.node.get()) != nullptr)
          {
             // Audio/note nodes are excluded here even when they implement
@@ -258,6 +262,8 @@
                   dynamic_cast<SetColorNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ParticleSystemNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ClothNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<RigidBodyNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<LSystemNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<WrapNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr ||
@@ -476,7 +482,25 @@
 
          // BeginNodeParams(gn.index) already ran above, ahead of the preview/
          // body dispatch - see the comment at that call site.
-         if (!isAudioBody && gn.showParams)
+         //
+         // Turbo 0.60 (upstream fix): a parameter only exists in the frames its
+         // control registers, so collapsing a node froze every modulator,
+         // expression, MIDI mapping and gesture driving it. A collapsed node
+         // that something drives still runs the params dispatch with the UI
+         // suppressed: gParamRegisterOnly makes the Mod* widgets register and
+         // skip their pin (CollapsedBindingPins gives the cables their landing),
+         // SkipItems makes every plain ImGui widget a no-op so the node keeps its
+         // size, and an empty clip rect swallows any raw draw-list work.
+         const bool registerOnlyParams = !isAudioBody && !gn.showParams && NodeIsParamDriven(gn);
+         ImGuiWindow* paramsWindow = ImGui::GetCurrentWindow();
+         const bool savedSkipItems = paramsWindow->SkipItems;
+         if (registerOnlyParams)
+         {
+            gParamRegisterOnly = true;
+            paramsWindow->SkipItems = true;
+            ImGui::GetWindowDrawList()->PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(0.0f, 0.0f), false);
+         }
+         if (!isAudioBody && (gn.showParams || registerOnlyParams))
          {
             if (auto* n = dynamic_cast<ImageSourceNode*>(gn.node.get()))
                DrawImageSourceParams(n);
@@ -506,6 +530,11 @@
                DrawVideoInParams(n);
             else if (auto* n = dynamic_cast<FitNode*>(gn.node.get()))
                DrawFitParams(n);
+            // Turbo 0.60: every node ported from upstream, behind one branch
+            // (this chain sits at MSVC's nesting limit).
+            else if (DrawPortedNodeParams(gn))
+            {
+            }
             else if (auto* n = dynamic_cast<ProjectionNode*>(gn.node.get()))
             {
                DrawProjectionParams(n);
@@ -555,8 +584,6 @@
                DrawMacroStepGateParams(n);
             else if (auto* n = dynamic_cast<ScenesNode*>(gn.node.get()))
                DrawScenesParams(n); // Turbo 0.50
-            else if (auto* n = dynamic_cast<DriftNode*>(gn.node.get()))
-               DrawDriftParams(n);
             else if (auto* n = dynamic_cast<UIButtonNode*>(gn.node.get()))
                DrawUIButtonOptions(n);
             else if (auto* n = dynamic_cast<UISliderNode*>(gn.node.get()))
@@ -873,6 +900,12 @@
             }
             else if (auto* n = dynamic_cast<SyphonOutNode*>(gn.node.get()))
                DrawSyphonOutParams(n);
+         }
+         if (registerOnlyParams)
+         {
+            ImGui::GetWindowDrawList()->PopClipRect();
+            paramsWindow->SkipItems = savedSkipItems;
+            gParamRegisterOnly = false;
          }
 
          ImGui::EndGroup();

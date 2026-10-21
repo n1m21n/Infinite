@@ -115,6 +115,26 @@ struct DelayToneFilter
    }
 };
 
+// One Schroeder allpass, y = -g x + x[n-M] + g y[n-M]: flat magnitude, so
+// diffusion smears the repeats without colouring them.
+struct DelayAllpass
+{
+   std::vector<float> buf;
+   int pos = 0;
+
+   void Prepare(int samples) { buf.assign((size_t)std::max(1, samples), 0.0f); pos = 0; }
+   void Reset() { std::fill(buf.begin(), buf.end(), 0.0f); pos = 0; }
+   float Process(float x, float g)
+   {
+      const float delayed = buf[(size_t)pos];
+      const float v = x + g * delayed;
+      buf[(size_t)pos] = v;
+      if (++pos >= (int)buf.size())
+         pos = 0;
+      return delayed - g * v;
+   }
+};
+
 // AudioEffectNode's kernel for the Delay node.
 class DelayKernel : public IEffectKernel
 {
@@ -128,8 +148,20 @@ public:
       kFreeMs,
       kPan,
       kDucking,
+      kWow,
+      kFlutter,
+      kSaturation,
+      kDiffusion,
       kNumSlots
    };
+
+   // Tape diffusion (2.20): four Schroeder allpasses in the loop, mutually
+   // prime lengths, 12.3 ms in all. Their tap reads this much earlier than
+   // the output tap, so the repeats still land on the delay time, and the
+   // diffusion knob fades it in over the plain tap.
+   static constexpr int kDiffuseStages = 4;
+   static constexpr float kDiffuseMs[kDiffuseStages] = { 1.3f, 2.1f, 3.4f, 5.5f };
+   static constexpr float kDiffuseGain = 0.6f;
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
@@ -149,6 +181,14 @@ public:
       mAnalogHpA.SetCutoff(80.0f, sampleRate);
       mAnalogLpB.SetCutoff(4500.0f, sampleRate);
       mAnalogHpB.SetCutoff(80.0f, sampleRate);
+      mDiffuseSamples = 0;
+      for (int k = 0; k < kDiffuseStages; k++)
+      {
+         const int len = std::max(1, (int)std::lround(kDiffuseMs[k] * 0.001 * sampleRate));
+         mDiffuseSamples += len;
+         for (DelayAllpass* chain : { mDiffuse, mDiffuseA, mDiffuseB })
+            chain[k].Prepare(len);
+      }
       Reset();
    }
 
@@ -164,6 +204,13 @@ public:
       mDelaySmootherInit = false;
       mDelaySmootherAnalogInit = false;
       mWowFlutter.Reset();
+      mFlutter.Reset(0.25f, 0.5f);
+      for (int k = 0; k < kDiffuseStages; k++)
+      {
+         mDiffuse[k].Reset();
+         mDiffuseA[k].Reset();
+         mDiffuseB[k].Reset();
+      }
       mAnalogLp.Reset();
       mAnalogHp.Reset();
       mAnalogLpA.Reset();
@@ -202,7 +249,10 @@ private:
    // Analog mode components
    DspMath::OnePole mDelaySmootherAnalog;
    bool mDelaySmootherAnalogInit = false;
-   AnalogDsp::DriftLfo mWowFlutter;
+   AnalogDsp::DriftLfo mWowFlutter; // wow: slow, drifting
+   AnalogDsp::DriftLfo mFlutter;    // flutter: capstan rate
+   DelayAllpass mDiffuse[kDiffuseStages], mDiffuseA[kDiffuseStages], mDiffuseB[kDiffuseStages];
+   int mDiffuseSamples = 0;
    AnalogDsp::OnePoleLP mAnalogLp;
    AnalogDsp::OnePoleHP mAnalogHp;
    AnalogDsp::OnePoleLP mAnalogLpA, mAnalogLpB;

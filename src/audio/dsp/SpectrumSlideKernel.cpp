@@ -73,6 +73,12 @@ void SpectrumSlideKernel::PrepareToPlay(double sampleRate, int /*maxBlockSize*/)
    mOutIm.assign(kNumBins, 0.0f);
    mA.Init();
    mB.Init();
+   for (int ch = 0; ch < kMaxChannels; ch++)
+   {
+      mChA[ch].Init();
+      mChB[ch].Init();
+   }
+   mMid.Init();
    mHist.assign(kNumBins + 2, 0.0f);
    mInstNum.assign(kNumBins + 2, 0.0f);
    mSrcA.assign(kNumBins + 2, 0.0f);
@@ -87,6 +93,7 @@ void SpectrumSlideKernel::Reset()
 {
    for (int ch = 0; ch < kMaxChannels; ch++)
       mChannels[ch].Reset();
+   mMid.Reset();
 }
 
 void SpectrumSlideKernel::PushParams(const AudioEffectNode& node, double sampleRate)
@@ -95,9 +102,7 @@ void SpectrumSlideKernel::PushParams(const AudioEffectNode& node, double sampleR
    mSlide.store(std::clamp(node.Param("slide"), 0.0f, 1.0f), std::memory_order_relaxed);
 }
 
-// Forward FFT of one input's window, then magnitude / phase / instantaneous
-// frequency (in bins) per bin and the normalised cumulative energy curve.
-void SpectrumSlideKernel::Analyse(Side& side, const float* fifo, Spectrum& sp)
+void SpectrumSlideKernel::Transform(const float* fifo, Spectrum& sp)
 {
    for (int n = 0; n < kFftSize; n++)
       mTime[n] = fifo[n] * mWindow[n];
@@ -107,6 +112,12 @@ void SpectrumSlideKernel::Analyse(Side& side, const float* fifo, Spectrum& sp)
       sp.re[k] *= 0.5f;
       sp.im[k] *= 0.5f;
    }
+}
+
+// Magnitude / phase / instantaneous frequency (in bins) per bin and the
+// normalised cumulative energy curve.
+void SpectrumSlideKernel::AnalyseBins(Side& side, Spectrum& sp)
+{
 
    const float hopAdv = kTwoPi * (float)kHopSize / (float)kFftSize;
    float total = 0.0f;
@@ -141,46 +152,101 @@ void SpectrumSlideKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer*
    const float normScale = 1.0f / ((float)kFftSize * 1.5f);
    const int olaMask = kOlaSize - 1;
 
-   for (int ch = 0; ch < numChannels; ch++)
+   for (int i = 0; i < out.numFrames; i++)
    {
-      ChannelState& st = mChannels[ch];
-      const float* inA = in.channels[ch];
-      // No cable on B: slide has nothing to move toward, so B mirrors A.
-      const float* inB = (sidechain && sidechain->numChannels > 0)
-                            ? sidechain->channels[std::min(ch, sidechain->numChannels - 1)]
-                            : inA;
-      float* outData = out.channels[ch];
-
-      for (int i = 0; i < out.numFrames; i++)
+      // Every channel's FIFOs fill on the same sample, so their frames are
+      // processed together (stereo link - see mMid).
+      for (int ch = 0; ch < numChannels; ch++)
       {
-         outData[i] = DspMath::FlushDenormal(st.outputOla[st.olaRead]);
+         ChannelState& st = mChannels[ch];
+         // No cable on B: slide has nothing to move toward, so B mirrors A.
+         const float* inB = (sidechain && sidechain->numChannels > 0)
+                               ? sidechain->channels[std::min(ch, sidechain->numChannels - 1)]
+                               : in.channels[ch];
+         out.channels[ch][i] = DspMath::FlushDenormal(st.outputOla[st.olaRead]);
          st.outputOla[st.olaRead] = 0.0f;
          st.olaRead = (st.olaRead + 1) & olaMask;
-
-         st.a.inputFifo[st.a.fifoSamples++] = inA[i];
+         st.a.inputFifo[st.a.fifoSamples++] = in.channels[ch][i];
          st.b.inputFifo[st.b.fifoSamples++] = inB[i];
-         if (st.a.fifoSamples >= kFftSize)
+      }
+      if (numChannels == 0 || mChannels[0].a.fifoSamples < kFftSize)
+         continue;
+
+      // Each channel's spectra, and the mid (their average).
+      std::fill(mA.re.begin(), mA.re.end(), 0.0f);
+      std::fill(mA.im.begin(), mA.im.end(), 0.0f);
+      std::fill(mB.re.begin(), mB.re.end(), 0.0f);
+      std::fill(mB.im.begin(), mB.im.end(), 0.0f);
+      const float avg = 1.0f / (float)numChannels;
+      for (int ch = 0; ch < numChannels; ch++)
+      {
+         ChannelState& st = mChannels[ch];
+         Transform(st.a.inputFifo.data(), mChA[ch]);
+         Transform(st.b.inputFifo.data(), mChB[ch]);
+         AnalyseBins(st.a, mChA[ch]);
+         AnalyseBins(st.b, mChB[ch]);
+         for (int k = 0; k < kNumBins; k++)
          {
-            Analyse(st.a, st.a.inputFifo.data(), mA);
-            Analyse(st.b, st.b.inputFifo.data(), mB);
-
-            ProcessFrame(st);
-
-            mFft.Inverse(mOutRe.data(), mOutIm.data(), kLog2Fft, mTime.data());
-            for (int n = 0; n < kFftSize; n++)
-               st.outputOla[(st.olaRead + n) & olaMask] += mTime[n] * mWindow[n] * normScale;
-
-            const size_t keep = (size_t)(kFftSize - kHopSize) * sizeof(float);
-            std::memmove(st.a.inputFifo.data(), st.a.inputFifo.data() + kHopSize, keep);
-            std::memmove(st.b.inputFifo.data(), st.b.inputFifo.data() + kHopSize, keep);
-            st.a.fifoSamples = st.b.fifoSamples = kFftSize - kHopSize;
+            mA.re[k] += mChA[ch].re[k] * avg;
+            mA.im[k] += mChA[ch].im[k] * avg;
+            mB.re[k] += mChB[ch].re[k] * avg;
+            mB.im[k] += mChB[ch].im[k] * avg;
          }
+      }
+      AnalyseBins(mMid.a, mA);
+      AnalyseBins(mMid.b, mB);
+      ProcessFrame(mMid);
+
+      for (int ch = 0; ch < numChannels; ch++)
+      {
+         ChannelState& st = mChannels[ch];
+         if (numChannels > 1)
+            ApplyToChannel(mChA[ch], mChB[ch]); // else mOutRe/mOutIm is already the channel's
+         mFft.Inverse(mOutRe.data(), mOutIm.data(), kLog2Fft, mTime.data());
+         for (int n = 0; n < kFftSize; n++)
+            st.outputOla[(st.olaRead + n) & olaMask] += mTime[n] * mWindow[n] * normScale;
+
+         const size_t keep = (size_t)(kFftSize - kHopSize) * sizeof(float);
+         std::memmove(st.a.inputFifo.data(), st.a.inputFifo.data() + kHopSize, keep);
+         std::memmove(st.b.inputFifo.data(), st.b.inputFifo.data() + kHopSize, keep);
+         st.a.fifoSamples = st.b.fifoSamples = kFftSize - kHopSize;
       }
    }
 
    for (int ch = numChannels; ch < out.numChannels; ch++)
       for (int i = 0; i < out.numFrames; i++)
          out.channels[ch][i] = 0.0f;
+}
+
+// After ProcessFrame(mMid): output bin j carries the mid's transported
+// magnitude mOutMag[j] at phase mMid.synthPhase[j], fed from source bins
+// ~mSrcA[j]/mHist[j] and ~mSrcB[j]/mHist[j]. This channel gets the same, with
+// its own level and phase relative to the mid at those source bins.
+void SpectrumSlideKernel::ApplyToChannel(const Spectrum& chA, const Spectrum& chB)
+{
+   const float s = mSlide.load(std::memory_order_relaxed);
+   std::fill(mOutRe.begin(), mOutRe.end(), 0.0f);
+   std::fill(mOutIm.begin(), mOutIm.end(), 0.0f);
+   mOutRe[0] = (1.0f - s) * chA.re[0] + s * chB.re[0];
+   mOutIm[0] = (1.0f - s) * chA.im[0] + s * chB.im[0];
+   const Spectrum& midSrc = s < 0.5f ? mA : mB;
+   const Spectrum& chSrc = s < 0.5f ? chA : chB;
+   for (int j = 1; j < kNumBins; j++)
+   {
+      const float h = mHist[j];
+      if (h <= 1e-9f || mOutMag[j] <= 0.0f)
+         continue;
+      const int sa = std::clamp((int)lroundf(mSrcA[j] / h), 1, kNumBins - 1);
+      const int sb = std::clamp((int)lroundf(mSrcB[j] / h), 1, kNumBins - 1);
+      const float rA = chA.mag[sa] / std::max(mA.mag[sa], 1e-9f);
+      const float rB = chB.mag[sb] / std::max(mB.mag[sb], 1e-9f);
+      const float ratio = std::clamp((1.0f - s) * rA + s * rB, 0.0f, 4.0f);
+      const int src = s < 0.5f ? sa : sb;
+      const float phase = mMid.synthPhase[j] + (chSrc.phase[src] - midSrc.phase[src]);
+      const float m = mOutMag[j] * ratio;
+      mOutRe[j] = m * cosf(phase);
+      mOutIm[j] = m * sinf(phase);
+   }
 }
 
 // mA / mB hold the two analysed spectra. Write the morph to mOutRe/mOutIm.

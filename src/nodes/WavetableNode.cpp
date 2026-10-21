@@ -1,6 +1,8 @@
 #include "WavetableNode.h"
 #include "WavetableSynthCore.h"
 
+#include <utility>
+
 // -------------------------------------------------------------- main thread
 WavetableNode::WavetableNode()
 {
@@ -57,6 +59,41 @@ double WavetableNode::DebugMailboxSampleRate() const
 int WavetableNode::DebugFmMode() const
 {
    return mAudioNode ? mAudioNode->DebugFmMode() : 0;
+}
+
+int WavetableNode::VoiceParamFor(const float* member) const
+{
+   using namespace WavetableSynthCore;
+   if (member == &mix)
+      return kMix;
+   if (member == &fmDepth)
+      return kFmDepth;
+   for (int e = 0; e < kEngines; e++)
+   {
+      const WavetableEngine& s = engines[e];
+      const std::pair<const float*, int> kVoiceParams[] = {
+         { &s.position, kEngPosition }, { &s.volume, kEngVolume }, { &s.pan, kEngPan },
+         { &s.detune, kEngDetune }, { &s.stereoWidth, kEngStereoWidth }, { &s.fine, kEngFine },
+         { &s.warpAmount, kEngWarpAmount }, { &s.warpRatio, kEngWarpRatio },
+         { &s.cutoff, kEngCutoff }, { &s.resonance, kEngResonance },
+      };
+      for (const auto& [ptr, id] : kVoiceParams)
+         if (ptr == member)
+            return EngineParamId(e, id);
+   }
+   return -1;
+}
+
+void WavetableNode::PublishVoicePlan(const VoiceMod::Plan& plan)
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioWavetableNode>();
+   mAudioNode->PublishVoicePlan(plan);
+}
+
+float WavetableNode::DebugVoiceSource(int voice, int source) const
+{
+   return mAudioNode ? mAudioNode->DebugVoiceSource(voice, source) : 0.0f;
 }
 
 int WavetableNode::ReadScope(float* out, int capacity)

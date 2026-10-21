@@ -273,6 +273,10 @@
    // locks the slider) while something is patched in.
    int gCurrentNodeIndex = -1;
    int gParamCounter = 0;
+   // Turbo 0.60 (upstream): set while a collapsed node that something drives
+   // runs its params body only to register them (Nodes.inl) - the widgets
+   // register their ParamRef and skip their pin.
+   bool gParamRegisterOnly = false;
    // Buttons, checkboxes and dropdowns live in a separate, label-derived
    // parameter range. Numeric parameter ordinals are part of the patch format;
    // mixing new discrete controls into gParamCounter would silently retarget
@@ -731,31 +735,35 @@
       Modulation::Instance().RegisterParam(ref);
 
       const int pinId = result.nodeIndex * GraphNode::kStride + GraphNode::kParamBase + result.paramIndex;
-      gDrawnParamPins.insert(pinId);
+      if (!gParamRegisterOnly)
+         gDrawnParamPins.insert(pinId);
       ImGui::PushID(result.paramIndex + 15000);
-      ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-      const ImVec2 p = ImGui::GetCursorScreenPos();
-      constexpr float box = 14.0f;
-      ImGui::Dummy(ImVec2(box, box));
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
-      const bool isLight = IsThemeLight();
-      const ImU32 pinColor = result.modulated
-         ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
-         : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
-      if (CategoryColors::IsDesignTheme())
-         DrawDesignParamPin(dl, c, result.modulated ? 1 : 0);
-      else
+      if (!gParamRegisterOnly) // Turbo 0.60: register-only pass of a collapsed node, no pin
       {
-         dl->AddCircleFilled(c, 4.0f, pinColor);
-         dl->AddCircle(c, 4.0f,
-                       isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255),
-                       0, 1.0f);
+         ed::BeginPin(pinId, ed::PinKind::Input);
+         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         constexpr float box = 14.0f;
+         ImGui::Dummy(ImVec2(box, box));
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
+         const bool isLight = IsThemeLight();
+         const ImU32 pinColor = result.modulated
+            ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
+            : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
+         if (CategoryColors::IsDesignTheme())
+            DrawDesignParamPin(dl, c, result.modulated ? 1 : 0);
+         else
+         {
+            dl->AddCircleFilled(c, 4.0f, pinColor);
+            dl->AddCircle(c, 4.0f,
+                          isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255),
+                          0, 1.0f);
+         }
+         DecorateParamPin(dl, c, result.nodeIndex, result.paramIndex, label);
+         ed::EndPin();
+         ImGui::SameLine(0.0f, 4.0f);
       }
-      DecorateParamPin(dl, c, result.nodeIndex, result.paramIndex, label);
-      ed::EndPin();
-      ImGui::SameLine(0.0f, 4.0f);
 
       result.value = &slot;
       result.valid = true;
@@ -1097,6 +1105,118 @@
       return held || cvHigh;
    }
 
+   GraphNode* FindNodeByIndex(int index);
+
+   // ---- Turbo 0.60 (upstream): Shift-grab of a predicted control ----------
+   // A knob a predictor (Drift / Moves) drives is read-only like any modulated
+   // one, except while Shift is held: the hand takes it over for the grab, the
+   // apply loop leaves it alone (gPredictorGrabs), and the predictor is told
+   // where it was let go and how fast it was moving - which is what it learns.
+   std::set<ParamKey> gPredictorGrabs;     // grabbed this frame
+   std::set<ParamKey> gPredictorGrabsPrev; // grabbed last frame (keeps the grab alive once Shift is let go)
+
+   uint64_t UidForIndex(int nodeIndex)
+   {
+      const GraphNode* gn = FindNodeByIndex(nodeIndex);
+      return gn != nullptr ? gn->uid : 0;
+   }
+
+   IPredictor* PredictorForParam(int nodeIndex, int paramIndex)
+   {
+      const Modulation::Source s = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
+      if (s.nodeIndex < 0)
+         return nullptr;
+      GraphNode* gn = FindNodeByIndex(s.nodeIndex);
+      return (gn != nullptr && gn->node != nullptr) ? dynamic_cast<IPredictor*>(gn->node.get()) : nullptr;
+   }
+
+   // Fader position (0..1) <-> parameter value, honouring the widget's own taper when it has one.
+   float ParamToPos(const ParamRef& r, float v)
+   {
+      if (r.valueToPos != nullptr)
+         return std::clamp(r.valueToPos(v, r.minValue, r.maxValue), 0.0f, 1.0f);
+      const float span = r.maxValue - r.minValue;
+      return span != 0.0f ? std::clamp((v - r.minValue) / span, 0.0f, 1.0f) : 0.0f;
+   }
+
+   float PosToParam(const ParamRef& r, float pos)
+   {
+      if (r.posToValue != nullptr)
+         return r.posToValue(pos, r.minValue, r.maxValue);
+      return r.minValue + (r.maxValue - r.minValue) * pos;
+   }
+
+   struct PredictorGrabCtx
+   {
+      IPredictor* pred = nullptr;
+      ParamKey key;
+      bool editable = false;
+   };
+
+   PredictorGrabCtx BeginPredictorGrab(const ParamRef& ref)
+   {
+      PredictorGrabCtx c;
+      c.pred = PredictorForParam(ref.nodeIndex, ref.paramIndex);
+      if (c.pred == nullptr || ref.isEnum || ref.isBool)
+      {
+         c.pred = nullptr;
+         return c;
+      }
+      c.key = ParamKey{ UidForIndex(ref.nodeIndex), ref.paramIndex };
+      c.editable = ImGui::GetIO().KeyShift || gPredictorGrabsPrev.count(c.key) > 0;
+      return c;
+   }
+
+   // Right after the widget, with its activated / active state (an ImGui item's
+   // or a knob's gLastAudioWidgetInteraction). The release is the frame it stops
+   // being active.
+   void EndPredictorGrab(const PredictorGrabCtx& c, const ParamRef& ref, bool activated, bool active)
+   {
+      if (c.pred == nullptr || !c.editable)
+         return;
+      // Release velocity from the last <=100 ms of this grab, in fader space.
+      struct Track { double t[8]; float pos[8]; int n = 0; bool active = false; };
+      static std::map<ParamKey, Track> sTracks;
+      Track& tr = sTracks[c.key];
+      const double now = ImGui::GetTime();
+      if (activated)
+      {
+         PushUndoCheckpoint();
+         tr.n = 0;
+         c.pred->OnGrab(c.key);
+      }
+      if (active)
+      {
+         gPredictorGrabs.insert(c.key);
+         const float pos = ParamToPos(ref, *ref.value);
+         if (tr.n == 8)
+         {
+            std::copy(tr.t + 1, tr.t + 8, tr.t);
+            std::copy(tr.pos + 1, tr.pos + 8, tr.pos);
+            tr.n = 7;
+         }
+         tr.t[tr.n] = now;
+         tr.pos[tr.n] = pos;
+         ++tr.n;
+      }
+      if (tr.active && !active)
+      {
+         float vel = 0.0f;
+         if (tr.n >= 2)
+         {
+            int i0 = tr.n - 1;
+            while (i0 > 0 && tr.t[tr.n - 1] - tr.t[i0 - 1] <= 0.1)
+               --i0;
+            const double span = tr.t[tr.n - 1] - tr.t[i0];
+            if (i0 < tr.n - 1 && span > 1e-3)
+               vel = (float)((tr.pos[tr.n - 1] - tr.pos[i0]) / span);
+         }
+         c.pred->OnRelease(c.key, ParamToPos(ref, *ref.value), vel);
+         tr.n = 0;
+      }
+      tr.active = active;
+   }
+
 
    // `audioStyle` swaps the widget in the middle of this function for
    // AudioSliderFloat above. Everything around it - the pin, the typed-edit
@@ -1134,33 +1254,37 @@
       const std::string* hasExprErr = hasExpr ? Modulation::Instance().ExpressionErrorFor(nodeIndex, paramIndex)
                                                : nullptr;
       const bool exprErrored = hasExprErr != nullptr && !hasExprErr->empty();
-      gDrawnParamPins.insert(pinId);
+      if (!gParamRegisterOnly)
+         gDrawnParamPins.insert(pinId);
 
       ImGui::PushID(paramIndex + 5000);
 
-      ed::BeginPin(pinId, ed::PinKind::Input);
-      ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-      ImVec2 p = ImGui::GetCursorScreenPos();
       const float box = 14.0f;
-      ImGui::Dummy(ImVec2(box, box));
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
-      const bool isLight = IsThemeLight();
-      const ImU32 pinColor = modulated
-         ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
-         : hasExpr && !exprErrored
-            ? (isLight ? IM_COL32(130, 80, 230, 255) : IM_COL32(170, 130, 255, 255))
-            : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
-      if (CategoryColors::IsDesignTheme())
-         DrawDesignParamPin(dl, c, modulated ? 1 : (hasExpr && !exprErrored ? 2 : 0));
-      else
+      if (!gParamRegisterOnly) // Turbo 0.60: register-only pass of a collapsed node, no pin
       {
-         dl->AddCircleFilled(c, 4.0f, pinColor);
-         dl->AddCircle(c, 4.0f, isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255), 0, 1.0f);
+         ed::BeginPin(pinId, ed::PinKind::Input);
+         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+         ImVec2 p = ImGui::GetCursorScreenPos();
+         ImGui::Dummy(ImVec2(box, box));
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
+         const bool isLight = IsThemeLight();
+         const ImU32 pinColor = modulated
+            ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
+            : hasExpr && !exprErrored
+               ? (isLight ? IM_COL32(130, 80, 230, 255) : IM_COL32(170, 130, 255, 255))
+               : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
+         if (CategoryColors::IsDesignTheme())
+            DrawDesignParamPin(dl, c, modulated ? 1 : (hasExpr && !exprErrored ? 2 : 0));
+         else
+         {
+            dl->AddCircleFilled(c, 4.0f, pinColor);
+            dl->AddCircle(c, 4.0f, isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255), 0, 1.0f);
+         }
+         DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
+         ed::EndPin();
+         ImGui::SameLine(0.0f, 4.0f);
       }
-      DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
-      ed::EndPin();
-      ImGui::SameLine(0.0f, 4.0f);
 
       // Double-clicking swaps the slider for a text field so an exact value
       // (or, prefixed with '=', an expression) can be typed. ImGui's built-in
@@ -1258,6 +1382,23 @@
             gTypedParamNoAutoSelect.erase(editKey);
             gTypedParamPendingInit.erase(editKey);
          }
+      }
+      else if (PredictorGrabCtx grab = BeginPredictorGrab(ref); modulated && grab.pred != nullptr && grab.editable)
+      {
+         // Turbo 0.60: Shift-grab of a predicted control - the hand drives it
+         // (green) and the predictor learns from the release.
+         if (audioStyle)
+            changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
+                                       IM_COL32(120, 220, 140, 255), /*readOnly=*/false);
+         else
+         {
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.10f, 0.30f, 0.16f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.45f, 0.90f, 0.55f, 1.0f));
+            ImGui::SetNextItemWidth(width - box - 4.0f);
+            changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
+            ImGui::PopStyleColor(2);
+         }
+         EndPredictorGrab(grab, ref, ImGui::IsItemActivated(), ImGui::IsItemActive());
       }
       else if (modulated)
       {
@@ -1480,7 +1621,11 @@
       // Same widget as Knob, routed through ConsoleFaderTaper.
       KnobDb,
       // Logarithmic taper matching human ear frequency/pitch perception and visualizer response curves.
-      KnobFreq
+      KnobFreq,
+      // Upstream's skewed knob tapers, named so ported bodies compile; Turbo
+      // draws them as a plain linear Knob for now.
+      KnobLog, KnobSkewAttack100, KnobSkewDecay300, KnobSkewRelease400, KnobSkewDelay250,
+      KnobSkewGlide150, KnobSkewGlide100
    };
 
    struct AudioWidgetInteraction
@@ -1978,6 +2123,8 @@
       ref.maxValue = maxV;
       ref.taper = (style == AudioWidgetStyle::VFaderDb || style == AudioWidgetStyle::KnobDb) ? 1
                 : (style == AudioWidgetStyle::KnobFreq ? 2 : 0);
+      ref.posToValue = p2v; // Turbo 0.60: the widget's taper, for the movement log and predictors
+      ref.valueToPos = v2p;
       ref.name = label;
       Modulation::Instance().RegisterParam(ref);
 
@@ -1987,7 +2134,8 @@
       const std::string* hasExprErr = hasExpr ? Modulation::Instance().ExpressionErrorFor(nodeIndex, paramIndex)
                                                : nullptr;
       const bool exprErrored = hasExprErr != nullptr && !hasExprErr->empty();
-      gDrawnParamPins.insert(pinId);
+      if (!gParamRegisterOnly)
+         gDrawnParamPins.insert(pinId);
 
       ImGui::PushID(paramIndex + 5000);
 
@@ -2096,6 +2244,12 @@
          ImGui::SetCursorScreenPos(cellOrigin);
          ImGui::Dummy(ImVec2(cell, diameter + 4.0f + ImGui::GetTextLineHeight()));
       }
+      else if (PredictorGrabCtx grab = BeginPredictorGrab(ref); modulated && grab.pred != nullptr && grab.editable)
+      {
+         // Turbo 0.60: Shift-grab of a predicted knob, as ModSlider.
+         changed = DrawWidget(value, IM_COL32(120, 220, 140, 255), /*readOnly=*/false);
+         EndPredictorGrab(grab, ref, gLastAudioWidgetInteraction.activated, gLastAudioWidgetInteraction.active);
+      }
       else if (modulated)
       {
          float shown = *value;
@@ -2168,36 +2322,39 @@
       // turning the knob. Same pin id, same ed::BeginPin/EndPin pair, same
       // Modulation registration as before: only where it is drawn changed.
       {
-         const ImVec2 cursorAfter = ImGui::GetCursorScreenPos();
-         const float box = 12.0f;
-         // Immediately to the left of the knob, not at the far edge of the
-         // cell: in a wide cell a pin parked at the cell boundary reads as
-         // belonging to the gap between two knobs rather than to either one.
-         // 8px of clear space between the pin's ring and the widget's outer
-         // arc. At the old 2px the two visually touched and read as one
-         // control with a wart on it rather than as a knob and its pin.
-         const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - 8.0f);
-         const ImVec2 pinTL(pinX, cellOrigin.y + diameter - box);
-         ImGui::SetCursorScreenPos(pinTL);
-         ed::BeginPin(pinId, ed::PinKind::Input);
-         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-         ImGui::Dummy(ImVec2(box, box));
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImVec2 c(pinTL.x + box * 0.5f, pinTL.y + box * 0.5f);
-         // A ring rather than a bare dot: at 4px a filled dot beside a 56px
-         // knob reads as a rendering artifact, not an affordance.
-         if (CategoryColors::IsDesignTheme())
-            DrawDesignParamPin(dl, c, modulated ? 1 : (hasExpr ? 2 : 0));
-         else
+         if (!gParamRegisterOnly) // Turbo 0.60: register-only pass of a collapsed node, no pin
          {
-            dl->AddCircleFilled(c, 4.0f, IM_COL32(18, 19, 25, 255));
-            dl->AddCircle(c, modulated || hasExpr ? 4.0f : 4.5f, pinColor, 12, 2.0f);
-            if (modulated || hasExpr)
-               dl->AddCircleFilled(c, 2.0f, pinColor);
+            const ImVec2 cursorAfter = ImGui::GetCursorScreenPos();
+            const float box = 12.0f;
+            // Immediately to the left of the knob, not at the far edge of the
+            // cell: in a wide cell a pin parked at the cell boundary reads as
+            // belonging to the gap between two knobs rather than to either one.
+            // 8px of clear space between the pin's ring and the widget's outer
+            // arc. At the old 2px the two visually touched and read as one
+            // control with a wart on it rather than as a knob and its pin.
+            const float pinX = cellOrigin.x + std::max(0.0f, (cell - widgetW) * 0.5f - box - 8.0f);
+            const ImVec2 pinTL(pinX, cellOrigin.y + diameter - box);
+            ImGui::SetCursorScreenPos(pinTL);
+            ed::BeginPin(pinId, ed::PinKind::Input);
+            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            ImGui::Dummy(ImVec2(box, box));
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 c(pinTL.x + box * 0.5f, pinTL.y + box * 0.5f);
+            // A ring rather than a bare dot: at 4px a filled dot beside a 56px
+            // knob reads as a rendering artifact, not an affordance.
+            if (CategoryColors::IsDesignTheme())
+               DrawDesignParamPin(dl, c, modulated ? 1 : (hasExpr ? 2 : 0));
+            else
+            {
+               dl->AddCircleFilled(c, 4.0f, IM_COL32(18, 19, 25, 255));
+               dl->AddCircle(c, modulated || hasExpr ? 4.0f : 4.5f, pinColor, 12, 2.0f);
+               if (modulated || hasExpr)
+                  dl->AddCircleFilled(c, 2.0f, pinColor);
+            }
+            DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
+            ed::EndPin();
+            ImGui::SetCursorScreenPos(cursorAfter);
          }
-         DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
-         ed::EndPin();
-         ImGui::SetCursorScreenPos(cursorAfter);
       }
 
       ImGui::PopID();

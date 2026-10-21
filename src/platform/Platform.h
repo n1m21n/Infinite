@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 
 #include <cstdint>
 #include <string>
@@ -981,4 +982,37 @@ namespace Platform
    // and is applied on the GPU). The frame is swapped, not copied.
    // Returns true only when a new frame was received.
    bool CameraReadFrame(CameraHandle* handle, VideoFrame& outFrame, unsigned long long& outFrameSeq);
+
+   // Turbo 0.60 (upstream): the latest channel pressure and slide (CC74) per
+   // MIDI channel, 0..1, stored by every MIDI input for Note Expression.
+   inline std::atomic<float>& MidiChannelPressureSlot(int channel)
+   {
+      static std::atomic<float> sPressure[16] = {};
+      return sPressure[channel & 15];
+   }
+   inline std::atomic<float>& MidiChannelSlideSlot(int channel)
+   {
+      static std::atomic<float> sSlide[16] = {};
+      return sSlide[channel & 15];
+   }
+   // The channel whose pressure or slide moved last: what a binding with no
+   // voices reads as "the note being played".
+   inline std::atomic<int>& MidiLastExpressionChannel()
+   {
+      static std::atomic<int> sChannel { 0 };
+      return sChannel;
+   }
+   inline void MidiStoreChannelPressure(int channel, float v01)
+   {
+      MidiChannelPressureSlot(channel).store(v01, std::memory_order_relaxed);
+      MidiLastExpressionChannel().store(channel & 15, std::memory_order_relaxed);
+   }
+   inline void MidiStoreChannelSlide(int channel, float v01)
+   {
+      MidiChannelSlideSlot(channel).store(v01, std::memory_order_relaxed);
+      MidiLastExpressionChannel().store(channel & 15, std::memory_order_relaxed);
+   }
+   inline float MidiChannelPressure(int channel) { return MidiChannelPressureSlot(channel).load(std::memory_order_relaxed); }
+   inline float MidiChannelSlide(int channel) { return MidiChannelSlideSlot(channel).load(std::memory_order_relaxed); }
+
 }

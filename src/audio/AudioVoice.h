@@ -147,6 +147,14 @@ public:
    // envelope's release stage does that once IsActive() goes false.
    void NoteOff(int voiceId);
 
+   // Restricts NoteOn() to the first n voices (1..NumVoices()). For a node that
+   // only renders its first n voices: a note allocated past n would never have
+   // its envelope advanced, so it would sound silent and never free its slot.
+   void SetActiveLimit(int n)
+   {
+      mLimit = n < 1 ? 1 : (n > (int)mVoices.size() ? (int)mVoices.size() : n);
+   }
+
    int NumVoices() const { return (int)mVoices.size(); }
    int NoteAt(int voiceIndex) const { return mVoices[voiceIndex].note; }
    float VelocityAt(int voiceIndex) const { return mVoices[voiceIndex].velocity; }
@@ -165,5 +173,6 @@ private:
 
    std::vector<Voice> mVoices;
    int mRoundRobinCursor = 0;
+   int mLimit = 0; // 0 = all voices (until SetActiveLimit is called)
    uint64_t mNextAge = 1;
 };

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <utility>
@@ -19,6 +21,39 @@ public:
    // Current value, normalised 0..1. The binding maps it onto the parameter's range.
    virtual float Value01() = 0;
 };
+
+// Turbo 0.60 (upstream): a parameter's stable identity - the node's uid, not
+// its reusable index.
+struct ParamKey
+{
+   uint64_t uid = 0;
+   int paramIndex = 0;
+   bool operator<(const ParamKey& o) const { return uid != o.uid ? uid < o.uid : paramIndex < o.paramIndex; }
+   bool operator==(const ParamKey& o) const { return uid == o.uid && paramIndex == o.paramIndex; }
+};
+
+// Side interface for a modulator that predicts where the user would move each destination, rather
+// than emitting one shared value. A node that implements this ALSO implements IModulator (the apply
+// loop reaches it through ModulatorForOutput); the apply loop prefers this path and writes each
+// destination in its own fader space (the position the user sees), so log knobs are not crowded.
+class IPredictor
+{
+public:
+   virtual ~IPredictor() {}
+
+   // Advance every slot exactly once per frame. Never advance inside ValuePos01For: one predictor
+   // can drive many params and a read-side step would run N times as fast.
+   virtual void Tick(int frameId, double dt) = 0;
+   // Pure read, 0..1 fader position. curPos lets a new slot start where the param already is.
+   virtual float ValuePos01For(const ParamKey& k, float curPos) = 0;
+   // Shift-grab began / ended on a bound param. pos and velPerSec are fader-space.
+   virtual void OnGrab(const ParamKey& k) = 0;
+   virtual void OnRelease(const ParamKey& k, float pos, float velPerSec) = 0;
+   virtual float Confidence01(const ParamKey& k) const { (void)k; return -1.0f; }
+};
+
+using FaderPosToValueFn = float (*)(float pos01, float minV, float maxV);
+using FaderValueToPosFn = float (*)(float value, float minV, float maxV);
 
 // One modulatable parameter, re-registered every frame while its node draws.
 // The raw float* is only ever used within the frame that registered it.
@@ -41,6 +76,10 @@ struct ParamRef
    float step = 0.0f;      // > 0 = discrete (ints, dropdowns, checkboxes)
    bool isEnum = false;    // a dropdown: enumOptions holds its labels
    std::vector<std::string> enumOptions;
+   // Turbo 0.60 (upstream): the widget's fader taper, for the movement log.
+   // nullptr = linear between minValue and maxValue.
+   FaderPosToValueFn posToValue = nullptr;
+   FaderValueToPosFn valueToPos = nullptr;
 };
 
 // Which modulator drives which parameter. Keyed by (nodeIndex, paramIndex) so the
@@ -84,6 +123,47 @@ public:
       bool HasRange() const { return inMin != 0.0f || inMax != 1.0f || outMin != 0.0f || outMax != 1.0f; }
    };
 
+   // Turbo 0.60 (upstream): smoothing steps the ported modulators use.
+   // One step of the per-destination smoother: an exact one-pole (time
+   // constant tau) of an input moving in a straight line from x0 to x1 over
+   // dt, from output y0. Exact for any dt, so the curve does not depend on
+   // frame rate.
+   static double SmoothStep(double y0, double x0, double x1, double dt, double tau)
+   {
+      const double a = std::exp(-dt / tau), m = (x1 - x0) / dt;
+      return x1 - m * tau + (y0 - x0 + m * tau) * a;
+   }
+   // One step of a damped spring (natural frequency w rad/s, damping ratio
+   // z) chasing an input that moves in a straight line from x0 to x1 over
+   // dt, from position y and velocity v. Closed form for every damping, so
+   // exact for any dt: the spring sits 2*z*m/w behind a ramp of slope m and
+   // the error from that moving rest point decays as the free spring would.
+   static void SpringStep(double& y, double& v, double x0, double x1, double dt, double w, double z)
+   {
+      const double m = (x1 - x0) / dt;
+      const double lag = 2.0 * z * m / w;
+      const double e0 = y - (x0 - lag), v0 = v - m;
+      const double a = z * w, k = w * w * (1.0 - z * z);
+      double c = 1.0, s = dt; // cos or cosh of wd*dt, and sin or sinh of it over wd
+      if (k > 0.0)
+      {
+         const double wd = std::sqrt(k);
+         c = std::cos(wd * dt);
+         s = std::sin(wd * dt) / wd;
+      }
+      else if (k < 0.0)
+      {
+         const double wd = std::sqrt(-k);
+         c = std::cosh(wd * dt);
+         s = std::sinh(wd * dt) / wd;
+      }
+      const double ex = std::exp(-a * dt);
+      const double e1 = ex * (e0 * c + (v0 + a * e0) * s);
+      const double v1 = ex * (v0 * c - (w * w * e0 + a * v0) * s);
+      y = x1 - lag + e1;
+      v = v1 + m;
+   }
+
    // Creates a fresh binding, always kAbsolute, capturing the destination
    // parameter's current value as `centre` (read through this frame's
    // FrameParams - see the .cpp for why that's safe at every real call site).
@@ -99,6 +179,10 @@ public:
    void SetRange(int nodeIndex, int paramIndex, float inMin, float inMax, float outMin, float outMax);
    void Unbind(int nodeIndex, int paramIndex);
    void UnbindAllFor(int nodeIndex); // node deleted: drop it as target and as source
+   // Turbo 0.60 (upstream): told about every binding change (MovementLog).
+   enum class BindingEvent { Bind = 1, Unbind, UnbindAll, SetRange };
+   using BindingCallback = void (*)(int nodeIndex, int paramIndex, BindingEvent evt, int modNodeIndex, float lo, float hi);
+   void SetBindingCallback(BindingCallback cb) { mBindingCallback = cb; }
 
    // nodeIndex is -1 when the parameter is not modulated.
    Source ModulatorFor(int nodeIndex, int paramIndex) const;
@@ -155,6 +239,7 @@ public:
 
 private:
    std::map<Key, Source> mLinks;
+   BindingCallback mBindingCallback = nullptr;
    std::map<Key, std::string> mExpressions;
    std::map<Key, std::string> mExpressionErrors;
    std::vector<ParamRef> mFrameParams;

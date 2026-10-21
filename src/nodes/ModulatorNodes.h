@@ -6,8 +6,11 @@
 
 #include "INode.h"
 #include "Modulation.h"
+#include "audio/VoiceMod.h"
 #include "core/AudioCable.h"
 #include "core/CurveShape.h"
+#include "core/ModShapes.h"
+#include "core/Transport.h"
 
 class AudioAudioToCVNode;
 
@@ -15,30 +18,93 @@ class AudioAudioToCVNode;
 // texture; the editor draws a value meter for them instead of a preview. All three
 // are tempo-synced: rates are in beats, so changing the global BPM retimes them.
 
-class LFONode : public INode, public IModulator
+// Synced-rate period memo for LFO/Random: the MusicTime division search
+// runs when the rate or the bar length changes, not on every Value01().
+struct SyncedPeriodCache
+{
+   float rate = -1.0f;
+   int sigNum = -1; // time signature a bar division was made with; < 0 = not a bar division
+   int sigDen = -1;
+   double period = 1.0;
+
+   bool Hit(float rateBeats, const Transport& tr) const
+   {
+      return rate == rateBeats && (sigNum < 0 || (sigNum == tr.TimeSigNumerator() && sigDen == tr.TimeSigDenominator()));
+   }
+};
+
+class LFONode : public INode, public IModulator, public VoiceMod::IVoiceModSource
 {
 public:
-   static INode* Create() { return new LFONode(); }
+   static INode* Create();
+   // S&H seeds come from their own counter, so spawning an LFO never moves
+   // the seed the next Random gets (patches without a saved seed rely on it).
+   static float NextSeed() { static int sSpawnCounter = 0; return (float)(++sSpawnCounter) * 5.1f + 0.37f; }
    static const std::vector<std::string>& ShapeNames();
+   static const std::vector<std::string>& RateModeNames();
+   static const std::vector<std::string>& PhaseModeNames();
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int) override {}
+   const char* InputLabel(int) const override { return "trig"; }
 
    float Value01() override;
 
+   // Restarts the cycle on a rising edge through 0.5 (Retrigger phase mode).
+   IModulator* trigger = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &trigger : nullptr; }
+   int ModulatorInputCount() const override { return 1; }
+
+   // Beats is the free float of every patch saved before rate modes existed;
+   // Synced snaps rateBeats to the nearest MusicTime division and times it
+   // exactly (triplets included), the note nodes' menu; Hz ignores tempo.
+   enum RateMode { kRateBeats = 0, kRateSynced = 1, kRateHz = 2 };
+   // Transport: the phase is a function of song position (Bitwig "Sync"),
+   // so seeks and loops land where they would on a fresh play. Free: runs
+   // on regardless of stop, seek and loop. Retrigger: free, restarted by
+   // the trig input.
+   enum PhaseMode { kPhaseTransport = 0, kPhaseFree = 1, kPhaseRetrigger = 2 };
+
    int shape = 0;          // index into ShapeNames()
-   float rateBeats = 4.0f; // one full cycle every N beats
+   float rateBeats = 4.0f; // one full cycle every N beats (Beats, Synced)
    float phase = 0.0f;     // 0..1
    float low = 0.0f;
    float high = 1.0f;
+   int rateMode = kRateSynced;
+   float rateHz = 1.0f;
+   int phaseMode = kPhaseTransport;
+   float seed = 0.0f; // Sample & Hold sequence; each spawn gets its own
+   // 0 = maths of patches saved before the modulation pass (S&H ignores
+   // the seed, so every S&H LFO plays the same sequence).
+   int maths = 1;
+   // Per voice (docs/plans/modulation/per-voice.md): cabled straight into a
+   // synth's voice param, runs once per voice from note-on on the audio thread.
+   bool voice = false;
+   bool VoiceSpec(VoiceMod::Spec& out) override;
+
+   void BeforeLoadParams() override { rateMode = kRateBeats; maths = 0; }
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("shape", shape); v.Float("rateBeats", rateBeats);
       v.Float("phase", phase); v.Float("low", low); v.Float("high", high);
+      v.Int("rateMode", rateMode); v.Float("rateHz", rateHz);
+      v.Int("phaseMode", phaseMode); v.Float("seed", seed); v.Int("maths", maths);
+      v.Bool("voice", voice);
    }
+
+   // Length of one cycle in beats for Beats and Synced.
+   double PeriodBeats() const;
+
+private:
+   double FreeCycles();
+   double mFreeCycles = 0.0;
+   double mFreeLast = -1.0;
+   float mTrigLast = 0.0f;
+   bool mFreeOffline = false;
+   mutable SyncedPeriodCache mPeriodCache;
 };
 
 // A fixed value, as a modulator.
@@ -69,7 +135,7 @@ public:
    void VisitParams(ParamVisitor& v) override { v.Float("value", value); }
 };
 
-class RandomNode : public INode, public IModulator
+class RandomNode : public INode, public IModulator, public VoiceMod::IVoiceModSource
 {
 public:
    // Each spawned Random starts on a different seed. Two of them dropped on the
@@ -90,7 +156,7 @@ public:
 
    float Value01() override;
 
-   float rateBeats = 1.0f; // new target value every N beats
+   float rateBeats = 1.0f; // new target value every N beats (Beats, Synced)
    float smooth = 0.5f;    // 0 = stepped, 1 = fully interpolated
    float low = 0.0f;
    float high = 1.0f;
@@ -101,14 +167,29 @@ public:
    // uncorrelated, while the same seed still reproduces the same run exactly.
    float seed = 0.0f;
 
+   int rateMode = LFONode::kRateSynced; // LFONode::RateMode
+   float rateHz = 1.0f;
+   // 0 = maths of patches saved before the modulation pass: the seed is
+   // salted at 1/1013 resolution, so seeds closer than that collide.
+   int maths = 1;
+   // Per voice (docs/plans/modulation/per-voice.md): cabled straight into a
+   // synth's voice param, runs once per voice from note-on on the audio thread.
+   bool voice = false;
+   bool VoiceSpec(VoiceMod::Spec& out) override;
+
+   void BeforeLoadParams() override { rateMode = LFONode::kRateBeats; maths = 0; }
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("rate", rateBeats); v.Float("smooth", smooth);
       v.Float("low", low); v.Float("high", high); v.Float("seed", seed);
+      v.Int("rateMode", rateMode); v.Float("rateHz", rateHz); v.Int("maths", maths);
+      v.Bool("voice", voice);
    }
 
 private:
-   float ValueForStep(long long step) const;
+   float ValueForStep(long long step, uint64_t salt) const; // salt: SeedSalt(seed, 2), maths 1 only
+   SyncedPeriodCache mPeriodCache;
 };
 
 // A step sequencer: the value walks through up to sixteen steps and repeats.
@@ -246,6 +327,7 @@ public:
 
    float Value01() override;
 
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IModulator* input = nullptr;
    IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    int ModulatorInputCount() const override { return 1; }
@@ -276,6 +358,7 @@ public:
 
    float Value01() override;
 
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IModulator* input = nullptr;
    IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    int ModulatorInputCount() const override { return 1; }
@@ -283,14 +366,44 @@ public:
    float constantIn = 0.5f;
    float amount = 0.85f; // 0 = pass-through, close to 1 = heavy smoothing
 
+   // mode defaults to Per frame (0), the behaviour of every patch saved before
+   // the field existed; Time and Spring are opt-in. Time and Spring read the
+   // transport's seconds, so the response is the same at 30 and 144 fps.
+   // With maths 1, Per frame reads `amount` as the time constant it gives at
+   // 60 fps, so it too is the same at every frame rate, and all three modes
+   // treat the input as a straight line between calls (exact one-pole and
+   // closed-form spring) instead of a value held for the whole step.
+   enum Mode { kPerFrame = 0, kTime = 1, kSpring = 2 };
+   int mode = kPerFrame;
+   float timeConstant = 0.25f; // seconds to cover ~63% of a step (Time mode)
+   float frequency = 3.0f;     // Hz, spring stiffness (Spring mode)
+   float damping = 0.5f;       // 1 = critically damped, below 1 overshoots
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("constantIn", constantIn); v.Float("amount", amount);
+      v.Int("mode", mode); v.Float("timeConstant", timeConstant);
+      v.Float("frequency", frequency); v.Float("damping", damping);
+      v.Int("maths", maths);
    }
 
+   int maths = 1; // 0 = per-frame step and held input, as saved before the modulation pass
+   void BeforeLoadParams() override { maths = 0; }
+
+   // Per frame `amount` as a time constant: the tau whose one-pole step at
+   // 60 fps is the old per-frame coefficient.
+   static double AmountTau(float amount);
+
 private:
-   float mLast = -1.0f;      // sentinel: not yet initialized
-   double mLastBeats = -1.0; // beat at which mLast was last updated
+   float ValueExact(float target);
+   float mTauAmount = -1.0f; // AmountTau memo
+   double mTau = 0.0;
+   bool mInit = false;
+   float mLast = 0.0f;
+   float mVel = 0.0f;
+   float mPrevIn = 0.0f;
+   double mLastBeats = -1.0;   // beat at which mLast was last updated (Per frame)
+   double mLastSeconds = -1.0; // transport second at which mLast was last updated
 };
 
 // Records whatever modulator is patched into "in" (or its own `in` knob when
@@ -382,6 +495,7 @@ public:
 
    float Value01() override;
 
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IModulator* input = nullptr;
    IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    int ModulatorInputCount() const override { return 1; }
@@ -402,12 +516,14 @@ public:
 // falling back below it starts release. Patch an LFO in and the LFO
 // retriggers the envelope once per cycle, each swing shaped by the ADSR.
 //
-// Output collapses toward 0.5 as the envelope level falls, the same
+// output kOutAdsr (new nodes): the level itself, 0..1. output kOutCentred
+// (patches saved before it existed, via BeforeLoadParams): the output
+// collapses toward 0.5 as the envelope level falls, the same
 // convention ModDepthNode uses above (its comment explains why): at
 // envLevel 0 the input has no say (holds at 0.5), at envLevel 1 the input
 // passes through unchanged. This also means "nothing patched" holds steady
 // at whatever constantIn settles to, rather than free-running a generator.
-class EnvelopeNode : public INode, public IModulator
+class EnvelopeNode : public INode, public IModulator, public VoiceMod::IVoiceModSource
 {
 public:
    static INode* Create() { return new EnvelopeNode(); }
@@ -420,6 +536,7 @@ public:
 
    float Value01() override;
 
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IModulator* input = nullptr;
    IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    int ModulatorInputCount() const override { return 1; }
@@ -432,17 +549,51 @@ public:
    float releaseMs = 400.0f;
    float constantIn = 0.5f; // used when nothing is patched into "in"
    float threshold = 0.5f;  // rising edge above this (on the raw 0..1 input) = gate on
+   // Hold at the peak after attack, and each moving stage's bend
+   // (ModShapes::MsegSegment: 0 straight, positive fast first). New nodes
+   // get a falling decay and release, as an analog envelope does; patches
+   // saved before these existed load straight (BeforeLoadParams).
+   float holdMs = 0.0f;
+   float attackCurve = 0.0f;
+   float decayCurve = 0.5f;
+   float releaseCurve = 0.5f;
+   // Per voice (docs/plans/modulation/per-voice.md): cabled straight into an
+   // Analog or Wavetable knob, each voice runs its own envelope, gated by its
+   // own note-on and note-off. Only the ADSR output goes per voice (centred
+   // needs the shared input).
+   bool voice = false;
+   bool VoiceSpec(VoiceMod::Spec& out) override;
+   ModShapes::Ahdsr Shape() const;
+
+   // ADSR: the output is the envelope level, 0 at rest, the standard ADSR.
+   // Centred: 0.5 + (in - 0.5) * level, the output of every patch saved
+   // before this existed (rest 0.5, a closed gate dips below it).
+   enum Output { kOutCentred = 0, kOutAdsr = 1 };
+   int output = kOutAdsr;
+   // 1 = stage edges at their exact times and the gate edge placed where
+   // the input crosses the threshold between calls; 0 = edges found once
+   // per call, as saved before the modulation pass.
+   int maths = 1;
+
+   void BeforeLoadParams() override { output = kOutCentred; maths = 0; decayCurve = 0.0f; releaseCurve = 0.0f; }
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("attackMs", attackMs); v.Float("decayMs", decayMs);
       v.Float("sustainLevel", sustainLevel); v.Float("releaseMs", releaseMs);
       v.Float("constantIn", constantIn); v.Float("threshold", threshold);
+      v.Int("output", output); v.Int("maths", maths);
+      v.Float("holdMs", holdMs); v.Float("attackCurve", attackCurve);
+      v.Float("decayCurve", decayCurve); v.Float("releaseCurve", releaseCurve);
+      v.Bool("voice", voice);
    }
 
 private:
-   enum class Stage { Idle, Attack, Decay, Sustain, Release };
-   Stage mStage = Stage::Idle;
+   float LevelExact(double seconds, float in01);
+   float LevelAt(double seconds);
+   float mPrevIn = 0.0f;
+   double mPrevSeconds = -1.0;
+   int mStage = ModShapes::kEnvIdle;
    float mLevel = 0.0f;
    float mStageStartLevel = 0.0f;
    double mStageStartSeconds = -1.0;
@@ -473,6 +624,7 @@ public:
 
    float Value01() override;
 
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IModulator* input = nullptr;
    IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    int ModulatorInputCount() const override { return 1; }
@@ -492,9 +644,19 @@ public:
    {
       v.Float("constantIn", constantIn); v.Int("rangeLow", rangeLow); v.Int("rangeHigh", rangeHigh);
       v.Int("scale", scale); v.Int("root", root); v.Float("glideMs", glideMs);
+      v.Int("maths", maths);
    }
 
+   // 1 = glide follows the input as a straight line between calls, gliding
+   // to each semitone from the moment the line crosses into it; 0 = the
+   // quantized value is held for the whole step, as saved before the
+   // modulation pass.
+   int maths = 1;
+   void BeforeLoadParams() override { maths = 0; }
+
 private:
+   float TargetFor(float v01, int* semitoneOut) const;
+   float mPrevIn = -1.0f;
    int mLastSemitone = 0;
    float mGlided = -1.0f;      // sentinel: not yet initialized
    double mLastSeconds = -1.0; // transport seconds at which mGlided was last updated
@@ -544,6 +706,7 @@ public:
 
    float Value01() override;
 
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IModulator* input = nullptr;
    IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    int ModulatorInputCount() const override { return 1; }
@@ -580,6 +743,7 @@ public:
 
    float Value01() override;
 
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IModulator* input = nullptr;
    IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    int ModulatorInputCount() const override { return 1; }
@@ -595,6 +759,151 @@ public:
       std::string encoded = curve.Encode();
       v.Text("curve", encoded);
       curve.Decode(encoded);
+   }
+};
+
+// A drawn shape played over time: breakpoints, each segment with its own
+// bend, run once through per `rate` (beats, a synced division, or Hz).
+//
+// Nothing patched to trig: the shape follows the transport, so it sits at the
+// same place after a seek or a loop. Loop off repeats the whole shape; loop on
+// plays in from the start, then repeats the part between loop start and end.
+//
+// trig patched: a rising edge through 0.5 starts the shape from its
+// beginning (retrigger). Loop off plays it once and holds the last value.
+// Loop on repeats start..end while trig stays high and, when it drops, plays
+// on from there to the end of the shape (the release). Loop start = loop end
+// is a sustain point.
+class MSEGNode : public INode, public IModulator, public VoiceMod::IVoiceModSource
+{
+public:
+   static INode* Create() { return new MSEGNode(); }
+   static constexpr int kMaxPoints = 32;
+
+   using Point = ModShapes::MsegPoint; // x, y (0..1) and the bend of the segment that leaves it
+
+   MSEGNode() { Reset(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   const char* InputLabel(int) const override { return "trig"; }
+
+   float Value01() override;
+
+   IModulator* trigger = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &trigger : nullptr; }
+   int ModulatorInputCount() const override { return 1; }
+
+   // Sorted by x; the first point is pinned to x = 0 and the last to x = 1.
+   std::vector<Point> points;
+   int rateMode = LFONode::kRateSynced;
+   float rateBeats = 4.0f; // the whole shape takes this many beats (Beats, Synced)
+   float rateHz = 1.0f;    // times through per second (Hz)
+   bool loop = false;
+   float loopStart = 0.25f; // 0..1 along the shape
+   float loopEnd = 0.75f;
+   // Per voice (docs/plans/modulation/per-voice.md): cabled straight into a
+   // synth's voice param, the note is its trig, once per voice on the audio thread.
+   bool voice = false;
+   bool VoiceSpec(VoiceMod::Spec& out) override;
+
+   void Reset();
+   int AddPoint(float x, float y); // index of the new point, or -1 at kMaxPoints
+   void MovePoint(int index, float x, float y);
+   void RemovePoint(int index); // the two end points stay
+   // Shape value at x (0..1).
+   float Evaluate(float x) const;
+   // Value of one segment at t (0..1) between y0 and y1 for a bend of curve.
+   static float Segment(float y0, float y1, float curve, float t);
+   // Where along the shape (0..1) a run that started `elapsed` shape-lengths
+   // ago is, while trig is held (or nothing is patched).
+   float PositionHeld(double elapsed, bool patched) const;
+   // Position (0..1) at the last Value01(), for the playhead.
+   float Position() const { return mShownX; }
+
+   // Round-tripped as one "x,y,curve;..." string.
+   std::string Encode() const;
+   void Decode(const std::string& s);
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("rateMode", rateMode); v.Float("rateBeats", rateBeats); v.Float("rateHz", rateHz);
+      v.Bool("loop", loop); v.Float("loopStart", loopStart); v.Float("loopEnd", loopEnd);
+      v.Bool("voice", voice);
+      std::string encoded = Encode();
+      v.Text("points", encoded);
+      Decode(encoded);
+   }
+
+private:
+   float Advance();
+   mutable SyncedPeriodCache mPeriodCache;
+   // trig patched: the run, advanced once per clock value.
+   double mClockLast = -1.0;
+   double mX = 1.0;        // position along the shape; starts at rest on the last value
+   bool mReleased = true;  // the run has left the loop
+   float mTrigLast = 0.0f;
+   float mShownX = 0.0f;
+};
+
+// A value per note, by its place among the notes held when it started: cabled
+// into an Analog or Wavetable knob it spreads a chord's voices across low..high
+// (cutoff, pan, detune...). Always per voice (docs/plans/modulation/per-voice.md);
+// into anything that has no voices it reads as the first note's value.
+class VoiceSpreadNode : public INode, public IModulator, public VoiceMod::IVoiceModSource
+{
+public:
+   static INode* Create() { return new VoiceSpreadNode(); }
+   static const std::vector<std::string>& ModeNames();
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   float Value01() override;
+   bool VoiceSpec(VoiceMod::Spec& out) override;
+
+   int mode = ModShapes::kSpreadLinear; // ModShapes::SpreadMode
+   int count = 4;                       // notes before the spread repeats, 1..16
+   float low = 0.0f;
+   float high = 1.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("mode", mode); v.Int("count", count); v.Float("low", low); v.Float("high", high);
+   }
+};
+
+// MPE per-note pressure or slide (CC74) as a modulator: cabled into an Analog
+// or Wavetable knob, each voice follows its own note's expression from MIDI
+// Notes in MPE mode, smoothed over 5 ms so 7-bit steps do not zipper. Always
+// per voice; into anything that has no voices it reads the last-moved
+// channel.
+class NoteExpressionNode : public INode, public IModulator, public VoiceMod::IVoiceModSource
+{
+public:
+   static INode* Create() { return new NoteExpressionNode(); }
+   static const std::vector<std::string>& SourceNames();
+   static constexpr float kSmoothHz = 200.0f; // 1 / 5 ms
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   float Value01() override;
+   bool VoiceSpec(VoiceMod::Spec& out) override;
+
+   int source = VoiceMod::kExprPressure; // VoiceMod::ExpressionSource
+   float low = 0.0f;
+   float high = 1.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("source", source); v.Float("low", low); v.Float("high", high);
    }
 };
 

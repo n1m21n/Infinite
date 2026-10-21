@@ -120,6 +120,7 @@ public:
    std::atomic<float> mStart { 0.0f };
    std::atomic<float> mEnd { 1.0f };
    std::atomic<bool> mLoop { false };
+   std::atomic<bool> mRateFix { true };
    std::atomic<bool> mReverse { false };
    std::atomic<bool> mPingpong { false };
 
@@ -154,6 +155,13 @@ public:
          mPlayheadRing.Write(&startFrac, 1);
          return;
       }
+
+      // Source frames per output frame at speed 1: the buffer's own rate over
+      // the device rate, so a 44.1 kHz file plays at its pitch on a 48 kHz
+      // device. 1 for patches saved before the fix (rateFix 0).
+      const float srRatio = (mRateFix.load(std::memory_order_relaxed) && mActiveBuffer->sampleRate > 0.0 && mSampleRate > 0.0)
+                                ? (float)(mActiveBuffer->sampleRate / mSampleRate)
+                                : 1.0f;
 
       if (mStopRequested.exchange(false, std::memory_order_acq_rel))
          mSelfEnv.NoteOff();
@@ -207,7 +215,7 @@ public:
             sampleL = ReadSample(*mActiveBuffer, mSelfPos, 0) * env;
             sampleR = sourceStereo ? ReadSample(*mActiveBuffer, mSelfPos, 1) * env : sampleL;
 
-            if (AdvanceVoicePosition(mSelfPos, mSelfDir, loop, pingpong, 1.0f, 1.0f, startPos, endPos))
+            if (AdvanceVoicePosition(mSelfPos, mSelfDir, loop, pingpong, srRatio, 1.0f, startPos, endPos))
                mSelfEnv.NoteOff();
          }
 
@@ -455,6 +463,7 @@ void MolderNode::CookIfNeeded(int frameId)
    mAudioNode->mStart.store(start, std::memory_order_relaxed);
    mAudioNode->mEnd.store(end, std::memory_order_relaxed);
    mAudioNode->mLoop.store(loop, std::memory_order_relaxed);
+   mAudioNode->mRateFix.store(rateFix != 0, std::memory_order_relaxed);
    mAudioNode->mReverse.store(reverse, std::memory_order_relaxed);
    mAudioNode->mPingpong.store(pingpong, std::memory_order_relaxed);
 
@@ -508,6 +517,7 @@ void MolderNode::VisitParams(ParamVisitor& v)
    v.Float("start", start);
    v.Float("end", end);
    v.Bool("loop", loop);
+   v.Int("rateFix", rateFix); // not a control: 0 = plays the file at the device rate (saved before the fix)
    v.Bool("reverse", reverse);
    v.Bool("pingpong", pingpong);
    v.Int("seed", mSeed); // Turbo 0.51: a member, a stack temp dangles in retaining visitors

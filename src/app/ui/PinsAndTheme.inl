@@ -429,6 +429,18 @@
       REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");
+      // Turbo 0.60: ported from upstream (Naman's Infinite after v0.6)
+      REGISTER_NODE(TimeMachineNode, Time Machine, "Feedback");
+      REGISTER_NODE(OpticalFlowNode, Optical Flow, "Effects");
+      REGISTER_NODE(FluidNode, Fluid, "Feedback");
+      REGISTER_NODE(VolumeNode, Volume, "Effects");
+      REGISTER_NODE(NdiInNode, NDI In, "Video");
+      REGISTER_NODE(NdiOutNode, NDI Out, "Output");
+      REGISTER_NODE(SweepNode, Sweep, "3D");
+      REGISTER_NODE(RevolveNode, Revolve, "3D");
+      REGISTER_NODE(LSystemNode, L-System, "3D");
+      REGISTER_NODE(ProximityLinesNode, Proximity Lines, "3D");
+      REGISTER_NODE(RigidBodyNode, Rigid Bodies, "3D");
       REGISTER_NODE(CommentNode, Comment, "Compositing");
       REGISTER_NODE(GroupNode, Group, "Compositing");
       REGISTER_NODE(NullNode, Null, "Compositing");
@@ -449,6 +461,10 @@
       REGISTER_NODE(ProjectionNode, Projection, "Output");
       REGISTER_NODE(LFONode, LFO, "Modulators");
       REGISTER_NODE(RandomNode, Random, "Modulators");
+      REGISTER_NODE(MSEGNode, MSEG, "Modulators");                   // Turbo 0.60, from upstream
+      REGISTER_NODE(VoiceSpreadNode, Voice Spread, "Modulators");
+      REGISTER_NODE(NoteExpressionNode, Note Expression, "Modulators");
+      REGISTER_NODE(PredictiveColoringNode, Predictive Coloring, "Prediction"); // Turbo 0.60, from upstream
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
       REGISTER_NODE(MathNode, Math, "Modulators");
       REGISTER_NODE(GeometryTableNode, Geometry Table, "Modulators");
@@ -471,6 +487,8 @@
       REGISTER_NODE(MacroStepGateNode, Macro Step Gate, "Macros");
       REGISTER_NODE(ScenesNode, Scenes, "Macros"); // Turbo 0.50
       REGISTER_NODE(DriftNode, Drift, "Modulators");
+      REGISTER_NODE(MovesNode, Moves, "Modulators"); // Turbo 0.60 (upstream)
+      REGISTER_NODE(PredictiveModulatorNode, Predictive Modulator, "Modulators");
       NodeFactory::Instance().Register("Button", &UIButtonNode::Create, "UI");
       NodeFactory::Instance().Register("Horizontal Slider", &UISliderNode::CreateHorizontal, "UI");
       NodeFactory::Instance().Register("Vertical Slider", &UISliderNode::CreateVertical, "UI");
@@ -518,6 +536,9 @@
       REGISTER_NODE(EquationNode, Equation Synth, "Synths");
       REGISTER_NODE(ImageSpectralSynthNode, Spectral Synth, "Synths");
       REGISTER_NODE(MetallicNode, Metallic, "Synths");
+      REGISTER_NODE(FMNode, FM, "Synths");           // Turbo 0.60, from upstream
+      REGISTER_NODE(PartialsNode, Partials, "Synths");
+      REGISTER_NODE(StringNode, String, "Synths");
       REGISTER_NODE(SamplerNode, Sampler, "Synths");
       REGISTER_NODE(PaulStretchNode, PaulStretch, "Synths");
       REGISTER_NODE(GranularNode, Granular, "Synths");

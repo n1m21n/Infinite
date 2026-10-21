@@ -56,6 +56,9 @@ namespace SynthModes
       kWarpRectify,   // crossfade toward the rectified sample
       kWarpOddOnly,   // keep the odd harmonics
       kWarpEvenOnly,  // keep the even harmonics
+      kWarpFormant,   // play the cycle `ratio` times faster, then hold (v0.6 2.26)
+      kWarpPinch,     // S-curve about the middle: linger at the centre (2.26)
+      kWarpSkew,      // move the half-way point, CZ phase distortion (2.26)
       kNumWarpModes
    };
 
@@ -68,12 +71,14 @@ namespace SynthModes
       static const char* const kNamesA[kNumWarpModes] = {
          "off",     "fm (b)",   "am (b)",   "rm (b)",   "pd (b)",   "hard sync",
          "bend +",  "bend -",   "asym +",   "asym -",   "flip",     "mirror",
-         "quantize","rectify",  "odd only", "even only"
+         "quantize","rectify",  "odd only", "even only",
+         "formant", "pinch",    "skew"
       };
       static const char* const kNamesB[kNumWarpModes] = {
          "off",     "fm (a)",   "am (a)",   "rm (a)",   "pd (a)",   "hard sync",
          "bend +",  "bend -",   "asym +",   "asym -",   "flip",     "mirror",
-         "quantize","rectify",  "odd only", "even only"
+         "quantize","rectify",  "odd only", "even only",
+         "formant", "pinch",    "skew"
       };
       return engine == 1 ? kNamesB : kNamesA;
    }
@@ -86,8 +91,9 @@ namespace SynthModes
 
    // True for the four modes that read the other engine (and therefore fall
    // back to the internal operator when it is off). These are also the only
-   // modes where `warpRatio` means anything besides sync's own ratio, which is
-   // why the UI greys the ratio slider outside this set plus hard sync.
+   // modes where `warpRatio` means anything besides sync's and formant's own
+   // ratio, which is why the UI greys the ratio slider outside this set plus
+   // those two.
    inline bool WarpIsCrossModulated(int mode)
    {
       return mode == kWarpFM || mode == kWarpAM || mode == kWarpRM || mode == kWarpPD;
@@ -95,7 +101,7 @@ namespace SynthModes
 
    inline bool WarpUsesRatio(int mode)
    {
-      return WarpIsCrossModulated(mode) || mode == kWarpSync;
+      return WarpIsCrossModulated(mode) || mode == kWarpSync || mode == kWarpFormant;
    }
 
    // ---------------------------------------------------------------- filter
@@ -259,6 +265,70 @@ namespace SynthModes
       if (list.empty())
          for (int i = 0; i < kNumFilterTypes; i++)
             list.push_back(FilterNames()[i]);
+      return list;
+   }
+
+   // For nodes whose DSP only ever implements a subset of the canonical
+   // filter types: pass the enum values that subset actually uses, in the
+   // node's own index order (which must stay whatever it already is - the
+   // caller's saved patches store that index as an int), and get back the
+   // canonical spelling for each. This is the only place a node-local filter
+   // string is allowed to come from, so the four-different-spellings drift
+   // that motivated this function cannot recur - a node can misname its own
+   // subset only by passing the wrong enum value, which is reviewable at the
+   // call site, not by hand-typing a string that silently diverges later.
+   inline std::vector<std::string> FilterTypeSubset(std::initializer_list<FilterType> types)
+   {
+      std::vector<std::string> list;
+      list.reserve(types.size());
+      for (FilterType t : types)
+         list.push_back(FilterName(t));
+      return list;
+   }
+
+   // -------------------------------------------------------------- waveform
+   // The same "same setting, different spelling per node" drift that
+   // motivated the filter table above also happened to the basic oscillator
+   // shapes: Wavetable capitalized them, Ring Mod and Tremolo lowercased
+   // them, and Cycle Shaper reordered them and then spelled its own dropdown
+   // differently from its own stat-line label. One canonical list here, in
+   // canonical order and canonical (lowercase) spelling, same as
+   // FilterNames() above.
+   //
+   // Every node keeps its own local index order - saved patches store that
+   // index as an int - and gets its canonical strings via WaveformTypeSubset,
+   // passing its own enum values in whatever order it already uses.
+   enum WaveformType
+   {
+      kWaveSine = 0,
+      kWaveTriangle,
+      kWaveSaw,
+      kWaveSquare,
+      kWaveRampDown,
+      kNumWaveformTypes
+   };
+
+   inline const char* const* WaveformNames()
+   {
+      static const char* const kNames[kNumWaveformTypes] = {
+         "sine", "triangle", "saw", "square", "ramp down"
+      };
+      return kNames;
+   }
+
+   inline const char* WaveformName(int type)
+   {
+      return (type >= 0 && type < kNumWaveformTypes) ? WaveformNames()[type] : WaveformNames()[0];
+   }
+
+   // Same contract as FilterTypeSubset: pass this node's own enum values in
+   // its own index order, get canonical spelling back, index order untouched.
+   inline std::vector<std::string> WaveformTypeSubset(std::initializer_list<WaveformType> types)
+   {
+      std::vector<std::string> list;
+      list.reserve(types.size());
+      for (WaveformType t : types)
+         list.push_back(WaveformName(t));
       return list;
    }
 }

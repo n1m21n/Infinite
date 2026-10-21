@@ -142,7 +142,7 @@ namespace GLUtil
       sQuadVaos.erase(found);
    }
 
-   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat)
+   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat, const char* /*label*/)
    {
       if (w <= 0 || h <= 0)
          return false;

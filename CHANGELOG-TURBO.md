@@ -1,5 +1,94 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.60.0-turbo (2026-10-21)
+
+Catch-up with upstream (Naman's Infinite) after v0.6: 30 nodes and operators, taken as upstream wrote
+them. Old patches open unchanged.
+
+### Image and video
+- **Time Machine**: each pixel from a different past frame, by a grey map (slit-scan by default).
+- **Optical Flow**: motion vectors per pixel on the GPU (Lucas-Kanade), or as colour.
+- **Fluid**: a 2D GPU fluid the picture rides in, with force and obstacle inputs and a stirrer.
+- **Volume**: ray-marched fog, smoke or cloud; after a Render 3D it sits in that scene (its camera
+  and depth). Render 3D now keeps its depth as a texture for this.
+- **dither**: posterize with an ordered (Bayer) or noise threshold, so gradients keep their tone.
+- **NDI In / NDI Out**: video over the network (OBS, vMix, Resolume). Needs the free NDI runtime;
+  without it the nodes say so and nothing else changes.
+
+### 3D
+- **Sweep** (profile along a path) and **Revolve** (lathe) surfaces.
+- **L-System**: plants and fractals from rewrite rules, drawn by a 3D turtle.
+- **Proximity Lines**: plexus / constellation lines between nearby points.
+- **Rigid Bodies**: pieces of a mesh fall, collide and stack (box, sphere or hull colliders).
+- **Bevel** and **Inset** in the geometry operators.
+
+### Audio and control
+- Synths **FM** (4 operators, 11 algorithms), **String** (waveguide, pluck / bow / hammer) and
+  **Partials** (playable additive resynthesis of a sample).
+- Effects **Saturator** (three stages, six curves, five routings), **Convolution Reverb** (a designed
+  room or a loaded impulse file) and **Shape Resonator** (rings the modes of the shape on its pin).
+- Modulators **MSEG** (a drawn shape, looped or triggered), **Voice Spread** and **Note Expression**
+  (MPE pressure / slide; MIDI inputs now store channel pressure and CC74). LFO and Random get the
+  upstream rate modes (beats, synced division, Hz) and LFO "phase from"; Smooth gets time and spring.
+- Drum Sequencer: **accent vol** next to accent pitch (0-12 dB on accented steps).
+- **Synth engine from upstream**: Analog and Wavetable run upstream's current cores (band-limited
+  oscillators, voice lanes, the newer filter models), with the parameter mailbox and note queue
+  they need. Turbo's own changes stay on top: comb filters, the old filter order of Equation /
+  Wave Terrain / Image Spectral Synth, the one-block timeline clip pitch, Sampler's one-shot release.
+- **Per voice**: LFO, Random and MSEG get the "per voice" switch. Cabled into a voice param of
+  Analog or Wavetable, each note gets its own cycle; Voice Spread and Note Expression are per note
+  too (MPE pressure and slide carried on each note).
+
+### Opening upstream patches
+- **Patches with names** (upstream's hand-written format, 93 of its 493 patches): nodes named by an
+  `id` line, cables and bindings that name nodes, inputs and outputs, `mod` / `expr` lines that name
+  the control by its key. These used to open with no cables and no modulation; they open wired now
+  (upstream's PatchSchema, verbatim). Bindings by name attach once their nodes have drawn.
+- Upstream's `mod` range (lo / hi, the destination's own units) becomes Turbo's range mapper; Turbo
+  files carry a marker line so the two `mod` layouts are never confused. A file with `rev 2` keeps
+  the defaults for keys it does not write, as upstream reads it.
+- A geometry loop (Join -> Transform -> Join) is refused on the canvas and over RPC, and a patch that
+  has one opens with the closing cable dropped - it used to crash the app (0.59 too).
+- **Modulation on a collapsed node** no longer freezes (upstream fix): a collapsed node that a cable,
+  expression, MIDI mapping or gesture drives still registers its controls, without drawing them.
+- **Mixer**: 0 to 12 channels (the channels stepper) and solo per channel, as upstream. A Mixer saved
+  by an older Turbo keeps its cables and modulation (its bindings move up one slot on load).
+- Sampler, Molder, Grain Molder, PaulStretch and Drum Sequencer play a file at its own sample rate
+  (a 44.1 kHz file is no longer sharp on a 48 kHz device); older patches keep the old pitch.
+- Effects on upstream's current kernels: Delay wow / flutter / saturation / diffusion (tape, with
+  analog on), Dynamics style (clean / bus / opto / FET) and sidechain high-pass, Pitch Shifter
+  spectral mode, Bitcrush dither, and the kernels' other fixes. Audio Filter (Turbo's LFO), Phaser
+  (Turbo's feedback) and EQ keep Turbo's own. New controls sit after the old ones, so saved
+  modulation keeps its target.
+
+### Gesture learning (upstream)
+- **Moves**, **Predictive Modulator** and upstream's **Drift** (replacing Turbo's older Drift; its
+  `home` knob is gone, every other key reads the same): they learn from how you move the knobs.
+  Upstream's movement log records every param change and who made it (hand, modulator, expression,
+  gesture, prediction); predictors write each destination in its own 0..1. Self-tests MOVELOGTEST
+  and MOVESTATSTEST.
+- **Shift-grab** a knob a predictor drives: it turns green, your hand takes over while you hold it,
+  and on release the predictor learns where you left it and how fast you were moving.
+- Drift draws one trace per destination in its header; SETUP > Movement log turns the log on/off,
+  opens its folder and caps its size (256 MB / 1 GB / 4 GB). Knobs with a dB or frequency taper are
+  logged and predicted along their own curve.
+- Saved modulation and expressions name their control by key (`mod 5 cutoff ...`, upstream's own
+  format), so a node whose body reorders its controls no longer moves a saved binding.
+
+### Prediction and geometry (from the to-do)
+- **Predictive Coloring**: learns what graded footage looks like and grades incoming frames toward it.
+- Null 3D, Material, Mapping and Cloth forward the point cloud and curve riding with the mesh
+  (upstream's component passthrough), so a Null no longer drops a cloud.
+- Render 3D caps a point cloud's sprite fill under a budget (upstream's guard against a Windows GPU
+  watchdog reset) by shrinking sprites instead of dropping points.
+
+### Housekeeping
+- Old local branches deleted; unmerged remote ones kept as tags (archive/*). Unused macOS icons removed.
+- New `PORTEDTEST` self-test (23 checks) and upstream's `VOICEMODTEST` (88 checks).
+- Patch compatibility probe (`INFINITE_PATCHCOMPAT`, `patchcompat.ps1` + `compare-patchcompat.py`):
+  493 upstream and the Turbo patches opened in 0.59.1 and 0.60, compared node by node - no
+  regressions.
+
 ## 0.59.1-turbo (2026-10-17)
 
 ### Audio: no blink when adding a module (upstream fix)

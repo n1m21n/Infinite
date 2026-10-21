@@ -16,121 +16,219 @@ void CycleShaperKernel::PushParams(const AudioEffectNode& node, double /*sampleR
    mAnalog.store(analog ? 1 : 0, std::memory_order_relaxed);
 }
 
+namespace
+{
+   // Lagrange quintic through h[0..5] at t = -2..3, evaluated at t (h[2] is
+   // t = 0, h[3] is t = 1).
+   inline double Interp6(const float* h, double t)
+   {
+      double sum = 0.0;
+      for (int k = 0; k < 6; k++)
+      {
+         double w = 1.0;
+         for (int j = 0; j < 6; j++)
+            if (j != k)
+               w *= (t - (double)(j - 2)) / (double)(k - j);
+         sum += w * (double)h[k];
+      }
+      return sum;
+   }
+
+   // Upward zero crossing of the interpolant between h[2] (<= 0) and h[3]
+   // (> 0), as a fraction past h[2]. Bisection-safeguarded Newton from the
+   // straight-line guess; the bracket always holds a root.
+   inline double CrossingFraction(const float* h)
+   {
+      double lo = 0.0, hi = 1.0;
+      double t = (double)h[2] / ((double)h[2] - (double)h[3]);
+      for (int it = 0; it < 8; it++)
+      {
+         const double v = Interp6(h, t);
+         if (v > 0.0)
+            hi = t;
+         else
+            lo = t;
+         const double d = (Interp6(h, t + 1.0e-4) - Interp6(h, t - 1.0e-4)) / 2.0e-4;
+         double next = (d > 0.0) ? t - v / d : 0.5 * (lo + hi);
+         if (!(next > lo && next < hi))
+            next = 0.5 * (lo + hi);
+         if (std::fabs(next - t) < 1.0e-9)
+            return next;
+         t = next;
+      }
+      return t;
+   }
+
+   // |interpolant| at its extreme within half a sample of h[2] (the crest
+   // between samples). Golden-section search; |h[2]| is the floor.
+   inline float CrestHeight(const float* h)
+   {
+      const double g = 0.6180339887;
+      double a = -0.5, b = 0.5;
+      double c = b - g * (b - a), d = a + g * (b - a);
+      double fc = std::fabs(Interp6(h, c)), fd = std::fabs(Interp6(h, d));
+      for (int it = 0; it < 24; it++)
+      {
+         if (fc > fd)
+         {
+            b = d; d = c; fd = fc;
+            c = b - g * (b - a);
+            fc = std::fabs(Interp6(h, c));
+         }
+         else
+         {
+            a = c; c = d; fc = fd;
+            d = a + g * (b - a);
+            fd = std::fabs(Interp6(h, d));
+         }
+      }
+      return std::max(std::fabs(h[2]), (float)std::max(fc, fd));
+   }
+
+   inline float ReadTable(const float* t, double phase)
+   {
+      const double x = phase * CycleShaperKernel::kTableSize;
+      const int i = (int)x;
+      const float f = (float)(x - i);
+      return t[i] + (t[i + 1] - t[i]) * f;
+   }
+}
+
 void CycleShaperKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
 {
    const int waveform = mWaveform.load(std::memory_order_relaxed);
    const float threshLinear = mThresholdLinear.load(std::memory_order_relaxed);
    const int smoothSamples = mSmoothSamples.load(std::memory_order_relaxed);
    const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
+   const ShapeTables& tables = Tables();
+   const double edgeSamples = (double)std::max(1, smoothSamples);
 
    const int numChannels = std::min({ in.numChannels, out.numChannels, kMaxChannels });
 
    for (int ch = 0; ch < numChannels; ch++)
    {
-      ChannelState& state = mChannels[ch];
+      ChannelState& s = mChannels[ch];
       const float* inData = in.channels[ch];
       float* outData = out.channels[ch];
 
       for (int i = 0; i < out.numFrames; i++)
       {
-         const float x = inData[i];
-         const bool isCrossing = (state.prevSample <= 0.0f && x > 0.0f);
+         // Everything below runs kLookAhead samples behind the input: x is
+         // hist[3], with hist[4..5] still to come.
+         for (int k = 0; k < 5; k++)
+            s.hist[k] = s.hist[k + 1];
+         s.hist[5] = inData[i];
+         const float* h = s.hist;
+         const float x = h[3];
+         s.sinceCrossing += 1.0;
 
-         if (isCrossing && state.inPos >= 4)
+         if (h[2] <= 0.0f && x > 0.0f)
          {
-            const int L = state.inPos;
-            const float A = state.cyclePeak;
-
-            if (A >= threshLinear)
+            // Crossing between the previous sample and this one, `after`
+            // samples before this one.
+            const double frac = CrossingFraction(h);
+            const double after = 1.0 - frac;
+            const double measured = s.sinceCrossing - after;
+            // Smooth the period across cycles: steady pitch stays steady,
+            // a real change still lands within a couple of cycles.
+            const double period = (s.period > 0.0 && std::fabs(measured - s.period) < 0.1 * s.period)
+                                     ? 0.5 * (s.period + measured)
+                                     : measured;
+            const bool valid = s.haveCrossing && period >= 4.0 && period <= (double)kMaxCycleSamples;
+            if (valid && s.cyclePeak >= threshLinear)
             {
-               // Resynthesize geometric waveform of length L and peak A
-               const float invL = 1.0f / (float)L;
-               const float twoPi = (float)(2.0 * M_PI);
-
-               for (int m = 0; m < L; m++)
+               const double target = after / period; // where the phase should be now
+               if (!s.locked)
                {
-                  const float phase = (float)m * invL * twoPi;
-                  const float s = sinf(phase);
-                  float y = 0.0f;
-
-                  switch (waveform)
-                  {
-                     case 0: // Sine
-                        y = A * s;
-                        break;
-                     case 1: // Square
-                        y = A * (s >= 0.0f ? 1.0f : -1.0f);
-                        break;
-                     case 2: // Triangle
-                     default:
-                        y = (2.0f * A / (float)M_PI) * asinf(std::clamp(s, -1.0f, 1.0f));
-                        break;
-                  }
-
-                  if (analog)
-                     y = AnalogDsp::AsymTanh(y);
-
-                  state.outBuffer[m] = y;
+                  s.phase = target;
+                  s.inc = 1.0 / period;
+                  s.amp = s.cyclePeak;
+                  s.ampSteps = 0;
+                  s.locked = true;
                }
-
-               // Cubic-Hermite crossfade of first smoothSamples against tail of previous cycle
-               const int crossfadeLen = std::min({ smoothSamples, L, state.lastTailLen });
-               for (int m = 0; m < crossfadeLen; m++)
+               else
                {
-                  const float t = (float)(m + 1) / (float)(crossfadeLen + 1);
-                  const float h = 3.0f * t * t - 2.0f * t * t * t;
-                  state.outBuffer[m] = (1.0f - h) * state.lastRenderedTail[m] + h * state.outBuffer[m];
+                  double err = target - s.phase;
+                  err -= std::floor(err + 0.5); // wrap to [-0.5, 0.5)
+                  s.inc = (1.0 + 0.5 * err) / period;
+                  s.ampSteps = std::max(1, (int)period);
+                  s.ampStep = (s.cyclePeak - s.amp) / (float)s.ampSteps;
                }
-
-               // Cache tail of newly synthesized cycle
-               state.lastTailLen = std::min(kMaxTail, L);
-               for (int m = 0; m < state.lastTailLen; m++)
-                  state.lastRenderedTail[m] = state.outBuffer[L - state.lastTailLen + m];
-
-               state.outLen = L;
-               state.outPos = 0;
-               state.lastCycleLen = (float)L;
-               state.lastCyclePeak = A;
+               s.gateTarget = 1.0f;
+               s.lastCycleLen = (float)period;
+               s.lastCyclePeak = s.cyclePeak;
             }
-            else
+            else if (s.haveCrossing)
             {
-               // Below threshold: pass through input cycle untouched
-               for (int m = 0; m < L; m++)
-                  state.outBuffer[m] = state.inBuffer[m];
-               state.outLen = L;
-               state.outPos = 0;
-               state.lastTailLen = 0;
+               s.gateTarget = 0.0f; // below threshold, or not a usable cycle
             }
-
-            state.inBuffer[0] = x;
-            state.inPos = 1;
-            state.cyclePeak = std::fabs(x);
-         }
-         else if (state.inPos >= kMaxCycleSamples)
-         {
-            // Degenerate: cycle exceeded max buffer without zero crossing (e.g. DC or sub-audio)
-            for (int m = 0; m < state.inPos; m++)
-               state.outBuffer[m] = state.inBuffer[m];
-            state.outLen = state.inPos;
-            state.outPos = 0;
-            state.lastTailLen = 0;
-
-            state.inBuffer[0] = x;
-            state.inPos = 1;
-            state.cyclePeak = std::fabs(x);
+            s.haveCrossing = true;
+            s.period = (valid ? period : 0.0);
+            s.sinceCrossing = after;
+            s.cyclePeak = std::fabs(x);
          }
          else
          {
-            state.inBuffer[state.inPos++] = x;
-            state.cyclePeak = std::max(state.cyclePeak, std::fabs(x));
+            // The previous sample was a crest of |x|: take the true peak
+            // between samples, not the nearest sample.
+            if (std::fabs(h[2]) >= std::fabs(h[1]) && std::fabs(h[2]) >= std::fabs(x))
+               s.cyclePeak = std::max(s.cyclePeak, CrestHeight(h));
+            s.cyclePeak = std::max(s.cyclePeak, std::fabs(x));
+            if (s.sinceCrossing > (double)kMaxCycleSamples)
+            {
+               // No crossing for longer than the longest cycle: DC or
+               // sub-audio. Hand back to the dry signal.
+               s.gateTarget = 0.0f;
+               s.locked = false;
+               s.haveCrossing = false;
+            }
          }
 
-         float outSample = 0.0f;
-         if (state.outPos < state.outLen)
-            outSample = state.outBuffer[state.outPos++];
+         s.gate = s.gateTarget + (s.gate - s.gateTarget) * mGateCoeff;
+         if (s.gateTarget == 0.0f && s.gate < 1.0e-6f)
+         {
+            s.gate = 0.0f;
+            s.locked = false;
+         }
 
-         outData[i] = DspMath::FlushDenormal(outSample);
-         state.prevSample = x;
+         float y = 0.0f;
+         if (s.gate > 0.0f)
+         {
+            if (s.ampSteps > 0)
+            {
+               s.amp += s.ampStep;
+               s.ampSteps--;
+            }
+            s.phase += s.inc;
+            s.phase -= std::floor(s.phase);
+
+            float shape;
+            if (waveform == 0)
+               shape = (float)std::sin(2.0 * M_PI * s.phase);
+            else
+            {
+               // Harmonic ceiling: under Nyquist, and no more than an
+               // `smooth`-sample edge allows (see the header). Level L is
+               // safe when L >= log2(1024 * edge * inc); the +1 keeps the
+               // brighter of the two crossfaded levels safe too - this runs
+               // at the base rate, so there is no decimator to remove a
+               // harmonic that slips over Nyquist.
+               const float mipPos = std::clamp(
+                  1.0f + (float)std::log2(std::max(1.0e-9, (double)kTableSize * edgeSamples * s.inc)), 0.0f,
+                  (float)(kMips - 1));
+               const int lo = (int)mipPos;
+               const int hi = std::min(lo + 1, kMips - 1);
+               const float f = mipPos - (float)lo;
+               const auto& t = (waveform == 1) ? tables.square : tables.triangle;
+               const float a = ReadTable(t[lo], s.phase);
+               shape = (f > 0.0f) ? a + (ReadTable(t[hi], s.phase) - a) * f : a;
+            }
+            y = s.amp * shape;
+            if (analog)
+               y = AnalogDsp::AsymTanh(y);
+         }
+
+         outData[i] = DspMath::FlushDenormal(s.gate * y + (1.0f - s.gate) * x);
       }
    }
 

@@ -29,7 +29,13 @@ void ChorusKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
 
    for (int i = 0; i < out.numFrames; i++)
    {
-      const float delayMs = mMailbox.SmoothedValue(kDelayMs);
+      float delayMs = mMailbox.SmoothedValue(kDelayMs);
+      if (!mDelaySlewInit)
+      {
+         mDelaySlew.SetImmediate(delayMs);
+         mDelaySlewInit = true;
+      }
+      delayMs = mDelaySlew.Process(delayMs);
       const float spread = std::clamp(mMailbox.SmoothedValue(kSpread), 0.0f, 1.0f);
       const float depthMs = mMailbox.SmoothedValue(kDepthMs);
       const float feedback = std::clamp(mMailbox.SmoothedValue(kFeedback), 0.0f, 0.9f);

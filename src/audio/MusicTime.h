@@ -76,6 +76,19 @@ namespace MusicTime
       }
    }
 
+   // Upstream: the closest RateDivision for an arbitrary beat length.
+   inline RateDivision NearestRateDivision(double beats)
+   {
+      RateDivision best = (RateDivision)0;
+      double bestDiff = 1e9;
+      for (int i = 0; i < kNumRateDivisions; i++)
+      {
+         const double d = std::abs(BeatsFor((RateDivision)i) - beats);
+         if (d < bestDiff) { bestDiff = d; best = (RateDivision)i; }
+      }
+      return best;
+   }
+
    // Hz for one full cycle at rate division `d`, at `bpm` - the inverse of
    // BeatsFor's period, used by Chorus/Flanger/Phaser's sync-to-tempo rate
    // mode so their LFO can lock to the same rate-division table Delay/Stutter

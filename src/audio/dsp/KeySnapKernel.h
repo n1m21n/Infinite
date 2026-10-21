@@ -9,7 +9,8 @@
 #include "audio/DspMath.h"
 #include "audio/dsp/PortableFft.h"
 
-// Key-Snap: streaming STFT phase vocoder (N=2048, hop=512) that finds the
+// Key-Snap: streaming STFT phase vocoder (N=2048, hop=N/4 at 44.1/48 kHz;
+// N scales with the rate so frames are the same length in time) that finds the
 // spectral peaks of every frame, moves each one to the nearest note of a
 // scale, and carries the peak's neighbouring bins with it (Laroche & Dolson,
 // "New phase-vocoder techniques for pitch-shifting", 1999: peak-locked
@@ -20,13 +21,9 @@ class AudioEffectNode;
 class KeySnapKernel : public IEffectKernel
 {
 public:
-   static constexpr int kFftSize = 2048;
-   static constexpr int kLog2Fft = 11;
-   static constexpr int kHopSize = 512;
-   static constexpr int kNumBins = kFftSize / 2; // 1024
+   static constexpr int kBaseLog2Fft = 11; // 2048 at 44.1/48 kHz
    static constexpr int kMaxChannels = 2;
    static constexpr int kMaxPeaks = 192;
-   static constexpr int kOlaSize = 4096; // power of two, >= kFftSize + kHopSize
 
    struct ChannelState
    {
@@ -41,7 +38,7 @@ public:
       int fifoSamples = 0;
       int olaRead = 0;
 
-      void Init();
+      void Init(int fftSize, int olaSize);
       void Reset();
    };
 
@@ -50,7 +47,7 @@ public:
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
    void ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out) override;
 
-   int LatencySamples() const override { return kFftSize; }
+   int LatencySamples() const override { return mFftSize; }
 
    // Nearest in-scale note to a fractional MIDI pitch. `mask` has bit pc set
    // when pitch class pc (absolute, 0 = C) belongs to the scale. Returns the
@@ -61,9 +58,19 @@ public:
    static uint32_t ScaleMask(int scale, int root);
 
 private:
+   // Decides the frame on `st`'s spectrum (mRe/mIm): which bins move where,
+   // and by what rotation, into mMapTarget/mMapRc/mMapRs.
    void ProcessFrame(ChannelState& st);
+   // Applies that mapping to one channel's own spectrum (re/im) -> mOutRe/mOutIm.
+   void ApplyMapping(const float* re, const float* im);
 
    double mSampleRate = 44100.0;
+   // Set by PrepareToPlay from the rate. mOlaSize is a power of two >= N + hop.
+   int mLog2Fft = kBaseLog2Fft;
+   int mFftSize = 1 << kBaseLog2Fft;
+   int mHopSize = (1 << kBaseLog2Fft) / 4;
+   int mNumBins = (1 << kBaseLog2Fft) / 2;
+   int mOlaSize = 2 << kBaseLog2Fft;
 
    PortableFft::RealFft mFft;
    std::vector<float> mWindow;
@@ -77,4 +84,18 @@ private:
    std::atomic<uint32_t> mMask { 0xFFFu };
 
    ChannelState mChannels[kMaxChannels];
+
+   // Stereo link. Each frame is decided once, on the mid spectrum (the
+   // average of the channels' spectra, tracked by mMid's phase state), and
+   // the same per-bin move and rotation is applied to every channel's own
+   // spectrum - so the channels' phase and level differences (the stereo
+   // image) pass through untouched and both sides always snap alike.
+   // Deciding per channel let each side's synthesis phases random-walk on
+   // their own and let a note exactly between two scale notes snap up on one
+   // side and down on the other (DSPTEST: L/R correlation 0.89 -> 0.51).
+   ChannelState mMid;
+   std::vector<float> mChRe[kMaxChannels], mChIm[kMaxChannels];
+   std::vector<int> mMapTarget; // per source bin: target bin, or -1 (dropped)
+   std::vector<float> mMapRc, mMapRs;
+   bool mMapPassthrough = false;
 };

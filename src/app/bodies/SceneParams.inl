@@ -895,6 +895,7 @@
          case GeometryOpNode::kTransform:
          case GeometryOpNode::kSolidify:
          case GeometryOpNode::kExtrude:
+         case GeometryOpNode::kInset:
          case GeometryOpNode::kWireframe:
          case GeometryOpNode::kTriangulate:
          case GeometryOpNode::kNormals:
@@ -1065,6 +1066,16 @@
          case GeometryOpNode::kDecimate:
             ModSlider("keep", &n->decimateRatio, 0.01f, 1.0f, "%.2f");
             ModCheckbox("lock border", &n->lockBorder);
+            break;
+         case GeometryOpNode::kBevel:
+            ModSlider("width", &n->bevelWidth, 0.001f, 0.5f, "%.3f");
+            ModSliderInt("segments", &n->bevelSegments, 1, 16);
+            ModSlider("sharp angle", &n->bevelAngle, 1.0f, 120.0f, "%.0f deg");
+            break;
+         case GeometryOpNode::kInset:
+            ModSlider("width", &n->insetWidth, 0.001f, 0.5f, "%.3f");
+            ModSlider("depth", &n->insetDepth, -0.5f, 0.5f, "%.3f");
+            ModSlider("patch angle", &n->bevelAngle, 1.0f, 120.0f, "%.0f deg");
             break;
          case GeometryOpNode::kTransformSelected:
             ModCheckbox("move along normals", &n->moveAlongNormals);

@@ -654,6 +654,40 @@
                else if (st == 4) ImGui::TextDisabled("check failed: %s", err.c_str());
             }
 
+            // Turbo 0.60 (upstream): the movement log Moves / Drift / Predictive
+            // Modulator learn from - on/off, its folder and how much it may keep.
+            ImGui::SeparatorText("Movement log");
+            {
+               bool moveLogEnabled = MovementLog::IsEnabled();
+               if (ImGui::Checkbox("Record movement log", &moveLogEnabled))
+                  MovementLog::SetEnabled(moveLogEnabled);
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("%s", "Every knob move and who made it (hand, modulator, gesture, prediction).\nMoves, Drift and Predictive Modulator learn from it. Stays on this machine.");
+               if (ImGui::MenuItem("Open log folder"))
+               {
+                  const std::string dir = MovementLog::GetLogDirectory();
+                  if (!dir.empty())
+                     Platform::RevealInFileManager(dir);
+               }
+               const float folderMB = (float)MovementLog::GetLogFolderSizeBytes() / (1024.0f * 1024.0f);
+               ImGui::TextDisabled("%.1f MB used", folderMB);
+               static const char* kCapLabels[] = { "256 MB", "1 GB", "4 GB" };
+               static const uint64_t kCapValues[] = { 256ULL * 1024 * 1024, 1024ULL * 1024 * 1024, 4096ULL * 1024 * 1024 };
+               const uint64_t curCap = MovementLog::GetRetentionCapBytes();
+               int capIdx = 1;
+               for (int i = 0; i < 3; i++)
+                  if (curCap == kCapValues[i])
+                     capIdx = i;
+               ImGui::SetNextItemWidth(120.0f);
+               if (ImGui::BeginCombo("Keep at most", kCapLabels[capIdx]))
+               {
+                  for (int i = 0; i < 3; i++)
+                     if (ImGui::Selectable(kCapLabels[i], capIdx == i))
+                        MovementLog::SetRetentionCapBytes(kCapValues[i]);
+                  ImGui::EndCombo();
+               }
+            }
+
             ImGui::SeparatorText("Safety and diagnostics");
             if (ImGui::Checkbox("Diagnostic log", &gDiagnosticLogEnabled))
             {

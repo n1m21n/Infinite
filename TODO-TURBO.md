@@ -25,7 +25,8 @@ CHANGELOG-TURBO.md when it ships.
 
 - TOP parity, what 0.52 left open (docs/TOP-PARITY.md): Common page on sources, Layer Stack and
   Switcher; pixel units for Crop / Transform; Blend with N inputs; the missing TOPs (Cache / Time
-  Machine, Tile, Remap, Corner Pin, Constant, Math, Channel Mix, Luma Blur, Optical Flow...);
+  Machine and Optical Flow arrived in 0.60; Tile, Remap, Corner Pin, Constant, Math, Channel Mix,
+  Luma Blur);
   Send / Receive partner lines and wireless links in the MCP graph. Then stage 2: 3D with POPs.
 
 - Timeline: MIDI clips and a piano-roll editor (data model, playback into an instrument's note
@@ -33,11 +34,20 @@ CHANGELOG-TURBO.md when it ships.
 - Headless engine from upstream: --render / --frame / --frames-dir / --node / --stems / --notes /
   --set / --audio-summary / --contact-sheet / --explain / --describe / --validate, plus the
   console launcher for cmd exit codes.
-- Prediction nodes from upstream: Moves (MovementLog / MovementStats), Predictive Modulator,
-  Predictive Coloring.
-
-- Geometry: upstream's sprite fill clamp (GPU driver-reset guard) and cloud forwarding through
-  Material / Null3D / Mapping / Cloth.
+- Gesture learning, rest of upstream: patch load / undo marks in the movement log; ModSlider has
+  no taper in Turbo (only knobs and faders carry one).
+- Upstream's own bodies were reordered (Delay, Dynamics, ...): its numeric `mod` lines on those land
+  on other knobs (keyed ones are fine). MIDI learn, gestures and Performance targets still save
+  ordinals.
+- Upstream `mod` curve and smoothing (read, not applied yet); dropdowns given an option name.
+- Upstream interop, keys Turbo does not read yet (from the compat report): Looper take / thru
+  (Turbo's Looper is its own rewrite), Drift's new modes (with the gesture-learning item), Output
+  offline render settings (headless), MIDI File speed / position, Audio File pitch, Note Capturer
+  scale, Random Note step timing (NoteNodes.cpp differs a lot on both sides).
+- Rest of the audio engine from upstream (multi-output nodes, Splitter crossover, worker pool,
+  ParamMailbox frame stamps) - Turbo's AudioEngine is kept for now.
+- Upstream UI parity for modulators: FixedParamOrdinal / RegisterHiddenParam (stable slider
+  ordinals per mode), skewed knob tapers (Turbo draws them linear), the "show more" folds.
 
 ## Out of scope (for now)
 

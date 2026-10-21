@@ -382,6 +382,13 @@
                         valid = false;
                         rejectReason = "Cannot connect: this would create a note feedback loop";
                      }
+                     if (valid && srcGeometry != nullptr &&
+                         dstNode->node->GeometryInputSlot(GraphNode::InputSlotFromPin(b)) != nullptr &&
+                         WouldCreateGeometryCycle(srcNode->node.get(), dstNode->node.get()))
+                     {
+                        valid = false;
+                        rejectReason = "Cannot connect: this would create a geometry loop";
+                     }
                   }
                }
 

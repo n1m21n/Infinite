@@ -62,6 +62,28 @@
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return HeadlessExit(RunDspTest());
 
+   // Turbo 0.60: upstream's movement log / stats tests (gesture learning).
+   if (getenv("INFINITE_MOVELOGTEST") != nullptr)
+   {
+      const bool ok = MovementLog::RunMovementLogTest();
+      printf("MOVELOGTEST %s\n", ok ? "OK" : "FAIL");
+      return HeadlessExit(0);
+   }
+   if (getenv("INFINITE_MOVESTATSTEST") != nullptr)
+   {
+      const bool ok = MovementStats::RunMovementStatsTest();
+      printf("MOVESTATSTEST %s\n", ok ? "OK" : "FAIL");
+      return HeadlessExit(0);
+   }
+
+   // Turbo 0.60: upstream's per-voice modulation fixture. Exit 0 always - the
+   // printed VOICEMODTEST verdict is the driver's signal, as for AUDIOPDCTEST.
+   if (getenv("INFINITE_VOICEMODTEST") != nullptr)
+   {
+      RunVoiceModFixture();
+      return HeadlessExit(0);
+   }
+
    if (getenv("INFINITE_AUDIOPDCTEST") != nullptr)
    {
       RunAudioPdcTest();
@@ -324,6 +346,20 @@
    }
 
    RegisterNodes();
+   // Turbo 0.60 (upstream): the movement log Moves / Drift / Predictive
+   // Modulator learn from, keyed by stable node uids.
+   MovementLog::SetNodeUidLookup([](int idx) -> uint64_t {
+      if (GraphNode* gn = FindNodeByIndex(idx))
+         return gn->uid;
+      return 0;
+   });
+   MovementLog::SetNodeTypeLookup([](int idx) -> std::string {
+      if (GraphNode* gn = FindNodeByIndex(idx))
+         return gn->typeName;
+      return std::string();
+   });
+   if (getenv("INFINITE_EXITAFTER") == nullptr) // self-tests neither read nor write the learned profiles
+      MovementLog::Start();
    StartupTrace("startup: nodes registered");
    ApplyTheme();
    StartupTrace("startup: theme applied");
@@ -1329,6 +1365,35 @@
          SpawnNode("Render 3D", "3D", 400.0f, 40.0f);     // 2
          static_cast<Render3DNode*>(gNodes[2].node.get())->geometry[0] =
             static_cast<OceanNode*>(gNodes[1].node.get());
+      }
+      else if (getenv("INFINITE_PORTEDTEST") != nullptr)
+      {
+         // Turbo 0.60: every node ported from upstream after v0.6 spawns,
+         // takes its input and produces output. Checked at frame 8, below.
+         const char* names[] = {
+            "Formula", "Time Machine", "Optical Flow", "Fluid", "Volume", "NDI In", "NDI Out",       // 0..6
+            "Curve", "Sweep", "Revolve", "L-System", "Distribute Points in Grid", "Proximity Lines", // 7..12
+            "Geometry", "Rigid Bodies", "Bevel", "Inset",                                            // 13..16
+            "MSEG", "Voice Spread", "Note Expression",                                               // 17..19
+            "FM", "String", "Partials", "Saturator", "Convolution Reverb", "Shape Resonator", "dither" // 20..26
+         };
+         for (int i = 0; i < (int)(sizeof(names) / sizeof(names[0])); i++)
+            SpawnNode(names[i], "", 40.0f + 260.0f * (i % 7), 40.0f + 320.0f * (i / 7));
+         auto* src = static_cast<FormulaNode*>(gNodes[0].node.get());
+         src->formula = "   return vec4(uv.x, uv.y, 0.5 + 0.5 * sin(t * 3.0), 1.0);";
+         src->width = 128.0f;
+         src->height = 128.0f;
+         src->Apply();
+         for (int i : { 1, 2, 3, 4, 6, 26 })
+            if (ImageCable* c = CableFor(gNodes[i], 0))
+               c->Connect(gNodes[0].node.get());
+         auto geo = [](int i) { return dynamic_cast<IGeometrySource*>(gNodes[i].node.get()); };
+         static_cast<SweepNode*>(gNodes[8].node.get())->path = geo(7);
+         *gNodes[9].node->GeometryInputSlot(0) = geo(7);
+         static_cast<ProximityLinesNode*>(gNodes[12].node.get())->input = geo(11);
+         static_cast<RigidBodyNode*>(gNodes[14].node.get())->input = geo(13);
+         *gNodes[15].node->GeometryInputSlot(0) = geo(13);
+         *gNodes[16].node->GeometryInputSlot(0) = geo(13);
       }
       else if (getenv("INFINITE_TOPPARITYTEST") != nullptr)
       {

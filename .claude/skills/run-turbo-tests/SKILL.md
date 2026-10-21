@@ -73,6 +73,16 @@ set INFINITE_UNDOTEST=1& set INFINITE_EXITAFTER=10& build\windows-vs2022\Release
 3. Prefer wiring the node into the generic sweeps (audio-node-sweep,
    geometry-transform-sweep) over a one-off fixture.
 
+## Patch compatibility (two builds, many patches)
+
+`patchcompat.ps1 -Exe <exe> -Corpus <dir of .inf> -Out <dir>` opens every patch with the
+`INFINITE_PATCHCOMPAT` probe (src/app/selftest/PatchCompat.inl): per node its output size, a 4x4
+thumbnail, triangle / vertex / point counts and modulator value, plus node types and saved keys the
+build does not know. Run it with a reference build and a candidate, then
+`python compare-patchcompat.py <ref out> <new out> report.md` lists regressions (ok -> crash /
+hang), per-node differences, and the unknown types / keys over the whole corpus. Run the two builds
+one after the other: two instances at once delay Text nodes past the probe frame.
+
 ## Windows-specific notes
 
 - PLUGINSCANTEST (Audio Units) was dropped. MEDIADRAGTEST / SAMPLERDRAGTEST

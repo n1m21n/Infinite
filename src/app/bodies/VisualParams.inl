@@ -843,22 +843,69 @@
       ImGui::EndDisabled();
    }
 
+   // ---- Turbo 0.60: modulator helpers for the ported MSEG / Voice Spread / Note Expression
+   inline void PushCheckboxStyle() {}
+   inline void PopCheckboxStyle() {}
+   // LFO / Random / MSEG: run once per voice when cabled straight into a
+   // synth's voice param (audio/VoiceMod.h). Off: one shared value, as ever.
+   void DrawPerVoiceCheckbox(bool* voice)
+   {
+      PushCheckboxStyle();
+      ModCheckbox("per voice", voice);
+      PopCheckboxStyle();
+   }
+   // Upstream's "rate in" row (beats / synced division / Hz). Turbo keeps the
+   // beats slider at this place in every mode, so the sliders after it never
+   // change ordinal; DrawModRateHz draws the Hz slider, called last.
+   void DrawModRateControls(int* rateMode, float* rateBeats, float* /*rateHz*/, int /*hzOrdinal*/)
+   {
+      DropdownButton("rate in", LFONode::RateModeNames(), *rateMode,
+                     [rateMode](int i) { PushUndoCheckpoint(); *rateMode = i; });
+      if (*rateMode == LFONode::kRateSynced)
+      {
+         const int div = MusicTime::NearestRateDivision(*rateBeats);
+         DropdownButton("division", MusicTime::RateDivisionList(), div, [rateBeats](int i) {
+            PushUndoCheckpoint();
+            *rateBeats = (float)MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(i, 0, (int)MusicTime::kNumRateDivisions - 1));
+         });
+      }
+      ImGui::BeginDisabled(*rateMode == LFONode::kRateHz);
+      ModSlider("rate", rateBeats, 0.05f, 32.0f, "%.2f beats");
+      ImGui::EndDisabled();
+   }
+   void DrawModRateHz(int rateMode, float* rateHz)
+   {
+      ImGui::BeginDisabled(rateMode != LFONode::kRateHz);
+      ModSlider("rate (Hz)", rateHz, 0.01f, 40.0f, "%.2f Hz");
+      ImGui::EndDisabled();
+   }
+
+
    void DrawLFOParams(LFONode* n)
    {
       DropdownButton("shape", LFONode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
-      ModSlider("rate (beats)", &n->rateBeats, 0.05f, 32.0f);
+      DrawModRateControls(&n->rateMode, &n->rateBeats, &n->rateHz, 4); // Turbo 0.60: upstream's rate modes
       ModSlider("phase", &n->phase, 0.0f, 1.0f);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
+      // Per voice, each note starts the cycle: phase from does not apply.
+      ImGui::BeginDisabled(n->voice);
+      DropdownButton("phase from", LFONode::PhaseModeNames(), n->phaseMode,
+                     [n](int i) { PushUndoCheckpoint(); n->phaseMode = i; });
+      ImGui::EndDisabled();
+      DrawPerVoiceCheckbox(&n->voice);
+      DrawModRateHz(n->rateMode, &n->rateHz); // after "high": ordinal 4, as upstream
    }
 
    void DrawRandomParams(RandomNode* n)
    {
-      ModSlider("rate (beats)", &n->rateBeats, 0.05f, 32.0f);
+      DrawModRateControls(&n->rateMode, &n->rateBeats, &n->rateHz, 5); // Turbo 0.60: upstream's rate modes
       ModSlider("smooth", &n->smooth, 0.0f, 1.0f);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
       ModSlider("seed", &n->seed, 0.0f, 200.0f);
+      DrawPerVoiceCheckbox(&n->voice);
+      DrawModRateHz(n->rateMode, &n->rateHz); // ordinal 5, as upstream
    }
 
    // Drag/paint state for the pattern step grid. A horizontal paint gesture

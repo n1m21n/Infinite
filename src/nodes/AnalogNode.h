@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "audio/SynthModes.h"
+#include "audio/VoiceMod.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
@@ -14,7 +15,7 @@ class AudioAnalogNode;
 enum AnalogFilterType
 {
    kAFilterOff = 0,
-   kAFilterLadder,   // ZDF nonlinear Moog ladder
+   kAFilterLadder,   // ZDF nonlinear Moog ladder (FilterModels::Ladder)
    kAFilterSvfLP12,  // 12 dB SVF Lowpass
    kAFilterSvfLP24,  // 24 dB SVF Lowpass
    kAFilterSvfLP36,  // 36 dB SVF Lowpass
@@ -25,6 +26,8 @@ enum AnalogFilterType
    kAFilterSvfBP24,  // 24 dB SVF Bandpass
    kAFilterSvfNotch12, // 12 dB SVF Notch
    kAFilterSvfNotch24, // 24 dB SVF Notch
+   kAFilterMs20,     // MS-20 style Sallen-Key (FilterModels::Ms20), v0.6 2.25
+   kAFilterDiode,    // diode ladder (FilterModels::Diode), v0.6 2.25
    kNumAFilterTypes
 };
 
@@ -57,7 +60,9 @@ inline const std::vector<std::string>& AnalogFilterTypeList()
       SynthModes::FilterName(SynthModes::kFilterBP12),
       SynthModes::FilterName(SynthModes::kFilterBP24),
       SynthModes::FilterName(SynthModes::kFilterNotch12),
-      SynthModes::FilterName(SynthModes::kFilterNotch24)
+      SynthModes::FilterName(SynthModes::kFilterNotch24),
+      "ms-20 lp",
+      "diode lp"
    };
    return kList;
 }
@@ -106,7 +111,7 @@ struct AnalogSynthParams
    bool analog = true;
 };
 
-class AnalogNode : public INode, public IAudioSource
+class AnalogNode : public INode, public IAudioSource, public VoiceMod::IVoiceModTarget
 {
 public:
    static constexpr int kMaxVoices = 8;
@@ -134,6 +139,15 @@ public:
    int ReadScope(float* out, int capacity);
    int ActiveVoices() const;
    double DebugMailboxSampleRate() const;
+
+   // Per-voice modulation (audio/VoiceMod.h): the oscillator, mixer, filter
+   // and envelope params each voice evaluates for itself.
+   int VoiceParamFor(const float* member) const override;
+   void PublishVoicePlan(const VoiceMod::Plan& plan) override;
+   float DebugVoiceSource(int voice, int source) const;
+   // Tests: routes in the last plan published, source 0's modulator uid; -1 before any.
+   int DebugPublishedRoutes() const { return mPublishedRoutes; }
+   uint64_t DebugPublishedSourceId() const { return mPublishedSourceId; }
 
    // 26 smoothed floats
    float volume = 0.8f;
@@ -177,4 +191,6 @@ public:
 private:
    std::unique_ptr<AudioAnalogNode> mAudioNode;
    int mLastCookFrame = -1;
+   int mPublishedRoutes = -1;
+   uint64_t mPublishedSourceId = 0;
 };

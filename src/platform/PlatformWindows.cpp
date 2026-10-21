@@ -1604,6 +1604,11 @@ namespace Platform
 
          void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& msg) override
          {
+            // Turbo 0.60 (upstream): per-channel pressure and slide for Note Expression.
+            if (msg.isChannelPressure())
+               MidiStoreChannelPressure(msg.getChannel() - 1, msg.getChannelPressureValue() / 127.0f);
+            else if (msg.isController() && msg.getControllerNumber() == 74)
+               MidiStoreChannelSlide(msg.getChannel() - 1, msg.getControllerValue() / 127.0f);
             MidiDeviceId dev = 0;
             {
                auto found = ids.find(source);

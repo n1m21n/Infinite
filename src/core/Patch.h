@@ -48,6 +48,10 @@ class INode;
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
 {
+   // Upstream: highest node index a hand-written patch may use (pin ids are
+   // index * GraphNode::kStride in an int). PatchSchema::Validate reports past it.
+   constexpr int kMaxNodeIndex = 1000000;
+
    struct NodeRecord
    {
       int index = 0;
@@ -66,6 +70,17 @@ namespace Patch
       int colorTag = 0; // Turbo: 6th token of the flags line
       // Raw key/value lines, replayed into the node through its ParamVisitor.
       std::vector<std::pair<std::string, std::string>> params;
+      // Turbo 0.60 (upstream): reader line numbers (1-based, 0 = not from a
+      // file), so PatchSchema can cite a line. Not written back.
+      int line = 0;
+      std::vector<int> paramLines; // parallel to params
+      // Upstream's authoring name, from an `id <word>` line of a hand-written
+      // patch. PatchSchema::Resolve turns references to it into indices; the
+      // writer emits it only when set (the GUI never sets it).
+      std::string id;
+      int idLine = 0;
+      bool hasFlags = false; // the block had a `flags` line (reader only)
+      std::string layoutHint; // upstream reader-only placement hint
    };
 
    struct CableRecord
@@ -77,6 +92,10 @@ namespace Patch
       // GetOutputSlot()). Unused (always 0) for cable/geo/aud records - only
       // Note Router has more than one note output.
       int srcOutput = 0;
+      int line = 0; // reader line number, see NodeRecord::line
+      // Turbo 0.60 (upstream): authoring names read in place of the number
+      // (empty when the file used one). PatchSchema::Resolve fills the ints.
+      std::string dstRef, srcRef, slotRef, outRef;
    };
 
    struct ModRecord
@@ -92,6 +111,22 @@ namespace Patch
       float centre = 0.0f;
       // Turbo range mapper (trailing tokens, defaults = no remap).
       float inMin = 0.0f, inMax = 1.0f, outMin = 0.0f, outMax = 1.0f;
+      // Turbo 0.60: upstream's trailing tokens instead - the destination-units
+      // range the binding writes (lo..hi), enabled, curve, smoothing. Read from
+      // upstream-format lines only; the loader turns lo/hi into the range
+      // mapper once it knows the destination's range. Turbo never writes them.
+      float lo = 0.0f, hi = 0.0f;
+      bool hasRange = false;
+      bool enabled = true;
+      float curve = 0.0f;
+      float smoothMs = 0.0f;
+      int line = 0;
+      std::string dstRef, srcRef, outRef; // authoring names, see CableRecord
+      std::string dstKey;                 // a control key in place of dstParam (`mod 5 radius ...`)
+      // Turbo 0.60, writer only: the key the file names the control by (empty =
+      // the ordinal). A key survives a body reordering its controls; dstParam
+      // stays filled for in-memory use (undo, clipboard).
+      std::string saveKey;
    };
 
    // A palette node driving one colour swatch on another node.
@@ -101,6 +136,7 @@ namespace Patch
       int dstColor = 0;
       int srcIndex = 0;
       int srcSwatch = 0;
+      std::string dstRef, srcRef; // authoring names, see CableRecord
    };
 
    // A typed algebraic expression driving one parameter directly, with no
@@ -110,6 +146,11 @@ namespace Patch
       int dstIndex = 0;
       int dstParam = 0;
       std::string text;
+      float curve = 0.0f;
+      int line = 0;
+      std::string dstRef; // authoring name, see CableRecord
+      std::string dstKey; // a control key in place of dstParam
+      std::string saveKey; // writer only, see ModRecord::saveKey
    };
 
    // One patch-wide named value an expression can read - see
@@ -420,6 +461,13 @@ namespace Patch
       bool hasArrange = false; // an `arrange` line was read
       std::vector<PerfRecord> performance; // Turbo 0.46: Performance Mode
       PerfLayoutRecord perfLayout;
+      // Turbo 0.60 (upstream): the file names a node, slot or output with a
+      // word, so PatchSchema::Resolve has to run before the patch is applied.
+      bool hasNamedRefs = false;
+      // A `mod`/`expr` line names its control by key, or an `i` line holds a
+      // dropdown option name: resolved once a node of the type has drawn.
+      bool hasKeyRefs = false;
+      int revision = 1; // upstream `rev` line; 1 = none in the file
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

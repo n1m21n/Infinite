@@ -121,6 +121,8 @@ public:
    }
 
    void PushLaneAccentPitch(int lane, float semis) { mLaneAccentPitch[lane].store(semis, std::memory_order_relaxed); }
+   // Upstream: linear gain on full-velocity steps, stored minus 1 so zero-init is no boost.
+   void PushLaneAccentGain(int lane, float gain) { mLaneAccentGain[lane].store(gain - 1.0f, std::memory_order_relaxed); }
 
    void PushLaneState(int lane, bool mute, bool solo, int choke)
    {
@@ -130,6 +132,8 @@ public:
    }
 
    void PushStep(int lane, int step, float vel) { mStepVel[lane][step].store(vel, std::memory_order_relaxed); }
+
+   void SetRateFix(bool on) { mRateFix.store(on, std::memory_order_relaxed); }
 
    void PushGlobals(int rate, int numSteps, float swing, float masterVolume, bool run)
    {
@@ -391,8 +395,14 @@ private:
       voice.readPos = (double)startFrac * buf->numFrames;
       voice.endFrame = (double)endFrac * buf->numFrames;
       const float accentSemis = velocity >= 0.99f ? mLaneAccentPitch[lane].load(std::memory_order_relaxed) : 0.0f;
-      voice.rate = NoteRateForPitch(lanePitchNow[lane] + accentSemis);
-      voice.velocity = velocity * laneVolNow[lane];
+      // Scaled by the sample's own rate over the device rate, so a 44.1 kHz
+      // hit plays at its pitch on a 48 kHz device (1 when rateFix is 0).
+      const double srRatio = (mRateFix.load(std::memory_order_relaxed) && buf->sampleRate > 0.0 && mSampleRate > 0.0)
+                                ? buf->sampleRate / mSampleRate
+                                : 1.0;
+      voice.rate = NoteRateForPitch(lanePitchNow[lane] + accentSemis) * (float)srRatio;
+      const float accentGain = velocity >= 0.99f ? 1.0f + mLaneAccentGain[lane].load(std::memory_order_relaxed) : 1.0f;
+      voice.velocity = velocity * laneVolNow[lane] * accentGain;
       DspMath::EqualPowerPan(lanePanNow[lane], voice.panL, voice.panR);
       voice.attackLevel = 0.0f;
       voice.attackInc = mLaneAttackInc[lane].load(std::memory_order_relaxed);
@@ -435,6 +445,7 @@ private:
    std::atomic<bool> mLaneSolo[kNumLanes] = {};
    std::atomic<int> mLaneChoke[kNumLanes] = {};
    std::atomic<float> mLaneAccentPitch[kNumLanes] = {};
+   std::atomic<float> mLaneAccentGain[kNumLanes] = {}; // linear gain minus 1, so zero-init = no boost
    std::atomic<float> mStepVel[kNumLanes][kMaxSteps] = {};
    std::atomic<float> mLaneStart[kNumLanes] = {};
    std::atomic<float> mLaneEnd[kNumLanes] = {};
@@ -444,6 +455,7 @@ private:
    std::atomic<float> mSwing { 0.0f };
    std::atomic<float> mMasterVolume { 0.8f };
    std::atomic<bool> mRun { true };
+   std::atomic<bool> mRateFix { true };
 
    friend class ::DrumSequencerNode;
 };
@@ -477,6 +489,8 @@ DrumSequencerNode::DrumSequencerNode()
       laneChoke[lane] = 0;
       laneAccentPitch[lane] = 0.0f;
       mLastLaneAccentPitch[lane] = -999.0f;
+      laneAccentLevel[lane] = 0.0f;
+      mLastLaneAccentLevel[lane] = -999.0f;
 
       mLastLaneVolume[lane] = -1.0f;
       mLastLanePan[lane] = -99.0f;
@@ -521,6 +535,7 @@ void DrumSequencerNode::PushDirtyParams()
    // two cooks, so a coefficient already pushed this session might have
    // been computed against the pre-PrepareToPlay default rate. Force one
    // corrective re-push, for every lane, the cook after that happens.
+   mAudioNode->SetRateFix(rateFix != 0);
    const double currentSr = mAudioNode->mSampleRate;
    const bool srChanged = currentSr != mLastCoeffSampleRate;
    mLastCoeffSampleRate = currentSr;
@@ -613,6 +628,12 @@ void DrumSequencerNode::PushDirtyParams()
          mAudioNode->PushLaneAccentPitch(lane, std::clamp(laneAccentPitch[lane], -24.0f, 24.0f));
          mLastLaneAccentPitch[lane] = laneAccentPitch[lane];
       }
+      if (laneAccentLevel[lane] != mLastLaneAccentLevel[lane])
+      {
+         const float db = std::isfinite(laneAccentLevel[lane]) ? std::clamp(laneAccentLevel[lane], 0.0f, 12.0f) : 0.0f;
+         mAudioNode->PushLaneAccentGain(lane, std::pow(10.0f, db / 20.0f));
+         mLastLaneAccentLevel[lane] = laneAccentLevel[lane];
+      }
 
       if (mFirstCook || laneMute[lane] != mLastLaneMute[lane] || laneSolo[lane] != mLastLaneSolo[lane] ||
           laneChoke[lane] != mLastLaneChoke[lane])
@@ -695,6 +716,7 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
       }
    }
    v.Int("rate", rate);
+   v.Int("rateFix", rateFix); // not a control: 0 = plays samples at the device rate (saved before the fix)
    v.Int("steps", numSteps);
    v.Float("swing", swing);
    v.Float("volume", volume);
@@ -708,6 +730,8 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
    {
       snprintf(name, sizeof(name), "lane%d_accentPitch", lane);
       v.Float(name, laneAccentPitch[lane]);
+      snprintf(name, sizeof(name), "lane%d_accentLevel", lane);
+      v.Float(name, laneAccentLevel[lane]);
    }
    v.Text("patternName", patternName);
    v.Int("patternPart", patternPart);

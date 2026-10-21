@@ -109,6 +109,30 @@
          return filter->Def().inputs;
       if (dynamic_cast<FitNode*>(gn.node.get()) != nullptr)
          return 1;
+      // Turbo 0.60: ported from upstream
+      if (dynamic_cast<OpticalFlowNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<TimeMachineNode*>(gn.node.get()) != nullptr)
+         return 2; // slot 0 is the image, slot 1 the delay map
+      if (dynamic_cast<FluidNode*>(gn.node.get()) != nullptr)
+         return 3; // image (the dye), force, obstacles
+      if (dynamic_cast<VolumeNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<NdiOutNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<PredictiveColoringNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<RigidBodyNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<ProximityLinesNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (dynamic_cast<SweepNode*>(gn.node.get()) != nullptr)
+         return 2;
+      if (dynamic_cast<RevolveNode*>(gn.node.get()) != nullptr)
+         return 1;
+      if (auto* fx = dynamic_cast<AudioEffectNode*>(gn.node.get()))
+         if (fx->Def().hasGeometryInput)
+            return 2; // audio (slot 0) + shape (slot 1), Shape Resonator
       if (dynamic_cast<FormulaNode*>(gn.node.get()) != nullptr)
          return FormulaNode::kInputs;
       if (dynamic_cast<SendImageNode*>(gn.node.get()) != nullptr ||
@@ -267,6 +291,18 @@
       }
       if (auto* fit = dynamic_cast<FitNode*>(gn.node.get()))
          return slot == 0 ? &fit->Input() : nullptr;
+      if (auto* flow = dynamic_cast<OpticalFlowNode*>(gn.node.get()))
+         return slot == 0 ? &flow->Input() : nullptr;
+      if (auto* tm = dynamic_cast<TimeMachineNode*>(gn.node.get()))
+         return slot == 0 ? &tm->Input() : (slot == 1 ? &tm->DelayMap() : nullptr);
+      if (auto* fluid = dynamic_cast<FluidNode*>(gn.node.get()))
+         return slot == 0 ? &fluid->Input() : (slot == 1 ? &fluid->Force() : (slot == 2 ? &fluid->Obstacles() : nullptr));
+      if (auto* vol = dynamic_cast<VolumeNode*>(gn.node.get()))
+         return slot == 0 ? &vol->Input() : nullptr;
+      if (auto* ndiOut = dynamic_cast<NdiOutNode*>(gn.node.get()))
+         return slot == 0 ? &ndiOut->Input() : nullptr;
+      if (auto* pc = dynamic_cast<PredictiveColoringNode*>(gn.node.get()))
+         return slot == 0 ? &pc->Input() : nullptr;
       if (auto* formula = dynamic_cast<FormulaNode*>(gn.node.get()))
          return (slot >= 0 && slot < FormulaNode::kInputs) ? &formula->Input(slot) : nullptr;
       if (auto* sendImage = dynamic_cast<SendImageNode*>(gn.node.get()))
@@ -623,6 +659,42 @@
    // actually form one - this exists for P3, where a Delay-shaped effect
    // node could otherwise wire one in without any test catching it until the
    // sort hangs at connect time instead of failing loudly.
+   // Turbo 0.60: the geometry graph has no delay stage either - a mesh pulled
+   // through Join -> Transform -> Join recursed until the stack ran out (a
+   // patch could load one; nothing refused it). Same walk as below, over the
+   // geometry pins: does anything downstream of dst already feed src?
+   bool WouldCreateGeometryCycle(INode* src, INode* dst)
+   {
+      if (src == dst)
+         return true;
+      std::vector<INode*> stack{ dst };
+      std::set<INode*> visited;
+      while (!stack.empty())
+      {
+         INode* cur = stack.back();
+         stack.pop_back();
+         if (!visited.insert(cur).second)
+            continue;
+         auto* curGeo = dynamic_cast<IGeometrySource*>(cur);
+         if (curGeo == nullptr)
+            continue;
+         for (GraphNode& gn : gNodes)
+         {
+            for (int slot = 0; slot < 64; slot++)
+            {
+               IGeometrySource** in = gn.node->GeometryInputSlot(slot);
+               if (in != nullptr && *in == curGeo)
+               {
+                  if (gn.node.get() == src)
+                     return true;
+                  stack.push_back(gn.node.get());
+               }
+            }
+         }
+      }
+      return false;
+   }
+
    bool WouldCreateAudioCycle(INode* src, INode* dst)
    {
       if (src == dst)
@@ -739,6 +811,13 @@
       if (srcIsNoteSource && WouldCreateNoteCycle(srcNode->node.get(), dstNode->node.get()))
       {
          outError = "would create a note feedback loop";
+         return false;
+      }
+      if (dynamic_cast<IGeometrySource*>(srcNode->node.get()) != nullptr &&
+          dstNode->node->GeometryInputSlot(dstSlot) != nullptr &&
+          WouldCreateGeometryCycle(srcNode->node.get(), dstNode->node.get()))
+      {
+         outError = "would create a geometry loop";
          return false;
       }
 
@@ -976,6 +1055,8 @@
          slicer->ReloadFromPath();
       if (auto* molder = dynamic_cast<MolderNode*>(node))
          molder->ReloadFromPath();
+      if (auto* partials = dynamic_cast<PartialsNode*>(node)) // Turbo 0.60 (upstream)
+         partials->ReloadFromPath();
       if (auto* gm = dynamic_cast<GrainMolderNode*>(node))
          gm->ReloadFromPath();
       if (auto* paul = dynamic_cast<PaulStretchNode*>(node))
@@ -1016,6 +1097,7 @@
    {
       std::vector<std::pair<std::string, std::string>> params;
       Patch::SaveParams(srcNode, params);
+      dstNode->BeforeLoadParams(); // Turbo 0.60 (upstream)
       Patch::LoadParams(dstNode, params);
       ReloadDerivedState(dstNode);
    }

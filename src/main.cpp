@@ -59,6 +59,7 @@
 #include "core/ExprGlobals.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
+#include "core/PatchSchema.h" // Turbo 0.60: upstream named-ref patches
 #include "core/NodeViewport.h"
 #include "core/AudioCable.h"
 #include "core/NoteCable.h"
@@ -87,7 +88,10 @@
 #include "nodes/ResynthNode.h"
 #include "nodes/MacroNodes.h"
 #include "nodes/ScenesNode.h" // Turbo 0.50
-#include "nodes/DriftNode.h"
+#include "nodes/PredictionNodes.h" // Turbo 0.60: upstream Drift / Moves
+#include "nodes/PredictiveModulatorNode.h"
+#include "core/MovementLog.h"
+#include "core/MovementStats.h"
 #include "nodes/SlideshowNode.h"
 #include "nodes/AudioMeterNode.h"
 #include "nodes/UINodes.h"
@@ -188,6 +192,25 @@ static const char* kTurboBuildDate = __DATE__ " " __TIME__;
 #include "nodes/LayoutNode.h"
 #include "nodes/VmpcNode.h"
 #include "nodes/ClipMatrixNode.h"
+// Turbo 0.60: nodes ported from upstream (Naman) after v0.6
+#include "nodes/TimeMachineNode.h"
+#include "nodes/OpticalFlowNode.h"
+#include "nodes/FluidNode.h"
+#include "nodes/VolumeNode.h"
+#include "nodes/NdiInNode.h"
+#include "nodes/NdiOutNode.h"
+#include "nodes/SweepRevolveNodes.h"
+#include "nodes/LSystemNode.h"
+#include "nodes/ProximityLinesNode.h"
+#include "nodes/RigidBodyNode.h"
+#include "nodes/FMNode.h"
+#include "nodes/StringNode.h"
+#include "nodes/PartialsNode.h"
+#include "platform/ndi/NdiRuntime.h"
+#include "nodes/PredictiveColoringNode.h"
+#include "audio/dsp/SaturatorKernel.h"
+#include "audio/dsp/ShapeResonatorKernel.h"
+#include "audio/dsp/ConvolutionKernel.h"
 #include "core/MidiMap.h"
 #include "audio/SampleScanner.h"
 #include "audio/PluginScanner.h"
@@ -246,6 +269,7 @@ namespace
    #include "app/bodies/Macros.inl" // macro and UI control node bodies
    #include "app/ui/AudioLayout.inl" // audio node body layout (v3), columns, waveform view
    #include "app/bodies/AudioSources.inl" // sampler, oscillators, wavetable, synths, meters, gain
+   #include "app/ui/UpstreamCompat.inl" // Turbo 0.60: upstream UI helpers the ported bodies call
    #include "app/bodies/DrumSequencer.inl" // Drum Sequencer and bundled pattern packs
    #include "app/ui/Library.inl" // sample / media library and plugin browser panels
    #include "app/bodies/NotesAndMix.inl" // audio in, mixer and note processing node bodies
@@ -255,10 +279,13 @@ namespace
    #include "app/bodies/AudioBody.inl" // DrawAudioNodeBody: the audio body dispatcher
    #include "app/bodies/SceneParams.inl" // media, geometry, 3D, material, blend and filter params
    #include "app/bodies/PopParams.inl" // the PointZ family's generic parameter body
+   #include "app/bodies/PredictionParams.inl" // Turbo 0.60: upstream Drift / Moves / Predictive Modulator
+   #include "app/bodies/PortedParams.inl" // Turbo 0.60: bodies of the nodes ported from upstream
    #include "app/ui/Preview.inl" // previews, comments, groups, mini viewport, viewport panel
    #include "app/ui/Mapping.inl" // colour tags, MIDI mapping and modulation range editors
    #include "app/ui/Help.inl" // node help texts and the help window
    #include "app/graph/AudioGraph.inl" // audio topology, engine start, scene settings, device recovery
+   #include "app/graph/PatchNames.inl" // Turbo 0.60: upstream patches with names, keys, lo/hi
    #include "app/graph/PatchIO.inl" // patch save / load / autosave / recovery, undo
    #include "app/graph/Rpc.inl" // MCP remote control (RPC) helpers
    #include "app/ui/AppWindows.inl" // minimap, save prompts, window title, projector windows
@@ -269,6 +296,7 @@ namespace
 
 #include "app/selftest/DspFixtures.inl" // audio node sweep discovery and the INFINITE_DSPTEST fixtures
 #include "app/selftest/EngineTests.inl" // PDC, param sweep and plugin scan tests
+#include "app/selftest/VoiceModFixture.inl" // Turbo 0.60: upstream per-voice modulation fixture
 
 int main(int argc, char** argv)
 {
