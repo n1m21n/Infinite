@@ -1,0 +1,17 @@
+infinite-patch 1
+rev 2
+# OSC Send: a starting patch for the OSC Send node
+node 1 Utility OSC Send
+  id node
+  pos 520 300
+end
+node 2 Modulators LFO
+  id lfo0
+  pos 0 300
+end
+node 3 Utility Output
+  id out
+  pos 1080 300
+end
+mod node port lfo0 0 0 1 0.5
+cable out 0 node

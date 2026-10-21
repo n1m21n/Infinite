@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# Camera: a starting patch for the Camera node
+node 1 3D Camera
+  id node
+  pos 520 300
+end
+node 2 3D Cube
+  id box
+  pos 1080 100
+end
+node 3 3D Render 3D
+  id view
+  pos 1080 300
+end
+node 4 Utility Output
+  id out
+  pos 1640 300
+end
+geo view 0 box
+geo view 4 node
+cable out 0 view

@@ -3,11 +3,11 @@
   var root = document.querySelector('[data-nodedeck]');
   if (!root || !window.InfiniteDeck) return;
   var grid = root.querySelector('.nd-grid'), cards = Array.prototype.slice.call(grid.children);
-  var t = root.querySelector('.nd-t'), d = root.querySelector('.nd-d');
+  var t = root.querySelector('.nd-t'), d = root.querySelector('.nd-d'), go = root.querySelector('.nd-go');
   var deck = InfiniteDeck.create({
     stage: root, grid: grid, cardSel: '.nd-card', mode: 'fan', keys: false,
     getCards: function () { return cards; },
-    onChange: function (i) { var c = cards[i]; if (!c) return; t.textContent = c.getAttribute('data-title'); d.textContent = c.getAttribute('data-desc'); }
+    onChange: function (i) { var c = cards[i]; if (!c) return; t.textContent = c.getAttribute('data-title'); d.textContent = c.getAttribute('data-desc'); var n = c.getAttribute('data-node'), h = n ? 'nodes/' + n + '.html' : 'nodes/'; t.href = h; go.href = h; }
   });
   deck.refresh(false);
   root.querySelectorAll('[data-nd]').forEach(function (b) { b.addEventListener('click', function () { deck.step(+b.getAttribute('data-nd')); }); });

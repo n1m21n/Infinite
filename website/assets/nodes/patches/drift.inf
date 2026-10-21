@@ -1,0 +1,12 @@
+infinite-patch 1
+rev 2
+# Drift: a starting patch for the Drift node
+node 1 Prediction Drift
+  id node
+  pos 520 300
+end
+node 2 Prediction Predictive Modulator
+  id guess
+  pos 1080 300
+end
+mod guess constantIn node 0 0 1 0.5

@@ -1,0 +1,12 @@
+infinite-patch 1
+rev 2
+# Moves: a starting patch for the Moves node
+node 1 Prediction Moves
+  id node
+  pos 520 300
+end
+node 2 Prediction Predictive Modulator
+  id guess
+  pos 1080 300
+end
+mod guess constantIn node 0 0 1 0.5

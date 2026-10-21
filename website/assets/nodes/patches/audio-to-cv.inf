@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# Audio to CV: a starting patch for the Audio to CV node
+node 1 Modulators Audio to CV
+  id node
+  pos 520 300
+end
+node 2 Synths Oscillator
+  id in0
+  pos 0 300
+end
+node 3 Source Shape
+  id shape
+  pos 1080 300
+end
+node 4 Utility Output
+  id out
+  pos 1640 300
+end
+aud node 0 in0
+mod shape sizeX node 0 0 0.6 0.5
+cable out 0 shape

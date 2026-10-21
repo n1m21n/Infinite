@@ -124,7 +124,7 @@ def main_html():
         <div class="ph-caps">{caps}</div>
         <span class="ph-lobe ph-lobe-a" aria-hidden="true">structure</span><span class="ph-lobe ph-lobe-b" aria-hidden="true">you</span>
         <nav class="ph-nav" aria-label="Chapters">{nav}</nav>
-        <div class="ph-end"><a class="btn btn-primary ph-dl" href="index.html#setup">Download</a></div>
+        <div class="ph-end"><a class="btn btn-primary ph-dl" href="index.html#download">Download</a></div>
         <span class="ph-hint" aria-hidden="true">{ga.icon("chevron-down")}</span>
       </div>
     </section>

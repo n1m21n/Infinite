@@ -1,0 +1,17 @@
+infinite-patch 1
+rev 2
+# Ring Mod: a starting patch for the Ring Mod node
+node 1 AudioEffects Ring Mod
+  id node
+  pos 520 300
+end
+node 2 Synths Oscillator
+  id in0
+  pos 0 300
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1080 300
+end
+aud node 0 in0
+aud speakers 0 node

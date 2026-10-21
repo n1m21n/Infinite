@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# Slicer: a starting patch for the Slicer node
+node 1 Synths Slicer
+  id node
+  pos 520 300
+end
+node 2 Notes Random Note Generator
+  id in0
+  pos 0 220
+end
+node 3 Synths Oscillator
+  id in1
+  pos 0 510
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1080 300
+end
+note node 0 in0
+aud node 1 in1
+aud speakers 0 node

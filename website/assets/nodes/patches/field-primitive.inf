@@ -1,0 +1,17 @@
+infinite-patch 1
+rev 2
+# Field Primitive: a starting patch for the Field Primitive node
+node 1 3D Field Primitive
+  id node
+  pos 520 300
+end
+node 2 3D Render 3D
+  id view
+  pos 1080 300
+end
+node 3 Utility Output
+  id out
+  pos 1640 300
+end
+geo view 0 node
+cable out 0 view

@@ -1,0 +1,17 @@
+infinite-patch 1
+rev 2
+# Random Note Generator: a starting patch for the Random Note Generator node
+node 1 Notes Random Note Generator
+  id node
+  pos 520 300
+end
+node 2 Synths Analog
+  id voice
+  pos 1080 300
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1640 300
+end
+note voice 0 node
+aud speakers 0 voice

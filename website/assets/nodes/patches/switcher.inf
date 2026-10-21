@@ -1,0 +1,32 @@
+infinite-patch 1
+rev 2
+# Switcher: a starting patch for the Switcher node
+node 1 Compositing Switcher
+  id node
+  pos 520 300
+end
+node 2 Source Ramp
+  id in0
+  pos 0 220
+end
+node 3 Source Ramp
+  id in1
+  pos 0 510
+end
+node 4 Source Ramp
+  id in2
+  pos 0 800
+end
+node 5 Source Ramp
+  id in3
+  pos 0 1090
+end
+node 6 Utility Output
+  id out
+  pos 1080 300
+end
+cable node 0 in0
+cable node 1 in1
+cable node 2 in2
+cable node 3 in3
+cable out 0 node

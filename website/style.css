@@ -948,8 +948,8 @@ p.mono { font-size: 0.84375rem; }
 
 /* Instruments: the 3D Wavetable patch (film render) floats across the stage. The panel shape is there before the image loads, and only transforms move (GPU, no layout), so it never looks like it is loading. */
 .wt-stage { --wt-h: clamp(260px, 30vw, 440px); --wt-w: calc(var(--wt-h) * 0.9 * 1802 / 744); height: var(--wt-h); perspective: 1600px; position: relative; }
-.wt-drift { position: absolute; top: 5%; left: 50%; height: 90%; width: var(--wt-w); margin-left: calc(var(--wt-w) / -2); transform-style: preserve-3d; animation: wt-drift-x 22s ease-in-out infinite alternate, wt-drift-y 7s ease-in-out infinite alternate; will-change: transform; }
-.wt-body { position: absolute; inset: 0; transform-style: preserve-3d; animation: wt-turn 13s ease-in-out infinite alternate; }
+.wt-drift { position: absolute; top: 5%; left: 50%; height: 90%; width: var(--wt-w); margin-left: calc(var(--wt-w) / -2); transform-style: preserve-3d; animation: wt-drift-x 9s ease-in-out infinite alternate, wt-drift-y 2.6s ease-in-out infinite alternate; will-change: transform; }
+.wt-body { position: absolute; inset: 0; transform-style: preserve-3d; animation: wt-turn 5.5s ease-in-out infinite alternate; }
 .wt-face { display: block; width: 100%; height: 100%; opacity: 0; transition: opacity var(--dur-large, 500ms) ease; filter: drop-shadow(0 18px 24px rgb(0 0 0 / 0.35)); }
 .wt-face.in { opacity: 1; }
 @keyframes wt-drift-x { from { translate: -9vw 0; } to { translate: 9vw 0; } }
@@ -957,3 +957,16 @@ p.mono { font-size: 0.84375rem; }
 @keyframes wt-turn { from { transform: rotateY(-9deg) rotateX(3deg) rotateZ(-0.6deg); } to { transform: rotateY(9deg) rotateX(-2deg) rotateZ(0.6deg); } }
 @media (max-width: 680px) { @keyframes wt-drift-x { from { translate: -28vw 0; } to { translate: 28vw 0; } } }
 @media (prefers-reduced-motion: reduce) { .wt-drift, .wt-body { animation: none; } }
+
+/* phone: the chain of node cards is just the pictures (no captions, cables or ports) and the one-time launch steps are left to the desktop */
+@media (max-width: 680px) {
+  #chain .hand-cap, #chain .node-foot, #chain .port, .chain-cables { display: none; }
+  #setup { display: none; }
+}
+
+.modal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.modal-actions .modal-doc-link { margin-top: 0; }
+.modal-quiet { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 18px 0 14px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink); text-decoration: none; font-weight: 600; font-size: 0.8438rem; box-shadow: var(--shadow-1); }
+.modal-quiet[hidden] { display: none; }
+.modal-quiet .ic { width: 18px; height: 18px; }
+@media (max-width: 680px) { .modal-quiet { min-height: 44px; } }

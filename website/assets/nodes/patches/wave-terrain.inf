@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# Wave Terrain: a starting patch for the Wave Terrain node
+node 1 Synths Wave Terrain
+  id node
+  pos 520 300
+end
+node 2 Source Ramp
+  id in0
+  pos 0 220
+end
+node 3 Notes Random Note Generator
+  id in1
+  pos 0 510
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1080 300
+end
+cable node 0 in0
+note node 1 in1
+aud speakers 0 node

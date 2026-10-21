@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# Palette: a starting patch for the Palette node
+node 1 Modulators Palette
+  id node
+  pos 520 300
+end
+node 2 Source Ramp
+  id in0
+  pos 0 300
+end
+node 3 Source Shape
+  id shape
+  pos 1080 300
+end
+node 4 Utility Output
+  id out
+  pos 1640 300
+end
+cable node 0 in0
+pal shape 0 node 0
+cable out 0 shape

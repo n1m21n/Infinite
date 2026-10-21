@@ -11,7 +11,7 @@ Exit codes: 0 written.
 """
 import datetime, html, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import gen_embeds
+import gen_embeds, gen_nodes
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 W = os.path.join(ROOT, "website")
 BASE = "https://infinitedevices.org/"
@@ -153,7 +153,7 @@ def main():
     embed_pages = [("embeds/" + i["slug"] + ".html", 0.7) for i in json.load(open(os.path.join(W, "embeds/embeds.json")))["items"]]
     pages = [("", 1.0), ("library.html", 0.8)] + blog_pages + embed_pages + [("developers.html", 0.7), ("philosophy.html", 0.7), ("artists.html", 0.7), ("musicians.html", 0.7), ("vjs.html", 0.7), ("creative-coders.html", 0.7), ("embeds/", 0.8), ("extensions.html", 0.6), ("benchmarks.html", 0.7), ("artworks.html", 0.6), ("assets/library/catalog.json", 0.3), ("assets/benchmarks.json", 0.3)]
     open(os.path.join(W, "sitemap.xml"), "w").write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-        "".join(f"  <url><loc>{BASE}{u}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>\n" for u, pr in pages + [(f"library/{i['id']}.html", 0.5) for i in its]) + "</urlset>\n")
+        "".join(f"  <url><loc>{BASE}{u}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>\n" for u, pr in pages + [(f"library/{i['id']}.html", 0.5) for i in its] + [(u, 0.8 if u == "nodes/" else 0.5) for u in gen_nodes.sitemap_paths()]) + "</urlset>\n")
     open(os.path.join(W, "robots.txt"), "w").write(
         "# Everyone is welcome, search engines and AI agents included.\nUser-agent: *\nAllow: /\n\n" +
         "".join(f"User-agent: {b}\nAllow: /\n\n" for b in ("GPTBot", "ChatGPT-User", "OAI-SearchBot", "ClaudeBot", "Claude-User", "Claude-SearchBot", "PerplexityBot", "Google-Extended", "Applebot-Extended", "Applebot", "CCBot", "Amazonbot", "Meta-ExternalAgent", "meta-externalagent", "cohere-ai", "DuckAssistBot", "Bytespider", "YouBot", "MistralAI-User", "Perplexity-User", "Googlebot", "Bingbot")) +
@@ -177,6 +177,7 @@ def main():
          f"- [Developers]({BASE}developers.html): headless command line, Python SDK and the nine MCP tools, with what each needs",
          f"- [Philosophy]({BASE}philosophy.html): why Infinite is a node graph, how it protects flow state, how machines should work with people, and its design principles",
          f"- [Infinite for artists]({BASE}artists.html), [musicians]({BASE}musicians.html), [VJs]({BASE}vjs.html), [creative coders]({BASE}creative-coders.html): one page per audience with starting patches",
+         f"- [Nodes]({BASE}nodes/): every node in the palette, one page each with its inputs, outputs, controls and a downloadable patch",
          f"- [Embeds]({BASE}embeds/): audio-reactive WebGL visuals to put on any page with one iframe",
          "- [Download](https://github.com/n1m21n/Infinite/releases/latest): installers for macOS, Windows and Linux",
          "- [Source code](https://github.com/n1m21n/Infinite): MIT licensed",
@@ -187,6 +188,7 @@ def main():
          "- `.field`: a Field device (a small program for a Field node). Import it into a Field Pixel node, or copy its code.", ""]
     for c, v in byc.items():
         L += [f"## Library: {c}", ""] + [f"- [{i['name']}]({i['page']}): {i['description']} (file: {i['file']})" for i in v] + [""]
+    L += ["## Nodes", ""] + gen_nodes.llms_lines() + [""]
     emb = json.load(open(os.path.join(W, "embeds/embeds.json")))["items"]
     L += ["## Embeds", "", f"- [Embed gallery]({BASE}embeds/): {len(emb)} live audio-reactive WebGL visuals, each with a copy-paste iframe"] + \
          [f"- [{i['title']}]({BASE}embeds/{i['slug']}.html): {i['description']}" for i in emb] + [""]

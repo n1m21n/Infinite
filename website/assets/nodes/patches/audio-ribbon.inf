@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# Audio Ribbon: a starting patch for the Audio Ribbon node
+node 1 3D Audio Ribbon
+  id node
+  pos 520 300
+end
+node 2 Synths Oscillator
+  id in0
+  pos 0 300
+end
+node 3 3D Render 3D
+  id view
+  pos 1080 300
+end
+node 4 Utility Output
+  id out
+  pos 1640 300
+end
+aud node 0 in0
+geo view 0 node
+cable out 0 view

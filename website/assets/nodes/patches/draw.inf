@@ -1,0 +1,17 @@
+infinite-patch 1
+rev 2
+# Draw: a starting patch for the Draw node
+node 1 Source Draw
+  id node
+  pos 520 300
+end
+node 2 Source Ramp
+  id in0
+  pos 0 300
+end
+node 3 Utility Output
+  id out
+  pos 1080 300
+end
+cable node 0 in0
+cable out 0 node

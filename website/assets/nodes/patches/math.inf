@@ -1,0 +1,27 @@
+infinite-patch 1
+rev 2
+# Math: a starting patch for the Math node
+node 1 Modulators Math
+  id node
+  pos 520 300
+end
+node 2 Modulators LFO
+  id lfo0
+  pos 0 220
+end
+node 3 Modulators LFO
+  id lfo1
+  pos 0 510
+end
+node 4 Source Shape
+  id shape
+  pos 1080 300
+end
+node 5 Utility Output
+  id out
+  pos 1640 300
+end
+mod node constantA lfo0 0 0 1 0.5
+mod node constantA lfo1 0 0 1 0.5
+mod shape sizeX node 0 0 0.6 0.5
+cable out 0 shape

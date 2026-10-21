@@ -1,0 +1,32 @@
+infinite-patch 1
+rev 2
+# Render 3D: a starting patch for the Render 3D node
+node 1 3D Render 3D
+  id node
+  pos 520 300
+end
+node 2 3D Cube
+  id in0
+  pos 0 220
+end
+node 3 3D Cube
+  id in1
+  pos 0 510
+end
+node 4 3D Cube
+  id in2
+  pos 0 800
+end
+node 5 3D Cube
+  id in3
+  pos 0 1090
+end
+node 6 Utility Output
+  id out
+  pos 1080 300
+end
+geo node 0 in0
+geo node 1 in1
+geo node 2 in2
+geo node 3 in3
+cable out 0 node

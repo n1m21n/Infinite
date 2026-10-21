@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# CV Recorder: a starting patch for the CV Recorder node
+node 1 Modulators CV Recorder
+  id node
+  pos 520 300
+end
+node 2 Modulators LFO
+  id lfo0
+  pos 0 300
+end
+node 3 Source Shape
+  id shape
+  pos 1080 300
+end
+node 4 Utility Output
+  id out
+  pos 1640 300
+end
+mod node constantIn lfo0 0 0 1 0.5
+mod shape sizeX node 0 0 0.6 0.5
+cable out 0 shape

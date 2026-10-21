@@ -6,9 +6,10 @@
   var script = document.currentScript || document.querySelector('script[src*="search.js"]');
   var ROOT = script ? new URL('.', script.src).href : new URL('./', location.href).href;
   var VER = script && /v=([^&]+)/.exec(script.src) ? RegExp.$1 : '1';
-  var KINDS = ['All', 'Blog', 'Library', 'Embed', 'Doc', 'Code', 'Page'];
-  var KIND_LABEL = { All: 'All', Blog: 'Blog', Library: 'Library', Embed: 'Embeds', Doc: 'PDFs', Code: 'Code', Page: 'Pages' };
+  var KINDS = ['All', 'Node', 'Blog', 'Library', 'Embed', 'Doc', 'Code', 'Page'];
+  var KIND_LABEL = { All: 'All', Node: 'Nodes', Blog: 'Blog', Library: 'Library', Embed: 'Embeds', Doc: 'PDFs', Code: 'Code', Page: 'Pages' };
   var ICON = {
+    Node: '<path d="M12 3.2 19.2 7.4v8.4L12 20 4.8 15.8V7.4Z"/><path d="M4.8 7.4 12 11.6l7.2-4.2M12 11.6V20"/>',
     Blog: '<path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3Z"/>',
     Library: '<rect x="4" y="4" width="4" height="16" rx="1.2"/><rect x="10" y="4" width="4" height="16" rx="1.2"/><path d="m16 5.5 3-.8 3 13.3-3 .8Z"/>',
     Embed: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>',
@@ -179,18 +180,18 @@
     last = document.activeElement;
     dlg.setAttribute('data-open', ''); document.documentElement.style.overflow = 'hidden';
     kind = 'All'; update(); input.focus(); input.select();
-    document.querySelectorAll('.search-btn').forEach(function (b) { b.setAttribute('aria-expanded', 'true'); });
+    document.querySelectorAll('.search-btn, [data-search]').forEach(function (b) { b.setAttribute('aria-expanded', 'true'); });
     load().then(update);
   }
   function close() {
     if (!dlg || !dlg.hasAttribute('data-open')) return;
     dlg.removeAttribute('data-open'); document.documentElement.style.overflow = '';
-    document.querySelectorAll('.search-btn').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+    document.querySelectorAll('.search-btn, [data-search]').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
     if (last && last.focus) last.focus();
   }
 
   function wire() {
-    document.querySelectorAll('.search-btn').forEach(function (b) {
+    document.querySelectorAll('.search-btn, [data-search]').forEach(function (b) {
       b.addEventListener('click', open);
       ['pointerenter', 'focus'].forEach(function (n) { b.addEventListener(n, load, { once: true }); });   // warm the index before the click
     });

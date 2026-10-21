@@ -1,0 +1,17 @@
+infinite-patch 1
+rev 2
+# Kaleidoscope: a starting patch for the Kaleidoscope node
+node 1 Effects kaleidoscope
+  id node
+  pos 520 300
+end
+node 2 Source Ramp
+  id in0
+  pos 0 300
+end
+node 3 Utility Output
+  id out
+  pos 1080 300
+end
+cable node 0 in0
+cable out 0 node

@@ -1,0 +1,37 @@
+infinite-patch 1
+rev 2
+# Note Merge: a starting patch for the Note Merge node
+node 1 Notes Note Merge
+  id node
+  pos 520 300
+end
+node 2 Notes Random Note Generator
+  id in0
+  pos 0 220
+end
+node 3 Notes Random Note Generator
+  id in1
+  pos 0 510
+end
+node 4 Notes Random Note Generator
+  id in2
+  pos 0 800
+end
+node 5 Notes Random Note Generator
+  id in3
+  pos 0 1090
+end
+node 6 Synths Analog
+  id voice
+  pos 1080 300
+end
+node 7 Utility Audio Out
+  id speakers
+  pos 1640 300
+end
+note node 0 in0
+note node 1 in1
+note node 2 in2
+note node 3 in3
+note voice 0 node
+aud speakers 0 voice

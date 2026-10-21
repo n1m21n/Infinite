@@ -1,0 +1,43 @@
+/* Node pages (website/nodes/*) and the node index. Built by tools/website/gen_nodes.py. Tokens only. */
+.np-cat { color: var(--cat, var(--ink2)); }
+.np-cat::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--cat, var(--ink2)); }
+.np-shot { margin: var(--web-stack-xl, 24px) 0; padding: var(--web-card-pad-lg, 24px); display: grid; place-items: center; border-radius: var(--web-card-radius, 24px); background: var(--nm-down); box-shadow: var(--nm-pocket); }
+.np-shot img { display: block; width: auto; height: auto; max-width: 100%; max-height: 440px; border-radius: var(--web-media-radius, 12px); }
+.np-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 0; }
+.np-step { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; background: var(--nm-up); box-shadow: var(--nm-raise); color: var(--ink); text-decoration: none; font-size: 0.875rem; font-weight: 600; }
+a.np-step:hover { transform: translateY(-1px); }
+.np-arrow { color: var(--ink2); }
+.np-io { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--web-gutter, 16px); }
+.np-io h3 { margin: 0 0 8px; }
+.np-ports { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.np-ports li { display: flex; align-items: center; gap: 10px; }
+.np-kind { display: inline-block; padding: 2px 10px; border-radius: 10px; background: var(--nm-up); box-shadow: var(--nm-raise); font: 500 0.75rem/1.5 var(--font-mono, ui-monospace, monospace); text-transform: capitalize; }
+.np-kind[data-kind="picture"] { color: var(--cat-source, #4ADE80); }
+.np-kind[data-kind="audio"] { color: var(--cat-audiofx, #53C7E3); }
+.np-kind[data-kind="notes"] { color: var(--cat-notes, #4CD964); }
+.np-kind[data-kind="control signal"] { color: var(--cat-mod, #A3E635); }
+.np-kind[data-kind="3D shape"] { color: var(--cat-3d, #38BDF8); }
+.np-table { overflow-x: auto; margin: 12px 0 0; border-radius: var(--web-card-radius, 24px); background: var(--nm-down); box-shadow: var(--nm-pocket); }
+.np-table table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.np-table th, .np-table td { padding: 10px 16px; text-align: left; vertical-align: top; }
+.np-table thead th { font: 500 0.75rem/1.4 var(--font-mono, ui-monospace, monospace); color: var(--ink2); text-transform: uppercase; letter-spacing: 0.08em; }
+.np-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.np-table tbody th { font-weight: 600; text-transform: capitalize; }
+.np-table td { color: var(--ink2); }
+.np-page pre { max-height: 420px; overflow: auto; }
+@media (max-width: 680px) { .np-io { grid-template-columns: 1fr; } .np-shot { padding: 16px; } .np-shot img { max-height: 320px; } }
+
+/* the index */
+.np-jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; }
+.np-chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; background: var(--nm-up); box-shadow: var(--nm-raise); color: var(--ink); text-decoration: none; font-size: 0.8125rem; font-weight: 600; }
+.np-chip:active, .np-step:active, .np-pill:active { box-shadow: var(--nm-pocket); }
+.np-sec { margin: var(--web-section-tight, 48px) 0 0; scroll-margin-top: 80px; }
+.np-sec h2 { display: flex; align-items: baseline; gap: 10px; }
+.np-sec h2::before { content: ""; align-self: center; width: 10px; height: 10px; border-radius: 50%; background: var(--cat); }
+.np-sec h2 small { color: var(--ink2); font-size: 0.75rem; }
+.np-sec p { color: var(--ink2); }
+.np-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.np-pill { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 999px; background: var(--nm-up); box-shadow: var(--nm-raise); color: var(--ink); text-decoration: none; font-size: 0.875rem; font-weight: 600; transition: transform 160ms ease; }
+.np-pill:hover { transform: translateY(-1px); }
+.np-pill:focus-visible, .np-chip:focus-visible, .np-step:focus-visible { outline: 0; box-shadow: var(--nm-raise), 0 0 0 2px var(--signal); }
+@media (prefers-reduced-motion: reduce) { .np-pill, a.np-step { transition: none; } .np-pill:hover, a.np-step:hover { transform: none; } }

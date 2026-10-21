@@ -1,0 +1,12 @@
+infinite-patch 1
+rev 2
+# Cross: a starting patch for the Cross node
+node 1 Source Cross
+  id node
+  pos 520 300
+end
+node 2 Utility Output
+  id out
+  pos 1080 300
+end
+cable out 0 node

@@ -1,0 +1,17 @@
+infinite-patch 1
+rev 2
+# Pattern: a starting patch for the Pattern node
+node 1 Modulators Pattern
+  id node
+  pos 520 300
+end
+node 2 Source Shape
+  id shape
+  pos 1080 300
+end
+node 3 Utility Output
+  id out
+  pos 1640 300
+end
+mod shape sizeX node 0 0 0.6 0.5
+cable out 0 shape

@@ -11,7 +11,7 @@ Usage: python3 tools/website/gen_audiences.py     then python3 tools/website/syn
        python3 tools/website/gen_audiences.py --check
 Exit codes: 0 written (or in sync), 1 differs under --check, 2 a linked page does not exist.
 """
-import html, json, os, sys
+import html, json, os, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sync_chrome as chrome
@@ -304,7 +304,7 @@ def main_html(a, rel):
           <h1 class="slab">{e(a["h1"])}</h1>
           <p class="lead">{e(a["lead"])}</p>
           <div class="aud-cta">
-            <a href="index.html#setup" class="btn btn-primary">Download Infinite</a>
+            <a href="index.html#download" class="btn btn-primary">Download Infinite</a>
             <a href="{a["extra"][0]}" class="btn btn-ghost">{e(a["extra"][1])}</a>
           </div>
           <ul class="facts">{facts}</ul>
@@ -456,14 +456,15 @@ def node_deck(a):
     """The Nodes section: a fan deck of zoomed node pictures. Swipe, drag, wheel, arrow keys or tap; it loops (website/nodedeck.js, engine deck.js)."""
     from PIL import Image
     cards = []
+    nodes = {re.sub(r"[^a-z0-9]", "", k.lower()): v["s"] for k, v in json.load(open(os.path.join(W, "assets", "nodes", "index.json")))["nodes"].items()}
     for i, (f, t, d, c) in enumerate(NODE_DECK[a["slug"]]):
         im = Image.open(os.path.join(W, "assets", "nodes", "hd", f + ".webp"))
         src = f"assets/nodes/hd/{f}.webp"
         img = f'src="{src}"' if i < 5 else f'data-src="{src}"'
-        cards.append(f'<figure class="nd-card" data-title="{e(t)}" data-desc="{e(d)}" style="--cat:{CAT.get(c, "#818CF8")}"><span class="nd-cat">{e(c)}</span><img {img} alt="{e(t)} node: {e(d)}" width="{im.size[0]}" height="{im.size[1]}" decoding="async" draggable="false"></figure>')
+        cards.append(f'<figure class="nd-card" data-title="{e(t)}" data-desc="{e(d)}" data-node="{nodes.get(re.sub("[^a-z0-9]", "", f.lower()), "")}" style="--cat:{CAT.get(c, "#818CF8")}"><span class="nd-cat">{e(c)}</span><img {img} alt="{e(t)} node: {e(d)}" width="{im.size[0]}" height="{im.size[1]}" decoding="async" draggable="false"></figure>')
     return (f'<div class="nd" data-nodedeck><div class="nd-grid" tabindex="0" aria-roledescription="carousel" aria-label="Nodes. Swipe or use the arrow keys.">{"".join(cards)}</div>'
             f'<div class="nd-hud"><button type="button" class="nd-btn" data-nd="-1" aria-label="Previous node"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5"/></svg></button>'
-            f'<div class="nd-info" aria-live="polite"><b class="nd-t"></b><span class="nd-d"></span></div>'
+            f'<div class="nd-info" aria-live="polite"><a class="nd-t" href="nodes/"></a><span class="nd-d"></span><a class="nd-go" href="nodes/">Node page and patch</a></div>'
             f'<button type="button" class="nd-btn" data-nd="1" aria-label="Next node"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5"/></svg></button></div></div>')
 
 
@@ -512,7 +513,7 @@ def artists_main(a, rel, hero="blob"):
           <div class="ax-low">
             <div class="ax-bubs" role="tablist" aria-label="What you can do">{bubbles}</div>
             <div class="ax-cta">
-              <a href="index.html#setup" class="btn btn-primary">Download</a>
+              <a href="index.html#download" class="btn btn-primary">Download</a>
               <a href="{a["extra"][0]}" class="ax-ghost" aria-label="{e(a["extra"][1])}">{icon(ghost[1])}<span>{ghost[0]}</span></a>
             </div>
           </div>
@@ -570,7 +571,7 @@ def dev_main(a, rel):
         <p class="lead">{e(a["lead"])}</p>
         <div class="dv-cmd"><code>npx -y infinite-engine init</code>{COPY_BTN % ' data-copy="npx -y infinite-engine init"'}</div>
         <ul class="facts">{facts}</ul>
-        <div class="aud-cta"><a href="index.html#setup" class="btn btn-primary">Download Infinite</a><a href="{a["extra"][0]}" class="btn btn-ghost">{e(a["extra"][1])}</a></div>
+        <div class="aud-cta"><a href="index.html#download" class="btn btn-primary">Download Infinite</a><a href="{a["extra"][0]}" class="btn btn-ghost">{e(a["extra"][1])}</a></div>
       </div>
     </section>
     <div class="container dv-grid">

@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# Merge by Distance: a starting patch for the Merge by Distance node
+node 1 3D Merge by Distance
+  id node
+  pos 520 300
+end
+node 2 3D Cube
+  id in0
+  pos 0 300
+end
+node 3 3D Render 3D
+  id view
+  pos 1080 300
+end
+node 4 Utility Output
+  id out
+  pos 1640 300
+end
+geo node 0 in0
+geo view 0 node
+cable out 0 view

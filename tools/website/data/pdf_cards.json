@@ -1,0 +1,142 @@
+{
+ "unsharpmask": {
+  "chapter": "2D Image Effects — Blur, Warp & Glow",
+  "desc": "Sharpens the image by comparing it to a blurred version of itself and boosting the difference, controlled by Amount and Radius."
+ },
+ "pixelate": {
+  "chapter": "2D Image Effects — Blur, Warp & Glow",
+  "desc": "Blocks the image into large flat squares to create a chunky, mosaic look, sized by Block Size."
+ },
+ "addnoise": {
+  "chapter": "2D Image Effects — Blur, Warp & Glow",
+  "desc": "Sprinkles random per-pixel grain onto the image, with Amount controlling how strong the speckling is."
+ },
+ "vignette": {
+  "chapter": "2D Image Effects — Blur, Warp & Glow",
+  "desc": "Darkens the corners and edges around a center point, with Amount for strength and Radius/Softness for how far the darkening spreads."
+ },
+ "transform": {
+  "chapter": "2D Image Effects — Blur, Warp & Glow",
+  "desc": "Moves, scales, and rotates the whole image using Translate, Scale, and Rotation controls, leaving anything pushed outside the frame transparent."
+ },
+ "lensdistortion": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Bulges or pinches the image like a camera lens and fringes the edges with color, controlled by Barrel curvature and Chromatic Aberration amount."
+ },
+ "displace": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Pushes pixels sideways using either a second connected image as a displacement map or, with nothing plugged in, an animated wavy pattern."
+ },
+ "liquify": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Warps the image with a smooth, flowing animated distortion like moving liquid, shaped by Amount, Scale, and Speed."
+ },
+ "symmetry": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Mirrors one half of the image onto the other across a chosen axis and center point, with an option to flip the whole result."
+ },
+ "crop": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Trims the edges of the image by set Left/Right/Top/Bottom amounts, then either leaves the trimmed area transparent, zooms in to fill the frame, or fills it with a solid color."
+ },
+ "emboss": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Turns the image into a raised, carved-relief look by comparing pixels on either side of a light direction, with Amount and Angle controlling depth and lighting."
+ },
+ "convolve": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Runs a custom 3×3 grid of numbers over every pixel and its neighbors, letting you dial in blur, sharpen, edge, or emboss-style looks from nine kernel values."
+ },
+ "halftone": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Recreates the image using a grid of dots sized by brightness (like a newspaper print), with Scale controlling dot density."
+ },
+ "lookup": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "A related color-remap node that reads a reference gradient/table image to redirect each pixel's color."
+ },
+ "gradientmap": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Recolors the image by mapping its brightness onto a custom two-color (or multi-stop) gradient."
+ },
+ "posterize": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Reduces the image to a limited number of tonal steps per channel for a flat, poster-print look."
+ },
+ "threshold": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Converts the image to pure black and white based on a brightness cutoff point."
+ },
+ "exposure": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Brightens or darkens the whole image in stops, the same control a camera's exposure dial gives you."
+ },
+ "outerglow": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Adds a soft colored glow that blooms outward from the image's edges or transparency, with Amount for strength and Color for tint."
+ },
+ "coloroverlay": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Tints the whole image toward a single flat color, with Opacity controlling how strongly the tint replaces the original colors."
+ },
+ "dropshadow": {
+  "chapter": "2D Image Effects — The Full Filter Shelf",
+  "desc": "Casts a soft offset shadow of the image's silhouette behind it, with Offset X/Y for direction and distance and Opacity/Color for its look."
+ },
+ "dynamics": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "A compressor that squashes loud peaks down once they cross a Threshold, tightening dynamics by a set Ratio, with Attack/Release/Makeup rounding out the feel."
+ },
+ "limiter": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "A brick-wall ceiling that catches anything above the Threshold and prevents it from getting louder, with In/Out Gain to drive it harder or make up level."
+ },
+ "stereo": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Widens or narrows the stereo image with a Width knob (0 collapses to mono), plus Pan and a Bass Mono control that keeps low end centered."
+ },
+ "pitchshifter": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Shifts pitch up or down by semitones (up to two octaves either way) using a delay-line pitch shifter, with Grain size shaping the artifacts."
+ },
+ "chorus": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Thickens the sound with multiple slightly detuned, delayed copies, with Delay time and Depth of the wobble and a free or tempo-synced Rate."
+ },
+ "flanger": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Creates a sweeping, jet-plane whoosh by mixing a short modulating delay with Feedback back into the signal."
+ },
+ "phaser": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Sweeps notches through the sound for a swirling effect, set by a Cutoff center frequency, Depth, and Rate."
+ },
+ "transientshaper": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Reshapes the punch of a sound by independently boosting or cutting the Attack (the initial hit) and the Sustain (the tail)."
+ },
+ "stutter": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Repeats a short slice of audio like a glitchy loop, with tempo-synced or free timing and a step/gate mask controlling which repeats play."
+ },
+ "ringmod": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Multiplies the signal by an oscillator to produce bell-like, metallic, robotic tones, with adjustable frequency and waveform."
+ },
+ "frequencyshifter": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Shifts every frequency in the sound up or down by a fixed Hz amount (not musically, like pitch), creating inharmonic textures, with Feedback adding spiraling \"barber pole\" motion."
+ },
+ "tremolo": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Pulses the volume up and down with an LFO, set by Depth and a free or tempo-synced Rate."
+ },
+ "formantfilter": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Gives the sound a vowel-like, talking/singing quality by morphing between A-E-I-O-U formant shapes, with Q controlling resonance."
+ },
+ "wavetableshaper": {
+  "chapter": "Audio Effects & Plugin Hosting",
+  "desc": "Distorts the sound by running it through a chosen wavetable, with Table picking the waveform set, Position scanning through it, and Drive controlling intensity."
+ }
+}

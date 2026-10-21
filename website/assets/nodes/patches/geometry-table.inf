@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# Geometry Table: a starting patch for the Geometry Table node
+node 1 Modulators Geometry Table
+  id node
+  pos 520 300
+end
+node 2 3D Cube
+  id in0
+  pos 0 300
+end
+node 3 Source Shape
+  id shape
+  pos 1080 300
+end
+node 4 Utility Output
+  id out
+  pos 1640 300
+end
+geo node 0 in0
+mod shape sizeX node 0 0 0.6 0.5
+cable out 0 shape

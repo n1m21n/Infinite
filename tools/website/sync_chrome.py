@@ -35,6 +35,7 @@ GROUPS = [
     ("explore", "Explore", [
         ("library.html", "Library", "Templates, patches and Field devices"),
         ("artworks.html", "Art gallery", "Made with Infinite"),
+        ("nodes/", "Nodes", "Every node, with a patch"),
         ("embeds/", "Embeds", "Audio-reactive widgets for any page"),
         ("extensions.html", "Extensions", "Hand, face and pose tracking"),
         ("benchmarks.html", "Benchmarks", "Measured against other tools"),
@@ -52,7 +53,7 @@ FOOTER_COLS = [
         ("creative-coders.html", "Creative coders"), ("developers.html", "Developers"),
     ]),
     ("Explore", [
-        ("library.html", "Library"), ("artworks.html", "Art gallery"), ("embeds/", "Embeds"), ("extensions.html", "Extensions"),
+        ("library.html", "Library"), ("artworks.html", "Art gallery"), ("nodes/", "Nodes"), ("embeds/", "Embeds"), ("extensions.html", "Extensions"),
         ("benchmarks.html", "Benchmarks"),
     ]),
     ("Learn", [
@@ -118,7 +119,7 @@ def is_current(path, rel):
 
 
 NAV_ICON = {"artists.html": "family-compositing", "musicians.html": "family-notes", "vjs.html": "perform", "creative-coders.html": "edit",
-            "developers.html": "cube", "library.html": "library", "artworks.html": "viewport", "embeds/": "grid-dots", "extensions.html": "pointer",
+            "developers.html": "cube", "library.html": "library", "artworks.html": "viewport", "embeds/": "grid-dots", "nodes/": "cube", "extensions.html": "pointer",
             "benchmarks.html": "range", "index.html#learn": "play", "philosophy.html": "loop", "blog/": "pencil"}
 
 
@@ -164,6 +165,7 @@ def dock_html(rel):
     for gid, label, ic in DOCK_STOPS:
         cur = " data-current" if any(is_current(i[0], rel) for g in GROUPS if g[0] == gid for i in g[2]) else ""
         out.append(f'    <button type="button" class="dock-stop" data-group="{gid}"{cur} aria-expanded="false" aria-controls="dock-sheet-{gid}">{_svg(ic)}<span>{label}</span></button>')
+    out.append('    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog">' + _svg("search") + '<span>Search</span></button>')
     out.append("  </div>")
     for gid, label, ic in DOCK_STOPS:
         g = next(g for g in GROUPS if g[0] == gid)

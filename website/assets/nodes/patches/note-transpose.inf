@@ -1,0 +1,22 @@
+infinite-patch 1
+rev 2
+# Note Transpose: a starting patch for the Note Transpose node
+node 1 Notes Note Transpose
+  id node
+  pos 520 300
+end
+node 2 Notes Random Note Generator
+  id in0
+  pos 0 300
+end
+node 3 Synths Analog
+  id voice
+  pos 1080 300
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1640 300
+end
+note node 0 in0
+note voice 0 node
+aud speakers 0 voice

@@ -1,0 +1,37 @@
+infinite-patch 1
+rev 2
+# Material: a starting patch for the Material node
+node 1 3D Material
+  id node
+  pos 520 300
+end
+node 2 3D Cube
+  id in0
+  pos 0 220
+end
+node 3 Source Ramp
+  id in1
+  pos 0 510
+end
+node 4 Source Ramp
+  id in2
+  pos 0 800
+end
+node 5 Source Ramp
+  id in3
+  pos 0 1090
+end
+node 6 3D Render 3D
+  id view
+  pos 1080 300
+end
+node 7 Utility Output
+  id out
+  pos 1640 300
+end
+geo node 0 in0
+cable node 1 in1
+cable node 2 in2
+cable node 3 in3
+geo view 0 node
+cable out 0 view
