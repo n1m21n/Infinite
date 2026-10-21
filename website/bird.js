@@ -126,7 +126,7 @@
       return { x: x + window.scrollX, y: r.top + window.scrollY + 1 };
     };
     const place = () => {
-      cv.style.transform = `translate3d(${(pos.x - CW / 2).toFixed(1)}px, ${(pos.y - (CH - PAD * 0.5)).toFixed(1)}px, 0)`;
+      cv.style.transform = `translate3d(${Math.max(0, Math.min(pos.x - CW / 2, window.scrollX + document.documentElement.clientWidth - CW)).toFixed(1)}px, ${(pos.y - (CH - PAD * 0.5)).toFixed(1)}px, 0)`;
     };
     const flyTo = (el) => {
       const p1 = perchPoint(el);

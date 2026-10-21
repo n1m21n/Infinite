@@ -83,6 +83,7 @@ body {
   font-size: var(--fs-body);
   line-height: 1.6;
   overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

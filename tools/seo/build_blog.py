@@ -137,8 +137,8 @@ def head(title, desc, url, image, extra="", kind="website", depth="../"):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{depth}brand.css?v=7eb5c13f">
-  <link rel="stylesheet" href="{depth}style.css?v=60c68394">
+  <link rel="stylesheet" href="{depth}brand.css?v=36336012">
+  <link rel="stylesheet" href="{depth}style.css?v=097b68e2">
   <link rel="stylesheet" href="{depth}glass.css?v=c25dae44">
   <link rel="stylesheet" href="{depth}blog.css?v=823c9183">
   <script>addEventListener('load',function(){{setTimeout(function(){{var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)}},2500)}})</script>

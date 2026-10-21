@@ -207,3 +207,7 @@
 
 /* the bird canvas must be out of flow before bird.js runs, or it pushes the page down then snaps back (CLS) */
 #bird{position:absolute;left:0;top:0;width:68px;height:52px;pointer-events:none;opacity:0}
+
+/* the page only scrolls up and down: nothing may widen it sideways (phones can otherwise drag the whole page left and right) */
+html { overflow-x: hidden; overflow-x: clip; }
+html { touch-action: manipulation; }   /* repeated taps never trigger double-tap zoom on any page; pinch-zoom and scrolling are unchanged */
