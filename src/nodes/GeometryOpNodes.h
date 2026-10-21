@@ -6,6 +6,12 @@
 #include "Geometry3DNodes.h"
 #include "Palette.h"
 
+class InstanceOnPointsNode;
+// Upstream: the InstanceOnPoints a chain of pass-through wrappers (Transform,
+// Subdivide, ...) leads back to, or null - and that instancer's transforms.
+InstanceOnPointsNode* FindInstancer(IGeometrySource* source);
+const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, InstanceOnPointsNode* instancer);
+
 // One class for every mesh -> mesh operator, chosen by a dropdown - the same
 // table-driven approach FilterNode uses for image effects, so adding an
 // operator is a case in a switch rather than a new node type.
@@ -38,6 +44,8 @@ public:
       // Quadric edge-collapse simplification (MeshOps::Decimate). Appended
       // after kDelete so every saved `op` integer keeps its meaning.
       kDecimate,
+      // True edge bevel and face inset (MeshOps::BevelEdges / InsetFaces, from upstream).
+      kBevel, kInset,
       kOpCount
    };
 
@@ -175,6 +183,12 @@ public:
    // Decimate
    float decimateRatio = 0.5f;
    bool lockBorder = true;
+   // Bevel and Inset
+   float bevelWidth = 0.05f;
+   int bevelSegments = 1;
+   float bevelAngle = 30.0f;
+   float insetWidth = 0.05f;
+   float insetDepth = 0.0f;
    // Screw
    int screwSteps = 32;
    float turns = 1.0f;
@@ -244,6 +258,9 @@ public:
       v.Int("iterations", iterations); v.Float("mirrorOffset", mirrorOffset);
       v.Bool("weldSeam", weldSeam); v.Int("screwSteps", screwSteps);
       v.Float("decimateRatio", decimateRatio); v.Bool("lockBorder", lockBorder);
+      v.Float("bevelWidth", bevelWidth); v.Int("bevelSegments", bevelSegments);
+      v.Float("bevelAngle", bevelAngle); v.Float("insetWidth", insetWidth);
+      v.Float("insetDepth", insetDepth);
       v.Float("turns", turns); v.Float("rise", rise); v.Float("radiusOffset", radiusOffset);
       v.Int("selectMode", selectMode); v.Float("selectA", selectA);
       v.Float("selectB", selectB); v.Float("selectC", selectC);
@@ -281,6 +298,8 @@ private:
       bool weldSeam = false;
       float decimateRatio = 0;
       bool lockBorder = false;
+      float bevelWidth = 0, bevelAngle = 0, insetWidth = 0, insetDepth = 0;
+      int bevelSegments = 0;
       int selectMode = -1;
       float selectA = 0, selectB = 0, selectC = 0, selectSeed = 0, normalAmount = 0;
       bool selectInvert = false, selectAppend = false, keepSelected = false;
@@ -303,6 +322,8 @@ private:
                 mirrorOffset == o.mirrorOffset && turns == o.turns && rise == o.rise &&
                 radiusOffset == o.radiusOffset && weldSeam == o.weldSeam &&
                 decimateRatio == o.decimateRatio && lockBorder == o.lockBorder &&
+                bevelWidth == o.bevelWidth && bevelSegments == o.bevelSegments &&
+                bevelAngle == o.bevelAngle && insetWidth == o.insetWidth && insetDepth == o.insetDepth &&
                 selectMode == o.selectMode && selectA == o.selectA &&
                 selectB == o.selectB && selectC == o.selectC &&
                 selectSeed == o.selectSeed && normalAmount == o.normalAmount &&

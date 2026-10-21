@@ -195,6 +195,13 @@ public:
    // none of its settings.
    virtual void VisitParams(ParamVisitor& /*visitor*/) {}
 
+   // Upstream: called on a node spawned from a saved patch (or a paste), just
+   // before its saved params are applied. A node sets here any param whose
+   // ABSENCE from a patch means "saved before this existed", so old patches
+   // keep their behaviour while a node made fresh from the picker gets the
+   // new default.
+   virtual void BeforeLoadParams() {}
+
    // Address of the pointer field backing geometry input `slot`, or nullptr if
    // this node has no geometry input there. Lets connect/disconnect/rebuild be
    // generic instead of a per-class dynamic_cast chain: a caller that wants to
@@ -249,6 +256,17 @@ public:
    // never gets an AudioTopologyEntry, so ProcessBlock never runs and it
    // can't do work that only happens inside ProcessBlock (like recording).
    virtual bool RequiresAudioProcessing() const { return false; }
+
+   // Upstream: true for a node fed from outside the process (camera, NDI,
+   // Spout receiver). Kept so ported nodes compile; Turbo has no offline
+   // render that would read it yet.
+   virtual bool IsHardwareDriven() const { return false; }
+
+   // Upstream sweep hints, kept for ported audio nodes: how many blocks the
+   // param sweep should measure, and whether only the spectrum (not peak/RMS)
+   // can see the node's params. Turbo's sweep does not read them yet.
+   virtual int SweepMeasureBlocks() const { return 1; }
+   virtual bool SweepSpectralSignature() const { return false; }
 
    // A param whose audible effect only shows up when another param sits at a
    // specific value (unison-spread params like "detune"/"stereoWidth" are a

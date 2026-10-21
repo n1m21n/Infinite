@@ -1480,7 +1480,11 @@
       // Same widget as Knob, routed through ConsoleFaderTaper.
       KnobDb,
       // Logarithmic taper matching human ear frequency/pitch perception and visualizer response curves.
-      KnobFreq
+      KnobFreq,
+      // Upstream's skewed knob tapers, named so ported bodies compile; Turbo
+      // draws them as a plain linear Knob for now.
+      KnobLog, KnobSkewAttack100, KnobSkewDecay300, KnobSkewRelease400, KnobSkewDelay250,
+      KnobSkewGlide150, KnobSkewGlide100
    };
 
    struct AudioWidgetInteraction

@@ -198,6 +198,8 @@ public:
    // Turbo 0.47: semitones added to this lane's accented (velocity 1.0)
    // steps, on top of pitch - a two-tone bell (agogo low/high) on one lane.
    float laneAccentPitch[kNumLanes];
+   // Upstream: dB added to the same full-velocity steps (0..12). 0 = off, so older patches sound unchanged.
+   float laneAccentLevel[kNumLanes];
 
    // Decimated min/max waveform for each lane card's visualizer, filled
    // once at load time (see FinishLaneBuffer) - mirrors SamplerNode's
@@ -337,6 +339,7 @@ private:
    bool mLastLaneSolo[kNumLanes];
    int mLastLaneChoke[kNumLanes];
    float mLastLaneAccentPitch[kNumLanes];
+   float mLastLaneAccentLevel[kNumLanes];
    int mLastRate = -1;
    int mLastNumSteps = -1;
    float mLastSwing = -1.0f;

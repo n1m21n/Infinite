@@ -38,6 +38,55 @@ namespace DspMath
       }
    };
 
+   // Upstream: identity below `knee`, then a tanh shoulder that is C1 at the
+   // knee and tops out at 1 - bounds a feedback loop or resonator without
+   // colouring normal levels.
+   inline float SoftCeiling(float x, float knee = 0.8f)
+   {
+      const float a = std::fabs(x);
+      if (a <= knee)
+         return x;
+      const float y = knee + (1.0f - knee) * std::tanh((a - knee) / (1.0f - knee));
+      return x < 0.0f ? -y : y;
+   }
+
+   // Upstream: antiderivative of FastTanh's rational form x(27+x^2)/(27+9x^2)
+   // (flat +-1 past |x| = 3), for first-order ADAA saturators.
+   inline double FastTanhAntiderivative(double u)
+   {
+      const double a = std::fabs(u);
+      const double atThree = 9.0 / 18.0 + (4.0 / 3.0) * std::log(9.0 * 9.0 + 27.0);
+      if (a > 3.0)
+         return atThree + (a - 3.0);
+      return a * a / 18.0 + (4.0 / 3.0) * std::log(9.0 * a * a + 27.0);
+   }
+
+   // One-pole DC blocker with its cutoff fixed in Hz (8 Hz at every sample
+   // rate), from upstream - used by the ported String model.
+   struct DcBlocker
+   {
+      static constexpr double kCutoffHz = 8.0;
+
+      float prevIn = 0.0f, prevOut = 0.0f;
+      float r = (float)std::exp(-2.0 * M_PI * kCutoffHz / 44100.0);
+
+      void SetSampleRate(double sampleRate)
+      {
+         if (sampleRate > 0.0)
+            r = (float)std::exp(-2.0 * M_PI * kCutoffHz / sampleRate);
+      }
+
+      void Reset() { prevIn = prevOut = 0.0f; }
+
+      float Process(float x)
+      {
+         const float y = x - prevIn + r * prevOut;
+         prevIn = x;
+         prevOut = y;
+         return y;
+      }
+   };
+
    // ------------------------------------------------------------- dB <-> lin
    inline float LinearToDb(float lin)
    {

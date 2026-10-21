@@ -188,6 +188,25 @@ static const char* kTurboBuildDate = __DATE__ " " __TIME__;
 #include "nodes/LayoutNode.h"
 #include "nodes/VmpcNode.h"
 #include "nodes/ClipMatrixNode.h"
+// Turbo 0.60: nodes ported from upstream (Naman) after v0.6
+#include "nodes/TimeMachineNode.h"
+#include "nodes/OpticalFlowNode.h"
+#include "nodes/FluidNode.h"
+#include "nodes/VolumeNode.h"
+#include "nodes/NdiInNode.h"
+#include "nodes/NdiOutNode.h"
+#include "nodes/SweepRevolveNodes.h"
+#include "nodes/LSystemNode.h"
+#include "nodes/ProximityLinesNode.h"
+#include "nodes/RigidBodyNode.h"
+#include "nodes/FMNode.h"
+#include "nodes/StringNode.h"
+#include "nodes/PartialsNode.h"
+#include "platform/ndi/NdiRuntime.h"
+#include "nodes/PredictiveColoringNode.h"
+#include "audio/dsp/SaturatorKernel.h"
+#include "audio/dsp/ShapeResonatorKernel.h"
+#include "audio/dsp/ConvolutionKernel.h"
 #include "core/MidiMap.h"
 #include "audio/SampleScanner.h"
 #include "audio/PluginScanner.h"
@@ -246,6 +265,7 @@ namespace
    #include "app/bodies/Macros.inl" // macro and UI control node bodies
    #include "app/ui/AudioLayout.inl" // audio node body layout (v3), columns, waveform view
    #include "app/bodies/AudioSources.inl" // sampler, oscillators, wavetable, synths, meters, gain
+   #include "app/ui/UpstreamCompat.inl" // Turbo 0.60: upstream UI helpers the ported bodies call
    #include "app/bodies/DrumSequencer.inl" // Drum Sequencer and bundled pattern packs
    #include "app/ui/Library.inl" // sample / media library and plugin browser panels
    #include "app/bodies/NotesAndMix.inl" // audio in, mixer and note processing node bodies
@@ -255,6 +275,7 @@ namespace
    #include "app/bodies/AudioBody.inl" // DrawAudioNodeBody: the audio body dispatcher
    #include "app/bodies/SceneParams.inl" // media, geometry, 3D, material, blend and filter params
    #include "app/bodies/PopParams.inl" // the PointZ family's generic parameter body
+   #include "app/bodies/PortedParams.inl" // Turbo 0.60: bodies of the nodes ported from upstream
    #include "app/ui/Preview.inl" // previews, comments, groups, mini viewport, viewport panel
    #include "app/ui/Mapping.inl" // colour tags, MIDI mapping and modulation range editors
    #include "app/ui/Help.inl" // node help texts and the help window

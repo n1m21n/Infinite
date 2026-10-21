@@ -271,6 +271,7 @@ struct Particle
    float age = 0.0f;              // seconds alive
    float life = 0.0f;             // seconds until death; <= 0 means immortal
    bool alive = true;
+   bool hasColor = false;         // r/g/b were set from a real colour, not the white default (upstream)
 };
 
 // An ordered chain of points in space. Curves, extracted mesh boundaries and
@@ -303,6 +304,18 @@ namespace MeshOps
    // All of these are mesh -> mesh, which is what lets the operator nodes chain
    // freely in any order.
    Mesh Transform(const Mesh& in, const Mat4& m);
+   // Upstream: bakes each instance transform (composed with groupMatrix) into
+   // a copy of `stamp` and concatenates them into one mesh.
+   // Upstream (BevelInset.cpp). Edges where faces meet at more than
+   // `angleDeg` are cut back by `width` and filled with `segments` strips
+   // (1 = chamfer, more = round); width is capped at 45 % of the shortest
+   // sharp edge.
+   Mesh BevelEdges(const Mesh& in, float width, int segments, float angleDeg);
+   // Insets the selected faces (all when nothing is selected) by `width` and
+   // lifts them by `depth`, leaving a wall ring.
+   Mesh InsetFaces(const Mesh& in, float width, float depth, float angleDeg);
+   Mesh RealizeInstances(const Mesh& stamp, const std::vector<Mat4>& xforms, const Mat4& groupMatrix,
+                         const std::vector<float>* instanceColors = nullptr, int maxInstances = 256);
    Mesh Array(const Mesh& in, int count, float dx, float dy, float dz,
               float rotStep, float scaleStep, bool radial, float radius);
    Mesh Subdivide(const Mesh& in, int levels, float smooth);
@@ -313,6 +326,15 @@ namespace MeshOps
    // Revolves the input's boundary edges around an axis, with an optional rise
    // per turn for threads and helices.
    Mesh Screw(const Mesh& in, int steps, float turns, float rise, float radiusOffset, int axis);
+
+   // Upstream (SweepRevolve.cpp). Lathe: revolves a curve about a world axis
+   // (0 X, 1 Y, 2 Z) through the origin, `angleDegrees` of it in `segments`
+   // steps; caps close a partial turn of a closed profile.
+   Mesh Revolve(const Polyline& profile, int axis, float angleDegrees, int segments, bool caps);
+   // Carries a profile along a path (parallel-transport frame), scaled from
+   // startScale to endScale and twisted `twistDegrees` in total.
+   Mesh Sweep(const Polyline& profile, const Polyline& path, float startScale, float endScale,
+              float twistDegrees, bool caps);
 
    // Turns closed 2D contours into an extruded solid. Contours wound
    // anticlockwise are treated as outlines and clockwise ones as holes, so the

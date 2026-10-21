@@ -151,6 +151,34 @@ public:
    }
 };
 
+// The one empty mesh an unconnected geometry node hands out (upstream).
+inline const Mesh& EmptyMesh()
+{
+   static const Mesh kEmpty;
+   return kEmpty;
+}
+
+// Upstream: byte-hashes a POD value and bumps `revision` via
+// NextMeshRevision() whenever the hash changes, caching it in `lastHash`.
+// Ported nodes derive MaterialRevision()/MappingRevision() with it.
+template <typename T>
+inline unsigned long long ComputeContentRevision(const T& value, unsigned long long& revision, size_t& lastHash)
+{
+   size_t h = 1469598103934665603ull; // FNV-1a offset basis
+   const unsigned char* bytes = reinterpret_cast<const unsigned char*>(&value);
+   for (size_t i = 0; i < sizeof(T); i++)
+   {
+      h ^= bytes[i];
+      h *= 1099511628211ull; // FNV-1a prime
+   }
+   if (revision == 0 || h != lastHash)
+   {
+      lastHash = h;
+      revision = NextMeshRevision();
+   }
+   return revision;
+}
+
 class IGeometrySource : public ICookWarningSource
 {
 public:
@@ -167,6 +195,9 @@ public:
 
    virtual Mat4 GetModelMatrix() const = 0;
    virtual Material GetMaterial() const = 0;
+   // Upstream: a stamp that moves when GetMaterial() changes (0 = not
+   // tracked). Ported nodes answer it; Turbo's renderer does not read it yet.
+   virtual unsigned long long MaterialRevision() const { return 0; }
    // Optional texture applied to the surface (0 when none is patched in).
    virtual unsigned int GetSurfaceTexture() { return 0; }
    // Per-channel maps. Defaults to routing slot 0 to the albedo texture, so a
@@ -186,6 +217,8 @@ public:
    // How material maps are looked up on the surface. Identity/UV by default,
    // so nothing changes for a chain with no Mapping node in it.
    virtual MappingTransform GetMappingTransform() const { return MappingTransform(); }
+   // Same idea as MaterialRevision(), for GetMappingTransform().
+   virtual unsigned long long MappingRevision() const { return 0; }
 
    // The upstream source this node derives its mesh from, for nodes whose
    // GetMesh() is built by transforming a single upstream mesh (Transform,
@@ -517,6 +550,24 @@ public:
       return (slot >= 0 && slot < 9) ? kNames[slot] : nullptr;
    }
 
+   // The view of the last render and its depth buffer, for a node that draws
+   // into the same picture (Volume, ported from upstream). Depth is a hardware
+   // depth value in 0..1. A multisampled render only resolves depth once
+   // someone asks for it, so the first frame after RequestDepth() has none
+   // (DepthValid() says so).
+   struct SceneCamera { Mat4 view, proj; float eye[3] = { 0, 0, 0 }; bool valid = false; };
+   const SceneCamera& LastCamera() const { return mLastCamera; }
+   unsigned int DepthTexture() const { return mDepthBuffer; }
+   bool DepthValid() const { return mDepthResolved; }
+   void RequestDepth()
+   {
+      if (!mDepthWanted)
+      {
+         mDepthWanted = true;
+         mHasSceneBuilt = false; // draw again so depth is resolved
+      }
+   }
+
    size_t LastTriangleCount() const { return mLastTriangles; }
    size_t LastDrawCalls() const { return mLastDrawCalls; }
    // Slots that had to re-upload this frame; 0 means everything came from cache.
@@ -784,7 +835,11 @@ private:
    // Resolve target: a plain texture, and what the rest of the graph reads.
    unsigned int mFbo = 0;
    unsigned int mColorTex = 0;
-   unsigned int mDepthBuffer = 0;
+   unsigned int mDepthBuffer = 0; // a depth texture (so Volume can read it)
+   SceneCamera mLastCamera;
+   bool mDepthWanted = false;
+   float mLastFillClamp = 1.0f; // last point-cloud sprite fill clamp, to log changes only
+   bool mDepthResolved = false;
    // Multisampled draw target, blitted into the above. Unused when samples == 0.
    unsigned int mMsFbo = 0;
    unsigned int mMsColor = 0;

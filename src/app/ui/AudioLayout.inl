@@ -254,10 +254,11 @@
       }
 
       void Knob(const char* label, float* v, float lo, float hi, const char* fmt,
-                float dia = kKnobSmall, bool dbTaper = false, bool freqTaper = false)
+                float dia = kKnobSmall, bool dbTaper = false, bool freqTaper = false,
+                AudioWidgetStyle explicitStyle = AudioWidgetStyle::Knob) // Turbo 0.60: upstream's style slot
       {
          Place(dia);
-         AudioWidgetStyle style = AudioWidgetStyle::Knob;
+         AudioWidgetStyle style = explicitStyle;
          if (dbTaper)
             style = AudioWidgetStyle::KnobDb;
          else if (freqTaper || (lo >= 1.0f && hi >= 1000.0f && (strstr(fmt, "Hz") != nullptr || strcmp(label, "freq") == 0 || strcmp(label, "cutoff") == 0)))
@@ -294,6 +295,18 @@
       // modCount > 0: only the first modCount options are reachable by CV /
       // MIDI / Performance (Turbo 0.48: an option appended later keeps the old
       // modulation range, so existing patches map as before).
+      // Turbo 0.60 (upstream): a button in one cell, centred like Dropdown.
+      bool Button(const char* label)
+      {
+         const float btnH = ImGui::GetFrameHeight();
+         const float btnW = std::min(cellW - 8.0f, 96.0f);
+         const float cx = x0 + (float)index * cellW + cellW * 0.5f;
+         ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, y0 + (maxDia - btnH) * 0.5f));
+         const bool clicked = ImGui::Button(label, ImVec2(btnW, 0));
+         index++;
+         return clicked;
+      }
+
       void Dropdown(const char* label, const std::vector<std::string>& options, int current,
                     std::function<void(int)> onSelect,
                     const std::vector<std::string>& categories = {}, int modCount = 0)

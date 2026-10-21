@@ -25,7 +25,8 @@ CHANGELOG-TURBO.md when it ships.
 
 - TOP parity, what 0.52 left open (docs/TOP-PARITY.md): Common page on sources, Layer Stack and
   Switcher; pixel units for Crop / Transform; Blend with N inputs; the missing TOPs (Cache / Time
-  Machine, Tile, Remap, Corner Pin, Constant, Math, Channel Mix, Luma Blur, Optical Flow...);
+  Machine and Optical Flow arrived in 0.60; Tile, Remap, Corner Pin, Constant, Math, Channel Mix,
+  Luma Blur);
   Send / Receive partner lines and wireless links in the MCP graph. Then stage 2: 3D with POPs.
 
 - Timeline: MIDI clips and a piano-roll editor (data model, playback into an instrument's note
@@ -33,11 +34,14 @@ CHANGELOG-TURBO.md when it ships.
 - Headless engine from upstream: --render / --frame / --frames-dir / --node / --stems / --notes /
   --set / --audio-summary / --contact-sheet / --explain / --describe / --validate, plus the
   console launcher for cmd exit codes.
-- Prediction nodes from upstream: Moves (MovementLog / MovementStats), Predictive Modulator,
-  Predictive Coloring.
-
-- Geometry: upstream's sprite fill clamp (GPU driver-reset guard) and cloud forwarding through
-  Material / Null3D / Mapping / Cloth.
+- Upstream gesture learning: Moves and Predictive Modulator need upstream's MovementLog (binding
+  callbacks and per-param tapers in Modulation, the CookFrame hooks) and its IPredictor Drift.
+- Upstream audio-engine resync: per-voice modulation (VoiceMod) in Analog / Wavetable, NoteEvent
+  MPE fields (pressure / slide per note), the newer synth cores (warp modes, voice lanes). Until
+  then Voice Spread and Note Expression act as one shared value, and LFO / Random / MSEG "per voice"
+  is not offered.
+- Upstream UI parity for modulators: FixedParamOrdinal / RegisterHiddenParam (stable slider
+  ordinals per mode), skewed knob tapers (Turbo draws them linear), the "show more" folds.
 
 ## Out of scope (for now)
 

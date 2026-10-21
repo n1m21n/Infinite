@@ -40,11 +40,28 @@ public:
    // not - see §0.5).
    virtual void ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out) = 0;
 
+   // Audio thread only. The dry half of the mix, for a kernel whose wet path
+   // is not delayed by the same whole number of samples at every frequency
+   // (minimum-phase oversampling: Drive, Wavetable Shaper). Such a kernel
+   // writes `in` as its own signal path passes it with the processing taken
+   // out, and returns true; the runtime then mixes against that instead of
+   // against `in` delayed by LatencySamples(), so wet and dry stay in phase
+   // across the whole spectrum at any mix. Called once per block, after
+   // ProcessBlock, with the same `in`. Default: not handled.
+   virtual bool ProcessDry(const AudioBuffer& /*in*/, AudioBuffer& /*dry*/) { return false; }
+
    // Samples of latency this kernel's processing adds (lookahead, oversample,
    // FFT window, ...). 0 for a kernel with none - Audio Filter's biquad/SVF
    // cascade has none. The engine compensates using whatever a kernel reports
    // here; see §0.5.
    virtual int LatencySamples() const { return 0; }
+
+   // The most LatencySamples() can ever return for this kernel (a kernel
+   // whose latency depends on a mode). AudioEffectRuntime sizes the dry
+   // path's delay to this once, on the main thread; when the reported
+   // latency changes, PollAudioLatencyChanges() re-runs PDC. Defaults to the
+   // fixed latency.
+   virtual int MaxLatencySamples() const { return LatencySamples(); }
 
    // Optional second meter a kernel publishes beyond AudioEffectRuntime's own
    // generic post-mix peak (AudioEffectNode::Level()) - Dynamics' live gain-
@@ -54,4 +71,10 @@ public:
    // thread) via AudioEffectNode::ExtraMeterValue() - same MeterRing
    // discipline as every other audio->main readback in this tree.
    virtual MeterRing* ExtraMeter() { return nullptr; }
+
+   // Main thread only. True while the kernel is still building what it needs
+   // to sound (Shape Resonator's background mode solve). An offline render
+   // (--audio-summary / --render) waits on this before its first sample, so a
+   // render that runs faster than real time does not start into silence.
+   virtual bool Preparing() const { return false; }
 };

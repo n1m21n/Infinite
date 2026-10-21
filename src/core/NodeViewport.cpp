@@ -17,19 +17,9 @@ namespace
    // the object the same apparent size while reading closer to orthographic.
    constexpr float kFovDegrees = 28.0f;
 
-   // Same chain-walk as Render3DNode's FindInstancer (Geometry3DNodes.cpp): an
-   // InstanceOnPoints wrapped in Transform/Subdivide/etc. is still an instancer
-   // as far as the preview is concerned, so the thumbnail shows every instance
-   // rather than just the one stamp mesh those wrappers actually operate on.
-   InstanceOnPointsNode* FindInstancer(IGeometrySource* source)
-   {
-      for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
-      {
-         if (auto* instancer = dynamic_cast<InstanceOnPointsNode*>(s))
-            return instancer;
-      }
-      return nullptr;
-   }
+   // FindInstancer (GeometryOpNodes.h) walks the same chain: an
+   // InstanceOnPoints wrapped in Transform/Subdivide/etc. is still an
+   // instancer here, so the thumbnail shows every instance.
    // Position + normal + UV, no instancing. Cheapest lit look that still
    // reads as a solid: ambient + one fixed directional light + a small
    // specular kick so curvature is visible on a flat-lit preview. UV is

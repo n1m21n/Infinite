@@ -449,6 +449,7 @@
          spawned->showAdvancedParams = rec.showAdvancedParams;
          spawned->showPreview = rec.showPreview;
          spawned->colorTag = rec.colorTag;
+         spawned->node->BeforeLoadParams(); // Turbo 0.60 (upstream): missing keys = the older behaviour
          Patch::LoadParams(spawned->node.get(), rec.params);
          ReloadDerivedState(spawned->node.get());
          // Phase 4 (selection as an input): rewrites a saved kDeleteSelected/

@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.59.1 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.60.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -259,6 +259,10 @@ add_executable(Infinite WIN32
     src/audio/dsp/SpecBlurKernel.cpp
     src/audio/dsp/KeySnapKernel.cpp
     src/audio/dsp/SpectrumSlideKernel.cpp
+    src/audio/dsp/SaturatorKernel.cpp
+    src/audio/dsp/ShapeResonatorKernel.cpp
+    src/audio/dsp/ConvolutionKernel.cpp
+    src/audio/dsp/MeshModalSolver.cpp
     src/audio/dsp/SlicerDsp.cpp
     src/audio/dsp/MolderDsp.cpp
     src/audio/dsp/GrainMolderDsp.cpp
@@ -277,6 +281,24 @@ add_executable(Infinite WIN32
     src/nodes/Text3DNode.cpp
     src/nodes/UtilityNodes.cpp
     src/nodes/WirelessNodes.cpp
+    src/nodes/TimeMachineNode.cpp
+    src/nodes/OpticalFlowNode.cpp
+    src/nodes/FluidNode.cpp
+    src/nodes/VolumeNode.cpp
+    src/nodes/NdiInNode.cpp
+    src/nodes/NdiOutNode.cpp
+    src/platform/ndi/NdiRuntime.cpp
+    src/core/SweepRevolve.cpp
+    src/core/BevelInset.cpp
+    src/core/ColorStats.cpp
+    src/nodes/PredictiveColoringNode.cpp
+    src/nodes/SweepRevolveNodes.cpp
+    src/nodes/LSystemNode.cpp
+    src/nodes/ProximityLinesNode.cpp
+    src/nodes/RigidBodyNode.cpp
+    src/nodes/FMNode.cpp
+    src/nodes/StringNode.cpp
+    src/nodes/PartialsNode.cpp
     src/nodes/PathNode.cpp
     src/nodes/OceanNode.cpp
     src/nodes/SimulationNodes.cpp
@@ -387,7 +409,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src/app" PREFIX "app" FILES ${INF
 target_link_options(Infinite PRIVATE "/ENTRY:mainCRTStartup")
 
 target_include_directories(Infinite PRIVATE
-    src src/core src/nodes src/platform src/audio
+    src src/core src/nodes src/platform src/platform/ndi src/audio
     ${IMGUI_DIR} ${IMGUI_DIR}/backends ${IMGUI_DIR}/misc/cpp
     ${NODE_EDITOR_DIR}
     ${STB_DIR}
@@ -395,6 +417,7 @@ target_include_directories(Infinite PRIVATE
     external/json
     external/shine
     external/cgltf
+    external/ndi/include
 )
 
 target_link_libraries(Infinite PRIVATE glfw strmiids dbghelp)

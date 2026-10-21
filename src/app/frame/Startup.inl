@@ -1330,6 +1330,35 @@
          static_cast<Render3DNode*>(gNodes[2].node.get())->geometry[0] =
             static_cast<OceanNode*>(gNodes[1].node.get());
       }
+      else if (getenv("INFINITE_PORTEDTEST") != nullptr)
+      {
+         // Turbo 0.60: every node ported from upstream after v0.6 spawns,
+         // takes its input and produces output. Checked at frame 8, below.
+         const char* names[] = {
+            "Formula", "Time Machine", "Optical Flow", "Fluid", "Volume", "NDI In", "NDI Out",       // 0..6
+            "Curve", "Sweep", "Revolve", "L-System", "Distribute Points in Grid", "Proximity Lines", // 7..12
+            "Geometry", "Rigid Bodies", "Bevel", "Inset",                                            // 13..16
+            "MSEG", "Voice Spread", "Note Expression",                                               // 17..19
+            "FM", "String", "Partials", "Saturator", "Convolution Reverb", "Shape Resonator", "dither" // 20..26
+         };
+         for (int i = 0; i < (int)(sizeof(names) / sizeof(names[0])); i++)
+            SpawnNode(names[i], "", 40.0f + 260.0f * (i % 7), 40.0f + 320.0f * (i / 7));
+         auto* src = static_cast<FormulaNode*>(gNodes[0].node.get());
+         src->formula = "   return vec4(uv.x, uv.y, 0.5 + 0.5 * sin(t * 3.0), 1.0);";
+         src->width = 128.0f;
+         src->height = 128.0f;
+         src->Apply();
+         for (int i : { 1, 2, 3, 4, 6, 26 })
+            if (ImageCable* c = CableFor(gNodes[i], 0))
+               c->Connect(gNodes[0].node.get());
+         auto geo = [](int i) { return dynamic_cast<IGeometrySource*>(gNodes[i].node.get()); };
+         static_cast<SweepNode*>(gNodes[8].node.get())->path = geo(7);
+         *gNodes[9].node->GeometryInputSlot(0) = geo(7);
+         static_cast<ProximityLinesNode*>(gNodes[12].node.get())->input = geo(11);
+         static_cast<RigidBodyNode*>(gNodes[14].node.get())->input = geo(13);
+         *gNodes[15].node->GeometryInputSlot(0) = geo(13);
+         *gNodes[16].node->GeometryInputSlot(0) = geo(13);
+      }
       else if (getenv("INFINITE_TOPPARITYTEST") != nullptr)
       {
          // Turbo (TOP parity): Common page, Crop/Transform/Blend/Switcher/

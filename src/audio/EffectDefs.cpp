@@ -28,6 +28,9 @@
 #include "dsp/FormantFilterKernel.h"
 #include "dsp/WavetableShaperKernel.h"
 #include "MusicTime.h"
+#include "dsp/SaturatorKernel.h"
+#include "dsp/ShapeResonatorKernel.h"
+#include "dsp/ConvolutionKernel.h"
 
 namespace
 {
@@ -797,6 +800,73 @@ namespace
          def.sidechainLabel = "to";
          def.params.push_back({ "slide", 0.0f, 1.0f, 0.5f });
          def.makeKernel = []() { return std::make_unique<SpectrumSlideKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+
+      // ------------------------- Turbo 0.60 (from upstream v0.6+): Saturator, Shape Resonator, Convolution Reverb
+      {
+         EffectDef def;
+         def.name = "Saturator";
+         def.linearMix = true; // wet is the dry signal processed - see EffectDef::linearMix
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kSaturatorCurves;
+
+         const float lastModel = (float)(SaturatorDsp::kNumModels - 1);
+         def.params.push_back({ "model1", 0.0f, lastModel, (float)SaturatorDsp::kTube });
+         def.params.push_back({ "amount1", 0.0f, 1.0f, 0.3f, false, { { "model1", (float)SaturatorDsp::kTube } } });
+         def.params.push_back({ "model2", 0.0f, lastModel, (float)SaturatorDsp::kOff });
+         def.params.push_back({ "amount2", 0.0f, 1.0f, 0.3f, false, { { "model2", (float)SaturatorDsp::kTube } } });
+         def.params.push_back({ "model3", 0.0f, lastModel, (float)SaturatorDsp::kOff });
+         def.params.push_back({ "amount3", 0.0f, 1.0f, 0.3f, false, { { "model3", (float)SaturatorDsp::kTube } } });
+         // With only stage 1 on (the default), serial and parallel sound
+         // the same, so the sweep tries 3-band, where stage 1 sees only the
+         // low band.
+         def.params.push_back({ "routing", 0.0f, (float)(SaturatorDsp::kNumRoutings - 1), (float)SaturatorDsp::kSerial,
+                                false, {}, { (float)SaturatorDsp::kBands } });
+         def.params.push_back({ "feedback", 0.0f, 0.95f, 0.5f, false, { { "routing", (float)SaturatorDsp::kFeedback } } });
+         def.params.push_back({ "output", -24.0f, 12.0f, 0.0f });
+         // mix is AudioEffectNode's universal field, not a table row.
+
+         def.makeKernel = []() { return std::make_unique<SaturatorKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      {
+         EffectDef def;
+         def.name = "Shape Resonator";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kShapeResonator;
+         def.defaultMix = 1.0f;
+         def.hasGeometryInput = true;
+         def.params.push_back({ "tune", 20.0f, 2000.0f, 110.0f });
+         def.params.push_back({ "decay", 0.02f, 20.0f, 2.0f });
+         def.params.push_back({ "damping", 0.0f, 1.0f, 0.5f });
+         def.params.push_back({ "pos", 0.0f, 1.0f, 0.3f });
+         def.params.push_back({ "modes", 1.0f, 32.0f, 16.0f });
+         def.makeKernel = []() { return std::make_unique<ShapeResonatorKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      {
+         EffectDef def;
+         def.name = "Convolution Reverb";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kConvolutionSpace;
+         // The impulse response starts with the direct sound, so fully wet is
+         // already "the source, in the room"; mix below 1 brings it closer.
+         def.defaultMix = 1.0f;
+         def.hasFile = true;
+         def.params.push_back({ "size", 0.0f, 1.0f, 0.45f });
+         def.params.push_back({ "shape", 0.0f, (float)(ConvolutionKernel::kNumShapes - 1), 0.0f });
+         def.params.push_back({ "material", 0.0f, 1.0f, 0.5f });
+         def.params.push_back({ "distance", 0.0f, 1.0f, 0.5f });
+         def.params.push_back({ "decay", 0.1f, ConvolutionKernel::kMaxSeconds, 1.8f });
+         def.params.push_back({ "spread", 0.0f, 1.0f, 1.0f });
+         def.makeKernel = []() { return std::make_unique<ConvolutionKernel>(); };
          defs.push_back(std::move(def));
       }
 

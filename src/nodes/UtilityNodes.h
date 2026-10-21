@@ -175,6 +175,12 @@ public:
 
    float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; } // Turbo 0.49
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
+   // Component passthrough (upstream, Blender's rule): no opinion on a
+   // point cloud or curve riding alongside the mesh, so both forward untouched.
+   const std::vector<Particle>* GetPointCloud() override { return input ? input->GetPointCloud() : nullptr; }
+   unsigned long long PointCloudRevision() override { return input ? input->PointCloudRevision() : 0; }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
@@ -225,6 +231,12 @@ public:
    float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; } // Turbo 0.49
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Component passthrough (upstream, Blender's rule): no opinion on a
+   // point cloud or curve riding alongside the mesh, so both forward untouched.
+   const std::vector<Particle>* GetPointCloud() override { return input ? input->GetPointCloud() : nullptr; }
+   unsigned long long PointCloudRevision() override { return input ? input->PointCloudRevision() : 0; }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    ImageCable& TextureInput() { return mMaps[kMapAlbedo]; }
@@ -374,6 +386,12 @@ public:
 
    float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; } // Turbo 0.49
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
+   // Component passthrough (upstream, Blender's rule): no opinion on a
+   // point cloud or curve riding alongside the mesh, so both forward untouched.
+   const std::vector<Particle>* GetPointCloud() override { return input ? input->GetPointCloud() : nullptr; }
+   unsigned long long PointCloudRevision() override { return input ? input->PointCloudRevision() : 0; }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }

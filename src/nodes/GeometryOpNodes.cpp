@@ -19,7 +19,7 @@ namespace
       // still named here so a saved index still has a label, just not spawned
       // or offered in the operation dropdown (GeometryOpNode::IsSpawnable).
       "Select", "Delete Selected", "Transform Selected", "Extrude Selected",
-      "Delete", "Decimate"
+      "Delete", "Decimate", "Bevel", "Inset"
    };
    const std::vector<std::string> kSourceNames = { "Vertices", "Edges", "Faces" };
    const std::vector<std::string> kWrapModeNames = { "Cylindrical", "Spherical", "Nearest Surface" };
@@ -59,6 +59,22 @@ namespace
       }
       return false;
    }
+}
+
+
+InstanceOnPointsNode* FindInstancer(IGeometrySource* s)
+{
+   for (; s != nullptr; s = s->PassthroughSource())
+   {
+      if (auto* instancer = dynamic_cast<InstanceOnPointsNode*>(s))
+         return instancer;
+   }
+   return nullptr;
+}
+
+const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* /*source*/, InstanceOnPointsNode* instancer)
+{
+   return instancer->InstanceTransforms();
 }
 
 const std::vector<std::string>& GeometryOpNode::OpNames() { return kOpNames; }
@@ -140,6 +156,8 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.weldSeam = weldSeam;
    s.decimateRatio = decimateRatio;
    s.lockBorder = lockBorder;
+   s.bevelWidth = bevelWidth; s.bevelSegments = bevelSegments; s.bevelAngle = bevelAngle;
+   s.insetWidth = insetWidth; s.insetDepth = insetDepth;
    s.upstream = input;
    // The upstream's own revision stamp, not its triangle count: Select and
    // other mask-only operators leave the vertex/index count unchanged, so a
@@ -238,6 +256,14 @@ const Mesh& GeometryOpNode::GetMesh()
       case kDecimate:
          // Connectivity-dependent - see kSubdivide. selectionOnly hidden.
          mCache = MeshOps::Decimate(src, decimateRatio, lockBorder);
+         break;
+      case kBevel:
+         // Connectivity-dependent - see kSubdivide. selectionOnly hidden.
+         mCache = MeshOps::BevelEdges(MeshOps::ClearSelection(src), bevelWidth, bevelSegments, bevelAngle);
+         break;
+      case kInset:
+         mCache = MeshOps::InsetFaces(selectionOnly ? src : MeshOps::ClearSelection(src),
+                                      insetWidth, insetDepth, bevelAngle);
          break;
       case kScrew:
          // Connectivity-dependent - see kSubdivide. selectionOnly hidden.

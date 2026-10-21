@@ -22,7 +22,9 @@ namespace GLUtil
    // Lazily (re)allocates the FBO's color texture to the requested size and
    // internal format (default GL_RGBA8, matching prior behavior). Pass
    // GL_RGBA16F for nodes that need HDR range or unclamped simulation state.
-   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat = GL_RGBA8);
+   // `label` names the target for upstream's GPU memory bench; unused in Turbo.
+   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat = GL_RGBA8,
+                  const char* label = "Fbo");
    void DestroyFbo(Fbo& fbo);
 
    // Shared scratch render target, one per (w, h, internalFormat), for an

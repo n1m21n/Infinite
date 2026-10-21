@@ -25,6 +25,8 @@ public:
 
    void SetPlaying(bool playing) { mPlaying = playing; }
    bool IsPlaying() const { return mPlaying; }
+   // Upstream offline render; Turbo has none, so ported nodes always see live time.
+   bool IsOfflineMode() const { return false; }
    void TogglePlay() { mPlaying = !mPlaying; }
 
    void Rewind()
@@ -79,6 +81,9 @@ public:
    double Beats() const;
    // Playing time in seconds, also frozen while paused.
    double Seconds() const;
+   // Upstream: seconds that keep running whatever the transport does (stop,
+   // seek, loop) - free-running modulators step by this. Steady wall clock here.
+   double FreeSeconds() const;
 
    // Called once, main thread, immediately after AudioEngine::Instance().Start()
    // succeeds. Captures the current frame-driven position as the audio clock's

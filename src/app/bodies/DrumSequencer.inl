@@ -680,6 +680,9 @@
          AudioSlider("pan", &n->lanePan[lane], -1.0f, 1.0f, "%.2f", half);
          // Turbo 0.47: pitch of the accented steps (two-tone bells).
          AudioSlider("accent pitch", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%.1f st", half);
+         ImGui::SameLine();
+         // Upstream: level boost of the same accented steps, so the two sit in pairs.
+         AudioSlider("accent vol", &n->laneAccentLevel[lane], 0.0f, 12.0f, "+%.1f dB", half);
       }
 
       EndAudioSection();

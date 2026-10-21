@@ -1,5 +1,50 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.60.0-turbo (2026-10-21)
+
+Catch-up with upstream (Naman's Infinite) after v0.6: 30 nodes and operators, taken as upstream wrote
+them. Old patches open unchanged.
+
+### Image and video
+- **Time Machine**: each pixel from a different past frame, by a grey map (slit-scan by default).
+- **Optical Flow**: motion vectors per pixel on the GPU (Lucas-Kanade), or as colour.
+- **Fluid**: a 2D GPU fluid the picture rides in, with force and obstacle inputs and a stirrer.
+- **Volume**: ray-marched fog, smoke or cloud; after a Render 3D it sits in that scene (its camera
+  and depth). Render 3D now keeps its depth as a texture for this.
+- **dither**: posterize with an ordered (Bayer) or noise threshold, so gradients keep their tone.
+- **NDI In / NDI Out**: video over the network (OBS, vMix, Resolume). Needs the free NDI runtime;
+  without it the nodes say so and nothing else changes.
+
+### 3D
+- **Sweep** (profile along a path) and **Revolve** (lathe) surfaces.
+- **L-System**: plants and fractals from rewrite rules, drawn by a 3D turtle.
+- **Proximity Lines**: plexus / constellation lines between nearby points.
+- **Rigid Bodies**: pieces of a mesh fall, collide and stack (box, sphere or hull colliders).
+- **Bevel** and **Inset** in the geometry operators.
+
+### Audio and control
+- Synths **FM** (4 operators, 11 algorithms), **String** (waveguide, pluck / bow / hammer) and
+  **Partials** (playable additive resynthesis of a sample).
+- Effects **Saturator** (three stages, six curves, five routings), **Convolution Reverb** (a designed
+  room or a loaded impulse file) and **Shape Resonator** (rings the modes of the shape on its pin).
+- Modulators **MSEG** (a drawn shape, looped or triggered), **Voice Spread** and **Note Expression**
+  (MPE pressure / slide; MIDI inputs now store channel pressure and CC74). LFO and Random get the
+  upstream rate modes (beats, synced division, Hz) and LFO "phase from"; Smooth gets time and spring.
+- Drum Sequencer: **accent vol** next to accent pitch (0-12 dB on accented steps).
+- Per-voice modulation (upstream's VoiceMod) is not in yet: Voice Spread and Note Expression act as
+  one shared value until Turbo's Analog and Wavetable get it.
+
+### Prediction and geometry (from the to-do)
+- **Predictive Coloring**: learns what graded footage looks like and grades incoming frames toward it.
+- Null 3D, Material, Mapping and Cloth forward the point cloud and curve riding with the mesh
+  (upstream's component passthrough), so a Null no longer drops a cloud.
+- Render 3D caps a point cloud's sprite fill under a budget (upstream's guard against a Windows GPU
+  watchdog reset) by shrinking sprites instead of dropping points.
+
+### Housekeeping
+- Old local branches deleted; unmerged remote ones kept as tags (archive/*). Unused macOS icons removed.
+- New `PORTEDTEST` self-test (23 checks).
+
 ## 0.59.1-turbo (2026-10-17)
 
 ### Audio: no blink when adding a module (upstream fix)

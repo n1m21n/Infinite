@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "core/AudioCable.h"
@@ -45,6 +46,7 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
 
+   INode* BypassSource() override { return input.GetSource(); }
    AudioNode* GetAudioNode() override;
    // Slot 1 (sidechain) only exists for an EffectDef with hasSidechain set
    // (Dynamics) - every other effect's contiguous-slot count stops at 1, the
@@ -58,10 +60,18 @@ public:
          return &sidechainInput;
       return nullptr;
    }
+   // Slot 1 doubles as the geometry pin for an effect with hasGeometryInput
+   // (Shape Resonator); a def never sets both it and hasSidechain.
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      return (slot == 1 && mDef.hasGeometryInput) ? &geometry : nullptr;
+   }
    const char* InputLabel(int slot) const override
    {
       if (slot == 0)
          return "audio";
+      if (slot == 1 && mDef.hasGeometryInput)
+         return "shape";
       if (slot == 1 && mDef.hasSidechain)
          return mDef.sidechainLabel;
       return nullptr;
@@ -73,9 +83,6 @@ public:
    // shared across every AudioEffectNode of this kind, so an index into it is
    // the stable handle UI code binds ModKnob/AudioSlider to directly.
    float* ParamPtr(size_t index) { return &mParamValues[index]; }
-   // Post-mix mono samples since the last call (main thread), for the live
-   // spectrum visualizers.
-   int ReadSpectrumSamples(float* out, int maxCount);
    float Param(size_t index) const { return mParamValues[index]; }
    // -1 if `name` isn't in this effect's table. A linear search over a
    // couple dozen entries, fine at UI/CookIfNeeded rates; not called from the
@@ -100,6 +107,23 @@ public:
 
    float Level() const { return mLevel; }
    int LatencySamples() const;
+   // Main thread only. Post-mix mono samples for a live spectrum trace (EQ's
+   // visualizer is the only caller today) - returns 0 if the audio node
+   // hasn't been created yet (no CookIfNeeded call landed before this draw).
+   int ReadSpectrumSamples(float* out, int maxCount);
+   // Main thread only. Shape Resonator: frequencies (Hz) of the modes now
+   // ringing; *solving is set while a mesh solve is still running. 0 for any
+   // other effect.
+   int ReadModeFrequencies(float* out, int maxCount, bool* solving = nullptr);
+   // Main thread only. Convolution Reverb: the impulse response now sounding
+   // as peak levels in dB over *seconds; 0 before the first one is built or
+   // for any other effect. *building is set while a new one is being made,
+   // *usingFile when it came from filePath, and *fileError (may be null)
+   // points at why a set file could not be used, or at an empty string.
+   int ReadImpulseEnvelope(float* outDb, int maxCount, float* seconds, bool* building = nullptr,
+                           bool* usingFile = nullptr, const std::string** fileError = nullptr);
+   // Main thread only. See IEffectKernel::Preparing.
+   bool KernelPreparing() const;
    // Kernel-published extra meter values beyond AudioEffectRuntime's own
    // generic post-mix peak - Dynamics publishes {instantaneous input dB,
    // gain-reduction dB} for its transfer-curve visualizer's operating-point
@@ -112,7 +136,9 @@ public:
    }
 
    AudioCable input;
+   IGeometrySource* geometry = nullptr; // only wired when mDef.hasGeometryInput
    AudioCable sidechainInput; // only wired to a pin when mDef.hasSidechain
+   std::string filePath; // only saved and read when mDef.hasFile
 
 private:
    const EffectDef& mDef;
