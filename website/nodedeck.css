@@ -14,11 +14,9 @@
 .nd-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .nd-info { display: grid; gap: 2px; width: clamp(180px, 40vw, 320px); padding: 0 8px; text-align: center; min-width: 0; }
 .nd-t { font: 600 var(--size-body)/1.2 'Geist', system-ui, sans-serif; }
-.nd-d { font: 400 var(--size-caption)/1.3 'Geist', system-ui, sans-serif; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nd-d { font: 400 var(--size-micro-mono)/1.4 'Geist', system-ui, sans-serif; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 680px) { .nd-grid { height: 380px; } .nd-card { width: 244px; height: 330px; margin: -165px 0 0 -122px; border-radius: var(--web-card-radius); } .nd-info { width: clamp(140px, 46vw, 220px); } }
 
 .nd-t { color: inherit; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* one line each, so the HUD never changes height */
-.nd-t:hover, .nd-go:hover { text-decoration: underline; text-underline-offset: 3px; }
-.nd-go { font: 500 var(--size-caption)/1.3 'Geist', system-ui, sans-serif; color: var(--ink-2); text-decoration: none; justify-self: center; }
-.nd-go::after { content: " \2192"; }
+.nd-t:hover { text-decoration: underline; text-underline-offset: 3px; }
 .np-index .nd { --mid: var(--surface-1); --mid-ink: var(--ink); margin-top: 8px; }
