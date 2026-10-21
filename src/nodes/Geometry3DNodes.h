@@ -647,6 +647,14 @@ public:
    float bloom = 0.0f;
    float bloomThreshold = 1.0f;
    float bloomRadius = 0.6f;
+   // Turbo 0.61: 0 raster (live), 1 path traced (progressive: noisy at first,
+   // clean after ptSamples frames; any change restarts it).
+   static const std::vector<std::string>& RenderModeNames();
+   int renderMode = 0;
+   int ptSamples = 256;
+   int ptBounces = 4;
+   int PathTracedSamples() const;
+   int PathTracedTriangles() const;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -671,6 +679,7 @@ public:
       v.Float("shadowBias", shadowBias); v.Float("shadowSoftness", shadowSoftness);
       v.Float("shadowStrength", shadowStrength);
       v.Float("bloom", bloom); v.Float("bloomThreshold", bloomThreshold); v.Float("bloomRadius", bloomRadius);
+      v.Int("renderMode", renderMode); v.Int("ptSamples", ptSamples); v.Int("ptBounces", ptBounces);
    }
 
 private:
@@ -845,6 +854,9 @@ private:
    unsigned int mFbo = 0;
    unsigned int mColorTex = 0;
    Render3DPost mPost;        // Turbo 0.61: IBL maps + HDR finish
+   // Turbo 0.61: renderMode 1. Deleter defined in the .cpp, where the type is complete.
+   struct PathTracerDeleter { void operator()(class Render3DPathTracer* p) const; };
+   std::unique_ptr<class Render3DPathTracer, PathTracerDeleter> mPathTracer;
    unsigned int mPostOut = 0; // mPost's output, 0 until the post pass ran
    unsigned int mDepthBuffer = 0; // a depth texture (so Volume can read it)
    SceneCamera mLastCamera;

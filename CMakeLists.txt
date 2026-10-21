@@ -284,6 +284,7 @@ add_executable(Infinite WIN32
     src/nodes/MidiNodes.cpp
     src/nodes/Geometry3DNodes.cpp
     src/nodes/Render3DPost.cpp
+    src/nodes/Render3DPathTracer.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
     src/nodes/Text3DNode.cpp

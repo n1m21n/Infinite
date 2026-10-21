@@ -1691,6 +1691,22 @@
          ModSlider("radius", &n->bloomRadius, 0.0f, 1.0f, "%.3f", colW);
       }
 
+      // Turbo 0.61: progressive path tracing (noisy at first, clean after the
+      // sample count; any change restarts it).
+      NodeSeparator("render", colW);
+      DropdownButton("mode", Render3DNode::RenderModeNames(), n->renderMode,
+                     [n](int i) { PushUndoCheckpoint(); n->renderMode = i; }, colW);
+      if (n->renderMode == 1)
+      {
+         ModSliderInt("samples", &n->ptSamples, 1, 4096);
+         ModSliderInt("bounces", &n->ptBounces, 1, 12);
+         if (n->PathTracedTriangles() > 0)
+            ImGui::TextDisabled("%d / %d samples, %d tris", std::min(n->PathTracedSamples(), n->ptSamples),
+                                n->ptSamples, n->PathTracedTriangles());
+         else
+            ImGui::TextDisabled("nothing to trace (meshes only, no sprites)");
+      }
+
       ImGui::EndGroup();
    }
 

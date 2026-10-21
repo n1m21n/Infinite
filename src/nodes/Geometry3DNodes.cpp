@@ -1,4 +1,5 @@
 #include "Geometry3DNodes.h"
+#include "Render3DPathTracer.h"
 
 #include "platform/OpenGLHeaders.h"
 #include <algorithm>
@@ -1278,6 +1279,17 @@ void Render3DNode::ReleaseTargets()
    if (mMsFbo != 0) { glDeleteFramebuffers(1, &mMsFbo); mMsFbo = 0; }
 }
 
+const std::vector<std::string>& Render3DNode::RenderModeNames()
+{
+   static const std::vector<std::string> kNames = { "Raster", "Path traced" };
+   return kNames;
+}
+
+void Render3DNode::PathTracerDeleter::operator()(Render3DPathTracer* p) const { delete p; }
+
+int Render3DNode::PathTracedSamples() const { return mPathTracer ? mPathTracer->Samples() : 0; }
+int Render3DNode::PathTracedTriangles() const { return mPathTracer ? mPathTracer->Triangles() : 0; }
+
 Render3DNode::~Render3DNode()
 {
    ReleaseTargets();
@@ -1667,7 +1679,14 @@ void Render3DNode::CookIfNeeded(int frameId)
    // mColorTex (and mSceneColorTex) already hold the right image, so skip
    // the shadow/opaque/transmissive passes entirely and reuse them.
    SceneSignature sceneSig = BuildSceneSignature();
-   if (mHasSceneBuilt && sceneSig == mSceneBuilt)
+   // Turbo 0.61: path traced keeps adding samples to an unchanged scene until
+   // it reaches ptSamples; any change restarts the average.
+   const bool pathTraced = renderMode == 1 && renderPass == 0;
+   const bool sceneChanged = !(mHasSceneBuilt && sceneSig == mSceneBuilt);
+   if (pathTraced && sceneChanged && mPathTracer)
+      mPathTracer->Restart();
+   const bool ptAccumulating = pathTraced && (!mPathTracer || mPathTracer->Samples() < ptSamples);
+   if (!sceneChanged && !ptAccumulating)
       return;
    mSceneBuilt = sceneSig;
    mHasSceneBuilt = true;
@@ -1863,6 +1882,107 @@ void Render3DNode::CookIfNeeded(int frameId)
    glDisable(GL_STENCIL_TEST);
    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
    glDepthMask(GL_TRUE);
+
+   // Turbo 0.61: path traced mode - the same meshes, materials, lights and
+   // environment, traced progressively (Render3DPathTracer), then the same
+   // HDR finish. Falls back to raster when there is nothing it can trace.
+   if (pathTraced)
+   {
+      if (!mPathTracer)
+         mPathTracer.reset(new Render3DPathTracer());
+      std::vector<Render3DPathTracer::Source> sources;
+      uint64_t key = 1469598103934665603ull;
+      auto mix = [&key](const void* p, size_t n) {
+         const unsigned char* b = (const unsigned char*)p;
+         for (size_t i = 0; i < n; i++)
+            key = (key ^ b[i]) * 1099511628211ull;
+      };
+      for (IGeometrySource* src : mDraw)
+      {
+         if (src == nullptr || IsSpriteSource(src) || src->GetPop() != nullptr)
+            continue;
+         const Mesh& mesh = src->GetMesh();
+         if (mesh.indices.size() < 3)
+            continue;
+         Render3DPathTracer::Source s;
+         s.mesh = &mesh;
+         s.model = src->GetModelMatrix();
+         s.material = src->GetMaterial();
+         s.surfaceTex = src->GetSurfaceTexture();
+         if (auto* instancer = FindInstancer(src))
+         {
+            const Mat4 group = src->GetInstanceGroupMatrix();
+            for (const Mat4& x : instancer->InstanceTransforms())
+               s.instances.push_back(Mat4::Multiply(group, x));
+            const unsigned long long irev = instancer->InstanceRevision();
+            mix(&irev, sizeof(irev));
+            mix(&group, sizeof(group));
+         }
+         const unsigned long long rev = src->MeshRevision();
+         mix(&src, sizeof(src));
+         mix(&rev, sizeof(rev));
+         mix(&s.model, sizeof(s.model));
+         // Field by field: the struct's padding is not stable across copies.
+         const Material& mt = s.material;
+         const float mf[14] = { mt.color[0], mt.color[1], mt.color[2], mt.metallic, mt.roughness, mt.opacity,
+                                mt.emissionColor[0], mt.emissionColor[1], mt.emissionColor[2], mt.emission,
+                                mt.ior, mt.transmission, 0.0f, 0.0f };
+         mix(mf, sizeof(mf));
+         mix(&s.surfaceTex, sizeof(s.surfaceTex));
+         sources.push_back(std::move(s));
+      }
+      unsigned int traced = 0;
+      if (mPathTracer->SetScene(sources, key))
+      {
+         std::vector<Render3DPathTracer::Light> lights;
+         for (int i = 0; i < lightCount; i++)
+         {
+            Render3DPathTracer::Light l;
+            l.type = lightTypes[i];
+            for (int k = 0; k < 3; k++)
+            {
+               l.dir[k] = lightDirs[i * 3 + k];
+               l.color[k] = lightCols[i * 3 + k];
+            }
+            l.intensity = lightPower[i];
+            l.spotAngle = lightSpotAngle[i];
+            lights.push_back(l);
+         }
+         Render3DPathTracer::Env env;
+         env.tex = envTex;
+         env.rotation = envRotationRad;
+         env.intensity = envIntensity * envHdriIntensity;
+         for (int k = 0; k < 3; k++)
+         {
+            env.sky[k] = envSky[k];
+            env.horizon[k] = envHorizon[k];
+            env.ground[k] = envGround[k];
+            env.ambient[k] = ambientColor[k];
+         }
+         traced = mPathTracer->Trace(w, h, viewProj, eye, lights, env, exposure, ptBounces, std::max(1, ptSamples), 1);
+      }
+      if (traced != 0)
+      {
+         if (envAsBackground && hasEnvMap)
+            mPostOut = mPost.Finish(traced, w, h, tonemap, bloom, bloomThreshold, bloomRadius, false, 0, bgColor);
+         else
+            mPostOut = mPost.FinishCoverage(traced, w, h, tonemap, bloom, bloomThreshold, bloomRadius, bgColor,
+                                            bgOpacity);
+         if (!prevDepth) glDisable(GL_DEPTH_TEST);
+         if (!prevCull) glDisable(GL_CULL_FACE);
+         if (!prevBlend) glDisable(GL_BLEND);
+         if (prevScissor)
+         {
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(prevScissorBox[0], prevScissorBox[1], prevScissorBox[2], prevScissorBox[3]);
+         }
+         glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+         glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+         mDepthResolved = false;
+         mRevision = NextTextureRevision();
+         return;
+      }
+   }
 
    const bool multisampling = mActiveSamples > 1 && mMsFbo != 0;
    glBindFramebuffer(GL_FRAMEBUFFER, multisampling ? mMsFbo : mFbo);

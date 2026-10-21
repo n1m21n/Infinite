@@ -31,9 +31,16 @@ public:
    // bloom halo screened over it. depthTex 0 = tonemap everything (HDRI bg).
    unsigned int Finish(unsigned int src, int w, int h, int tonemap, float bloom, float bloomThreshold,
                        float bloomRadius, bool passthrough, unsigned int depthTex, const float bg[3]);
+   // Path-traced input: src.a is coverage (share of samples that hit
+   // something); the background colour shows through where it is below 1,
+   // with bgOpacity as its alpha.
+   unsigned int FinishCoverage(unsigned int src, int w, int h, int tonemap, float bloom, float bloomThreshold,
+                               float bloomRadius, const float bg[3], float bgOpacity);
    unsigned int Output() const { return mOutTex; }
 
 private:
+   unsigned int Run(unsigned int src, int w, int h, int tonemap, float bloom, float bloomThreshold, float bloomRadius,
+                    bool passthrough, unsigned int depthTex, const float bg[3], int keyMode, float bgOpacity);
    bool EnsurePrograms();
    void EnsureTargets(int w, int h);
    void DrawFullscreen();

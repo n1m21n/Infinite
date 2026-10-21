@@ -191,6 +191,7 @@ namespace
       "uniform sampler2D uDepth;\n"
       "uniform int uBgKey;\n"
       "uniform vec3 uBg;\n"
+      "uniform float uBgOpacity;\n"
       "vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }\n"
       "vec3 agxContrast(vec3 x) {\n"
       "   vec3 x2 = x * x, x4 = x2 * x2;\n"
@@ -253,9 +254,18 @@ namespace
       "   else if (uTonemap == 4) c = neutral(c);\n"
       "   c = pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2));\n"
       "   if (bg) c = 1.0 - (1.0 - uBg) * (1.0 - c);\n"
+      "   float alpha = src.a;\n"
+      "   if (uBgKey == 2) {\n" // path traced: alpha is coverage
+      "      vec3 g = glow;\n"
+      "      if (uTonemap == 1) g = aces(g); else if (uTonemap == 2) g = g / (g + vec3(1.0));\n"
+      "      else if (uTonemap == 3) g = agx(g); else if (uTonemap == 4) g = neutral(g);\n"
+      "      vec3 bgOut = 1.0 - (1.0 - uBg) * (1.0 - pow(clamp(g, 0.0, 1.0), vec3(1.0 / 2.2)));\n"
+      "      c = mix(bgOut, c, clamp(src.a, 0.0, 1.0));\n"
+      "      alpha = mix(uBgOpacity, 1.0, clamp(src.a, 0.0, 1.0));\n"
+      "   }\n"
       "   vec2 p = floor(gl_FragCoord.xy);\n"
       "   c += (fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;\n"
-      "   fragColor = vec4(c, src.a);\n"
+      "   fragColor = vec4(c, alpha);\n"
       "}\n";
 
    unsigned int MakeTex(int w, int h, unsigned int internalFormat)
@@ -470,6 +480,20 @@ void Render3DPost::EnsureTargets(int w, int h)
 unsigned int Render3DPost::Finish(unsigned int src, int w, int h, int tonemap, float bloom, float bloomThreshold,
                                   float bloomRadius, bool passthrough, unsigned int depthTex, const float bg[3])
 {
+   return Run(src, w, h, tonemap, bloom, bloomThreshold, bloomRadius, passthrough, depthTex, bg,
+              depthTex != 0 ? 1 : 0, 1.0f);
+}
+
+unsigned int Render3DPost::FinishCoverage(unsigned int src, int w, int h, int tonemap, float bloom,
+                                          float bloomThreshold, float bloomRadius, const float bg[3], float bgOpacity)
+{
+   return Run(src, w, h, tonemap, bloom, bloomThreshold, bloomRadius, false, 0, bg, 2, bgOpacity);
+}
+
+unsigned int Render3DPost::Run(unsigned int src, int w, int h, int tonemap, float bloom, float bloomThreshold,
+                               float bloomRadius, bool passthrough, unsigned int depthTex, const float bg[3],
+                               int keyMode, float bgOpacity)
+{
    if (!EnsurePrograms())
       return 0;
    EnsureTargets(w, h);
@@ -531,7 +555,8 @@ unsigned int Render3DPost::Finish(unsigned int src, int w, int h, int tonemap, f
    glActiveTexture(GL_TEXTURE7);
    glBindTexture(GL_TEXTURE_2D, depthTex);
    glUniform1i(glGetUniformLocation(mFinishProgram, "uDepth"), 7);
-   glUniform1i(glGetUniformLocation(mFinishProgram, "uBgKey"), depthTex != 0 ? 1 : 0);
+   glUniform1i(glGetUniformLocation(mFinishProgram, "uBgKey"), keyMode);
+   glUniform1f(glGetUniformLocation(mFinishProgram, "uBgOpacity"), bgOpacity);
    glUniform3f(glGetUniformLocation(mFinishProgram, "uBg"), bg[0], bg[1], bg[2]);
    glActiveTexture(GL_TEXTURE0);
    glUniform1i(glGetUniformLocation(mFinishProgram, "uLevels"), levels);

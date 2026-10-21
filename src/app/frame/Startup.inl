@@ -1768,7 +1768,7 @@
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Render 3D", "3D", 700.0f, 40.0f);
       }
-      else if (getenv("INFINITE_3DTEST") != nullptr)
+      else if (getenv("INFINITE_3DTEST") != nullptr || getenv("INFINITE_PATHTRACETEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Geometry", "3D", 40.0f, 500.0f);
@@ -1784,9 +1784,16 @@
          auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
          r->geometry[0] = g0;
          r->geometry[1] = g1;
-         g0->TextureInput().Connect(gNodes[3].node.get());
+         // Path traced: a static scene, or the animated Noise restarts the average every frame.
+         if (getenv("INFINITE_PATHTRACETEST") == nullptr)
+            g0->TextureInput().Connect(gNodes[3].node.get());
          r->width = 700.0f; r->height = 700.0f;
          r->samples = 0; // the antialias check below turns it on at frame 4
+         if (getenv("INFINITE_PATHTRACETEST") != nullptr)
+         {
+            r->renderMode = 1; // Turbo 0.61: the same scene, path traced
+            r->ptSamples = 32;
+         }
          if (getenv("INFINITE_NOCULL") != nullptr)
             r->backfaceCull = false;
          if (getenv("INFINITE_NODEPTH") != nullptr)
