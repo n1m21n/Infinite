@@ -62,12 +62,11 @@ html:has(.np-page) { overflow-x: hidden; overflow-x: clip; }
 .ns-name { font-size: var(--fs-h3); font-weight: 700; line-height: 1.2; color: var(--ink); }
 .ns-open { text-decoration: none; margin-top: 4px; }
 html .ns-info input.ns-range { height: 20px; width: min(100%, 200px); margin: 8px 0 0; background: none; box-shadow: none; }
-html .ns-info input.ns-range::-webkit-slider-runnable-track { height: 2px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--ink2) 35%, transparent); box-shadow: none; }
-html .ns-info input.ns-range::-moz-range-track { height: 2px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--ink2) 35%, transparent); box-shadow: none; }
+html .ns-info input.ns-range::-webkit-slider-runnable-track { height: 6px; border-radius: var(--r-pill); background: var(--nm-down); box-shadow: var(--nm-pocket); }
+html .ns-info input.ns-range::-moz-range-track { height: 6px; border-radius: var(--r-pill); background: var(--nm-down); box-shadow: var(--nm-pocket); }
 html .ns-info input.ns-range::-moz-range-progress { background: none; }
-html .ns-info input.ns-range::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -5px; border-radius: 50%; background: var(--ink); box-shadow: none; }
-html .ns-info input.ns-range::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--ink); box-shadow: none; }
-html .ns-info input.ns-range:active::-webkit-slider-thumb { background: var(--signal); box-shadow: none; transform: scale(1.15); }
+html .ns-info input.ns-range::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -5px; border-radius: 50%; background: var(--nm-up); box-shadow: var(--nm-raise); }
+html .ns-info input.ns-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--nm-up); box-shadow: var(--nm-raise); }
 .ns-bar { margin: 8px 0 0; align-items: center; gap: 8px; }
 .ns-sel { position: relative; z-index: 30; }
 .ns-select, .ns-view { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 0; border-radius: var(--r-pill); background: var(--nm-up); box-shadow: var(--nm-raise); color: var(--ink); font: inherit; font-size: var(--fs-small); font-weight: 600; cursor: pointer; }

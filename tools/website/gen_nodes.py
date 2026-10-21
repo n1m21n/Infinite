@@ -434,7 +434,7 @@ def head(title, desc, url, image, ld, rel="nodes/x.html", bodyclass="blog-page b
   <link rel="stylesheet" href="../style.css?v=60c68394">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
-  <link rel="stylesheet" href="../nodepage.css?v=8c058d29">
+  <link rel="stylesheet" href="../nodepage.css?v=cea194f1">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="{bodyclass}">
