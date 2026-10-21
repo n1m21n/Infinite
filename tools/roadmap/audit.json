@@ -1,16 +1,16 @@
 {
  "merges": [
-  371,
-  406
+  406,
+  441
  ],
  "direct": [
   500,
-  591
+  626
  ],
  "notes_total": 389,
  "evidence": [
-  580,
-  672
+  615,
+  707
  ],
  "per_release": {
   "v0.1": {
@@ -123,6 +123,41 @@
   }
  },
  "loose": [
+  "2026-10-14 9b57324 agent-language: record T4 pass on dev and held-out, correct the T4 diagnosis, release clai",
+  "2026-10-14 ed5d97f agentlang: ship nodefacts (ask returns keys), SPEC output/ask/Field Notes rules, option na",
+  "2026-10-14 94bacf1 agentlang: fix t4dev output path",
+  "2026-10-14 501b14d agentlang: T4 dev-set check job",
+  "2026-10-14 a285278 agentlang: SPEC names Field domains and a sample idiom; T4 re-run job",
+  "2026-10-14 868884a agentlang: al logs apply errors; diag job",
+  "2026-10-14 cbc4fe9 agentlang: phase 2 results section",
+  "2026-10-14 34d200c agentlang: phase 2 results (KEEP-GOING, T4 fails)",
+  "2026-10-14 85a3df8 agentlang: handoff to the Air",
+  "2026-10-14 8c6f7d1 agentlang: film plan status",
+  "2026-10-14 3393cb7 agentlang: film_check one-call loop and spec",
+  "2026-10-14 9a36679 agentlang: film dialect plan and token miner",
+  "2026-10-14 42864d9 agentlang: keep pilot2 runs under docs, ignore out/",
+  "2026-10-14 58a65d1 agentlang: pilot v2 passes the gate (B1 about half of B0p fresh tokens)",
+  "2026-10-14 0611db1 agentlang: final_suite (T2 via CLI, T4, T5, T7, verdict), --reps, --t7, full job",
+  "2026-10-14 3405bbb agentlang: verdict.py, paired bootstrap per model",
+  "2026-10-14 c74ca0d agentlang: air_run.sh (sync newest app + branch, pin, start job), pilot2 job",
+  "2026-10-14 9fd9a09 agentlang: tasks v2, goals name the nodes the oracle requires",
+  "2026-10-14 3413c39 agentlang: harness refuses an unpinned app, records its sha",
+  "2026-10-14 7fd9008 agentlang: validate_all honours INFINITE_APP",
+  "2026-10-14 6664ae6 agentlang: report_runs.py, Air pilot brief",
+  "2026-10-14 5e5fd38 agentlang: harness for B0/B0p/B1, percent-unit note",
+  "2026-10-14 82938d5 agentlang: check.py and al.py, the one-call check and the B1 tool",
+  "2026-10-14 856a821 NOW: claim pro-agent-language",
+  "2026-10-14 9363d8e agentlang phase 2: validate_all runs real --validate on every task patch (40/40 ok; audio-",
+  "2026-10-14 57b9346 agentlang: report, Phase 1 notes and results; release claim",
+  "2026-10-14 d6fda0b agentlang: codec tests T1 T2 T3 T6",
+  "2026-10-14 a769f1e agentlang: codec (decode, encode, gloss, ask); SPEC wire examples use out.in",
+  "2026-10-14 175144b agentlang: SPEC v0 (3.4k chars)",
+  "2026-10-14 7a8d8a9 agentlang: freeze tasks",
+  "2026-10-14 f023eac agentlang: freeze tool",
+  "2026-10-14 da14711 agentlang: tasks, solutions, oracle and facts helpers (step 1)",
+  "2026-10-14 e0446ff agentlang: save design, claim air-agent-language",
+  "2026-10-14 c759a93 Sweep drivers gate on real failures: shared per-param audio baseline check, self-test skip",
+  "2026-10-13 70931ef NOW: v0.6 item count 61",
   "2026-10-13 980d07e Driver: hold QUALITY rows to docs/quality/registry.tsv; a release-gated miss fails the che",
   "2026-10-13 0d65bf5 quality-system skill; AGENTS, tool-first, node-audits and re-survey point at it",
   "2026-10-13 71af380 Quality scoreboard: first recorded run, Synths (SYNTHAUDIT + Diva/Serum 2/Vital probe)",

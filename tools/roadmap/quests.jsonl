@@ -2971,3 +2971,111 @@
 {"ts": "2026-10-13T08:07:37+05:30", "event": "done", "id": "R753", "why": "merged into main (ed461e5)"}
 {"ts": "2026-10-13T08:07:37+05:30", "event": "edit", "id": "R753", "opened": "2026-10-13T01:03:40+05:30", "closed": "2026-10-13T08:07:37+05:30", "release": "", "commits": ["ed461e5"]}
 {"ts": "2026-10-13T07:55:12+00:00", "event": "add", "id": "R754", "track": "engine", "kind": "infra", "horizon": "next", "title": "Perf: motion blur and radial blur cost", "why": "Owner accepted image-fx maths (linear light, headroom); motion/radial blur are the heaviest of those filters per cook. Measure at 1080p/4K, cut sample cost (separable/downsampled taps) without changing the export look.", "after": [], "user": false, "origin": "ask", "effort": "M", "rate": {"user": 2, "func": 0, "perf": 3, "ux": 1}, "ptier": "projector"}
+{"ts": "2026-10-13T08:35:15+05:30", "event": "add", "id": "R755", "after": [], "user": false, "src": "merge:feature/audio-audit-left", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Audio audit left", "why": "merged into main (78fef84)", "origin": "merge"}
+{"ts": "2026-10-13T08:35:21+05:30", "event": "done", "id": "R755", "why": "merged into main (78fef84)"}
+{"ts": "2026-10-13T08:35:21+05:30", "event": "edit", "id": "R755", "opened": "2026-10-13T08:35:15+05:30", "closed": "2026-10-13T08:35:21+05:30", "release": "", "commits": ["78fef84"]}
+{"ts": "2026-10-13T08:45:03+05:30", "event": "add", "id": "R756", "after": [], "user": false, "src": "merge:feature/comp-audit-left", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Comp audit left", "why": "merged into main (27bd0d7)", "origin": "merge"}
+{"ts": "2026-10-13T08:45:07+05:30", "event": "done", "id": "R756", "why": "merged into main (27bd0d7)"}
+{"ts": "2026-10-13T08:45:07+05:30", "event": "edit", "id": "R756", "opened": "2026-10-13T08:45:03+05:30", "closed": "2026-10-13T08:45:07+05:30", "release": "", "commits": ["27bd0d7"]}
+{"ts": "2026-10-13T08:42:40+05:30", "event": "add", "id": "R757", "after": [], "user": false, "src": "merge:feature/re-survey-robustness", "track": "engine", "kind": "feature", "horizon": "later", "title": "Re survey robustness", "why": "merged into main (e190178)", "origin": "merge"}
+{"ts": "2026-10-13T08:58:11+05:30", "event": "done", "id": "R757", "why": "merged into main (e190178)"}
+{"ts": "2026-10-13T08:58:11+05:30", "event": "edit", "id": "R757", "opened": "2026-10-13T08:42:40+05:30", "closed": "2026-10-13T08:58:11+05:30", "release": "", "commits": ["e190178"]}
+{"ts": "2026-10-13T10:10:12+05:30", "event": "add", "id": "R758", "after": [], "user": false, "src": "merge:feature/geo-audit-left", "track": "engine", "kind": "feature", "horizon": "later", "title": "Geo audit left", "why": "merged into main (6136354)", "origin": "merge"}
+{"ts": "2026-10-13T10:10:22+05:30", "event": "done", "id": "R758", "why": "merged into main (6136354)"}
+{"ts": "2026-10-13T10:10:22+05:30", "event": "edit", "id": "R758", "opened": "2026-10-13T10:10:12+05:30", "closed": "2026-10-13T10:10:22+05:30", "release": "", "commits": ["6136354"]}
+{"ts": "2026-10-13T10:16:23+05:30", "event": "add", "id": "R759", "after": [], "user": false, "src": "merge:feature/quality-rows-audits", "track": "engine", "kind": "feature", "horizon": "later", "title": "Quality rows audits", "why": "merged into main (4132284)", "origin": "merge"}
+{"ts": "2026-10-13T10:16:23+05:30", "event": "done", "id": "R759", "why": "merged into main (4132284)"}
+{"ts": "2026-10-13T10:16:23+05:30", "event": "edit", "id": "R759", "opened": "2026-10-13T10:16:23+05:30", "closed": "2026-10-13T10:16:23+05:30", "release": "", "commits": ["4132284"]}
+{"ts": "2026-10-13T10:33:37+05:30", "event": "add", "id": "R760", "after": [], "user": false, "src": "merge:feature/audit-leftovers", "track": "ship", "kind": "feature", "horizon": "later", "title": "Audit leftovers", "why": "merged into main (cb0affe)", "origin": "merge"}
+{"ts": "2026-10-13T10:33:38+05:30", "event": "done", "id": "R760", "why": "merged into main (cb0affe)"}
+{"ts": "2026-10-13T10:33:38+05:30", "event": "edit", "id": "R760", "opened": "2026-10-13T10:33:37+05:30", "closed": "2026-10-13T10:33:38+05:30", "release": "", "commits": ["cb0affe"]}
+{"ts": "2026-10-12T22:26:09+05:30", "event": "add", "id": "R761", "after": [], "user": false, "src": "merge:bugfix/cook-overlay-over-windows", "track": "platform", "kind": "fix", "horizon": "later", "title": "Cook overlay over windows", "why": "merged into main (42bb79d)", "origin": "merge"}
+{"ts": "2026-10-13T10:37:13+05:30", "event": "done", "id": "R761", "why": "merged into main (42bb79d)"}
+{"ts": "2026-10-13T10:37:13+05:30", "event": "edit", "id": "R761", "opened": "2026-10-12T22:26:09+05:30", "closed": "2026-10-13T10:37:13+05:30", "release": "", "commits": ["42bb79d"]}
+{"ts": "2026-10-13T11:24:19+05:30", "event": "add", "id": "R762", "after": [], "user": false, "src": "merge:bugfix/field-validate-unknown-fn", "track": "field", "kind": "fix", "horizon": "later", "title": "Field validate unknown fn", "why": "merged into main (d184ef2)", "origin": "merge"}
+{"ts": "2026-10-13T12:58:46+05:30", "event": "done", "id": "R762", "why": "merged into main (d184ef2)"}
+{"ts": "2026-10-13T12:58:46+05:30", "event": "edit", "id": "R762", "opened": "2026-10-13T11:24:19+05:30", "closed": "2026-10-13T12:58:46+05:30", "release": "", "commits": ["d184ef2"]}
+{"ts": "2026-10-13T11:06:01+05:30", "event": "add", "id": "R763", "after": [], "user": false, "src": "merge:feature/quality-bench-rows", "track": "engine", "kind": "feature", "horizon": "later", "title": "Quality bench rows", "why": "merged into main (12034d7)", "origin": "merge"}
+{"ts": "2026-10-13T12:58:47+05:30", "event": "done", "id": "R763", "why": "merged into main (12034d7)"}
+{"ts": "2026-10-13T12:58:47+05:30", "event": "edit", "id": "R763", "opened": "2026-10-13T11:06:01+05:30", "closed": "2026-10-13T12:58:47+05:30", "release": "", "commits": ["12034d7"]}
+{"ts": "2026-10-13T11:25:39+05:30", "event": "add", "id": "R764", "after": [], "user": false, "src": "merge:feature/re-survey-probes-2", "track": "growth", "kind": "feature", "horizon": "later", "title": "Re survey probes 2", "why": "merged into main (d8845dd)", "origin": "merge"}
+{"ts": "2026-10-13T12:59:08+05:30", "event": "done", "id": "R764", "why": "merged into main (d8845dd)"}
+{"ts": "2026-10-13T12:59:08+05:30", "event": "edit", "id": "R764", "opened": "2026-10-13T11:25:39+05:30", "closed": "2026-10-13T12:59:08+05:30", "release": "", "commits": ["d8845dd"]}
+{"ts": "2026-10-13T13:07:11+05:30", "event": "add", "id": "R765", "after": [], "user": false, "src": "merge:feature/site-extensions", "track": "growth", "kind": "feature", "horizon": "later", "title": "Site extensions", "why": "merged into main (e6acbe2)", "origin": "merge"}
+{"ts": "2026-10-13T13:07:30+05:30", "event": "done", "id": "R765", "why": "merged into main (e6acbe2)"}
+{"ts": "2026-10-13T13:07:30+05:30", "event": "edit", "id": "R765", "opened": "2026-10-13T13:07:11+05:30", "closed": "2026-10-13T13:07:30+05:30", "release": "", "commits": ["e6acbe2"]}
+{"ts": "2026-10-11T17:02:33+05:30", "event": "add", "id": "R766", "after": [], "user": false, "src": "merge:feature/image-fx-maths", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Image fx maths", "why": "merged into main (7b6e036)", "origin": "merge"}
+{"ts": "2026-10-13T13:24:49+05:30", "event": "done", "id": "R766", "why": "merged into main (7b6e036)"}
+{"ts": "2026-10-13T13:24:49+05:30", "event": "edit", "id": "R766", "opened": "2026-10-11T17:02:33+05:30", "closed": "2026-10-13T13:24:49+05:30", "release": "", "commits": ["7b6e036"]}
+{"ts": "2026-10-13T11:14:15+05:30", "event": "add", "id": "R767", "after": [], "user": false, "src": "merge:feature/quality-measure-unmeasured", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Quality measure unmeasured", "why": "merged into main (deefa3b)", "origin": "merge"}
+{"ts": "2026-10-13T13:33:00+05:30", "event": "done", "id": "R767", "why": "merged into main (deefa3b)"}
+{"ts": "2026-10-13T13:33:00+05:30", "event": "edit", "id": "R767", "opened": "2026-10-13T11:14:15+05:30", "closed": "2026-10-13T13:33:00+05:30", "release": "", "commits": ["deefa3b"]}
+{"ts": "2026-10-13T11:16:15+05:30", "event": "add", "id": "R768", "after": [], "user": false, "src": "merge:bugfix/quality-analog-pitch", "track": "engine", "kind": "fix", "horizon": "later", "title": "Quality analog pitch", "why": "merged into main (84c7cba)", "origin": "merge"}
+{"ts": "2026-10-13T13:33:01+05:30", "event": "done", "id": "R768", "why": "merged into main (84c7cba)"}
+{"ts": "2026-10-13T13:33:01+05:30", "event": "edit", "id": "R768", "opened": "2026-10-13T11:16:15+05:30", "closed": "2026-10-13T13:33:01+05:30", "release": "", "commits": ["84c7cba"]}
+{"ts": "2026-10-13T11:41:10+05:30", "event": "add", "id": "R769", "after": [], "user": false, "src": "merge:bugfix/quality-analog-aliasing", "track": "ship", "kind": "fix", "horizon": "later", "title": "Quality analog aliasing", "why": "merged into main (ecc8712)", "origin": "merge"}
+{"ts": "2026-10-13T13:33:03+05:30", "event": "done", "id": "R769", "why": "merged into main (ecc8712)"}
+{"ts": "2026-10-13T13:33:03+05:30", "event": "edit", "id": "R769", "opened": "2026-10-13T11:41:10+05:30", "closed": "2026-10-13T13:33:03+05:30", "release": "", "commits": ["ecc8712"]}
+{"ts": "2026-10-13T13:16:36+05:30", "event": "add", "id": "R770", "after": [], "user": false, "src": "merge:bugfix/quality-node-findings", "track": "nodes", "kind": "fix", "horizon": "later", "title": "Quality node findings", "why": "merged into main (adc4b73)", "origin": "merge"}
+{"ts": "2026-10-13T13:33:04+05:30", "event": "done", "id": "R770", "why": "merged into main (adc4b73)"}
+{"ts": "2026-10-13T13:33:04+05:30", "event": "edit", "id": "R770", "opened": "2026-10-13T13:16:36+05:30", "closed": "2026-10-13T13:33:04+05:30", "release": "", "commits": ["adc4b73"]}
+{"ts": "2026-10-13T13:18:26+05:30", "event": "add", "id": "R771", "after": [], "user": false, "src": "merge:bugfix/describe-no-args", "track": "platform", "kind": "fix", "horizon": "later", "title": "Describe no args", "why": "merged into main (6478217)", "origin": "merge"}
+{"ts": "2026-10-13T13:41:27+05:30", "event": "done", "id": "R771", "why": "merged into main (6478217)"}
+{"ts": "2026-10-13T13:41:27+05:30", "event": "edit", "id": "R771", "opened": "2026-10-13T13:18:26+05:30", "closed": "2026-10-13T13:41:27+05:30", "release": "", "commits": ["6478217"]}
+{"ts": "2026-10-13T13:40:14+05:30", "event": "add", "id": "R772", "after": [], "user": false, "src": "merge:bugfix/validate-formula-expr", "track": "platform", "kind": "fix", "horizon": "later", "title": "Validate formula expr", "why": "merged into main (546b7f9)", "origin": "merge"}
+{"ts": "2026-10-13T13:41:27+05:30", "event": "done", "id": "R772", "why": "merged into main (546b7f9)"}
+{"ts": "2026-10-13T13:41:27+05:30", "event": "edit", "id": "R772", "opened": "2026-10-13T13:40:14+05:30", "closed": "2026-10-13T13:41:27+05:30", "release": "", "commits": ["546b7f9"]}
+{"ts": "2026-10-13T11:37:31+05:30", "event": "add", "id": "R773", "after": [], "user": false, "src": "merge:feature/re-survey-finish", "track": "engine", "kind": "feature", "horizon": "later", "title": "Re survey finish", "why": "merged into main (430835d)", "origin": "merge"}
+{"ts": "2026-10-13T13:41:37+05:30", "event": "done", "id": "R773", "why": "merged into main (430835d)"}
+{"ts": "2026-10-13T13:41:37+05:30", "event": "edit", "id": "R773", "opened": "2026-10-13T11:37:31+05:30", "closed": "2026-10-13T13:41:37+05:30", "release": "", "commits": ["430835d"]}
+{"ts": "2026-10-13T13:52:46+05:30", "event": "add", "id": "R774", "after": [], "user": false, "src": "merge:bugfix/patch1-canonical", "track": "platform", "kind": "fix", "horizon": "later", "title": "Patch1 canonical", "why": "merged into main (f67c2c7)", "origin": "merge"}
+{"ts": "2026-10-13T13:52:46+05:30", "event": "done", "id": "R774", "why": "merged into main (f67c2c7)"}
+{"ts": "2026-10-13T13:52:46+05:30", "event": "edit", "id": "R774", "opened": "2026-10-13T13:52:46+05:30", "closed": "2026-10-13T13:52:46+05:30", "release": "", "commits": ["f67c2c7"]}
+{"ts": "2026-10-13T14:07:25+05:30", "event": "add", "id": "R775", "after": [], "user": false, "src": "merge:bugfix/render3d-stats-width", "track": "ux", "kind": "fix", "horizon": "later", "title": "Render3d stats width", "why": "merged into main (0d57bb9)", "origin": "merge"}
+{"ts": "2026-10-13T14:23:18+05:30", "event": "done", "id": "R775", "why": "merged into main (0d57bb9)"}
+{"ts": "2026-10-13T14:23:18+05:30", "event": "edit", "id": "R775", "opened": "2026-10-13T14:07:25+05:30", "closed": "2026-10-13T14:23:18+05:30", "release": "", "commits": ["0d57bb9"]}
+{"ts": "2026-10-13T14:56:43+05:30", "event": "add", "id": "R776", "after": [], "user": false, "src": "merge:bugfix/step4-offline-audio", "track": "engine", "kind": "fix", "horizon": "later", "title": "Step4 offline audio", "why": "merged into main (a2cd2d6)", "origin": "merge"}
+{"ts": "2026-10-13T15:07:42+05:30", "event": "done", "id": "R776", "why": "merged into main (a2cd2d6)"}
+{"ts": "2026-10-13T15:07:42+05:30", "event": "edit", "id": "R776", "opened": "2026-10-13T14:56:43+05:30", "closed": "2026-10-13T15:07:42+05:30", "release": "", "commits": ["a2cd2d6"]}
+{"ts": "2026-10-13T17:19:42+05:30", "event": "add", "id": "R777", "after": [], "user": false, "src": "merge:docs/re-survey-data-fix", "track": "ship", "kind": "infra", "horizon": "later", "title": "Re survey data fix", "why": "merged into main (3a8598f)", "origin": "merge"}
+{"ts": "2026-10-13T17:23:39+05:30", "event": "done", "id": "R777", "why": "merged into main (3a8598f)"}
+{"ts": "2026-10-13T17:23:39+05:30", "event": "edit", "id": "R777", "opened": "2026-10-13T17:19:42+05:30", "closed": "2026-10-13T17:23:39+05:30", "release": "", "commits": ["3a8598f"]}
+{"ts": "2026-10-13T17:26:10+05:30", "event": "add", "id": "R778", "after": [], "user": false, "src": "merge:docs/v06-carryover", "track": "nodes", "kind": "infra", "horizon": "later", "title": "V06 carryover", "why": "merged into main (b505956)", "origin": "merge"}
+{"ts": "2026-10-13T17:26:11+05:30", "event": "done", "id": "R778", "why": "merged into main (b505956)"}
+{"ts": "2026-10-13T17:26:11+05:30", "event": "edit", "id": "R778", "opened": "2026-10-13T17:26:10+05:30", "closed": "2026-10-13T17:26:11+05:30", "release": "", "commits": ["b505956"]}
+{"ts": "2026-10-13T17:42:25+05:30", "event": "add", "id": "R779", "after": [], "user": false, "src": "merge:docs/v06-full-scope", "track": "engine", "kind": "infra", "horizon": "later", "title": "V06 full scope", "why": "merged into main (5796e39)", "origin": "merge"}
+{"ts": "2026-10-13T17:42:25+05:30", "event": "done", "id": "R779", "why": "merged into main (5796e39)"}
+{"ts": "2026-10-13T17:42:25+05:30", "event": "edit", "id": "R779", "opened": "2026-10-13T17:42:25+05:30", "closed": "2026-10-13T17:42:25+05:30", "release": "", "commits": ["5796e39"]}
+{"ts": "2026-10-13T17:48:59+05:30", "event": "add", "id": "R780", "after": [], "user": false, "src": "merge:docs/v06-data-use", "track": "engine", "kind": "infra", "horizon": "later", "title": "V06 data use", "why": "merged into main (d285177)", "origin": "merge"}
+{"ts": "2026-10-13T17:48:59+05:30", "event": "done", "id": "R780", "why": "merged into main (d285177)"}
+{"ts": "2026-10-13T17:48:59+05:30", "event": "edit", "id": "R780", "opened": "2026-10-13T17:48:59+05:30", "closed": "2026-10-13T17:48:59+05:30", "release": "", "commits": ["d285177"]}
+{"ts": "2026-10-13T17:49:09+05:30", "event": "add", "id": "R781", "after": [], "user": false, "src": "merge:docs/v06-renumber", "track": "engine", "kind": "infra", "horizon": "later", "title": "V06 renumber", "why": "merged into main (955c604)", "origin": "merge"}
+{"ts": "2026-10-13T17:49:09+05:30", "event": "done", "id": "R781", "why": "merged into main (955c604)"}
+{"ts": "2026-10-13T17:49:09+05:30", "event": "edit", "id": "R781", "opened": "2026-10-13T17:49:09+05:30", "closed": "2026-10-13T17:49:09+05:30", "release": "", "commits": ["955c604"]}
+{"ts": "2026-10-13T17:58:17+05:30", "event": "add", "id": "R782", "after": [], "user": false, "src": "merge:docs/v06-design-direction", "track": "engine", "kind": "infra", "horizon": "later", "title": "V06 design direction", "why": "merged into main (820fc82)", "origin": "merge"}
+{"ts": "2026-10-13T17:58:18+05:30", "event": "done", "id": "R782", "why": "merged into main (820fc82)"}
+{"ts": "2026-10-13T17:58:18+05:30", "event": "edit", "id": "R782", "opened": "2026-10-13T17:58:17+05:30", "closed": "2026-10-13T17:58:18+05:30", "release": "", "commits": ["820fc82"]}
+{"ts": "2026-10-13T18:01:41+05:30", "event": "add", "id": "R783", "after": [], "user": false, "src": "merge:docs/v06-live-design", "track": "engine", "kind": "infra", "horizon": "later", "title": "V06 live design", "why": "merged into main (8fcd388)", "origin": "merge"}
+{"ts": "2026-10-13T18:01:41+05:30", "event": "done", "id": "R783", "why": "merged into main (8fcd388)"}
+{"ts": "2026-10-13T18:01:41+05:30", "event": "edit", "id": "R783", "opened": "2026-10-13T18:01:41+05:30", "closed": "2026-10-13T18:01:41+05:30", "release": "", "commits": ["8fcd388"]}
+{"ts": "2026-10-13T18:06:12+05:30", "event": "add", "id": "R784", "after": [], "user": false, "src": "merge:docs/v06-take-it-live", "track": "engine", "kind": "infra", "horizon": "later", "title": "V06 take it live", "why": "merged into main (4f1c5e6)", "origin": "merge"}
+{"ts": "2026-10-13T18:06:13+05:30", "event": "done", "id": "R784", "why": "merged into main (4f1c5e6)"}
+{"ts": "2026-10-13T18:06:13+05:30", "event": "edit", "id": "R784", "opened": "2026-10-13T18:06:12+05:30", "closed": "2026-10-13T18:06:13+05:30", "release": "", "commits": ["4f1c5e6"]}
+{"ts": "2026-10-13T18:08:43+05:30", "event": "add", "id": "R785", "after": [], "user": false, "src": "merge:docs/v06-evolving-patches", "track": "engine", "kind": "infra", "horizon": "later", "title": "V06 evolving patches", "why": "merged into main (2d81ff5)", "origin": "merge"}
+{"ts": "2026-10-13T18:08:43+05:30", "event": "done", "id": "R785", "why": "merged into main (2d81ff5)"}
+{"ts": "2026-10-13T18:08:43+05:30", "event": "edit", "id": "R785", "opened": "2026-10-13T18:08:43+05:30", "closed": "2026-10-13T18:08:43+05:30", "release": "", "commits": ["2d81ff5"]}
+{"ts": "2026-10-13T19:01:03+05:30", "event": "add", "id": "R786", "after": [], "user": false, "src": "merge:docs/v06-final-list", "track": "engine", "kind": "infra", "horizon": "later", "title": "V06 final list", "why": "merged into main (6613fe7)", "origin": "merge"}
+{"ts": "2026-10-13T19:01:03+05:30", "event": "done", "id": "R786", "why": "merged into main (6613fe7)"}
+{"ts": "2026-10-13T19:01:03+05:30", "event": "edit", "id": "R786", "opened": "2026-10-13T19:01:03+05:30", "closed": "2026-10-13T19:01:03+05:30", "release": "", "commits": ["6613fe7"]}
+{"ts": "2026-10-13T19:08:51+05:30", "event": "add", "id": "R787", "after": [], "user": false, "src": "merge:docs/v06-pro-verdict", "track": "engine", "kind": "infra", "horizon": "later", "title": "V06 pro verdict", "why": "merged into main (6723f61)", "origin": "merge"}
+{"ts": "2026-10-13T19:08:51+05:30", "event": "done", "id": "R787", "why": "merged into main (6723f61)"}
+{"ts": "2026-10-13T19:08:51+05:30", "event": "edit", "id": "R787", "opened": "2026-10-13T19:08:51+05:30", "closed": "2026-10-13T19:08:51+05:30", "release": "", "commits": ["6723f61"]}
+{"ts": "2026-10-13T20:26:39+05:30", "event": "add", "id": "R788", "after": [], "user": false, "src": "merge:feature/extensions-seamless", "track": "growth", "kind": "feature", "horizon": "later", "title": "Extensions seamless", "why": "merged into main (3ef6742)", "origin": "merge"}
+{"ts": "2026-10-13T20:31:20+05:30", "event": "done", "id": "R788", "why": "merged into main (3ef6742)"}
+{"ts": "2026-10-13T20:31:20+05:30", "event": "edit", "id": "R788", "opened": "2026-10-13T20:26:39+05:30", "closed": "2026-10-13T20:31:20+05:30", "release": "", "commits": ["3ef6742"]}
+{"ts": "2026-10-13T15:52:08+05:30", "event": "add", "id": "R789", "after": [], "user": false, "src": "merge:a482727", "track": "engine", "kind": "feature", "horizon": "later", "title": "Bugfix/v06-audio-correctness (v0.6 Block 1)", "why": "merged into main (a482727)", "origin": "merge"}
+{"ts": "2026-10-15T08:03:24+05:30", "event": "done", "id": "R789", "why": "merged into main (a482727)"}
+{"ts": "2026-10-15T08:03:24+05:30", "event": "edit", "id": "R789", "opened": "2026-10-13T15:52:08+05:30", "closed": "2026-10-15T08:03:24+05:30", "release": "", "commits": ["a482727"]}
+{"ts": "2026-10-15T07:52:02+00:00", "event": "add", "id": "R790", "after": [], "user": false, "src": "plan:image-fx", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: Image effects to industry grade", "why": "docs/plans/image-fx"}
+{"ts": "2026-10-15T07:52:02+00:00", "event": "add", "id": "R791", "after": [], "user": false, "src": "plan:metal-compute.md", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: Metal compute for particles and simulations (R556): design, scope and gates", "why": "docs/plans/metal-compute.md"}
+{"ts": "2026-10-15T07:52:02+00:00", "event": "add", "id": "R792", "after": [], "user": false, "src": "plan:v0.6-quality", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: v0.6 plan: quality lead", "why": "docs/plans/v0.6-quality"}

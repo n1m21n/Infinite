@@ -89,7 +89,7 @@ Process: `.claude/skills/infinite-lifecycle/SKILL.md` (follow it in every decisi
 
 <!-- FACTS:BEGIN (tools/lifecycle/now.py) -->
 
-_Generated 2026-10-14 19:36 UTC. Do not edit inside this block; rerun the tool._
+_Generated 2026-10-15 07:52 UTC. Do not edit inside this block; rerun the tool._
 
 ### Open quests (7) **over the cap of 5: park or close before adding**
 
@@ -97,16 +97,16 @@ _Generated 2026-10-14 19:36 UTC. Do not edit inside this block; rerun the tool._
 - R711 [later] Plan: Modulators to industry grade
 - R717 [later] Plan: Node audits: beyond effects and modulators
 - R754 [next] Perf: motion blur and radial blur cost
-- R779 [later] Plan: Image effects to industry grade
-- R780 [later] Plan: Metal compute for particles and simulations (R556): design, scope and gates
-- R781 [later] Plan: v0.6 plan: quality lead
+- R790 [later] Plan: Image effects to industry grade
+- R791 [later] Plan: Metal compute for particles and simulations (R556): design, scope and gates
+- R792 [later] Plan: v0.6 plan: quality lead
 
 ### Releases
 
 | Tag | Date | Downloads (context) |
 |---|---|---|
 | extensions | 2026-10-13 | 10 |
-| v0.5.0 | 2026-10-10 | 204 |
+| v0.5.0 | 2026-10-10 | 215 |
 | v0.4.7 | 2026-10-07 | 74 |
 | v0.4.6 | 2026-10-01 | 166 |
 
@@ -114,24 +114,24 @@ _Generated 2026-10-14 19:36 UTC. Do not edit inside this block; rerun the tool._
 
 | Measure | Value | Want |
 |---|---|---|
-| Escaped fixes: fixes after extensions touching src it changed | 4 e90f84fe d90f745a 89555bc0 9f5fd27d | 0, falling release to release |
+| Escaped fixes: fixes after extensions touching src it changed | 6 7f002bee 79c8e6b4 e90f84fe d90f745a 89555bc0 9f5fd27d | 0, falling release to release |
 | Reverts after extensions | 0 | 0 |
-| Fix-shaped commits after extensions (all) | 25 | context |
+| Fix-shaped commits after extensions (all) | 36 | context |
 | Known test failures (macOS / Linux) | 3 / 6 | never grows |
 | Open GitHub issues labelled bug | 0 | 0 |
 | Crash reports filed since extensions | 0 | 0 |
 
 ### Reach (context only: moves with outreach, not with release quality)
 
-- GitHub (2026-10-13): 276 stars, 21 forks, 1866 downloads all-time
-- Website (2026-10-13, last 30 days): 1114 sessions, 741 users
+- GitHub (2026-10-15): 277 stars, 21 forks, 1949 downloads all-time
+- Website (2026-10-15, last 30 days): 1217 sessions, 820 users
 
 ### Last merges to main
 
+- 2026-10-15 Merge bugfix/v06-audio-correctness (v0.6 Block 1)
 - 2026-10-13 Merge feature/extensions-seamless: pack store on its own release tag, Extensions tab status and app update row, Library category
 - 2026-10-13 Merge docs/v06-pro-verdict
 - 2026-10-13 Merge docs/v06-final-list
 - 2026-10-13 Merge docs/v06-evolving-patches
-- 2026-10-13 Merge docs/v06-take-it-live
 
 <!-- FACTS:END -->
