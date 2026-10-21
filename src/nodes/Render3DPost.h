@@ -38,6 +38,15 @@ public:
                                float bloomRadius, const float bg[3], float bgOpacity);
    unsigned int Output() const { return mOutTex; }
 
+   // 360: the six cube faces (RGBA8 2D array, Render3DNode's face order and
+   // basis, see kPanoFaces in the .cpp) reprojected to w x h - mode 1
+   // equirectangular, 2 cubemap 3x2. Returns the RGBA8 result.
+   unsigned int Panorama(unsigned int faceArray, int w, int h, int mode);
+   // Camera-space basis of face i (forward, right, up), shared with the face renders.
+   static void PanoFace(int i, float forward[3], float right[3], float up[3]);
+   // GLSL: vec3 panoDir(vec2 uv, int mode) - camera-space direction of a panorama pixel.
+   static const char* PanoGlsl();
+
 private:
    unsigned int Run(unsigned int src, int w, int h, int tonemap, float bloom, float bloomThreshold, float bloomRadius,
                     bool passthrough, unsigned int depthTex, const float bg[3], int keyMode, float bgOpacity);
@@ -61,4 +70,7 @@ private:
    unsigned int mBloomFbo[kBloomLevels][2] = {};
    int mBloomW[kBloomLevels] = {}, mBloomH[kBloomLevels] = {};
    int mWidth = 0, mHeight = 0;
+
+   unsigned int mPanoProgram = 0, mPanoTex = 0, mPanoFbo = 0;
+   int mPanoW = 0, mPanoH = 0;
 };

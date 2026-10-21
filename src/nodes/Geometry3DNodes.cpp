@@ -1287,6 +1287,12 @@ const std::vector<std::string>& Render3DNode::RenderModeNames()
 
 void Render3DNode::PathTracerDeleter::operator()(Render3DPathTracer* p) const { delete p; }
 
+const std::vector<std::string>& Render3DNode::PanoramaNames()
+{
+   static const std::vector<std::string> kNames = { "Off", "360 equirect", "Cubemap 3x2" };
+   return kNames;
+}
+
 int Render3DNode::PathTracedSamples() const { return mPathTracer ? mPathTracer->Samples() : 0; }
 int Render3DNode::PathTracedTriangles() const { return mPathTracer ? mPathTracer->Triangles() : 0; }
 
@@ -1626,8 +1632,81 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
    return sig;
 }
 
+void Render3DNode::Cook360(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   const int outW = std::max(16, (int)width), outH = std::max(16, (int)height);
+   const int face = std::clamp(panorama == 1 ? outW / 4 : outW / 3, 64, 4096);
+
+   // Cook the sources first: the signature reads their revisions.
+   CollectDraw();
+   for (IGeometrySource* src : mDraw)
+      if (auto* node = dynamic_cast<INode*>(src))
+         node->CookIfNeeded(frameId);
+   SceneSignature sig = BuildSceneSignature();
+   if (m360Valid && mPanoOut != 0 && sig == m360Sig && outW == m360OutW && outH == m360OutH && panorama == m360Mode &&
+       !sig.animated)
+   {
+      mLastCookFrame = frameId;
+      return;
+   }
+
+   if (mFaceArray == 0 || mFaceArraySize != face)
+   {
+      if (mFaceArray != 0)
+         glDeleteTextures(1, &mFaceArray);
+      glGenTextures(1, &mFaceArray);
+      glBindTexture(GL_TEXTURE_2D_ARRAY, mFaceArray);
+      glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, face, face, 6);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+      mFaceArraySize = face;
+   }
+   // One full render per face: CookIfNeeded with m360Face set swaps in the
+   // face's camera and size, and runs the normal HDR finish (so the plain
+   // background keeps its exact colour on every face).
+   for (int f = 0; f < 6; f++)
+   {
+      m360Face = f;
+      m360FaceSize = face;
+      mLastCookFrame = -1;
+      mHasSceneBuilt = false;
+      CookIfNeeded(frameId);
+      if (mPostOut != 0)
+         glCopyImageSubData(mPostOut, GL_TEXTURE_2D, 0, 0, 0, 0, mFaceArray, GL_TEXTURE_2D_ARRAY, 0, 0, 0, f, face, face,
+                            1);
+   }
+   m360Face = -1;
+   mLastCookFrame = frameId;
+   mPanoOut = mPost.Panorama(mFaceArray, outW, outH, panorama);
+   m360Sig = sig;
+   m360Valid = true;
+   m360OutW = outW;
+   m360OutH = outH;
+   m360Mode = panorama;
+   mRevision = NextTextureRevision();
+}
+
 void Render3DNode::CookIfNeeded(int frameId)
 {
+   // Turbo 0.61: raster 360 renders six faces and reprojects them (Cook360);
+   // path traced 360 traces the panorama's rays directly (below).
+   if (panorama > 0 && m360Face < 0 && renderMode == 0 && renderPass == 0)
+   {
+      Cook360(frameId);
+      return;
+   }
+   if (m360Face < 0 && mPanoOut != 0)
+   {
+      mPanoOut = 0;
+      m360Valid = false;
+      mHasSceneBuilt = false;
+   }
+
    if (mLastCookFrame == frameId)
       return;
    mLastCookFrame = frameId;
@@ -1635,8 +1714,8 @@ void Render3DNode::CookIfNeeded(int frameId)
    if (!EnsureShader())
       return;
 
-   const int w = std::max(16, (int)width);
-   const int h = std::max(16, (int)height);
+   const int w = m360Face >= 0 ? m360FaceSize : std::max(16, (int)width);
+   const int h = m360Face >= 0 ? m360FaceSize : std::max(16, (int)height);
    const int wantSamples =
       kSampleCounts[std::max(0, std::min(samples, (int)(sizeof(kSampleCounts) / sizeof(int)) - 1))];
    if (!EnsureResources(w, h, wantSamples))
@@ -1716,6 +1795,19 @@ void Render3DNode::CookIfNeeded(int frameId)
       proj = (projection == 1)
          ? Mat4::Orthographic(orthoHeight, aspect, nearPlane, farPlane)
          : Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
+   }
+   if (m360Face >= 0)
+   {
+      // Turbo 0.61: one 90-degree cube face, turned from the camera's own
+      // orientation (rows right, up, -forward of the face basis).
+      float f[3], r[3], u[3];
+      Render3DPost::PanoFace(m360Face, f, r, u);
+      Mat4 face = Mat4::Identity();
+      face.m[0] = r[0]; face.m[4] = r[1]; face.m[8] = r[2];
+      face.m[1] = u[0]; face.m[5] = u[1]; face.m[9] = u[2];
+      face.m[2] = -f[0]; face.m[6] = -f[1]; face.m[10] = -f[2];
+      view = Mat4::Multiply(face, view);
+      proj = Mat4::Perspective(3.14159265f * 0.5f, 1.0f, nearPlane, farPlane);
    }
    const Mat4 viewProj = Mat4::Multiply(proj, view);
    mLastCamera.view = view;
@@ -1959,7 +2051,8 @@ void Render3DNode::CookIfNeeded(int frameId)
             env.ground[k] = envGround[k];
             env.ambient[k] = ambientColor[k];
          }
-         traced = mPathTracer->Trace(w, h, viewProj, eye, lights, env, exposure, ptBounces, std::max(1, ptSamples), 1);
+         traced = mPathTracer->Trace(w, h, viewProj, eye, lights, env, exposure, ptBounces, std::max(1, ptSamples), 1,
+                                     panorama, view);
       }
       if (traced != 0)
       {

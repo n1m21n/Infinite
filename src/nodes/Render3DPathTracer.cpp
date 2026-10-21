@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 namespace
 {
@@ -33,8 +34,12 @@ uniform int uLightCount;
 uniform int uLightType[4];
 uniform vec3 uLightDir[4], uLightColor[4];
 uniform float uLightIntensity[4], uLightSpot[4];
+uniform int uPanorama;     // 0 camera, 1 equirect, 2 cubemap 3x2 (Render3DPost::PanoGlsl)
+uniform mat3 uInvViewRot;  // camera space -> world, for the panorama's rays
+uniform vec3 uEye;
 
 const float PI = 3.14159265359;
+//PANO_GLSL
 uint rngState;
 uint pcg(uint v) { uint s = v * 747796405u + 2891336453u; uint w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u; return (w >> 22u) ^ w; }
 float rnd() { rngState = pcg(rngState); return float(rngState) * (1.0 / 4294967296.0); }
@@ -224,8 +229,14 @@ void main() {
    for (int s = 0; s < uSpp; s++) {
       vec2 jit = vec2(rnd(), rnd());
       vec2 ndc = ((gl_FragCoord.xy - 0.5 + jit) / uRes) * 2.0 - 1.0;
-      vec4 p0 = uInvViewProj * vec4(ndc, -1.0, 1.0), p1 = uInvViewProj * vec4(ndc, 1.0, 1.0);
-      vec3 ro = p0.xyz / p0.w, rd = normalize(p1.xyz / p1.w - ro);
+      vec3 ro, rd;
+      if (uPanorama > 0) {
+         ro = uEye;
+         rd = normalize(uInvViewRot * panoDir((gl_FragCoord.xy - 0.5 + jit) / uRes, uPanorama));
+      } else {
+         vec4 p0 = uInvViewProj * vec4(ndc, -1.0, 1.0), p1 = uInvViewProj * vec4(ndc, 1.0, 1.0);
+         ro = p0.xyz / p0.w; rd = normalize(p1.xyz / p1.w - ro);
+      }
       float m;
       vec3 c = radiance(ro, rd, m);
       if (!any(isnan(c)) && !any(isinf(c))) sum += min(c, vec3(64.0)); // firefly clamp
@@ -422,7 +433,10 @@ bool Render3DPathTracer::EnsureProgram()
       return true;
    if (mProgramFailed)
       return false;
-   mProgram = GLUtil::CompileProgram(kTraceSrc);
+   std::string src = kTraceSrc;
+   const std::string marker = "//PANO_GLSL";
+   src.replace(src.find(marker), marker.size(), Render3DPost::PanoGlsl());
+   mProgram = GLUtil::CompileProgram(src.c_str());
    if (mProgram == 0)
    {
       fprintf(stderr, "Render3DPathTracer: shader compile failed\n");
@@ -621,9 +635,8 @@ void Render3DPathTracer::EnsureTargets(int w, int h)
 
 unsigned int Render3DPathTracer::Trace(int w, int h, const Mat4& viewProj, const float eye[3],
                                        const std::vector<Light>& lights, const Env& env, float exposure, int bounces,
-                                       int maxSamples, int spp)
+                                       int maxSamples, int spp, int panorama, const Mat4& view)
 {
-   (void)eye;
    if (mTriCount == 0 || !EnsureProgram())
       return 0;
    EnsureTargets(w, h);
@@ -676,6 +689,13 @@ unsigned int Render3DPathTracer::Trace(int w, int h, const Mat4& viewProj, const
    glUniform1i(glGetUniformLocation(mProgram, "uBounces"), std::clamp(bounces, 1, 16));
    glUniform1ui(glGetUniformLocation(mProgram, "uSeed"), mFrameSeed++);
    glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
+   // Camera space -> world is the transpose of the view's rotation (rows of
+   // the column-major view matrix are the camera axes in world space).
+   const float invRot[9] = { view.m[0], view.m[4], view.m[8], view.m[1], view.m[5], view.m[9],
+                             view.m[2], view.m[6], view.m[10] };
+   glUniform1i(glGetUniformLocation(mProgram, "uPanorama"), panorama);
+   glUniformMatrix3fv(glGetUniformLocation(mProgram, "uInvViewRot"), 1, GL_FALSE, invRot);
+   glUniform3fv(glGetUniformLocation(mProgram, "uEye"), 1, eye);
    int types[4] = {}, count = 0;
    float dirs[12] = {}, cols[12] = {}, ints[4] = {}, spots[4] = {};
    for (const Light& l : lights)

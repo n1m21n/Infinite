@@ -1696,6 +1696,14 @@
       NodeSeparator("render", colW);
       DropdownButton("mode", Render3DNode::RenderModeNames(), n->renderMode,
                      [n](int i) { PushUndoCheckpoint(); n->renderMode = i; }, colW);
+      DropdownButton("360", Render3DNode::PanoramaNames(), n->panorama,
+                     [n](int i) {
+                        PushUndoCheckpoint();
+                        n->panorama = i;
+                        // The formats' own aspect: 2:1 equirect, 3:2 cubemap.
+                        if (i == 1) n->height = std::max(16.0f, n->width * 0.5f);
+                        else if (i == 2) n->height = std::max(16.0f, n->width * 2.0f / 3.0f);
+                     }, colW);
       if (n->renderMode == 1)
       {
          ModSliderInt("samples", &n->ptSamples, 1, 4096);

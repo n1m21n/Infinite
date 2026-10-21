@@ -268,6 +268,37 @@ namespace
       "   fragColor = vec4(c, alpha);\n"
       "}\n";
 
+   // Cube faces in camera space (-Z forward): forward, right, up. Face i is
+   // rendered looking down `forward`; a direction d lands on it at
+   // (dot(d, right), dot(d, up)) / dot(d, forward).
+   const float kPanoFaces[6][9] = {
+      { 1, 0, 0, 0, 0, 1, 0, 1, 0 },   // +X
+      { -1, 0, 0, 0, 0, -1, 0, 1, 0 }, // -X
+      { 0, 1, 0, 1, 0, 0, 0, 0, 1 },   // +Y
+      { 0, -1, 0, 1, 0, 0, 0, 0, -1 }, // -Y
+      { 0, 0, 1, -1, 0, 0, 0, 1, 0 },  // +Z (behind the camera)
+      { 0, 0, -1, 1, 0, 0, 0, 1, 0 },  // -Z (where the camera looks)
+   };
+
+   const char* kPanoGlsl = R"GLSL(
+const vec3 PANO_F[6] = vec3[](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
+const vec3 PANO_R[6] = vec3[](vec3(0,0,1), vec3(0,0,-1), vec3(1,0,0), vec3(1,0,0), vec3(-1,0,0), vec3(1,0,0));
+const vec3 PANO_U[6] = vec3[](vec3(0,1,0), vec3(0,1,0), vec3(0,0,1), vec3(0,0,-1), vec3(0,1,0), vec3(0,1,0));
+// 1 equirect: centre column looks down -Z, top row is +Y. 2 cubemap 3x2:
+// top row +X -X +Y, bottom row -Y +Z -Z.
+vec3 panoDir(vec2 uv, int mode) {
+   if (mode == 1) {
+      float phi = (uv.x - 0.5) * 6.28318530718, th = (1.0 - uv.y) * 3.14159265359;
+      return vec3(sin(th) * sin(phi), cos(th), -sin(th) * cos(phi));
+   }
+   vec2 g = uv * vec2(3.0, 2.0);
+   int cx = int(min(floor(g.x), 2.0)), cy = int(min(floor(g.y), 1.0));
+   vec2 f = fract(g) * 2.0 - 1.0;
+   int face = (1 - cy) * 3 + cx;
+   return normalize(PANO_F[face] + f.x * PANO_R[face] + f.y * PANO_U[face]);
+}
+)GLSL";
+
    unsigned int MakeTex(int w, int h, unsigned int internalFormat)
    {
       unsigned int t = 0;
@@ -323,8 +354,72 @@ namespace
    };
 }
 
+void Render3DPost::PanoFace(int i, float forward[3], float right[3], float up[3])
+{
+   i = std::clamp(i, 0, 5);
+   for (int k = 0; k < 3; k++)
+   {
+      forward[k] = kPanoFaces[i][k];
+      right[k] = kPanoFaces[i][3 + k];
+      up[k] = kPanoFaces[i][6 + k];
+   }
+}
+
+const char* Render3DPost::PanoGlsl()
+{
+   return kPanoGlsl;
+}
+
+unsigned int Render3DPost::Panorama(unsigned int faceArray, int w, int h, int mode)
+{
+   if (mPanoProgram == 0)
+   {
+      const std::string src = std::string("#version 330 core\n"
+                                          "in vec2 vUv;\n"
+                                          "out vec4 fragColor;\n"
+                                          "uniform sampler2DArray uFaces;\n"
+                                          "uniform int uMode;\n") +
+                              kPanoGlsl +
+                              "void main() {\n"
+                              "   vec3 d = panoDir(vUv, uMode);\n"
+                              "   int best = 0; float bd = -2.0;\n"
+                              "   for (int i = 0; i < 6; i++) { float k = dot(d, PANO_F[i]); if (k > bd) { bd = k; best = i; } }\n"
+                              "   vec2 st = vec2(dot(d, PANO_R[best]), dot(d, PANO_U[best])) / max(bd, 1e-4);\n"
+                              "   fragColor = texture(uFaces, vec3(clamp(st * 0.5 + 0.5, 0.0, 1.0), float(best)));\n"
+                              "}\n";
+      mPanoProgram = GLUtil::CompileProgram(src.c_str());
+      if (mPanoProgram == 0)
+         return 0;
+   }
+   if (mPanoTex == 0 || w != mPanoW || h != mPanoH)
+   {
+      if (mPanoTex != 0) glDeleteTextures(1, &mPanoTex);
+      if (mPanoFbo != 0) glDeleteFramebuffers(1, &mPanoFbo);
+      GLint prev = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prev);
+      mPanoTex = MakeTex(w, h, GL_RGBA8);
+      mPanoFbo = MakeFbo(mPanoTex);
+      glBindFramebuffer(GL_FRAMEBUFFER, prev);
+      mPanoW = w;
+      mPanoH = h;
+   }
+   SavedState saved;
+   glBindFramebuffer(GL_FRAMEBUFFER, mPanoFbo);
+   glViewport(0, 0, w, h);
+   glUseProgram(mPanoProgram);
+   glBindTexture(GL_TEXTURE_2D_ARRAY, faceArray);
+   glUniform1i(glGetUniformLocation(mPanoProgram, "uFaces"), 0);
+   glUniform1i(glGetUniformLocation(mPanoProgram, "uMode"), mode);
+   DrawFullscreen();
+   glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+   return mPanoTex;
+}
+
 Render3DPost::~Render3DPost()
 {
+   if (mPanoProgram != 0) glDeleteProgram(mPanoProgram);
+   if (mPanoTex != 0) glDeleteTextures(1, &mPanoTex);
+   if (mPanoFbo != 0) glDeleteFramebuffers(1, &mPanoFbo);
    unsigned int progs[] = { mPrefProgram, mIrrProgram, mLutProgram, mBrightProgram, mBlurProgram, mFinishProgram };
    for (unsigned int p : progs)
       if (p != 0)

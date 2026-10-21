@@ -511,9 +511,15 @@ public:
 
    // Turbo 0.61: the HDR scene's finished image (bloom, tonemap, sRGB) when
    // the post pass ran, the raw target otherwise.
-   unsigned int GetOutputTexture() override { return mPostOut != 0 ? mPostOut : mColorTex; }
-   int GetOutputWidth() const override { return mWidth; }
-   int GetOutputHeight() const override { return mHeight; }
+   unsigned int GetOutputTexture() override
+   {
+      if (mPanoOut != 0)
+         return mPanoOut;
+      return mPostOut != 0 ? mPostOut : mColorTex;
+   }
+   // A raster 360's internal targets are face-sized; its output is the panorama.
+   int GetOutputWidth() const override { return mPanoOut != 0 ? m360OutW : mWidth; }
+   int GetOutputHeight() const override { return mPanoOut != 0 ? m360OutH : mHeight; }
    void CookIfNeeded(int frameId) override;
    unsigned long long TextureRevision() const override { return mRevision; }
 
@@ -655,6 +661,13 @@ public:
    int ptBounces = 4;
    int PathTracedSamples() const;
    int PathTracedTriangles() const;
+   // Turbo 0.61: 360 output from the camera's position, relative to its
+   // orientation (keep elevation 0 for a level horizon): 0 off, 1
+   // equirectangular (2:1), 2 cubemap 3x2 (+X -X +Y / -Y +Z -Z, 3:2). Raster
+   // renders six 90-degree faces and reprojects them; path traced traces the
+   // panorama's rays directly.
+   static const std::vector<std::string>& PanoramaNames();
+   int panorama = 0;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -680,6 +693,7 @@ public:
       v.Float("shadowStrength", shadowStrength);
       v.Float("bloom", bloom); v.Float("bloomThreshold", bloomThreshold); v.Float("bloomRadius", bloomRadius);
       v.Int("renderMode", renderMode); v.Int("ptSamples", ptSamples); v.Int("ptBounces", ptBounces);
+      v.Int("panorama", panorama);
    }
 
 private:
@@ -857,6 +871,15 @@ private:
    // Turbo 0.61: renderMode 1. Deleter defined in the .cpp, where the type is complete.
    struct PathTracerDeleter { void operator()(class Render3DPathTracer* p) const; };
    std::unique_ptr<class Render3DPathTracer, PathTracerDeleter> mPathTracer;
+   // Turbo 0.61: raster 360 - one CookIfNeeded per cube face (m360Face >= 0
+   // swaps the camera and the size), faces kept in a 6-layer array, then
+   // reprojected by mPost into mPanoOut.
+   void Cook360(int frameId);
+   int m360Face = -1;
+   int m360FaceSize = 0;
+   unsigned int mFaceArray = 0;
+   int mFaceArraySize = 0;
+   unsigned int mPanoOut = 0;
    unsigned int mPostOut = 0; // mPost's output, 0 until the post pass ran
    unsigned int mDepthBuffer = 0; // a depth texture (so Volume can read it)
    SceneCamera mLastCamera;
@@ -904,5 +927,10 @@ private:
    size_t mLastUploads = 0;
    bool mHasSceneBuilt = false;
    SceneSignature mSceneBuilt;
+   // Turbo 0.61: what the last 360 render was made from (its six faces are
+   // only redrawn when this or the output size / mode moves).
+   SceneSignature m360Sig;
+   bool m360Valid = false;
+   int m360OutW = 0, m360OutH = 0, m360Mode = 0;
    unsigned long long mRevision = 0;
 };

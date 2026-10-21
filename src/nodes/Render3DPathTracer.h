@@ -56,7 +56,8 @@ public:
    // Traces `spp` more samples per pixel (up to maxSamples) and returns the
    // averaged HDR texture (w x h), or 0 on failure.
    unsigned int Trace(int w, int h, const Mat4& viewProj, const float eye[3], const std::vector<Light>& lights,
-                      const Env& env, float exposure, int bounces, int maxSamples, int spp);
+                      const Env& env, float exposure, int bounces, int maxSamples, int spp, int panorama,
+                      const Mat4& view);
    int Samples() const { return mSamples; }
    int Triangles() const { return mTriCount; }
 

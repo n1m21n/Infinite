@@ -5188,7 +5188,8 @@
       // two renders of an identical scene can, because only the edges move.
       // Turbo 0.61: the 3DTEST scene path traced - samples accumulate up to
       // ptSamples, and the finished image covers the geometry like the raster.
-      if (getenv("INFINITE_PATHTRACETEST") != nullptr && frameId == 40)
+      const bool panoTest = getenv("INFINITE_PANORAMATEST") != nullptr;
+      if ((getenv("INFINITE_PATHTRACETEST") != nullptr || panoTest) && frameId == 40)
       {
          auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
          const int w = r->GetOutputWidth(), h = r->GetOutputHeight();
@@ -5207,11 +5208,13 @@
                lit++;
          const double coverage = (double)lit / (double)std::max(1, w * h);
          const GLenum err = glGetError();
-         const bool ok = r->PathTracedSamples() >= r->ptSamples && r->PathTracedTriangles() > 0 &&
-                         coverage > 0.03 && coverage < 0.95 && err == GL_NO_ERROR;
+         const bool traced = r->renderMode == 0 || (r->PathTracedSamples() >= r->ptSamples && r->PathTracedTriangles() > 0);
+         const bool sized = r->panorama == 0 || (w == (int)r->width && h == (int)r->height);
+         const bool ok = traced && sized && coverage > 0.03 && (r->panorama > 0 || coverage < 0.95) && err == GL_NO_ERROR;
          if (const char* png = getenv("INFINITE_PATHTRACETEST_PNG")) // eyeball the result (bottom-up rows)
             stbi_write_png(png, w, h, 4, px.data(), w * 4);
-         printf("PATHTRACETEST samples=%d/%d tris=%d coverage=%.1f%% gl=0x%x  %s\n", r->PathTracedSamples(),
+         printf("%s %dx%d samples=%d/%d tris=%d coverage=%.1f%% gl=0x%x  %s\n",
+                panoTest ? "PANORAMATEST" : "PATHTRACETEST", w, h, r->PathTracedSamples(),
                 r->ptSamples, r->PathTracedTriangles(), coverage * 100.0, err, ok ? "OK" : "FAIL");
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
