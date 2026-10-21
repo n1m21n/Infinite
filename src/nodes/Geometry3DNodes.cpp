@@ -30,7 +30,7 @@ namespace
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
    const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position" };
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
-   const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard" };
+   const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
    const std::vector<std::string> kSpriteSizeModeNames = { "World", "Screen" };
@@ -324,10 +324,9 @@ namespace
       "      vec3 lower = mix(toLinear(uEnvGround), toLinear(uEnvHorizon), smoothstep(0.0, 0.5, t));\n"
       "      col = mix(lower, toLinear(uEnvSky), smoothstep(0.5, 1.0, t)) * uEnvIntensity;\n"
       "   }\n"
+      // Turbo 0.61: linear HDR out; Render3DPost tonemaps and encodes.
       "   col *= uExposure;\n"
-      "   if (uTonemap == 1) col = acesFilm(col);\n"
-      "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
-      "   fragColor = vec4(toSrgb(col), uBgOpacity);\n"
+      "   fragColor = vec4(col, uBgOpacity);\n"
       "}\n";
 
    const char* kVertSrc =
@@ -511,6 +510,13 @@ namespace
       "uniform int uHasEnvMap;\n"
       "uniform float uEnvRotation;\n"
       "uniform float uEnvMaxLod;\n"
+      // Turbo 0.61: split-sum IBL from Render3DPost (prefiltered GGX mips,
+      // irradiance, BRDF table), when an HDRI is patched in.
+      "uniform int uHasIbl;\n"
+      "uniform sampler2D uPrefEnv;\n"
+      "uniform sampler2D uIrrEnv;\n"
+      "uniform sampler2D uBrdfLut;\n"
+      "uniform float uPrefMaxLod;\n"
       "uniform sampler2DShadow uShadowMap;\n"
       "uniform int uShadowsOn;\n"
       "uniform float uShadowBias;\n"
@@ -750,7 +756,7 @@ namespace
       "   vec3 base = toLinear(uBaseColor) * vInstanceColor * vVertexColor;\n"
       "   if (uHasTexture == 1) base *= toLinear(sampleMap(uTexture, n, mapUv).rgb);\n"
       "   if (uInstTexMode != 0) base *= toLinear(instTexel.rgb);\n"
-      "   if (uShading == 3) { fragColor = vec4(toSrgb(base), uOpacity); return; }\n"
+      "   if (uShading == 3) { fragColor = vec4(base, uOpacity); return; }\n"
       "\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
       "   float rough = uRoughness;\n"
@@ -862,16 +868,21 @@ namespace
       "      vec3 irid = evalIridescence(nDotV, uIridescenceIor, uIridescenceThickness);\n"
       "      fAmbient = mix(fAmbient, fAmbient * irid * 2.0, uIridescence);\n"
       "   }\n"
+      "   vec3 specWeight = fAmbient;\n"
+      "   if (uHasIbl == 1) {\n"
+      "      irradiance = texture(uIrrEnv, dirToEquirect(n)).rgb * uEnvIntensity * toLinear(uAmbient) * 3.0;\n"
+      "      reflection = textureLod(uPrefEnv, dirToEquirect(reflectDir), rough * uPrefMaxLod).rgb * uEnvIntensity;\n"
+      "      vec2 ab = texture(uBrdfLut, vec2(nDotV, rough)).rg;\n"
+      "      specWeight = fAmbient * ab.x + ab.y;\n"
+      "   }\n"
       "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance * ao;\n"
-      "   col += reflection * fAmbient * ao;\n"
+      "   col += reflection * specWeight * ao;\n"
       "\n"
       "   col += base * pow(1.0 - nDotV, 3.0) * uRim;\n"
       "   col += emiss;\n"
       "\n"
+      // Turbo 0.61: linear HDR out; Render3DPost tonemaps, encodes and dithers.
       "   col *= uExposure;\n"
-      "   if (uTonemap == 1) col = acesFilm(col);\n"
-      "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
-      "   col = toSrgb(col) + ditherOffset();\n"
       "\n"
       "   if (uTransmission > 0.0) {\n"
       "      vec4 clipA = uViewProj * vec4(vWorldPos, 1.0);\n"
@@ -888,9 +899,9 @@ namespace
       "         float r = textureLod(uSceneColor, clamp(refractUv - dispOffset, 0.0, 1.0), lod).r;\n"
       "         float g = textureLod(uSceneColor, refractUv, lod).g;\n"
       "         float b = textureLod(uSceneColor, clamp(refractUv + dispOffset, 0.0, 1.0), lod).b;\n"
-      "         refracted = vec3(r, g, b) * mix(vec3(1.0), toSrgb(base), 0.4);\n"
+      "         refracted = vec3(r, g, b) * mix(vec3(1.0), base, 0.4);\n"
       "      } else {\n"
-      "         refracted = textureLod(uSceneColor, refractUv, lod).rgb * mix(vec3(1.0), toSrgb(base), 0.4);\n"
+      "         refracted = textureLod(uSceneColor, refractUv, lod).rgb * mix(vec3(1.0), base, 0.4);\n"
       "      }\n"
       "      col = mix(col, refracted, uTransmission);\n"
       "   }\n"
@@ -1354,9 +1365,10 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
 
    ReleaseTargets();
 
+   // Turbo 0.61: linear HDR - the post pass (Render3DPost) tonemaps it.
    glGenTextures(1, &mColorTex);
    glBindTexture(GL_TEXTURE_2D, mColorTex);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -1404,7 +1416,7 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
       // both area and sample count: 4096 square at 8x is over a gigabyte of
       // renderbuffer. Halve the sample count until it fits a budget rather than
       // letting a big export try to allocate more than the GPU will give.
-      const double bytesPerSample = (double)w * (double)h * 8.0;
+      const double bytesPerSample = (double)w * (double)h * 12.0; // RGBA16F + depth
       const double budget = 512.0 * 1024.0 * 1024.0;
       while (resolved > 1 && bytesPerSample * resolved > budget)
          resolved /= 2;
@@ -1416,7 +1428,7 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
    {
       glGenRenderbuffers(1, &mMsColor);
       glBindRenderbuffer(GL_RENDERBUFFER, mMsColor);
-      glRenderbufferStorageMultisample(GL_RENDERBUFFER, resolved, GL_RGBA8, w, h);
+      glRenderbufferStorageMultisample(GL_RENDERBUFFER, resolved, GL_RGBA16F, w, h);
 
       glGenRenderbuffers(1, &mMsDepth);
       glBindRenderbuffer(GL_RENDERBUFFER, mMsDepth);
@@ -1451,7 +1463,7 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
    // attachment, no depth: it only exists to be blitted into and sampled.
    glGenTextures(1, &mSceneColorTex);
    glBindTexture(GL_TEXTURE_2D, mSceneColorTex);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -1635,6 +1647,7 @@ void Render3DNode::CookIfNeeded(int frameId)
    float envRotationRad = 0.0f;
    float envHdriIntensity = 1.0f;
    float envMaxLod = 0.0f;
+   unsigned long long envRevision = 0;
    if (envInput.IsConnected())
    {
       INode* envNode = envInput.Resolved();
@@ -1645,6 +1658,7 @@ void Render3DNode::CookIfNeeded(int frameId)
          envRotationRad = env->rotation * (float)M_PI / 180.0f;
          envHdriIntensity = env->intensity;
          envMaxLod = env->MaxLod();
+         envRevision = env->TextureRevision();
       }
    }
    const bool hasEnvMap = envTex != 0;
@@ -1972,6 +1986,24 @@ void Render3DNode::CookIfNeeded(int frameId)
    glActiveTexture(GL_TEXTURE6);
    glBindTexture(GL_TEXTURE_2D, hasEnvMap ? envTex : DummyEnvTexture());
    glUniform1i(glGetUniformLocation(mProgram, "uEnvMap"), 6);
+   // Turbo 0.61: split-sum IBL, rebuilt only when the HDRI changes. The
+   // equirect base is 2^maxLod wide (maxLod = floor(log2(max(w, h)))).
+   const int envW = (int)std::exp2(envMaxLod);
+   const bool ibl = hasEnvMap && mPost.EnsureIbl(envTex, envW, std::max(1, envW / 2), envMaxLod, envRevision);
+   glUniform1i(glGetUniformLocation(mProgram, "uHasIbl"), ibl ? 1 : 0);
+   if (ibl)
+   {
+      glActiveTexture(GL_TEXTURE13);
+      glBindTexture(GL_TEXTURE_2D, mPost.PrefilteredTexture());
+      glUniform1i(glGetUniformLocation(mProgram, "uPrefEnv"), 13);
+      glActiveTexture(GL_TEXTURE14);
+      glBindTexture(GL_TEXTURE_2D, mPost.IrradianceTexture());
+      glUniform1i(glGetUniformLocation(mProgram, "uIrrEnv"), 14);
+      glActiveTexture(GL_TEXTURE15);
+      glBindTexture(GL_TEXTURE_2D, mPost.BrdfLut());
+      glUniform1i(glGetUniformLocation(mProgram, "uBrdfLut"), 15);
+      glUniform1f(glGetUniformLocation(mProgram, "uPrefMaxLod"), mPost.PrefilteredMaxLod());
+   }
    glActiveTexture(GL_TEXTURE0);
 
    // Point-cloud slots draw an instanced unit quad, billboarded against the
@@ -2873,6 +2905,10 @@ void Render3DNode::CookIfNeeded(int frameId)
    glBindVertexArray(0);
    glUseProgram(0);
 
+   // The plain-colour background is keyed by depth in the post pass (an HDRI
+   // background goes through the tonemap like the scene, as it always did).
+   const bool bgKey = renderPass == 0 && !(envAsBackground && hasEnvMap);
+
    // Resolve the multisampled buffer down into the texture the graph reads.
    // Scissor is already off, which matters here: a blit is clipped by it too.
    if (multisampling)
@@ -2880,12 +2916,17 @@ void Render3DNode::CookIfNeeded(int frameId)
       glBindFramebuffer(GL_READ_FRAMEBUFFER, mMsFbo);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
       glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-      if (mDepthWanted)
+      if (mDepthWanted || bgKey)
          glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
-   mDepthResolved = !multisampling || mDepthWanted;
+   mDepthResolved = !multisampling || mDepthWanted || bgKey;
+
+   // Turbo 0.61: HDR finish - bloom, tonemap, sRGB. The plain background
+   // colour stays exactly what it was (keyed by depth); data passes are copied.
+   mPostOut = mPost.Finish(mColorTex, w, h, tonemap, bloom, bloomThreshold, bloomRadius, renderPass != 0,
+                           bgKey ? mDepthBuffer : 0, bgColor);
 
    // --- restore, or every 2D node after this draws wrongly ------------
    if (!prevDepth) glDisable(GL_DEPTH_TEST);

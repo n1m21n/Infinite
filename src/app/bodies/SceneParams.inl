@@ -1681,6 +1681,16 @@
       DropdownButton("sprite size", Render3DNode::SpriteSizeModeNames(), n->spriteSizeMode,
                      [n](int i) { n->spriteSizeMode = i; }, colW);
 
+      // Turbo 0.61: bloom from the HDR scene. Last on the body, so the sliders
+      // above keep their modulation slots.
+      NodeSeparator("glow", colW);
+      ModSlider("bloom", &n->bloom, 0.0f, 2.0f, "%.3f", colW);
+      if (n->bloom > 0.0f)
+      {
+         ModSlider("threshold", &n->bloomThreshold, 0.0f, 8.0f, "%.3f", colW);
+         ModSlider("radius", &n->bloomRadius, 0.0f, 1.0f, "%.3f", colW);
+      }
+
       ImGui::EndGroup();
    }
 

@@ -9,6 +9,7 @@
 #include "ImageCable.h"
 #include "GLUtil.h"
 #include "Mesh.h"
+#include "nodes/Render3DPost.h"
 
 // Surface properties handed to the renderer. A struct rather than a row of
 // out-params: this already carried five, and every material feature after this
@@ -508,7 +509,9 @@ public:
 
    ~Render3DNode() override;
 
-   unsigned int GetOutputTexture() override { return mColorTex; }
+   // Turbo 0.61: the HDR scene's finished image (bloom, tonemap, sRGB) when
+   // the post pass ran, the raw target otherwise.
+   unsigned int GetOutputTexture() override { return mPostOut != 0 ? mPostOut : mColorTex; }
    int GetOutputWidth() const override { return mWidth; }
    int GetOutputHeight() const override { return mHeight; }
    void CookIfNeeded(int frameId) override;
@@ -637,8 +640,13 @@ public:
    // glClear, so it is already in the same encoded space the shader outputs.
    static const std::vector<std::string>& TonemapNames();
    float exposure = 1.0f;
-   int tonemap = 1; // none / ACES / Reinhard
+   int tonemap = 1; // none / ACES / Reinhard / AgX / Neutral (Khronos PBR Neutral)
    int ActiveSamples() const { return mActiveSamples; }
+   // Turbo 0.61: the scene is lit in linear HDR; bloom adds what is brighter
+   // than the threshold back as a soft glow before the tonemap (0 = off).
+   float bloom = 0.0f;
+   float bloomThreshold = 1.0f;
+   float bloomRadius = 0.6f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -662,6 +670,7 @@ public:
       v.Bool("shadows", shadowsEnabled); v.Int("shadowQuality", shadowQuality);
       v.Float("shadowBias", shadowBias); v.Float("shadowSoftness", shadowSoftness);
       v.Float("shadowStrength", shadowStrength);
+      v.Float("bloom", bloom); v.Float("bloomThreshold", bloomThreshold); v.Float("bloomRadius", bloomRadius);
    }
 
 private:
@@ -835,6 +844,8 @@ private:
    // Resolve target: a plain texture, and what the rest of the graph reads.
    unsigned int mFbo = 0;
    unsigned int mColorTex = 0;
+   Render3DPost mPost;        // Turbo 0.61: IBL maps + HDR finish
+   unsigned int mPostOut = 0; // mPost's output, 0 until the post pass ran
    unsigned int mDepthBuffer = 0; // a depth texture (so Volume can read it)
    SceneCamera mLastCamera;
    bool mDepthWanted = false;
