@@ -213,6 +213,10 @@
             DrawMacroRadioSelectorBody(m);
          else if (auto* m = dynamic_cast<MacroStepGateNode*>(gn.node.get()))
             DrawMacroStepGateBody(m);
+         // Turbo 0.60 (upstream): Drift drives one value per destination, so the
+         // single-history meter would have to pick one; this draws every line.
+         else if (!isAudioBodyNode && dynamic_cast<DriftNode*>(gn.node.get()) != nullptr)
+            DrawDriftMeter(dynamic_cast<DriftNode*>(gn.node.get()), gn.index);
          else if (!isAudioBodyNode && dynamic_cast<IModulator*>(gn.node.get()) != nullptr)
          {
             // Audio/note nodes are excluded here even when they implement

@@ -659,6 +659,42 @@
    // actually form one - this exists for P3, where a Delay-shaped effect
    // node could otherwise wire one in without any test catching it until the
    // sort hangs at connect time instead of failing loudly.
+   // Turbo 0.60: the geometry graph has no delay stage either - a mesh pulled
+   // through Join -> Transform -> Join recursed until the stack ran out (a
+   // patch could load one; nothing refused it). Same walk as below, over the
+   // geometry pins: does anything downstream of dst already feed src?
+   bool WouldCreateGeometryCycle(INode* src, INode* dst)
+   {
+      if (src == dst)
+         return true;
+      std::vector<INode*> stack{ dst };
+      std::set<INode*> visited;
+      while (!stack.empty())
+      {
+         INode* cur = stack.back();
+         stack.pop_back();
+         if (!visited.insert(cur).second)
+            continue;
+         auto* curGeo = dynamic_cast<IGeometrySource*>(cur);
+         if (curGeo == nullptr)
+            continue;
+         for (GraphNode& gn : gNodes)
+         {
+            for (int slot = 0; slot < 64; slot++)
+            {
+               IGeometrySource** in = gn.node->GeometryInputSlot(slot);
+               if (in != nullptr && *in == curGeo)
+               {
+                  if (gn.node.get() == src)
+                     return true;
+                  stack.push_back(gn.node.get());
+               }
+            }
+         }
+      }
+      return false;
+   }
+
    bool WouldCreateAudioCycle(INode* src, INode* dst)
    {
       if (src == dst)
@@ -775,6 +811,13 @@
       if (srcIsNoteSource && WouldCreateNoteCycle(srcNode->node.get(), dstNode->node.get()))
       {
          outError = "would create a note feedback loop";
+         return false;
+      }
+      if (dynamic_cast<IGeometrySource*>(srcNode->node.get()) != nullptr &&
+          dstNode->node->GeometryInputSlot(dstSlot) != nullptr &&
+          WouldCreateGeometryCycle(srcNode->node.get(), dstNode->node.get()))
+      {
+         outError = "would create a geometry loop";
          return false;
       }
 

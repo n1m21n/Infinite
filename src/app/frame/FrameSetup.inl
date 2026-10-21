@@ -65,6 +65,8 @@
       // Turbo 0.60 (upstream): the movement log diffs last frame's final values -
       // what no machine writer claimed (NoteWriter) was the hand.
       MovementLog::Capture(ImGui::GetTime(), true);
+      gPredictorGrabsPrev.swap(gPredictorGrabs); // Turbo 0.60: last frame's Shift-grabs
+      gPredictorGrabs.clear();
       PollPendingNamed(); // Turbo 0.60: before the clear - last frame's controls are still registered
       RefreshParamKeyCache();
       Modulation::Instance().ClearFrameParams();

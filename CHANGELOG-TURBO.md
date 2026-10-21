@@ -47,6 +47,8 @@ them. Old patches open unchanged.
 - Upstream's `mod` range (lo / hi, the destination's own units) becomes Turbo's range mapper; Turbo
   files carry a marker line so the two `mod` layouts are never confused. A file with `rev 2` keeps
   the defaults for keys it does not write, as upstream reads it.
+- A geometry loop (Join -> Transform -> Join) is refused on the canvas and over RPC, and a patch that
+  has one opens with the closing cable dropped - it used to crash the app (0.59 too).
 - **Modulation on a collapsed node** no longer freezes (upstream fix): a collapsed node that a cable,
   expression, MIDI mapping or gesture drives still registers its controls, without drawing them.
 - **Mixer**: 0 to 12 channels (the channels stepper) and solo per channel, as upstream. A Mixer saved
@@ -65,6 +67,11 @@ them. Old patches open unchanged.
   Upstream's movement log records every param change and who made it (hand, modulator, expression,
   gesture, prediction); predictors write each destination in its own 0..1. Self-tests MOVELOGTEST
   and MOVESTATSTEST.
+- **Shift-grab** a knob a predictor drives: it turns green, your hand takes over while you hold it,
+  and on release the predictor learns where you left it and how fast you were moving.
+- Drift draws one trace per destination in its header; SETUP > Movement log turns the log on/off,
+  opens its folder and caps its size (256 MB / 1 GB / 4 GB). Knobs with a dB or frequency taper are
+  logged and predicted along their own curve.
 - Saved modulation and expressions name their control by key (`mod 5 cutoff ...`, upstream's own
   format), so a node whose body reorders its controls no longer moves a saved binding.
 

@@ -13,11 +13,6 @@
    };
    std::map<std::pair<uint64_t, ParamKey>, DriftTrace> gDriftTraces;
 
-   uint64_t UidForIndex(int nodeIndex)
-   {
-      const GraphNode* gn = FindNodeByIndex(nodeIndex);
-      return gn != nullptr ? gn->uid : 0;
-   }
 
    ImU32 DriftLineColor(int i, int alpha)
    {

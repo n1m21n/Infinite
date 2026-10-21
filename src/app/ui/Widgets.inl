@@ -1105,6 +1105,118 @@
       return held || cvHigh;
    }
 
+   GraphNode* FindNodeByIndex(int index);
+
+   // ---- Turbo 0.60 (upstream): Shift-grab of a predicted control ----------
+   // A knob a predictor (Drift / Moves) drives is read-only like any modulated
+   // one, except while Shift is held: the hand takes it over for the grab, the
+   // apply loop leaves it alone (gPredictorGrabs), and the predictor is told
+   // where it was let go and how fast it was moving - which is what it learns.
+   std::set<ParamKey> gPredictorGrabs;     // grabbed this frame
+   std::set<ParamKey> gPredictorGrabsPrev; // grabbed last frame (keeps the grab alive once Shift is let go)
+
+   uint64_t UidForIndex(int nodeIndex)
+   {
+      const GraphNode* gn = FindNodeByIndex(nodeIndex);
+      return gn != nullptr ? gn->uid : 0;
+   }
+
+   IPredictor* PredictorForParam(int nodeIndex, int paramIndex)
+   {
+      const Modulation::Source s = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
+      if (s.nodeIndex < 0)
+         return nullptr;
+      GraphNode* gn = FindNodeByIndex(s.nodeIndex);
+      return (gn != nullptr && gn->node != nullptr) ? dynamic_cast<IPredictor*>(gn->node.get()) : nullptr;
+   }
+
+   // Fader position (0..1) <-> parameter value, honouring the widget's own taper when it has one.
+   float ParamToPos(const ParamRef& r, float v)
+   {
+      if (r.valueToPos != nullptr)
+         return std::clamp(r.valueToPos(v, r.minValue, r.maxValue), 0.0f, 1.0f);
+      const float span = r.maxValue - r.minValue;
+      return span != 0.0f ? std::clamp((v - r.minValue) / span, 0.0f, 1.0f) : 0.0f;
+   }
+
+   float PosToParam(const ParamRef& r, float pos)
+   {
+      if (r.posToValue != nullptr)
+         return r.posToValue(pos, r.minValue, r.maxValue);
+      return r.minValue + (r.maxValue - r.minValue) * pos;
+   }
+
+   struct PredictorGrabCtx
+   {
+      IPredictor* pred = nullptr;
+      ParamKey key;
+      bool editable = false;
+   };
+
+   PredictorGrabCtx BeginPredictorGrab(const ParamRef& ref)
+   {
+      PredictorGrabCtx c;
+      c.pred = PredictorForParam(ref.nodeIndex, ref.paramIndex);
+      if (c.pred == nullptr || ref.isEnum || ref.isBool)
+      {
+         c.pred = nullptr;
+         return c;
+      }
+      c.key = ParamKey{ UidForIndex(ref.nodeIndex), ref.paramIndex };
+      c.editable = ImGui::GetIO().KeyShift || gPredictorGrabsPrev.count(c.key) > 0;
+      return c;
+   }
+
+   // Right after the widget, with its activated / active state (an ImGui item's
+   // or a knob's gLastAudioWidgetInteraction). The release is the frame it stops
+   // being active.
+   void EndPredictorGrab(const PredictorGrabCtx& c, const ParamRef& ref, bool activated, bool active)
+   {
+      if (c.pred == nullptr || !c.editable)
+         return;
+      // Release velocity from the last <=100 ms of this grab, in fader space.
+      struct Track { double t[8]; float pos[8]; int n = 0; bool active = false; };
+      static std::map<ParamKey, Track> sTracks;
+      Track& tr = sTracks[c.key];
+      const double now = ImGui::GetTime();
+      if (activated)
+      {
+         PushUndoCheckpoint();
+         tr.n = 0;
+         c.pred->OnGrab(c.key);
+      }
+      if (active)
+      {
+         gPredictorGrabs.insert(c.key);
+         const float pos = ParamToPos(ref, *ref.value);
+         if (tr.n == 8)
+         {
+            std::copy(tr.t + 1, tr.t + 8, tr.t);
+            std::copy(tr.pos + 1, tr.pos + 8, tr.pos);
+            tr.n = 7;
+         }
+         tr.t[tr.n] = now;
+         tr.pos[tr.n] = pos;
+         ++tr.n;
+      }
+      if (tr.active && !active)
+      {
+         float vel = 0.0f;
+         if (tr.n >= 2)
+         {
+            int i0 = tr.n - 1;
+            while (i0 > 0 && tr.t[tr.n - 1] - tr.t[i0 - 1] <= 0.1)
+               --i0;
+            const double span = tr.t[tr.n - 1] - tr.t[i0];
+            if (i0 < tr.n - 1 && span > 1e-3)
+               vel = (float)((tr.pos[tr.n - 1] - tr.pos[i0]) / span);
+         }
+         c.pred->OnRelease(c.key, ParamToPos(ref, *ref.value), vel);
+         tr.n = 0;
+      }
+      tr.active = active;
+   }
+
 
    // `audioStyle` swaps the widget in the middle of this function for
    // AudioSliderFloat above. Everything around it - the pin, the typed-edit
@@ -1270,6 +1382,23 @@
             gTypedParamNoAutoSelect.erase(editKey);
             gTypedParamPendingInit.erase(editKey);
          }
+      }
+      else if (PredictorGrabCtx grab = BeginPredictorGrab(ref); modulated && grab.pred != nullptr && grab.editable)
+      {
+         // Turbo 0.60: Shift-grab of a predicted control - the hand drives it
+         // (green) and the predictor learns from the release.
+         if (audioStyle)
+            changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
+                                       IM_COL32(120, 220, 140, 255), /*readOnly=*/false);
+         else
+         {
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.10f, 0.30f, 0.16f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.45f, 0.90f, 0.55f, 1.0f));
+            ImGui::SetNextItemWidth(width - box - 4.0f);
+            changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
+            ImGui::PopStyleColor(2);
+         }
+         EndPredictorGrab(grab, ref, ImGui::IsItemActivated(), ImGui::IsItemActive());
       }
       else if (modulated)
       {
@@ -1994,6 +2123,8 @@
       ref.maxValue = maxV;
       ref.taper = (style == AudioWidgetStyle::VFaderDb || style == AudioWidgetStyle::KnobDb) ? 1
                 : (style == AudioWidgetStyle::KnobFreq ? 2 : 0);
+      ref.posToValue = p2v; // Turbo 0.60: the widget's taper, for the movement log and predictors
+      ref.valueToPos = v2p;
       ref.name = label;
       Modulation::Instance().RegisterParam(ref);
 
@@ -2112,6 +2243,12 @@
          // whether or not one of its cells is being typed into.
          ImGui::SetCursorScreenPos(cellOrigin);
          ImGui::Dummy(ImVec2(cell, diameter + 4.0f + ImGui::GetTextLineHeight()));
+      }
+      else if (PredictorGrabCtx grab = BeginPredictorGrab(ref); modulated && grab.pred != nullptr && grab.editable)
+      {
+         // Turbo 0.60: Shift-grab of a predicted knob, as ModSlider.
+         changed = DrawWidget(value, IM_COL32(120, 220, 140, 255), /*readOnly=*/false);
+         EndPredictorGrab(grab, ref, gLastAudioWidgetInteraction.activated, gLastAudioWidgetInteraction.active);
       }
       else if (modulated)
       {

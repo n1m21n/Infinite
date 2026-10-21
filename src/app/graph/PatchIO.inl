@@ -521,8 +521,18 @@
       {
          GraphNode* dst = resolve(c.dstIndex);
          GraphNode* src = resolve(c.srcIndex);
-         if (dst != nullptr && src != nullptr)
-            ConnectGeometrySlot(*dst, c.dstSlot, *src, c.srcOutput);
+         if (dst == nullptr || src == nullptr)
+            continue;
+         // Turbo 0.60: a file can describe a geometry loop the canvas refuses;
+         // the cable that would close it is dropped instead of crashing the cook.
+         if (dst->node->GeometryInputSlot(c.dstSlot) != nullptr &&
+             WouldCreateGeometryCycle(src->node.get(), dst->node.get()))
+         {
+            fprintf(stderr, "patch: geometry cable %d -> %d dropped (it would close a loop)\n", c.srcIndex, c.dstIndex);
+            gPatchStatus = "Opened; a geometry cable that closed a loop was dropped";
+            continue;
+         }
+         ConnectGeometrySlot(*dst, c.dstSlot, *src, c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.audio)
       {

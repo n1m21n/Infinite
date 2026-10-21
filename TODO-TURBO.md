@@ -34,9 +34,8 @@ CHANGELOG-TURBO.md when it ships.
 - Headless engine from upstream: --render / --frame / --frames-dir / --node / --stems / --notes /
   --set / --audio-summary / --contact-sheet / --explain / --describe / --validate, plus the
   console launcher for cmd exit codes.
-- Gesture learning, rest of upstream: Shift-grab of a predicted knob (OnGrab / OnRelease), the
-  Drift meter in the node header, the movement-log settings page (folder, size cap), fader tapers
-  on ParamRef (Turbo logs linear), patch load / undo marks.
+- Gesture learning, rest of upstream: patch load / undo marks in the movement log; ModSlider has
+  no taper in Turbo (only knobs and faders carry one).
 - Upstream's own bodies were reordered (Delay, Dynamics, ...): its numeric `mod` lines on those land
   on other knobs (keyed ones are fine). MIDI learn, gestures and Performance targets still save
   ordinals.
@@ -45,7 +44,6 @@ CHANGELOG-TURBO.md when it ships.
   (Turbo's Looper is its own rewrite), Drift's new modes (with the gesture-learning item), Output
   offline render settings (headless), MIDI File speed / position, Audio File pitch, Note Capturer
   scale, Random Note step timing (NoteNodes.cpp differs a lot on both sides).
-- Bug: tests/headless/topology/g8_geo_cycle.inf crashes (access violation) in 0.59.1 and 0.60.
 - Rest of the audio engine from upstream (multi-output nodes, Splitter crossover, worker pool,
   ParamMailbox frame stamps) - Turbo's AudioEngine is kept for now.
 - Upstream UI parity for modulators: FixedParamOrdinal / RegisterHiddenParam (stable slider

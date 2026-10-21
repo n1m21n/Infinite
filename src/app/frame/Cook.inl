@@ -445,14 +445,23 @@
                {
                   if (ref.isEnum || ref.isBool)
                      continue;
-                  const float span = ref.maxValue - ref.minValue;
-                  const float cur = std::fabs(span) > 1e-9f ? (*ref.value - ref.minValue) / span : 0.0f;
+                  const float cur = ParamToPos(ref, *ref.value); // fader space, the widget's taper
                   const GraphNode* dstGn = FindNodeByIndex(ref.nodeIndex);
                   const ParamKey pk{ dstGn != nullptr ? dstGn->uid : 0, ref.paramIndex };
-                  v01 = std::clamp(pred->ValuePos01For(pk, std::clamp(cur, 0.0f, 1.0f)), 0.0f, 1.0f);
+                  if (gPredictorGrabs.count(pk) > 0 || gPredictorGrabsPrev.count(pk) > 0)
+                  {
+                     MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Hand);
+                     continue; // Shift-grabbed: the hand owns it this frame
+                  }
+                  // In fader space, inside the binding's output window, written
+                  // straight back through the taper (upstream: so a log knob is
+                  // not crowded at its top end).
+                  const float p = std::clamp(pred->ValuePos01For(pk, cur), 0.0f, 1.0f);
+                  *ref.value = PosToParam(ref, src.outMin + (src.outMax - src.outMin) * p);
+                  MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Prediction);
+                  continue;
                }
-               MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex,
-                                       pred != nullptr ? MovementLog::Source::Prediction : MovementLog::Source::Modulator);
+               MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Modulator);
                // Turbo range mapper (see Modulation::Source::HasRange).
                if (src.HasRange())
                {
