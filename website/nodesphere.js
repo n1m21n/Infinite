@@ -15,7 +15,7 @@
 
   function size() {
     var w = stage.clientWidth, narrow = w < 560;
-    R = narrow ? 240 : Math.min(w * 0.34, 400);
+    R = narrow ? 300 : Math.min(w * 0.36, 420);
     H = Math.round(R * 2 + (narrow ? 60 : 90)); W = w;
     stage.style.setProperty('--ns-size', H + 'px'); stage.style.setProperty('--ns-r', R + 'px');
   }
@@ -24,9 +24,9 @@
     for (var i = 0; i < n; i++) {
       var p = pts[i], x = p[0] * cy + p[2] * sy, z = -p[0] * sy + p[2] * cy;
       var y = p[1] * cp - z * sp; z = p[1] * sp + z * cp;
-      var d = (z + 1) / 2, s = 0.72 + 0.5 * d, a = anchors[i];
+      var d = (z + 1) / 2, s = 0.8 + 0.35 * d, a = anchors[i];
       a.style.transform = 'translate(-50%,-50%) translate(' + (x * R).toFixed(1) + 'px,' + (y * R).toFixed(1) + 'px) scale(' + s.toFixed(3) + ')';
-      a.style.opacity = (0.18 + 0.82 * d * d).toFixed(2);
+      a.style.opacity = (d < 0.4 ? 0.06 : 0.25 + 0.75 * (d - 0.4) / 0.6).toFixed(2);
       a.style.zIndex = Math.round(d * 100);
       a.classList.toggle('is-back', d < 0.32); a.classList.toggle('is-front', d > 0.78);
     }

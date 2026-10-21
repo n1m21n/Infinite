@@ -56,14 +56,17 @@ html:has(.np-page) { overflow-x: hidden; overflow-x: clip; }
 .js .ns-orb { display: block; position: absolute; left: 50%; top: 50%; width: calc(var(--ns-r, 300px) * 2); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
   background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--surface-1, var(--ground)) 100%, white 6%), var(--nm-down-flat, var(--ground)) 72%);
   box-shadow: var(--nm-raise), inset 0 0 90px color-mix(in srgb, var(--signal) 14%, transparent); opacity: 0.9; }
-.js .ns-a:not(.is-front) { background: transparent; box-shadow: none; }
-.js .ns-a { position: absolute; left: 50%; top: 50%; min-height: 0; height: 30px; padding: 0 12px; font-size: 0.8125rem; will-change: transform, opacity; transition: opacity 220ms ease, box-shadow 160ms ease; }
-.js .ns-a:not(.is-back):hover, .js .ns-a:focus-visible { background: var(--nm-up); }
-.js .ns-a:hover, .js .ns-a:focus-visible { box-shadow: var(--nm-raise), 0 0 0 2px var(--signal); }
+.js .ns-a { position: absolute; left: 50%; top: 50%; min-height: 0; height: 28px; padding: 0 6px; border-radius: 6px; background: none; box-shadow: none; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.005em; color: var(--ink); will-change: transform, opacity; transition: opacity 220ms ease, color 160ms ease; }
+.js .ns-a.is-front { font-weight: 600; }
+.js .ns-a:hover, .js .ns-a:focus-visible { color: var(--signal); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; outline: 0; }
 .js .ns-a.is-dim { opacity: 0.1 !important; pointer-events: none; }
 .js .ns-a.is-back { pointer-events: none; }
 .ns-bar { margin: 8px 0 0; }
 .np-chip { border: 0; cursor: pointer; font-family: inherit; }
 .np-chip[aria-pressed="true"] { background: var(--nm-pearl); box-shadow: var(--nm-pearl-raise); color: var(--nm-ink-on-pearl, var(--ground)); }
-@media (max-width: 680px) { .js .ns-a { height: 28px; padding: 0 10px; } }
+@media (max-width: 680px) { }
 @media (prefers-reduced-motion: reduce) { .ns-a { transition: none; } }
+.ns-bar { gap: 2px 4px; }
+.ns-bar .np-chip { min-height: 32px; padding: 0 12px; background: none; box-shadow: none; color: var(--ink2); }
+.ns-bar .np-chip:hover { color: var(--ink); }
+.ns-bar .np-chip[aria-pressed="true"] { background: var(--nm-pearl); box-shadow: var(--nm-pearl-raise); color: var(--nm-ink-on-pearl, var(--ground)); }
