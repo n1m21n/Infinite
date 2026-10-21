@@ -230,6 +230,7 @@
   <url><loc>https://infinitedevices.org/nodes/compare.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/cone.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/constant.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/nodes/convolution-reverb.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/convolve.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/crescent.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/crop.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
@@ -274,11 +275,13 @@
   <url><loc>https://infinitedevices.org/nodes/field-effect.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/field-graph.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/field-modifier.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/nodes/field-notes.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/field-pixel.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/field-primitive.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/field-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/fit.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/flanger.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/nodes/fm.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/formant-filter.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/formula.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/frequency-shifter.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
@@ -384,6 +387,7 @@
   <url><loc>https://infinitedevices.org/nodes/outer-glow.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/output.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/palette.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/nodes/partials.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/particle-system.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/path.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/pattern.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
@@ -429,12 +433,15 @@
   <url><loc>https://infinitedevices.org/nodes/rounded-cube.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/rounded-rect.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/sampler.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/nodes/saturator.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/screw.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/select.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/set-alpha.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/set-vertex-color.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/shape.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/show-alpha.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/nodes/sketch-3d.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/nodes/sketch.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/slicer.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/slideshow.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/smooth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
@@ -447,6 +454,7 @@
   <url><loc>https://infinitedevices.org/nodes/star-3d.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/star.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/stereo.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/nodes/string.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/stutter.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/subdivide.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/superellipse.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>

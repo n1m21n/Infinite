@@ -1,0 +1,12 @@
+infinite-patch 1
+rev 2
+# Sketch: a starting patch for the Sketch node
+node 1 Source Sketch
+  id node
+  pos 520 300
+end
+node 2 Utility Output
+  id out
+  pos 1080 300
+end
+cable out 0 node

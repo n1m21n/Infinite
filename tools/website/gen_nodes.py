@@ -79,6 +79,10 @@ def engine(refresh=False):
     return {NORM(t["type"]): t for t in json.load(open(p))}
 
 
+# nodes the engine has but the marquee list (website/nodes.js, a dated census) does not name yet; they get pages like every other node
+EXTRA = ["Sketch", "Sketch 3D", "Field Notes", "FM", "String", "Partials", "Convolution Reverb", "Saturator"]
+
+
 def library():
     s = open(os.path.join(W, "nodes.js"), encoding="utf-8").read()
     return json.loads(re.search(r"NODE_LIBRARY = (\[.*?\]);", s, re.S).group(1))
@@ -318,7 +322,7 @@ def build():
         refresh_pdf_cards()
     types, cards = engine(refresh), guide_cards()
     pages_txt = pdf_pages()
-    lib = library()
+    lib = library() + [(n, types[NORM(n)]["category"]) for n in EXTRA if NORM(n) in types]
     items = []
     for name, cat in lib:
         t = types[NORM(name)]
