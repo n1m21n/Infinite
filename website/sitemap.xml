@@ -50,6 +50,7 @@
   <url><loc>https://infinitedevices.org/embeds/spectral-caustics.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/plasma-filament.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/solar-flare.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/gravitational-lensing.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
@@ -93,6 +94,8 @@
   <url><loc>https://infinitedevices.org/library/ring-modulator-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/subharmonic-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bitcrush-degrader-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/karplus-strong-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/frequency-shifter-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
@@ -179,6 +182,11 @@
   <url><loc>https://infinitedevices.org/library/subharmonic-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/bitcrush-degrader-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/solar-flare.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dejong-attractor.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/breather-surface-3d.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/karplus-strong-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/frequency-shifter-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/gravitational-lensing.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-21</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>

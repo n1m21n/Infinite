@@ -73,6 +73,10 @@
    "hex": 5,
    "radius": 1
   },
+  "embeds/gravitational-lensing.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/harmonic-warp.html": {
    "font-size": 2,
    "hex": 6
