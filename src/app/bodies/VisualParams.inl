@@ -846,10 +846,14 @@
    // ---- Turbo 0.60: modulator helpers for the ported MSEG / Voice Spread / Note Expression
    inline void PushCheckboxStyle() {}
    inline void PopCheckboxStyle() {}
-   // Upstream runs LFO / Random / MSEG once per synth voice when "per voice"
-   // is on; Turbo's synths have no per-voice modulation yet, so the switch
-   // is not offered (the field stays saved, off).
-   inline void DrawPerVoiceCheckbox(bool* /*voice*/) {}
+   // LFO / Random / MSEG: run once per voice when cabled straight into a
+   // synth's voice param (audio/VoiceMod.h). Off: one shared value, as ever.
+   void DrawPerVoiceCheckbox(bool* voice)
+   {
+      PushCheckboxStyle();
+      ModCheckbox("per voice", voice);
+      PopCheckboxStyle();
+   }
    // Upstream's "rate in" row (beats / synced division / Hz). Turbo keeps the
    // beats slider at this place in every mode, so the sliders after it never
    // change ordinal; DrawModRateHz draws the Hz slider, called last.
@@ -884,8 +888,12 @@
       ModSlider("phase", &n->phase, 0.0f, 1.0f);
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
+      // Per voice, each note starts the cycle: phase from does not apply.
+      ImGui::BeginDisabled(n->voice);
       DropdownButton("phase from", LFONode::PhaseModeNames(), n->phaseMode,
                      [n](int i) { PushUndoCheckpoint(); n->phaseMode = i; });
+      ImGui::EndDisabled();
+      DrawPerVoiceCheckbox(&n->voice);
       DrawModRateHz(n->rateMode, &n->rateHz); // after "high": ordinal 4, as upstream
    }
 
@@ -896,6 +904,7 @@
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
       ModSlider("seed", &n->seed, 0.0f, 200.0f);
+      DrawPerVoiceCheckbox(&n->voice);
       DrawModRateHz(n->rateMode, &n->rateHz); // ordinal 5, as upstream
    }
 

@@ -41,6 +41,14 @@ struct NoteEvent
    bool bendUpdate = false;    // true = "update this held note's bend", not a
                                // real note-on/off; isNoteOn is false when this
                                // is set
+
+   // MPE per-note pressure and slide (CC74), 0..1, from MIDI Notes in MPE
+   // mode. Carried on the note-on and on a bendUpdate; `hasExpression` says
+   // they are real, so a bendUpdate from Pitch Bend (which knows nothing of
+   // pressure) never zeroes a held note's pressure.
+   float pressure = 0.0f;
+   float slide = 0.0f;
+   bool hasExpression = false;
 };
 
 // Monotonic counter for NoteEvent::voiceId. Every producer that emits a

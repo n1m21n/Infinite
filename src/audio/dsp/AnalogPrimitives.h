@@ -92,7 +92,10 @@ namespace AnalogDsp
    }
 
    // mu-Law non-uniform companding quantization for vintage DAC/sampler emulation
-   inline float MuLawQuantize(float x, float bits, float mu = 255.0f)
+   // `ditherLsb` is added before rounding, in units of one quantisation
+   // step of the compressed signal (0 = undithered, the previous behaviour
+   // exactly).
+   inline float MuLawQuantize(float x, float bits, float mu = 255.0f, float ditherLsb = 0.0f)
    {
       const float clamped = std::clamp(x, -1.0f, 1.0f);
       const float sgn = clamped < 0.0f ? -1.0f : 1.0f;
@@ -100,16 +103,18 @@ namespace AnalogDsp
 
       // Compress: y = sgn * ln(1 + mu*|x|) / ln(1 + mu)
       const float logMu = logf(1.0f + mu);
-      const float y = (logf(1.0f + mu * absX) / logMu);
+      const float y = sgn * (logf(1.0f + mu * absX) / logMu);
 
-      // Uniform quantization in compressed space
+      // Uniform quantization in compressed space (signed, so dither can
+      // cross zero symmetrically; std::round is odd, so at zero dither this
+      // matches quantising |y| and restoring the sign).
       const float levels = powf(2.0f, std::clamp(bits, 1.0f, 16.0f));
       const float steps = levels * 0.5f;
-      const float yQuant = std::round(y * steps) / steps;
+      const float yQuant = std::clamp(std::round(y * steps + ditherLsb) / steps, -1.0f, 1.0f);
 
       // Expand: x_recon = sgn * ((1 + mu)^|yQuant| - 1) / mu
-      const float xRecon = sgn * (powf(1.0f + mu, yQuant) - 1.0f) / mu;
-      return xRecon;
+      const float qs = yQuant < 0.0f ? -1.0f : 1.0f;
+      return qs * (powf(1.0f + mu, std::fabs(yQuant)) - 1.0f) / mu;
    }
 
    // Slow LFO with secondary rate drift for wow & flutter / BBD clock drift

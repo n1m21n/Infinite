@@ -323,6 +323,73 @@
          const std::map<std::string, float>& globals = ExprGlobals::Values();
          const double midiNow = ImGui::GetTime();
          MidiMap::Update(midiNow);
+         // Turbo 0.60 (upstream): per-voice modulation (audio/VoiceMod.h). A
+         // modulator with "per voice" on, cabled straight into a synth's voice
+         // param, also goes into that synth's plan and runs once per voice on
+         // the audio thread. The shared write still happens: the knob shows
+         // it, and a synth playing with no notes uses it. Plans are keyed by
+         // the synth's uid, so a deleted synth is dropped, not published to.
+         static std::map<uint64_t, VoiceMod::Plan> sVoicePlans;
+         for (auto& entry : sVoicePlans)
+         {
+            entry.second.numSources = 0;
+            entry.second.numRoutes = 0;
+         }
+         const auto collectVoiceRoute = [&](const ParamRef& ref, const Modulation::Source& src,
+                                            IModulator* modulator, const GraphNode* modNode) {
+            auto* source = dynamic_cast<VoiceMod::IVoiceModSource*>(modulator);
+            if (source == nullptr || ref.isEnum || ref.isBool)
+               return;
+            // The range mapper's input window has no per-voice form; such a
+            // cable stays on the shared value.
+            if (src.inMin != 0.0f || src.inMax != 1.0f)
+               return;
+            GraphNode* dst = FindNodeByIndex(ref.nodeIndex);
+            auto* target = dst != nullptr ? dynamic_cast<VoiceMod::IVoiceModTarget*>(dst->node.get()) : nullptr;
+            if (target == nullptr)
+               return;
+            const int param = target->VoiceParamFor(ref.value);
+            VoiceMod::Spec spec;
+            if (param < 0 || !source->VoiceSpec(spec))
+               return;
+            spec.id = modNode->uid;
+            VoiceMod::Plan& plan = sVoicePlans[dst->uid];
+            int s = 0;
+            while (s < plan.numSources && plan.sources[s].id != spec.id)
+               s++;
+            if (s == plan.numSources)
+            {
+               if (s >= VoiceMod::kMaxSources)
+                  return;
+               plan.sources[plan.numSources++] = spec;
+            }
+            if (plan.numRoutes >= VoiceMod::kMaxRoutes)
+               return;
+            // Turbo's binding (absolute or bipolar around the centre, with the
+            // output window) as the lo..hi the per-voice kernel sweeps.
+            const float range = ref.maxValue - ref.minValue;
+            float lo, hi;
+            if (src.polarity == Modulation::Source::kBipolar)
+            {
+               lo = src.centre + (src.outMin - 0.5f) * 2.0f * src.depth * range;
+               hi = src.centre + (src.outMax - 0.5f) * 2.0f * src.depth * range;
+            }
+            else
+            {
+               lo = ref.minValue + range * src.outMin;
+               hi = ref.minValue + range * src.outMax;
+            }
+            VoiceMod::Route& r = plan.routes[plan.numRoutes++];
+            r.source = s;
+            r.param = param;
+            r.lo = lo;
+            r.hi = hi;
+            r.curve = 0.0f;
+            r.smoothMs = 0.0f;
+            r.minValue = std::min(ref.minValue, ref.maxValue);
+            r.maxValue = std::max(ref.minValue, ref.maxValue);
+            r.step = ref.step;
+         };
          for (const ParamRef& ref : modulation.FrameParams())
          {
             if (ref.value == nullptr)
@@ -383,6 +450,7 @@
                {
                   *ref.value = ref.minValue + (ref.maxValue - ref.minValue) * v01;
                }
+               collectVoiceRoute(ref, src, modulator, modNode);
                continue;
             }
             const std::string* expr = modulation.ExpressionFor(ref.nodeIndex, ref.paramIndex);
@@ -419,6 +487,17 @@
                // a typo mid-edit should not blank out the render.
                modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, error);
             }
+         }
+         // Every synth with a plan gets this frame's; one whose routes all
+         // went (unbound, switch off, modulator deleted) gets the empty plan
+         // once, so its voices fall back to the shared value, and is forgotten.
+         for (auto it = sVoicePlans.begin(); it != sVoicePlans.end();)
+         {
+            GraphNode* gn = FindNodeByUid(it->first);
+            auto* target = gn != nullptr ? dynamic_cast<VoiceMod::IVoiceModTarget*>(gn->node.get()) : nullptr;
+            if (target != nullptr)
+               target->PublishVoicePlan(it->second);
+            it = target != nullptr && it->second.numRoutes > 0 ? std::next(it) : sVoicePlans.erase(it);
          }
       }
 

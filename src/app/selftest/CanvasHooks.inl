@@ -4439,6 +4439,7 @@
          printf("%s\n", ok ? "PALETTE OK" : "SUSPECT");
       }
 
+#include "app/selftest/PatchCompat.inl" // Turbo 0.60: INFINITE_PATCHCOMPAT probe
       if (getenv("INFINITE_PORTEDTEST") != nullptr && frameId == 8)
       {
          int failed = 0;

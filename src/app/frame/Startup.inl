@@ -62,6 +62,14 @@
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return HeadlessExit(RunDspTest());
 
+   // Turbo 0.60: upstream's per-voice modulation fixture. Exit 0 always - the
+   // printed VOICEMODTEST verdict is the driver's signal, as for AUDIOPDCTEST.
+   if (getenv("INFINITE_VOICEMODTEST") != nullptr)
+   {
+      RunVoiceModFixture();
+      return HeadlessExit(0);
+   }
+
    if (getenv("INFINITE_AUDIOPDCTEST") != nullptr)
    {
       RunAudioPdcTest();

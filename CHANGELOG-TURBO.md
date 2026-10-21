@@ -31,8 +31,13 @@ them. Old patches open unchanged.
   (MPE pressure / slide; MIDI inputs now store channel pressure and CC74). LFO and Random get the
   upstream rate modes (beats, synced division, Hz) and LFO "phase from"; Smooth gets time and spring.
 - Drum Sequencer: **accent vol** next to accent pitch (0-12 dB on accented steps).
-- Per-voice modulation (upstream's VoiceMod) is not in yet: Voice Spread and Note Expression act as
-  one shared value until Turbo's Analog and Wavetable get it.
+- **Synth engine from upstream**: Analog and Wavetable run upstream's current cores (band-limited
+  oscillators, voice lanes, the newer filter models), with the parameter mailbox and note queue
+  they need. Turbo's own changes stay on top: comb filters, the old filter order of Equation /
+  Wave Terrain / Image Spectral Synth, the one-block timeline clip pitch, Sampler's one-shot release.
+- **Per voice**: LFO, Random and MSEG get the "per voice" switch. Cabled into a voice param of
+  Analog or Wavetable, each note gets its own cycle; Voice Spread and Note Expression are per note
+  too (MPE pressure and slide carried on each note).
 
 ### Prediction and geometry (from the to-do)
 - **Predictive Coloring**: learns what graded footage looks like and grades incoming frames toward it.
@@ -43,7 +48,10 @@ them. Old patches open unchanged.
 
 ### Housekeeping
 - Old local branches deleted; unmerged remote ones kept as tags (archive/*). Unused macOS icons removed.
-- New `PORTEDTEST` self-test (23 checks).
+- New `PORTEDTEST` self-test (23 checks) and upstream's `VOICEMODTEST` (88 checks).
+- Patch compatibility probe (`INFINITE_PATCHCOMPAT`, `patchcompat.ps1` + `compare-patchcompat.py`):
+  493 upstream and the Turbo patches opened in 0.59.1 and 0.60, compared node by node - no
+  regressions.
 
 ## 0.59.1-turbo (2026-10-17)
 

@@ -21,7 +21,7 @@ int VoiceAllocator::NoteOn(int midiNote, float velocity, int voiceId)
 {
    // Round-robin first: cycle through voices starting at the cursor,
    // preferring one that's already inactive.
-   const int numVoices = (int)mVoices.size();
+   const int numVoices = mLimit > 0 ? mLimit : (int)mVoices.size();
    int chosen = -1;
    for (int i = 0; i < numVoices; ++i)
    {

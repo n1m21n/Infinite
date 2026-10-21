@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio/FpContract.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -33,36 +34,24 @@ namespace DspMath
 
       float Process(float target)
       {
-         current = target + (current - target) * coeff;
+         // In float the step stops moving once it rounds back to `current`,
+         // ~0.5 ulp / (1 - coeff) short of target (hundreds of ulps at 96 kHz
+         // with a 5 ms time constant). Harmless for a gain; fatal for a
+         // smoothed biquad coefficient, where a 50 Hz band's 1 + a1 + a2 is
+         // ~1e-5 and that error moved its response by up to 18 dB. Snap
+         // when a step makes no progress.
+         const float next = target + (current - target) * coeff;
+         current = (next == current) ? target : next;
          return current;
       }
    };
 
-   // Upstream: identity below `knee`, then a tanh shoulder that is C1 at the
-   // knee and tops out at 1 - bounds a feedback loop or resonator without
-   // colouring normal levels.
-   inline float SoftCeiling(float x, float knee = 0.8f)
-   {
-      const float a = std::fabs(x);
-      if (a <= knee)
-         return x;
-      const float y = knee + (1.0f - knee) * std::tanh((a - knee) / (1.0f - knee));
-      return x < 0.0f ? -y : y;
-   }
-
-   // Upstream: antiderivative of FastTanh's rational form x(27+x^2)/(27+9x^2)
-   // (flat +-1 past |x| = 3), for first-order ADAA saturators.
-   inline double FastTanhAntiderivative(double u)
-   {
-      const double a = std::fabs(u);
-      const double atThree = 9.0 / 18.0 + (4.0 / 3.0) * std::log(9.0 * 9.0 + 27.0);
-      if (a > 3.0)
-         return atThree + (a - 3.0);
-      return a * a / 18.0 + (4.0 / 3.0) * std::log(9.0 * a * a + 27.0);
-   }
-
-   // One-pole DC blocker with its cutoff fixed in Hz (8 Hz at every sample
-   // rate), from upstream - used by the ported String model.
+   // One-pole DC blocker (y[n] = x[n] - x[n-1] + R*y[n-1]). R =
+   // exp(-2 pi fc / fs) puts the cutoff at kCutoffHz at every sample rate, so
+   // it has no audible effect on the signal itself. (Drive's used to be a
+   // fixed R = 0.995, which is 35 Hz at 44.1 kHz and 76 Hz at 96 kHz -
+   // audibly thinning the bass of everything through it.) Used after Drive's
+   // and Wavetable Shaper's asymmetric shapers and as Analog's AC coupling.
    struct DcBlocker
    {
       static constexpr double kCutoffHz = 8.0;
@@ -80,6 +69,7 @@ namespace DspMath
 
       float Process(float x)
       {
+         INFINITE_NO_FMA
          const float y = x - prevIn + r * prevOut;
          prevIn = x;
          prevOut = y;
@@ -109,20 +99,36 @@ namespace DspMath
       rightGain = sinf(angle);
    }
 
+   // -------------------------------------------------------- FlushDenormal
+   // Flushes denormal / subnormal floating point numbers to zero to prevent
+   // CPU performance stalls in recursive filter & delay feedback loops.
+   inline float FlushDenormal(float x)
+   {
+      return std::fabs(x) < 1.0e-20f ? 0.0f : x;
+   }
+
+   // Soft ceiling: the identity below `knee`, then a tanh shoulder that is C1
+   // at the knee and tops out at 1. For a feedback loop or a resonator that
+   // must stay bounded without colouring anything at normal levels -
+   // bit-identical to no limiter at all while |x| <= knee.
+   inline float SoftCeiling(float x, float knee = 0.8f)
+   {
+      const float a = std::fabs(x);
+      if (a <= knee)
+         return x;
+      const float y = knee + (1.0f - knee) * std::tanh((a - knee) / (1.0f - knee));
+      return x < 0.0f ? -y : y;
+   }
+
    // ------------------------------------------------------------- Fast tanh
    // Pade-style rational approximation, x*(27+x*x)/(27+9*x*x), clamped
    // outside +/-3 where the rational form stops tracking tanh (saturates to
    // +/-1 instead, which is the correct limit anyway). Common cheap
    // saturator approximation; max error versus std::tanh is small enough for
    // audio-rate soft clipping and much cheaper than the libm transcendental.
-   // Flushes denormals to zero (recursive filter / feedback loops).
-   inline float FlushDenormal(float x)
-   {
-      return std::fabs(x) < 1.0e-20f ? 0.0f : x;
-   }
-
    inline float FastTanh(float x)
    {
+      INFINITE_NO_FMA
       if (x < -3.0f)
          return -1.0f;
       if (x > 3.0f)
@@ -130,6 +136,48 @@ namespace DspMath
       const float x2 = x * x;
       return x * (27.0f + x2) / (27.0f + 9.0f * x2);
    }
+
+   // Antiderivative of FastTanh: the rational part x(27+x^2)/(27+9x^2)
+   // divides to x/9 + 24x/(9x^2+27), and past |x| = 3 the curve is a flat
+   // +-1. Continuous at 3, and even.
+   inline double FastTanhAntiderivative(double u)
+   {
+      const double a = std::fabs(u);
+      const double atThree = 9.0 / 18.0 + (4.0 / 3.0) * std::log(9.0 * 9.0 + 27.0);
+      if (a > 3.0)
+         return atThree + (a - 3.0);
+      return a * a / 18.0 + (4.0 / 3.0) * std::log(9.0 * a * a + 27.0);
+   }
+
+   // First-order antiderivative anti-aliasing (ADAA) of FastTanh: the
+   // average of the curve over the straight line between the previous input
+   // and this one, (F(u) - F(u')) / (u - u'), instead of its value at one
+   // point (Parker, Zavalishin & Le Bivic, DAFx-16). Suppresses the aliasing
+   // a saturator generates by roughly an extra 6 dB/octave, at the cost of
+   // half a sample of delay. Double precision: the difference quotient of
+   // two antiderivative values is mostly rounding in float.
+   struct FastTanhAdaa
+   {
+      double prevU = 0.0;
+      double prevF = FastTanhAntiderivative(0.0);
+
+      void Reset()
+      {
+         prevU = 0.0;
+         prevF = FastTanhAntiderivative(0.0);
+      }
+
+      float Process(float u)
+      {
+         const double F = FastTanhAntiderivative(u);
+         const double du = (double)u - prevU;
+         const float y = (std::fabs(du) < 1.0e-5) ? FastTanh((float)(0.5 * ((double)u + prevU)))
+                                                   : (float)((F - prevF) / du);
+         prevU = u;
+         prevF = F;
+         return y;
+      }
+   };
 
    // --------------------------------------------------------------- PolyBLEP
    // Band-limited sawtooth/square/sine/triangle via a phase-accumulator
@@ -167,27 +215,40 @@ namespace DspMath
 
       // Reads `atPhase` (normally `phase`, or `phase` plus a momentary
       // modulation offset) rather than the member directly - see the class
-      // comment. `pulseWidth` only matters for kWaveSquare/kWavePulse.
+      // comment. `pulseWidth` skews every waveform, not just
+      // kWaveSquare/kWavePulse: it moves where in the cycle the shape's
+      // "midpoint" falls (see WarpPhase), the same way it moves a square's
+      // duty cycle. At 0.5 every waveform is unchanged from its symmetric
+      // form.
       float Generate(int waveform, float pulseWidth, double atPhase) const
       {
          atPhase -= floor(atPhase); // wrap into [0, 1) - floor handles negative offsets too
          switch (waveform)
          {
             case kWaveSine:
-               return (float)sin(2.0 * M_PI * atPhase);
+               return (float)sin(2.0 * M_PI * WarpPhase(atPhase, pulseWidth));
 
             case kWaveTriangle:
+            {
                // Naive (non-BLEP) triangle: its harmonics already roll off
                // at -12 dB/octave, so residual aliasing is far less audible
                // than on saw/square - not worth a second integrator state
                // to correct, especially once phase can be offset per-sample
                // by FM (an integrator's running state can't be "read at an
-               // offset" the way this stateless formula can).
-               return 2.0f * (float)fabs(2.0 * (atPhase - floor(atPhase + 0.5))) - 1.0f;
+               // offset" the way this stateless formula can). Same naive
+               // treatment extends to the pulseWidth-skewed peak below.
+               const double w = WarpPhase(atPhase, pulseWidth);
+               return (float)(1.0 - 4.0 * fabs(w - 0.5));
+            }
 
             case kWaveSaw:
             {
-               float out = (float)(2.0 * atPhase - 1.0);
+               // Phase-warped ramp: pulseWidth bends how fast phase crosses
+               // the first vs. second half of the cycle (a Casio CZ-style
+               // phase-distortion "warm-up"), while the hard wrap edge stays
+               // exactly where the un-warped BLEP correction expects it.
+               const double w = WarpPhase(atPhase, pulseWidth);
+               float out = (float)(2.0 * w - 1.0);
                out -= BlepCorrection(atPhase, phaseInc);
                return out;
             }
@@ -223,6 +284,18 @@ namespace DspMath
       }
 
    private:
+      // Remaps atPhase so its "midpoint" - the point every non-square shape
+      // below treats as its symmetric centre - falls at pulseWidth instead
+      // of always at 0.5, stretching [0, pulseWidth) and [pulseWidth, 1)
+      // each into half the returned range. Continuous at 0/pulseWidth/1 (no
+      // new value discontinuity), so it's safe to feed into sin/saw/triangle
+      // without additional BLEP handling.
+      static double WarpPhase(double atPhase, float pulseWidth)
+      {
+         const double pw = pulseWidth < 0.01f ? 0.01 : (pulseWidth > 0.99f ? 0.99 : (double)pulseWidth);
+         return atPhase < pw ? (atPhase / pw) * 0.5 : 0.5 + (atPhase - pw) / (1.0 - pw) * 0.5;
+      }
+
       // PolyBLEP: 2nd-order polynomial approximation of the band-limited
       // step, applied within one sample (dt = phaseInc) of a discontinuity.
       static float BlepCorrection(double t, double dt)
@@ -346,6 +419,7 @@ namespace DspMath
 
       Outputs Process(float in)
       {
+         INFINITE_NO_FMA
          const float a1 = 1.0f / (1.0f + g * (g + k));
          const float a2 = g * a1;
          const float band = a1 * s1 + a2 * (in - s2);
@@ -567,15 +641,43 @@ namespace DspMath
       }
    };
 
+   // Knob position (0..1) -> comb feedback. Both families of comb call site
+   // land here so one knob position means one sound everywhere.
+   //
+   // Not the identity map it used to be. A feedback comb's tooth depth is a
+   // brutally non-linear function of g: the ripple between a peak and a
+   // notch is 0.9 dB at g = 0.05, 2.6 dB at 0.15, 9.5 dB at 0.5 and 52 dB at
+   // 0.995. Feeding a 0..1 knob in raw therefore spends its entire lower half
+   // on differences no one can hear - and puts g = 0 at "exactly a wire",
+   // since y[n] = x[n] + g*y[n-M] with g = 0 is the input unchanged. Selecting
+   // "comb +" at any ordinary resonance setting did nothing audible, and the
+   // cutoff knob it greyed out (see SynthModes::FilterUsesCutoff) had nothing
+   // to control.
+   //
+   // Instead the knob is linear in the comb's *peak gain in dB*, which is
+   // roughly how the depth is heard: 4 dB at zero, 40 dB at full. Zero is a
+   // shallow comb rather than a bypass, because for a comb the resonance is
+   // not an optional extra on top of a filter - it IS the filter, and the
+   // choice of "comb" in the type dropdown is the request for one.
+   inline float CombFeedbackFromResonance(float resonance01)
+   {
+      constexpr float kPeakDbMin = 4.0f, kPeakDbMax = 40.0f;
+      const float r = std::clamp(resonance01, 0.0f, 1.0f);
+      const float peakDb = kPeakDbMin + (kPeakDbMax - kPeakDbMin) * r;
+      const float g = 1.0f - powf(10.0f, -peakDb / 20.0f);
+      return std::clamp(g, 0.0f, 0.995f);
+   }
+
    // Comb has no continuous-Q concept of its own, so every filter node that
    // adds it repurposes its existing 0.1..18.0 "Q" knob as "how much ring" -
    // the same way those knobs already repurpose "gain" as a no-op for LP/HP
-   // types. One shared mapping so every node's comb sounds the same at the
-   // same knob position.
+   // types. Normalises to 0..1 and defers to the shared law above rather than
+   // carrying a second one; before that it was a bare linear map into g, so
+   // the Filter node's comb at its default Q of 1.0 was a 0.9 dB ripple.
    inline float CombFeedbackFromQ(float q)
    {
       constexpr float kQMin = 0.1f, kQMax = 18.0f;
-      return std::clamp((q - kQMin) / (kQMax - kQMin), 0.0f, 1.0f) * 0.995f;
+      return CombFeedbackFromResonance((q - kQMin) / (kQMax - kQMin));
    }
 
    // Closed-form |H(e^jw)| of a feedback comb y[n] = x[n] + g*y[n-M], in dB:

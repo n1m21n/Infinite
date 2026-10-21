@@ -290,6 +290,7 @@ namespace
 
 #include "app/selftest/DspFixtures.inl" // audio node sweep discovery and the INFINITE_DSPTEST fixtures
 #include "app/selftest/EngineTests.inl" // PDC, param sweep and plugin scan tests
+#include "app/selftest/VoiceModFixture.inl" // Turbo 0.60: upstream per-voice modulation fixture
 
 int main(int argc, char** argv)
 {

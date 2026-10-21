@@ -84,6 +84,11 @@ public:
    // Upstream: seconds that keep running whatever the transport does (stop,
    // seek, loop) - free-running modulators step by this. Steady wall clock here.
    double FreeSeconds() const;
+   // Upstream: the engine time of the current audio block, the stamp domain
+   // ParamMailbox ramps toward once frames are published (PublishFrame). Turbo
+   // never publishes, so the mailbox only ever runs its fixed fallback ramp and
+   // this value just has to be steady.
+   double EngineBlockStartSeconds() const { return 0.0; }
 
    // Called once, main thread, immediately after AudioEngine::Instance().Start()
    // succeeds. Captures the current frame-driven position as the audio clock's
