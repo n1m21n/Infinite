@@ -1,7 +1,7 @@
 /* Node pages (website/nodes/*) and the node index. Built by tools/website/gen_nodes.py. Tokens only. */
 .np-cat { color: var(--cat, var(--ink2)); }
 .np-shot { margin: var(--web-stack-xl, 24px) 0; padding: var(--web-card-pad-lg, 24px); display: grid; place-items: center; border-radius: var(--web-card-radius, 24px); background: var(--nm-down); box-shadow: var(--nm-pocket); }
-.np-shot img { display: block; width: auto; height: auto; max-width: 100%; max-height: 680px; border-radius: var(--web-media-radius, 12px); }
+.np-shot img { display: block; width: auto; height: auto; max-width: 100%; max-height: 640px; border-radius: var(--web-media-radius, 12px); }
 .np-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 0; }
 .np-step { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; background: var(--nm-up); box-shadow: var(--nm-raise); color: var(--ink); text-decoration: none; font-size: 0.875rem; font-weight: 600; }
 a.np-step:hover { transform: translateY(-1px); }
@@ -39,3 +39,31 @@ a.np-step:hover { transform: translateY(-1px); }
 .np-pill:hover { transform: translateY(-1px); }
 .np-pill:focus-visible, .np-chip:focus-visible, .np-step:focus-visible { outline: 0; box-shadow: var(--nm-raise), 0 0 0 2px var(--signal); }
 @media (prefers-reduced-motion: reduce) { .np-pill, a.np-step { transition: none; } .np-pill:hover, a.np-step:hover { transform: none; } }
+
+/* the node sphere on nodes/ : links laid on a turning sphere, a plain list without scripting */
+html:has(.np-page) { overflow-x: hidden; overflow-x: clip; }
+.np-page { overflow-x: hidden; overflow-x: clip; max-width: 100%; }
+.np-page main { overflow-x: clip; }
+.ns-stage { display: flex; flex-wrap: wrap; gap: 8px; }
+.ns-orb, .ns-bar .ns-view { display: none; }
+.js .ns-bar .ns-view { display: inline-flex; }
+.ns-list { display: none; }
+.ns[data-view="list"] .ns-stage { display: none; }
+.ns[data-view="list"] + .ns-list { display: block; }
+.ns-a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; background: var(--nm-up); box-shadow: var(--nm-raise); color: var(--ink); text-decoration: none; font-size: 0.875rem; font-weight: 600; white-space: nowrap; }
+.js .ns-stage { position: relative; display: block; width: min(100vw, 1100px); margin-left: 50%; transform: translateX(-50%); height: var(--ns-size, 720px); margin-top: 8px; overflow: hidden; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; contain: layout paint; }
+.js .ns-stage.is-drag { cursor: grabbing; }
+.js .ns-orb { display: block; position: absolute; left: 50%; top: 50%; width: calc(var(--ns-r, 300px) * 2); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--surface-1, var(--ground)) 100%, white 6%), var(--nm-down-flat, var(--ground)) 72%);
+  box-shadow: var(--nm-raise), inset 0 0 90px color-mix(in srgb, var(--signal) 14%, transparent); opacity: 0.9; }
+.js .ns-a:not(.is-front) { background: transparent; box-shadow: none; }
+.js .ns-a { position: absolute; left: 50%; top: 50%; min-height: 0; height: 30px; padding: 0 12px; font-size: 0.8125rem; will-change: transform, opacity; transition: opacity 220ms ease, box-shadow 160ms ease; }
+.js .ns-a:not(.is-back):hover, .js .ns-a:focus-visible { background: var(--nm-up); }
+.js .ns-a:hover, .js .ns-a:focus-visible { box-shadow: var(--nm-raise), 0 0 0 2px var(--signal); }
+.js .ns-a.is-dim { opacity: 0.1 !important; pointer-events: none; }
+.js .ns-a.is-back { pointer-events: none; }
+.ns-bar { margin: 8px 0 0; }
+.np-chip { border: 0; cursor: pointer; font-family: inherit; }
+.np-chip[aria-pressed="true"] { background: var(--nm-pearl); box-shadow: var(--nm-pearl-raise); color: var(--nm-ink-on-pearl, var(--ground)); }
+@media (max-width: 680px) { .js .ns-a { height: 28px; padding: 0 10px; } }
+@media (prefers-reduced-motion: reduce) { .ns-a { transition: none; } }

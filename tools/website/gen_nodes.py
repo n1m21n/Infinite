@@ -434,7 +434,7 @@ def head(title, desc, url, image, ld, rel="nodes/x.html", bodyclass="blog-page b
   <link rel="stylesheet" href="../style.css?v=60c68394">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
-  <link rel="stylesheet" href="../nodepage.css?v=6147ea2e">
+  <link rel="stylesheet" href="../nodepage.css?v=47e4a6c8">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="{bodyclass}">
@@ -558,25 +558,31 @@ def index_page(items):
         pills = "".join('<a class="np-pill" href="%s.html">%s</a>' % (i["slug"], e(i["name"])) for i in xs)
         secs.append('<section class="np-sec" id="%s" style="--cat:%s"><h2>%s <small class="mono">%d</small></h2><p>%s.</p><div class="np-pills">%s</div></section>'
                     % (slug(c), CAT_COLOR[c], e(CAT_LABEL[c]), len(xs), e(CAT_BLURB[c][0].upper() + CAT_BLURB[c][1:]), pills))
-    jump = "".join('<a class="np-chip" href="#%s">%s</a>' % (slug(c), e(CAT_LABEL[c])) for c in order if any(i["cat"] == c for i in items))
+    fams = [c for c in order if any(i["cat"] == c for i in items)]
+    chips = '<button type="button" class="np-chip" data-fam="" aria-pressed="true">All</button>' + "".join(
+        '<button type="button" class="np-chip" data-fam="%s" aria-pressed="false">%s</button>' % (slug(c), e(CAT_LABEL[c])) for c in fams)
+    cloud = "".join('<a class="ns-a" data-fam="%s" href="%s.html">%s</a>' % (slug(i["cat"]), i["slug"], e(i["name"]))
+                    for i in sorted(items, key=lambda i: (order.index(i["cat"]), i["name"].lower())))
     body = f"""  {chrome.header_html(rel)}
 
   <main>
     <div class="container post-wrap np-wrap">
       <nav class="crumbs mono" aria-label="Breadcrumb"><a href="../index.html">Infinite</a> / Nodes</nav>
       <header class="post-head">
-        <p class="post-kicker mono">The palette</p>
         <h1>Every node in Infinite</h1>
-        <p class="post-lede">{len(items)} nodes, one page each: what it does, its inputs and outputs, its controls and a patch you can download.</p>
-        <p class="np-jump" aria-label="Jump to a family">{jump}</p>
       </header>
-      {"".join(secs)}
+      <div class="ns" id="ns">
+        <div class="np-jump ns-bar" role="group" aria-label="Filter by family">{chips}<button type="button" class="np-chip ns-view" aria-pressed="false">List</button></div>
+        <div class="ns-stage" id="ns-stage"><span class="ns-orb" aria-hidden="true"></span>{cloud}</div>
+      </div>
+      <div class="ns-list" id="ns-list">{"".join(secs)}</div>
     </div>
   </main>
 
   {chrome.footer_html(rel)}
 
   <script src="../site.js?v={chrome.JS_VERSION}" defer></script>
+  <script src="../nodesphere.js?v=1" defer></script>
 </body>
 </html>
 """
