@@ -51,16 +51,15 @@ html:has(.np-page) { overflow-x: hidden; overflow-x: clip; }
 .ns[data-view="list"] .ns-stage { display: none; }
 .ns[data-view="list"] + .ns-list { display: block; }
 .ns-a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; background: var(--nm-up); box-shadow: var(--nm-raise); color: var(--ink); text-decoration: none; font-size: 0.875rem; font-weight: 600; white-space: nowrap; }
-.js .ns-stage { position: relative; display: block; width: min(100vw, 1100px); margin-left: 50%; transform: translateX(-50%); height: var(--ns-size, 720px); margin-top: 8px; overflow: hidden; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; contain: layout paint; }
+.js .ns-stage { position: relative; display: block; width: min(100vw, 1100px); margin-left: 50%; transform: translateX(-50%); height: var(--ns-size, 720px); margin-top: 8px; overflow: hidden; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; contain: layout paint; }
 .js .ns-stage.is-drag { cursor: grabbing; }
 .js .ns-orb { display: block; position: absolute; left: 50%; top: 50%; width: calc(var(--ns-r, 300px) * 2); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
   background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--surface-1, var(--ground)) 100%, white 6%), var(--nm-down-flat, var(--ground)) 72%);
   box-shadow: var(--nm-raise), inset 0 0 90px color-mix(in srgb, var(--signal) 14%, transparent); opacity: 0.9; }
-.js .ns-a { position: absolute; left: 50%; top: 50%; min-height: 0; height: 28px; padding: 0 6px; border-radius: 6px; background: none; box-shadow: none; font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.005em; color: var(--ink); will-change: transform, opacity; transition: opacity 220ms ease, color 160ms ease; }
-.js .ns-a.is-front { font-weight: 600; }
-.js .ns-a:hover, .js .ns-a:focus-visible { color: var(--signal); text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; outline: 0; }
-.js .ns-a.is-dim { opacity: 0.1 !important; pointer-events: none; }
-.js .ns-a.is-back { pointer-events: none; }
+.js .ns-a { position: absolute; left: 50%; top: 50%; min-height: 0; height: 22px; padding: 0 8px 0 8px; display: flex; align-items: center; box-sizing: border-box; border-radius: 6px; background: none; box-shadow: none; font-size: 0.8125rem; font-weight: 500; color: var(--ink); opacity: 0; pointer-events: none; transition: opacity 320ms ease, color 160ms ease; }
+.js .ns-a.on { opacity: 0.5; pointer-events: auto; }
+.js .ns-a.near { opacity: 1; font-weight: 600; }
+.js .ns-a:hover, .js .ns-a:focus-visible { color: var(--signal); opacity: 1; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; outline: 0; }
 .ns-bar { margin: 8px 0 0; }
 .np-chip { border: 0; cursor: pointer; font-family: inherit; }
 .np-chip[aria-pressed="true"] { background: var(--nm-pearl); box-shadow: var(--nm-pearl-raise); color: var(--nm-ink-on-pearl, var(--ground)); }
