@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Modal Bar Synth",
+    "author": "Infinite",
+    "description": "Physical modeling modal synthesis of struck wooden bars with inharmonic vibrational modes and mallet impulse excitation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float strike = 0.85 [0.1, 2.0];\nparam float brightness = 0.65 [0.0, 1.0];\nparam float damping = 0.45 [0.05, 1.5];\nparam float body = 0.5 [0.0, 1.0];\nstate float prevGate = 0;\nstate float mallet = 0;\nstate float y1 = 0;\nstate float y1_prev = 0;\nstate float y2 = 0;\nstate float y2_prev = 0;\nstate float y3 = 0;\nstate float y3_prev = 0;\nstate float y4 = 0;\nstate float y4_prev = 0;\n\n// Detect note trigger on gate rising edge\nif (gate > 0.5 && prevGate <= 0.5) {\n  mallet = strike;\n}\nprevGate = gate;\n\n// Fast decaying mallet excitation burst\nimpulse = mallet;\nmallet = mallet * clamp(1.0 - 1800.0 / sr, 0.85, 0.999);\n\nf0 = clamp(freq, 40.0, 3500.0);\n\n// Inharmonic bar modes (1.0, 2.756, 5.404, 8.933)\nw1 = clamp(6.2831853 * f0 / sr, 0.005, 1.5);\nw2 = clamp(6.2831853 * f0 * 2.756 / sr, 0.005, 1.5);\nw3 = clamp(6.2831853 * f0 * 5.404 / sr, 0.005, 1.5);\nw4 = clamp(6.2831853 * f0 * 8.933 / sr, 0.005, 1.5);\n\nd1 = clamp(1.0 - (0.8 + damping * 1.8) / sr, 0.95, 0.9999);\nd2 = clamp(1.0 - (1.6 + damping * 3.6) / sr, 0.92, 0.9998);\nd3 = clamp(1.0 - (3.2 + damping * 7.2) / sr, 0.88, 0.9995);\nd4 = clamp(1.0 - (6.4 + damping * 14.4) / sr, 0.82, 0.999);\n\n// 2nd-order resonator difference equations\nnext_y1 = 2.0 * d1 * cos(w1) * y1 - d1 * d1 * y1_prev + impulse;\nnext_y2 = 2.0 * d2 * cos(w2) * y2 - d2 * d2 * y2_prev + impulse * brightness * 0.7;\nnext_y3 = 2.0 * d3 * cos(w3) * y3 - d3 * d3 * y3_prev + impulse * brightness * 0.45;\nnext_y4 = 2.0 * d4 * cos(w4) * y4 - d4 * d4 * y4_prev + impulse * brightness * 0.25;\n\ny1_prev = y1; y1 = next_y1;\ny2_prev = y2; y2 = next_y2;\ny3_prev = y3; y3 = next_y3;\ny4_prev = y4; y4 = next_y4;\n\nbarSound = y1 + y2 + y3 + y4;\nresonator = sin(y1 * 0.4) * body;\nout = (barSound * 0.35 + resonator * 0.15);\n",
+    "params": {
+      "strike": 0.85,
+      "brightness": 0.65,
+      "damping": 0.45,
+      "body": 0.5
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

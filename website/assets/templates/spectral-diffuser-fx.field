@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spectral Diffuser FX",
+    "author": "Infinite",
+    "description": "Multi-stage nested allpass diffusion network with modulation jitter, dissolving transients into ethereal reverb halos.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float diffusion = 0.72 [0.1, 0.95];\nparam float damping = 0.35 [0.0, 0.95];\nparam float modRate = 0.85 [0.1, 5.0];\nparam float modDepth = 0.4 [0.0, 1.0];\nparam float mix = 0.8 [0.0, 1.0];\nstate float ap1 = 0;\nstate float ap1_buf = 0;\nstate float ap2 = 0;\nstate float ap2_buf = 0;\nstate float ap3 = 0;\nstate float ap3_buf = 0;\nstate float ap4 = 0;\nstate float ap4_buf = 0;\nstate float lfoP = 0;\nstate float lp = 0;\n\nlfoP = (lfoP + modRate / sr) % 1.0;\njitter = sin(6.2831853 * lfoP) * modDepth * 0.15;\ng = clamp(diffusion + jitter, 0.1, 0.88);\n\nx = in;\n\n// Stage 1 allpass\nv1 = x - g * ap1_buf;\nap1 = ap1_buf + g * v1;\nap1_buf = v1;\n\n// Stage 2 allpass\nv2 = ap1 - g * ap2_buf;\nap2 = ap2_buf + g * v2;\nap2_buf = v2;\n\n// Damping lowpass filter in circulation\nlp = lp + clamp((1.0 - damping) * 0.45, 0.01, 0.8) * (ap2 - lp);\n\n// Stage 3 allpass\nv3 = lp - g * ap3_buf;\nap3 = ap3_buf + g * v3;\nap3_buf = v3;\n\n// Stage 4 allpass\nv4 = ap3 - g * ap4_buf;\nap4 = ap4_buf + g * v4;\nap4_buf = v4;\n\nwet = ap4;\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "diffusion": 0.72,
+      "damping": 0.35,
+      "modRate": 0.85,
+      "modDepth": 0.4,
+      "mix": 0.8
+    },
+    "nodeSettings": {}
+  }
+}

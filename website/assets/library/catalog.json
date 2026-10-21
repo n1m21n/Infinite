@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 124,
+ "count": 137,
  "items": [
   {
    "id": "first-sound",
@@ -1490,6 +1490,162 @@
    "file": "https://infinitedevices.org/assets/library/pixel/gravitational-lensing.field",
    "preview": "https://infinitedevices.org/assets/library/previews/gravitational-lensing.jpg",
    "page": "https://infinitedevices.org/library/gravitational-lensing.html"
+  },
+  {
+   "id": "harmonograph-resonance",
+   "name": "Harmonograph Resonance",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Three-pendulum rotary harmonograph with lateral damping and decaying elliptical Lissajous interference.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/harmonograph-resonance.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/harmonograph-resonance.jpg",
+   "page": "https://infinitedevices.org/library/harmonograph-resonance.html"
+  },
+  {
+   "id": "chua-circuit",
+   "name": "Chua Circuit",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Chua non-linear double-scroll chaotic attractor with piecewise linear diode vector field dynamics.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/chua-circuit.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/chua-circuit.jpg",
+   "page": "https://infinitedevices.org/library/chua-circuit.html"
+  },
+  {
+   "id": "hopf-fibration-3d",
+   "name": "Hopf Fibration 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Stereographic projection of 4D 3-sphere fibers into interlocking nested Villarceau circles in 3D.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/hopf-fibration-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/hopf-fibration-3d.jpg",
+   "page": "https://infinitedevices.org/library/hopf-fibration-3d.html"
+  },
+  {
+   "id": "hyperbolic-helicoid-3d",
+   "name": "Hyperbolic Helicoid 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Bonnet isometric transformation morphing continuously between a catenoid and helicoid minimal surface.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/hyperbolic-helicoid-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-helicoid-3d.jpg",
+   "page": "https://infinitedevices.org/library/hyperbolic-helicoid-3d.html"
+  },
+  {
+   "id": "granular-cloud-synth",
+   "name": "Granular Cloud Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Asynchronous quasi-stochastic granular cloud synthesizer with Gaussian pitch scatter and Hann windowing.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/granular-cloud-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/granular-cloud-synth.jpg",
+   "page": "https://infinitedevices.org/library/granular-cloud-synth.html"
+  },
+  {
+   "id": "modal-bar-synth",
+   "name": "Modal Bar Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Physical modeling modal synthesis of struck wooden bars with inharmonic vibrational modes and mallet impulse excitation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/modal-bar-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/modal-bar-synth.jpg",
+   "page": "https://infinitedevices.org/library/modal-bar-synth.html"
+  },
+  {
+   "id": "spectral-diffuser-fx",
+   "name": "Spectral Diffuser FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Multi-stage nested allpass diffusion network with modulation jitter, dissolving transients into ethereal reverb halos.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/spectral-diffuser-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/spectral-diffuser-fx.jpg",
+   "page": "https://infinitedevices.org/library/spectral-diffuser-fx.html"
+  },
+  {
+   "id": "vowel-resonator-fx",
+   "name": "Vowel Resonator FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Triple-formant vocal tract acoustic filter bank with dynamic vowel morphing and saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/vowel-resonator-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/vowel-resonator-fx.jpg",
+   "page": "https://infinitedevices.org/library/vowel-resonator-fx.html"
+  },
+  {
+   "id": "supernova-remnant",
+   "name": "Supernova Remnant",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Expanding relativistic blast shockwave with turbulent magnetohydrodynamic filaments and audio-reactive synchrotron core flare.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/supernova-remnant.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/supernova-remnant.jpg",
+   "page": "https://infinitedevices.org/library/supernova-remnant.html"
+  },
+  {
+   "id": "hyperbolic-kaleidoscope",
+   "name": "Hyperbolic Kaleidoscope",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/hyperbolic-kaleidoscope.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-kaleidoscope.jpg",
+   "page": "https://infinitedevices.org/library/hyperbolic-kaleidoscope.html"
+  },
+  {
+   "id": "cyber-tunnel",
+   "name": "Cyber Tunnel",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Neon cyan perspective rings around a magenta core with audio-reactive speed and warp.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/cyber-tunnel.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/cyber-tunnel.jpg",
+   "page": "https://infinitedevices.org/library/cyber-tunnel.html"
+  },
+  {
+   "id": "hex-lattice",
+   "name": "Hex Lattice",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Isometric hexagonal honeycomb grid with concentric harmonic audio-reactive ripple pulses.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/hex-lattice.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/hex-lattice.jpg",
+   "page": "https://infinitedevices.org/library/hex-lattice.html"
+  },
+  {
+   "id": "harmonic-warp",
+   "name": "Harmonic Warp",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Multi-octave harmonic coordinate warp with frequency-dependent color gradients and ripple displacement.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/harmonic-warp.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/harmonic-warp.jpg",
+   "page": "https://infinitedevices.org/library/harmonic-warp.html"
   }
  ]
 }

@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Vowel Resonator FX",
+    "author": "Infinite",
+    "description": "Triple-formant vocal tract acoustic filter bank with dynamic vowel morphing and saturation.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float vowel = 0.5 [0.0, 1.0];\nparam float resonance = 0.86 [0.2, 0.98];\nparam float drive = 1.6 [1.0, 4.0];\nparam float lfoSpeed = 0.75 [0.05, 5.0];\nparam float mix = 0.85 [0.0, 1.0];\nstate float lfoP = 0;\nstate float bp1 = 0;\nstate float lp1 = 0;\nstate float bp2 = 0;\nstate float lp2 = 0;\nstate float bp3 = 0;\nstate float lp3 = 0;\n\nlfoP = (lfoP + lfoSpeed / sr) % 1.0;\nmodV = sin(6.2831853 * lfoP) * 0.25;\nv = clamp(vowel + modV, 0.0, 1.0);\n\n// 3 phonetic formant frequencies interpolated across vowel space\nf1 = clamp(350.0 + v * 480.0, 250.0, 1000.0);\nf2 = clamp(800.0 + (1.0 - v) * 1600.0, 600.0, 2800.0);\nf3 = clamp(2200.0 + sin(v * 3.14159) * 600.0, 1800.0, 3400.0);\n\nu = in * drive;\nsat = u / (1.0 + abs(u) * 0.3);\n\nq = 1.0 - resonance * 0.95;\n\nw1 = clamp(f1 / sr * 2.2, 0.005, 0.45);\nhp1 = sat - lp1 - q * bp1;\nbp1 = bp1 + w1 * hp1;\nlp1 = lp1 + w1 * bp1;\n\nw2 = clamp(f2 / sr * 2.2, 0.005, 0.45);\nhp2 = sat - lp2 - q * bp2;\nbp2 = bp2 + w2 * hp2;\nlp2 = lp2 + w2 * bp2;\n\nw3 = clamp(f3 / sr * 2.2, 0.005, 0.45);\nhp3 = sat - lp3 - q * bp3;\nbp3 = bp3 + w3 * hp3;\nlp3 = lp3 + w3 * bp3;\n\nwet = (bp1 * 1.2 + bp2 * 0.9 + bp3 * 0.6) * 0.65;\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "vowel": 0.5,
+      "resonance": 0.86,
+      "drive": 1.6,
+      "lfoSpeed": 0.75,
+      "mix": 0.85
+    },
+    "nodeSettings": {}
+  }
+}

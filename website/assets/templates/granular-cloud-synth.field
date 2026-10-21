@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Granular Cloud Synth",
+    "author": "Infinite",
+    "description": "Asynchronous quasi-stochastic granular cloud synthesizer with Gaussian pitch scatter and Hann windowing.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float density = 22.0 [4.0, 60.0];\nparam float grainSize = 0.065 [0.02, 0.25];\nparam float scatter = 0.35 [0.0, 1.0];\nparam float cutoff = 2600.0 [200.0, 12000.0];\nparam float res = 0.55 [0.0, 0.92];\nstate float gPhase1 = 0;\nstate float gPhase2 = 0.5;\nstate float gFreq1 = 440.0;\nstate float gFreq2 = 440.0;\nstate float cPhase1 = 0;\nstate float cPhase2 = 0;\nstate float lp = 0;\nstate float bp = 0;\n\ntargetFreq = clamp(freq, 30.0, 4000.0);\ngStep1 = clamp(density * 0.5 / sr, 0.0001, 0.01);\ngStep2 = clamp(density * 0.5 / sr, 0.0001, 0.01);\n\ngPhase1 = gPhase1 + gStep1;\nif (gPhase1 >= 1.0) {\n  gPhase1 = gPhase1 - 1.0;\n  gFreq1 = targetFreq * (1.0 + (sin(cPhase1 * 13.7) * scatter * 0.4));\n}\n\ngPhase2 = gPhase2 + gStep2;\nif (gPhase2 >= 1.0) {\n  gPhase2 = gPhase2 - 1.0;\n  gFreq2 = targetFreq * (1.0 + (cos(cPhase2 * 17.3) * scatter * 0.4));\n}\n\ncStep1 = clamp(gFreq1 / sr, 0.0002, 0.45);\ncStep2 = clamp(gFreq2 / sr, 0.0002, 0.45);\ncPhase1 = (cPhase1 + cStep1) % 1.0;\ncPhase2 = (cPhase2 + cStep2) % 1.0;\n\n// Raised cosine Hann grain windows\nwin1 = 0.5 - 0.5 * cos(6.2831853 * gPhase1);\nwin2 = 0.5 - 0.5 * cos(6.2831853 * gPhase2);\n\n// Complex carrier waveform (sine + soft saw)\ncar1 = sin(6.2831853 * cPhase1) * 0.7 + (2.0 * cPhase1 - 1.0) * 0.3;\ncar2 = sin(6.2831853 * cPhase2) * 0.7 + (2.0 * cPhase2 - 1.0) * 0.3;\n\nraw = (car1 * win1 + car2 * win2) * 0.65 * gate;\n\n// State variable resonant filter\nfCut = clamp(cutoff / sr * 2.2, 0.005, 0.45);\nq = 1.0 - res * 0.95;\nhp = raw - lp - q * bp;\nbp = bp + fCut * hp;\nlp = lp + fCut * bp;\n\nout = (lp + bp * 0.35) * 0.85;\n",
+    "params": {
+      "density": 22.0,
+      "grainSize": 0.065,
+      "scatter": 0.35,
+      "cutoff": 2600.0,
+      "res": 0.55
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

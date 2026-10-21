@@ -129,6 +129,11 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Plasma Filament](https://infinitedevices.org/library/plasma-filament.html): High-energy electrical plasma arcs with audio-reactive magnetic twist undulations, helical flux filaments and incandescent core discharge. (file: https://infinitedevices.org/assets/library/pixel/plasma-filament.field)
 - [Solar Flare](https://infinitedevices.org/library/solar-flare.html): Blinding coronal solar flares with twisting magnetic loop prominences, turbulent convection granulation and audio-reactive coronal mass ejections. (file: https://infinitedevices.org/assets/library/pixel/solar-flare.field)
 - [Gravitational Lensing](https://infinitedevices.org/library/gravitational-lensing.html): Relativistic black hole gravitational lensing with Einstein rings, warped starfield caustics, Doppler-boosted accretion disk and audio-reactive photon sphere. (file: https://infinitedevices.org/assets/library/pixel/gravitational-lensing.field)
+- [Supernova Remnant](https://infinitedevices.org/library/supernova-remnant.html): Expanding relativistic blast shockwave with turbulent magnetohydrodynamic filaments and audio-reactive synchrotron core flare. (file: https://infinitedevices.org/assets/library/pixel/supernova-remnant.field)
+- [Hyperbolic Kaleidoscope](https://infinitedevices.org/library/hyperbolic-kaleidoscope.html): Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling. (file: https://infinitedevices.org/assets/library/pixel/hyperbolic-kaleidoscope.field)
+- [Cyber Tunnel](https://infinitedevices.org/library/cyber-tunnel.html): Neon cyan perspective rings around a magenta core with audio-reactive speed and warp. (file: https://infinitedevices.org/assets/library/pixel/cyber-tunnel.field)
+- [Hex Lattice](https://infinitedevices.org/library/hex-lattice.html): Isometric hexagonal honeycomb grid with concentric harmonic audio-reactive ripple pulses. (file: https://infinitedevices.org/assets/library/pixel/hex-lattice.field)
+- [Harmonic Warp](https://infinitedevices.org/library/harmonic-warp.html): Multi-octave harmonic coordinate warp with frequency-dependent color gradients and ripple displacement. (file: https://infinitedevices.org/assets/library/pixel/harmonic-warp.field)
 
 ## Library: Sketch
 
@@ -146,6 +151,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Tinkerbell Map](https://infinitedevices.org/library/tinkerbell-map.html): Chaotic Tinkerbell attractor with sweeping dynamical orbital plumes, fractal dust filament trails and parameter drift. (file: https://infinitedevices.org/assets/library/sketch/tinkerbell-map.js)
 - [Halvorsen Attractor](https://infinitedevices.org/library/halvorsen-attractor.html): 3-fold cyclically symmetric chaotic strange attractor with looping orbital ribbons, parameter drift and luminous particle trails. (file: https://infinitedevices.org/assets/library/sketch/halvorsen-attractor.js)
 - [De Jong Attractor](https://infinitedevices.org/library/dejong-attractor.html): Peter de Jong 4-parameter chaotic trigonometric attractor with high-density particle accumulation, luminous gossamer folds and phase drift. (file: https://infinitedevices.org/assets/library/sketch/dejong-attractor.js)
+- [Harmonograph Resonance](https://infinitedevices.org/library/harmonograph-resonance.html): Three-pendulum rotary harmonograph with lateral damping and decaying elliptical Lissajous interference. (file: https://infinitedevices.org/assets/library/sketch/harmonograph-resonance.js)
+- [Chua Circuit](https://infinitedevices.org/library/chua-circuit.html): Chua non-linear double-scroll chaotic attractor with piecewise linear diode vector field dynamics. (file: https://infinitedevices.org/assets/library/sketch/chua-circuit.js)
 
 ## Library: Sketch 3D
 
@@ -158,6 +165,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Kuen's Surface 3D](https://infinitedevices.org/library/kuen-surface-3d.html): Parametric Alfred Kuen pseudospherical surface of constant negative curvature with twisting spire lobes and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/kuen-surface-3d.js)
 - [Boy's Surface 3D](https://infinitedevices.org/library/boy-surface-3d.html): Parametric non-orientable immersion of the projective plane in 3-space with 3-fold symmetry, central triple point and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/boy-surface-3d.js)
 - [Breather Surface 3D](https://infinitedevices.org/library/breather-surface-3d.html): Parametric Breather soliton surface from the sine-Gordon equation with transverse wireframe ribs, breathing helical lobes and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/breather-surface-3d.js)
+- [Hopf Fibration 3D](https://infinitedevices.org/library/hopf-fibration-3d.html): Stereographic projection of 4D 3-sphere fibers into interlocking nested Villarceau circles in 3D. (file: https://infinitedevices.org/assets/library/sketch/hopf-fibration-3d.js)
+- [Hyperbolic Helicoid 3D](https://infinitedevices.org/library/hyperbolic-helicoid-3d.html): Bonnet isometric transformation morphing continuously between a catenoid and helicoid minimal surface. (file: https://infinitedevices.org/assets/library/sketch/hyperbolic-helicoid-3d.js)
 
 ## Library: Synths
 
@@ -170,6 +179,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Hard Sync Synth](https://infinitedevices.org/library/hard-sync-synth.html): Master/slave oscillator with dynamic formant sync sweep, sub-oscillator and analog diode saturation. (file: https://infinitedevices.org/assets/templates/hard-sync-synth.inf)
 - [Subharmonic Synth](https://infinitedevices.org/library/subharmonic-synth.html): Subharmonic division oscillator with dual quantized sub-octave generators (1/2, 1/3, 1/4), pulse-width modulation and warm low-pass saturation. (file: https://infinitedevices.org/assets/templates/subharmonic-synth.inf)
 - [Karplus-Strong Synth](https://infinitedevices.org/library/karplus-strong-synth.html): Physical modeling plucked string synthesizer using the Karplus-Strong algorithm with noise burst excitation, low-pass loss filter and body resonance. (file: https://infinitedevices.org/assets/templates/karplus-strong-synth.inf)
+- [Granular Cloud Synth](https://infinitedevices.org/library/granular-cloud-synth.html): Asynchronous quasi-stochastic granular cloud synthesizer with Gaussian pitch scatter and Hann windowing. (file: https://infinitedevices.org/assets/templates/granular-cloud-synth.inf)
+- [Modal Bar Synth](https://infinitedevices.org/library/modal-bar-synth.html): Physical modeling modal synthesis of struck wooden bars with inharmonic vibrational modes and mallet impulse excitation. (file: https://infinitedevices.org/assets/templates/modal-bar-synth.inf)
 
 ## Library: Audio Effects
 
@@ -182,6 +193,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Ring Modulator FX](https://infinitedevices.org/library/ring-modulator-fx.html): Diode ring modulator with variable carrier frequency, carrier wave shaping, LFO tremolo and wet/dry mix. (file: https://infinitedevices.org/assets/templates/ring-modulator-fx.inf)
 - [Bitcrush Degrader FX](https://infinitedevices.org/library/bitcrush-degrader-fx.html): Sample-rate decimation and variable bit-depth reduction with jitter noise, analog pre-drive and wet/dry mix. (file: https://infinitedevices.org/assets/templates/bitcrush-degrader-fx.inf)
 - [Frequency Shifter FX](https://infinitedevices.org/library/frequency-shifter-fx.html): Bode-style single-sideband frequency shifter with quadrature Hilbert phase-shifting, through-zero shift modulation and harmonic ring modulation. (file: https://infinitedevices.org/assets/templates/frequency-shifter-fx.inf)
+- [Spectral Diffuser FX](https://infinitedevices.org/library/spectral-diffuser-fx.html): Multi-stage nested allpass diffusion network with modulation jitter, dissolving transients into ethereal reverb halos. (file: https://infinitedevices.org/assets/templates/spectral-diffuser-fx.inf)
+- [Vowel Resonator FX](https://infinitedevices.org/library/vowel-resonator-fx.html): Triple-formant vocal tract acoustic filter bank with dynamic vowel morphing and saturation. (file: https://infinitedevices.org/assets/templates/vowel-resonator-fx.inf)
 
 ## Nodes
 
@@ -495,7 +508,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 26 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 28 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -522,6 +535,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Plasma Filament](https://infinitedevices.org/embeds/plasma-filament.html): High-energy electrical plasma arcs with audio-reactive magnetic twist undulations, helical flux filaments and incandescent core discharge.
 - [Solar Flare](https://infinitedevices.org/embeds/solar-flare.html): Blinding coronal solar flares with twisting magnetic loop prominences, turbulent convection granulation and audio-reactive coronal mass ejections.
 - [Gravitational Lensing](https://infinitedevices.org/embeds/gravitational-lensing.html): Relativistic black hole gravitational lensing with Einstein rings, warped starfield caustics, Doppler-boosted accretion disk and audio-reactive photon sphere.
+- [Supernova Remnant](https://infinitedevices.org/embeds/supernova-remnant.html): Expanding relativistic blast shockwave with turbulent magnetohydrodynamic filaments and audio-reactive synchrotron core flare.
+- [Hyperbolic Kaleidoscope](https://infinitedevices.org/embeds/hyperbolic-kaleidoscope.html): Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.
 
 ## For AI agents
 

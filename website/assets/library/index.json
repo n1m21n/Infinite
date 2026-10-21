@@ -1064,6 +1064,253 @@
       "file": "assets/library/pixel/gravitational-lensing.field",
       "preview": "assets/library/previews/gravitational-lensing.jpg",
       "bytes": 2219
+    },
+    {
+      "id": "harmonograph-resonance",
+      "name": "Harmonograph Resonance",
+      "kind": "Generator",
+      "tags": [
+        "harmonograph",
+        "lissajous",
+        "pendulum",
+        "math"
+      ],
+      "description": "Three-pendulum rotary harmonograph with lateral damping and decaying elliptical Lissajous interference.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/harmonograph-resonance.js",
+      "preview": "assets/library/previews/harmonograph-resonance.jpg",
+      "bytes": 1509
+    },
+    {
+      "id": "chua-circuit",
+      "name": "Chua Circuit",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "circuit",
+        "math"
+      ],
+      "description": "Chua non-linear double-scroll chaotic attractor with piecewise linear diode vector field dynamics.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/chua-circuit.js",
+      "preview": "assets/library/previews/chua-circuit.jpg",
+      "bytes": 1586
+    },
+    {
+      "id": "hopf-fibration-3d",
+      "name": "Hopf Fibration 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "topology",
+        "fibers"
+      ],
+      "description": "Stereographic projection of 4D 3-sphere fibers into interlocking nested Villarceau circles in 3D.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/hopf-fibration-3d.js",
+      "preview": "assets/library/previews/hopf-fibration-3d.jpg",
+      "bytes": 1593
+    },
+    {
+      "id": "hyperbolic-helicoid-3d",
+      "name": "Hyperbolic Helicoid 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "minimal-surface",
+        "bonnet"
+      ],
+      "description": "Bonnet isometric transformation morphing continuously between a catenoid and helicoid minimal surface.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/hyperbolic-helicoid-3d.js",
+      "preview": "assets/library/previews/hyperbolic-helicoid-3d.jpg",
+      "bytes": 1695
+    },
+    {
+      "id": "granular-cloud-synth",
+      "name": "Granular Cloud Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "granular",
+        "audio",
+        "dsp"
+      ],
+      "description": "Asynchronous quasi-stochastic granular cloud synthesizer with Gaussian pitch scatter and Hann windowing.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/granular-cloud-synth.inf",
+      "preview": "assets/library/previews/granular-cloud-synth.jpg",
+      "bytes": 2258
+    },
+    {
+      "id": "modal-bar-synth",
+      "name": "Modal Bar Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "modal",
+        "physical-modeling",
+        "dsp"
+      ],
+      "description": "Physical modeling modal synthesis of struck wooden bars with inharmonic vibrational modes and mallet impulse excitation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 4,
+      "file": "assets/templates/modal-bar-synth.inf",
+      "preview": "assets/library/previews/modal-bar-synth.jpg",
+      "bytes": 2372
+    },
+    {
+      "id": "spectral-diffuser-fx",
+      "name": "Spectral Diffuser FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "reverb",
+        "diffusion",
+        "dsp"
+      ],
+      "description": "Multi-stage nested allpass diffusion network with modulation jitter, dissolving transients into ethereal reverb halos.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/spectral-diffuser-fx.inf",
+      "preview": "assets/library/previews/spectral-diffuser-fx.jpg",
+      "bytes": 1638
+    },
+    {
+      "id": "vowel-resonator-fx",
+      "name": "Vowel Resonator FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "filter",
+        "formant",
+        "dsp"
+      ],
+      "description": "Triple-formant vocal tract acoustic filter bank with dynamic vowel morphing and saturation.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/vowel-resonator-fx.inf",
+      "preview": "assets/library/previews/vowel-resonator-fx.jpg",
+      "bytes": 1826
+    },
+    {
+      "id": "supernova-remnant",
+      "name": "Supernova Remnant",
+      "kind": "Generator",
+      "tags": [
+        "supernova",
+        "shockwave",
+        "reactive",
+        "visuals"
+      ],
+      "description": "Expanding relativistic blast shockwave with turbulent magnetohydrodynamic filaments and audio-reactive synchrotron core flare.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/supernova-remnant.field",
+      "preview": "assets/library/previews/supernova-remnant.jpg",
+      "bytes": 1484
+    },
+    {
+      "id": "hyperbolic-kaleidoscope",
+      "name": "Hyperbolic Kaleidoscope",
+      "kind": "Generator",
+      "tags": [
+        "hyperbolic",
+        "poincare",
+        "kaleidoscope",
+        "visuals"
+      ],
+      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/hyperbolic-kaleidoscope.field",
+      "preview": "assets/library/previews/hyperbolic-kaleidoscope.jpg",
+      "bytes": 1412
+    },
+    {
+      "id": "cyber-tunnel",
+      "name": "Cyber Tunnel",
+      "kind": "Generator",
+      "tags": [
+        "tunnel",
+        "cyber",
+        "reactive",
+        "visuals"
+      ],
+      "description": "Neon cyan perspective rings around a magenta core with audio-reactive speed and warp.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 2,
+      "file": "assets/library/pixel/cyber-tunnel.field",
+      "preview": "assets/library/previews/cyber-tunnel.jpg",
+      "bytes": 951
+    },
+    {
+      "id": "hex-lattice",
+      "name": "Hex Lattice",
+      "kind": "Generator",
+      "tags": [
+        "hexagon",
+        "geometric",
+        "harmonics",
+        "visuals"
+      ],
+      "description": "Isometric hexagonal honeycomb grid with concentric harmonic audio-reactive ripple pulses.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 2,
+      "file": "assets/library/pixel/hex-lattice.field",
+      "preview": "assets/library/previews/hex-lattice.jpg",
+      "bytes": 932
+    },
+    {
+      "id": "harmonic-warp",
+      "name": "Harmonic Warp",
+      "kind": "Generator",
+      "tags": [
+        "warp",
+        "harmonics",
+        "spectrum",
+        "visuals"
+      ],
+      "description": "Multi-octave harmonic coordinate warp with frequency-dependent color gradients and ripple displacement.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 2,
+      "file": "assets/library/pixel/harmonic-warp.field",
+      "preview": "assets/library/previews/harmonic-warp.jpg",
+      "bytes": 933
     }
   ]
 }

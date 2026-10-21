@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Supernova Remnant",
+    "author": "Infinite",
+    "description": "Expanding relativistic blast wave with turbulent Kelvin-Helmholtz plasma filaments and audio-reactive synchrotron core flare.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float expansion = 1.1 [0.2, 3.0];\nparam float turbulence = 2.4 [0.5, 6.0];\nparam float coreGlow = 1.3 [0.2, 3.5];\nparam float speed = 1.2 [0.1, 4.0];\np = (uv - 0.5) * 2.2;\np.x = p.x * aspect;\nr = length(p);\na = atan2(p.y, p.x);\nshockRadius = 0.55 * expansion;\nshockWave = exp(-abs(r - shockRadius) * 6.5);\nfilaments = sin(a * 7.0 + sin(r * turbulence * 8.0 - t * speed * 2.0) * 2.2);\nfilamentGlow = pow(max(0.0, filaments), 2.5) * smoothstep(shockRadius * 1.3, shockRadius * 0.7, r);\npulsar = exp(-r * 11.0) * coreGlow;\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.21);\nemerald = vec3(0.306, 0.949, 0.722);\nground = vec3(0.082, 0.098, 0.188);\nplasma = mix(ember, signal, sin(a * 3.0 + t) * 0.5 + 0.5);\nplasma = mix(plasma, emerald, filamentGlow * 0.4);\ncol = ground + plasma * (shockWave * 1.6 + filamentGlow * 1.2);\ncol = col + vec3(1.0, 0.96, 0.9) * pulsar;\ncol = col * smoothstep(1.9, 0.9, r);\nalpha = 1.0;\n",
+    "params": {
+      "expansion": 1.1,
+      "turbulence": 2.4,
+      "coreGlow": 1.3,
+      "speed": 1.2
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

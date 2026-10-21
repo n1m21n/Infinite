@@ -1,0 +1,44 @@
+infinite-patch 1
+# Granular Cloud Synth: multi-grain Field Synth
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i rangeLow 48
+  i rangeHigh 72
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float density = 22.0 [4.0, 60.0]\nparam float grainSize = 0.065 [0.02, 0.25]\nparam float scatter = 0.35 [0.0, 1.0]\nparam float cutoff = 2600.0 [200.0, 12000.0]\nparam float res = 0.55 [0.0, 0.92]\nstate float gPhase1 = 0\nstate float gPhase2 = 0.5\nstate float gFreq1 = 440.0\nstate float gFreq2 = 440.0\nstate float cPhase1 = 0\nstate float cPhase2 = 0\nstate float lp = 0\nstate float bp = 0\n\ntargetFreq = clamp(freq, 30.0, 4000.0)\ngStep1 = clamp(density * 0.5 / sr, 0.0001, 0.01)\ngStep2 = clamp(density * 0.5 / sr, 0.0001, 0.01)\n\ngPhase1 = gPhase1 + gStep1\nif (gPhase1 >= 1.0) {\n  gPhase1 = gPhase1 - 1.0\n  gFreq1 = targetFreq * (1.0 + (sin(cPhase1 * 13.7) * scatter * 0.4))\n}\n\ngPhase2 = gPhase2 + gStep2\nif (gPhase2 >= 1.0) {\n  gPhase2 = gPhase2 - 1.0\n  gFreq2 = targetFreq * (1.0 + (cos(cPhase2 * 17.3) * scatter * 0.4))\n}\n\ncStep1 = clamp(gFreq1 / sr, 0.0002, 0.45)\ncStep2 = clamp(gFreq2 / sr, 0.0002, 0.45)\ncPhase1 = (cPhase1 + cStep1) % 1.0\ncPhase2 = (cPhase2 + cStep2) % 1.0\n\nwin1 = 0.5 - 0.5 * cos(6.2831853 * gPhase1)\nwin2 = 0.5 - 0.5 * cos(6.2831853 * gPhase2)\n\ncar1 = sin(6.2831853 * cPhase1) * 0.7 + (2.0 * cPhase1 - 1.0) * 0.3\ncar2 = sin(6.2831853 * cPhase2) * 0.7 + (2.0 * cPhase2 - 1.0) * 0.3\n\nraw = (car1 * win1 + car2 * win2) * 0.65 * gate\n\nfCut = clamp(cutoff / sr * 2.2, 0.005, 0.45)\nq = 1.0 - res * 0.95\nhp = raw - lp - q * bp\nbp = bp + fCut * hp\nlp = lp + fCut * bp\n\nout = (lp + bp * 0.35) * 0.85\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Granular Cloud Synth. Asynchronous quasi-stochastic grain scatter.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

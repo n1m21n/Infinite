@@ -52,6 +52,8 @@
   <url><loc>https://infinitedevices.org/embeds/plasma-filament.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/solar-flare.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/gravitational-lensing.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/supernova-remnant.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/hyperbolic-kaleidoscope.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-21</lastmod><priority>0.7</priority></url>
@@ -188,6 +190,19 @@
   <url><loc>https://infinitedevices.org/library/karplus-strong-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/frequency-shifter-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/gravitational-lensing.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/harmonograph-resonance.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/chua-circuit.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hopf-fibration-3d.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hyperbolic-helicoid-3d.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/granular-cloud-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/modal-bar-synth.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spectral-diffuser-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vowel-resonator-fx.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/supernova-remnant.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hyperbolic-kaleidoscope.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cyber-tunnel.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hex-lattice.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/harmonic-warp.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-21</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-21</lastmod><priority>0.5</priority></url>
