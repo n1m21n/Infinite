@@ -1,0 +1,17 @@
+# Maintainer: Naman Soni <contact@infinitedevices.org>
+pkgname=infinite-bin
+pkgver=0.6.0
+pkgrel=1
+pkgdesc="Free, open-source real-time modular audiovisual workstation for visuals, music and code"
+arch=('x86_64')
+url="https://infinitedevices.org"
+license=('MIT' 'GPL-3.0-or-later')
+depends=('fuse2' 'desktop-file-utils' 'gtk3')
+provides=('infinite')
+conflicts=('infinite')
+source_x86_64=("https://github.com/n1m21n/Infinite/releases/download/v${pkgver}/Infinite-x86_64.AppImage")
+sha256sums_x86_64=('dfbd86356b13e7ead5cc3abd063e3660f3d5eab5f72de9af91a98d026253e757')
+
+package() {
+    install -Dm755 "${srcdir}/Infinite-x86_64.AppImage" "${pkgdir}/usr/bin/infinite"
+}

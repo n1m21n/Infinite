@@ -1,0 +1,46 @@
+# writing sample-accurate audio dsp without juce in modern c++
+
+> architecting a real-time, lock-free audio engine and multi-format plugin host in pure modern c++ with zero audio-thread allocations.
+
+![Infinite Audio Graph](https://raw.githubusercontent.com/n1m21n/infinite/main/website/assets/nodegraph.png)
+
+juce is the de facto standard for audio software development, but it brings substantial architectural gravity: a massive monolithic codebase, custom string classes, complex licensing, and heavy abstractions.
+
+when building [infinite](https://infinitedevices.org), an open-source modular workstation, we chose to write the entire pull-based audio engine in modern standard c++ (c++20) from scratch.
+
+here is what we learned and how the architecture is designed.
+
+### 1. the golden rule: zero allocations on the audio thread
+
+any audio callback deadline at 48khz with a 128-sample buffer is strict: you have exactly 2.66 milliseconds to finish processing before the dac underflows and creates an audible click.
+
+to guarantee hard real-time safety:
+- **zero `malloc` / `free`**: all audio buffers, voice allocations, and delay memory are pre-allocated during `preparetoplay()`.
+- **zero mutexes**: cross-thread communication between the ui thread and audio thread uses atomic pointers, lock-free single-producer single-consumer (spsc) ring buffers, and double-buffered modulation arrays.
+- **cache-line aligned processing**: audio frames are laid out contiguously in memory so SIMD instructions can vectorize filter stages without cache stalls.
+
+### 2. native au and vst3 plugin hosting
+
+instead of relying on framework wrappers, infinite speaks directly to plugin apis:
+- **vst3**: loads the component bundle, queries `IComponent` and `IAudioProcessor`, maps parameters to continuous modulation arrays, and schedules sample-accurate note events.
+- **audio unit (au)**: interacts directly with the coreaudio audio unit v2/v3 c-api on macos.
+
+parameters on third-party plugins can be modulated in real time by any signal on the canvas—whether an audio lfo, an envelope follower, or a generative javascript sketch.
+
+![Infinite Modular Canvas](https://raw.githubusercontent.com/n1m21n/infinite/main/press_kit/screenshots/01_infinite_main_canvas.png)
+
+### 3. embedded dsp kernel language
+
+to let users write custom filters and physical modeling synths without recompiling c++, we created **field**, an embedded dsp language. a 1-pole filter in field is 4 lines:
+
+```
+param float cutoff = 0.25 [0.01, 0.99]
+state float z = 0
+z += (in - z) * cutoff
+out = z
+```
+
+the compiler translates this directly into optimized vector loops evaluated per-sample on the audio thread.
+
+- try infinite: https://infinitedevices.org
+- read the codebase: https://github.com/n1m21n/infinite

@@ -664,6 +664,7 @@ extern bool gVsync;
 extern bool gRequestFitView;
 
 extern int gRequestFitViewNodeIndex;
+extern bool gRequestFitViewNodeZoom;
 extern int gRequestSelectNodeIndex; // select this node alone on the next canvas frame (-1 = none)
 
 extern bool gRequestGroup;

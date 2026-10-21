@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "harmonic-warp",
+    "author": "community",
+    "description": "multi-octave harmonic coordinate warp with frequency-dependent color gradients",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float warp = 4.0 [1.0, 10.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\nw1 = sin(r * warp * 4.0 - t * 2.5 + a * 3.0);\nw2 = cos(p.x * warp * 3.0 + t * 1.8 + audio_bass * 2.0);\nw3 = sin(p.y * warp * 3.0 - t * 2.0);\n\nfld = w1 * 0.5 + w2 * 0.25 + w3 * 0.25;\nedge = smoothstep(0.02, 0.08, abs(fld));\n\ncol = (0.5 + 0.5 * sin(fld * 6.28 + vec3(0.0, 1.2, 2.4))) * edge;\ncol = col * (0.8 + 0.6 * audio_bass);",
+    "params": {
+      "audio_bass": 0.5,
+      "warp": 4.0
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

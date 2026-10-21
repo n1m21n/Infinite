@@ -1,0 +1,40 @@
+# Review, then copy to .github/workflows/blog-schedule.yml to enable.
+# A post in tools/seo/posts with status: published and a future date appears on that date.
+# Each morning this rebuilds the blog; if a post became due it commits the result and starts the Pages deploy.
+name: Publish scheduled blog posts
+
+on:
+  schedule:
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Rebuild blog, sitemap and llms.txt
+        run: |
+          python3 tools/seo/build_blog.py
+          if git status --porcelain website/blog | grep -q .; then
+            python3 tools/website/gen_seo.py
+            echo "changed=true" >> "$GITHUB_ENV"
+          fi
+      - name: Commit and deploy
+        if: env.changed == 'true'
+        run: |
+          git config user.name "infinite-blog-bot"
+          git config user.email "noreply@infinitedevices.org"
+          git add website/blog website/sitemap.xml website/llms.txt
+          git commit -m "website: publish scheduled blog posts"
+          git push origin HEAD:main
+          gh workflow run deploy-pages.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}

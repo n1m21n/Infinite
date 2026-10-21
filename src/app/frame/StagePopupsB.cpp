@@ -751,10 +751,11 @@ void DrawPopupsB(FrameCtx& fc)
             // with a selected-highlight border on the frame that gets shot.
             ed::ClearSelection();
             ed::SelectNode(fitNode->NodeId());
-            ed::NavigateToSelection(false, 0.0f);
+            ed::NavigateToSelection(gRequestFitViewNodeZoom, 0.0f);
             ed::ClearSelection();
          }
          gRequestFitViewNodeIndex = -1;
+         gRequestFitViewNodeZoom = false;
       }
       // A node asked to be the selection (New Synth selects its Keyboard). The node has to have been
       // drawn once before the editor knows it, so the request waits a frame if it is not there yet.

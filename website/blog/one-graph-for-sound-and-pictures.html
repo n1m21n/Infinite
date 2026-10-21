@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="paper">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script src="../theme.js?v=2"></script>
+  <title>One graph for sound and pictures: how Infinite keeps them in step | Infinite</title>
+  <meta name="description" content="Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.">
+  <link rel="canonical" href="https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html">
+  <meta property="og:title" content="One graph for sound and pictures: how Infinite keeps them in step | Infinite">
+  <meta property="og:description" content="Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/nodegraph.png">
+  <meta property="og:url" content="https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="One graph for sound and pictures: how Infinite keeps them in step | Infinite">
+  <meta name="twitter:description" content="Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/nodegraph.png">
+  <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
+  <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css?v=3">
+  <link rel="stylesheet" href="../style.css?v=64">
+  <link rel="stylesheet" href="../glass.css?v=4">
+  <link rel="stylesheet" href="../blog.css?v=1">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ZC4TYX1WCL');
+  </script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "One graph for sound and pictures: how Infinite keeps them in step", "description": "Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.", "datePublished": "2026-10-17", "dateModified": "2026-10-17", "mainEntityOfPage": "https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html", "url": "https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html", "image": ["https://infinitedevices.org/assets/nodegraph.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "architecture, audio, opengl, modulation", "wordCount": 357, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "One graph for sound and pictures: how Infinite keeps them in step", "item": "https://infinitedevices.org/blog/one-graph-for-sound-and-pictures.html"}]}</script>
+</head>
+<body class="blog-page blog-post">
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="../index.html#top" class="brand" aria-label="Infinite home">
+        <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+        <a href="../index.html#learn">Learn</a>
+        <a href="../artworks.html">Art Gallery</a>
+        <a href="../library.html">Library</a>
+        <a href="../extensions.html">Extensions</a>
+        <a href="../blog/" aria-current="page">Blog</a>
+        <a href="../index.html#setup">Setup</a>
+        <div class="nav-sheet-social">
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>
+          <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener">YouTube tutorial</a>
+        </div>
+      </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn hide-sm" aria-label="View on GitHub" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn sm-only" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <article class="post">
+      <div class="container post-wrap">
+        <nav class="crumbs mono" aria-label="Breadcrumb"><a href="../index.html">Infinite</a> / <a href="./">Blog</a></nav>
+        <header class="post-head">
+          <p class="post-kicker mono">Product · 17 October 2026 · 2 min read</p>
+          <h1>One graph for sound and pictures: how Infinite keeps them in step</h1>
+          <p class="post-lede">Infinite runs a pull-based audio graph and a GPU texture pipeline off one BPM transport, so audio can drive visuals and visuals can drive audio.</p>
+          <p class="post-by">By <a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a></p>
+        </header>
+        <figure class="post-hero"><img src="../assets/nodegraph.png" alt="A node graph in Infinite with audio and image nodes connected by cables" width="1200" height="675"></figure>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#two-graphs-one-clock">Two graphs, one clock</a></li><li><a href="#modulation-crosses-the-boundary">Modulation crosses the boundary</a></li><li><a href="#why-one-canvas-helps">Why one canvas helps</a></li><li><a href="#try-it">Try it</a></li></ol></details>
+        <div class="prose">
+<p>Video tools and audio tools usually live in separate programs. You wire them together with OSC, MIDI clock or a texture-sharing protocol, and you accept a little latency and jitter on the way. Infinite takes a different route: audio and visuals are two parts of one engine that share a transport.</p>
+<h2 id="two-graphs-one-clock">Two graphs, one clock</h2>
+<p>The engine has two sides, and each one follows the rules of its own medium.</p>
+<ul><li><strong>Audio</strong> is a pull-based, sample-accurate graph. If a buffer is late, you hear a click, so it is built around a deadline.</li><li><strong>Visuals</strong> are a GPU texture pipeline on GLSL and OpenGL 3.2 Core. A dropped frame is far less noticeable, but throughput matters.</li></ul>
+<p>Both sides are tied to a global BPM transport, so a beat means the same moment in the sound and in the picture.</p>
+<h2 id="modulation-crosses-the-boundary">Modulation crosses the boundary</h2>
+<p>The useful part is what happens between the two. Any signal can modulate any control:</p>
+<ul><li>an <strong>Audio Analyze</strong> node gives an 8-band FFT and onset detection;</li><li>an <strong>LFO</strong>, <strong>Envelope Follower</strong>, <strong>Random</strong> or <strong>Pattern CV</strong> gives a moving number;</li><li>an <strong>Image Analyze</strong> node reads luminance or motion from a picture.</li></ul>
+<p>Wire the output of one of those to a control and it moves. That control can be a shader parameter, a 3D transform, a synth knob or the slider of a hosted plugin. Sound drives pictures, and pictures drive sound.</p>
+<h2 id="why-one-canvas-helps">Why one canvas helps</h2>
+<p>When both live on the same canvas, the connection is a cable you can see. There is no second application to launch, no port to configure and no project that has to be kept in sync by hand. A patch is also a plain-text <code>.inf</code> file, so it can be versioned, diffed and rendered <a href="https://infinitedevices.org/blog/render-video-and-audio-from-a-text-file.html">without a window</a>.</p>
+<h2 id="try-it">Try it</h2>
+<p>Open the <strong>Moves with the music</strong> template from the <a href="https://infinitedevices.org/library.html">Library</a>. It is a shape that grows with the sound, and it is the smallest example of the idea above.</p>
+<p>Infinite is free and open source for macOS, Windows and Linux.</p>
+        </div>
+        <aside class="post-cta" aria-label="Try Infinite">
+          <p class="hand">your turn</p>
+          <h2>Make something with it</h2>
+          <p>Infinite is free and open source for macOS, Windows and Linux. Start from a template in the Library, or read how the nodes fit together.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="../library.html">Browse the Library</a></p>
+        </aside>
+        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="modulate-vst3-plugins-with-visuals-and-lfos.html"><span class="mono">Creative</span><b>Modulate any VST3 or AU plugin with LFOs, audio and visuals</b></a><a class="rel-card" href="field-language-write-what-a-node-does.html"><span class="mono">Product</span><b>Field: write a short kernel and let the node decide where it runs</b></a><a class="rel-card" href="render-video-and-audio-from-a-text-file.html"><span class="mono">Product</span><b>Render video and audio from a text file with no window open</b></a></div></section>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+        </div>
+        <div class="footer-col">
+          <h5>Explore</h5>
+          <a href="../blog/">Blog</a>
+          <a href="../artworks.html">Art Gallery</a>
+          <a href="../index.html#listen">Listen</a>
+          <a href="../index.html#learn">Learn</a>
+          <a href="../index.html#nodes">Node library</a>
+          <a href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" download="Infinite_Node_Reference_Manual.pdf">Node Reference Manual (PDF)</a>
+          <a href="../assets/Field_Language_Manual.pdf" target="_blank" download="Field_Language_Manual.pdf">Field Language Manual (PDF)</a>
+          <a href="../assets/Infinite_Headless_User_Guide.pdf" target="_blank" download="Infinite_Headless_User_Guide.pdf">Headless User Guide (PDF)</a>
+        </div>
+        <div class="footer-col">
+          <h5>Open source</h5>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture guide</a>
+          <a href="https://github.com/n1m21n/Infinite/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+        </div>
+        <div class="footer-col">
+          <h5>Community</h5>
+          <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>
+          <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener">YouTube tutorial</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener noreferrer">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom mono">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
+    </div>
+  </footer>
+  <script src="../site.js?v=9" defer></script>
+</body>
+</html>

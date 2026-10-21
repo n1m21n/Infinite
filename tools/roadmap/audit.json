@@ -1,16 +1,16 @@
 {
  "merges": [
-  371,
-  406
+  404,
+  439
  ],
  "direct": [
   500,
-  591
+  592
  ],
  "notes_total": 389,
  "evidence": [
-  580,
-  672
+  613,
+  705
  ],
  "per_release": {
   "v0.1": {
@@ -123,6 +123,7 @@
   }
  },
  "loose": [
+  "2026-10-13 70931ef NOW: v0.6 item count 61",
   "2026-10-13 980d07e Driver: hold QUALITY rows to docs/quality/registry.tsv; a release-gated miss fails the che",
   "2026-10-13 0d65bf5 quality-system skill; AGENTS, tool-first, node-audits and re-survey point at it",
   "2026-10-13 71af380 Quality scoreboard: first recorded run, Synths (SYNTHAUDIT + Diva/Serum 2/Vital probe)",

@@ -217,6 +217,7 @@ namespace app
             return false;
          }
          gRequestFitViewNodeIndex = index;
+         gRequestFitViewNodeZoom = params.value("zoom", false);
          outResult = json::object();
          return true;
       }

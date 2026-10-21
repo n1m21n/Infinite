@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Hyperspace Tunnel",
+    "author": "Inigo Quilez",
+    "description": "Audio-reactive infinite warp tunnel with dynamic spectrum modulation.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "// Infinite Audio-Reactive Modulators\nparam float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float audio_high = 0.5 [0.0, 2.0];\nparam float reactivity = 1.0 [0.0, 3.0];\n\n// Aspect-corrected coordinate space\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nvec2 p = ((uv * res) - 0.5 * vec3(res.x, res.y, 1.0).xy) / vec3(res.x, res.y, 1.0).y;\n    float r = length(p);\n    float a = atan2(p.y, p.x);\n    \n    float z = 1.0 / (r + 0.08);\n    float u = a / 3.14159265;\n    float v = z + t * 0.5;\n    \n    vec3 col = 0.5 + 0.5 * cos(vec3(0.0, 1.0, 2.0) + (u * 4.0 + v * 2.0));\n    col *= smoothstep(0.0, 0.4, r);\n    col = vec4(col, 1.0);\nalpha = 1.0;\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "audio_high": 0.5,
+      "reactivity": 1.0
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

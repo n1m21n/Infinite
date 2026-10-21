@@ -42,3 +42,8 @@ __pycache__/
 
 # release gate run logs (tools/release/run_gate.sh)
 docs/release/runs/
+
+# spread tokens & keys
+tools/spread/bluesky_config.json
+tools/spread/youtube_client_secrets.json
+tools/spread/youtube_token.json

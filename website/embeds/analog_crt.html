@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analog CRT &amp; VHS Tracking Glitch — Infinite 2D Sketch</title>
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body, html {{ width: 100%; height: 100%; overflow: hidden; background: #0b0d17; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+    canvas {{ width: 100%; height: 100%; display: block; }}
+    .badge {{
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      background: rgba(15, 18, 35, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 6px 12px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 10;
+    }}
+    .badge-icon {{ width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, #F57F66, #A9CDF1); }}
+    .controls {{ position: absolute; bottom: 14px; left: 14px; display: flex; gap: 8px; z-index: 10; }}
+    .btn {{
+      background: rgba(15, 18, 35, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #eaeaea;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+    }}
+    .btn:hover {{ background: rgba(255, 255, 255, 0.2); }}
+  </style>
+</head>
+<body>
+  <canvas id="cv"></canvas>
+  <div class="controls">
+    <button class="btn" id="btn-audio">enable mic input</button>
+  </div>
+  <a href="https://infinitedevices.org" target="_blank" rel="noopener" class="badge">
+    <span class="badge-icon"></span>
+    <span>Analog CRT &amp; VHS Tracking Glitch • made in <strong>infinite</strong></span>
+  </a>
+
+  <script>
+    const canvas = document.getElementById("cv");
+    const ctx = canvas.getContext("2d");
+    let width = 800, height = 600;
+    const PI = Math.PI, TAU = Math.PI * 2;
+    const sin = Math.sin, cos = Math.cos, min = Math.min, max = Math.max, floor = Math.floor, sqrt = Math.sqrt, abs = Math.abs, dist = Math.hypot;
+
+    function resize() {{
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = canvas.width = window.innerWidth * dpr;
+      height = canvas.height = window.innerHeight * dpr;
+    }}
+    window.addEventListener("resize", resize);
+    resize();
+
+    // Infinite Sketch compatibility runtime
+    let _fill = "white", _stroke = null, _lineWidth = 1;
+    let _shapeActive = false, _shapePts = [];
+    function background(...args) {{
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (args.length === 1 && typeof args[0] === 'number') {{
+        const v = floor(args[0] * 255); ctx.fillStyle = `rgb(${v},${v},${v})`;
+      }} else if (args.length === 3) {{
+        ctx.fillStyle = `rgb(${floor(args[0]*255)},${floor(args[1]*255)},${floor(args[2]*255)})`;
+      }} else if (typeof args[0] === 'string') {{ ctx.fillStyle = args[0]; }}
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }}
+    function fill(...args) {{
+      if (typeof args[0] === 'string') {{ _fill = args[0]; }}
+      else if (args.length === 1) {{ const v = floor(args[0]*255); _fill = `rgb(${v},${v},${v})`; }}
+      else if (args.length >= 3) {{ const a = args[3] !== undefined ? args[3] : 1; _fill = `rgba(${floor(args[0]*255)},${floor(args[1]*255)},${floor(args[2]*255)},${a})`; }}
+    }}
+    function noFill() {{ _fill = null; }}
+    function stroke(...args) {{
+      if (typeof args[0] === 'string') {{ _stroke = args[0]; }}
+      else if (args.length === 1) {{ const v = floor(args[0]*255); _stroke = `rgb(${v},${v},${v})`; }}
+      else if (args.length >= 3) {{ const a = args[3] !== undefined ? args[3] : 1; _stroke = `rgba(${floor(args[0]*255)},${floor(args[1]*255)},${floor(args[2]*255)},${a})`; }}
+    }}
+    function noStroke() {{ _stroke = null; }}
+    function strokeWeight(w) {{ _lineWidth = w; }}
+    function translate(x, y) {{ ctx.translate(x, y); }}
+    function rotate(a) {{ ctx.rotate(a); }}
+    function push() {{ ctx.save(); }}
+    function pop() {{ ctx.restore(); }}
+    function circle(x, y, r) {{
+      ctx.beginPath(); ctx.arc(x, y, r / 2, 0, TAU);
+      if (_fill) {{ ctx.fillStyle = _fill; ctx.fill(); }}
+      if (_stroke) {{ ctx.strokeStyle = _stroke; ctx.lineWidth = _lineWidth; ctx.stroke(); }}
+    }}
+    function rect(x, y, w, h) {{
+      if (_fill) {{ ctx.fillStyle = _fill; ctx.fillRect(x, y, w, h); }}
+      if (_stroke) {{ ctx.strokeStyle = _stroke; ctx.lineWidth = _lineWidth; ctx.strokeRect(x, y, w, h); }}
+    }}
+    function line(x1, y1, x2, y2) {{
+      if (!_stroke) return;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.strokeStyle = _stroke; ctx.lineWidth = _lineWidth; ctx.stroke();
+    }}
+    function beginShape() {{ _shapePts = []; _shapeActive = true; }}
+    function vertex(x, y) {{ if (_shapeActive) _shapePts.push([x, y]); }}
+    function endShape() {{
+      if (!_shapeActive || _shapePts.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(_shapePts[0][0], _shapePts[0][1]);
+      for (let i = 1; i < _shapePts.length; i++) ctx.lineTo(_shapePts[i][0], _shapePts[i][1]);
+      if (_fill) {{ ctx.fillStyle = _fill; ctx.fill(); }}
+      if (_stroke) {{ ctx.strokeStyle = _stroke; ctx.lineWidth = _lineWidth; ctx.stroke(); }}
+      _shapeActive = false;
+    }}
+    function hsl(h, s, l, a = 1.0) {{
+      const H = ((h % 1) + 1) % 1 * 360, S = s * 100, L = l * 100;
+      return `hsla(${H}, ${S}%, ${L}%, ${a})`;
+    }}
+    function param(name, def) {{ window[name] = def; }}
+
+    // User script body
+    param("scanlines", 80, 20, 200);
+
+function draw(t) {
+  background(0.02, 0.03, 0.02);
+  
+  // Phosphor vector green sweep
+  stroke(0.1, 0.95, 0.4, 0.8);
+  strokeWeight(2.0);
+  noFill();
+  
+  translate(width / 2, height / 2);
+  for (let i = 0; i < 4; i++) {
+    rotate(t * 0.5 + i * 0.4);
+    const r = min(width, height) * (0.2 + i * 0.08);
+    ellipse(0, 0, r * 1.5, r * 0.7);
+  }
+}
+
+    // Audio reactivity
+    let audioCtx = null, analyser = null, freqData = null, bass = 0.5;
+    document.getElementById("btn-audio").addEventListener("click", async () => {{
+      if (!audioCtx) {{
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        try {{
+          const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
+          const src = audioCtx.createMediaStreamSource(stream);
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64;
+          src.connect(analyser);
+          freqData = new Uint8Array(analyser.frequencyBinCount);
+          document.getElementById("btn-audio").innerText = "mic active";
+        }} catch(e) {{
+          document.getElementById("btn-audio").innerText = "mic denied";
+        }}
+      }}
+    }});
+
+    const start = performance.now();
+    function loop() {{
+      const t = (performance.now() - start) * 0.001;
+      if (analyser && freqData) {{
+        analyser.getByteFrequencyData(freqData);
+        bass = (freqData[1] + freqData[2]) / 255.0;
+      }}
+      ctx.save();
+      if (typeof draw === 'function') draw(t);
+      ctx.restore();
+      requestAnimationFrame(loop);
+    }}
+    loop();
+  </script>
+</body>
+</html>

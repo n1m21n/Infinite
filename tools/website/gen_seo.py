@@ -50,6 +50,16 @@ def page(i):
           "isPartOf": {"@type": "CollectionPage", "name": "Infinite Library", "url": BASE + "library.html"},
           "author": {"@type": "Person", "name": i["author"] or "n1m21n", "url": "https://github.com/" + (i["author"] or "n1m21n"), "sameAs": ["https://github.com/n1m21n"] if not i["author"] or i["author"] == "n1m21n" else []}}
     by = f' by {e(i["author"])}' if i["author"] else ""
+    embed_box = ""
+    embed_path = os.path.join(W, "embeds", f'{i["id"]}.html')
+    if os.path.exists(embed_path):
+        embed_url = f'{BASE}embeds/{i["id"]}.html'
+        embed_box = f'''
+  <div style="margin-top:28px;padding:16px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,0.02)">
+    <p style="font-weight:600;margin-bottom:8px">embed this interactive visualizer on your website or blog:</p>
+    <code style="display:block;padding:10px;background:rgba(0,0,0,0.35);border-radius:6px;font-size:12px;overflow-x:auto;word-break:break-all">&lt;iframe src="{embed_url}" width="640" height="400" frameborder="0" allow="microphone"&gt;&lt;/iframe&gt;</code>
+  </div>'''
+
     return f"""<!DOCTYPE html>
 <html lang="en" data-mode="midnight">
 <head>
@@ -93,6 +103,7 @@ def page(i):
   <a class="btn" href="{e(i["file"])}" download>Download .{e(ext)}</a>
   <a class="btn alt" href="../library.html">Back to the Library</a>
   <a class="btn alt" href="https://github.com/n1m21n/Infinite/releases/latest">Get Infinite</a>
+  {embed_box}
 </main>
 </body>
 </html>
@@ -116,7 +127,13 @@ def main():
         s = s.replace("  </main>", "  </main>\n\n  " + blk, 1)
     open(p, "w").write(s)
     today = datetime.date.today().isoformat()
-    pages = [("", 1.0), ("library.html", 0.8), ("extensions.html", 0.6), ("artworks.html", 0.6), ("assets/library/catalog.json", 0.3)]
+    try:
+        posts = json.load(open(os.path.join(W, "blog/posts.json")))
+        posts = posts.get("posts", posts) if isinstance(posts, dict) else posts
+    except (OSError, ValueError):
+        posts = []
+    blog_pages = [("blog/", 0.8)] + [("blog/" + q["slug"] + ".html", 0.7) for q in posts if "slug" in q]
+    pages = [("", 1.0), ("library.html", 0.8)] + blog_pages + [ ("extensions.html", 0.6), ("artworks.html", 0.6), ("assets/library/catalog.json", 0.3)]
     open(os.path.join(W, "sitemap.xml"), "w").write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         "".join(f"  <url><loc>{BASE}{u}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>\n" for u, pr in pages + [(f"library/{i['id']}.html", 0.5) for i in its]) + "</urlset>\n")
     open(os.path.join(W, "robots.txt"), "w").write(
@@ -134,6 +151,7 @@ def main():
          f"- [Library]({BASE}library.html): free templates, community patches and Field devices to download",
          f"- [Extensions]({BASE}extensions.html): optional packs (hand, face and pose tracking), installed live from Settings, Extensions",
          f"- [Library catalog (JSON)]({BASE}assets/library/catalog.json): every library item with description, category and file URL",
+         f"- [Blog]({BASE}blog/): guides on audio-reactive visuals, headless rendering, Field language and plugin modulation (feed: {BASE}blog/feed.xml)",
          f"- [Art Gallery]({BASE}artworks.html): visuals and motion made with Infinite",
          "- [Download](https://github.com/n1m21n/Infinite/releases/latest): installers for macOS, Windows and Linux",
          "- [Source code](https://github.com/n1m21n/Infinite): MIT licensed",

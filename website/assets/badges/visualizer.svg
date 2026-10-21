@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 96" width="460" height="96" fill="none">
+  <defs>
+    <linearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F57F66" />
+      <stop offset="100%" stop-color="#A9CDF1" />
+    </linearGradient>
+    <style>
+      .bg { fill: #151930; stroke: #2f3868; stroke-width: 1.5; rx: 12px; }
+      .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; font-weight: 700; fill: #ffffff; }
+      .sub { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; font-weight: 500; fill: #8F99B8; }
+      .link { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; font-weight: 600; fill: #F57F66; text-decoration: none; }
+      
+          @keyframes bounce_0 {
+            0%, 100% { height: 12px; y: 63px; }
+            50% { height: 50px; y: 25px; }
+          }
+          .bar-0 {
+            animation: bounce_0 0.80s ease-in-out infinite;
+            animation-delay: -0.00s;
+          }
+        
+
+          @keyframes bounce_1 {
+            0%, 100% { height: 16px; y: 59px; }
+            50% { height: 58px; y: 17px; }
+          }
+          .bar-1 {
+            animation: bounce_1 1.05s ease-in-out infinite;
+            animation-delay: -0.12s;
+          }
+        
+
+          @keyframes bounce_2 {
+            0%, 100% { height: 20px; y: 55px; }
+            50% { height: 66px; y: 9px; }
+          }
+          .bar-2 {
+            animation: bounce_2 1.30s ease-in-out infinite;
+            animation-delay: -0.24s;
+          }
+        
+
+          @keyframes bounce_3 {
+            0%, 100% { height: 24px; y: 51px; }
+            50% { height: 74px; y: 1px; }
+          }
+          .bar-3 {
+            animation: bounce_3 1.55s ease-in-out infinite;
+            animation-delay: -0.36s;
+          }
+        
+
+          @keyframes bounce_4 {
+            0%, 100% { height: 28px; y: 47px; }
+            50% { height: 82px; y: -7px; }
+          }
+          .bar-4 {
+            animation: bounce_4 0.80s ease-in-out infinite;
+            animation-delay: -0.48s;
+          }
+        
+
+          @keyframes bounce_5 {
+            0%, 100% { height: 12px; y: 63px; }
+            50% { height: 90px; y: -15px; }
+          }
+          .bar-5 {
+            animation: bounce_5 1.05s ease-in-out infinite;
+            animation-delay: -0.60s;
+          }
+        
+
+          @keyframes bounce_6 {
+            0%, 100% { height: 16px; y: 59px; }
+            50% { height: 98px; y: -23px; }
+          }
+          .bar-6 {
+            animation: bounce_6 1.30s ease-in-out infinite;
+            animation-delay: -0.72s;
+          }
+        
+
+          @keyframes bounce_7 {
+            0%, 100% { height: 20px; y: 55px; }
+            50% { height: 50px; y: 25px; }
+          }
+          .bar-7 {
+            animation: bounce_7 1.55s ease-in-out infinite;
+            animation-delay: -0.84s;
+          }
+        
+
+          @keyframes bounce_8 {
+            0%, 100% { height: 24px; y: 51px; }
+            50% { height: 58px; y: 17px; }
+          }
+          .bar-8 {
+            animation: bounce_8 0.80s ease-in-out infinite;
+            animation-delay: -0.96s;
+          }
+        
+
+          @keyframes bounce_9 {
+            0%, 100% { height: 28px; y: 47px; }
+            50% { height: 66px; y: 9px; }
+          }
+          .bar-9 {
+            animation: bounce_9 1.05s ease-in-out infinite;
+            animation-delay: -1.08s;
+          }
+        
+
+          @keyframes bounce_10 {
+            0%, 100% { height: 12px; y: 63px; }
+            50% { height: 74px; y: 1px; }
+          }
+          .bar-10 {
+            animation: bounce_10 1.30s ease-in-out infinite;
+            animation-delay: -0.00s;
+          }
+        
+
+          @keyframes bounce_11 {
+            0%, 100% { height: 16px; y: 59px; }
+            50% { height: 82px; y: -7px; }
+          }
+          .bar-11 {
+            animation: bounce_11 1.55s ease-in-out infinite;
+            animation-delay: -0.12s;
+          }
+        
+
+          @keyframes bounce_12 {
+            0%, 100% { height: 20px; y: 55px; }
+            50% { height: 90px; y: -15px; }
+          }
+          .bar-12 {
+            animation: bounce_12 0.80s ease-in-out infinite;
+            animation-delay: -0.24s;
+          }
+        
+
+          @keyframes bounce_13 {
+            0%, 100% { height: 24px; y: 51px; }
+            50% { height: 98px; y: -23px; }
+          }
+          .bar-13 {
+            animation: bounce_13 1.05s ease-in-out infinite;
+            animation-delay: -0.36s;
+          }
+        
+
+          @keyframes bounce_14 {
+            0%, 100% { height: 28px; y: 47px; }
+            50% { height: 50px; y: 25px; }
+          }
+          .bar-14 {
+            animation: bounce_14 1.30s ease-in-out infinite;
+            animation-delay: -0.48s;
+          }
+        
+
+          @keyframes bounce_15 {
+            0%, 100% { height: 12px; y: 63px; }
+            50% { height: 58px; y: 17px; }
+          }
+          .bar-15 {
+            animation: bounce_15 1.55s ease-in-out infinite;
+            animation-delay: -0.60s;
+          }
+        
+
+          @keyframes bounce_16 {
+            0%, 100% { height: 16px; y: 59px; }
+            50% { height: 66px; y: 9px; }
+          }
+          .bar-16 {
+            animation: bounce_16 0.80s ease-in-out infinite;
+            animation-delay: -0.72s;
+          }
+        
+
+          @keyframes bounce_17 {
+            0%, 100% { height: 20px; y: 55px; }
+            50% { height: 74px; y: 1px; }
+          }
+          .bar-17 {
+            animation: bounce_17 1.05s ease-in-out infinite;
+            animation-delay: -0.84s;
+          }
+        
+    </style>
+  </defs>
+
+  <!-- Background Card -->
+  <rect class="bg" width="458" height="94" x="1" y="1" />
+
+  <!-- Spectrum Bars -->
+  <g id="bars">
+    <rect class="bar bar-0" x="20" y="63" width="8" height="12" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-1" x="34" y="59" width="8" height="16" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-2" x="48" y="55" width="8" height="20" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-3" x="62" y="51" width="8" height="24" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-4" x="76" y="47" width="8" height="28" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-5" x="90" y="63" width="8" height="12" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-6" x="104" y="59" width="8" height="16" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-7" x="118" y="55" width="8" height="20" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-8" x="132" y="51" width="8" height="24" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-9" x="146" y="47" width="8" height="28" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-10" x="160" y="63" width="8" height="12" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-11" x="174" y="59" width="8" height="16" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-12" x="188" y="55" width="8" height="20" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-13" x="202" y="51" width="8" height="24" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-14" x="216" y="47" width="8" height="28" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-15" x="230" y="63" width="8" height="12" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-16" x="244" y="59" width="8" height="16" rx="3" fill="url(#brandGrad)"/>
+    <rect class="bar bar-17" x="258" y="55" width="8" height="20" rx="3" fill="url(#brandGrad)"/>
+  </g>
+
+  <!-- Brand Typography -->
+  <g transform="translate(280, 32)">
+    <text class="title" x="0" y="0">infinite</text>
+    <text class="sub" x="0" y="18">visuals, music and code</text>
+    <a href="https://infinitedevices.org" target="_blank">
+      <text class="link" x="0" y="38">infinitedevices.org</text>
+    </a>
+  </g>
+</svg>

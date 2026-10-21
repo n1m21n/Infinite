@@ -12,6 +12,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Library](https://infinitedevices.org/library.html): free templates, community patches and Field devices to download
 - [Extensions](https://infinitedevices.org/extensions.html): optional packs (hand, face and pose tracking), installed live from Settings, Extensions
 - [Library catalog (JSON)](https://infinitedevices.org/assets/library/catalog.json): every library item with description, category and file URL
+- [Blog](https://infinitedevices.org/blog/): guides on audio-reactive visuals, headless rendering, Field language and plugin modulation (feed: https://infinitedevices.org/blog/feed.xml)
 - [Art Gallery](https://infinitedevices.org/artworks.html): visuals and motion made with Infinite
 - [Download](https://github.com/n1m21n/Infinite/releases/latest): installers for macOS, Windows and Linux
 - [Source code](https://github.com/n1m21n/Infinite): MIT licensed
@@ -88,6 +89,9 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Pixel Plate](https://infinitedevices.org/library/pixel-plate.html): A plate of square cells with ragged, notched edges that grows outward cell by cell. (file: https://infinitedevices.org/assets/library/pixel/pixel-plate.field)
 - [Iridescent Orb](https://infinitedevices.org/library/iridescent-orb.html): A soft holographic pastel ball that slowly spins its colours, with a white sheen and a gloss spot. (file: https://infinitedevices.org/assets/library/pixel/iridescent-orb.field)
 - [Phyllotaxis Bloom](https://infinitedevices.org/library/phyllotaxis-bloom.html): A sunflower of golden-angle seeds, each dot coloured along the spiral. Seed count and turn are live. (file: https://infinitedevices.org/assets/library/pixel/phyllotaxis-bloom.field)
+- [Cyber Tunnel](https://infinitedevices.org/library/cyber-tunnel.html): Audio-reactive infinite cyber tunnel with perspective warping and speed modulation. (file: https://infinitedevices.org/assets/library/pixel/cyber-tunnel.field)
+- [Hex Lattice](https://infinitedevices.org/library/hex-lattice.html): Audio-reactive geometric hexagonal lattice with concentric harmonic rings. (file: https://infinitedevices.org/assets/library/pixel/hex-lattice.field)
+- [Harmonic Warp](https://infinitedevices.org/library/harmonic-warp.html): Multi-octave harmonic coordinate warp with frequency-dependent color gradients. (file: https://infinitedevices.org/assets/library/pixel/harmonic-warp.field)
 
 ## Library: Sketch
 

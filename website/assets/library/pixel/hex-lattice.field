@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "hex-lattice",
+    "author": "community",
+    "description": "audio-reactive geometric hexagonal lattice with concentric harmonic rings",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float scale = 12.0 [2.0, 30.0];\n\np = (uv - 0.5) * scale;\nh = vec2(1.7320508, 1.0);\na = mod(p, h) - h * 0.5;\nb = mod(p - h * 0.5, h) - h * 0.5;\ng = if(dot(a, a) < dot(b, b), a, b);\n\nedge = abs(max(abs(g.x) * 0.866025 + abs(g.y) * 0.5, abs(g.y)) - 0.45);\npulse = smoothstep(0.08, 0.02, edge);\n\nrings = sin(length(uv - 0.5) * 16.0 - t * 3.0);\ncol = vec3(pulse) * (0.5 + 0.5 * sin(vec3(0.2, 0.7, 1.2) + rings));\ncol = col * (0.8 + 0.5 * audio_bass);",
+    "params": {
+      "audio_bass": 0.5,
+      "scale": 12.0
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

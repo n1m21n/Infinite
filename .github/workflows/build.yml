@@ -112,6 +112,8 @@ jobs:
     needs: detect
     if: needs.detect.outputs.has_windows == 'true'
     runs-on: ${{ matrix.runner }}
+    env:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
     # ARM64 is best-effort: it exists so an Apple Silicon Parallels VM (which
     # runs Windows 11 on ARM) can run a native build instead of leaning on
     # Windows' x64 emulation. x64 is the supported target and must stay green.
@@ -270,6 +272,38 @@ jobs:
           # fills it. Without it the Drum Sequencer's groove picker has no kit.
           cp -r build/Release/Resources dist/Infinite/
           cp README.md LICENSE dist/Infinite/ 2>/dev/null || true
+
+      - name: Upload unsigned artifact
+        id: upload-unsigned
+        if: matrix.arch == 'x64' && env.SIGNPATH_API_TOKEN != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinite-windows-${{ matrix.arch }}-unsigned
+          path: dist/Infinite
+          if-no-files-found: error
+
+      - name: Submit signing request to SignPath
+        if: matrix.arch == 'x64' && env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: 'Infinite'
+          signing-policy-slug: 'test-signing'
+          artifact-configuration-slug: 'Zip-Archive'
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist-signed
+
+      - name: Extract signed binaries
+        if: matrix.arch == 'x64' && env.SIGNPATH_API_TOKEN != ''
+        shell: bash
+        run: |
+          if compgen -G "dist-signed/*.zip" > /dev/null; then
+            unzip -o dist-signed/*.zip -d dist/Infinite
+          else
+            cp -r dist-signed/* dist/Infinite/
+          fi
 
       - name: Upload
         uses: actions/upload-artifact@v4

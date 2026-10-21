@@ -1462,7 +1462,7 @@ namespace app
          // face, so no caption strip is reserved under them (it left a gap
          // above the manual checkbox); Free mode has a captioned knob.
          AudioKnobRow row(2, kKnobSmall, 0.0f, n->rateMode != 0);
-         DrawRateModeControls         DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
+         DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
          row.End();
       }
 

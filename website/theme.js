@@ -13,7 +13,8 @@
       b[i].setAttribute('title', mode === 'paper' ? 'Dark mode' : 'Light mode');
     }
   }
-  apply(saved() === 'paper' ? 'paper' : 'midnight');
+  var dflt = window.INFINITE_DEFAULT_MODE === 'paper' ? 'paper' : 'midnight';
+  apply(saved() === 'paper' || saved() === 'midnight' ? saved() : dflt);
   document.addEventListener('DOMContentLoaded', function () {
     apply(root.getAttribute('data-mode'));
     document.addEventListener('click', function (e) {

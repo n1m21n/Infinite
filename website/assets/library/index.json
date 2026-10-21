@@ -199,6 +199,63 @@
       "file": "assets/library/sketch/clifford-attractor.js",
       "preview": "assets/library/previews/clifford-attractor.jpg",
       "bytes": 791
+    },
+    {
+      "id": "cyber-tunnel",
+      "name": "Cyber Tunnel",
+      "kind": "Generator",
+      "tags": [
+        "Tunnel",
+        "Cyber",
+        "Reactive",
+        "Visuals"
+      ],
+      "description": "Audio-reactive infinite cyber tunnel with perspective warping and speed modulation.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 2,
+      "file": "assets/library/pixel/cyber-tunnel.field",
+      "preview": "assets/library/previews/cyber-tunnel.jpg",
+      "bytes": 951
+    },
+    {
+      "id": "hex-lattice",
+      "name": "Hex Lattice",
+      "kind": "Generator",
+      "tags": [
+        "Hexagon",
+        "Geometric",
+        "Harmonics",
+        "Visuals"
+      ],
+      "description": "Audio-reactive geometric hexagonal lattice with concentric harmonic rings.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 2,
+      "file": "assets/library/pixel/hex-lattice.field",
+      "preview": "assets/library/previews/hex-lattice.jpg",
+      "bytes": 932
+    },
+    {
+      "id": "harmonic-warp",
+      "name": "Harmonic Warp",
+      "kind": "Generator",
+      "tags": [
+        "Warp",
+        "Harmonics",
+        "Spectrum",
+        "Visuals"
+      ],
+      "description": "Multi-octave harmonic coordinate warp with frequency-dependent color gradients.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 2,
+      "file": "assets/library/pixel/harmonic-warp.field",
+      "preview": "assets/library/previews/harmonic-warp.jpg",
+      "bytes": 933
     }
   ]
 }

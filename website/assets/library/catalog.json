@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 59,
+ "count": 62,
  "items": [
   {
    "id": "first-sound",
@@ -710,6 +710,42 @@
    "file": "https://infinitedevices.org/assets/library/sketch/clifford-attractor.js",
    "preview": "https://infinitedevices.org/assets/library/previews/clifford-attractor.jpg",
    "page": "https://infinitedevices.org/library/clifford-attractor.html"
+  },
+  {
+   "id": "cyber-tunnel",
+   "name": "Cyber Tunnel",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Audio-reactive infinite cyber tunnel with perspective warping and speed modulation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/cyber-tunnel.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/cyber-tunnel.jpg",
+   "page": "https://infinitedevices.org/library/cyber-tunnel.html"
+  },
+  {
+   "id": "hex-lattice",
+   "name": "Hex Lattice",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Audio-reactive geometric hexagonal lattice with concentric harmonic rings.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/hex-lattice.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/hex-lattice.jpg",
+   "page": "https://infinitedevices.org/library/hex-lattice.html"
+  },
+  {
+   "id": "harmonic-warp",
+   "name": "Harmonic Warp",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Multi-octave harmonic coordinate warp with frequency-dependent color gradients.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/harmonic-warp.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/harmonic-warp.jpg",
+   "page": "https://infinitedevices.org/library/harmonic-warp.html"
   }
  ]
 }

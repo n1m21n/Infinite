@@ -535,8 +535,22 @@ namespace app
                      if (resolved != nullptr && cand.node.get() == resolved)
                         gn = &cand;
                }
+               // Fade In / Fade Out ramp the clip's opacity linearly, the same
+               // envelope the audio scheduler applies (AudioEngine's
+               // fadeInBeats/fadeOutBeats), so a video clip fades with its sound.
+               float fadeEnv = 1.0f;
+               {
+                  const double fadeInBeats = Arrange::TicksToBeats(c.fadeIn);
+                  const double fadeOutBeats = Arrange::TicksToBeats(c.fadeOut);
+                  const double sinceStart = beat - startBeat;
+                  const double untilEnd = Arrange::TicksToBeats(c.End()) - beat;
+                  if (fadeInBeats > 0.0 && sinceStart < fadeInBeats)
+                     fadeEnv *= (float)std::clamp(sinceStart / fadeInBeats, 0.0, 1.0);
+                  if (fadeOutBeats > 0.0 && untilEnd < fadeOutBeats)
+                     fadeEnv *= (float)std::clamp(untilEnd / fadeOutBeats, 0.0, 1.0);
+               }
                if (gn != nullptr && gn->node != nullptr)
-                  out.push_back({ gn, srcOutput, c.blendMode, std::clamp(lane.opacity * c.opacity, 0.0f, 1.0f),
+                  out.push_back({ gn, srcOutput, c.blendMode, std::clamp(lane.opacity * c.opacity * fadeEnv, 0.0f, 1.0f),
                                   c.id, c.colorBrightness, c.colorContrast, c.colorSaturation });
             }
             break;

@@ -1,0 +1,12 @@
+{
+  "queries": [
+    {"q": "touchdesigner alternative", "track": "A", "match": ["touchdesigner", "alternative"]},
+    {"q": "audio reactive visuals", "track": "A", "match": ["audio", "reactive", "visual"]},
+    {"q": "open source vj software", "track": "B", "match": ["vj", "visual", "open source"]},
+    {"q": "vst3 host modular", "track": "B", "match": ["vst", "modular", "host"]},
+    {"q": "node based daw", "track": "B", "match": ["node", "daw", "modular"]},
+    {"q": "generative visuals live performance", "track": "B", "match": ["generative", "visual", "live"]},
+    {"q": "headless render video from script", "track": "A", "match": ["headless", "render", "cli"]},
+    {"q": "linux daw", "track": "B", "match": ["linux", "daw"]}
+  ]
+}
