@@ -7,7 +7,7 @@
   var deck = InfiniteDeck.create({
     stage: root, grid: grid, cardSel: '.nd-card', mode: 'fan', keys: false,
     getCards: function () { return cards; },
-    onChange: function (i) { var c = cards[i]; if (!c) return; t.textContent = c.getAttribute('data-title'); d.textContent = c.getAttribute('data-desc'); var n = c.getAttribute('data-node'), h = n ? 'nodes/' + n + '.html' : 'nodes/'; t.href = h; }
+    onChange: function (i) { var c = cards[i]; if (!c) return; t.textContent = c.getAttribute('data-title'); d.textContent = c.getAttribute('data-desc'); var n = c.getAttribute('data-node'); if (n) t.href = 'nodes/' + n + '.html'; else t.removeAttribute('href'); }
   });
   deck.refresh(false);
   root.querySelectorAll('[data-nd]').forEach(function (b) { b.addEventListener('click', function () { deck.step(+b.getAttribute('data-nd')); }); });
@@ -17,6 +17,6 @@
   grid.addEventListener('click', function (e) {       // a tap on the front card opens its node page (a tap on another card just brings it forward)
     if (e.defaultPrevented) return;
     var c = e.target.closest('.nd-card');
-    if (c && c === cards[deck.index]) { var n = c.getAttribute('data-node'); location.href = n ? 'nodes/' + n + '.html' : 'nodes/'; }
+    var n = c && c === cards[deck.index] && c.getAttribute('data-node'); if (n) location.href = 'nodes/' + n + '.html';   // a node with no page yet stays put, never a generic page
   });
 })();
