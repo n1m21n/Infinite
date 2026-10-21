@@ -114,28 +114,36 @@
   });
   window.addEventListener('resize', function () { size(); render(); });
 
-  var chips = root.querySelectorAll('.np-chip[data-fam]'), view = root.querySelector('.ns-view');
+  var sel = root.querySelector('.ns-select'), menu = root.querySelector('.ns-menu'), view = root.querySelector('.ns-view'),
+      opts = root.querySelectorAll('.ns-opt'), val = root.querySelector('.ns-select-val');
   function refilter(f) {
     act = all.filter(function (a) {
       var ok = !f || a.getAttribute('data-fam') === f;
       a.style.display = ok ? '' : 'none'; a._v = -1; return ok;
     });
     m = act.length; rng.max = Math.max(0, m - 1); rng.disabled = m < 2;
-    pos = target = 0; shown = -1; render();
+    pos = target = Math.floor(Math.random() * m); shown = -1; render();
   }
-  Array.prototype.forEach.call(chips, function (c) {
+  function menuOpen(o) { menu.hidden = !o; sel.setAttribute('aria-expanded', String(o)); }
+  sel.addEventListener('click', function () { menuOpen(menu.hidden); });
+  document.addEventListener('click', function (e) { if (!e.target.closest('.ns-sel')) menuOpen(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') menuOpen(false); });
+  Array.prototype.forEach.call(opts, function (c) {
     c.addEventListener('click', function () {
-      Array.prototype.forEach.call(chips, function (o) { o.setAttribute('aria-pressed', o === c ? 'true' : 'false'); });
-      root.removeAttribute('data-view'); view.setAttribute('aria-pressed', 'false'); view.textContent = 'List';
+      Array.prototype.forEach.call(opts, function (o) { o.setAttribute('aria-selected', o === c ? 'true' : 'false'); });
+      val.textContent = c.firstChild.textContent; menuOpen(false);
+      root.removeAttribute('data-view'); view.setAttribute('aria-pressed', 'false');
       refilter(c.getAttribute('data-fam') || '');
     });
   });
   view.addEventListener('click', function () {
     var list = root.getAttribute('data-view') !== 'list';
     if (list) root.setAttribute('data-view', 'list'); else root.removeAttribute('data-view');
-    view.setAttribute('aria-pressed', list ? 'true' : 'false'); view.textContent = list ? 'Ring' : 'List';
+    view.setAttribute('aria-pressed', list ? 'true' : 'false');
+    view.setAttribute('aria-label', list ? 'Show as a ring' : 'Show as a list'); view.title = list ? 'Ring' : 'List';
     if (!list) { size(); render(); }
   });
   rng.max = m - 1;
+  pos = target = Math.floor(Math.random() * m);   // a different node in front on every visit
   size(); render();
 })();

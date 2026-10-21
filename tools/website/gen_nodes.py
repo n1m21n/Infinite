@@ -434,7 +434,7 @@ def head(title, desc, url, image, ld, rel="nodes/x.html", bodyclass="blog-page b
   <link rel="stylesheet" href="../style.css?v=60c68394">
   <link rel="stylesheet" href="../glass.css?v=c25dae44">
   <link rel="stylesheet" href="../blog.css?v=823c9183">
-  <link rel="stylesheet" href="../nodepage.css?v=be1f691d">
+  <link rel="stylesheet" href="../nodepage.css?v=8c058d29">
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head>
 <body class="{bodyclass}">
@@ -564,8 +564,13 @@ def index_page(items):
         secs.append('<section class="np-sec" id="%s" style="--cat:%s"><h2>%s <small class="mono">%d</small></h2><p>%s.</p><div class="np-pills">%s</div></section>'
                     % (slug(c), CAT_COLOR[c], e(CAT_LABEL[c]), len(xs), e(CAT_BLURB[c][0].upper() + CAT_BLURB[c][1:]), pills))
     fams = [c for c in order if any(i["cat"] == c for i in items)]
-    chips = '<button type="button" class="np-chip" data-fam="" aria-pressed="true">All</button>' + "".join(
-        '<button type="button" class="np-chip" data-fam="%s" aria-pressed="false">%s</button>' % (slug(c), e(CAT_LABEL[c])) for c in fams)
+    SEL_IC = '<svg class="ns-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5h13M6 10h8M8.5 15h3"/></svg>'
+    CHEV = '<svg class="ns-chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>'
+    opts = '<button type="button" class="ns-opt" role="option" data-fam="" aria-selected="true"><span>All</span><small class="mono">%d</small></button>' % len(items) + "".join(
+        '<button type="button" class="ns-opt" role="option" data-fam="%s" aria-selected="false"><span>%s</span><small class="mono">%d</small></button>'
+        % (slug(c), e(CAT_LABEL[c]), len([i for i in items if i["cat"] == c])) for c in fams)
+    chips = ('<div class="ns-sel"><button type="button" class="ns-select" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter by family">%s<span class="ns-select-val">All</span>%s</button>'
+             '<div class="ns-menu" role="listbox" aria-label="Family" hidden>%s</div></div>' % (SEL_IC, CHEV, opts))
     cloud = "".join('<a class="ns-a" data-fam="%s" data-fl="%s" data-n="%s"%s href="%s.html">%s</a>' % (slug(i["cat"]), e(CAT_LABEL[i["cat"]]), e(i["name"]), (' data-img="../assets/nodes/hd/%s"' % i["shot"][0]) if i["shot"] else "", i["slug"], e(i["name"]))
                     for i in sorted(items, key=lambda i: (order.index(i["cat"]), i["name"].lower())))
     body = f"""  {chrome.header_html(rel)}
@@ -577,7 +582,7 @@ def index_page(items):
         <h1>Every node in Infinite</h1>
       </header>
       <div class="ns" id="ns">
-        <div class="np-jump ns-bar" role="group" aria-label="Filter by family">{chips}<button type="button" class="np-chip ns-view" aria-pressed="false">List</button></div>
+        <div class="ns-bar">{chips}<button type="button" class="ns-view" aria-pressed="false" aria-label="Show as a list" title="List"><svg class="ns-ic" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5.5h9M7 10h9M7 14.5h9M3.5 5.5h.01M3.5 10h.01M3.5 14.5h.01"/></svg></button></div>
         <div class="ns-stage" id="ns-stage">{cloud}</div>
       </div>
       <div class="ns-list" id="ns-list">{"".join(secs)}</div>

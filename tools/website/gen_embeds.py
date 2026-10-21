@@ -233,10 +233,19 @@ def build_gallery(items):
         }});
       }}
 
+      /* a fresh random order on every visit, and again on every lap of the endless reel */
+      function shuffled(a) {{
+        a = a.slice();
+        for (var i = a.length - 1; i > 0; i--) {{ var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; }}
+        return a;
+      }}
+      base = shuffled(base);
+      base.forEach(function (s) {{ reels.appendChild(s); }});
+
       function add() {{
         loops += 1; more.disconnect();
         var last;
-        base.forEach(function (s) {{
+        shuffled(base).forEach(function (s) {{
           var c = s.cloneNode(true), f = c.querySelector('iframe'), t = c.querySelector('textarea'), b = c.querySelector('[data-copy]');
           f.removeAttribute('src'); t.id += '-' + loops; b.setAttribute('data-copy', t.id);
           reels.appendChild(c); wire(c); last = c;
