@@ -2919,6 +2919,49 @@ bool RunMolderFixture()
          printf("MOLDERTEST save/load seed+generation mismatch FAIL\n");
          ok = false;
       }
+
+      // Patch load, paste and undo/redo all go LoadParams -> ReloadFromPath().
+      // The reload must keep the saved seed + generation (it used to re-roll a
+      // random seed and reset to generation 0, so every reopen changed the
+      // sound); only a fresh LoadFile() of a new source rolls a new seed.
+      {
+         const std::string wavPath = TmpPath("infinite_molder_reload_fixture.wav");
+         {
+            const int frames = 22050;
+            std::vector<int16_t> pcm(frames);
+            for (int i = 0; i < frames; ++i)
+               pcm[i] = (int16_t)(std::sin((float)i * 220.0f * 6.283185f / 44100.0f) * 20000.0f);
+            std::ofstream f(wavPath, std::ios::binary);
+            auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+            auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+            const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+            f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+            f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+            writeU32(44100); writeU32(44100 * 2); writeU16(2); writeU16(16);
+            f.write("data", 4); writeU32(dataSize);
+            f.write((const char*)pcm.data(), dataSize);
+         }
+         std::vector<std::pair<std::string, std::string>> saved;
+         Patch::SaveParams(&node, saved);
+         for (auto& kv : saved)
+         {
+            if (kv.first == "path") kv.second = wavPath;
+            if (kv.first == "seed") kv.second = "12345";
+            if (kv.first == "generation") kv.second = "4";
+         }
+         MolderNode respawned;
+         Patch::LoadParams(&respawned, saved);
+         respawned.ReloadFromPath();
+         const bool keptOk = respawned.Seed() == 12345u && respawned.Generation() == 4;
+         MolderNode fresh;
+         Patch::LoadParams(&fresh, saved);
+         const bool loadedOk = fresh.LoadFile(wavPath);
+         const bool rolledOk = loadedOk && fresh.Generation() == 0;
+         printf("MOLDERTEST reload keeps seed+generation (seed %u gen %d, fresh load gen %d) %s\n",
+                respawned.Seed(), respawned.Generation(), fresh.Generation(),
+                keptOk && rolledOk ? "OK" : "FAIL");
+         ok = ok && keptOk && rolledOk;
+      }
    }
 
    printf("%s\n", ok ? "MOLDERTEST OK" : "MOLDERTEST FAIL");

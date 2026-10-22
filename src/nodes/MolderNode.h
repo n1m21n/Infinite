@@ -69,7 +69,10 @@ public:
       return slot == 0 ? "record in" : nullptr;
    }
 
-   bool LoadFile(const std::string& path);
+   // A fresh load (drop, browse) rolls a new seed and starts at generation 0.
+   // ReloadFromPath() keeps the saved seed + generation: patch load, paste and
+   // undo/redo respawn the node from its params and must replay the same genome.
+   bool LoadFile(const std::string& path, bool keepGenome = false);
    void ReloadFromPath();
 
    void StartRecording();
