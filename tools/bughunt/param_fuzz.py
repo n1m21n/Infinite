@@ -22,7 +22,7 @@ error code the base run did not have.
                  a full-scale 30 Hz square) then a clean -12 dBFS sine; the base
                  run plays the sine alone. It looks for state that never
                  recovers: NANSTUCK (NaN long after the burst), HOTSTUCK (last
-                 second 20 dB over base), SILENT (last second silent where base
+                 second 20 dB over base and not falling 3 dB/s), SILENT (last second silent where base
                  had sound), SLOW (4x base time). NANPASS (NaN only while the
                  burst plays) is recorded but is not BAD.
   --jobs N       run N cases at once (default 1). Each case is its own process;
@@ -214,7 +214,7 @@ def run_case(binp, out, tag, text, audio, timeout, signal=False):
     if rc == 6:
         rc = "TIMEOUT"
     reports = [f for f in os.listdir(out) if f.startswith(tag + ".san")]
-    tail = None
+    tail = prev = None
     if audio:
         raw = ""
         try:
@@ -224,6 +224,8 @@ def run_case(binp, out, tag, text, audio, timeout, signal=False):
             nonfinite = j.get("non_finite_frames") or 0
             lps = j.get("loudness_per_second") or []
             tail = lps[-1] if lps and isinstance(lps[-1], (int, float)) else None
+            if tail is not None and len(lps) > 1 and isinstance(lps[-2], (int, float)):
+                prev = lps[-2]
             if signal:
                 if nonfinite > SIG_RATE * (SIG_BURST + SIG_GRACE):
                     codes += ",NANSTUCK"
@@ -238,7 +240,7 @@ def run_case(binp, out, tag, text, audio, timeout, signal=False):
                 codes += ",NANAUDIO"
         except OSError:
             pass
-    return rc, codes, reports, round(time.time() - t0, 1), tail
+    return rc, codes, reports, round(time.time() - t0, 1), tail, prev
 
 
 def describe(binp, out):
@@ -271,7 +273,7 @@ def fuzz_type(binp, out, kind, t, prior, max_timeout, write):
         text, audio = patch_for(t, kind, None if v == "base" else v, sig)
         tag = f"{kind}-{safe}-{label.lstrip('-').replace('.', '')}{'n' if label.startswith('-') else ''}"
         signal = kind == "signal" and audio
-        rc, codes, reports, secs, tail = run_case(binp, out, tag, text, audio,
+        rc, codes, reports, secs, tail, prev = run_case(binp, out, tag, text, audio,
                                                   max_timeout if v == "base" else budget, signal)
         if signal and v == "base" and tail is None:
             codes += ",NOSIGNAL"  # the sine never reached the sink: this type's rows prove nothing
@@ -281,7 +283,9 @@ def fuzz_type(binp, out, kind, t, prior, max_timeout, write):
                 codes += ",SLOW"
             if base_tail is not None and tail is None and "NANSTUCK" not in codes:
                 codes += ",SILENT"
-            elif base_tail is not None and tail is not None and tail > base_tail + 20:
+            elif (base_tail is not None and tail is not None and tail > base_tail + 20
+                  and (prev is None or tail > prev - 3)):
+                # a reverb or delay tail still falling is decay, not a stuck state
                 codes += ",HOTSTUCK"
         crashed = rc == "TIMEOUT" or (isinstance(rc, int) and (rc < 0 or rc >= 128))
         if v == "base":
