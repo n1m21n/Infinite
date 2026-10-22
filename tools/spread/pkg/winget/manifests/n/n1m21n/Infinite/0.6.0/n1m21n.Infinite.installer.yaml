@@ -1,0 +1,17 @@
+PackageIdentifier: n1m21n.Infinite
+PackageVersion: 0.6.0
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+- RelativeFilePath: Infinite\Infinite.exe
+  PortableCommandAlias: infinite
+ReleaseDate: 2026-10-17
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/n1m21n/Infinite/releases/download/v0.6.0/Infinite-windows-x64.zip
+  InstallerSha256: D3EF6024FDD16CEB412F8DDC8770E25913546170B5F7DAA192E1B1F3B0F58E9A
+- Architecture: arm64
+  InstallerUrl: https://github.com/n1m21n/Infinite/releases/download/v0.6.0/Infinite-windows-ARM64.zip
+  InstallerSha256: 2D120AD89443B60839E6200BE7DDB457C299A6C40488C4233CADE6E63DDA406
+ManifestType: installer
+ManifestVersion: 1.6.0
