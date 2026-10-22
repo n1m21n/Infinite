@@ -300,11 +300,16 @@ namespace app
          if (mapped.targetsY.empty() && mapped.dstIndex >= 0 && mapped.dstParam2 >= 0)
             mapped.targetsY.push_back({ mapped.dstIndex, mapped.dstParam2, "" });
 
+         using Layout = Patch::PerfLayoutRecord;
+         mapped.cellX = std::clamp(mapped.cellX, 0, Layout::kMaxCell);
+         mapped.cellY = std::clamp(mapped.cellY, 0, Layout::kMaxCell);
+
          gPerfElements.push_back(mapped);
       }
       gPerfLayout = data.perfLayout;
-      if (gPerfLayout.cellSize < 40) gPerfLayout.cellSize = 76;
-      if (gPerfLayout.pageCount < 1) gPerfLayout.pageCount = 1;
+      if (gPerfLayout.cellSize < Patch::PerfLayoutRecord::kMinCellSize || gPerfLayout.cellSize > Patch::PerfLayoutRecord::kMaxCellSize)
+         gPerfLayout.cellSize = 76;
+      gPerfLayout.pageCount = std::clamp(gPerfLayout.pageCount, 1, Patch::PerfLayoutRecord::kMaxPages);
       if (gPerfActivePage >= gPerfLayout.pageCount) gPerfActivePage = gPerfLayout.pageCount - 1;
 
       // A clip whose node didn't survive (an unknown type in this build, or a

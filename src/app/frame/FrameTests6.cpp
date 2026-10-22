@@ -469,6 +469,47 @@ void FrameTest_MODCURVETEST(int frameId, GLFWwindow* window)
       }
 }
 
+// A patch is outside input: a hostile or corrupt perf layout (2e9 pages, an
+// element at cell 2e9) must be clamped on load, not handed to the panel, which
+// would push one page name per page and draw one grid line per cell every frame.
+void FrameTest_PERFBOUNDSTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_PERFBOUNDSTEST") == nullptr)
+      return;
+   static std::string path;
+   static int fails = 0;
+   auto Fail = [&](const char* msg) { printf("PERFBOUNDSTEST FAIL: %s\n", msg); fails++; };
+   using Layout = Patch::PerfLayoutRecord;
+   if (frameId == 3)
+   {
+      path = TmpPath("infinite_perfbounds.inf");
+      std::ofstream f(path);
+      f << "infinite-patch 1\n"
+           "node 1 Utility Output\n  id out\nend\n"
+           "perfui 76 2000000000\n"
+           "perf 0 -1 -1 -1 2000000000 2000000000 0 0.5 0.5 0.5\n";
+      f.close();
+      if (!LoadPatchFrom(path))
+         Fail("load failed");
+      gPerfPanelOpen = true;
+   }
+   if (frameId == 30)
+   {
+      if (gPerfLayout.pageCount != Layout::kMaxPages)
+         Fail("pageCount not clamped to kMaxPages");
+      // DrawPerfPanelContent pads the names to pageCount, so this also shows the panel drew.
+      if ((int)gPerfLayout.pageNames.size() != Layout::kMaxPages)
+         Fail("page names not padded to kMaxPages (panel did not draw?)");
+      if (gPerfElements.size() != 1)
+         Fail("perf element not loaded");
+      else if (gPerfElements[0].cellX != Layout::kMaxCell || gPerfElements[0].cellY != Layout::kMaxCell)
+         Fail("element cell not clamped to kMaxCell");
+      std::remove(path.c_str());
+      printf("PERFBOUNDSTEST %s\n", fails == 0 ? "OK" : "FAIL");
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+   }
+}
+
 void FrameTest_CACHETEST(int frameId, GLFWwindow* window)
 {
    if (getenv("INFINITE_CACHETEST") != nullptr)

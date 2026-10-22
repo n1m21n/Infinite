@@ -509,6 +509,7 @@ int DrawTestsB(FrameCtx& fc)
       // since those still have to run for UI responsiveness (hover states,
       // cursor, animated widgets) regardless of whether the node graph is idle.
       FrameTest_CACHETEST(frameId, window);
+      FrameTest_PERFBOUNDSTEST(frameId, window);
 
       if (getenv("INFINITE_TEXTFIT") != nullptr && frameId == 4 && !gNodes.empty())
       {
