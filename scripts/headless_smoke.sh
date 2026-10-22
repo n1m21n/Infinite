@@ -91,6 +91,13 @@ SP="$ROOT/tests/headless/summary/spatial_only.inf"
 r=$("$BIN" --audio-summary "$SP" "$OUT/sp.json" --duration 0.5 2>/dev/null)
 [ "$(echo "$r" | json "d['ok']")" = "True" ]; check "spatial-only patch measures audio (sink = Spatial Mixer)" $?
 
+# --timeout is checked between ticks; a tick that never returns must still end the job (watchdog, B-A-001)
+INFINITE_HEADLESS_TEST_HANG_TICK=1 "$BIN" --audio-summary "$SP" "$OUT/hang.json" --duration 2 --timeout 1 > "$OUT/hang.out" 2>/dev/null &
+hpid=$!; hs=$SECONDS
+while kill -0 $hpid 2>/dev/null && [ $((SECONDS - hs)) -lt 30 ]; do sleep 1; done
+if kill -0 $hpid 2>/dev/null; then kill -9 $hpid; hrc=99; else wait $hpid; hrc=$?; fi
+[ "$hrc" = "6" ] && grep -q '"E_TIMEOUT"' "$OUT/hang.out"; check "a hung tick is stopped by the watchdog (exit 6, E_TIMEOUT, ${hrc}/$((SECONDS - hs))s)" $?
+
 # Audio File -> Output direct used to mux the raw file, ignoring volume/gain: volume 0.2 must render ~12 dB under 0.8
 if command -v ffmpeg >/dev/null; then
   FV="$ROOT/tests/headless/filevol/file_volume.inf"
