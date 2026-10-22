@@ -145,6 +145,9 @@ public:
    // mouse click/drag, -1 if none. Public because the UI needs to track it
    // across frames the same way it owns baseOctave/computerKeyboardEnabled.
    int mMouseNote = -1;
+   // Same ownership: the note each typing key (kTypingKeys order) is holding, note + 1, 0 = up. A key releases the
+   // note it pressed, so an octave change (-/= or the knob) under a held key cannot leave the old note stuck on.
+   int mTypedNotes[40] = {};
 
 private:
    std::unique_ptr<AudioKeyboardNode> mAudioNode;
