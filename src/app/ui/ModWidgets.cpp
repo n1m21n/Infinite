@@ -595,7 +595,7 @@ namespace app
 
 
    bool ModSliderInt(const char* label, int* value, int minV, int maxV, float width,
-                     bool audioStyle)
+                     bool audioStyle, const char* fmt)
    {
       const std::pair<int, int> key(gCurrentNodeIndex, gParamCounter);
       float& slot = gIntParamStore[key];
@@ -607,7 +607,7 @@ namespace app
       }
 
       gPendingSrcAddr = value;
-      bool changed = ModSlider(label, &slot, (float)minV, (float)maxV, "%.0f", width, audioStyle, /*step=*/1.0f);
+      bool changed = ModSlider(label, &slot, (float)minV, (float)maxV, fmt, width, audioStyle, /*step=*/1.0f);
       // lroundf, not (int)(x + 0.5f): the latter truncates toward zero, so
       // -3.7 lands on -3 instead of -4 and every negative-range param (octave,
       // semi, transpose) is biased upward by half a step. Clamp after

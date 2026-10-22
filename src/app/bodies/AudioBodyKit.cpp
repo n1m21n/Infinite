@@ -578,9 +578,9 @@ namespace app
    }
 
 
-   bool AudioSliderInt(const char* label, int* v, int lo, int hi, float width)
+   bool AudioSliderInt(const char* label, int* v, int lo, int hi, float width, const char* fmt)
    {
-      return ModSliderInt(label, v, lo, hi, width, /*audioStyle=*/true);
+      return ModSliderInt(label, v, lo, hi, width, /*audioStyle=*/true, fmt);
    }
 
 
