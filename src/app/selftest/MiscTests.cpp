@@ -27,8 +27,8 @@ namespace app
 {
 // ==================================================== INFINITE_BLOCKSETTEST
 //
-// Set blocks: GO plays the next block and switches the others off, at once on a
-// stopped transport and on the next bar while playing; a node in an off block
+// Set blocks: Show Set's Next plays the next block and switches the others off, at
+// once on a stopped transport and on Show Set's quantize grid while playing; a node in an off block
 // gives no picture (its cable resolves to nothing) and its sound ramps to silence
 // and stops; the block params survive a save. Pre-GL: nothing here draws.
 bool RunBlockSetTest()
@@ -64,7 +64,7 @@ bool RunBlockSetTest()
    // Stopped transport: GO lands at once on the block after the current one.
    Transport& tr = Transport::Instance();
    tr.SetPlaying(false);
-   SetBlockGoNext();
+   ShowSetStep(+1);   // no patches in the show set: the step is the block's
    BlockSetUpdate();
    ImageCable cable;
    cable.Connect(picNode);
@@ -86,6 +86,8 @@ bool RunBlockSetTest()
       buf.numFrames = 256;
       AudioBuffer* outs[1] = { &buf };
       an->blockFadeSeconds.store(0.01f);   // 480 frames at 48 kHz
+      an->blockSnap.store(false);          // a node already sounding, not one the patch just made
+      an->blockGain = 1.0f;
       std::fill(l, l + 256, 1.0f);
       std::fill(r, r + 256, 1.0f);
       an->ApplyBlockGain(outs, 1, 256, 48000.0);
@@ -99,18 +101,31 @@ bool RunBlockSetTest()
       an->blockGainTarget.store(1.0f);
       std::fill(l, l + 256, 1.0f);
       an->ApplyBlockGain(outs, 1, 256, 48000.0);
-      const bool back = !an->BlockSilent() && l[0] > 0.0f && l[0] < 0.01f && l[255] > 0.5f;
-      printf("BLOCKSET fade %s (half-way %.3f, then %.3f, silent %d; back in %.3f -> %.3f)\n", faded && back ? "OK" : "FAIL",
-             mid, end, silent ? 1 : 0, l[0], l[255]);
-      ok &= faded && back;
+      const float backFirst = l[0], backLast = l[255];
+      const bool back = !an->BlockSilent() && backFirst > 0.0f && backFirst < 0.01f && backLast > 0.5f;
+      // A node the patch just made in an off block starts silent instead of fading out.
+      an->blockGain = 1.0f;
+      an->blockGainTarget.store(0.0f);
+      an->blockSnap.store(true);
+      std::fill(l, l + 256, 1.0f);
+      std::fill(r, r + 256, 1.0f);
+      const bool snapped = an->BlockSilent();
+      an->blockGainTarget.store(1.0f);
+      an->blockSnap.store(true);
+      an->BlockSilent();
+      printf("BLOCKSET fade %s (half-way %.3f, then %.3f, silent %d; back in %.3f -> %.3f; new node silent %d)\n",
+             faded && back && snapped ? "OK" : "FAIL", mid, end, silent ? 1 : 0, backFirst, backLast, snapped ? 1 : 0);
+      ok &= faded && back && snapped;
    }
 
    // Playing with a bar grid: GO waits for the bar line, then lands.
-   const int oldQ = tr.LaunchQuantize();
-   tr.SetLaunchQuantize(MusicTime::kLaunchBar);
+   const int oldQ = ShowSetQuantize();
+   ShowSetQuantize() = MusicTime::kLaunchBar;
    tr.SetPlaying(true);
    const double beat0 = tr.Beats();
-   SetBlockGoNext();
+   ShowSetStep(+1);
+   const bool endStays = SetBlockPending() == -1 && SetBlockCurrent() == 1;   // past the last block, nothing to step to
+   ShowSetStep(-1);
    BlockSetUpdate();
    const bool waiting = SetBlockPending() == 0 && SetBlockCurrent() == 1;
    const double bar = MusicTime::NextLaunchBeat(beat0, MusicTime::kLaunchBar, 1e-3);
@@ -119,18 +134,19 @@ bool RunBlockSetTest()
       tr.Tick(0.1f);
    BlockSetUpdate();
    const bool landed = SetBlockPending() == -1 && SetBlockCurrent() == 0 && b1->on && !b2->on && !picNode->blockOff;
-   printf("BLOCKSET go on bar %s (waited %d, landed %d)\n", waiting && landed ? "OK" : "FAIL", waiting ? 1 : 0, landed ? 1 : 0);
-   ok &= waiting && landed;
+   printf("BLOCKSET go on bar %s (end stays %d, waited %d, landed %d)\n", endStays && waiting && landed ? "OK" : "FAIL",
+          endStays ? 1 : 0, waiting ? 1 : 0, landed ? 1 : 0);
+   ok &= endStays && waiting && landed;
    tr.SetPlaying(false);
-   tr.SetLaunchQuantize(oldQ);
+   ShowSetQuantize() = oldQ;
 
    // Saved params round-trip into a fresh group.
-   b2->fade = 3;
+   b2->order = 7;
    std::vector<std::pair<std::string, std::string>> saved;
    Patch::SaveParams(b2, saved);
    GroupNode copy;
    Patch::LoadParams(&copy, saved);
-   const bool kept = copy.block && !copy.on && copy.fade == 3 && copy.order == b2->order;
+   const bool kept = copy.block && !copy.on && copy.order == 7;
    printf("BLOCKSET save %s\n", kept ? "OK" : "FAIL");
    ok &= kept;
 

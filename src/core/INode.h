@@ -189,6 +189,7 @@ public:
    // every frame by BlockSetUpdate). Unlike bypass nothing passes through: a
    // cable reading it gets no picture (black) and it is not cooked.
    bool blockOff = false;
+   bool blockSeen = false;   // BlockSetUpdate has met this node (a new one starts at its block's level)
 
    // The node's current problem, if any (missing file, plugin that would not load, compile error, no input
    // device). Polled while the node is drawn, so it must be cheap and must not touch the disk or the GPU.

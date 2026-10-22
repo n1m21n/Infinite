@@ -54,15 +54,9 @@ void DrawKeyboard(FrameCtx& fc)
       // Space toggles play/pause on the transport, mirroring the Play/Pause
       // button, so the timeline can be started or paused without reaching
       // for the mouse.
-      // While the Set list has the keyboard, Space is its GO instead.
       if (!typing && !cmdOrCtrl && !io.KeyShift &&
           ImGui::IsKeyPressed(ImGuiKey_Space, false))
-      {
-         if (gSetListFocused)
-            SetBlockGoNext();
-         else
-            LaunchRequestTogglePlay();
-      }
+         LaunchRequestTogglePlay();
 
       // ---- Shift+<letter> canvas shortcuts ----
       // One family, all reachable with the left hand while the right stays on
@@ -156,7 +150,8 @@ void DrawKeyboard(FrameCtx& fc)
       if (cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Period, false))
          ShowPanicToggle();
 
-      // PageDown / PageUp: next / previous patch of the show set (v0.6 2.35).
+      // PageDown / PageUp: next / previous in the show set (v0.6 2.35): the playing
+      // patch's blocks first, then the next / previous patch.
       if (!typing && !cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_PageDown, false))
          ShowSetStep(+1);
       if (!typing && !cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_PageUp, false))

@@ -81,18 +81,16 @@ public:
       v.Color("color", color);
       v.Bool("block", block);
       v.Bool("on", on);
-      v.Int("fade", fade);
       v.Int("order", order);
    }
 
    // ---- set block ----
-   // A group marked as a block is one section of a live set: the Set list
-   // window steps through blocks in `order`, and a block that is off stops
-   // its members cooking (pictures hold black, sound fades out over `fade`
-   // bars, 0 = a short anti-click fade).
+   // A group marked as a block is one section of a patch in a live set: the
+   // Show Set window steps through blocks in `order`, and a block that is off
+   // stops its members cooking (pictures hold black, sound fades out over
+   // Show Set's fade time).
    bool block = false;
    bool on = true;
-   int fade = 0;    // bars, 0-4
    int order = 0;
 };
 
