@@ -11,6 +11,7 @@
 #include "app/AppShared.h"
 #include "app/graph/NodeClipboard.h"
 #include "miniz.h"
+#include "core/MediaCollect.h"
 #include "platform/AppPaths.h"
 #include <filesystem>
 #include "platform/PluginCrashGuard.h"
@@ -23,6 +24,98 @@ namespace app
 //
 // Help > Collect diagnostics writes what it says: the system info, a patch only when one is passed, and the
 // user's home folder never appears in what it copies. Pre-GL, so the system info here is a stand-in string.
+// Save with media: three nodes read four files (two share a name, one is used twice,
+// one is gone), plus Gesture's `s path` of points. Plan, copy, write, move the whole
+// folder somewhere else, read it back: every present file must resolve inside the
+// moved folder, and the plain-save rewrite must make them relative again.
+bool RunSaveWithMediaTest()
+{
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      printf("SAVEMEDIATEST %s: %s\n", what, cond ? "OK" : "FAIL");
+      if (!cond)
+         ok = false;
+   };
+   namespace fs = std::filesystem;
+   std::error_code ec;
+   const fs::path root = fs::temp_directory_path() / "infinite_savemedia_test";
+   fs::remove_all(root, ec);
+   const fs::path srcA = root / "src" / "a", srcB = root / "src" / "b", out = root / "out";
+   fs::create_directories(srcA, ec);
+   fs::create_directories(srcB, ec);
+   fs::create_directories(out, ec);
+   auto touch = [](const fs::path& p, const char* text) { std::ofstream f(p, std::ios::binary); f << text; };
+   touch(srcA / "kick.wav", "A");
+   touch(srcB / "kick.wav", "B");
+   touch(srcA / "clip.mp4", "C");
+   const std::string gesture = "0.48,0.54,0;0.49,0.55,0.27";
+
+   Patch::Data data;
+   data.nodes.resize(3);
+   for (int i = 0; i < 3; i++)
+   {
+      data.nodes[(size_t)i].index = i;
+      data.nodes[(size_t)i].category = "Audio";
+      data.nodes[(size_t)i].typeName = "Sampler";
+   }
+   data.nodes[0].params = { { "s path", (srcA / "kick.wav").u8string() }, { "s path", "" } };
+   data.nodes[1].params = { { "s pad0_path", (srcB / "kick.wav").u8string() },
+                            { "s pad1_path", (srcA / "kick.wav").u8string() },
+                            { "s pad2_path", (root / "gone" / "snare.wav").u8string() } };
+   data.nodes[2].params = { { "s filePath", (srcA / "clip.mp4").u8string() }, { "s path", gesture },
+                            { "s recordVideoPath", (srcA / "clip.mp4").u8string() } };
+   const std::string mediaDir = MediaCollect::MediaDirFor((out / "My Set.inf").u8string());
+   check(mediaDir == "My Set media", "media folder is named after the patch");
+
+   const std::vector<MediaCollect::Item> items = MediaCollect::Plan(data, mediaDir);
+   int copies = 0, twice = 0, missing = 0;
+   for (const auto& item : items)
+   {
+      copies += item.state == MediaCollect::State::Copy;
+      twice += item.state == MediaCollect::State::Duplicate;
+      missing += item.state == MediaCollect::State::Missing;
+   }
+   check(items.size() == 5 && copies == 3 && twice == 1 && missing == 1, "plan: 3 copies, 1 used twice, 1 missing");
+   check(data.nodes[0].params[0].second == "My Set media/kick.wav", "first kick keeps its name");
+   check(data.nodes[1].params[0].second == "My Set media/kick-2.wav", "a different kick gets -2");
+   check(data.nodes[1].params[1].second == "My Set media/kick.wav", "the same kick twice shares one copy");
+   check(data.nodes[1].params[2].second == (root / "gone" / "snare.wav").u8string(), "missing file is left as written");
+   check(data.nodes[2].params[1].second == gesture, "gesture points are not media");
+   check(data.nodes[2].params[2].second == (srcA / "clip.mp4").u8string(), "record targets are not collected");
+
+   int copied = 0;
+   std::string error;
+   check(MediaCollect::CopyAll(items, out.u8string(), copied, error) && copied == 3, "three files copied");
+   std::ifstream k2(out / "My Set media" / "kick-2.wav");
+   std::string body;
+   k2 >> body;
+   check(body == "B", "kick-2 is the second folder's kick");
+   check(Patch::Write((out / "My Set.inf").u8string(), data, error), "patch written");
+
+   const fs::path moved = root / "moved";
+   fs::rename(out, moved, ec);
+   check(!ec, "folder moved");
+   Patch::Data back;
+   check(Patch::Read((moved / "My Set.inf").u8string(), back, error) && back.nodes.size() == 3, "moved patch reads");
+   MediaCollect::ResolveRelative(back, moved.u8string());
+   bool allFound = back.nodes.size() == 3;
+   if (allFound)
+      for (const std::string& v : { back.nodes[0].params[0].second, back.nodes[1].params[0].second,
+                                    back.nodes[1].params[1].second, back.nodes[2].params[0].second })
+         allFound = allFound && fs::is_regular_file(AppPaths::FsPath(v)) &&
+                    AppPaths::FsPath(v).lexically_normal().u8string().find(moved.u8string()) == 0;
+   check(allFound, "every node finds its file in the moved folder");
+   check(back.nodes.size() == 3 && back.nodes[2].params[1].second == gesture, "gesture points survive the load");
+
+   MediaCollect::MakeRelative(back, moved.u8string(), mediaDir);
+   check(back.nodes.size() == 3 && back.nodes[1].params[0].second == "My Set media/kick-2.wav",
+         "a plain save writes them relative again");
+   check(back.nodes.size() == 3 && back.nodes[1].params[2].second == (root / "gone" / "snare.wav").u8string(),
+         "a path outside the media folder stays absolute");
+   fs::remove_all(root, ec);
+   return ok;
+}
+
 bool RunDiagnosticsZipTest()
 {
    bool ok = true;

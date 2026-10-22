@@ -1,5 +1,7 @@
 // Patch file watching, unsaved-changes guard (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/MediaCollect.h"
+#include "core/Notices.h"
 #include "platform/AppPaths.h"
 
 namespace app
@@ -132,6 +134,72 @@ namespace app
             path += kPatchExtension;
       }
       SavePatchTo(path);
+   }
+
+   // Save with media: asks where, copies every file the patch reads into "<name> media"
+   // next to it, writes the patch with those paths relative, then opens the saved copy
+   // so later edits and saves belong to the movable one.
+   bool SavePatchWithMediaTo(const std::string& path, std::string& report)
+   {
+      const size_t slash = path.find_last_of("/\\");
+      if (slash == std::string::npos)
+      {
+         report = "no folder in the path";
+         return false;
+      }
+      const std::string patchDir = path.substr(0, slash);
+      Patch::Data data = BuildPatchData();
+      const std::vector<MediaCollect::Item> items = MediaCollect::Plan(data, MediaCollect::MediaDirFor(path));
+      int copied = 0, duplicates = 0, missing = 0;
+      std::string error;
+      if (!MediaCollect::CopyAll(items, patchDir, copied, error))
+      {
+         report = "copying " + error;
+         return false;
+      }
+      for (const MediaCollect::Item& item : items)
+      {
+         duplicates += item.state == MediaCollect::State::Duplicate ? 1 : 0;
+         missing += item.state == MediaCollect::State::Missing ? 1 : 0;
+      }
+      if (!Patch::Write(path, data, error))
+      {
+         report = error;
+         return false;
+      }
+      report = std::to_string(copied) + (copied == 1 ? " file copied" : " files copied");
+      if (duplicates > 0)
+         report += ", " + std::to_string(duplicates) + " used twice";
+      if (missing > 0)
+         report += ", " + std::to_string(missing) + " missing (left as they were)";
+      return true;
+   }
+
+   void SavePatchWithMediaInteractive()
+   {
+      std::string suggested = std::string("Untitled") + kPatchExtension;
+      if (!gPatchPath.empty())
+      {
+         const size_t slash = gPatchPath.find_last_of("/\\");
+         suggested = (slash == std::string::npos) ? gPatchPath : gPatchPath.substr(slash + 1);
+      }
+      std::string path = Platform::SavePatchDialog(suggested);
+      if (path.empty())
+         return; // cancelled
+      if (!HasExtension(path, std::vector<std::string> { "inf", "infinite" }))
+         path += kPatchExtension;
+      std::string report;
+      if (!SavePatchWithMediaTo(path, report))
+      {
+         gPatchStatus = std::string(T("Save failed: ")) + report;
+         Notices::Post(Notices::Level::Error, "patch.savemedia", "Couldn't save with media",
+                       report + ". Your patch is still open and unchanged.");
+         return;
+      }
+      LoadPatchFrom(path);
+      gPatchStatus = "Saved with media: " + report;
+      Notices::Post(Notices::Level::Info, "patch.savemedia", "Saved with media", report + ".", "Reveal",
+                    [path]() { Platform::RevealInFileManager(path); });
    }
  // banner is up: the file changed while the canvas had unsaved edits
 
