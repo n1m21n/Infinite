@@ -46,6 +46,11 @@ namespace Field
       int NextParamId() const { return mNextParamId; }
       void SetNextParamId(int nextId) { mNextParamId = nextId; }
 
+      // Declared params are drawn at pin index 50 + id, and a node has 800
+      // param pin indices (GraphNode kParamBase..kColorBase), so ids stay in
+      // 1..kMaxParamId. Anything outside came from a damaged patch.
+      static constexpr int kMaxParamId = 749;
+
       std::string SerializeParamMap() const;
       void DeserializeParamMap(const std::string& str);
 
@@ -53,6 +58,8 @@ namespace Field
       std::map<std::string, float> ValueMap() const;
 
    private:
+      int AllocateId();
+
       std::vector<ParamEntry> mParams;
       std::map<std::string, int> mParamIdByName;
       int mNextParamId = 1;

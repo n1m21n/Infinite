@@ -2162,6 +2162,71 @@ int RunFieldParamTest()
       fflush(stdout);
    }
 
+   // SECTION 6b: Param ids from a damaged patch stay inside the param pin
+   // block (kFieldDeclaredParamBase + id < 800) and never collide.
+   {
+      bool secOk = true;
+
+      do
+      {
+         FieldElementNode fe;
+         fe.code = "param float freq = 2.5 [0, 10]\nparam float gain = 0.8 [0, 1]\nP.y += sin(P.x * freq) * gain\n";
+         if (!applyOk(fe, "IdBounds")) { secOk = false; break; }
+
+         std::vector<std::pair<std::string, std::string>> saved;
+         Patch::SaveParams(&fe, saved);
+         int tampered = 0;
+         for (auto& kv : saved)
+         {
+            if (kv.first == "i field_nextParamId")
+               kv.second = "2147483647", ++tampered;
+            else if (kv.first == "s field_paramMap")
+               kv.second = "freq:5000,gain:3,zzz:3", ++tampered;
+         }
+         if (tampered != 2) { printf("IdBounds: FAIL - saved params lack the id keys (%d of 2)\n", tampered); secOk = false; break; }
+
+         FieldElementNode fe2;
+         Patch::LoadParams(&fe2, saved);
+         if (!applyOk(fe2, "IdBounds")) { secOk = false; break; }
+         fe2.code += "param float extra = 0.5 [0, 1]\nP.x += extra\n";
+         if (!applyOk(fe2, "IdBounds")) { secOk = false; break; }
+
+         std::vector<int> seen;
+         for (const auto& p : fe2.GetParamTable().Params())
+         {
+            if (!p.isDeclared)
+               continue;
+            if (p.id < 1 || kFieldDeclaredParamBase + p.id >= GraphNode::kColorBase - GraphNode::kParamBase)
+            {
+               printf("IdBounds: FAIL - param '%s' got id %d, outside the param pin block\n", p.name.c_str(), p.id);
+               secOk = false;
+            }
+            if (std::find(seen.begin(), seen.end(), p.id) != seen.end())
+            {
+               printf("IdBounds: FAIL - param '%s' shares id %d with another declared param\n", p.name.c_str(), p.id);
+               secOk = false;
+            }
+            seen.push_back(p.id);
+         }
+         if (seen.size() != 3)
+         {
+            printf("IdBounds: FAIL - expected 3 declared params, got %zu\n", seen.size());
+            secOk = false;
+         }
+         const auto* gain = fe2.GetParamTable().Find("gain");
+         if (!gain || gain->id != 3)
+         {
+            printf("IdBounds: FAIL - in-range saved id for 'gain' was not kept (got %d)\n", gain ? gain->id : -1);
+            secOk = false;
+         }
+
+      } while (false);
+
+      if (secOk) printf("SECTION 6b (Param Ids From A Damaged Patch): OK\n");
+      else { printf("SECTION 6b (Param Ids From A Damaged Patch): FAIL\n"); allOk = false; }
+      fflush(stdout);
+   }
+
    printf("INFINITE_FIELDPARAMTEST: %s\n", allOk ? "OK" : "FAIL");
    fflush(stdout);
    return allOk ? 0 : 1;

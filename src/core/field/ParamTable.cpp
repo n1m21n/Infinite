@@ -123,7 +123,7 @@ namespace Field
             }
             else
             {
-               id = mNextParamId++;
+               id = AllocateId();
                mParamIdByName[d.name] = id;
             }
             if (id >= mNextParamId)
@@ -142,6 +142,49 @@ namespace Field
             mParams.push_back(entry);
          }
       }
+   }
+
+   // Ids are never reused while there is room, so a binding saved against a
+   // deleted param can't latch onto a new one. Once the counter runs out,
+   // take the lowest id no declared param holds, and drop the undeclared
+   // name that last had it.
+   int ParamTable::AllocateId()
+   {
+      auto idInUse = [this](int id) {
+         if (FindById(id) != nullptr)
+            return true;
+         for (const auto& kv : mParamIdByName)
+         {
+            if (kv.second == id)
+               return true;
+         }
+         return false;
+      };
+      while (mNextParamId >= 1 && mNextParamId <= kMaxParamId)
+      {
+         const int id = mNextParamId++;
+         if (!idInUse(id))
+            return id;
+      }
+      for (int id = 1; id <= kMaxParamId; ++id)
+      {
+         const ParamEntry* holder = FindById(id);
+         if (holder != nullptr && holder->isDeclared)
+            continue;
+         mParams.erase(std::remove_if(mParams.begin(), mParams.end(),
+                                      [id](const ParamEntry& p) { return p.id == id; }),
+                       mParams.end());
+         for (auto it = mParamIdByName.begin(); it != mParamIdByName.end();)
+         {
+            if (it->second == id)
+               it = mParamIdByName.erase(it);
+            else
+               ++it;
+         }
+         return id;
+      }
+      // Unreachable in practice: FieldIR refuses more than 128 params.
+      return kMaxParamId;
    }
 
    std::string ParamTable::SerializeParamMap() const
@@ -170,7 +213,13 @@ namespace Field
          {
             std::string name = token.substr(0, colon);
             int id = std::atoi(token.substr(colon + 1).c_str());
-            if (!name.empty() && id > 0)
+            bool idTaken = false;
+            for (const auto& kv : mParamIdByName)
+            {
+               if (kv.second == id && kv.first != name)
+                  idTaken = true;
+            }
+            if (!name.empty() && id > 0 && id <= kMaxParamId && !idTaken)
             {
                mParamIdByName[name] = id;
                if (id >= mNextParamId)
@@ -191,6 +240,8 @@ namespace Field
    void ParamTable::VisitParams(ParamVisitor& v)
    {
       v.Int("field_nextParamId", mNextParamId);
+      if (mNextParamId < 1 || mNextParamId > kMaxParamId + 1)
+         mNextParamId = 1;
       std::string mapStr = SerializeParamMap();
       v.Text("field_paramMap", mapStr);
       if (!mapStr.empty())
