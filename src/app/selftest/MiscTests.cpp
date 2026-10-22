@@ -11,6 +11,7 @@
 #include "app/AppShared.h"
 #include "app/graph/NodeClipboard.h"
 #include "miniz.h"
+#include "platform/AppPaths.h"
 #include <filesystem>
 #include "platform/PluginCrashGuard.h"
 #include <signal.h>
@@ -18,6 +19,73 @@
 
 namespace app
 {
+// ====================================================== INFINITE_DIAGZIPTEST
+//
+// Help > Collect diagnostics writes what it says: the system info, a patch only when one is passed, and the
+// user's home folder never appears in what it copies. Pre-GL, so the system info here is a stand-in string.
+bool RunDiagnosticsZipTest()
+{
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      printf("DIAGZIPTEST %s: %s\n", what, cond ? "OK" : "FAIL");
+      if (!cond)
+         ok = false;
+   };
+   namespace fs = std::filesystem;
+   const fs::path dir = fs::temp_directory_path() / "infinite_diagzip_test";
+   std::error_code ec;
+   fs::remove_all(dir, ec);
+   fs::create_directories(dir, ec);
+   const std::string home = AppPaths::HomeDir();
+   const std::string patch = (dir / "my patch.inf").u8string();
+   {
+      std::ofstream f(AppPaths::FsPath(patch));
+      f << "{ \"nodes\": [] }";
+   }
+   auto names = [](const std::string& zipPath, std::string* sysInfo) {
+      std::vector<std::string> out;
+      mz_zip_archive zip {};
+      if (!mz_zip_reader_init_file(&zip, zipPath.c_str(), 0))
+         return out;
+      for (mz_uint i = 0; i < mz_zip_reader_get_num_files(&zip); i++)
+      {
+         char name[512];
+         mz_zip_reader_get_filename(&zip, i, name, sizeof(name));
+         out.push_back(name);
+         if (sysInfo != nullptr && out.back() == "system-info.txt")
+         {
+            size_t size = 0;
+            if (void* data = mz_zip_reader_extract_to_heap(&zip, i, &size, 0))
+            {
+               sysInfo->assign((const char*)data, size);
+               mz_free(data);
+            }
+         }
+      }
+      mz_zip_reader_end(&zip);
+      return out;
+   };
+   auto has = [](const std::vector<std::string>& v, const std::string& n) { return std::find(v.begin(), v.end(), n) != v.end(); };
+
+   std::string error, sys;
+   const std::string zipA = (dir / "a.zip").u8string();
+   check(WriteDiagnosticsZip(zipA, "Infinite test\nhome: " + home + "/Music/x.wav\n", "", error), "zip written");
+   const auto a = names(zipA, &sys);
+   check(has(a, "system-info.txt"), "system info is in the zip");
+   check(!home.empty() && sys.find(home) == std::string::npos && sys.find("~/Music/x.wav") != std::string::npos,
+         "home folder is written as ~");
+   check(std::none_of(a.begin(), a.end(), [](const std::string& n) { return n.rfind("patch/", 0) == 0; }),
+         "no patch unless asked");
+   check(std::none_of(a.begin(), a.end(), [](const std::string& n) { return n.find("Index") != std::string::npos || n.find("token") != std::string::npos || n.find("recents") != std::string::npos; }),
+         "no indexes, tokens or recents");
+
+   const std::string zipB = (dir / "b.zip").u8string();
+   check(WriteDiagnosticsZip(zipB, "x", patch, error), "zip with patch written");
+   check(has(names(zipB, nullptr), "patch/my patch.inf"), "the open patch is in when asked");
+   fs::remove_all(dir, ec);
+   return ok;
+}
+
 // ====================================================== INFINITE_BROWSERSORTTEST
 //
 // Pure-function proof for the docked node-browser panel's sort/filter strip

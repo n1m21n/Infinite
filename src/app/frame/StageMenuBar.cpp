@@ -448,6 +448,8 @@ void DrawMenuBar(FrameCtx& fc)
             if (MenuParts::Item(L("UI Style Editor"))) // i18n-ok (debug UI)
                gUiStyleEditorOpen = true;
 #endif
+            if (MenuParts::Item(L("Collect diagnostics...")))
+               gShowDiagnosticsModal = true;
             if (MenuParts::Item(L("About Infinite")))
                gShowAboutModal = true;
             if (MenuParts::Item(L("Check for updates")))
