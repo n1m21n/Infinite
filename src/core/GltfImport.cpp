@@ -225,6 +225,17 @@ namespace GltfImport
          return nullptr;
       }
 
+      // A model file is outside input, and cgltf's accessor reads trust it:
+      // an accessor past its buffer view reads past the buffer, and an index
+      // past the vertex count makes GenerateNormals write out of bounds.
+      // cgltf_validate checks both (and the rest of the file's extents).
+      if (cgltf_validate(data) != cgltf_result_success)
+      {
+         cgltf_free(data);
+         outError = "glTF file is damaged (an accessor or index points outside its data)";
+         return nullptr;
+      }
+
       if (data->meshes_count == 0 || data->meshes[0].primitives_count == 0)
       {
          cgltf_free(data);
