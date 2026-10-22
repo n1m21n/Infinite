@@ -734,9 +734,9 @@ namespace app
 
       AudioSlider("freq shift", &n->freqShift, -1000.0f, 1000.0f, "%.0f Hz", AudioHalfWidth());
       ImGui::SameLine();
-      float unisonF = (float)n->unison;
-      if (AudioSlider("unison", &unisonF, 1.0f, 8.0f, "%.0f v", AudioHalfWidth()))
-         n->unison = std::clamp((int)(unisonF + 0.5f), 1, 8);
+      // AudioSliderInt, not AudioSlider on a local copy: the slider registers its
+      // value pointer for modulation, which writes through it next frame.
+      AudioSliderInt("unison", &n->unison, 1, 8, AudioHalfWidth());
 
       ImGui::BeginDisabled((n->unison <= 1) && !gParamRegisterOnly);
       AudioSlider("detune", &n->detune, 0.0f, 100.0f, "%.1f c", AudioHalfWidth());
@@ -1262,12 +1262,9 @@ namespace app
 
          if (n->key == 2)
          {
-            float seedFloat = (float)n->seed;
-            if (AudioSlider("seed", &seedFloat, 1.0f, 9999.0f, "%.0f", AudioHalfWidth()))
-            {
-               PushUndoCheckpoint();
-               n->seed = std::max(1, (int)seedFloat);
-            }
+            // Not AudioSlider on a local copy: modulation writes through the
+            // registered pointer next frame, after the local is gone.
+            AudioSliderInt("seed", &n->seed, 1, 9999, AudioHalfWidth());
          }
          else
          {
