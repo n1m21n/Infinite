@@ -16,6 +16,10 @@ namespace DrumPatterns
    struct Groove;
    struct Part;
 }
+namespace MidiFile
+{
+   struct Song;
+}
 
 // An 8-lane, up-to-32-step drum machine, laid out as 8 lane cards (waveform +
 // per-lane transient/decay/pitch/volume/pan) above an 8-lane step grid (16 steps per page). Each
@@ -95,6 +99,21 @@ public:
    // One call, so a caller that pushes one undo checkpoint first gets one undo
    // step for all of it. Lanes the user loaded a sample into are never touched.
    void ApplyPattern(const DrumPatterns::Groove& g, int part);
+
+   // Main thread. Replaces the whole pattern with a drum MIDI file, the same
+   // way ApplyPattern does (one call = one undo step for the caller): General
+   // MIDI drum notes go to the lane of the same role (kick, snare, hats, clap /
+   // rim, toms / congas, bells / cymbals; LaneRole), every hit is quantized to
+   // the nearest 1/16, and the first two bars become the pattern (16 or 32
+   // steps). A file that is not a GM drum file (no channel-10 hits and some
+   // pitch that is no GM drum key: a melodic or remapped file) gives its 8
+   // lowest pitches to lanes 1-8 instead. Rate 1/16, no swing, no
+   // accents; `name` (the file name) becomes patternName. Then fills still-empty
+   // lanes from the bundled kit. Returns the number of hits placed.
+   int ApplyMidiSong(const MidiFile::Song& song, const std::string& name);
+   // Loads `path` and ApplyMidiSong's it. False (pattern untouched) when the
+   // file does not parse or holds no notes; `error` says why.
+   bool ApplyMidiFile(const std::string& path, std::string& error);
 
    // Loads the bundled kit file into every lane that has no sample and that
    // `part` actually uses (non-null lane string). If lanes 2 and 3 (closed and

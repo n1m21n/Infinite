@@ -5,6 +5,8 @@
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "platform/AppPaths.h"
+#include "core/Notices.h"
 #include "app/ui/design/components/AudioViz.h"
 
 namespace app
@@ -1701,6 +1703,48 @@ namespace app
    }
 
 
+   // "My grooves": .mid files the user keeps in <app support>/grooves, listed
+   // after the library in the groove picker. Read when the picker opens (not
+   // every frame), sorted by name.
+   static const char* const kMyGroovesCategory = "My grooves";
+   std::string DrumGrooveDir() { return AppPaths::AppSupportDir() + "/grooves"; }
+   std::vector<std::string> ScanDrumGrooveFiles()
+   {
+      std::vector<std::string> out;
+      std::error_code ec;
+      const auto dir = AppPaths::FsPath(DrumGrooveDir());
+      for (auto it = std::filesystem::directory_iterator(dir, ec); !ec && it != std::filesystem::directory_iterator(); it.increment(ec))
+      {
+         if (!it->is_regular_file(ec))
+            continue;
+         std::string ext = it->path().extension().u8string();
+         std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+         if (ext == ".mid" || ext == ".midi")
+            out.push_back(it->path().u8string());
+      }
+      std::sort(out.begin(), out.end());
+      return out;
+   }
+   std::string DrumGrooveStem(const std::string& path)
+   {
+      std::string name = path.substr(path.find_last_of("/\\") == std::string::npos ? 0 : path.find_last_of("/\\") + 1);
+      const size_t dot = name.find_last_of('.');
+      return (dot != std::string::npos && dot > 0) ? name.substr(0, dot) : name;
+   }
+   void ApplyDrumGrooveFile(DrumSequencerNode* n, const std::string& path)
+   {
+      PushUndoCheckpoint();
+      std::string err;
+      if (!n->ApplyMidiFile(path, err))
+         Notices::Post(Notices::Level::Warning, "drum.midi", "Could not read that MIDI file", err);
+   }
+   void RevealDrumGrooveDir()
+   {
+      AppPaths::EnsureDir(DrumGrooveDir());
+      Platform::RevealInFileManager(DrumGrooveDir());
+   }
+
+
    // Picker dropdown. Deliberately NOT AudioBareDropdown: that registers the
    // button as a modulatable enum param, and a cable on it would re-apply a
    // whole groove (and push an undo step) on every change of the driven value.
@@ -1765,8 +1809,12 @@ namespace app
       const DrumGrooveLists& gl = DrumGrooves();
       const int grooveIdx = gl.IndexOfName(n->patternName);
       char grooveLabel[96];
+      // A pattern from a MIDI file (dropped, or from My grooves) keeps the file's name.
+      const bool fromFile = grooveIdx < 0 && !n->patternName.empty();
       if (grooveIdx >= 0)
          snprintf(grooveLabel, sizeof(grooveLabel), "%s - %c", n->patternName.c_str(), 'A' + std::clamp(n->patternPart, 0, 2));
+      else if (fromFile)
+         snprintf(grooveLabel, sizeof(grooveLabel), "%s", n->patternName.c_str());
       else
          snprintf(grooveLabel, sizeof(grooveLabel), "custom pattern");
       char stat[160];
@@ -1821,17 +1869,63 @@ namespace app
          const int curCat = grooveIdx >= 0 ? gl.IndexOfCategory(gl.cats[(size_t)grooveIdx]) : -1;
          const int part = std::clamp(n->patternPart, 0, 2);
 
-         DrumPickerDropdown("drumcat", curCat >= 0 ? gl.catNames[(size_t)curCat].c_str() : "category", gl.catNames, {}, curCat,
+         // The library's categories plus "My grooves" (picks the first file there, or shows the folder when empty).
+         static const std::vector<std::string> catOptions = [&gl]() {
+            std::vector<std::string> v = gl.catNames;
+            v.push_back(kMyGroovesCategory);
+            return v;
+         }();
+         const char* catCaption = curCat >= 0 ? gl.catNames[(size_t)curCat].c_str() : (fromFile ? kMyGroovesCategory : "category");
+         DrumPickerDropdown("drumcat", catCaption, catOptions, {}, curCat >= 0 ? curCat : (fromFile ? (int)gl.catNames.size() : -1),
                             catW,
                             [n, part](int c) {
                                const DrumGrooveLists& l = DrumGrooves();
                                if (c >= 0 && c < (int)l.catFirst.size() && l.catFirst[(size_t)c] >= 0)
                                   ApplyDrumGroove(n, l.catFirst[(size_t)c], part);
+                               else if (c == (int)l.catNames.size())
+                               {
+                                  const std::vector<std::string> files = ScanDrumGrooveFiles();
+                                  if (files.empty())
+                                     RevealDrumGrooveDir();
+                                  else
+                                     ApplyDrumGrooveFile(n, files[0]);
+                               }
                             },
                             /*focusSearch=*/false);
          ImGui::SameLine();
-         DrumPickerDropdown("drumgroove", grooveIdx >= 0 ? gl.names[(size_t)grooveIdx].c_str() : "pick a groove", gl.names, gl.cats,
-                            grooveIdx, grvW, [n, part](int i) { ApplyDrumGroove(n, i, part); }, /*focusSearch=*/true);
+         // Built at the click, not every frame: the library, then each file in the grooves folder, then a last
+         // "open folder" row so the folder can be found (it lives in the app's support directory).
+         const std::string grvLabel = std::string(grooveIdx >= 0 ? gl.names[(size_t)grooveIdx].c_str()
+                                                                 : (fromFile ? n->patternName.c_str() : "pick a groove")) + "##drumgroove";
+         if (NodeDropdownField(grvLabel.c_str(), ImVec2(grvW, 0)))
+         {
+            const std::vector<std::string> files = ScanDrumGrooveFiles();
+            gDropdown.options = gl.names;
+            gDropdown.categories = gl.cats;
+            int current = grooveIdx;
+            for (size_t f = 0; f < files.size(); f++)
+            {
+               gDropdown.options.push_back(DrumGrooveStem(files[f]));
+               gDropdown.categories.push_back(kMyGroovesCategory);
+               if (fromFile && current < 0 && DrumGrooveStem(files[f]) == n->patternName)
+                  current = gl.count + (int)f;
+            }
+            gDropdown.options.push_back(files.empty() ? "Add .mid files: open the grooves folder" : "Open the grooves folder");
+            gDropdown.categories.push_back(kMyGroovesCategory);
+            gDropdown.onSelect = [n, part, files](int i) {
+               const DrumGrooveLists& l = DrumGrooves();
+               if (i >= 0 && i < l.count)
+                  ApplyDrumGroove(n, i, part);
+               else if (i >= l.count && i < l.count + (int)files.size())
+                  ApplyDrumGrooveFile(n, files[(size_t)(i - l.count)]);
+               else if (i == l.count + (int)files.size())
+                  RevealDrumGrooveDir();
+            };
+            gDropdown.current = current;
+            gDropdown.justOpened = true;
+            gDropdown.focusSearch = true;
+            gDropdown.filterBuf[0] = '\0';
+         }
          ImGui::SameLine();
          const bool prev = ActionButton::Draw("<##drumgrvprev", ImVec2(navW, 0));
          ImGui::SameLine();

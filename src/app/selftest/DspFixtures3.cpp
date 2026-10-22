@@ -1,5 +1,6 @@
 // DSP self-test fixtures, part 3: drum sequencer..RunDspTest (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "audio/MidiFile.h"
 
 namespace app
 {
@@ -1234,6 +1235,56 @@ static bool RunDrumSequencerFixture()
       printf("DRUMSEQTEST bundled kit %s (dir=%s filled=%d/8)\n", realOk ? "OK" : "FAIL", real.empty() ? "<not found>" : real.c_str(),
              filled);
       ok &= realOk;
+   }
+
+   // 26) MIDI import: GM drum keys land on their lanes on the 1/16 grid, the
+   // louder of two hits on one cell wins, a file past one bar gets 32 steps,
+   // and a file with no GM keys maps its lowest pitches to lanes 0..7.
+   {
+      auto ev = [](double beat, int note, int vel) {
+         MidiFile::Event e;
+         e.beat = beat;
+         e.note = (uint8_t)note;
+         e.velocity = (uint8_t)vel;
+         e.channel = 9;
+         e.on = vel > 0;
+         return e;
+      };
+      MidiFile::Song gm;
+      gm.events = { ev(0.0, 36, 127), ev(0.02, 36, 64), ev(1.0, 38, 100), ev(0.5, 42, 64), ev(0.25, 70, 90),
+                    ev(0.1, 36, 0) };
+      gm.lengthBeats = 4.0;
+      gm.noteCount = 5;
+      auto a = std::make_unique<DrumSequencerNode>();
+      a->stepVel[6][9] = 1.0f; // an old step is cleared
+      const int placedA = a->ApplyMidiSong(gm, "My beat");
+      bool midiOk = placedA == 3 && a->numSteps == 16 && a->stepVel[0][0] == 1.0f &&
+                    std::fabs(a->stepVel[1][4] - 100.0f / 127.0f) < 1e-4f && a->stepVel[2][2] > 0.0f &&
+                    a->stepVel[6][9] == 0.0f && a->patternName == "My beat" && a->swing == 0.0f &&
+                    a->rate == MusicTime::kSixteenth;
+      int lit = 0;
+      for (int l = 0; l < 8; l++)
+         for (int st = 0; st < 32; st++)
+            lit += a->stepVel[l][st] > 0.0f ? 1 : 0;
+      midiOk &= lit == 3;
+
+      MidiFile::Song melodic;
+      // channel 1, and 72 is no GM drum key, so 48 and 60 are not read as toms
+      melodic.events = { ev(0.0, 60, 100), ev(1.0, 48, 100), ev(5.0, 72, 100) };
+      for (MidiFile::Event& e : melodic.events)
+         e.channel = 0;
+      melodic.lengthBeats = 6.0;
+      melodic.noteCount = 3;
+      auto b = std::make_unique<DrumSequencerNode>();
+      const int placedB = b->ApplyMidiSong(melodic, "Tune");
+      midiOk &= placedB == 3 && b->numSteps == 32 && b->stepVel[0][4] > 0.0f && b->stepVel[1][0] > 0.0f &&
+                b->stepVel[2][20] > 0.0f;
+
+      std::string err;
+      midiOk &= !b->ApplyMidiFile(kitRoot + "/missing.mid", err) && !err.empty() && b->patternName == "Tune";
+      printf("DRUMSEQTEST midi import %s (gm placed=%d lit=%d, other placed=%d steps=%d)\n", midiOk ? "OK" : "FAIL",
+             placedA, lit, placedB, b->numSteps);
+      ok &= midiOk;
    }
 
    DrumSequencerNode::SetKitDir(savedKitDir);
