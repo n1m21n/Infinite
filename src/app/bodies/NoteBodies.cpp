@@ -586,7 +586,7 @@ namespace app
       if (last >= 0)
          snprintf(stat, sizeof(stat), "%s%d", kNoteNames[((last % 12) + 12) % 12], last / 12 - 1);
       else
-         snprintf(stat, sizeof(stat), "click or type to play");
+         snprintf(stat, sizeof(stat), "click or type to play \xc2\xb7 -/= octave");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
@@ -609,22 +609,42 @@ namespace app
                              (ed::GetSelectedObjectCount() == 1 && ed::IsNodeSelected(gn.NodeId()));
       if (n->computerKeyboardEnabled && isHovered)
          gComputerKeyboardHot = true; // letter keys belong to this node; canvas WASD/F/H/U stand down
-      for (const TypingKey& tk : kTypingKeys)
+      // No Cmd/Ctrl/Alt: Cmd+Z, Cmd+S, Cmd+C... are shortcuts, not notes (Z, S and C are piano keys). No Shift either:
+      // Shift+letter is a canvas chord, and a capital typed by mistake should not sound. !gArrangeFocused: the
+      // timeline owns the keyboard (its M marker key would otherwise also play a note here).
+      const ImGuiIO& io = ImGui::GetIO();
+      const bool canPlay = n->computerKeyboardEnabled && isHovered && !TextFocusClaimed() && !gArrangeFocused &&
+                           !io.KeyCtrl && !io.KeySuper && !io.KeyAlt && !io.KeyShift;
+      static_assert(sizeof(kTypingKeys) / sizeof(kTypingKeys[0]) <= sizeof(n->mTypedNotes) / sizeof(int), "mTypedNotes");
+      for (int i = 0; i < (int)(sizeof(kTypingKeys) / sizeof(kTypingKeys[0])); i++)
       {
-         const int note = std::clamp(baseNote + tk.semitone, 0, 127);
+         const TypingKey& tk = kTypingKeys[i];
          // Release always processed, even off-hover, so a key held while the
          // mouse leaves the node can't leave a note stuck on. Press requires
          // hover + the toggle, so typing here doesn't hijack shortcuts
          // elsewhere in the app.
          if (ImGui::IsKeyReleased(tk.key))
-            n->SetKeyState(note, false);
-         // !gArrangeFocused: the timeline owns the keyboard (its M marker
-         // key would otherwise also play a note here).
-         // No Cmd/Ctrl/Alt: Cmd+Z, Cmd+S, Cmd+C... are shortcuts, not notes (Z, S and C are piano keys).
-         else if (n->computerKeyboardEnabled && isHovered && !TextFocusClaimed() && !gArrangeFocused
-                  && !ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeySuper && !ImGui::GetIO().KeyAlt
-                  && ImGui::IsKeyPressed(tk.key, false))
+         {
+            if (n->mTypedNotes[i] > 0)
+               n->SetKeyState(n->mTypedNotes[i] - 1, false);
+            n->mTypedNotes[i] = 0;
+         }
+         else if (canPlay && n->mTypedNotes[i] == 0 && ImGui::IsKeyPressed(tk.key, false))
+         {
+            const int note = std::clamp(baseNote + tk.semitone, 0, 127);
             n->SetKeyState(note, true);
+            n->mTypedNotes[i] = note + 1;
+         }
+      }
+      // - and = step the octave (Logic's Musical Typing keys). Held keys keep the note they pressed.
+      if (canPlay && (ImGui::IsKeyPressed(ImGuiKey_Minus, false) || ImGui::IsKeyPressed(ImGuiKey_Equal, false)))
+      {
+         const int next = std::clamp(n->baseOctave + (ImGui::IsKeyPressed(ImGuiKey_Equal, false) ? 1 : -1), -1, 7);
+         if (next != n->baseOctave)
+         {
+            PushUndoCheckpoint();
+            n->baseOctave = next;
+         }
       }
 
       ImGui::Dummy(ImVec2(0.0f, 5.0f));

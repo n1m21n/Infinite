@@ -1754,9 +1754,49 @@ void FrameTest_NEWSYNTHTEST(int frameId, GLFWwindow* window)
       check(held() == 1, "the Z key plays the selected Keyboard with no hover");
       tio.AddKeyEvent(ImGuiKey_Z, false);
    }
+   auto keyboard = [&]() {
+      GraphNode* kb = FindNodeByIndex(kbIndex);
+      return kb != nullptr ? dynamic_cast<KeyboardNode*>(kb->node.get()) : nullptr;
+   };
+   static int octave0 = 0;
    if (frameId == 16)
    {
       check(held() == 0, "releasing the key releases the note");
+      octave0 = keyboard() != nullptr ? keyboard()->baseOctave : 0;
+      tio.AddKeyEvent(ImGuiKey_Z, true);
+   }
+   if (frameId == 19)
+   {
+      check(held() == 1, "Z is down again");
+      tio.AddKeyEvent(ImGuiKey_Equal, true);
+   }
+   if (frameId == 22)
+   {
+      tio.AddKeyEvent(ImGuiKey_Equal, false);
+      check(keyboard() != nullptr && keyboard()->baseOctave == octave0 + 1, "= raises the octave");
+      tio.AddKeyEvent(ImGuiKey_Z, false);
+   }
+   if (frameId == 25)
+   {
+      check(held() == 0, "a key held across an octave change releases its own note");
+      tio.AddKeyEvent(ImGuiKey_Minus, true);
+   }
+   if (frameId == 28)
+   {
+      tio.AddKeyEvent(ImGuiKey_Minus, false);
+      check(keyboard() != nullptr && keyboard()->baseOctave == octave0, "- lowers the octave");
+      tio.AddKeyEvent(ImGuiMod_Shift, true);
+      tio.AddKeyEvent(ImGuiKey_Z, true);
+   }
+   if (frameId == 31)
+   {
+      check(held() == 0, "Shift+Z does not play");
+      tio.AddKeyEvent(ImGuiKey_Z, false);
+      tio.AddKeyEvent(ImGuiMod_Shift, false);
+   }
+   if (frameId == 34)
+   {
+      check(held() == 0, "nothing left sounding");
       printf("%s\n", ok ? "NEWSYNTH TEST OK" : "NEWSYNTH TEST FAIL");
       glfwSetWindowShouldClose(window, GLFW_TRUE);
    }
