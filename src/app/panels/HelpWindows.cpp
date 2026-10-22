@@ -516,7 +516,9 @@ namespace app
    // and "delay" both find Delay. English keeps matching names only, so a query never hits prose.
    std::string NodeSearchHaystack(const std::string& typeName, const std::string& category)
    {
-      std::string hay = typeName + " " + category;
+      // The shown name too: on Windows "Syphon In" is labelled "Spout In"
+      // (DisplayName), and a search for "spout" has to find it.
+      std::string hay = typeName + " " + DisplayName(typeName) + " " + category;
       if (I18n::CurrentLanguage() != "en")
       {
          const char* key = NodeHelpTextFor(typeName, category);
