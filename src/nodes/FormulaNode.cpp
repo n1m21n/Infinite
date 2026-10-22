@@ -2,6 +2,10 @@
 
 #include "gl3.h"
 #include <algorithm>
+#include <cstdlib>
+#include <ctime>
+#include <regex>
+#include <sstream>
 
 #include "Transport.h"
 
@@ -44,6 +48,59 @@ namespace
       "   float mask = smoothstep(0.005, -0.005, d);\n"
       "   vec3 col = mix(vec3(0.05), vec3(uC, 0.6, 1.0 - uC), mask);\n"
       "   return vec4(col, 1.0);";
+}
+
+namespace
+{
+   // Everything shadertoy.com provides to a pass. The user's code (Common, then the
+   // pass) follows, then main() calls mainImage.
+   const char* kShadertoyPreamble =
+      "#version 150\n"
+      "out vec4 infFragColor;\n"
+      "uniform vec3 iResolution;\n"
+      "uniform float iTime;\n"
+      "uniform float iTimeDelta;\n"
+      "uniform float iFrameRate;\n"
+      "uniform int iFrame;\n"
+      "uniform vec4 iMouse;\n"
+      "uniform vec4 iDate;\n"
+      "uniform float iSampleRate;\n"
+      "uniform float iChannelTime[4];\n"
+      "uniform vec3 iChannelResolution[4];\n"
+      "uniform sampler2D iChannel0;\n"
+      "uniform sampler2D iChannel1;\n"
+      "uniform sampler2D iChannel2;\n"
+      "uniform sampler2D iChannel3;\n"
+      "#define texture2D texture\n"
+      "#define HW_PERFORMANCE 1\n";
+
+   // The image pass is opaque, as on the site; a buffer keeps its alpha.
+   const char* kShadertoyMainImage =
+      "\nvoid main() { vec4 c = vec4(0.0, 0.0, 0.0, 1.0); mainImage(c, gl_FragCoord.xy); infFragColor = vec4(c.rgb, 1.0); }\n";
+   const char* kShadertoyMainBuffer =
+      "\nvoid main() { vec4 c = vec4(0.0); mainImage(c, gl_FragCoord.xy); infFragColor = c; }\n";
+
+   // Shadertoy's own "new shader" template, so the picture moves at once.
+   const char* kShadertoyDefault =
+      "void mainImage( out vec4 fragColor, in vec2 fragCoord )\n"
+      "{\n"
+      "    // Normalized pixel coordinates (from 0 to 1)\n"
+      "    vec2 uv = fragCoord/iResolution.xy;\n"
+      "\n"
+      "    // Time varying pixel color\n"
+      "    vec3 col = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));\n"
+      "\n"
+      "    // Output to screen\n"
+      "    fragColor = vec4(col,1.0);\n"
+      "}\n";
+
+   int CountLines(const char* text)
+   {
+      int n = 0;
+      for (const char* c = text; *c != '\0'; c++)
+         n += *c == '\n' ? 1 : 0;
+      return n;
+   }
 }
 
 namespace
@@ -393,17 +450,50 @@ void FormulaNode::LoadDeviceFile(const Field::DeviceFile& device)
 FormulaNode::FormulaNode()
 {
    formula = kDefaultFormula;
+   passCode[kImage] = kShadertoyDefault;
+}
+
+const std::vector<std::string>& FormulaNode::ModeNames()
+{
+   static const std::vector<std::string> names = { "Expression", "Shadertoy" };
+   return names;
+}
+
+const std::vector<std::string>& FormulaNode::BufferNames()
+{
+   static const std::vector<std::string> names = { "no buffers", "buffer A", "buffers A + B", "buffers A - D" };
+   return names;
+}
+
+const char* FormulaNode::PassName(int pass)
+{
+   static const char* kNames[kPasses] = { "Image", "Buffer A", "Buffer B", "Buffer C", "Buffer D", "Common" };
+   return pass >= 0 && pass < kPasses ? kNames[pass] : "";
+}
+
+const char* FormulaNode::InputLabel(int slot) const
+{
+   static const char* kLabels[kChannels] = { "iChannel0", "iChannel1", "iChannel2", "iChannel3" };
+   return IsShadertoy() && slot >= 0 && slot < kChannels ? kLabels[slot] : nullptr;
 }
 
 FormulaNode::~FormulaNode()
 {
    if (mProgram != 0)
       glDeleteProgram(mProgram);
+   for (unsigned int& program : mPassProgram)
+      if (program != 0)
+         glDeleteProgram(program);
+   for (auto& pair : mBuf)
+      for (GLUtil::Fbo& fbo : pair)
+         GLUtil::DestroyFbo(fbo);
    GLUtil::DestroyFbo(mOut);
 }
 
 bool FormulaNode::Apply()
 {
+   if (IsShadertoy())
+      return ApplyShadertoy();
    std::string src = std::string(kPreamble) + formula + kEpilogue;
 
    std::string error;
@@ -427,6 +517,11 @@ void FormulaNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
 
+   if (IsShadertoy())
+   {
+      CookShadertoy(frameId);
+      return;
+   }
    if (mProgram == 0 && mLastError.empty())
       Apply();
    if (mProgram == 0)
@@ -449,4 +544,242 @@ void FormulaNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uD"), knobD);
       glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
    });
+}
+
+// ---- Shadertoy mode ----
+
+void FormulaNode::ParseKnobs()
+{
+   // uniform float name; // lo..hi = default   (the "= default" part is optional)
+   static const std::regex knobLine(
+      R"(uniform\s+float\s+([A-Za-z_][A-Za-z0-9_]*)\s*;\s*//\s*(-?[0-9]*\.?[0-9]+)\s*\.\.\s*(-?[0-9]*\.?[0-9]+)(?:\s*=\s*(-?[0-9]*\.?[0-9]+))?)");
+   std::vector<Knob> knobs;
+   const int order[] = { kCommon, kBufA, kBufB, kBufC, kBufD, kImage };
+   for (int pass : order)
+   {
+      if (pass >= kBufA && pass <= kBufD && pass > BufferCount())
+         continue;
+      const std::string& code = passCode[pass];
+      for (auto it = std::sregex_iterator(code.begin(), code.end(), knobLine); it != std::sregex_iterator(); ++it)
+      {
+         Knob k;
+         k.name = (*it)[1].str();
+         k.lo = (float)std::atof((*it)[2].str().c_str());
+         k.hi = (float)std::atof((*it)[3].str().c_str());
+         if (k.hi < k.lo)
+            std::swap(k.lo, k.hi);
+         k.def = (*it)[4].matched ? (float)std::atof((*it)[4].str().c_str()) : k.lo;
+         k.def = std::clamp(k.def, k.lo, k.hi);
+         bool seen = false;
+         for (const Knob& other : knobs)
+            seen = seen || other.name == k.name;
+         if (!seen && (int)knobs.size() < kMaxKnobs)
+            knobs.push_back(k);
+      }
+   }
+
+   // A knob keeps its value while its slot keeps its name (a reload, a recompile);
+   // a new or renamed one starts at its default. The names are saved with the patch,
+   // so a load keeps the saved values.
+   std::vector<std::string> oldNames;
+   {
+      std::stringstream in(mKnobNames);
+      std::string name;
+      while (std::getline(in, name, '|'))
+         oldNames.push_back(name);
+   }
+   std::string joined;
+   for (int i = 0; i < (int)knobs.size(); i++)
+   {
+      const bool same = i < (int)oldNames.size() && oldNames[(size_t)i] == knobs[(size_t)i].name;
+      if (!same)
+         stKnob[i] = knobs[(size_t)i].def;
+      joined += (i > 0 ? "|" : "") + knobs[(size_t)i].name;
+   }
+   mKnobs = knobs;
+   mKnobNames = joined;
+}
+
+std::string FormulaNode::MapError(const std::string& error, int pass, int preambleLines) const
+{
+   // Drivers write "0:12(3)", "0(12)" or "ERROR: 0:12:" - map the line back to the
+   // pasted text, and name the tab when the line is in Common.
+   // Common plus the newline that ends it; the pass's first line follows.
+   const int commonLines = (int)std::count(passCode[kCommon].begin(), passCode[kCommon].end(), '\n') + 1;
+   static const std::regex lineRef(R"(\b0[:(]([0-9]+))");
+   std::string out;
+   std::string::const_iterator from = error.begin();
+   for (auto it = std::sregex_iterator(error.begin(), error.end(), lineRef); it != std::sregex_iterator(); ++it)
+   {
+      const std::smatch& m = *it;
+      out.append(from, m[0].first);
+      int line = std::atoi(m[1].str().c_str()) - preambleLines;
+      const char* where = PassName(pass);
+      if (!passCode[kCommon].empty() && line <= commonLines)
+         where = PassName(kCommon);
+      else
+         line -= commonLines;
+      out += std::string(where) + " line " + std::to_string(std::max(1, line));
+      from = m[0].second;
+   }
+   out.append(from, error.end());
+   return out;
+}
+
+bool FormulaNode::ApplyShadertoy()
+{
+   ParseKnobs();
+   for (int pass = 0; pass <= kBufD; pass++)
+   {
+      const std::string& code = passCode[pass];
+      if (code.find("mainSound") != std::string::npos || code.find("mainCubemap") != std::string::npos ||
+          code.find("samplerCube") != std::string::npos || code.find("mainVR") != std::string::npos)
+      {
+         mLastError = std::string(PassName(pass)) +
+                      ": sound, cubemap and VR passes are not supported. Paste the Image and Buffer A-D tabs.";
+         return false;
+      }
+   }
+
+   unsigned int built[kBufD + 1] = {};
+   const int preambleLines = CountLines(kShadertoyPreamble);
+   for (int pass = 0; pass <= kBufD; pass++)
+   {
+      if (pass != kImage && pass > BufferCount())
+         continue;
+      // A buffer tab left empty stays black instead of failing the whole shader.
+      if (pass != kImage && passCode[pass].find_first_not_of(" \t\r\n") == std::string::npos)
+         continue;
+      const std::string src = std::string(kShadertoyPreamble) + passCode[kCommon] + "\n" + passCode[pass] +
+                              (pass == kImage ? kShadertoyMainImage : kShadertoyMainBuffer);
+      std::string error;
+      built[pass] = GLUtil::CompileProgram(src.c_str(), &error);
+      if (built[pass] == 0)
+      {
+         for (unsigned int program : built)
+            if (program != 0)
+               glDeleteProgram(program);
+         mLastError = MapError(error, pass, preambleLines);
+         return false;
+      }
+   }
+   for (int pass = 0; pass <= kBufD; pass++)
+   {
+      if (mPassProgram[pass] != 0)
+         glDeleteProgram(mPassProgram[pass]);
+      mPassProgram[pass] = built[pass];
+   }
+   mLastError.clear();
+   mFrame = 0;
+   return true;
+}
+
+void FormulaNode::CookShadertoy(int frameId)
+{
+   if (mPassProgram[kImage] == 0 && mLastError.empty())
+      ApplyShadertoy();
+   if (mPassProgram[kImage] == 0)
+      return;
+
+   if (animate)
+      mClock = (float)Transport::Instance().Seconds();
+   const float delta = mFrame == 0 ? 0.0f : std::max(0.0f, mClock - mLastTime);
+   mLastTime = mClock;
+
+   const int w = std::max(4, (int)width);
+   const int h = std::max(4, (int)height);
+   if (!GLUtil::EnsureFbo(mOut, w, h))
+      return;
+
+   const int numBuffers = BufferCount();
+   for (int b = 0; b < numBuffers; b++)
+      for (int k = 0; k < 2; k++)
+      {
+         const bool fresh = mBuf[b][k].w != w || mBuf[b][k].h != h || mBuf[b][k].fbo == 0;
+         if (!GLUtil::EnsureFbo(mBuf[b][k], w, h, GL_RGBA16F))
+            return;
+         if (fresh)
+         {
+            // A new buffer starts black, as on the site, not with whatever the driver left.
+            GLint prev = 0;
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prev);
+            glBindFramebuffer(GL_FRAMEBUFFER, mBuf[b][k].fbo);
+            glClearColor(0, 0, 0, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glBindFramebuffer(GL_FRAMEBUFFER, prev);
+            mFrame = 0;
+         }
+      }
+
+   // Wired pins first; an unwired channel reads the buffer with its number.
+   unsigned int channelTex[kChannels] = {};
+   float channelRes[kChannels * 3] = {};
+   for (int c = 0; c < kChannels; c++)
+   {
+      channelTex[c] = mChannel[c].Pull(frameId);
+      if (channelTex[c] != 0)
+      {
+         INode* src = mChannel[c].Resolved();
+         channelRes[c * 3 + 0] = src != nullptr ? (float)src->GetOutputWidth() : 0.0f;
+         channelRes[c * 3 + 1] = src != nullptr ? (float)src->GetOutputHeight() : 0.0f;
+         channelRes[c * 3 + 2] = 1.0f;
+      }
+   }
+
+   std::time_t now = std::time(nullptr);
+   std::tm local {};
+   if (const std::tm* t = std::localtime(&now))   // GL thread only; nothing else here calls it
+      local = *t;
+   const float date[4] = { (float)(local.tm_year + 1900), (float)local.tm_mon, (float)local.tm_mday,
+                           (float)(local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec) };
+
+   auto runPass = [&](unsigned int program, const GLUtil::Fbo& target)
+   {
+      GLUtil::RunShaderPass(target, program, [&]()
+      {
+         glUniform3f(glGetUniformLocation(program, "iResolution"), (float)w, (float)h, 1.0f);
+         glUniform1f(glGetUniformLocation(program, "iTime"), mClock);
+         glUniform1f(glGetUniformLocation(program, "iTimeDelta"), delta);
+         glUniform1f(glGetUniformLocation(program, "iFrameRate"), delta > 0.0f ? 1.0f / delta : 60.0f);
+         glUniform1i(glGetUniformLocation(program, "iFrame"), mFrame);
+         glUniform4f(glGetUniformLocation(program, "iMouse"), mouse[0], mouse[1], mouse[2], mouse[3]);
+         glUniform4f(glGetUniformLocation(program, "iDate"), date[0], date[1], date[2], date[3]);
+         glUniform1f(glGetUniformLocation(program, "iSampleRate"), 48000.0f);
+         static const char* kSamplers[kChannels] = { "iChannel0", "iChannel1", "iChannel2", "iChannel3" };
+         float res[kChannels * 3];
+         for (int c = 0; c < kChannels; c++)
+         {
+            unsigned int tex = channelTex[c];
+            res[c * 3 + 0] = channelRes[c * 3 + 0];
+            res[c * 3 + 1] = channelRes[c * 3 + 1];
+            res[c * 3 + 2] = channelRes[c * 3 + 2];
+            if (tex == 0 && c < numBuffers)
+            {
+               // The buffer's newest frame: this frame's if it already ran, else the last one.
+               tex = GLUtil::FboTexture(mBuf[c][mBufCur[c]]);
+               res[c * 3 + 0] = (float)w;
+               res[c * 3 + 1] = (float)h;
+               res[c * 3 + 2] = 1.0f;
+            }
+            glActiveTexture(GL_TEXTURE0 + c);
+            glBindTexture(GL_TEXTURE_2D, tex);
+            glUniform1i(glGetUniformLocation(program, kSamplers[c]), c);
+         }
+         glUniform3fv(glGetUniformLocation(program, "iChannelResolution"), kChannels, res);
+         for (int i = 0; i < (int)mKnobs.size(); i++)
+            glUniform1f(glGetUniformLocation(program, mKnobs[(size_t)i].name.c_str()), stKnob[i]);
+      });
+      glActiveTexture(GL_TEXTURE0);
+   };
+
+   for (int b = 0; b < numBuffers; b++)
+   {
+      if (mPassProgram[kBufA + b] == 0)
+         continue;
+      const int next = 1 - mBufCur[b];
+      runPass(mPassProgram[kBufA + b], mBuf[b][next]);
+      mBufCur[b] = next;
+   }
+   runPass(mPassProgram[kImage], mOut);
+   mFrame++;
 }

@@ -717,7 +717,91 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SetNextWindowSize(ImVec2(620, 460), ImGuiCond_FirstUseEver);
          const bool editorVisible = BeginEditorWindow(L("Formula editor"), &gFormulaEditorOpen);
-         if (editorVisible)
+         if (editorVisible && gFormulaEditor->IsShadertoy())
+         {
+            // Shadertoy mode: one tab per pass, as on the site. Each tab keeps its own
+            // draft until Apply, which compiles every pass at once.
+            FormulaNode* fn = gFormulaEditor;
+            static char stBuf[65536];
+            static std::string drafts[FormulaNode::kPasses];
+            static FormulaNode* stLast = nullptr;
+            static int stTab = FormulaNode::kImage;
+            const auto loadAll = [fn]()
+            {
+               for (int p = 0; p < FormulaNode::kPasses; p++)
+                  drafts[p] = fn->passCode[p];
+               snprintf(stBuf, sizeof(stBuf), "%s", drafts[stTab].c_str());
+            };
+            if (stLast != fn)
+            {
+               stTab = FormulaNode::kImage;
+               loadAll();
+               stLast = fn;
+            }
+
+            // Tabs in the site's order: Common, the buffers in use, Image.
+            int passes[FormulaNode::kPasses];
+            PillGroup::Segment segs[FormulaNode::kPasses];
+            static const char* kKeys[FormulaNode::kPasses] = { "st.image", "st.bufa", "st.bufb", "st.bufc", "st.bufd", "st.common" };
+            int count = 0;
+            const auto addTab = [&](int pass)
+            {
+               passes[count] = pass;
+               segs[count] = { kKeys[pass], T(FormulaNode::PassName(pass)) };
+               count++;
+            };
+            addTab(FormulaNode::kCommon);
+            for (int b = 0; b < fn->BufferCount(); b++)
+               addTab(FormulaNode::kBufA + b);
+            addTab(FormulaNode::kImage);
+            int sel = count - 1;
+            for (int i = 0; i < count; i++)
+               if (passes[i] == stTab)
+                  sel = i;
+            if (passes[sel] != stTab)
+            {
+               drafts[stTab] = stBuf;
+               stTab = passes[sel];
+               snprintf(stBuf, sizeof(stBuf), "%s", drafts[stTab].c_str());
+            }
+
+            SectionCard::Begin(T("Shadertoy"));
+            EditorHint(T("paste each tab from shadertoy.com; iChannel0-3 are the pins, or buffer A-D when unwired"));
+            EditorHint(T("uniform float name; // 0..1 = 0.5   adds a knob"));
+            {
+               const ImVec2 cp = ImGui::GetCursorScreenPos();
+               const UiLayout::Rect r{ cp.x, cp.y, ImGui::GetContentRegionAvail().x, 28.0f };
+               const int hit = PillGroup::Draw("st.tabs", r, segs, count, sel);
+               ImGui::SetCursorScreenPos(cp);
+               ImGui::Dummy(ImVec2(r.w, r.h));
+               if (hit >= 0 && passes[hit] != stTab)
+               {
+                  drafts[stTab] = stBuf;
+                  stTab = passes[hit];
+                  snprintf(stBuf, sizeof(stBuf), "%s", drafts[stTab].c_str());
+               }
+            }
+            SectionCard::Begin(T("Code"));
+            FieldWell::InputTextMultiline("##stglsl", stBuf, sizeof(stBuf),
+                                          ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
+
+            PushPrimaryButtonStyle();
+            if (ActionButton::Draw(L("Apply"), ImVec2(120, 0)))
+            {
+               drafts[stTab] = stBuf;
+               for (int p = 0; p < FormulaNode::kPasses; p++)
+                  fn->passCode[p] = drafts[p];
+               fn->Apply();
+            }
+            PopPrimaryButtonStyle();
+            FormParts::Inline();
+            if (ActionButton::Draw(L("Revert"), ImVec2(120, 0)))
+               loadAll();
+
+            if (!fn->LastError().empty())
+               ImGui::TextWrapped("%s", fn->LastError().c_str());
+         }
+         else if (editorVisible)
          {
             SectionCard::Begin(T("Kernel"));
             EditorHint(T("body of  vec4 shape(vec2 uv, vec2 p, float t)"));

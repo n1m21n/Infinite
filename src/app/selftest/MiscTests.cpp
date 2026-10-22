@@ -12,6 +12,8 @@
 #include "app/graph/NodeClipboard.h"
 #include "miniz.h"
 #include "core/MediaCollect.h"
+#include "nodes/FormulaNode.h"
+#include "gl3.h"
 #include "platform/AppPaths.h"
 #include <filesystem>
 #include "platform/PluginCrashGuard.h"
@@ -20,6 +22,101 @@
 
 namespace app
 {
+// ================================================== INFINITE_FORMULASTTEST
+//
+// Formula's Shadertoy mode: a `uniform float` comment becomes a knob with its range and
+// default, the knob reaches the shader, an unwired iChannel0 reads buffer A (so a buffer
+// that adds to itself accumulates frame by frame), compile errors name the tab and the
+// pasted line, and sound passes are refused. Needs the GL context.
+bool RunFormulaShadertoyTest()
+{
+   bool ok = true;
+   const auto redAt = [](FormulaNode& n) {
+      unsigned int fbo = 0;
+      glGenFramebuffers(1, &fbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, n.GetOutputTexture(), 0);
+      unsigned char px[4] = {};
+      glReadPixels(n.GetOutputWidth() / 2, n.GetOutputHeight() / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glDeleteFramebuffers(1, &fbo);
+      return (int)px[0];
+   };
+   int frame = 1000;
+
+   {
+      FormulaNode n;
+      n.mode = FormulaNode::kShadertoy;
+      n.width = 32;
+      n.height = 32;
+      n.animate = false;
+      n.passCode[FormulaNode::kImage] =
+         "uniform float amt; // 0..2 = 1.5\n"
+         "void mainImage(out vec4 c, in vec2 p) { c = vec4(amt * 0.5, 0.0, 0.0, 0.0); }\n";
+      const bool built = n.Apply();
+      n.CookIfNeeded(frame++);
+      const bool knob = n.Knobs().size() == 1 && n.Knobs()[0].name == "amt" && n.Knobs()[0].hi == 2.0f &&
+                        n.stKnob[0] == 1.5f;
+      const int red = redAt(n);
+      const bool pass = built && knob && red > 180 && red < 202;
+      printf("FORMULAST knob %s (built %d, knobs %d, value %.2f, red %d)\n", pass ? "OK" : "FAIL", built ? 1 : 0,
+             (int)n.Knobs().size(), n.stKnob[0], red);
+      ok &= pass;
+
+      // A recompile with the same knob keeps a value the user set.
+      n.stKnob[0] = 0.5f;
+      n.Apply();
+      const bool kept = n.stKnob[0] == 0.5f;
+      printf("FORMULAST knob kept %s (%.2f)\n", kept ? "OK" : "FAIL", n.stKnob[0]);
+      ok &= kept;
+   }
+
+   {
+      FormulaNode n;
+      n.mode = FormulaNode::kShadertoy;
+      n.buffers = 1;
+      n.width = 32;
+      n.height = 32;
+      n.animate = false;
+      n.passCode[FormulaNode::kBufA] =
+         "void mainImage(out vec4 c, in vec2 p) { c = texture(iChannel0, p / iResolution.xy) + vec4(0.1); }\n";
+      n.passCode[FormulaNode::kImage] =
+         "void mainImage(out vec4 c, in vec2 p) { c = texture(iChannel0, p / iResolution.xy); }\n";
+      const bool built = n.Apply();
+      for (int i = 0; i < 3; i++)
+         n.CookIfNeeded(frame++);
+      const int red = redAt(n);
+      const bool pass = built && red > 70 && red < 84;   // 0.3 after three frames
+      printf("FORMULAST buffer feedback %s (built %d, red %d, error '%s')\n", pass ? "OK" : "FAIL", built ? 1 : 0, red,
+             n.LastError().c_str());
+      ok &= pass;
+   }
+
+   {
+      FormulaNode n;
+      n.mode = FormulaNode::kShadertoy;
+      n.passCode[FormulaNode::kCommon] = "float helper() { return 1.0; }\n";
+      n.passCode[FormulaNode::kImage] =
+         "void mainImage(out vec4 c, in vec2 p)\n"
+         "{\n"
+         "   c = vec4(undefinedThing);\n"
+         "}\n";
+      const bool built = n.Apply();
+      const bool named = n.LastError().find("Image line 3") != std::string::npos;
+      printf("FORMULAST error line %s (built %d, '%s')\n", !built && named ? "OK" : "FAIL", built ? 1 : 0,
+             n.LastError().c_str());
+      ok &= !built && named;
+
+      n.passCode[FormulaNode::kImage] = "vec2 mainSound(int s, float t) { return vec2(0.0); }\n";
+      const bool refused = !n.Apply() && n.LastError().find("not supported") != std::string::npos;
+      printf("FORMULAST sound refused %s\n", refused ? "OK" : "FAIL");
+      ok &= refused;
+   }
+
+   printf("FORMULAST TEST %s\n", ok ? "OK" : "FAIL");
+   return ok;
+}
+
 // ====================================================== INFINITE_DIAGZIPTEST
 //
 // Help > Collect diagnostics writes what it says: the system info, a patch only when one is passed, and the

@@ -389,10 +389,16 @@ namespace app
       // the user's saved .infdev devices into one control (plan §6), rather
       // than a bare preset picker - FormulaNode's device.params stays empty
       // (plan §7), only `formula` round-trips.
-      DrawFieldDeviceControls<FormulaNode>(n, "formula", &FormulaNode::PresetNames(),
-                                          [](FormulaNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
+      // Shadertoy mode: paste a shader from shadertoy.com as it is (mainImage, its
+      // buffers, iChannel pins); its `uniform float x; // lo..hi` lines become knobs.
+      DropdownButton("mode", FormulaNode::ModeNames(), n->mode, [n](int i) { n->mode = i; n->Apply(); });
+      if (n->IsShadertoy())
+         DropdownButton("buffers", FormulaNode::BufferNames(), n->buffers, [n](int i) { n->buffers = i; n->Apply(); });
+      else
+         DrawFieldDeviceControls<FormulaNode>(n, "formula", &FormulaNode::PresetNames(),
+                                             [](FormulaNode* n2, int i) { n2->presetIndex = i; n2->LoadPreset(i); });
 
-      if (ActionButton::Draw("Edit GLSL...", ImVec2(kPreviewSize, 0)))
+      if (ActionButton::Draw(n->IsShadertoy() ? "Edit shader..." : "Edit GLSL...", ImVec2(kPreviewSize, 0)))
       {
          gFormulaEditor = n;
          gFormulaEditorOpen = true;
@@ -407,10 +413,19 @@ namespace app
 
       ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
-      ModSlider("uA", &n->knobA, 0.0f, 1.0f);
-      ModSlider("uB", &n->knobB, 0.0f, 1.0f);
-      ModSlider("uC", &n->knobC, 0.0f, 1.0f);
-      ModSlider("uD", &n->knobD, 0.0f, 1.0f);
+      if (n->IsShadertoy())
+      {
+         const std::vector<FormulaNode::Knob>& knobs = n->Knobs();
+         for (int i = 0; i < (int)knobs.size(); i++)
+            ModSlider(knobs[(size_t)i].name.c_str(), &n->stKnob[i], knobs[(size_t)i].lo, knobs[(size_t)i].hi);
+      }
+      else
+      {
+         ModSlider("uA", &n->knobA, 0.0f, 1.0f);
+         ModSlider("uB", &n->knobB, 0.0f, 1.0f);
+         ModSlider("uC", &n->knobC, 0.0f, 1.0f);
+         ModSlider("uD", &n->knobD, 0.0f, 1.0f);
+      }
       ModCheckbox("animate", &n->animate);
    }
 

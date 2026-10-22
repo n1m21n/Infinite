@@ -5732,6 +5732,7 @@ void SavePatchInteractive(bool forceDialog);
 bool SavePatchWithMediaTo(const std::string& path, std::string& report);
 void SavePatchWithMediaInteractive();
 bool RunSaveWithMediaTest();
+bool RunFormulaShadertoyTest();
 extern bool gShowSaveMediaModal;
 
 // Templates (TemplatesWindow.cpp): the window, the empty-canvas invitation, and the open-as-untitled-copy.

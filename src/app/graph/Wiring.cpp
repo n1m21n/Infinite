@@ -300,6 +300,8 @@ namespace app
          // (device-catalog simplification) - one slot per currently-declared
          // `input image` pin.
          return fp->DeclaredImageInputCount();
+      if (auto* formula = dynamic_cast<FormulaNode*>(gn.node.get()))
+         return formula->ChannelCount();   // iChannel0-3 in Shadertoy mode, none for an expression
       if (dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr)
          return 1; // the kernel's optional "geo" input (generator when unwired)
       // (Audio Analyze used to need an entry here for its fileSource pin; it
@@ -500,6 +502,8 @@ namespace app
          // (device-catalog simplification) - slot 0..N-1 route to the
          // currently-declared `input image` pins in PinTable order.
          return fp->DeclaredImageInput(slot);
+      if (auto* formula = dynamic_cast<FormulaNode*>(gn.node.get()))
+         return slot >= 0 && slot < formula->ChannelCount() ? &formula->Channel(slot) : nullptr;
       if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
          return slot == 0 ? &model->TextureInput() : nullptr;
       if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
