@@ -7,6 +7,10 @@ namespace app
 {
  // R30, defined with the live-issue state below
 
+   // An output index GraphNode::OutputPinId() can encode without running into the
+   // next node's pin block. A patch file is outside input, so links past it are dropped.
+   static bool IsValidOutputIndex(int output) { return output >= 0 && output < GraphNode::kStride - GraphNode::kOutputBase; }
+
    // Node types a patch named that this build does not have, collected by ApplyPatchData and reported once by
    // the open that asked for them (undo and paste go through ApplyPatchData too and stay quiet).
    std::vector<std::string> gSkippedNodeTypes;
@@ -151,7 +155,7 @@ namespace app
       {
          GraphNode* dst = resolve(c.dstIndex);
          GraphNode* src = resolve(c.srcIndex);
-         if (dst == nullptr || src == nullptr)
+         if (dst == nullptr || src == nullptr || !IsValidOutputIndex(c.srcOutput))
             continue;
          if (ImageCable* cable = CableFor(*dst, c.dstSlot))
             cable->Connect(src->node.get(), c.srcOutput);
@@ -160,14 +164,14 @@ namespace app
       {
          GraphNode* dst = resolve(c.dstIndex);
          GraphNode* src = resolve(c.srcIndex);
-         if (dst != nullptr && src != nullptr)
+         if (dst != nullptr && src != nullptr && IsValidOutputIndex(c.srcOutput))
             ConnectGeometrySlot(*dst, c.dstSlot, *src, c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.audio)
       {
          GraphNode* dst = resolve(c.dstIndex);
          GraphNode* src = resolve(c.srcIndex);
-         if (dst == nullptr || src == nullptr)
+         if (dst == nullptr || src == nullptr || !IsValidOutputIndex(c.srcOutput))
             continue;
          if (AudioCable* cable = dst->node->AudioInputSlot(c.dstSlot))
             cable->Connect(src->node.get(), c.srcOutput);
@@ -176,7 +180,7 @@ namespace app
       {
          GraphNode* dst = resolve(c.dstIndex);
          GraphNode* src = resolve(c.srcIndex);
-         if (dst == nullptr || src == nullptr)
+         if (dst == nullptr || src == nullptr || !IsValidOutputIndex(c.srcOutput))
             continue;
          if (NoteCable* cable = dst->node->NoteInputSlot(c.dstSlot))
             cable->Connect(src->node.get(), c.srcOutput);
@@ -185,7 +189,7 @@ namespace app
       {
          GraphNode* dst = resolve(m.dstIndex);
          GraphNode* src = resolve(m.srcIndex);
-         if (dst != nullptr && src != nullptr)
+         if (dst != nullptr && src != nullptr && IsValidOutputIndex(m.srcOutput))
          {
             // RestoreLink, not Bind(): the destination node hasn't drawn a
             // frame yet during a load, so Bind()'s FrameParams-based centre
