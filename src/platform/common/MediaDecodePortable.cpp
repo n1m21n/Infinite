@@ -1107,11 +1107,20 @@ namespace Platform
 
          const bool stereoOrMono = wav.channels <= (unsigned)kMaxDecodeChannels;
          const int channels = (int)std::min<unsigned>(wav.channels, (unsigned)kMaxDecodeChannels);
-         const uint64_t total = wav.totalPCMFrameCount;
-         std::vector<float> interleaved((size_t)total * channels, 0.0f);
+         // The frame count is a header claim too (an AIFF COMM inside a .wav
+         // can say 4 billion frames in a 59-byte file), so decode frame-wise
+         // like MP3 and FLAC below rather than allocating for it up front.
+         std::vector<float> interleaved;
+         float chunk[4096 * 2];
          uint64_t got = 0;
-         if (stereoOrMono)
-            got = drwav_read_pcm_frames_f32(&wav, total, interleaved.data());
+         while (stereoOrMono && got < (uint64_t)INT_MAX)
+         {
+            const uint64_t decoded = drwav_read_pcm_frames_f32(&wav, 4096, chunk);
+            if (decoded == 0)
+               break;
+            interleaved.insert(interleaved.end(), chunk, chunk + decoded * channels);
+            got += decoded;
+         }
          const int rate = wav.sampleRate;
          drwav_uninit(&wav);
          if (!stereoOrMono)
