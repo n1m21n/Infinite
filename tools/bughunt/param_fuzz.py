@@ -11,12 +11,20 @@ A "base" run with defaults goes first. An extreme run is BAD on a crash, signal,
 hang, sanitizer report, NaN or >+12 dBFS audio the base run did not have, or an
 error code the base run did not have.
 
-  param_fuzz.py BIN OUTDIR [--kind int|float|text|mod|all] [--only TYPE]... [--jobs N]
+  param_fuzz.py BIN OUTDIR [--kind int|float|text|mod|signal|all] [--only TYPE]... [--jobs N]
                            [--max-timeout S] [--types-from results.tsv]
 
   --kind mod     one run per type: every modulatable control on a 32-beat LFO,
                  unipolar and bipolar, full depth (catches controls registered
                  against dead storage, NaN through modulation, out-of-range writes)
+  --kind signal  every node with an audio input, fed by an Audio File node
+                 playing 0.25 s of an extreme (nan, inf, denormals, +-1e6, DC,
+                 a full-scale 30 Hz square) then a clean -12 dBFS sine; the base
+                 run plays the sine alone. It looks for state that never
+                 recovers: NANSTUCK (NaN long after the burst), HOTSTUCK (last
+                 second 20 dB over base), SILENT (last second silent where base
+                 had sound), SLOW (4x base time). NANPASS (NaN only while the
+                 burst plays) is recorded but is not BAD.
   --jobs N       run N cases at once (default 1). Each case is its own process;
                  keep 1 when the machine is also timing something.
   --max-timeout  per-case cap in seconds (default 90). Each type's budget is
@@ -46,9 +54,41 @@ VALUES = {
              "fmt=" + "%s%n%x%999999d" * 8, "path=../../../../../../../../etc/passwd",
              "lines=" + "\\n" * 100000, "ctrl=\x01\x7fÿ‮�{}$(){{}}"],
     "mod": ["uni=0", "bi=1"],
+    "signal": ["nan", "inf", "denorm", "huge", "dc", "square"],
 }
 PREFIX = {"int": "i", "float": "f", "text": "s"}
 HOT_PEAK = 4.0  # +12 dBFS
+# --start seeks the transport and Audio File follows it, so the whole file
+# renders from 0 and the verdict reads the last whole second's loudness.
+SIG_RATE, SIG_SECS, SIG_BURST = 48000, 3.0, 0.25
+SIG_GRACE = 0.5  # NaN frames past burst + this are state that never recovered
+INFO_CODES = {"", "NANPASS", "NOSIGNAL"}  # recorded, never BAD on their own
+
+
+def signal_wav(out, name):
+    """Stereo float32 WAV: SIG_BURST s of the named extreme, then a -12 dBFS sine."""
+    import math
+    import struct
+    path = os.path.join(out, "signals", name + ".wav")
+    if os.path.exists(path):
+        return path
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    burst = {"nan": lambda i: float("nan"), "inf": lambda i: float("inf") if i & 1 else float("-inf"),
+             "denorm": lambda i: 1e-40 if i & 1 else -1e-40, "huge": lambda i: 1e6 if (i // 400) & 1 else -1e6,
+             "dc": lambda i: 1.0, "square": lambda i: 1.0 if (i // 800) & 1 else -1.0}.get(name)
+    n = int(SIG_RATE * SIG_SECS)
+    nb = int(SIG_RATE * SIG_BURST) if burst else 0
+    frames = []
+    for i in range(n):
+        v = burst(i) if i < nb else 0.25 * math.sin(2 * math.pi * 440 * i / SIG_RATE)
+        frames.append(struct.pack("<ff", v, v))
+    data = b"".join(frames)
+    fmt = struct.pack("<HHIIHH", 3, 2, SIG_RATE, SIG_RATE * 8, 8, 32)  # IEEE float
+    with open(path, "wb") as f:
+        f.write(b"RIFF" + struct.pack("<I", 4 + 8 + len(fmt) + 8 + len(data)) + b"WAVE")
+        f.write(b"fmt " + struct.pack("<I", len(fmt)) + fmt)
+        f.write(b"data" + struct.pack("<I", len(data)) + data)
+    return path
 
 BLOCKS = {
     "fnoise": "node 101 Source Noise\n  id fnoise\nend",
@@ -68,15 +108,18 @@ def label_of(kind, v):
 
 
 def has_params(t, kind):
+    if kind == "signal":
+        return any(i.get("kind") == "audio" for i in t.get("inputs") or [])
     if kind == "mod":
         return bool(t.get("modulatable"))
     return any(p.get("kind") == kind for p in t["params"])
 
 
-def patch_for(t, kind, value):
-    """(patch text, is_audio_only). value None = the base run."""
+def patch_for(t, kind, value, sig_path=None):
+    """(patch text, is_audio_only). value None = the base run. kind signal
+    feeds audio inputs from sig_path instead of the synth."""
     lines = ["infinite-patch 1", f"node 1 {t['category']} {t['type']}", "  id a"]
-    if value is not None and kind != "mod":
+    if value is not None and kind not in ("mod", "signal"):
         v = value.split("=", 1)[1] if kind == "text" else value
         for p in t["params"]:
             if p.get("kind") == kind:
@@ -93,6 +136,8 @@ def patch_for(t, kind, value):
         k, s = i["kind"], i["slot"]
         if k == "image":
             use("fnoise"); wires.append(f"cable a {s} fnoise 0")
+        elif k == "audio" and kind == "signal":
+            use("fsig"); wires.append(f"aud a {s} fsig")
         elif k == "audio":
             use("fseq", "fsyn"); wires.append(f"aud a {s} fsyn")
         elif k == "note":
@@ -116,7 +161,11 @@ def patch_for(t, kind, value):
         for m in t.get("modulatable") or []:
             if m.get("key"):
                 wires.append(f"mod a {m['key']} lfo 0 {pol} 1 0.5")
-    lines += [BLOCKS[n] for n in used] + wires
+    blocks = dict(BLOCKS)
+    if sig_path:
+        blocks["fsig"] = (f"node 110 Modulators Audio File\n  id fsig\n  s path {sig_path}\n"
+                          "  b loop 0\n  f volume 1\nend")  # followTransport 0 waits for a manual play
+    lines += [blocks[n] for n in used] + wires
     # No image sink: measure audio. Sinks with no outputs (Audio Out, MIDI Out,
     # OSC Send, Comment) would only ever fail --frame with E_RENDER.
     audio = "out" not in used
@@ -133,7 +182,8 @@ def bad_num(x):
     return False
 
 
-def run_case(binp, out, tag, text, audio, timeout):
+def run_case(binp, out, tag, text, audio, timeout, signal=False):
+    """(rc, codes, sanitizer reports, secs, last whole second's LUFS or None)."""
     path = os.path.join(out, tag + ".inf")
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
@@ -142,7 +192,8 @@ def run_case(binp, out, tag, text, audio, timeout):
                ASAN_OPTIONS=f"detect_leaks=0:log_path={san}",
                UBSAN_OPTIONS=f"print_stacktrace=1:log_path={san}",
                TSAN_OPTIONS=f"log_path={san}")
-    cmd = ([binp, "--audio-summary", path, os.path.join(out, tag + ".json"), "--duration", "1.5"] if audio
+    dur = SIG_SECS if signal else 1.5
+    cmd = ([binp, "--audio-summary", path, os.path.join(out, tag + ".json"), "--duration", str(dur)] if audio
            else [binp, "--frame", path, "0.5", os.path.join(out, tag + ".png")])
     cmd += ["--lenient", "--timeout", str(int(timeout))]
     t0 = time.time()
@@ -163,13 +214,22 @@ def run_case(binp, out, tag, text, audio, timeout):
     if rc == 6:
         rc = "TIMEOUT"
     reports = [f for f in os.listdir(out) if f.startswith(tag + ".san")]
+    tail = None
     if audio:
         raw = ""
         try:
             raw = open(os.path.join(out, tag + ".json")).read()
             j = json.loads(raw)
             peak = j.get("sample_peak")
-            if bad_num(j) or not isinstance(peak, (int, float)):
+            nonfinite = j.get("non_finite_frames") or 0
+            lps = j.get("loudness_per_second") or []
+            tail = lps[-1] if lps and isinstance(lps[-1], (int, float)) else None
+            if signal:
+                if nonfinite > SIG_RATE * (SIG_BURST + SIG_GRACE):
+                    codes += ",NANSTUCK"
+                elif nonfinite:
+                    codes += ",NANPASS"
+            elif nonfinite or bad_num(j) or not isinstance(peak, (int, float)):
                 codes += ",NANAUDIO"
             elif peak > HOT_PEAK:
                 codes += ",HOTAUDIO"
@@ -178,7 +238,7 @@ def run_case(binp, out, tag, text, audio, timeout):
                 codes += ",NANAUDIO"
         except OSError:
             pass
-    return rc, codes, reports, round(time.time() - t0, 1)
+    return rc, codes, reports, round(time.time() - t0, 1), tail
 
 
 def describe(binp, out):
@@ -207,18 +267,31 @@ def fuzz_type(binp, out, kind, t, prior, max_timeout, write):
         if v != "base" and base is not None and base[0] == "TIMEOUT":
             write(t["type"], label, "SKIP", "(base timed out)", 0, 0, "ok")
             continue
-        text, audio = patch_for(t, kind, None if v == "base" else v)
+        sig = signal_wav(out, "base" if v == "base" else v) if kind == "signal" else None
+        text, audio = patch_for(t, kind, None if v == "base" else v, sig)
         tag = f"{kind}-{safe}-{label.lstrip('-').replace('.', '')}{'n' if label.startswith('-') else ''}"
-        rc, codes, reports, secs = run_case(binp, out, tag, text, audio, max_timeout if v == "base" else budget)
+        signal = kind == "signal" and audio
+        rc, codes, reports, secs, tail = run_case(binp, out, tag, text, audio,
+                                                  max_timeout if v == "base" else budget, signal)
+        if signal and v == "base" and tail is None:
+            codes += ",NOSIGNAL"  # the sine never reached the sink: this type's rows prove nothing
+        if signal and v != "base" and base is not None:
+            base_tail = base[3] if len(base) > 3 else None
+            if secs > 4 * max(base[1], 1.0):
+                codes += ",SLOW"
+            if base_tail is not None and tail is None and "NANSTUCK" not in codes:
+                codes += ",SILENT"
+            elif base_tail is not None and tail is not None and tail > base_tail + 20:
+                codes += ",HOTSTUCK"
         crashed = rc == "TIMEOUT" or (isinstance(rc, int) and (rc < 0 or rc >= 128))
         if v == "base":
-            base = ("TIMEOUT" if rc == "TIMEOUT" else codes, secs, rc)
+            base = ("TIMEOUT" if rc == "TIMEOUT" else codes, secs, rc, tail)
             budget = min(max_timeout, max(20.0, 5.0 * secs))
             bad = crashed or bool(reports)
         else:
             new_codes = set(codes.split(",")) - set(base[0].split(","))
             base_rc = base[2] if len(base) > 2 else rc
-            bad = crashed or bool(reports) or bool(new_codes - {""}) or (rc not in (0, 3) and str(rc) != str(base_rc))
+            bad = crashed or bool(reports) or bool(new_codes - INFO_CODES) or (rc not in (0, 3) and str(rc) != str(base_rc))
         write(t["type"], label, rc, codes, len(reports), secs, "BAD" if bad else "ok")
         if not bad:
             for ext in (".inf", ".json", ".png"):
@@ -272,6 +345,9 @@ def selftest():
     sink = {"type": "S", "category": "C", "params": [], "inputs": [{"kind": "audio", "slot": 0}], "outputs": []}
     assert patch_for(sink, "int", None)[1], "a sink with no outputs runs as audio"
     assert bad_num({"a": [1.0, float("nan")]}) and not bad_num({"integrated_lufs": float("nan")})
+    text, _ = patch_for(t, "signal", "nan", "/x/nan.wav")
+    assert "aud a 0 fsig" in text and "s path /x/nan.wav" in text and "fsyn" not in text, text
+    assert has_params(t, "signal") and not has_params(sink | {"inputs": []}, "signal")
     assert label_of("text", "big=AAA") == "big" and label_of("int", "-5") == "-5"
     print("param_fuzz selftest ok")
 
@@ -290,7 +366,7 @@ def main():
     jobs = int(a[a.index("--jobs") + 1]) if "--jobs" in a else 1
     max_timeout = float(a[a.index("--max-timeout") + 1]) if "--max-timeout" in a else 90.0
     os.makedirs(out, exist_ok=True)
-    kinds = ["int", "float", "text", "mod"] if kind == "all" else [kind]
+    kinds = ["int", "float", "text", "mod", "signal"] if kind == "all" else [kind]
     total = sum(run_kind(binp, out, k, only, jobs, max_timeout) for k in kinds)
     sys.exit(1 if total else 0)
 
