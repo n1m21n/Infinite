@@ -1879,7 +1879,9 @@ namespace app
       // dropped, so nothing grows, shifts or leaves a gap when a switch flips or a param is added.
       // Left: output, camera, points, raster (25 rows). Right: light, shadows, environment, quality (25 rows).
       char label[64];
-      const int wantedAa = (n->samples <= 0) ? 0 : (1 << n->samples);
+      // Same clamp the renderer applies (Render3DNode::Cook): a patch can hold any int here.
+      const int aaIndex = std::clamp(n->samples, 0, (int)Render3DNode::SampleNames().size() - 1);
+      const int wantedAa = (aaIndex == 0) ? 0 : (1 << aaIndex);
 
       // --- Left Column ---
       ImGui::BeginGroup();
