@@ -109,6 +109,26 @@ namespace pop
       return mCpu;
    }
 
+   void PopBuffer::ReadRows(const std::vector<int>& rows, float* out) const
+   {
+      const size_t stride = (size_t)mComps;
+      if (mCpuValid || mGpu == 0)
+      {
+         const std::vector<float>& all = Cpu();
+         for (size_t r = 0; r < rows.size(); r++)
+            std::copy_n(&all[(size_t)rows[r] * stride], stride, out + r * stride);
+         return;
+      }
+      // A few small reads: the first waits for the GPU, the rest are copies.
+      GLint prev = 0;
+      glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prev);
+      glBindBuffer(GL_ARRAY_BUFFER, mGpu);
+      for (size_t r = 0; r < rows.size(); r++)
+         glGetBufferSubData(GL_ARRAY_BUFFER, (GLintptr)((size_t)rows[r] * stride * sizeof(float)),
+                            (GLsizeiptr)(stride * sizeof(float)), out + r * stride);
+      glBindBuffer(GL_ARRAY_BUFFER, (GLuint)prev);
+   }
+
    unsigned int PopBuffer::Gpu() const
    {
       if (mGpu == 0)

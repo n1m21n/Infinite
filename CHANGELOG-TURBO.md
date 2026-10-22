@@ -1,5 +1,43 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.62.0-turbo (unreleased)
+
+GPU first: an animated PointZ patch at 1080p went from ~17 fps to ~52 fps (raster) on an RTX 4060,
+and the path tracer became a hardware RTX renderer.
+
+### Render 3D
+- **RTX mode** replaces the GL path tracer (which stalled the whole machine): NVIDIA OptiX on the
+  RT cores. One sample per pixel per frame, accumulating while nothing moves; meshes, PointZ
+  geometry and instances, particles as real spheres; HDRI, lights, glass; 360 equirect / cubemap /
+  dome. Animated geometry is refitted, not rebuilt. **Denoise**: Auto (fast a-trous filter while the
+  scene moves, the OptiX AI denoiser once it is still), AI, Fast, Off. The test patch: ~25 ms a frame
+  at 1080p with everything animated.
+- RTX is an optional module of the build (full edition only, needs the CUDA Toolkit; the OptiX 7.7
+  headers are fetched from NVIDIA's optix-dev repository). Without it, or without an RTX GPU, the
+  mode draws raster and says why.
+
+### PointZ on the GPU
+- **Copy PointZ** runs as GPU kernels (identical output, verified against the CPU path): no template
+  download, no per-point CPU work.
+- **Particle PointZ** samples its source from last frame's GPU copy (no stall), and removes dead
+  particles in place (~3 ms -> ~0.3 ms a frame).
+- **Image to PointZ** keeps its grid and reruns only the kernel.
+- Point bounds (framing, shadows) are a compute-shader reduction instead of blending every point into
+  one pixel.
+- Kernel lookups can read both inputs (`KernelIO::input` / `as`).
+
+### Previews and readbacks
+- 3D node previews draw PointZ straight from its GL buffers (they converted the whole cloud to a CPU
+  mesh every frame - ~38 ms on the test patch) and refresh every other frame unless hovered.
+- Image Analyze, Palette, Predictive Coloring, Image to Points, Depth Projection and Displacement
+  read the GPU back asynchronously (GLUtil::AsyncReadback, about a frame of latency) instead of
+  stalling the pipeline every cook.
+
+### Tools
+- `INFINITE_FRAMEPROF=1`: CPU and GPU time per frame stage, the slowest node bodies, Render 3D's
+  share, RTX stage times. `INFINITE_PATCHCOMPAT_PLAY=1`: the patch probe with the transport
+  running, with per-node CPU and GPU cook times.
+
 ## 0.61.0-turbo (2026-10-21)
 
 3D quality and 360 output, and patches that travel with their media.

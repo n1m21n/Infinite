@@ -158,6 +158,204 @@ namespace pop
          return acc;
       }
 
+      // Turbo 0.62: Copy PointZ on the GPU - the same points the CPU loop below
+      // makes (Load's layout, then CopyId / TemplateId / stamped Color), as
+      // kernels that look the geometry and the template up directly, so an
+      // animated template costs no download and no per-point CPU work. Up to
+      // 16 copies per site (the step matrices go in as uniforms); returns
+      // false to leave the job to the CPU path.
+      bool CopyOnGpu(CookCtx& c, const PopData& in, const PopData* tmpl, int copies, int siteCount, const float t[3],
+                     const float r[3], const float s[3])
+      {
+         constexpr int kMaxSteps = 16;
+         if (copies > kMaxSteps || (tmpl != nullptr && tmpl->pointCount <= 0))
+            return false;
+         const int n = in.pointCount;
+         const long long total = (long long)n * copies * siteCount;
+         if (n <= 0 || total <= 0 || total > 0x7fffffffLL)
+            return false;
+
+         std::vector<KernelIO> outAttrs;
+         auto indexOf = [&](const std::string& name) {
+            for (size_t i = 0; i < outAttrs.size(); i++)
+               if (outAttrs[i].name == name)
+                  return (int)i;
+            return -1;
+         };
+         outAttrs.push_back({ attr::P, 3 });
+         for (const PopAttrib& at : in.attribs)
+            if (at.name != attr::P)
+            {
+               if (!ValidAttribName(at.name))
+                  return false;
+               outAttrs.push_back({ at.name, at.buffer->Comps() });
+            }
+         const size_t srcAttrs = outAttrs.size();
+         const bool stamp = tmpl != nullptr && c.Bl("color");
+         if (indexOf("CopyId") < 0)
+            outAttrs.push_back({ "CopyId", 1 });
+         if (indexOf("TemplateId") < 0)
+            outAttrs.push_back({ "TemplateId", 1 });
+         const bool srcHasColor = indexOf(attr::Color) >= 0 && indexOf(attr::Color) < (int)srcAttrs;
+         if (stamp && indexOf(attr::Color) < 0)
+            outAttrs.push_back({ attr::Color, 4 });
+
+         std::vector<KernelUniform> u;
+         u.push_back(Int("uN", n));
+         u.push_back(Int("uCopies", copies));
+         u.push_back(Int("uHasTmpl", tmpl != nullptr ? 1 : 0));
+         u.push_back(Int("uAlign", c.I("align")));
+         u.push_back(Flt("uTScale", c.F("scale")));
+         {
+            const Mat4 one = CopyStep(t, r, s, 1);
+            Mat4 acc;
+            for (int k = 0; k < kMaxSteps; k++) // unused ones stay identity
+            {
+               KernelUniform m;
+               m.name = "uStep" + std::to_string(k);
+               m.type = KernelUniform::kMat4;
+               std::memcpy(m.v, (k < copies ? acc : Mat4()).m, sizeof(m.v));
+               u.push_back(m);
+               if (k < copies)
+                  acc = Mat4::Multiply(one, acc);
+            }
+         }
+
+         // (The uniforms above are declared by the kernel builder.)
+         const std::string decls = R"GLSL(
+// Copy's rotation taking `from` onto N (the CPU path's formula).
+mat3 copyAlign(vec3 from, vec3 to)
+{
+   if (dot(to, to) > 1e-20) to = normalize(to);
+   vec3 v = cross(from, to);
+   float cs = dot(from, to);
+   if (cs < -0.9999) return rotX(PI);
+   float k = 1.0 / (1.0 + cs);
+   return mat3(v.x * v.x * k + cs, v.y * v.x * k + v.z, v.z * v.x * k - v.y,
+               v.x * v.y * k - v.z, v.y * v.y * k + cs, v.z * v.y * k + v.x,
+               v.x * v.z * k + v.y, v.y * v.z * k - v.x, v.z * v.z * k + cs);
+}
+)GLSL";
+         std::string head = R"GLSL(
+   int piece = id / uN;
+   int pi = id - piece * uN;
+   int site = piece / uCopies;
+   int ck = piece - site * uCopies;
+   mat4 steps[16] = mat4[16](uStep0, uStep1, uStep2, uStep3, uStep4, uStep5, uStep6, uStep7,
+                             uStep8, uStep9, uStep10, uStep11, uStep12, uStep13, uStep14, uStep15);
+   mat4 cm = steps[ck];
+)GLSL";
+         if (tmpl != nullptr)
+            head += R"GLSL(
+   {
+      mat3 R = eulerDeg(fetch_tR(site));
+      if (uAlign != 0) R = copyAlign(uAlign == 2 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0), fetch_tN(site)) * R;
+      float sc = fetch_tS(site) * uTScale;
+      cm = mat4(vec4(R[0] * sc, 0.0), vec4(R[1] * sc, 0.0), vec4(R[2] * sc, 0.0), vec4(fetch_tP(site), 1.0)) * cm;
+   }
+)GLSL";
+
+         auto swz = [](int comps) {
+            static const char* k[] = { "", ".x", ".xy", ".xyz", "" };
+            return std::string(k[std::clamp(comps, 1, 4)]);
+         };
+         float colDefault[4] = { 1, 1, 1, 1 };
+         DefaultValue(attr::Color, colDefault);
+
+         // At most four writes per kernel: one pass per group.
+         std::vector<BufferPtr> results(outAttrs.size());
+         for (size_t first = 0; first < outAttrs.size(); first += 4)
+         {
+            KernelSpec k;
+            k.decls = decls;
+            k.body = head;
+            std::vector<std::string> geomLookups;
+            auto needGeom = [&](const KernelIO& a) {
+               for (const std::string& g : geomLookups)
+                  if (g == a.name)
+                     return;
+               geomLookups.push_back(a.name);
+               KernelIO l = a;
+               l.input = 0;
+               l.as = "g" + a.name;
+               k.lookups.push_back(l);
+            };
+            if (tmpl != nullptr)
+            {
+               const KernelIO tl[] = { { attr::P, 3 }, { attr::N, 3 }, { attr::PScale, 1 }, { attr::Rotate, 3 }, { attr::Color, 4 } };
+               const char* as[] = { "tP", "tN", "tS", "tR", "tC" };
+               for (int i = 0; i < 5; i++)
+               {
+                  KernelIO l = tl[i];
+                  l.input = 1;
+                  l.as = as[i];
+                  k.lookups.push_back(l);
+               }
+            }
+            for (size_t w = first; w < outAttrs.size() && w < first + 4; w++)
+            {
+               const KernelIO& a = outAttrs[w];
+               k.writes.push_back(a);
+               const std::string ty = GlslType(a.comps);
+               if (a.name == "CopyId")
+                  k.body += "   CopyId = float(ck);\n";
+               else if (a.name == "TemplateId")
+                  k.body += "   TemplateId = float(site);\n";
+               else if (a.name == attr::P)
+               {
+                  needGeom(a);
+                  k.body += "   P = (cm * vec4(fetch_gP(pi), 1.0)).xyz;\n";
+               }
+               else if (a.name == attr::N && a.comps >= 3)
+               {
+                  needGeom(a);
+                  k.body += "   {\n      " + ty + " nv = fetch_gN(pi);\n";
+                  k.body += "      vec3 nn = transpose(inverse(mat3(cm))) * nv.xyz;\n";
+                  k.body += "      if (dot(nn, nn) > 1e-20) nn = normalize(nn);\n";
+                  k.body += std::string("      N = ") + (a.comps == 4 ? "vec4(nn, nv.w)" : "nn") + ";\n   }\n";
+               }
+               else if (a.name == attr::Color && stamp)
+               {
+                  if (srcHasColor)
+                  {
+                     needGeom(a);
+                     k.body += "   Color = fetch_gColor(pi) * fetch_tC(site)" + swz(a.comps) + ";\n";
+                  }
+                  else
+                  {
+                     char lit[160];
+                     snprintf(lit, sizeof(lit), "vec4(%.9g, %.9g, %.9g, %.9g)", colDefault[0], colDefault[1], colDefault[2],
+                              colDefault[3]);
+                     k.body += "   Color = (" + std::string(lit) + " * fetch_tC(site))" + swz(a.comps) + ";\n";
+                  }
+               }
+               else
+               {
+                  needGeom(a);
+                  k.body += "   " + a.name + " = fetch_g" + a.name + "(pi);\n";
+               }
+            }
+            PopData dummy;
+            dummy.pointCount = (int)total;
+            std::vector<BufferPtr> outBufs;
+            if (!RunKernel(k, dummy, u, c.env, outBufs, c.error))
+            {
+               c.error.clear();
+               return false; // the CPU path will do it
+            }
+            for (size_t w = 0; w < outBufs.size(); w++)
+               results[first + w] = outBufs[w];
+         }
+
+         auto out = std::make_shared<PopData>();
+         out->pointCount = (int)total;
+         for (size_t i = 0; i < outAttrs.size(); i++)
+            out->Set(outAttrs[i].name, results[i]);
+         out->topo = ReplicateTopo(in.topo, copies * siteCount, n, &c.State<ReplicaTopoCache>());
+         c.out = out;
+         return true;
+      }
+
       void TransformArrays(Arrays& a, int first, int last, const Mat4& m)
       {
          float nm[9];
@@ -742,6 +940,8 @@ namespace pop
                return true;
             }
             const int pieces = copies * siteCount;
+            if (CopyOnGpu(c, *in, tmpl, copies, siteCount, t, r, s))
+               return true;
 
             // One allocation per attribute for the whole result, every piece
             // written in place in one pass (copy, transform, ids, colour),

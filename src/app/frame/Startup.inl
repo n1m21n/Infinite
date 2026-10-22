@@ -1820,7 +1820,7 @@
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Render 3D", "3D", 700.0f, 40.0f);
       }
-      else if (getenv("INFINITE_3DTEST") != nullptr || getenv("INFINITE_PATHTRACETEST") != nullptr ||
+      else if (getenv("INFINITE_3DTEST") != nullptr || getenv("INFINITE_RTXTEST") != nullptr ||
                getenv("INFINITE_PANORAMATEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
@@ -1837,18 +1837,18 @@
          auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
          r->geometry[0] = g0;
          r->geometry[1] = g1;
-         // Path traced: a static scene, or the animated Noise restarts the average every frame.
-         if (getenv("INFINITE_PATHTRACETEST") == nullptr && getenv("INFINITE_PANORAMATEST") == nullptr)
+         // RTX: a static scene, or the animated Noise restarts the average every frame.
+         if (getenv("INFINITE_RTXTEST") == nullptr && getenv("INFINITE_PANORAMATEST") == nullptr)
             g0->TextureInput().Connect(gNodes[3].node.get());
          r->width = 700.0f; r->height = 700.0f;
          r->samples = 0; // the antialias check below turns it on at frame 4
-         if (getenv("INFINITE_PATHTRACETEST") != nullptr)
+         if (getenv("INFINITE_RTXTEST") != nullptr)
          {
-            r->renderMode = 1; // Turbo 0.61: the same scene, path traced
+            r->renderMode = 1; // Turbo 0.62: the same scene, RTX
             r->ptSamples = 32;
          }
          // Turbo 0.61: 360 output (raster by default; INFINITE_PANORAMA=1|2 picks
-         // equirect / cubemap, also under PATHTRACETEST).
+         // equirect / cubemap, also under RTXTEST).
          if (getenv("INFINITE_PANORAMATEST") != nullptr || getenv("INFINITE_PANORAMA") != nullptr)
          {
             const char* pano = getenv("INFINITE_PANORAMA");

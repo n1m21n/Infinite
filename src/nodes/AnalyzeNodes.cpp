@@ -269,13 +269,12 @@ void ImageAnalyzeNode::Analyze()
       glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 0);
    });
 
-   mPixels.assign((size_t)size * size * 4, 0);
-   GLint prevFbo = 0;
-   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
-   glBindFramebuffer(GL_FRAMEBUFFER, mSmallFbo);
-   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-   glReadPixels(0, 0, size, size, GL_RGBA, GL_UNSIGNED_BYTE, mPixels.data());
-   glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+   // Turbo 0.62: read back without stalling the GPU pipeline (see
+   // GLUtil::AsyncReadback) - no new copy yet means keep last frame's result.
+   if (mPixels.size() != (size_t)size * size * 4)
+      mPixels.assign((size_t)size * size * 4, 0);
+   if (!mReadback.Read(mSmallTex, size, size, GL_RGBA, GL_UNSIGNED_BYTE, mPixels.data()))
+      return;
 
    const bool haveHistory = mPrevPixels.size() == mPixels.size();
 

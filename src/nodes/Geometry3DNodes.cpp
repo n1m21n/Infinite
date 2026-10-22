@@ -1,8 +1,9 @@
 #include "Geometry3DNodes.h"
-#include "Render3DPathTracer.h"
+#include "RtxBackend.h"
 
 #include "platform/OpenGLHeaders.h"
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cmath>
 
@@ -1281,11 +1282,17 @@ void Render3DNode::ReleaseTargets()
 
 const std::vector<std::string>& Render3DNode::RenderModeNames()
 {
-   static const std::vector<std::string> kNames = { "Raster", "Path traced" };
+   static const std::vector<std::string> kNames = { "Raster", "RTX (NVIDIA)" };
    return kNames;
 }
 
-void Render3DNode::PathTracerDeleter::operator()(Render3DPathTracer* p) const { delete p; }
+void Render3DNode::RtxDeleter::operator()(RtxBackend* p) const { delete p; }
+
+const std::vector<std::string>& Render3DNode::RtxDenoiseNames()
+{
+   static const std::vector<std::string> kNames = { "Auto", "AI (best)", "Fast", "Off" };
+   return kNames;
+}
 
 const std::vector<std::string>& Render3DNode::PanoramaNames()
 {
@@ -1293,8 +1300,8 @@ const std::vector<std::string>& Render3DNode::PanoramaNames()
    return kNames;
 }
 
-int Render3DNode::PathTracedSamples() const { return mPathTracer ? mPathTracer->Samples() : 0; }
-int Render3DNode::PathTracedTriangles() const { return mPathTracer ? mPathTracer->Triangles() : 0; }
+int Render3DNode::RtxSamples() const { return mRtx ? mRtx->Samples() : 0; }
+double Render3DNode::RtxMs() const { return mRtx ? mRtx->LastMs() : 0.0; }
 
 Render3DNode::~Render3DNode()
 {
@@ -1693,11 +1700,20 @@ void Render3DNode::Cook360(int frameId)
    mRevision = NextTextureRevision();
 }
 
+// Turbo 0.62: Render 3D's cook time (inclusive of the sources it pulls),
+// for INFINITE_FRAMEPROF.
+double gRender3DCookSeconds = 0.0;
+
 void Render3DNode::CookIfNeeded(int frameId)
 {
+   struct CookTimer
+   {
+      std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+      ~CookTimer() { gRender3DCookSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); }
+   } cookTimer;
    // Turbo 0.61: raster 360 renders six faces and reprojects them (Cook360);
    // path traced 360 traces the panorama's rays directly (below).
-   if (panorama > 0 && m360Face < 0 && renderMode == 0 && renderPass == 0)
+   if (panorama > 0 && m360Face < 0 && (renderMode == 0 || (mRtxTried && !mRtx)) && renderPass == 0)
    {
       Cook360(frameId);
       return;
@@ -1760,13 +1776,11 @@ void Render3DNode::CookIfNeeded(int frameId)
    // mColorTex (and mSceneColorTex) already hold the right image, so skip
    // the shadow/opaque/transmissive passes entirely and reuse them.
    SceneSignature sceneSig = BuildSceneSignature();
-   // Turbo 0.61: path traced keeps adding samples to an unchanged scene until
-   // it reaches ptSamples; any change restarts the average.
-   const bool pathTraced = renderMode == 1 && renderPass == 0;
+   // Turbo 0.62: RTX keeps adding samples to an unchanged scene until it
+   // reaches ptSamples; any change restarts the average.
+   const bool pathTraced = renderMode == 1 && renderPass == 0 && !(mRtxTried && !mRtx);
    const bool sceneChanged = !(mHasSceneBuilt && sceneSig == mSceneBuilt);
-   if (pathTraced && sceneChanged && mPathTracer)
-      mPathTracer->Restart();
-   const bool ptAccumulating = pathTraced && (!mPathTracer || mPathTracer->Samples() < ptSamples);
+   const bool ptAccumulating = pathTraced && (!mRtx || mRtx->Samples() < ptSamples);
    if (!sceneChanged && !ptAccumulating)
       return;
    mSceneBuilt = sceneSig;
@@ -1977,184 +1991,148 @@ void Render3DNode::CookIfNeeded(int frameId)
    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
    glDepthMask(GL_TRUE);
 
-   // Turbo 0.61: path traced mode - the same meshes, materials, lights and
-   // environment, traced progressively (Render3DPathTracer), then the same
-   // HDR finish. Falls back to raster when there is nothing it can trace.
+   // Turbo 0.62: RTX mode - the scene handed to the hardware ray tracer
+   // (RtxBackend) as GPU handles, then the same HDR finish. Draws raster
+   // instead when the module or an RTX GPU is missing (RtxStatus says why).
    if (pathTraced)
    {
-      if (!mPathTracer)
-         mPathTracer.reset(new Render3DPathTracer());
-      std::vector<Render3DPathTracer::Source> sources;
-      uint64_t key = 1469598103934665603ull;
-      auto mix = [&key](const void* p, size_t n) {
-         const unsigned char* b = (const unsigned char*)p;
-         for (size_t i = 0; i < n; i++)
-            key = (key ^ b[i]) * 1099511628211ull;
-      };
-      // PointZ sources and point sprites have no CPU mesh of their own: their
-      // traceable stand-ins live here until SetScene has copied them.
-      std::vector<std::unique_ptr<Mesh>> ptMeshes;
-      static const Mesh kOcta = [] {
-         // A unit octahedron with radial normals: a particle shades like a
-         // sphere of the sprite's radius at eight triangles.
-         Mesh m;
-         const float d[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
-         for (const auto& p : d)
-         {
-            Vertex v;
-            v.px = v.nx = p[0]; v.py = v.ny = p[1]; v.pz = v.nz = p[2];
-            m.vertices.push_back(v);
-         }
-         const unsigned int f[8][3] = { { 0, 2, 4 }, { 2, 1, 4 }, { 1, 3, 4 }, { 3, 0, 4 },
-                                        { 2, 0, 5 }, { 1, 2, 5 }, { 3, 1, 5 }, { 0, 3, 5 } };
-         for (const auto& t : f)
-            m.indices.insert(m.indices.end(), t, t + 3);
-         return m;
-      }();
-      // Per-point transforms (and colours) of a PointZ, as the raster builds them.
-      auto popInstances = [](const pop::PopData& pts, const Mat4& model, float scale, int align,
-                             Render3DPathTracer::Source& s) {
-         std::vector<pop::BufferPtr> cols;
-         std::string err;
-         if (!pop::InstanceMatrices(pts, model.m, scale, align, cols, err) || cols.size() != 4)
-            return false;
-         const int n = pts.pointCount;
-         for (int i = 0; i < n; i++)
-         {
-            Mat4 M;
-            for (int c = 0; c < 4; c++)
-            {
-               const std::vector<float>& col = cols[(size_t)c]->Cpu();
-               if (col.size() < (size_t)(i + 1) * 4)
-                  return false;
-               for (int r = 0; r < 4; r++)
-                  M.m[c * 4 + r] = col[(size_t)i * 4 + r];
-            }
-            s.instances.push_back(M);
-         }
-         if (pts.Has(pop::attr::Color))
-            s.instanceColors = pts.Read(pop::attr::Color, 3);
-         return true;
-      };
-      for (IGeometrySource* src : mDraw)
+      if (!mRtx && !mRtxTried)
       {
-         if (src == nullptr)
-            continue;
-         Render3DPathTracer::Source s;
-         s.model = src->GetModelMatrix();
-         s.material = src->GetMaterial();
-         s.surfaceTex = src->GetSurfaceTexture();
-         const pop::PopData* pd = src->GetPop();
-         if (IsSpriteSource(src))
-         {
-            // Points / particles: an octahedron per point, sized like the sprite.
-            s.mesh = &kOcta;
-            s.surfaceTex = 0;
-            const float baseSize = src->PointBaseSize();
-            if (pd != nullptr)
-            {
-               const float spriteScale = baseSize * (pd->Has(pop::attr::PScale) ? 1.0f : 0.02f);
-               if (!popInstances(*pd, s.model, spriteScale, 0, s))
-                  continue;
-               mix(&pd->revision, sizeof(pd->revision));
-            }
-            else if (const std::vector<Particle>* cloud = src->GetPointCloud())
-            {
-               const Mat4& m = s.model;
-               const float scaleX = std::sqrt(m.m[0] * m.m[0] + m.m[1] * m.m[1] + m.m[2] * m.m[2]);
-               for (const Particle& p : *cloud)
-               {
-                  if (!p.alive)
-                     continue;
-                  const float wx = m.m[0] * p.px + m.m[4] * p.py + m.m[8] * p.pz + m.m[12];
-                  const float wy = m.m[1] * p.px + m.m[5] * p.py + m.m[9] * p.pz + m.m[13];
-                  const float wz = m.m[2] * p.px + m.m[6] * p.py + m.m[10] * p.pz + m.m[14];
-                  const float r = p.scale * baseSize * scaleX;
-                  s.instances.push_back(Mat4::Multiply(Mat4::Translation(wx, wy, wz), Mat4::Scale(r, r, r)));
-                  s.instanceColors.push_back(p.r);
-                  s.instanceColors.push_back(p.g);
-                  s.instanceColors.push_back(p.b);
-               }
-               const unsigned long long crev = src->PointCloudRevision();
-               mix(&crev, sizeof(crev));
-            }
-            if (s.instances.empty())
-               continue;
-            mix(&src, sizeof(src));
-            sources.push_back(std::move(s));
-            continue;
-         }
-         if (pd != nullptr)
-         {
-            // PointZ with faces: a mesh from its P / N / Tex / Color and triangles.
-            const pop::PopTopology& topo = pd->Topo();
-            if (!topo.HasFaces() || pd->pointCount <= 0)
-               continue;
-            auto mesh = std::make_unique<Mesh>();
-            const std::vector<float> P = pd->Read(pop::attr::P, 3);
-            const bool hasN = pd->Has(pop::attr::N), hasT = pd->Has(pop::attr::Tex), hasC = pd->Has(pop::attr::Color);
-            const std::vector<float> N = hasN ? pd->Read(pop::attr::N, 3) : std::vector<float>();
-            const std::vector<float> T = hasT ? pd->Read(pop::attr::Tex, 2) : std::vector<float>();
-            mesh->vertices.resize((size_t)pd->pointCount);
-            for (int i = 0; i < pd->pointCount; i++)
-            {
-               Vertex& v = mesh->vertices[(size_t)i];
-               v.px = P[(size_t)i * 3]; v.py = P[(size_t)i * 3 + 1]; v.pz = P[(size_t)i * 3 + 2];
-               if (hasN) { v.nx = N[(size_t)i * 3]; v.ny = N[(size_t)i * 3 + 1]; v.nz = N[(size_t)i * 3 + 2]; }
-               if (hasT) { v.u = T[(size_t)i * 2]; v.v = T[(size_t)i * 2 + 1]; }
-            }
-            mesh->indices.assign(topo.tris.begin(), topo.tris.end());
-            if (!hasN)
-               *mesh = MeshOps::RecalculateNormals(*mesh, false, false);
-            if (hasC)
-               mesh->vertexColor = pd->Read(pop::attr::Color, 3);
-            const pop::PopData* inst = src->GetPopInstances();
-            if (inst != nullptr && inst->pointCount > 0 &&
-                !popInstances(*inst, s.model, inst->instanceScale, inst->instanceAlign, s))
-               continue;
-            mix(&src, sizeof(src));
-            mix(&pd->revision, sizeof(pd->revision));
-            if (inst != nullptr)
-               mix(&inst->revision, sizeof(inst->revision));
-            mix(&s.model, sizeof(s.model));
-            s.mesh = mesh.get();
-            ptMeshes.push_back(std::move(mesh));
-            sources.push_back(std::move(s));
-            continue;
-         }
-         const Mesh& mesh = src->GetMesh();
-         if (mesh.indices.size() < 3)
-            continue;
-         s.mesh = &mesh;
-         if (auto* instancer = FindInstancer(src))
-         {
-            const Mat4 group = src->GetInstanceGroupMatrix();
-            for (const Mat4& x : instancer->InstanceTransforms())
-               s.instances.push_back(Mat4::Multiply(group, x));
-            const unsigned long long irev = instancer->InstanceRevision();
-            mix(&irev, sizeof(irev));
-            mix(&group, sizeof(group));
-         }
-         const unsigned long long rev = src->MeshRevision();
-         mix(&src, sizeof(src));
-         mix(&rev, sizeof(rev));
-         mix(&s.model, sizeof(s.model));
-         // Field by field: the struct's padding is not stable across copies.
-         const Material& mt = s.material;
-         const float mf[14] = { mt.color[0], mt.color[1], mt.color[2], mt.metallic, mt.roughness, mt.opacity,
-                                mt.emissionColor[0], mt.emissionColor[1], mt.emissionColor[2], mt.emission,
-                                mt.ior, mt.transmission, 0.0f, 0.0f };
-         mix(mf, sizeof(mf));
-         mix(&s.surfaceTex, sizeof(s.surfaceTex));
-         sources.push_back(std::move(s));
+         mRtxTried = true;
+         std::unique_ptr<RtxBackend> made = CreateRtxBackend(mRtxWhy);
+         mRtx.reset(made.release());
       }
       unsigned int traced = 0;
-      if (mPathTracer->SetScene(sources, key))
+      if (mRtx)
       {
-         std::vector<Render3DPathTracer::Light> lights;
+         mRtxKeep.clear();
+         std::vector<RtxBackend::Geometry> geo;
+         auto keyOf = [](const void* p, unsigned long long rev) {
+            return (uint64_t)(uintptr_t)p * 0x9E3779B97F4A7C15ull ^ (uint64_t)rev;
+         };
+         auto gpuOf = [this](const pop::PopData& d, const char* name, int& comps) -> unsigned int {
+            const pop::PopAttrib* a = d.Find(name);
+            if (a == nullptr || !a->buffer)
+               return 0;
+            comps = a->buffer->Comps();
+            mRtxKeep.push_back(a->buffer);
+            return a->buffer->Gpu();
+         };
+         // Per-point transforms of a PointZ, as the raster builds them, kept on the GPU.
+         auto popInstances = [this, &gpuOf](const pop::PopData& pts, const Mat4& model, float scale, int align,
+                                            RtxBackend::Geometry& g) {
+            std::vector<pop::BufferPtr> cols;
+            std::string err;
+            if (!pop::InstanceMatrices(pts, model.m, scale, align, cols, err) || cols.size() != 4)
+               return false;
+            for (int c = 0; c < 4; c++)
+            {
+               g.instCols[c] = cols[(size_t)c]->Gpu();
+               mRtxKeep.push_back(cols[(size_t)c]);
+            }
+            g.instCount = pts.pointCount;
+            g.instColorBuf = gpuOf(pts, pop::attr::Color, g.instColorComps);
+            return true;
+         };
+         for (IGeometrySource* src : mDraw)
+         {
+            if (src == nullptr)
+               continue;
+            RtxBackend::Geometry g;
+            g.slot = (uint64_t)(uintptr_t)src;
+            g.model = src->GetModelMatrix();
+            g.material = src->GetMaterial();
+            g.surfaceTex = src->GetSurfaceTexture();
+            const pop::PopData* pd = src->GetPop();
+            if (IsSpriteSource(src))
+            {
+               // Points / particles: one sphere per point, sized like the sprite.
+               g.kind = RtxBackend::Geometry::kSpheres;
+               g.surfaceTex = 0;
+               const float baseSize = src->PointBaseSize();
+               if (pd != nullptr)
+               {
+                  if (pd->pointCount <= 0)
+                     continue;
+                  int pc = 3, rc = 1;
+                  g.posBuf = gpuOf(*pd, pop::attr::P, pc);
+                  g.posComps = pc;
+                  g.radiusBuf = gpuOf(*pd, pop::attr::PScale, rc);
+                  g.radiusScale = baseSize * (g.radiusBuf != 0 ? 1.0f : 0.02f);
+                  g.colorBuf = gpuOf(*pd, pop::attr::Color, g.colorComps);
+                  g.pointCount = pd->pointCount;
+                  g.key = keyOf(src, pd->revision);
+               }
+               else if (const std::vector<Particle>* cloud = src->GetPointCloud())
+               {
+                  const Mat4& m = g.model;
+                  const float scaleX = std::sqrt(m.m[0] * m.m[0] + m.m[1] * m.m[1] + m.m[2] * m.m[2]);
+                  for (const Particle& p : *cloud)
+                  {
+                     if (!p.alive)
+                        continue;
+                     g.cpuCentres.push_back(m.m[0] * p.px + m.m[4] * p.py + m.m[8] * p.pz + m.m[12]);
+                     g.cpuCentres.push_back(m.m[1] * p.px + m.m[5] * p.py + m.m[9] * p.pz + m.m[13]);
+                     g.cpuCentres.push_back(m.m[2] * p.px + m.m[6] * p.py + m.m[10] * p.pz + m.m[14]);
+                     g.cpuCentres.push_back(p.scale * baseSize * scaleX);
+                     g.cpuColors.push_back(p.r);
+                     g.cpuColors.push_back(p.g);
+                     g.cpuColors.push_back(p.b);
+                  }
+                  g.model = Mat4::Identity();
+                  g.pointCount = (int)(g.cpuCentres.size() / 4);
+                  g.key = keyOf(src, src->PointCloudRevision());
+               }
+               if (g.pointCount <= 0)
+                  continue;
+               geo.push_back(std::move(g));
+               continue;
+            }
+            if (pd != nullptr)
+            {
+               // PointZ with faces: its own GL buffers and triangle index buffer.
+               const pop::PopTopology& topo = pd->Topo();
+               if (!topo.HasFaces() || pd->pointCount <= 0)
+                  continue;
+               int pc = 3;
+               g.posBuf = gpuOf(*pd, pop::attr::P, pc);
+               g.posComps = pc;
+               g.normalBuf = gpuOf(*pd, pop::attr::N, g.normalComps);
+               g.uvBuf = gpuOf(*pd, pop::attr::Tex, g.uvComps);
+               g.colorBuf = gpuOf(*pd, pop::attr::Color, g.colorComps);
+               g.indexBuf = topo.TriIbo();
+               g.pointCount = pd->pointCount;
+               g.triCount = (int)topo.TriangleCount();
+               g.key = keyOf(src, pd->revision);
+               if (g.posBuf == 0)
+                  continue;
+               const pop::PopData* inst = src->GetPopInstances();
+               if (inst != nullptr && inst->pointCount > 0 &&
+                   !popInstances(*inst, g.model, inst->instanceScale, inst->instanceAlign, g))
+                  continue;
+               geo.push_back(std::move(g));
+               continue;
+            }
+            const Mesh& mesh = src->GetMesh();
+            if (mesh.indices.size() < 3)
+               continue;
+            g.mesh = &mesh;
+            g.pointCount = (int)mesh.vertices.size();
+            g.triCount = (int)(mesh.indices.size() / 3);
+            g.key = keyOf(src, src->MeshRevision());
+            if (auto* instancer = FindInstancer(src))
+            {
+               const Mat4 group = src->GetInstanceGroupMatrix();
+               for (const Mat4& x : instancer->InstanceTransforms())
+                  g.instCpu.push_back(Mat4::Multiply(group, x));
+            }
+            geo.push_back(std::move(g));
+         }
+
+         std::vector<RtxBackend::Light> lights;
          for (int i = 0; i < lightCount; i++)
          {
-            Render3DPathTracer::Light l;
+            RtxBackend::Light l;
             l.type = lightTypes[i];
             for (int k = 0; k < 3; k++)
             {
@@ -2165,8 +2143,9 @@ void Render3DNode::CookIfNeeded(int frameId)
             l.spotAngle = lightSpotAngle[i];
             lights.push_back(l);
          }
-         Render3DPathTracer::Env env;
+         RtxBackend::Env env;
          env.tex = envTex;
+         env.texKey = envTex;
          env.rotation = envRotationRad;
          env.intensity = envIntensity * envHdriIntensity;
          for (int k = 0; k < 3; k++)
@@ -2176,9 +2155,28 @@ void Render3DNode::CookIfNeeded(int frameId)
             env.ground[k] = envGround[k];
             env.ambient[k] = ambientColor[k];
          }
-         mPathTracer->SetDome(domeAngle, domeTilt);
-         traced = mPathTracer->Trace(w, h, viewProj, eye, lights, env, exposure, ptBounces, std::max(1, ptSamples), 1,
-                                     panorama, view);
+         mRtx->SetScene(geo, lights, env);
+         RtxBackend::Frame f;
+         f.width = w;
+         f.height = h;
+         f.view = view;
+         f.viewProj = viewProj;
+         for (int k = 0; k < 3; k++)
+            f.eye[k] = eye[k];
+         f.panorama = panorama;
+         f.domeAngle = domeAngle;
+         f.domeTilt = domeTilt;
+         f.bounces = ptBounces;
+         f.maxSamples = std::max(1, ptSamples);
+         f.restart = sceneChanged;
+         f.exposure = exposure;
+         f.denoise = rtxDenoise;
+         traced = mRtx->Render(f);
+         mRtxKeep.clear();
+         if (traced == 0 && !mRtx->Error().empty())
+            mRtxWhy = mRtx->Error();
+         else if (traced != 0)
+            mRtxWhy.clear();
       }
       if (traced != 0)
       {

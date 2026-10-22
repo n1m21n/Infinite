@@ -896,7 +896,26 @@ namespace pop
             const float aspect = (float)c.imageH / (float)c.imageW;
             const int rows = c.Bl("aspect") ? std::max(2, (int)std::lround(cols * aspect)) : std::max(2, c.I("rows"));
             const float w = c.F("width");
-            auto grid = GridFromImage(cols, rows, w, w * aspect, c.I("kind"));
+            // Turbo 0.62: the grid only changes with its shape; a live image
+            // reruns the kernel over the cached one instead of rebuilding
+            // (and re-uploading) every point on the CPU each frame.
+            struct GridState : OpState
+            {
+               int cols = 0, rows = 0, kind = -1;
+               float w = 0.0f, h = 0.0f;
+               std::shared_ptr<PopData> grid;
+            };
+            GridState& gs = c.State<GridState>();
+            if (!gs.grid || gs.cols != cols || gs.rows != rows || gs.kind != c.I("kind") || gs.w != w || gs.h != w * aspect)
+            {
+               gs.grid = GridFromImage(cols, rows, w, w * aspect, c.I("kind"));
+               gs.cols = cols;
+               gs.rows = rows;
+               gs.kind = c.I("kind");
+               gs.w = w;
+               gs.h = w * aspect;
+            }
+            auto grid = ShallowCopy(*gs.grid);
             KernelSpec k;
             k.usesImage = true;
             k.reads = { { attr::P, 3 }, { attr::Tex, 3 } };

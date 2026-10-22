@@ -77,6 +77,9 @@ namespace pop
       int Comps() const { return mComps; }
       // Downloads from the GPU on first call when the data was made there.
       const std::vector<float>& Cpu() const;
+      // Turbo 0.62: just these points (Comps() floats each, into `out`),
+      // without downloading the rest when the data lives on the GPU.
+      void ReadRows(const std::vector<int>& rows, float* out) const;
       // Uploads on first call when the data was made on the CPU.
       unsigned int Gpu() const;
       bool OnGpu() const { return mGpu != 0; }

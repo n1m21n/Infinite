@@ -299,6 +299,98 @@ namespace
 #include "app/selftest/EngineTests.inl" // PDC, param sweep and plugin scan tests
 #include "app/selftest/VoiceModFixture.inl" // Turbo 0.60: upstream per-voice modulation fixture
 
+namespace
+{
+   // Turbo 0.62: INFINITE_FRAMEPROF=1 prints where the frame's time goes
+   // (averages over 120 frames) - which stage is the bottleneck of a patch.
+   struct FrameProf
+   {
+      static constexpr int kMarks = 10;
+      double last = 0.0, sum[kMarks] = {}, gpuSum[kMarks] = {};
+      GLuint q[3][kMarks] = {};
+      int ring = 0, gpuFrames = 0;
+      std::map<int, std::pair<std::string, double>> nodes; // index -> (type, seconds)
+      void AddNode(int index, const std::string& type, double seconds)
+      {
+         auto& e = nodes[index];
+         e.first = type;
+         e.second += seconds;
+      }
+      int frames = 0;
+      bool on = getenv("INFINITE_FRAMEPROF") != nullptr;
+      void Mark(int i)
+      {
+         if (!on)
+            return;
+         const double now = glfwGetTime();
+         if (i > 0)
+            sum[i] += now - last;
+         last = now;
+         // GPU time of the same stages: timestamps, read two frames later.
+         if (q[0][0] == 0)
+            glGenQueries(3 * kMarks, &q[0][0]);
+         glQueryCounter(q[ring][i], GL_TIMESTAMP);
+         if (i == kMarks - 1)
+         {
+            const int old = (ring + 1) % 3;
+            GLint ready = 0;
+            if (gpuFrames >= 0 && frames > 2)
+               glGetQueryObjectiv(q[old][kMarks - 1], GL_QUERY_RESULT_AVAILABLE, &ready);
+            if (ready)
+            {
+               GLuint64 t[kMarks] = {};
+               for (int k = 0; k < kMarks; k++)
+                  glGetQueryObjectui64v(q[old][k], GL_QUERY_RESULT, &t[k]);
+               for (int k = 1; k < kMarks; k++)
+                  gpuSum[k] += (double)(t[k] - t[k - 1]) * 1e-9;
+               gpuFrames++;
+            }
+            ring = (ring + 1) % 3;
+         }
+         if (i == kMarks - 1 && ++frames == 120)
+         {
+            static const char* kNames[kMarks] = { "", "events+setup", "menu+canvas", "node bodies", "links+panels",
+                                                  "modulation", "cook", "ui draw", "swap", "after" };
+            printf("FRAMEPROF");
+            double total = 0.0;
+            for (int k = 1; k < kMarks; k++)
+            {
+               printf(" %s=%.1f", kNames[k], sum[k] * 1000.0 / frames);
+               total += sum[k];
+               sum[k] = 0.0;
+            }
+            printf(" total=%.1fms\n", total * 1000.0 / frames);
+            if (gpuFrames > 0)
+            {
+               printf("FRAMEPROF gpu:");
+               double gtotal = 0.0;
+               for (int k = 1; k < kMarks; k++)
+               {
+                  printf(" %s=%.1f", kNames[k], gpuSum[k] * 1000.0 / gpuFrames);
+                  gtotal += gpuSum[k];
+                  gpuSum[k] = 0.0;
+               }
+               printf(" total=%.1fms\n", gtotal * 1000.0 / gpuFrames);
+               gpuFrames = 0;
+            }
+            std::vector<std::pair<double, std::string>> top;
+            for (auto& kv : nodes)
+               top.push_back({ kv.second.second, std::to_string(kv.first) + " " + kv.second.first });
+            std::sort(top.rbegin(), top.rend());
+            extern double gRender3DCookSeconds;
+            printf("FRAMEPROF render3d(incl. its sources)=%.1fms\n", gRender3DCookSeconds * 1000.0 / frames);
+            gRender3DCookSeconds = 0.0;
+            printf("FRAMEPROF bodies:");
+            for (size_t k = 0; k < top.size() && k < 8; k++)
+               printf(" [%s %.1f]", top[k].second.c_str(), top[k].first * 1000.0 / frames);
+            printf("\n");
+            nodes.clear();
+            frames = 0;
+         }
+      }
+   } gFrameProf;
+}
+
 int main(int argc, char** argv)
 {
    #include "app/frame/Startup.inl" // startup: arguments, window, audio, editor, first patch
@@ -306,18 +398,24 @@ int main(int argc, char** argv)
    StartupTrace("startup: entering main loop");
    while (!glfwWindowShouldClose(window))
    {
+      gFrameProf.Mark(0);
       #include "app/frame/FrameBegin.inl" // frame start: events, RPC, file watch, audio recovery, projectors
       #include "app/selftest/InputHooks.inl" // INFINITE_*TEST input injection hooks (dev runs only)
       #include "app/frame/FrameSetup.inl" // ImGui frame, transport tick, per-frame resets
+      gFrameProf.Mark(1);
       #include "app/frame/MenuBar.inl" // main window, recovery prompt, menu bar
       #include "app/frame/Canvas.inl" // canvas layout, docked panels, node editor begin, drops
       #include "app/selftest/CanvasHooks.inl" // INFINITE_*TEST canvas hooks (dev runs only)
+      gFrameProf.Mark(2);
       #include "app/frame/Nodes.inl" // per-node drawing loop
+      gFrameProf.Mark(3);
       #include "app/frame/Links.inl" // MIDI learn pick, cables, splicing, new links, keyboard, deletions, snapping
       #include "app/frame/Popups.inl" // search, spawn menu, dropdown popups
       #include "app/frame/ModMatrix.inl" // modulation matrix and editor-side windows
       #include "app/frame/Panels.inl" // node browser panel and windows outside the canvas
+      gFrameProf.Mark(4);
       #include "app/frame/Cook.inl" // expressions, modulation, cooking, rendering, swap
+      gFrameProf.Mark(9);
    }
 
    #include "app/frame/Shutdown.inl" // shutdown with watchdog

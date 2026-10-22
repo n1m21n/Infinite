@@ -146,6 +146,7 @@ private:
    unsigned int mDownsampleProgram = 0;
    bool mShaderTried = false;
    std::vector<unsigned char> mPixels;
+   GLUtil::AsyncReadback mReadback; // Turbo 0.62
 
    GLUtil::Fbo mStrip;
 

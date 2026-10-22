@@ -1691,8 +1691,8 @@
          ModSlider("radius", &n->bloomRadius, 0.0f, 1.0f, "%.3f", colW);
       }
 
-      // Turbo 0.61: progressive path tracing (noisy at first, clean after the
-      // sample count; any change restarts it).
+      // Turbo 0.62: RTX - hardware ray tracing, denoised, refining while
+      // nothing moves (raster with a note when the GPU / build lacks it).
       NodeSeparator("render", colW);
       DropdownButton("mode", Render3DNode::RenderModeNames(), n->renderMode,
                      [n](int i) { PushUndoCheckpoint(); n->renderMode = i; }, colW);
@@ -1714,11 +1714,13 @@
       {
          ModSliderInt("samples", &n->ptSamples, 1, 4096);
          ModSliderInt("bounces", &n->ptBounces, 1, 12);
-         if (n->PathTracedTriangles() > 0)
-            ImGui::TextDisabled("%d / %d samples, %d tris", std::min(n->PathTracedSamples(), n->ptSamples),
-                                n->ptSamples, n->PathTracedTriangles());
+         DropdownButton("denoise", Render3DNode::RtxDenoiseNames(), n->rtxDenoise,
+                        [n](int i) { PushUndoCheckpoint(); n->rtxDenoise = i; }, colW);
+         if (!n->RtxStatus().empty())
+            ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.35f, 1.0f), "%s", n->RtxStatus().c_str());
          else
-            ImGui::TextDisabled("nothing to trace");
+            ImGui::TextDisabled("%d / %d samples, %.1f ms", std::min(n->RtxSamples(), n->ptSamples), n->ptSamples,
+                                n->RtxMs());
       }
 
       ImGui::EndGroup();

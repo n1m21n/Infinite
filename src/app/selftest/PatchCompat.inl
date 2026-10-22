@@ -9,9 +9,25 @@
       // of anything newer than 0.59.
       if (const char* compatOut = getenv("INFINITE_PATCHCOMPAT"))
       {
-         Transport::Instance().SetPlaying(false);
+         // Turbo 0.62: INFINITE_PATCHCOMPAT_PLAY=1 keeps the transport running
+         // and adds frame and per-node cook times (a profile of the patch).
+         const bool compatPlay = getenv("INFINITE_PATCHCOMPAT_PLAY") != nullptr;
+         if (!compatPlay)
+            Transport::Instance().SetPlaying(false);
+         static auto sCompatT0 = std::chrono::steady_clock::now();
+         static double sCompatMs = 0.0;
+         static int sCompatFrames = 0;
          const char* frameEnv = getenv("INFINITE_PATCHCOMPAT_FRAME");
          const int dumpFrame = frameEnv != nullptr ? atoi(frameEnv) : 20;
+         {
+            const auto now = std::chrono::steady_clock::now();
+            if (frameId > dumpFrame / 2) // skip the loading frames
+            {
+               sCompatMs += std::chrono::duration<double, std::milli>(now - sCompatT0).count();
+               sCompatFrames++;
+            }
+            sCompatT0 = now;
+         }
          if (frameId == dumpFrame)
          {
             auto num = [](double v) {
@@ -84,6 +100,10 @@
                   if (const std::vector<Particle>* cloud = g->GetPointCloud())
                      row += ", \"points\": " + std::to_string(cloud->size());
                }
+               if (compatPlay)
+                  if (auto* pn = dynamic_cast<PopNode*>(n))
+                     row += ", \"ms\": " + num(pn->TotalCookMs() / std::max(1, frameId)) + ", \"gpu\": " +
+                            num(pn->TotalGpuMs() / std::max(1, frameId));
                if (IModulator* mod = ModulatorForOutput(n, 0))
                   row += ", \"mod\": " + num(mod->Value01());
                row += "}";
@@ -91,6 +111,8 @@
                first = false;
             }
             js += "\n ],\n";
+            if (compatPlay && sCompatFrames > 0)
+               js += " \"frameMs\": " + num(sCompatMs / sCompatFrames) + ",\n";
             // Wiring as loaded: cables drawn on the canvas and modulation bindings.
             js += " \"links\": " + std::to_string(gLinks.size()) + ", \"mods\": " +
                   std::to_string(Modulation::Instance().Links().size()) + ",\n";

@@ -23,6 +23,7 @@ option(INFINITE_ENABLE_GPL "Build the GPL-3.0 modules in src/gpl (full Infinite-
 option(INFINITE_ENABLE_DIRECTML_MATTING "Accelerate Remove Background with Windows ML / DirectML" ON)
 option(INFINITE_ENABLE_AVX2 "Compile with /arch:AVX2 (any x64 CPU from ~2013 on)" ON)
 option(INFINITE_ENABLE_ASIO "ASIO driver support (downloads the Steinberg ASIO SDK, GPLv3)" ON)
+option(INFINITE_ENABLE_RTX "RTX render mode: NVIDIA OptiX ray tracing (full edition; needs the CUDA Toolkit to build)" ON)
 option(INFINITE_ENABLE_LTCG "Whole-program optimization (/GL + /LTCG) in Release; slower link" OFF)
 
 # GLFW is built from source and linked statically.
@@ -284,7 +285,6 @@ add_executable(Infinite WIN32
     src/nodes/MidiNodes.cpp
     src/nodes/Geometry3DNodes.cpp
     src/nodes/Render3DPost.cpp
-    src/nodes/Render3DPathTracer.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
     src/nodes/Text3DNode.cpp
@@ -511,6 +511,76 @@ if(INFINITE_ENABLE_GPL)
     message(STATUS "Infinite-Turbo edition: full (GPL-3.0 modules from src/gpl)")
 else()
     message(STATUS "Infinite-Turbo edition: MIT (src/gpl left out)")
+endif()
+
+# ---- RTX render mode (Turbo 0.62) ------------------------------------------
+# Render 3D's RTX mode: NVIDIA OptiX hardware ray tracing. Full edition only
+# (not the MIT build). Needs a CUDA Toolkit with nvcc at build time (11.8 or
+# newer; the newest install that has nvcc is used, or INFINITE_CUDA_ROOT) and
+# fetches the OptiX 7.7 headers from github.com/NVIDIA/optix-dev. At run time
+# only the NVIDIA driver is needed (nvcuda.dll is delay-loaded, so the exe
+# still starts without one). Without any of this, RtxStub.cpp keeps the mode
+# listed and Render 3D draws raster with a note.
+set(INFINITE_RTX_BUILT OFF)
+if(INFINITE_ENABLE_RTX AND INFINITE_ENABLE_GPL)
+    set(INFINITE_CUDA_ROOT "" CACHE PATH "CUDA Toolkit folder for the RTX module (empty = newest with nvcc)")
+    set(_rtx_cuda "${INFINITE_CUDA_ROOT}")
+    if(NOT _rtx_cuda OR NOT EXISTS "${_rtx_cuda}/bin/nvcc.exe")
+        set(_rtx_cuda "")
+        file(TO_CMAKE_PATH "$ENV{ProgramFiles}" _rtx_pf)
+        file(GLOB _rtx_cands "${_rtx_pf}/NVIDIA GPU Computing Toolkit/CUDA/v*")
+        list(SORT _rtx_cands COMPARE NATURAL ORDER DESCENDING)
+        foreach(_c IN LISTS _rtx_cands)
+            if(EXISTS "${_c}/bin/nvcc.exe" AND EXISTS "${_c}/include/cudaGL.h" AND EXISTS "${_c}/lib/x64/cuda.lib")
+                set(_rtx_cuda "${_c}")
+                break()
+            endif()
+        endforeach()
+    endif()
+    if(_rtx_cuda)
+        FetchContent_Declare(optixdev
+            GIT_REPOSITORY https://github.com/NVIDIA/optix-dev.git
+            GIT_TAG v7.7.0
+            GIT_SHALLOW TRUE)
+        FetchContent_MakeAvailable(optixdev) # headers only, no CMakeLists of its own
+    endif()
+    if(_rtx_cuda AND EXISTS "${optixdev_SOURCE_DIR}/include/optix.h")
+        get_filename_component(_rtx_ccbin "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        set(_rtx_out "${CMAKE_BINARY_DIR}/rtx")
+        file(MAKE_DIRECTORY "${_rtx_out}")
+        # MSVC newer than the toolkit knows: device code uses no STL, so the
+        # version checks are switched off rather than failing the build.
+        set(_rtx_flags -allow-unsupported-compiler -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+            -ccbin "${_rtx_ccbin}" -I "${optixdev_SOURCE_DIR}/include" -I "${CMAKE_CURRENT_SOURCE_DIR}/src/rtx"
+            -arch=compute_75 -use_fast_math -m64)
+        add_custom_command(OUTPUT "${_rtx_out}/RtxDevice.optixir"
+            COMMAND "${_rtx_cuda}/bin/nvcc.exe" -optix-ir -rdc=true ${_rtx_flags}
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/rtx/RtxDevice.cu" -o "${_rtx_out}/RtxDevice.optixir"
+            DEPENDS src/rtx/RtxDevice.cu src/rtx/RtxShared.h
+            COMMENT "nvcc: RTX device programs (OptiX-IR)" VERBATIM)
+        add_custom_command(OUTPUT "${_rtx_out}/RtxKernels.ptx"
+            COMMAND "${_rtx_cuda}/bin/nvcc.exe" --ptx ${_rtx_flags}
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/rtx/RtxKernels.cu" -o "${_rtx_out}/RtxKernels.ptx"
+            DEPENDS src/rtx/RtxKernels.cu
+            COMMENT "nvcc: RTX helper kernels (PTX)" VERBATIM)
+        add_custom_command(OUTPUT "${_rtx_out}/RtxEmbedded.cpp"
+            COMMAND ${CMAKE_COMMAND} -DIN_IR=${_rtx_out}/RtxDevice.optixir -DIN_PTX=${_rtx_out}/RtxKernels.ptx
+                    -DOUT=${_rtx_out}/RtxEmbedded.cpp -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RtxEmbed.cmake"
+            DEPENDS "${_rtx_out}/RtxDevice.optixir" "${_rtx_out}/RtxKernels.ptx" cmake/RtxEmbed.cmake
+            COMMENT "Embedding the RTX device code" VERBATIM)
+        target_sources(Infinite PRIVATE src/rtx/RtxOptix.cpp "${_rtx_out}/RtxEmbedded.cpp")
+        target_include_directories(Infinite PRIVATE "${_rtx_cuda}/include" "${optixdev_SOURCE_DIR}/include")
+        target_link_libraries(Infinite PRIVATE "${_rtx_cuda}/lib/x64/cuda.lib" delayimp.lib)
+        target_link_options(Infinite PRIVATE /DELAYLOAD:nvcuda.dll)
+        set(INFINITE_RTX_BUILT ON)
+        message(STATUS "RTX render mode: ON (CUDA ${_rtx_cuda}, OptiX 7.7 headers)")
+    else()
+        message(WARNING "RTX render mode: no CUDA Toolkit with nvcc found (or the OptiX headers did not download) - "
+                        "building without it. Install the CUDA Toolkit or set INFINITE_CUDA_ROOT.")
+    endif()
+endif()
+if(NOT INFINITE_RTX_BUILT)
+    target_sources(Infinite PRIVATE src/nodes/RtxStub.cpp)
 endif()
 target_include_directories(Infinite PRIVATE ${FFMPEG_INCLUDE_DIRS})
 target_link_directories(Infinite PRIVATE ${FFMPEG_LIBRARY_DIRS})

@@ -653,14 +653,21 @@ public:
    float bloom = 0.0f;
    float bloomThreshold = 1.0f;
    float bloomRadius = 0.6f;
-   // Turbo 0.61: 0 raster (live), 1 path traced (progressive: noisy at first,
-   // clean after ptSamples frames; any change restarts it).
+   // Turbo 0.62: 0 raster, 1 RTX - hardware ray tracing on an NVIDIA RTX GPU
+   // (RtxBackend, optional module): one sample per pixel per frame, denoised,
+   // accumulating up to ptSamples while nothing moves.
    static const std::vector<std::string>& RenderModeNames();
    int renderMode = 0;
    int ptSamples = 256;
    int ptBounces = 4;
-   int PathTracedSamples() const;
-   int PathTracedTriangles() const;
+   // RTX denoiser: 0 auto (fast while the scene moves, AI once it is still),
+   // 1 AI (OptiX, best, ~20 ms at 1080p), 2 fast (a-trous, ~1 ms), 3 off.
+   int rtxDenoise = 0;
+   static const std::vector<std::string>& RtxDenoiseNames();
+   int RtxSamples() const;
+   double RtxMs() const;
+   // Why RTX mode is drawing raster instead (empty when it traces).
+   const std::string& RtxStatus() const { return mRtxWhy; }
    // Turbo 0.61: 360 output from the camera's position, relative to its
    // orientation (keep elevation 0 for a level horizon): 0 off, 1
    // equirectangular (2:1), 2 cubemap 3x2 (+X -X +Y / -Y +Z -Z, 3:2). Raster
@@ -696,6 +703,7 @@ public:
       v.Float("bloom", bloom); v.Float("bloomThreshold", bloomThreshold); v.Float("bloomRadius", bloomRadius);
       v.Int("renderMode", renderMode); v.Int("ptSamples", ptSamples); v.Int("ptBounces", ptBounces);
       v.Int("panorama", panorama); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt);
+      v.Int("rtxDenoise", rtxDenoise);
    }
 
 private:
@@ -870,9 +878,13 @@ private:
    unsigned int mFbo = 0;
    unsigned int mColorTex = 0;
    Render3DPost mPost;        // Turbo 0.61: IBL maps + HDR finish
-   // Turbo 0.61: renderMode 1. Deleter defined in the .cpp, where the type is complete.
-   struct PathTracerDeleter { void operator()(class Render3DPathTracer* p) const; };
-   std::unique_ptr<class Render3DPathTracer, PathTracerDeleter> mPathTracer;
+   // Turbo 0.62: renderMode 1. Deleter defined in the .cpp, where the type is complete.
+   struct RtxDeleter { void operator()(class RtxBackend* p) const; };
+   std::unique_ptr<class RtxBackend, RtxDeleter> mRtx;
+   bool mRtxTried = false;
+   std::string mRtxWhy;
+   // Instance matrices made for the tracer this frame, alive until it copied them.
+   std::vector<std::shared_ptr<const void>> mRtxKeep;
    // Turbo 0.61: raster 360 - one CookIfNeeded per cube face (m360Face >= 0
    // swaps the camera and the size), faces kept in a 6-layer array, then
    // reprojected by mPost into mPanoOut.

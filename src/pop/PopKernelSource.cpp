@@ -288,21 +288,23 @@ float remap(float x, float a, float b, float c, float d) { return c + (x - a) * 
       for (size_t k = 0; k < spec.lookups.size(); k++)
       {
          const KernelIO& l = spec.lookups[k];
+         const std::string& ln = l.as.empty() ? l.name : l.as;
          char line[512];
          snprintf(line, sizeof(line), "uniform samplerBuffer t_%s;\nuniform int c_%s;\nuniform int n_%s;\n",
-                  l.name.c_str(), l.name.c_str(), l.name.c_str());
+                  ln.c_str(), ln.c_str(), ln.c_str());
          src += line;
       }
       src += kPreamble;
       src += "vec4 sampleImage(vec2 uv) { return uHasImage != 0 ? texture(uImage, uv) : vec4(1.0); }\n";
       for (const KernelIO& l : spec.lookups)
       {
+         const std::string& ln = l.as.empty() ? l.name : l.as;
          // Raw float buffer: component c of point i lives at i * comps + c.
          const std::string t = GlslType(l.comps);
-         std::string f = t + " fetch_" + l.name + "(int i)\n{\n   i = clamp(i, 0, max(0, n_" + l.name + " - 1));\n";
-         f += "   int b = i * c_" + l.name + ";\n";
+         std::string f = t + " fetch_" + ln + "(int i)\n{\n   i = clamp(i, 0, max(0, n_" + ln + " - 1));\n";
+         f += "   int b = i * c_" + ln + ";\n";
          if (l.comps == 1)
-            f += "   return texelFetch(t_" + l.name + ", b).r;\n";
+            f += "   return texelFetch(t_" + ln + ", b).r;\n";
          else
          {
             f += "   return " + t + "(";
@@ -310,7 +312,7 @@ float remap(float x, float a, float b, float c, float d) { return c + (x - a) * 
             {
                if (c > 0)
                   f += ", ";
-               f += "(c_" + l.name + " > " + std::to_string(c) + " ? texelFetch(t_" + l.name + ", b + " +
+               f += "(c_" + ln + " > " + std::to_string(c) + " ? texelFetch(t_" + ln + ", b + " +
                     std::to_string(c) + ").r : " + (l.name == attr::Color && c == 3 ? "1.0" : "0.0") + ")";
             }
             f += ");\n";

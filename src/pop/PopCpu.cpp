@@ -49,6 +49,32 @@ namespace pop
       return a;
    }
 
+   Arrays LoadRows(const PopData& d, const std::vector<int>& rows)
+   {
+      Arrays a;
+      a.count = (int)rows.size();
+      auto add = [&](const std::string& name, const PopAttrib* at, int comps) {
+         a.names.push_back(name);
+         a.comps.push_back(comps);
+         std::vector<float> v((size_t)a.count * comps);
+         if (at != nullptr && at->buffer->Comps() == comps && at->buffer->Count() == d.pointCount)
+            at->buffer->ReadRows(rows, v.data());
+         else
+         {
+            // Odd shapes (a P with two components...) take the full path.
+            const std::vector<float> all = d.Read(name, comps);
+            for (size_t r = 0; r < rows.size(); r++)
+               std::copy_n(&all[(size_t)rows[r] * comps], comps, &v[r * comps]);
+         }
+         a.data.push_back(std::move(v));
+      };
+      add(attr::P, d.Find(attr::P), 3);
+      for (const PopAttrib& at : d.attribs)
+         if (at.name != attr::P)
+            add(at.name, &at, at.buffer->Comps());
+      return a;
+   }
+
    std::shared_ptr<PopData> Store(Arrays&& a, std::shared_ptr<PopTopology> topo)
    {
       auto out = std::make_shared<PopData>();

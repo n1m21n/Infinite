@@ -220,6 +220,7 @@ private:
    // instead of spreading the whole image across it.
    std::vector<std::pair<float, float>> mPointUv;
    std::vector<unsigned char> mPixels;
+   GLUtil::AsyncReadback mReadback; // Turbo 0.62
    unsigned long long mRevision = 0;
 
    GLUtil::Fbo mSmall;

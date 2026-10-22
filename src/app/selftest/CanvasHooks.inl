@@ -5186,10 +5186,11 @@
 
       // antialiased silhouette from ordinary shading gradients; differencing
       // two renders of an identical scene can, because only the edges move.
-      // Turbo 0.61: the 3DTEST scene path traced - samples accumulate up to
+      // Turbo 0.62: the 3DTEST scene in RTX mode - samples accumulate up to
       // ptSamples, and the finished image covers the geometry like the raster.
+      // Without the module or an RTX GPU it draws raster and says SKIP.
       const bool panoTest = getenv("INFINITE_PANORAMATEST") != nullptr;
-      if ((getenv("INFINITE_PATHTRACETEST") != nullptr || panoTest) && frameId == 40)
+      if ((getenv("INFINITE_RTXTEST") != nullptr || panoTest) && frameId == 40)
       {
          auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
          const int w = r->GetOutputWidth(), h = r->GetOutputHeight();
@@ -5208,14 +5209,16 @@
                lit++;
          const double coverage = (double)lit / (double)std::max(1, w * h);
          const GLenum err = glGetError();
-         const bool traced = r->renderMode == 0 || (r->PathTracedSamples() >= r->ptSamples && r->PathTracedTriangles() > 0);
+         const bool skipped = r->renderMode == 1 && !r->RtxStatus().empty();
+         const bool traced = r->renderMode == 0 || skipped || r->RtxSamples() >= r->ptSamples;
          const bool sized = r->panorama == 0 || (w == (int)r->width && h == (int)r->height);
          const bool ok = traced && sized && coverage > 0.03 && (r->panorama > 0 || coverage < 0.95) && err == GL_NO_ERROR;
-         if (const char* png = getenv("INFINITE_PATHTRACETEST_PNG")) // eyeball the result (bottom-up rows)
+         if (const char* png = getenv("INFINITE_RTXTEST_PNG")) // eyeball the result (bottom-up rows)
             stbi_write_png(png, w, h, 4, px.data(), w * 4);
-         printf("%s %dx%d samples=%d/%d tris=%d coverage=%.1f%% gl=0x%x  %s\n",
-                panoTest ? "PANORAMATEST" : "PATHTRACETEST", w, h, r->PathTracedSamples(),
-                r->ptSamples, r->PathTracedTriangles(), coverage * 100.0, err, ok ? "OK" : "FAIL");
+         printf("%s %dx%d samples=%d/%d %.1fms coverage=%.1f%% gl=0x%x %s%s%s %s\n",
+                panoTest ? "PANORAMATEST" : "RTXTEST", w, h, r->RtxSamples(), r->ptSamples, r->RtxMs(),
+                coverage * 100.0, err, skipped ? "SKIP (" : "", skipped ? r->RtxStatus().c_str() : "",
+                skipped ? ")" : "", ok ? "OK" : "FAIL");
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
       if (getenv("INFINITE_3DTEST") != nullptr &&

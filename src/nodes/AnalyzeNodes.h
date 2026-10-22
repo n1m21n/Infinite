@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "GLUtil.h"
 #include "INode.h"
 #include "ImageCable.h"
 #include "AudioCable.h"
@@ -163,6 +164,7 @@ private:
    std::string mExprError;
 
    std::vector<unsigned char> mPixels;
+   GLUtil::AsyncReadback mReadback; // Turbo 0.62
    std::vector<unsigned char> mPrevPixels;
    unsigned int mSmallFbo = 0;
    unsigned int mSmallTex = 0;

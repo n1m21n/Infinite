@@ -793,7 +793,13 @@
       ImDrawList* dl = ImGui::GetWindowDrawList();
       DrawCheckerboardBackdrop(dl, origin, size);
 
-      const unsigned int tex = viewport.Render(geo, cam, (int)size, (int)size);
+      // Turbo 0.62: an animated preview refreshes every other frame
+      // (alternating between nodes) unless the pointer is over it - half the
+      // GPU time of a canvas full of moving geometry.
+      const bool live = ImGui::IsMouseHoveringRect(origin, ImVec2(origin.x + size, origin.y + size)) ||
+                        ((ImGui::GetFrameCount() + gn.index) & 1) == 0;
+      const unsigned int tex = (live || viewport.LastTexture() == 0) ? viewport.Render(geo, cam, (int)size, (int)size)
+                                                                     : viewport.LastTexture();
       if (tex != 0)
       {
          dl->AddImage((ImTextureID)(intptr_t)tex, origin, ImVec2(origin.x + size, origin.y + size),

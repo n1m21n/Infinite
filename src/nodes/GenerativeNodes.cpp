@@ -272,11 +272,11 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uTex"), 0);
    });
 
+   // Turbo 0.62: read back without stalling the GPU pipeline (see
+   // GLUtil::AsyncReadback) - no new copy yet means keep last frame's result.
    mPixels.resize((size_t)n * (size_t)n * 4);
-   glBindTexture(GL_TEXTURE_2D, mSmall.tex);
-   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-   glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, mPixels.data());
-   glBindTexture(GL_TEXTURE_2D, 0);
+   if (!mReadback.Read(mSmall.tex, n, n, GL_RGBA, GL_UNSIGNED_BYTE, mPixels.data()))
+      return;
 
    mPoints.clear();
    mPoints.reserve((size_t)n * (size_t)n);

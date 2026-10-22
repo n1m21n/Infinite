@@ -6,6 +6,7 @@
 #include <cstdio>
 
 #include "GeometryOpNodes.h"
+#include "pop/PopGpu.h"
 
 namespace
 {
@@ -265,6 +266,7 @@ NodeViewport::~NodeViewport()
    if (mVertexColorVbo != 0) glDeleteBuffers(1, &mVertexColorVbo);
    if (mPointVbo != 0) glDeleteBuffers(1, &mPointVbo);
    if (mPointVao != 0) glDeleteVertexArrays(1, &mPointVao);
+   if (mPopVao != 0) glDeleteVertexArrays(1, &mPopVao);
 }
 
 bool NodeViewport::EnsureFbo(int w, int h)
@@ -486,16 +488,102 @@ void NodeViewport::Zoom(float wheelDelta)
    mUserAdjusted = true;
 }
 
+void NodeViewport::PopBoundsDeleter::operator()(pop::AsyncBounds* b) const
+{
+   delete b;
+}
+
+void NodeViewport::BindPop(const pop::PopData& d, const pop::PopData* inst, const Mat4& model)
+{
+   if (mPopVao == 0)
+      glGenVertexArrays(1, &mPopVao);
+   glBindVertexArray(mPopVao);
+   auto bind = [&](unsigned int loc, const char* name, int size) -> bool {
+      const pop::PopAttrib* a = d.Find(name);
+      if (a == nullptr || !a->buffer || a->buffer->Count() < d.pointCount || a->buffer->Comps() < size)
+      {
+         glDisableVertexAttribArray(loc);
+         return false;
+      }
+      glBindBuffer(GL_ARRAY_BUFFER, a->buffer->Gpu());
+      glEnableVertexAttribArray(loc);
+      glVertexAttribPointer(loc, size, GL_FLOAT, GL_FALSE, a->buffer->Comps() * (GLsizei)sizeof(float), (void*)0);
+      glVertexAttribDivisor(loc, 0);
+      return true;
+   };
+   bind(0, pop::attr::P, 3);
+   if (!bind(1, pop::attr::N, 3))
+      glVertexAttrib3f(1, 0.0f, 0.0f, 1.0f);
+   bind(6, pop::attr::Tex, 2);
+   mPopColor = bind(7, pop::attr::Color, 3);
+   const pop::PopTopology& topo = d.Topo();
+   mPopTriIndices = topo.HasFaces() ? (int)topo.tris.size() : 0;
+   mPopLineIndices = (!topo.HasFaces() && topo.HasLines()) ? topo.LineIndexCount() : 0;
+   mPopPoints = d.pointCount;
+   if (mPopTriIndices > 0)
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, topo.TriIbo());
+   else if (mPopLineIndices > 0)
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, topo.LineIbo());
+   else
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+   // Instance PointZ: the same per-point matrices Render 3D draws with.
+   mPopInstances = 0;
+   std::vector<pop::BufferPtr> cols;
+   std::string err;
+   if (inst != nullptr && inst->pointCount > 0 &&
+       pop::InstanceMatrices(*inst, model.m, inst->instanceScale, inst->instanceAlign, cols, err) && cols.size() == 4)
+   {
+      for (int c = 0; c < 4; c++)
+      {
+         glBindBuffer(GL_ARRAY_BUFFER, cols[(size_t)c]->Gpu());
+         glEnableVertexAttribArray(2 + c);
+         glVertexAttribPointer(2 + c, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+         glVertexAttribDivisor(2 + c, 1);
+      }
+      mPopInstances = inst->pointCount;
+   }
+   else
+      for (int c = 0; c < 4; c++)
+      {
+         glDisableVertexAttribArray(2 + c);
+         glVertexAttribDivisor(2 + c, 0);
+      }
+   glBindVertexArray(0);
+   glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+   // Framing bounds: a GPU reduction, read back a frame later (no stall).
+   if (!mPopBounds)
+      mPopBounds.reset(new pop::AsyncBounds());
+   float lo[3], hi[3];
+   const pop::PopData& framed = mPopInstances > 0 ? *inst : d;
+   if (framed.BoundsAsync(*mPopBounds, lo, hi))
+   {
+      for (int k = 0; k < 3; k++)
+      {
+         mLo[k] = lo[k];
+         mHi[k] = hi[k];
+      }
+      mHasBounds = mLo[0] <= mHi[0];
+   }
+}
+
 unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h,
                                   bool forceRedraw)
 {
    if (geo == nullptr)
       return 0;
-   const Mesh& mesh = geo->GetMesh();
+   // Turbo 0.62: PointZ never goes through GetMesh() here (see BindPop).
+   static const Mesh kNoMesh;
+   const pop::PopData* pd = geo->GetPop();
+   if (pd != nullptr && (pd->pointCount <= 0 || pd->Find(pop::attr::P) == nullptr))
+      return 0;
+   const pop::PopData* pdInst = pd != nullptr ? geo->GetPopInstances() : nullptr;
+   const Mesh& mesh = pd != nullptr ? kNoMesh : geo->GetMesh();
    // HasGeometry(), not Empty(): a vertices-only mesh (Points to Vertices'
    // output, indices empty) has nothing to preview as triangles but is still
    // drawn below as GL_POINTS.
-   const bool hasMesh = mesh.HasGeometry();
+   const bool hasMesh = pd != nullptr || mesh.HasGeometry();
 
    // A pure point-cloud source (Particle System) has no mesh at all -
    // GetMesh() is a permanently-empty stub (SimulationNodes.h) - so it has to
@@ -521,13 +609,15 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    w = std::max(16, w);
    h = std::max(16, h);
 
-   const unsigned long long revision = usePointCloud ? geo->PointCloudRevision() : geo->MeshRevision();
+   const unsigned long long revision = pd != nullptr
+      ? pd->revision ^ (pdInst != nullptr ? pdInst->revision * 0x9E3779B97F4A7C15ull : 0ull)
+      : (usePointCloud ? geo->PointCloudRevision() : geo->MeshRevision());
    const Mat4 model = geo->GetModelMatrix();
    const Material material = geo->GetMaterial();
    const unsigned int surfaceTexture = geo->GetSurfaceTexture();
    const unsigned long long surfaceTextureRevision = geo->SurfaceTextureRevision();
 
-   InstanceOnPointsNode* instancer = FindInstancer(geo);
+   InstanceOnPointsNode* instancer = pd != nullptr ? nullptr : FindInstancer(geo);
    const bool instanced = instancer != nullptr && instancer->InstanceCount() > 0;
    const unsigned long long instanceRevision = instanced ? instancer->InstanceRevision() : 0;
    const Mat4 instanceGroupMatrix = instanced ? geo->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -581,7 +671,9 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    if (!EnsureFbo(w, h))
       return 0;
 
-   if (usePointCloud)
+   if (pd != nullptr)
+      BindPop(*pd, pdInst, model);
+   else if (usePointCloud)
       UploadPoints(*cloud, revision);
    else
       UploadMesh(mesh, revision);
@@ -727,6 +819,28 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    glUniform1i(glGetUniformLocation(program, "uTexture"), 0);
    glUniform1i(glGetUniformLocation(program, "uHasTexture"), surfaceTexture != 0 ? 1 : 0);
 
+   if (pd != nullptr)
+   {
+      glUniform1i(glGetUniformLocation(program, "uInstanced"), mPopInstances > 0 ? 1 : 0);
+      glUniform1i(glGetUniformLocation(program, "uHasVertexColor"), mPopColor ? 1 : 0);
+      glBindVertexArray(mPopVao);
+      const GLenum prim = mPopTriIndices > 0 ? GL_TRIANGLES : (mPopLineIndices > 0 ? GL_LINES : GL_POINTS);
+      const int indices = mPopTriIndices > 0 ? mPopTriIndices : mPopLineIndices;
+      if (prim == GL_POINTS)
+      {
+         if (mPopInstances > 0)
+            glDrawArraysInstanced(GL_POINTS, 0, mPopPoints, mPopInstances);
+         else
+            glDrawArrays(GL_POINTS, 0, mPopPoints);
+      }
+      else if (mPopInstances > 0)
+         glDrawElementsInstanced(prim, indices, GL_UNSIGNED_INT, nullptr, mPopInstances);
+      else
+         glDrawElements(prim, indices, GL_UNSIGNED_INT, nullptr);
+      glBindVertexArray(0);
+   }
+   else
+   {
    glBindVertexArray(mVao);
    if (instanced)
    {
@@ -781,6 +895,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          glDrawElements(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, nullptr);
    }
    glBindVertexArray(0);
+   } // !pd
    glUseProgram(0);
    } // !usePointCloud
 
