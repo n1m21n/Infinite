@@ -85,6 +85,8 @@ check_verdict INFINITE_AUDIOPDCTEST "AUDIOPDCTEST OK"
 # reads it back and asserts both nodes survive ApplyPatchData. Headless -
 # returns before glfwInit().
 check_verdict INFINITE_SYPHONPATCHTEST "SYPHONPATCHTEST OK"
+# W1: settings, patch save/load and recents in a non-ASCII folder.
+check_verdict INFINITE_UNICODEPATHTEST "UNICODEPATHTEST OK"
 
 # Exported-movie A/V sync: pure arithmetic over the same pacing both
 # recorders' PTS depend on, so it runs headless here as well as on macOS -

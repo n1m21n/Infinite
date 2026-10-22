@@ -15,6 +15,7 @@
 #include "audio/NoteEventQueue.h"
 #include "audio/NoteModel.h"
 #include "core/Transport.h"
+#include "platform/AppPaths.h"
 
 namespace
 {
@@ -148,7 +149,7 @@ namespace
 
       bool Load(const std::string& directory)
       {
-         std::ifstream f(Path(directory), std::ios::binary | std::ios::ate);
+         std::ifstream f(AppPaths::FsPath(Path(directory)), std::ios::binary | std::ios::ate);
          if (!f.is_open())
             return false;
          const size_t sz = (size_t)f.tellg();
@@ -175,7 +176,7 @@ namespace
       {
          std::error_code ec;
          std::filesystem::create_directories(directory, ec);
-         std::ofstream f(Path(directory), std::ios::binary | std::ios::trunc);
+         std::ofstream f(AppPaths::FsPath(Path(directory)), std::ios::binary | std::ios::trunc);
          if (!f.is_open())
             return false;
          const uint32_t count = (uint32_t)mSamples.size();

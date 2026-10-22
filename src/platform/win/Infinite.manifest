@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Merged into Infinite.exe's own manifest by CMake (a .manifest in a target's
+  sources becomes /MANIFESTINPUT on MSVC).
+
+  activeCodePage UTF-8 (Windows 10 1903+) makes every narrow Win32 and CRT call
+  in the process - fopen, std::ifstream(std::string), std::filesystem::path
+  from a std::string, getenv, main()'s argv, and the same calls inside
+  third-party libraries - read and write UTF-8 instead of the system ANSI code
+  page. Infinite keeps every path as UTF-8 std::string, so without this a user
+  named Jose with an accent, or any CJK/Hindi folder name, silently loses
+  settings and patch loads. The code also routes its own opens through
+  AppPaths::FsPath / AppPaths::OpenFile, which covers older Windows where this
+  setting is ignored.
+-->
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

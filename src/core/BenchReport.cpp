@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include "platform/AppPaths.h"
 
 namespace Bench
 {
@@ -258,7 +259,7 @@ namespace Bench
       // INFINITE_BENCH_DUMPRGBA=<file> writes them for scripts/bench/rgbadiff.py.
       if (const char* dumpPath = std::getenv("INFINITE_BENCH_DUMPRGBA"))
       {
-         if (FILE* f = std::fopen(dumpPath, "wb"))
+         if (FILE* f = AppPaths::OpenFile(dumpPath, "wb"))
          {
             std::fwrite(pixels.data(), 1, pixels.size(), f);
             std::fclose(f);

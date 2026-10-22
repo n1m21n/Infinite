@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include "platform/AppPaths.h"
 
 namespace MidiFile
 {
@@ -203,7 +204,7 @@ namespace MidiFile
 
    bool Load(const std::string& path, Song& out, std::string& error)
    {
-      FILE* f = fopen(path.c_str(), "rb");
+      FILE* f = AppPaths::OpenFile(path, "rb");
       if (!f)
       {
          error = "cannot open file";

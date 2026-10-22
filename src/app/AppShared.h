@@ -4,6 +4,7 @@
 #include "app/ui/design/TokenColors.h"
 #include "app/AppCommon.h"
 #include "app/ui/design/components/ActionButton.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -1657,7 +1658,7 @@ void SaveBrowserFilterPrefs();
          const std::string path = Path();
          if (path.empty())
             return;
-         std::ifstream file(path);
+         std::ifstream file(AppPaths::FsPath(path));
          if (!file)
             return;
          modules.clear();
@@ -1697,7 +1698,7 @@ void SaveBrowserFilterPrefs();
          const std::string path = Path();
          if (path.empty())
             return;
-         std::ofstream file(path);
+         std::ofstream file(AppPaths::FsPath(path));
          if (!file)
             return;
          file << "[modules]\n";
@@ -4181,7 +4182,7 @@ std::vector<uint8_t> EncodePng16(int w, int h, const uint16_t* rgba, int level);
                   png = ContactSheet::TagSrgb(png);
             }
             if (!png.empty())
-               if (FILE* f = std::fopen(job.path.c_str(), "wb"))
+               if (FILE* f = AppPaths::OpenFile(job.path, "wb"))
                {
                   ok = std::fwrite(png.data(), 1, png.size(), f) == png.size();
                   std::fclose(f);
@@ -6158,6 +6159,7 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false);
 int RunCameraConvTest();
 #endif
 int RunPatchOpenerTest();   // INFINITE_PATCHOPENERTEST, PlatformTests.cpp
+int RunUnicodePathTest();  // INFINITE_UNICODEPATHTEST, PlatformTests.cpp
 int RunSelfUpdateTest();    // INFINITE_SELFUPDATETEST, PlatformTests.cpp (throwaway copies only)
 
 #if defined(__linux__)

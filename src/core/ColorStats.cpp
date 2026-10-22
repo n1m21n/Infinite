@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include "platform/AppPaths.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -418,7 +419,7 @@ namespace ColorStats
    {
       mLastDir = directory;
       const std::string path = StatsPath(directory);
-      std::ifstream f(path, std::ios::binary | std::ios::ate);
+      std::ifstream f(AppPaths::FsPath(path), std::ios::binary | std::ios::ate);
       if (!f.is_open())
          return false;
       const size_t sz = (size_t)f.tellg();
@@ -434,7 +435,7 @@ namespace ColorStats
       const std::string path = StatsPath(directory);
       std::error_code ec;
       std::filesystem::create_directories(directory, ec);
-      std::ofstream f(path, std::ios::binary | std::ios::trunc);
+      std::ofstream f(AppPaths::FsPath(path), std::ios::binary | std::ios::trunc);
       if (!f.is_open())
          return false;
       std::vector<uint8_t> buf = mProfile.Serialize();

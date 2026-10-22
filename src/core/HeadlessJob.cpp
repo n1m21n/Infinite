@@ -8,6 +8,7 @@
 #ifndef _WIN32
 #include <sys/types.h>
 #endif
+#include "platform/AppPaths.h"
 
 namespace Headless
 {
@@ -646,7 +647,7 @@ namespace Headless
 
    bool MovieHasIndex(const std::string& path)
    {
-      FILE* f = std::fopen(path.c_str(), "rb");
+      FILE* f = AppPaths::OpenFile(path, "rb");
       if (f == nullptr)
          return false;
       bool found = false;
@@ -682,7 +683,7 @@ namespace Headless
       const std::string json = StatusToJson(status);
       if (!job.jsonPath.empty())
       {
-         if (FILE* f = std::fopen(job.jsonPath.c_str(), "wb"))
+         if (FILE* f = AppPaths::OpenFile(job.jsonPath, "wb"))
          {
             std::fwrite(json.data(), 1, json.size(), f);
             std::fputc('\n', f);

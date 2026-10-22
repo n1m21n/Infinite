@@ -63,6 +63,7 @@
 #include "pluginterfaces/vst/ivstprocesscontext.h"
 #include "pluginterfaces/vst/vstspeaker.h"
 #include "pluginterfaces/vst/vsttypes.h"
+#include "../AppPaths.h"
 
 namespace
 {
@@ -368,7 +369,7 @@ namespace
       const std::string path = VST3SentinelPath();
       if (path.empty())
          return;
-      FILE* f = std::fopen(path.c_str(), "rb");
+      FILE* f = AppPaths::OpenFile(path, "rb");
       if (f == nullptr)
          return;
       char buf[4096] = {};
@@ -419,7 +420,7 @@ namespace
       const std::string path = VST3SentinelPath();
       if (path.empty())
          return;
-      FILE* f = std::fopen(path.c_str(), "wb");
+      FILE* f = AppPaths::OpenFile(path, "wb");
       if (f == nullptr)
          return;
       std::fwrite(bundlePath.data(), 1, bundlePath.size(), f);

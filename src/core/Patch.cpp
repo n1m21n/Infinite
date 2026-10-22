@@ -1487,7 +1487,7 @@ void LoadRecents()
    const std::string path = RecentsPath();
    if (path.empty())
       return;
-   std::ifstream file(path);
+   std::ifstream file(AppPaths::FsPath(path));
    std::string line;
    while (std::getline(file, line) && sRecents.size() < kMaxRecents)
    {
@@ -1501,7 +1501,7 @@ void SaveRecents()
    const std::string path = RecentsPath();
    if (path.empty())
       return;
-   std::ofstream file(path);
+   std::ofstream file(AppPaths::FsPath(path));
    for (const std::string& entry : sRecents)
       file << entry << "\n";
 }

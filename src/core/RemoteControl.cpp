@@ -56,7 +56,7 @@ namespace RemoteControl
          const std::string dir = SettingsDir();
          if (dir.empty())
             return;
-         std::ofstream file(dir + "/control_token");
+         std::ofstream file(AppPaths::FsPath(dir + "/control_token"));
          file << token;
       }
 

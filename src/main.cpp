@@ -14,6 +14,19 @@ using namespace app;
 
 int main(int argc, char** argv)
 {
+#if defined(_WIN32)
+   // argv is in the ANSI code page; every path in the engine is UTF-8.
+   static std::vector<std::string> utf8Args = Platform::CommandLineUtf8();
+   static std::vector<char*> utf8Argv;
+   if (!utf8Args.empty())
+   {
+      for (std::string& a : utf8Args)
+         utf8Argv.push_back(a.data());
+      utf8Argv.push_back(nullptr);
+      argc = (int)utf8Args.size();
+      argv = utf8Argv.data();
+   }
+#endif
    FrameCtx fc;
    {
       const int rc = InitApp(fc, argc, argv);

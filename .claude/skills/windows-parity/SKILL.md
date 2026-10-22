@@ -213,12 +213,21 @@ state, reverb tanks) carry their own guard, same as the twenty existing kernels.
 ### 3.7 Paths and encodings
 
 - Engine strings are UTF-8 `std::string` everywhere, always.
-- In a Windows TU, `fopen` / `std::ifstream` with that string mangles any
-  non-ASCII path. Convert with `WinCommon::Utf8ToWide` and use `_wfopen`.
-  MSVC's `std::ifstream` accepts a `std::wstring` directly, which is the
-  cheapest fix. There is **no UTF-8 `ActiveCodePage` manifest** in this repo,
-  so the process ANSI code page is the system default and this conversion
-  really does mangle — do not assume modern Windows saves you.
+- On Windows, `fopen` / `std::ifstream(std::string)` / `std::filesystem::path(std::string)` /
+  `getenv` / `main()`'s `argv` all use the ANSI code page. Two layers handle it (W1):
+  1. `src/platform/win/Infinite.manifest` sets `activeCodePage` UTF-8, so on
+     Windows 10 1903+ every narrow call in the process (third-party libraries
+     too) is UTF-8. `/utf-8` keeps source literals UTF-8.
+  2. Own code still opens through `AppPaths::FsPath(path)` (streams,
+     `std::filesystem`) and `AppPaths::OpenFile(path, mode)` (`FILE*`), reads
+     env vars with `AppPaths::GetEnvUtf8`, and `main()` rebuilds argv from
+     `Platform::CommandLineUtf8()`. That covers older Windows where the
+     manifest is ignored. Both helpers need no `windows.h`.
+  `scripts/check_utf8_paths.py` (CI, design-ratchet job) fails on a new narrow
+  open; `INFINITE_UNICODEPATHTEST` saves settings, a patch and recents in a
+  `Ünïcødé_テスト_टेस्ट` folder on all three CI platforms. Never pass an
+  `std::filesystem::path` to `FsPath` (it takes `std::string`; on Windows a
+  path does not convert, so that only fails on the Windows runner).
 - `MediaDecodeWin.cpp:79` already documents the rule and defines a `WPATH()`
   helper for it; the dr_libs, stb_image and tinyexr paths all honour it. **The
   four hand-rolled parsers in the same file do not**: `LoadModelObj` (:192),

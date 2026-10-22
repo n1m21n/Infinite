@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "json.hpp"
+#include "platform/AppPaths.h"
 
 namespace Headless
 {
@@ -12,7 +13,7 @@ namespace Headless
    {
       bool ReadJson(const std::string& path, nlohmann::json& out, std::string& error)
       {
-         std::ifstream f(path, std::ios::binary);
+         std::ifstream f(AppPaths::FsPath(path), std::ios::binary);
          if (!f)
          {
             error = "could not open " + path;

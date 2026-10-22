@@ -24,6 +24,7 @@
 #include <future>
 #include <map>
 #include <memory>
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -364,7 +365,7 @@ namespace app
 
    bool ShowSetOpenFile(const std::string& path)
    {
-      std::ifstream in(path);
+      std::ifstream in(AppPaths::FsPath(path));
       if (!in.is_open())
       {
          gPatchStatus = std::string(T("Couldn't open the show set")) + ": " + path;
@@ -389,7 +390,7 @@ namespace app
 
    bool ShowSetSaveFile(const std::string& path)
    {
-      std::ofstream out(path);
+      std::ofstream out(AppPaths::FsPath(path));
       if (!out.is_open())
       {
          gPatchStatus = std::string(T("Couldn't save the show set")) + ": " + path;

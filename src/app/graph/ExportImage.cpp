@@ -1,5 +1,6 @@
 // PNG / image export (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -95,7 +96,7 @@ namespace app
       if (!ok || png.empty())
          return false;
       png = ContactSheet::TagSrgb(png);
-      FILE* f = std::fopen(path.c_str(), "wb");
+      FILE* f = AppPaths::OpenFile(path, "wb");
       if (f == nullptr)
          return false;
       const bool wrote = std::fwrite(png.data(), 1, png.size(), f) == png.size();
