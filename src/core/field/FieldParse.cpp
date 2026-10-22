@@ -14,6 +14,17 @@ namespace Field
          ParserState(const std::vector<Token>& toks, FieldError& err)
             : tokens(toks), error(err) {}
 
+         // Field code arrives in patch files, and the parser and every later
+         // pass recurse on it, so its shape is bounded here: `nesting` counts
+         // the recursive constructs (parentheses, unary ops, calls, blocks),
+         // `depth` also counts each link of an a + b + c chain, which nests
+         // the tree as deeply. Past either limit the main thread runs out of
+         // stack (10k parentheses crash an 8 MB stack; Windows gets 1 MB).
+         static constexpr int kMaxNesting = 100;
+         static constexpr int kMaxDepth = 500;
+         int nesting = 0;
+         int depth = 0;
+
          bool AtEnd() const
          {
             return index >= tokens.size() || tokens[index].kind == TokenKind::EndOfFile;
@@ -75,6 +86,29 @@ namespace Field
          static Token sEof;
       };
 
+      // Restores both counters on scope exit; Nest()/Chain() bump them.
+      struct DepthGuard
+      {
+         ParserState& p;
+         int nesting, depth;
+         explicit DepthGuard(ParserState& ps) : p(ps), nesting(ps.nesting), depth(ps.depth) {}
+         ~DepthGuard() { p.nesting = nesting; p.depth = depth; }
+         bool Nest()
+         {
+            p.nesting++;
+            return Chain();
+         }
+         bool Chain()
+         {
+            if (++p.depth > ParserState::kMaxDepth || p.nesting > ParserState::kMaxNesting)
+            {
+               p.Fail("expression is nested too deeply");
+               return false;
+            }
+            return true;
+         }
+      };
+
       Token ParserState::sEof = { TokenKind::EndOfFile, {}, 0.0, "" };
 
       AstNodePtr ParseOr(ParserState& p);
@@ -84,6 +118,8 @@ namespace Field
       AstNodePtr ParsePrimary(ParserState& p)
       {
          if (p.Failed()) return nullptr;
+         DepthGuard guard(p);
+         if (!guard.Nest()) return nullptr;
 
          if (p.AtEnd())
          {
@@ -197,8 +233,10 @@ namespace Field
          AstNodePtr base = ParsePrimary(p);
          if (p.Failed() || !base) return base;
 
+         DepthGuard guard(p);
          while (!p.AtEnd())
          {
+            if (!guard.Chain()) return nullptr;
             if (p.Peek().IsOp("."))
             {
                Token dotTok = p.Advance(); // consume '.'
@@ -307,8 +345,10 @@ namespace Field
          AstNodePtr left = ParsePower(p);
          if (p.Failed() || !left) return left;
 
+         DepthGuard guard(p);
          while (!p.AtEnd() && (p.Peek().IsOp("*") || p.Peek().IsOp("/") || p.Peek().IsOp("%")))
          {
+            if (!guard.Chain()) return nullptr;
             Token opTok = p.Advance();
             AstNodePtr right = ParsePower(p);
             if (!right) return nullptr;
@@ -323,8 +363,10 @@ namespace Field
          AstNodePtr left = ParseTerm(p);
          if (p.Failed() || !left) return left;
 
+         DepthGuard guard(p);
          while (!p.AtEnd() && (p.Peek().IsOp("+") || p.Peek().IsOp("-")))
          {
+            if (!guard.Chain()) return nullptr;
             Token opTok = p.Advance();
             AstNodePtr right = ParseTerm(p);
             if (!right) return nullptr;
@@ -339,10 +381,12 @@ namespace Field
          AstNodePtr left = ParseExpr(p);
          if (p.Failed() || !left) return left;
 
+         DepthGuard guard(p);
          while (!p.AtEnd() && (p.Peek().IsOp("<") || p.Peek().IsOp("<=") ||
                                p.Peek().IsOp(">") || p.Peek().IsOp(">=") ||
                                p.Peek().IsOp("==") || p.Peek().IsOp("!=")))
          {
+            if (!guard.Chain()) return nullptr;
             Token opTok = p.Advance();
             AstNodePtr right = ParseExpr(p);
             if (!right) return nullptr;
@@ -357,8 +401,10 @@ namespace Field
          AstNodePtr left = ParseCompare(p);
          if (p.Failed() || !left) return left;
 
+         DepthGuard guard(p);
          while (!p.AtEnd() && p.Peek().IsOp("&&"))
          {
+            if (!guard.Chain()) return nullptr;
             Token opTok = p.Advance();
             AstNodePtr right = ParseCompare(p);
             if (!right) return nullptr;
@@ -373,8 +419,10 @@ namespace Field
          AstNodePtr left = ParseAnd(p);
          if (p.Failed() || !left) return left;
 
+         DepthGuard guard(p);
          while (!p.AtEnd() && p.Peek().IsOp("||"))
          {
+            if (!guard.Chain()) return nullptr;
             Token opTok = p.Advance();
             AstNodePtr right = ParseAnd(p);
             if (!right) return nullptr;
@@ -936,6 +984,8 @@ namespace Field
       AstNodePtr ParseStatement(ParserState& p)
       {
          if (p.Failed() || p.AtEnd()) return nullptr;
+         DepthGuard guard(p);
+         if (!guard.Nest()) return nullptr;
 
          const Token& tok = p.Peek();
 
