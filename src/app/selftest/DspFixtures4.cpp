@@ -4,6 +4,7 @@
 // block, so what is measured is what a patch hears.
 #include "app/AppShared.h"
 #include <algorithm>
+#include <limits>
 
 namespace app
 {
@@ -121,6 +122,44 @@ bool RunEffectMixAndLimiterFixture()
       }
       ok &= checked > 0;
       printf("DSPTEST effect dry path delayed by reported latency: %d latent effects checked  %s\n", checked,
+             ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
+   // 1b) A NaN or inf block does not stick. Recursive kernels (filters,
+   //     delay lines, reverb tails, oversamplers) kept the first non-finite
+   //     input forever, so one bad block silenced the chain until reload
+   //     (B-K-023). After 2048 frames of NaN then inf, a clean sine must come
+   //     out finite for every effect.
+   {
+      int stuck = 0, checked = 0;
+      for (const EffectDef& def : GetEffectDefs())
+      {
+         auto node = MakeEffect(def, 1.0f, sampleRate);
+         const int burst = 2048, total = (int)(1.5 * sampleRate);
+         std::vector<std::vector<float>> out;
+         DelayTest::RunSamples(*node, total, 2,
+                               [&](int i, int) {
+                                  if (i < burst)
+                                     return std::numeric_limits<float>::quiet_NaN();
+                                  if (i < 2 * burst)
+                                     return std::numeric_limits<float>::infinity();
+                                  return 0.25f * std::sin(2.0f * (float)M_PI * 440.0f * (float)i / (float)sampleRate);
+                               },
+                               &out);
+         long long bad = 0;
+         for (const auto& ch : out)
+            for (size_t i = (size_t)(0.5 * sampleRate); i < ch.size(); i++)
+               bad += !std::isfinite(ch[i]);
+         if (bad > 0)
+         {
+            printf("DSPTEST   %s: %lld non-finite samples a second after the burst\n", def.name.c_str(), bad);
+            stuck++;
+         }
+         checked++;
+      }
+      const bool ok = stuck == 0 && checked > 0;
+      printf("DSPTEST effect recovers from a NaN/inf block: %d effects checked, %d stuck  %s\n", checked, stuck,
              ok ? "OK" : "FAIL");
       all &= ok;
    }
