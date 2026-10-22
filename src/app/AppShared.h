@@ -286,7 +286,8 @@ extern bool gSampleDragActive;
       Sample,
       Media,
       Plugin,
-      FieldPreset
+      FieldPreset,
+      SampleFolder // a library folder: gSampleDragPath is the folder, its samples load as a kit
    };
 
 extern LibraryDragKind gSampleDragKind;
@@ -3693,9 +3694,16 @@ void DrawMpcBody(GraphNode& gn, MpcNode* n);
 
 const std::vector<std::string>& MediaTypeFilterNames();
 
+// `dirKey` (a SampleScanner::PathKey) limits the result to files inside that folder: its own files only, or
+// everything under it when `recursive`. Empty = the whole index.
 std::vector<const SampleScanner::Entry*> FilterAndSortSampleEntries(
       const std::vector<SampleScanner::Entry>& index, const std::string& lowerQuery,
-      const BrowserFilterState& state, bool mediaKind);
+      const BrowserFilterState& state, bool mediaKind, const std::string& dirKey = std::string(), bool recursive = true);
+
+std::vector<std::string> ListSubfolders(const std::vector<SampleScanner::Entry>& index, const std::string& dir,
+                                        const std::string& lowerQuery);
+std::vector<std::string> SampleFilesInFolder(const std::vector<SampleScanner::Entry>& index, const std::string& folder);
+std::string FolderDisplayName(const std::string& path);
 
 void DrawLibrarySearchPanel(SampleScanner& scanner, const char* idPrefix, const char* searchHint, bool mediaKind);
 

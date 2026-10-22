@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cmath>
 #include <string>
+#include <vector>
 #include "imgui_internal.h"
 #include "app/AppShared.h"
 #include "core/CategoryColors.h"
@@ -218,6 +219,119 @@ namespace LibraryParts
       else if (hv > 0.001f)
          glyph::Draw(dl, trail, 14.0f, ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.6f * hv)), IconsInfinite::Plus);
       return r;
+   }
+
+   // A folder in a list: Row's hover tile and height, a folder glyph in place of the dot, a chevron at the end
+   // (a click opens it). `width` < 0 fills the line. `dim` greys the label (a folder that is not on disk).
+   inline RowResult FolderRow(const char* id, const std::string& label, bool dim = false, float width = -1.0f)
+   {
+      RowResult r;
+      const float w = width > 0.0f ? width : ImGui::GetContentRegionAvail().x;
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      ImGui::PushID(id);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 0.0f));
+      r.clicked = ImGui::InvisibleButton("##row", ImVec2(w, kRowH));
+      ImGui::PopStyleVar();
+      r.hovered = ImGui::IsItemHovered();
+      const bool down = ImGui::IsItemActive();
+      const float hv = UiAnim::Hover(ImGui::GetItemID(), r.hovered, tok::motion_hover_in, tok::motion_hover_out);
+      ImGui::PopID();
+      r.min = p;
+      r.max = ImVec2(p.x + w, p.y + kRowH);
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const float o = down ? 0.12f : 0.07f * hv;
+      if (o > 0.001f)
+         dl->AddRectFilled(ImVec2(p.x + tok::space_1, p.y + 1.0f), ImVec2(p.x + w - tok::space_1, p.y + kRowH - 1.0f),
+                           ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, o)), tok::radius_tile);
+      const float cy = p.y + kRowH * 0.5f;
+      const float x = p.x + tok::space_3;
+      glyph::Draw(dl, ImVec2(x + 7.0f, cy), 14.0f, ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, dim ? 0.35f : 0.6f)),
+                  IconsInfinite::Folder);
+      UiType::Scope ts(UiType::Size::Title);
+      dl->AddText(ImVec2(x + 14.0f + tok::space_2, std::round(cy - ImGui::GetFontSize() * 0.5f)),
+                  ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, dim ? 0.45f : text.w)), label.c_str());
+      glyph::Draw(dl, ImVec2(p.x + w - tok::space_3 - 6.0f, cy), 12.0f,
+                  ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.3f + 0.4f * hv)), IconsInfinite::ChevronRight);
+      return r;
+   }
+
+   // "All > Drums > Kicks": one row of path segments with chevrons between. Every segment but the last is a
+   // link; returns the index of the one clicked, or -1. When the row is too narrow the middle collapses to "...".
+   inline int Breadcrumb(const char* id, const std::vector<std::string>& segments)
+   {
+      int clicked = -1;
+      const int n = (int)segments.size();
+      if (n == 0)
+         return clicked;
+      const float w = ImGui::GetContentRegionAvail().x;
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      ImGui::PushID(id);
+      UiType::Scope ts(UiType::Size::Body);
+      const float sep = 12.0f + tok::space_2;
+      const float ellipsisW = ImGui::CalcTextSize("...").x + sep;
+
+      // Keep the first segment and as many trailing ones as fit; the rest become "...".
+      int firstTail = 1;
+      {
+         float total = ImGui::CalcTextSize(segments[0].c_str()).x;
+         for (int i = 1; i < n; i++)
+            total += sep + ImGui::CalcTextSize(segments[(size_t)i].c_str()).x;
+         while (total > w - tok::space_3 * 2.0f && firstTail < n - 1)
+         {
+            total -= sep + ImGui::CalcTextSize(segments[(size_t)firstTail].c_str()).x;
+            if (firstTail == 1)
+               total += ellipsisW;
+            firstTail++;
+         }
+      }
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec4 text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+      const float cy = p.y + kRowH * 0.5f;
+      const float ty = std::round(cy - ImGui::GetFontSize() * 0.5f);
+      float x = p.x + tok::space_3;
+      auto chevron = [&]() {
+         glyph::Draw(dl, ImVec2(x + tok::space_1 + 6.0f, cy), 10.0f, ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.3f)),
+                     IconsInfinite::ChevronRight);
+         x += sep;
+      };
+      for (int i = 0; i < n; i++)
+      {
+         if (i > 0 && i < firstTail)
+         {
+            if (i == 1)
+            {
+               chevron();
+               dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, 0.4f)), "...");
+               x += ImGui::CalcTextSize("...").x;
+            }
+            continue;
+         }
+         if (i > 0)
+            chevron();
+         const std::string& s = segments[(size_t)i];
+         const float sw = ImGui::CalcTextSize(s.c_str()).x;
+         const bool last = (i == n - 1);
+         float a = 1.0f;
+         if (!last)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(x, p.y));
+            ImGui::PushID(i);
+            if (ImGui::InvisibleButton("##seg", ImVec2(std::max(1.0f, sw), kRowH)))
+               clicked = i;
+            const float hv = UiAnim::Hover(ImGui::GetItemID(), ImGui::IsItemHovered(), tok::motion_hover_in, tok::motion_hover_out);
+            ImGui::PopID();
+            a = 0.55f + 0.4f * hv;
+         }
+         dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImVec4(text.x, text.y, text.z, a * text.w)), s.c_str());
+         x += sw;
+      }
+      ImGui::SetCursorScreenPos(p);
+      ImGui::Dummy(ImVec2(w, kRowH));
+      ImGui::PopID();
+      return clicked;
    }
 
    // The recessed list well: a darker rounded surface under a scrolling child, so the controls above read as a
