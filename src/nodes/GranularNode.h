@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "audio/WavePeaks.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 
@@ -91,6 +92,8 @@ public:
    float waveformMin[kWaveformCacheSize] = {};
    float waveformMax[kWaveformCacheSize] = {};
    int waveformCacheCount = 0;
+   // Full-resolution envelope for the waveform view, built with the cache above.
+   WavePeaks wavePeaks;
 
    float Playhead() const { return mPlayhead; }
    const GrainVisualSnapshot& VisualSnapshot() const { return mLatestVisualSnapshot; }

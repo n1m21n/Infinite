@@ -880,6 +880,7 @@ bool SlicerNode::LoadFile(const std::string& path)
 void SlicerNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::string& fileName,
                               const std::string& filePath, const std::string& status)
 {
+   wavePeaks.BuildFrom(*decoded);
    waveformCacheCount = std::min(kWaveformCacheSize, decoded->numFrames);
    if (waveformCacheCount > 0)
    {

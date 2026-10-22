@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "audio/WavePeaks.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
@@ -113,6 +114,8 @@ public:
 
    bool PadPlaying(int pad) const { return (mPlayingMask & (1u << Clamp(pad))) != 0; }
    bool PadLoaded(int pad) const { return !padPath[Clamp(pad)].empty(); }
+   // Where the pad's voice is reading (0..1 of its sample), -1 when idle; as of the last cook.
+   float PadCursor(int pad) const { return mPadCursor[Clamp(pad)]; }
    const std::string& PadName(int pad) const { return padName[Clamp(pad)]; }
    float Level() const { return mLevel; }
 
@@ -147,6 +150,8 @@ public:
    float padWaveMin[kPads][kWaveCache] = {};
    float padWaveMax[kPads][kWaveCache] = {};
    int padWaveCount[kPads] = {};
+   // Full-resolution envelope per pad for the pad and editor waveforms.
+   WavePeaks padPeaks[kPads];
    std::string padPath[kPads]; // persisted
 
    // UI-only, main thread. Canvas-space rects (x0,y0,x1,y1) of each pad and of
@@ -183,6 +188,7 @@ private:
    int mLastCookFrame = -1;
    float mLevel = 0.0f;
    unsigned int mPlayingMask = 0;
+   float mPadCursor[kPads] = {};
    bool mHeld[kPads] = {};
    std::string padName[kPads];
 };

@@ -124,10 +124,9 @@ namespace app
    }
 
 
-   // Sampler's waveform + playhead: a static min/max envelope (the sample
-   // data never changes during playback, so there's nothing to redecimate
-   // per frame - unlike DrawWavetableScope's live trace) with a moving
-   // playhead line drawn on top from SamplerNode::Playhead().
+   // Sampler's waveform + playhead: the shared trimmed waveform (DrawTrimWave
+   // over SamplerNode::wavePeaks, built once at load, so nothing is
+   // re-decimated per frame) with the playhead and a cursor per note voice.
    // Interactive: clicking anywhere on the body auditions the sample from
    // that point (SamplerNode::TriggerPreview, independent of any note
    // cable), and the two edge handles drag the loop range (start/end)
@@ -137,142 +136,28 @@ namespace app
    void DrawSamplerWaveform(SamplerNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
-      const ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 br(origin.x + w, origin.y + h);
-      const bool hasSample = n->waveformCacheCount > 0;
-
-      // Body click-catcher first, so it owns hover/active by default; the
-      // handle grab-zones are added afterwards at the same screen position.
-      // Overlap resolution in ImGui is NOT "last submitted wins" - a later
-      // item is blocked from becoming hovered/active while an earlier item
-      // already holds g.HoveredId, unless the earlier item opts in via
-      // SetNextItemAllowOverlap() (called before it, not after). Without
-      // this the two handle buttons below never receive mouse input at all.
-      ImGui::SetNextItemAllowOverlap();
-      ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##samplerwavebody", ImVec2(w, h));
-      if (hasSample && (ImGui::IsItemActivated() || ImGui::IsItemActive()))
+      const auto& snap = n->VisualSnapshot();
+      WaveCursor cursors[SamplerVoiceSnapshot::kMaxVisualVoices];
+      int numCursors = 0;
+      for (int v = 0; v < snap.count && numCursors < SamplerVoiceSnapshot::kMaxVisualVoices; v++)
       {
-         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
-         const float target = std::clamp(frac, n->start, n->end);
+         if (snap.voices[v].amp < 0.002f)
+            continue;
+         cursors[numCursors++] = { snap.voices[v].position, snap.voices[v].amp };
+      }
+      // The playhead tracks the audition / free-running voice while it plays, and otherwise
+      // parks at `position`, where the next audition starts.
+      const float parked = std::clamp(n->position, n->start, n->end);
+      const float playhead = (snap.selfActive && snap.selfPos >= 0.0f) ? snap.selfPos : parked;
+      const TrimWaveInput in = DrawTrimWave("##samplerwave", n->wavePeaks, &n->start, &n->end, w, h, cursors,
+                                            numCursors, playhead, "no sample loaded");
+      if (!n->wavePeaks.Empty() && (in.activated || in.active))
+      {
+         const float target = std::clamp(in.frac, n->start, n->end);
          n->position = target;
-         if (ImGui::IsItemActivated())
+         if (in.activated)
             n->TriggerPreview(target);
       }
-
-      const bool isLight = IsThemeLight();
-      AudioViz::Fill(dl, origin, br);
-      dl->PushClipRect(origin, br, true);
-
-      const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
-
-      if (hasSample)
-      {
-         const int count = n->waveformCacheCount;
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::U32(tok::pal::c_1E6EE6D2) : tok::U32(tok::pal::c_96D6FFC8));
-         }
-
-         // Dim whatever the start/end range excludes, so the active loop
-         // region reads at a glance rather than needing the two handles
-         // read numerically against each other.
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? tok::U32(tok::pal::c_FFFFFF8C) : tok::U32(tok::pal::c_00000082);
-         if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
-         if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
-
-         // Primary yellow playhead: tracks live playback position across the sample when active,
-         // or parks at `position` as the starting anchor when idle.
-         const auto& snap = n->VisualSnapshot();
-         const float posClamped = std::clamp(n->position, n->start, n->end);
-         const float activeFrac = (snap.selfActive && snap.selfPos >= 0.0f) ? snap.selfPos : posClamped;
-         const float posX = origin.x + w * std::clamp(activeFrac, 0.0f, 1.0f);
-         const ImU32 yellowCol = isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFC85AF0);
-         dl->AddLine(ImVec2(posX, origin.y), ImVec2(posX, br.y), yellowCol, 2.0f);
-
-         // Active note voices in flight: drawn as white playheads whose opacity
-         // fades out in sync with each voice's envelope decay time (only when notes are connected/played).
-         for (int v = 0; v < snap.count; v++)
-         {
-            const auto& voice = snap.voices[v];
-            if (voice.amp < 0.002f)
-               continue;
-            const float px = origin.x + w * std::clamp(voice.position, 0.0f, 1.0f);
-            const int alpha = (int)(voice.amp * 255.0f);
-            const ImU32 whiteCol = isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha);
-            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), whiteCol, 1.5f);
-         }
-
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96EB), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896EB), 2.0f);
-      }
-      else
-      {
-         EmptyState::DrawCaption(origin, br, "no sample loaded");
-      }
-
-      dl->PopClipRect();
-      AudioViz::Border(dl, origin, br);
-
-      if (hasSample)
-      {
-         // Narrow grab-zones centred on each marker, drawn (and therefore
-         // hit-tested) after the body button above.
-         const float handleW = 10.0f;
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-
-         // Triangle grips at top and bottom of each marker, anchored a few
-         // pixels in from the true edge so they stay visible/grabbable even
-         // at the default start=0/end=1 - at those values the marker line
-         // sits flush on the border and is otherwise unreadable as a handle.
-         const float grip = 8.0f;
-         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96FF);
-         const ImU32 endCol = isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896FF);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
-
-         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
-         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
-
-         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
-         ImGui::InvisibleButton("##samplerstarthandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
-         ImGui::InvisibleButton("##samplerendhandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-      }
-
-      ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, h));
    }
 
 
@@ -349,16 +234,7 @@ namespace app
                               isLight ? tok::U32(tok::pal::c_0000000E) : tok::U32(tok::pal::c_FFFFFF0C));
          }
 
-         const int count = n->waveformCacheCount;
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::U32(tok::pal::c_1E6EE6D2) : tok::U32(tok::pal::c_96D6FFC8));
-         }
+         AudioViz::Peaks(dl, n->wavePeaks, origin, w, h);
 
          // Voices in flight, faded by their own amplitude.
          const SlicerVoiceSnapshot& snap = n->VisualSnapshot();
@@ -454,16 +330,8 @@ namespace app
 
       if (hasSample)
       {
-         const int count = n->waveformCacheCount;
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::U32(tok::pal::c_2864E6D2) : tok::U32(tok::pal::c_A5B4FFD2));
-         }
+         AudioViz::Peaks(dl, n->wavePeaks, origin, w, h, 0.45f,
+                         isLight ? tok::U32(tok::pal::c_2864E6D2) : tok::U32(tok::pal::c_A5B4FFD2));
 
          const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
          const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
@@ -569,16 +437,8 @@ namespace app
 
       if (hasSample)
       {
-         const int count = n->waveformCacheCount;
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.44f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.44f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::U32(tok::pal::c_285AC8C8) : tok::U32(tok::pal::c_8CA0DCAF));
-         }
+         AudioViz::Peaks(dl, n->wavePeaks, origin, w, h, 0.44f,
+                         isLight ? tok::U32(tok::pal::c_285AC8C8) : tok::U32(tok::pal::c_8CA0DCAF));
 
          const float startX = origin.x + w * s;
          const float endX = origin.x + w * e;

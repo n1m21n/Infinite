@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "audio/WavePeaks.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
@@ -137,6 +138,8 @@ public:
    float waveformMin[kWaveformCacheSize] = {};
    float waveformMax[kWaveformCacheSize] = {};
    int waveformCacheCount = 0;
+   // Full-resolution envelope for the waveform view, built with the cache above.
+   WavePeaks wavePeaks;
 
    // Current playhead of the most recently triggered voice, 0..1 of the
    // loaded sample's length, drained from the audio node's MeterRing.

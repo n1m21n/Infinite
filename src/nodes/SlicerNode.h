@@ -6,6 +6,7 @@
 #include <thread>
 #include <vector>
 
+#include "audio/WavePeaks.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
@@ -159,6 +160,8 @@ public:
    float waveformMin[kWaveformCacheSize] = {};
    float waveformMax[kWaveformCacheSize] = {};
    int waveformCacheCount = 0;
+   // Full-resolution envelope for the waveform view, built with the cache above.
+   WavePeaks wavePeaks;
 
    const SlicerVoiceSnapshot& VisualSnapshot() const { return mLatestVisualSnapshot; }
 

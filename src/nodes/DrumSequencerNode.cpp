@@ -77,6 +77,7 @@ public:
    {
       for (auto& v : mVoices)
          v = Voice();
+      PublishCursors();
       const int rateDiv = mRate.load(std::memory_order_relaxed);
       const double beatsPerStep = std::max(1e-6, MusicTime::BeatsFor((MusicTime::RateDivision)rateDiv));
       mPrevRawPos = Transport::Instance().Beats() / beatsPerStep - 1e-6;
@@ -359,9 +360,34 @@ public:
             }
          }
       }
+      PublishCursors();
+   }
+
+   // Where each voice is reading (0..1 of its buffer, -1 = idle) and how loud it is, for the
+   // lane waveforms' play cursors. Written once per block; the UI reads them relaxed.
+   void GetCursors(int lane, float* pos, float* amp) const
+   {
+      for (int slot = 0; slot < kVoicesPerLane; slot++)
+      {
+         pos[slot] = mCursorPos[lane * kVoicesPerLane + slot].load(std::memory_order_relaxed);
+         amp[slot] = mCursorAmp[lane * kVoicesPerLane + slot].load(std::memory_order_relaxed);
+      }
    }
 
 private:
+   void PublishCursors()
+   {
+      for (int v = 0; v < kNumVoices; v++)
+      {
+         const Voice& voice = mVoices[v];
+         const bool on = voice.active && voice.buffer != nullptr && voice.buffer->numFrames > 0;
+         mCursorPos[v].store(on ? (float)(voice.readPos / voice.buffer->numFrames) : -1.0f,
+                             std::memory_order_relaxed);
+         mCursorAmp[v].store(on ? std::clamp(voice.decayAmp * voice.boostEnv * voice.velocity, 0.0f, 1.0f) : 0.0f,
+                             std::memory_order_relaxed);
+      }
+   }
+
    struct Voice
    {
       const Platform::SampleBuffer* buffer = nullptr;
@@ -466,6 +492,8 @@ private:
    ParamMailbox mMailbox;
 
    Voice mVoices[kNumVoices];
+   std::atomic<float> mCursorPos[kNumVoices] = {};
+   std::atomic<float> mCursorAmp[kNumVoices] = {};
    int mLaneVoiceCursor[kNumLanes] = {};
    double mPrevRawPos = 0.0;
 
@@ -895,6 +923,7 @@ void DrumSequencerNode::FinishLaneBuffer(int lane, Platform::SampleBuffer* decod
       }
    }
 
+   lanePeaks[lane].BuildFrom(*decoded);
    mAudioNode->PushBuffer(lane, decoded);
    laneFilePath[lane] = filePath;
    laneFileName[lane] = fileName;
@@ -1005,6 +1034,17 @@ void DrumSequencerNode::RandomizeLane(int lane)
       stepVel[lane][s] = 0.0f;
 }
 
+void DrumSequencerNode::LaneCursors(int lane, float* pos, float* amp) const
+{
+   for (int slot = 0; slot < kVoicesPerLane; slot++)
+   {
+      pos[slot] = -1.0f;
+      amp[slot] = 0.0f;
+   }
+   if (mAudioNode && lane >= 0 && lane < kNumLanes)
+      mAudioNode->GetCursors(lane, pos, amp);
+}
+
 void DrumSequencerNode::ClearLane(int lane)
 {
    lane = Clamp(lane);
@@ -1020,6 +1060,7 @@ void DrumSequencerNode::ClearLane(int lane)
    laneFileName[lane].clear();
    laneStatus[lane] = "--";
    laneWaveCount[lane] = 0;
+   lanePeaks[lane].Clear();
    laneStart[lane] = 0.0f;
    laneEnd[lane] = 1.0f;
    mLastLaneDecay[lane] = -1.0f;

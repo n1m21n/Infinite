@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "audio/WavePeaks.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 
@@ -172,6 +173,10 @@ public:
    float laneWaveMin[kNumLanes][kWaveCache] = {};
    float laneWaveMax[kNumLanes][kWaveCache] = {};
    int laneWaveCount[kNumLanes] = {};
+   // Full-resolution envelope per lane for the lane waveform (built with the cache above).
+   WavePeaks lanePeaks[kNumLanes];
+   // Each of the lane's voices: read position 0..1 (-1 = idle) and loudness 0..1.
+   void LaneCursors(int lane, float* pos, float* amp) const;
 
    // ---- global ---------------------------------------------------------
    int rate = 12;      // MusicTime::RateDivision, stored as plain int (see Transport.h's mScale for why)

@@ -1,5 +1,6 @@
 // Audio node body building blocks: columns, sections, knob rows, drift meters, gates (moved verbatim from main.cpp).
 #include "app/ui/design/TokenColors.h"
+#include <unordered_map>
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
 
@@ -819,4 +820,204 @@ namespace app
          return kAudioNarrowWidth;
       return kAudioNodeWidth;
    }
+
+   // ---- trimmed waveform (Sampler, Drum Sequencer lanes) ---------------------
+   // UI-only zoom per waveform (not saved): the visible 0..1 range, keyed by the view's ImGui id.
+   namespace
+   {
+      struct WaveZoom
+      {
+         double a = 0.0, b = 1.0;
+      };
+      std::unordered_map<ImGuiID, WaveZoom> gWaveZoom;
+
+      // The handle being dragged: where it and the mouse were when the drag (or the last Shift
+      // change) began, so a drag never jumps on grab and Shift switches to fine without a jump.
+      struct HandleGrab
+      {
+         ImGuiID id = 0;
+         float value = 0.0f;
+         float mouseX = 0.0f;
+         bool fine = false;
+      };
+      HandleGrab gHandleGrab;
+
+      void FormatSeconds(char* out, size_t size, double seconds)
+      {
+         if (seconds < 10.0)
+            snprintf(out, size, "%.3f s", seconds);
+         else
+            snprintf(out, size, "%.2f s", seconds);
+      }
+   }
+
+   TrimWaveInput DrawTrimWave(const char* id, const WavePeaks& peaks, float* start, float* end, float w, float h,
+                              const WaveCursor* cursors, int numCursors, float playhead, const char* emptyCaption)
+   {
+      TrimWaveInput in;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool has = !peaks.Empty();
+      const bool trim = has && start != nullptr && end != nullptr;
+      const bool isLight = IsThemeLight();
+
+      ImGui::PushID(id);
+      const ImGuiID zoomKey = ImGui::GetID("##zoom");
+      auto zit = gWaveZoom.find(zoomKey);
+      if (!trim && zit != gWaveZoom.end())
+      {
+         gWaveZoom.erase(zit);
+         zit = gWaveZoom.end();
+      }
+      double a = zit != gWaveZoom.end() ? zit->second.a : 0.0;
+      double b = zit != gWaveZoom.end() ? zit->second.b : 1.0;
+      auto toX = [&](float frac) { return origin.x + (float)((frac - a) / (b - a)) * w; };
+
+      // Body first, so it owns hover by default; the handles below opt in on top of it (see
+      // SetNextItemAllowOverlap: a later item is otherwise blocked while this one is hovered).
+      ImGui::SetNextItemAllowOverlap();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##body", ImVec2(w, h));
+      in.activated = ImGui::IsItemActivated();
+      in.active = ImGui::IsItemActive();
+      in.hovered = ImGui::IsItemHovered();
+      in.frac = std::clamp((float)(a + (ImGui::GetIO().MousePos.x - origin.x) / w * (b - a)), 0.0f, 1.0f);
+
+      // Double-click zooms to the trimmed range (a little either side), and back out.
+      if (trim && in.hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+      {
+         if (zit != gWaveZoom.end())
+            gWaveZoom.erase(zit);
+         else
+         {
+            const double margin = 0.05 * (double)(*end - *start);
+            WaveZoom z;
+            z.a = std::max(0.0, (double)*start - margin);
+            z.b = std::min(1.0, (double)*end + margin);
+            if (z.b - z.a < 0.95)
+               gWaveZoom[zoomKey] = z;
+         }
+         zit = gWaveZoom.find(zoomKey);
+         a = zit != gWaveZoom.end() ? zit->second.a : 0.0;
+         b = zit != gWaveZoom.end() ? zit->second.b : 1.0;
+      }
+
+      AudioViz::Fill(dl, origin, br);
+      dl->PushClipRect(origin, br, true);
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      const ImU32 startCol = isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96FF);
+      const ImU32 endCol = isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896FF);
+      if (has)
+      {
+         AudioViz::Peaks(dl, peaks, origin, w, h, a, b);
+         if (trim)
+         {
+            // Dim what the trim excludes, so the played range reads at a glance.
+            const float startX = toX(std::clamp(*start, 0.0f, 1.0f));
+            const float endX = toX(std::clamp(*end, 0.0f, 1.0f));
+            const ImU32 dimCol = isLight ? tok::U32(tok::pal::c_FFFFFF8C) : tok::U32(tok::pal::c_00000082);
+            if (startX > origin.x)
+               dl->AddRectFilled(origin, ImVec2(std::min(startX, br.x), br.y), dimCol);
+            if (endX < br.x)
+               dl->AddRectFilled(ImVec2(std::max(endX, origin.x), origin.y), br, dimCol);
+         }
+         if (playhead >= 0.0f)
+         {
+            const float px = toX(std::clamp(playhead, 0.0f, 1.0f));
+            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
+                        isLight ? tok::U32(tok::pal::c_E68C14FF) : tok::U32(tok::pal::c_FFC85AF0), 2.0f);
+         }
+         // One cursor per sounding voice, fading with the voice.
+         for (int v = 0; v < numCursors; v++)
+         {
+            if (cursors[v].pos < 0.0f || cursors[v].alpha < 0.01f)
+               continue;
+            const float px = toX(std::clamp(cursors[v].pos, 0.0f, 1.0f));
+            const int alpha = (int)(std::clamp(cursors[v].alpha, 0.0f, 1.0f) * 235.0f) + 20;
+            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
+                        isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha), 1.5f);
+         }
+         if (trim)
+         {
+            dl->AddLine(ImVec2(toX(*start), origin.y), ImVec2(toX(*start), br.y), startCol, 2.0f);
+            dl->AddLine(ImVec2(toX(*end), origin.y), ImVec2(toX(*end), br.y), endCol, 2.0f);
+         }
+         if (zit != gWaveZoom.end())
+         {
+            char z[24];
+            snprintf(z, sizeof(z), "%.0fx", 1.0 / (b - a));
+            const ImVec2 zs = AudioLabelSize(z);
+            AudioLabelText(dl, ImVec2(br.x - zs.x - 5.0f, origin.y + 3.0f), ScopeTextCol(), z);
+         }
+      }
+      else
+      {
+         EmptyState::DrawCaption(origin, br, emptyCaption);
+      }
+      dl->PopClipRect();
+      AudioViz::Border(dl, origin, br);
+
+      char val[32];
+      if (has && in.hovered)
+      {
+         FormatSeconds(val, sizeof(val), in.frac * peaks.Seconds());
+         SetAudioReadout("time", val);
+      }
+
+      if (trim)
+      {
+         // Triangle grips top and bottom of each marker, kept a few pixels in from the edge so
+         // they stay grabbable at start = 0 / end = 1, where the line sits on the border.
+         const float grip = 8.0f;
+         const float handleW = 10.0f;
+         for (int which = 0; which < 2; which++)
+         {
+            float* v = which == 0 ? start : end;
+            const float x = toX(*v);
+            if (x < origin.x - 1.0f || x > br.x + 1.0f)
+               continue; // scrolled out of a zoomed view
+            const float gx = std::clamp(x, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+            const ImU32 col = which == 0 ? startCol : endCol;
+            dl->AddTriangleFilled(ImVec2(gx - grip * 0.5f, origin.y), ImVec2(gx + grip * 0.5f, origin.y),
+                                  ImVec2(gx, origin.y + grip), col);
+            dl->AddTriangleFilled(ImVec2(gx - grip * 0.5f, br.y), ImVec2(gx + grip * 0.5f, br.y),
+                                  ImVec2(gx, br.y - grip), col);
+
+            ImGui::SetCursorScreenPos(ImVec2(std::clamp(x - handleW * 0.5f, origin.x, br.x - handleW), origin.y));
+            ImGui::InvisibleButton(which == 0 ? "##start" : "##end", ImVec2(handleW, h));
+            const ImGuiID hid = ImGui::GetItemID();
+            const bool fine = ImGui::GetIO().KeyShift;
+            const float mouseX = ImGui::GetIO().MousePos.x;
+            if (ImGui::IsItemActivated())
+            {
+               PushUndoCheckpoint();
+               gHandleGrab = { hid, *v, mouseX, fine };
+            }
+            if (ImGui::IsItemActive() && gHandleGrab.id == hid)
+            {
+               // Shift = a tenth of the speed; rebase on every change so neither switch jumps.
+               if (fine != gHandleGrab.fine)
+                  gHandleGrab = { hid, *v, mouseX, fine };
+               const float perPx = (float)((b - a) / w) * (fine ? 0.1f : 1.0f);
+               const float want = gHandleGrab.value + (mouseX - gHandleGrab.mouseX) * perPx;
+               *v = which == 0 ? std::clamp(want, 0.0f, *end - 0.01f) : std::clamp(want, *start + 0.01f, 1.0f);
+            }
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            {
+               ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+               FormatSeconds(val, sizeof(val), *v * peaks.Seconds());
+               SetAudioReadout(which == 0 ? "start" : "end", val);
+            }
+         }
+      }
+
+      ImGui::PopID();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+      return in;
+   }
+
 }

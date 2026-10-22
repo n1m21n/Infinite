@@ -118,6 +118,7 @@ public:
    void SetTestAllPads(bool on) { mTestAllPads.store(on, std::memory_order_relaxed); }
 
    unsigned int PlayingMask() const { return mPlayingMask.load(std::memory_order_relaxed); }
+   float Cursor(int pad) const { return mCursor[pad].load(std::memory_order_relaxed); }
    float Peak() const { return mPeak.exchange(0.0f, std::memory_order_relaxed); }
 
    // ---- audio thread ----------------------------------------------------
@@ -234,6 +235,12 @@ public:
          if (mVoice[p].active)
             mask |= 1u << p;
       mPlayingMask.store(mask, std::memory_order_relaxed);
+      for (int p = 0; p < MpcNode::kPads; p++)
+      {
+         const Platform::SampleBuffer* buf = mActive[p];
+         const bool on = mVoice[p].active && buf != nullptr && buf->numFrames > 0;
+         mCursor[p].store(on ? (float)(mVoice[p].pos / buf->numFrames) : -1.0f, std::memory_order_relaxed);
+      }
       float prev = mPeak.load(std::memory_order_relaxed);
       if (peak > prev)
          mPeak.store(peak, std::memory_order_relaxed);
@@ -597,6 +604,7 @@ private:
    std::atomic<bool> mTestAllPads { false };
 
    std::atomic<unsigned int> mPlayingMask { 0 };
+   std::atomic<float> mCursor[MpcNode::kPads] = {};
    mutable std::atomic<float> mPeak { 0.0f };
 };
 
@@ -667,6 +675,7 @@ bool MpcNode::LoadPad(int pad, const std::string& path)
          padWaveMax[pad][b] = mx;
       }
    }
+   padPeaks[pad].BuildFrom(*decoded);
    mAudioNode->PushBuffer(pad, decoded);
    return true;
 }
@@ -704,6 +713,7 @@ void MpcNode::ClearPad(int pad)
    padPath[pad].clear();
    padName[pad].clear();
    padWaveCount[pad] = 0;
+   padPeaks[pad].Clear();
    // Push an empty buffer (a null push would leave the old one playing).
    mAudioNode->PushBuffer(pad, new Platform::SampleBuffer());
 }
@@ -737,6 +747,8 @@ void MpcNode::CookIfNeeded(int frameId)
    mAudioNode->DrainRetired();
    mAudioNode->PushParams(*this);
    mPlayingMask = mAudioNode->PlayingMask();
+   for (int p = 0; p < kPads; p++)
+      mPadCursor[p] = mAudioNode->Cursor(p);
    mLevel = mAudioNode->Peak();
 }
 

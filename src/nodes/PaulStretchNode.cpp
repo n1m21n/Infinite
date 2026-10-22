@@ -816,6 +816,7 @@ void PaulStretchNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::s
    mStatus = stat;
 
    // Build min/max waveform cache for GUI from channel 0
+   wavePeaks.BuildFrom(*decoded);
    waveformCacheCount = std::min(kWaveformCacheSize, totalFrames);
    if (waveformCacheCount > 0)
    {
