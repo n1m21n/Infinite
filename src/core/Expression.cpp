@@ -3,6 +3,7 @@
 #include "field/FieldVM.h"
 
 #include <cctype>
+#include <cmath>
 
 namespace Expression
 {
@@ -43,6 +44,14 @@ namespace Expression
          return false;
       }
 
+      // pow(-1, 0.5), pow(0, -1) and overflow give NaN/inf without a VM
+      // error. Report it like any other runtime error so the caller keeps the
+      // param's last good value instead of writing NaN into a kernel.
+      if (!std::isfinite((float)result))
+      {
+         outError = "result is not a finite number";
+         return false;
+      }
       outValue = (float)result;
       return true;
    }

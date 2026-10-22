@@ -614,6 +614,8 @@ r=$("$BIN" --audio-summary "$M/clipping.inf" "$OUT/clip.json" --duration 1 2>/de
 [ "$rc" = 0 ] && [ "$(echo "$r" | json "[w['code'] for w in d['warnings']]==['W_CLIPPING'] and d['audio_summary']['clipped_percent'] > 10")" = "True" ]; check "summary: over full scale warns W_CLIPPING, still exit 0" $?
 r=$("$BIN" --audio-summary "$M/silent.inf" "$OUT/silent.json" --duration 1 2>/dev/null); rc=$?
 [ "$rc" = 0 ] && [ "$(echo "$r" | json "[w['code'] for w in d['warnings']]==['W_SILENT'] and d['audio_summary']['integrated_lufs'] is None")" = "True" ]; check "summary: silence warns W_SILENT, loudness null" $?
+r=$("$BIN" --audio-summary "$M/nan_param.inf" "$OUT/nan.json" --duration 1 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ "$(echo "$r" | json "d['warnings']==[] and 900 < d['audio_summary']['loudest_band_hz'] < 1200")" = "True" ]; check "summary: a nan/inf param in a patch is ignored, the sine still sounds" $?
 r=$("$BIN" --audio-summary "$M/no_audio.inf" "$OUT/na.json" 2>/dev/null); rc=$?
 [ "$rc" = 3 ] && [ ! -e "$OUT/na.json" ] && echo "$r" | grep -q '"E_NO_AUDIO"'; check "summary: no audio terminal exit 3 E_NO_AUDIO, nothing written" $?
 r=$("$BIN" --audio-summary "$PATCH" "$OUT/one.json" --duration 1 --output 15 2>/dev/null); rc=$?

@@ -66,7 +66,7 @@ namespace app
             {
                char* end = nullptr;
                float parsed = strtof(trimmed.c_str(), &end);
-               if (end != trimmed.c_str())
+               if (end != trimmed.c_str() && std::isfinite(parsed))
                {
                   *value = std::clamp(parsed, std::min(minV, maxV), std::max(minV, maxV));
                   changed = true;

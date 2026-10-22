@@ -76,7 +76,9 @@ struct DelayLine
    // sample.
    float Read(float delaySamples) const
    {
-      const float d = std::clamp(delaySamples, 1.0f, (float)size - 3.0f);
+      // std::clamp passes NaN through, and (int)NaN is undefined; the
+      // `>=` test is false for NaN, so it lands on the shortest delay.
+      const float d = std::clamp(delaySamples >= 1.0f ? delaySamples : 1.0f, 1.0f, (float)size - 3.0f);
       const int idx = (int)d;
       const float frac = d - (float)idx;
 
