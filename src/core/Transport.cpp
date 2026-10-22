@@ -192,7 +192,12 @@ double Transport::Beats() const
 
 void Transport::SetTempo(float bpm)
 {
-   mPendingBpm.store(bpm < 1.0f ? 1.0f : bpm, std::memory_order_relaxed);
+   // A patch or show file is outside input. A NaN would slip past a `< 1`
+   // test and ApplyPendingTempo, and a huge bpm overflows the step clocks'
+   // tick math (StepClock::Ticks). Hold to headless --bpm's 1..999.
+   if (!std::isfinite(bpm))
+      return;
+   mPendingBpm.store(std::clamp(bpm, 1.0f, 999.0f), std::memory_order_relaxed);
 }
 
 void Transport::ApplyPendingTempo()
