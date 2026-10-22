@@ -126,7 +126,7 @@ numbers, so a check is one command and one JSON read.
 |---|---|---|
 | `frame_stats[]` | `--frame` | per frame: `mean_luma`, `min_luma`, `max_luma`, `mean_rgb`, `black_percent`, `white_percent`, `alpha_coverage`, `mean_alpha`, `luma_histogram` (16 bins, sums to 1). Luma is BT.709 on the encoded 8-bit values, 0..1 |
 | `contact_sheet` | `--frame --contact-sheet` | `file`, `size`, `cells`, `cell_width` (480 px); an sRGB-tagged PNG |
-| `audio_summary` | `--audio-summary` | `integrated_lufs` (BS.1770, gated), `true_peak_dbtp` (4x oversampled), `sample_peak_dbfs`, `rms_dbfs` per channel, `dc_offset`, `clipped_percent`, `silence_ratio`, `stereo_correlation`, `onset_count_estimate`, `bpm_estimate` + `bpm_confidence` (estimates, not a beat tracker), `loudest_band_hz`. `null` means the number does not exist for this signal (loudness of silence) |
+| `audio_summary` | `--audio-summary` | `integrated_lufs` (BS.1770, gated), `true_peak_dbtp` (4x oversampled), `sample_peak_dbfs`, `rms_dbfs` per channel, `dc_offset`, `clipped_percent`, `non_finite_frames` (NaN/inf, analysed as silence), `silence_ratio`, `stereo_correlation`, `onset_count_estimate`, `bpm_estimate` + `bpm_confidence` (estimates, not a beat tracker), `loudest_band_hz`. `null` means the number does not exist for this signal (loudness of silence) |
 | `source`, `sinks[]` | `--audio-summary` | what was measured: `mix` is every Audio Out and every Output with audio wired in, summed, as the speakers would get it; `--output <node>` measures one of them |
 
 `out.json` holds the same numbers plus `spectrum` (32 log-spaced bands, 20 Hz to 20 kHz, mean dB) and
@@ -136,6 +136,7 @@ own render length, else 10 s. The patch needs no Output: an Audio Out is enough.
 | Code | Exit | Means |
 |---|---|---|
 | `W_BLACK_FRAME` | 0 | a frame is 100 % black: nothing reached the Output at that time |
+| `W_NONFINITE` | 0 | NaN or infinite samples in the mix (`non_finite_frames`); the other numbers treat them as silence |
 | `W_CLIPPING` | 0 | samples at or over full scale; a file written from this distorts |
 | `W_SILENT` | 0 | nothing above -70 LUFS in the whole range |
 | `E_NO_AUDIO` | 3 | no Audio Out and no Output with audio wired in (`--timeline`: no clip on an audio lane) |

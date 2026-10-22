@@ -2105,6 +2105,12 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       sStatus.extraJson.push_back("\"audio_summary\":" + AudioSummary::ToJson(res, false));
 
       char num[64];
+      if (res.nonFiniteFrames > 0)
+      {
+         std::snprintf(num, sizeof(num), "%lld", res.nonFiniteFrames);
+         sStatus.warnings.push_back({ "W_NONFINITE", std::string(num) + " frames are NaN or infinite; the rest of the summary treats them as silence",
+                                      0, -1, "bypass nodes back toward the source until the summary is clean; the last one bypassed made the NaN" });
+      }
       if (res.clippedFrames > 0)
       {
          std::snprintf(num, sizeof(num), "%+.2f dBFS, %.3f%% of frames", AudioSummary::Db(res.samplePeak), res.clippedPercent);
