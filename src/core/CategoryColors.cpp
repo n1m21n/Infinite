@@ -242,6 +242,106 @@ const std::vector<Preset>& RawPresets()
         { 0.239f, 0.353f, 0.259f },  // textDim Slate Moss      #3D5A42
         { 0.706f, 0.773f, 0.682f },  // border  Sage Lichen     #B4C5AE
         { 0.102f, 0.431f, 0.231f } } // accent  Forest Emerald  #1A6E3B
+      },
+      { "Infinite Midnight", {   // brand Midnight mode, Signal accent (structure, focus)
+         { "Source", { 0.373f, 0.827f, 0.761f } },
+         { "3D", { 0.529f, 0.584f, 0.957f } },
+         { "Compositing", { 0.667f, 0.510f, 1.000f } },
+         { "Effects", { 1.000f, 0.541f, 0.357f } },
+         { "Modulators", { 1.000f, 0.745f, 0.353f } },
+         { "Prediction", { 0.431f, 0.843f, 0.549f } },
+         { "Macros", { 1.000f, 0.420f, 0.208f } },
+         { "Utility", { 0.639f, 0.667f, 0.796f } },
+         { "Notes", { 0.541f, 0.867f, 0.604f } },
+         { "Synths", { 0.655f, 0.694f, 1.000f } },
+         { "AudioEffects", { 0.431f, 0.765f, 0.910f } }
+      },
+      { { 0.082f, 0.098f, 0.188f },  // window
+        { 0.125f, 0.149f, 0.247f },  // panel
+        { 0.933f, 0.945f, 0.980f },  // text
+        { 0.639f, 0.667f, 0.796f },  // textDim
+        { 0.204f, 0.231f, 0.369f },  // border
+        { 0.655f, 0.694f, 1.000f } } // accent
+      },
+      { "Infinite Deep", {   // brand Midnight deep ground, for dark rooms
+         { "Source", { 0.373f, 0.827f, 0.761f } },
+         { "3D", { 0.529f, 0.584f, 0.957f } },
+         { "Compositing", { 0.667f, 0.510f, 1.000f } },
+         { "Effects", { 1.000f, 0.541f, 0.357f } },
+         { "Modulators", { 1.000f, 0.745f, 0.353f } },
+         { "Prediction", { 0.431f, 0.843f, 0.549f } },
+         { "Macros", { 1.000f, 0.420f, 0.208f } },
+         { "Utility", { 0.639f, 0.667f, 0.796f } },
+         { "Notes", { 0.541f, 0.867f, 0.604f } },
+         { "Synths", { 0.655f, 0.694f, 1.000f } },
+         { "AudioEffects", { 0.431f, 0.765f, 0.910f } }
+      },
+      { { 0.051f, 0.063f, 0.125f },  // window
+        { 0.082f, 0.098f, 0.188f },  // panel
+        { 0.933f, 0.945f, 0.980f },  // text
+        { 0.639f, 0.667f, 0.796f },  // textDim
+        { 0.165f, 0.188f, 0.322f },  // border
+        { 0.655f, 0.694f, 1.000f } } // accent
+      },
+      { "Infinite Ember", {   // brand Midnight mode, Ember accent (the human act)
+         { "Source", { 0.373f, 0.827f, 0.761f } },
+         { "3D", { 0.529f, 0.584f, 0.957f } },
+         { "Compositing", { 0.667f, 0.510f, 1.000f } },
+         { "Effects", { 1.000f, 0.541f, 0.357f } },
+         { "Modulators", { 1.000f, 0.745f, 0.353f } },
+         { "Prediction", { 0.431f, 0.843f, 0.549f } },
+         { "Macros", { 1.000f, 0.420f, 0.208f } },
+         { "Utility", { 0.639f, 0.667f, 0.796f } },
+         { "Notes", { 0.541f, 0.867f, 0.604f } },
+         { "Synths", { 0.655f, 0.694f, 1.000f } },
+         { "AudioEffects", { 0.431f, 0.765f, 0.910f } }
+      },
+      { { 0.082f, 0.098f, 0.188f },  // window
+        { 0.125f, 0.149f, 0.247f },  // panel
+        { 0.933f, 0.945f, 0.980f },  // text
+        { 0.639f, 0.667f, 0.796f },  // textDim
+        { 0.204f, 0.231f, 0.369f },  // border
+        { 1.000f, 0.420f, 0.208f } } // accent
+      },
+      { "Infinite Mist", {   // brand Mist mode: light, cool
+         { "Source", { 0.118f, 0.541f, 0.494f } },
+         { "3D", { 0.290f, 0.329f, 0.839f } },
+         { "Compositing", { 0.510f, 0.314f, 0.902f } },
+         { "Effects", { 0.761f, 0.255f, 0.047f } },
+         { "Modulators", { 0.725f, 0.392f, 0.020f } },
+         { "Prediction", { 0.118f, 0.588f, 0.275f } },
+         { "Macros", { 0.710f, 0.216f, 0.000f } },
+         { "Utility", { 0.353f, 0.380f, 0.502f } },
+         { "Notes", { 0.149f, 0.549f, 0.243f } },
+         { "Synths", { 0.227f, 0.243f, 0.616f } },
+         { "AudioEffects", { 0.059f, 0.498f, 0.659f } }
+      },
+      { { 0.894f, 0.886f, 0.937f },  // window
+        { 0.969f, 0.961f, 0.984f },  // panel
+        { 0.071f, 0.082f, 0.165f },  // text
+        { 0.251f, 0.275f, 0.376f },  // textDim
+        { 0.769f, 0.757f, 0.851f },  // border
+        { 0.290f, 0.329f, 0.839f } } // accent
+      },
+      { "Infinite Paper", {   // brand Paper mode: light, neutral, Ember accent
+         { "Source", { 0.118f, 0.541f, 0.494f } },
+         { "3D", { 0.290f, 0.329f, 0.839f } },
+         { "Compositing", { 0.510f, 0.314f, 0.902f } },
+         { "Effects", { 0.761f, 0.255f, 0.047f } },
+         { "Modulators", { 0.725f, 0.392f, 0.020f } },
+         { "Prediction", { 0.118f, 0.588f, 0.275f } },
+         { "Macros", { 0.710f, 0.216f, 0.000f } },
+         { "Utility", { 0.353f, 0.380f, 0.502f } },
+         { "Notes", { 0.149f, 0.549f, 0.243f } },
+         { "Synths", { 0.227f, 0.243f, 0.616f } },
+         { "AudioEffects", { 0.059f, 0.498f, 0.659f } }
+      },
+      { { 0.984f, 0.980f, 0.965f },  // window
+        { 0.937f, 0.941f, 0.957f },  // panel
+        { 0.071f, 0.082f, 0.165f },  // text
+        { 0.251f, 0.275f, 0.376f },  // textDim
+        { 0.855f, 0.847f, 0.902f },  // border
+        { 0.851f, 0.263f, 0.055f } } // accent
       }
    };
    return presets;
@@ -935,6 +1035,11 @@ void LoadPreference()
          }
       }
    }
+   // INFINITE_THEME=<preset name> picks a preset for this run only (screenshots, tests); never saved.
+   if (const char* forced = std::getenv("INFINITE_THEME"))
+      for (size_t i = 0; i < Presets().size(); i++)
+         if (Presets()[i].name == forced)
+            gCurrent = (int)i;
    LoadAppearanceOverrides();
 }
 
