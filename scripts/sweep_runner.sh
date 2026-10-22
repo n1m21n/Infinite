@@ -46,7 +46,7 @@ done
 # others, and a fixture that dies before printing anything must not pass by
 # printing nothing.
 FAIL_MARK='FAIL|BUG$|MISMATCH|SUSPECT|UNEXPECTED|DID NOT MOVE|TONE MISSING'
-PASS_MARK=' OK$|OK$|PASS$|SKIP$|CLEAN$'
+PASS_MARK=' OK$|OK$|PASS$|SKIP$|SKIP \(.*\)$|CLEAN$'
 
 PASS=0
 FAIL=0

@@ -77,7 +77,7 @@ done
 # emits, and separately require a positive verdict (below), so a fixture that
 # dies before printing anything can no longer masquerade as a pass either.
 FAIL_MARK='FAIL|BUG$|MISMATCH|SUSPECT|DID NOT MOVE|TONE MISSING'
-PASS_MARK=' OK$|OK$|PASS$|SKIP$|CLEAN$|PASS \([0-9]+ flags?\)$'
+PASS_MARK=' OK$|OK$|PASS$|SKIP$|SKIP \(.*\)$|CLEAN$|PASS \([0-9]+ flags?\)$'
 PASS=0
 FAIL=0
 FAILED_NAMES=()
