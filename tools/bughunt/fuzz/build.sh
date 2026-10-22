@@ -27,7 +27,10 @@ if [ -z "${CXX:-}" ]; then
 fi
 CC="${CXX/clang++/clang}"
 SAN="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
-COMMON="-g -O1 -w $SAN"
+# Bounds-checked libc++/libstdc++: an index past size() traps even inside
+# capacity, where ASan sees valid memory.
+HARDEN="-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST -D_GLIBCXX_ASSERTIONS"
+COMMON="-g -O1 -w $SAN $HARDEN"
 CXXFLAGS="-std=c++20 $COMMON"
 
 ENGINE="${FUZZ_ENGINE:-}"
