@@ -279,7 +279,12 @@ WIRE = {"image": "cable", "geometry": "geo", "camera": "geo", "light": "geo", "a
 
 
 def random_patch(types, r):
-    """A small random graph with legal cables (kinds match) and parameters inside their declared range."""
+    """A small random graph with legal cables (kinds match) and parameters inside their declared range.
+
+    About 60% of graphs also get an LFO bound to 1-3 random modulatable controls per node (random polarity,
+    depth and centre): the only way to reach a control registered against the wrong storage (B-K-018).
+    About 5% of inputs are wired from a LATER node instead (a cycle): the app must refuse or break it
+    cleanly, never crash or hang."""
     pick = [r.choice(types) for _ in range(r.randint(3, 9))]
     lines, outs, wires = ["infinite-patch 1"], [], []
     for i, t in enumerate(pick, 1):
@@ -298,6 +303,19 @@ def random_patch(types, r):
                 wires.append("%s n%d %d n%d" % (w, i, inp["slot"], j))
         outs += [(i, o) for o in t["outputs"]]
     n = len(pick)
+    for i, t in enumerate(pick, 1):
+        for inp in t["inputs"]:
+            w = WIRE.get(inp["kind"])
+            later = [(j, o) for j, o in outs if j > i and o["kind"] == inp["kind"]]
+            if w and later and r.random() < 0.05:
+                j, o = r.choice(later)
+                wires.append("%s n%d %d n%d" % (w, i, inp["slot"], j))
+    if r.random() < 0.6:
+        lines += ["node %d Modulators LFO" % (n + 3), "  id lfo", "  f rateBeats %.3g" % r.choice([0.25, 1, 8, 32]), "end"]
+        for i, t in enumerate(pick, 1):
+            keys = [m["key"] for m in t.get("modulatable", []) if m.get("key")]
+            for k in r.sample(keys, min(len(keys), r.randint(1, 3))):
+                wires.append("mod n%d %s lfo 0 %d %.3g %.3g" % (i, k, r.randint(0, 1), r.uniform(0.1, 1.0), r.random()))
     imgs = [j for j, o in outs if o["kind"] == "image"]
     auds = [j for j, o in outs if o["kind"] == "audio"]
     lines += ["node %d Utility Output" % (n + 1), "  id out", "end", "node %d Utility Audio Out" % (n + 2), "  id spk", "end"]
@@ -380,6 +398,13 @@ def selftest():
     for m in MUTATORS.values():
         m(d, r)
     assert big_patch(3).count("node ") == 5
+    fake = [{"category": "C", "type": "T%d" % k, "params": [], "inputs": [{"kind": "audio", "slot": 0}],
+             "outputs": [{"kind": "audio", "output": 0}], "modulatable": [{"key": "gain", "min": 0, "max": 1}]}
+            for k in range(3)]
+    texts = [random_patch(fake, random.Random(s)) for s in range(200)]
+    assert any("mod n" in t and "id lfo" in t for t in texts), "random_patch never modulates"
+    assert any(re.search(r"aud n(\d+) 0 n(\d+)", t) and any(int(a) < int(b) for a, b in re.findall(r"aud n(\d+) 0 n(\d+)", t))
+               for t in texts), "random_patch never makes a back-edge"
     print("stress_kit selftest ok (%d node types)" % len(rows))
 
 

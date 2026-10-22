@@ -1,0 +1,15 @@
+# code_lint.py accepted hits: rule<TAB>file<TAB>detail. Each was reviewed and is guarded at the use site.
+loaded-index	src/nodes/AnalogNode.cpp	filterType -> [filterType] in src/app/bodies
+loaded-index	src/nodes/EquationNode.cpp	filterType -> [filterType] in src/app/bodies
+loaded-index	src/nodes/GrainMolderNode.cpp	key -> [key] in src/app/bodies
+loaded-index	src/nodes/ImageSpectralSynthNode.cpp	filterType -> [filterType] in src/app/bodies
+loaded-index	src/nodes/MacroNodes.h	selected -> [selected] in src/app/bodies
+loaded-index	src/nodes/MetallicNode.cpp	filterType -> [filterType] in src/app/bodies
+loaded-index	src/nodes/MidiNodes.h	note -> [note] in src/app/bodies
+loaded-index	src/nodes/ModulatorNodes.h	root -> [root] in src/app/bodies
+loaded-index	src/nodes/NoteNodes.cpp	root -> [root] in src/app/bodies
+loaded-index	src/nodes/OscillatorNode.cpp	filterType -> [filterType] in src/app/bodies
+loaded-index	src/nodes/OscillatorNode.cpp	waveform -> [waveform] in src/app/bodies
+loaded-index	src/nodes/PredictiveModulatorNode.h	rank -> [rank] in src/app/bodies
+loaded-index	src/nodes/PredictiveRhythmNode.cpp	root -> [root] in src/app/bodies
+loaded-index	src/nodes/WaveTerrainNode.cpp	filterType -> [filterType] in src/app/bodies
