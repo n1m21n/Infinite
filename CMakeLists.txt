@@ -86,6 +86,21 @@ if(INFINITE_SANITIZE AND NOT MSVC)
     message(STATUS "Sanitizers enabled: ${INFINITE_SANITIZE}")
 endif()
 
+# Hardened standard library: -DINFINITE_HARDEN=ON traps an out-of-range
+# vector/string/span index or an empty front()/back() at the call, which ASan
+# misses inside a vector's spare capacity. Cheap checks only (libc++ "fast"
+# mode, libstdc++ assertions); on by default in sanitizer builds, never shipped.
+if(INFINITE_SANITIZE)
+    set(_infinite_harden_default ON)
+else()
+    set(_infinite_harden_default OFF)
+endif()
+option(INFINITE_HARDEN "Bounds-checked standard library (libc++ fast mode / _GLIBCXX_ASSERTIONS)" ${_infinite_harden_default})
+if(INFINITE_HARDEN AND NOT MSVC)
+    add_compile_definitions(_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST _GLIBCXX_ASSERTIONS)
+    message(STATUS "Hardened standard library enabled")
+endif()
+
 # Coverage builds: -DINFINITE_COVERAGE=ON (clang only) instruments for llvm-cov,
 # so a fuzz or test run can show which code it never reached
 # (tools/bughunt/coverage.py). Off by default, never shipped; combinable with
