@@ -1,7 +1,9 @@
 #include "Geometry3DNodes.h"
+#include "RtxBackend.h"
 
 #include "platform/OpenGLHeaders.h"
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cmath>
 
@@ -30,7 +32,7 @@ namespace
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
    const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position" };
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
-   const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard" };
+   const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
    const std::vector<std::string> kSpriteSizeModeNames = { "World", "Screen" };
@@ -324,10 +326,9 @@ namespace
       "      vec3 lower = mix(toLinear(uEnvGround), toLinear(uEnvHorizon), smoothstep(0.0, 0.5, t));\n"
       "      col = mix(lower, toLinear(uEnvSky), smoothstep(0.5, 1.0, t)) * uEnvIntensity;\n"
       "   }\n"
+      // Turbo 0.61: linear HDR out; Render3DPost tonemaps and encodes.
       "   col *= uExposure;\n"
-      "   if (uTonemap == 1) col = acesFilm(col);\n"
-      "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
-      "   fragColor = vec4(toSrgb(col), uBgOpacity);\n"
+      "   fragColor = vec4(col, uBgOpacity);\n"
       "}\n";
 
    const char* kVertSrc =
@@ -511,6 +512,13 @@ namespace
       "uniform int uHasEnvMap;\n"
       "uniform float uEnvRotation;\n"
       "uniform float uEnvMaxLod;\n"
+      // Turbo 0.61: split-sum IBL from Render3DPost (prefiltered GGX mips,
+      // irradiance, BRDF table), when an HDRI is patched in.
+      "uniform int uHasIbl;\n"
+      "uniform sampler2D uPrefEnv;\n"
+      "uniform sampler2D uIrrEnv;\n"
+      "uniform sampler2D uBrdfLut;\n"
+      "uniform float uPrefMaxLod;\n"
       "uniform sampler2DShadow uShadowMap;\n"
       "uniform int uShadowsOn;\n"
       "uniform float uShadowBias;\n"
@@ -750,7 +758,7 @@ namespace
       "   vec3 base = toLinear(uBaseColor) * vInstanceColor * vVertexColor;\n"
       "   if (uHasTexture == 1) base *= toLinear(sampleMap(uTexture, n, mapUv).rgb);\n"
       "   if (uInstTexMode != 0) base *= toLinear(instTexel.rgb);\n"
-      "   if (uShading == 3) { fragColor = vec4(toSrgb(base), uOpacity); return; }\n"
+      "   if (uShading == 3) { fragColor = vec4(base, uOpacity); return; }\n"
       "\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
       "   float rough = uRoughness;\n"
@@ -862,16 +870,21 @@ namespace
       "      vec3 irid = evalIridescence(nDotV, uIridescenceIor, uIridescenceThickness);\n"
       "      fAmbient = mix(fAmbient, fAmbient * irid * 2.0, uIridescence);\n"
       "   }\n"
+      "   vec3 specWeight = fAmbient;\n"
+      "   if (uHasIbl == 1) {\n"
+      "      irradiance = texture(uIrrEnv, dirToEquirect(n)).rgb * uEnvIntensity * toLinear(uAmbient) * 3.0;\n"
+      "      reflection = textureLod(uPrefEnv, dirToEquirect(reflectDir), rough * uPrefMaxLod).rgb * uEnvIntensity;\n"
+      "      vec2 ab = texture(uBrdfLut, vec2(nDotV, rough)).rg;\n"
+      "      specWeight = fAmbient * ab.x + ab.y;\n"
+      "   }\n"
       "   col += (vec3(1.0) - fAmbient) * (1.0 - metal) * base * irradiance * ao;\n"
-      "   col += reflection * fAmbient * ao;\n"
+      "   col += reflection * specWeight * ao;\n"
       "\n"
       "   col += base * pow(1.0 - nDotV, 3.0) * uRim;\n"
       "   col += emiss;\n"
       "\n"
+      // Turbo 0.61: linear HDR out; Render3DPost tonemaps, encodes and dithers.
       "   col *= uExposure;\n"
-      "   if (uTonemap == 1) col = acesFilm(col);\n"
-      "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
-      "   col = toSrgb(col) + ditherOffset();\n"
       "\n"
       "   if (uTransmission > 0.0) {\n"
       "      vec4 clipA = uViewProj * vec4(vWorldPos, 1.0);\n"
@@ -888,9 +901,9 @@ namespace
       "         float r = textureLod(uSceneColor, clamp(refractUv - dispOffset, 0.0, 1.0), lod).r;\n"
       "         float g = textureLod(uSceneColor, refractUv, lod).g;\n"
       "         float b = textureLod(uSceneColor, clamp(refractUv + dispOffset, 0.0, 1.0), lod).b;\n"
-      "         refracted = vec3(r, g, b) * mix(vec3(1.0), toSrgb(base), 0.4);\n"
+      "         refracted = vec3(r, g, b) * mix(vec3(1.0), base, 0.4);\n"
       "      } else {\n"
-      "         refracted = textureLod(uSceneColor, refractUv, lod).rgb * mix(vec3(1.0), toSrgb(base), 0.4);\n"
+      "         refracted = textureLod(uSceneColor, refractUv, lod).rgb * mix(vec3(1.0), base, 0.4);\n"
       "      }\n"
       "      col = mix(col, refracted, uTransmission);\n"
       "   }\n"
@@ -1267,6 +1280,29 @@ void Render3DNode::ReleaseTargets()
    if (mMsFbo != 0) { glDeleteFramebuffers(1, &mMsFbo); mMsFbo = 0; }
 }
 
+const std::vector<std::string>& Render3DNode::RenderModeNames()
+{
+   static const std::vector<std::string> kNames = { "Raster", "RTX (NVIDIA)" };
+   return kNames;
+}
+
+void Render3DNode::RtxDeleter::operator()(RtxBackend* p) const { delete p; }
+
+const std::vector<std::string>& Render3DNode::RtxDenoiseNames()
+{
+   static const std::vector<std::string> kNames = { "Auto", "AI (best)", "Fast", "Off" };
+   return kNames;
+}
+
+const std::vector<std::string>& Render3DNode::PanoramaNames()
+{
+   static const std::vector<std::string> kNames = { "Off", "360 equirect", "Cubemap 3x2", "Dome (fisheye)" };
+   return kNames;
+}
+
+int Render3DNode::RtxSamples() const { return mRtx ? mRtx->Samples() : 0; }
+double Render3DNode::RtxMs() const { return mRtx ? mRtx->LastMs() : 0.0; }
+
 Render3DNode::~Render3DNode()
 {
    ReleaseTargets();
@@ -1354,9 +1390,10 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
 
    ReleaseTargets();
 
+   // Turbo 0.61: linear HDR - the post pass (Render3DPost) tonemaps it.
    glGenTextures(1, &mColorTex);
    glBindTexture(GL_TEXTURE_2D, mColorTex);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -1404,7 +1441,7 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
       // both area and sample count: 4096 square at 8x is over a gigabyte of
       // renderbuffer. Halve the sample count until it fits a budget rather than
       // letting a big export try to allocate more than the GPU will give.
-      const double bytesPerSample = (double)w * (double)h * 8.0;
+      const double bytesPerSample = (double)w * (double)h * 12.0; // RGBA16F + depth
       const double budget = 512.0 * 1024.0 * 1024.0;
       while (resolved > 1 && bytesPerSample * resolved > budget)
          resolved /= 2;
@@ -1416,7 +1453,7 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
    {
       glGenRenderbuffers(1, &mMsColor);
       glBindRenderbuffer(GL_RENDERBUFFER, mMsColor);
-      glRenderbufferStorageMultisample(GL_RENDERBUFFER, resolved, GL_RGBA8, w, h);
+      glRenderbufferStorageMultisample(GL_RENDERBUFFER, resolved, GL_RGBA16F, w, h);
 
       glGenRenderbuffers(1, &mMsDepth);
       glBindRenderbuffer(GL_RENDERBUFFER, mMsDepth);
@@ -1451,7 +1488,7 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
    // attachment, no depth: it only exists to be blitted into and sampled.
    glGenTextures(1, &mSceneColorTex);
    glBindTexture(GL_TEXTURE_2D, mSceneColorTex);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -1602,8 +1639,92 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
    return sig;
 }
 
+void Render3DNode::Cook360(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   const int outW = std::max(16, (int)width), outH = std::max(16, (int)height);
+   const int face = std::clamp(panorama == 1 ? outW / 4 : (panorama == 3 ? outW / 2 : outW / 3), 64, 4096);
+
+   // Cook the sources first: the signature reads their revisions.
+   CollectDraw();
+   for (IGeometrySource* src : mDraw)
+      if (auto* node = dynamic_cast<INode*>(src))
+         node->CookIfNeeded(frameId);
+   SceneSignature sig = BuildSceneSignature();
+   if (m360Valid && mPanoOut != 0 && sig == m360Sig && outW == m360OutW && outH == m360OutH && panorama == m360Mode &&
+       domeAngle == m360Dome[0] && domeTilt == m360Dome[1] && !sig.animated)
+   {
+      mLastCookFrame = frameId;
+      return;
+   }
+
+   if (mFaceArray == 0 || mFaceArraySize != face)
+   {
+      if (mFaceArray != 0)
+         glDeleteTextures(1, &mFaceArray);
+      glGenTextures(1, &mFaceArray);
+      glBindTexture(GL_TEXTURE_2D_ARRAY, mFaceArray);
+      glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, face, face, 6);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+      mFaceArraySize = face;
+   }
+   // One full render per face: CookIfNeeded with m360Face set swaps in the
+   // face's camera and size, and runs the normal HDR finish (so the plain
+   // background keeps its exact colour on every face).
+   for (int f = 0; f < 6; f++)
+   {
+      m360Face = f;
+      m360FaceSize = face;
+      mLastCookFrame = -1;
+      mHasSceneBuilt = false;
+      CookIfNeeded(frameId);
+      if (mPostOut != 0)
+         glCopyImageSubData(mPostOut, GL_TEXTURE_2D, 0, 0, 0, 0, mFaceArray, GL_TEXTURE_2D_ARRAY, 0, 0, 0, f, face, face,
+                            1);
+   }
+   m360Face = -1;
+   mLastCookFrame = frameId;
+   mPanoOut = mPost.Panorama(mFaceArray, outW, outH, panorama, domeAngle, domeTilt);
+   m360Sig = sig;
+   m360Valid = true;
+   m360OutW = outW;
+   m360OutH = outH;
+   m360Mode = panorama;
+   m360Dome[0] = domeAngle;
+   m360Dome[1] = domeTilt;
+   mRevision = NextTextureRevision();
+}
+
+// Turbo 0.62: Render 3D's cook time (inclusive of the sources it pulls),
+// for INFINITE_FRAMEPROF.
+double gRender3DCookSeconds = 0.0;
+
 void Render3DNode::CookIfNeeded(int frameId)
 {
+   struct CookTimer
+   {
+      std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+      ~CookTimer() { gRender3DCookSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); }
+   } cookTimer;
+   // Turbo 0.61: raster 360 renders six faces and reprojects them (Cook360);
+   // path traced 360 traces the panorama's rays directly (below).
+   if (panorama > 0 && m360Face < 0 && (renderMode == 0 || (mRtxTried && !mRtx)) && renderPass == 0)
+   {
+      Cook360(frameId);
+      return;
+   }
+   if (m360Face < 0 && mPanoOut != 0)
+   {
+      mPanoOut = 0;
+      m360Valid = false;
+      mHasSceneBuilt = false;
+   }
+
    if (mLastCookFrame == frameId)
       return;
    mLastCookFrame = frameId;
@@ -1611,8 +1732,8 @@ void Render3DNode::CookIfNeeded(int frameId)
    if (!EnsureShader())
       return;
 
-   const int w = std::max(16, (int)width);
-   const int h = std::max(16, (int)height);
+   const int w = m360Face >= 0 ? m360FaceSize : std::max(16, (int)width);
+   const int h = m360Face >= 0 ? m360FaceSize : std::max(16, (int)height);
    const int wantSamples =
       kSampleCounts[std::max(0, std::min(samples, (int)(sizeof(kSampleCounts) / sizeof(int)) - 1))];
    if (!EnsureResources(w, h, wantSamples))
@@ -1635,6 +1756,7 @@ void Render3DNode::CookIfNeeded(int frameId)
    float envRotationRad = 0.0f;
    float envHdriIntensity = 1.0f;
    float envMaxLod = 0.0f;
+   unsigned long long envRevision = 0;
    if (envInput.IsConnected())
    {
       INode* envNode = envInput.Resolved();
@@ -1645,6 +1767,7 @@ void Render3DNode::CookIfNeeded(int frameId)
          envRotationRad = env->rotation * (float)M_PI / 180.0f;
          envHdriIntensity = env->intensity;
          envMaxLod = env->MaxLod();
+         envRevision = env->TextureRevision();
       }
    }
    const bool hasEnvMap = envTex != 0;
@@ -1653,7 +1776,12 @@ void Render3DNode::CookIfNeeded(int frameId)
    // mColorTex (and mSceneColorTex) already hold the right image, so skip
    // the shadow/opaque/transmissive passes entirely and reuse them.
    SceneSignature sceneSig = BuildSceneSignature();
-   if (mHasSceneBuilt && sceneSig == mSceneBuilt)
+   // Turbo 0.62: RTX keeps adding samples to an unchanged scene until it
+   // reaches ptSamples; any change restarts the average.
+   const bool pathTraced = renderMode == 1 && renderPass == 0 && !(mRtxTried && !mRtx);
+   const bool sceneChanged = !(mHasSceneBuilt && sceneSig == mSceneBuilt);
+   const bool ptAccumulating = pathTraced && (!mRtx || mRtx->Samples() < ptSamples);
+   if (!sceneChanged && !ptAccumulating)
       return;
    mSceneBuilt = sceneSig;
    mHasSceneBuilt = true;
@@ -1683,6 +1811,19 @@ void Render3DNode::CookIfNeeded(int frameId)
       proj = (projection == 1)
          ? Mat4::Orthographic(orthoHeight, aspect, nearPlane, farPlane)
          : Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
+   }
+   if (m360Face >= 0)
+   {
+      // Turbo 0.61: one 90-degree cube face, turned from the camera's own
+      // orientation (rows right, up, -forward of the face basis).
+      float f[3], r[3], u[3];
+      Render3DPost::PanoFace(m360Face, f, r, u);
+      Mat4 face = Mat4::Identity();
+      face.m[0] = r[0]; face.m[4] = r[1]; face.m[8] = r[2];
+      face.m[1] = u[0]; face.m[5] = u[1]; face.m[9] = u[2];
+      face.m[2] = -f[0]; face.m[6] = -f[1]; face.m[10] = -f[2];
+      view = Mat4::Multiply(face, view);
+      proj = Mat4::Perspective(3.14159265f * 0.5f, 1.0f, nearPlane, farPlane);
    }
    const Mat4 viewProj = Mat4::Multiply(proj, view);
    mLastCamera.view = view;
@@ -1850,6 +1991,217 @@ void Render3DNode::CookIfNeeded(int frameId)
    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
    glDepthMask(GL_TRUE);
 
+   // Turbo 0.62: RTX mode - the scene handed to the hardware ray tracer
+   // (RtxBackend) as GPU handles, then the same HDR finish. Draws raster
+   // instead when the module or an RTX GPU is missing (RtxStatus says why).
+   if (pathTraced)
+   {
+      if (!mRtx && !mRtxTried)
+      {
+         mRtxTried = true;
+         std::unique_ptr<RtxBackend> made = CreateRtxBackend(mRtxWhy);
+         mRtx.reset(made.release());
+      }
+      unsigned int traced = 0;
+      if (mRtx)
+      {
+         mRtxKeep.clear();
+         std::vector<RtxBackend::Geometry> geo;
+         auto keyOf = [](const void* p, unsigned long long rev) {
+            return (uint64_t)(uintptr_t)p * 0x9E3779B97F4A7C15ull ^ (uint64_t)rev;
+         };
+         auto gpuOf = [this](const pop::PopData& d, const char* name, int& comps) -> unsigned int {
+            const pop::PopAttrib* a = d.Find(name);
+            if (a == nullptr || !a->buffer)
+               return 0;
+            comps = a->buffer->Comps();
+            mRtxKeep.push_back(a->buffer);
+            return a->buffer->Gpu();
+         };
+         // Per-point transforms of a PointZ, as the raster builds them, kept on the GPU.
+         auto popInstances = [this, &gpuOf](const pop::PopData& pts, const Mat4& model, float scale, int align,
+                                            RtxBackend::Geometry& g) {
+            std::vector<pop::BufferPtr> cols;
+            std::string err;
+            if (!pop::InstanceMatrices(pts, model.m, scale, align, cols, err) || cols.size() != 4)
+               return false;
+            for (int c = 0; c < 4; c++)
+            {
+               g.instCols[c] = cols[(size_t)c]->Gpu();
+               mRtxKeep.push_back(cols[(size_t)c]);
+            }
+            g.instCount = pts.pointCount;
+            g.instColorBuf = gpuOf(pts, pop::attr::Color, g.instColorComps);
+            return true;
+         };
+         for (IGeometrySource* src : mDraw)
+         {
+            if (src == nullptr)
+               continue;
+            RtxBackend::Geometry g;
+            g.slot = (uint64_t)(uintptr_t)src;
+            g.model = src->GetModelMatrix();
+            g.material = src->GetMaterial();
+            g.surfaceTex = src->GetSurfaceTexture();
+            const pop::PopData* pd = src->GetPop();
+            if (IsSpriteSource(src))
+            {
+               // Points / particles: one sphere per point, sized like the sprite.
+               g.kind = RtxBackend::Geometry::kSpheres;
+               g.surfaceTex = 0;
+               const float baseSize = src->PointBaseSize();
+               if (pd != nullptr)
+               {
+                  if (pd->pointCount <= 0)
+                     continue;
+                  int pc = 3, rc = 1;
+                  g.posBuf = gpuOf(*pd, pop::attr::P, pc);
+                  g.posComps = pc;
+                  g.radiusBuf = gpuOf(*pd, pop::attr::PScale, rc);
+                  g.radiusScale = baseSize * (g.radiusBuf != 0 ? 1.0f : 0.02f);
+                  g.colorBuf = gpuOf(*pd, pop::attr::Color, g.colorComps);
+                  g.pointCount = pd->pointCount;
+                  g.key = keyOf(src, pd->revision);
+               }
+               else if (const std::vector<Particle>* cloud = src->GetPointCloud())
+               {
+                  const Mat4& m = g.model;
+                  const float scaleX = std::sqrt(m.m[0] * m.m[0] + m.m[1] * m.m[1] + m.m[2] * m.m[2]);
+                  for (const Particle& p : *cloud)
+                  {
+                     if (!p.alive)
+                        continue;
+                     g.cpuCentres.push_back(m.m[0] * p.px + m.m[4] * p.py + m.m[8] * p.pz + m.m[12]);
+                     g.cpuCentres.push_back(m.m[1] * p.px + m.m[5] * p.py + m.m[9] * p.pz + m.m[13]);
+                     g.cpuCentres.push_back(m.m[2] * p.px + m.m[6] * p.py + m.m[10] * p.pz + m.m[14]);
+                     g.cpuCentres.push_back(p.scale * baseSize * scaleX);
+                     g.cpuColors.push_back(p.r);
+                     g.cpuColors.push_back(p.g);
+                     g.cpuColors.push_back(p.b);
+                  }
+                  g.model = Mat4::Identity();
+                  g.pointCount = (int)(g.cpuCentres.size() / 4);
+                  g.key = keyOf(src, src->PointCloudRevision());
+               }
+               if (g.pointCount <= 0)
+                  continue;
+               geo.push_back(std::move(g));
+               continue;
+            }
+            if (pd != nullptr)
+            {
+               // PointZ with faces: its own GL buffers and triangle index buffer.
+               const pop::PopTopology& topo = pd->Topo();
+               if (!topo.HasFaces() || pd->pointCount <= 0)
+                  continue;
+               int pc = 3;
+               g.posBuf = gpuOf(*pd, pop::attr::P, pc);
+               g.posComps = pc;
+               g.normalBuf = gpuOf(*pd, pop::attr::N, g.normalComps);
+               g.uvBuf = gpuOf(*pd, pop::attr::Tex, g.uvComps);
+               g.colorBuf = gpuOf(*pd, pop::attr::Color, g.colorComps);
+               g.indexBuf = topo.TriIbo();
+               g.pointCount = pd->pointCount;
+               g.triCount = (int)topo.TriangleCount();
+               g.key = keyOf(src, pd->revision);
+               if (g.posBuf == 0)
+                  continue;
+               const pop::PopData* inst = src->GetPopInstances();
+               if (inst != nullptr && inst->pointCount > 0 &&
+                   !popInstances(*inst, g.model, inst->instanceScale, inst->instanceAlign, g))
+                  continue;
+               geo.push_back(std::move(g));
+               continue;
+            }
+            const Mesh& mesh = src->GetMesh();
+            if (mesh.indices.size() < 3)
+               continue;
+            g.mesh = &mesh;
+            g.pointCount = (int)mesh.vertices.size();
+            g.triCount = (int)(mesh.indices.size() / 3);
+            g.key = keyOf(src, src->MeshRevision());
+            if (auto* instancer = FindInstancer(src))
+            {
+               const Mat4 group = src->GetInstanceGroupMatrix();
+               for (const Mat4& x : instancer->InstanceTransforms())
+                  g.instCpu.push_back(Mat4::Multiply(group, x));
+            }
+            geo.push_back(std::move(g));
+         }
+
+         std::vector<RtxBackend::Light> lights;
+         for (int i = 0; i < lightCount; i++)
+         {
+            RtxBackend::Light l;
+            l.type = lightTypes[i];
+            for (int k = 0; k < 3; k++)
+            {
+               l.dir[k] = lightDirs[i * 3 + k];
+               l.color[k] = lightCols[i * 3 + k];
+            }
+            l.intensity = lightPower[i];
+            l.spotAngle = lightSpotAngle[i];
+            lights.push_back(l);
+         }
+         RtxBackend::Env env;
+         env.tex = envTex;
+         env.texKey = envTex;
+         env.rotation = envRotationRad;
+         env.intensity = envIntensity * envHdriIntensity;
+         for (int k = 0; k < 3; k++)
+         {
+            env.sky[k] = envSky[k];
+            env.horizon[k] = envHorizon[k];
+            env.ground[k] = envGround[k];
+            env.ambient[k] = ambientColor[k];
+         }
+         mRtx->SetScene(geo, lights, env);
+         RtxBackend::Frame f;
+         f.width = w;
+         f.height = h;
+         f.view = view;
+         f.viewProj = viewProj;
+         for (int k = 0; k < 3; k++)
+            f.eye[k] = eye[k];
+         f.panorama = panorama;
+         f.domeAngle = domeAngle;
+         f.domeTilt = domeTilt;
+         f.bounces = ptBounces;
+         f.maxSamples = std::max(1, ptSamples);
+         f.restart = sceneChanged;
+         f.exposure = exposure;
+         f.denoise = rtxDenoise;
+         traced = mRtx->Render(f);
+         mRtxKeep.clear();
+         if (traced == 0 && !mRtx->Error().empty())
+            mRtxWhy = mRtx->Error();
+         else if (traced != 0)
+            mRtxWhy.clear();
+      }
+      if (traced != 0)
+      {
+         if (envAsBackground && hasEnvMap)
+            mPostOut = mPost.FinishCoverage(traced, w, h, tonemap, bloom, bloomThreshold, bloomRadius, bgColor,
+                                            bgOpacity, true);
+         else
+            mPostOut = mPost.FinishCoverage(traced, w, h, tonemap, bloom, bloomThreshold, bloomRadius, bgColor,
+                                            bgOpacity);
+         if (!prevDepth) glDisable(GL_DEPTH_TEST);
+         if (!prevCull) glDisable(GL_CULL_FACE);
+         if (!prevBlend) glDisable(GL_BLEND);
+         if (prevScissor)
+         {
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(prevScissorBox[0], prevScissorBox[1], prevScissorBox[2], prevScissorBox[3]);
+         }
+         glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+         glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+         mDepthResolved = false;
+         mRevision = NextTextureRevision();
+         return;
+      }
+   }
+
    const bool multisampling = mActiveSamples > 1 && mMsFbo != 0;
    glBindFramebuffer(GL_FRAMEBUFFER, multisampling ? mMsFbo : mFbo);
    glViewport(0, 0, w, h);
@@ -1972,6 +2324,24 @@ void Render3DNode::CookIfNeeded(int frameId)
    glActiveTexture(GL_TEXTURE6);
    glBindTexture(GL_TEXTURE_2D, hasEnvMap ? envTex : DummyEnvTexture());
    glUniform1i(glGetUniformLocation(mProgram, "uEnvMap"), 6);
+   // Turbo 0.61: split-sum IBL, rebuilt only when the HDRI changes. The
+   // equirect base is 2^maxLod wide (maxLod = floor(log2(max(w, h)))).
+   const int envW = (int)std::exp2(envMaxLod);
+   const bool ibl = hasEnvMap && mPost.EnsureIbl(envTex, envW, std::max(1, envW / 2), envMaxLod, envRevision);
+   glUniform1i(glGetUniformLocation(mProgram, "uHasIbl"), ibl ? 1 : 0);
+   if (ibl)
+   {
+      glActiveTexture(GL_TEXTURE13);
+      glBindTexture(GL_TEXTURE_2D, mPost.PrefilteredTexture());
+      glUniform1i(glGetUniformLocation(mProgram, "uPrefEnv"), 13);
+      glActiveTexture(GL_TEXTURE14);
+      glBindTexture(GL_TEXTURE_2D, mPost.IrradianceTexture());
+      glUniform1i(glGetUniformLocation(mProgram, "uIrrEnv"), 14);
+      glActiveTexture(GL_TEXTURE15);
+      glBindTexture(GL_TEXTURE_2D, mPost.BrdfLut());
+      glUniform1i(glGetUniformLocation(mProgram, "uBrdfLut"), 15);
+      glUniform1f(glGetUniformLocation(mProgram, "uPrefMaxLod"), mPost.PrefilteredMaxLod());
+   }
    glActiveTexture(GL_TEXTURE0);
 
    // Point-cloud slots draw an instanced unit quad, billboarded against the
@@ -2873,6 +3243,10 @@ void Render3DNode::CookIfNeeded(int frameId)
    glBindVertexArray(0);
    glUseProgram(0);
 
+   // The plain-colour background is keyed by depth in the post pass (an HDRI
+   // background goes through the tonemap like the scene, as it always did).
+   const bool bgKey = renderPass == 0 && !(envAsBackground && hasEnvMap);
+
    // Resolve the multisampled buffer down into the texture the graph reads.
    // Scissor is already off, which matters here: a blit is clipped by it too.
    if (multisampling)
@@ -2880,12 +3254,17 @@ void Render3DNode::CookIfNeeded(int frameId)
       glBindFramebuffer(GL_READ_FRAMEBUFFER, mMsFbo);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
       glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-      if (mDepthWanted)
+      if (mDepthWanted || bgKey)
          glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
-   mDepthResolved = !multisampling || mDepthWanted;
+   mDepthResolved = !multisampling || mDepthWanted || bgKey;
+
+   // Turbo 0.61: HDR finish - bloom, tonemap, sRGB. The plain background
+   // colour stays exactly what it was (keyed by depth); data passes are copied.
+   mPostOut = mPost.Finish(mColorTex, w, h, tonemap, bloom, bloomThreshold, bloomRadius, renderPass != 0,
+                           bgKey ? mDepthBuffer : 0, bgColor);
 
    // --- restore, or every 2D node after this draws wrongly ------------
    if (!prevDepth) glDisable(GL_DEPTH_TEST);

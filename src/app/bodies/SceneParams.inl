@@ -1681,6 +1681,48 @@
       DropdownButton("sprite size", Render3DNode::SpriteSizeModeNames(), n->spriteSizeMode,
                      [n](int i) { n->spriteSizeMode = i; }, colW);
 
+      // Turbo 0.61: bloom from the HDR scene. Last on the body, so the sliders
+      // above keep their modulation slots.
+      NodeSeparator("glow", colW);
+      ModSlider("bloom", &n->bloom, 0.0f, 2.0f, "%.3f", colW);
+      if (n->bloom > 0.0f)
+      {
+         ModSlider("threshold", &n->bloomThreshold, 0.0f, 8.0f, "%.3f", colW);
+         ModSlider("radius", &n->bloomRadius, 0.0f, 1.0f, "%.3f", colW);
+      }
+
+      // Turbo 0.62: RTX - hardware ray tracing, denoised, refining while
+      // nothing moves (raster with a note when the GPU / build lacks it).
+      NodeSeparator("render", colW);
+      DropdownButton("mode", Render3DNode::RenderModeNames(), n->renderMode,
+                     [n](int i) { PushUndoCheckpoint(); n->renderMode = i; }, colW);
+      DropdownButton("360", Render3DNode::PanoramaNames(), n->panorama,
+                     [n](int i) {
+                        PushUndoCheckpoint();
+                        n->panorama = i;
+                        // The formats' own aspect: 2:1 equirect, 3:2 cubemap.
+                        if (i == 1) n->height = std::max(16.0f, n->width * 0.5f);
+                        else if (i == 2) n->height = std::max(16.0f, n->width * 2.0f / 3.0f);
+                        else if (i == 3) n->height = n->width; // dome: square domemaster
+                     }, colW);
+      if (n->panorama == 3)
+      {
+         ModSlider("dome angle", &n->domeAngle, 90.0f, 360.0f, "%.0f\xC2\xB0", colW);
+         ModSlider("dome tilt", &n->domeTilt, 0.0f, 90.0f, "%.0f\xC2\xB0", colW);
+      }
+      if (n->renderMode == 1)
+      {
+         ModSliderInt("samples", &n->ptSamples, 1, 4096);
+         ModSliderInt("bounces", &n->ptBounces, 1, 12);
+         DropdownButton("denoise", Render3DNode::RtxDenoiseNames(), n->rtxDenoise,
+                        [n](int i) { PushUndoCheckpoint(); n->rtxDenoise = i; }, colW);
+         if (!n->RtxStatus().empty())
+            ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.35f, 1.0f), "%s", n->RtxStatus().c_str());
+         else
+            ImGui::TextDisabled("%d / %d samples, %.1f ms", std::min(n->RtxSamples(), n->ptSamples), n->ptSamples,
+                                n->RtxMs());
+      }
+
       ImGui::EndGroup();
    }
 

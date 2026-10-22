@@ -1,7 +1,14 @@
 #pragma once
 
+#include <memory>
+
 #include "Geometry3DNodes.h"
 #include "SharedViewportCamera.h"
+
+namespace pop
+{
+   struct AsyncBounds;
+}
 
 // A tiny, cheap solo-render of one geometry-producing node's own mesh -
 // independent of whatever Render 3D shows downstream. Deliberately far
@@ -27,6 +34,8 @@ public:
    // between a node's inline mini-viewport and its viewport-panel card so
    // the two agree, but never shared across different nodes) - this instance
    // only reads it and tracks the value it last rendered.
+   // Turbo 0.62: the last render, without redrawing (0 before the first).
+   unsigned int LastTexture() const { return mHasRendered ? mColorTex : 0; }
    unsigned int Render(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h,
                        bool forceRedraw = false);
 
@@ -44,6 +53,9 @@ private:
    void UploadMesh(const Mesh& mesh, unsigned long long revision);
    void UpdateSelectionBuffer(const Mesh& mesh, unsigned long long revision);
    void UploadPoints(const std::vector<Particle>& points, unsigned long long revision);
+   // Turbo 0.62: a PointZ is drawn straight from its own GL buffers (no
+   // ToMesh download + re-upload every frame of an animated chain).
+   void BindPop(const pop::PopData& d, const pop::PopData* inst, const Mat4& model);
 
    unsigned int mFbo = 0, mColorTex = 0, mDepthBuffer = 0;
    int mWidth = 0, mHeight = 0;
@@ -88,6 +100,15 @@ private:
    // sprite/instancing pipeline.
    unsigned int mPointVao = 0, mPointVbo = 0;
    int mPointCount = 0;
+   // Turbo 0.62: PointZ draw state (BindPop).
+   struct PopBoundsDeleter
+   {
+      void operator()(pop::AsyncBounds* b) const;
+   };
+   unsigned int mPopVao = 0;
+   int mPopTriIndices = 0, mPopLineIndices = 0, mPopPoints = 0, mPopInstances = 0;
+   bool mPopColor = false;
+   std::unique_ptr<pop::AsyncBounds, PopBoundsDeleter> mPopBounds;
    unsigned long long mLastPointRevision = (unsigned long long)-1;
 
    // Orbit camera. Distance/target are auto-framed to the mesh bounds the

@@ -17,6 +17,11 @@ namespace pop
    {
       std::string name; // attribute name, also the GLSL local variable
       int comps = 1;    // 1..4 -> float, vec2, vec3, vec4
+      // Turbo 0.62, lookups only: which input to read (-1 = the spec's
+      // lookupInput) and the GLSL name (fetch_<as>; empty = the attribute's),
+      // so one kernel can read same-named attributes of both inputs.
+      int input = -1;
+      std::string as;
    };
 
    struct KernelUniform
@@ -100,6 +105,47 @@ namespace pop
    // `blockFloats` floats holding `newest` first, then the first blocks - 1
    // blocks of `history`. With no usable history every block is `newest`.
    BufferPtr GpuShiftIn(const BufferPtr& newest, const BufferPtr& history, int blockFloats, int blocks, int comps);
+
+   // Turbo 0.62: reading a few points of GPU-made data without stalling.
+   // Request() queues a GPU-side copy of some attributes into memory the CPU
+   // can read (persistently mapped) and fences it; Latest() hands back the
+   // newest copy the GPU has finished - normally last frame's - so an
+   // operator that samples its input every frame (Particle births) never
+   // waits for the GPU. Two copies in flight at most.
+   class AsyncRows
+   {
+   public:
+      struct Snapshot
+      {
+         int count = 0;
+         std::vector<std::string> names;
+         std::vector<int> comps;
+         std::vector<const float*> data; // per attribute, count * comps floats
+         unsigned long long revision = 0;
+      };
+      AsyncRows() = default;
+      AsyncRows(const AsyncRows&) = delete;
+      AsyncRows& operator=(const AsyncRows&) = delete;
+      ~AsyncRows();
+      // Copies `names` of `d` (P first; missing ones are left out).
+      void Request(const PopData& d, const std::vector<std::string>& names);
+      // The newest finished copy, or nullptr while none has finished yet.
+      const Snapshot* Latest();
+
+   private:
+      struct Slot
+      {
+         unsigned int buf = 0;
+         size_t bytes = 0;
+         void* ptr = nullptr;
+         void* fence = nullptr;
+         bool done = false;
+         Snapshot snap;
+      };
+      Slot mSlots[2];
+      int mNext = 0;
+      int mReady = -1;
+   };
 
    // Per-instance transforms for points: four vec4 column buffers (M0..M3).
    // T(P + offset) * R(align) * R(Rotate + rotate) * S(PScale * scale * Scale *

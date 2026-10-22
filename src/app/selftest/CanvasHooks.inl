@@ -5186,6 +5186,41 @@
 
       // antialiased silhouette from ordinary shading gradients; differencing
       // two renders of an identical scene can, because only the edges move.
+      // Turbo 0.62: the 3DTEST scene in RTX mode - samples accumulate up to
+      // ptSamples, and the finished image covers the geometry like the raster.
+      // Without the module or an RTX GPU it draws raster and says SKIP.
+      const bool panoTest = getenv("INFINITE_PANORAMATEST") != nullptr;
+      if ((getenv("INFINITE_RTXTEST") != nullptr || panoTest) && frameId == 40)
+      {
+         auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
+         const int w = r->GetOutputWidth(), h = r->GetOutputHeight();
+         std::vector<unsigned char> px((size_t)w * h * 4);
+         GLuint fbo = 0;
+         glGenFramebuffers(1, &fbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, r->GetOutputTexture(), 0);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+         glDeleteFramebuffers(1, &fbo);
+         size_t lit = 0;
+         for (size_t i = 0; i < px.size(); i += 4)
+            if (px[i] + px[i + 1] + px[i + 2] > 60)
+               lit++;
+         const double coverage = (double)lit / (double)std::max(1, w * h);
+         const GLenum err = glGetError();
+         const bool skipped = r->renderMode == 1 && !r->RtxStatus().empty();
+         const bool traced = r->renderMode == 0 || skipped || r->RtxSamples() >= r->ptSamples;
+         const bool sized = r->panorama == 0 || (w == (int)r->width && h == (int)r->height);
+         const bool ok = traced && sized && coverage > 0.03 && (r->panorama > 0 || coverage < 0.95) && err == GL_NO_ERROR;
+         if (const char* png = getenv("INFINITE_RTXTEST_PNG")) // eyeball the result (bottom-up rows)
+            stbi_write_png(png, w, h, 4, px.data(), w * 4);
+         printf("%s %dx%d samples=%d/%d %.1fms coverage=%.1f%% gl=0x%x %s%s%s %s\n",
+                panoTest ? "PANORAMATEST" : "RTXTEST", w, h, r->RtxSamples(), r->ptSamples, r->RtxMs(),
+                coverage * 100.0, err, skipped ? "SKIP (" : "", skipped ? r->RtxStatus().c_str() : "",
+                skipped ? ")" : "", ok ? "OK" : "FAIL");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
       if (getenv("INFINITE_3DTEST") != nullptr &&
           (frameId == 4 || frameId == 8 || frameId == 12 || frameId == 16 ||
            frameId == 20 || frameId == 24 || frameId == 28))

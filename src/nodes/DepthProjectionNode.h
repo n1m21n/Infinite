@@ -202,6 +202,7 @@ private:
 
    std::vector<unsigned char> mDepthPixels;
    std::vector<unsigned char> mColorPixels;
+   GLUtil::AsyncReadback mDepthReadback, mColorReadback; // Turbo 0.62
 
    unsigned long long mPointRevision = 0;
    unsigned long long mMeshRevision = 0;

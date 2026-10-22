@@ -4,6 +4,7 @@
 
 #include "PopOpsInternal.h"
 #include "PopCpu.h"
+#include "PopGpu.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -42,9 +43,12 @@ namespace pop
       {
          Arrays parts;
          double carry = 0.0;
+         double time = 0.0; // Turbo 0.61: drives the built-in turbulence
          float nextId = 0.0f;
          uint32_t rng = 0x9e3779b9u;
          bool init = false;
+         // Turbo 0.62: last frame's source, read back without stalling.
+         std::shared_ptr<AsyncRows> async;
          float Rnd() { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return (float)(rng & 0xffffff) / 16777215.0f; }
       };
 
@@ -447,7 +451,17 @@ namespace pop
                       F("damp", "damping", 0.0f, 0.0f, 1.0f), F("mass", "mass", 1.0f, 0.001f, 100.0f),
                       I("max", "max particles", 100000, 1, 10000000), F("timeScale", "time scale", 1.0f, 0.0f, 10.0f),
                       B("inherit", "copy source attributes", true), T("target", "target (Null PointZ tag)", ""), B("play", "play", true),
-                      F("seed", "seed", 1.0f, 0.0f, 1000.0f) };
+                      F("seed", "seed", 1.0f, 0.0f, 1000.0f),
+                      // Turbo 0.61: over life (age / life span) and a built-in turbulence.
+                      // Appended, so older patches keep their parameter slots.
+                      F("sizeBirth", "size at birth (x PScale)", 1.0f, 0.0f, 10.0f),
+                      F("sizeDeath", "size at death (x PScale)", 1.0f, 0.0f, 10.0f),
+                      F("sizeCurve", "size curve", 1.0f, 0.1f, 8.0f),
+                      B("colorLife", "colour over life", false),
+                      C("colorBirth", "colour at birth", 1.0f, 1.0f, 1.0f, "colorLife=1"),
+                      C("colorDeath", "colour at death", 1.0f, 0.3f, 0.1f, "colorLife=1"),
+                      F("turb", "turbulence", 0.0f, 0.0f, 50.0f), F("turbScale", "turbulence scale", 1.0f, 0.05f, 20.0f),
+                      F("turbSpeed", "turbulence speed", 1.0f, 0.0f, 10.0f) };
          d.cook = [](CookCtx& c) {
             ParticleState& s = c.State<ParticleState>();
             const PopData* src = c.Input(0);
@@ -481,6 +495,11 @@ namespace pop
             float g[3];
             c.V3("gravity", g);
             const float damp = c.F("damp");
+            // Turbo 0.61: a smooth, divergence-ish swirl from summed sines of
+            // the position, moving with time - turbulence without a force chain.
+            const float turb = c.F("turb"), turbK = c.F("turbScale");
+            s.time += dt * c.F("turbSpeed");
+            const float tt = (float)s.time;
             // Integrate and age.
             std::vector<char> keep((size_t)a.count, 1);
             int alive = 0;
@@ -493,9 +512,17 @@ namespace pop
                const float m = std::max(1e-4f, *a.At(iM, i));
                const float sp = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
                const float dragK = *a.At(iD, i) * sp;
+               float tf[3] = { 0.0f, 0.0f, 0.0f };
+               if (turb > 0.0f)
+               {
+                  const float x = p[0] * turbK, y = p[1] * turbK, z = p[2] * turbK;
+                  tf[0] = turb * (std::sin(y + tt * 0.9f) + std::sin(z * 1.7f + tt * 1.3f)) * 0.5f;
+                  tf[1] = turb * (std::sin(z + tt * 1.1f) + std::sin(x * 1.3f + tt * 0.7f)) * 0.5f;
+                  tf[2] = turb * (std::sin(x + tt * 1.2f) + std::sin(y * 1.5f + tt * 0.8f)) * 0.5f;
+               }
                for (int k = 0; k < 3; k++)
                {
-                  const float force = f[k] + g[k] * m - dragK * v[k];
+                  const float force = f[k] + g[k] * m - dragK * v[k] + tf[k] * m;
                   v[k] = (v[k] + force / m * dt) * (1.0f - damp * std::min(1.0f, dt * 60.0f));
                   p[k] += v[k] * dt;
                   f[k] = 0.0f;
@@ -509,11 +536,44 @@ namespace pop
             }
             if (alive != a.count)
             {
-               PointBuilder b(a);
-               for (int i = 0; i < a.count; i++) if (keep[(size_t)i]) b.Copy(i);
-               a = b.Take();
+               // Turbo 0.62: compacted in place, attribute by attribute (a
+               // PointBuilder copy of every living particle cost ~3 ms a frame
+               // at 7k particles).
+               for (size_t at = 0; at < a.data.size(); at++)
+               {
+                  const int cc = a.comps[at];
+                  float* d = a.data[at].data();
+                  int w = 0;
+                  for (int i = 0; i < a.count; i++)
+                     if (keep[(size_t)i])
+                     {
+                        if (w != i)
+                           std::memmove(d + (size_t)w * cc, d + (size_t)i * cc, (size_t)cc * sizeof(float));
+                        w++;
+                     }
+                  a.data[at].resize((size_t)w * cc);
+               }
+               a.count = alive;
             }
             // Births.
+            // Turbo 0.62: a GPU-made source is sampled from the copy the GPU
+            // finished last frame (AsyncRows) - reading it now would make the
+            // CPU wait for every kernel queued before. A CPU source is read directly.
+            const bool inheritAll = c.Bl("inherit");
+            bool srcOnCpu = src != nullptr;
+            if (src != nullptr)
+               for (const PopAttrib& at : src->attribs)
+                  if ((inheritAll || at.name == attr::P || at.name == attr::N) && !at.buffer->OnCpu())
+                     srcOnCpu = false;
+            const AsyncRows::Snapshot* snap = nullptr;
+            if (src != nullptr && !srcOnCpu)
+            {
+               if (!s.async)
+                  s.async = std::make_shared<AsyncRows>();
+               snap = s.async->Latest();
+               if (snap != nullptr && snap->count <= 0)
+                  snap = nullptr;
+            }
             if (src != nullptr && src->pointCount > 0 && c.Bl("play"))
             {
                int births = 0;
@@ -529,8 +589,53 @@ namespace pop
                births = std::max(0, std::min(births, maxP - a.count));
                if (births > 0)
                {
-                  Arrays sa = Load(*src);
-                  const std::vector<float> SN = src->Read(attr::N, 3);
+                  // Turbo 0.62: draw every random number first, in the order the
+                  // births always used, then read only the source points picked -
+                  // not the whole (often GPU-made, every frame new) source.
+                  struct Draw
+                  {
+                     int si;
+                     float jit[3], vr[3], lr;
+                  };
+                  std::vector<Draw> draws((size_t)births);
+                  std::vector<int> rows((size_t)births);
+                  const int srcCount = snap ? snap->count : src->pointCount;
+                  for (int b = 0; b < births; b++)
+                  {
+                     Draw& dr = draws[(size_t)b];
+                     dr.si = c.I("birth") == 1 ? std::min(b, srcCount - 1) : std::min(srcCount - 1, (int)(s.Rnd() * srcCount));
+                     for (int k = 0; k < 3; k++) dr.jit[k] = s.Rnd();
+                     for (int k = 0; k < 3; k++) dr.vr[k] = s.Rnd();
+                     dr.lr = s.Rnd();
+                     rows[(size_t)b] = dr.si;
+                  }
+                  Arrays sa;
+                  if (snap != nullptr)
+                  {
+                     // Load's layout (P first) from the snapshot's rows.
+                     sa.count = births;
+                     auto take = [&](size_t k) {
+                        const int cc = snap->comps[k];
+                        std::vector<float> v((size_t)births * cc);
+                        for (int b = 0; b < births; b++)
+                           std::memcpy(&v[(size_t)b * cc], snap->data[k] + (size_t)rows[(size_t)b] * cc, cc * sizeof(float));
+                        sa.names.push_back(snap->names[k]);
+                        sa.comps.push_back(cc);
+                        sa.data.push_back(std::move(v));
+                     };
+                     for (size_t k = 0; k < snap->names.size(); k++)
+                        if (snap->names[k] == attr::P)
+                           take(k);
+                     if (sa.names.empty() || sa.comps[0] != 3)
+                        sa = LoadRows(*src, rows); // odd P: the plain path
+                     else
+                        for (size_t k = 0; k < snap->names.size(); k++)
+                           if (snap->names[k] != attr::P)
+                              take(k);
+                  }
+                  else
+                     sa = LoadRows(*src, rows);
+                  const int saN = sa.Index(attr::N);
                   float vel[3];
                   c.V3("vel", vel);
                   const float speedN = c.F("speedN"), velRand = c.F("velRand"), jitter = c.F("jitter");
@@ -541,7 +646,8 @@ namespace pop
                         a.Ensure(sa.names[at], sa.comps[at]);
                   for (int b = 0; b < births; b++)
                   {
-                     const int si = c.I("birth") == 1 ? b : std::min(src->pointCount - 1, (int)(s.Rnd() * src->pointCount));
+                     const Draw& dr = draws[(size_t)b];
+                     const int si = b; // row in sa
                      const int p = a.count++;
                      for (size_t at = 0; at < a.data.size(); at++)
                      {
@@ -558,11 +664,14 @@ namespace pop
                      }
                      float* pp = a.At(a.Index(attr::P), p);
                      const float* sp = sa.Pos(si);
-                     for (int k = 0; k < 3; k++) pp[k] = sp[k] + (s.Rnd() * 2.0f - 1.0f) * jitter;
+                     for (int k = 0; k < 3; k++) pp[k] = sp[k] + (dr.jit[k] * 2.0f - 1.0f) * jitter;
                      float* vv = a.At(a.Index(attr::PartVel), p);
-                     for (int k = 0; k < 3; k++) vv[k] = vel[k] + SN[(size_t)si * 3 + k] * speedN + (s.Rnd() * 2.0f - 1.0f) * velRand;
+                     float sn[3] = { 0.0f, 0.0f, 1.0f }; // N's default
+                     if (saN >= 0)
+                        for (int k = 0; k < 3 && k < sa.comps[(size_t)saN]; k++) sn[k] = sa.At(saN, si)[k];
+                     for (int k = 0; k < 3; k++) vv[k] = vel[k] + sn[k] * speedN + (dr.vr[k] * 2.0f - 1.0f) * velRand;
                      *a.At(a.Index(attr::PartAge), p) = 0.0f;
-                     *a.At(a.Index(attr::PartLifeSpan), p) = life * (1.0f + (s.Rnd() * 2.0f - 1.0f) * var);
+                     *a.At(a.Index(attr::PartLifeSpan), p) = life * (1.0f + (dr.lr * 2.0f - 1.0f) * var);
                      *a.At(a.Index(attr::PartId), p) = s.nextId;
                      s.nextId += 1.0f;
                      *a.At(a.Index(attr::PartMass), p) = mass;
@@ -573,6 +682,67 @@ namespace pop
                }
             }
             (void)iId; (void)iM; (void)iD;
+            // Queue next frame's copy of the source.
+            if (src != nullptr && !srcOnCpu && src->pointCount > 0 && c.Bl("play"))
+            {
+               std::vector<std::string> names = { attr::P, attr::N };
+               if (inheritAll)
+                  for (const PopAttrib& at : src->attribs)
+                     if (at.name != attr::P && at.name != attr::N)
+                        names.push_back(at.name);
+               s.async->Request(*src, names);
+            }
+
+            // Turbo 0.61: size and colour over life (t = age / life span). PScale
+            // at birth is kept in PartSize0 so the curve scales what the source
+            // gave each particle (1 when it had none); off = left untouched.
+            const float sizeBirth = c.F("sizeBirth"), sizeDeath = c.F("sizeDeath"), sizeCurve = c.F("sizeCurve");
+            const bool sizeLife = sizeBirth != 1.0f || sizeDeath != 1.0f;
+            const bool colorLife = c.Bl("colorLife");
+            if ((sizeLife || colorLife) && a.count > 0)
+            {
+               const int jAge = a.Index(attr::PartAge), jLife = a.Index(attr::PartLifeSpan);
+               int jS = -1, jS0 = -1, jC = -1;
+               if (sizeLife)
+               {
+                  const bool hadScale = a.Index(attr::PScale) >= 0;
+                  jS = a.Ensure(attr::PScale, 1);
+                  const bool hadBase = a.Index("PartSize0") >= 0;
+                  jS0 = a.Ensure("PartSize0", 1);
+                  if (!hadBase)
+                     for (int i = 0; i < a.count; i++)
+                        *a.At(jS0, i) = hadScale ? *a.At(jS, i) : 1.0f;
+               }
+               float cb[3] = { 1, 1, 1 }, cd[3] = { 1, 1, 1 };
+               if (colorLife)
+               {
+                  c.V3("colorBirth", cb);
+                  c.V3("colorDeath", cd);
+                  jC = a.Ensure(attr::Color, 4);
+               }
+               for (int i = 0; i < a.count; i++)
+               {
+                  const float life = *a.At(jLife, i);
+                  const float t = life > 0.0f ? std::clamp(*a.At(jAge, i) / life, 0.0f, 1.0f) : 0.0f;
+                  if (sizeLife)
+                  {
+                     // A particle born this frame has no base yet: its PScale is
+                     // still what it inherited from the source (or the default).
+                     float& base = *a.At(jS0, i);
+                     if (base <= 0.0f)
+                        base = *a.At(jS, i) > 0.0f ? *a.At(jS, i) : 1.0f;
+                     const float k = std::pow(t, sizeCurve);
+                     *a.At(jS, i) = base * (sizeBirth + (sizeDeath - sizeBirth) * k);
+                  }
+                  if (colorLife)
+                  {
+                     float* col = a.At(jC, i);
+                     for (int q = 0; q < 3; q++)
+                        col[q] = cb[q] + (cd[q] - cb[q]) * t;
+                     col[3] = 1.0f;
+                  }
+               }
+            }
             Arrays out = a;
             c.out = PointsOnly(std::move(out));
             return true;

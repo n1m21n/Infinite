@@ -40,6 +40,10 @@ public:
    size_t TriangleCount() const { return mOut ? mOut->Topo().TriangleCount() : 0; }
    size_t StripCount() const { return mOut ? mOut->Topo().StripCount() : 0; }
    double LastCookMs() const { return mLastCookMs; }
+   // Turbo 0.62: every cook's time added up (profiling: divide by frames).
+   double TotalCookMs() const { return mTotalCookMs; }
+   // GPU time of the cooks (INFINITE_FRAMEPROF / PATCHCOMPAT_PLAY only).
+   double TotalGpuMs() const { return mTotalGpuMs; }
 
    // INode
    unsigned int GetOutputTexture() override { return 0; }
@@ -91,6 +95,10 @@ private:
    unsigned long long mLastImageRev = 0;
    std::string mWarning, mError;
    double mLastCookMs = 0.0;
+   double mTotalCookMs = 0.0;
+   double mTotalGpuMs = 0.0;
+   unsigned int mGpuQ[3][2] = {};
+   int mGpuRing = 0, mGpuUsed = 0;
    double mLastTime = -1.0;
 
    // Non-PointZ inputs converted once per upstream revision.

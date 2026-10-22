@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "Transport.h"
+#include "platform/OpenGLHeaders.h"
 
 namespace
 {
@@ -71,6 +72,8 @@ PopNode::PopNode(const pop::PopDef* def) : mDef(def)
 
 PopNode::~PopNode()
 {
+   if (mGpuQ[0][0] != 0)
+      glDeleteQueries(6, &mGpuQ[0][0]);
    auto& all = AllPopNodes();
    all.erase(std::remove(all.begin(), all.end(), this), all.end());
 }
@@ -318,9 +321,35 @@ void PopNode::CookIfNeeded(int frameId)
       return n ? n->mState.get() : nullptr;
    };
 
+   static const bool gpuTimes = getenv("INFINITE_FRAMEPROF") != nullptr || getenv("INFINITE_PATCHCOMPAT_PLAY") != nullptr;
+   if (gpuTimes)
+   {
+      if (mGpuQ[0][0] == 0)
+         glGenQueries(6, &mGpuQ[0][0]);
+      // The result from two cooks ago, when the GPU has finished it.
+      const int old = (mGpuRing + 1) % 3;
+      GLint ready = 0;
+      if (mGpuUsed >= 2)
+         glGetQueryObjectiv(mGpuQ[old][1], GL_QUERY_RESULT_AVAILABLE, &ready);
+      if (ready)
+      {
+         GLuint64 a = 0, b = 0;
+         glGetQueryObjectui64v(mGpuQ[old][0], GL_QUERY_RESULT, &a);
+         glGetQueryObjectui64v(mGpuQ[old][1], GL_QUERY_RESULT, &b);
+         mTotalGpuMs += (double)(b - a) * 1e-6;
+      }
+      glQueryCounter(mGpuQ[mGpuRing][0], GL_TIMESTAMP);
+   }
    const auto t0 = std::chrono::steady_clock::now();
    const bool ok = mDef->cook ? mDef->cook(c) : false;
+   if (gpuTimes)
+   {
+      glQueryCounter(mGpuQ[mGpuRing][1], GL_TIMESTAMP);
+      mGpuRing = (mGpuRing + 1) % 3;
+      mGpuUsed++;
+   }
    mLastCookMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+   mTotalCookMs += mLastCookMs;
 
    if (!ok || !c.error.empty())
    {

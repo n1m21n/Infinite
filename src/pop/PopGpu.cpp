@@ -225,7 +225,8 @@ namespace pop
       for (size_t k = 0; k < spec.lookups.size(); k++)
       {
          const KernelIO& l = spec.lookups[k];
-         const PopData* src2 = env.lookupData[spec.lookupInput == 1 ? 1 : 0];
+         const int from = l.input >= 0 ? l.input : spec.lookupInput;
+         const PopData* src2 = env.lookupData[from == 1 ? 1 : 0];
          if (src2 == nullptr)
             src2 = &in;
          const PopAttrib* a = src2->Find(l.name);
@@ -236,9 +237,10 @@ namespace pop
          glBindTexture(GL_TEXTURE_BUFFER, tex);
          BufferPtr keep = a ? a->buffer : MakeFilled(1, l.comps, [&] { static float d[4]; DefaultValue(l.name, d); return d; }());
          glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, keep->Gpu());
-         glUniform1i(prog.Loc("t_" + l.name), (GLint)(1 + k));
-         glUniform1i(prog.Loc("c_" + l.name), keep->Comps());
-         glUniform1i(prog.Loc("n_" + l.name), keep->Count());
+         const std::string& ln = l.as.empty() ? l.name : l.as;
+         glUniform1i(prog.Loc("t_" + ln), (GLint)(1 + k));
+         glUniform1i(prog.Loc("c_" + ln), keep->Comps());
+         glUniform1i(prog.Loc("n_" + ln), keep->Count());
       }
 
       // Outputs.
@@ -271,6 +273,108 @@ namespace pop
       for (size_t w = 0; w < outBufs.size(); w++)
          out.push_back(std::make_shared<PopBuffer>(outBufs[w], count, spec.writes[w].comps));
       return true;
+   }
+
+   AsyncRows::~AsyncRows()
+   {
+      for (Slot& s : mSlots)
+      {
+         if (s.fence)
+            glDeleteSync((GLsync)s.fence);
+         if (s.buf)
+         {
+            glBindBuffer(GL_COPY_WRITE_BUFFER, s.buf);
+            glUnmapBuffer(GL_COPY_WRITE_BUFFER);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+            glDeleteBuffers(1, &s.buf);
+         }
+      }
+   }
+
+   void AsyncRows::Request(const PopData& d, const std::vector<std::string>& names)
+   {
+      Latest(); // retire finished copies first
+      Slot& s = mSlots[mNext];
+      if (s.fence != nullptr) // both slots still in flight: skip this frame
+         return;
+      std::vector<const PopAttrib*> attrs;
+      std::vector<size_t> offs;
+      size_t bytes = 0;
+      for (const std::string& n : names)
+         if (const PopAttrib* a = d.Find(n))
+            if (a->buffer && a->buffer->Count() == d.pointCount)
+            {
+               attrs.push_back(a);
+               offs.push_back(bytes);
+               bytes += (size_t)d.pointCount * (size_t)a->buffer->Comps() * sizeof(float);
+               bytes = (bytes + 255) / 256 * 256;
+            }
+      if (attrs.empty() || bytes == 0)
+         return;
+      if (bytes > s.bytes)
+      {
+         if (s.buf)
+         {
+            glBindBuffer(GL_COPY_WRITE_BUFFER, s.buf);
+            glUnmapBuffer(GL_COPY_WRITE_BUFFER);
+            glDeleteBuffers(1, &s.buf);
+         }
+         const size_t want = bytes + bytes / 4;
+         glGenBuffers(1, &s.buf);
+         glBindBuffer(GL_COPY_WRITE_BUFFER, s.buf);
+         const GLbitfield flags = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+         glBufferStorage(GL_COPY_WRITE_BUFFER, (GLsizeiptr)want, nullptr, flags | GL_CLIENT_STORAGE_BIT);
+         s.ptr = glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, (GLsizeiptr)want, flags);
+         s.bytes = s.ptr ? want : 0;
+         if (s.ptr == nullptr)
+         {
+            glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+            return;
+         }
+      }
+      glBindBuffer(GL_COPY_WRITE_BUFFER, s.buf);
+      s.snap = Snapshot();
+      s.snap.count = d.pointCount;
+      s.snap.revision = d.revision;
+      for (size_t i = 0; i < attrs.size(); i++)
+      {
+         const PopAttrib* a = attrs[i];
+         glBindBuffer(GL_COPY_READ_BUFFER, a->buffer->Gpu());
+         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, (GLintptr)offs[i],
+                             (GLsizeiptr)((size_t)d.pointCount * a->buffer->Comps() * sizeof(float)));
+         s.snap.names.push_back(a->name);
+         s.snap.comps.push_back(a->buffer->Comps());
+         s.snap.data.push_back((const float*)((const char*)s.ptr + offs[i]));
+      }
+      glBindBuffer(GL_COPY_READ_BUFFER, 0);
+      glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+      s.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+      s.done = false;
+      glFlush(); // so the fence gets signalled without anyone waiting on it
+      mNext ^= 1;
+   }
+
+   const AsyncRows::Snapshot* AsyncRows::Latest()
+   {
+      for (int i = 0; i < 2; i++)
+      {
+         Slot& s = mSlots[i];
+         if (s.fence == nullptr)
+            continue;
+         const GLenum r = glClientWaitSync((GLsync)s.fence, 0, 0);
+         if (r == GL_ALREADY_SIGNALED || r == GL_CONDITION_SATISFIED)
+         {
+            glDeleteSync((GLsync)s.fence);
+            s.fence = nullptr;
+            s.done = true;
+            // Newer of the two finished copies wins.
+            if (mReady < 0 || !mSlots[mReady].done || s.snap.revision >= mSlots[mReady].snap.revision || mReady == i)
+               mReady = i;
+         }
+      }
+      if (mReady >= 0 && mSlots[mReady].done && mSlots[mReady].fence == nullptr)
+         return &mSlots[mReady].snap;
+      return nullptr;
    }
 
    namespace
@@ -339,11 +443,154 @@ namespace pop
          return &g;
       }
 
+      // Turbo 0.62: the bounds as a compute-shader reduction (GL 4.3, Windows).
+      // The MAX-blend version below draws every point into one pixel, so the
+      // blending of a 300k-point cloud is serialised on that pixel - several
+      // ms of GPU per call, per node, per frame. Here 256-thread groups reduce
+      // in shared memory and only one thread per group touches the result,
+      // through atomics on order-preserving uint encodings of the floats.
+      // Result layout as the blend path: 4 x max, then 4 x -min (encoded;
+      // DecodeBounds turns them back into floats after the read).
+      struct BoundsComputeGl
+      {
+         GLuint prog = 0, result = 0;
+         GLint countLoc = -1, compsLoc = -1;
+         bool failed = false;
+      };
+
+      BoundsComputeGl* BoundsComputeResources()
+      {
+         static BoundsComputeGl c;
+         if (c.failed)
+            return nullptr;
+         if (c.prog != 0)
+            return &c;
+         const char* src =
+            "#version 430\n"
+            "layout(local_size_x = 256) in;\n"
+            "layout(std430, binding = 0) readonly buffer Pts { float p[]; };\n"
+            "layout(std430, binding = 1) buffer Res { uint r[8]; };\n"
+            "uniform int uCount;\n"
+            "uniform int uComps;\n"
+            "shared vec3 sMax[256];\n"
+            "shared vec3 sMin[256];\n"
+            "uint enc(float f) { uint u = floatBitsToUint(f); return (u & 0x80000000u) != 0u ? ~u : (u | 0x80000000u); }\n"
+            "void main() {\n"
+            "   vec3 mx = vec3(-1e30), mn = vec3(1e30);\n"
+            "   uint stride = gl_NumWorkGroups.x * 256u;\n"
+            "   for (uint i = gl_GlobalInvocationID.x; i < uint(uCount); i += stride) {\n"
+            "      uint b = i * uint(uComps);\n"
+            "      vec3 v = vec3(p[b], uComps > 1 ? p[b + 1u] : 0.0, uComps > 2 ? p[b + 2u] : 0.0);\n"
+            "      mx = max(mx, v); mn = min(mn, v);\n"
+            "   }\n"
+            "   uint l = gl_LocalInvocationID.x;\n"
+            "   sMax[l] = mx; sMin[l] = mn;\n"
+            "   barrier();\n"
+            "   for (uint s = 128u; s > 0u; s >>= 1u) {\n"
+            "      if (l < s) { sMax[l] = max(sMax[l], sMax[l + s]); sMin[l] = min(sMin[l], sMin[l + s]); }\n"
+            "      barrier();\n"
+            "   }\n"
+            "   if (l == 0u) {\n"
+            "      for (int k = 0; k < 3; k++) {\n"
+            "         atomicMax(r[k], enc(sMax[0][k]));\n"
+            "         atomicMax(r[4 + k], enc(-sMin[0][k]));\n"
+            "      }\n"
+            "   }\n"
+            "}\n";
+         GLuint cs = glCreateShader(GL_COMPUTE_SHADER);
+         glShaderSource(cs, 1, &src, nullptr);
+         glCompileShader(cs);
+         GLint ok = 0;
+         glGetShaderiv(cs, GL_COMPILE_STATUS, &ok);
+         if (!ok)
+         {
+            glDeleteShader(cs);
+            c.failed = true;
+            return nullptr;
+         }
+         c.prog = glCreateProgram();
+         glAttachShader(c.prog, cs);
+         glLinkProgram(c.prog);
+         glDeleteShader(cs);
+         glGetProgramiv(c.prog, GL_LINK_STATUS, &ok);
+         if (!ok)
+         {
+            glDeleteProgram(c.prog);
+            c.prog = 0;
+            c.failed = true;
+            return nullptr;
+         }
+         c.countLoc = glGetUniformLocation(c.prog, "uCount");
+         c.compsLoc = glGetUniformLocation(c.prog, "uComps");
+         glGenBuffers(1, &c.result);
+         glBindBuffer(GL_SHADER_STORAGE_BUFFER, c.result);
+         glBufferData(GL_SHADER_STORAGE_BUFFER, 8 * sizeof(GLuint), nullptr, GL_DYNAMIC_COPY);
+         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+         return &c;
+      }
+
+      // Encoded uints (as read back) -> floats, in place.
+      void DecodeBounds(float r[2][4])
+      {
+         for (int i = 0; i < 2; i++)
+            for (int k = 0; k < 4; k++)
+            {
+               uint32_t u;
+               std::memcpy(&u, &r[i][k], 4);
+               u = (u & 0x80000000u) != 0u ? (u & 0x7fffffffu) : ~u;
+               std::memcpy(&r[i][k], &u, 4);
+            }
+      }
+
+      // Runs the reduction; the result goes to `pbo` (encoded, read later)
+      // or, with pbo == 0, is read now and decoded into dst. False when
+      // compute shaders are unavailable (the blend path then runs).
+      bool RunBoundsCompute(unsigned int buffer, int count, int comps, float dst[2][4], GLuint pbo)
+      {
+         BoundsComputeGl* c = BoundsComputeResources();
+         if (c == nullptr)
+            return false;
+         GLint prevProg = 0;
+         glGetIntegerv(GL_CURRENT_PROGRAM, &prevProg);
+         const GLuint zero = 0;
+         glBindBuffer(GL_SHADER_STORAGE_BUFFER, c->result);
+         glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer);
+         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, c->result);
+         glUseProgram(c->prog);
+         glUniform1i(c->countLoc, count);
+         glUniform1i(c->compsLoc, std::max(1, comps));
+         const GLuint groups = (GLuint)std::min(256, std::max(1, (count + 255) / 256));
+         glDispatchCompute(groups, 1, 1);
+         glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
+         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
+         glUseProgram((GLuint)prevProg);
+         if (pbo != 0)
+         {
+            glBindBuffer(GL_COPY_READ_BUFFER, c->result);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, pbo);
+            glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, 8 * sizeof(GLuint));
+            glBindBuffer(GL_COPY_READ_BUFFER, 0);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+         }
+         else
+         {
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, c->result);
+            glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, 8 * sizeof(GLuint), dst);
+            DecodeBounds(dst);
+         }
+         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+         return true;
+      }
+
       // Max pass then (negated) min pass, each read into `dst` (client memory)
       // or, when pbo != 0, into that pixel-pack buffer at offsets 0 and 16
       // without waiting for the GPU.
       void BoundsPasses(BoundsGl& g, unsigned int buffer, int count, int comps, float dst[2][4], GLuint pbo)
       {
+         if (RunBoundsCompute(buffer, count, comps, dst, pbo))
+            return;
          GLint prevFbo = 0, prevProg = 0, prevVao = 0, prevArray = 0, prevPack = 0, viewport[4] = { 0, 0, 0, 0 };
          GLint blendEqRgb = 0, blendEqA = 0;
          GLfloat clear[4] = { 0, 0, 0, 0 };
@@ -446,6 +693,8 @@ namespace pop
             glBindBuffer(GL_PIXEL_PACK_BUFFER, s.pbo);
             glGetBufferSubData(GL_PIXEL_PACK_BUFFER, 0, sizeof(r), r);
             glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prev);
+            if (BoundsComputeResources() != nullptr)
+               DecodeBounds(r); // the compute path stores encoded uints
             s.have = BoundsFromPixels(r, s.comps, s.lo, s.hi);
             glDeleteSync((GLsync)s.fence);
             s.fence = nullptr;

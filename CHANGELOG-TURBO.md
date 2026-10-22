@@ -1,5 +1,89 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.62.0-turbo (2026-10-22)
+
+GPU first: an animated PointZ patch at 1080p went from ~17 fps to ~52 fps (raster) on an RTX 4060,
+and the path tracer became a hardware RTX renderer.
+
+### Render 3D
+- **RTX mode** replaces the GL path tracer (which stalled the whole machine): NVIDIA OptiX on the
+  RT cores. One sample per pixel per frame, accumulating while nothing moves; meshes, PointZ
+  geometry and instances, particles as real spheres; HDRI, lights, glass; 360 equirect / cubemap /
+  dome. Animated geometry is refitted, not rebuilt. **Denoise**: Auto (fast a-trous filter while the
+  scene moves, the OptiX AI denoiser once it is still), AI, Fast, Off. The test patch: ~25 ms a frame
+  at 1080p with everything animated.
+- RTX is an optional module of the build (full edition only, needs the CUDA Toolkit; the OptiX 7.7
+  headers are fetched from NVIDIA's optix-dev repository). Without it, or without an RTX GPU, the
+  mode draws raster and says why.
+
+### PointZ on the GPU
+- **Copy PointZ** runs as GPU kernels (identical output, verified against the CPU path): no template
+  download, no per-point CPU work.
+- **Particle PointZ** samples its source from last frame's GPU copy (no stall), and removes dead
+  particles in place (~3 ms -> ~0.3 ms a frame).
+- **Image to PointZ** keeps its grid and reruns only the kernel.
+- Point bounds (framing, shadows) are a compute-shader reduction instead of blending every point into
+  one pixel.
+- Kernel lookups can read both inputs (`KernelIO::input` / `as`).
+
+### Previews and readbacks
+- 3D node previews draw PointZ straight from its GL buffers (they converted the whole cloud to a CPU
+  mesh every frame - ~38 ms on the test patch) and refresh every other frame unless hovered.
+- Image Analyze, Palette, Predictive Coloring, Image to Points, Depth Projection and Displacement
+  read the GPU back asynchronously (GLUtil::AsyncReadback, about a frame of latency) instead of
+  stalling the pipeline every cook.
+
+### Menus
+- The SHAPES category is gone: the named shapes were the Shape node with a preset, which offers
+  every shape itself. Patches that use them by name still open.
+
+### Tools
+- `INFINITE_FRAMEPROF=1`: CPU and GPU time per frame stage, the slowest node bodies, Render 3D's
+  share, RTX stage times. `INFINITE_PATCHCOMPAT_PLAY=1`: the patch probe with the transport
+  running, with per-node CPU and GPU cook times.
+
+## 0.61.0-turbo (2026-10-21)
+
+3D quality and 360 output, and patches that travel with their media.
+
+### Render 3D
+- **Linear HDR**: the scene is lit and blended in 16-bit float and finished in one pass - **bloom**
+  (threshold, radius) from what is brighter than white, tonemaps **ACES**, Reinhard, **AgX** and
+  **Khronos PBR Neutral**, sRGB and dither. The plain background colour stays exactly as chosen;
+  depth / normals / position passes are untouched.
+- **HDRI lighting done properly**: a GGX-prefiltered copy of the HDRI (one roughness per mip), a
+  diffuse irradiance map and the BRDF table (split-sum, as the Khronos glTF-Sample-Viewer) replace
+  the mip-blur approximation - metals and rough surfaces read correctly.
+- **Path traced** mode: a progressive GPU path tracer over the same meshes, materials, lights and
+  HDRI - soft shadows, light bouncing between objects, real glass. Noisy at first, clean after
+  `samples` frames; any change restarts it. Traces meshes, PointZ geometry and instances, and
+  particles / point sprites (as small solids, with their colour); surface texture only. Animated
+  scenes restart it every frame, so it is for stills and slow moves.
+- **360 output**: equirectangular (2:1), cubemap 3x2 or **dome** (domemaster fisheye, square, with
+  `dome angle` and `dome tilt` - 0 = zenith at the centre, 90 = camera forward at the centre), from
+  the camera's position. Raster renders six faces through the normal pipeline (cached when nothing
+  moves); path traced traces the panorama directly.
+
+### PointZ / video
+- **Particle PointZ**: size over life (birth, death, curve), colour over life (birth, death) and
+  turbulence (amount, scale, speed).
+- **VMPC**: during a transition the outgoing clip keeps playing instead of freezing.
+
+### Menus
+- Node categories grouped by family with coloured headings (VISUAL 2D, 3D, SOUND, CONTROL), in the
+  side panel and the floating menu; Prediction moved to CONTROL.
+
+### Files
+- **FILE > Save with media...** (Collect Media): the patch plus every file it uses (samples, video,
+  images, 3D models with their glTF buffers, MIDI, LUTs, fonts, presets) copied into
+  `<name>_media/<type>/` next to it, same content once, with a report of what was copied and what
+  is missing. Paths inside the patch's folder are saved relative and resolved on open, so the folder
+  opens on any machine. Output paths (render / record / snapshot targets) are not collected, and
+  a file already in the folder with the same content is reused instead of copied as `_2`.
+
+### Tests
+- PATHTRACETEST, PANORAMATEST, COLLECTMEDIATEST.
+
 ## 0.60.0-turbo (2026-10-21)
 
 Catch-up with upstream (Naman's Infinite) after v0.6: 30 nodes and operators, taken as upstream wrote

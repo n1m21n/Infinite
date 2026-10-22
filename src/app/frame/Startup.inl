@@ -62,6 +62,58 @@
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return HeadlessExit(RunDspTest());
 
+   // Turbo 0.61: Collect Media, headless, in a temp folder of its own.
+   if (getenv("INFINITE_COLLECTMEDIATEST") != nullptr)
+   {
+      namespace fs = std::filesystem;
+      std::error_code ec;
+      const fs::path root = fs::temp_directory_path(ec) / "infinite_collect_test";
+      fs::remove_all(root, ec);
+      fs::create_directories(root / "a", ec);
+      fs::create_directories(root / "b", ec);
+      fs::create_directories(root / "c", ec);
+      fs::create_directories(root / "out", ec);
+      auto put = [](const fs::path& p, const char* bytes) { std::ofstream(p, std::ios::binary) << bytes; };
+      put(root / "a" / "photo.png", "same-bytes");
+      put(root / "b" / "photo.png", "same-bytes"); // same content: reused
+      put(root / "c" / "photo.png", "other-bytes"); // same name, other content: photo_2
+      Patch::Data data;
+      const char* files[4] = { "a", "b", "c", nullptr };
+      for (int i = 0; i < 4; i++)
+      {
+         Patch::NodeRecord rec;
+         rec.index = i + 1;
+         rec.typeName = "Image Source";
+         rec.category = "Source";
+         const std::string v = files[i] ? (root / files[i] / "photo.png").u8string() : std::string("C:/nope/missing.wav");
+         rec.params.push_back({ "s path", v });
+         rec.params.push_back({ "s label", "just a label" });
+         data.nodes.push_back(rec);
+      }
+      const std::string inf = (root / "out" / "test.inf").u8string();
+      const CollectReport rep = CollectPatchMedia(data, inf);
+      bool ok = rep.copied == 2 && rep.reused == 1 && rep.missing.size() == 1;
+      ok = ok && fs::exists(root / "out" / "test_media" / "images" / "photo.png", ec) &&
+           fs::exists(root / "out" / "test_media" / "images" / "photo_2.png", ec);
+      ok = ok && data.nodes[0].params[0].second == "test_media/images/photo.png" &&
+           data.nodes[1].params[0].second == "test_media/images/photo.png" &&
+           data.nodes[2].params[0].second == "test_media/images/photo_2.png" &&
+           data.nodes[0].params[1].second == "just a label";
+      std::string err;
+      Patch::Data back;
+      ok = ok && Patch::Write(inf, data, err) && Patch::Read(inf, back, err);
+      if (ok)
+      {
+         ResolveRelativeMedia(back, inf);
+         fs::path p0 = fs::u8path(back.nodes[0].params[0].second);
+         ok = p0.is_absolute() && fs::exists(p0, ec);
+      }
+      printf("COLLECTMEDIATEST copied=%d reused=%d missing=%d  %s\n", rep.copied, rep.reused, (int)rep.missing.size(),
+             ok ? "OK" : "FAIL");
+      fs::remove_all(root, ec);
+      return HeadlessExit(0);
+   }
+
    // Turbo 0.60: upstream's movement log / stats tests (gesture learning).
    if (getenv("INFINITE_MOVELOGTEST") != nullptr)
    {
@@ -1768,7 +1820,8 @@
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Render 3D", "3D", 700.0f, 40.0f);
       }
-      else if (getenv("INFINITE_3DTEST") != nullptr)
+      else if (getenv("INFINITE_3DTEST") != nullptr || getenv("INFINITE_RTXTEST") != nullptr ||
+               getenv("INFINITE_PANORAMATEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Geometry", "3D", 40.0f, 500.0f);
@@ -1784,9 +1837,26 @@
          auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
          r->geometry[0] = g0;
          r->geometry[1] = g1;
-         g0->TextureInput().Connect(gNodes[3].node.get());
+         // RTX: a static scene, or the animated Noise restarts the average every frame.
+         if (getenv("INFINITE_RTXTEST") == nullptr && getenv("INFINITE_PANORAMATEST") == nullptr)
+            g0->TextureInput().Connect(gNodes[3].node.get());
          r->width = 700.0f; r->height = 700.0f;
          r->samples = 0; // the antialias check below turns it on at frame 4
+         if (getenv("INFINITE_RTXTEST") != nullptr)
+         {
+            r->renderMode = 1; // Turbo 0.62: the same scene, RTX
+            r->ptSamples = 32;
+         }
+         // Turbo 0.61: 360 output (raster by default; INFINITE_PANORAMA=1|2 picks
+         // equirect / cubemap, also under RTXTEST).
+         if (getenv("INFINITE_PANORAMATEST") != nullptr || getenv("INFINITE_PANORAMA") != nullptr)
+         {
+            const char* pano = getenv("INFINITE_PANORAMA");
+            r->panorama = pano != nullptr ? std::clamp(atoi(pano), 1, 2) : 1;
+            r->width = 1200.0f;
+            r->height = r->panorama == 1 ? 600.0f : 800.0f;
+            r->camDistance = 0.6f; // inside the knot, so every direction sees geometry
+         }
          if (getenv("INFINITE_NOCULL") != nullptr)
             r->backfaceCull = false;
          if (getenv("INFINITE_NODEPTH") != nullptr)

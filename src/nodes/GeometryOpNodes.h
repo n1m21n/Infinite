@@ -510,6 +510,7 @@ private:
    std::vector<float> mTexPixels;
    int mTexW = 0, mTexH = 0;
    unsigned int mReadFbo = 0;
+   GLUtil::AsyncReadback mTexReadback; // Turbo 0.62
    unsigned long long mTexGeneration = 0;
    unsigned long long mTexHash = 0;
    bool mHasTexHash = false;
@@ -793,6 +794,7 @@ private:
    std::vector<float> mTexPixels;
    int mTexW = 0, mTexH = 0;
    unsigned int mReadFbo = 0;
+   GLUtil::AsyncReadback mTexReadback; // Turbo 0.62
    unsigned long long mTexGeneration = 0;
    unsigned long long mTexHash = 0;
    bool mHasTexHash = false;

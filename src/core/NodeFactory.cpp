@@ -74,8 +74,8 @@ namespace
       static const char* const kOrder[] = {
          "Source", "Shapes", "Video", "Color", "Effects", "Mask", "Feedback", "Compositing", "Output",
          "3DSource", "3D", "PointZ", "3DScene",
-         "AudioIO", "NoteSource", "Notes", "Prediction", "Synths", "AudioEffects", "AudioUtility", "AudioVisual",
-         "Modulators", "CVTools", "Analysis", "Control", "Macros", "UI",
+         "AudioIO", "NoteSource", "Notes", "Synths", "AudioEffects", "AudioUtility", "AudioVisual",
+         "Modulators", "Prediction", "CVTools", "Analysis", "Control", "Macros", "UI",
          "Utility",
       };
       for (int i = 0; i < (int)(sizeof(kOrder) / sizeof(kOrder[0])); i++)
@@ -118,6 +118,11 @@ void NodeFactory::Register(const std::string& name, CreateNodeFn createFn, const
       return;
    }
    mFactoryMap[name] = NodeInfo{ name, category, createFn };
+   // Turbo 0.62: the named shapes (Circle, Star...) are the Shape node with a
+   // preset - still made by name so old patches load, but not listed in any
+   // menu or search (the Shape node offers every shape itself).
+   if (category == "Shapes")
+      return;
 
    auto& list = mByCategory[category];
    if (list.empty())

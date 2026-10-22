@@ -27,6 +27,17 @@
 
       for (GraphNode& gn : gNodes)
       {
+         // Turbo 0.62: INFINITE_FRAMEPROF also adds up each node's body time.
+         struct BodyTimer
+         {
+            GraphNode& g;
+            double t0;
+            ~BodyTimer()
+            {
+               if (gFrameProf.on)
+                  gFrameProf.AddNode(g.index, g.typeName, glfwGetTime() - t0);
+            }
+         } bodyTimer{ gn, gFrameProf.on ? glfwGetTime() : 0.0 };
          if (gn.needsPosition)
          {
             ed::SetNodePosition(gn.NodeId(), ImVec2(gn.spawnX, gn.spawnY));

@@ -764,9 +764,11 @@
          }
       }
 
+      gFrameProf.Mark(5);
       for (GraphNode& gn : gNodes)
          if (!gn.node->blockOff)
             gn.node->CookIfNeeded(frameId);
+      gFrameProf.Mark(6);
       // Turbo 0.43: the timeline monitor shows this frame's textures.
       ArrangeCompositeMonitorIfRequested(frameId);
       ArrangeRenderPump(frameId); // Turbo 0.43.1: offline timeline render, one frame per iteration
@@ -939,6 +941,7 @@
 
 
 
+      gFrameProf.Mark(6); // the rest of the cook stage (timeline, render pump, tests)
       ImGui::Render();
       int fbW, fbH;
       glfwGetFramebufferSize(window, &fbW, &fbH);
@@ -962,7 +965,9 @@
       }
 
       ApplyMainSwapInterval((gVsync && gProjectorWindows.empty()) ? 1 : 0);
+      gFrameProf.Mark(7);
       glfwSwapBuffers(window);
+      gFrameProf.Mark(8);
 
       // glfwSwapBuffers blocks on vsync - dead time for AppKit to service a
       // hosted plugin's editor window. See local-prompts/02-plugin-editor-lag.md.

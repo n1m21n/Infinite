@@ -353,15 +353,23 @@ int FamilyRank(const std::string& category)
    if (category == "Source" || category == "Text" || category == "Compositing" ||
        category == "Color" || category == "Mask" || category == "Feedback" ||
        category == "Resynth" || category == "Effects" || category == "Output" ||
-       category == "Video" || category == "Utility" || category == "Shapes")
+       category == "Video" || category == "Shapes")
       return 0;
    if (category == "3D" || category == "3DSource" || category == "3DScene" || category == "PointZ")
       return 1;
+   // Turbo 0.61: Prediction (its nodes are modulators) and Utility (groups,
+   // comments, routing) belong with control, so each colour is one block.
    if (category == "Audio" || category == "Synths" || category == "AudioEffects" ||
        category == "AudioUtility" || category == "Notes" || category == "AudioIO" ||
-       category == "AudioVisual" || category == "Prediction" || category == "NoteSource")
+       category == "AudioVisual" || category == "NoteSource")
       return 2;
    return 3;
+}
+
+const char* FamilyName(int family)
+{
+   static const char* const kNames[] = { "VISUAL 2D", "3D", "SOUND", "CONTROL" };
+   return kNames[family < 0 ? 0 : (family > 3 ? 3 : family)];
 }
 
 const Color& ColorFor(const std::string& category)

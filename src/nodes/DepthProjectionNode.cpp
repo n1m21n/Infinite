@@ -236,11 +236,11 @@ void DepthProjectionNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uTex"), 0);
    });
 
+   // Turbo 0.62: read back without stalling the GPU pipeline (see
+   // GLUtil::AsyncReadback) - no new copy yet means keep last frame's result.
    mDepthPixels.resize((size_t)n * (size_t)n * 4);
-   glBindTexture(GL_TEXTURE_2D, mDepthFbo.tex);
-   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-   glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, mDepthPixels.data());
-   glBindTexture(GL_TEXTURE_2D, 0);
+   if (!mDepthReadback.Read(mDepthFbo.tex, n, n, GL_RGBA, GL_UNSIGNED_BYTE, mDepthPixels.data()))
+      return;
 
    // 2. Resample Color Texture if present
    const bool hasColorTex = (colorTex != 0);
@@ -254,10 +254,7 @@ void DepthProjectionNode::CookIfNeeded(int frameId)
       });
 
       mColorPixels.resize((size_t)n * (size_t)n * 4);
-      glBindTexture(GL_TEXTURE_2D, mColorFbo.tex);
-      glPixelStorei(GL_PACK_ALIGNMENT, 1);
-      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, mColorPixels.data());
-      glBindTexture(GL_TEXTURE_2D, 0);
+      mColorReadback.Read(mColorFbo.tex, n, n, GL_RGBA, GL_UNSIGNED_BYTE, mColorPixels.data());
    }
 
    // 3. Compute Aspect & Intrinsics

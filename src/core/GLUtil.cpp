@@ -755,3 +755,141 @@ namespace GLUtil
       return ok;
    }
 }
+
+namespace GLUtil
+{
+   namespace
+   {
+      size_t PixelBytes(unsigned int format, unsigned int type)
+      {
+         const size_t comps = format == GL_RGBA ? 4 : format == GL_RGB ? 3 : format == GL_RG ? 2 : 1;
+         const size_t size = type == GL_FLOAT ? 4 : (type == GL_HALF_FLOAT ? 2 : 1);
+         return comps * size;
+      }
+   }
+
+   AsyncReadback::~AsyncReadback()
+   {
+      for (Slot& s : mSlots)
+      {
+         if (s.fence)
+            glDeleteSync((GLsync)s.fence);
+         if (s.pbo)
+            glDeleteBuffers(1, &s.pbo);
+      }
+      if (mFbo)
+         glDeleteFramebuffers(1, &mFbo);
+   }
+
+   bool AsyncReadback::Read(unsigned int tex, int w, int h, unsigned int format, unsigned int type, void* out)
+   {
+      if (tex == 0)
+         return false;
+      return Run(tex, w, h, format, type, out);
+   }
+
+   bool AsyncReadback::ReadBound(int w, int h, unsigned int format, unsigned int type, void* out)
+   {
+      return Run(0, w, h, format, type, out);
+   }
+
+   bool AsyncReadback::Run(unsigned int tex, int w, int h, unsigned int format, unsigned int type, void* out)
+   {
+      if (w <= 0 || h <= 0 || out == nullptr)
+         return false;
+      const size_t bytes = (size_t)w * h * PixelBytes(format, type);
+
+      GLint prevRead = 0, prevPack = 0;
+      glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
+      glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prevPack);
+      if (tex != 0)
+      {
+         if (mFbo == 0)
+            glGenFramebuffers(1, &mFbo);
+         glBindFramebuffer(GL_READ_FRAMEBUFFER, mFbo);
+         glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+         if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+         {
+            glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
+            return false;
+         }
+      }
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+
+      bool got = false;
+      const bool sameShape = w == mLastW && h == mLastH && format == mLastFormat && type == mLastType;
+      if (!sameShape)
+      {
+         // New shape (or the first call): drop what is in flight, read now.
+         for (Slot& s : mSlots)
+            if (s.fence)
+            {
+               glDeleteSync((GLsync)s.fence);
+               s.fence = nullptr;
+            }
+         glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+         glReadPixels(0, 0, w, h, (GLenum)format, (GLenum)type, out);
+         mLastW = w;
+         mLastH = h;
+         mLastFormat = format;
+         mLastType = type;
+         got = true;
+      }
+      else
+      {
+         // The newest copy the GPU has finished; older finished ones are dropped.
+         Slot* best = nullptr;
+         for (Slot& s : mSlots)
+         {
+            if (s.fence == nullptr)
+               continue;
+            const GLenum st = glClientWaitSync((GLsync)s.fence, 0, 0);
+            if (st != GL_ALREADY_SIGNALED && st != GL_CONDITION_SATISFIED)
+               continue;
+            glDeleteSync((GLsync)s.fence);
+            s.fence = nullptr;
+            if (s.w == w && s.h == h && s.format == format && s.type == type && (best == nullptr || s.order > best->order))
+               best = &s;
+         }
+         if (best != nullptr)
+         {
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, best->pbo);
+            if (const void* p = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, (GLsizeiptr)bytes, GL_MAP_READ_BIT))
+            {
+               std::memcpy(out, p, bytes);
+               glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+               got = true;
+            }
+         }
+         // Queue this frame's copy.
+         for (Slot& s : mSlots)
+         {
+            if (s.fence != nullptr)
+               continue;
+            if (s.pbo == 0)
+               glGenBuffers(1, &s.pbo);
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, s.pbo);
+            if (s.capacity < bytes)
+            {
+               glBufferData(GL_PIXEL_PACK_BUFFER, (GLsizeiptr)bytes, nullptr, GL_STREAM_READ);
+               s.capacity = bytes;
+            }
+            glReadPixels(0, 0, w, h, (GLenum)format, (GLenum)type, nullptr);
+            s.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+            s.w = w;
+            s.h = h;
+            s.format = format;
+            s.type = type;
+            s.bytes = bytes;
+            s.order = ++mSeq;
+            break;
+         }
+      }
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prevPack);
+      if (tex != 0)
+         glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
+      return got;
+   }
+}

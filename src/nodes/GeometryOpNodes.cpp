@@ -473,13 +473,20 @@ void DisplacementNode::CookIfNeeded(int frameId)
       const unsigned int tex = mTextureInput.Pull(frameId);
       const int w = mTextureInput.Width();
       const int h = mTextureInput.Height();
-      if (tex != 0 && w > 0 && h > 0 &&
-          GLUtil::ReadTexturePixels(mReadFbo, tex, w, h, mTexPixels))
+      // Turbo 0.62: read back without stalling the GPU pipeline (see
+      // GLUtil::AsyncReadback); until this frame's copy is ready the last
+      // one stays, and only fresh pixels are hashed.
+      bool fresh = false;
+      if (tex != 0 && w > 0 && h > 0)
       {
+         if (w != mTexW || h != mTexH || mTexPixels.size() != (size_t)w * h * 4)
+            mTexPixels.assign((size_t)w * h * 4, 0.0f);
+         fresh = mTexReadback.Read(tex, w, h, GL_RGBA, GL_FLOAT, mTexPixels.data());
          mTexW = w; mTexH = h;
       }
       else
       {
+         fresh = true;
          mTexPixels.clear();
          mTexW = mTexH = 0;
       }
@@ -490,7 +497,7 @@ void DisplacementNode::CookIfNeeded(int frameId)
       // mesh rebuild - and resetting any simulation downstream, like Cloth -
       // every single frame. An animated source (Noise with time, Voronoi with
       // a modulated seed) still drives the mesh every frame its pixels change.
-      const unsigned long long hash = HashFloats(mTexPixels);
+      const unsigned long long hash = (fresh || !mHasTexHash) ? HashFloats(mTexPixels) : mTexHash;
       if (!mHasTexHash || hash != mTexHash)
       {
          mTexGeneration++;
@@ -1112,17 +1119,24 @@ void SetColorNode::CookIfNeeded(int frameId)
       const unsigned int tex = mTextureInput.Pull(frameId);
       const int w = mTextureInput.Width();
       const int h = mTextureInput.Height();
-      if (tex != 0 && w > 0 && h > 0 &&
-          GLUtil::ReadTexturePixels(mReadFbo, tex, w, h, mTexPixels))
+      // Turbo 0.62: read back without stalling the GPU pipeline (see
+      // GLUtil::AsyncReadback); until this frame's copy is ready the last
+      // one stays, and only fresh pixels are hashed.
+      bool fresh = false;
+      if (tex != 0 && w > 0 && h > 0)
       {
+         if (w != mTexW || h != mTexH || mTexPixels.size() != (size_t)w * h * 4)
+            mTexPixels.assign((size_t)w * h * 4, 0.0f);
+         fresh = mTexReadback.Read(tex, w, h, GL_RGBA, GL_FLOAT, mTexPixels.data());
          mTexW = w; mTexH = h;
       }
       else
       {
+         fresh = true;
          mTexPixels.clear();
          mTexW = mTexH = 0;
       }
-      const unsigned long long hash = HashFloats(mTexPixels);
+      const unsigned long long hash = (fresh || !mHasTexHash) ? HashFloats(mTexPixels) : mTexHash;
       if (!mHasTexHash || hash != mTexHash)
       {
          mTexGeneration++;

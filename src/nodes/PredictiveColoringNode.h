@@ -81,6 +81,7 @@ private:
    bool mDownsampleShaderTried = false;
    int mSampleSize = 64;
    std::vector<unsigned char> mPixels;
+   GLUtil::AsyncReadback mReadback; // Turbo 0.62
 
    double mLastSampleSeconds = -1.0;
    double mLastFitSeconds = -1.0;

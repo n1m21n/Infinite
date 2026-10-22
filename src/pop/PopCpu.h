@@ -32,6 +32,10 @@ namespace pop
    };
 
    Arrays Load(const PopData& d);
+   // Turbo 0.62: Load's layout for just these points (row r = point rows[r]),
+   // reading only them - for operators that sample a few points of a big,
+   // GPU-made input every frame (Particle births).
+   Arrays LoadRows(const PopData& d, const std::vector<int>& rows);
    // A PopData from arrays + topology (attributes uploaded lazily).
    std::shared_ptr<PopData> Store(Arrays&& a, std::shared_ptr<PopTopology> topo);
 

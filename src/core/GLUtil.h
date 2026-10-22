@@ -108,4 +108,43 @@ namespace GLUtil
    // would serialise the whole pipeline instead of one readback per rebuild.
    bool ReadTexturePixels(unsigned int& scratchFbo, unsigned int srcTex, int w, int h,
                           std::vector<float>& outRGBA);
+
+   // Turbo 0.62: a texture read back to the CPU without making the CPU wait
+   // for the GPU. Each Read() queues a copy into a pixel-pack buffer (fenced)
+   // and hands back the newest copy the GPU has finished - normally last
+   // frame's - so analysers, colour pickers and image-driven geometry trail
+   // their input by about a frame instead of stalling the whole pipeline
+   // every cook. The very first Read() (and any size change) reads
+   // synchronously, so a node still has data from its first cook.
+   class AsyncReadback
+   {
+   public:
+      AsyncReadback() = default;
+      AsyncReadback(const AsyncReadback&) = delete;
+      AsyncReadback& operator=(const AsyncReadback&) = delete;
+      ~AsyncReadback();
+      // `tex` is w x h; `out` receives w * h pixels of `format` / `type`
+      // (GL_RGBA / GL_RED..., GL_UNSIGNED_BYTE or GL_FLOAT), tightly packed.
+      // False (out untouched) when no new copy has finished yet.
+      bool Read(unsigned int tex, int w, int h, unsigned int format, unsigned int type, void* out);
+      // Same, for the framebuffer that is bound for reading when it is called.
+      bool ReadBound(int w, int h, unsigned int format, unsigned int type, void* out);
+
+   private:
+      bool Run(unsigned int tex, int w, int h, unsigned int format, unsigned int type, void* out);
+      struct Slot
+      {
+         unsigned int pbo = 0;
+         void* fence = nullptr;
+         int w = 0, h = 0;
+         unsigned int format = 0, type = 0;
+         size_t bytes = 0, capacity = 0;
+         unsigned long long order = 0;
+      };
+      Slot mSlots[3];
+      unsigned int mFbo = 0;
+      unsigned long long mSeq = 0;
+      int mLastW = 0, mLastH = 0;
+      unsigned int mLastFormat = 0, mLastType = 0;
+   };
 }

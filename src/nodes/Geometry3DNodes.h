@@ -9,6 +9,7 @@
 #include "ImageCable.h"
 #include "GLUtil.h"
 #include "Mesh.h"
+#include "nodes/Render3DPost.h"
 
 // Surface properties handed to the renderer. A struct rather than a row of
 // out-params: this already carried five, and every material feature after this
@@ -508,9 +509,17 @@ public:
 
    ~Render3DNode() override;
 
-   unsigned int GetOutputTexture() override { return mColorTex; }
-   int GetOutputWidth() const override { return mWidth; }
-   int GetOutputHeight() const override { return mHeight; }
+   // Turbo 0.61: the HDR scene's finished image (bloom, tonemap, sRGB) when
+   // the post pass ran, the raw target otherwise.
+   unsigned int GetOutputTexture() override
+   {
+      if (mPanoOut != 0)
+         return mPanoOut;
+      return mPostOut != 0 ? mPostOut : mColorTex;
+   }
+   // A raster 360's internal targets are face-sized; its output is the panorama.
+   int GetOutputWidth() const override { return mPanoOut != 0 ? m360OutW : mWidth; }
+   int GetOutputHeight() const override { return mPanoOut != 0 ? m360OutH : mHeight; }
    void CookIfNeeded(int frameId) override;
    unsigned long long TextureRevision() const override { return mRevision; }
 
@@ -637,8 +646,37 @@ public:
    // glClear, so it is already in the same encoded space the shader outputs.
    static const std::vector<std::string>& TonemapNames();
    float exposure = 1.0f;
-   int tonemap = 1; // none / ACES / Reinhard
+   int tonemap = 1; // none / ACES / Reinhard / AgX / Neutral (Khronos PBR Neutral)
    int ActiveSamples() const { return mActiveSamples; }
+   // Turbo 0.61: the scene is lit in linear HDR; bloom adds what is brighter
+   // than the threshold back as a soft glow before the tonemap (0 = off).
+   float bloom = 0.0f;
+   float bloomThreshold = 1.0f;
+   float bloomRadius = 0.6f;
+   // Turbo 0.62: 0 raster, 1 RTX - hardware ray tracing on an NVIDIA RTX GPU
+   // (RtxBackend, optional module): one sample per pixel per frame, denoised,
+   // accumulating up to ptSamples while nothing moves.
+   static const std::vector<std::string>& RenderModeNames();
+   int renderMode = 0;
+   int ptSamples = 256;
+   int ptBounces = 4;
+   // RTX denoiser: 0 auto (fast while the scene moves, AI once it is still),
+   // 1 AI (OptiX, best, ~20 ms at 1080p), 2 fast (a-trous, ~1 ms), 3 off.
+   int rtxDenoise = 0;
+   static const std::vector<std::string>& RtxDenoiseNames();
+   int RtxSamples() const;
+   double RtxMs() const;
+   // Why RTX mode is drawing raster instead (empty when it traces).
+   const std::string& RtxStatus() const { return mRtxWhy; }
+   // Turbo 0.61: 360 output from the camera's position, relative to its
+   // orientation (keep elevation 0 for a level horizon): 0 off, 1
+   // equirectangular (2:1), 2 cubemap 3x2 (+X -X +Y / -Y +Z -Z, 3:2). Raster
+   // renders six 90-degree faces and reprojects them; path traced traces the
+   // panorama's rays directly.
+   static const std::vector<std::string>& PanoramaNames();
+   int panorama = 0;           // 3: dome (domemaster fisheye, zenith at the centre, forward at the bottom)
+   float domeAngle = 180.0f;   // dome field of view in degrees
+   float domeTilt = 0.0f;      // dome: 0 = zenith at the centre, 90 = camera forward at the centre
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -662,6 +700,10 @@ public:
       v.Bool("shadows", shadowsEnabled); v.Int("shadowQuality", shadowQuality);
       v.Float("shadowBias", shadowBias); v.Float("shadowSoftness", shadowSoftness);
       v.Float("shadowStrength", shadowStrength);
+      v.Float("bloom", bloom); v.Float("bloomThreshold", bloomThreshold); v.Float("bloomRadius", bloomRadius);
+      v.Int("renderMode", renderMode); v.Int("ptSamples", ptSamples); v.Int("ptBounces", ptBounces);
+      v.Int("panorama", panorama); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt);
+      v.Int("rtxDenoise", rtxDenoise);
    }
 
 private:
@@ -835,6 +877,24 @@ private:
    // Resolve target: a plain texture, and what the rest of the graph reads.
    unsigned int mFbo = 0;
    unsigned int mColorTex = 0;
+   Render3DPost mPost;        // Turbo 0.61: IBL maps + HDR finish
+   // Turbo 0.62: renderMode 1. Deleter defined in the .cpp, where the type is complete.
+   struct RtxDeleter { void operator()(class RtxBackend* p) const; };
+   std::unique_ptr<class RtxBackend, RtxDeleter> mRtx;
+   bool mRtxTried = false;
+   std::string mRtxWhy;
+   // Instance matrices made for the tracer this frame, alive until it copied them.
+   std::vector<std::shared_ptr<const void>> mRtxKeep;
+   // Turbo 0.61: raster 360 - one CookIfNeeded per cube face (m360Face >= 0
+   // swaps the camera and the size), faces kept in a 6-layer array, then
+   // reprojected by mPost into mPanoOut.
+   void Cook360(int frameId);
+   int m360Face = -1;
+   int m360FaceSize = 0;
+   unsigned int mFaceArray = 0;
+   int mFaceArraySize = 0;
+   unsigned int mPanoOut = 0;
+   unsigned int mPostOut = 0; // mPost's output, 0 until the post pass ran
    unsigned int mDepthBuffer = 0; // a depth texture (so Volume can read it)
    SceneCamera mLastCamera;
    bool mDepthWanted = false;
@@ -881,5 +941,11 @@ private:
    size_t mLastUploads = 0;
    bool mHasSceneBuilt = false;
    SceneSignature mSceneBuilt;
+   // Turbo 0.61: what the last 360 render was made from (its six faces are
+   // only redrawn when this or the output size / mode moves).
+   SceneSignature m360Sig;
+   bool m360Valid = false;
+   int m360OutW = 0, m360OutH = 0, m360Mode = 0;
+   float m360Dome[2] = { 0.0f, 0.0f };
    unsigned long long mRevision = 0;
 };
