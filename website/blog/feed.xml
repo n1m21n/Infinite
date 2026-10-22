@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
   <title>Infinite blog</title><link>https://infinitedevices.org/blog/</link><description>Notes on building and using Infinite, the free open-source DAW for visuals, music and code.</description>
-  <language>en-gb</language><lastBuildDate>Wed, 21 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <language>en-gb</language><lastBuildDate>Thu, 22 Oct 2026 09:00:00 +0000</lastBuildDate><atom:link href="https://infinitedevices.org/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <item><title>Reaction-diffusion simulation in real-time GLSL</title><link>https://infinitedevices.org/blog/reaction-diffusion-simulation-in-real-time-glsl.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/reaction-diffusion-simulation-in-real-time-glsl.html</guid>
+    <pubDate>Thu, 22 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>How to build a reaction-diffusion simulation in real-time GLSL shaders and nodes, creating generative Turing patterns with audio-reactive parameter modulation.</description></item>
   <item><title>Audio-reactive GLSL shaders: writing real-time visuals in Infinite</title><link>https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html</guid>
     <pubDate>Wed, 21 Oct 2026 09:00:00 +0000</pubDate><category>creative</category><description>Learn how to write real-time audio-reactive GLSL shaders in Infinite, map FFT frequency bands to shader uniforms, and generate responsive visuals on the GPU.</description></item>
   <item><title>Lorenz attractor interactive simulation in creative coding</title><link>https://infinitedevices.org/blog/lorenz-attractor-interactive-simulation.html</link><guid isPermaLink="true">https://infinitedevices.org/blog/lorenz-attractor-interactive-simulation.html</guid>

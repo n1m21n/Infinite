@@ -1,5 +1,14 @@
 [
  {
+  "slug": "reaction-diffusion-simulation-in-real-time-glsl",
+  "title": "Reaction-diffusion simulation in real-time GLSL",
+  "description": "How to build a reaction-diffusion simulation in real-time GLSL shaders and nodes, creating generative Turing patterns with audio-reactive parameter modulation.",
+  "date": "2026-10-22",
+  "updated": "2026-10-22",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/reaction-diffusion-simulation-in-real-time-glsl.html"
+ },
+ {
   "slug": "audio-reactive-glsl-shaders",
   "title": "Audio-reactive GLSL shaders: writing real-time visuals in Infinite",
   "description": "Learn how to write real-time audio-reactive GLSL shaders in Infinite, map FFT frequency bands to shader uniforms, and generate responsive visuals on the GPU.",
