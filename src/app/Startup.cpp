@@ -545,6 +545,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
 
    if (getenv("INFINITE_MIDIFILETEST") != nullptr)
       return RunMidiFileFixture() ? 0 : 1;
+   if (getenv("INFINITE_RESTARTTEST") != nullptr)
+      return RunRestartTest() ? 0 : 1;
 
    if (getenv("INFINITE_MPETEST") != nullptr)
       return RunMpeFixture() ? 0 : 1;

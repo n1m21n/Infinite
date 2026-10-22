@@ -761,8 +761,19 @@ public:
    int CurrentNote() const;    // -1 if nothing is currently sounding
    int CurrentGridStep() const; // -1 if nothing is currently held (playhead parked)
 
+   // Quantized restart: `level` is the restart button's level (mouse held or
+   // CV high); a rising edge starts the pattern over on the Transport launch
+   // grid (the next step / at once with none). Not saved: a loaded patch
+   // starts on the transport grid.
+   void SetRestartLevel(bool level);
+   void RequestRestart();
+   bool RestartArmed() const; // a restart is waiting for its grid line
+   int RestartPresses() const { return mRestartPresses; }
+
 private:
    std::unique_ptr<AudioArpeggiatorNode> mAudioNode;
+   bool mRestartLevel = false;
+   int mRestartPresses = 0;
    int mLastCookFrame = -1;
 };
 
@@ -808,8 +819,19 @@ public:
 
    int CurrentStep() const; // main-thread readout for the visualizer, -1 if stopped
 
+   // Quantized restart: `level` is the restart button's level (mouse held or
+   // CV high); a rising edge starts the pattern over on the Transport launch
+   // grid (the next step / at once with none). Not saved: a loaded patch
+   // starts on the transport grid.
+   void SetRestartLevel(bool level);
+   void RequestRestart();
+   bool RestartArmed() const; // a restart is waiting for its grid line
+   int RestartPresses() const { return mRestartPresses; }
+
 private:
    std::unique_ptr<AudioNoteSequencerNode> mAudioNode;
+   bool mRestartLevel = false;
+   int mRestartPresses = 0;
    int mLastCookFrame = -1;
 };
 
@@ -1135,8 +1157,19 @@ public:
    // Main-thread readout of the playhead inside the file, in beats, -1 when stopped.
    double PlayheadBeats() const;
 
+   // Quantized restart: `level` is the restart button's level (mouse held or
+   // CV high); a rising edge starts the pattern over on the Transport launch
+   // grid (the next step / at once with none). Not saved: a loaded patch
+   // starts on the transport grid.
+   void SetRestartLevel(bool level);
+   void RequestRestart();
+   bool RestartArmed() const; // a restart is waiting for its grid line
+   int RestartPresses() const { return mRestartPresses; }
+
 private:
    std::unique_ptr<AudioMidiFileNode> mAudioNode;
+   bool mRestartLevel = false;
+   int mRestartPresses = 0;
    std::vector<std::unique_ptr<MidiFile::Song>> mSongs; // every loaded song stays alive: the audio thread may still hold the old pointer
    const MidiFile::Song* mSong = nullptr;
    std::string mLoadedPath;

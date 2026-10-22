@@ -40,6 +40,8 @@
 #include "nodes/NoteNodes.h"
 
 #include <chrono>
+#include <cstdio>
+#include <fstream>
 #include <map>
 
 namespace app
@@ -835,6 +837,160 @@ bool RunNoteAudit()
       AuditCpu();
 
    printf("NOTEAUDIT %s (%d flags)\n", ok ? "PASS" : "FAIL", flags.n);
+   return ok;
+}
+
+// INFINITE_RESTARTTEST: quantized restart on Note Sequencer, Arpeggiator and
+// MIDI File. A press waits for the Transport launch grid (bar, beat) and the
+// pattern plays its first step on that line; with no grid it lands on the
+// next step; Play after a stop starts on the transport grid again.
+bool RunRestartTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      printf("RESTARTTEST %s %s\n", what, cond ? "OK" : "FAIL");
+      ok = ok && cond;
+   };
+   const double bpm = 120.0;
+   const double samplesPerBeat = kRate * 60.0 / bpm;
+   auto runTo = [&](Rig& rig, double beat, long long base = 0) {
+      while ((double)(rig.pos - base) < beat * samplesPerBeat)
+         rig.Step();
+   };
+   // The note-on nearest `beat` (within 0.02 beats), -1 if none.
+   // `base`: the sample the transport last started from 0 at.
+   auto noteAt = [&](const Rig& rig, double beat, long long base = 0) {
+      for (const Evt& e : rig.got)
+         if (e.e.isNoteOn && e.sample >= base && std::fabs((double)(e.sample - base) / samplesPerBeat - beat) < 0.02)
+            return e.e.note;
+      return -1;
+   };
+   // Stop, then a few stopped blocks so every pending note-off flushes.
+   auto stopAndFlush = [&](Rig& rig) {
+      StopTransport();
+      for (int b = 0; b < 8; b++)
+         rig.Step();
+   };
+   auto pairsOk = [&](const Rig& rig) {
+      const PairReport p = Pairs(rig.got);
+      if (p.Bad())
+         printf("RESTARTTEST pairs: on %d off %d stuck %d orphan-off %d dup-on %d off-before-on %d\n", p.ons, p.offs,
+                p.stuck, p.orphanOff, p.dupOn, p.offBeforeOn);
+      return !p.Bad();
+   };
+   Transport& tr = Transport::Instance();
+   const double bar = MusicTime::LaunchQuantizeBeats(MusicTime::kLaunchBar);
+
+   // ---- Note Sequencer: 5 steps of 1/16 (notes 60..64) ----
+   {
+      auto* seq = static_cast<NoteSequencerNode*>(NoteSequencerNode::Create());
+      seq->steps = 5;
+      seq->rateMode = 0;
+      seq->rateBeats = 0.25f;
+      for (int i = 0; i < 5; i++)
+      {
+         seq->stepNote[i] = 60 + i;
+         seq->stepEnabled[i] = true;
+      }
+      Rig rig;
+      check(rig.Init(seq), "sequencer rig");
+      StartTransport(bpm);
+      tr.SetLaunchQuantize(MusicTime::kLaunchBar);
+      runTo(rig, 1.1);
+      seq->RequestRestart();
+      rig.Step();
+      check(seq->RestartArmed(), "sequencer: a press waits for the bar");
+      runTo(rig, bar + 0.6);
+      const long long lastStep = (long long)std::lround(bar / 0.25) - 1;
+      check(noteAt(rig, bar - 0.25) == 60 + (int)(lastStep % 5), "sequencer: the pattern runs on until the bar");
+      check(noteAt(rig, bar) == 60 && noteAt(rig, bar + 0.25) == 61 && noteAt(rig, bar + 0.5) == 62,
+            "sequencer: step 1 lands on the bar line");
+      check(!seq->RestartArmed(), "sequencer: no longer armed after it lands");
+      // No grid: the next step plays step 1.
+      tr.SetLaunchQuantize(MusicTime::kLaunchNone);
+      runTo(rig, bar + 1.35);
+      seq->RequestRestart();
+      runTo(rig, bar + 2.0);
+      check(noteAt(rig, bar + 1.5) == 60 && noteAt(rig, bar + 1.75) == 61, "sequencer: no grid lands on the next step");
+      // Stop and play from 0: the restart's offset is gone.
+      stopAndFlush(rig);
+      const long long base = rig.pos;
+      StartTransport(bpm);
+      runTo(rig, 0.6, base);
+      check(noteAt(rig, 0.0, base) == 60 && noteAt(rig, 0.25, base) == 61, "sequencer: play starts on the transport grid again");
+      stopAndFlush(rig);
+      check(pairsOk(rig), "sequencer: every note-on has its off");
+   }
+
+   // ---- Arpeggiator: hold C E G, Up, 1/16 ----
+   {
+      auto* arp = static_cast<ArpeggiatorNode*>(ArpeggiatorNode::Create());
+      arp->mode = ArpeggiatorNode::kUp;
+      arp->octaves = 1;
+      arp->rateMode = 0;
+      arp->rateBeats = 0.25f;
+      Rig rig;
+      check(rig.Init(arp), "arp rig");
+      StartTransport(bpm);
+      tr.SetLaunchQuantize(MusicTime::kLaunchBar);
+      Push(rig.in[0], 60, 0.8f, true, 901);
+      Push(rig.in[0], 64, 0.8f, true, 902);
+      Push(rig.in[0], 67, 0.8f, true, 903);
+      runTo(rig, 1.1);
+      arp->RequestRestart();
+      runTo(rig, bar + 0.6);
+      const int seqNotes[3] = { 60, 64, 67 };
+      const long long ticks = (long long)std::lround(bar / 0.25);
+      check(noteAt(rig, bar - 0.25) == seqNotes[(ticks - 1) % 3], "arp: the pattern runs on until the bar");
+      check(noteAt(rig, bar) == 60 && noteAt(rig, bar + 0.25) == 64 && noteAt(rig, bar + 0.5) == 67,
+            "arp: the first note lands on the bar line");
+      Push(rig.in[0], 60, 0.0f, false, 901);
+      Push(rig.in[0], 64, 0.0f, false, 902);
+      Push(rig.in[0], 67, 0.0f, false, 903);
+      runTo(rig, bar + 1.0);
+      stopAndFlush(rig);
+      check(pairsOk(rig), "arp: every note-on has its off");
+   }
+
+   // ---- MIDI File: C D E F on beats 0..3, 0.9 beat each, a 4-beat loop ----
+   {
+      const uint8_t trk[] = {
+         0x00, 0x90, 60, 100, 0x83, 0x30, 0x80, 60, 0,
+         0x30, 0x90, 62, 100, 0x83, 0x30, 0x80, 62, 0,
+         0x30, 0x90, 64, 100, 0x83, 0x30, 0x80, 64, 0,
+         0x30, 0x90, 65, 100, 0x83, 0x30, 0x80, 65, 0,
+         0x00, 0xFF, 0x2F, 0x00 };
+      std::vector<uint8_t> bytes = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0, 'M', 'T', 'r', 'k',
+                                     0, 0, 0, (uint8_t)sizeof(trk) };
+      bytes.insert(bytes.end(), trk, trk + sizeof(trk));
+      const std::string path = "/tmp/infinite_restarttest.mid";
+      {
+         std::ofstream f(path, std::ios::binary);
+         f.write((const char*)bytes.data(), (std::streamsize)bytes.size());
+      }
+      auto* mf = static_cast<MidiFileNode*>(MidiFileNode::Create());
+      mf->path = path;
+      mf->loop = true;
+      Rig rig;
+      check(rig.Init(mf), "midi file rig");
+      check(mf->GetSong() != nullptr, "midi file loads");
+      StartTransport(bpm);
+      tr.SetLaunchQuantize(MusicTime::kLaunchBeat);
+      runTo(rig, 2.3); // the E is sounding
+      mf->RequestRestart();
+      runTo(rig, 3.6);
+      check(noteAt(rig, 2.0) == 64, "midi file: the file runs on until the beat");
+      check(noteAt(rig, 3.0) == 60 && noteAt(rig, 3.0) != 65, "midi file: the file starts over on the beat line");
+      runTo(rig, 4.2);
+      check(noteAt(rig, 4.0) == 62, "midi file: and plays on from there");
+      stopAndFlush(rig);
+      check(pairsOk(rig), "midi file: every note-on has its off");
+      std::remove(path.c_str());
+   }
+
+   tr.SetLaunchQuantize(MusicTime::kLaunchNone);
+   printf("RESTARTTEST %s\n", ok ? "ALL OK" : "FAILED");
    return ok;
 }
 

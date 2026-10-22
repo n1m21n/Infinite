@@ -228,6 +228,76 @@ namespace
       long long mLastStep = -1;
       double mExpectedBeat = -1.0;
    };
+
+   // Quantized restart (Note Sequencer, Arpeggiator, MIDI File; after Ricardo
+   // Palmieri's Turbo fork): a press starts the pattern again from its top on
+   // the Transport launch grid (MusicTime::LaunchQuantize, the rule the
+   // Switchers' manual slot already follows), or at the next step / at once
+   // when the grid is "none" or the transport is stopped. The main thread only
+   // counts presses; the audio thread owns the wait.
+   class RestartLatch
+   {
+   public:
+      // Main thread.
+      void Request() { mRequests.fetch_add(1, std::memory_order_relaxed); }
+      bool Armed() const { return mArmed.load(std::memory_order_relaxed); }
+
+      // Audio thread, once per block before any Due(): picks up a new press
+      // and aims it at the first grid line at or after `beats`. A second press
+      // while one waits re-aims it from here.
+      void Poll(double beats, bool playing)
+      {
+         const unsigned r = mRequests.load(std::memory_order_relaxed);
+         if (r == mSeen)
+            return;
+         mSeen = r;
+         mQ = playing ? Transport::Instance().LaunchQuantize() : (int)MusicTime::kLaunchNone;
+         mGrid = MusicTime::LaunchQuantizeBeats(mQ);
+         mTarget = MusicTime::NextLaunchBeat(beats, mQ);
+         mPending = true;
+         mArmed.store(true, std::memory_order_relaxed);
+      }
+
+      // Audio thread: true once, at the first point (a step tick, a block
+      // start) at transport beat `beat` that is on or past the line. A seek
+      // back by more than a grid step re-aims at the next line from there.
+      bool Due(double beat)
+      {
+         if (!mPending)
+            return false;
+         if (mGrid > 0.0)
+         {
+            if (beat < mTarget - mGrid - 1e-9)
+               mTarget = MusicTime::NextLaunchBeat(beat, mQ);
+            if (beat < mTarget - 1e-9)
+               return false;
+         }
+         mPending = false;
+         mArmed.store(false, std::memory_order_relaxed);
+         return true;
+      }
+
+      // Audio thread: the transport line this restart waits for, or -1 when
+      // it lands on the next point whatever its beat.
+      double TargetBeat() const { return mPending && mGrid > 0.0 ? mTarget : -1.0; }
+
+      // Audio thread: drop a waiting press (and any not yet seen).
+      void Cancel()
+      {
+         mSeen = mRequests.load(std::memory_order_relaxed);
+         mPending = false;
+         mArmed.store(false, std::memory_order_relaxed);
+      }
+
+   private:
+      std::atomic<unsigned> mRequests { 0 };
+      std::atomic<bool> mArmed { false };
+      unsigned mSeen = 0;
+      bool mPending = false;
+      int mQ = 0;
+      double mGrid = 0.0;
+      double mTarget = 0.0;
+   };
 }
 
 // ------------------------------------------------------------------ MIDI Notes
@@ -2768,12 +2838,19 @@ public:
       const bool accurate = mStepTiming.load(std::memory_order_relaxed) != 0;
       if (!accurate)
          flushOff(mSamplePos + (uint64_t)numFrames);
+      mRestart.Poll(Transport::Instance().BlockStartBeats(), Transport::Instance().IsPlaying());
       StepTick ticks[StepClock::kMaxTicks];
       const int nTicks = mClock.Ticks(rateBeats, bpm, mSampleRate, numFrames, accurate, ticks);
       for (int t = 0; t < nTicks; t++)
       {
          const int frame = ticks[t].frame;
          flushOff(mSamplePos + (uint64_t)frame + 1);
+         if (mRestart.Due((double)ticks[t].step * rateBeats))
+         {
+            // The pattern and the gate grid both start over on this tick.
+            mStepCounter = 0;
+            mGridStep = 0;
+         }
 
          // The grid-gate clock advances on every step tick, unconditionally -
          // including when nothing is held and when the step is gated off.
@@ -2907,6 +2984,8 @@ public:
    int HeldCount() const { return mHeldCountReadout.load(std::memory_order_relaxed); }
    int CurrentNote() const { return mCurrentOutNoteReadout.load(std::memory_order_relaxed); }
    int CurrentGridStep() const { return mGridStepReadout.load(std::memory_order_relaxed); }
+   void RequestRestart() { mRestart.Request(); }
+   bool RestartArmed() const { return mRestart.Armed(); }
 
 private:
    struct HeldNote
@@ -3064,6 +3143,7 @@ private:
    int mHeldCount = 0;
 
    StepClock mClock;
+   RestartLatch mRestart;
    uint64_t mStepCounter = 0;
    uint64_t mGridStep = 0;
    int mCurrentOutNote = -1;
@@ -3116,6 +3196,26 @@ AudioNode* ArpeggiatorNode::GetAudioNode()
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioArpeggiatorNode>();
    return mAudioNode.get();
+}
+
+void ArpeggiatorNode::SetRestartLevel(bool level)
+{
+   const bool rising = level && !mRestartLevel;
+   mRestartLevel = level;
+   if (rising)
+      RequestRestart();
+}
+
+void ArpeggiatorNode::RequestRestart()
+{
+   mRestartPresses++;
+   GetAudioNode();
+   mAudioNode->RequestRestart();
+}
+
+bool ArpeggiatorNode::RestartArmed() const
+{
+   return mAudioNode && mAudioNode->RestartArmed();
 }
 
 int ArpeggiatorNode::HeldCount() const
@@ -3203,11 +3303,19 @@ public:
       mCurrentOutNote = -1;
       mCurrentOutVoiceId = 0;
       mPendingOffActive = false;
+      mStepOffset = 0;
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
       const int numFrames = output.numFrames;
+      // Play starts the pattern on the transport grid again: a restart's
+      // offset lasts until the transport stops (or is reset).
+      const unsigned long long epoch = Transport::Instance().ResetEpoch();
+      if (epoch != mEpoch)
+         mStepOffset = 0;
+      mEpoch = epoch;
+      mRestart.Poll(Transport::Instance().BlockStartBeats(), Transport::Instance().IsPlaying());
       const int steps = std::clamp(mSteps.load(std::memory_order_relaxed), 1, NoteSequencerNode::kMaxSteps);
       const int rateMode = mRateMode.load(std::memory_order_relaxed);
       const float rateBeatsP = std::max(0.015625f, mRateBeats.load(std::memory_order_relaxed));
@@ -3243,7 +3351,10 @@ public:
          const long long step = ticks[t].step;
          const int frame = ticks[t].frame;
          flushOff(mSamplePos + (uint64_t)frame + 1);
-         const int idx = (int)(((step % steps) + steps) % steps);
+         if (mRestart.Due((double)step * rateBeats))
+            mStepOffset = step; // this tick plays step 1
+         const long long rel = step - mStepOffset;
+         const int idx = (int)(((rel % steps) + steps) % steps);
          mCurrentStepReadout.store(idx, std::memory_order_relaxed);
 
          if (mEnabled[idx].load(std::memory_order_relaxed))
@@ -3309,6 +3420,8 @@ public:
    }
 
    int CurrentStep() const { return mCurrentStepReadout.load(std::memory_order_relaxed); }
+   void RequestRestart() { mRestart.Request(); }
+   bool RestartArmed() const { return mRestart.Armed(); }
 
 private:
    NoteEventQueue mOutbox;
@@ -3316,6 +3429,9 @@ private:
    uint64_t mSamplePos = 0;
 
    StepClock mClock;
+   RestartLatch mRestart;
+   long long mStepOffset = 0; // audio thread: the step that plays step 1
+   unsigned long long mEpoch = 0;
    int mCurrentOutNote = -1;
    int mCurrentOutVoiceId = 0;
    bool mPendingOffActive = false;
@@ -3381,6 +3497,26 @@ AudioNode* NoteSequencerNode::GetAudioNode()
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioNoteSequencerNode>();
    return mAudioNode.get();
+}
+
+void NoteSequencerNode::SetRestartLevel(bool level)
+{
+   const bool rising = level && !mRestartLevel;
+   mRestartLevel = level;
+   if (rising)
+      RequestRestart();
+}
+
+void NoteSequencerNode::RequestRestart()
+{
+   mRestartPresses++;
+   GetAudioNode();
+   mAudioNode->RequestRestart();
+}
+
+bool NoteSequencerNode::RestartArmed() const
+{
+   return mAudioNode && mAudioNode->RestartArmed();
 }
 
 int NoteSequencerNode::CurrentStep() const
@@ -4908,6 +5044,7 @@ public:
          ReleaseAll(0);
          mLastTransport = -1.0;
          mPlayhead.store(-1.0, std::memory_order_relaxed);
+         mRestart.Cancel(); // Play starts the file from `position` anyway
          return;
       }
 
@@ -4935,54 +5072,87 @@ public:
          ReleaseAll(0);
          mPlay = (double)position * len;
       }
-      const double t0 = mPlay;
-      const double t1 = t0 + dBeats;
-      mPlayhead.store(t0, std::memory_order_relaxed);
-      mPlay = loop ? std::fmod(t1, len) : t1;
 
-      const auto& ev = song->events;
-      const long long k0 = loop ? (long long)std::floor(t0 / len) : 0;
-      const long long k1 = loop ? (long long)std::floor(t1 / len) : 0;
-      for (long long k = k0; k <= k1; k++)
+      // A restart starts the file over from `position` at the frame of its
+      // grid line in this block (frame 0 with no grid).
+      mRestart.Poll(tStart, true);
+      int split = -1;
+      if (mRestart.Due(tStart))
+         split = 0;
+      else
       {
-         const double base = loop ? (double)k * len : 0.0;
-         // The file wrapped inside this block: whatever is still held must not ring into the restart.
-         if (k > k0)
-            ReleaseAll(std::clamp((int)((base - t0) / dBeats * (double)numFrames), 0, numFrames - 1));
-         const double lo = std::max(0.0, t0 - base);
-         const double hi = loop ? std::min(len, t1 - base) : t1;
-         auto it = std::lower_bound(ev.begin(), ev.end(), lo, [&](const MidiFile::Event& e, double b) { return beatOf(e) < b; });
-         for (; it != ev.end() && beatOf(*it) < hi; ++it)
+         const double line = mRestart.TargetBeat();
+         if (line >= 0.0 && line < tStart + dTransport - 1e-9 && mRestart.Due(line))
+            split = std::clamp((int)std::lround((line - tStart) / dTransport * (double)numFrames), 0, numFrames - 1);
+      }
+
+      // Plays file beats [from, from + span) over frames [f0, f0 + nf) and
+      // returns where the file is after them.
+      const auto& ev = song->events;
+      auto play = [&](double from, double span, int f0, int nf) -> double
+      {
+         const double to = from + span;
+         if (nf <= 0 || span <= 0.0)
+            return loop ? std::fmod(to, len) : to;
+         auto frameOf = [&](double b) { return std::clamp(f0 + (int)((b - from) / span * (double)nf), f0, f0 + nf - 1); };
+         const long long k0 = loop ? (long long)std::floor(from / len) : 0;
+         const long long k1 = loop ? (long long)std::floor(to / len) : 0;
+         for (long long k = k0; k <= k1; k++)
          {
-            const double abs = base + beatOf(*it);
-            const int offset = std::clamp((int)((abs - t0) / dBeats * (double)numFrames), 0, numFrames - 1);
-            if (it->on)
+            const double base = loop ? (double)k * len : 0.0;
+            // The file wrapped inside this span: whatever is still held must not ring into the restart.
+            if (k > k0)
+               ReleaseAll(frameOf(base));
+            const double lo = std::max(0.0, from - base);
+            const double hi = loop ? std::min(len, to - base) : to;
+            auto it = std::lower_bound(ev.begin(), ev.end(), lo, [&](const MidiFile::Event& e, double b) { return beatOf(e) < b; });
+            for (; it != ev.end() && beatOf(*it) < hi; ++it)
             {
-               NoteEvent on;
-               // General MIDI percussion (channel 10) is a drum map, not pitch: transposing it would change the instrument.
-               on.note = std::clamp((int)it->note + (it->channel == 9 ? 0 : transpose), 0, 127);
-               on.velocity = std::clamp((float)it->velocity / 127.0f * velScale, 0.0f, 1.0f);
-               on.isNoteOn = true;
-               on.frameOffset = offset;
-               on.source = this;
-               on.voiceId = NextVoiceId();
-               if (mHeldCount < kMaxHeld)
+               const int offset = frameOf(base + beatOf(*it));
+               if (it->on)
                {
-                  mHeld[mHeldCount++] = { it->note, it->track, (uint8_t)on.note, on.voiceId };
-                  mOutbox.Push(on);
+                  NoteEvent on;
+                  // General MIDI percussion (channel 10) is a drum map, not pitch: transposing it would change the instrument.
+                  on.note = std::clamp((int)it->note + (it->channel == 9 ? 0 : transpose), 0, 127);
+                  on.velocity = std::clamp((float)it->velocity / 127.0f * velScale, 0.0f, 1.0f);
+                  on.isNoteOn = true;
+                  on.frameOffset = offset;
+                  on.source = this;
+                  on.voiceId = NextVoiceId();
+                  if (mHeldCount < kMaxHeld)
+                  {
+                     mHeld[mHeldCount++] = { it->note, it->track, (uint8_t)on.note, on.voiceId };
+                     mOutbox.Push(on);
+                  }
+               }
+               else
+               {
+                  for (int i = 0; i < mHeldCount; i++)
+                     if (mHeld[i].note == it->note && mHeld[i].track == it->track)
+                     {
+                        PushOff(mHeld[i], offset);
+                        mHeld[i] = mHeld[--mHeldCount];
+                        break;
+                     }
                }
             }
-            else
-            {
-               for (int i = 0; i < mHeldCount; i++)
-                  if (mHeld[i].note == it->note && mHeld[i].track == it->track)
-                  {
-                     PushOff(mHeld[i], offset);
-                     mHeld[i] = mHeld[--mHeldCount];
-                     break;
-                  }
-            }
          }
+         return loop ? std::fmod(to, len) : to;
+      };
+
+      if (split < 0)
+      {
+         mPlayhead.store(mPlay, std::memory_order_relaxed);
+         mPlay = play(mPlay, dBeats, 0, numFrames);
+      }
+      else
+      {
+         const double head = dBeats * (double)split / (double)numFrames;
+         play(mPlay, head, 0, split);
+         ReleaseAll(split);
+         mPlay = (double)position * len;
+         mPlayhead.store(mPlay, std::memory_order_relaxed);
+         mPlay = play(mPlay, dBeats - head, split, numFrames - split);
       }
    }
 
@@ -5000,6 +5170,8 @@ public:
       mSong.store(song, std::memory_order_release);
    }
    double Playhead() const { return mPlayhead.load(std::memory_order_relaxed); }
+   void RequestRestart() { mRestart.Request(); }
+   bool RestartArmed() const { return mRestart.Armed(); }
 
 private:
    static constexpr int kMaxHeld = 64;
@@ -5028,6 +5200,7 @@ private:
    double mLastTransport = -1.0;
    float mLastPosition = 0.0f;
    double mPlay = 0.0; // file position in beats
+   RestartLatch mRestart;
    Held mHeld[kMaxHeld] = {};
    int mHeldCount = 0;
    std::atomic<const MidiFile::Song*> mSong { nullptr };
@@ -5113,4 +5286,24 @@ AudioNode* MidiFileNode::GetAudioNode()
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMidiFileNode>();
    return mAudioNode.get();
+}
+
+void MidiFileNode::SetRestartLevel(bool level)
+{
+   const bool rising = level && !mRestartLevel;
+   mRestartLevel = level;
+   if (rising)
+      RequestRestart();
+}
+
+void MidiFileNode::RequestRestart()
+{
+   mRestartPresses++;
+   GetAudioNode();
+   mAudioNode->RequestRestart();
+}
+
+bool MidiFileNode::RestartArmed() const
+{
+   return mAudioNode && mAudioNode->RestartArmed();
 }
