@@ -85,15 +85,10 @@ int main(int argc, char** argv)
    // A teardown step that never returns (an audio driver, a plugin, a socket) must not keep a show machine
    // hanging: the process is gone 4 s after the window closes, whatever is still running.
    StartQuitWatchdog(4);
-   CloseAllProjectorWindows();
-   Platform::StopDisplayRefreshClock();
-   AudioEngine::Instance().Stop();
-   if (getenv("INFINITE_QUITSTALLTEST") != nullptr)
-      printf("QUITSTALLTEST FAIL (Stop returned: the stall did not happen)\n");
-   Extensions::Shutdown();
-   SelfUpdate::Shutdown();
-   UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
-   MovementLog::Stop();
+   // The learned profiles go first: a teardown step that stalls ends with the
+   // watchdog's _Exit, and anything not yet saved by then is lost. They are
+   // only ever changed on this thread, so the audio engine can still be running.
+   SetQuitStep("save prediction profiles");
    if (gHeadlessJob.mode == Headless::Mode::None) // headless renders never write the learned profiles
    {
       if (ColorStats::Engine::Instance().HasLearnedData())
@@ -107,9 +102,24 @@ int main(int argc, char** argv)
       if (PredictiveRhythmStyle::HasLearnedData())
          PredictiveRhythmStyle::Save(AppPaths::AppSupportDir() + "/prediction");
    }
+   SetQuitStep("close output windows");
+   CloseAllProjectorWindows();
+   Platform::StopDisplayRefreshClock();
+   SetQuitStep("stop audio engine");
+   AudioEngine::Instance().Stop();
+   if (getenv("INFINITE_QUITSTALLTEST") != nullptr)
+      printf("QUITSTALLTEST FAIL (Stop returned: the stall did not happen)\n");
+   SetQuitStep("extensions and updater");
+   Extensions::Shutdown();
+   SelfUpdate::Shutdown();
+   UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
+   SetQuitStep("movement log");
+   MovementLog::Stop();
+   SetQuitStep("delete nodes");
    gNodes.clear();
    if (getenv("INFINITE_RECTEARDOWNTEST") != nullptr && std::string(getenv("INFINITE_RECTEARDOWNTEST")) == "quit")
       printf("quit-mid-record: survived  OK\n");
+   SetQuitStep("ui and window");
    ed::DestroyEditor(gEditor);
    ImGui_ImplOpenGL3_Shutdown();
    ImGui_ImplGlfw_Shutdown();
