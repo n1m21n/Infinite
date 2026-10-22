@@ -33,6 +33,7 @@ namespace AudioSummary
       double rms[2] = { 0.0, 0.0 };
       double dcOffset[2] = { 0.0, 0.0 };
       long long clippedFrames = 0; // frames with |sample| >= 1.0 on either channel
+      long long nonFiniteFrames = 0; // frames with a NaN or inf on either channel; analysed as 0
       double clippedPercent = 0.0;
       double silenceRatio = 0.0;   // share of 100 ms blocks under -60 dBFS RMS
       double correlation = 0.0;    // sum(LR) / sqrt(sum(LL) sum(RR)), -1..1

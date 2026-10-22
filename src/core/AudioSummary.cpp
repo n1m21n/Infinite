@@ -140,6 +140,7 @@ namespace AudioSummary
       double peak = 0.0;
       double truePeak = 0.0;
       long long clipped = 0;
+      long long nonFinite = 0;
 
       // 100 ms sub-blocks: K-weighted mean square summed over channels (the
       // gating blocks are four of these) and the louder channel's raw mean
@@ -264,7 +265,17 @@ namespace AudioSummary
       State& s = *mState;
       for (int i = 0; i < frames; i++)
       {
-         const double x[2] = { (double)left[i], (double)right[i] };
+         double x[2] = { (double)left[i], (double)right[i] };
+         // A NaN fails every max() and sticks in the K-weighting filters, so
+         // it would hide as a quiet peak and null loudness. Count it, then
+         // analyse the frame as silence.
+         if (!std::isfinite(x[0]) || !std::isfinite(x[1]))
+         {
+            s.nonFinite++;
+            for (double& v : x)
+               if (!std::isfinite(v))
+                  v = 0.0;
+         }
          bool clip = false;
          for (int ch = 0; ch < 2; ch++)
          {
@@ -340,6 +351,7 @@ namespace AudioSummary
       r.samplePeak = s.peak;
       r.truePeak = std::max(s.truePeak, s.peak);
       r.clippedFrames = s.clipped;
+      r.nonFiniteFrames = s.nonFinite;
       r.clippedPercent = 100.0 * (double)s.clipped / n;
       if (s.sumSq[0] > 1e-18 && s.sumSq[1] > 1e-18)
          r.correlation = std::clamp(s.sumLR / std::sqrt(s.sumSq[0] * s.sumSq[1]), -1.0, 1.0);
@@ -553,6 +565,7 @@ namespace AudioSummary
       s += ",\"dc_offset\":[" + Num(r.dcOffset[0], "%.6f") + "," + Num(r.dcOffset[1], "%.6f") + "]";
       s += ",\"clipped_frames\":" + std::to_string(r.clippedFrames);
       s += ",\"clipped_percent\":" + Num(r.clippedPercent, "%.4f");
+      s += ",\"non_finite_frames\":" + std::to_string(r.nonFiniteFrames);
       s += ",\"silence_ratio\":" + Num(r.silenceRatio, "%.4f");
       s += ",\"stereo_correlation\":" + Num(r.correlation, "%.3f");
       s += ",\"onset_count_estimate\":" + std::to_string(r.onsetCount);
@@ -631,6 +644,24 @@ namespace AudioSummary
          const Result r = run(fs, x, x);
          check("inter-sample peak: sample peak -3 dBFS", std::abs(Db(r.samplePeak) + 3.01) < 0.05, Db(r.samplePeak));
          check("inter-sample peak: true peak ~0 dBTP", std::abs(Db(r.truePeak)) < 0.3, Db(r.truePeak));
+      }
+
+      {
+         // A NaN burst in a quiet sine: counted, and the rest still measured.
+         const double fs = 48000.0;
+         std::vector<float> x((size_t)(fs * 3.0));
+         for (size_t i = 0; i < x.size(); i++)
+            x[i] = (float)(0.1 * std::sin(2.0 * kPi * 440.0 * (double)i / fs));
+         for (size_t i = 1000; i < 1100; i++)
+            x[i] = std::numeric_limits<float>::quiet_NaN();
+         x[1100] = std::numeric_limits<float>::infinity();
+         const Result r = run(fs, x, x);
+         check("nan: non-finite frames counted", r.nonFiniteFrames == 101, (double)r.nonFiniteFrames);
+         check("nan: sample peak is the sine's", std::abs(r.samplePeak - 0.1) < 1e-3, r.samplePeak);
+         check("nan: loudness still measured", std::isfinite(r.integratedLufs) && r.loudnessPerSecond.size() == 3 &&
+                                                   std::isfinite(r.loudnessPerSecond[2]),
+               r.integratedLufs);
+         check("sine: no non-finite frames", run(fs, std::vector<float>(1000, 0.5f), std::vector<float>(1000, 0.5f)).nonFiniteFrames == 0, 0.0);
       }
 
       {
