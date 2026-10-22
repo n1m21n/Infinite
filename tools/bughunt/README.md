@@ -43,6 +43,13 @@ In signal mode:
 
 Resumable: re-running skips rows already written. `--types-from results.tsv` re-runs only the BAD types (the verify step after a fix).
 
+## tsan_selftests.sh — races
+
+`tsan_selftests.sh BIN OUT [TEST ...]` runs 14 live-engine selftests (GUI plus the real audio device) one at a time under a TSan build.
+
+- Headless renders process audio on the main thread, so they can't show audio-thread races. Use these instead.
+- Baseline on 2026-10-22 (main@c2ab99be): 0 warnings in all 14. A racy canary program confirmed reports reach `log_path` on this setup.
+
 ## fuzz/ — decoders, coverage-guided
 
 `fuzz/build.sh [OUT] [hap patch gltf audio_decode]`
