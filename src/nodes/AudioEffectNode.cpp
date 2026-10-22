@@ -95,26 +95,6 @@ public:
 
       mKernel->ProcessBlock(in, sidechainPtr, wet);
 
-      // A NaN or inf that reaches a recursive kernel (filter state, a delay
-      // line, a reverb tail) never leaves: every later block reads it back,
-      // so one bad input block would silence this chain until the patch is
-      // reloaded. Clear the kernel and drop its block instead; the dry path
-      // still carries what came in. Every kernel's Reset() only zero-fills.
-      bool wetFinite = true;
-      for (int ch = 0; ch < numChannels && wetFinite; ch++)
-         for (int i = 0; i < wet.numFrames; i++)
-            if (!std::isfinite(wet.channels[ch][i]))
-            {
-               wetFinite = false;
-               break;
-            }
-      if (!wetFinite)
-      {
-         mKernel->Reset();
-         for (int ch = 0; ch < numChannels; ch++)
-            std::fill(wet.channels[ch], wet.channels[ch] + wet.numFrames, 0.0f);
-      }
-
       // A kernel that aligns its own dry signal (IEffectKernel::ProcessDry)
       // replaces the delay ring below.
       AudioBuffer kernelDry;
@@ -122,6 +102,32 @@ public:
       kernelDry.numChannels = numChannels;
       kernelDry.numFrames = output.numFrames;
       const bool hasKernelDry = mKernel->ProcessDry(in, kernelDry);
+
+      // A NaN or inf that reaches a recursive kernel (filter state, a delay
+      // line, a reverb tail, an oversampler) never leaves: every later block
+      // reads it back, so one bad input block would silence this chain until
+      // the patch is reloaded. Clear the kernel and drop its block instead;
+      // the dry path still carries what came in. Every kernel's Reset() only
+      // zero-fills. Checked after ProcessDry, whose own filters (Drive's dry
+      // oversampler) hold state too.
+      bool finite = true;
+      for (int ch = 0; ch < numChannels && finite; ch++)
+         for (int i = 0; i < output.numFrames; i++)
+            if (!std::isfinite(wet.channels[ch][i]) || (hasKernelDry && !std::isfinite(mDryChannels[ch][i])))
+            {
+               finite = false;
+               break;
+            }
+      if (!finite)
+      {
+         mKernel->Reset();
+         for (int ch = 0; ch < numChannels; ch++)
+         {
+            std::fill(wet.channels[ch], wet.channels[ch] + wet.numFrames, 0.0f);
+            if (hasKernelDry)
+               std::copy(in.channels[ch], in.channels[ch] + output.numFrames, mDryChannels[ch]);
+         }
+      }
 
       float peak = 0.0f;
       float monoBuf[kAudioMaxBlockFrames];
