@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Reaction Diffusion Core",
+    "author": "Infinite",
+    "description": "Gray-Scott chemical reaction-diffusion morphogenesis with audio-reactive feed rates, cellular Turing patterns and iridescent color mapping.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float feed = 0.054 [0.01, 0.09];\nparam float kill = 0.062 [0.03, 0.08];\nparam float zoom = 1.0 [0.2, 3.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * zoom;\nr = length(p);\na = atan2(p.y, p.x);\n\n// Dynamic feed rate modulated by audio bass\nfMod = feed + 0.012 * sin(t * 0.8 + r * 4.0) + 0.015 * audio_bass;\n\n// Multi-scale Laplacian cellular Turing wave interference\nw1 = sin(p.x * 24.0 + sin(p.y * 18.0 + t * 0.9));\nw2 = cos(p.y * 24.0 + cos(p.x * 18.0 - t * 0.9));\nw3 = sin((p.x + p.y) * 16.0 + t * 1.4);\n\n// Reaction chemical concentration B\nchemB = smoothstep(0.2, 0.85, (w1 * w2 + w3 * 0.5) * 0.5 + 0.5);\nspots = smoothstep(0.72, 0.98, sin(p.x * 38.0) * cos(p.y * 38.0) + chemB);\n\n// Radial dispersion and core excitation\ncore = smoothstep(0.48 + 0.15 * audio_bass, 0.0, r);\n\n// Brand colors\nmidnight = vec3(0.082, 0.098, 0.188);\nemerald = vec3(0.306, 0.949, 0.722);\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.208);\n\nturingCol = mix(emerald, signal, chemB) * (0.6 + 0.8 * chemB);\npattern = turingCol * (0.4 + 0.9 * core) + ember * spots * (0.6 + 0.8 * audio_mid);\n\ncol = mix(midnight, pattern, clamp(chemB * 1.4 + core * 0.5, 0.0, 1.0));\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "feed": 0.054,
+      "kill": 0.062,
+      "zoom": 1.0
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

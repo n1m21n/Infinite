@@ -1495,6 +1495,190 @@
       "file": "assets/library/pixel/quantum-field-lattice.field",
       "preview": "assets/library/previews/quantum-field-lattice.jpg",
       "bytes": 1397
+    },
+    {
+      "id": "chen-attractor",
+      "name": "Chen Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math"
+      ],
+      "description": "Chaotic continuous dynamical spiral flow with dual scroll trajectories and phase-space transition orbits.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 6,
+      "file": "assets/library/sketch/chen-attractor.js",
+      "preview": "assets/library/previews/chen-attractor.jpg",
+      "bytes": 1981
+    },
+    {
+      "id": "spirograph-epitrochoid",
+      "name": "Spirograph Epitrochoid",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "math",
+        "drawing"
+      ],
+      "description": "Multi-frequency nested planetary epitrochoid curves with phased eccentric orbits and harmonic geometric resonance.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 6,
+      "file": "assets/library/sketch/spirograph-epitrochoid.js",
+      "preview": "assets/library/previews/spirograph-epitrochoid.jpg",
+      "bytes": 1559
+    },
+    {
+      "id": "costa-surface-3d",
+      "name": "Costa Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "parametric"
+      ],
+      "description": "Costa complete embedded minimal surface of genus 1 with catenoidal and planar asymptotic ends.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 6,
+      "file": "assets/library/sketch/costa-surface-3d.js",
+      "preview": "assets/library/previews/costa-surface-3d.jpg",
+      "bytes": 1489
+    },
+    {
+      "id": "catenoid-helicoid-3d",
+      "name": "Catenoid-Helicoid 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "parametric"
+      ],
+      "description": "Continuous isometric Bonnet transformation between catenoid and helicoid minimal surfaces with zero mean curvature.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 7,
+      "file": "assets/library/sketch/catenoid-helicoid-3d.js",
+      "preview": "assets/library/previews/catenoid-helicoid-3d.jpg",
+      "bytes": 1683
+    },
+    {
+      "id": "vector-morph-synth",
+      "name": "Vector Morph Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "vector",
+        "audio",
+        "dsp"
+      ],
+      "description": "4-quadrant planar vector crossfade synthesizer with orbital trajectory modulation, bilinear wave morphing and sub-bass drive.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 7,
+      "file": "assets/templates/vector-morph-synth.inf",
+      "preview": "assets/library/previews/vector-morph-synth.jpg",
+      "bytes": 2243
+    },
+    {
+      "id": "resonant-drone-synth",
+      "name": "Resonant Drone Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "drone",
+        "audio",
+        "dsp"
+      ],
+      "description": "Microtonal cluster drone synthesizer with 5 detuned prime-ratio oscillators, organic phase drift and warm acoustic body saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/resonant-drone-synth.inf",
+      "preview": "assets/library/previews/resonant-drone-synth.jpg",
+      "bytes": 2328
+    },
+    {
+      "id": "granular-freeze-reverb-fx",
+      "name": "Granular Freeze Reverb FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "reverb",
+        "freeze",
+        "dsp"
+      ],
+      "description": "Infinite spectral freeze and multi-tap diffusion cloud with grain pitch micro-modulation, air damping and feedback saturation.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/granular-freeze-reverb-fx.inf",
+      "preview": "assets/library/previews/granular-freeze-reverb-fx.jpg",
+      "bytes": 1980
+    },
+    {
+      "id": "analog-chorus-flanger-fx",
+      "name": "Analog Chorus Flanger FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "chorus",
+        "flanger",
+        "dsp"
+      ],
+      "description": "Bucket-brigade modelled dual-line stereo chorus and through-zero flanger with quadrature LFO modulation and resonant feedback.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/analog-chorus-flanger-fx.inf",
+      "preview": "assets/library/previews/analog-chorus-flanger-fx.jpg",
+      "bytes": 1949
+    },
+    {
+      "id": "reaction-diffusion-core",
+      "name": "Reaction Diffusion Core",
+      "kind": "Generator",
+      "tags": [
+        "Pattern",
+        "Simulation",
+        "Motion"
+      ],
+      "description": "Gray-Scott chemical reaction-diffusion morphogenesis with audio-reactive feed rates, cellular Turing patterns and iridescent color mapping.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/reaction-diffusion-core.field",
+      "preview": "assets/library/previews/reaction-diffusion-core.jpg",
+      "bytes": 1851
+    },
+    {
+      "id": "cymatic-liquid-matrix",
+      "name": "Cymatic Liquid Matrix",
+      "kind": "Generator",
+      "tags": [
+        "Water",
+        "Pattern",
+        "Motion"
+      ],
+      "description": "Faraday liquid surface standing wave resonance under acoustic multi-tone excitation with specular fluid reflections and audio-reactive modal lattice interference.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/cymatic-liquid-matrix.field",
+      "preview": "assets/library/previews/cymatic-liquid-matrix.jpg",
+      "bytes": 2021
     }
   ]
 }

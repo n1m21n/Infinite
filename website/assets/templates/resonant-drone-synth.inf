@@ -1,0 +1,44 @@
+infinite-patch 1
+# Resonant Drone Synth: microtonal cluster drone synthesizer
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 1.0
+  i rangeLow 32
+  i rangeHigh 56
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float spread = 0.35 [0.0, 1.0]\nparam float warmth = 0.6 [0.0, 1.0]\nparam float driftSpeed = 0.4 [0.05, 3.0]\nparam float subBass = 0.5 [0.0, 1.0]\nparam float cutoff = 3200.0 [200.0, 10000.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float p4 = 0\nstate float p5 = 0\nstate float pSub = 0\nstate float lfo1 = 0\nstate float lfo2 = 0\nstate float lp = 0\n\nbaseStep = clamp(freq, 20.0, 4000.0) / sr\n\nl1Step = driftSpeed * 0.37 / sr\nl2Step = driftSpeed * 0.53 / sr\nlfo1 = (lfo1 + l1Step) % 1.0\nlfo2 = (lfo2 + l2Step) % 1.0\n\nd1 = 1.0 + sin(6.2831853 * lfo1) * 0.003 * spread\nd2 = 1.004 + cos(6.2831853 * lfo2) * 0.004 * spread\nd3 = 1.4983 + sin(6.2831853 * lfo2 * 1.3) * 0.003 * spread\nd4 = 2.0012 + cos(6.2831853 * lfo1 * 0.7) * 0.002 * spread\nd5 = 2.996 + sin(6.2831853 * (lfo1 + lfo2)) * 0.005 * spread\n\np1 = (p1 + baseStep * d1) % 1.0\np2 = (p2 + baseStep * d2) % 1.0\np3 = (p3 + baseStep * d3) % 1.0\np4 = (p4 + baseStep * d4) % 1.0\np5 = (p5 + baseStep * d5) % 1.0\npSub = (pSub + baseStep * 0.5) % 1.0\n\ns1 = sin(6.2831853 * p1) * 0.32\ns2 = sin(6.2831853 * p2) * 0.28\ns3 = sin(6.2831853 * p3) * 0.22\ns4 = sin(6.2831853 * p4) * 0.18\ns5 = sin(6.2831853 * p5) * 0.14\nsSub = sin(6.2831853 * pSub) * subBass * 0.45\n\ncluster = s1 + s2 + s3 + s4 + s5 + sSub\ndrive = 1.0 + warmth * 1.5\nu = cluster * drive\nsat = u / (1.0 + abs(u) * 0.28)\n\nfCut = clamp(cutoff / sr * 2.0, 0.01, 0.45)\nlp = lp + fCut * (sat - lp)\n\nout = lp * 0.85\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.306 0.949 0.722
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Resonant Drone Synth. Microtonal cluster drone synthesizer with 5 detuned prime-ratio oscillators.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

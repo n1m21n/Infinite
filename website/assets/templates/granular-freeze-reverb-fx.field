@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Granular Freeze Reverb FX",
+    "author": "Infinite",
+    "description": "Infinite spectral freeze and multi-tap diffusion cloud with grain pitch micro-modulation, high-frequency air damping and feedback saturation.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float freeze = 0.0 [0.0, 1.0];\nparam float decay = 0.88 [0.2, 0.98];\nparam float damping = 0.35 [0.05, 0.9];\nparam float pitchMod = 0.45 [0.0, 1.0];\nparam float mix = 0.85 [0.0, 1.0];\nstate float fb = 0;\nstate float ap1 = 0;\nstate float ap1_buf = 0;\nstate float ap2 = 0;\nstate float ap2_buf = 0;\nstate float ap3 = 0;\nstate float ap3_buf = 0;\nstate float ap4 = 0;\nstate float ap4_buf = 0;\nstate float lfo = 0;\nstate float lp = 0;\n\nlfo = (lfo + 0.65 / sr) % 1.0;\nmod = sin(6.2831853 * lfo) * pitchMod * 0.08;\ng = clamp(0.7 + mod, 0.3, 0.88);\n\ninputSignal = in * (1.0 - freeze * 0.9);\nfbGain = if(freeze > 0.5, 0.998, decay);\n\nx = inputSignal + fb * fbGain;\n\nv1 = x - g * ap1_buf;\nap1 = ap1_buf + g * v1;\nap1_buf = v1;\n\nv2 = ap1 - g * ap2_buf;\nap2 = ap2_buf + g * v2;\nap2_buf = v2;\n\nlp = lp + clamp((1.0 - damping) * 0.4, 0.02, 0.75) * (ap2 - lp);\n\nv3 = lp - g * ap3_buf;\nap3 = ap3_buf + g * v3;\nap3_buf = v3;\n\nv4 = ap3 - g * ap4_buf;\nap4 = ap4_buf + g * v4;\nap4_buf = v4;\n\nfb = ap4 / (1.0 + abs(ap4) * 0.15);\nwet = ap4;\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "freeze": 0.0,
+      "decay": 0.88,
+      "damping": 0.35,
+      "pitchMod": 0.45,
+      "mix": 0.85
+    },
+    "nodeSettings": {}
+  }
+}
