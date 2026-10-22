@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <climits>
 #include <cmath>
 #include <cstdint>
 
@@ -3795,6 +3796,9 @@ public:
       mPrevDegree = 0;
       mPrevVoicingN = 0;
       mStrumDown = true;
+      mPrevTickStep = LLONG_MIN;
+      mHoldUntilStep = LLONG_MIN;
+      mCurrentCell.store(-1, std::memory_order_relaxed);
       for (int i = 0; i < kMaxPending; i++)
          mPending[i].active = false;
    }
@@ -3811,6 +3815,16 @@ public:
       const float humanizeMs = std::max(0.0f, mHumanizeTimingMs.load(std::memory_order_relaxed));
       const float humanizeVel = std::max(0.0f, mHumanizeVelocity.load(std::memory_order_relaxed));
       const float upperHarmonics = std::clamp(mUpperHarmonics.load(std::memory_order_relaxed), 0.0f, 100.0f);
+      const bool progression = mMode.load(std::memory_order_relaxed) == ChorderNode::kProgression;
+      const int progSteps = std::clamp(mProgSteps.load(std::memory_order_relaxed), 1, (int)ChorderNode::kProgCells);
+      int cellDegree[ChorderNode::kProgCells], cellType[ChorderNode::kProgCells];
+      for (int c = 0; c < ChorderNode::kProgCells; c++)
+      {
+         cellDegree[c] = mProgDegree[c].load(std::memory_order_relaxed);
+         cellType[c] = mProgType[c].load(std::memory_order_relaxed);
+      }
+      if (!progression)
+         mCurrentCell.store(-1, std::memory_order_relaxed);
 
       const bool accurate = mStepTiming.load(std::memory_order_relaxed) != 0;
       StepTick ticks[StepClock::kMaxTicks];
@@ -3819,21 +3833,51 @@ public:
       for (int t = 0; t < nTicks; t++)
       {
          const int frame = ticks[t].frame;
+         const long long step = ticks[t].step;
+         const bool continuous = step == mPrevTickStep + 1;
+         mPrevTickStep = step;
 
          const int degreeCount = std::max(1, MusicTime::ScaleTable(scale).count);
-         // Root by functional-harmony transition (I->IV/V, V->I ...), not a uniform draw.
-         const int rootDegree =
-            NoteTheory::NextChordDegree(mPrevDegree, degreeCount, mRng.Next() * 0.5f + 0.5f);
+         int rootDegree = 0;
+         int offsets[kMaxChordNotes];
+         int toneCount = 0;
+         long long lengthSteps = 1; // rate steps this chord lasts (a progression's held cells add to it)
+         if (progression)
+         {
+            const int cell = (int)(((step % progSteps) + progSteps) % progSteps);
+            mCurrentCell.store(cell, std::memory_order_relaxed);
+            // A held cell sounds the chord before it: nothing new while that chord still rings,
+            // but a jump into the hold (seek, loop wrap, start) plays it for what is left.
+            if (cellDegree[cell] < 0 && continuous && step < mHoldUntilStep)
+               continue;
+            int from = cell;
+            for (int back = 0; back < progSteps && cellDegree[from] < 0; back++)
+               from = (from + progSteps - 1) % progSteps;
+            if (cellDegree[from] < 0)
+               continue; // every cell holds: nothing to play
+            while (lengthSteps < progSteps && cellDegree[(cell + lengthSteps) % progSteps] < 0)
+               lengthSteps++;
+            mHoldUntilStep = step + lengthSteps;
+            rootDegree = std::clamp(cellDegree[from], 0, 11);
+            toneCount = NoteTheory::ChordTypeOffsets(cellType[from], chordSize, offsets);
+         }
+         else
+         {
+            // Root by functional-harmony transition (I->IV/V, V->I ...), not a uniform draw.
+            rootDegree = NoteTheory::NextChordDegree(mPrevDegree, degreeCount, mRng.Next() * 0.5f + 0.5f);
+            toneCount = NoteTheory::ChordTypeOffsets(NoteTheory::kChordAuto, chordSize, offsets);
+         }
          mPrevDegree = rootDegree;
          const double bpm = (double)Transport::Instance().Tempo();
          const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
          const double strumSamples = strumMs * 0.001 * mSampleRate;
-         const double gateSamples = (double)rateBeats * samplesPerBeat * 0.85; // held, then a clean release
+         // Held, then a clean release before the next chord.
+         const double gateSamples = ((double)lengthSteps - 0.15) * (double)rateBeats * samplesPerBeat;
 
          // Voice-led: the inversion and octave nearest the previous chord, so the top line moves
          // by step instead of jumping to a new root position every time.
          int notes[kMaxChordNotes];
-         int n = NoteTheory::VoiceChord(rootDegree, chordSize, root, scale, mPrevVoicing, mPrevVoicingN, notes);
+         int n = NoteTheory::VoiceDegrees(offsets, toneCount, rootDegree, root, scale, mPrevVoicing, mPrevVoicingN, notes);
          for (int i = 0; i < n; i++)
             mPrevVoicing[i] = notes[i];
          mPrevVoicingN = n;
@@ -3922,9 +3966,17 @@ public:
       mUpperHarmonics.store(n.upperHarmonics, std::memory_order_relaxed);
       mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
       mStepTiming.store(n.stepTiming, std::memory_order_relaxed);
+      mMode.store(n.mode, std::memory_order_relaxed);
+      mProgSteps.store(n.progSteps, std::memory_order_relaxed);
+      for (int c = 0; c < ChorderNode::kProgCells; c++)
+      {
+         mProgDegree[c].store(n.progDegree[c], std::memory_order_relaxed);
+         mProgType[c].store(n.progType[c], std::memory_order_relaxed);
+      }
    }
 
    int LastChordSize() const { return mLastChordSizeReadout.load(std::memory_order_relaxed); }
+   int CurrentCell() const { return mCurrentCell.load(std::memory_order_relaxed); }
 
 private:
    struct Pending
@@ -3955,7 +4007,14 @@ private:
    int mPrevVoicing[NoteTheory::kMaxVoicing] = {};
    int mPrevVoicingN = 0;
    bool mStrumDown = true;
+   long long mPrevTickStep = LLONG_MIN;
+   long long mHoldUntilStep = LLONG_MIN; // first step after the progression chord now sounding
 
+   std::atomic<int> mMode { ChorderNode::kRandom };
+   std::atomic<int> mProgSteps { 4 };
+   std::atomic<int> mProgDegree[ChorderNode::kProgCells] = {};
+   std::atomic<int> mProgType[ChorderNode::kProgCells] = {};
+   std::atomic<int> mCurrentCell { -1 };
    std::atomic<int> mScale { 0 };
    std::atomic<int> mRoot { 0 };
    std::atomic<int> mChordSize { 3 };
@@ -3994,8 +4053,59 @@ void ChorderNode::VisitParams(ParamVisitor& v)
    v.Float("upperHarmonics", upperHarmonics);
    v.Bool("useGlobalScale", useGlobalScale);
    v.Int("stepTiming", stepTiming); // not a control: 0 = block-start step timing (saved before the fix)
+   v.Int("mode", mode);
+   v.Int("progSteps", progSteps);
+   for (int c = 0; c < kProgCells; c++)
+   {
+      v.Int(("progDeg" + std::to_string(c)).c_str(), progDegree[c]);
+      v.Int(("progType" + std::to_string(c)).c_str(), progType[c]);
+   }
    SanitizeLoadedKey(root, scale);
    chordSize = std::clamp(chordSize, 2, 6);
+   mode = std::clamp(mode, (int)kRandom, (int)kProgression);
+   progSteps = std::clamp(progSteps, 1, kProgCells);
+   for (int c = 0; c < kProgCells; c++)
+   {
+      progDegree[c] = std::clamp(progDegree[c], -1, 11);
+      progType[c] = std::clamp(progType[c], 0, NoteTheory::kNumChordTypes - 1);
+   }
+}
+
+void ChorderNode::ApplyProgression(int index)
+{
+   int count = 0;
+   const NoteTheory::Progression* list = NoteTheory::Progressions(count);
+   if (index < 0 || index >= count)
+      return;
+   const NoteTheory::Progression& p = list[index];
+   progSteps = std::clamp(p.steps, 1, kProgCells);
+   for (int c = 0; c < kProgCells; c++)
+   {
+      progDegree[c] = c < p.steps ? p.degrees[c] : 0;
+      progType[c] = c < p.steps ? p.types[c] : 0;
+   }
+   rateBeats = (float)MusicTime::BeatsFor(MusicTime::k1Bar);
+   mode = kProgression;
+}
+
+int ChorderNode::MatchingProgression() const
+{
+   int count = 0;
+   const NoteTheory::Progression* list = NoteTheory::Progressions(count);
+   for (int i = 0; i < count; i++)
+   {
+      bool same = list[i].steps == progSteps;
+      for (int c = 0; same && c < progSteps; c++)
+         same = list[i].degrees[c] == progDegree[c] && list[i].types[c] == progType[c];
+      if (same)
+         return i;
+   }
+   return -1;
+}
+
+int ChorderNode::CurrentProgCell() const
+{
+   return mAudioNode ? mAudioNode->CurrentCell() : -1;
 }
 
 AudioNode* ChorderNode::GetAudioNode()

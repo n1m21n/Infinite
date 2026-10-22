@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 #include "MusicTime.h"
 
@@ -181,16 +182,17 @@ namespace NoteTheory
 
    constexpr int kMaxVoicing = 8;
 
-   // Voices a stacked-thirds chord on scale degree `rootDegree` (size tones) by choosing the
-   // inversion and octave whose sorted notes move least from `prev` (smooth voice leading), while
-   // staying in a comfortable register. With no previous chord it centres on middle C. Writes
-   // `size` ascending notes to `out` and returns size.
-   inline int VoiceChord(int rootDegree, int size, int root, int scale, const int* prev, int prevN, int* out)
+   // Voices a chord whose tones are the scale degrees rootDegree + offsets[i] (ascending offsets)
+   // by choosing the inversion and octave whose sorted notes move least from `prev` (smooth voice
+   // leading), while staying in a comfortable register. With no previous chord it centres on
+   // middle C. Writes `size` ascending notes to `out` and returns size.
+   inline int VoiceDegrees(const int* offsets, int size, int rootDegree, int root, int scale, const int* prev, int prevN,
+                           int* out)
    {
       size = std::clamp(size, 1, kMaxVoicing);
       int base[kMaxVoicing];
       for (int i = 0; i < size; i++)
-         base[i] = MusicTime::DegreeToNote(rootDegree + 2 * i, 4, root, scale);
+         base[i] = MusicTime::DegreeToNote(rootDegree + offsets[i], 4, root, scale);
 
       float bestCost = 1e30f;
       int best[kMaxVoicing];
@@ -227,5 +229,89 @@ namespace NoteTheory
       for (int i = 0; i < size; i++)
          out[i] = std::clamp(best[i], 0, 127);
       return size;
+   }
+
+   // A stacked-thirds chord of `size` tones on scale degree `rootDegree`, voiced as VoiceDegrees.
+   inline int VoiceChord(int rootDegree, int size, int root, int scale, const int* prev, int prevN, int* out)
+   {
+      size = std::clamp(size, 1, kMaxVoicing);
+      int offsets[kMaxVoicing];
+      for (int i = 0; i < size; i++)
+         offsets[i] = 2 * i;
+      return VoiceDegrees(offsets, size, rootDegree, root, scale, prev, prevN, out);
+   }
+
+   // Chord types a progression cell can ask for. kChordAuto is the Chorder's chord-size knob.
+   enum ChordType { kChordAuto = 0, kChordSeventh, kChordSus2, kChordSus4, kNumChordTypes };
+
+   // Scale-degree offsets for a chord type; returns the tone count.
+   inline int ChordTypeOffsets(int type, int autoSize, int* out)
+   {
+      switch (type)
+      {
+         case kChordSeventh: out[0] = 0; out[1] = 2; out[2] = 4; out[3] = 6; return 4;
+         case kChordSus2: out[0] = 0; out[1] = 1; out[2] = 4; return 3;
+         case kChordSus4: out[0] = 0; out[1] = 3; out[2] = 4; return 3;
+         default:
+         {
+            const int n = std::clamp(autoSize, 1, kMaxVoicing);
+            for (int i = 0; i < n; i++)
+               out[i] = 2 * i;
+            return n;
+         }
+      }
+   }
+
+   // Roman numeral for scale degree `degree` (0-based) in `scale`: upper case for a major triad,
+   // lower case for minor, lower case + "°" for diminished, upper case + "+" for augmented. Scales
+   // with fewer than three tones per octave read as upper case.
+   inline void RomanNumeral(int degree, int scale, char* out, size_t outSize)
+   {
+      static const char* const kUpper[] = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" };
+      static const char* const kLower[] = { "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii" };
+      const int count = std::max(1, MusicTime::ScaleTable(scale).count);
+      const int d = ((degree % count) + count) % count;
+      const int r = MusicTime::DegreeToNote(d, 0, 0, scale);
+      const int third = MusicTime::DegreeToNote(d + 2, 0, 0, scale) - r;
+      const int fifth = MusicTime::DegreeToNote(d + 4, 0, 0, scale) - r;
+      const bool minorThird = third == 3;
+      const char* suffix = (minorThird && fifth == 6) ? "\xC2\xB0" : (!minorThird && fifth == 8) ? "+" : "";
+      snprintf(out, outSize, "%s%s", (minorThird ? kLower : kUpper)[std::min(d, 11)], suffix);
+   }
+
+   // Well-known chord progressions as scale degrees (0 = I; -1 = hold the chord before), written
+   // for Infinite. Every one is diatonic, so it follows whatever key and scale is set.
+   struct Progression
+   {
+      const char* name;
+      const char* category;
+      int steps;
+      int degrees[8];
+      int types[8];
+   };
+
+   inline const Progression* Progressions(int& count)
+   {
+      static const Progression kList[] = {
+         { "I V vi IV", "pop", 4, { 0, 4, 5, 3 }, {} },
+         { "vi IV I V", "pop", 4, { 5, 3, 0, 4 }, {} },
+         { "I vi IV V", "pop", 4, { 0, 5, 3, 4 }, {} },
+         { "I IV vi V", "pop", 4, { 0, 3, 5, 4 }, {} },
+         { "IV I V vi", "pop", 4, { 3, 0, 4, 5 }, {} },
+         { "IV V iii vi", "pop", 4, { 3, 4, 2, 5 }, {} },
+         { "I IV", "pop", 2, { 0, 3 }, {} },
+         { "I V vi IV, 2 bars each", "pop", 8, { 0, -1, 4, -1, 5, -1, 3, -1 }, {} },
+         { "ii V I", "jazz", 4, { 1, 4, 0, -1 }, { 1, 1, 1, 0 } },
+         { "I vi ii V", "jazz", 4, { 0, 5, 1, 4 }, { 1, 1, 1, 1 } },
+         { "iii vi ii V", "jazz", 4, { 2, 5, 1, 4 }, { 1, 1, 1, 1 } },
+         { "I IV iii vi ii V I", "jazz", 8, { 0, 3, 2, 5, 1, 4, 0, -1 }, { 1, 1, 1, 1, 1, 1, 1, 0 } },
+         { "I Isus4 IV Vsus2", "suspended", 4, { 0, 0, 3, 4 }, { 0, 3, 0, 2 } },
+         { "Isus2 IV vi Vsus4", "suspended", 4, { 0, 3, 5, 4 }, { 2, 0, 0, 3 } },
+         { "Canon", "classical", 8, { 0, 4, 5, 2, 3, 0, 3, 4 }, {} },
+         { "Descending (I VII VI V)", "classical", 4, { 0, 6, 5, 4 }, {} },
+         { "I IV V I", "classical", 4, { 0, 3, 4, 0 }, {} },
+      };
+      count = (int)(sizeof(kList) / sizeof(kList[0]));
+      return kList;
    }
 }

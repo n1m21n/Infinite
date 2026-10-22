@@ -89,6 +89,7 @@ check_verdict INFINITE_SYPHONPATCHTEST "SYPHONPATCHTEST OK"
 check_verdict INFINITE_UNICODEPATHTEST "UNICODEPATHTEST OK"
 # E1: quantized restart on Note Sequencer, Arpeggiator and MIDI File.
 check_verdict INFINITE_RESTARTTEST "RESTARTTEST ALL OK"
+check_verdict INFINITE_CHORDPROGTEST "CHORDPROGTEST ALL OK"
 
 # Exported-movie A/V sync: pure arithmetic over the same pacing both
 # recorders' PTS depend on, so it runs headless here as well as on macOS -

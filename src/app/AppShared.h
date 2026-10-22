@@ -6031,6 +6031,7 @@ bool RunCycleShaperFixture();
 
 bool RunMidiFileFixture();
 bool RunRestartTest();
+bool RunChordProgTest();
 
 bool RunMpeFixture();
 

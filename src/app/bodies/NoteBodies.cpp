@@ -6,6 +6,7 @@
 #include "app/ui/design/components/AudioViz.h"
 #include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/StepCell.h"
+#include "audio/NoteTheory.h"
 
 namespace app
 {
@@ -2146,6 +2147,100 @@ namespace app
    }
 
 
+   // Eight chord cells (roman numeral in the current key, "-" = hold the chord before) over eight
+   // thin chord-type cells. Click = next value, right-click = previous; either switches the node to
+   // progression mode. Cells past `steps` are dimmed; the playing cell is lit.
+   void DrawChorderProgressionStrip(ChorderNode* n)
+   {
+      constexpr int kCells = ChorderNode::kProgCells;
+      const bool useGlobal = n->useGlobalScale;
+      const int scale = useGlobal ? Transport::Instance().Scale() : n->scale;
+      const int degreeCount = std::clamp(MusicTime::ScaleTable(scale).count, 1, 12);
+      const bool progression = n->mode == ChorderNode::kProgression;
+      const int playing = progression ? n->CurrentProgCell() : -1;
+
+      const float gap = 2.0f;
+      const float w = gAudioContentW;
+      const float cellW = (w - gap * (float)(kCells - 1)) / (float)kCells;
+      const float chordH = 30.0f;
+      const float typeH = 18.0f;
+      const ImVec2 origin(gAudioContentX, ImGui::GetCursorScreenPos().y);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool light = IsThemeLight();
+      const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text);
+      const ImU32 dimCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      const ImU32 litText = tok::U32(tok::pal::c_0B0C10FF);
+      static const char* const kTypeLabels[NoteTheory::kNumChordTypes] = { "\xC2\xB7", "7", "sus2", "sus4" };
+
+      ImGui::SetWindowFontScale(tok::type_body / ImGui::GetFontSize());
+      for (int c = 0; c < kCells; c++)
+      {
+         const float x0 = origin.x + (float)c * (cellW + gap);
+         const bool used = c < n->progSteps;
+         ImGui::PushID(c);
+
+         // chord cell
+         const ImVec2 cMin(x0, origin.y), cMax(x0 + cellW, origin.y + chordH);
+         ImGui::SetCursorScreenPos(cMin);
+         ImGui::InvisibleButton("chordcell", ImVec2(cellW, chordH), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+         const bool chordHovered = ImGui::IsItemHovered();
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         {
+            // values: 0 .. degreeCount-1, then -1 (hold)
+            const int span = degreeCount + 1;
+            const int idx = n->progDegree[c] < 0 ? degreeCount : std::min(n->progDegree[c], degreeCount - 1);
+            const int next = (idx + (ImGui::IsItemClicked(ImGuiMouseButton_Left) ? 1 : span - 1)) % span;
+            PushUndoCheckpoint();
+            n->progDegree[c] = next == degreeCount ? -1 : next;
+            n->mode = ChorderNode::kProgression;
+         }
+         if (chordHovered)
+            gNodeHoverTip = "Chord: click for the next, right-click for the previous; - holds the chord before";
+         const bool lit = playing == c;
+         StepCell::Draw(dl, cMin, cMax, lit, lit, chordHovered);
+         char label[16];
+         if (n->progDegree[c] < 0)
+            snprintf(label, sizeof(label), "-");
+         else
+            NoteTheory::RomanNumeral(n->progDegree[c], scale, label, sizeof(label));
+         const ImVec2 ts = ImGui::CalcTextSize(label);
+         ImU32 col = lit ? litText : (n->progDegree[c] < 0 ? dimCol : textCol);
+         if (!used || !progression)
+            col = (col & ~IM_COL32_A_MASK) | ((ImU32)((float)((col >> IM_COL32_A_SHIFT) & 0xFF) * (used ? 0.6f : 0.3f)) << IM_COL32_A_SHIFT);
+         dl->AddText(ImVec2(x0 + (cellW - ts.x) * 0.5f, origin.y + (chordH - ts.y) * 0.5f), col, label);
+
+         // type cell
+         const float ty = origin.y + chordH + gap;
+         const ImVec2 tMin(x0, ty), tMax(x0 + cellW, ty + typeH);
+         ImGui::SetCursorScreenPos(tMin);
+         ImGui::InvisibleButton("typecell", ImVec2(cellW, typeH), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+         const bool typeHovered = ImGui::IsItemHovered();
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         {
+            const int span = NoteTheory::kNumChordTypes;
+            PushUndoCheckpoint();
+            n->progType[c] = (n->progType[c] + (ImGui::IsItemClicked(ImGuiMouseButton_Left) ? 1 : span - 1)) % span;
+            n->mode = ChorderNode::kProgression;
+         }
+         if (typeHovered)
+            gNodeHoverTip = "Chord type: \xC2\xB7 = chord knob, 7th, sus2, sus4 (click / right-click)";
+         StepCell::Draw(dl, tMin, tMax, false, false, typeHovered);
+         const char* tl = kTypeLabels[std::clamp(n->progType[c], 0, NoteTheory::kNumChordTypes - 1)];
+         const ImVec2 tts = ImGui::CalcTextSize(tl);
+         ImU32 tcol = n->progType[c] == 0 ? dimCol : textCol;
+         if (!used || !progression)
+            tcol = (tcol & ~IM_COL32_A_MASK) | ((ImU32)((float)((tcol >> IM_COL32_A_SHIFT) & 0xFF) * (used ? 0.6f : 0.3f)) << IM_COL32_A_SHIFT);
+         dl->AddText(ImVec2(x0 + (cellW - tts.x) * 0.5f, ty + (typeH - tts.y) * 0.5f), tcol, tl);
+
+         ImGui::PopID();
+      }
+      ImGui::SetWindowFontScale(1.0f);
+      (void)light;
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, chordH + gap + typeH + 4.0f));
+   }
+
+
    void DrawChorderBody(GraphNode& gn, ChorderNode* n)
    {
       char stat[64];
@@ -2154,8 +2249,30 @@ namespace app
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
+      // Top row: every selector. Middle: what is played. Bottom: how it is played.
       {
-         AudioKnobRow row(4);
+         // "random" walks functional harmony; a preset name (or "custom": the cells as edited)
+         // plays the cells below. Picking "custom" keeps the cells and switches to them.
+         static std::vector<std::string> progNames, progCats;
+         if (progNames.empty())
+         {
+            int count = 0;
+            const NoteTheory::Progression* list = NoteTheory::Progressions(count);
+            progNames.push_back("random");
+            progCats.push_back("");
+            for (int i = 0; i < count; i++)
+            {
+               progNames.push_back(list[i].name);
+               progCats.push_back(list[i].category);
+            }
+            progNames.push_back("custom");
+            progCats.push_back("");
+         }
+         const int customIdx = (int)progNames.size() - 1;
+         const int match = n->MatchingProgression();
+         const int progIdx = n->mode != ChorderNode::kProgression ? 0 : (match >= 0 ? match + 1 : customIdx);
+
+         AudioKnobRow row(4, 20.0f, 0.0f, false); // selectors only: a dropdown's height, no caption line
          if (n->useGlobalScale)
             ImGui::BeginDisabled();
          row.Dropdown("scale", MusicTime::ScaleTypeList(), n->scale,
@@ -2172,17 +2289,35 @@ namespace app
             n->rateBeats = (float)MusicTime::BeatsFor(
                (MusicTime::RateDivision)std::clamp(i, 0, (int)MusicTime::kNumRateDivisions - 1));
          });
-         row.KnobInt("chord", &n->chordSize, 2, 6);
+         row.Dropdown("chords", progNames, progIdx,
+                      [n, customIdx](int i) {
+                         PushUndoCheckpoint();
+                         if (i <= 0)
+                            n->mode = ChorderNode::kRandom;
+                         else if (i >= customIdx)
+                            n->mode = ChorderNode::kProgression;
+                         else
+                            n->ApplyProgression(i - 1);
+                      },
+                      progCats);
          row.End();
+         ImGui::Dummy(ImVec2(0.0f, 4.0f));
       }
       {
-         AudioKnobRow row(4);
-         row.Knob("strum", &n->strumMs, 0.0f, 200.0f, "%.0fms", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewStrum30);
-         row.Knob("hu.time", &n->humanizeTimingMs, 0.0f, 100.0f, "%.0fms", kKnobSmall);
-         row.Knob("hu.vel", &n->humanizeVelocity, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         AudioKnobRow row(3);
+         row.KnobInt("chord", &n->chordSize, 2, 6);
+         row.KnobInt("steps", &n->progSteps, 1, ChorderNode::kProgCells);
          row.Knob("harmonics", &n->upperHarmonics, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
          row.End();
       }
+      {
+         AudioKnobRow row(3);
+         row.Knob("strum", &n->strumMs, 0.0f, 200.0f, "%.0fms", kKnobSmall, false, false, AudioWidgetStyle::KnobSkewStrum30);
+         row.Knob("hu.time", &n->humanizeTimingMs, 0.0f, 100.0f, "%.0fms", kKnobSmall);
+         row.Knob("hu.vel", &n->humanizeVelocity, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         row.End();
+      }
+      DrawChorderProgressionStrip(n);
 
       EndAudioBody();
    }
