@@ -262,6 +262,8 @@ namespace
       "      vec3 bgOut = 1.0 - (1.0 - uBg) * (1.0 - pow(clamp(g, 0.0, 1.0), vec3(1.0 / 2.2)));\n"
       "      c = mix(bgOut, c, clamp(src.a, 0.0, 1.0));\n"
       "      alpha = mix(uBgOpacity, 1.0, clamp(src.a, 0.0, 1.0));\n"
+      "   } else if (uBgKey == 3) {\n" // path traced over its own environment
+      "      alpha = mix(uBgOpacity, 1.0, clamp(src.a, 0.0, 1.0));\n"
       "   }\n"
       "   vec2 p = floor(gl_FragCoord.xy);\n"
       "   c += (fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;\n"
@@ -286,7 +288,21 @@ const vec3 PANO_R[6] = vec3[](vec3(0,0,1), vec3(0,0,-1), vec3(1,0,0), vec3(1,0,0
 const vec3 PANO_U[6] = vec3[](vec3(0,1,0), vec3(0,1,0), vec3(0,0,1), vec3(0,0,-1), vec3(0,1,0), vec3(0,1,0));
 // 1 equirect: centre column looks down -Z, top row is +Y. 2 cubemap 3x2:
 // top row +X -X +Y, bottom row -Y +Z -Z.
+uniform float uDomeAngle; // mode 3: fisheye angle in degrees (180 = hemisphere)
+uniform float uDomeTilt;  // mode 3: degrees the zenith leans toward the camera's forward
+// 3 dome (domemaster fisheye): zenith = camera up at the centre, the camera's
+// forward at the bottom edge, +X to the right; outside the circle -> vec3(0).
 vec3 panoDir(vec2 uv, int mode) {
+   if (mode == 3) {
+      vec2 p = uv * 2.0 - 1.0;
+      float r = length(p);
+      if (r > 1.0) return vec3(0.0);
+      float th = r * radians(uDomeAngle) * 0.5;
+      vec2 a = r > 1e-6 ? p / r : vec2(0.0, -1.0);
+      vec3 d = normalize(vec3(0.0, cos(th), 0.0) + vec3(a.x, 0.0, a.y) * sin(th));
+      float ct = cos(radians(uDomeTilt)), st = sin(radians(uDomeTilt));
+      return vec3(d.x, d.y * ct + d.z * st, d.z * ct - d.y * st);
+   }
    if (mode == 1) {
       float phi = (uv.x - 0.5) * 6.28318530718, th = (1.0 - uv.y) * 3.14159265359;
       return vec3(sin(th) * sin(phi), cos(th), -sin(th) * cos(phi));
@@ -370,7 +386,7 @@ const char* Render3DPost::PanoGlsl()
    return kPanoGlsl;
 }
 
-unsigned int Render3DPost::Panorama(unsigned int faceArray, int w, int h, int mode)
+unsigned int Render3DPost::Panorama(unsigned int faceArray, int w, int h, int mode, float domeAngle, float domeTilt)
 {
    if (mPanoProgram == 0)
    {
@@ -382,6 +398,7 @@ unsigned int Render3DPost::Panorama(unsigned int faceArray, int w, int h, int mo
                               kPanoGlsl +
                               "void main() {\n"
                               "   vec3 d = panoDir(vUv, uMode);\n"
+                              "   if (dot(d, d) < 0.5) { fragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }\n"
                               "   int best = 0; float bd = -2.0;\n"
                               "   for (int i = 0; i < 6; i++) { float k = dot(d, PANO_F[i]); if (k > bd) { bd = k; best = i; } }\n"
                               "   vec2 st = vec2(dot(d, PANO_R[best]), dot(d, PANO_U[best])) / max(bd, 1e-4);\n"
@@ -410,6 +427,8 @@ unsigned int Render3DPost::Panorama(unsigned int faceArray, int w, int h, int mo
    glBindTexture(GL_TEXTURE_2D_ARRAY, faceArray);
    glUniform1i(glGetUniformLocation(mPanoProgram, "uFaces"), 0);
    glUniform1i(glGetUniformLocation(mPanoProgram, "uMode"), mode);
+   glUniform1f(glGetUniformLocation(mPanoProgram, "uDomeAngle"), domeAngle);
+   glUniform1f(glGetUniformLocation(mPanoProgram, "uDomeTilt"), domeTilt);
    DrawFullscreen();
    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
    return mPanoTex;
@@ -580,9 +599,10 @@ unsigned int Render3DPost::Finish(unsigned int src, int w, int h, int tonemap, f
 }
 
 unsigned int Render3DPost::FinishCoverage(unsigned int src, int w, int h, int tonemap, float bloom,
-                                          float bloomThreshold, float bloomRadius, const float bg[3], float bgOpacity)
+                                          float bloomThreshold, float bloomRadius, const float bg[3], float bgOpacity,
+                                          bool envBackground)
 {
-   return Run(src, w, h, tonemap, bloom, bloomThreshold, bloomRadius, false, 0, bg, 2, bgOpacity);
+   return Run(src, w, h, tonemap, bloom, bloomThreshold, bloomRadius, false, 0, bg, envBackground ? 3 : 2, bgOpacity);
 }
 
 unsigned int Render3DPost::Run(unsigned int src, int w, int h, int tonemap, float bloom, float bloomThreshold,

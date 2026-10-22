@@ -25,6 +25,7 @@ public:
       const Mesh* mesh = nullptr;
       Mat4 model;                  // used when instances is empty
       std::vector<Mat4> instances; // world matrices, one copy each
+      std::vector<float> instanceColors; // rgb per instance (empty = white), times the mesh's vertex colour
       Material material;
       unsigned int surfaceTex = 0; // 0 = none
    };
@@ -59,6 +60,7 @@ public:
                       const Env& env, float exposure, int bounces, int maxSamples, int spp, int panorama,
                       const Mat4& view);
    int Samples() const { return mSamples; }
+   void SetDome(float degrees, float tilt) { mDomeAngle = degrees; mDomeTilt = tilt; } // panorama mode 3
    int Triangles() const { return mTriCount; }
 
 private:
@@ -81,4 +83,5 @@ private:
    int mWidth = 0, mHeight = 0;
    int mSamples = 0;
    unsigned int mFrameSeed = 1;
+   float mDomeAngle = 180.0f, mDomeTilt = 0.0f;
 };

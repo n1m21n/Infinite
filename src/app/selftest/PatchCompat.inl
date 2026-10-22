@@ -47,6 +47,16 @@
                   row += ", \"w\": " + std::to_string(w) + ", \"h\": " + std::to_string(h);
                   if (GLUtil::ReadTexturePixels(sCompatFbo, tex, w, h, px) && px.size() >= (size_t)w * h * 4)
                   {
+                     // Turbo 0.61: INFINITE_DUMPNODE=<index> + INFINITE_DUMPPNG=<file> saves that node's output.
+                     const char* dumpNode = getenv("INFINITE_DUMPNODE");
+                     const char* dumpPng = getenv("INFINITE_DUMPPNG");
+                     if (dumpNode != nullptr && dumpPng != nullptr && atoi(dumpNode) == gn.index)
+                     {
+                        std::vector<unsigned char> rgba(px.size());
+                        for (size_t k = 0; k < px.size(); k++)
+                           rgba[k] = (unsigned char)std::clamp(px[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+                        stbi_write_png(dumpPng, w, h, 4, rgba.data(), w * 4);
+                     }
                      row += ", \"img\": [";
                      for (int gy = 0; gy < 4; gy++)
                         for (int gx = 0; gx < 4; gx++)

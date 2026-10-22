@@ -33,15 +33,16 @@ public:
                        float bloomRadius, bool passthrough, unsigned int depthTex, const float bg[3]);
    // Path-traced input: src.a is coverage (share of samples that hit
    // something); the background colour shows through where it is below 1,
-   // with bgOpacity as its alpha.
+   // with bgOpacity as its alpha. envBackground: the traced misses already
+   // show the environment, so only the alpha follows coverage.
    unsigned int FinishCoverage(unsigned int src, int w, int h, int tonemap, float bloom, float bloomThreshold,
-                               float bloomRadius, const float bg[3], float bgOpacity);
+                               float bloomRadius, const float bg[3], float bgOpacity, bool envBackground = false);
    unsigned int Output() const { return mOutTex; }
 
    // 360: the six cube faces (RGBA8 2D array, Render3DNode's face order and
    // basis, see kPanoFaces in the .cpp) reprojected to w x h - mode 1
    // equirectangular, 2 cubemap 3x2. Returns the RGBA8 result.
-   unsigned int Panorama(unsigned int faceArray, int w, int h, int mode);
+   unsigned int Panorama(unsigned int faceArray, int w, int h, int mode, float domeAngle, float domeTilt = 0.0f);
    // Camera-space basis of face i (forward, right, up), shared with the face renders.
    static void PanoFace(int i, float forward[3], float right[3], float up[3]);
    // GLSL: vec3 panoDir(vec2 uv, int mode) - camera-space direction of a panorama pixel.

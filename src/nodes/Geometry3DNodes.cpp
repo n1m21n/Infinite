@@ -1289,7 +1289,7 @@ void Render3DNode::PathTracerDeleter::operator()(Render3DPathTracer* p) const { 
 
 const std::vector<std::string>& Render3DNode::PanoramaNames()
 {
-   static const std::vector<std::string> kNames = { "Off", "360 equirect", "Cubemap 3x2" };
+   static const std::vector<std::string> kNames = { "Off", "360 equirect", "Cubemap 3x2", "Dome (fisheye)" };
    return kNames;
 }
 
@@ -1637,7 +1637,7 @@ void Render3DNode::Cook360(int frameId)
    if (mLastCookFrame == frameId)
       return;
    const int outW = std::max(16, (int)width), outH = std::max(16, (int)height);
-   const int face = std::clamp(panorama == 1 ? outW / 4 : outW / 3, 64, 4096);
+   const int face = std::clamp(panorama == 1 ? outW / 4 : (panorama == 3 ? outW / 2 : outW / 3), 64, 4096);
 
    // Cook the sources first: the signature reads their revisions.
    CollectDraw();
@@ -1646,7 +1646,7 @@ void Render3DNode::Cook360(int frameId)
          node->CookIfNeeded(frameId);
    SceneSignature sig = BuildSceneSignature();
    if (m360Valid && mPanoOut != 0 && sig == m360Sig && outW == m360OutW && outH == m360OutH && panorama == m360Mode &&
-       !sig.animated)
+       domeAngle == m360Dome[0] && domeTilt == m360Dome[1] && !sig.animated)
    {
       mLastCookFrame = frameId;
       return;
@@ -1682,12 +1682,14 @@ void Render3DNode::Cook360(int frameId)
    }
    m360Face = -1;
    mLastCookFrame = frameId;
-   mPanoOut = mPost.Panorama(mFaceArray, outW, outH, panorama);
+   mPanoOut = mPost.Panorama(mFaceArray, outW, outH, panorama, domeAngle, domeTilt);
    m360Sig = sig;
    m360Valid = true;
    m360OutW = outW;
    m360OutH = outH;
    m360Mode = panorama;
+   m360Dome[0] = domeAngle;
+   m360Dome[1] = domeTilt;
    mRevision = NextTextureRevision();
 }
 
@@ -1989,18 +1991,141 @@ void Render3DNode::CookIfNeeded(int frameId)
          for (size_t i = 0; i < n; i++)
             key = (key ^ b[i]) * 1099511628211ull;
       };
+      // PointZ sources and point sprites have no CPU mesh of their own: their
+      // traceable stand-ins live here until SetScene has copied them.
+      std::vector<std::unique_ptr<Mesh>> ptMeshes;
+      static const Mesh kOcta = [] {
+         // A unit octahedron with radial normals: a particle shades like a
+         // sphere of the sprite's radius at eight triangles.
+         Mesh m;
+         const float d[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+         for (const auto& p : d)
+         {
+            Vertex v;
+            v.px = v.nx = p[0]; v.py = v.ny = p[1]; v.pz = v.nz = p[2];
+            m.vertices.push_back(v);
+         }
+         const unsigned int f[8][3] = { { 0, 2, 4 }, { 2, 1, 4 }, { 1, 3, 4 }, { 3, 0, 4 },
+                                        { 2, 0, 5 }, { 1, 2, 5 }, { 3, 1, 5 }, { 0, 3, 5 } };
+         for (const auto& t : f)
+            m.indices.insert(m.indices.end(), t, t + 3);
+         return m;
+      }();
+      // Per-point transforms (and colours) of a PointZ, as the raster builds them.
+      auto popInstances = [](const pop::PopData& pts, const Mat4& model, float scale, int align,
+                             Render3DPathTracer::Source& s) {
+         std::vector<pop::BufferPtr> cols;
+         std::string err;
+         if (!pop::InstanceMatrices(pts, model.m, scale, align, cols, err) || cols.size() != 4)
+            return false;
+         const int n = pts.pointCount;
+         for (int i = 0; i < n; i++)
+         {
+            Mat4 M;
+            for (int c = 0; c < 4; c++)
+            {
+               const std::vector<float>& col = cols[(size_t)c]->Cpu();
+               if (col.size() < (size_t)(i + 1) * 4)
+                  return false;
+               for (int r = 0; r < 4; r++)
+                  M.m[c * 4 + r] = col[(size_t)i * 4 + r];
+            }
+            s.instances.push_back(M);
+         }
+         if (pts.Has(pop::attr::Color))
+            s.instanceColors = pts.Read(pop::attr::Color, 3);
+         return true;
+      };
       for (IGeometrySource* src : mDraw)
       {
-         if (src == nullptr || IsSpriteSource(src) || src->GetPop() != nullptr)
-            continue;
-         const Mesh& mesh = src->GetMesh();
-         if (mesh.indices.size() < 3)
+         if (src == nullptr)
             continue;
          Render3DPathTracer::Source s;
-         s.mesh = &mesh;
          s.model = src->GetModelMatrix();
          s.material = src->GetMaterial();
          s.surfaceTex = src->GetSurfaceTexture();
+         const pop::PopData* pd = src->GetPop();
+         if (IsSpriteSource(src))
+         {
+            // Points / particles: an octahedron per point, sized like the sprite.
+            s.mesh = &kOcta;
+            s.surfaceTex = 0;
+            const float baseSize = src->PointBaseSize();
+            if (pd != nullptr)
+            {
+               const float spriteScale = baseSize * (pd->Has(pop::attr::PScale) ? 1.0f : 0.02f);
+               if (!popInstances(*pd, s.model, spriteScale, 0, s))
+                  continue;
+               mix(&pd->revision, sizeof(pd->revision));
+            }
+            else if (const std::vector<Particle>* cloud = src->GetPointCloud())
+            {
+               const Mat4& m = s.model;
+               const float scaleX = std::sqrt(m.m[0] * m.m[0] + m.m[1] * m.m[1] + m.m[2] * m.m[2]);
+               for (const Particle& p : *cloud)
+               {
+                  if (!p.alive)
+                     continue;
+                  const float wx = m.m[0] * p.px + m.m[4] * p.py + m.m[8] * p.pz + m.m[12];
+                  const float wy = m.m[1] * p.px + m.m[5] * p.py + m.m[9] * p.pz + m.m[13];
+                  const float wz = m.m[2] * p.px + m.m[6] * p.py + m.m[10] * p.pz + m.m[14];
+                  const float r = p.scale * baseSize * scaleX;
+                  s.instances.push_back(Mat4::Multiply(Mat4::Translation(wx, wy, wz), Mat4::Scale(r, r, r)));
+                  s.instanceColors.push_back(p.r);
+                  s.instanceColors.push_back(p.g);
+                  s.instanceColors.push_back(p.b);
+               }
+               const unsigned long long crev = src->PointCloudRevision();
+               mix(&crev, sizeof(crev));
+            }
+            if (s.instances.empty())
+               continue;
+            mix(&src, sizeof(src));
+            sources.push_back(std::move(s));
+            continue;
+         }
+         if (pd != nullptr)
+         {
+            // PointZ with faces: a mesh from its P / N / Tex / Color and triangles.
+            const pop::PopTopology& topo = pd->Topo();
+            if (!topo.HasFaces() || pd->pointCount <= 0)
+               continue;
+            auto mesh = std::make_unique<Mesh>();
+            const std::vector<float> P = pd->Read(pop::attr::P, 3);
+            const bool hasN = pd->Has(pop::attr::N), hasT = pd->Has(pop::attr::Tex), hasC = pd->Has(pop::attr::Color);
+            const std::vector<float> N = hasN ? pd->Read(pop::attr::N, 3) : std::vector<float>();
+            const std::vector<float> T = hasT ? pd->Read(pop::attr::Tex, 2) : std::vector<float>();
+            mesh->vertices.resize((size_t)pd->pointCount);
+            for (int i = 0; i < pd->pointCount; i++)
+            {
+               Vertex& v = mesh->vertices[(size_t)i];
+               v.px = P[(size_t)i * 3]; v.py = P[(size_t)i * 3 + 1]; v.pz = P[(size_t)i * 3 + 2];
+               if (hasN) { v.nx = N[(size_t)i * 3]; v.ny = N[(size_t)i * 3 + 1]; v.nz = N[(size_t)i * 3 + 2]; }
+               if (hasT) { v.u = T[(size_t)i * 2]; v.v = T[(size_t)i * 2 + 1]; }
+            }
+            mesh->indices.assign(topo.tris.begin(), topo.tris.end());
+            if (!hasN)
+               *mesh = MeshOps::RecalculateNormals(*mesh, false, false);
+            if (hasC)
+               mesh->vertexColor = pd->Read(pop::attr::Color, 3);
+            const pop::PopData* inst = src->GetPopInstances();
+            if (inst != nullptr && inst->pointCount > 0 &&
+                !popInstances(*inst, s.model, inst->instanceScale, inst->instanceAlign, s))
+               continue;
+            mix(&src, sizeof(src));
+            mix(&pd->revision, sizeof(pd->revision));
+            if (inst != nullptr)
+               mix(&inst->revision, sizeof(inst->revision));
+            mix(&s.model, sizeof(s.model));
+            s.mesh = mesh.get();
+            ptMeshes.push_back(std::move(mesh));
+            sources.push_back(std::move(s));
+            continue;
+         }
+         const Mesh& mesh = src->GetMesh();
+         if (mesh.indices.size() < 3)
+            continue;
+         s.mesh = &mesh;
          if (auto* instancer = FindInstancer(src))
          {
             const Mat4 group = src->GetInstanceGroupMatrix();
@@ -2051,13 +2176,15 @@ void Render3DNode::CookIfNeeded(int frameId)
             env.ground[k] = envGround[k];
             env.ambient[k] = ambientColor[k];
          }
+         mPathTracer->SetDome(domeAngle, domeTilt);
          traced = mPathTracer->Trace(w, h, viewProj, eye, lights, env, exposure, ptBounces, std::max(1, ptSamples), 1,
                                      panorama, view);
       }
       if (traced != 0)
       {
          if (envAsBackground && hasEnvMap)
-            mPostOut = mPost.Finish(traced, w, h, tonemap, bloom, bloomThreshold, bloomRadius, false, 0, bgColor);
+            mPostOut = mPost.FinishCoverage(traced, w, h, tonemap, bloom, bloomThreshold, bloomRadius, bgColor,
+                                            bgOpacity, true);
          else
             mPostOut = mPost.FinishCoverage(traced, w, h, tonemap, bloom, bloomThreshold, bloomRadius, bgColor,
                                             bgOpacity);

@@ -17,7 +17,7 @@ out vec4 fragColor;
 
 uniform samplerBuffer uNodes;  // 2 texels per node: (min, left|first), (max, count)
 uniform samplerBuffer uTriPos; // 3 texels per triangle: v0 + material, v1, v2
-uniform samplerBuffer uTriAtt; // 4 texels: n0 + u0, n1 + u1, n2 + u2, (v0, v1, v2)
+uniform samplerBuffer uTriAtt; // 5 texels: n0 + u0, n1 + u1, n2 + u2, (v0, v1, v2), colour
 uniform samplerBuffer uMats;   // 3 texels: (base, metal), (emission, rough), (ior, transmission, opacity, layer)
 uniform sampler2DArray uTex;
 uniform sampler2D uPrev;
@@ -138,13 +138,14 @@ vec3 radiance(vec3 ro, vec3 rd, out float primaryMiss) {
       }
       vec4 p0 = texelFetch(uTriPos, h.tri * 3);
       int mi = int(p0.w);
-      vec4 n0 = texelFetch(uTriAtt, h.tri * 4), n1 = texelFetch(uTriAtt, h.tri * 4 + 1), n2 = texelFetch(uTriAtt, h.tri * 4 + 2);
-      vec4 vv = texelFetch(uTriAtt, h.tri * 4 + 3);
+      vec4 n0 = texelFetch(uTriAtt, h.tri * 5), n1 = texelFetch(uTriAtt, h.tri * 5 + 1), n2 = texelFetch(uTriAtt, h.tri * 5 + 2);
+      vec4 vv = texelFetch(uTriAtt, h.tri * 5 + 3);
+      vec3 triColor = texelFetch(uTriAtt, h.tri * 5 + 4).rgb;
       float w = 1.0 - h.u - h.v;
       vec3 n = normalize(n0.xyz * w + n1.xyz * h.u + n2.xyz * h.v);
       vec2 uv = vec2(n0.w * w + n1.w * h.u + n2.w * h.v, vv.x * w + vv.y * h.u + vv.z * h.v);
       vec4 m0 = texelFetch(uMats, mi * 3), m1 = texelFetch(uMats, mi * 3 + 1), m2 = texelFetch(uMats, mi * 3 + 2);
-      vec3 base = m0.rgb;
+      vec3 base = m0.rgb * triColor;
       if (m2.w >= 0.0) base *= toLin(texture(uTex, vec3(uv, m2.w)).rgb);
       float metal = m0.a, rough = clamp(m1.a, 0.03, 1.0), a = rough * rough;
       float ior = max(m2.x, 1.0), trans = m2.y, opacity = m2.z;
@@ -226,13 +227,16 @@ void main() {
    ivec2 px = ivec2(gl_FragCoord.xy);
    rngState = uint(px.x) * 1973u + uint(px.y) * 9277u + uSeed * 26699u;
    vec3 sum = vec3(0.0); float miss = 0.0;
+   bool outside = false;
    for (int s = 0; s < uSpp; s++) {
       vec2 jit = vec2(rnd(), rnd());
       vec2 ndc = ((gl_FragCoord.xy - 0.5 + jit) / uRes) * 2.0 - 1.0;
       vec3 ro, rd;
       if (uPanorama > 0) {
+         vec3 pdir = panoDir((gl_FragCoord.xy - 0.5 + jit) / uRes, uPanorama);
+         if (dot(pdir, pdir) < 0.5) { outside = true; break; } // dome: outside the circle
          ro = uEye;
-         rd = normalize(uInvViewRot * panoDir((gl_FragCoord.xy - 0.5 + jit) / uRes, uPanorama));
+         rd = normalize(uInvViewRot * pdir);
       } else {
          vec4 p0 = uInvViewProj * vec4(ndc, -1.0, 1.0), p1 = uInvViewProj * vec4(ndc, 1.0, 1.0);
          ro = p0.xyz / p0.w; rd = normalize(p1.xyz / p1.w - ro);
@@ -243,7 +247,7 @@ void main() {
       miss += m;
    }
    // Alpha = coverage (1 - primary miss), so the finish can key the background.
-   vec4 cur = vec4(sum / float(uSpp) * uExposure, 1.0 - miss / float(uSpp));
+   vec4 cur = outside ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(sum / float(uSpp) * uExposure, 1.0 - miss / float(uSpp));
    vec4 prev = texelFetch(uPrev, px, 0);
    float n = float(uSamples), k = float(uSpp);
    fragColor = uSamples == 0 ? cur : (prev * n + cur * k) / (n + k);
@@ -256,6 +260,7 @@ void main() {
       float v[3][3];
       float n[3][3];
       float uv[3][2];
+      float col[3];
       int mat;
       float c[3]; // centroid
       float lo[3], hi[3];
@@ -485,15 +490,35 @@ bool Render3DPathTracer::SetScene(const std::vector<Source>& sources, uint64_t g
       if (worlds.empty())
          worlds.push_back(s.model);
       const Mesh& mesh = *s.mesh;
-      for (const Mat4& M : worlds)
+      const bool vcol = mesh.HasVertexColor();
+      for (size_t wi = 0; wi < worlds.size(); wi++)
       {
+         const Mat4& M = worlds[wi];
          if (tris.size() + mesh.indices.size() / 3 > kMaxTriangles)
             break;
+         float ic[3] = { 1.0f, 1.0f, 1.0f };
+         if (s.instanceColors.size() >= (wi + 1) * 3)
+            for (int k = 0; k < 3; k++)
+               ic[k] = s.instanceColors[wi * 3 + k];
          const Mat4 inv = Mat4::Inverse(M);
          for (size_t i = 0; i + 2 < mesh.indices.size(); i += 3)
          {
             Tri t;
             t.mat = matId;
+            for (int k = 0; k < 3; k++)
+            {
+               float c = 1.0f;
+               if (vcol)
+               {
+                  c = 0.0f;
+                  for (int q = 0; q < 3; q++)
+                  {
+                     const size_t vi = mesh.indices[i + q];
+                     c += vi < mesh.vertices.size() ? mesh.vertexColor[vi * 3 + k] / 3.0f : 1.0f / 3.0f;
+                  }
+               }
+               t.col[k] = c * ic[k];
+            }
             bool ok = true;
             for (int k = 0; k < 3 && ok; k++)
             {
@@ -547,15 +572,16 @@ bool Render3DPathTracer::SetScene(const std::vector<Source>& sources, uint64_t g
       nodeData.insert(nodeData.end(), d, d + 8);
    }
    posData.reserve(tris.size() * 12);
-   attData.reserve(tris.size() * 16);
+   attData.reserve(tris.size() * 20);
    for (const Tri& t : tris)
    {
       const float p[12] = { t.v[0][0], t.v[0][1], t.v[0][2], (float)t.mat, t.v[1][0], t.v[1][1], t.v[1][2], 0.0f,
                             t.v[2][0], t.v[2][1], t.v[2][2], 0.0f };
       posData.insert(posData.end(), p, p + 12);
-      const float a[16] = { t.n[0][0], t.n[0][1], t.n[0][2], t.uv[0][0], t.n[1][0], t.n[1][1], t.n[1][2], t.uv[1][0],
-                            t.n[2][0], t.n[2][1], t.n[2][2], t.uv[2][0], t.uv[0][1], t.uv[1][1], t.uv[2][1], 0.0f };
-      attData.insert(attData.end(), a, a + 16);
+      const float a[20] = { t.n[0][0], t.n[0][1], t.n[0][2], t.uv[0][0], t.n[1][0], t.n[1][1], t.n[1][2], t.uv[1][0],
+                            t.n[2][0], t.n[2][1], t.n[2][2], t.uv[2][0], t.uv[0][1], t.uv[1][1], t.uv[2][1], 0.0f,
+                            t.col[0], t.col[1], t.col[2], 0.0f };
+      attData.insert(attData.end(), a, a + 20);
    }
    UploadTbo(mBuf[0], mTbo[0], nodeData);
    UploadTbo(mBuf[1], mTbo[1], posData);
@@ -694,6 +720,8 @@ unsigned int Render3DPathTracer::Trace(int w, int h, const Mat4& viewProj, const
    const float invRot[9] = { view.m[0], view.m[4], view.m[8], view.m[1], view.m[5], view.m[9],
                              view.m[2], view.m[6], view.m[10] };
    glUniform1i(glGetUniformLocation(mProgram, "uPanorama"), panorama);
+   glUniform1f(glGetUniformLocation(mProgram, "uDomeAngle"), mDomeAngle);
+   glUniform1f(glGetUniformLocation(mProgram, "uDomeTilt"), mDomeTilt);
    glUniformMatrix3fv(glGetUniformLocation(mProgram, "uInvViewRot"), 1, GL_FALSE, invRot);
    glUniform3fv(glGetUniformLocation(mProgram, "uEye"), 1, eye);
    int types[4] = {}, count = 0;

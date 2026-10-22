@@ -1703,7 +1703,13 @@
                         // The formats' own aspect: 2:1 equirect, 3:2 cubemap.
                         if (i == 1) n->height = std::max(16.0f, n->width * 0.5f);
                         else if (i == 2) n->height = std::max(16.0f, n->width * 2.0f / 3.0f);
+                        else if (i == 3) n->height = n->width; // dome: square domemaster
                      }, colW);
+      if (n->panorama == 3)
+      {
+         ModSlider("dome angle", &n->domeAngle, 90.0f, 360.0f, "%.0f\xC2\xB0", colW);
+         ModSlider("dome tilt", &n->domeTilt, 0.0f, 90.0f, "%.0f\xC2\xB0", colW);
+      }
       if (n->renderMode == 1)
       {
          ModSliderInt("samples", &n->ptSamples, 1, 4096);
@@ -1712,7 +1718,7 @@
             ImGui::TextDisabled("%d / %d samples, %d tris", std::min(n->PathTracedSamples(), n->ptSamples),
                                 n->ptSamples, n->PathTracedTriangles());
          else
-            ImGui::TextDisabled("nothing to trace (meshes only, no sprites)");
+            ImGui::TextDisabled("nothing to trace");
       }
 
       ImGui::EndGroup();

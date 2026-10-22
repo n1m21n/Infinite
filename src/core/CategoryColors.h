@@ -62,6 +62,8 @@ namespace CategoryColors
    // alphabetical. Keeping this beside ColorFor guarantees that catalogue
    // order and the visible colour code can never drift apart.
    int FamilyRank(const std::string& category);
+   // Turbo 0.61: heading of a family in the node menus ("VISUAL 2D", "3D", "SOUND", "CONTROL").
+   const char* FamilyName(int family);
 
    // Reads the saved preset name (if any) from ~/Library/Application
    // Support/Infinite.theme. Call once at startup, before the first frame.

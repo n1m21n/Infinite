@@ -14,17 +14,30 @@
   the mip-blur approximation - metals and rough surfaces read correctly.
 - **Path traced** mode: a progressive GPU path tracer over the same meshes, materials, lights and
   HDRI - soft shadows, light bouncing between objects, real glass. Noisy at first, clean after
-  `samples` frames; any change restarts it. Meshes only (no point sprites), surface texture only.
-- **360 output**: equirectangular (2:1) or cubemap 3x2, from the camera's position. Raster renders
-  six faces through the normal pipeline (cached when nothing moves); path traced traces the
-  panorama directly.
+  `samples` frames; any change restarts it. Traces meshes, PointZ geometry and instances, and
+  particles / point sprites (as small solids, with their colour); surface texture only. Animated
+  scenes restart it every frame, so it is for stills and slow moves.
+- **360 output**: equirectangular (2:1), cubemap 3x2 or **dome** (domemaster fisheye, square, with
+  `dome angle` and `dome tilt` - 0 = zenith at the centre, 90 = camera forward at the centre), from
+  the camera's position. Raster renders six faces through the normal pipeline (cached when nothing
+  moves); path traced traces the panorama directly.
+
+### PointZ / video
+- **Particle PointZ**: size over life (birth, death, curve), colour over life (birth, death) and
+  turbulence (amount, scale, speed).
+- **VMPC**: during a transition the outgoing clip keeps playing instead of freezing.
+
+### Menus
+- Node categories grouped by family with coloured headings (VISUAL 2D, 3D, SOUND, CONTROL), in the
+  side panel and the floating menu; Prediction moved to CONTROL.
 
 ### Files
 - **FILE > Save with media...** (Collect Media): the patch plus every file it uses (samples, video,
   images, 3D models with their glTF buffers, MIDI, LUTs, fonts, presets) copied into
   `<name>_media/<type>/` next to it, same content once, with a report of what was copied and what
   is missing. Paths inside the patch's folder are saved relative and resolved on open, so the folder
-  opens on any machine.
+  opens on any machine. Output paths (render / record / snapshot targets) are not collected, and
+  a file already in the folder with the same content is reused instead of copied as `_2`.
 
 ### Tests
 - PATHTRACETEST, PANORAMATEST, COLLECTMEDIATEST.

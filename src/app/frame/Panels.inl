@@ -138,6 +138,20 @@
 
                ImGui::PushID(category.c_str());
                const auto& cc = CategoryColors::ColorFor(category);
+               // Turbo 0.61: a heading where the colour family changes.
+               {
+                  static int sLastFamily = -1;
+                  if (category == NodeFactory::Instance().GetCategories().front())
+                     sLastFamily = -1;
+                  const int family = CategoryColors::FamilyRank(category);
+                  if (q.empty() && family != sLastFamily)
+                  {
+                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(cc.r, cc.g, cc.b, 0.75f));
+                     ImGui::SeparatorText(CategoryColors::FamilyName(family));
+                     ImGui::PopStyleColor();
+                  }
+                  sLastFamily = family;
+               }
                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(cc.r, cc.g, cc.b, 1.0f));
                const std::string categoryLabel =
                   NodeBrowserLabel(category, "SIDEBAR_CATEGORY", category);

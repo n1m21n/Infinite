@@ -159,6 +159,12 @@ private:
    double mTransSeconds = 0.0;
    std::chrono::steady_clock::time_point mTransStart;
    unsigned int mPrevTex = 0;
+   // Turbo 0.61: the outgoing pad keeps playing under the transition - its own
+   // decoder, position and uploader feed mPrevTex until the blend ends.
+   int mPrevPad = -1;
+   double mPrevPos = 0.0;
+   Platform::VideoFrame mPrevFrame;
+   VideoTexture mPrevUploader;
    int mPrevW = 0; // allocated size of mPrevTex (= the outgoing frame's)
    int mPrevH = 0;
    GLUtil::Fbo mOut;

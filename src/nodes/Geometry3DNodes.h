@@ -667,7 +667,9 @@ public:
    // renders six 90-degree faces and reprojects them; path traced traces the
    // panorama's rays directly.
    static const std::vector<std::string>& PanoramaNames();
-   int panorama = 0;
+   int panorama = 0;           // 3: dome (domemaster fisheye, zenith at the centre, forward at the bottom)
+   float domeAngle = 180.0f;   // dome field of view in degrees
+   float domeTilt = 0.0f;      // dome: 0 = zenith at the centre, 90 = camera forward at the centre
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -693,7 +695,7 @@ public:
       v.Float("shadowStrength", shadowStrength);
       v.Float("bloom", bloom); v.Float("bloomThreshold", bloomThreshold); v.Float("bloomRadius", bloomRadius);
       v.Int("renderMode", renderMode); v.Int("ptSamples", ptSamples); v.Int("ptBounces", ptBounces);
-      v.Int("panorama", panorama);
+      v.Int("panorama", panorama); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt);
    }
 
 private:
@@ -932,5 +934,6 @@ private:
    SceneSignature m360Sig;
    bool m360Valid = false;
    int m360OutW = 0, m360OutH = 0, m360Mode = 0;
+   float m360Dome[2] = { 0.0f, 0.0f };
    unsigned long long mRevision = 0;
 };

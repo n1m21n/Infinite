@@ -42,6 +42,7 @@ namespace pop
       {
          Arrays parts;
          double carry = 0.0;
+         double time = 0.0; // Turbo 0.61: drives the built-in turbulence
          float nextId = 0.0f;
          uint32_t rng = 0x9e3779b9u;
          bool init = false;
@@ -447,7 +448,17 @@ namespace pop
                       F("damp", "damping", 0.0f, 0.0f, 1.0f), F("mass", "mass", 1.0f, 0.001f, 100.0f),
                       I("max", "max particles", 100000, 1, 10000000), F("timeScale", "time scale", 1.0f, 0.0f, 10.0f),
                       B("inherit", "copy source attributes", true), T("target", "target (Null PointZ tag)", ""), B("play", "play", true),
-                      F("seed", "seed", 1.0f, 0.0f, 1000.0f) };
+                      F("seed", "seed", 1.0f, 0.0f, 1000.0f),
+                      // Turbo 0.61: over life (age / life span) and a built-in turbulence.
+                      // Appended, so older patches keep their parameter slots.
+                      F("sizeBirth", "size at birth (x PScale)", 1.0f, 0.0f, 10.0f),
+                      F("sizeDeath", "size at death (x PScale)", 1.0f, 0.0f, 10.0f),
+                      F("sizeCurve", "size curve", 1.0f, 0.1f, 8.0f),
+                      B("colorLife", "colour over life", false),
+                      C("colorBirth", "colour at birth", 1.0f, 1.0f, 1.0f, "colorLife=1"),
+                      C("colorDeath", "colour at death", 1.0f, 0.3f, 0.1f, "colorLife=1"),
+                      F("turb", "turbulence", 0.0f, 0.0f, 50.0f), F("turbScale", "turbulence scale", 1.0f, 0.05f, 20.0f),
+                      F("turbSpeed", "turbulence speed", 1.0f, 0.0f, 10.0f) };
          d.cook = [](CookCtx& c) {
             ParticleState& s = c.State<ParticleState>();
             const PopData* src = c.Input(0);
@@ -481,6 +492,11 @@ namespace pop
             float g[3];
             c.V3("gravity", g);
             const float damp = c.F("damp");
+            // Turbo 0.61: a smooth, divergence-ish swirl from summed sines of
+            // the position, moving with time - turbulence without a force chain.
+            const float turb = c.F("turb"), turbK = c.F("turbScale");
+            s.time += dt * c.F("turbSpeed");
+            const float tt = (float)s.time;
             // Integrate and age.
             std::vector<char> keep((size_t)a.count, 1);
             int alive = 0;
@@ -493,9 +509,17 @@ namespace pop
                const float m = std::max(1e-4f, *a.At(iM, i));
                const float sp = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
                const float dragK = *a.At(iD, i) * sp;
+               float tf[3] = { 0.0f, 0.0f, 0.0f };
+               if (turb > 0.0f)
+               {
+                  const float x = p[0] * turbK, y = p[1] * turbK, z = p[2] * turbK;
+                  tf[0] = turb * (std::sin(y + tt * 0.9f) + std::sin(z * 1.7f + tt * 1.3f)) * 0.5f;
+                  tf[1] = turb * (std::sin(z + tt * 1.1f) + std::sin(x * 1.3f + tt * 0.7f)) * 0.5f;
+                  tf[2] = turb * (std::sin(x + tt * 1.2f) + std::sin(y * 1.5f + tt * 0.8f)) * 0.5f;
+               }
                for (int k = 0; k < 3; k++)
                {
-                  const float force = f[k] + g[k] * m - dragK * v[k];
+                  const float force = f[k] + g[k] * m - dragK * v[k] + tf[k] * m;
                   v[k] = (v[k] + force / m * dt) * (1.0f - damp * std::min(1.0f, dt * 60.0f));
                   p[k] += v[k] * dt;
                   f[k] = 0.0f;
@@ -573,6 +597,57 @@ namespace pop
                }
             }
             (void)iId; (void)iM; (void)iD;
+
+            // Turbo 0.61: size and colour over life (t = age / life span). PScale
+            // at birth is kept in PartSize0 so the curve scales what the source
+            // gave each particle (1 when it had none); off = left untouched.
+            const float sizeBirth = c.F("sizeBirth"), sizeDeath = c.F("sizeDeath"), sizeCurve = c.F("sizeCurve");
+            const bool sizeLife = sizeBirth != 1.0f || sizeDeath != 1.0f;
+            const bool colorLife = c.Bl("colorLife");
+            if ((sizeLife || colorLife) && a.count > 0)
+            {
+               const int jAge = a.Index(attr::PartAge), jLife = a.Index(attr::PartLifeSpan);
+               int jS = -1, jS0 = -1, jC = -1;
+               if (sizeLife)
+               {
+                  const bool hadScale = a.Index(attr::PScale) >= 0;
+                  jS = a.Ensure(attr::PScale, 1);
+                  const bool hadBase = a.Index("PartSize0") >= 0;
+                  jS0 = a.Ensure("PartSize0", 1);
+                  if (!hadBase)
+                     for (int i = 0; i < a.count; i++)
+                        *a.At(jS0, i) = hadScale ? *a.At(jS, i) : 1.0f;
+               }
+               float cb[3] = { 1, 1, 1 }, cd[3] = { 1, 1, 1 };
+               if (colorLife)
+               {
+                  c.V3("colorBirth", cb);
+                  c.V3("colorDeath", cd);
+                  jC = a.Ensure(attr::Color, 4);
+               }
+               for (int i = 0; i < a.count; i++)
+               {
+                  const float life = *a.At(jLife, i);
+                  const float t = life > 0.0f ? std::clamp(*a.At(jAge, i) / life, 0.0f, 1.0f) : 0.0f;
+                  if (sizeLife)
+                  {
+                     // A particle born this frame has no base yet: its PScale is
+                     // still what it inherited from the source (or the default).
+                     float& base = *a.At(jS0, i);
+                     if (base <= 0.0f)
+                        base = *a.At(jS, i) > 0.0f ? *a.At(jS, i) : 1.0f;
+                     const float k = std::pow(t, sizeCurve);
+                     *a.At(jS, i) = base * (sizeBirth + (sizeDeath - sizeBirth) * k);
+                  }
+                  if (colorLife)
+                  {
+                     float* col = a.At(jC, i);
+                     for (int q = 0; q < 3; q++)
+                        col[q] = cb[q] + (cd[q] - cb[q]) * t;
+                     col[3] = 1.0f;
+                  }
+               }
+            }
             Arrays out = a;
             c.out = PointsOnly(std::move(out));
             return true;

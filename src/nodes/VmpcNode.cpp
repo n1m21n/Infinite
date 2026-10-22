@@ -483,6 +483,8 @@ void VmpcNode::StartPad(int pad)
          std::swap(mTexH, mPrevH);
       }
       mTransState = kTransWaiting;
+      mPrevPad = mActive; // keeps decoding under the blend (CookClip)
+      mPrevPos = mPos;
       mTransStyle = std::clamp(transitionStyle - 1, 0, (int)ImageTransition::kStyleCount - 1);
       mTransSeconds = std::clamp((double)transitionTime, 0.0, 30.0);
    }
@@ -708,6 +710,25 @@ void VmpcNode::CookClip()
          }
       }
    }
+
+   // Turbo 0.61: the outgoing clip plays on under the transition (it used to
+   // freeze on its last frame): advanced on the wall clock in its own range,
+   // looping, decoded into mPrevTex.
+   if (mTransState == kTransRunning && mPrevPad >= 0 && mPrevPad != mActive && mPads[mPrevPad].video != nullptr)
+   {
+      double pf = 0.0, pt = 0.0;
+      RangeSeconds(mPrevPad, pf, pt);
+      const double ps = std::clamp((double)padSpeed[mPrevPad], -4.0, 4.0);
+      mPrevPos += dt * ps;
+      const double len = std::max(0.001, pt - pf);
+      if (mPrevPos >= pt || mPrevPos < pf)
+         mPrevPos = ps >= 0.0 ? pf + std::fmod(std::max(0.0, mPrevPos - pf), len)
+                              : pt - std::fmod(std::max(0.0, pt - mPrevPos), len);
+      if (Platform::VideoFrameAt(mPads[mPrevPad].video, mPrevPos, mPrevFrame) && !mPrevFrame.empty())
+         mPrevUploader.Upload(mPrevFrame, mPrevTex, mPrevW, mPrevH);
+   }
+   else if (mTransState == kTransNone)
+      mPrevPad = -1;
 }
 
 void VmpcNode::VisitParams(ParamVisitor& v)

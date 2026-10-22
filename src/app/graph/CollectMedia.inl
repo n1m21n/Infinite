@@ -87,6 +87,17 @@
          return sep && dot != std::string::npos && dot + 1 < v.size() && v.size() - dot <= 6;
       }
 
+      // Where a node writes (an Output's export / snapshot file, a recorder's
+      // take): not media the patch reads, so never copied or reported missing.
+      bool IsOutputPath(const std::string& typeName, const std::string& key)
+      {
+         const std::string k = Lower(key);
+         for (const char* w : { "output", "export", "record", "snapshot", "save", "capture", "dest" })
+            if (k.find(w) != std::string::npos)
+               return true;
+         return typeName == "Output" || typeName.find("Recorder") != std::string::npos;
+      }
+
       std::string Relative(const fs::path& file, const fs::path& base)
       {
          std::error_code ec;
@@ -167,7 +178,18 @@
          fs::create_directories(folder, ec);
          fs::path dst = folder / src.filename();
          for (int n = 2; fs::exists(dst, ec); n++)
+         {
+            // Collected before (same file, same content, already there): reuse it.
+            uint64_t dsize = 0;
+            if (ContentHash(dst, dsize) == hash && dsize == size)
+            {
+               rep.reused++;
+               bySource[key] = dst;
+               byContent[{ hash, size }] = dst;
+               return dst;
+            }
             dst = folder / fs::u8path(src.stem().u8string() + "_" + std::to_string(n) + src.extension().u8string());
+         }
          fs::copy_file(src, dst, fs::copy_options::none, ec);
          if (ec)
          {
@@ -251,6 +273,8 @@
          for (auto& kv : rec.params)
          {
             if (kv.first.size() < 2 || kv.first[0] != 's' || kv.second.empty())
+               continue;
+            if (CollectMedia::IsOutputPath(rec.typeName, kv.first))
                continue;
             fs::path file;
             if (!CollectMedia::AsFile(kv.second, currentDir, file) && !CollectMedia::AsFile(kv.second, dir, file))
