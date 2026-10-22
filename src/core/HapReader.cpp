@@ -13,6 +13,9 @@ namespace Hap
 {
    namespace
    {
+      // Largest texture side a GPU we run on accepts (GL_MAX_TEXTURE_SIZE).
+      constexpr int kMaxTextureSide = 16384;
+
       constexpr uint32_t Fourcc(char a, char b, char c, char d)
       {
          return ((uint32_t)(uint8_t)a << 24) | ((uint32_t)(uint8_t)b << 16) | ((uint32_t)(uint8_t)c << 8) |
@@ -93,7 +96,7 @@ namespace Hap
 
       // Fills `p` from one video trak. False when it is not a supported HAP
       // track (wrong handler, codec, or a malformed sample table).
-      bool ParseTrak(const std::vector<uint8_t>& b, const Atom& trak, Parsed& p)
+      bool ParseTrak(const std::vector<uint8_t>& b, const Atom& trak, uint64_t fileSize, Parsed& p)
       {
          Atom mdia, hdlr, mdhd, minf, stbl, stsd, stts, stsz, stsc, stco;
          if (!FindChild(b, trak, Fourcc('m', 'd', 'i', 'a'), mdia) || !FindChild(b, mdia, Fourcc('h', 'd', 'l', 'r'), hdlr) ||
@@ -132,7 +135,10 @@ namespace Hap
             return false;
          p.width = (int)Be16(&b[entry + 32]);
          p.height = (int)Be16(&b[entry + 34]);
-         if (p.width <= 0 || p.height <= 0)
+         // Every frame buffer is sized from these, so a header claiming 65535 x
+         // 65535 would cost ~4 GB per frame; nothing past a GPU's largest
+         // texture can be shown anyway.
+         if (p.width <= 0 || p.height <= 0 || p.width > kMaxTextureSide || p.height > kMaxTextureSide)
             return false;
 
          // Sample sizes.
@@ -141,6 +147,11 @@ namespace Hap
          const uint32_t fixedSize = Be32(&b[stsz.body + 4]);
          const uint32_t count = Be32(&b[stsz.body + 8]);
          if (count == 0 || (fixedSize == 0 && stsz.end - stsz.body < 12 + (size_t)count * 4))
+            return false;
+         // A fixed size lists no table to bound the count, and the per-sample
+         // vectors below are sized from it: count samples of fixedSize bytes
+         // each must fit in the file.
+         if (fixedSize != 0 && count > fileSize / fixedSize)
             return false;
          std::vector<uint32_t> sizes(count);
          for (uint32_t i = 0; i < count; i++)
@@ -204,6 +215,18 @@ namespace Hap
          return p.samples.size() == count;
       }
 
+      // ReadFrame allocates a sample's stsz size before reading it, so a
+      // damaged table (a 4 GB sample in a 4 KB file) would allocate and zero
+      // gigabytes per frame. A sample past the end also means a cut-off file,
+      // which is refused like any other (CompAudit's HAP cut-off check).
+      bool SamplesInsideFile(const Parsed& p, uint64_t fileSize)
+      {
+         for (const auto& s : p.samples)
+            if (s.offset > fileSize || s.size > fileSize - s.offset)
+               return false;
+         return true;
+      }
+
       bool LoadMovie(std::ifstream& f, Parsed& p)
       {
          f.clear();
@@ -253,7 +276,7 @@ namespace Hap
                   if (trak.type == Fourcc('t', 'r', 'a', 'k'))
                   {
                      Parsed tmp;
-                     if (ParseTrak(moov, trak, tmp))
+                     if (ParseTrak(moov, trak, fileSize, tmp) && SamplesInsideFile(tmp, fileSize))
                      {
                         p = std::move(tmp);
                         return true;
