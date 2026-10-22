@@ -4,6 +4,8 @@
 #include "app/frame/FrameCtx.h"
 #include "app/ui/design/components/DialogParts.h"
 #include "app/ui/design/components/FormParts.h"
+#include "app/ui/design/components/LibraryParts.h"
+#include "core/MediaCollect.h"
 #include "core/SelfUpdate.h"
 #include "core/Notices.h"
 
@@ -275,6 +277,79 @@ int DrawFloating(FrameCtx& fc)
          {
             CollectDiagnostics(sIncludePatch && !gPatchPath.empty());
             ImGui::CloseCurrentPopup();
+         }
+         if (pick == 1 || ImGui::IsKeyPressed(ImGuiKey_Escape))
+            ImGui::CloseCurrentPopup();
+         DialogParts::End();
+      }
+
+      // ---- save with media modal ----
+      // Shows exactly what will be copied before anything is touched; Save asks where.
+      static std::vector<MediaCollect::Item> sMediaPlan;
+      if (gShowSaveMediaModal)
+      {
+         Patch::Data preview = BuildPatchData();
+         sMediaPlan = MediaCollect::Plan(preview, MediaCollect::MediaDirFor(gPatchPath));
+         ImGui::OpenPopup(L("Save with media"));
+         gShowSaveMediaModal = false;
+      }
+      if (DialogParts::Begin(L("Save with media")))
+      {
+         ImGui::Dummy(ImVec2(420.0f, 0.0f));
+         DialogParts::Title(T("Save with media"));
+         DialogParts::Message(T("Copies every file this patch reads into a \"<name> media\" folder next to it, and saves the patch pointing there, so the two move together. The originals stay where they are."));
+         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         int copies = 0, twice = 0, missing = 0;
+         for (const MediaCollect::Item& item : sMediaPlan)
+         {
+            copies += item.state == MediaCollect::State::Copy ? 1 : 0;
+            twice += item.state == MediaCollect::State::Duplicate ? 1 : 0;
+            missing += item.state == MediaCollect::State::Missing ? 1 : 0;
+         }
+         if (sMediaPlan.empty())
+            DialogParts::Message(T("This patch reads no files. It will be saved on its own."));
+         else
+         {
+            const float rowH = ImGui::GetTextLineHeightWithSpacing();
+            LibraryParts::BeginWell("##media_list", std::min(8.0f, (float)sMediaPlan.size()) * rowH + tok::space_2 * 2.0f);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text);
+            const ImU32 dimCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+            for (const MediaCollect::Item& item : sMediaPlan)
+            {
+               const ImVec2 p = ImGui::GetCursorScreenPos();
+               const float w = ImGui::GetContentRegionAvail().x;
+               const size_t slash = item.source.find_last_of("/\\");
+               const std::string name = slash == std::string::npos ? item.source : item.source.substr(slash + 1);
+               const char* state = item.state == MediaCollect::State::Missing   ? T("missing")
+                                   : item.state == MediaCollect::State::Duplicate ? T("used twice")
+                                   : item.isFolder                                ? T("folder")
+                                                                                  : T("copy");
+               const ImU32 stateCol = item.state == MediaCollect::State::Missing ? tok::U32(tok::record) : dimCol;
+               const float stateW = ImGui::CalcTextSize(state).x;
+               dl->PushClipRect(p, ImVec2(p.x + w - stateW - tok::space_3, p.y + rowH), true);
+               dl->AddText(p, item.state == MediaCollect::State::Duplicate ? dimCol : textCol, name.c_str());
+               dl->PopClipRect();
+               dl->AddText(ImVec2(p.x + w - stateW, p.y), stateCol, state);
+               ImGui::Dummy(ImVec2(w, rowH));
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("%s", item.source.c_str());
+            }
+            LibraryParts::EndWell();
+            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+            std::string summary = std::to_string(copies) + T(" to copy");
+            if (twice > 0)
+               summary += ", " + std::to_string(twice) + T(" used twice (copied once)");
+            if (missing > 0)
+               summary += ", " + std::to_string(missing) + T(" missing (kept as they are)");
+            ImGui::TextDisabled("%s", summary.c_str());
+         }
+         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         const int pick = DialogParts::Buttons({ L("Save..."), L("Cancel") });
+         if (pick == 0)
+         {
+            ImGui::CloseCurrentPopup();
+            SavePatchWithMediaInteractive();
          }
          if (pick == 1 || ImGui::IsKeyPressed(ImGuiKey_Escape))
             ImGui::CloseCurrentPopup();

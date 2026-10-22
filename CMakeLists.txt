@@ -596,6 +596,7 @@ set(COMMON_SOURCES
     src/core/Extensions.cpp
     src/core/HapReader.cpp
     src/core/ShareBundle.cpp
+    src/core/MediaCollect.cpp
     src/core/tracking/OrtRuntime.cpp
     src/core/tracking/HandTracker.cpp
     src/core/tracking/FaceTracker.cpp

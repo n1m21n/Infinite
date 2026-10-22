@@ -335,19 +335,20 @@ namespace LibraryParts
    }
 
    // The recessed list well: a darker rounded surface under a scrolling child, so the controls above read as a
-   // header and the list as its own surface. Pair with EndWell. Fills the rest of the panel.
-   inline void BeginWell(const char* id)
+   // header and the list as its own surface. Pair with EndWell. Fills the rest of the panel, or `height`
+   // when given (a list inside a dialog).
+   inline void BeginWell(const char* id, float height = 0.0f)
    {
       const ImVec2 w0 = ImGui::GetCursorScreenPos();
       const ImVec2 avail = ImGui::GetContentRegionAvail();
-      const ImVec2 w1(w0.x + avail.x, w0.y + avail.y);
+      const ImVec2 w1(w0.x + avail.x, w0.y + (height > 0.0f ? height : avail.y));
       const bool light = CategoryColors::IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(w0, w1, ImGui::GetColorU32(ImVec4(0, 0, 0, light ? 0.04f : 0.27f)), tok::radius_pill);
       dl->AddRect(w0, w1, ImGui::GetColorU32(light ? ImVec4(0, 0, 0, 0.055f) : ImVec4(1, 1, 1, 0.04f)), tok::radius_pill);
       ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_2, tok::space_2));
-      ImGui::BeginChild(id, ImVec2(0, 0), ImGuiChildFlags_AlwaysUseWindowPadding);
+      ImGui::BeginChild(id, ImVec2(0, height > 0.0f ? height : 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
       ImGui::PopStyleVar();
       ImGui::PopStyleColor();
    }

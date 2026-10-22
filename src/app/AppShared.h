@@ -5728,6 +5728,11 @@ std::string BundledResourcePath(const char* relPath);
 void SetWindowIcon(GLFWwindow* window);
 
 void SavePatchInteractive(bool forceDialog);
+// FILE > Save with media: copies the files the patch reads next to it (MediaCollect).
+bool SavePatchWithMediaTo(const std::string& path, std::string& report);
+void SavePatchWithMediaInteractive();
+bool RunSaveWithMediaTest();
+extern bool gShowSaveMediaModal;
 
 // Templates (TemplatesWindow.cpp): the window, the empty-canvas invitation, and the open-as-untitled-copy.
 void DrawTemplatesWindow(bool* open);

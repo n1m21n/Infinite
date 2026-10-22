@@ -1,5 +1,6 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/MediaCollect.h"
 #include "core/Notices.h"
 #include "platform/AppPaths.h"
 
@@ -752,6 +753,12 @@ namespace app
    bool SavePatchTo(const std::string& path)
    {
       Patch::Data data = BuildPatchData();
+      // Files Save with media copied next to this patch stay relative, so the folder moves with it.
+      {
+         const size_t slash = path.find_last_of("/\\");
+         if (slash != std::string::npos)
+            MediaCollect::MakeRelative(data, path.substr(0, slash), MediaCollect::MediaDirFor(path));
+      }
       std::string error;
       if (!Patch::Write(path, data, error))
       {

@@ -1,6 +1,7 @@
 // Patch load, auto layout, field graph regenerate, undo/redo, copy/paste (moved verbatim from main.cpp).
 #include "app/AppShared.h"
 #include "core/UndoDescribe.h"
+#include "core/MediaCollect.h"
 #include "core/Notices.h"
 
 namespace app
@@ -588,6 +589,12 @@ namespace app
 
    bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload)
    {
+      // Media saved next to the patch (Save with media) is written relative to it.
+      {
+         const size_t slash = path.find_last_of("/\\");
+         if (slash != std::string::npos)
+            MediaCollect::ResolveRelative(data, path.substr(0, slash));
+      }
       if (HeadlessJobActive() && (!gHeadlessJob.sets.empty() || gHeadlessJob.bpm > 0.0))
          ApplyHeadlessSets(data, nullptr, nullptr);
       if (data.hasNamedRefs)

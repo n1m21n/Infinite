@@ -493,6 +493,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_DIAGZIPTEST") != nullptr)
       return RunDiagnosticsZipTest() ? 0 : 1;
 
+   if (getenv("INFINITE_SAVEMEDIATEST") != nullptr)
+      return RunSaveWithMediaTest() ? 0 : 1;
+
    if (getenv("INFINITE_APPEARANCETEST") != nullptr)
       return RunAppearanceSelfTest() ? 0 : 1;
 

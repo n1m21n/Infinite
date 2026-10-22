@@ -200,6 +200,8 @@ void DrawMenuBar(FrameCtx& fc)
                SavePatchInteractive(false);
             if (MenuParts::Item(L("Save As..."), MODKEY "+Shift+S"))
                SavePatchInteractive(true);
+            if (MenuParts::Item(L("Save with media...")))
+               gShowSaveMediaModal = true;
             if (MenuParts::Item(L("Share Patch..."), nullptr, false, !SharePatchBusy()))
                SharePatchInteractive();
 
