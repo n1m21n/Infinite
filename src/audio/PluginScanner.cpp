@@ -79,10 +79,13 @@ std::vector<std::string> PluginScanner::DefaultVST3Folders(const std::vector<std
    // to it, so scanning only the first is what made a machine full of VST3s
    // still come up empty. Both are walked; a missing folder is a harmless
    // no-op in the directory walk.
-   if (const char* common = getenv("COMMONPROGRAMFILES"))
-      vst3Folders.push_back(std::string(common) + "\\VST3");
-   if (const char* localAppData = getenv("LOCALAPPDATA"))
-      vst3Folders.push_back(std::string(localAppData) + "\\Programs\\Common\\VST3");
+   // GetEnvUtf8, not getenv: %LOCALAPPDATA% holds the account name, which
+   // the narrow getenv returns in the ANSI code page.
+   std::string common, localAppData;
+   if (AppPaths::GetEnvUtf8("COMMONPROGRAMFILES", common))
+      vst3Folders.push_back(common + "\\VST3");
+   if (AppPaths::GetEnvUtf8("LOCALAPPDATA", localAppData))
+      vst3Folders.push_back(localAppData + "\\Programs\\Common\\VST3");
 #elif defined(__linux__)
    // The three locations phase-04-vst3.md defines for Linux: a per-user
    // folder plus the two system-wide FHS locations (the second covers

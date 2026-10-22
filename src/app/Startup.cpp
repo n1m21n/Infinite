@@ -4,6 +4,7 @@
 #include "app/ui/design/Glyphs.gen.h"
 #include "app/frame/FrameCtx.h"
 #include "platform/HeadTracker.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -750,6 +751,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return RunPatchLayoutTest();
    if (getenv("INFINITE_PATCHOPENERTEST") != nullptr)
       return RunPatchOpenerTest();
+   if (getenv("INFINITE_UNICODEPATHTEST") != nullptr)
+      return RunUnicodePathTest();
    if (getenv("INFINITE_SELFUPDATETEST") != nullptr)
       return RunSelfUpdateTest();
 
@@ -1287,7 +1290,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    }
    else if (!graphPath.empty())
    {
-      if (FILE* f = fopen(graphPath.c_str(), "rb"))
+      if (FILE* f = AppPaths::OpenFile(graphPath, "rb"))
       {
          fseek(f, 0, SEEK_END);
          long sz = ftell(f);
@@ -1605,7 +1608,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
                const float t = (float)i / (float)(fixtureFrames - 1);
                fixturePcm[i] = (int16_t)(sinf(t * 30.0f) * 30000.0f);
             }
-            std::ofstream f(fixtureWav, std::ios::binary);
+            std::ofstream f(AppPaths::FsPath(fixtureWav), std::ios::binary);
             auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
             auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
             const uint32_t dataSize = (uint32_t)(fixturePcm.size() * sizeof(int16_t));
@@ -1642,7 +1645,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
                   slicerPcm[start + i] = (int16_t)(env * sinf(2.0f * 3.14159265f * 220.0f * t) * 30000.0f);
                }
             }
-            std::ofstream sf(slicerWav, std::ios::binary);
+            std::ofstream sf(AppPaths::FsPath(slicerWav), std::ios::binary);
             auto writeU32s = [&](uint32_t v) { sf.write((const char*)&v, 4); };
             auto writeU16s = [&](uint16_t v) { sf.write((const char*)&v, 2); };
             const uint32_t slicerDataSize = (uint32_t)(slicerPcm.size() * sizeof(int16_t));
@@ -1665,7 +1668,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             std::vector<int16_t> drumPcm(drumFrames, 0);
             for (int i = 0; i < drumFrames && i < 200; i++)
                drumPcm[i] = (int16_t)(0.85f * 32000.0f);
-            std::ofstream df(drumWav, std::ios::binary);
+            std::ofstream df(AppPaths::FsPath(drumWav), std::ios::binary);
             auto writeU32 = [&](uint32_t v) { df.write((const char*)&v, 4); };
             auto writeU16 = [&](uint16_t v) { df.write((const char*)&v, 2); };
             const uint32_t drumDataSize = (uint32_t)(drumPcm.size() * sizeof(int16_t));
@@ -1778,7 +1781,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
             const float t = (float)i / (float)(numFrames - 1);
             pcm[i] = (int16_t)((t * 2.0f - 1.0f) * 32000.0f);
          }
-         std::ofstream f(wavPath, std::ios::binary);
+         std::ofstream f(AppPaths::FsPath(wavPath), std::ios::binary);
          auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
          auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
          const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));

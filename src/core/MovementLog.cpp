@@ -426,7 +426,7 @@ void EnforceRetention(const std::string& dir)
 
 static bool CompressFileMiniz(const std::string& srcPath, const std::string& dstPath)
 {
-   std::ifstream in(srcPath, std::ios::binary);
+   std::ifstream in(AppPaths::FsPath(srcPath), std::ios::binary);
    if (!in)
       return false;
 
@@ -455,7 +455,7 @@ static bool CompressFileMiniz(const std::string& srcPath, const std::string& dst
    if (status != MZ_OK)
       return false;
 
-   std::ofstream out(dstPath, std::ios::binary);
+   std::ofstream out(AppPaths::FsPath(dstPath), std::ios::binary);
    if (!out)
       return false;
 
@@ -595,7 +595,7 @@ static void WritePendingStats(const std::string& logDir)
    const std::string path = MovementStats::StatsPath(logDir);
    const std::string tmp = path + ".tmp";
    {
-      std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+      std::ofstream out(AppPaths::FsPath(tmp), std::ios::binary | std::ios::trunc);
       if (!out)
          return;
       out.write(reinterpret_cast<const char*>(blob.data()), static_cast<std::streamsize>(blob.size()));
@@ -610,7 +610,7 @@ static void WritePendingStats(const std::string& logDir)
 
 static void WriterThreadFunc(const std::string& logDir, const std::string& filePath)
 {
-   std::ofstream file(filePath, std::ios::binary | std::ios::app);
+   std::ofstream file(AppPaths::FsPath(filePath), std::ios::binary | std::ios::app);
    if (!file)
       return;
 
@@ -1158,7 +1158,7 @@ void Capture(double t, bool isNormalFrame)
 
 bool ReadFile(const std::string& path, const std::function<bool(const Record&)>& callback)
 {
-   std::ifstream file(path, std::ios::binary);
+   std::ifstream file(AppPaths::FsPath(path), std::ios::binary);
    if (!file)
       return false;
 
@@ -1511,7 +1511,7 @@ bool RunMovementLogTest()
 
    // A session file left open by a "crash": Start() must compress it.
    {
-      std::ofstream stale(testDir + "/19990101-000000.mlog", std::ios::binary);
+      std::ofstream stale(AppPaths::FsPath(testDir + "/19990101-000000.mlog"), std::ios::binary);
       const char hdr[8] = {'I', 'M', 'L', 'O', 'G', '1', 1, 0};
       stale.write(hdr, 8);
    }
@@ -1743,13 +1743,13 @@ bool RunMovementLogTest()
    // 4. Retention Cap Test
    {
       // Create a dummy stats.bin and several large dummy .z files
-      std::ofstream statsFile(testDir + "/stats.bin", std::ios::binary);
+      std::ofstream statsFile(AppPaths::FsPath(testDir + "/stats.bin"), std::ios::binary);
       statsFile << "STATS_DATA";
       statsFile.close();
 
       for (int i = 0; i < 5; i++)
       {
-         std::ofstream fakeFile(testDir + "/20260101-00000" + std::to_string(i) + ".mlog.z", std::ios::binary);
+         std::ofstream fakeFile(AppPaths::FsPath(testDir + "/20260101-00000" + std::to_string(i) + ".mlog.z"), std::ios::binary);
          std::vector<char> dummy(20000, 'X');
          fakeFile.write(dummy.data(), dummy.size());
          fakeFile.close();

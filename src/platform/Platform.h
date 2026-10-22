@@ -1540,6 +1540,11 @@ namespace Platform
                               int x = 0, int y = 0, int w = 0, int h = 0);
    void ReassertOutputWindowTopmost(GLFWwindow* window);
    void SetWindowIconFromResource(GLFWwindow* window);
+
+   // The process's command line as UTF-8 (CommandLineToArgvW). main()'s argv
+   // is in the ANSI code page, so a patch double-clicked in a folder with an
+   // accented or CJK name would arrive as a path no loader can open.
+   std::vector<std::string> CommandLineUtf8();
 #endif
 }
 

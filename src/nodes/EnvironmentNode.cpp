@@ -13,6 +13,7 @@
 #define STBI_NO_STDIO
 #include <cstdio>
 #include "stb_image.h"
+#include "platform/AppPaths.h"
 
 namespace
 {
@@ -21,7 +22,7 @@ namespace
    // for a loader that only ever runs once per Load() call.
    bool ReadWholeFile(const std::string& path, std::vector<unsigned char>& out)
    {
-      FILE* f = fopen(path.c_str(), "rb");
+      FILE* f = AppPaths::OpenFile(path, "rb");
       if (f == nullptr)
          return false;
       fseek(f, 0, SEEK_END);

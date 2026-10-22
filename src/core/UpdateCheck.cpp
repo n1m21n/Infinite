@@ -68,7 +68,7 @@ namespace
       std::string path = DismissalPath();
       if (path.empty())
          return {};
-      FILE* f = fopen(path.c_str(), "rb");
+      FILE* f = AppPaths::OpenFile(path, "rb");
       if (!f)
          return {};
       char buf[64] = {};
@@ -85,7 +85,7 @@ namespace
       std::string path = DismissalPath();
       if (path.empty())
          return;
-      if (FILE* f = fopen(path.c_str(), "wb"))
+      if (FILE* f = AppPaths::OpenFile(path, "wb"))
       {
          fwrite(version.data(), 1, version.size(), f);
          fclose(f);
@@ -364,7 +364,7 @@ static std::string AutoOffPath()
 
 bool AutoCheckEnabled()
 {
-   std::ifstream f(AutoOffPath());
+   std::ifstream f(AppPaths::FsPath(AutoOffPath()));
    return !f.good();
 }
 
@@ -373,7 +373,7 @@ void SetAutoCheckEnabled(bool on)
    if (on)
       std::remove(AutoOffPath().c_str());
    else
-      std::ofstream(AutoOffPath()) << "off\n";
+      std::ofstream(AppPaths::FsPath(AutoOffPath())) << "off\n";
 }
 
 void Dismiss()

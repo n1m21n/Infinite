@@ -1,6 +1,7 @@
 // Patch build, settings files, autosave, new patch (moved verbatim from main.cpp).
 #include "app/AppShared.h"
 #include "core/Notices.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -255,7 +256,7 @@ namespace app
       const std::string path = GeneralSettingsPath();
       if (path.empty())
          return;
-      std::ifstream file(path);
+      std::ifstream file(AppPaths::FsPath(path));
       std::string line;
       if (std::getline(file, line) && !line.empty())
          gAutosaveEnabled = (line != "0");
@@ -283,7 +284,7 @@ namespace app
       const std::string path = GeneralSettingsPath();
       if (path.empty())
          return;
-      std::ofstream file(path);
+      std::ofstream file(AppPaths::FsPath(path));
       file << (gAutosaveEnabled ? "1" : "0") << "\n" << gAutosaveSeconds << "\n"
            << gTargetFps << "\n" << (gVsync ? "1" : "0") << "\n"
            << (gCheckerboardBackdrop ? "1" : "0") << "\n"
@@ -304,7 +305,7 @@ namespace app
       const std::string path = WorkspaceSettingsPath();
       if (path.empty())
          return;
-      std::ifstream file(path);
+      std::ifstream file(AppPaths::FsPath(path));
       std::string line;
       while (std::getline(file, line))
       {
@@ -370,7 +371,7 @@ namespace app
       const std::string path = WorkspaceSettingsPath();
       if (path.empty())
          return;
-      std::ofstream file(path);
+      std::ofstream file(AppPaths::FsPath(path));
       file << "snapToGrid=" << (gSnapToGrid ? 1 : 0) << "\n";
       file << "showCanvasGrid=" << (gShowCanvasGrid ? 1 : 0) << "\n";
       file << "gridSnap=" << gGridSnap << "\n";
@@ -441,7 +442,7 @@ namespace app
       const std::string path = AudioSettingsPath();
       if (path.empty())
          return;
-      std::ifstream file(path);
+      std::ifstream file(AppPaths::FsPath(path));
       std::string line;
       while (std::getline(file, line))
       {
@@ -476,7 +477,7 @@ namespace app
       const std::string path = AudioSettingsPath();
       if (path.empty())
          return;
-      std::ofstream file(path);
+      std::ofstream file(AppPaths::FsPath(path));
       file << "outputDeviceId=" << gAudioOutputDeviceId << "\n";
       file << "inputDeviceId=" << gAudioInputDeviceId << "\n";
       file << "sampleRate=" << gAudioSampleRate << "\n";
@@ -547,7 +548,7 @@ namespace app
       const std::string path = ExprGlobalsSettingsPath();
       if (path.empty())
          return;
-      std::ifstream file(path);
+      std::ifstream file(AppPaths::FsPath(path));
       if (!file)
          return;
       std::string tag, line;
@@ -579,7 +580,7 @@ namespace app
       const std::string path = ExprGlobalsSettingsPath();
       if (path.empty())
          return;
-      std::ofstream file(path);
+      std::ofstream file(AppPaths::FsPath(path));
       for (const ExprGlobals::Global& g : ExprGlobals::All())
          file << "glob " << g.name << " " << EscapeExprGlobalsLine(g.expr) << "\n";
    }
@@ -740,7 +741,7 @@ namespace app
 
       if (!marker.empty())
       {
-         std::ofstream m(marker);
+         std::ofstream m(AppPaths::FsPath(marker));
       }
    }
 
@@ -979,7 +980,7 @@ namespace app
    std::string SaveAISkillFile(const std::string& folder, const char* filename, const char* content)
    {
       const std::string path = folder + "/" + filename;
-      std::ofstream file(path);
+      std::ofstream file(AppPaths::FsPath(path));
       if (!file.is_open())
          return "Couldn't write " + path;
       file << content;

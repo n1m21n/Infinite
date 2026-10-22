@@ -22,7 +22,7 @@ bool WavWriter::Open(const std::string& path, double sampleRate, int numChannels
 {
    Close();
 
-   mFile = fopen(path.c_str(), "wb");
+   mFile = AppPaths::OpenFile(path, "wb");
    if (mFile == nullptr)
       return false;
 

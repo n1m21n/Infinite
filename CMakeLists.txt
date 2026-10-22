@@ -56,6 +56,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     add_compile_options(/Zc:preprocessor)
+    # Read sources as UTF-8 and keep string literals UTF-8. Without it MSVC
+    # reads a BOM-less source in the build machine's code page, so a label
+    # with a non-ASCII glyph builds differently on a Japanese or Russian
+    # Windows than on the CI runner.
+    add_compile_options(/utf-8)
 
     # One cl.exe invocation per translation unit instead of the Visual Studio
     # generator's default of batching every source in a target into a single
@@ -856,6 +861,8 @@ set(WIN32_SOURCES
     # RC language is enabled (see enable_language below); without this the
     # exe shows Explorer's generic application icon everywhere.
     ${CMAKE_CURRENT_BINARY_DIR}/generated/Infinite.rc
+    # activeCodePage UTF-8: narrow paths, getenv and argv become UTF-8 (W1).
+    src/platform/win/Infinite.manifest
     src/platform/win/PlatformWin.cpp
     src/platform/HeadTrackerStub.cpp
     src/platform/win/TextWin.cpp

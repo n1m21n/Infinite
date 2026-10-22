@@ -2059,7 +2059,7 @@ std::string StatsPath(const std::string& logDir)
 
 static bool ReadWholeFile(const std::string& path, std::vector<uint8_t>& out)
 {
-   std::ifstream f(path, std::ios::binary);
+   std::ifstream f(AppPaths::FsPath(path), std::ios::binary);
    if (!f)
       return false;
    f.seekg(0, std::ios::end);
@@ -2211,7 +2211,7 @@ bool NearlyEqual(const ParamStats& a, const ParamStats& b)
 
 void WriteBytes(const std::string& path, const std::vector<uint8_t>& bytes)
 {
-   std::ofstream f(path, std::ios::binary | std::ios::trunc);
+   std::ofstream f(AppPaths::FsPath(path), std::ios::binary | std::ios::trunc);
    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
 }
 } // namespace

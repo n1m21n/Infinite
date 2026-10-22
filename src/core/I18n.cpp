@@ -6,6 +6,7 @@
 #include <fstream>
 #include <memory>
 #include <sstream>
+#include "platform/AppPaths.h"
 
 namespace I18n
 {
@@ -270,7 +271,7 @@ size_t ParseTsv(const std::string& text, Table& out)
 
 bool LoadTsvFile(const std::string& path, Table& out)
 {
-   std::ifstream f(path, std::ios::binary);
+   std::ifstream f(AppPaths::FsPath(path), std::ios::binary);
    if (!f.is_open())
       return false;
    std::stringstream ss;

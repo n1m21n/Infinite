@@ -492,6 +492,90 @@ int RunPatchOpenerTest()
    return fails == 0 ? 0 : 1;
 }
 
+// ===================================================== INFINITE_UNICODEPATHTEST
+// A user whose name or folders are not ASCII (José, テスト, टेस्ट): the settings
+// folder, a patch save + load and the recents list all inside a folder with
+// such a name. On Windows the narrow CRT/Win32 calls read paths in the ANSI
+// code page, so each of these failed silently there before W1; macOS and Linux
+// run it too, so a regression shows up on every platform's CI.
+int RunUnicodePathTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+   namespace fs = std::filesystem;
+   int fails = 0;
+   auto check = [&](bool ok, const std::string& what)
+   {
+      printf("%s %s\n", ok ? "  ok  " : "  FAIL", what.c_str());
+      if (!ok)
+         fails++;
+   };
+   const std::string name = "Ünïcødé_テスト_टेस्ट";
+   const std::string root = AppPaths::TempDir() + "/" + name;
+   std::error_code ec;
+   fs::remove_all(AppPaths::FsPath(root), ec);
+   check(AppPaths::EnsureDir(root), "make " + root);
+
+   // The folder on disk carries the real name, not code-page mojibake.
+   bool found = false;
+   for (const auto& e : fs::directory_iterator(AppPaths::FsPath(AppPaths::TempDir()), ec))
+      if (e.path().filename().u8string() == name)
+         found = true;
+   check(found, "the folder's name on disk round-trips as UTF-8");
+
+   // Settings: point the per-user folder at the Unicode folder.
+#if defined(_WIN32)
+   _wputenv_s(L"APPDATA", AppPaths::FsPath(root).wstring().c_str());
+   const std::string wantSettings = root + "/Infinite";
+#elif defined(__APPLE__)
+   setenv("HOME", root.c_str(), 1);
+   const std::string wantSettings = root + "/Library/Application Support/Infinite";
+#else
+   setenv("XDG_CONFIG_HOME", root.c_str(), 1);
+   const std::string wantSettings = root + "/Infinite";
+#endif
+   const std::string settings = AppPaths::AppSupportDir();
+   check(settings == wantSettings, "settings folder is " + settings);
+   check(AppPaths::DirExists(wantSettings), "settings folder exists");
+
+   // Patch save + load.
+   Patch::Data data;
+   {
+      Patch::NodeRecord rec;  // Read rejects a patch with no nodes
+      rec.index = 1;
+      rec.category = "Source";
+      rec.typeName = "Shape";
+      data.nodes.push_back(rec);
+   }
+   std::string before, after, error;
+   Patch::WriteText(data, before);
+   const std::string patchPath = root + "/patch_ñ_テスト.inf";
+   check(Patch::Write(patchPath, data, error), "save " + patchPath + " " + error);
+   Patch::Data loaded;
+   check(Patch::Read(patchPath, loaded, error), "load it back " + error);
+   Patch::WriteText(loaded, after);
+   check(!before.empty() && before == after, "the loaded patch matches the saved one");
+
+   // A settings file (recents) written and read through the settings folder.
+   Patch::NoteRecent(patchPath);
+   Patch::LoadRecents();
+   check(!Patch::Recents().empty() && Patch::Recents()[0] == patchPath, "recents list keeps the Unicode path");
+
+   // Raw fopen and ifstream helpers.
+   const std::string rawPath = root + "/raw_é.bin";
+   if (FILE* f = AppPaths::OpenFile(rawPath, "wb"))
+   {
+      fputs("x", f);
+      fclose(f);
+   }
+   std::ifstream in(AppPaths::FsPath(rawPath), std::ios::binary);
+   check(in.good() && in.get() == 'x', "OpenFile writes and FsPath reads " + rawPath);
+   in.close();
+
+   fs::remove_all(AppPaths::FsPath(root), ec);
+   printf("%s\n", fails == 0 ? "UNICODEPATHTEST OK" : "UNICODEPATHTEST FAIL");
+   return fails == 0 ? 0 : 1;
+}
+
 // ===================================================== INFINITE_SELFUPDATETEST
 // INFINITE_SELFUPDATETEST=<payload>|<version>: stages the payload (DMG / unpacked folder / AppImage) and starts the
 // swap helper without relaunch, then exits. Replaces THIS copy once it exits - run only from a throwaway copy

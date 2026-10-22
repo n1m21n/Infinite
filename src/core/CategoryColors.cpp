@@ -367,7 +367,7 @@ void LoadAppearanceOverrides()
    const std::string path = AppearancePath();
    if (path.empty())
       return;
-   std::ifstream file(path);
+   std::ifstream file(AppPaths::FsPath(path));
    if (!file.is_open())
       return;
 
@@ -488,7 +488,7 @@ void SetPreset(int index)
    const std::string path = ThemePath();
    if (!path.empty())
    {
-      std::ofstream file(path);
+      std::ofstream file(AppPaths::FsPath(path));
       file << Presets()[gCurrent].name << "\n";
    }
 }
@@ -863,7 +863,7 @@ void SaveAppearanceOverrides()
       return;
    }
 
-   std::ofstream file(path);
+   std::ofstream file(AppPaths::FsPath(path));
    if (!file.is_open())
       return;
 
@@ -920,7 +920,7 @@ void LoadPreference()
    const std::string path = ThemePath();
    if (!path.empty())
    {
-      std::ifstream file(path);
+      std::ifstream file(AppPaths::FsPath(path));
       std::string name;
       if (std::getline(file, name) && !name.empty())
       {

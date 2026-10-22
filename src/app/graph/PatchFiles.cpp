@@ -1,5 +1,6 @@
 // Patch file watching, unsaved-changes guard (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -76,7 +77,7 @@ namespace app
       // Polyline, which hides core/Mesh.h's global `struct Polyline` and breaks
       // every MeshOps declaration that takes one. main.cpp includes no Windows
       // headers at all today; keep it that way.
-      std::ifstream iconFile(iconPath, std::ios::binary | std::ios::ate);
+      std::ifstream iconFile(AppPaths::FsPath(iconPath), std::ios::binary | std::ios::ate);
       if (!iconFile) return;
       const std::streamoff iconSize = iconFile.tellg();
       if (iconSize <= 0) return;

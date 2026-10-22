@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 
 extern "C"
@@ -604,7 +605,7 @@ void SketchEngine::SetFontFile(const std::string& path)
       if (slash != std::string::npos) bold = bold.substr(0, slash + 1) + "Inter-SemiBold.ttf";
       bool haveBold = false;
       if (bold != path)
-         if (std::FILE* f = std::fopen(bold.c_str(), "rb")) { haveBold = true; std::fclose(f); }
+         { std::error_code ec; haveBold = std::filesystem::exists(std::filesystem::u8path(bold), ec); }
       for (const char* fam : families)
       {
          lunasvg_add_font_face_from_file(fam, false, false, path.c_str());

@@ -5,6 +5,7 @@
 #include "app/ui/design/components/FilterBar.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -256,7 +257,7 @@ namespace app
       const std::string path = BrowserFilterPrefsPath();
       if (path.empty())
          return;
-      std::ifstream file(path);
+      std::ifstream file(AppPaths::FsPath(path));
       if (!file)
          return;
       BrowserFilterState* states[5] = { &gModulesFilter, &gSampleFilter, &gMediaFilter, &gPluginFilter, &gFieldFilter };
@@ -277,7 +278,7 @@ namespace app
       const std::string path = BrowserFilterPrefsPath();
       if (path.empty())
          return;
-      std::ofstream file(path);
+      std::ofstream file(AppPaths::FsPath(path));
       if (!file)
          return;
       const BrowserFilterState* states[5] = { &gModulesFilter, &gSampleFilter, &gMediaFilter, &gPluginFilter, &gFieldFilter };

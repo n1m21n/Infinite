@@ -12,6 +12,7 @@
 #else
 #include <unistd.h>
 #endif
+#include "AppPaths.h"
 
 namespace
 {
@@ -25,7 +26,7 @@ namespace
    {
       if (gListPath.empty())
          return;
-      std::ofstream out(gListPath, std::ios::trunc);
+      std::ofstream out(AppPaths::FsPath(gListPath), std::ios::trunc);
       for (const std::string& id : gCrashed)
          out << id << "\n";
    }
@@ -47,7 +48,7 @@ namespace PluginCrashGuard
       gListPath = dir + "/plugin-crashed.txt";
 
       {
-         std::ifstream in(gListPath);
+         std::ifstream in(AppPaths::FsPath(gListPath));
          std::string line;
          while (std::getline(in, line))
             if (!line.empty())
@@ -56,7 +57,7 @@ namespace PluginCrashGuard
 
       std::string crashed;
       {
-         std::ifstream in(marker);
+         std::ifstream in(AppPaths::FsPath(marker));
          std::getline(in, crashed);
       }
       if (!crashed.empty())

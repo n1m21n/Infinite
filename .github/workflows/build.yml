@@ -90,6 +90,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Literal colours only go down; generated tokens current
         run: python3 tools/design/ratchet.py
+      # W1: Windows reads narrow paths in the ANSI code page; every open goes through AppPaths.
+      - name: No narrow file opens (UTF-8 paths on Windows)
+        run: python3 scripts/check_utf8_paths.py
 
   macos:
     name: macOS (arm64)

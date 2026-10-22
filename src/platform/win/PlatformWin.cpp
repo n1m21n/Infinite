@@ -1526,6 +1526,19 @@ namespace Platform
          SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
    }
 
+   std::vector<std::string> CommandLineUtf8()
+   {
+      std::vector<std::string> args;
+      int count = 0;
+      LPWSTR* wide = CommandLineToArgvW(GetCommandLineW(), &count);
+      if (wide == nullptr)
+         return args;
+      for (int i = 0; i < count; ++i)
+         args.push_back(WinCommon::WideToUtf8(wide[i]));
+      LocalFree(wide);
+      return args;
+   }
+
    // Defined here, not in PluginHostWin.cpp: infinite-vst3-scanner compiles
    // PluginVST3Win.cpp and PlatformWin.cpp but not PluginHostWin.cpp. Platform.h
    // declares it for every build; the main loop uses it around glfwPollEvents().

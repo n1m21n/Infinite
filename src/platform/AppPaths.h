@@ -42,17 +42,6 @@ namespace AppPaths
 namespace AppPaths
 {
 
-   // The user's home directory. HOME first (set by shells and CI), then
-   // Windows' USERPROFILE. Empty string if neither is set.
-   inline std::string HomeDir()
-   {
-      if (const char* home = std::getenv("HOME"))
-         return home;
-      if (const char* profile = std::getenv("USERPROFILE"))
-         return profile;
-      return {};
-   }
-
    // Engine paths are UTF-8 std::string everywhere. std::filesystem::path's
    // string constructor reads them in the ANSI code page on Windows, which
    // mangles any non-ASCII folder (a user called "Müller", a Cyrillic
@@ -61,6 +50,56 @@ namespace AppPaths
    inline std::filesystem::path FsPath(const std::string& utf8)
    {
       return std::filesystem::u8path(utf8);
+   }
+
+   // fopen for a UTF-8 path. On Windows the narrow fopen reads the path in the
+   // ANSI code page (same trap as FsPath above), so it goes through _wfopen with
+   // the path's wide form; elsewhere narrow paths already are UTF-8.
+   inline FILE* OpenFile(const std::string& utf8, const char* mode)
+   {
+#if defined(_WIN32)
+      std::wstring wideMode;
+      for (const char* c = mode; *c != '\0'; ++c)
+         wideMode.push_back((wchar_t)(unsigned char)*c);
+      return _wfopen(FsPath(utf8).c_str(), wideMode.c_str());
+#else
+      return std::fopen(utf8.c_str(), mode);
+#endif
+   }
+
+   // An environment variable as UTF-8, false when unset. Windows' getenv
+   // returns the ANSI code page, so %APPDATA% for a user called "José" would
+   // come back as bytes FsPath cannot read; _wgetenv has the real name.
+   inline bool GetEnvUtf8(const char* name, std::string& out)
+   {
+#if defined(_WIN32)
+      std::wstring wideName;
+      for (const char* c = name; *c != '\0'; ++c)
+         wideName.push_back((wchar_t)(unsigned char)*c);
+      const wchar_t* value = _wgetenv(wideName.c_str());
+      if (value == nullptr)
+         return false;
+      out = std::filesystem::path(value).u8string();
+      return true;
+#else
+      const char* value = std::getenv(name);
+      if (value == nullptr)
+         return false;
+      out = value;
+      return true;
+#endif
+   }
+
+   // The user's home directory. HOME first (set by shells and CI), then
+   // Windows' USERPROFILE. Empty string if neither is set.
+   inline std::string HomeDir()
+   {
+      std::string value;
+      if (GetEnvUtf8("HOME", value))
+         return value;
+      if (GetEnvUtf8("USERPROFILE", value))
+         return value;
+      return {};
    }
 
    // Saves a user's document: writes beside the target and renames over it, so a full disk or a
@@ -149,11 +188,9 @@ namespace AppPaths
       // %APPDATA% is the roaming profile (CSIDL_APPDATA); fall back to
       // USERPROFILE\AppData\Roaming when the variable is missing, which is
       // effectively never on real installs.
-      std::string base;
-      if (const char* appdata = std::getenv("APPDATA"))
-         base = appdata;
-      else if (const char* profile = std::getenv("USERPROFILE"))
-         base = std::string(profile) + "\\AppData\\Roaming";
+      std::string base, profile;
+      if (!GetEnvUtf8("APPDATA", base) && GetEnvUtf8("USERPROFILE", profile))
+         base = profile + "\\AppData\\Roaming";
       if (base.empty())
          return {};
       std::string dir = base + "/Infinite";
@@ -216,10 +253,10 @@ namespace AppPaths
       if (std::rename(oldPath.c_str(), newPath.c_str()) == 0)
          return;
 
-      std::ifstream in(oldPath, std::ios::binary);
+      std::ifstream in(FsPath(oldPath), std::ios::binary);
       if (!in)
          return;
-      std::ofstream out(newPath, std::ios::binary);
+      std::ofstream out(FsPath(newPath), std::ios::binary);
       if (!out)
          return;
       out << in.rdbuf();
@@ -237,10 +274,9 @@ namespace AppPaths
    inline std::string TempDir()
    {
 #if defined(_WIN32)
-      if (const char* temp = std::getenv("TEMP"))
-         return temp;
-      if (const char* tmp = std::getenv("TMP"))
-         return tmp;
+      std::string value;
+      if (GetEnvUtf8("TEMP", value) || GetEnvUtf8("TMP", value))
+         return value;
       return ".";
 #else
       return "/tmp";

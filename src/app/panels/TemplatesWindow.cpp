@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include "platform/AppPaths.h"
 
 namespace app
 {
@@ -29,7 +30,7 @@ std::vector<Entry>& Entries()
    if (!sRead)
    {
       sRead = true;
-      std::ifstream in(BundledResourcePath("templates/index.txt"));
+      std::ifstream in(AppPaths::FsPath(BundledResourcePath("templates/index.txt")));
       std::string line;
       while (std::getline(in, line))
       {
@@ -65,7 +66,7 @@ namespace
       if (it != sCache.end())
          return it->second;
       unsigned int tex = 0;
-      std::ifstream f(BundledResourcePath(("templates/thumbs/" + slug + ".png").c_str()), std::ios::binary | std::ios::ate);
+      std::ifstream f(AppPaths::FsPath(BundledResourcePath(("templates/thumbs/" + slug + ".png").c_str())), std::ios::binary | std::ios::ate);
       if (f)
       {
          const std::streamoff n = f.tellg();
