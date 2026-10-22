@@ -1,5 +1,14 @@
 [
  {
+  "slug": "raymarching-signed-distance-fields-in-real-time-glsl",
+  "title": "Raymarching signed distance fields in real-time GLSL",
+  "description": "How to build a real-time raymarcher in GLSL: sphere tracing algorithm, primitive distance functions, smooth blending, normals, and audio-reactive scenes.",
+  "date": "2026-10-23",
+  "updated": "2026-10-23",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/raymarching-signed-distance-fields-in-real-time-glsl.html"
+ },
+ {
   "slug": "reaction-diffusion-simulation-in-real-time-glsl",
   "title": "Reaction-diffusion simulation in real-time GLSL",
   "description": "How to build a reaction-diffusion simulation in real-time GLSL shaders and nodes, creating generative Turing patterns with audio-reactive parameter modulation.",
