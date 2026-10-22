@@ -24,7 +24,8 @@ Usage:
 
 With --baseline, prints only rows whose issues differ from the baseline file
 (a previous census.json), so a new node or a regression stands out. Exit code
-1 when anything new appears.
+1 when a type gains an issue or a new type has any; one that only lost issues
+is reported as improved and does not fail.
 """
 import argparse, concurrent.futures as cf, json, os, subprocess, sys
 import numpy as np
@@ -212,12 +213,16 @@ def main():
         json.dump(rows, f, indent=1)
 
     if a.baseline:
+        # Only a gained issue (or a new type that has any) fails: a type that lost one
+        # improved, so it is reported for a baseline refresh rather than failing the gate.
         base = {r["type"]: sorted(r["issues"]) for r in json.load(open(a.baseline))}
-        new = [r for r in rows if base.get(r["type"]) != sorted(r["issues"])]
-        for r in new:
-            print(f"{r['type']:28} was {base.get(r['type'], 'NEW TYPE')} now {r['issues']}")
-        print(f"{len(rows)} types, {len(new)} changed vs baseline")
-        sys.exit(1 if new else 0)
+        changed = [r for r in rows if base.get(r["type"]) != sorted(r["issues"])]
+        worse = [r for r in changed if set(r["issues"]) - set(base.get(r["type"], []))]
+        for r in changed:
+            tag = "" if r in worse else "  (improved: refresh the baseline)"
+            print(f"{r['type']:28} was {base.get(r['type'], 'NEW TYPE')} now {r['issues']}{tag}")
+        print(f"{len(rows)} types, {len(changed)} changed vs baseline, {len(worse)} worse")
+        sys.exit(1 if worse else 0)
     bad = [r for r in rows if r["issues"]]
     print(f"{len(rows)} types, {len(rows) - len(bad)} clean", file=sys.stderr)
 
