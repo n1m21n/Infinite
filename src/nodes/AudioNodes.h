@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -98,6 +100,20 @@ public:
    float ChannelLevel(int slot) const
    {
       return (slot >= 0 && slot < numChannels) ? mChannelLevel[slot] : 0.0f;
+   }
+
+   // Strips past the default channel count are not in the mix until "channels"
+   // reaches them, so the sweep raises it before probing their params.
+   std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
+   {
+      static const char* kStripPrefixes[] = { "gain", "pan", "mute", "solo" };
+      for (const char* prefix : kStripPrefixes)
+      {
+         const size_t n = strlen(prefix);
+         if (paramName.compare(0, n, prefix) == 0 && paramName.size() > n && atoi(paramName.c_str() + n) >= 8)
+            return { { "channels", (float)kMaxSlots } };
+      }
+      return {};
    }
 
    int numChannels = 8;

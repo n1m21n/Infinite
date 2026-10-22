@@ -536,6 +536,13 @@ namespace AudioParamSweep
          if (!BuildRig(cand, sampleRate, blockSize, rig))
             return false;
          ApplyPrerequisites(rig.node.get(), cand.name, probeSlot.name);
+         // A prerequisite can add input pins (Mixer's "channels"): drive those too.
+         while (rig.numInputs > 0 && rig.numInputs < kAudioMaxNodeInputs && rig.node->AudioInputSlot(rig.numInputs) != nullptr)
+         {
+            rig.drive[rig.numInputs] = rig.drive[0];
+            rig.driveInputs[rig.numInputs] = &rig.drive[rig.numInputs];
+            rig.numInputs++;
+         }
          rig.node->CookIfNeeded(frame++);
          for (int b = 0; b < 12; b++)
             RunOneBlock(rig, blockSize);
