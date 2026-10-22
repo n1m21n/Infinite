@@ -18,6 +18,9 @@ namespace Tracking
    public:
       ~OrtRuntime();
 
+      // Where the pack keeps this platform's runtime: <packDir>/lib/ plus
+      // libonnxruntime.dylib, onnxruntime.dll or libonnxruntime.so.
+      static std::string PackLibraryPath(const std::string& packDir);
       // libPath: full path of libonnxruntime (.dylib/.so/.dll) inside the pack.
       bool Load(const std::string& libPath, std::string& err);
       bool Loaded() const { return m_api != nullptr; }

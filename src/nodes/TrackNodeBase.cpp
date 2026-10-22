@@ -173,13 +173,7 @@ void TrackNodeBase::WorkerLoop()
          else
          {
             std::string err;
-#if defined(__APPLE__)
-            const std::string lib = dir + "/lib/libonnxruntime.dylib";
-#elif defined(_WIN32)
-            const std::string lib = dir + "/lib/onnxruntime.dll";
-#else
-            const std::string lib = dir + "/lib/libonnxruntime.so";
-#endif
+            const std::string lib = Tracking::OrtRuntime::PackLibraryPath(dir);
             if (rt.Load(lib, err) && OpenTracker(rt, dir, err))
             {
                opened = true;
