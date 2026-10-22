@@ -2065,13 +2065,24 @@ namespace app
          ImGui::Dummy(ImVec2(w, h));
       }
 
+      ImGui::Dummy(ImVec2(0.0f, 4.0f)); // the skeleton's gap under the visualizer
+
       {
-         AudioKnobRow row(5);
+         // Four knobs a row (five cells put each mod pin against its neighbour's knob), the checkbox bottom-left
+         // under them - the Keyboard's shape (P3, P6).
+         AudioKnobRow row(4);
          row.KnobInt("transpose", &n->transpose, -48, 48);
          row.Knob("position", &n->position, 0.0f, 1.0f, "%.2f", kKnobSmall);
          row.Knob("speed", &n->speed, 0.25f, 4.0f, "%.2fx", kKnobSmall);
          row.Knob("vel", &n->velocity, 0.0f, 2.0f, "%.2f", kKnobSmall);
+         row.End();
+      }
+      {
+         AudioKnobRow row(4, 20.0f, 0.0f, false);
          row.Checkbox("loop", &n->loop);
+         row.Skip();
+         row.Skip();
+         row.Skip();
          row.End();
       }
 
