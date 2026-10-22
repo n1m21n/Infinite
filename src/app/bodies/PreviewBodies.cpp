@@ -5,6 +5,8 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/GlyphToggle.h"
+#include "app/ui/design/components/FormParts.h"
 #include "app/AppShared.h"
 #include "app/ui/design/components/AudioViz.h"
 
@@ -446,8 +448,10 @@ namespace app
       AutoFitGroupToMembers(gn, n);
 
       const bool isLight = IsThemeLight();
-      const float bgAlpha = isLight ? 0.08f : 0.13f;
-      const float borderAlpha = isLight ? 0.65f : 0.80f;
+      // A set block that is off reads as dimmed: its members hold black and silent.
+      const float offDim = (n->block && !n->on) ? 0.4f : 1.0f;
+      const float bgAlpha = (isLight ? 0.08f : 0.13f) * offDim;
+      const float borderAlpha = (isLight ? 0.65f : 0.80f) * offDim;
       ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(0, 0, 0, 0));
       ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0, 0, 0, 0));
       ed::PushStyleColor(ed::StyleColor_GroupBg,
@@ -458,6 +462,14 @@ namespace app
       ed::BeginNode(gn.NodeId());
       ImGui::PushID(gn.index);
       ImGui::BeginGroup();
+      if (n->block)
+      {
+         // The same power glyph as a node's: lit while the block plays. A live
+         // control, like node power, so it is not an undo step.
+         if (GlyphToggle::Draw("##blockpower", IconsInfinite::Power, IconsInfinite::PowerFill, n->on, 22.0f, true))
+            n->on = !n->on;
+         FormParts::Inline();
+      }
       if (ImGui::ColorButton("##groupcolor", ImVec4(n->color[0], n->color[1], n->color[2], 1.0f),
                              ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoBorder,
                              ImVec2(14, 14)))
@@ -614,7 +626,12 @@ namespace app
 
       DrawCheckerboardBackdrop(dl, origin, size);
 
-      if (tex != 0 && shown->GetOutputWidth() > 0)
+      // An off set block sends nothing on, so its last frame would be a stale picture.
+      if (node->blockOff)
+      {
+         EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), "block off");
+      }
+      else if (tex != 0 && shown->GetOutputWidth() > 0)
       {
          float w = (float)shown->GetOutputWidth();
          float h = (float)shown->GetOutputHeight();
@@ -630,7 +647,7 @@ namespace app
          EmptyState::DrawCaption(origin, ImVec2(origin.x + size, origin.y + size), EmptyPreviewLabel(node, "no input"));
       }
 
-      if (!node->bypassed)
+      if (!node->bypassed && !node->blockOff)
       {
          const char* idle = nullptr;
          if (auto* is = dynamic_cast<ImageSourceNode*>(node); is != nullptr && is->LoadedPath().empty())

@@ -63,6 +63,42 @@ public:
    // (the canvas Cook times overlay); read by the main thread.
    std::atomic<float> costMs { 0.0f };
 
+   // ---- set blocks ----
+   // A set block switched off fades this node's outputs to silence over
+   // blockFadeSeconds (both written by the main thread), so the switch never
+   // clicks; once silent the engine stops running the node until the block
+   // comes back on, when it fades in the same way.
+   std::atomic<float> blockGainTarget { 1.0f };
+   std::atomic<float> blockFadeSeconds { 0.01f };
+   float blockGain = 1.0f;   // audio thread only
+
+   bool BlockSilent() const
+   {
+      return blockGain <= 0.0f && blockGainTarget.load(std::memory_order_relaxed) <= 0.0f;
+   }
+
+   void ApplyBlockGain(AudioBuffer* const* outputs, int numOutputs, int numFrames, double sampleRate)
+   {
+      const float target = blockGainTarget.load(std::memory_order_relaxed);
+      if (blockGain == target && target >= 1.0f)
+         return;
+      const double fadeFrames = (double)blockFadeSeconds.load(std::memory_order_relaxed) * (sampleRate > 0.0 ? sampleRate : 48000.0);
+      const float step = 1.0f / (float)(fadeFrames > 1.0 ? fadeFrames : 1.0);
+      float g = blockGain;
+      for (int i = 0; i < numFrames; i++)
+      {
+         g = g < target ? (g + step < target ? g + step : target) : (g - step > target ? g - step : target);
+         for (int o = 0; o < numOutputs; o++)
+         {
+            if (outputs[o] == nullptr || i >= outputs[o]->numFrames)
+               continue;
+            for (int ch = 0; ch < outputs[o]->numChannels; ch++)
+               outputs[o]->channels[ch][i] *= g;
+         }
+      }
+      blockGain = g;
+   }
+
    // Must match kAudioMaxNodeInputs (AudioEngine.h) - a static_assert there
    // checks it. Can't reference that constant directly: AudioEngine.h is the
    // one that includes AudioNode.h, not the other way around.

@@ -257,6 +257,8 @@ void DrawMenuBar(FrameCtx& fc)
                gRequestGroup = true;
             if (MenuParts::Item(L("Ungroup"), MODKEY "+U"))
                gRequestUngroup = true;
+            if (MenuParts::Item(L("Make block")))
+               gRequestMakeBlock = true;
             MenuParts::Separator();
             if (MenuParts::Item(L("Add Node..."), "Shift+N"))
                gRequestAddNode = true;
@@ -395,6 +397,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (MenuParts::SubMenu(L("Show Set")))
             {
                MenuParts::Check(L("Show Set window"), &gShowSetOpen);
+               MenuParts::Check(L("Set list window"), &gSetListOpen);
                if (MenuParts::Item(L("Next patch"), "PgDn", false, ShowSetSize() > 0))
                   ShowSetStep(+1);
                if (MenuParts::Item(L("Previous patch"), "PgUp", false, ShowSetSize() > 0))

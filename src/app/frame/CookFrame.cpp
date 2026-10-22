@@ -169,6 +169,9 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    // between audio callbacks, so every modulator read below sees the frame's
    // own time rather than the last block boundary (Block 2, F2).
    Transport::Instance().BeginFrameClock();
+   // Set blocks: a GO waiting for the grid lands here, and every node learns
+   // whether its block is off before anything cooks.
+   BlockSetUpdate();
    UpdatePerformanceMatrixMIDI();
    // Before any binding is read: which clip is under the playhead decides
    // which modulations are bypassed this frame.
@@ -660,7 +663,7 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    // controls and have it land the same frame.
    for (GraphNode& gn : gNodes)
    {
-      if (dynamic_cast<IPaletteSource*>(gn.node.get()) != nullptr && !gn.node->bypassed)
+      if (dynamic_cast<IPaletteSource*>(gn.node.get()) != nullptr && !gn.node->bypassed && !gn.node->blockOff)
       {
          CookProbe::Scope probe(gn.node.get());
          gn.node->CookIfNeeded(frameId);
@@ -674,7 +677,7 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    // never being called on them.
    for (GraphNode& gn : gNodes)
    {
-      if (!gn.node->bypassed &&
+      if (!gn.node->bypassed && !gn.node->blockOff &&
           (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr ||
            dynamic_cast<FieldPrimitiveNode*>(gn.node.get()) != nullptr ||
            dynamic_cast<Sketch3DNode*>(gn.node.get()) != nullptr ||

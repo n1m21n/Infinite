@@ -328,6 +328,7 @@ bool gHeadlessNeedProbe = false;
    // selection, so both routes meet in one place inside the editor frame
    // rather than the menu reaching into the editor from outside it.
    bool gRequestGroup = false;
+   bool gRequestMakeBlock = false;
 
    bool gRequestUngroup = false;
 

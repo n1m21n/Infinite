@@ -671,6 +671,7 @@ extern bool gRequestFitViewNodeZoom; // fit_view_node "zoom": scale up to fill t
 extern int gRequestSelectNodeIndex; // select this node alone on the next canvas frame (-1 = none)
 
 extern bool gRequestGroup;
+extern bool gRequestMakeBlock;   // wrap the selection in a group and make it a set block
 
 extern bool gRequestUngroup;
 
@@ -5644,6 +5645,23 @@ void PollOscListeners();
 // Show set (v0.6 2.35, graph/ShowSet.cpp): patches played in order in a live
 // set, switched on the launch grid with an audio crossfade and a held picture.
 extern bool gShowSetOpen;
+
+// ---- Set blocks (graph/BlockSet.cpp) ----
+// Groups marked as blocks are the sections of a live set, stepped through in
+// order from the Set list window. GO waits for the Transport launch grid.
+extern bool gSetListOpen;
+extern bool gSetListFocused;   // the Set list has the keyboard: Space is GO
+std::vector<GroupNode*> SetBlocks();   // every block, in set order
+int SetBlockCurrent();                 // index of the block the last GO landed on, or -1
+int SetBlockPending();                 // index waiting for the grid, or -1
+int SetBlockNext();                    // what GO plays next
+void SetBlockGo(int index);
+void SetBlockGoNext();                 // GO: play SetBlockNext() on the launch grid
+void SetBlockCue(int direction);       // move what GO plays next, without playing it
+void SetBlockStep(int direction);      // GO straight to the block after (+1) / before (-1) the current one
+void SetBlockMove(int index, int direction);
+void MakeBlock(GroupNode* g, bool block);
+void BlockSetUpdate();                 // once per frame, before cooking
 int ShowSetSize();
 const std::string& ShowSetName(int i);
 const std::string& ShowSetEntryPath(int i);
@@ -5733,6 +5751,7 @@ bool SavePatchWithMediaTo(const std::string& path, std::string& report);
 void SavePatchWithMediaInteractive();
 bool RunSaveWithMediaTest();
 bool RunFormulaShadertoyTest();
+bool RunBlockSetTest();
 extern bool gShowSaveMediaModal;
 
 // Templates (TemplatesWindow.cpp): the window, the empty-canvas invitation, and the open-as-untitled-copy.
