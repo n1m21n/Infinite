@@ -244,6 +244,7 @@ void MixerNode::CookIfNeeded(int frameId)
 void MixerNode::VisitParams(ParamVisitor& v)
 {
    v.Int("channels", numChannels);
+   numChannels = std::clamp(numChannels, 0, kMaxSlots); // loaded unchecked; indexes inputs[]
    static const char* kGainNames[kMaxSlots] = {
       "gain0", "gain1", "gain2", "gain3", "gain4", "gain5",
       "gain6", "gain7", "gain8", "gain9", "gain10", "gain11"

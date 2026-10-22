@@ -93,6 +93,10 @@ void OscillatorNode::VisitParams(ParamVisitor& v)
    v.Float("fine", engine.fine);
    v.Int("octave", engine.octave);
    v.Int("semi", engine.semi);
+   // Loaded unchecked: the body indexes OctaveNames/SemiNames with these and the
+   // audio thread does note + octave * 12 + semi. Same range as the dropdowns.
+   engine.octave = std::clamp(engine.octave, -4, 4);
+   engine.semi = std::clamp(engine.semi, -12, 12);
    v.Float("volume", engine.volume);
    v.Float("phase", engine.phase);
    v.Int("unison", engine.unison);

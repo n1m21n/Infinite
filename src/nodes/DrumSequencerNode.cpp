@@ -749,6 +749,7 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
       }
    }
    v.Int("rate", rate);
+   rate = std::clamp(rate, 0, (int)MusicTime::kNumRateDivisions - 1); // loaded unchecked; cast to RateDivision
    v.Int("rateFix", rateFix); // not a control: 0 = plays samples at the device rate (saved before the fix)
    v.Int("steps", numSteps);
    v.Float("swing", swing);

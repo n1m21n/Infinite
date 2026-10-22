@@ -1017,6 +1017,7 @@ void ImageSpectralSynthNode::VisitParams(ParamVisitor& v)
 {
    v.Int("scanMode", scanMode);
    v.Int("rate", rate);
+   rate = std::clamp(rate, 0, (int)MusicTime::kNumRateDivisions - 1); // loaded unchecked; cast to RateDivision
    v.Float("scanSpeed", scanSpeed);
    v.Float("position", position);
    v.Int("direction", direction);
@@ -1030,6 +1031,10 @@ void ImageSpectralSynthNode::VisitParams(ParamVisitor& v)
 
    v.Int("octave", octave);
    v.Int("semi", semi);
+   // Loaded unchecked: the body indexes OctaveNames/SemiNames with these and the
+   // audio thread does note + octave * 12 + semi. Same range as the dropdowns.
+   octave = std::clamp(octave, -4, 4);
+   semi = std::clamp(semi, -12, 12);
    v.Float("fine", fine);
    v.Float("glide", glide);
 

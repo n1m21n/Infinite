@@ -379,6 +379,8 @@ namespace WaveTerrainDsp
       const float* hi = bank.Frame(f1, mip);
 
       phase01 -= floor(phase01);
+      if (!(phase01 >= 0.0 && phase01 < 1.0)) // a non-finite pitch gives NaN here; the int cast below is UB on it
+         phase01 = 0.0;
       const double x = phase01 * (double)kFrameSize;
       const int i0 = (int)x & (kFrameSize - 1);
       const int i1 = (i0 + 1) & (kFrameSize - 1);

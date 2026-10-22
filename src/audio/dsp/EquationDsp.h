@@ -71,6 +71,8 @@ namespace EquationDsp
    inline float SampleBank(const EquationBank& bank, double phase01, double phaseInc)
    {
       phase01 -= floor(phase01);
+      if (!(phase01 >= 0.0 && phase01 < 1.0)) // a non-finite pitch gives NaN here; the int cast below is UB on it
+         phase01 = 0.0;
       const int mip = MipForPhaseInc(phaseInc);
       const float* frame = bank.Mip(mip);
       const double x = phase01 * (double)kFrameSize;

@@ -474,6 +474,10 @@ void MetallicNode::VisitParams(ParamVisitor& v)
    v.Float("frequency", frequency);
    v.Int("octave", octave);
    v.Int("semi", semi);
+   // Loaded unchecked: the body indexes OctaveNames/SemiNames with these and the
+   // audio thread does note + octave * 12 + semi. Same range as the dropdowns.
+   octave = std::clamp(octave, -4, 4);
+   semi = std::clamp(semi, -12, 12);
    v.Float("fine", fine);
    v.Float("glide", glide);
    v.Int("filterType", filterType);
