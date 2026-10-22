@@ -5109,7 +5109,7 @@ namespace Platform
       }
    }
 
-   bool DecodeAudioFileToBuffer(const std::string& path, SampleBuffer& outBuffer, std::string& outError)
+   static bool DecodeAudioFileRaw(const std::string& path, SampleBuffer& outBuffer, std::string& outError)
    {
       @autoreleasepool
       {
@@ -5164,6 +5164,14 @@ namespace Platform
          outError.clear();
          return true;
       }
+   }
+
+   bool DecodeAudioFileToBuffer(const std::string& path, SampleBuffer& outBuffer, std::string& outError)
+   {
+      if (!DecodeAudioFileRaw(path, outBuffer, outError))
+         return false;
+      ZeroNonFiniteSamples(outBuffer);
+      return true;
    }
 
    // Reads a video container's audio track via AVAssetReader (not
