@@ -5,6 +5,7 @@
 #include "app/AppCommon.h"
 #include "app/ui/design/components/ActionButton.h"
 #include "platform/AppPaths.h"
+#include "audio/WavePeaks.h"
 
 namespace app
 {
@@ -3552,6 +3553,25 @@ void DrawSketchParams(SketchNode* n);
 void DrawSketch3DParams(Sketch3DNode* n);
 
 void DrawSamplerWaveform(SamplerNode* n, float h, float width);
+
+// One sounding voice's play cursor on a waveform: position 0..1 of the sample (-1 = none) and opacity.
+struct WaveCursor
+{
+   float pos = -1.0f;
+   float alpha = 1.0f;
+};
+// What the mouse did on the waveform's body, for the caller's own click behaviour.
+struct TrimWaveInput
+{
+   bool activated = false, active = false, hovered = false;
+   float frac = 0.0f; // 0..1 of the sample under the mouse
+};
+// A sample's waveform with start / end trim handles (null = no handles): one column per pixel,
+// the excluded range dimmed, a cursor per voice, `playhead` (< 0 = none) in the playhead colour.
+// Shift-drag a handle for fine trim; double-click zooms to the trim range and back; hovering
+// shows the time under the mouse (or the handle's time) in the readout strip.
+TrimWaveInput DrawTrimWave(const char* id, const WavePeaks& peaks, float* start, float* end, float w, float h,
+                           const WaveCursor* cursors, int numCursors, float playhead, const char* emptyCaption);
 
 void DrawSlicerWaveform(SlicerNode* n, float h, float width);
 

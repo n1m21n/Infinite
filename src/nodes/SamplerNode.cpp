@@ -807,6 +807,7 @@ void SamplerNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::strin
    // Decimated min/max waveform for the visualizer - built once here on the
    // main thread from channel 0 only (a stereo file's L/R rarely differ
    // enough to matter for a shape overview).
+   wavePeaks.BuildFrom(*decoded);
    waveformCacheCount = std::min(kWaveformCacheSize, decoded->numFrames);
    if (waveformCacheCount > 0)
    {

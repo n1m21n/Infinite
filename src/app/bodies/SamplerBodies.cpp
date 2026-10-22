@@ -1426,114 +1426,25 @@ namespace app
 
 
    // One lane's waveform view: a drag-&-drop/click-to-load target when
-   // empty, or start/end range handles over the decimated waveform once a
-   // sample is loaded - same overlap-ordering trick as DrawSamplerWaveform
-   // (body click-catcher first via SetNextItemAllowOverlap, then the
-   // handles), just reading DrumSequencerNode's per-lane waveform cache
-   // instead of SamplerNode's single one.
+   // empty, or the shared trimmed waveform (DrawTrimWave: start/end handles,
+   // a cursor per sounding voice) once a sample is loaded.
    void DrawDrumLaneWaveform(DrumSequencerNode* n, int lane, float h)
    {
-      const float w = gAudioContentW;
-      const ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 br(origin.x + w, origin.y + h);
-      const bool hasSample = n->laneWaveCount[lane] > 0;
-
-      ImGui::SetNextItemAllowOverlap();
-      ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##drumlanewavebody", ImVec2(w, h));
-      if (!hasSample && ImGui::IsItemActivated())
+      float pos[DrumSequencerNode::kVoicesPerLane], amp[DrumSequencerNode::kVoicesPerLane];
+      n->LaneCursors(lane, pos, amp);
+      WaveCursor cursors[DrumSequencerNode::kVoicesPerLane];
+      for (int v = 0; v < DrumSequencerNode::kVoicesPerLane; v++)
+         cursors[v] = { pos[v], amp[v] };
+      const TrimWaveInput in = DrawTrimWave("##drumlanewave", n->lanePeaks[lane], &n->laneStart[lane],
+                                            &n->laneEnd[lane], gAudioContentW, h, cursors,
+                                            DrumSequencerNode::kVoicesPerLane, -1.0f, "drop sample / click");
+      if (n->lanePeaks[lane].Empty() && in.activated)
       {
          PushUndoCheckpoint();
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
             n->LoadFileToLane(lane, path);
       }
-
-      const bool isLight = IsThemeLight();
-      AudioViz::Fill(dl, origin, br);
-      dl->PushClipRect(origin, br, true);
-
-      const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
-
-      if (hasSample)
-      {
-         const int count = n->laneWaveCount[lane];
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->laneWaveMax[lane][i] * h * 0.45f;
-            const float bottom = midY - n->laneWaveMin[lane][i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? tok::U32(tok::pal::c_1E6EE6D2) : tok::U32(tok::pal::c_96D6FFC8));
-         }
-
-         const float startX = origin.x + w * std::clamp(n->laneStart[lane], 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->laneEnd[lane], 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? tok::U32(tok::pal::c_FFFFFF8C) : tok::U32(tok::pal::c_00000082);
-         if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
-         if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
-
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? tok::U32(tok::pal::c_14A03CFF) : tok::U32(tok::pal::c_78DC96EB), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? tok::U32(tok::pal::c_DC2828FF) : tok::U32(tok::pal::c_DC7896EB), 2.0f);
-      }
-      else
-      {
-         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "drop sample / click");
-      }
-
-      dl->PopClipRect();
-      AudioViz::Border(dl, origin, br);
-
-      if (hasSample)
-      {
-         const float handleW = 10.0f;
-         const float startX = origin.x + w * std::clamp(n->laneStart[lane], 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->laneEnd[lane], 0.0f, 1.0f);
-         const float grip = 8.0f;
-         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = tok::U32(tok::pal::c_78DC96FF);
-         const ImU32 endCol = tok::U32(tok::pal::c_DC7896FF);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y),
-                               ImVec2(startGripX, origin.y + grip), startCol);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y),
-                               ImVec2(startGripX, br.y - grip), startCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y),
-                               ImVec2(endGripX, origin.y + grip), endCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y),
-                               ImVec2(endGripX, br.y - grip), endCol);
-
-         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
-         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
-
-         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
-         ImGui::InvisibleButton("##drumlanestarthandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->laneStart[lane] = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->laneEnd[lane] - 0.01f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
-         ImGui::InvisibleButton("##drumlaneendhandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->laneEnd[lane] = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->laneStart[lane] + 0.01f, 1.0f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-      }
-
-      ImGui::SetCursorScreenPos(origin);
-      ImGui::Dummy(ImVec2(w, h));
    }
 
 
@@ -2642,19 +2553,14 @@ namespace app
                         // Waveform, drawn as the Sampler draws its own: bars
                         // at 0.45 of the box either side of the mid line, no
                         // auto-gain.
-                        const int cnt = n->padWaveCount[pad];
                         const float wx0 = mn.x + 5.0f, wx1 = mx.x - 5.0f;
                         const float wTop = mn.y + lh + 7.0f, wBot = mx.y - lh - 7.0f;
-                        const float wy = (wTop + wBot) * 0.5f;
-                        const float wh = wBot - wTop;
-                        const ImU32 wc = lit ? tok::U32(tok::pal::c_FFFFFFE6) : (isLight ? tok::U32(tok::pal::c_1E6EE6D2) : tok::U32(tok::pal::c_96D6FFC8));
-                        for (int i = 0; i < cnt; i++)
+                        AudioViz::Peaks(dl, n->padPeaks[pad], ImVec2(wx0, wTop), wx1 - wx0, wBot - wTop, 0.0, 1.0, lit);
+                        const float cur = n->PadCursor(pad);
+                        if (n->PadPlaying(pad) && cur >= 0.0f)
                         {
-                           const float x = wx0 + (wx1 - wx0) * (float)i / (float)cnt;
-                           const float bw = std::max(1.0f, (wx1 - wx0) / (float)cnt);
-                           const float t = wy - n->padWaveMax[pad][i] * wh * 0.45f;
-                           const float b = wy - n->padWaveMin[pad][i] * wh * 0.45f;
-                           dl->AddRectFilled(ImVec2(x, std::min(t, wy - 0.5f)), ImVec2(x + bw, std::max(b, wy + 0.5f)), wc);
+                           const float px = wx0 + (wx1 - wx0) * std::clamp(cur, 0.0f, 1.0f);
+                           dl->AddLine(ImVec2(px, wTop), ImVec2(px, wBot), tok::U32(tok::pal::c_FFFFFFE6), 1.5f);
                         }
                         std::string nm = n->PadName(pad);
                         const size_t dot = nm.find_last_of('.');
@@ -2736,15 +2642,20 @@ namespace app
             dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
             if (has)
             {
-               const int cnt = n->padWaveCount[cur];
-               const ImU32 wc = isLight ? tok::U32(tok::pal::c_1E6EE6D2) : tok::U32(tok::pal::c_96D6FFC8);
-               for (int i = 0; i < cnt; i++)
+               AudioViz::Peaks(dl, n->padPeaks[cur], origin, w, h);
+               const float at = n->PadCursor(cur);
+               if (n->PadPlaying(cur) && at >= 0.0f)
                {
-                  const float x = origin.x + w * (float)i / (float)cnt;
-                  const float bw = std::max(1.0f, w / (float)cnt);
-                  const float t = midY - n->padWaveMax[cur][i] * h * 0.45f;
-                  const float b = midY - n->padWaveMin[cur][i] * h * 0.45f;
-                  dl->AddRectFilled(ImVec2(x, std::min(t, midY - 0.5f)), ImVec2(x + bw, std::max(b, midY + 0.5f)), wc);
+                  const float px = origin.x + w * std::clamp(at, 0.0f, 1.0f);
+                  dl->AddLine(ImVec2(px, origin.y), ImVec2(px, origin.y + h),
+                              tok::U32(isLight ? tok::pal::c_282C38FF : tok::pal::c_FFFFFFEB), 1.5f);
+               }
+               if (hov && !n->padPeaks[cur].Empty())
+               {
+                  char val[32];
+                  const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+                  snprintf(val, sizeof(val), "%.3f s", frac * n->padPeaks[cur].Seconds());
+                  SetAudioReadout("time", val);
                }
             }
             else

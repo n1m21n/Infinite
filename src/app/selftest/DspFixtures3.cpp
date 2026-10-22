@@ -1287,6 +1287,49 @@ static bool RunDrumSequencerFixture()
       ok &= midiOk;
    }
 
+   // Waveform view data: the lane's peak cache reads the sample where it is (a click at the
+   // start, silence after), at any width; a sounding voice publishes its cursor; clearing the
+   // lane clears the cache.
+   {
+      resetTransport();
+      auto node = makeNode(shortClickPath);
+      const WavePeaks& pk = node->lanePeaks[0];
+      const double clickEnd = (double)kClickFrames / (double)std::max(1, pk.NumFrames());
+      float mn, mx, rms, tmn, tmx, trms, fmn, fmx, frms;
+      pk.RangeFrac(0.0, 1.0, mn, mx, rms);
+      pk.RangeFrac(clickEnd * 2.0, 1.0, tmn, tmx, trms);   // the silent tail
+      pk.RangeFrac(0.0, clickEnd * 0.5, fmn, fmx, frms);   // inside the click, a narrow range
+      const int frames = pk.NumFrames();
+      bool waveOk = !pk.Empty() && frames == 4000 && mx > 0.8f && tmx < 1e-3f && trms < 1e-3f &&
+                    fmx > 0.8f && frms > 0.8f && rms <= mx + 1e-4f;
+      // Every pixel width agrees with the whole: no column reads louder than the whole sample.
+      for (int cols : { 7, 64, 333, 2000 })
+         for (int c = 0; c < cols; c++)
+         {
+            float a, b, r;
+            pk.RangeFrac((double)c / cols, (double)(c + 1) / cols, a, b, r);
+            waveOk &= b <= mx + 1e-4f && a >= mn - 1e-4f;
+         }
+
+      auto held = makeNode(longClickPath);
+      held->numSteps = 16;
+      held->stepVel[0][0] = 1.0f;
+      Render(*held, blockSize * 8, blockSize, sampleRate);
+      float pos[DrumSequencerNode::kVoicesPerLane], amp[DrumSequencerNode::kVoicesPerLane];
+      held->LaneCursors(0, pos, amp);
+      int sounding = 0;
+      for (int v = 0; v < DrumSequencerNode::kVoicesPerLane; v++)
+         if (pos[v] > 0.0f && pos[v] < 1.0f && amp[v] > 0.0f)
+            sounding++;
+      held->LaneCursors(1, pos, amp); // an empty lane has no cursor
+      const bool emptyIdle = pos[0] < 0.0f;
+      node->ClearLane(0);
+      waveOk &= sounding == 1 && emptyIdle && node->lanePeaks[0].Empty();
+      printf("DRUMSEQTEST waveform %s (frames=%d peak=%.2f tail=%.4f cursors=%d)\n", waveOk ? "OK" : "FAIL",
+             frames, mx, tmx, sounding);
+      ok &= waveOk;
+   }
+
    DrumSequencerNode::SetKitDir(savedKitDir);
    {
       std::error_code ec;

@@ -788,6 +788,7 @@ void GranularNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::stri
       const int numFrames = decoded->numFrames;
       const int channels = decoded->channels;
       const float* data = decoded->channelData.data();
+      wavePeaks.BuildFrom(*decoded);
       waveformCacheCount = std::min(kWaveformCacheSize, numFrames);
 
       if (waveformCacheCount > 0)
@@ -815,6 +816,7 @@ void GranularNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::stri
    else
    {
       waveformCacheCount = 0;
+      wavePeaks.Clear();
    }
 
    mAudioNode->PushBuffer(decoded);
