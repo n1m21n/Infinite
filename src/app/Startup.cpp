@@ -490,6 +490,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_BROWSERSORTTEST") != nullptr)
       return RunBrowserSortTest() ? 0 : 1;
 
+   if (getenv("INFINITE_DIAGZIPTEST") != nullptr)
+      return RunDiagnosticsZipTest() ? 0 : 1;
+
    if (getenv("INFINITE_APPEARANCETEST") != nullptr)
       return RunAppearanceSelfTest() ? 0 : 1;
 

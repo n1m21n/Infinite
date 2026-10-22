@@ -1523,6 +1523,7 @@ extern bool gTemplatesOpen;
 
 extern bool gShowUpdateCheckModal;
 extern bool gShowAboutModal;
+extern bool gShowDiagnosticsModal;
 // The app icon as a GL texture (created on first call); 0 if it could not be decoded.
 ImTextureID BrandLogoTexture();
 
@@ -5707,6 +5708,12 @@ void DrawFind();
 void DrawCookOverlay();   // View > Cook times; see CookOverlay.cpp
 std::string BuildSystemInfo();   // Help > Copy system info; see Diagnostics.cpp
 void CopySystemInfo();
+// Help > Collect diagnostics: one zip (system info, logs, redacted prefs, recent crash reports, the open patch
+// only when asked) on the Desktop. Nothing is sent anywhere. See Diagnostics.cpp.
+bool WriteDiagnosticsZip(const std::string& zipPath, const std::string& systemInfo, const std::string& patchPath,
+                         std::string& error);
+void CollectDiagnostics(bool includePatch);
+bool RunDiagnosticsZipTest();
 void DrawNotices();       // Notices::Active() as cards, bottom-right; see NoticeStack.cpp
 void CheckPatchOpener();  // once at launch: notice when double-click opens a different copy; see PatchOpenerCheck.cpp
 bool PatchOpenerNotice(const Platform::PatchOpener& o, std::string& title, std::string& detail);

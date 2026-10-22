@@ -3,6 +3,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/frame/FrameCtx.h"
 #include "app/ui/design/components/DialogParts.h"
+#include "app/ui/design/components/FormParts.h"
 #include "core/SelfUpdate.h"
 #include "core/Notices.h"
 
@@ -246,6 +247,36 @@ int DrawFloating(FrameCtx& fc)
          if (pick == 1)
             Platform::OpenExternalUrl("https://infinitedevices.org/");
          if (pick == 2 || ImGui::IsKeyPressed(ImGuiKey_Escape))
+            ImGui::CloseCurrentPopup();
+         DialogParts::End();
+      }
+
+      // ---- collect diagnostics modal ----
+      if (gShowDiagnosticsModal)
+      {
+         ImGui::OpenPopup(L("Collect diagnostics"));
+         gShowDiagnosticsModal = false;
+      }
+      if (DialogParts::Begin(L("Collect diagnostics")))
+      {
+         static bool sIncludePatch = false;
+         ImGui::Dummy(ImVec2(400.0f, 0.0f));
+         DialogParts::Title(T("Collect diagnostics"));
+         DialogParts::Message(T("System info, logs, settings (home folder hidden) and recent crash reports go into one zip on your Desktop. Nothing is sent anywhere."));
+         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         if (gPatchPath.empty())
+            ImGui::BeginDisabled();
+         FormParts::Switch(L("Include the open patch"), &sIncludePatch);
+         if (gPatchPath.empty())
+            ImGui::EndDisabled();
+         ImGui::Dummy(ImVec2(0.0f, tok::space_2));
+         const int pick = DialogParts::Buttons({ L("Collect"), L("Cancel") });
+         if (pick == 0)
+         {
+            CollectDiagnostics(sIncludePatch && !gPatchPath.empty());
+            ImGui::CloseCurrentPopup();
+         }
+         if (pick == 1 || ImGui::IsKeyPressed(ImGuiKey_Escape))
             ImGui::CloseCurrentPopup();
          DialogParts::End();
       }
