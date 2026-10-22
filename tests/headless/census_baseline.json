@@ -1500,11 +1500,9 @@
   "type": "Fluid",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "nondeterministic"
-  ],
+  "issues": [],
   "animates": true,
-  "render_vs_frame": 1.24
+  "render_vs_frame": 1.14
  },
  {
   "type": "Volume",
@@ -1973,9 +1971,7 @@
   "type": "Note to CV",
   "cat": "Modulators",
   "out": "modulator",
-  "issues": [
-   "nondeterministic"
-  ],
+  "issues": [],
   "animates": false,
   "render_vs_frame": 0.0
  },
@@ -2015,11 +2011,9 @@
   "type": "Moves",
   "cat": "Prediction",
   "out": "predictor",
-  "issues": [
-   "nondeterministic"
-  ],
+  "issues": [],
   "animates": true,
-  "render_vs_frame": 0.06
+  "render_vs_frame": 0.0
  },
  {
   "type": "Predictive Modulator",
@@ -2240,12 +2234,10 @@
   "type": "Metallic",
   "cat": "Synths",
   "out": "audio",
-  "issues": [
-   "clips"
-  ],
+  "issues": [],
   "animates": false,
   "render_vs_frame": 0.0,
-  "peak": 1.132
+  "peak": 0.975
  },
  {
   "type": "Sampler",
