@@ -28,9 +28,7 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
   - Grain Molder is skipped, since it only has a record-armed input.
 - **DSPTEST:** OK, including two new checks. "effect recovers from a NaN/inf block" covers all 28 effects; "decode zeroes NaN/inf samples" is the other.
 
-## In progress
-
-- **TSan build** in `worktrees/main/build-tsan` (`-DINFINITE_SANITIZE=thread`). Next, run headless audio cases and DSPTEST under it, then triage the races.
+- **TSan:** `build-tsan`, run with `tools/bughunt/tsan_selftests.sh` over 14 live-engine selftests. 0 warnings. A canary confirmed reports are logged. CONVOLUTIONTEST fails only its CPU-cost budget, as expected under TSan.
 
 ## Not yet run
 
