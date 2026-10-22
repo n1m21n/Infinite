@@ -1,0 +1,290 @@
+# AUDIOPARAMSWEEPTEST check-B params the generic rig cannot observe (SKILL.md, "blind spots").
+# One "<node>\t<param>" per line. driver.sh fails only on a [FAIL] that is NOT listed here,
+# and reports listed entries that now pass so they can be removed.
+#
+# Seeded from the sweep at 562ee6fc (2026-10-22, finding B-D-001) after Mixer gain8..solo11
+# were made testable with a "channels" prerequisite. This is a snapshot of what the rig cannot
+# see, not a judgement that each param is wired correctly: before adding a line, confirm it by
+# hand (or give the node a SweepPrerequisitesFor) as SKILL.md describes.
+Arpeggiator	gatePercent
+Arpeggiator	mode
+Arpeggiator	octaves
+Arpeggiator	rateBeats
+Arpeggiator	rateMode
+Arpeggiator	rateSeconds
+Arpeggiator	stepGates
+Arpeggiator	stepTiming
+Arpeggiator	useGlobalScale
+Audio File	attack
+Audio File	gain
+Audio File	release
+Audio Filter	rateDiv
+Chorus	rateDiv
+Convolution Reverb	decay
+Convolution Reverb	distance
+Convolution Reverb	material
+Convolution Reverb	shape
+Convolution Reverb	size
+Convolution Reverb	spread
+Delay	rateDiv
+Delay	sync
+Drum Sequencer	patternPart
+Drum Sequencer	rateFix
+Dynamics	sidechainExternal
+Equation Synth	ampRelease
+Equation Synth	ampSustain
+Equation Synth	filterAttack
+Equation Synth	filterDecay
+Equation Synth	filterRelease
+Equation Synth	filterSustain
+Equation Synth	frequency
+Equation Synth	glide
+Equation Synth	knobD
+Equation Synth	preset
+FM	release1
+FM	release2
+FM	release3
+FM	release4
+Field Effect	exposeRmsOutput
+Field Effect	field_nextParamId
+Field Notes	field_nextParamId
+Field Notes	p.hits
+Field Notes	root
+Field Notes	scale
+Field Synth	exposeRmsOutput
+Field Synth	field_nextParamId
+Field Synth	maxVoices
+Flanger	rateDiv
+Grain Molder	amount
+Grain Molder	descending
+Grain Molder	grain
+Grain Molder	key
+Grain Molder	loop
+Grain Molder	pingpong
+Grain Molder	rateFix
+Grain Molder	reverse
+Grain Molder	seed
+Granular	density
+Granular	fineTune
+Granular	freeze
+Granular	grainLength
+Granular	loop
+Granular	pan
+Granular	pitchShift
+Granular	position
+Granular	randomLength
+Granular	randomPan
+Granular	randomPitch
+Granular	randomPos
+Granular	reverseProb
+Granular	scan
+Granular	width
+Granular	windowShape
+Limiter	mix
+Limiter	release
+Looper	fadeIn
+Looper	fadeOut
+Looper	syncStart
+Looper	take
+MPC	pad0_div
+MPC	pad0_fadeout
+MPC	pad0_mode
+MPC	pad0_sync
+MPC	pad10_div
+MPC	pad10_fadeout
+MPC	pad10_mode
+MPC	pad10_sync
+MPC	pad11_div
+MPC	pad11_fadeout
+MPC	pad11_mode
+MPC	pad11_sync
+MPC	pad12_div
+MPC	pad12_fadeout
+MPC	pad12_mode
+MPC	pad12_sync
+MPC	pad13_div
+MPC	pad13_fadeout
+MPC	pad13_mode
+MPC	pad13_sync
+MPC	pad14_div
+MPC	pad14_fadeout
+MPC	pad14_mode
+MPC	pad14_sync
+MPC	pad15_div
+MPC	pad15_fadeout
+MPC	pad15_mode
+MPC	pad15_sync
+MPC	pad1_div
+MPC	pad1_fadeout
+MPC	pad1_mode
+MPC	pad1_sync
+MPC	pad2_div
+MPC	pad2_fadeout
+MPC	pad2_mode
+MPC	pad2_sync
+MPC	pad3_div
+MPC	pad3_fadeout
+MPC	pad3_mode
+MPC	pad3_sync
+MPC	pad4_div
+MPC	pad4_fadeout
+MPC	pad4_mode
+MPC	pad4_sync
+MPC	pad5_div
+MPC	pad5_fadeout
+MPC	pad5_mode
+MPC	pad5_sync
+MPC	pad6_div
+MPC	pad6_fadeout
+MPC	pad6_mode
+MPC	pad6_sync
+MPC	pad7_div
+MPC	pad7_fadeout
+MPC	pad7_mode
+MPC	pad7_sync
+MPC	pad8_div
+MPC	pad8_fadeout
+MPC	pad8_mode
+MPC	pad8_sync
+MPC	pad9_div
+MPC	pad9_fadeout
+MPC	pad9_mode
+MPC	pad9_sync
+MPC	selectedPad
+Metallic	frequency
+Metallic	glide
+Molder	rateFix
+Molder	snap
+Note Capturer	loop
+Note Capturer	useGlobalScale
+Note Echo	decay
+Note Echo	rateBeats
+Note Echo	rateMode
+Note Echo	repeats
+Note Echo	transposePerRepeat
+Note Filter	useGlobalScale
+Note Router	probability
+Note Stack	useGlobalScale
+Note Switcher	manual
+Note Switcher	manualSlot
+Note Switcher	rateBeats
+Note Switcher	rateMode
+Note Switcher	rateSeconds
+Note Transpose	useGlobalScale
+Oscillator	ampRelease
+Oscillator	cutoff
+Oscillator	detune
+Oscillator	fmMode
+Oscillator	frequency
+Oscillator	glide
+Oscillator	phase
+Oscillator	resonance
+PaulStretch	loop
+PaulStretch	rateFix
+Phaser	rateDiv
+Pitch Bend	bendSemitones
+Pitch Shifter	grain
+Plugin	bypass
+Plugin	map_slots
+Plugin	plugin_accepts_notes
+Plugin	plugin_sidechain
+Predictive Quantize	mix
+Reverb	damping
+Reverb	decay
+Reverb	predelay
+Sampler	fadeOut
+Sampler	loop
+Sampler	pingpong
+Sampler	rateFix
+Sampler	reverse
+Shape Resonator	damping
+Shape Resonator	decay
+Shape Resonator	modes
+Shape Resonator	pos
+Shape Resonator	tune
+Spectral Synth	ampDecay
+Spectral Synth	ampRelease
+Spectral Synth	ampSustain
+Spectral Synth	detune
+Spectral Synth	fine
+Spectral Synth	glide
+Spectral Synth	position
+Spectral Synth	rate
+Spectral Synth	rootFreq
+Spectral Synth	scanMode
+Spectrum Slide	slide
+Stereo	mix
+String	release
+Stutter	rateDiv
+Transient Shaper	mix
+Tremolo	rateDiv
+Video	audioEnabled
+Video	loop
+Video	speed
+Video	trimEnd
+Video	trimStart
+Video	volume
+Wave Terrain	ampRelease
+Wave Terrain	filterAttack
+Wave Terrain	filterDecay
+Wave Terrain	filterRelease
+Wave Terrain	filterSustain
+Wave Terrain	frequency
+Wave Terrain	glide
+Wave Terrain	ratioA
+Wave Terrain	ratioB
+Wavetable	a.ampRelease
+Wavetable	a.cutoff
+Wavetable	a.detune
+Wavetable	a.filterAmount
+Wavetable	a.filterAttack
+Wavetable	a.filterDecay
+Wavetable	a.filterRelease
+Wavetable	a.filterSustain
+Wavetable	a.phase
+Wavetable	a.phaseRandomize
+Wavetable	a.pitchAttack
+Wavetable	a.pitchDecay
+Wavetable	a.pitchRelease
+Wavetable	a.pitchSustain
+Wavetable	a.resonance
+Wavetable	a.stereoWidth
+Wavetable	a.warpAmount
+Wavetable	a.warpMode
+Wavetable	a.warpRatio
+Wavetable	b.ampAttack
+Wavetable	b.ampDecay
+Wavetable	b.ampRelease
+Wavetable	b.ampSustain
+Wavetable	b.cutoff
+Wavetable	b.detune
+Wavetable	b.filterAmount
+Wavetable	b.filterAttack
+Wavetable	b.filterDecay
+Wavetable	b.filterRelease
+Wavetable	b.filterSustain
+Wavetable	b.filterType
+Wavetable	b.fine
+Wavetable	b.octave
+Wavetable	b.on
+Wavetable	b.pan
+Wavetable	b.phase
+Wavetable	b.phaseRandomize
+Wavetable	b.pitchAmount
+Wavetable	b.pitchAttack
+Wavetable	b.pitchDecay
+Wavetable	b.pitchRelease
+Wavetable	b.pitchSustain
+Wavetable	b.position
+Wavetable	b.resonance
+Wavetable	b.semi
+Wavetable	b.stereoWidth
+Wavetable	b.table
+Wavetable	b.unison
+Wavetable	b.volume
+Wavetable	b.warpAmount
+Wavetable	b.warpMode
+Wavetable	b.warpRatio
+Wavetable	fmMode
+Wavetable	frequency
+Wavetable	glide

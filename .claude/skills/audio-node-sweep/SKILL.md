@@ -19,6 +19,14 @@ this skill directory.
 Add `--skip-build` to reuse the existing `build/` tree. Runs both sweeps
 below in one pass.
 
+The param sweep's own verdict is FAIL whenever any param reads `[FAIL]`, and
+the blind spots below guarantee some always do. So `driver.sh` judges it
+against `known-blind-spots.txt` (one `<node>\t<param>` per line): it fails
+only on a `[FAIL]` that is not listed, and lists entries that now pass so they
+can be removed. Don't add a line to make a run green. First confirm by hand
+that the param is wired, or give the node a `SweepPrerequisitesFor` so the rig
+can see it (Mixer's strips 8-11 went that way).
+
 ## What this catches
 
 Two real bug classes, each generalized into a sweep that covers every
