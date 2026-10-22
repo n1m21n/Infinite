@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Cymatic Liquid Matrix",
+    "author": "Infinite",
+    "description": "Faraday liquid surface standing wave resonance under acoustic multi-tone excitation with specular fluid reflections and audio-reactive modal lattice interference.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float modeM = 6.0 [2.0, 16.0];\nparam float freq = 18.0 [4.0, 40.0];\nparam float ripple = 1.2 [0.2, 3.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\n// Multi-frequency Faraday standing wave modal synthesis\nmodal = cos(a * modeM) * sin(r * freq - t * 3.0 * ripple);\nharm1 = cos(a * (modeM * 2.0)) * sin(r * (freq * 1.6) + t * 2.0);\nharm2 = sin(p.x * 22.0) * sin(p.y * 22.0);\n\nh = (modal * 0.55 + harm1 * 0.3 + harm2 * 0.15) * (0.5 + 0.9 * audio_bass);\n\n// Specular fluid lighting normals\neps = 0.005;\nh_dx = cos(atan2(p.y, p.x + eps) * modeM) * sin(length(p + vec2(eps, 0.0)) * freq - t * 3.0) - h;\nh_dy = cos(atan2(p.y + eps, p.x) * modeM) * sin(length(p + vec2(0.0, eps)) * freq - t * 3.0) - h;\n\nnor = normalize(vec3(-h_dx * 30.0, -h_dy * 30.0, 1.0));\nlightDir = normalize(vec3(0.5, 0.7, 0.9));\nspec = pow(max(0.0, dot(reflect(-lightDir, nor), vec3(0.0, 0.0, 1.0))), 16.0);\n\n// Brand colors\nmidnight = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.208);\n\nfluidBase = mix(midnight, signal, clamp(h * 0.6 + 0.4, 0.0, 1.0));\nrimGlow = emerald * smoothstep(0.48, 0.0, r) * (0.6 + 0.8 * audio_mid);\nspecular = ember * spec * 1.5 + vec3(1.0) * (spec * 0.8);\n\ncol = fluidBase + rimGlow + specular;\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "modeM": 6.0,
+      "freq": 18.0,
+      "ripple": 1.2
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -136,6 +136,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Harmonic Warp](https://infinitedevices.org/library/harmonic-warp.html): Multi-octave harmonic coordinate warp with frequency-dependent color gradients and ripple displacement. (file: https://infinitedevices.org/assets/library/pixel/harmonic-warp.field)
 - [Bioluminescent Abyss](https://infinitedevices.org/library/bioluminescent-abyss.html): Deep oceanic bioluminescence with floating pulsing bell structures, chromatic water caustics and audio-reactive luminous tentacles. (file: https://infinitedevices.org/assets/library/pixel/bioluminescent-abyss.field)
 - [Quantum Field Lattice](https://infinitedevices.org/library/quantum-field-lattice.html): Relativistic quantum vacuum fluctuation lattice with warped spacetime curvature, vibrating node packets and audio-reactive phase interference. (file: https://infinitedevices.org/assets/library/pixel/quantum-field-lattice.field)
+- [Reaction Diffusion Core](https://infinitedevices.org/library/reaction-diffusion-core.html): Gray-Scott chemical reaction-diffusion morphogenesis with audio-reactive feed rates, cellular Turing patterns and iridescent color mapping. (file: https://infinitedevices.org/assets/library/pixel/reaction-diffusion-core.field)
+- [Cymatic Liquid Matrix](https://infinitedevices.org/library/cymatic-liquid-matrix.html): Faraday liquid surface standing wave resonance under acoustic multi-tone excitation with specular fluid reflections and audio-reactive modal lattice interference. (file: https://infinitedevices.org/assets/library/pixel/cymatic-liquid-matrix.field)
 
 ## Library: Sketch
 
@@ -157,6 +159,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Chua Circuit](https://infinitedevices.org/library/chua-circuit.html): Chua non-linear double-scroll chaotic attractor with piecewise linear diode vector field dynamics. (file: https://infinitedevices.org/assets/library/sketch/chua-circuit.js)
 - [Aizawa Attractor](https://infinitedevices.org/library/aizawa-attractor.html): Helical orbital chaotic attractor with a central vertical funnel axis and spiraling toroidal loops. (file: https://infinitedevices.org/assets/library/sketch/aizawa-attractor.js)
 - [Thomas Attractor](https://infinitedevices.org/library/thomas-attractor.html): Cyclically symmetric chaotic dynamical flow tracing twisting labyrinthine 3D orbits. (file: https://infinitedevices.org/assets/library/sketch/thomas-attractor.js)
+- [Chen Attractor](https://infinitedevices.org/library/chen-attractor.html): Chaotic continuous dynamical spiral flow with dual scroll trajectories and phase-space transition orbits. (file: https://infinitedevices.org/assets/library/sketch/chen-attractor.js)
+- [Spirograph Epitrochoid](https://infinitedevices.org/library/spirograph-epitrochoid.html): Multi-frequency nested planetary epitrochoid curves with phased eccentric orbits and harmonic geometric resonance. (file: https://infinitedevices.org/assets/library/sketch/spirograph-epitrochoid.js)
 
 ## Library: Sketch 3D
 
@@ -173,6 +177,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Hyperbolic Helicoid 3D](https://infinitedevices.org/library/hyperbolic-helicoid-3d.html): Bonnet isometric transformation morphing continuously between a catenoid and helicoid minimal surface. (file: https://infinitedevices.org/assets/library/sketch/hyperbolic-helicoid-3d.js)
 - [Roman Surface 3D](https://infinitedevices.org/library/roman-surface-3d.html): Steiner's Roman Surface: non-orientable self-intersecting projective plane with tetrahedral symmetry. (file: https://infinitedevices.org/assets/library/sketch/roman-surface-3d.js)
 - [Clifford Torus 3D](https://infinitedevices.org/library/clifford-torus-3d.html): 4D Clifford flat torus stereographically projected into 3D space with 4D isoclinic rotation. (file: https://infinitedevices.org/assets/library/sketch/clifford-torus-3d.js)
+- [Costa Surface 3D](https://infinitedevices.org/library/costa-surface-3d.html): Costa complete embedded minimal surface of genus 1 with catenoidal and planar asymptotic ends. (file: https://infinitedevices.org/assets/library/sketch/costa-surface-3d.js)
+- [Catenoid-Helicoid 3D](https://infinitedevices.org/library/catenoid-helicoid-3d.html): Continuous isometric Bonnet transformation between catenoid and helicoid minimal surfaces with zero mean curvature. (file: https://infinitedevices.org/assets/library/sketch/catenoid-helicoid-3d.js)
 
 ## Library: Synths
 
@@ -189,6 +195,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Modal Bar Synth](https://infinitedevices.org/library/modal-bar-synth.html): Physical modeling modal synthesis of struck wooden bars with inharmonic vibrational modes and mallet impulse excitation. (file: https://infinitedevices.org/assets/templates/modal-bar-synth.inf)
 - [Wave Terrain Synth](https://infinitedevices.org/library/wave-terrain-synth.html): Continuous wave terrain synthesizer with 2D orbital trajectory scanning and dynamic non-linear surface deformation. (file: https://infinitedevices.org/assets/templates/wave-terrain-synth.inf)
 - [Formant Vocal Synth](https://infinitedevices.org/library/formant-vocal-synth.html): Phonetic vowel singing synthesizer with parallel formant resonators, vibrato LFO and aspiration breath model. (file: https://infinitedevices.org/assets/templates/formant-vocal-synth.inf)
+- [Vector Morph Synth](https://infinitedevices.org/library/vector-morph-synth.html): 4-quadrant planar vector crossfade synthesizer with orbital trajectory modulation, bilinear wave morphing and sub-bass drive. (file: https://infinitedevices.org/assets/templates/vector-morph-synth.inf)
+- [Resonant Drone Synth](https://infinitedevices.org/library/resonant-drone-synth.html): Microtonal cluster drone synthesizer with 5 detuned prime-ratio oscillators, organic phase drift and warm acoustic body saturation. (file: https://infinitedevices.org/assets/templates/resonant-drone-synth.inf)
 
 ## Library: Audio Effects
 
@@ -205,6 +213,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Vowel Resonator FX](https://infinitedevices.org/library/vowel-resonator-fx.html): Triple-formant vocal tract acoustic filter bank with dynamic vowel morphing and saturation. (file: https://infinitedevices.org/assets/templates/vowel-resonator-fx.inf)
 - [Pitch Shifter Delay FX](https://infinitedevices.org/library/pitch-shifter-delay-fx.html): Continuous granular pitch-shifting delay with dual rotating crossfading heads, feedback shimmer and tape flutter. (file: https://infinitedevices.org/assets/templates/pitch-shifter-delay-fx.inf)
 - [Envelope Follower Wah FX](https://infinitedevices.org/library/envelope-follower-wah-fx.html): Dynamic auto-wah filter with optical envelope detection, variable resonance and warm saturation. (file: https://infinitedevices.org/assets/templates/envelope-follower-wah-fx.inf)
+- [Granular Freeze Reverb FX](https://infinitedevices.org/library/granular-freeze-reverb-fx.html): Infinite spectral freeze and multi-tap diffusion cloud with grain pitch micro-modulation, air damping and feedback saturation. (file: https://infinitedevices.org/assets/templates/granular-freeze-reverb-fx.inf)
+- [Analog Chorus Flanger FX](https://infinitedevices.org/library/analog-chorus-flanger-fx.html): Bucket-brigade modelled dual-line stereo chorus and through-zero flanger with quadrature LFO modulation and resonant feedback. (file: https://infinitedevices.org/assets/templates/analog-chorus-flanger-fx.inf)
 
 ## Nodes
 
@@ -518,7 +528,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 30 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 32 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -549,6 +559,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Hyperbolic Kaleidoscope](https://infinitedevices.org/embeds/hyperbolic-kaleidoscope.html): Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.
 - [Bioluminescent Abyss](https://infinitedevices.org/embeds/bioluminescent-abyss.html): Deep oceanic bioluminescence with floating pulsing bell structures, chromatic water caustics and audio-reactive luminous tentacles.
 - [Quantum Field Lattice](https://infinitedevices.org/embeds/quantum-field-lattice.html): Relativistic quantum vacuum fluctuation lattice with warped spacetime curvature, vibrating node packets and audio-reactive phase interference.
+- [Reaction Diffusion Core](https://infinitedevices.org/embeds/reaction-diffusion-core.html): Gray-Scott chemical reaction-diffusion morphogenesis with audio-reactive feed rates, cellular Turing patterns and iridescent color mapping.
+- [Cymatic Liquid Matrix](https://infinitedevices.org/embeds/cymatic-liquid-matrix.html): Faraday liquid surface standing wave resonance under acoustic multi-tone excitation with specular fluid reflections and audio-reactive modal lattice interference.
 
 ## For AI agents
 

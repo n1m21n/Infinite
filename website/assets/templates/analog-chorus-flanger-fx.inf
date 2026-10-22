@@ -1,0 +1,49 @@
+infinite-patch 1
+# Analog Chorus Flanger FX: bucket-brigade modelled stereo chorus and through-zero flanger
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 40
+  i rangeHigh 68
+end
+node 2 Synths Wavetable
+  id synth
+  pos 360 1024
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 720 1024
+  s code param float rate = 0.85 [0.05, 5.0]\nparam float depth = 0.65 [0.0, 1.0]\nparam float feedback = 0.45 [-0.9, 0.9]\nparam float warmth = 0.5 [0.0, 1.0]\nparam float mix = 0.7 [0.0, 1.0]\nstate float lfo = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float d4 = 0\nstate float fb = 0\nstate float lp = 0\n\nlfo = (lfo + rate / sr) % 1.0\nmod1 = sin(6.2831853 * lfo) * depth * 0.4\nmod2 = cos(6.2831853 * lfo) * depth * 0.4\n\nx = in + fb * feedback * 0.85\n\nu = x * (1.0 + warmth * 0.8)\nsat = u / (1.0 + abs(u) * 0.22)\n\nc1 = clamp(0.5 + mod1, 0.1, 0.9)\nd1 = sat + (d1 - sat) * (1.0 - c1)\n\nc2 = clamp(0.5 - mod1, 0.1, 0.9)\nd2 = d1 + (d2 - d1) * (1.0 - c2)\n\nc3 = clamp(0.5 + mod2, 0.1, 0.9)\nd3 = d2 + (d3 - d2) * (1.0 - c3)\n\nc4 = clamp(0.5 - mod2, 0.1, 0.9)\nd4 = d3 + (d4 - d3) * (1.0 - c4)\n\nfb = d4\n\nfCut = clamp((4500.0 - warmth * 2000.0) / sr * 2.0, 0.02, 0.45)\nlp = lp + fCut * (d4 - lp)\n\nwet = (d2 * 0.5 + lp * 0.5)\nout = in * (1.0 - mix) + wet * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1100 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.306 0.949 0.722
+  f size 0.26
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Analog Chorus Flanger FX. Bucket-brigade modelled stereo chorus and through-zero flanger with feedback warmth.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud fx 0 synth
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

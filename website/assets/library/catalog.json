@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 147,
+ "count": 157,
  "items": [
   {
    "id": "first-sound",
@@ -1766,6 +1766,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/quantum-field-lattice.field",
    "preview": "https://infinitedevices.org/assets/library/previews/quantum-field-lattice.jpg",
    "page": "https://infinitedevices.org/library/quantum-field-lattice.html"
+  },
+  {
+   "id": "chen-attractor",
+   "name": "Chen Attractor",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Chaotic continuous dynamical spiral flow with dual scroll trajectories and phase-space transition orbits.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/chen-attractor.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/chen-attractor.jpg",
+   "page": "https://infinitedevices.org/library/chen-attractor.html"
+  },
+  {
+   "id": "spirograph-epitrochoid",
+   "name": "Spirograph Epitrochoid",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Multi-frequency nested planetary epitrochoid curves with phased eccentric orbits and harmonic geometric resonance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/spirograph-epitrochoid.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/spirograph-epitrochoid.jpg",
+   "page": "https://infinitedevices.org/library/spirograph-epitrochoid.html"
+  },
+  {
+   "id": "costa-surface-3d",
+   "name": "Costa Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Costa complete embedded minimal surface of genus 1 with catenoidal and planar asymptotic ends.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/costa-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/costa-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/costa-surface-3d.html"
+  },
+  {
+   "id": "catenoid-helicoid-3d",
+   "name": "Catenoid-Helicoid 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Continuous isometric Bonnet transformation between catenoid and helicoid minimal surfaces with zero mean curvature.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/catenoid-helicoid-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/catenoid-helicoid-3d.jpg",
+   "page": "https://infinitedevices.org/library/catenoid-helicoid-3d.html"
+  },
+  {
+   "id": "vector-morph-synth",
+   "name": "Vector Morph Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "4-quadrant planar vector crossfade synthesizer with orbital trajectory modulation, bilinear wave morphing and sub-bass drive.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/vector-morph-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/vector-morph-synth.jpg",
+   "page": "https://infinitedevices.org/library/vector-morph-synth.html"
+  },
+  {
+   "id": "resonant-drone-synth",
+   "name": "Resonant Drone Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Microtonal cluster drone synthesizer with 5 detuned prime-ratio oscillators, organic phase drift and warm acoustic body saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/resonant-drone-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/resonant-drone-synth.jpg",
+   "page": "https://infinitedevices.org/library/resonant-drone-synth.html"
+  },
+  {
+   "id": "granular-freeze-reverb-fx",
+   "name": "Granular Freeze Reverb FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Infinite spectral freeze and multi-tap diffusion cloud with grain pitch micro-modulation, air damping and feedback saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/granular-freeze-reverb-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/granular-freeze-reverb-fx.jpg",
+   "page": "https://infinitedevices.org/library/granular-freeze-reverb-fx.html"
+  },
+  {
+   "id": "analog-chorus-flanger-fx",
+   "name": "Analog Chorus Flanger FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Bucket-brigade modelled dual-line stereo chorus and through-zero flanger with quadrature LFO modulation and resonant feedback.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/analog-chorus-flanger-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/analog-chorus-flanger-fx.jpg",
+   "page": "https://infinitedevices.org/library/analog-chorus-flanger-fx.html"
+  },
+  {
+   "id": "reaction-diffusion-core",
+   "name": "Reaction Diffusion Core",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Gray-Scott chemical reaction-diffusion morphogenesis with audio-reactive feed rates, cellular Turing patterns and iridescent color mapping.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/reaction-diffusion-core.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/reaction-diffusion-core.jpg",
+   "page": "https://infinitedevices.org/library/reaction-diffusion-core.html"
+  },
+  {
+   "id": "cymatic-liquid-matrix",
+   "name": "Cymatic Liquid Matrix",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Faraday liquid surface standing wave resonance under acoustic multi-tone excitation with specular fluid reflections and audio-reactive modal lattice interference.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/cymatic-liquid-matrix.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/cymatic-liquid-matrix.jpg",
+   "page": "https://infinitedevices.org/library/cymatic-liquid-matrix.html"
   }
  ]
 }

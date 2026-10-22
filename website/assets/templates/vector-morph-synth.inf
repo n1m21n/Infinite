@@ -1,0 +1,44 @@
+infinite-patch 1
+# Vector Morph Synth: 4-corner planar vector crossfade synthesizer
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i rangeLow 36
+  i rangeHigh 64
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float vectorX = 0.5 [0.0, 1.0]\nparam float vectorY = 0.5 [0.0, 1.0]\nparam float orbitSpeed = 1.2 [0.0, 8.0]\nparam float orbitDepth = 0.35 [0.0, 1.0]\nparam float subLevel = 0.4 [0.0, 1.0]\nparam float cutoff = 4200.0 [200.0, 12000.0]\nparam float envDecay = 0.6 [0.05, 3.0]\nstate float phase = 0\nstate float subPhase = 0\nstate float lfoPhase = 0\nstate float env = 0\nstate float lp = 0\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0)\ndecayRate = clamp(1.0 / (sr * envDecay), 0.00005, 0.02)\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.12, env - env * decayRate)\n\npStep = clamp(freq, 20.0, 5000.0) / sr\nphase = (phase + pStep) % 1.0\nsubPhase = (subPhase + pStep * 0.5) % 1.0\n\nlfoStep = orbitSpeed / sr\nlfoPhase = (lfoPhase + lfoStep) % 1.0\n\ncurrX = clamp(vectorX + cos(6.2831853 * lfoPhase) * orbitDepth * 0.5, 0.0, 1.0)\ncurrY = clamp(vectorY + sin(6.2831853 * lfoPhase) * orbitDepth * 0.5, 0.0, 1.0)\n\nwaveA = sin(6.2831853 * phase)\nwaveB = (phase * 2.0 - 1.0) * 0.8\nwaveC = if(phase < 0.5, 0.75, -0.75)\nwaveD = sin(6.2831853 * phase * 2.76) * sin(6.2831853 * phase)\n\ntop = waveA * (1.0 - currX) + waveB * currX\nbottom = waveC * (1.0 - currX) + waveD * currX\nvectMix = top * (1.0 - currY) + bottom * currY\n\nsub = sin(6.2831853 * subPhase) * subLevel\nraw = (vectMix + sub) * env\n\nfCut = clamp(cutoff / sr * 2.0, 0.01, 0.46)\nlp = lp + fCut * (raw - lp)\n\nout = lp * 0.82\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Vector Morph Synth. 4-quadrant planar crossfade synthesizer with orbital modulation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45
