@@ -155,4 +155,5 @@ void FrameTest_GESTUREUNDOTEST(int frameId, GLFWwindow* window);
 void FrameTest_CULLDRIVENTEST(int frameId, GLFWwindow* window);
 void FrameTest_MODCURVETEST(int frameId, GLFWwindow* window);
 void FrameTest_CACHETEST(int frameId, GLFWwindow* window);
+void FrameTest_PERFBOUNDSTEST(int frameId, GLFWwindow* window);
 }

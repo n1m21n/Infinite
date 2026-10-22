@@ -282,6 +282,15 @@ namespace Patch
 
    struct PerfLayoutRecord
    {
+      // What the panel can draw. A patch is outside input, so the loader
+      // holds a file's layout to these (PatchLoad.cpp): the "+" button stops
+      // at kMaxPages, and a cell past kMaxCell would make the grid pass draw
+      // billions of lines a frame.
+      static constexpr int kMaxPages = 12;
+      static constexpr int kMaxCell = 512;
+      static constexpr int kMinCellSize = 40;
+      static constexpr int kMaxCellSize = 400;
+
       int cellSize = 76;
       int pageCount = 1;
       std::vector<std::string> pageNames;

@@ -2315,7 +2315,7 @@ namespace app
       }
 
       // Add new page '+' button
-      if (gPerfLayout.pageCount < 12)
+      if (gPerfLayout.pageCount < Patch::PerfLayoutRecord::kMaxPages)
       {
          ImGui::SameLine();
          if (ChipButton::Draw(L("+##addpagebtn"), false, kPerfChipH, kPerfChipH))
