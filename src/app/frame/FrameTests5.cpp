@@ -1258,9 +1258,9 @@ void FrameTest_UTILTEST(int frameId, GLFWwindow* window)
             printf("null 2D passes: tex=%d size=%d, output %dx%d\n",
                    sameTexture, sameSize, out->GetOutputWidth(), out->GetOutputHeight());
 
-            printf("mesh to points: %zu points -> %zu triangles\n",
-                   m2p->PointCount(), m2p->TriangleCount());
-            const bool sampled = m2p->PointCount() > 10 && m2p->TriangleCount() > 10;
+            // Points only: TriangleCount() is 0 by design (no mesh output, see UtilityNodes.h).
+            printf("mesh to points: %zu points\n", m2p->PointCount());
+            const bool sampled = m2p->PointCount() > 10;
 
             printf("%s\n", (sameMesh && sameStamp && sameTexture && sameSize &&
                             outputFed && sampled) ? "NULL + MESH TO POINTS OK" : "SUSPECT");
