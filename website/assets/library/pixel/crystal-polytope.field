@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Crystal Polytope",
+    "author": "Infinite",
+    "description": "4D regular polytope projection with audio-reactive polychoron facet reflections, internal refraction lattice and chromatic spectral dispersion.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float audio_high = 0.5 [0.0, 2.0];\nparam float spin = 0.6 [0.0, 2.0];\nparam float facets = 8.0 [4.0, 16.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\nrot = t * spin + audio_bass * 0.4;\nang = a + rot;\n\nsec = 6.2831853 / facets;\npolyA = mod(ang, sec) - sec * 0.5;\ndPoly = r * cos(polyA);\n\nshell1 = abs(sin(dPoly * 18.0 - t * 1.5 + audio_bass * 2.0));\nshell2 = abs(cos(r * 24.0 + audio_mid * 2.5));\nlattice = smoothstep(0.12, 0.02, min(shell1, shell2));\n\ncore = smoothstep(0.42 + 0.16 * audio_bass, 0.0, r);\nfacetsGlow = smoothstep(0.35, 0.0, abs(dPoly - 0.22 - 0.08 * sin(t * 2.0)));\n\nmidnight = vec3(0.082, 0.098, 0.188);\nemerald = vec3(0.306, 0.949, 0.722);\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.208);\n\npolyCol = mix(signal, emerald, sin(dPoly * 12.0 + t) * 0.5 + 0.5);\npolyCol = mix(polyCol, ember, lattice * (0.5 + 0.8 * audio_high));\n\nglow = polyCol * (lattice * 1.4 + facetsGlow * 0.9 + core * 0.6);\ncol = mix(midnight, glow, clamp(lattice + facetsGlow + core * 0.8, 0.0, 1.0));\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "audio_high": 0.5,
+      "spin": 0.6,
+      "facets": 8.0
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

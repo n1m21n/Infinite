@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Voronoi Bioluminescence",
+    "author": "Infinite",
+    "description": "Living Voronoi cellular foam tissue with audio-reactive cytoplasmic currents, phosphorescent organelle cores and iridescent membrane tension.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float audio_high = 0.5 [0.0, 2.0];\nparam float density = 6.0 [2.0, 14.0];\nparam float speed = 0.7 [0.0, 2.5];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\n\ngp = p * density;\nf = fract(gp) - 0.5;\nid = floor(gp);\n\nd1 = 10.0;\nd2 = 10.0;\n\nfor (y = -1; y <= 1; y = y + 1) {\n  for (x = -1; x <= 1; x = x + 1) {\n    neighbor = vec2(float(x), float(y));\n    seed = id + neighbor;\n    hash = sin(vec2(dot(seed, vec2(127.1, 311.7)), dot(seed, vec2(269.5, 183.3)))) * 43758.5453;\n    offset = sin(fract(hash) * 6.2831853 + t * speed + audio_bass * 1.5) * 0.4;\n    diff = neighbor + offset - f;\n    dist = length(diff);\n    if (dist < d1) {\n      d2 = d1;\n      d1 = dist;\n    } else if (dist < d2) {\n      d2 = dist;\n    }\n  }\n}\n\nmembrane = smoothstep(0.04, 0.12, d2 - d1);\ncore = smoothstep(0.35 + 0.15 * audio_bass, 0.02, d1);\npulses = smoothstep(0.18, 0.04, abs(d1 - 0.22 - 0.08 * sin(t * 3.0 + r * 5.0)));\n\nmidnight = vec3(0.082, 0.098, 0.188);\nemerald = vec3(0.306, 0.949, 0.722);\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.208);\n\nbioCol = mix(emerald, signal, d1 * 1.8);\nbioCol = mix(bioCol, ember, pulses * (0.6 + 0.8 * audio_mid));\n\norganelles = bioCol * (core * 1.6 + pulses * 1.2);\npattern = organelles * membrane + emerald * (1.0 - membrane) * (0.4 + 0.8 * audio_high);\n\ncol = mix(midnight, pattern, clamp(core + pulses + (1.0 - membrane) * 0.7, 0.0, 1.0));\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "audio_high": 0.5,
+      "density": 6.0,
+      "speed": 0.7
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

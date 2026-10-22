@@ -1679,6 +1679,190 @@
       "file": "assets/library/pixel/cymatic-liquid-matrix.field",
       "preview": "assets/library/previews/cymatic-liquid-matrix.jpg",
       "bytes": 2021
+    },
+    {
+      "id": "dadras-attractor",
+      "name": "Dadras Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math"
+      ],
+      "description": "5-parameter continuous chaotic flow with braided toroidal phase-space trajectories and multi-scroll orbital manifolds.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 6,
+      "file": "assets/library/sketch/dadras-attractor.js",
+      "preview": "assets/library/previews/dadras-attractor.jpg",
+      "bytes": 2055
+    },
+    {
+      "id": "fourier-epicycles",
+      "name": "Fourier Epicycles",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "math",
+        "drawing"
+      ],
+      "description": "Multi-frequency nested complex epicyclic orbit synthesis generating intricate geometric harmonograph rosettes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 6,
+      "file": "assets/library/sketch/fourier-epicycles.js",
+      "preview": "assets/library/previews/fourier-epicycles.jpg",
+      "bytes": 1724
+    },
+    {
+      "id": "calabi-yau-3d",
+      "name": "Calabi-Yau 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "parametric"
+      ],
+      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold Kähler manifold with interlocking compactified sheets.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 7,
+      "file": "assets/library/sketch/calabi-yau-3d.js",
+      "preview": "assets/library/previews/calabi-yau-3d.jpg",
+      "bytes": 1551
+    },
+    {
+      "id": "richmond-surface-3d",
+      "name": "Richmond Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "parametric"
+      ],
+      "description": "Herbert Richmond's complete minimal surface with monkey-saddle branched central singularity and planar asymptotic ends.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 7,
+      "file": "assets/library/sketch/richmond-surface-3d.js",
+      "preview": "assets/library/previews/richmond-surface-3d.jpg",
+      "bytes": 1557
+    },
+    {
+      "id": "pulsar-train-synth",
+      "name": "Pulsar Train Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "pulsar",
+        "audio",
+        "dsp"
+      ],
+      "description": "Microsound pulsar synthesizer with duty-cycle morphing, formant bandpass resonance and subharmonic acoustic weight.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/pulsar-train-synth.inf",
+      "preview": "assets/library/previews/pulsar-train-synth.jpg",
+      "bytes": 1774
+    },
+    {
+      "id": "chaos-duffing-synth",
+      "name": "Chaos Duffing Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "chaos",
+        "audio",
+        "dsp"
+      ],
+      "description": "Nonlinear Duffing oscillator synthesizer with double-potential-well chaotic orbit hopping and subharmonic bifurcation resonance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/chaos-duffing-synth.inf",
+      "preview": "assets/library/previews/chaos-duffing-synth.jpg",
+      "bytes": 1783
+    },
+    {
+      "id": "rotary-speaker-doppler-fx",
+      "name": "Rotary Speaker Doppler FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "rotary",
+        "doppler",
+        "dsp"
+      ],
+      "description": "Dual-rotor Leslie mechanical speaker emulation with Doppler pitch modulation, horn/drum acoustic inertia and warm tube saturation.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/rotary-speaker-doppler-fx.inf",
+      "preview": "assets/library/previews/rotary-speaker-doppler-fx.jpg",
+      "bytes": 2102
+    },
+    {
+      "id": "spectral-gate-stutter-fx",
+      "name": "Spectral Gate Stutter FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "gate",
+        "stutter",
+        "dsp"
+      ],
+      "description": "Rhythmic multiband spectral gating effect with envelope hysteresis, micro-loop buffer stutter and frequency-dependent transient slicing.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/spectral-gate-stutter-fx.inf",
+      "preview": "assets/library/previews/spectral-gate-stutter-fx.jpg",
+      "bytes": 1629
+    },
+    {
+      "id": "crystal-polytope",
+      "name": "Crystal Polytope",
+      "kind": "Generator",
+      "tags": [
+        "Geometry",
+        "3D",
+        "Audio-Reactive"
+      ],
+      "description": "4D regular polytope projection with audio-reactive polychoron facet reflections, internal refraction lattice and chromatic spectral dispersion.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/crystal-polytope.field",
+      "preview": "assets/library/previews/crystal-polytope.jpg",
+      "bytes": 1736
+    },
+    {
+      "id": "voronoi-bioluminescence",
+      "name": "Voronoi Bioluminescence",
+      "kind": "Generator",
+      "tags": [
+        "Organic",
+        "Pattern",
+        "Audio-Reactive"
+      ],
+      "description": "Living Voronoi cellular foam tissue with audio-reactive cytoplasmic currents, phosphorescent organelle cores and iridescent membrane tension.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/voronoi-bioluminescence.field",
+      "preview": "assets/library/previews/voronoi-bioluminescence.jpg",
+      "bytes": 2103
     }
   ]
 }

@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Rotary Speaker Doppler FX",
+    "author": "Infinite",
+    "description": "Dual-rotor Leslie mechanical speaker emulation with Doppler pitch modulation, horn/drum acoustic inertia and warm tube saturation.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float speed = 1.0 [0.1, 3.0];\nparam float depth = 0.65 [0.0, 1.0];\nparam float hornRate = 5.8 [1.0, 10.0];\nparam float drive = 0.35 [0.0, 1.0];\nparam float mix = 0.85 [0.0, 1.0];\nstate float lfoHorn = 0;\nstate float lfoDrum = 0;\nstate float d1 = 0;\nstate float d2 = 0;\nstate float d3 = 0;\nstate float d4 = 0;\nstate float lp = 0;\n\nhornHz = hornRate * speed;\ndrumHz = (hornRate * 0.14) * speed;\n\nlfoHorn = (lfoHorn + hornHz / sr) % 1.0;\nlfoDrum = (lfoDrum + drumHz / sr) % 1.0;\n\nhornAM = 0.7 + 0.3 * cos(6.2831853 * lfoHorn);\ndrumAM = 0.8 + 0.2 * cos(6.2831853 * lfoDrum);\n\ndopHorn = sin(6.2831853 * lfoHorn) * depth * 0.4;\ndopDrum = sin(6.2831853 * lfoDrum) * depth * 0.25;\n\nsatIn = in * (1.0 + drive * 2.0);\ntube = satIn / (1.0 + abs(satIn) * 0.4);\n\nlp = lp + 0.06 * (tube - lp);\nhighs = tube - lp;\n\ng1 = clamp(0.55 + dopHorn, 0.1, 0.85);\nv1 = highs - g1 * d1;\napHorn = d1 + g1 * v1;\nd1 = v1;\n\nv2 = apHorn - g1 * d2;\napHorn2 = d2 + g1 * v2;\nd2 = v2;\n\ng2 = clamp(0.6 + dopDrum, 0.1, 0.88);\nv3 = lp - g2 * d3;\napDrum = d3 + g2 * v3;\nd3 = v3;\n\nv4 = apDrum - g2 * d4;\napDrum2 = d4 + g2 * v4;\nd4 = v4;\n\nwet = apHorn2 * hornAM + apDrum2 * drumAM;\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "speed": 1.0,
+      "depth": 0.65,
+      "hornRate": 5.8,
+      "drive": 0.35,
+      "mix": 0.85
+    },
+    "nodeSettings": {}
+  }
+}

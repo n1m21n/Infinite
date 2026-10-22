@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Chaos Duffing Synth",
+    "author": "Infinite",
+    "description": "Nonlinear Duffing oscillator synthesizer with double-potential-well chaotic orbit hopping and subharmonic bifurcation resonance.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float drive = 1.2 [0.1, 3.0];\nparam float stiffness = 1.0 [0.2, 2.5];\nparam float damping = 0.25 [0.05, 0.8];\nparam float cutoff = 3600.0 [200.0, 12000.0];\nparam float envDecay = 0.65 [0.05, 3.0];\nstate float pos = 0.1;\nstate float vel = 0.0;\nstate float drivePhase = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * envDecay), 0.00005, 0.02);\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.15, env - env * decayRate);\n\npStep = clamp(freq, 20.0, 4000.0) / sr;\ndrivePhase = (drivePhase + pStep) % 1.0;\n\nextForce = sin(6.2831853 * drivePhase) * drive;\ndt = clamp(pStep * 6.2831853, 0.001, 0.35);\n\nacc = pos - stiffness * pos * pos * pos - damping * vel + extForce;\nvel = clamp(vel + acc * dt, -4.0, 4.0);\npos = clamp(pos + vel * dt, -3.0, 3.0);\n\nraw = pos * 0.6 * env;\n\nfCut = clamp(cutoff / sr * 2.0, 0.01, 0.46);\nlp = lp + fCut * (raw - lp);\n\nout = lp * 0.82;\n",
+    "params": {
+      "drive": 1.2,
+      "stiffness": 1.0,
+      "damping": 0.25,
+      "cutoff": 3600.0,
+      "envDecay": 0.65
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

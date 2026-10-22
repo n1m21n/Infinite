@@ -160,6 +160,16 @@
       "slug": "cymatic-liquid-matrix",
       "title": "Cymatic Liquid Matrix",
       "description": "Faraday liquid surface standing wave resonance under acoustic multi-tone excitation with specular fluid reflections and audio-reactive modal lattice interference."
+    },
+    {
+      "slug": "crystal-polytope",
+      "title": "Crystal Polytope",
+      "description": "4D regular polytope projection with audio-reactive polychoron facet reflections, internal refraction lattice and chromatic spectral dispersion."
+    },
+    {
+      "slug": "voronoi-bioluminescence",
+      "title": "Voronoi Bioluminescence",
+      "description": "Living Voronoi cellular foam tissue with audio-reactive cytoplasmic currents, phosphorescent organelle cores and iridescent membrane tension."
     }
   ]
 }

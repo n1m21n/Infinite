@@ -59,7 +59,15 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/crystal-polytope.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/cyber-tunnel.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/cymatic-liquid-matrix.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -178,6 +186,10 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/reaction-diffusion-core.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/retro_surreal.html": {
    "font-size": 2,
    "hex": 5,
@@ -218,6 +230,10 @@
    "font-size": 2,
    "hex": 5,
    "radius": 1
+  },
+  "embeds/voronoi-bioluminescence.html": {
+   "font-size": 2,
+   "hex": 6
   },
   "embeds/y2k_acid.html": {
    "font-size": 2,

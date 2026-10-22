@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Pulsar Train Synth",
+    "author": "Infinite",
+    "description": "Microsound pulsar synthesizer with duty-cycle morphing, formant bandpass resonance and subharmonic acoustic weight.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float formantRatio = 3.2 [1.0, 8.0];\nparam float dutyCycle = 0.45 [0.05, 0.95];\nparam float envDecay = 0.7 [0.05, 3.0];\nparam float filterCutoff = 4800.0 [200.0, 14000.0];\nparam float subLevel = 0.35 [0.0, 1.0];\nstate float phase = 0;\nstate float subPhase = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * envDecay), 0.00005, 0.02);\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.15, env - env * decayRate);\n\npStep = clamp(freq, 20.0, 5000.0) / sr;\nphase = (phase + pStep) % 1.0;\nsubPhase = (subPhase + pStep * 0.5) % 1.0;\n\npulsaret = if(phase < dutyCycle, sin(6.2831853 * (phase / dutyCycle) * formantRatio) * (0.5 - 0.5 * cos(6.2831853 * (phase / dutyCycle))), 0.0);\nsub = sin(6.2831853 * subPhase) * subLevel;\n\nraw = (pulsaret * 1.2 + sub) * env;\n\nfCut = clamp(filterCutoff / sr * 2.0, 0.01, 0.46);\nlp = lp + fCut * (raw - lp);\n\nout = lp * 0.85;\n",
+    "params": {
+      "formantRatio": 3.2,
+      "dutyCycle": 0.45,
+      "envDecay": 0.7,
+      "filterCutoff": 4800.0,
+      "subLevel": 0.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

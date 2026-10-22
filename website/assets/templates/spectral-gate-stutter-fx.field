@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spectral Gate Stutter FX",
+    "author": "Infinite",
+    "description": "Rhythmic multiband spectral gating effect with envelope hysteresis, micro-loop buffer stutter and frequency-dependent transient slicing.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float rateHz = 8.0 [1.0, 20.0];\nparam float threshold = 0.12 [0.01, 0.5];\nparam float hysteresis = 0.45 [0.1, 0.9];\nparam float feedback = 0.62 [0.0, 0.95];\nparam float mix = 0.8 [0.0, 1.0];\nstate float phase = 0;\nstate float gateState = 1.0;\nstate float envIn = 0;\nstate float buf = 0;\nstate float lp = 0;\n\nabsIn = abs(in);\nenvIn = envIn + if(absIn > envIn, 0.25, 0.002) * (absIn - envIn);\n\ngateState = if(envIn > threshold, 1.0, if(envIn < (threshold * hysteresis), 0.0, gateState));\n\nphase = (phase + rateHz / sr) % 1.0;\nchop = if(phase < 0.5, 1.0, 0.0);\n\nfbSig = buf * feedback;\nrawWet = (in + fbSig) * chop * gateState;\nbuf = rawWet;\n\nlp = lp + 0.15 * (rawWet - lp);\n\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "rateHz": 8.0,
+      "threshold": 0.12,
+      "hysteresis": 0.45,
+      "feedback": 0.62,
+      "mix": 0.8
+    },
+    "nodeSettings": {}
+  }
+}
