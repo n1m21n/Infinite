@@ -2215,7 +2215,7 @@ extern std::map<std::pair<int, int>, float> gIntParamStore;
 extern std::map<std::pair<int, int>, int> gIntParamLastWritten;
 
 bool ModSliderInt(const char* label, int* value, int minV, int maxV, float width = kParamWidth,
-                     bool audioStyle = false);
+                     bool audioStyle = false, const char* fmt = "%.0f");
 
 
 
@@ -3474,7 +3474,7 @@ bool AudioSlider(const char* label, float* v, float lo, float hi, const char* fm
                     FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
                     int explicitParamIndex = -1, const char* nameOverride = nullptr);
 
-bool AudioSliderInt(const char* label, int* v, int lo, int hi, float width);
+bool AudioSliderInt(const char* label, int* v, int lo, int hi, float width, const char* fmt = "%.0f");
 
 bool AudioToggleButton(const char* label, bool* value, float width = 44.0f, float height = 0.0f);
 
