@@ -11,6 +11,7 @@
 //  - Quit watchdog: a device that never finishes closing cannot keep the
 //    process alive past a few seconds.
 #include "app/AppShared.h"
+#include "core/CoverageFlush.h"
 #include <filesystem>
 #include <fstream>
 #include <atomic>
@@ -156,6 +157,7 @@ namespace app
          }
          fflush(stdout);
          fflush(stderr);
+         FlushCoverageProfile();
          std::_Exit(0);
       }).detach();
    }

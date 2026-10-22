@@ -86,6 +86,18 @@ if(INFINITE_SANITIZE AND NOT MSVC)
     message(STATUS "Sanitizers enabled: ${INFINITE_SANITIZE}")
 endif()
 
+# Coverage builds: -DINFINITE_COVERAGE=ON (clang only) instruments for llvm-cov,
+# so a fuzz or test run can show which code it never reached
+# (tools/bughunt/coverage.py). Off by default, never shipped; combinable with
+# INFINITE_SANITIZE.
+option(INFINITE_COVERAGE "Instrument for llvm-cov source coverage (clang)" OFF)
+if(INFINITE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate)
+    add_compile_definitions(INFINITE_COVERAGE_BUILD=1) # src/core/CoverageFlush.h
+    message(STATUS "Coverage instrumentation enabled")
+endif()
+
 # GLFW is built from source and linked statically rather than taken from
 # Homebrew: a downloaded .app must not depend on /opt/homebrew existing. (On
 # Windows the same reasoning applies to any vcpkg/system copy.)
