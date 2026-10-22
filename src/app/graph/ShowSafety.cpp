@@ -13,6 +13,7 @@
 #include "app/AppShared.h"
 #include <filesystem>
 #include <fstream>
+#include <atomic>
 #include <cctype>
 #include "platform/AppPaths.h"
 
@@ -126,17 +127,32 @@ namespace app
       return items;
    }
 
+   namespace
+   {
+      std::atomic<const char*> sQuitStep{ "start" };
+   }
+
+   void SetQuitStep(const char* step)
+   {
+      sQuitStep.store(step, std::memory_order_release);
+   }
+
    // The process must be gone a few seconds after the window closes, whatever
-   // a device driver, plugin or network call is doing in the teardown.
+   // a device driver, plugin or network call is doing in the teardown. The
+   // log names the teardown step that stalled (idea from Ricardo Palmieri's
+   // Windows fork, 4f545d2d), so a hang report says which device or thread.
    void StartQuitWatchdog(int seconds)
    {
       std::thread([seconds]() {
          std::this_thread::sleep_for(std::chrono::seconds(seconds));
+         const char* step = sQuitStep.load(std::memory_order_acquire);
+         fprintf(stderr, "quit stall: still in '%s' after %d s; ending the process\n", step, seconds);
          if (getenv("INFINITE_QUITSTALLTEST") != nullptr)
          {
             // Two lines so the verdict line ends in OK, which is what the hygiene driver matches.
-            printf("quit stall: the watchdog ended a quit that was stalled in the audio device\n");
-            printf("QUITSTALLTEST OK\n");
+            printf("quit stall: the watchdog ended a quit that was stalled in '%s'\n", step);
+            printf(std::string(step) == "stop audio engine" ? "QUITSTALLTEST OK\n"
+                                                             : "QUITSTALLTEST FAIL (wrong step named)\n");
          }
          fflush(stdout);
          fflush(stderr);

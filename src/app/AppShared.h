@@ -5661,6 +5661,7 @@ std::vector<ShowCheckItem> ShowPreCheck();
 extern bool gShowCheckRequest; // menu item: open the Show Set window and run the check
 void ShowSafetyTick(int frameId, GLFWwindow* window); // SHOWSAFETYTEST / QUITSTALLTEST harness
 void StartQuitWatchdog(int seconds);
+void SetQuitStep(const char* step); // named in the watchdog's stall line
 // AudioTopology.cpp: the audio half of panic.
 void AudioPanicSilence();
 void AudioPanicResume();
