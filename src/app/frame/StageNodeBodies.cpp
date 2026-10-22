@@ -286,6 +286,11 @@ void DrawNodeBodies(FrameCtx& fc)
          {
             const float expectedW = AudioNodeWidth(gn.node.get());
             bool* globalScalePtr = GetNodeGlobalScaleFlag(gn.node.get());
+            if (CanRestart(gn.node.get()))
+            {
+               ImGui::SetCursorPos(ImVec2(topRowPos.x + expectedW - (globalScalePtr != nullptr ? 66.0f : 44.0f), topRowPos.y));
+               RestartToggle(gn.node.get());
+            }
             if (globalScalePtr != nullptr)
             {
                ImGui::SetCursorPos(ImVec2(topRowPos.x + expectedW - 44.0f, topRowPos.y));

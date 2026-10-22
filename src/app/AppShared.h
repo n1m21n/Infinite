@@ -2286,6 +2286,11 @@ bool* GetNodeGlobalScaleFlag(INode* node);
 
 bool BypassToggle(bool bypassed);
 
+// The header's restart glyph on the pattern nodes (Arpeggiator, Note Sequencer, MIDI File); false for any other
+// node. RestartToggle draws it at the cursor: a press restarts on the Transport launch grid, accent while waiting.
+bool CanRestart(INode* node);
+void RestartToggle(INode* node);
+
 void DrawPin(int pinId, ed::PinKind kind, const char* label, bool labelFirst = false);
 
 #ifndef NDEBUG
@@ -6025,6 +6030,7 @@ bool RunMetallicDecayFixture();
 bool RunCycleShaperFixture();
 
 bool RunMidiFileFixture();
+bool RunRestartTest();
 
 bool RunMpeFixture();
 

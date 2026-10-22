@@ -1851,6 +1851,30 @@ namespace app
    }
 
 
+   bool CanRestart(INode* node)
+   {
+      return dynamic_cast<ArpeggiatorNode*>(node) != nullptr || dynamic_cast<NoteSequencerNode*>(node) != nullptr ||
+             dynamic_cast<MidiFileNode*>(node) != nullptr;
+   }
+
+
+   // Rewind glyph (the top bar's "back to start"). The press itself is the edge, so a restart lands on the grid line
+   // after the mouse goes down, not after it comes up; the tooltip goes through gNodeHoverTip (drawn after the node loop).
+   void RestartToggle(INode* node)
+   {
+      auto apply = [](auto* n)
+      {
+         GlyphToggle::Draw("##restart", IconsInfinite::Rewind, IconsInfinite::Rewind, n->RestartArmed());
+         n->SetRestartLevel(ImGui::IsItemActive());
+         if (ImGui::IsItemHovered() && CategoryColors::GetTooltips())
+            gNodeHoverTip = n->RestartArmed() ? "Restart: waiting for the launch grid" : "Restart on the launch grid";
+      };
+      if (auto* n = dynamic_cast<ArpeggiatorNode*>(node)) apply(n);
+      else if (auto* n = dynamic_cast<NoteSequencerNode*>(node)) apply(n);
+      else if (auto* n = dynamic_cast<MidiFileNode*>(node)) apply(n);
+   }
+
+
    // PushTextWrapPos takes a window-local x and reads <= 0 as "do not wrap" (or "wrap at the window edge"). Inside the
    // node canvas the window sits at canvas 0, so GetCursorPosX() + width went negative for any node left of the canvas
    // origin, its text stopped wrapping and the node grew to the text's full length. Scroll.x is shifted for the span so
