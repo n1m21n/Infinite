@@ -368,15 +368,28 @@ void FrameTest_PLUGINDRAGTEST(int frameId, GLFWwindow* window)
          // list, and by the time the synthetic press lands the list underneath
          // has been replaced. Requiring the captured row to hold still rules
          // that out without having to reach into the scanner's internals.
+         // The count only runs while the scanner is idle and is keyed on the
+         // index version and the row rect too: frames counted mid-scan used to
+         // satisfy it the moment IsScanning() went false, before the panel had
+         // polled the new index, so the press landed where the old row was
+         // (B-I-002, reproducible under CPU load).
          static std::string sSeenId;
+         static uint64_t sSeenVersion = 0;
+         static ImVec4 sSeenRect(-1.0f, -1.0f, -1.0f, -1.0f);
          static int sStableFrames = 0;
          if (sPhase == 0)
          {
-            if (!gPluginDragTestRowId.empty() && gPluginDragTestRowId == sSeenId)
+            const ImVec4& r = gPluginDragTestRowRect;
+            const bool same = !gPluginDragTestRowId.empty() && gPluginDragTestRowId == sSeenId &&
+                              gPluginScanner.IndexVersion() == sSeenVersion && r.x == sSeenRect.x &&
+                              r.y == sSeenRect.y && r.z == sSeenRect.z && r.w == sSeenRect.w;
+            if (same && !gPluginScanner.IsScanning())
                sStableFrames++;
             else
             {
                sSeenId = gPluginDragTestRowId;
+               sSeenVersion = gPluginScanner.IndexVersion();
+               sSeenRect = r;
                sStableFrames = 0;
             }
          }
@@ -394,6 +407,10 @@ void FrameTest_PLUGINDRAGTEST(int frameId, GLFWwindow* window)
          }
          else if (sPhase == 1)
          {
+            // Re-aim at the row as last drawn, in case it moved after the latch.
+            if (gPluginDragTestRowId == sSeenId && gPluginDragTestRowRect.x >= 0.0f)
+               sRowCenter = ImVec2((gPluginDragTestRowRect.x + gPluginDragTestRowRect.z) * 0.5f,
+                                   (gPluginDragTestRowRect.y + gPluginDragTestRowRect.w) * 0.5f);
             gTestMouse = sRowCenter;
             if (frameId >= sPhaseFrame + 2)
             {
