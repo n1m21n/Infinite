@@ -3438,7 +3438,7 @@ void DrawPredictiveModulatorParams(PredictiveModulatorNode* n);
    // the same node (see PINDUPTEST / FieldPrimitiveNode's "count"+"max
    // elements" collision: two native int sliders claimed indices 0 and 1,
    // and the first declared param, with p.id == 1, collided with the second).
-   inline const int kFieldDeclaredParamBase = 50;
+   inline const int kFieldDeclaredParamBase = Field::kDeclaredParamIndexBase;
 
 
 
