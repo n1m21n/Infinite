@@ -177,6 +177,7 @@ void Normalize(Model& m)
          if (clip.length < 1) clip.length = 1;
          if (clip.srcOutput < 0) clip.srcOutput = 0;
          if (!std::isfinite(clip.gainDb)) clip.gainDb = 0.0f;
+         clip.gainDb = std::clamp(clip.gainDb, -60.0f, 12.0f); // the gain slider's range
          if (clip.blendMode < 0 || clip.blendMode > 31) clip.blendMode = 0; // BlendModes::Names() range
          if (!std::isfinite(clip.pan)) clip.pan = 0.0f;
          clip.pan = std::clamp(clip.pan, -1.0f, 1.0f);
