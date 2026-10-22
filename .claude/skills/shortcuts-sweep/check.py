@@ -26,8 +26,8 @@ KEY_ALIASES = {
     "/": "Slash", "escape": "Escape", "enter": "Enter", "tab": "Tab",
     "scroll wheel": None, "drag canvas": None, "shift + drag": None,
     "left": "LeftArrow", "right": "RightArrow", "up": "UpArrow", "down": "DownArrow",
-    "home": "Home", "end": "End",
-    "=": "Equal", "-": "Minus",
+    "home": "Home", "end": "End", "pagedown": "PageDown", "pageup": "PageUp",
+    "=": "Equal", "-": "Minus", ".": "Period",
 }
 
 def norm_key(tok):
