@@ -3,6 +3,10 @@
 
 namespace app
 {
+   // An output index GraphNode::OutputPinId() can encode without running into the
+   // next node's pin block. A patch file is outside input, so links past it are dropped.
+   static bool IsValidOutputIndex(int output) { return output >= 0 && output < GraphNode::kStride - GraphNode::kOutputBase; }
+
    // Resolves a bundled asset shipped next to the app (fonts, icon fonts) from
    // the *executable's own location*, not the process's working directory.
    //
@@ -249,7 +253,7 @@ namespace app
       {
          GraphNode* dst = liveOf(m.dstIndex);
          GraphNode* src = liveOf(m.srcIndex);
-         if (dst == nullptr || src == nullptr)
+         if (dst == nullptr || src == nullptr || !IsValidOutputIndex(m.srcOutput))
             continue;
          const int p = paramOf(*dst, m.dstKey);
          if (p < 0)
