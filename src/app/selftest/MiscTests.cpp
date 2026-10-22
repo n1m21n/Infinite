@@ -123,6 +123,59 @@ bool RunBrowserSortTest()
       check(queried.size() == 2, "sample query filters by substring, length");
    }
 
+   // ---- Folder browsing: subfolders, a folder's own files, search under it, folder-drag kit order ----
+   {
+      auto makeEntry = [](const std::string& path) {
+         SampleScanner::Entry e;
+         e.path = path;
+         e.folderRoot = "/lib";
+         e.fileName = path.substr(path.find_last_of('/') + 1);
+         e.fileNameLower = e.fileName;
+         std::transform(e.fileNameLower.begin(), e.fileNameLower.end(), e.fileNameLower.begin(), ::tolower);
+         e.extension = "wav";
+         return e;
+      };
+      std::vector<SampleScanner::Entry> index = {
+         makeEntry("/lib/top.wav"),
+         makeEntry("/lib/Kit/snare.wav"),
+         makeEntry("/lib/Kit/kick.wav"),
+         makeEntry("/lib/Kit/Extra/clap.wav"),
+         makeEntry("/lib/bass/sub.wav"),
+         makeEntry("/lib/Split/Kicks/k1.wav"),
+         makeEntry("/lib/Split/Snares/s1.wav"),
+         makeEntry("/library2/other.wav"), // shares a name prefix with /lib, must never show inside it
+      };
+      BrowserFilterState st;
+      auto names = [](const std::vector<const SampleScanner::Entry*>& v) {
+         std::string out;
+         for (const auto* e : v)
+            out += e->fileName + ",";
+         return out;
+      };
+
+      auto own = FilterAndSortSampleEntries(index, "", st, false, SampleScanner::PathKey("/lib"), false);
+      check(names(own) == "top.wav,", "folder browse lists only the folder's own files");
+      auto sub = ListSubfolders(index, "/lib", "");
+      check(sub.size() == 3 && sub[0] == "/lib/bass" && sub[1] == "/lib/Kit" && sub[2] == "/lib/Split",
+            "folder browse lists subfolders once, by name");
+      auto kitOwn = FilterAndSortSampleEntries(index, "", st, false, SampleScanner::PathKey("/lib/Kit/"), false);
+      check(names(kitOwn) == "kick.wav,snare.wav,", "folder browse with a trailing slash, sorted");
+      auto searched = FilterAndSortSampleEntries(index, "clap", st, false, SampleScanner::PathKey("/lib"), true);
+      check(names(searched) == "clap.wav,", "search inside a folder reaches nested files");
+      auto subQ = ListSubfolders(index, "/lib", "ki");
+      check(subQ.size() == 1 && subQ[0] == "/lib/Kit", "search inside a folder filters subfolders by name");
+      check(ListSubfolders(index, "/lib/bass", "").empty(), "a leaf folder has no subfolders");
+      check(FolderDisplayName("/lib/Kit/") == "Kit" && FolderDisplayName("C:\\Samples\\Drums") == "Drums",
+            "folder display name is the last component");
+
+      auto kit = SampleFilesInFolder(index, "/lib/Kit");
+      check(kit.size() == 2 && kit[0] == "/lib/Kit/kick.wav" && kit[1] == "/lib/Kit/snare.wav",
+            "folder drag loads the folder's own files by name");
+      auto split = SampleFilesInFolder(index, "/lib/Split");
+      check(split.size() == 2 && split[0] == "/lib/Split/Kicks/k1.wav", "folder of subfolders loads what is under it");
+      check(SampleFilesInFolder(index, "/nowhere").empty(), "unknown folder loads nothing");
+   }
+
    // ---- Media: Video/Image grouping, individual extension filter ----
    {
       auto makeEntry = [](const std::string& fileName, const std::string& ext) {

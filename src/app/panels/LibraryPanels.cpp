@@ -124,9 +124,15 @@ namespace app
    // synthetic data rather than a re-typed copy of it. `lowerQuery` must
    // already be lowercased (callers already have it that way, to avoid
    // lowercasing it once per row).
+   // "<dirKey>/" for prefix tests, without doubling a root's own slash ("/" or "C:/").
+   static std::string DirPrefix(const std::string& dirKey)
+   {
+      return (!dirKey.empty() && dirKey.back() == '/') ? dirKey : dirKey + "/";
+   }
+
    std::vector<const SampleScanner::Entry*> FilterAndSortSampleEntries(
       const std::vector<SampleScanner::Entry>& index, const std::string& lowerQuery,
-      const BrowserFilterState& state, bool mediaKind)
+      const BrowserFilterState& state, bool mediaKind, const std::string& dirKey, bool recursive)
    {
       std::vector<const SampleScanner::Entry*> filtered;
       filtered.reserve(index.size());
@@ -134,9 +140,19 @@ namespace app
       // The index itself keeps both, so removing either folder still leaves the other's copy.
       std::unordered_set<std::string> seen;
       seen.reserve(index.size());
+      const std::string prefix = dirKey.empty() ? std::string() : DirPrefix(dirKey);
       for (const SampleScanner::Entry& entry : index)
       {
-         if (!seen.insert(SampleScanner::PathKey(entry.path)).second)
+         std::string key = SampleScanner::PathKey(entry.path);
+         if (!prefix.empty())
+         {
+            // Browsing a folder: only what is inside it, and (when not searching) only its own files.
+            if (key.compare(0, prefix.size(), prefix) != 0)
+               continue;
+            if (!recursive && key.find('/', prefix.size()) != std::string::npos)
+               continue;
+         }
+         if (!seen.insert(std::move(key)).second)
             continue;
          if (!lowerQuery.empty() && entry.fileNameLower.find(lowerQuery) == std::string::npos)
             continue;
@@ -158,6 +174,76 @@ namespace app
    }
 
 
+   // The folders directly inside `dir`, as full paths in the index's own spelling, sorted by name. Read off the
+   // scanned index (a folder holding no audio at any depth is not listed). With a query, only names containing it.
+   std::vector<std::string> ListSubfolders(const std::vector<SampleScanner::Entry>& index, const std::string& dir,
+                                           const std::string& lowerQuery)
+   {
+      const std::string prefix = DirPrefix(SampleScanner::PathKey(dir));
+      std::vector<std::pair<std::string, std::string>> found; // key, path
+      std::unordered_set<std::string> seen;
+      for (const SampleScanner::Entry& entry : index)
+      {
+         const std::string key = SampleScanner::PathKey(entry.path);
+         if (key.compare(0, prefix.size(), prefix) != 0)
+            continue;
+         const size_t slash = key.find('/', prefix.size());
+         if (slash == std::string::npos)
+            continue;
+         std::string folderKey = key.substr(0, slash);
+         if (!seen.insert(folderKey).second)
+            continue;
+         // PathKey only swaps separators and (on Windows) case, so its offsets line up with the original path.
+         std::string path = entry.path.substr(0, slash);
+         std::replace(path.begin(), path.end(), '\\', '/');
+         if (!lowerQuery.empty())
+         {
+            std::string name = FolderDisplayName(path);
+            std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            if (name.find(lowerQuery) == std::string::npos)
+               continue;
+         }
+         found.emplace_back(std::move(folderKey), std::move(path));
+      }
+      std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) {
+         return ILess(FolderDisplayName(a.second), FolderDisplayName(b.second));
+      });
+      std::vector<std::string> out;
+      out.reserve(found.size());
+      for (auto& f : found)
+         out.push_back(std::move(f.second));
+      return out;
+   }
+
+   // The samples a folder drag loads, by name: the folder's own files, or everything under it when it holds only
+   // subfolders (a kit folder split into Kicks/Snares/...).
+   std::vector<std::string> SampleFilesInFolder(const std::vector<SampleScanner::Entry>& index, const std::string& folder)
+   {
+      const BrowserFilterState byName;
+      const std::string key = SampleScanner::PathKey(folder);
+      std::vector<const SampleScanner::Entry*> files = FilterAndSortSampleEntries(index, "", byName, false, key, false);
+      if (files.empty())
+         files = FilterAndSortSampleEntries(index, "", byName, false, key, true);
+      std::vector<std::string> out;
+      out.reserve(files.size());
+      for (const SampleScanner::Entry* e : files)
+         out.push_back(e->path);
+      return out;
+   }
+
+   // Last path component ("/a/Drums/" -> "Drums"); a bare root stays as written.
+   std::string FolderDisplayName(const std::string& path)
+   {
+      std::string p = path;
+      while (p.size() > 1 && (p.back() == '/' || p.back() == '\\'))
+         p.pop_back();
+      const size_t slash = p.find_last_of("/\\");
+      if (slash == std::string::npos || slash + 1 >= p.size())
+         return p;
+      return p.substr(slash + 1);
+   }
+
+
    // The Samples/Media modes of the docked node-browser panel (docs/plans/
    // audio/README.md P3e): folder list management, a background-thread scan
    // (SampleScanner), filter-as-you-type over the persisted index, and a
@@ -168,9 +254,40 @@ namespace app
    // the mode-specific placeholder text, and mediaKind tags the drag so the
    // release handler knows whether to resolve it against Sampler or against
    // Image Source/Video.
+   // A folder row dragged past ImGui's threshold starts a folder drag (Samples only): released on a Drum
+   // Sequencer or MPC it loads the folder as a kit (see the SampleFolder branch in StagePopupsA.cpp).
+   static void MaybeStartFolderDrag(const std::string& folder, bool mediaKind)
+   {
+      if (mediaKind || !ImGui::IsItemActive() || !ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
+         return;
+      gSampleDragActive = true;
+      gSampleDragKind = LibraryDragKind::SampleFolder;
+      gSampleDragPath = folder;
+      gSampleDragName = FolderDisplayName(folder);
+   }
+
    void DrawLibrarySearchPanel(SampleScanner& scanner, const char* idPrefix, const char* searchHint, bool mediaKind)
    {
       scanner.PollResults();
+
+      // The folder being browsed ("" = the flat list of every file). Per mode, like the filter state.
+      static std::string sSampleBrowseDir;
+      static std::string sMediaBrowseDir;
+      std::string& browseDir = mediaKind ? sMediaBrowseDir : sSampleBrowseDir;
+      if (!browseDir.empty())
+      {
+         // Leave a folder whose library folder was removed.
+         const std::string key = SampleScanner::PathKey(browseDir);
+         bool inside = false;
+         for (const std::string& f : scanner.Folders())
+         {
+            const std::string fk = SampleScanner::PathKey(f);
+            if (key == fk || key.compare(0, DirPrefix(fk).size(), DirPrefix(fk)) == 0)
+               inside = true;
+         }
+         if (!inside)
+            browseDir.clear();
+      }
 
       ImGui::PushID(idPrefix);
 
@@ -197,9 +314,19 @@ namespace app
       {
          ImGui::PushID(folder.c_str());
          const float btnW = 24.0f;
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + panelW - 2.0f * btnW - 14.0f);
-         ImGui::TextDisabled(scanner.IsFolderMissing(folder) ? "%s  (not found)" : "%s", folder.c_str());
-         ImGui::PopTextWrapPos();
+         // A folder row: click opens it in the list below, drag loads it as a kit; the full path on hover.
+         const bool missing = scanner.IsFolderMissing(folder);
+         const float rowW = panelW - 2.0f * btnW - 8.0f;
+         std::string label = FolderDisplayName(folder);
+         if (missing)
+            label += T("  (not found)");
+         const LibraryParts::RowResult row =
+            LibraryParts::FolderRow("folder", TruncateWithEllipsis(label, std::max(20.0f, rowW - 64.0f)), missing, rowW);
+         if (row.clicked && !missing)
+            browseDir = folder;
+         MaybeStartFolderDrag(folder, mediaKind);
+         if (row.hovered && !gSampleDragActive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
+            ImGui::SetTooltip("%s", folder.c_str());
          ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
          if (LibraryParts::IconButton("refreshfolder", LibraryParts::Icon::Refresh, !scanning))
             folderToScan = folder;
@@ -232,7 +359,9 @@ namespace app
          int lastSortMode = -1;
          int lastTypeFilter = -1;
          bool lastDescending = false;
+         std::string lastDir;
          std::vector<const SampleScanner::Entry*> filtered;
+         std::vector<std::string> folders; // subfolders of lastDir, listed before its files
       };
       static LibraryFilterCache sSampleCache;
       static LibraryFilterCache sMediaCache;
@@ -268,9 +397,13 @@ namespace app
       if (cache.lastQuery != q || cache.lastIndexVersion != scanner.IndexVersion() ||
           cache.lastFavoritesVersion != gBrowserFavorites.Version() ||
           cache.lastSortMode != filterState.sortMode || cache.lastTypeFilter != filterState.typeFilter ||
-          cache.lastDescending != filterState.descending)
+          cache.lastDescending != filterState.descending || cache.lastDir != browseDir)
       {
-         cache.filtered = FilterAndSortSampleEntries(scanner.Index(), q, filterState, mediaKind);
+         // Browsing: the folder's subfolders, then its own files; a search there reaches every file under it.
+         const std::string dirKey = browseDir.empty() ? std::string() : SampleScanner::PathKey(browseDir);
+         cache.filtered = FilterAndSortSampleEntries(scanner.Index(), q, filterState, mediaKind, dirKey, !q.empty());
+         cache.folders = browseDir.empty() ? std::vector<std::string>() : ListSubfolders(scanner.Index(), browseDir, q);
+         cache.lastDir = browseDir;
 
          cache.lastQuery = q;
          cache.lastIndexVersion = scanner.IndexVersion();
@@ -281,6 +414,46 @@ namespace app
       }
 
       const auto& filtered = cache.filtered;
+      const auto& subfolders = cache.folders;
+      const int numFolders = (int)subfolders.size();
+
+      // Where the list is: "All > Drums > Kicks". Any earlier segment goes back up.
+      if (!browseDir.empty())
+      {
+         std::string root;
+         const std::string key = SampleScanner::PathKey(browseDir);
+         for (const std::string& f : scanner.Folders())
+         {
+            const std::string fk = SampleScanner::PathKey(f);
+            if ((key == fk || key.compare(0, DirPrefix(fk).size(), DirPrefix(fk)) == 0) && f.size() > root.size())
+               root = f; // the innermost library folder holding it
+         }
+         std::vector<std::string> segments = { T("All") };
+         std::vector<std::string> targets = { std::string() };
+         std::string path = root;
+         segments.push_back(FolderDisplayName(root));
+         targets.push_back(root);
+         std::string rest = browseDir.size() > root.size() ? browseDir.substr(root.size()) : std::string();
+         std::replace(rest.begin(), rest.end(), '\\', '/');
+         size_t at = 0;
+         while (at < rest.size())
+         {
+            const size_t next = rest.find('/', at);
+            const std::string part = rest.substr(at, next == std::string::npos ? std::string::npos : next - at);
+            if (!part.empty())
+            {
+               path = DirPrefix(path) + part;
+               segments.push_back(part);
+               targets.push_back(path);
+            }
+            if (next == std::string::npos)
+               break;
+            at = next + 1;
+         }
+         const int hit = LibraryParts::Breadcrumb("##crumbs", segments);
+         if (hit >= 0)
+            browseDir = targets[(size_t)hit];
+      }
 
       // Tighter vertical rhythm than ImGui's default ItemSpacing - a few
       // hundred one-shot rows is the point of this panel, and the default
@@ -288,7 +461,12 @@ namespace app
       const ImVec2 savedItemSpacing = ImGui::GetStyle().ItemSpacing;
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(savedItemSpacing.x, 2.0f));
       LibraryParts::BeginWell("##librarypanellist");
-      if (filtered.empty())
+      if (filtered.empty() && numFolders == 0 && !browseDir.empty())
+      {
+         EmptyState::DrawInWindow(q.empty() ? T("Empty folder") : T("Nothing to show"),
+                                  q.empty() ? T("No files in this folder") : T("Try clearing the search or filter"));
+      }
+      else if (filtered.empty() && numFolders == 0)
       {
          // Say what is actually wrong: no folders, nothing indexed yet, or just a search/filter that hides everything.
          if (scanner.Folders().empty())
@@ -311,12 +489,25 @@ namespace app
       // rendered height, which compounds over thousands of rows into a
       // visible gap of blank space once scrolled near the end of the list.
       ImGuiListClipper clipper;
-      clipper.Begin((int)filtered.size());
+      clipper.Begin(numFolders + (int)filtered.size());
       while (clipper.Step())
       {
          for (int rowIdx = clipper.DisplayStart; rowIdx < clipper.DisplayEnd; rowIdx++)
          {
-            const SampleScanner::Entry& entry = *filtered[rowIdx];
+            if (rowIdx < numFolders)
+            {
+               // Subfolder rows first: a click opens it, a drag (Samples) loads it as a kit.
+               const std::string& folder = subfolders[(size_t)rowIdx];
+               ImGui::PushID(folder.c_str());
+               const float availW = ImGui::GetContentRegionAvail().x;
+               const std::string name = FolderDisplayName(folder);
+               if (LibraryParts::FolderRow("sub", TruncateWithEllipsis(name, std::max(20.0f, availW - 48.0f))).clicked)
+                  browseDir = folder;
+               MaybeStartFolderDrag(folder, mediaKind);
+               ImGui::PopID();
+               continue;
+            }
+            const SampleScanner::Entry& entry = *filtered[rowIdx - numFolders];
 
             ImGui::PushID(entry.path.c_str());
 

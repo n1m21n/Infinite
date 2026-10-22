@@ -891,6 +891,42 @@ void DrawPopupsA(FrameCtx& fc)
                   }
                }
             }
+            else if (gSampleDragKind == LibraryDragKind::SampleFolder)
+            {
+               // A library folder: its samples load as a kit, by name. On a Drum Sequencer they fill lanes from
+               // the one under the cursor (one file per lane), on an MPC pads from the one under the cursor (or
+               // the next empty ones); on empty canvas the node picker opens with up to 16 of them.
+               std::vector<std::string> files = SampleFilesInFolder(gSampleScanner.Index(), gSampleDragPath);
+               if (files.empty())
+               {
+               }
+               else if (DrumSequencerNode* drum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasMouse))
+               {
+                  PushUndoCheckpoint();
+                  int lane = DrumSequencerLaneForCanvasPos(drum, canvasMouse.x, canvasMouse.y);
+                  for (size_t i = 0; i < files.size() && i < (size_t)DrumSequencerNode::kNumLanes; i++)
+                  {
+                     drum->LoadFileToLane(lane, files[i]);
+                     lane = (lane + 1) % DrumSequencerNode::kNumLanes;
+                  }
+                  gPatchDirty = true;
+               }
+               else if (MpcNode* mpc = FindNodeUnderCanvasPoint<MpcNode>(canvasMouse))
+               {
+                  PushUndoCheckpoint();
+                  MpcDropFiles(mpc, canvasMouse.x, canvasMouse.y, files);
+                  gPatchDirty = true;
+               }
+               else if (overCanvas)
+               {
+                  if (files.size() > (size_t)MpcNode::kPads)
+                     files.resize((size_t)MpcNode::kPads);
+                  gAudioDropPicker.justOpened = true;
+                  gAudioDropPicker.canvasPos = canvasMouse;
+                  gAudioDropPicker.screenPos = mp;
+                  gAudioDropPicker.paths = std::move(files);
+               }
+            }
             else if (gSampleDragKind == LibraryDragKind::Sample)
             {
                // Checked before Sampler: a plain rect test on gNodes order,
