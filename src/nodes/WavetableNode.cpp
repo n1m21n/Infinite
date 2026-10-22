@@ -134,6 +134,9 @@ void WavetableNode::VisitParams(ParamVisitor& v)
       v.Float((p + "stereoWidth").c_str(), s.stereoWidth);
       v.Int((p + "octave").c_str(), s.octave);
       v.Int((p + "semi").c_str(), s.semi);
+      // Loaded unchecked; same range as the dropdowns (body index, note + octave * 12).
+      s.octave = std::clamp(s.octave, -4, 4);
+      s.semi = std::clamp(s.semi, -12, 12);
       v.Float((p + "fine").c_str(), s.fine);
       v.Float((p + "phase").c_str(), s.phase);
       v.Float((p + "phaseRandomize").c_str(), s.phaseRandomize);

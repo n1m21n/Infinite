@@ -129,7 +129,9 @@ namespace Field
             }
             case SampleOp::Deg:
             {
-               const int d = (int)std::floor(regs[ins.a]);
+               // Any float can reach here; the int cast is undefined outside int's range.
+               const float x = regs[ins.a];
+               const int d = (x == x) ? (int)std::floor(std::fmin(std::fmax(x, -1000.0f), 1000.0f)) : 0;
                // Octave index 5 puts root C at MIDI 60 (middle C), the same
                // note Field Synth's MidiNoteToHz calls C4.
                regs[ins.dst] = (float)MusicTime::DegreeToNote(d, 5, in.root, in.scale);
@@ -192,9 +194,8 @@ namespace Field
                if (tableIdx >= 0 && tableIdx < (int)prog.tables.size() && in.tableBuf != nullptr)
                {
                   const SampleTable& tbl = prog.tables[tableIdx];
-                  int idx = (int)regs[ins.b];
-                  if (idx < 0) idx = 0;
-                  else if (idx >= tbl.length) idx = tbl.length - 1;
+                  const float fi = regs[ins.b];
+                  const int idx = (fi >= 0.0f) ? (int)std::fmin(fi, (float)(tbl.length - 1)) : 0; // NaN -> 0
                   regs[ins.dst] = in.tableBuf[tbl.bufferOffset + idx];
                }
                else
@@ -209,9 +210,8 @@ namespace Field
                if (tableIdx >= 0 && tableIdx < (int)prog.tables.size() && in.tableBuf != nullptr)
                {
                   const SampleTable& tbl = prog.tables[tableIdx];
-                  int idx = (int)regs[ins.b];
-                  if (idx < 0) idx = 0;
-                  else if (idx >= tbl.length) idx = tbl.length - 1;
+                  const float fi = regs[ins.b];
+                  const int idx = (fi >= 0.0f) ? (int)std::fmin(fi, (float)(tbl.length - 1)) : 0; // NaN -> 0
                   in.tableBuf[tbl.bufferOffset + idx] = DspMath::FlushDenormal(regs[ins.c]);
                }
                break;

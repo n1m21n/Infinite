@@ -484,6 +484,7 @@ void AudioColorRampNode::VisitParams(ParamVisitor& v)
    v.Int("mode", mode);
    v.Int("interpMode", interpMode);
    v.Int("bandCount", bandCount);
+   bandCount = std::clamp(bandCount, 2, kMaxBands); // loaded unchecked; indexes crossoverPos/bandColor
    v.Float("gain", gain);
    v.Float("minBrightness", minBrightness);
 

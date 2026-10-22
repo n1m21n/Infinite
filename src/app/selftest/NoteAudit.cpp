@@ -26,6 +26,7 @@
 //           to the source's queue, as the topology builder does) or deleted
 //           (consumer's inbox cleared) while notes sound: pair integrity at the
 //           consumer, and how many voices it holds open afterwards
+//   LOAD    out-of-range ints from a patch file stay inside the node's tables
 //   CPU     ns per 512-frame block while active
 //
 // Only hard invariants fail the run (a note-on without its off at the end of
@@ -33,6 +34,7 @@
 // thresholds above.
 #include "app/AppShared.h"
 #include "audio/AudioBuffer.h"
+#include "audio/MusicTime.h"
 #include "audio/NoteEventQueue.h"
 #include "core/Transport.h"
 #include "nodes/NoteNodes.h"
@@ -647,6 +649,77 @@ namespace
    // output is the pair check). Mid-note the node is bypassed: it stops cooking and the
    // consumer reads the source's queue from the tail, as RebuildAudioTopology does.
    // Deleted: the consumer's inbox is cleared and nothing replaces it.
+   // A patch file is outside input and Patch::LoadParams hands ints through
+   // unchecked. Each note node must leave a damaged key, range or octave inside
+   // the tables its body and audio thread index (fuzz: Chorder SIGBUS, body
+   // reads past NoteNameList, (baseOctave + 1) * 12 overflow).
+   void AuditLoadClamp(bool& ok)
+   {
+      const char* kExtremes[] = { "2147483647", "-2147483648", "100000", "-100000" };
+      int bad = 0;
+      auto check = [&](const char* node, const char* what, int got, int lo, int hi) {
+         if (got < lo || got > hi)
+         {
+            printf("  LOAD %s: %s = %d, outside %d..%d\n", node, what, got, lo, hi);
+            bad++;
+         }
+      };
+      for (const char* x : kExtremes)
+      {
+         auto load = [x](INode* n, std::initializer_list<const char*> keys) {
+            std::vector<std::pair<std::string, std::string>> in;
+            for (const char* k : keys)
+               in.push_back({ std::string("i ") + k, x });
+            Patch::LoadParams(n, in);
+         };
+         std::unique_ptr<INode> kb(KeyboardNode::Create());
+         load(kb.get(), { "baseOctave", "transpose" });
+         check("Keyboard", "baseOctave", static_cast<KeyboardNode*>(kb.get())->baseOctave, -1, 8);
+         check("Keyboard", "transpose", static_cast<KeyboardNode*>(kb.get())->transpose, -127, 127);
+
+         std::unique_ptr<INode> nf(NoteFilterNode::Create());
+         load(nf.get(), { "scale", "root", "rangeLow", "rangeHigh" });
+         auto* f = static_cast<NoteFilterNode*>(nf.get());
+         check("Note Filter", "root", f->root, 0, 11);
+         check("Note Filter", "scale", f->scale, 0, MusicTime::kNumScaleTypes - 1);
+         check("Note Filter", "rangeLow", f->rangeLow, 0, 127);
+         check("Note Filter", "rangeHigh", f->rangeHigh, 0, 127);
+
+         std::unique_ptr<INode> rg(RandomNoteGeneratorNode::Create());
+         load(rg.get(), { "scale", "root", "rangeLow", "rangeHigh" });
+         auto* r = static_cast<RandomNoteGeneratorNode*>(rg.get());
+         check("Random Note Gen", "root", r->root, 0, 11);
+         check("Random Note Gen", "scale", r->scale, 0, MusicTime::kNumScaleTypes - 1);
+         check("Random Note Gen", "rangeLow", r->rangeLow, 0, 127);
+         check("Random Note Gen", "rangeHigh", r->rangeHigh, 0, 127);
+
+         std::unique_ptr<INode> ch(ChorderNode::Create());
+         load(ch.get(), { "scale", "root", "chordSize" });
+         auto* c = static_cast<ChorderNode*>(ch.get());
+         check("Chorder", "root", c->root, 0, 11);
+         check("Chorder", "scale", c->scale, 0, MusicTime::kNumScaleTypes - 1);
+         check("Chorder", "chordSize", c->chordSize, 2, 6);
+      }
+      // In-range values load unchanged; a root past B keeps its pitch class.
+      std::unique_ptr<INode> ch(ChorderNode::Create());
+      Patch::LoadParams(ch.get(), { { "i root", "5" }, { "i scale", "3" }, { "i chordSize", "4" } });
+      auto* c = static_cast<ChorderNode*>(ch.get());
+      if (c->root != 5 || c->scale != 3 || c->chordSize != 4)
+      {
+         printf("  LOAD Chorder: in-range values changed (%d %d %d)\n", c->root, c->scale, c->chordSize);
+         bad++;
+      }
+      Patch::LoadParams(ch.get(), { { "i root", "14" }, { "i scale", "-1" } });
+      if (c->root != 2 || c->scale != MusicTime::kMajor)
+      {
+         printf("  LOAD Chorder: root 14 / scale -1 gave %d / %d, want 2 / major\n", c->root, c->scale);
+         bad++;
+      }
+      printf("LOAD %s (%d out of range)\n", bad == 0 ? "ok" : "FAIL", bad);
+      if (bad != 0)
+         ok = false;
+   }
+
    void AuditBypass(Flags& flags, bool& ok)
    {
       for (const Case& c : Cases())
@@ -756,6 +829,8 @@ bool RunNoteAudit()
       AuditJitter(flags);
    if (want("BYPASS"))
       AuditBypass(flags, ok);
+   if (want("LOAD"))
+      AuditLoadClamp(ok);
    if (want("CPU"))
       AuditCpu();
 

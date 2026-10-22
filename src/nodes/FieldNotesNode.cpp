@@ -854,6 +854,10 @@ void FieldNotesNode::VisitParams(ParamVisitor& v)
    v.Text("code", code);
    v.Int("root", root);
    v.Int("scale", scale);
+   // Loaded unchecked: keep the key inside the tables, as the Note nodes do.
+   root = ((root % 12) + 12) % 12;
+   if (scale < 0 || scale >= MusicTime::kNumScaleTypes)
+      scale = MusicTime::kMajor;
    mParamTable.VisitParams(v);
 }
 
