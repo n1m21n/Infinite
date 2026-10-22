@@ -2146,6 +2146,31 @@ void RunOscControlTest()
    got = Exchange(base + "no_such_param", { OscMessage::FloatArg(1.0f) }, "/infinite/error");
    Check("an unknown param replies an error", Last(got, "/infinite/error") != nullptr);
 
+   // Show lock: delete, connect and disconnect are refused over OSC and RPC; a param set is not.
+   {
+      ShowLockToggle();
+      got = Exchange("/infinite/disconnect", { OscMessage::IntArg(output), OscMessage::IntArg(0) }, "/infinite/error");
+      const bool discRefused = Last(got, "/infinite/error") != nullptr && Cables() == 1;
+      got = Exchange("/infinite/delete", { OscMessage::IntArg(shape) }, "/infinite/error");
+      Check("show lock refuses OSC disconnect and delete", discRefused && Last(got, "/infinite/error") != nullptr &&
+                                                              FindNodeByIndex(shape) != nullptr && gNodes.size() == 2);
+      Exchange(floatParam, { OscMessage::FloatArg(0.42f) }, "");
+      got = Exchange(floatParam, {}, floatParam);
+      q = Last(got, floatParam);
+      Check("show lock still lets an OSC param set through", q != nullptr && std::fabs(q->args[0].f - 0.42f) < 1e-6f);
+      using json = nlohmann::json;
+      json r;
+      std::string e;
+      const bool rpcDelete = HandleRpcCommand("delete_node", { {"index", shape} }, r, e);
+      const json createShape = { {"method", "create_node"}, {"params", { {"typeName", "Shape"}, {"category", "Source"} }} };
+      const bool rpcBatch = HandleRpcCommand("batch", { {"calls", json::array({ createShape, { {"method", "delete_node"}, {"params", { {"index", shape} }} } })} }, r, e);
+      Check("show lock refuses RPC delete and a batch that deletes, applying nothing", !rpcDelete && !rpcBatch &&
+                                                                                        gNodes.size() == 2 && Cables() == 1);
+      // A batch the lock allows still rolls back whole when a later call fails.
+      const bool failedBatch = HandleRpcCommand("batch", { {"calls", json::array({ createShape, { {"method", "get_params"}, {"params", { {"index", -999} }} } })} }, r, e);
+      Check("under show lock a failed batch still rolls back", !failedBatch && gNodes.size() == 2);
+      ShowLockToggle();
+   }
    Exchange("/infinite/disconnect", { OscMessage::IntArg(output), OscMessage::IntArg(0) }, "");
    Check("disconnect removes the cable", Cables() == 0);
    got = Exchange("/infinite/disconnect", { OscMessage::IntArg(output), OscMessage::IntArg(0) }, "/infinite/error");

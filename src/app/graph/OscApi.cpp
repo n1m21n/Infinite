@@ -63,6 +63,16 @@ namespace app
          OscControl::Send(to, "/infinite/error", { StringArg(msg) });
       }
 
+      // Show lock keeps nodes and cables where they are: a controller gets the
+      // refusal the canvas gives. Param sets and creating a node still go through.
+      bool RefusedByShowLock(const OscControl::Request& req)
+      {
+         if (!ShowLockBlocks())
+            return false;
+         Error(req.from, req.address + ": show lock is on");
+         return true;
+      }
+
       // "f name" / "i name" / ... -> the value as the OSC type it reads best as.
       Arg ValueArg(const std::string& key, const std::string& value)
       {
@@ -268,6 +278,8 @@ namespace app
       }
       else if (a == "/infinite/delete")
       {
+         if (RefusedByShowLock(req))
+            return;
          int idx = -1;
          if (!ArgInt(req.args, 0, idx) || FindNodeByIndex(idx) == nullptr)
          {
@@ -278,6 +290,8 @@ namespace app
       }
       else if (a == "/infinite/connect")
       {
+         if (RefusedByShowLock(req))
+            return;
          int src = -1, out = 0, dst = -1, slot = 0;
          if (!ArgInt(req.args, 0, src) || !ArgInt(req.args, 1, out) || !ArgInt(req.args, 2, dst) ||
              !ArgInt(req.args, 3, slot))
@@ -291,6 +305,8 @@ namespace app
       }
       else if (a == "/infinite/disconnect")
       {
+         if (RefusedByShowLock(req))
+            return;
          int dst = -1, slot = 0;
          if (!ArgInt(req.args, 0, dst) || !ArgInt(req.args, 1, slot))
          {

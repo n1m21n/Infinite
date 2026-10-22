@@ -25,6 +25,23 @@ namespace app
          return true;
       }();
       (void)sProbeSet;
+      // Show lock (ShowSafety.cpp) keeps nodes and cables where they are and
+      // stands undo/redo still; a remote caller gets that as an error, not a
+      // silent no-op. A batch is checked whole before anything in it runs.
+      auto MovesTheGraph = [](const std::string& m)
+      {
+         return m == "delete_node" || m == "connect" || m == "disconnect" || m == "set_node_position" ||
+                m == "auto_wire_inputs" || m == "undo" || m == "redo";
+      };
+      bool movesGraph = MovesTheGraph(method);
+      if (method == "batch" && params.contains("calls") && params["calls"].is_array())
+         for (const json& call : params["calls"])
+            movesGraph = movesGraph || (call.is_object() && MovesTheGraph(call.value("method", std::string())));
+      if (movesGraph && ShowLockBlocks())
+      {
+         outError = "show lock is on";
+         return false;
+      }
 
       if (method == "list_node_types")
       {
@@ -735,7 +752,11 @@ namespace app
          {
             if (gUndoStack.size() == undoDepth)
             {
+               // Not a user undo: it backs out calls the lock let through.
+               const bool wasLocked = gShowLock;
+               gShowLock = false;
                Undo();
+               gShowLock = wasLocked;
                gRedoStack.clear(); // the rolled-back attempt is not something to redo
             }
             outError = "batch call " + std::to_string(failAt) + " failed, nothing applied - " + failMsg;
