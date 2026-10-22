@@ -549,7 +549,25 @@ int RunFieldTest()
    else
       printf("SECTION E (Pure Randomness): FAIL\n");
 
-   bool allOk = secAOk && secBOk && secCOk && secDOk && secEOk;
+   // SECTION F: a param expression whose result is NaN or inf is an error,
+   // not a value - CookFrame keeps the param's last good value on an error,
+   // and a NaN written into a kernel (Delay's line) silences the master.
+   bool secFOk = true;
+   for (const char* expr : { "pow(0 - 1, 0.5)", "pow(0, 0 - 1)", "pow(10, 400)" })
+   {
+      float outV = 123.0f;
+      std::string errStr;
+      const bool res = Expression::Evaluate(expr, 0.0, nullptr, nullptr, outV, errStr);
+      if (res || errStr.find("not a finite number") == std::string::npos || outV != 123.0f)
+      {
+         printf("SECTION F (Non-finite result): FAIL - '%s' gave ok=%d value=%g err='%s'\n", expr, (int)res, outV,
+                errStr.c_str());
+         secFOk = false;
+      }
+   }
+   printf("SECTION F (Non-finite result): %s\n", secFOk ? "OK" : "FAIL");
+
+   bool allOk = secAOk && secBOk && secCOk && secDOk && secEOk && secFOk;
    printf("INFINITE_FIELDTEST: %s\n", allOk ? "OK" : "FAIL");
    return allOk ? 0 : 1;
 }

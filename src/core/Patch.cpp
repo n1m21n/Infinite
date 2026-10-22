@@ -168,11 +168,20 @@ namespace
       // Every setter leaves the field untouched when the key is absent, so a
       // patch written before a parameter existed still loads and that parameter
       // simply keeps its default.
+      // A non-finite value ("nan", "inf", or a number past float range) is
+      // treated like a missing key: kernels clamp with std::clamp, which
+      // passes NaN straight through, and one NaN in a feedback path (Delay's
+      // line) silences the whole master until the node is removed. Patch
+      // load, paste, and OSC/RPC param sets all arrive here.
       void Float(const char* name, float& value) override
       {
          auto it = values.find(std::string("f ") + name);
          if (it != values.end())
-            value = (float)atof(it->second.c_str());
+         {
+            const float parsed = (float)atof(it->second.c_str());
+            if (std::isfinite(parsed))
+               value = parsed;
+         }
       }
       void Int(const char* name, int& value) override
       {
@@ -893,14 +902,16 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
             float val1 = std::strtof(tok1.c_str(), &endP);
             if (endP != tok1.c_str() && *endP == '\0')
             {
-               p.value = val1;
+               if (std::isfinite(val1))
+                  p.value = val1;
                std::string tok2;
                if (in >> tok2)
                {
                   float val2 = std::strtof(tok2.c_str(), &endP);
                   if (endP != tok2.c_str() && *endP == '\0')
                   {
-                     p.value2 = val2;
+                     if (std::isfinite(val2))
+                        p.value2 = val2;
                      in >> p.boolName;
                   }
                   else

@@ -197,6 +197,11 @@ namespace app
             OscControl::Send(req.from, req.address, { ValueArg(key, value) });
             return;
          }
+         if (req.args[0].type == OscMessage::ArgType::Float && !std::isfinite(req.args[0].f))
+         {
+            Error(req.from, req.address + ": value must be a finite number");
+            return;
+         }
          Patch::LoadParams(gn->node.get(), { { key, ArgToParamText(key, req.args[0]) } });
       }
    }

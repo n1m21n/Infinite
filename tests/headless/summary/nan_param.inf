@@ -1,0 +1,20 @@
+infinite-patch 1
+# A 1 kHz sine through a Delay whose time is "nan": a non-finite param in a
+# patch must be ignored (default kept), not reach the kernel and silence Audio Out.
+node 1 Synths Oscillator
+  id osc
+  f frequency 1000
+  i waveform Sine
+  f volume 0.5
+end
+node 2 AudioEffects Delay
+  id echo
+  f sync 0
+  f timeMs nan
+  f feedback inf
+end
+node 3 AudioUtility Audio Out
+  id speakers
+end
+aud echo 0 osc
+aud speakers 0 echo
