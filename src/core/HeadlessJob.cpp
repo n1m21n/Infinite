@@ -1,4 +1,5 @@
 #include "HeadlessJob.h"
+#include "core/Provenance.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -628,6 +629,8 @@ namespace Headless
       IssuesJson(s, st.warnings);
       s += ",\"errors\":";
       IssuesJson(s, st.errors);
+      // Same object every agent-facing tool result carries (Provenance.h).
+      s += ",\"attribution\":" + Provenance::AttributionJson();
       s += "}";
       return s;
    }

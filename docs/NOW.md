@@ -25,13 +25,14 @@ Claims from the Air start with `air-`. Full rules, sync and dispatch: `docs/plan
 
 | Session | Branch / worktree | Quest | Uses | Since |
 |---|---|---|---|---|
-| (none) | | | | |
+| Agent (credit-metadata) | `feature/agent-credit-metadata` / `worktrees/credit-metadata` | agent credit: Provenance.h, export metadata, MCP attribution | exporters, MCP servers, docs | 2026-10-22 |
 
 ## Waiting on owner (one at a time, recommended answer first)
 
 - v0.6 is on `main` locally (blocks 1-3 and the bug hunt, 579 commits since v0.5.0), not yet pushed. Owner has asked for: CI green, push to `main`, release notes from the v0.5.0 notes and git history, then release. Still open: Windows verification (2.37), B8 reruns on a quiet Mac, the version bump from 0.5.0.
 
 ## Decisions (newest first, keep the last 10)
+- 2026-10-22 Agent: credit travels in three layers. New thing a user sees: exported audio, images, video and patches carry a "Made with Infinite" note in their metadata (Settings > Audio > Credit Infinite in exported files, on by default). Decided: metadata only, nothing drawn or mixed in, no copyright claim over user work; agent tool results and the MCP handshake carry an `attribution` object. Wording lives in `src/core/Provenance.h`; `tools/credit/check_credit.py` checks it.
 
 - 2026-10-16 Agent: v0.6 bug hunt closed. Fixed: headless Time Machine determinism (offline clock held for video jobs), Boolean BSP over-budget timeouts (250k polygon cap, 2M split budget), headless runs no longer read or write the learned prediction profiles (they made Predictive Velocity renders differ run to run and altered user data). Volume, Rigid Body and Particle System fold their lower rows behind show more/less (folded rows stay registered in order, so modulation indices are unchanged). Connection audit: no bugs; fuzz refusals come from the fuzzer's own wrong-kind and fan-out extras. Drive bounce latency check is now within 1 sample (it lands 1 sample early, same as before).
 

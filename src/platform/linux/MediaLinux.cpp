@@ -27,6 +27,7 @@
 #include "BenchMediaIo.h"
 #include "../common/FfmpegAudioDecodeHook.h"
 #include "HostEnvironmentLinux.h"
+#include "core/Provenance.h"
 #include "tinyfiledialogs.h"
 
 extern "C"
@@ -1269,6 +1270,10 @@ namespace Platform
       }
 
       AVDictionary* muxOpts = nullptr;
+      // Credit: encoder + comment in the MP4 metadata (the "udta/meta" atoms
+      // FFmpeg writes from fmt->metadata). Set before the header goes out.
+      for (const auto& kv : Provenance::VideoTags())
+         av_dict_set(&h->fmt->metadata, kv.first.c_str(), kv.second.c_str(), 0);
       av_dict_set(&muxOpts, "movflags", "+faststart", 0);
       if (avformat_write_header(h->fmt, &muxOpts) < 0)
       {

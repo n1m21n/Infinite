@@ -25,6 +25,7 @@
 #import <Vision/Vision.h>
 #import <Accelerate/Accelerate.h>
 #import <CoreMedia/CoreMedia.h>
+#include "core/Provenance.h"
 #import <CoreVideo/CoreVideo.h>
 #import <CoreMIDI/CoreMIDI.h>
 #import <CoreAudio/CoreAudio.h>
@@ -2998,6 +2999,26 @@ namespace Platform
          {
             outError = err ? std::string([[err localizedDescription] UTF8String]) : "writer failed";
             return nullptr;
+         }
+
+         // Credit: software + description, written before startWriting. The
+         // common identifiers let AVFoundation pick the right key for MP4 or MOV.
+         {
+            const auto tags = Provenance::VideoTags();
+            if (!tags.empty())
+            {
+               NSMutableArray<AVMetadataItem*>* items = [NSMutableArray array];
+               auto add = ^(AVMetadataIdentifier ident, const std::string& text) {
+                  AVMutableMetadataItem* item = [AVMutableMetadataItem metadataItem];
+                  item.identifier = ident;
+                  item.dataType = (NSString*)kCMMetadataBaseDataType_UTF8;
+                  item.value = [NSString stringWithUTF8String:text.c_str()];
+                  [items addObject:item];
+               };
+               add(AVMetadataCommonIdentifierSoftware, Provenance::Software());
+               add(AVMetadataCommonIdentifierDescription, Provenance::Comment());
+               writer.metadata = items;
+            }
          }
 
          // Same quality ladder as the Windows path (MediaWin.cpp): ~0.30 bits

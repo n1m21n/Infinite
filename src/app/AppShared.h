@@ -1,6 +1,7 @@
 #pragma once
 // Shared declarations for the code split out of main.cpp.
 #include "core/ModShapes.h"
+#include "core/Provenance.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppCommon.h"
 #include "app/ui/design/components/ActionButton.h"
@@ -4216,6 +4217,8 @@ std::vector<uint8_t> EncodePng16(int w, int h, const uint16_t* rgba, int level);
                if (!png.empty())
                   png = ContactSheet::TagSrgb(png);
             }
+            if (!png.empty())
+               png = Provenance::StampPng(png.data(), png.size());
             if (!png.empty())
                if (FILE* f = AppPaths::OpenFile(job.path, "wb"))
                {

@@ -1,6 +1,7 @@
 #include "AudioFileWriter.h"
 #include "shine.h"
 #include "platform/AppPaths.h"
+#include "core/Provenance.h"
 
 #include <algorithm>
 #include <cmath>
@@ -26,6 +27,7 @@
 // Windows - dr_libs is decode-only, so it can't encode) instead of CoreAudio's
 // ExtAudioFile. libFLAC is linked here and only here.
 #include <FLAC/stream_encoder.h>
+#include <FLAC/metadata.h>
 
 namespace
 {
@@ -167,6 +169,25 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
          FLAC__stream_encoder_set_bits_per_sample(encoder, (uint32_t)mBitDepth); // matches the WAV path
          FLAC__stream_encoder_set_sample_rate(encoder, (uint32_t)std::lround(sampleRate));
          FLAC__stream_encoder_set_compression_level(encoder, 5);
+
+         // Credit as Vorbis comments (ENCODER, COMMENT). The block has to
+         // outlive init; CloseFlac frees it.
+         FLAC__StreamMetadata* credit = nullptr;
+         const auto comments = Provenance::VorbisComments();
+         if (!comments.empty())
+         {
+            credit = FLAC__metadata_object_new(FLAC__METADATA_TYPE_VORBIS_COMMENT);
+            if (credit != nullptr)
+            {
+               for (const auto& kv : comments)
+               {
+                  FLAC__StreamMetadata_VorbisComment_Entry entry;
+                  if (FLAC__metadata_object_vorbiscomment_entry_from_name_value_pair(&entry, kv.first.c_str(), kv.second.c_str()))
+                     FLAC__metadata_object_vorbiscomment_append_comment(credit, entry, /*copy=*/false);
+               }
+               FLAC__stream_encoder_set_metadata(encoder, &credit, 1);
+            }
+         }
 #if defined(_WIN32)
          // init_file() takes a narrow path; hand libFLAC an already-open FILE
          // instead (it closes it in finish(), and "w+b" lets it rewrite
@@ -182,9 +203,12 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
          if (flacOk)
          {
             mExtAudioFile = encoder;
+            mFlacMeta = credit;
             return true;
          }
          FLAC__stream_encoder_delete(encoder);
+         if (credit != nullptr)
+            FLAC__metadata_object_delete(credit);
       }
       // Same "fall back to WAV if the encoder refuses the format" behavior
       // the ExtAudioFile path had.
@@ -211,6 +235,13 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
          {
             shine_close(shine);
             return false;
+         }
+         // ID3v2 credit tag ahead of the first MP3 frame.
+         const std::string id3 = Provenance::Id3v2Tag();
+         if (!id3.empty())
+         {
+            fwrite(id3.data(), 1, id3.size(), mMp3File);
+            mBytesWrittenDirect += (int64_t)id3.size();
          }
          mShineHandle = (void*)shine;
          return true;
@@ -346,6 +377,11 @@ void AudioFileWriter::CloseFlac()
       FLAC__stream_encoder_finish(encoder);
       FLAC__stream_encoder_delete(encoder);
       mExtAudioFile = nullptr;
+      if (mFlacMeta != nullptr)
+      {
+         FLAC__metadata_object_delete(static_cast<FLAC__StreamMetadata*>(mFlacMeta));
+         mFlacMeta = nullptr;
+      }
 
       // Update actual file size
       StatFileSize(mPath, mBytesWrittenDirect);
@@ -382,7 +418,22 @@ void AudioFileWriter::CloseWav()
       return;
 
    const uint32_t dataBytes = (uint32_t)(mFramesWritten * mNumChannels * (mBitDepth / 8));
-   const uint32_t riffSize = 36 + dataBytes;
+
+   // Credit chunk (LIST/INFO) after the audio. 24-bit mono can leave an odd
+   // data length; RIFF wants a pad byte then (the data size field stays odd).
+   uint32_t padBytes = 0;
+   const std::string info = Provenance::WavInfoChunk();
+   if (!info.empty())
+   {
+      fseek(mFile, 0, SEEK_END);
+      if (dataBytes & 1)
+      {
+         fputc(0, mFile);
+         padBytes = 1;
+      }
+      fwrite(info.data(), 1, info.size(), mFile);
+   }
+   const uint32_t riffSize = 36 + dataBytes + padBytes + (uint32_t)info.size();
 
    fseek(mFile, 4, SEEK_SET);
    WriteU32(mFile, riffSize);

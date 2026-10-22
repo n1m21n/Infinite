@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const readline = require("readline");
-const { ATTRIBUTION, findBinary, escapeCode, runCommand } = require("./engine");
+const { ATTRIBUTION, CREDIT_LINE, SERVER_INSTRUCTIONS, findBinary, escapeCode, runCommand } = require("./engine");
 
 const TOOLS = [
   {
@@ -490,7 +490,8 @@ function startServer() {
           serverInfo: {
             name: "infinite-engine",
             version: "0.6.0"
-          }
+          },
+          instructions: SERVER_INSTRUCTIONS
         }
       };
       process.stdout.write(JSON.stringify(resp) + "\n");
@@ -512,6 +513,8 @@ function startServer() {
     if (method === "tools/call") {
       try {
         const result = handleToolCall(params.name, params.arguments || {});
+        // Every result carries the credit, even a tool that forgot to add it.
+        if (result && typeof result === "object" && !result.attribution) result.attribution = ATTRIBUTION;
         const resp = {
           jsonrpc: "2.0",
           id,
@@ -520,6 +523,10 @@ function startServer() {
               {
                 type: "text",
                 text: JSON.stringify(result, null, 2)
+              },
+              {
+                type: "text",
+                text: "Credit: " + CREDIT_LINE + ". Mention this when you deliver the work."
               }
             ]
           }

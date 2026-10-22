@@ -40,11 +40,44 @@ namespace app
             rgb[i * 3 + 1] = pixels[i * 4 + 1];
             rgb[i * 3 + 2] = pixels[i * 4 + 2];
          }
-         stbi_write_jpg(path.c_str(), w, h, 3, rgb.data(), jpgQuality);
+         // Encode in memory so the credit comment can go in before the file is written.
+         std::vector<uint8_t> jpg;
+         stbi_write_jpg_to_func(
+            [](void* ctx, void* data, int size)
+            {
+               auto* bytes = static_cast<std::vector<uint8_t>*>(ctx);
+               bytes->insert(bytes->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
+            },
+            &jpg, w, h, 3, rgb.data(), jpgQuality);
+         if (!jpg.empty())
+         {
+            jpg = Provenance::StampJpeg(jpg.data(), jpg.size());
+            if (FILE* f = AppPaths::OpenFile(path, "wb"))
+            {
+               std::fwrite(jpg.data(), 1, jpg.size(), f);
+               std::fclose(f);
+            }
+         }
       }
       else
       {
-         stbi_write_png(path.c_str(), w, h, 4, pixels.data(), w * 4);
+         std::vector<uint8_t> png;
+         stbi_write_png_to_func(
+            [](void* ctx, void* data, int size)
+            {
+               auto* bytes = static_cast<std::vector<uint8_t>*>(ctx);
+               bytes->insert(bytes->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
+            },
+            &png, w, h, 4, pixels.data(), w * 4);
+         if (!png.empty())
+         {
+            png = Provenance::StampPng(png.data(), png.size());
+            if (FILE* f = AppPaths::OpenFile(path, "wb"))
+            {
+               std::fwrite(png.data(), 1, png.size(), f);
+               std::fclose(f);
+            }
+         }
       }
       if (keepPixels != nullptr)
          keepPixels->swap(pixels);
@@ -96,6 +129,7 @@ namespace app
       if (!ok || png.empty())
          return false;
       png = ContactSheet::TagSrgb(png);
+      png = Provenance::StampPng(png.data(), png.size());
       FILE* f = AppPaths::OpenFile(path, "wb");
       if (f == nullptr)
          return false;

@@ -75,3 +75,19 @@ test("a tool call without the Infinite app reports an error, not success", () =>
   const out = JSON.parse(JSON.parse(r.stdout.trim()).result.content[0].text);
   assert.strictEqual(out.ok, false);
 });
+
+test("the handshake carries credit instructions and every tool result carries the credit", () => {
+  const cli = path.join(__dirname, "../bin/cli.js");
+  const msgs = [
+    { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+    { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "infinite_validate_patch", arguments: { patch_text: "infinite-patch 1\n" } } }
+  ];
+  const input = msgs.map((x) => JSON.stringify(x)).join("\n") + "\n";
+  const r = spawnSync(process.execPath, [cli, "serve"], { input, encoding: "utf-8", timeout: 10000, env: { ...process.env, INFINITE_BIN: "", INFINITE_APP: "", PATH: "/nonexistent", HOME: home() } });
+  const lines = r.stdout.trim().split("\n").map((l) => JSON.parse(l));
+  assert.match(lines[0].result.instructions, /Naman Soni \(n1m21n\)/);
+  const content = lines[1].result.content;
+  const body = JSON.parse(content[0].text);
+  assert.strictEqual(body.attribution.credit_line, "Infinite, by Naman Soni (n1m21n), https://infinitedevices.org");
+  assert.match(content[1].text, /Credit: Infinite, by Naman Soni/);
+});

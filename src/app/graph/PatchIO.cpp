@@ -469,6 +469,8 @@ namespace app
             gAudioOutputMode = std::clamp(atoi(val.c_str()), 0, 2);
          else if (key == "audioThreads")
             gAudioThreads = std::clamp(atoi(val.c_str()), 0, 1);
+         else if (key == "creditInExports")
+            Provenance::SetEnabled(val != "0");
       }
    }
 
@@ -486,6 +488,7 @@ namespace app
       file << "oversample=" << gAudioOversample << "\n";
       file << "outputMode=" << gAudioOutputMode << "\n";
       file << "audioThreads=" << gAudioThreads << "\n";
+      file << "creditInExports=" << (Provenance::Enabled() ? 1 : 0) << "\n";
    }
 
 
