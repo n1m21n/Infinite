@@ -1,4 +1,5 @@
 // Split out of main(): see docs/plans/main-split/README.md (Block C)
+#include "core/Notices.h"
 #include "app/frame/FrameCtx.h"
 
 namespace app
@@ -35,6 +36,7 @@ void DrawDropHandling(FrameCtx& fc)
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
          static const std::vector<std::string> kMidiExt = { "mid", "midi" };
+         bool drumTookMidi = false; // one .mid per drop becomes the Drum Sequencer's pattern; more spawn MIDI Files
          MidiFileNode* dropTargetMidi = FindNodeUnderCanvasPoint<MidiFileNode>(canvasPos);
          SamplerNode* dropTargetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasPos);
          MpcNode* dropTargetMpc = FindNodeUnderCanvasPoint<MpcNode>(canvasPos);
@@ -302,6 +304,18 @@ void DrawDropHandling(FrameCtx& fc)
             GraphNode* spawned = nullptr;
             if (HasExtension(path, kMidiExt))
             {
+               // On a Drum Sequencer the file becomes its pattern (GM drum notes to lanes, 1/16 grid).
+               if (dropTargetDrum != nullptr && !drumTookMidi)
+               {
+                  ensureDroppedCheckpoint();
+                  std::string err;
+                  if (dropTargetDrum->ApplyMidiFile(path, err))
+                     gPatchDirty = true;
+                  else
+                     Notices::Post(Notices::Level::Warning, "drum.midi", "Could not read that MIDI file", err);
+                  drumTookMidi = true;
+                  continue;
+               }
                if (dropTargetMidi != nullptr)
                {
                   ensureDroppedCheckpoint();

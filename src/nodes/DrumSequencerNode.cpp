@@ -12,6 +12,7 @@
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
 #include "audio/DspMath.h"
+#include "audio/MidiFile.h"
 #include "audio/MusicTime.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
@@ -1057,6 +1058,111 @@ void DrumSequencerNode::ApplyPattern(const DrumPatterns::Groove& g, int part)
    patternPart = part;
 
    LoadKitIntoEmptyLanes(p);
+}
+
+namespace
+{
+   // General MIDI percussion key -> lane (DrumPatterns::LaneRole order), -1 = no lane.
+   int GmDrumLane(int note)
+   {
+      switch (note)
+      {
+         case 35: case 36: return 0;                                  // kick
+         case 38: case 40: return 1;                                  // snare
+         case 42: case 44: return 2;                                  // closed / pedal hat
+         case 46: return 3;                                           // open hat
+         case 37: case 39: return 4;                                  // side stick, clap
+         case 41: case 43: case 45: case 64: case 66: return 5;       // low / floor toms, low conga, low timbale
+         case 47: case 48: case 50: case 60: case 61:
+         case 62: case 63: case 65: return 6;                         // high toms, bongos, high congas, high timbale
+         case 49: case 51: case 52: case 53: case 55: case 56: case 57:
+         case 59: case 67: case 68: return 7;                         // crash / ride / china / splash, cowbell, agogo
+         default: return -1;
+      }
+   }
+}
+
+int DrumSequencerNode::ApplyMidiSong(const MidiFile::Song& song, const std::string& name)
+{
+   constexpr int kStepsPerBeat = 4; // 1/16
+   int laneOf[128];
+   // GM drum file: it uses the percussion channel (10), or every hit is a GM drum key.
+   bool percussionChannel = false, allGm = true;
+   for (const MidiFile::Event& e : song.events)
+      if (e.velocity > 0)
+      {
+         percussionChannel = percussionChannel || e.channel == 9;
+         allGm = allGm && GmDrumLane(e.note) >= 0;
+      }
+   if (percussionChannel || allGm)
+      for (int k = 0; k < 128; k++)
+         laneOf[k] = GmDrumLane(k);
+   else
+   {
+      // Not a GM drum file: the 8 lowest pitches it uses, in order.
+      bool used[128] = {};
+      for (const MidiFile::Event& e : song.events)
+         if (e.velocity > 0)
+            used[e.note] = true;
+      int next = 0;
+      for (int k = 0; k < 128; k++)
+         laneOf[k] = (used[k] && next < kNumLanes) ? next++ : -1;
+   }
+
+   // Two bars at most; one bar when the file fits in one.
+   const int steps = (song.lengthBeats * kStepsPerBeat > 16.0 + 1e-6) ? kMaxSteps : kEditPageSteps;
+   for (int lane = 0; lane < kNumLanes; lane++)
+      for (int st = 0; st < kMaxSteps; st++)
+         stepVel[lane][st] = 0.0f;
+   int placed = 0;
+   bool laneUsed[kNumLanes] = {};
+   for (const MidiFile::Event& e : song.events)
+   {
+      if (e.velocity == 0)
+         continue;
+      const int lane = laneOf[e.note];
+      const int st = (int)std::lround(e.beat * kStepsPerBeat);
+      if (lane < 0 || st < 0 || st >= steps)
+         continue;
+      const float v = std::clamp((float)e.velocity / 127.0f, 0.05f, 1.0f);
+      if (stepVel[lane][st] == 0.0f)
+         placed++;
+      stepVel[lane][st] = std::max(stepVel[lane][st], v); // two hits on one cell: the louder
+      laneUsed[lane] = true;
+   }
+
+   rate = MusicTime::kSixteenth;
+   swing = 0.0f;
+   numSteps = steps;
+   editPage = 0;
+   for (int lane = 0; lane < kNumLanes; lane++)
+      laneAccentPitch[lane] = 0.0f;
+   patternName = name;
+   patternPart = 0;
+
+   DrumPatterns::Part part = { steps, {} };
+   for (int lane = 0; lane < kNumLanes; lane++)
+      part.lanes[lane] = laneUsed[lane] ? "x" : nullptr;
+   LoadKitIntoEmptyLanes(part);
+   return placed;
+}
+
+bool DrumSequencerNode::ApplyMidiFile(const std::string& path, std::string& error)
+{
+   MidiFile::Song song;
+   if (!MidiFile::Load(path, song, error))
+      return false;
+   if (song.noteCount == 0)
+   {
+      error = "no notes in the file";
+      return false;
+   }
+   std::string name = path.substr(path.find_last_of("/\\") == std::string::npos ? 0 : path.find_last_of("/\\") + 1);
+   const size_t dot = name.find_last_of('.');
+   if (dot != std::string::npos && dot > 0)
+      name = name.substr(0, dot);
+   ApplyMidiSong(song, name);
+   return true;
 }
 
 void DrumSequencerNode::LoadKitIntoEmptyLanes(const DrumPatterns::Part& part)
