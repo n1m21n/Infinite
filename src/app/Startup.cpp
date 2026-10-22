@@ -1096,6 +1096,15 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return ok ? 0 : 1;
    }
 
+   if (getenv("INFINITE_FORMULASTTEST") != nullptr)
+   {
+      // Formula's Shadertoy mode compiles and cooks real passes, so it needs the GL context.
+      const bool ok = RunFormulaShadertoyTest();
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      return ok ? 0 : 1;
+   }
+
    if (getenv("INFINITE_SPOUTLOOPTEST") != nullptr)
    {
       // Needs a live GL context (textures, FBOs), unlike the pre-GLFW

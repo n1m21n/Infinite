@@ -647,7 +647,41 @@ void DrawNodeBodies(FrameCtx& fc)
          else if (isAudioBody)
             DrawAudioNodeBody(gn);
          else
+         {
             DrawPreview(gn.node.get());
+            // Shadertoy's iMouse: drag on the picture. xy follow the drag, zw hold where
+            // it began (z goes negative on release, w is positive on the click frame only).
+            if (auto* stFormula = dynamic_cast<FormulaNode*>(gn.node.get()); stFormula != nullptr && stFormula->IsShadertoy())
+            {
+               const ImVec2 lo = ImGui::GetItemRectMin();
+               const ImVec2 hi = ImGui::GetItemRectMax();
+               const ImVec2 after = ImGui::GetCursorScreenPos();
+               ImGui::SetCursorScreenPos(lo);
+               ImGui::InvisibleButton("##stmouse", ImVec2(std::max(1.0f, hi.x - lo.x), std::max(1.0f, hi.y - lo.y)));
+               float* m = stFormula->mouse;
+               if (ImGui::IsItemActive())
+               {
+                  const ImVec2 mp = ImGui::GetIO().MousePos;
+                  const float px = std::clamp((mp.x - lo.x) / std::max(1.0f, hi.x - lo.x), 0.0f, 1.0f) * stFormula->width;
+                  const float py = std::clamp((hi.y - mp.y) / std::max(1.0f, hi.y - lo.y), 0.0f, 1.0f) * stFormula->height;
+                  m[0] = px;
+                  m[1] = py;
+                  if (ImGui::IsItemActivated())
+                  {
+                     m[2] = px;
+                     m[3] = py;
+                  }
+                  else
+                     m[3] = -std::fabs(m[3]);
+               }
+               else
+               {
+                  m[2] = -std::fabs(m[2]);
+                  m[3] = -std::fabs(m[3]);
+               }
+               ImGui::SetCursorScreenPos(after);
+            }
+         }
 
          // --- params (eye) ---
          // Audio nodes skip the eye toggle entirely: DrawAudioNodeBody above
