@@ -108,8 +108,9 @@ def label_of(kind, v):
 
 
 def has_params(t, kind):
-    if kind == "signal":
-        return any(i.get("kind") == "audio" for i in t.get("inputs") or [])
+    if kind == "signal":  # audio in and audio out, or there is nothing to measure
+        return (any(i.get("kind") == "audio" for i in t.get("inputs") or [])
+                and any(o.get("kind") == "audio" for o in t.get("outputs") or []))
     if kind == "mod":
         return bool(t.get("modulatable"))
     return any(p.get("kind") == kind for p in t["params"])
@@ -124,6 +125,13 @@ def patch_for(t, kind, value, sig_path=None):
         for p in t["params"]:
             if p.get("kind") == kind:
                 lines.append(f"  {PREFIX[kind]} {p['key']} {v}")
+    # "record in" only captures after the record button is armed, which a
+    # headless run can't press; file players take the signal as their file.
+    file_key = next((p["key"] for p in t["params"] if p["key"] in ("path", "filePath")
+                     and p.get("kind") == "text"), None)
+    by_file = kind == "signal" and sig_path and file_key is not None
+    if by_file:
+        lines.append(f"  s {file_key} {sig_path}")
     lines.append("end")
     used, wires = [], []
 
@@ -136,6 +144,8 @@ def patch_for(t, kind, value, sig_path=None):
         k, s = i["kind"], i["slot"]
         if k == "image":
             use("fnoise"); wires.append(f"cable a {s} fnoise 0")
+        elif k == "audio" and kind == "signal" and by_file and i.get("name") == "record_in":
+            continue
         elif k == "audio" and kind == "signal":
             use("fsig"); wires.append(f"aud a {s} fsig")
         elif k == "audio":
@@ -192,6 +202,9 @@ def run_case(binp, out, tag, text, audio, timeout, signal=False):
                ASAN_OPTIONS=f"detect_leaks=0:log_path={san}",
                UBSAN_OPTIONS=f"print_stacktrace=1:log_path={san}",
                TSAN_OPTIONS=f"log_path={san}")
+    if signal and "id fsig" in text:
+        # the decoder zeroes NaN/inf samples; the Audio File stimulus needs them
+        env["INFINITE_DECODE_KEEP_NONFINITE"] = "1"
     dur = SIG_SECS if signal else 1.5
     cmd = ([binp, "--audio-summary", path, os.path.join(out, tag + ".json"), "--duration", str(dur)] if audio
            else [binp, "--frame", path, "0.5", os.path.join(out, tag + ".png")])
@@ -284,8 +297,10 @@ def fuzz_type(binp, out, kind, t, prior, max_timeout, write):
             if base_tail is not None and tail is None and "NANSTUCK" not in codes:
                 codes += ",SILENT"
             elif (base_tail is not None and tail is not None and tail > base_tail + 20
-                  and (prev is None or tail > prev - 3)):
-                # a reverb or delay tail still falling is decay, not a stuck state
+                  and (prev is None or tail > prev - 3) and "id fsig" in text):
+                # A reverb or delay tail still falling is decay, not a stuck
+                # state; a player given the loud file as its sample is just
+                # replaying it.
                 codes += ",HOTSTUCK"
         crashed = rc == "TIMEOUT" or (isinstance(rc, int) and (rc < 0 or rc >= 128))
         if v == "base":
@@ -352,6 +367,12 @@ def selftest():
     text, _ = patch_for(t, "signal", "nan", "/x/nan.wav")
     assert "aud a 0 fsig" in text and "s path /x/nan.wav" in text and "fsyn" not in text, text
     assert has_params(t, "signal") and not has_params(sink | {"inputs": []}, "signal")
+    rec = {"type": "R", "category": "C", "params": [{"key": "filePath", "kind": "text"}],
+           "inputs": [{"kind": "note", "slot": 0}, {"kind": "audio", "slot": 1, "name": "record_in"}],
+           "outputs": [{"kind": "audio"}]}
+    text, _ = patch_for(rec, "signal", None, "/x/base.wav")
+    assert "  s filePath /x/base.wav" in text and "fsig" not in text and "note a 0 fseq 0" in text, text
+    assert not has_params(t | {"outputs": [{"kind": "modulator"}]}, "signal")
     assert label_of("text", "big=AAA") == "big" and label_of("int", "-5") == "-5"
     print("param_fuzz selftest ok")
 

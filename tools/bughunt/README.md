@@ -37,6 +37,9 @@ The following don't exist on Apple clang (macOS), so they would need Linux CI or
 In signal mode:
 - **NANPASS** means NaN only while the burst plays. It's recorded but not BAD.
 - **NOSIGNAL** on a base row means the test signal never reached the sink, so that type's rows prove nothing. Fix the harness wiring for that type.
+- File players (Granular, Sampler, Molder, PaulStretch...) only capture "record in" once a UI record button is armed. They get the signal as their `path`/`filePath` instead, which tests the decoder's NaN zeroing rather than node state.
+- The Audio File stimulus runs with `INFINITE_DECODE_KEEP_NONFINITE=1`. Otherwise the decoder zeroes the NaN/inf burst before it plays.
+- HOTSTUCK needs the last second to sit 20 dB over base *and* not be falling (within 3 dB of the second before), so a reverb tail dying away doesn't count.
 
 Resumable: re-running skips rows already written. `--types-from results.tsv` re-runs only the BAD types (the verify step after a fix).
 
@@ -63,4 +66,5 @@ OUT/fuzz_hap OUT/crash-<hash>          # replay
 - **A header count is a claim.** Never size an allocation from it before checking it against the bytes actually there (B-K-020/021/022). Decode frame-wise, as the MP3/FLAC/WAV paths now do.
 - **NaN hides.** `max()` skips it and filters keep it. Any audio check needs an explicit non-finite count (`non_finite_frames` in `--audio-summary`).
 - **`--start` seeks the transport,** and file players follow it. To test what happens *after* an event, render from 0 and read the later seconds (`loudness_per_second`).
+- **Fix a NaN where it is stored, not where it shows.** One central check per host (AudioEffectNode after the kernel *and* its dry path; the decoder for files) beat 19 per-kernel fixes. Check every state the host owns: the first guard missed Drive's dry oversampler.
 - **A silent base run proves nothing.** Check that the stimulus reached the sink before trusting a clean result.
