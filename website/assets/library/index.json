@@ -1311,6 +1311,190 @@
       "file": "assets/library/pixel/harmonic-warp.field",
       "preview": "assets/library/previews/harmonic-warp.jpg",
       "bytes": 933
+    },
+    {
+      "id": "aizawa-attractor",
+      "name": "Aizawa Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math"
+      ],
+      "description": "Helical orbital chaotic attractor with a central vertical funnel axis and spiraling toroidal loops.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 6,
+      "file": "assets/library/sketch/aizawa-attractor.js",
+      "preview": "assets/library/previews/aizawa-attractor.jpg",
+      "bytes": 1691
+    },
+    {
+      "id": "thomas-attractor",
+      "name": "Thomas Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math"
+      ],
+      "description": "Cyclically symmetric chaotic dynamical flow tracing twisting labyrinthine 3D orbits.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 4,
+      "file": "assets/library/sketch/thomas-attractor.js",
+      "preview": "assets/library/previews/thomas-attractor.jpg",
+      "bytes": 1572
+    },
+    {
+      "id": "roman-surface-3d",
+      "name": "Roman Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "parametric"
+      ],
+      "description": "Steiner's Roman Surface: non-orientable self-intersecting projective plane with tetrahedral symmetry.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/roman-surface-3d.js",
+      "preview": "assets/library/previews/roman-surface-3d.jpg",
+      "bytes": 1608
+    },
+    {
+      "id": "clifford-torus-3d",
+      "name": "Clifford Torus 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "parametric"
+      ],
+      "description": "4D Clifford flat torus stereographically projected into 3D space with 4D isoclinic rotation.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/clifford-torus-3d.js",
+      "preview": "assets/library/previews/clifford-torus-3d.jpg",
+      "bytes": 1545
+    },
+    {
+      "id": "wave-terrain-synth",
+      "name": "Wave Terrain Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "terrain",
+        "audio",
+        "dsp"
+      ],
+      "description": "Continuous wave terrain synthesizer with 2D orbital trajectory scanning and dynamic non-linear surface deformation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/wave-terrain-synth.inf",
+      "preview": "assets/library/previews/wave-terrain-synth.jpg",
+      "bytes": 1819
+    },
+    {
+      "id": "formant-vocal-synth",
+      "name": "Formant Vocal Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "vocal",
+        "audio",
+        "dsp"
+      ],
+      "description": "Phonetic vowel singing synthesizer with parallel formant resonators, vibrato LFO and aspiration breath model.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/formant-vocal-synth.inf",
+      "preview": "assets/library/previews/formant-vocal-synth.jpg",
+      "bytes": 2341
+    },
+    {
+      "id": "pitch-shifter-delay-fx",
+      "name": "Pitch Shifter Delay FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "pitch",
+        "delay",
+        "dsp"
+      ],
+      "description": "Continuous granular pitch-shifting delay with dual rotating crossfading heads, feedback shimmer and tape flutter.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/pitch-shifter-delay-fx.inf",
+      "preview": "assets/library/previews/pitch-shifter-delay-fx.jpg",
+      "bytes": 1590
+    },
+    {
+      "id": "envelope-follower-wah-fx",
+      "name": "Envelope Follower Wah FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "wah",
+        "filter",
+        "dsp"
+      ],
+      "description": "Dynamic auto-wah filter with optical envelope detection, variable resonance and warm saturation.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 6,
+      "file": "assets/templates/envelope-follower-wah-fx.inf",
+      "preview": "assets/library/previews/envelope-follower-wah-fx.jpg",
+      "bytes": 1701
+    },
+    {
+      "id": "bioluminescent-abyss",
+      "name": "Bioluminescent Abyss",
+      "kind": "Generator",
+      "tags": [
+        "Nature",
+        "Water",
+        "Motion"
+      ],
+      "description": "Deep oceanic bioluminescence with floating pulsing bell structures, chromatic water caustics and audio-reactive luminous tentacles.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/bioluminescent-abyss.field",
+      "preview": "assets/library/previews/bioluminescent-abyss.jpg",
+      "bytes": 1440
+    },
+    {
+      "id": "quantum-field-lattice",
+      "name": "Quantum Field Lattice",
+      "kind": "Generator",
+      "tags": [
+        "Pattern",
+        "Geometric",
+        "Motion"
+      ],
+      "description": "Relativistic quantum vacuum fluctuation lattice with warped spacetime curvature, vibrating node packets and audio-reactive phase interference.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 4,
+      "file": "assets/library/pixel/quantum-field-lattice.field",
+      "preview": "assets/library/previews/quantum-field-lattice.jpg",
+      "bytes": 1397
     }
   ]
 }

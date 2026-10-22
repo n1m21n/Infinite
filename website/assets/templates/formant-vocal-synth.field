@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Formant Vocal Synth",
+    "author": "Infinite",
+    "description": "Phonetic vowel singing synthesizer with parallel formant resonators, vibrato LFO and aspiration breath model.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float vowel = 0.35 [0.0, 1.0];\nparam float vibratoRate = 5.2 [1.0, 10.0];\nparam float vibratoDepth = 0.015 [0.0, 0.06];\nparam float breath = 0.12 [0.0, 0.5];\nparam float resonance = 0.88 [0.3, 0.98];\nstate float phase = 0;\nstate float vibPhase = 0;\nstate float bp1 = 0;\nstate float lp1 = 0;\nstate float bp2 = 0;\nstate float lp2 = 0;\nstate float bp3 = 0;\nstate float lp3 = 0;\nstate float noiseState = 0.1;\n\nvibPhase = (vibPhase + vibratoRate / sr) % 1.0;\npitchMod = 1.0 + sin(6.2831853 * vibPhase) * vibratoDepth;\nf0 = clamp(freq * pitchMod, 40.0, 2000.0);\n\npStep = f0 / sr;\nphase = phase + pStep;\npulse = 0.0;\nif (phase >= 1.0) {\n  phase = phase - 1.0;\n  pulse = 1.0;\n}\n\nnoiseState = (noiseState * 196314.16 + 0.33) % 1.0;\nrandNoise = noiseState * 2.0 - 1.0;\nexcitation = (pulse * 2.5 + randNoise * breath) * gate;\n\nv = clamp(vowel, 0.0, 1.0);\nf1 = clamp(if(v < 0.5, 750.0 - v * 900.0, 300.0 + (v - 0.5) * 100.0), 200.0, 1200.0);\nf2 = clamp(if(v < 0.5, 1200.0 + v * 2200.0, 2300.0 - (v - 0.5) * 3000.0), 600.0, 3200.0);\nf3 = clamp(2400.0 + (v - 0.5) * 800.0, 1800.0, 3800.0);\n\nq = 1.0 - resonance * 0.94;\nw1 = clamp(f1 / sr * 2.4, 0.005, 0.42);\nhp1 = excitation - lp1 - q * bp1;\nbp1 = bp1 + w1 * hp1;\nlp1 = lp1 + w1 * bp1;\n\nw2 = clamp(f2 / sr * 2.4, 0.005, 0.42);\nhp2 = excitation - lp2 - q * bp2;\nbp2 = bp2 + w2 * hp2;\nlp2 = lp2 + w2 * bp2;\n\nw3 = clamp(f3 / sr * 2.4, 0.005, 0.42);\nhp3 = excitation - lp3 - q * bp3;\nbp3 = bp3 + w3 * hp3;\nlp3 = lp3 + w3 * bp3;\n\nout = (bp1 * 1.0 + bp2 * 0.7 + bp3 * 0.4) * 0.6;\n",
+    "params": {
+      "vowel": 0.35,
+      "vibratoRate": 5.2,
+      "vibratoDepth": 0.015,
+      "breath": 0.12,
+      "resonance": 0.88
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

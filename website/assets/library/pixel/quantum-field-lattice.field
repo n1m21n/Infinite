@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Quantum Field Lattice",
+    "author": "Infinite",
+    "description": "Relativistic quantum vacuum fluctuation lattice with warped spacetime curvature, vibrating node packets and audio-reactive phase interference.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_high = 0.5 [0.0, 2.0];\nparam float tension = 2.4 [0.5, 6.0];\nparam float curvature = 1.6 [0.2, 4.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\n\nwarp = p / (1.0 + r * r * curvature * (0.8 + 0.6 * audio_bass));\nw = warp * 16.0;\n\nq1 = sin(w.x + t * 2.0) * cos(w.y * tension);\nq2 = cos(w.y - t * 1.8) * sin(w.x * tension);\nfield = q1 + q2;\n\nrings = abs(fract(r * 8.0 - t * 0.8) - 0.5);\nphase = smoothstep(0.42, 0.48, max(abs(field) * 0.35, rings));\n\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.208);\n\ncol = mix(signal, emerald, sin(field * 3.14159) * 0.5 + 0.5) * (phase * 1.6);\ncol = col + ember * smoothstep(0.35, 0.0, r) * (1.0 + 1.2 * audio_bass);\ncol = col * (0.7 + 0.5 * audio_high);\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_high": 0.5,
+      "tension": 2.4,
+      "curvature": 1.6
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

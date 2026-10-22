@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Envelope Follower Wah FX",
+    "author": "Infinite",
+    "description": "Dynamic auto-wah filter with optical envelope detection, variable resonance and warm saturation.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float sensitivity = 3.5 [0.5, 8.0];\nparam float resonance = 0.82 [0.1, 0.98];\nparam float minFreq = 350.0 [80.0, 1200.0];\nparam float maxFreq = 3800.0 [800.0, 8000.0];\nparam float drive = 1.8 [1.0, 5.0];\nparam float mix = 0.9 [0.0, 1.0];\nstate float env = 0;\nstate float lp = 0;\nstate float bp = 0;\n\ninputLevel = abs(in) * sensitivity;\nattackRate = 0.04;\nreleaseRate = 0.0008;\nrate = if(inputLevel > env, attackRate, releaseRate);\nenv = env + rate * (inputLevel - env);\nenvNorm = clamp(env, 0.0, 1.0);\n\ncenterFreq = minFreq + (maxFreq - minFreq) * (envNorm * envNorm);\nfCut = clamp(centerFreq / sr * 2.2, 0.005, 0.44);\n\nu = in * drive;\nsat = u / (1.0 + abs(u) * 0.25);\n\nq = 1.0 - resonance * 0.93;\nhp = sat - lp - q * bp;\nbp = bp + fCut * hp;\nlp = lp + fCut * bp;\n\nwet = (bp * 1.5 + lp * 0.35) * 0.75;\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "sensitivity": 3.5,
+      "resonance": 0.82,
+      "minFreq": 350.0,
+      "maxFreq": 3800.0,
+      "drive": 1.8,
+      "mix": 0.9
+    },
+    "nodeSettings": {}
+  }
+}

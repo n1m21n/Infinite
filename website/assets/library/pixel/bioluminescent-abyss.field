@@ -1,0 +1,24 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Bioluminescent Abyss",
+    "author": "Infinite",
+    "description": "Deep oceanic bioluminescence with floating pulsing bell structures, chromatic water caustics and audio-reactive luminous tentacles.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float speed = 1.2 [0.1, 5.0];\nparam float glow = 1.4 [0.2, 3.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\npulse = sin(t * speed * 2.5 - r * 6.0) * 0.5 + 0.5;\nbell = smoothstep(0.45 + 0.1 * audio_bass, 0.0, r);\n\nribs = cos(a * 8.0 + sin(r * 12.0 - t * speed) * 1.5);\nfilaments = smoothstep(0.3, 0.9, ribs) * smoothstep(0.6, 0.1, r);\n\ncaustic = sin(p.x * 14.0 + sin(p.y * 10.0 + t)) * sin(p.y * 14.0 + cos(p.x * 10.0 + t));\nglowSpore = smoothstep(0.7, 1.0, caustic) * (0.4 + 0.6 * audio_mid);\n\ncyan = vec3(0.12, 0.85, 0.92);\nviolet = vec3(0.65, 0.22, 0.98);\nember = vec3(1.0, 0.42, 0.21);\n\ncol = mix(cyan, violet, r * 1.8 + pulse * 0.3) * (bell * 1.5 + filaments * 1.8);\ncol = col + ember * glowSpore * 0.8;\ncol = col * (0.8 + 0.7 * audio_bass) * glow;\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "speed": 1.2,
+      "glow": 1.4
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

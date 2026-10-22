@@ -42,6 +42,10 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/bioluminescent-abyss.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/chavetta_montage.html": {
    "font-size": 2,
    "hex": 5,
@@ -86,6 +90,10 @@
    "hex": 6
   },
   "embeds/hyper-torus.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/hyperbolic-kaleidoscope.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -162,6 +170,10 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/quantum-field-lattice.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/quantum-vortex.html": {
    "font-size": 2,
    "hex": 6
@@ -185,6 +197,10 @@
    "hex": 6
   },
   "embeds/spectrum-bars.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/supernova-remnant.html": {
    "font-size": 2,
    "hex": 6
   },

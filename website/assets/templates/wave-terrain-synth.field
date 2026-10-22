@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Wave Terrain Synth",
+    "author": "Infinite",
+    "description": "Continuous wave terrain synthesizer with 2D orbital trajectory scanning and dynamic non-linear surface deformation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float radiusX = 1.6 [0.2, 4.0];\nparam float radiusY = 1.2 [0.2, 4.0];\nparam float terrainMult = 2.5 [1.0, 8.0];\nparam float warp = 0.45 [0.0, 1.0];\nparam float envDecay = 0.4 [0.05, 2.0];\nstate float phase = 0;\nstate float subPhase = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0);\ndecayRate = clamp(1.0 / (sr * envDecay), 0.00005, 0.02);\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.1, env - env * decayRate);\n\npStep = clamp(freq, 20.0, 5000.0) / sr;\nphase = (phase + pStep) % 1.0;\nsubPhase = (subPhase + pStep * 0.5) % 1.0;\n\nradX = radiusX * (0.6 + 0.4 * env);\nradY = radiusY * (0.5 + 0.5 * env);\nx = radX * sin(6.2831853 * phase);\ny = radY * cos(6.2831853 * phase * 1.5 + warp * sin(6.2831853 * subPhase));\n\nz1 = sin(x * terrainMult) * cos(y * terrainMult * 0.7);\nz2 = sin(x * y * (1.0 + warp * 3.0));\nraw = (z1 * 0.7 + z2 * 0.3) * (0.2 + 0.8 * env);\n\nfCut = clamp(3500.0 / sr * 2.2, 0.01, 0.45);\nlp = lp + fCut * (raw - lp);\n\nout = lp * 0.85;\n",
+    "params": {
+      "radiusX": 1.6,
+      "radiusY": 1.2,
+      "terrainMult": 2.5,
+      "warp": 0.45,
+      "envDecay": 0.4
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

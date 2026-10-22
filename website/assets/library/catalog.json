@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 137,
+ "count": 147,
  "items": [
   {
    "id": "first-sound",
@@ -1646,6 +1646,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/harmonic-warp.field",
    "preview": "https://infinitedevices.org/assets/library/previews/harmonic-warp.jpg",
    "page": "https://infinitedevices.org/library/harmonic-warp.html"
+  },
+  {
+   "id": "aizawa-attractor",
+   "name": "Aizawa Attractor",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Helical orbital chaotic attractor with a central vertical funnel axis and spiraling toroidal loops.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/aizawa-attractor.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/aizawa-attractor.jpg",
+   "page": "https://infinitedevices.org/library/aizawa-attractor.html"
+  },
+  {
+   "id": "thomas-attractor",
+   "name": "Thomas Attractor",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Cyclically symmetric chaotic dynamical flow tracing twisting labyrinthine 3D orbits.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/thomas-attractor.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/thomas-attractor.jpg",
+   "page": "https://infinitedevices.org/library/thomas-attractor.html"
+  },
+  {
+   "id": "roman-surface-3d",
+   "name": "Roman Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Steiner's Roman Surface: non-orientable self-intersecting projective plane with tetrahedral symmetry.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/roman-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/roman-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/roman-surface-3d.html"
+  },
+  {
+   "id": "clifford-torus-3d",
+   "name": "Clifford Torus 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "4D Clifford flat torus stereographically projected into 3D space with 4D isoclinic rotation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/clifford-torus-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/clifford-torus-3d.jpg",
+   "page": "https://infinitedevices.org/library/clifford-torus-3d.html"
+  },
+  {
+   "id": "wave-terrain-synth",
+   "name": "Wave Terrain Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Continuous wave terrain synthesizer with 2D orbital trajectory scanning and dynamic non-linear surface deformation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/wave-terrain-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/wave-terrain-synth.jpg",
+   "page": "https://infinitedevices.org/library/wave-terrain-synth.html"
+  },
+  {
+   "id": "formant-vocal-synth",
+   "name": "Formant Vocal Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Phonetic vowel singing synthesizer with parallel formant resonators, vibrato LFO and aspiration breath model.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/formant-vocal-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/formant-vocal-synth.jpg",
+   "page": "https://infinitedevices.org/library/formant-vocal-synth.html"
+  },
+  {
+   "id": "pitch-shifter-delay-fx",
+   "name": "Pitch Shifter Delay FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Continuous granular pitch-shifting delay with dual rotating crossfading heads, feedback shimmer and tape flutter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/pitch-shifter-delay-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/pitch-shifter-delay-fx.jpg",
+   "page": "https://infinitedevices.org/library/pitch-shifter-delay-fx.html"
+  },
+  {
+   "id": "envelope-follower-wah-fx",
+   "name": "Envelope Follower Wah FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Dynamic auto-wah filter with optical envelope detection, variable resonance and warm saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/envelope-follower-wah-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/envelope-follower-wah-fx.jpg",
+   "page": "https://infinitedevices.org/library/envelope-follower-wah-fx.html"
+  },
+  {
+   "id": "bioluminescent-abyss",
+   "name": "Bioluminescent Abyss",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Deep oceanic bioluminescence with floating pulsing bell structures, chromatic water caustics and audio-reactive luminous tentacles.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/bioluminescent-abyss.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/bioluminescent-abyss.jpg",
+   "page": "https://infinitedevices.org/library/bioluminescent-abyss.html"
+  },
+  {
+   "id": "quantum-field-lattice",
+   "name": "Quantum Field Lattice",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Relativistic quantum vacuum fluctuation lattice with warped spacetime curvature, vibrating node packets and audio-reactive phase interference.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/quantum-field-lattice.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/quantum-field-lattice.jpg",
+   "page": "https://infinitedevices.org/library/quantum-field-lattice.html"
   }
  ]
 }

@@ -1,0 +1,47 @@
+infinite-patch 1
+# Envelope Follower Wah FX: dynamic optical auto-wah filter
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1024
+end
+node 3 AudioEffects Field Effect
+  id wahfx
+  pos 1020 1024
+  s code param float sensitivity = 3.5 [0.5, 8.0]\nparam float resonance = 0.82 [0.1, 0.98]\nparam float minFreq = 350.0 [80.0, 1200.0]\nparam float maxFreq = 3800.0 [800.0, 8000.0]\nparam float drive = 1.8 [1.0, 5.0]\nparam float mix = 0.9 [0.0, 1.0]\nstate float env = 0\nstate float lp = 0\nstate float bp = 0\n\ninputLevel = abs(in) * sensitivity\nattackRate = 0.04\nreleaseRate = 0.0008\nrate = if(inputLevel > env, attackRate, releaseRate)\nenv = env + rate * (inputLevel - env)\nenvNorm = clamp(env, 0.0, 1.0)\n\ncenterFreq = minFreq + (maxFreq - minFreq) * (envNorm * envNorm)\nfCut = clamp(centerFreq / sr * 2.2, 0.005, 0.44)\n\nu = in * drive\nsat = u / (1.0 + abs(u) * 0.25)\n\nq = 1.0 - resonance * 0.93\nhp = sat - lp - q * bp\nbp = bp + fCut * hp\nlp = lp + fCut * bp\n\nwet = (bp * 1.5 + lp * 0.35) * 0.75\nout = in * (1.0 - mix) + wet * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1560 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.25
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Envelope Follower Wah FX. Dynamic envelope-reactive bandpass filter.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud wahfx 0 synth
+aud speakers 0 wahfx
+aud ana 0 wahfx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

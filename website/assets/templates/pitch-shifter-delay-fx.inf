@@ -1,0 +1,47 @@
+infinite-patch 1
+# Pitch Shifter Delay FX: dual-head crossfading pitch delay
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1024
+end
+node 3 AudioEffects Field Effect
+  id pitchfx
+  pos 1020 1024
+  s code param float shift = 0.5 [-1.0, 1.0]\nparam float feedback = 0.45 [0.0, 0.95]\nparam float window = 0.05 [0.02, 0.15]\nparam float flutter = 0.25 [0.0, 1.0]\nparam float mix = 0.75 [0.0, 1.0]\nstate float p1 = 0\nstate float lfo = 0\nstate float d1 = 0\nstate float d2 = 0\nstate float fb = 0\n\nlfo = (lfo + 0.35 / sr) % 1.0\nfl = sin(6.2831853 * lfo) * flutter * 0.005\n\nrate = (shift + fl) / (window * sr)\np1 = (p1 + rate) % 1.0\np2 = (p1 + 0.5) % 1.0\n\nw1 = 1.0 - abs(2.0 * p1 - 1.0)\nw2 = 1.0 - abs(2.0 * p2 - 1.0)\n\nx = in + fb * feedback\nu = x / (1.0 + abs(x) * 0.1)\n\nd1 = d1 + 0.25 * (u * p1 - d1)\nd2 = d2 + 0.25 * (u * p2 - d2)\n\nwet = d1 * w1 + d2 * w2\nfb = wet\n\nout = in * (1.0 - mix) + wet * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1560 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.25
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Pitch Shifter Delay FX. Granular crossfading rotating heads with tape flutter.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud pitchfx 0 synth
+aud speakers 0 pitchfx
+aud ana 0 pitchfx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45
