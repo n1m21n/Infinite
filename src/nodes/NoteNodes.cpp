@@ -19,6 +19,23 @@
 
 namespace
 {
+   // A patch file is outside input and its ints load unchecked. Keep a loaded
+   // key inside the tables the bodies and the audio thread index: root wraps to
+   // its pitch class, and an unknown scale plays as major, the same fallback
+   // MusicTime::ScaleTable uses.
+   void SanitizeLoadedKey(int& root, int& scale)
+   {
+      root = ((root % 12) + 12) % 12;
+      if (scale < 0 || scale >= MusicTime::kNumScaleTypes)
+         scale = MusicTime::kMajor;
+   }
+
+   void SanitizeLoadedRange(int& lo, int& hi)
+   {
+      lo = std::clamp(lo, 0, 127);
+      hi = std::clamp(hi, 0, 127);
+   }
+
    // Held-key bitmap helpers: 128 MIDI notes as two 64-bit words, published
    // by the audio thread and read by the UI. Two relaxed atomic loads is a
    // cheaper and far simpler cross-thread surface than 128 flags or a ring,
@@ -583,6 +600,9 @@ void KeyboardNode::VisitParams(ParamVisitor& v)
    v.Float("velocityScale", velocityScale);
    v.Bool("computerKeyboardEnabled", computerKeyboardEnabled);
    v.Bool("useGlobalScale", useGlobalScale);
+   // Loaded unchecked; the key math is (baseOctave + 1) * 12 + key + transpose.
+   baseOctave = std::clamp(baseOctave, -1, 8);
+   transpose = std::clamp(transpose, -127, 127);
 }
 
 AudioNode* KeyboardNode::GetAudioNode()
@@ -950,6 +970,8 @@ void NoteFilterNode::VisitParams(ParamVisitor& v)
    v.Int("rangeHigh", rangeHigh);
    v.Float("chance", chance);
    v.Bool("useGlobalScale", useGlobalScale);
+   SanitizeLoadedKey(root, scale);
+   SanitizeLoadedRange(rangeLow, rangeHigh);
 }
 
 AudioNode* NoteFilterNode::GetAudioNode()
@@ -3606,6 +3628,8 @@ void RandomNoteGeneratorNode::VisitParams(ParamVisitor& v)
    v.Float("groove", groove); // appended after existing params - save-compat
    v.Int("swingMode", swingMode);
    v.Int("stepTiming", stepTiming); // not a control: 0 = block-start step timing (saved before the fix)
+   SanitizeLoadedKey(root, scale);
+   SanitizeLoadedRange(rangeLow, rangeHigh);
 }
 
 AudioNode* RandomNoteGeneratorNode::GetAudioNode()
@@ -3834,6 +3858,8 @@ void ChorderNode::VisitParams(ParamVisitor& v)
    v.Float("upperHarmonics", upperHarmonics);
    v.Bool("useGlobalScale", useGlobalScale);
    v.Int("stepTiming", stepTiming); // not a control: 0 = block-start step timing (saved before the fix)
+   SanitizeLoadedKey(root, scale);
+   chordSize = std::clamp(chordSize, 2, 6);
 }
 
 AudioNode* ChorderNode::GetAudioNode()

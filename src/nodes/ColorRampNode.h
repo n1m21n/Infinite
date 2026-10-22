@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -68,6 +69,7 @@ public:
       v.Int("interpMode", interpMode);
       v.Float("mix", mix);
       v.Int("stopCount", stopCount);
+      stopCount = std::clamp(stopCount, 1, kMaxStops); // loaded unchecked; indexes stopPos/stopColor
       char posKey[16];
       char colKey[16];
       for (int i = 0; i < kMaxStops; i++)

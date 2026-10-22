@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -80,6 +81,7 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("activeChannel", activeChannel);
+      activeChannel = std::clamp(activeChannel, 0, kChannelCount - 1); // loaded unchecked; indexes mShapes
       v.Float("mix", mix);
       bool exact = ExactLine();
       v.Bool("exactLine", exact);
