@@ -34,6 +34,17 @@ namespace Tracking
       // The library stays mapped: ORT does not support unload.
    }
 
+   std::string OrtRuntime::PackLibraryPath(const std::string& packDir)
+   {
+#if defined(__APPLE__)
+      return packDir + "/lib/libonnxruntime.dylib";
+#elif defined(_WIN32)
+      return packDir + "/lib/onnxruntime.dll";
+#else
+      return packDir + "/lib/libonnxruntime.so";
+#endif
+   }
+
    bool OrtRuntime::Load(const std::string& libPath, std::string& err)
    {
       if (m_api) return true;

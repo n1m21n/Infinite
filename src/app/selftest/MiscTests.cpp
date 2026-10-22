@@ -2938,13 +2938,7 @@ int RunTrackingTest()
    check(!dir.empty(), "PackDir resolves after install");
 
    Tracking::OrtRuntime rt;
-#if defined(__APPLE__)
-   const std::string lib = dir + "/lib/libonnxruntime.dylib";
-#elif defined(_WIN32)
-   const std::string lib = dir + "/lib/onnxruntime.dll";
-#else
-   const std::string lib = dir + "/lib/libonnxruntime.so";
-#endif
+   const std::string lib = Tracking::OrtRuntime::PackLibraryPath(dir);
    check(rt.Load(lib, err), "ONNX Runtime loads from the pack folder");
    if (!rt.Loaded()) { printf("  %s\n", err.c_str()); return 1; }
 
