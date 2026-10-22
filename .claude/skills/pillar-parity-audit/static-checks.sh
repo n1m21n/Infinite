@@ -35,15 +35,22 @@ head2 "P11 platform contract - every Platform:: declaration has both implementat
 # by design (the projector/output window) and are exempt from the macOS side.
 GUARD=$(grep -n '^#if defined(_WIN32)' src/platform/Platform.h | tail -1 | cut -d: -f1)
 GUARD=${GUARD:-999999}
+# An inline function is defined right there in the header and needs neither.
 head -n "$((GUARD - 1))" src/platform/Platform.h \
+  | grep -vE '^[[:space:]]*(static[[:space:]]+)?(inline|constexpr)\b' \
   | grep -oE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_:<>,* &]*[ *&]([A-Z][A-Za-z0-9_]*)\(' \
   | grep -oE '[A-Z][A-Za-z0-9_]*\($' | tr -d '(' | sort -u > /tmp/pillar_decls.txt
+# Where a definition can live: the platform's own files, plus whatever of
+# src/platform/common/ CMakeLists.txt builds for it (COMMON_SOURCES on every
+# platform; WIN32_SOURCES adds the portable decoders on Windows).
+cmake_list() { sed -n "/^set($1/,/^)/p" CMakeLists.txt | grep -oE 'src/platform/common/[A-Za-z0-9_]+\.(cpp|mm)'; }
+mac_files=(src/platform/*.mm $(cmake_list COMMON_SOURCES | sort -u))
+win_files=(src/platform/win/*.cpp $(cmake_list COMMON_SOURCES; cmake_list WIN32_SOURCES) )
 missing_mac=(); missing_win=()
 while read -r fn; do
    [ -z "$fn" ] && continue
-   grep -qE "\b${fn}[[:space:]]*\(" src/platform/Platform.mm src/platform/PluginVST3.mm \
-      || missing_mac+=("$fn")
-   grep -rqE "\b${fn}[[:space:]]*\(" src/platform/win/ || missing_win+=("$fn")
+   grep -qE "\b${fn}[[:space:]]*\(" "${mac_files[@]}" || missing_mac+=("$fn")
+   grep -qE "\b${fn}[[:space:]]*\(" "${win_files[@]}" || missing_win+=("$fn")
 done < /tmp/pillar_decls.txt
 total=$(wc -l < /tmp/pillar_decls.txt | tr -d ' ')
 if [ ${#missing_mac[@]} -eq 0 ]; then ok "all $total portable declarations have a macOS definition"

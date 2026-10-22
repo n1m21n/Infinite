@@ -7,8 +7,9 @@ icon - is OS-specific, and the rule is that the OS-specific part lives behind
 Platform:: and nowhere else. Two consequences are checkable without a build:
 
   1. TWO IMPLEMENTATIONS. Every function declared in src/platform/Platform.h
-     outside a _WIN32 guard must exist in BOTH src/platform/Platform.mm and
-     src/platform/win/*.cpp. A declaration implemented on one side only links
+     outside a _WIN32 guard (and not inline there) must exist in BOTH the macOS
+     sources (src/platform/*.mm) and src/platform/win/*.cpp, counting the
+     src/platform/common/ files CMakeLists.txt builds for each. A declaration implemented on one side only links
      on that OS and fails to link - or worse, silently no-ops - on the other.
      Declarations inside an `#if defined(_WIN32)` block are Windows-only by
      design and are skipped.
@@ -51,26 +52,61 @@ def strip_win32_only(text):
     return '\n'.join(out)
 
 
+def namespace_level(text):
+    """Keep only what sits directly in namespace Platform: drop every brace body
+    below it (inline functions, structs), whose calls would read as declarations."""
+    out, depth = [], 0
+    for ch in text:
+        if ch == '{':
+            depth += 1
+            if depth == 2:
+                out.append(' {}\n')  # an empty body: still a definition, and DECL_RE cannot run past it
+            continue
+        if ch == '}':
+            depth -= 1
+            continue
+        if depth <= 1:
+            out.append(ch)
+    return ''.join(out)
+
+
+def platform_common(list_name):
+    """src/platform/common/ files CMakeLists.txt builds under set(<list_name> ...)."""
+    cmake = open(os.path.join(ROOT, 'CMakeLists.txt'), encoding='utf-8', errors='replace').read()
+    m = re.search(r'^set\(' + list_name + r'\b(.*?)^\)', cmake, re.S | re.M)
+    return re.findall(r'src/platform/common/\w+\.(?:cpp|mm)', m.group(1)) if m else []
+
+
+def read_all(paths):
+    return ''.join(open(os.path.join(ROOT, p), encoding='utf-8', errors='replace').read()
+                   for p in sorted(set(paths)))
+
+
 def main():
     header = open(os.path.join(ROOT, 'src/platform/Platform.h'),
                   encoding='utf-8', errors='replace').read()
     header = re.sub(r'//.*', '', header)
-    decls = {n for n in DECL_RE.findall(strip_win32_only(header))
+    decls = {n for n in DECL_RE.findall(namespace_level(strip_win32_only(header)))
              if n not in NOT_A_FUNCTION}
 
-    mac = open(os.path.join(ROOT, 'src/platform/Platform.mm'),
-               encoding='utf-8', errors='replace').read()
-    win = ''.join(open(f, encoding='utf-8', errors='replace').read()
-                  for f in sorted(glob.glob(os.path.join(ROOT, 'src/platform/win/*.cpp'))))
+    # A definition can live in the platform's own files or in whatever of
+    # src/platform/common/ CMakeLists.txt builds for that platform.
+    common = platform_common('COMMON_SOURCES')
+    mac = read_all([os.path.relpath(f, ROOT) for f in glob.glob(os.path.join(ROOT, 'src/platform/*.mm'))] + common)
+    win = read_all([os.path.relpath(f, ROOT) for f in glob.glob(os.path.join(ROOT, 'src/platform/win/*.cpp'))] +
+                   common + platform_common('WIN32_SOURCES'))
 
     problems = []
     for name in sorted(decls):
         pat = re.compile(r'\b' + re.escape(name) + r'\s*\(')
         on_mac, on_win = bool(pat.search(mac)), bool(pat.search(win))
         if not (on_mac and on_win):
-            problems.append('Platform::%s implemented on %s only - it will not '
-                            'link, or will silently no-op, on the other OS'
-                            % (name, 'macOS' if on_mac else 'Windows'))
+            if not on_mac and not on_win:
+                problems.append('Platform::%s implemented on neither macOS nor Windows' % name)
+            else:
+                problems.append('Platform::%s implemented on %s only - it will not '
+                                'link, or will silently no-op, on the other OS'
+                                % (name, 'macOS' if on_mac else 'Windows'))
 
     node_win32 = []
     for path in sorted(glob.glob(os.path.join(ROOT, 'src/nodes/*'))):
