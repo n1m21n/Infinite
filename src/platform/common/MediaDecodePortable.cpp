@@ -151,6 +151,15 @@ namespace
                     std::vector<Platform::ModelVertex>& outVertices,
                     std::vector<unsigned int>& outIndices, std::string& outError)
    {
+      // A model file is outside input and PLY face indices are read as
+      // written; one past the vertex list would make GenerateNormals (and
+      // the renderer) index out of bounds.
+      for (const unsigned int i : indices)
+         if (i >= vertices.size())
+         {
+            outError = "model file is damaged (a face uses a vertex that does not exist)";
+            return false;
+         }
       if (!fileHadNormals && !vertices.empty())
          GenerateNormals(vertices, indices);
       if (vertices.empty() || indices.empty())
