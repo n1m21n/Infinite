@@ -1,6 +1,9 @@
 // Headless jobs: ExplainLive, ParamKeyJoiner, HeadlessTick (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include <atomic>
+#include <chrono>
 #include <functional>
+#include <thread>
 
 namespace app
 {
@@ -200,12 +203,50 @@ static void ReportPlugins(Headless::Status& st, bool withParams)
       st.extraJson.push_back("\"plugins\":[" + json + "]");
 }
 
+// -1 until the job's status is out; then its exit code. Whoever claims it first
+// (HeadlessFinish or the watchdog) emits, so the status line is never printed twice.
+static std::atomic<int> gHeadlessEmitState { -1 };
+static constexpr int kHeadlessEmitting = -2;
+
 static void HeadlessFinish(GLFWwindow* window, Headless::Status& st, double startWall)
 {
+   int idle = -1;
+   if (!gHeadlessEmitState.compare_exchange_strong(idle, kHeadlessEmitting))
+      return; // the watchdog already reported, and is ending the process
    st.elapsedMs = (long long)((glfwGetTime() - startWall) * 1000.0);
    st.ok = st.errors.empty();
    gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
+   gHeadlessEmitState = gHeadlessExitCode;
    glfwSetWindowShouldClose(window, GLFW_TRUE);
+}
+
+// --timeout is checked between ticks, so one tick that never returns (a decoder
+// or GPU wait, as on Windows CI in B-J-001) used to outlive it. The watchdog is
+// the hard stop, kHeadlessHardStopGraceSec past the deadline: if no status is out
+// it reports E_TIMEOUT itself; if one is but the process is stuck shutting down,
+// it exits with that status's code. Either way the process ends.
+static constexpr double kHeadlessHardStopGraceSec = 5.0;
+static void StartHeadlessWatchdog(const Headless::Job& job, Headless::Status started)
+{
+   std::thread([job, started]() mutable {
+      const double limit = job.timeoutSec + kHeadlessHardStopGraceSec;
+      std::this_thread::sleep_for(std::chrono::duration<double>(limit));
+      int idle = -1;
+      if (gHeadlessEmitState.compare_exchange_strong(idle, kHeadlessEmitting))
+      {
+         started.errors.push_back({ "E_TIMEOUT", "job exceeded --timeout " + std::to_string((int)job.timeoutSec) +
+                                                    " s inside one step; stopped by the watchdog", 0, -1 });
+         started.elapsedMs = (long long)(limit * 1000.0);
+         started.ok = false;
+         std::_Exit(Headless::Emit(job, started));
+      }
+      // Status already out (or being written): give the writer a moment, then end with its code.
+      for (int i = 0; i < 200 && gHeadlessEmitState.load() == kHeadlessEmitting; i++)
+         std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      const int code = gHeadlessEmitState.load();
+      std::fflush(stdout);
+      std::_Exit(code >= 0 ? code : 6);
+   }).detach();
 }
 
 // A probe (validate / describe) is done once every spawned node has been drawn
@@ -771,6 +812,7 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       sStatus.patch = job.patch;
       sStatus.out = job.out;
       sStatus.fps = job.fps;
+      StartHeadlessWatchdog(job, sStatus);
    }
    auto fail = [&](const char* code, const std::string& msg, int node = -1)
    {
@@ -786,6 +828,10 @@ void HeadlessTick(int& frameId, GLFWwindow* window)
       fail("E_TIMEOUT", "job exceeded --timeout " + std::to_string((int)job.timeoutSec) + " s");
       return;
    }
+   // Test hook for the watchdog: this tick never returns.
+   static const bool sHangTick = getenv("INFINITE_HEADLESS_TEST_HANG_TICK") != nullptr;
+   while (sHangTick)
+      std::this_thread::sleep_for(std::chrono::seconds(1));
 
    // Frame jobs hold the clock at zero from the first tick: the probe/load ticks and the warm-up cook the
    // graph too, and a wall-clock frame in a history node (Time Machine ring, Trails) makes two renders differ.
