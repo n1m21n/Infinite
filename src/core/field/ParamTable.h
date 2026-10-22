@@ -7,6 +7,11 @@
 
 namespace Field
 {
+   // A declared param's modulation/pin index is this base plus its ParamTable
+   // id, keeping it clear of the native controls drawn above it in the same
+   // node body (kFieldDeclaredParamBase in AppShared.h is this value).
+   inline constexpr int kDeclaredParamIndexBase = 50;
+
    struct DeclaredParam
    {
       std::string name;

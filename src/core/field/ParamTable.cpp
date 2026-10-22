@@ -56,14 +56,15 @@ namespace Field
             p.isDeclared = false;
             if (nodeIndex >= 0)
             {
-               if (Modulation::Instance().IsModulated(nodeIndex, p.id))
+               const int paramIndex = kDeclaredParamIndexBase + p.id;
+               if (Modulation::Instance().IsModulated(nodeIndex, paramIndex))
                {
-                  Modulation::Instance().Unbind(nodeIndex, p.id);
+                  Modulation::Instance().Unbind(nodeIndex, paramIndex);
                   droppedModNames.push_back(p.name);
                }
-               if (Modulation::Instance().HasExpression(nodeIndex, p.id))
+               if (Modulation::Instance().HasExpression(nodeIndex, paramIndex))
                {
-                  Modulation::Instance().ClearExpression(nodeIndex, p.id);
+                  Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
                }
             }
          }
@@ -99,16 +100,17 @@ namespace Field
             existing->maxValue = (float)d.maxValue;
 
             // Clamp modulation range if modulated
-            if (nodeIndex >= 0 && Modulation::Instance().IsModulated(nodeIndex, existing->id))
+            const int paramIndex = kDeclaredParamIndexBase + existing->id;
+            if (nodeIndex >= 0 && Modulation::Instance().IsModulated(nodeIndex, paramIndex))
             {
-               Modulation::Source src = Modulation::Instance().ModulatorFor(nodeIndex, existing->id);
+               Modulation::Source src = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
                if (src.hasRange)
                {
                   float clampedLo = std::max(existing->minValue, std::min(existing->maxValue, src.lo));
                   float clampedHi = std::max(existing->minValue, std::min(existing->maxValue, src.hi));
                   if (clampedLo != src.lo || clampedHi != src.hi)
                   {
-                     Modulation::Instance().SetRange(nodeIndex, existing->id, clampedLo, clampedHi);
+                     Modulation::Instance().SetRange(nodeIndex, paramIndex, clampedLo, clampedHi);
                   }
                }
             }

@@ -1882,9 +1882,9 @@ int RunFieldParamTest()
 
          int speedId = paramId(fe, "speed", "SurvivesInsert");
          if (speedId < 0) { secOk = false; break; }
-         Modulation::Instance().Bind(10, speedId, 99, 0);
+         Modulation::Instance().Bind(10, kFieldDeclaredParamBase + speedId, 99, 0);
 
-         if (!Modulation::Instance().IsModulated(10, speedId))
+         if (!Modulation::Instance().IsModulated(10, kFieldDeclaredParamBase + speedId))
          {
             printf("SurvivesInsert: FAIL - binding failed\n");
             secOk = false;
@@ -1909,17 +1909,17 @@ int RunFieldParamTest()
             printf("SurvivesInsert: FAIL - speed ID shifted after insertion (%d -> %d)\n", speedId, newSpeedId);
             secOk = false;
          }
-         if (!Modulation::Instance().IsModulated(10, speedId))
+         if (!Modulation::Instance().IsModulated(10, kFieldDeclaredParamBase + speedId))
          {
             printf("SurvivesInsert: FAIL - modulation binding on speed was lost after insert\n");
             secOk = false;
          }
-         if (Modulation::Instance().ModulatorFor(10, speedId).nodeIndex != 99)
+         if (Modulation::Instance().ModulatorFor(10, kFieldDeclaredParamBase + speedId).nodeIndex != 99)
          {
             printf("SurvivesInsert: FAIL - modulation binding pointed at wrong modulator\n");
             secOk = false;
          }
-         if (Modulation::Instance().IsModulated(10, aId))
+         if (Modulation::Instance().IsModulated(10, kFieldDeclaredParamBase + aId))
          {
             printf("SurvivesInsert: FAIL - newly inserted param 'a' was falsely modulated\n");
             secOk = false;
@@ -1950,8 +1950,8 @@ int RunFieldParamTest()
          int speedId = paramId(fe, "speed", "Delete/Rename");
          int amountId = paramId(fe, "amount", "Delete/Rename");
          if (speedId < 0 || amountId < 0) { secOk = false; break; }
-         Modulation::Instance().Bind(10, speedId, 99, 0);
-         Modulation::Instance().Bind(10, amountId, 98, 0);
+         Modulation::Instance().Bind(10, kFieldDeclaredParamBase + speedId, 99, 0);
+         Modulation::Instance().Bind(10, kFieldDeclaredParamBase + amountId, 98, 0);
 
          // Delete 'speed'
          fe.code = "param float a = 0.1 [0, 1]\nparam float amount = 0.75 [0, 2]\nP.y += amount + a\n";
@@ -1963,12 +1963,12 @@ int RunFieldParamTest()
          EndNodeParams();
          gParamRegisterOnly = false;
 
-         if (Modulation::Instance().IsModulated(10, speedId))
+         if (Modulation::Instance().IsModulated(10, kFieldDeclaredParamBase + speedId))
          {
             printf("Delete/Rename: FAIL - deleted param 'speed' is still modulated\n");
             secOk = false;
          }
-         if (Modulation::Instance().Links().find(Modulation::Key(10, speedId)) != Modulation::Instance().Links().end())
+         if (Modulation::Instance().Links().find(Modulation::Key(10, kFieldDeclaredParamBase + speedId)) != Modulation::Instance().Links().end())
          {
             printf("Delete/Rename: FAIL - deleted param 'speed' left stale Key in Links()\n");
             secOk = false;
@@ -1989,7 +1989,7 @@ int RunFieldParamTest()
          EndNodeParams();
          gParamRegisterOnly = false;
 
-         if (Modulation::Instance().IsModulated(10, amountId))
+         if (Modulation::Instance().IsModulated(10, kFieldDeclaredParamBase + amountId))
          {
             printf("Delete/Rename: FAIL - renamed param 'amount' still has modulation on old ID\n");
             secOk = false;
@@ -2004,6 +2004,69 @@ int RunFieldParamTest()
 
       if (secOk) printf("SECTION 4 (Binding Drops on Delete & Rename): OK\n");
       else { printf("SECTION 4 (Binding Drops on Delete & Rename): FAIL\n"); allOk = false; }
+   }
+
+   // SECTION 4b: Reconcile leaves the node's native controls alone. Declared
+   // params sit at kFieldDeclaredParamBase + id; the first one (id 1) must not
+   // touch native control 1 ("generate count") - neither clamp its range on
+   // a re-apply nor drop its binding when the param is renamed.
+   {
+      bool secOk = true;
+
+      do
+      {
+         // The constructor's preset already handed out the low ids, so
+         // re-declare whichever name holds id 1.
+         FieldElementNode fe;
+         const Field::ParamEntry* first = fe.GetParamTable().FindById(1);
+         if (!first) { printf("NativeUntouched: FAIL - no param with id 1\n"); secOk = false; break; }
+         const std::string firstName = first->name;
+         fe.code = "param float " + firstName + " = 0.1 [0, 1]\nP.y += " + firstName + "\n";
+         if (!applyOk(fe, "NativeUntouched")) { secOk = false; break; }
+
+         gParamRegisterOnly = true;
+         BeginNodeParams(10);
+         DrawFieldElementParams(&fe);
+         EndNodeParams();
+         gParamRegisterOnly = false;
+
+         const int aId = 1;
+         const ParamRef* native = Modulation::Instance().KnownParam(10, aId);
+         if (!native || native->name != "generate count")
+         {
+            printf("NativeUntouched: FAIL - native control 1 is '%s', not 'generate count'\n", native ? native->name.c_str() : "(none)");
+            secOk = false;
+            break;
+         }
+         Modulation::Instance().Bind(10, aId, 97, 0);
+         Modulation::Instance().SetRange(10, aId, 10.0f, 5000.0f);
+
+         if (!applyOk(fe, "NativeUntouched")) { secOk = false; break; }
+         Modulation::Source src = Modulation::Instance().ModulatorFor(10, aId);
+         if (src.lo != 10.0f || src.hi != 5000.0f)
+         {
+            printf("NativeUntouched: FAIL - re-apply clamped native mod range to [%g, %g]\n", src.lo, src.hi);
+            secOk = false;
+         }
+
+         fe.code = "param float renamed_b = 0.1 [0, 1]\nP.y += renamed_b\n";
+         if (!applyOk(fe, "NativeUntouched")) { secOk = false; break; }
+         if (!Modulation::Instance().IsModulated(10, aId) || Modulation::Instance().ModulatorFor(10, aId).nodeIndex != 97)
+         {
+            printf("NativeUntouched: FAIL - renaming param 1 dropped the native control's modulation\n");
+            secOk = false;
+         }
+         if (fe.Notice().find("'" + firstName + "'") != std::string::npos)
+         {
+            printf("NativeUntouched: FAIL - notice claims unmodulated '%s' lost modulation: %s\n", firstName.c_str(), fe.Notice().c_str());
+            secOk = false;
+         }
+         Modulation::Instance().Unbind(10, aId);
+
+      } while (false);
+
+      if (secOk) printf("SECTION 4b (Native Controls Untouched): OK\n");
+      else { printf("SECTION 4b (Native Controls Untouched): FAIL\n"); allOk = false; }
    }
 
    // SECTION 5: Failed Compile Keeps Program & Bindings (§5.5)
@@ -2026,7 +2089,7 @@ int RunFieldParamTest()
          int amountId = paramId(fe, "amount", "FailedCompile");
          if (aId < 0 || amountId < 0) { secOk = false; break; }
          fe.GetParamTable().Find("a")->value = 0.42f;
-         Modulation::Instance().Bind(10, amountId, 99, 0);
+         Modulation::Instance().Bind(10, kFieldDeclaredParamBase + amountId, 99, 0);
 
          // Introduce broken syntax
          fe.code = "param float a = 0.1 [0, 1]\nthis is completely broken code syntax!!!\n";
@@ -2051,7 +2114,7 @@ int RunFieldParamTest()
             printf("FailedCompile: FAIL - running param table was wiped on failed compile\n");
             secOk = false;
          }
-         if (!Modulation::Instance().IsModulated(10, amountId))
+         if (!Modulation::Instance().IsModulated(10, kFieldDeclaredParamBase + amountId))
          {
             printf("FailedCompile: FAIL - modulation binding was dropped on failed compile\n");
             secOk = false;
@@ -2084,7 +2147,7 @@ int RunFieldParamTest()
          if (freqId < 0 || gainId < 0) { secOk = false; break; }
          fe.GetParamTable().Find("freq")->value = 4.25f;
          fe.GetParamTable().Find("gain")->value = 0.33f;
-         Modulation::Instance().Bind(10, gainId, 99, 0);
+         Modulation::Instance().Bind(10, kFieldDeclaredParamBase + gainId, 99, 0);
 
          std::vector<std::pair<std::string, std::string>> saved;
          Patch::SaveParams(&fe, saved);
@@ -2134,7 +2197,7 @@ int RunFieldParamTest()
          // Undo -> replay saved snapshot (both node params and modulation state)
          Patch::LoadParams(&fe, saved);
          if (!applyOk(fe, "Undo")) { secOk = false; break; }
-         Modulation::Instance().Bind(10, gainId, 99, 0); // Undo restores patch-level modulation bindings
+         Modulation::Instance().Bind(10, kFieldDeclaredParamBase + gainId, 99, 0); // Undo restores patch-level modulation bindings
 
          gParamRegisterOnly = true;
          BeginNodeParams(10);
@@ -2149,7 +2212,7 @@ int RunFieldParamTest()
             printf("Undo: FAIL - undo failed to restore param values and stable IDs\n");
             secOk = false;
          }
-         if (!undoneGain || !Modulation::Instance().IsModulated(10, undoneGain->id))
+         if (!undoneGain || !Modulation::Instance().IsModulated(10, kFieldDeclaredParamBase + undoneGain->id))
          {
             printf("Undo: FAIL - modulation binding was not attached to restored param ID\n");
             secOk = false;
