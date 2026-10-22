@@ -41,6 +41,10 @@ In signal mode:
 - The Audio File stimulus runs with `INFINITE_DECODE_KEEP_NONFINITE=1`. Otherwise the decoder zeroes the NaN/inf burst before it plays.
 - HOTSTUCK needs the last second to sit 20 dB over base *and* not be falling (within 3 dB of the second before), so a reverb tail dying away doesn't count.
 
+If the Mac sleeps during a row, the row is re-run. A slept row otherwise shows as a TIMEOUT hours long, because the app's own `--timeout` counts the sleep. The check is `kern.waketime`.
+
+Float values are ±1e30, nan, inf, 1e9 and -1. 1e9 casts to int fine but can size a buffer. -1 is UB once it's cast to an unsigned seed.
+
 Resumable: re-running skips rows already written. `--types-from results.tsv` re-runs only the BAD types (the verify step after a fix).
 
 ## tsan_selftests.sh — races
