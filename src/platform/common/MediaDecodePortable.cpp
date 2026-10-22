@@ -37,6 +37,7 @@
 #include "dr_flac.h"
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -662,7 +663,7 @@ namespace
       double mantissa = 0.0;
       for (int i = 2; i < 10; i++)
          mantissa = mantissa * 256.0 + (double)p[i];
-      mantissa /= 4503599627370496.0; // 2^52: shift past the integer bit
+      mantissa /= 9223372036854775808.0; // 2^63: the 64-bit mantissa has an explicit integer bit
       const int sign = (p[0] & 0x80) ? -1 : 1;
       if (mantissa == 0.0 && exponent == 0)
          return 0.0;
@@ -746,7 +747,7 @@ namespace
          outError = "AIFF missing COMM/SSND chunks";
          return false;
       }
-      if (channels <= 0 || channels > kMaxDecodeChannels || frames == 0 || rate <= 0.0)
+      if (channels <= 0 || channels > kMaxDecodeChannels || frames == 0 || !(rate >= 1.0 && rate <= 4294967295.0))
       {
          outError = "unsupported AIFF channel count or length";
          return false;
@@ -758,13 +759,20 @@ namespace
       }
 
       file.clear();
+      file.seekg(0, std::ios::end);
+      const std::streamoff fileSize = (std::streamoff)file.tellg();
       file.seekg(ssndDataPos);
+
+      const int bytesPerSample = sampleFormatFloat ? 4 : (bits + 7) / 8;
+      const size_t frameBytes = (size_t)channels * bytesPerSample;
+      // COMM's frame count is only a claim: never allocate for more frames
+      // than the file actually holds after SSND's data offset.
+      const uint64_t framesInFile = ssndDataPos < fileSize ? (uint64_t)(fileSize - ssndDataPos) / frameBytes : 0;
+      frames = (uint32_t)std::min<uint64_t>({ frames, framesInFile, (uint64_t)INT_MAX });
 
       const size_t totalSamples = (size_t)frames * channels;
       std::vector<float> interleaved(totalSamples, 0.0f);
 
-      const int bytesPerSample = sampleFormatFloat ? 4 : (bits + 7) / 8;
-      const size_t frameBytes = (size_t)channels * bytesPerSample;
       std::vector<unsigned char> buf(totalSamples * bytesPerSample);
       file.read(reinterpret_cast<char*>(buf.data()),
                 (std::streamsize)(totalSamples * bytesPerSample));
@@ -781,7 +789,7 @@ namespace
                memcpy(&value, &asInt, 4); // big-endian bit pattern reinterpreted
             }
             else if (bytesPerSample == 1)
-               value = (float)s[0] / 128.0f - 1.0f; // 8-bit AIFF is unsigned
+               value = (float)(int8_t)s[0] / 128.0f; // AIFF is signed at every depth (unsigned 8-bit is WAV's)
             else if (bytesPerSample == 2)
                value = (float)(int16_t)ReadU16BE(s) / 32768.0f;
             else if (bytesPerSample == 3)
@@ -1074,11 +1082,20 @@ namespace Platform
 
          const bool stereoOrMono = flac->channels <= (unsigned)kMaxDecodeChannels;
          const int channels = (int)std::min<unsigned>(flac->channels, (unsigned)kMaxDecodeChannels);
-         const uint64_t total = flac->totalPCMFrameCount;
-         std::vector<float> interleaved((size_t)total * channels, 0.0f);
+         // STREAMINFO's total is a header claim (up to 2^36 frames, or 0 for
+         // "unknown"), so decode frame-wise like MP3 above rather than
+         // allocating for it up front.
+         std::vector<float> interleaved;
+         float chunk[4096 * 2];
          uint64_t got = 0;
-         if (stereoOrMono)
-            got = drflac_read_pcm_frames_f32(flac, total, interleaved.data());
+         while (stereoOrMono && got < (uint64_t)INT_MAX)
+         {
+            const uint64_t decoded = drflac_read_pcm_frames_f32(flac, 4096, chunk);
+            if (decoded == 0)
+               break;
+            interleaved.insert(interleaved.end(), chunk, chunk + decoded * channels);
+            got += decoded;
+         }
          const int rate = flac->sampleRate;
          drflac_close(flac);
          if (!stereoOrMono)
