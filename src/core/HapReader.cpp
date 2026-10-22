@@ -51,7 +51,9 @@ namespace Hap
          {
             size = end - pos;
          }
-         if (size < hdr || pos + size > end)
+         // `size` can be 64-bit: compare against what is left, so pos + size
+         // cannot wrap and send pos backwards (an endless loop on open).
+         if (size < hdr || size > end - pos)
             return false;
          a.body = pos + hdr;
          a.end = pos + (size_t)size;
@@ -229,7 +231,7 @@ namespace Hap
             {
                size = fileSize - pos;
             }
-            if (size < hdr || pos + size > fileSize)
+            if (size < hdr || size > fileSize - pos) // as in NextAtom: no wrap
                return false;
             if (type == Fourcc('m', 'o', 'o', 'v'))
             {
