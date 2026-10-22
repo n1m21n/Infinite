@@ -436,7 +436,7 @@ namespace Hap
          const uint8_t* compressors = nullptr;
          const uint8_t* sizes = nullptr;
          const uint8_t* offsets = nullptr;
-         size_t compressorsN = 0, sizesN = 0;
+         size_t compressorsN = 0, sizesN = 0, offsetsN = 0;
          size_t at = 0;
          while (at < ilen)
          {
@@ -457,11 +457,13 @@ namespace Hap
             else if (stype == 0x04)
             {
                offsets = ins + at + shdr;
+               offsetsN = slen;
             }
             at += shdr + slen;
          }
          const size_t chunks = compressorsN;
-         if (chunks == 0 || sizes == nullptr || sizesN != chunks * 4)
+         // A file is outside input: every table must hold one entry per chunk.
+         if (chunks == 0 || sizes == nullptr || sizesN != chunks * 4 || (offsets != nullptr && offsetsN < chunks * 4))
          {
             error = "HAP chunk table is damaged";
             return false;
@@ -504,6 +506,12 @@ namespace Hap
             else
             {
                outSizes[c] = csize;
+            }
+            // The sum is checked against the texture, so it must not wrap.
+            if (outSizes[c] > SIZE_MAX - total)
+            {
+               error = "HAP chunk table is damaged";
+               return false;
             }
             total += outSizes[c];
          }
