@@ -1,6 +1,9 @@
-// Set blocks: groups of nodes that are the sections of a live set. The Set list
-// window steps through them in order; a block that is off stops its members
-// cooking (pictures hold black, sound fades out). Membership is the group's own
+// Set blocks: groups of nodes that are the sections of a patch in a live set.
+// The Show Set window lists the playing patch's blocks under it; Next / Previous
+// (PageDown / PageUp, OSC) step through the blocks first, then on to the next
+// patch, which starts on its first block. A switch lands on Show Set's quantize
+// grid; a block that is off stops its members cooking (pictures hold black) and
+// its sound fades out over Show Set's fade time. Membership is the group's own
 // (whatever sits inside its frame), so a node is in one block at most and blocks
 // save, load, copy and undo as the groups they are.
 // The idea comes from Ricardo Palmieri's Infinite-Turbo fork; this is a fresh
@@ -14,14 +17,10 @@
 
 namespace app
 {
-   bool gSetListOpen = false;
-   bool gSetListFocused = false;
-
    namespace
    {
-      GroupNode* sCurrent = nullptr;   // the block the last GO landed on
-      int sPending = -1;               // index waiting for the launch grid
-      int sStandby = -1;               // index Previous / Next picked for GO, -1 = the one after current
+      GroupNode* sCurrent = nullptr;   // the block the last switch landed on
+      int sPending = -1;               // index waiting for the grid
       double sPendingBeat = 0.0;
 
       bool Alive(GroupNode* g)
@@ -43,7 +42,6 @@ namespace app
             blocks[(size_t)i]->on = i == index;
          sCurrent = blocks[(size_t)index];
          sPending = -1;
-         sStandby = -1;
       }
    }
 
@@ -65,7 +63,7 @@ namespace app
       for (int i = 0; i < (int)blocks.size(); i++)
          if (blocks[(size_t)i] == sCurrent)
             return i;
-      // No GO yet (a patch just loaded): the first block that is on.
+      // No switch yet (a patch just opened): the first block that is on.
       for (int i = 0; i < (int)blocks.size(); i++)
          if (blocks[(size_t)i]->on)
             return i;
@@ -74,31 +72,18 @@ namespace app
 
    int SetBlockPending() { return sPending; }
 
-   int SetBlockNext()
-   {
-      const int n = (int)SetBlocks().size();
-      if (n == 0)
-         return -1;
-      if (sPending >= 0)
-         return sPending;
-      if (sStandby >= 0 && sStandby < n)
-         return sStandby;
-      const int cur = SetBlockCurrent();
-      return cur < 0 ? 0 : (cur + 1) % n;
-   }
-
    void SetBlockGo(int index)
    {
-      if (index < 0 || index >= (int)SetBlocks().size())
+      if (ShowPanicLatched() || index < 0 || index >= (int)SetBlocks().size())
          return;
       Transport& tr = Transport::Instance();
-      const int q = tr.LaunchQuantize();
+      const int q = ShowSetQuantize();
       if (!tr.IsPlaying() || q <= MusicTime::kLaunchNone)
       {
          ApplyGo(index);
          return;
       }
-      // Pressing GO again for the block already waiting cancels the wait.
+      // Asking again for the block already waiting cancels the wait.
       if (sPending == index)
       {
          sPending = -1;
@@ -108,23 +93,24 @@ namespace app
       sPendingBeat = MusicTime::NextLaunchBeat(tr.Beats(), q, 1e-3);
    }
 
-   void SetBlockGoNext() { SetBlockGo(SetBlockNext()); }
-
-   void SetBlockCue(int direction)
-   {
-      const int n = (int)SetBlocks().size();
-      if (n == 0 || sPending >= 0)
-         return;
-      sStandby = ((SetBlockNext() + direction) % n + n) % n;
-   }
-
-   void SetBlockStep(int direction)
+   bool SetBlockStep(int direction)
    {
       const int n = (int)SetBlocks().size();
       if (n == 0)
-         return;
+         return false;
       const int from = sPending >= 0 ? sPending : SetBlockCurrent();
-      SetBlockGo(from < 0 ? 0 : ((from + direction) % n + n) % n);
+      const int to = from < 0 ? (direction > 0 ? 0 : -1) : from + direction;
+      if (to < 0 || to >= n)
+         return false;   // past either end: the show set moves to the next / previous patch
+      SetBlockGo(to);
+      return true;
+   }
+
+   void SetBlockLandFirst()
+   {
+      sCurrent = nullptr;
+      sPending = -1;
+      ApplyGo(0);
    }
 
    void SetBlockMove(int index, int direction)
@@ -138,7 +124,6 @@ namespace app
       for (int i = 0; i < (int)blocks.size(); i++)
          blocks[(size_t)i]->order = i;
       sPending = -1;
-      sStandby = -1;
       gPatchDirty = true;
    }
 
@@ -165,7 +150,7 @@ namespace app
          g->color[2] = c.b;
          if (g->label == "Group")
             g->label = "Block " + std::to_string((int)blocks.size());
-         gSetListOpen = true;
+         gShowSetOpen = true;   // where blocks are played from
       }
       sPending = -1;
       gPatchDirty = true;
@@ -177,20 +162,25 @@ namespace app
       if (sPending >= 0 && (!tr.IsPlaying() || tr.Beats() >= sPendingBeat - 1e-6))
          ApplyGo(sPending);
 
-      const double secondsPerBar = MusicTime::BarsToBeats(1.0) * 60.0 / std::max(1.0f, tr.Tempo());
+      const float fadeSeconds = std::max(0.01f, ShowSetFadeMs() * 0.001f);
       for (GraphNode& gn : gNodes)
       {
          if (!gn.node || dynamic_cast<GroupNode*>(gn.node.get()) != nullptr)
             continue;
          GroupNode* owner = GroupOwning(gn.index);
-         const bool inBlock = owner != nullptr && owner->block;
-         const bool off = inBlock && !owner->on;
+         const bool off = owner != nullptr && owner->block && !owner->on;
          gn.node->blockOff = off;
          if (AudioNode* an = AudioNodeOfAny(gn.node.get()))
          {
-            const float fadeSeconds = inBlock && owner->fade > 0 ? (float)(owner->fade * secondsPerBar) : 0.01f;
             an->blockFadeSeconds.store(fadeSeconds, std::memory_order_relaxed);
             an->blockGainTarget.store(off ? 0.0f : 1.0f, std::memory_order_relaxed);
+            // A node the patch just made (open, undo, a show set switch) starts where its
+            // block is, rather than fading out from full.
+            if (!gn.node->blockSeen)
+            {
+               an->blockSnap.store(true, std::memory_order_release);   // after the target it snaps to
+               gn.node->blockSeen = true;
+            }
          }
       }
    }

@@ -7,7 +7,9 @@
 // the new patch's Output has drawn, so the screen never goes black.
 //
 // Program Change n picks entry n+1 (index n); PageDown / PageUp, the Menu tile
-// and OSC (/infinite/show/next, /prev, /go) step through it.
+// and OSC (/infinite/show/next, /prev, /go) step through it. A patch with set
+// blocks (BlockSet.cpp) is stepped through block by block first, and starts on
+// its first block when it switches in.
 #include "app/AppShared.h"
 
 #include "audio/AudioEngine.h"
@@ -259,6 +261,8 @@ namespace app
             return false;
          }
          RemapProjectors();
+         if (!SetBlocks().empty())
+            SetBlockLandFirst();
          gCurrent = index;
          gHoldActive = true;
          gHoldFrames = 0;
@@ -434,6 +438,9 @@ namespace app
 
    void ShowSetStep(int dir)
    {
+      // The playing patch's blocks come first; past its last block, the next patch.
+      if (gRequest < 0 && SetBlockStep(dir))
+         return;
       if (gEntries.empty())
          return;
       const int from = gRequest >= 0 ? gRequest : gCurrent;

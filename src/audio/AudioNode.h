@@ -70,15 +70,21 @@ public:
    // comes back on, when it fades in the same way.
    std::atomic<float> blockGainTarget { 1.0f };
    std::atomic<float> blockFadeSeconds { 0.01f };
+   std::atomic<bool> blockSnap { false };   // jump straight to the target (a node the patch just made)
    float blockGain = 1.0f;   // audio thread only
 
-   bool BlockSilent() const
+   // Audio thread, before processing: true once the node's block is off and its fade is done.
+   bool BlockSilent()
    {
+      if (blockSnap.load(std::memory_order_relaxed) && blockSnap.exchange(false, std::memory_order_acquire))
+         blockGain = blockGainTarget.load(std::memory_order_relaxed);
       return blockGain <= 0.0f && blockGainTarget.load(std::memory_order_relaxed) <= 0.0f;
    }
 
    void ApplyBlockGain(AudioBuffer* const* outputs, int numOutputs, int numFrames, double sampleRate)
    {
+      if (blockSnap.load(std::memory_order_relaxed) && blockSnap.exchange(false, std::memory_order_acquire))
+         blockGain = blockGainTarget.load(std::memory_order_relaxed);
       const float target = blockGainTarget.load(std::memory_order_relaxed);
       if (blockGain == target && target >= 1.0f)
          return;
