@@ -62,7 +62,11 @@ HOT_PEAK = 4.0  # +12 dBFS
 # renders from 0 and the verdict reads the last whole second's loudness.
 SIG_RATE, SIG_SECS, SIG_BURST = 48000, 3.0, 0.25
 SIG_GRACE = 0.5  # NaN frames past burst + this are state that never recovered
-INFO_CODES = {"", "NANPASS", "NOSIGNAL"}  # recorded, never BAD on their own
+# Settings a file player needs before the stock Note Sequencer makes it sound.
+# Slicer plays slice 0 at C1 and nothing past its last slice; the sequencer
+# plays around C4, so cut a 1/32 grid (48 slices in 3 s at 120 BPM).
+SIGNAL_EXTRA = {"Slicer": ["  i sliceBy 1", "  i division 5"]}
+INFO_CODES = {"", "NANPASS", "NOSIGNAL", "FLAKYSILENT"}  # recorded, never BAD on their own
 
 
 def signal_wav(out, name):
@@ -108,9 +112,10 @@ def label_of(kind, v):
 
 
 def has_params(t, kind):
-    if kind == "signal":  # audio in and audio out, or there is nothing to measure
-        return (any(i.get("kind") == "audio" for i in t.get("inputs") or [])
-                and any(o.get("kind") == "audio" for o in t.get("outputs") or []))
+    if kind == "signal":  # a way in for audio and audio out, or there is nothing to measure
+        way_in = any(i.get("kind") == "audio" and i.get("name") != "record_in" for i in t.get("inputs") or [])
+        way_in = way_in or any(p["key"] in ("path", "filePath") and p.get("kind") == "text" for p in t["params"])
+        return way_in and any(o.get("kind") == "audio" for o in t.get("outputs") or [])
     if kind == "mod":
         return bool(t.get("modulatable"))
     return any(p.get("kind") == kind for p in t["params"])
@@ -132,6 +137,7 @@ def patch_for(t, kind, value, sig_path=None):
     by_file = kind == "signal" and sig_path and file_key is not None
     if by_file:
         lines.append(f"  s {file_key} {sig_path}")
+        lines += SIGNAL_EXTRA.get(t["type"], [])
     lines.append("end")
     used, wires = [], []
 
@@ -295,7 +301,11 @@ def fuzz_type(binp, out, kind, t, prior, max_timeout, write):
             if secs > 4 * max(base[1], 1.0):
                 codes += ",SLOW"
             if base_tail is not None and tail is None and "NANSTUCK" not in codes:
-                codes += ",SILENT"
+                # Nodes that analyse on a worker thread (Molder) start sounding
+                # whenever it finishes, which headless does not wait for: only
+                # a silence that repeats counts.
+                again = run_case(binp, out, tag, text, audio, budget, signal)
+                codes += ",SILENT" if again[4] is None else ",FLAKYSILENT"
             elif (base_tail is not None and tail is not None and tail > base_tail + 20
                   and (prev is None or tail > prev - 3) and "id fsig" in text):
                 # A reverb or delay tail still falling is decay, not a stuck
@@ -373,6 +383,7 @@ def selftest():
     text, _ = patch_for(rec, "signal", None, "/x/base.wav")
     assert "  s filePath /x/base.wav" in text and "fsig" not in text and "note a 0 fseq 0" in text, text
     assert not has_params(t | {"outputs": [{"kind": "modulator"}]}, "signal")
+    assert has_params(rec, "signal") and not has_params(rec | {"params": []}, "signal")
     assert label_of("text", "big=AAA") == "big" and label_of("int", "-5") == "-5"
     print("param_fuzz selftest ok")
 
