@@ -330,7 +330,10 @@ void GeometryTableNode::SampleRow(int row, float outWorld[3]) const
       return;
    // `offset` rotates which sample lands in row 0, read from the cached array
    // - never by re-sampling. See §4.2.
-   const int baseIndex = (int)std::floor(offset * (float)mSampleCount);
+   // Only offset's fraction matters after the modulo below; taking it first
+   // keeps a large offset from overflowing the int cast.
+   const float offsetFrac = std::isfinite(offset) ? offset - std::floor(offset) : 0.0f;
+   const int baseIndex = std::min(mSampleCount - 1, (int)std::floor(offsetFrac * (float)mSampleCount));
    const int idx = ((baseIndex + row) % mSampleCount + mSampleCount) % mSampleCount;
    outWorld[0] = mSamplePoints[idx * 3 + 0];
    outWorld[1] = mSamplePoints[idx * 3 + 1];

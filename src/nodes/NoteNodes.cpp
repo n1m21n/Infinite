@@ -20,6 +20,14 @@
 
 namespace
 {
+   // A length in samples from params (hold ms, gate %, step rate, swing) as an
+   // offset from now. A plain (uint64_t) cast is undefined for a negative
+   // length (lengthSteps 0 - 0.15), NaN, or a product of two large params, so
+   // those saturate to 0 or ~2^62 (a note-off that never arrives in practice).
+   inline uint64_t SampleCount(double samples)
+   {
+      return samples > 0.0 ? (uint64_t)std::min(samples, 4.0e18) : 0;
+   }
    // A patch file is outside input and its ints load unchecked. Keep a loaded
    // key inside the tables the bodies and the audio thread index: root wraps to
    // its pitch class, and an unknown scale plays as major, the same fallback
@@ -1492,7 +1500,7 @@ public:
             {
                state.suppressOff = true;
                state.scheduledActive = true;
-               state.scheduledTarget = mSamplePos + (uint64_t)in.frameOffset + (uint64_t)holdSamples;
+               state.scheduledTarget = mSamplePos + (uint64_t)in.frameOffset + SampleCount(holdSamples);
             }
             else
             {
@@ -1628,7 +1636,10 @@ public:
             int offset = in.frameOffset;
             if (timingMs > 0.0f)
             {
-               const int jitterSamples = (int)(mRng.Next() * timingMs * 0.001 * mSampleRate);
+               // The clamp below keeps the note in this block anyway; bounding
+               // first keeps a huge timing value from overflowing the cast.
+               const int jitterSamples = (int)std::clamp(mRng.Next() * timingMs * 0.001 * mSampleRate,
+                                                         -(double)numFrames, (double)numFrames);
                offset = std::clamp(offset + jitterSamples, 0, std::max(0, numFrames - 1));
             }
             const uint64_t onsetAbs = mSamplePos + (uint64_t)offset;
@@ -1767,7 +1778,7 @@ public:
             if (div > 0)
             {
                const double gridSamples = std::max(1.0, MusicTime::QuantizeGridBeats(div) * samplesPerBeat);
-               onsetAbs = (uint64_t)(std::ceil((double)onsetAbs / gridSamples) * gridSamples);
+               onsetAbs = SampleCount(std::ceil((double)onsetAbs / gridSamples) * gridSamples);
             }
             mOutNote.GetOrInsert(in.voiceId) = in.note;
             mShift.GetOrInsert(in.voiceId) = onsetAbs - (mSamplePos + (uint64_t)in.frameOffset);
@@ -1925,8 +1936,8 @@ public:
                for (int k = 0; k < steps - 1; k++)
                {
                   const int stepNote = std::clamp(mLastOutNote + dir * (k + 1), 0, 127);
-                  const uint64_t onSample = stepBase + (uint64_t)((double)k * stepSamples);
-                  const uint64_t offSample = stepBase + (uint64_t)((double)(k + 1) * stepSamples);
+                  const uint64_t onSample = stepBase + SampleCount((double)k * stepSamples);
+                  const uint64_t offSample = stepBase + SampleCount((double)(k + 1) * stepSamples);
                   const int stepVoiceId = NextVoiceId();
                   if (DeferredNote* on = mPending.FreeSlot())
                   {
@@ -1947,7 +1958,7 @@ public:
                      off->voiceId = stepVoiceId;
                   }
                }
-               onsetAbs = stepBase + (uint64_t)((double)(steps - 1) * stepSamples);
+               onsetAbs = stepBase + SampleCount((double)(steps - 1) * stepSamples);
             }
 
             mLastOutNote = in.note;
@@ -2138,7 +2149,7 @@ public:
             slot->isNoteOn = in.isNoteOn;
             slot->voiceId = repeatId;
             slot->idKey = in.isNoteOn ? 0 : key; // a note-off frees its id once emitted
-            slot->targetSample = mSamplePos + (uint64_t)in.frameOffset + (uint64_t)(delaySamples * k);
+            slot->targetSample = mSamplePos + (uint64_t)in.frameOffset + SampleCount(delaySamples * k);
          }
       }
 
@@ -2929,7 +2940,7 @@ public:
                   const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
                   const double stepSamples = rateBeats * samplesPerBeat;
                   const double gateSamples = stepSamples * (double)gatePercent / 100.0;
-                  mPendingOffSample = mSamplePos + (uint64_t)frame + (uint64_t)gateSamples;
+                  mPendingOffSample = mSamplePos + (uint64_t)frame + SampleCount(gateSamples);
                   mPendingOffActive = true;
                }
                else
@@ -3390,7 +3401,7 @@ public:
             const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
             const double stepSamples = rateBeats * samplesPerBeat;
             const double gateSamples = stepSamples * (double)gatePercent / 100.0;
-            mPendingOffSample = mSamplePos + (uint64_t)frame + (uint64_t)gateSamples;
+            mPendingOffSample = mSamplePos + (uint64_t)frame + SampleCount(gateSamples);
             mPendingOffActive = true;
          }
       }
@@ -3660,7 +3671,7 @@ public:
          if (deferSwing)
          {
             mSwingOnActive = true;
-            mSwingOnSample = mSamplePos + (uint64_t)frame + (uint64_t)std::llround(swingSamplesD);
+            mSwingOnSample = mSamplePos + (uint64_t)frame + SampleCount(std::round(swingSamplesD));
             mSwingOnNote = on.note;
             mSwingOnVelocity = on.velocity;
          }
@@ -3675,7 +3686,7 @@ public:
          // the full step - that keeps the off strictly before the next
          // boundary for any groove in [0, 1].
          const double availableSamples = stepSamples - swingSamplesD;
-         mPendingOffSample = mSamplePos + (uint64_t)frame + (uint64_t)std::llround(swingSamplesD) + (uint64_t)(availableSamples * 0.7);
+         mPendingOffSample = mSamplePos + (uint64_t)frame + SampleCount(std::round(swingSamplesD)) + SampleCount(availableSamples * 0.7);
          mPendingOffActive = true;
       }
       if (accurate)
@@ -3924,7 +3935,7 @@ public:
                off->velocity = 0.0f;
                off->isNoteOn = false;
                off->voiceId = noteVoiceId;
-               off->targetSample = onset + (uint64_t)gateSamples;
+               off->targetSample = onset + SampleCount(gateSamples);
             }
          }
       }

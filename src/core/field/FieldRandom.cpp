@@ -38,16 +38,26 @@ namespace Field
       return (double)m / 536870912.0;
    }
 
+   // (int64_t)seed is undefined for NaN/inf and past +-2^63, and a field
+   // expression can pass any of those. fmod leaves every seed under 9e18 as it
+   // was (same stream) and folds the rest into range.
+   static uint64_t SeedWord(double seed)
+   {
+      if (!std::isfinite(seed))
+         return 0;
+      return (uint64_t)(int64_t)std::fmod(seed, 9.0e18);
+   }
+
    double Rand(double minVal, double maxVal, double speed, double seed, double t)
    {
-      uint64_t seedWord = (uint64_t)(int64_t)seed;
+      uint64_t seedWord = SeedWord(seed);
       double n = TimeToRand(t * speed, seedWord);
       return minVal + (maxVal - minVal) * n;
    }
 
    double Sh(double minVal, double maxVal, double speed, double seed, double t)
    {
-      uint64_t seedWord = (uint64_t)(int64_t)seed;
+      uint64_t seedWord = SeedWord(seed);
       double stepTime = std::floor(t * speed);
       double frac = TimeToRand(stepTime, seedWord);
       return minVal + (maxVal - minVal) * frac;

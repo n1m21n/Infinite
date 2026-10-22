@@ -59,7 +59,9 @@ void ParticleSystemNode::Reset()
    mEmitCarry = 0.0f;
    mLastBeats = -1.0;
    // Reseeded from the parameter so a rewind reproduces the same run exactly.
-   mRandState = (unsigned int)(seed * 1000.0f) + 1u;
+   // fmod keeps every non-negative seed under 4.29M on its old stream; a
+   // negative or huge seed used to be an undefined float->unsigned cast.
+   mRandState = (unsigned int)std::fmod(std::fabs((double)seed) * 1000.0, 4294967296.0) + 1u;
    mRevision = NextMeshRevision();
 }
 
