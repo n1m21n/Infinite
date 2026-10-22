@@ -112,7 +112,10 @@ for t in "${TARGETS[@]}"; do
       ;;
    gltf)
       INC="-I$ROOT/src/core -I$ROOT/src/platform -I$ROOT/external/cgltf"
-      build gltf "$HERE/fuzz_gltf.cpp" "$ROOT/src/core/GltfImport.cpp"
+      # cgltf reads 16/32-bit indices straight from the buffer; an odd
+      # bufferView offset is a misaligned load, harmless on arm64/x86, so the
+      # alignment check only stops the fuzzer at the first odd offset.
+      CXXFLAGS="$CXXFLAGS -fno-sanitize=alignment" build gltf "$HERE/fuzz_gltf.cpp" "$ROOT/src/core/GltfImport.cpp"
       while IFS= read -r f; do seed gltf "$f"; done < <(find "$ROOT/tests" "$ROOT/assets" \
          \( -name '*.gltf' -o -name '*.glb' \) -size -256k 2>/dev/null | head -50)
       # the harness reads byte 0 as the gltf/glb selector

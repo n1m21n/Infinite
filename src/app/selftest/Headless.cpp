@@ -1,5 +1,6 @@
 // Headless jobs: ExplainLive, ParamKeyJoiner, HeadlessTick (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "core/CoverageFlush.h"
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -238,13 +239,16 @@ static void StartHeadlessWatchdog(const Headless::Job& job, Headless::Status sta
                                                     " s inside one step; stopped by the watchdog", 0, -1 });
          started.elapsedMs = (long long)(limit * 1000.0);
          started.ok = false;
-         std::_Exit(Headless::Emit(job, started));
+         const int rc = Headless::Emit(job, started);
+         FlushCoverageProfile();
+         std::_Exit(rc);
       }
       // Status already out (or being written): give the writer a moment, then end with its code.
       for (int i = 0; i < 200 && gHeadlessEmitState.load() == kHeadlessEmitting; i++)
          std::this_thread::sleep_for(std::chrono::milliseconds(10));
       const int code = gHeadlessEmitState.load();
       std::fflush(stdout);
+      FlushCoverageProfile();
       std::_Exit(code >= 0 ? code : 6);
    }).detach();
 }

@@ -7,10 +7,12 @@
 // Guidance comes from -fsanitize-coverage=trace-pc-guard: an input that hits an
 // edge no earlier input hit joins the corpus. Mutations are byte-level (flip,
 // interesting values, 2/4-byte integers, chunk insert/erase/copy, splice).
-// A sanitizer abort writes the input to <artifact_prefix>crash-<hash> first.
+// A sanitizer abort writes the input to <artifact_prefix>crash-<hash> first;
+// an input that runs longer than -timeout seconds (default 10) is written to
+// <artifact_prefix>timeout-<hash> and the run exits 70, as libFuzzer does.
 //
 //   fuzz_x [corpus_dir_or_file ...] [-runs=N] [-max_len=N] [-seed=N]
-//          [-max_total_time=S] [-artifact_prefix=DIR/]
+//          [-max_total_time=S] [-timeout=S] [-artifact_prefix=DIR/]
 //
 // With only files and no -runs it replays them once (repro mode), like libFuzzer.
 #include <sanitizer/common_interface_defs.h>
@@ -22,8 +24,11 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <csignal>
+#include <fcntl.h>
 #include <random>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
@@ -73,6 +78,36 @@ static void WriteFile(const std::string& path, const std::vector<uint8_t>& v)
    f.write((const char*)v.data(), (std::streamsize)v.size());
 }
 
+// Async-signal-safe: no allocation, only open/write/_exit.
+static void OnTimeout(int)
+{
+   const std::vector<uint8_t>* in = gCurrent;
+   if (in != nullptr)
+   {
+      char path[1024];
+      const size_t n = gArtifactPrefix.size() < 900 ? gArtifactPrefix.size() : 900;
+      memcpy(path, gArtifactPrefix.data(), n);
+      static const char kPre[] = "timeout-";
+      memcpy(path + n, kPre, 8);
+      uint64_t h = Hash(*in);
+      for (int i = 15; i >= 0; i--, h >>= 4)
+         path[n + 8 + i] = "0123456789abcdef"[h & 15];
+      path[n + 24] = 0;
+      const int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd >= 0)
+      {
+         if (!in->empty())
+            (void)!write(fd, in->data(), in->size());
+         close(fd);
+      }
+      static const char kMsg[] = "==driver== input ran past -timeout; written to ";
+      (void)!write(2, kMsg, sizeof(kMsg) - 1);
+      (void)!write(2, path, strlen(path));
+      (void)!write(2, "\n", 1);
+   }
+   _exit(70);
+}
+
 static void OnDeath()
 {
    if (gCurrent == nullptr)
@@ -84,11 +119,15 @@ static void OnDeath()
    fprintf(stderr, "==driver== input that crashed written to %s (%zu bytes)\n", path.c_str(), gCurrent->size());
 }
 
+static unsigned gTimeout = 10;
+
 static size_t Run(const std::vector<uint8_t>& in)
 {
    gNewEdges = 0;
    gCurrent = &in;
+   alarm(gTimeout);
    LLVMFuzzerTestOneInput(in.empty() ? nullptr : in.data(), in.size());
+   alarm(0);
    gCurrent = nullptr;
    return gNewEdges;
 }
@@ -183,10 +222,12 @@ int main(int argc, char** argv)
       else if (a.rfind("-seed=", 0) == 0) seed = (uint64_t)atoll(a.c_str() + 6);
       else if (a.rfind("-max_total_time=", 0) == 0) maxTime = atof(a.c_str() + 16);
       else if (a.rfind("-artifact_prefix=", 0) == 0) gArtifactPrefix = a.substr(17);
+      else if (a.rfind("-timeout=", 0) == 0) gTimeout = (unsigned)atoi(a.c_str() + 9);
       else if (a[0] == '-') fprintf(stderr, "==driver== ignoring %s\n", a.c_str());
       else inputs.push_back(a);
    }
    __sanitizer_set_death_callback(OnDeath);
+   signal(SIGALRM, OnTimeout);
 
    std::vector<std::vector<uint8_t>> corpus;
    std::string corpusDir;

@@ -89,6 +89,7 @@ option(INFINITE_COVERAGE "Instrument for llvm-cov source coverage (clang)" OFF)
 if(INFINITE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
     add_link_options(-fprofile-instr-generate)
+    add_compile_definitions(INFINITE_COVERAGE_BUILD=1) # src/core/CoverageFlush.h
     message(STATUS "Coverage instrumentation enabled")
 endif()
 

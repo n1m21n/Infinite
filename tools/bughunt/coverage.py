@@ -20,6 +20,7 @@ Test: `coverage.py selftest`.
 import collections
 import glob
 import json
+import platform
 import os
 import subprocess
 import sys
@@ -86,8 +87,10 @@ def cmd_report(a):
         sys.exit(f"no .profraw files in {prof}")
     data = os.path.join(prof, "merged.profdata")
     subprocess.check_call([tool("llvm-profdata"), "merge", "-sparse", "-o", data] + raws)
+    # a macOS app build is universal; llvm-cov needs the slice that actually ran
+    arch = ["-arch", platform.machine()] if sys.platform == "darwin" else []
     j = json.loads(subprocess.check_output([tool("llvm-cov"), "export", "-summary-only",
-                                            "-instr-profile=" + data, binp], text=True))
+                                            "-instr-profile=" + data, binp] + arch, text=True))
     md = f"# Coverage: {len(raws)} processes\n\n" + summarize(j, under, top)
     print(md)
     if out:

@@ -1,5 +1,5 @@
 // HAP frames and movie containers: Hap::DecodeFrame on the bytes, and the
-// movie-atom scan (Hap::Reader::Probe) on the same bytes as a file.
+// movie parse and frame reads (Hap::Reader) on the same bytes as a file.
 // B-K-003 (chunk table past the frame) and B-K-004 (64-bit atom size wrap).
 #include "HapReader.h"
 
@@ -36,7 +36,16 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
    {
       fwrite(data, 1, size, f);
       fclose(f);
-      Hap::Reader::Probe(gPath);
+      // The full path a dropped .mov takes: parse the sample table, then read
+      // and decode the first and last frames out of the file.
+      Hap::Reader r;
+      if (r.Open(gPath, err) && r.FrameCount() > 0)
+      {
+         std::vector<uint8_t> tex;
+         r.ReadFrame(0, tex, err);
+         r.ReadFrame(r.FrameCount() - 1, tex, err);
+         r.FrameIndexAt(r.Duration() * 0.5);
+      }
    }
    return 0;
 }

@@ -2,6 +2,7 @@
 #include "app/frame/FrameCtx.h"
 #include "app/frame/FrameTests.h"
 #include "core/SelfUpdate.h"
+#include "core/CoverageFlush.h"
 
 namespace app
 {
@@ -126,5 +127,6 @@ int main(int argc, char** argv)
    // driver.sh run). One flush here covers every self-test's exit path
    // instead of requiring each one to remember its own.
    fflush(stdout);
+   FlushCoverageProfile();
    std::_Exit(gHeadlessExitCode);
 }
