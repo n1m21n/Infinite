@@ -43,6 +43,7 @@
 #include <cctype>
 #include <cmath>
 #include <condition_variable>
+#include <cstdio>
 #include <cstring>
 #include <deque>
 #include <mutex>
@@ -1026,9 +1027,41 @@ namespace Platform
          }
       }
 
+      double NativeFrameRate(IMFMediaType* type)
+      {
+         UINT64 rate64 = 0;
+         if (FAILED(type->GetUINT64(MF_MT_FRAME_RATE, &rate64)))
+            return 0.0;
+         UINT32 num = 0, den = 0;
+         UnpackFrameSize(rate64, num, den); // same hi/lo packing as the frame size
+         return den != 0 ? (double)num / (double)den : 0.0;
+      }
+
+      // FourCC of a video subtype for the log (MFVideoFormat_* GUIDs carry it
+      // in Data1); the RGB formats carry a small D3DFORMAT number instead.
+      std::string SubtypeName(const GUID& subtype)
+      {
+         const unsigned long fcc = subtype.Data1;
+         if (fcc <= 0xFF)
+            return "RGB" + std::to_string(fcc);
+         std::string name;
+         for (int i = 0; i < 4; i++)
+         {
+            const char c = (char)((fcc >> (8 * i)) & 0xFF);
+            name += std::isprint((unsigned char)c) ? c : '?';
+         }
+         return name;
+      }
+
       // Scores one native media type against what was asked for. Lower wins.
-      // Auto prefers the largest frame; explicit picks prefer the closest
-      // height, breaking ties toward uncompressed formats (cheaper conversion).
+      // A frame rate under ~30 costs the most (that is what dropped frames
+      // look like on stage), then the size: Auto prefers the largest frame,
+      // explicit picks the closest height. Ties at the same size and rate go
+      // to formats that need no decode (NV12, RGB), then MJPG, then the rest.
+      // YUY2 at 720p and up goes last: it is the mode USB 2.0 capture sticks
+      // advertise but cannot carry at full rate. The frame rate used to be
+      // ignored and any uncompressed mode beat MJPG, so those sticks picked
+      // their unusable 1080p YUY2 mode.
       long ScoreNativeType(IMFMediaType* type, int targetHeight)
       {
          UINT64 size64 = 0;
@@ -1041,17 +1074,27 @@ namespace Platform
 
          GUID subtype {};
          type->GetGUID(MF_MT_SUBTYPE, &subtype);
-         const bool uncompressed =
-            subtype == MFVideoFormat_RGB32 || subtype == MFVideoFormat_RGB24 ||
-            subtype == MFVideoFormat_ARGB32 || subtype == MFVideoFormat_NV12 ||
-            subtype == MFVideoFormat_YUY2;
 
-         long score;
+         long score = 0;
+         const double fps = NativeFrameRate(type);
+         if (fps > 0.0 && fps < 29.0)
+            score += (long)((30.0 - fps) * 10000.0);
          if (targetHeight <= 0)
-            score = (long)(2160 - h); // Auto: bigger is better
+            score += (long)(2160 - h) * 10; // Auto: bigger is better
          else
-            score = (long)std::abs((int)h - targetHeight);
-         return uncompressed ? score : score + 1000;
+            score += (long)std::abs((int)h - targetHeight) * 10;
+
+         int rank;
+         if (subtype == MFVideoFormat_NV12 || subtype == MFVideoFormat_RGB32 ||
+             subtype == MFVideoFormat_ARGB32 || subtype == MFVideoFormat_RGB24)
+            rank = 0;
+         else if (subtype == MFVideoFormat_MJPG)
+            rank = 1;
+         else if (subtype == MFVideoFormat_YUY2 && h < 720)
+            rank = 2;
+         else
+            rank = 3;
+         return score * 4 + rank;
       }
 
       // Picks the best native type and asks the reader for it converted to
@@ -1077,6 +1120,19 @@ namespace Platform
             const long score = MajorTypeIs(native, MFMediaType_Video)
                                   ? ScoreNativeType(native, targetHeight)
                                   : LONG_MAX;
+            if (score != LONG_MAX)
+            {
+               // The device's real mode list, so a "wrong mode" report can be
+               // read from the log instead of guessed at.
+               UINT64 size64 = 0;
+               native->GetUINT64(MF_MT_FRAME_SIZE, &size64);
+               UINT32 w = 0, h = 0;
+               UnpackFrameSize(size64, w, h);
+               GUID subtype {};
+               native->GetGUID(MF_MT_SUBTYPE, &subtype);
+               std::fprintf(stderr, "[camera] mode %lu: %ux%u %.2f fps %s\n", (unsigned long)i,
+                            w, h, NativeFrameRate(native), SubtypeName(subtype).c_str());
+            }
             if (score < bestScore)
             {
                bestScore = score;
@@ -1090,6 +1146,7 @@ namespace Platform
             outError = "camera offers no usable video format";
             return false;
          }
+         std::fprintf(stderr, "[camera] using mode %lu\n", (unsigned long)bestIndex);
 
          IMFMediaType* native = nullptr;
          HRESULT hr = reader->GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM,
@@ -1160,6 +1217,11 @@ namespace Platform
          std::string error;
          std::atomic<bool> threadDone{ false };
 
+         // Who frees the handle (ReleaseCameraHandle). 0: capture thread still
+         // running. 1: the thread has made its last access, the closer frees
+         // it. 2: the closer gave up waiting and detached; the thread frees it.
+         std::atomic<int> handoff{ 0 };
+
          ~CameraHandleMf()
          {
             stop.store(true, std::memory_order_release);
@@ -1178,6 +1240,9 @@ namespace Platform
             ~DoneFlag()
             {
                cam->threadDone.store(true, std::memory_order_release);
+               // Last access to cam unless this thread owns it now.
+               if (cam->handoff.exchange(1, std::memory_order_acq_rel) == 2)
+                  delete cam;
             }
          } done{ cam };
 
@@ -1338,6 +1403,39 @@ namespace Platform
       }
    }
 
+   namespace
+   {
+      // Stops the capture thread and frees the handle without ever blocking
+      // on a device. A live camera returns from ReadSample within a frame; a
+      // capture card that stopped sending can block it indefinitely, and the
+      // handle's destructor used to join that thread - closing Video In, or
+      // quitting with it open, froze the app. After 1.5 s the thread is
+      // detached and frees the handle itself if the read ever returns.
+      // Calling IMFMediaSource::Shutdown from here to unblock it is not an
+      // option: with a ReadSample pending on the capture thread it can
+      // deadlock too (Ricardo Palmieri's fork, 25867bab).
+      void ReleaseCameraHandle(CameraHandleMf* cam)
+      {
+         cam->stop.store(true, std::memory_order_release);
+         for (int waitedMs = 0; waitedMs < 1500; waitedMs += 5)
+         {
+            if (cam->handoff.load(std::memory_order_acquire) == 1)
+            {
+               delete cam; // joins a thread that has already finished
+               return;
+            }
+            Sleep(5);
+         }
+         cam->thread.detach();
+         if (cam->handoff.exchange(2, std::memory_order_acq_rel) == 1)
+         {
+            delete cam; // finished between the last check and the detach
+            return;
+         }
+         std::fprintf(stderr, "[camera] closed with the capture thread still blocked (detached)\n");
+      }
+   }
+
    // Media Foundation capture has no per-app consent prompt to trigger; a
    // camera blocked in Windows privacy settings fails in CameraOpen instead.
    CameraAuthorization CameraAuthorizationStatus()
@@ -1430,14 +1528,20 @@ namespace Platform
 
       if (cam->running.load(std::memory_order_acquire))
          return reinterpret_cast<CameraHandle*>(cam);
-      outError = cam->error.empty() ? std::string("camera failed to start") : cam->error;
-      delete cam; // dtor signals stop and joins
+      // cam->error is only safe to read once the thread has published
+      // threadDone; a device still stuck opening is just "did not start".
+      if (cam->threadDone.load(std::memory_order_acquire) && !cam->error.empty())
+         outError = cam->error;
+      else
+         outError = "camera failed to start";
+      ReleaseCameraHandle(cam);
       return nullptr;
    }
 
    void CameraClose(CameraHandle* handle)
    {
-      delete reinterpret_cast<CameraHandleMf*>(handle);
+      if (handle != nullptr)
+         ReleaseCameraHandle(reinterpret_cast<CameraHandleMf*>(handle));
    }
 
    bool CameraIsRunning(CameraHandle* handle)

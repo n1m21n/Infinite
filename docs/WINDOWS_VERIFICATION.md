@@ -56,6 +56,7 @@ Severity, briefly:
 | 1.11 | Exe imported the VC++ redist CRT | wouldn't launch on a clean Windows install (fixed) |
 | 1.12 | Hand-rolled parsers used byte paths for UTF-8 files | 3D/audio load fails on non-ASCII Windows paths (fixed) |
 | 1.13 | ~80 narrow opens, `getenv` and `argv` in the ANSI code page | settings, patches, recents and per-user VST3 folder fail for a non-ASCII user or folder name (fixed: UTF-8 manifest + `AppPaths::FsPath`/`OpenFile`/`GetEnvUtf8`, `INFINITE_UNICODEPATHTEST`; needs a hands-on pass) |
+| 1.14 | Video In close joined a capture thread stuck in `ReadSample`; mode pick ignored frame rate | closing Video In or quitting with a stalled capture card froze the app; USB 2.0 sticks picked unusable YUY2 1080p (fixed: 1.5 s close then detach, rate-aware scoring, mode list in the log; needs a webcam + capture card pass) |
 
 ### 1.1 `PortableFft::Inverse` is broken (blocker)
 
