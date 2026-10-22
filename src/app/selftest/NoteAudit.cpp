@@ -38,6 +38,8 @@
 #include "audio/NoteEventQueue.h"
 #include "core/Transport.h"
 #include "nodes/NoteNodes.h"
+#include "audio/NoteTheory.h"
+#include "core/Patch.h"
 
 #include <chrono>
 #include <cstdio>
@@ -991,6 +993,210 @@ bool RunRestartTest()
 
    tr.SetLaunchQuantize(MusicTime::kLaunchNone);
    printf("RESTARTTEST %s\n", ok ? "ALL OK" : "FAILED");
+   return ok;
+}
+
+// INFINITE_CHORDPROGTEST: Chorder progression mode against its spec (plan E6):
+// each cell's chord on its step, held cells, seek into a hold, chord types,
+// random mode untouched, note pairing through edits, save/load and presets.
+bool RunChordProgTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      printf("CHORDPROGTEST %s %s\n", what, cond ? "OK" : "FAIL");
+      ok = ok && cond;
+   };
+   const double bpm = 120.0;
+   const double samplesPerBeat = kRate * 60.0 / bpm;
+   Transport& tr = Transport::Instance();
+   const int savedKey = tr.Key(), savedScale = tr.Scale();
+   tr.SetKey(0);
+   tr.SetScale(MusicTime::kMajor);
+
+   auto makeChorder = []() {
+      auto* c = static_cast<ChorderNode*>(ChorderNode::Create());
+      c->rateBeats = 1.0f;
+      c->strumMs = 0.0f;
+      c->humanizeTimingMs = 0.0f;
+      c->humanizeVelocity = 0.0f;
+      c->upperHarmonics = 0.0f;
+      c->useGlobalScale = true;
+      c->chordSize = 3;
+      c->mode = ChorderNode::kProgression;
+      c->progSteps = 4;
+      const int deg[4] = { 1, 4, -1, 0 };
+      const int type[4] = { NoteTheory::kChordSeventh, NoteTheory::kChordAuto, NoteTheory::kChordAuto, NoteTheory::kChordSus4 };
+      for (int i = 0; i < 4; i++)
+      {
+         c->progDegree[i] = deg[i];
+         c->progType[i] = type[i];
+      }
+      return c;
+   };
+   auto runTo = [&](Rig& rig, double beat) {
+      while ((double)rig.pos < beat * samplesPerBeat)
+         rig.Step();
+   };
+   // Pitch-class bitmask of the note-ons within 0.02 beats of `beat` (0 = none).
+   auto chordAt = [&](const Rig& rig, double beat, long long base = 0) {
+      int mask = 0;
+      for (const Evt& e : rig.got)
+         if (e.e.isNoteOn && std::fabs((double)(e.sample - base) / samplesPerBeat - beat) < 0.02)
+            mask |= 1 << (e.e.note % 12);
+      return mask;
+   };
+   auto pcs = [](std::initializer_list<int> l) {
+      int m = 0;
+      for (int p : l)
+         m |= 1 << p;
+      return m;
+   };
+   // Stop, then long enough stopped for a held chord's offs (up to 4 beats here) to flush.
+   auto stopAndFlush = [&](Rig& rig) {
+      StopTransport();
+      for (int b = 0; b < 240; b++)
+         rig.Step();
+   };
+
+   // 1-3: ii7, V held through the next cell, Isus4, then around again.
+   {
+      ChorderNode* c = makeChorder();
+      Rig rig;
+      check(rig.Init(c), "rig");
+      StartTransport(bpm);
+      runTo(rig, 4.5);
+      check(chordAt(rig, 0.0) == pcs({ 2, 5, 9, 0 }), "cell 1: ii7 (D F A C)");
+      check(chordAt(rig, 1.0) == pcs({ 7, 11, 2 }), "cell 2: V (G B D)");
+      check(chordAt(rig, 2.0) == 0, "cell 3: a hold plays nothing new");
+      check(chordAt(rig, 3.0) == pcs({ 0, 5, 7 }), "cell 4: Isus4 (C F G)");
+      check(chordAt(rig, 4.0) == pcs({ 2, 5, 9, 0 }), "wraps to cell 1");
+      // The V's offs land after the held cell has begun (held through it), before cell 4.
+      bool heldOk = false;
+      for (const Evt& e : rig.got)
+         if (!e.e.isNoteOn && e.e.note % 12 == 11)
+         {
+            const double b = (double)e.sample / samplesPerBeat;
+            heldOk = b > 2.5 && b < 3.0;
+         }
+      check(heldOk, "V is held through the hold cell");
+      check(c->CurrentProgCell() == 0, "playing cell readout");
+
+      // Seek into the hold cell: the chord it holds plays for what is left.
+      tr.SeekBeats(6.0);
+      const long long seekPos = rig.pos;
+      for (int b = 0; b < 30; b++)
+         rig.Step();
+      int maskAfterSeek = 0;
+      for (const Evt& e : rig.got)
+         if (e.e.isNoteOn && e.sample >= seekPos && e.sample < seekPos + 2 * rig.block)
+            maskAfterSeek |= 1 << (e.e.note % 12);
+      if (maskAfterSeek != pcs({ 7, 11, 2 }))
+         for (const Evt& e : rig.got)
+            if (e.e.isNoteOn && e.sample >= seekPos)
+               printf("CHORDPROGTEST after seek: note %d at +%lld (beat %.3f)\n", e.e.note, e.sample - seekPos, tr.Beats());
+      check(maskAfterSeek == pcs({ 7, 11, 2 }), "seek into a hold plays the held chord");
+
+      // Edits mid-chord (cells, steps, mode, key) never strand a note.
+      c->progDegree[0] = 5;
+      c->progSteps = 3;
+      for (int b = 0; b < 40; b++)
+         rig.Step();
+      c->mode = ChorderNode::kRandom;
+      tr.SetKey(2);
+      for (int b = 0; b < 40; b++)
+         rig.Step();
+      tr.SetKey(0);
+      stopAndFlush(rig);
+      const PairReport p = Pairs(rig.got);
+      if (p.Bad())
+         printf("CHORDPROGTEST pairs: on %d off %d stuck %d orphan-off %d dup-on %d off-before-on %d\n", p.ons, p.offs,
+                p.stuck, p.orphanOff, p.dupOn, p.offBeforeOn);
+      check(!p.Bad(), "every note-on has its off through edits");
+   }
+
+   // Own key when Global Scale is off: ii in D major is E minor.
+   {
+      ChorderNode* c = makeChorder();
+      c->useGlobalScale = false;
+      c->root = 2;
+      c->scale = MusicTime::kMajor;
+      c->progType[0] = NoteTheory::kChordAuto;
+      Rig rig;
+      rig.Init(c);
+      StartTransport(bpm);
+      runTo(rig, 0.5);
+      check(chordAt(rig, 0.0) == pcs({ 4, 7, 11 }), "node key: ii in D is E G B");
+      stopAndFlush(rig);
+   }
+
+   // Random mode is unchanged: one 3-note diatonic chord per step.
+   {
+      ChorderNode* c = makeChorder();
+      c->mode = ChorderNode::kRandom;
+      Rig rig;
+      rig.Init(c);
+      StartTransport(bpm);
+      runTo(rig, 4.5);
+      bool randOk = c->CurrentProgCell() == -1;
+      const int cMajor = pcs({ 0, 2, 4, 5, 7, 9, 11 });
+      for (int b = 0; b < 4; b++)
+      {
+         const int m = chordAt(rig, (double)b);
+         int count = 0;
+         for (int k = 0; k < 12; k++)
+            count += (m >> k) & 1;
+         randOk = randOk && count == 3 && (m & ~cMajor) == 0;
+      }
+      check(randOk, "random mode: a 3-note C-major chord every step");
+      stopAndFlush(rig);
+   }
+
+   // 5: save/load, old patches, presets, numerals.
+   {
+      std::unique_ptr<ChorderNode> src(makeChorder());
+      src->progSteps = 6;
+      src->progDegree[5] = 3;
+      src->progType[5] = NoteTheory::kChordSus2;
+      std::vector<std::pair<std::string, std::string>> params;
+      Patch::SaveParams(src.get(), params);
+      std::unique_ptr<ChorderNode> dst(static_cast<ChorderNode*>(ChorderNode::Create()));
+      Patch::LoadParams(dst.get(), params);
+      bool rt = dst->mode == ChorderNode::kProgression && dst->progSteps == 6 && dst->progDegree[2] == -1 &&
+                dst->progDegree[5] == 3 && dst->progType[5] == NoteTheory::kChordSus2 && dst->progType[0] == NoteTheory::kChordSeventh;
+      check(rt, "cells, types, steps and mode round trip");
+
+      std::vector<std::pair<std::string, std::string>> old;
+      for (const auto& kv : params)
+         if (kv.first.find("mode") == std::string::npos && kv.first.find("prog") == std::string::npos)
+            old.push_back(kv);
+      std::unique_ptr<ChorderNode> legacy(static_cast<ChorderNode*>(ChorderNode::Create()));
+      Patch::LoadParams(legacy.get(), old);
+      check(legacy->mode == ChorderNode::kRandom, "a patch from before loads as random");
+
+      int count = 0;
+      const NoteTheory::Progression* list = NoteTheory::Progressions(count);
+      std::unique_ptr<ChorderNode> pre(static_cast<ChorderNode*>(ChorderNode::Create()));
+      pre->ApplyProgression(0);
+      bool presetOk = count > 0 && pre->mode == ChorderNode::kProgression && pre->progSteps == list[0].steps &&
+                      pre->progDegree[0] == list[0].degrees[0] && pre->MatchingProgression() == 0 &&
+                      std::fabs(pre->rateBeats - (float)MusicTime::BeatsFor(MusicTime::k1Bar)) < 1e-4f;
+      pre->progDegree[0] = 6;
+      presetOk = presetOk && pre->MatchingProgression() == -1;
+      for (int i = 0; i < count; i++)
+         presetOk = presetOk && list[i].steps >= 1 && list[i].steps <= ChorderNode::kProgCells && list[i].degrees[0] >= 0;
+      check(presetOk, "presets apply, match, and start on a chord");
+
+      char a[16], b[16], d[16];
+      NoteTheory::RomanNumeral(6, MusicTime::kMajor, a, sizeof(a));
+      NoteTheory::RomanNumeral(0, MusicTime::kNaturalMinor, b, sizeof(b));
+      NoteTheory::RomanNumeral(4, MusicTime::kMajor, d, sizeof(d));
+      check(std::string(a) == "vii\xC2\xB0" && std::string(b) == "i" && std::string(d) == "V", "roman numerals");
+   }
+
+   tr.SetKey(savedKey);
+   tr.SetScale(savedScale);
+   printf("CHORDPROGTEST %s\n", ok ? "ALL OK" : "FAILED");
    return ok;
 }
 

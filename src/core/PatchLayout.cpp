@@ -30,7 +30,7 @@ namespace PatchLayout
          { "Mixer", 740, 580 }, { "Reverb", 460, 480 }, { "Delay", 460, 480 }, { "Chorus", 460, 480 },
          { "Limiter", 460, 420 }, { "Drum Sequencer", 900, 900 }, { "MPC", 900, 900 }, { "Sampler", 700, 700 },
          { "Dynamics", 500, 520 }, { "EQ", 620, 560 }, { "Random Note Generator", 320, 300 },
-         { "Arpeggiator", 340, 320 }, { "Note Sequencer", 900, 600 }, { "Chorder", 340, 320 },
+         { "Arpeggiator", 340, 320 }, { "Note Sequencer", 900, 600 }, { "Chorder", 340, 420 },
          { "Audio Analyze", 250, 560 }, { "LFO", 250, 340 }, { "Envelope", 260, 340 }, { "Random", 250, 300 },
          { "Pattern", 420, 420 }, { "FieldPixel", 340, 380 }, { "Output", 340, 340 }, { "Audio Out", 300, 220 },
          { "Render 3D", 360, 420 }, { "Material", 320, 520 }, { "Camera", 300, 320 }, { "Light", 300, 320 },

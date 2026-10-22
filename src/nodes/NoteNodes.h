@@ -928,7 +928,33 @@ public:
    int stepTiming = 1;
    void BeforeLoadParams() override { stepTiming = 0; }
 
+   // Progression mode: instead of a random functional-harmony walk, each rate
+   // step plays the chord its cell names. The cell is the transport's step
+   // index mod progSteps, so it stays on the bar after a seek or loop wrap.
+   // progDegree is a 0-based scale degree, or -1 = hold the chord before it
+   // (it keeps sounding); progType is NoteTheory::ChordType (0 = chord knob).
+   enum Mode { kRandom = 0, kProgression = 1 };
+   static constexpr int kProgCells = 8;
+   int mode = kRandom;
+   int progSteps = 4;
+   int progDegree[kProgCells] = { 0, 4, 5, 3, 0, 4, 5, 3 };
+   int progType[kProgCells] = {};
+   // Copies NoteTheory::Progressions()[index] into the cells, sets rate to
+   // one bar and switches to progression mode.
+   void ApplyProgression(int index);
+   int MatchingProgression() const; // index of the preset the cells equal, or -1
+
+   // In progression mode "mode" is the only thing that makes the cells
+   // audible; see INode's SweepPrerequisitesFor comment.
+   std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
+   {
+      if (paramName == "progSteps" || paramName.rfind("progDeg", 0) == 0 || paramName.rfind("progType", 0) == 0)
+         return { { "mode", (float)kProgression } };
+      return {};
+   }
+
    int LastChordSize() const; // main-thread readout for the visualizer
+   int CurrentProgCell() const; // cell playing now in progression mode, -1 otherwise
 
 private:
    std::unique_ptr<AudioChorderNode> mAudioNode;
