@@ -2450,6 +2450,11 @@ int RunNetworkTest()
 // non-integral point on an integer param's scale.
 float ShapeToParam(const ParamRef& ref, float v)
 {
+   // std::clamp passes NaN straight through, and finite inputs can still make
+   // one (a wide lo/hi range overflows hi - lo to inf, times a shaped 0). Hold
+   // the param where it is rather than hand the node a NaN.
+   if (std::isnan(v))
+      v = (ref.value != nullptr && std::isfinite(*ref.value)) ? *ref.value : ref.minValue;
    if (ref.step > 0.0f)
       v = std::round(v / ref.step) * ref.step;
    return std::clamp(v, ref.minValue, ref.maxValue);
