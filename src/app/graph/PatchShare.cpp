@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -14,6 +15,12 @@
 #include "core/Notices.h"
 #include "core/ShareBundle.h"
 #include "core/SplashScreen.h"
+
+#ifdef _WIN32
+#define environ _environ
+#else
+extern char** environ;
+#endif
 
 namespace app
 {
@@ -44,24 +51,7 @@ namespace app
       }
 
       // Runs the app's own headless mode on the cleaned copy; returns true on exit code 0.
-      bool RunSelf(const std::vector<std::string>& args)
-      {
-         // The copy must not inherit a self-test switch, or it would run the test instead of the job.
-#ifdef _WIN32
-         std::string cmd = Quote(Platform::ExecutablePath());
-#else
-         std::string cmd = "env -u INFINITE_COMPAUDIT -u INFINITE_COMPAUDIT_ONLY -u INFINITE_GEOAUDIT -u INFINITE_GEOAUDIT_ONLY " + Quote(Platform::ExecutablePath());
-#endif
-         for (const std::string& a : args)
-            cmd += " " + Quote(a);
-#ifdef _WIN32
-         cmd += " >NUL 2>&1";
-         cmd = "\"" + cmd + "\"";
-#else
-         cmd += " >/dev/null 2>&1";
-#endif
-         return std::system(cmd.c_str()) == 0;
-      }
+      bool RunSelf(const std::vector<std::string>& args) { return std::system(SelfCommand(args).c_str()) == 0; }
 
       bool ReadFile(const std::string& path, std::string& out)
       {
@@ -136,6 +126,58 @@ namespace app
          gShareJob.finished = true;
          gShareJob.running = false;
       }
+   }
+
+   bool SelfChildKeepsEnv(const std::string& name)
+   {
+      if (name.compare(0, 9, "INFINITE_") != 0)
+         return true;
+      // Configuration a headless child needs to load the same patch the same way. Everything
+      // else under INFINITE_ is a test, bench or harness switch (400+ of them), or a port the
+      // parent already holds.
+      static const char* kKeep[] = { "INFINITE_EXTENSIONS_DIR", "INFINITE_VST3_BROKEN_PLUGIN_DIR",
+                                     "INFINITE_NO_UPDATE_CHECK", "INFINITE_NO_SINGLE_INSTANCE",
+                                     "INFINITE_LANG", "INFINITE_AUDIO_BACKEND", "INFINITE_AUDIO_THREADS",
+                                     "INFINITE_WAYLAND" };
+      for (const char* k : kKeep)
+         if (name == k)
+            return true;
+      return false;
+   }
+
+   std::string SelfCommand(const std::vector<std::string>& args)
+   {
+      // Unset in the child's shell, not in this process: other threads read the environment.
+      std::vector<std::string> drop;
+      for (char** e = environ; e != nullptr && *e != nullptr; e++)
+      {
+         const char* eq = strchr(*e, '=');
+         const std::string name = eq ? std::string(*e, (size_t)(eq - *e)) : std::string(*e);
+         if (!name.empty() && !SelfChildKeepsEnv(name))
+            drop.push_back(name);
+      }
+#ifdef _WIN32
+      std::string cmd;
+      for (const std::string& n : drop)
+         cmd += "set \"" + n + "=\"& ";
+      cmd += Quote(Platform::ExecutablePath());
+#else
+      std::string cmd = drop.empty() ? std::string() : std::string("env");
+      for (const std::string& n : drop)
+         cmd += " -u " + n;
+      if (!cmd.empty())
+         cmd += " ";
+      cmd += Quote(Platform::ExecutablePath());
+#endif
+      for (const std::string& a : args)
+         cmd += " " + Quote(a);
+#ifdef _WIN32
+      cmd += " >NUL 2>&1";
+      cmd = "\"" + cmd + "\"";
+#else
+      cmd += " >/dev/null 2>&1";
+#endif
+      return cmd;
    }
 
    bool BuildShareBundleBlocking(const std::string& patchFile, const std::string& outPath, const std::string& name,

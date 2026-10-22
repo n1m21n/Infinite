@@ -1625,12 +1625,21 @@ namespace
       auto size = [&](const char* n) { std::error_code ec; return extracted ? (long long)std::filesystem::file_size(dir + "/open/" + n, ec) : -1LL; };
       printf("COMPAUDIT BUNDLE parts: patch %lld bytes, thumbnail %lld, preview %lld, meta %lld\n", size("patch.inf"),
              size("thumbnail.png"), size("preview.mp4"), size("share.json"));
+      // The child keeps configuration and drops every self-test switch (B-A-002: Windows kept them all,
+      // macOS/Linux dropped four by name). This audit runs with INFINITE_COMPAUDIT set, so the build
+      // above is the end-to-end proof; these pin the rule itself.
+      const bool envRule = !SelfChildKeepsEnv("INFINITE_COMPAUDIT") && !SelfChildKeepsEnv("INFINITE_FIELDTEST") &&
+                           !SelfChildKeepsEnv("INFINITE_EXITAFTER") && !SelfChildKeepsEnv("INFINITE_OSC_PORT") &&
+                           SelfChildKeepsEnv("INFINITE_EXTENSIONS_DIR") && SelfChildKeepsEnv("PATH") &&
+                           SelfChildKeepsEnv("HOME");
+      printf("COMPAUDIT BUNDLE child env rule: %d\n", envRule ? 1 : 0);
+      if (!envRule)
+         f.Flag("BUNDLE", "self-relaunch keeps a test switch or drops configuration", 1.0);
       if (!built || size("patch.inf") <= 0 || size("thumbnail.png") <= 0 || size("share.json") <= 0)
          f.Flag("BUNDLE", "bundle is missing a part", 1.0);
       if (extracted)
       {
-         const std::string cmd = "env -u INFINITE_COMPAUDIT -u INFINITE_COMPAUDIT_ONLY \"" + Platform::ExecutablePath() + "\" --validate \"" + dir + "/open/patch.inf\" >/dev/null 2>&1";
-         const int rc = std::system(cmd.c_str());
+         const int rc = std::system(SelfCommand({ "--validate", dir + "/open/patch.inf" }).c_str());
          printf("COMPAUDIT BUNDLE unpacked patch validates: %d (exit %d)\n", rc == 0 ? 1 : 0, rc);
          if (rc != 0)
             f.Flag("BUNDLE", "unpacked patch does not validate", (double)rc);

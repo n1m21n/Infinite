@@ -1404,6 +1404,12 @@ bool SharePatchBusy();
 // Synchronous form for tests: the same bundle, built on this thread.
 bool BuildShareBundleBlocking(const std::string& patchFile, const std::string& outPath, const std::string& name,
                               const std::string& workDir, std::string& message);
+// The app relaunching itself for one headless job (share thumbnails, audits): a shell command
+// for std::system with output discarded. The child keeps only the INFINITE_* variables that are
+// real configuration (SelfChildKeepsEnv); every self-test or harness switch is dropped, on every
+// platform, so the child runs the job instead of the parent's test.
+bool SelfChildKeepsEnv(const std::string& name);
+std::string SelfCommand(const std::vector<std::string>& args);
 
 
 
