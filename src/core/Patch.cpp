@@ -993,6 +993,7 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          if (!std::isfinite(s.opacity)) s.opacity = 1.0f;
          s.opacity = std::clamp(s.opacity, 0.0f, 1.0f);
          if (!std::isfinite(s.gainDb)) s.gainDb = 0.0f;
+         s.gainDb = std::clamp(s.gainDb, -60.0f, 12.0f); // the lane fader's range; 10^(dB/20) is inf past ~770 dB
          if (!std::isfinite(s.pan)) s.pan = 0.0f;
          s.pan = std::clamp(s.pan, -1.0f, 1.0f);
          outData.streams.push_back(std::move(s));
@@ -1223,6 +1224,7 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
             if (c.fadeInTick > c.lengthTick) c.fadeInTick = c.lengthTick;
             if (c.fadeOutTick > c.lengthTick) c.fadeOutTick = c.lengthTick;
             if (!std::isfinite(c.gainDb)) c.gainDb = 0.0f;
+            c.gainDb = std::clamp(c.gainDb, -60.0f, 12.0f); // the clip gain slider's range
             if (in >> c.colorR >> c.colorG >> c.colorB) {}
             if (!std::isfinite(c.colorR)) c.colorR = 0.0f;
             if (!std::isfinite(c.colorG)) c.colorG = 0.0f;
@@ -1260,6 +1262,7 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
             lc.fadeInSec = std::clamp(lc.fadeInSec, 0.0f, len);
             lc.fadeOutSec = std::clamp(lc.fadeOutSec, 0.0f, len);
             if (!std::isfinite(lc.gainDb)) lc.gainDb = 0.0f;
+            lc.gainDb = std::clamp(lc.gainDb, -60.0f, 12.0f);
             if (in >> lc.colorR >> lc.colorG >> lc.colorB) {}
             if (!std::isfinite(lc.colorR)) lc.colorR = 0.0f;
             if (!std::isfinite(lc.colorG)) lc.colorG = 0.0f;
