@@ -54,9 +54,15 @@ void DrawKeyboard(FrameCtx& fc)
       // Space toggles play/pause on the transport, mirroring the Play/Pause
       // button, so the timeline can be started or paused without reaching
       // for the mouse.
+      // While the Set list has the keyboard, Space is its GO instead.
       if (!typing && !cmdOrCtrl && !io.KeyShift &&
           ImGui::IsKeyPressed(ImGuiKey_Space, false))
-         LaunchRequestTogglePlay();
+      {
+         if (gSetListFocused)
+            SetBlockGoNext();
+         else
+            LaunchRequestTogglePlay();
+      }
 
       // ---- Shift+<letter> canvas shortcuts ----
       // One family, all reachable with the left hand while the right stays on
@@ -514,8 +520,10 @@ void DrawKeyboard(FrameCtx& fc)
 
       // !gArrangeFocused: Cmd+G / Cmd+Shift+G group timeline clips while the
       // Arrangement panel has focus, and must not also group canvas nodes.
+      const bool makeBlock = gRequestMakeBlock;
+      gRequestMakeBlock = false;
       const bool doGroup =
-         gRequestGroup ||
+         makeBlock || gRequestGroup ||
          (!typing && !gArrangeFocused && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_G, false));
       const bool doUngroup =
          gRequestUngroup ||
@@ -677,6 +685,12 @@ void DrawKeyboard(FrameCtx& fc)
                      grp->width = gw;
                      grp->height = gh;
                      gGroupMembers[grp] = picked;
+                     if (makeBlock)
+                     {
+                        // Inside the "Group" undo step already taken above.
+                        gSuppressUndoCheckpoints = true;
+                        MakeBlock(grp, true);
+                     }
                   }
                   ed::ClearSelection();
                   gPendingSelect.push_back(ggn->NodeId());

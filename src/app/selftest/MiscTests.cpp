@@ -13,6 +13,9 @@
 #include "miniz.h"
 #include "core/MediaCollect.h"
 #include "nodes/FormulaNode.h"
+#include "audio/AudioNode.h"
+#include "audio/MusicTime.h"
+#include "core/Transport.h"
 #include "gl3.h"
 #include "platform/AppPaths.h"
 #include <filesystem>
@@ -22,6 +25,128 @@
 
 namespace app
 {
+// ==================================================== INFINITE_BLOCKSETTEST
+//
+// Set blocks: GO plays the next block and switches the others off, at once on a
+// stopped transport and on the next bar while playing; a node in an off block
+// gives no picture (its cable resolves to nothing) and its sound ramps to silence
+// and stops; the block params survive a save. Pre-GL: nothing here draws.
+bool RunBlockSetTest()
+{
+   bool ok = true;
+   // gNodes is a vector: a GraphNode* lasts only until the next spawn, so keep the nodes and indices.
+   auto spawn = [](const char* type, const char* cat, float x, float y, int& index) -> INode*
+   {
+      GraphNode* gn = SpawnNode(type, cat, x, y);
+      index = gn != nullptr ? gn->index : -1;
+      return gn != nullptr ? gn->node.get() : nullptr;
+   };
+   int i1 = -1, i2 = -1, iPic = -1, iSnd = -1, iPic2 = -1;
+   auto* b1 = dynamic_cast<GroupNode*>(spawn("Group", "Compositing", 0.0f, 0.0f, i1));
+   auto* b2 = dynamic_cast<GroupNode*>(spawn("Group", "Compositing", 600.0f, 0.0f, i2));
+   INode* picNode = spawn("Formula", "Source", 40.0f, 40.0f, iPic);
+   INode* sndNode = spawn("Audio Filter", "AudioEffects", 40.0f, 300.0f, iSnd);
+   INode* pic2Node = spawn("Formula", "Source", 640.0f, 40.0f, iPic2);
+   if (b1 == nullptr || b2 == nullptr || picNode == nullptr || sndNode == nullptr || pic2Node == nullptr)
+   {
+      printf("BLOCKSET TEST FAIL (could not spawn)\n");
+      return false;
+   }
+   gGroupMembers[b1] = { iPic, iSnd };
+   gGroupMembers[b2] = { iPic2 };
+   MakeBlock(b1, true);
+   MakeBlock(b2, true);
+   const std::vector<GroupNode*> blocks = SetBlocks();
+   const bool made = blocks.size() == 2 && blocks[0] == b1 && blocks[1] == b2 && b1->on && b2->on;
+   printf("BLOCKSET make %s (blocks %d)\n", made ? "OK" : "FAIL", (int)blocks.size());
+   ok &= made;
+
+   // Stopped transport: GO lands at once on the block after the current one.
+   Transport& tr = Transport::Instance();
+   tr.SetPlaying(false);
+   SetBlockGoNext();
+   BlockSetUpdate();
+   ImageCable cable;
+   cable.Connect(picNode);
+   AudioNode* an = AudioNodeOfAny(sndNode);
+   const bool switched = SetBlockCurrent() == 1 && !b1->on && b2->on && picNode->blockOff && cable.Resolved() == nullptr &&
+                         an != nullptr && an->blockGainTarget.load() == 0.0f;
+   printf("BLOCKSET go stopped %s (current %d, off %d, cable %s)\n", switched ? "OK" : "FAIL", SetBlockCurrent(),
+          picNode->blockOff ? 1 : 0, cable.Resolved() == nullptr ? "black" : "live");
+   ok &= switched;
+
+   // The sound ramps out over the fade and then the engine skips the node.
+   if (an != nullptr)
+   {
+      float l[256], r[256];
+      float* ch[2] = { l, r };
+      AudioBuffer buf;
+      buf.channels = ch;
+      buf.numChannels = 2;
+      buf.numFrames = 256;
+      AudioBuffer* outs[1] = { &buf };
+      an->blockFadeSeconds.store(0.01f);   // 480 frames at 48 kHz
+      std::fill(l, l + 256, 1.0f);
+      std::fill(r, r + 256, 1.0f);
+      an->ApplyBlockGain(outs, 1, 256, 48000.0);
+      const float mid = l[255];
+      std::fill(l, l + 256, 1.0f);
+      std::fill(r, r + 256, 1.0f);
+      an->ApplyBlockGain(outs, 1, 256, 48000.0);
+      const float end = l[255];
+      const bool silent = an->BlockSilent();
+      const bool faded = mid > 0.4f && mid < 0.5f && end == 0.0f && silent;
+      an->blockGainTarget.store(1.0f);
+      std::fill(l, l + 256, 1.0f);
+      an->ApplyBlockGain(outs, 1, 256, 48000.0);
+      const bool back = !an->BlockSilent() && l[0] > 0.0f && l[0] < 0.01f && l[255] > 0.5f;
+      printf("BLOCKSET fade %s (half-way %.3f, then %.3f, silent %d; back in %.3f -> %.3f)\n", faded && back ? "OK" : "FAIL",
+             mid, end, silent ? 1 : 0, l[0], l[255]);
+      ok &= faded && back;
+   }
+
+   // Playing with a bar grid: GO waits for the bar line, then lands.
+   const int oldQ = tr.LaunchQuantize();
+   tr.SetLaunchQuantize(MusicTime::kLaunchBar);
+   tr.SetPlaying(true);
+   const double beat0 = tr.Beats();
+   SetBlockGoNext();
+   BlockSetUpdate();
+   const bool waiting = SetBlockPending() == 0 && SetBlockCurrent() == 1;
+   const double bar = MusicTime::NextLaunchBeat(beat0, MusicTime::kLaunchBar, 1e-3);
+   // Tick clamps a step to 0.25 s, so walk the clock to just past the bar line.
+   while (tr.Beats() < bar + 0.05)
+      tr.Tick(0.1f);
+   BlockSetUpdate();
+   const bool landed = SetBlockPending() == -1 && SetBlockCurrent() == 0 && b1->on && !b2->on && !picNode->blockOff;
+   printf("BLOCKSET go on bar %s (waited %d, landed %d)\n", waiting && landed ? "OK" : "FAIL", waiting ? 1 : 0, landed ? 1 : 0);
+   ok &= waiting && landed;
+   tr.SetPlaying(false);
+   tr.SetLaunchQuantize(oldQ);
+
+   // Saved params round-trip into a fresh group.
+   b2->fade = 3;
+   std::vector<std::pair<std::string, std::string>> saved;
+   Patch::SaveParams(b2, saved);
+   GroupNode copy;
+   Patch::LoadParams(&copy, saved);
+   const bool kept = copy.block && !copy.on && copy.fade == 3 && copy.order == b2->order;
+   printf("BLOCKSET save %s\n", kept ? "OK" : "FAIL");
+   ok &= kept;
+
+   // A plain group again: its nodes cook as before.
+   MakeBlock(b1, false);
+   MakeBlock(b2, false);
+   BlockSetUpdate();
+   const bool cleared = SetBlocks().empty() && !pic2Node->blockOff;
+   printf("BLOCKSET remove %s\n", cleared ? "OK" : "FAIL");
+   ok &= cleared;
+
+   printf("BLOCKSET TEST %s\n", ok ? "OK" : "FAIL");
+   fflush(stdout);
+   return ok;
+}
+
 // ================================================== INFINITE_FORMULASTTEST
 //
 // Formula's Shadertoy mode: a `uniform float` comment becomes a knob with its range and

@@ -1246,6 +1246,15 @@ void AudioEngine::RunEntry(AudioTopologyEntry& entry, ProcessList* list, int num
          outputPtrs[o] = nullptr;
       }
    }
+   // Faded out by a switched-off set block: silence, and no work.
+   if (entry.node->BlockSilent())
+   {
+      for (int o = 0; o < numOuts; o++)
+         if (outputPtrs[o] != nullptr)
+            for (int ch = 0; ch < outputPtrs[o]->numChannels; ch++)
+               std::fill(outputPtrs[o]->channels[ch], outputPtrs[o]->channels[ch] + numFrames, 0.0f);
+      return;
+   }
    if (stageMs != nullptr)
    {
       const double t0 = NowMs();
@@ -1263,6 +1272,7 @@ void AudioEngine::RunEntry(AudioTopologyEntry& entry, ProcessList* list, int num
    {
       entry.node->ProcessBlockMulti(inputPtrs, entry.numInputs, outputPtrs, numOuts);
    }
+   entry.node->ApplyBlockGain(outputPtrs, numOuts, numFrames, mSampleRate.load(std::memory_order_relaxed));
    if (mOfflineTaps != nullptr)
       for (OfflineTap& tap : *mOfflineTaps)
       {

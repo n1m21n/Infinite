@@ -838,6 +838,127 @@ void DrawSidePanels(FrameCtx& fc)
          EndEditorWindow(editorVisible);
       }
 
+      // Set list (set blocks): the blocks of this patch in running order. The playing
+      // block is lit, the one GO plays next sits in a field well.
+      gSetListFocused = false;
+      if (gSetListOpen)
+      {
+         ImGui::SetNextWindowSize(ImVec2(420, 560), ImGuiCond_FirstUseEver);
+         // Narrower than a label column plus a control, the Launch on and Fade fields run past the cards.
+         ImGui::SetNextWindowSizeConstraints(ImVec2(420.0f, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
+         const bool visible = BeginEditorWindow(L("Set list"), &gSetListOpen);
+         if (visible)
+         {
+            gSetListFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::GetIO().WantTextInput;
+            static int sPicked = -1;
+            const std::vector<GroupNode*> blocks = SetBlocks();
+            const int count = (int)blocks.size();
+            const int current = SetBlockCurrent();
+            const int next = SetBlockNext();
+            if (sPicked >= count)
+               sPicked = count - 1;
+            // The Block card always edits a real block: the playing one until a row is picked.
+            if (sPicked < 0 && count > 0)
+               sPicked = std::clamp(current, 0, count - 1);
+
+            SectionCard::Begin(T("Blocks"));
+            if (count == 0)
+               EditorHint(T("Select nodes, right-click > Make block. Each block is one section of the set"));
+            for (int i = 0; i < count; i++)
+            {
+               GroupNode* b = blocks[(size_t)i];
+               // Leading spaces clear the colour strip drawn at the row's left edge.
+               std::string row = "  " + std::to_string(i + 1) + "  " + b->label;
+               if (i == SetBlockPending())
+                  row += std::string("  (") + T("next bar") + ")";
+               else if (!b->on)
+                  row += std::string("  (") + T("off") + ")";
+               row += "##setblock" + std::to_string(i);
+               if (MenuParts::Choice(row.c_str(), i == current))
+                  sPicked = i;
+               const ImVec2 lo = ImGui::GetItemRectMin();
+               const ImVec2 hi = ImGui::GetItemRectMax();
+               if (i == next && i != current)
+                  FieldWell::Draw(ImGui::GetWindowDrawList(), lo, hi, false, false);
+               // The block's own colour as a strip at the row's left edge.
+               ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(lo.x, lo.y + 3.0f), ImVec2(lo.x + 3.0f, hi.y - 3.0f),
+                                                         ImGui::GetColorU32(ImVec4(b->color[0], b->color[1], b->color[2], 1.0f)), 1.5f);
+               if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                  SetBlockGo(i);
+            }
+
+            const auto rowBtn = [](const char* label, const char* glyphName, int cells, ActionButton::Kind kind = ActionButton::Kind::Plain) {
+               const float gap = ImGui::GetStyle().ItemSpacing.x;
+               const float w = (ImGui::GetContentRegionAvail().x - gap * (float)(cells - 1)) / (float)cells;
+               return ActionButton::Draw(label, ImVec2(std::floor(w), 0.0f), kind, glyphName);
+            };
+
+            SectionCard::Begin(T("Play"));
+            ImGui::BeginDisabled(count == 0);
+            if (rowBtn(L("Previous"), IconsInfinite::Rewind, 3))
+               SetBlockCue(-1);
+            FormParts::Inline();
+            PushPrimaryButtonStyle();
+            if (rowBtn(L("GO"), IconsInfinite::Play, 2))
+               SetBlockGoNext();
+            PopPrimaryButtonStyle();
+            FormParts::Inline();
+            if (rowBtn(L("Next"), IconsInfinite::ChevronRight, 1))
+               SetBlockCue(+1);
+            ImGui::EndDisabled();
+            {
+               const std::vector<std::string>& qs = MusicTime::LaunchQuantizeList();
+               Transport& tr = Transport::Instance();
+               const int lq = tr.LaunchQuantize();
+               if (FormParts::BeginCombo(L("Launch on"), T(qs[std::clamp(lq, 0, (int)qs.size() - 1)].c_str())))
+               {
+                  for (int i = 0; i < (int)qs.size(); i++)
+                     if (MenuParts::Choice(T(qs[i].c_str()), i == lq))
+                        tr.SetLaunchQuantize(i);
+                  FormParts::EndCombo();
+               }
+            }
+            EditorHint(T("GO (Space while this window is focused) plays the outlined block on the launch grid and switches the others off. Previous / Next move the outline"));
+
+            SectionCard::Begin(T("Block"));
+            const bool havePick = sPicked >= 0 && sPicked < count;
+            ImGui::BeginDisabled(!havePick);
+            if (rowBtn(L("Up"), IconsInfinite::ChevronUp, 3) && havePick && sPicked > 0)
+            {
+               SetBlockMove(sPicked, -1);
+               sPicked--;
+            }
+            FormParts::Inline();
+            if (rowBtn(L("Down"), IconsInfinite::ChevronDown, 2) && havePick && sPicked + 1 < count)
+            {
+               SetBlockMove(sPicked, +1);
+               sPicked++;
+            }
+            FormParts::Inline();
+            if (rowBtn(L("Remove"), IconsInfinite::Close, 1) && havePick)
+            {
+               MakeBlock(blocks[(size_t)sPicked], false);
+               sPicked = -1;
+            }
+            static int sFadeScratch = 0;
+            int* fade = havePick ? &blocks[(size_t)sPicked]->fade : &sFadeScratch;
+            const int before = *fade;
+            if (FormParts::SliderInt(L("Fade"), fade, 0, 4, *fade == 1 ? "%d bar" : "%d bars"))
+               gPatchDirty = true;
+            if (ImGui::IsItemActivated() && havePick)
+            {
+               // One undo step per drag, holding the value from before it.
+               const int during = *fade;
+               *fade = before;
+               PushUndoCheckpoint("Block fade");
+               *fade = during;
+            }
+            ImGui::EndDisabled();
+            EditorHint(T("An off block holds black and silent. Fade is how long its sound takes to fade out or in"));
+         }
+         EndEditorWindow(visible);
+      }
+
       // Show set (v0.6 2.35): the list of patches a live set steps through.
       if (gShowSetOpen)
       {

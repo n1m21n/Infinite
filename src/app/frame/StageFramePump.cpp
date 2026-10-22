@@ -243,7 +243,7 @@ void DrawFramePump(FrameCtx& fc)
                ArrangeSeekVideoSampleSources(Transport::Instance().Beats());
 
                for (GraphNode& gn : gNodes)
-                  if (!gn.node->bypassed)
+                  if (!gn.node->bypassed && !gn.node->blockOff)
                      gn.node->CookIfNeeded(frameId);
 
                // Arrangement render: composite every active video lane, bottom

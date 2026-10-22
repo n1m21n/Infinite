@@ -470,6 +470,7 @@ set(COMMON_SOURCES
     src/app/graph/Rpc.cpp
     src/app/graph/OscApi.cpp
     src/app/graph/ShowSet.cpp
+    src/app/graph/BlockSet.cpp
     src/app/graph/ShowSafety.cpp
     src/app/graph/Wiring.cpp
     src/app/panels/ArrangePanel.cpp

@@ -79,7 +79,21 @@ public:
       v.Text("label", label);
       v.Float("width", width); v.Float("height", height);
       v.Color("color", color);
+      v.Bool("block", block);
+      v.Bool("on", on);
+      v.Int("fade", fade);
+      v.Int("order", order);
    }
+
+   // ---- set block ----
+   // A group marked as a block is one section of a live set: the Set list
+   // window steps through blocks in `order`, and a block that is off stops
+   // its members cooking (pictures hold black, sound fades out over `fade`
+   // bars, 0 = a short anti-click fade).
+   bool block = false;
+   bool on = true;
+   int fade = 0;    // bars, 0-4
+   int order = 0;
 };
 
 // --- Null (2D) ----------------------------------------------------------

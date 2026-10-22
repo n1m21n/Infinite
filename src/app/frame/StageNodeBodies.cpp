@@ -212,7 +212,8 @@ void DrawNodeBodies(FrameCtx& fc)
          ed::BeginNode(gn.NodeId());
          gInsideNodeCanvas = true;
          ImGui::PushID(gn.index);
-         const bool dimmed = gn.node->bypassed;
+         // A node in an off set block reads like a bypassed one: it is not cooking.
+         const bool dimmed = gn.node->bypassed || gn.node->blockOff;
          if (dimmed)
             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.55f);
 
