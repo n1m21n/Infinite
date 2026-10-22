@@ -82,13 +82,84 @@ namespace
       return ext;
    }
 
-   inline bool InitDrWavFile(drwav* wav, const std::string& path)
+   // dr_wav steps over chunks it does not use by seeking forward the chunk's
+   // size in 2 GB steps, and stdio lets a seek land past the end of the file.
+   // A size from a damaged header (an AIFF SSND chunk under 8 bytes wraps to
+   // ~2^64, a W64 chunk can claim ~2^64 outright) then means billions of seeks
+   // that all succeed, and the decode never returns. Reading the file through
+   // these callbacks refuses any seek past the end, so the open fails instead.
+   struct DrWavFile
+   {
+      FILE* f = nullptr;
+      int64_t size = 0;
+      DrWavFile() = default;
+      DrWavFile(const DrWavFile&) = delete;
+      DrWavFile& operator=(const DrWavFile&) = delete;
+      ~DrWavFile()
+      {
+         if (f)
+            fclose(f);
+      }
+   };
+
+   int64_t DrWavFileTell(FILE* f)
    {
 #if defined(_WIN32)
-      return drwav_init_file_w(wav, WinCommon::Utf8ToWide(path).c_str(), nullptr) != 0;
+      return _ftelli64(f);
 #else
-      return drwav_init_file(wav, path.c_str(), nullptr) != 0;
+      return (int64_t)ftello(f);
 #endif
+   }
+
+   bool DrWavFileSeekTo(FILE* f, int64_t at)
+   {
+#if defined(_WIN32)
+      return _fseeki64(f, at, SEEK_SET) == 0;
+#else
+      return fseeko(f, (off_t)at, SEEK_SET) == 0;
+#endif
+   }
+
+   size_t DrWavOnRead(void* user, void* out, size_t bytes)
+   {
+      return fread(out, 1, bytes, static_cast<DrWavFile*>(user)->f);
+   }
+
+   drwav_bool32 DrWavOnSeek(void* user, int offset, drwav_seek_origin origin)
+   {
+      auto* file = static_cast<DrWavFile*>(user);
+      int64_t base = 0;
+      if (origin == DRWAV_SEEK_CUR)
+         base = DrWavFileTell(file->f);
+      else if (origin == DRWAV_SEEK_END)
+         base = file->size;
+      const int64_t target = base + offset;
+      if (base < 0 || target < 0 || target > file->size)
+         return DRWAV_FALSE;
+      return DrWavFileSeekTo(file->f, target) ? DRWAV_TRUE : DRWAV_FALSE;
+   }
+
+   drwav_bool32 DrWavOnTell(void* user, drwav_int64* cursor)
+   {
+      const int64_t at = DrWavFileTell(static_cast<DrWavFile*>(user)->f);
+      if (at < 0)
+         return DRWAV_FALSE;
+      *cursor = at;
+      return DRWAV_TRUE;
+   }
+
+   // `file` must outlive `wav` (drwav_uninit before it closes).
+   bool InitDrWavFile(drwav* wav, DrWavFile& file, const std::string& path)
+   {
+      file.f = OpenFileUtf8(path, "rb");
+      if (file.f == nullptr)
+         return false;
+      if (fseek(file.f, 0, SEEK_END) != 0)
+         return false;
+      file.size = DrWavFileTell(file.f);
+      if (file.size < 0 || !DrWavFileSeekTo(file.f, 0))
+         return false;
+      return drwav_init(wav, DrWavOnRead, DrWavOnSeek, DrWavOnTell, &file, nullptr) != 0;
    }
 
    inline bool InitDrMp3File(drmp3* mp3, const std::string& path)
@@ -1026,8 +1097,9 @@ namespace Platform
 
       if (ext == "wav")
       {
+         DrWavFile file;
          drwav wav;
-         if (!InitDrWavFile(&wav, path))
+         if (!InitDrWavFile(&wav, file, path))
          {
             outError = "not a readable WAV file";
             return false;
