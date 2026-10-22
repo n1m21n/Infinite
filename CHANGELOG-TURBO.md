@@ -1,6 +1,6 @@
 # Infinite-Turbo (for Windows) - changelog
 
-## 0.62.0-turbo (unreleased)
+## 0.62.0-turbo (2026-10-22)
 
 GPU first: an animated PointZ patch at 1080p went from ~17 fps to ~52 fps (raster) on an RTX 4060,
 and the path tracer became a hardware RTX renderer.
@@ -32,6 +32,10 @@ and the path tracer became a hardware RTX renderer.
 - Image Analyze, Palette, Predictive Coloring, Image to Points, Depth Projection and Displacement
   read the GPU back asynchronously (GLUtil::AsyncReadback, about a frame of latency) instead of
   stalling the pipeline every cook.
+
+### Menus
+- The SHAPES category is gone: the named shapes were the Shape node with a preset, which offers
+  every shape itself. Patches that use them by name still open.
 
 ### Tools
 - `INFINITE_FRAMEPROF=1`: CPU and GPU time per frame stage, the slowest node bodies, Render 3D's

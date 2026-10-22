@@ -118,6 +118,11 @@ void NodeFactory::Register(const std::string& name, CreateNodeFn createFn, const
       return;
    }
    mFactoryMap[name] = NodeInfo{ name, category, createFn };
+   // Turbo 0.62: the named shapes (Circle, Star...) are the Shape node with a
+   // preset - still made by name so old patches load, but not listed in any
+   // menu or search (the Shape node offers every shape itself).
+   if (category == "Shapes")
+      return;
 
    auto& list = mByCategory[category];
    if (list.empty())
