@@ -2,6 +2,8 @@
 #include "app/AppShared.h"
 #include "audio/MidiFile.h"
 
+#include <limits>
+
 namespace app
 {
 // Drum Sequencer's DSP fixture (drum-sequencer-prompt.md §6). Drives the
@@ -3679,6 +3681,49 @@ static bool RunMpcFixture()
    return ok;
 }
 
+// A float WAV holding NaN and inf decodes with them zeroed: played raw they
+// poison every recursive node after the player, and a looping player brings
+// them back on every pass (Platform::ZeroNonFiniteSamples).
+static bool RunDecodeNonFiniteFixture()
+{
+   const std::string path = TmpPath("infinite_decode_nonfinite.wav");
+   const int frames = 1000;
+   std::vector<float> pcm(frames, 0.5f);
+   pcm[10] = std::numeric_limits<float>::quiet_NaN();
+   pcm[20] = std::numeric_limits<float>::infinity();
+   pcm[30] = -std::numeric_limits<float>::infinity();
+   {
+      std::ofstream f(path, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(float));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(3); writeU16(1); // IEEE float, mono
+      writeU32(48000); writeU32(48000 * 4); writeU16(4); writeU16(32);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)pcm.data(), dataSize);
+   }
+   Platform::SampleBuffer sb;
+   std::string err;
+   const bool decoded = Platform::DecodeAudioFileToBuffer(path, sb, err);
+   std::error_code ec;
+   std::filesystem::remove(std::filesystem::u8path(path), ec);
+   bool ok = decoded && sb.numFrames == frames && sb.channels == 1;
+   int zeroed = 0, kept = 0;
+   for (int i = 0; ok && i < frames; i++)
+   {
+      const float x = sb.channelData[(size_t)i];
+      if (i == 10 || i == 20 || i == 30)
+         zeroed += x == 0.0f;
+      else
+         kept += std::fabs(x - 0.5f) < 1.0e-6f;
+   }
+   ok = ok && zeroed == 3 && kept == frames - 3;
+   printf("DSPTEST decode zeroes NaN/inf samples: %s, %d of 3 zeroed, %d of %d kept  %s\n",
+          decoded ? "decoded" : err.c_str(), zeroed, kept, frames - 3, ok ? "OK" : "FAIL");
+   return ok;
+}
+
 bool RunEffectMixAndLimiterFixture(); // DspFixtures4.cpp
 
 int RunDspTest()
@@ -3711,11 +3756,12 @@ int RunDspTest()
    const bool equationOk = RunEquationFixture();
    const bool audioDisplacementOk = RunAudioDisplacementFixture();
    const bool effectMixLimiterOk = RunEffectMixAndLimiterFixture();
+   const bool decodeNonFiniteOk = RunDecodeNonFiniteFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk && slicerOk &&
                     paulStretchOk && granularOk && drumSeqOk && looperOk && mpcOk && wavetableShaperOk && eqOk && noteStackOk &&
                     freqShifterOk && spectralSynthOk && waveTerrainOk && equationOk && audioDisplacementOk &&
-                    portableFftOk && effectMixLimiterOk;
+                    portableFftOk && effectMixLimiterOk && decodeNonFiniteOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
    return all ? 0 : 1;
 }

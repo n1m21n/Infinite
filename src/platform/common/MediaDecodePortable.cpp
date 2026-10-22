@@ -1073,8 +1073,8 @@ namespace Platform
       return false;
    }
 
-   bool DecodeAudioFileToBuffer(const std::string& path, SampleBuffer& outBuffer,
-                                std::string& outError)
+   static bool DecodeAudioFileRaw(const std::string& path, SampleBuffer& outBuffer,
+                                  std::string& outError)
    {
       outError.clear();
       outBuffer = SampleBuffer();
@@ -1215,6 +1215,15 @@ namespace Platform
 
       outError = "unsupported audio format";
       return false;
+   }
+
+   bool DecodeAudioFileToBuffer(const std::string& path, SampleBuffer& outBuffer,
+                                std::string& outError)
+   {
+      if (!DecodeAudioFileRaw(path, outBuffer, outError))
+         return false;
+      ZeroNonFiniteSamples(outBuffer);
+      return true;
    }
 
    void SetFfmpegAudioDecodeHook(FfmpegAudioDecodeFn fn)

@@ -3,6 +3,8 @@
 #include <atomic>
 
 #include <chrono>
+#include <cmath>
+#include <cstdlib>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -546,6 +548,27 @@ namespace Platform
    // Returns false and fills outError on failure (missing file, unsupported
    // codec, etc). Main-thread only - not real-time safe.
    bool DecodeAudioFileToBuffer(const std::string& path, SampleBuffer& outBuffer, std::string& outError);
+
+   // A damaged or hostile float file can hold NaN or inf samples. Played,
+   // they poison every recursive node after the player (filters, delays,
+   // reverbs) and the master meters, and a looping player brings them back on
+   // every pass; so each DecodeAudioFileToBuffer zeroes them, and returns how
+   // many it zeroed. INFINITE_DECODE_KEEP_NONFINITE=1 keeps them: the signal
+   // fuzzer (tools/bughunt/param_fuzz.py --kind signal) plays them on purpose.
+   inline long long ZeroNonFiniteSamples(SampleBuffer& buf)
+   {
+      static const bool keep = std::getenv("INFINITE_DECODE_KEEP_NONFINITE") != nullptr;
+      if (keep)
+         return 0;
+      long long n = 0;
+      for (float& x : buf.channelData)
+         if (!std::isfinite(x))
+         {
+            x = 0.0f;
+            n++;
+         }
+      return n;
+   }
 
    // ---- audio input capture (for the node graph's Audio In node) ----
    // Taps the render device's own AVAudioEngine input node (the same engine
