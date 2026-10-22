@@ -1903,11 +1903,16 @@ void RunHistoryTest()
    }
    RemoveNodeByIndex(outIdx);                                                                     // 5 delete Output (pushes its own checkpoint)
 
+   // UndoDescribe names a single param edit "<Type>: <Key> <old> -> <new>", key capitalised.
+   std::string paramLabel = "Shape: " + floatName;
+   if (paramLabel.size() > 7 && paramLabel[7] >= 'a' && paramLabel[7] <= 'z')
+      paramLabel[7] = (char)(paramLabel[7] - 'a' + 'A');
+
    Check("five edits are on the undo stack", gUndoStack.size() == 5);
    const std::string l0 = UndoLabelAt(0), l1 = UndoLabelAt(1), l2 = UndoLabelAt(2), l3 = UndoLabelAt(3), l4 = UndoLabelAt(4);
    printf("  labels newest first: %s | %s | %s | %s | %s\n", l0.c_str(), l1.c_str(), l2.c_str(), l3.c_str(), l4.c_str());
    Check("explicit labels are kept", l0.find("Delete") == 0 && l1 == "Bypass");
-   Check("a param edit is named by what changed", l2.find(floatName) == 0 && l2.find("0.37") != std::string::npos);
+   Check("a param edit is named by what changed", l2.rfind(paramLabel + " ", 0) == 0 && l2.find("0.37") != std::string::npos);
    Check("an added node is named by its type", l3 == "Add Output" && l4 == "Add Shape");
 
    // Save and load: labels are not in the file, and loading clears the history.
@@ -1926,7 +1931,7 @@ void RunHistoryTest()
    Check("jump back applies two undos", gUndoStack.size() == 3 && gRedoStack.size() == 2);
    Check("jump back landed on the right state", gNodes.size() == 2 && FindNodeByIndex(shapeIdx) != nullptr && !FindNodeByIndex(shapeIdx)->node->bypassed);
    Check("redo entries keep their names", RedoLabelAt(0) == "Bypass" && RedoLabelAt(1).find("Delete") == 0);
-   Check("undo entry names survive the jump", UndoLabelAt(0).find(floatName) == 0);
+   Check("undo entry names survive the jump", UndoLabelAt(0).rfind(paramLabel + " ", 0) == 0);
 
    // Jump forward one: the bypass is back.
    JumpInHistory(0, 1);
