@@ -5057,6 +5057,7 @@ public:
       const double len = std::max(4.0, (double)mLoopBeats.load(std::memory_order_relaxed));
       const int transpose = mTranspose.load(std::memory_order_relaxed);
       const float velScale = mVelocity.load(std::memory_order_relaxed);
+      const bool snap = mUseGlobalScale.load(std::memory_order_relaxed);
       auto beatOf = [](const MidiFile::Event& e) { return e.beat; };
 
       // The node keeps its own playhead. It starts at `position` (0 = file start, 1 = file end) whenever the
@@ -5114,6 +5115,10 @@ public:
                   NoteEvent on;
                   // General MIDI percussion (channel 10) is a drum map, not pitch: transposing it would change the instrument.
                   on.note = std::clamp((int)it->note + (it->channel == 9 ? 0 : transpose), 0, 127);
+                  // Snapped on the on only: Held keeps the pitch played, so the off matches it whatever the key does.
+                  if (snap && it->channel != 9)
+                     on.note = std::clamp(MusicTime::SnapToScale(on.note, Transport::Instance().Key(), Transport::Instance().Scale(),
+                                                                 MusicTime::kSnapNearest), 0, 127);
                   on.velocity = std::clamp((float)it->velocity / 127.0f * velScale, 0.0f, 1.0f);
                   on.isNoteOn = true;
                   on.frameOffset = offset;
@@ -5166,6 +5171,7 @@ public:
       mLoop.store(n.loop, std::memory_order_relaxed);
       mSpeed.store(n.speed, std::memory_order_relaxed);
       mVelocity.store(n.velocity, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
       mLoopBeats.store((float)n.LoopBeats(), std::memory_order_relaxed);
       mSong.store(song, std::memory_order_release);
    }
@@ -5209,6 +5215,7 @@ private:
    std::atomic<bool> mLoop { true };
    std::atomic<float> mSpeed { 1.0f };
    std::atomic<float> mVelocity { 1.0f };
+   std::atomic<bool> mUseGlobalScale { false };
    std::atomic<float> mLoopBeats { 4.0f };
    std::atomic<double> mPlayhead { -1.0 };
 };
@@ -5279,6 +5286,7 @@ void MidiFileNode::VisitParams(ParamVisitor& v)
    v.Bool("loop", loop);
    v.Float("velocity", velocity);
    v.Float("speed", speed);
+   v.Bool("useGlobalScale", useGlobalScale);
 }
 
 AudioNode* MidiFileNode::GetAudioNode()

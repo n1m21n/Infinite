@@ -1839,6 +1839,7 @@ namespace app
       if (auto* n = dynamic_cast<NoteCapturerNode*>(node)) return &n->useGlobalScale;
       if (auto* n = dynamic_cast<KeyboardNode*>(node)) return &n->useGlobalScale;
       if (auto* n = dynamic_cast<PredictiveNotesNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<MidiFileNode*>(node)) return &n->useGlobalScale;
       return nullptr;
    }
 

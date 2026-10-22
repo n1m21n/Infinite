@@ -1151,6 +1151,7 @@ public:
    bool loop = true;
    float velocity = 1.0f; // scales every note's velocity
    float speed = 1.0f;    // 1 = project bpm; the file's own tempo is ignored
+   bool useGlobalScale = false; // snap played notes (after transpose) to Transport key/scale; drums never snap
 
    bool LoadFile(const std::string& filePath);
    const MidiFile::Song* GetSong() const { return mSong; }

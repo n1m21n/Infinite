@@ -2,6 +2,7 @@
 #include "app/AppShared.h"
 #include "audio/dsp/ConvolutionKernel.h"
 #include "audio/dsp/SimdF4.h"
+#include "audio/MusicTime.h"
 
 #include <chrono>
 
@@ -1309,6 +1310,49 @@ bool RunMidiFileFixture()
       if (g.note == 76 && g.on && std::fabs(g.beat - 0.5) < 0.03)
          fast = true;
    check(fast, "speed 2 plays the file twice as fast");
+   // Global Scale: transpose +1 makes C# F G#; in C major every note that sounds is in the scale, and each off
+   // releases the pitch its on played even when the key changes while it is held.
+   {
+      const int key0 = Transport::Instance().Key(), scale0 = Transport::Instance().Scale();
+      Transport::Instance().SetKey(0);
+      Transport::Instance().SetScale(MusicTime::kMajor);
+      Transport::Instance().SetPlaying(false); // flush what the speed test left sounding
+      run(1);
+      Transport::Instance().SetPlaying(true);
+      got.clear();
+      node.speed = 1.0f;
+      node.transpose = 1;
+      node.useGlobalScale = true;
+      node.CookIfNeeded(5);
+      Transport::Instance().SeekBeats(0.0);
+      run(100); // 2.1 beats: C#->C/D and F have played, G# is held
+      Transport::Instance().SetKey(1); // the key moves under the held note
+      run(100);
+      Transport::Instance().SetPlaying(false);
+      run(1);
+      bool inScale = true;
+      int early = 0; // ons played while the key was still C major (C#, F, G# at beats 0, 1, 2)
+      int balance[128] = {};
+      for (auto& g : got)
+      {
+         if (g.on && g.beat < 2.05)
+         {
+            early++;
+            inScale = inScale && MusicTime::SnapToScale(g.note, 0, MusicTime::kMajor, MusicTime::kSnapNearest) == g.note;
+         }
+         balance[g.note] += g.on ? 1 : -1;
+      }
+      bool paired = true;
+      for (int b : balance)
+         paired = paired && b == 0;
+      check(early == 3 && inScale, "Global Scale snaps the file's notes into the key");
+      check(paired, "snapped offs release the pitch their ons played");
+      node.useGlobalScale = false;
+      node.transpose = 12;
+      node.CookIfNeeded(6);
+      Transport::Instance().SetKey(key0);
+      Transport::Instance().SetScale(scale0);
+   }
    Transport::Instance().SetPlaying(false);
    Transport::Instance().NotifyAudioEngineStopped();
    std::remove(path.c_str());
