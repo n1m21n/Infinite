@@ -2206,7 +2206,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
          auto* geo = static_cast<GeometryNode*>(gNodes[0].node.get());
          geo->shape = 0;    // plane
          geo->detail = 16;
-         geo->rotX = -1.5707963f; // stand it up so gravity has something to do
+         // Primitives::Plane is already upright (XY). Laying it flat made
+         // every vertex the "top" row, so Pin Top pinned all of it.
          auto* cloth = static_cast<ClothNode*>(gNodes[1].node.get());
          cloth->input = geo;
          cloth->pinMode = ClothNode::kPinTop;
