@@ -111,6 +111,13 @@ def head(title, desc, url, image, extra="", kind="website", depth="../"):
     return f"""<!DOCTYPE html>
 <html lang="en" data-mode="paper">
 <head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){{w[l]=w[l]||[];w[l].push({{'gtm.start':
+  new Date().getTime(),event:'gtm.js'}});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  }})(window,document,'script','dataLayer','GTM-P855CS2V');</script>
+  <!-- End Google Tag Manager -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#FBFAF6">
@@ -223,6 +230,10 @@ def build_index(posts, header, footer):
     s = s.replace('blog.css?v=', 'blog.css?v=', 1)
     s = re.sub(r'(<link rel="stylesheet" href="\.\./blog\.css\?v=[A-Za-z0-9]+">)', r'\1\n  <link rel="stylesheet" href="../deck.css?v=e7678fc1">', s, count=1)
     s += f"""<body class="blog-page blog-index">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
   {header}
 
   <main>
@@ -326,6 +337,10 @@ def build_post(p, posts, header, footer):
         {"@type": "ListItem", "position": 3, "name": p["title"], "item": p["url"]}]}
     s = head(page_title(p), p["description"], p["url"], img or "assets/og-image.jpg", ld(art) + ld(crumbs), kind="article")
     s += f"""<body class="blog-page blog-post">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
   {header}
 
   <main>
