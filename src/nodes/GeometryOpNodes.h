@@ -65,6 +65,7 @@ public:
    };
 
    static INode* Create() { return new GeometryOpNode(); }
+   ~GeometryOpNode() override;
    // Each operator is registered as its own spawnable node, all sharing this
    // class - the spawn menu shows ten named nodes, and the dropdown still lets
    // you switch operation without rewiring.
@@ -129,15 +130,19 @@ public:
    unsigned long long CurveStamp() override;
    float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    // Point cloud forwards unchanged for every op except kTransform, which
-   // applies TransformMatrix() to each particle. Deliberately NOT applied for
-   // kArray: array's semantics on a point cloud (replicate the whole cloud N
-   // times? offset each copy?) are ambiguous and nobody has asked for it, so
-   // it passes the cloud through untouched rather than guessing.
+   // applies TransformMatrix() to each particle, and kTwist, which twists
+   // each particle's position (and turns its normal) exactly as it twists a
+   // mesh vertex; size and colour are left alone. Deliberately NOT applied
+   // for kArray: array's semantics on a point cloud (replicate the whole
+   // cloud N times? offset each copy?) are ambiguous and nobody has asked
+   // for it, so it passes the cloud through untouched rather than guessing.
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
    // Transform hands GPU points on with its matrix folded into pointMatrix,
-   // no copy; every other op (and bypass) forwards the input's as is, the
-   // same way GetPointCloud() forwards the input's cloud.
+   // no copy; Twist runs one pass over them into its own textures (the
+   // upstream pointMatrix baked in, since a twist is not a matrix); every
+   // other op (and bypass) forwards the input's as is, the same way
+   // GetPointCloud() forwards the input's cloud.
    const GpuPoints* GetGpuPoints() override;
    // When this node (or the chain of GeometryOpNodes it's wired through) sits
    // downstream of an InstanceOnPoints and op is kTransform, GetMesh() leaves
@@ -418,7 +423,18 @@ private:
    unsigned long long mPointCloudStampUpstreamRevision = 0;
    Mat4 mPointCloudStampMatrix;
    void StampPointCloudRevision(unsigned long long upstreamRev, const Mat4& m);
+   // The ops that change a point cloud, and what their cloud revision is
+   // stamped on: Transform's matrix, or Twist's angle and axis.
+   bool ActsOnPoints() const { return op == kTransform || op == kTwist; }
+   Mat4 PointOpKey() const;
+   float TwistAngle() const { return amount * 3.14159265f / 180.0f * 3.0f; }
    GpuPoints mGpuPoints;
+   // kTwist's GPU points: its own textures, rebuilt when the stamp moves.
+   GpuPointsGL::Target mGpuTarget;
+   unsigned int mTwistProgram = 0;
+   bool mTwistShaderTried = false;
+   unsigned long long mGpuBuiltRevision = 0;
+   bool mGpuBuiltValid = false;
    // kTransform's curve cache - see GetCurve().
    Polyline mCurveCache;
    bool mHasCurveCache = false;
@@ -519,6 +535,15 @@ public:
    {
       return input ? input->InstanceTransformOverride() : nullptr;
    }
+
+   // A point cloud is displaced too (MeshOps::DisplacePoints: it samples the
+   // texture at its x, y, having no UVs). GPU points take one pass that reads
+   // the texture where it is, so a cloud on the GPU never waits on the
+   // readback the mesh path needs; the CPU cloud reads it back on first ask.
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
+   const std::vector<Particle>* GetPointCloud() override;
+   unsigned long long PointCloudRevision() override;
+   const GpuPoints* GetGpuPoints() override;
 
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
@@ -634,6 +659,45 @@ private:
    // What the last readback was taken from, so an unchanged input skips it.
    unsigned long long mTexReadRev = 0;
    unsigned int mTexReadTex = 0;
+
+   // The texture as pulled this cook. The points paths key on mTexKey, which
+   // moves when the texture's revision, id or size does (every cook for a
+   // source with no revision), so asking whether the cloud changed never
+   // costs a readback. mTexPixelsStale: Cook skipped the readback because
+   // only GPU points read the texture; ReadTexture() catches up on demand.
+   void ReadTexture();
+   bool TakesGpuPoints();
+   unsigned int mTexTex = 0;
+   int mTexTexW = 0, mTexTexH = 0;
+   unsigned long long mTexTexRev = 0;
+   bool mTexPixelsStale = false;
+   unsigned long long mTexKey = 0;
+
+   struct PointSignature
+   {
+      const void* upstream = nullptr;
+      unsigned long long upstreamRevision = 0;
+      int mode = -1;
+      float strength = 0, midlevel = 0;
+      unsigned long long texKey = 0;
+      bool operator==(const PointSignature& o) const
+      {
+         return upstream == o.upstream && upstreamRevision == o.upstreamRevision && mode == o.mode &&
+                strength == o.strength && midlevel == o.midlevel && texKey == o.texKey;
+      }
+   };
+   PointSignature mPointStamp;
+   bool mHasPointStamp = false;
+   unsigned long long mPointRevision = 0;
+   std::vector<Particle> mPointCache;
+   unsigned long long mPointCacheRevision = 0;
+
+   GpuPoints mGpuPoints;
+   GpuPointsGL::Target mGpuTarget;
+   unsigned int mGpuProgram = 0;
+   bool mGpuShaderTried = false;
+   unsigned long long mGpuBuiltRevision = 0;
+   bool mGpuBuiltValid = false;
 };
 
 // --- Mesh to Points / Instance on Points --------------------------------

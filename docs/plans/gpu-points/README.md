@@ -74,7 +74,7 @@ The rest of the P8 plan's phases 1-2 (`claude-context/P8_POINTS_PLAN.md` section
 the steps above, in the order they will be done:
 
 8. Mesh to Points outputs GPU points. Done (section below).
-9. Twist and Displacement run on GPU points when their input has them.
+9. Twist and Displacement run on GPU points when their input has them. Done (section below).
 10. Field Modifier compiles to GLSL (`src/core/field/GlslBackend.cpp`) when its input is GPU points.
 11. Model 3D reads `.ply` point clouds as points.
 12. Field Modifier presets for point jobs: random size, random colour, colour from image, stagger
@@ -210,3 +210,30 @@ and revision equal the CPU cloud's, and the revision is stable on a second ask; 
 the CPU frame (0 pixels differ). Group 3d and `render-pipeline-sweep`: see step 9 (run once over
 both). Parity: `glTexSubImage2D` and `glPixelStorei` are GL 1.x core; no shader, no `Platform::`
 code.
+
+## Step 9: Twist and Displacement on points (2026-10-24, dev build)
+
+Both now act on point clouds, on both paths: a fragment pass per point (`GpuPointsGL::RunPointPass`
+with `kPointPassHeader`, the shared prelude Field Modifier will use too) when the input offers GPU
+points, and the same maths on the CPU cloud otherwise. The GPU pass reruns only when the point
+revision changes; a CPU consumer below gets the cloud computed lazily on the CPU, with no readback.
+
+**Behaviour change (saved patches).** Before this step Twist passed a cloud through untouched and
+Displacement dropped it (its output had no cloud). Now:
+- Twist turns points exactly as it turns vertices (same angle, axis and normal rotation).
+- Displacement samples its texture at planar UVs `(x, y) * 0.5 + 0.5` (wrapped, bilinear; points
+  have no UVs). Scalar mode pushes along +Z by `(luma - midlevel) * strength`; vector mode adds
+  `(rgb - 0.5) * 2 * strength`. With GPU points the texture is sampled where it lives, with no
+  readback; the readback happens only if a CPU consumer asks for the cloud.
+- Bounds without a readback: Twist keeps the extent along its axis and widens the other two to
+  the largest corner radius; Displacement grows the box by the most a 0..1 texel can move a point.
+- The "needs a mesh" warning no longer shows on either node when the input carries points.
+
+**Checks.** `GPUPOINTSTEST` step 9 section, all pass: Twist over Image to Points (behind a
+Transform, so the pass bakes an upstream matrix) and over Mesh to Points; Displacement scalar and
+vector over Image to Points. Each case: no GPU points with the path off, GPU points with it on; the
+points move; the frame is drawn and matches the CPU frame (0 pixels differ by more than 1); the
+lazy CPU cloud after a GPU frame equals the CPU run (max error 0). `run-infinite-hygiene --group 3d`
+23/23 and `render-pipeline-sweep` 23/23, both against `build-dev` with steps 8-9 in.
+Parity: the pass uses `texelFetch`, MRT and `glUniformMatrix4fv` (GL 3.0-3.3 core, in glad);
+shaders stay `#version 150`; no `Platform::` or `#ifdef` code.

@@ -2,6 +2,8 @@
 
 #include "Mesh.h"
 
+#include <functional>
+
 // A point cloud that lives on the GPU: two textures, one point per texel,
 // point i at texel (i % texW, i / texW). Render 3D and the node mini viewport
 // draw it without the CPU ever seeing the points (docs/plans/gpu-points).
@@ -73,4 +75,20 @@ namespace GpuPointsGL
    // The caller sets out.revision. False (out untouched) for an empty cloud
    // or a missing target.
    bool Upload(Target& t, GpuPoints& out, const std::vector<Particle>& points, float baseSize, const char* label);
+
+   // A per-point operator's pass (Twist, Displacement, Field Modifier): one
+   // fragment per texel of `src`, written into `t` (resized to match). The
+   // program reads the source through kPointPassHeader's uPointPos and
+   // uPointColor (units 0 and 1, bound here) and uPointMatrix (src's), so it
+   // works in the space the CPU cloud is in; `setup` binds everything else,
+   // on units 2 and up. Fills `out`'s textures, size and count, with an
+   // identity matrix; bounds, live count and revision are the caller's.
+   bool RunPointPass(Target& t, GpuPoints& out, const GpuPoints& src, unsigned int program,
+                     const std::function<void()>& setup, const char* label);
+   // GLSL 150 prelude for RunPointPass programs. Declares the inputs and the
+   // two outputs, and defines `P` (position after uPointMatrix), `W` (sprite
+   // half-size, 0 = hidden), `Cd` (colour) and `index` for the point this
+   // fragment owns. The program's main() ends with `outPos = vec4(P, W);
+   // outColor = vec4(Cd, 1.0);`.
+   extern const char* const kPointPassHeader;
 }

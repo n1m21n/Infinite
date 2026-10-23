@@ -1,6 +1,7 @@
 #include "GpuPoints.h"
 
 #include "gl3.h"
+#include "GLUtil.h"
 #include "BenchReport.h"
 
 #include <cstdio>
@@ -162,6 +163,75 @@ namespace GpuPointsGL
          out.hi[k] = live > 0 ? hi[k] : 0.0f;
       }
       out.maxHalfSize = maxHalf;
+      return true;
+   }
+
+   const char* const kPointPassHeader =
+      "#version 150\n"
+      "uniform sampler2D uPointPos;\n"
+      "uniform sampler2D uPointColor;\n"
+      "uniform mat4 uPointMatrix;\n"
+      "uniform int uPointTexW;\n"
+      "out vec4 outPos;\n"
+      "out vec4 outColor;\n"
+      "vec3 P;\n"
+      "float W;\n"
+      "vec3 Cd;\n"
+      "int index;\n"
+      "void LoadPoint() {\n"
+      "   ivec2 cell = ivec2(gl_FragCoord.xy);\n"
+      "   vec4 p = texelFetch(uPointPos, cell, 0);\n"
+      "   P = (uPointMatrix * vec4(p.xyz, 1.0)).xyz;\n"
+      "   W = p.w;\n"
+      "   Cd = texelFetch(uPointColor, cell, 0).rgb;\n"
+      "   index = cell.y * uPointTexW + cell.x;\n"
+      "}\n";
+
+   bool RunPointPass(Target& t, GpuPoints& out, const GpuPoints& src, unsigned int program,
+                     const std::function<void()>& setup, const char* label)
+   {
+      if (program == 0 || src.posTex == 0 || src.texW <= 0 || src.texH <= 0)
+         return false;
+      if (!EnsureTarget(t, src.texW, src.texH, label))
+         return false;
+      BindOutputs(t, program, "outPos", "outColor");
+
+      // RunShaderPass wants a GLUtil::Fbo; this one carries the MRT
+      // framebuffer, whose draw buffers BindOutputs just set.
+      GLUtil::Fbo target;
+      target.fbo = t.fbo;
+      target.tex = t.posTex;
+      target.w = t.w;
+      target.h = t.h;
+      target.internalFormat = GL_RGBA32F;
+
+      const GLboolean prevBlend = glIsEnabled(GL_BLEND);
+      glDisable(GL_BLEND); // positions are data
+      GLUtil::RunShaderPass(target, program, [&]()
+      {
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, src.posTex);
+         glActiveTexture(GL_TEXTURE1);
+         glBindTexture(GL_TEXTURE_2D, src.colorTex);
+         glUniform1i(glGetUniformLocation(program, "uPointPos"), 0);
+         glUniform1i(glGetUniformLocation(program, "uPointColor"), 1);
+         glUniformMatrix4fv(glGetUniformLocation(program, "uPointMatrix"), 1, GL_FALSE, src.pointMatrix.m);
+         glUniform1i(glGetUniformLocation(program, "uPointTexW"), src.texW);
+         setup();
+      });
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      if (prevBlend)
+         glEnable(GL_BLEND);
+
+      out.posTex = t.posTex;
+      out.colorTex = t.colorTex;
+      out.texW = t.w;
+      out.texH = t.h;
+      out.count = src.count;
+      out.pointMatrix = Mat4::Identity();
       return true;
    }
 }

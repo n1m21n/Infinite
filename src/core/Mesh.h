@@ -532,6 +532,14 @@ namespace MeshOps
    Mesh Displace(const Mesh& in, const std::vector<float>& texRGBA, int texW, int texH,
                  int mode, float strength, float midlevel, bool flat, bool flip,
                  const std::vector<unsigned char>* vertexMask = nullptr);
+   // Displace on a point cloud, which has no UVs: each point samples the
+   // texture at uv = (x, y) * 0.5 + 0.5 (the -1..1 square, which is Image to
+   // Points' default 2 x 2 grid), wrapped like Displace. Scalar mode pushes
+   // along +Z by (luma - midlevel) * strength; vector mode adds the RGB
+   // offset. Size and colour are left alone. The GLSL in DisplacementNode
+   // is the same maths; keep the two in step.
+   void DisplacePoints(std::vector<Particle>& points, const std::vector<float>& texRGBA, int texW, int texH,
+                       int mode, float strength, float midlevel);
 
    // Sampling for instancing: vertices, edge midpoints or face centres.
    //

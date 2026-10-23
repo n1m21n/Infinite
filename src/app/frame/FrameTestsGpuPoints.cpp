@@ -584,6 +584,107 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
       GpuPointsGL::SetEnabledForTest(wasEnabled);
    }
 
+   // Step 9: Twist and Displacement act on points, on both paths. Each runs
+   // over Image to Points behind the Transform (so the pass bakes an
+   // upstream pointMatrix) and must draw the CPU path's frame; Twist also
+   // runs over Mesh to Points (uploaded points), and the displaced CPU
+   // cloud, read back on demand after a GPU frame, must hold the CPU run's
+   // positions.
+   {
+      GeometryNode ball;
+      ball.shape = 2;
+      MeshToPointsNode ballPts;
+      ballPts.input = &ball;
+      ballPts.pointSize = 0.05f;
+
+      GeometryOpNode twist;
+      twist.op = GeometryOpNode::kTwist;
+      twist.input = &xf;
+      twist.amount = 25.0f;
+      twist.axis = 1;
+      GeometryOpNode twistM2p;
+      twistM2p.op = GeometryOpNode::kTwist;
+      twistM2p.input = &ballPts;
+      twistM2p.amount = 40.0f;
+      twistM2p.axis = 0;
+
+      DisplacementNode dispScalar;
+      dispScalar.input = &xf;
+      dispScalar.TextureInput().Connect(&circle);
+      dispScalar.strength = 0.6f;
+      DisplacementNode dispVector;
+      dispVector.input = &i2p;
+      dispVector.TextureInput().Connect(&circle);
+      dispVector.mode = DisplacementNode::kVector;
+      dispVector.strength = 0.3f;
+
+      struct Case { const char* name; IGeometrySource* node; INode* producer; };
+      const Case cases[] = {
+         { "Twist over Image to Points", &twist, &i2p },
+         { "Twist over Mesh to Points", &twistM2p, &ballPts },
+         { "Displacement (scalar) over Image to Points", &dispScalar, &i2p },
+         { "Displacement (vector) over Image to Points", &dispVector, &i2p },
+      };
+      for (const Case& c : cases)
+      {
+         auto renderCase = [&](bool gpu)
+         {
+            GpuPointsGL::SetEnabledForTest(gpu);
+            Render3DNode r; // fresh, for the same reason as renderOnce
+            r.geometry[0] = c.node;
+            r.CookIfNeeded(frame++);
+            return ReadRgba(r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight());
+         };
+         const std::vector<unsigned char> cpuF = renderCase(false);
+         const bool cpuNone = c.node->GetGpuPoints() == nullptr;
+         std::vector<Particle> cpuCloud;
+         if (const std::vector<Particle>* cc = c.node->GetPointCloud())
+            cpuCloud = *cc;
+         const std::vector<unsigned char> gpuF = renderCase(true);
+         const bool offered = c.node->GetGpuPoints() != nullptr;
+         c.producer->bypassed = true;
+         const std::vector<unsigned char> emptyF = renderCase(true);
+         c.producer->bypassed = false;
+         renderCase(true); // the GPU path again, so the cloud below is asked for after a GPU frame
+
+         // The same points as the CPU run, through the lazy CPU path.
+         const std::vector<Particle>* lazy = c.node->GetPointCloud();
+         float maxErr = 0.0f;
+         bool sameSize = lazy != nullptr && lazy->size() == cpuCloud.size() && !cpuCloud.empty();
+         if (sameSize)
+            for (size_t i = 0; i < cpuCloud.size(); i++)
+            {
+               maxErr = std::max(maxErr, std::fabs((*lazy)[i].px - cpuCloud[i].px));
+               maxErr = std::max(maxErr, std::fabs((*lazy)[i].py - cpuCloud[i].py));
+               maxErr = std::max(maxErr, std::fabs((*lazy)[i].pz - cpuCloud[i].pz));
+            }
+         // The points must have moved: the op is not a pass-through.
+         const std::vector<Particle>* before = (c.node == &twistM2p) ? &ballPts.GetPoints()
+                                               : (c.node == &dispVector) ? &i2p.GetPoints()
+                                               : xf.GetPointCloud();
+         float moved = 0.0f;
+         if (before != nullptr && before->size() == cpuCloud.size())
+            for (size_t i = 0; i < cpuCloud.size(); i++)
+               moved = std::max(moved, std::fabs((*before)[i].px - cpuCloud[i].px) +
+                                       std::fabs((*before)[i].py - cpuCloud[i].py) +
+                                       std::fabs((*before)[i].pz - cpuCloud[i].pz));
+
+         const FrameDiff d = CompareFrames(cpuF, gpuF, emptyF);
+         printf("%s: %zu points, moved up to %.3f, lazy cloud err %.6f, drawn %zu, differ %zu (max %d)\n",
+                c.name, cpuCloud.size(), moved, maxErr, d.drawn, d.differ, d.maxDiff);
+         char label[160];
+         snprintf(label, sizeof(label), "%s: CPU path offers no GPU points, GPU path does", c.name);
+         report(label, cpuNone && offered);
+         snprintf(label, sizeof(label), "%s: moves the points", c.name);
+         report(label, moved > 0.01f);
+         snprintf(label, sizeof(label), "%s: drawn, GPU frame matches the CPU frame", c.name);
+         report(label, d.Drawn() && d.Match());
+         snprintf(label, sizeof(label), "%s: CPU cloud after a GPU frame matches the CPU run", c.name);
+         report(label, sameSize && maxErr < 1e-4f);
+      }
+      GpuPointsGL::SetEnabledForTest(wasEnabled);
+   }
+
    printf("%s\n", allOk ? "GPU POINTS TEST OK" : "GPU POINTS TEST FAIL");
 }
 
