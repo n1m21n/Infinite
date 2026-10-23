@@ -65,8 +65,6 @@ namespace app
             AddTrackOfType(Arrange::kLaneVideo);
          if (MenuParts::Item(L("Add Audio Track")))
             AddTrackOfType(Arrange::kLaneAudio);
-         if (MenuParts::Item(L("Add Track Group")))
-            ArrangeEdit([&]() { Arrange::AddTrackGroup(gArrange, {}, "New Group"); });
          const Arrange::Lane* l = Arrange::FindLane(gArrange, sTrackCtxLaneId);
          if (l != nullptr)
          {
@@ -232,6 +230,31 @@ namespace app
          *consumed = true;
       }
 
+      // An unassigned clip in an empty cell, then the click-to-assign flow
+      // the Timeline's Add Clip uses.
+      void AddSlotClip(uint64_t laneId, int row)
+      {
+         uint64_t made = 0;
+         ArrangeEdit([&]() {
+            if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+            {
+               EnsureRow(*l, row);
+               Arrange::Clip c;
+               c.id = made = gArrange.NewId();
+               c.start = 0;
+               c.length = Arrange::kTicksPerBar;
+               l->slots[(size_t)row].clip = c;
+               gArrange.revision++;
+            }
+         });
+         if (made != 0)
+         {
+            gArrangeSel = { made };
+            gArrangeSelAnchor = made;
+            gArrangeAssigningClipId = made;
+         }
+      }
+
       void DrawSlotMenu()
       {
          if (!MenuParts::BeginPopup("##sessionslotctx"))
@@ -254,27 +277,7 @@ namespace app
             if (lane->groupId != 0 && MenuParts::Item(L("Launch Row in Group")))
                ArrangeSessionLaunchGroupRow(lane->groupId, row);
             if (MenuParts::Item(L("Add Clip")))
-            {
-               uint64_t made = 0;
-               ArrangeEdit([&]() {
-                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
-                  {
-                     EnsureRow(*l, row);
-                     Arrange::Clip c;
-                     c.id = made = gArrange.NewId();
-                     c.start = 0;
-                     c.length = Arrange::kTicksPerBar;
-                     l->slots[(size_t)row].clip = c;
-                     gArrange.revision++;
-                  }
-               });
-               if (made != 0)
-               {
-                  gArrangeSel = { made };
-                  gArrangeSelAnchor = made;
-                  gArrangeAssigningClipId = made;
-               }
-            }
+               AddSlotClip(laneId, row);
             const Arrange::Clip* sel = SelectedClipOfType(lane->type);
             if (MenuParts::Item(L("Paste Selected Clip"), nullptr, false, sel != nullptr) && sel != nullptr)
             {
@@ -465,11 +468,6 @@ namespace app
          const float x0 = o.x + kSceneColW + colW * (float)li;
          const ImVec2 a(x0 + kGap, o.y + kGap), b(x0 + colW - kGap, o.y + kHeaderH - kGap);
          dl->AddRectFilled(a, b, TextCol(0.06f), tok::radius_field);
-         const bool laneTint = lane.colorR > 0.001f || lane.colorG > 0.001f || lane.colorB > 0.001f;
-         const ImU32 stripe = laneTint ? ImGui::ColorConvertFloat4ToU32(ImVec4(lane.colorR, lane.colorG, lane.colorB, 1.0f))
-                                       : (lane.type == Arrange::kLaneVideo ? tok::U32(tok::pal::c_8B5CF6FF)
-                                                                           : tok::U32(tok::pal::c_10B981FF));
-         dl->AddRectFilled(a, ImVec2(a.x + 3.0f, b.y), stripe, tok::radius_field, ImDrawFlags_RoundCornersLeft);
          const std::string name = lane.name.empty() ? (lane.type == Arrange::kLaneVideo ? T("Video") : T("Audio"))
                                                     : lane.name;
          const float th = ImGui::GetTextLineHeight();
@@ -500,7 +498,7 @@ namespace app
             ImGui::OpenPopup("##sessiontrackctx");
          }
          if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Add a video track, an audio track or a track group"));
+            HelpTip("%s", T("Add a video or audio track"));
       }
 
       // ---- add scene row ----
@@ -593,8 +591,8 @@ namespace app
                   gArrangeSel = { ss->clip.id };
                   gArrangeSelAnchor = ss->clip.id;
                }
-               else if (ls.playingSlot >= 0)
-                  ArrangeSessionStopLane(laneId);
+               else
+                  AddSlotClip(laneId, row);
             }
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
             {
@@ -650,14 +648,16 @@ namespace app
                // Empty: a quiet recess. While the track plays, the cell is a
                // stop button, and says so on hover.
                dl->AddRectFilled(a, b, TextCol(hov ? 0.08f : 0.035f), tok::radius_field);
-               if (hov && ls.playingSlot >= 0)
+               if (hov)
                {
-                  DrawStopSquare(dl, ImVec2((a.x + b.x) * 0.5f, cy), 8.0f, TextCol(0.6f));
-                  HelpTip("%s", T("Stop this track"));
+                  // A plus: click adds an unassigned clip to this cell.
+                  const ImVec2 pc((a.x + b.x) * 0.5f, cy);
+                  const ImU32 pcol = TextCol(0.55f);
+                  dl->AddLine(ImVec2(pc.x - 6.0f, pc.y), ImVec2(pc.x + 6.0f, pc.y), pcol, 1.5f);
+                  dl->AddLine(ImVec2(pc.x, pc.y - 6.0f), ImVec2(pc.x, pc.y + 6.0f), pcol, 1.5f);
+                  HelpTip("%s", isVideo ? T("Click to add a clip. You can also drop a video or image file here.")
+                                        : T("Click to add a clip. You can also drop an audio file here."));
                }
-               else if (hov)
-                  HelpTip("%s", isVideo ? T("Empty slot: drop a video or image file here")
-                                        : T("Empty slot: drop an audio file here"));
             }
 
             // File drops land on the cell under the drop point: a Finder drop
