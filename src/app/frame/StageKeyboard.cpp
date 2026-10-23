@@ -150,8 +150,7 @@ void DrawKeyboard(FrameCtx& fc)
       if (cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Period, false))
          ShowPanicToggle();
 
-      // PageDown / PageUp: next / previous in the show set (v0.6 2.35): the playing
-      // patch's blocks first, then the next / previous patch.
+      // PageDown / PageUp: next / previous patch of the show set (v0.6 2.35).
       if (!typing && !cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_PageDown, false))
          ShowSetStep(+1);
       if (!typing && !cmdOrCtrl && ImGui::IsKeyPressed(ImGuiKey_PageUp, false))

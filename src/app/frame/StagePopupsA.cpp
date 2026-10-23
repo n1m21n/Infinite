@@ -35,7 +35,7 @@ void DrawPopupsA(FrameCtx& fc)
                ed::SelectNode(gn->NodeId());
                gRequestUngroup = true;
             }
-            if (MenuParts::Item(g->block ? L("Remove from set") : L("Make block")))
+            if (MenuParts::Item(g->block ? L("Remove block") : L("Make block")))
                MakeBlock(g, !g->block);
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {

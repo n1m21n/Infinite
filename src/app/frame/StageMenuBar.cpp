@@ -397,10 +397,9 @@ void DrawMenuBar(FrameCtx& fc)
             if (MenuParts::SubMenu(L("Show Set")))
             {
                MenuParts::Check(L("Show Set window"), &gShowSetOpen);
-               const bool canStep = ShowSetSize() > 0 || !SetBlocks().empty();
-               if (MenuParts::Item(L("Next"), "PgDn", false, canStep))
+               if (MenuParts::Item(L("Next patch"), "PgDn", false, ShowSetSize() > 0))
                   ShowSetStep(+1);
-               if (MenuParts::Item(L("Previous"), "PgUp", false, canStep))
+               if (MenuParts::Item(L("Previous patch"), "PgUp", false, ShowSetSize() > 0))
                   ShowSetStep(-1);
                MenuParts::Separator();
                if (MenuParts::Item(L("Show lock"), MODKEY "+Shift+L", gShowLock))

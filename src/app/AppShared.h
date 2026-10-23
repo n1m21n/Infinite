@@ -5650,16 +5650,9 @@ void PollOscListeners();
 extern bool gShowSetOpen;
 
 // ---- Set blocks (graph/BlockSet.cpp) ----
-// Groups marked as blocks are the sections of a patch in a live set. The Show
-// Set window lists them under the playing patch; a switch waits for Show Set's
-// quantize grid and fades over its fade time.
-std::vector<GroupNode*> SetBlocks();   // every block, in set order
-int SetBlockCurrent();                 // index of the block the last switch landed on, or -1
-int SetBlockPending();                 // index waiting for the grid, or -1
-void SetBlockGo(int index);
-bool SetBlockStep(int direction);      // the block after (+1) / before (-1); false past either end
-void SetBlockLandFirst();              // a patch just switched in: its first block plays, the rest are off
-void SetBlockMove(int index, int direction);
+// A group marked as a block has a power button in its frame: switched off, its
+// members stop cooking (pictures hold black) and their sound fades out.
+std::vector<GroupNode*> SetBlocks();   // every block, in the order they were made
 void MakeBlock(GroupNode* g, bool block);
 void BlockSetUpdate();                 // once per frame, before cooking
 int ShowSetSize();
