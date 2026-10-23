@@ -5,8 +5,10 @@
 // where nothing was drawn, then each pixel is shaded once with depth test
 // LEQUAL and no depth write (S2: Filament's standard model, hq_surface.frag;
 // its own image-based lighting built here, hq_ibl.frag). The HDR result goes
-// through Render3DPost (bloom, tonemap, sRGB) like Render 3D's. Its own
-// targets, IBL maps and GPU copies of the geometry: Render 3D is untouched.
+// through its own finish (S8: HqPost - Filament's bloom, tonemap, sRGB; until
+// S7 Render 3D's Render3DPost), then FSR 1 when it renders below the output
+// size. Its own targets, IBL maps and GPU copies of the geometry: Render 3D
+// is untouched.
 //
 // Draws triangle meshes (Geometry, Group 3D, mesh operators), PointZ triangles
 // straight from their GPU buffers, and PointZ points as sphere impostors (S3:
@@ -26,8 +28,8 @@
 
 #include "core/GLUtil.h"
 #include "nodes/Geometry3DNodes.h"
-#include "nodes/Render3DPost.h"
 #include "nodes/Render3DTemporal.h"
+#include "nodes/render_hq/HqPost.h"
 #include "platform/OpenGLHeaders.h"
 #include "pop/PopData.h"
 #include "pop/PopGpu.h"
@@ -376,6 +378,7 @@ namespace
          int mapSpace = -1, mapTranslate = -1, mapRotate = -1, mapScale = -1, triplanarBlend = -1;
          int objLo = -1, objHi = -1;
          int instanced = -1, instColored = -1; // S7
+         int lodBias = -1; // S8
          LitLocs lit;
       };
       struct ShadowProgram
@@ -425,6 +428,7 @@ namespace
          int gRadius = -1, gInvRadiusSquared = -1, gIntensity = -1, gPower = -1, gMaxLevel = -1, gFullTexel = -1;
          int bSize = -1, bAxis = -1, bFarZ = -1, bEdgeInv = -1;
          int gNoiseFrame = -1; // S6
+         int dLevel0Shift = -1, gLevel0Shift = -1; // S8
       };
       // S6: hq_taa.comp.
       struct TaaProgram
@@ -434,7 +438,7 @@ namespace
       };
 
       bool EnsurePrograms();
-      bool EnsureTargets(int w, int h);
+      bool EnsureTargets(int w, int h, bool aoFullRes);
       void EnsureDfg();
       bool EnsureIbl(const HqFrame& f);
       void DrawFullscreenInto(unsigned int tex, int level, int w, int h);
@@ -471,6 +475,7 @@ namespace
       bool mAoTried = false;
       unsigned int mAoZ = 0, mAo[2] = { 0, 0 };
       int mAoW = 0, mAoH = 0, mAoLevels = 0;
+      bool mAoFullRes = false; // S8: the AO targets at the frame size
       int mAoNoiseFrame = 0;
       // S6: TAA - the prepass velocity target (attachment 2), the history
       // and coverage pairs (mTaaHist[mTaaCur] is the latest), the motion
@@ -495,7 +500,7 @@ namespace
       unsigned long long mIblRevision = 0;
       int mW = 0, mH = 0;
       std::vector<Slot> mSlots;
-      Render3DPost mPost;
+      HqPost mPost; // S8 (was Render 3D's Render3DPost)
       size_t mTriangles = 0, mDrawCalls = 0, mSpheres = 0, mSkipped = 0;
       std::string mError;
    };
@@ -552,6 +557,7 @@ namespace
       mSurf.objHi = loc(s, "uObjHi");
       mSurf.instanced = loc(s, "uInstanced");
       mSurf.instColored = loc(s, "uInstColored");
+      mSurf.lodBias = loc(s, "uLodBias");
       mSurf.lit.Load(s);
       const char* mapNames[kMapCount] = { "uAlbedoMap", "uRoughnessMap", "uMetallicMap", "uNormalMap",
                                           "uAoMap", "uEmissionMap", "uClearcoatMap", "uSheenMap" };
@@ -629,10 +635,11 @@ namespace
       return true;
    }
 
-   bool HqRendererGl::EnsureTargets(int w, int h)
+   bool HqRendererGl::EnsureTargets(int w, int h, bool aoFullRes)
    {
-      if (mFbo != 0 && w == mW && h == mH)
+      if (mFbo != 0 && w == mW && h == mH && aoFullRes == mAoFullRes)
          return true;
+      mAoFullRes = aoFullRes;
       auto makeTex = [w, h](unsigned int& tex, GLenum internal, const char* label) {
          if (tex != 0)
             glDeleteTextures(1, &tex);
@@ -653,9 +660,10 @@ namespace
       // real one is attached (no feedback loop).
       makeTex(mDepthCopy, GL_DEPTH_COMPONENT24, "Render 3D HQ: depth copy");
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-      // S5: the AO targets at half the frame size (Filament's resolution 0.5).
-      mAoW = std::max(1, (w + 1) / 2);
-      mAoH = std::max(1, (h + 1) / 2);
+      // S5: the AO targets at half the frame size (Filament's resolution 0.5;
+      // S8: 1.0, the frame size, with aoFullRes - the High preset).
+      mAoW = aoFullRes ? w : std::max(1, (w + 1) / 2);
+      mAoH = aoFullRes ? h : std::max(1, (h + 1) / 2);
       mAoLevels = 1;
       while (mAoLevels < kAoMaxLevels && (std::min(mAoW, mAoH) >> mAoLevels) >= 1)
          mAoLevels++;
@@ -739,6 +747,8 @@ namespace
       a.gMaxLevel = loc(a.gtao, "uMaxLevel");
       a.gFullTexel = loc(a.gtao, "uFullTexel");
       a.gNoiseFrame = loc(a.gtao, "uNoiseFrame");
+      a.dLevel0Shift = loc(a.depth, "uLevel0Shift");
+      a.gLevel0Shift = loc(a.gtao, "uLevel0Shift");
       a.bSize = loc(a.blur, "uSize");
       a.bAxis = loc(a.blur, "uAxis");
       a.bFarZ = loc(a.blur, "uFarZ");
@@ -759,8 +769,10 @@ namespace
       const GLbitfield barrier = GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT;
 
       // View z: level 0 from the depth copy, each next level from the one before.
+      const int level0Shift = mAoFullRes ? 0 : 1;
       glUseProgram(a.depth);
       glUniform3f(a.dProjParams, P.m[10], P.m[14], ortho ? 1.0f : 0.0f);
+      glUniform1i(a.dLevel0Shift, level0Shift);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, mDepthCopy);
       int srcW = f.width, srcH = f.height;
@@ -797,6 +809,7 @@ namespace
       glUniform1f(a.gMaxLevel, (float)(mAoLevels - 1));
       glUniform2f(a.gFullTexel, 1.0f / (float)f.width, 1.0f / (float)f.height);
       glUniform1i(a.gNoiseFrame, noiseFrame);
+      glUniform1i(a.gLevel0Shift, level0Shift);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, mAoZ);
       glActiveTexture(GL_TEXTURE1);
@@ -1399,7 +1412,7 @@ namespace
       EnsureDfg();
       const bool ibl = EnsureIbl(f);
       const bool envBackground = f.envTex != 0 && f.envAsBackground;
-      if (!EnsureTargets(f.width, f.height))
+      if (!EnsureTargets(f.width, f.height, f.aoFullRes))
       {
          restore();
          return 0;
@@ -1447,8 +1460,11 @@ namespace
          pushFs(f.envGround, 3);
          pushFs(f.bg, 3);
          const float knobs[] = { f.exposure, f.bloom, f.bloomThreshold, f.bloomRadius, f.shadowSoftness, f.aoRadius,
-                                 f.aoIntensity };
+                                 f.aoIntensity, f.sharpness };
          pushFs(knobs, (int)(sizeof(knobs) / sizeof(float)));
+         // S8: bloom levels, the upscaled size, AO resolution.
+         sig.push_back((unsigned long long)f.bloomLevels | ((unsigned long long)f.aoFullRes << 8));
+         sig.push_back(((unsigned long long)(unsigned int)f.outWidth << 32) | (unsigned int)f.outHeight);
          sig.push_back((unsigned long long)f.tonemap | ((unsigned long long)f.shadowSize << 8) |
                        ((unsigned long long)f.envAsBackground << 40) | ((unsigned long long)f.shadows << 41) |
                        ((unsigned long long)f.contactShadows << 42) | ((unsigned long long)f.ao << 43) |
@@ -1720,6 +1736,9 @@ namespace
          glEnable(GL_CULL_FACE);
          glUseProgram(mSurf.id);
          glUniformMatrix4fv(mSurf.viewProj, 1, GL_FALSE, viewProj.m);
+         // S8: Filament's lodBias (-1 under TAA) and -log2 of the upscale.
+         const float upscaleRatio = f.outWidth > 0 ? (float)f.outWidth / (float)f.width : 1.0f;
+         glUniform1f(mSurf.lodBias, (taaOn ? -1.0f : 0.0f) - std::log2(std::max(1.0f, upscaleRatio)));
          mSurf.lit.SetFrame(f, ibl);
          mSurf.lit.SetShadow(shadow);
          mSurf.lit.SetAo(aoMode, f.width, f.height);
@@ -1814,7 +1833,6 @@ namespace
       }
 
       glDrawBuffers(1, both);
-      restore();
 
       // S6: this frame's cameras and model matrices are next frame's "last".
       mPrevViewProj = viewProjPlain;
@@ -1826,22 +1844,44 @@ namespace
             mSlots[i].prevSource = draw[i];
          }
 
-      // HDR -> RGBA8: bloom, tonemap, sRGB. With the HDRI behind, everything
-      // is tonemapped; otherwise the plain background shows where nothing was
-      // drawn (depth 1), as in Render 3D - under TAA by the history's coverage.
+      // HDR -> RGBA8 (S8: HqPost - Filament's bloom, tonemap, sRGB). With the
+      // HDRI behind, everything is tonemapped; otherwise the plain background
+      // shows where nothing was drawn (depth 1), as in Render 3D - under TAA by
+      // the history's coverage.
+      HqPostSettings post;
+      post.tonemap = f.tonemap;
+      post.bloom = std::max(0.0f, f.bloom);
+      post.threshold = std::max(0.0f, f.bloomThreshold);
+      post.levels = std::max(1, f.bloomLevels);
+      post.fireflies = !taaOn; // as in Filament
+      unsigned int finished = 0;
       if (taaOn)
       {
          const unsigned int resolved = RunTaa(f, viewProj, viewProjPlain, jx, jy);
-         if (envBackground)
-            mLastOut = mPost.Finish(resolved, f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold, f.bloomRadius,
-                                    false, 0u, f.bg);
-         else
-            mLastOut = mPost.FinishTaa(resolved, mTaaCov[mTaaCur], f.width, f.height, f.tonemap, f.bloom,
-                                       f.bloomThreshold, f.bloomRadius, f.bg, 1.0f);
+         finished = envBackground ? mPost.Finish(resolved, f.width, f.height, post, 0, 0u, f.bg, 1.0f)
+                                  : mPost.Finish(resolved, f.width, f.height, post, 4, mTaaCov[mTaaCur], f.bg, 1.0f);
       }
       else
-         mLastOut = mPost.Finish(mColor, f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold, f.bloomRadius,
-                                 false, envBackground ? 0u : mDepth, f.bg);
+         finished = mPost.Finish(mColor, f.width, f.height, post, envBackground ? 0 : 1, envBackground ? 0u : mDepth,
+                                 f.bg, 1.0f);
+      // S8: render scale - FSR 1 (EASU + RCAS) to the output size, as Render
+      // 3D's upscale; at native size, RCAS alone when sharpness is up.
+      const bool upscale = f.outWidth > 0 && f.outHeight > 0 && (f.outWidth != f.width || f.outHeight != f.height);
+      const float stops = (1.0f - std::clamp(f.sharpness, 0.0f, 1.0f)) * 2.0f;
+      if (finished != 0 && upscale)
+      {
+         if (unsigned int up = mTemporal.Upscale(finished, f.width, f.height, f.outWidth, f.outHeight, stops))
+            finished = up;
+      }
+      else if (finished != 0 && f.sharpness > 0.0f)
+      {
+         if (unsigned int sharp = mTemporal.Sharpen(finished, f.width, f.height, stops))
+            finished = sharp;
+      }
+      if (finished == 0)
+         mError = "Render 3D HQ: its finishing shaders did not build (see the log)";
+      mLastOut = finished;
+      restore();
       return mLastOut;
    }
 
@@ -1881,6 +1921,12 @@ namespace
       }
       mFbo = mIblFbo = mEmptyVao = 0;
    }
+}
+
+// S8: HqPost's programs, built like the renderer's.
+unsigned int HqBuildProgram(const char* vertName, const char* fragName)
+{
+   return BuildProgram(vertName, fragName);
 }
 
 std::unique_ptr<HqRenderer> CreateHqRenderer(std::string& why)

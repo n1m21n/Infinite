@@ -32,6 +32,9 @@ uniform vec3 uMapScale;
 uniform float uTriplanarBlend;
 uniform vec3 uObjLo;
 uniform vec3 uObjHi;
+// S8: mip bias of the material maps - Filament's TAA lodBias (-1) and
+// -log2 of the render-scale ratio, so the upscaled image keeps their detail.
+uniform float uLodBias;
 
 layout(location = 0) out vec4 outColor;
 
@@ -86,13 +89,14 @@ vec2 computeMapUv(vec3 n)
 vec4 sampleMap(sampler2D tex, vec3 n, vec2 uv)
 {
    if (uMapSpace == 0 || uTriplanarBlend <= 0.001)
-      return texture(tex, uv);
+      return texture(tex, uv, uLodBias);
    vec3 base = mapBase();
    vec3 an = abs(n);
    float sharpness = 1.0 + (1.0 - uTriplanarBlend) * 7.0;
    vec3 w = pow(max(an, vec3(1e-4)), vec3(sharpness));
    w /= (w.x + w.y + w.z);
-   return texture(tex, base.yz) * w.x + texture(tex, base.xz) * w.y + texture(tex, base.xy) * w.z;
+   return texture(tex, base.yz, uLodBias) * w.x + texture(tex, base.xz, uLodBias) * w.y +
+          texture(tex, base.xy, uLodBias) * w.z;
 }
 
 // Cotangent frame from screen derivatives (no tangents in the mesh).
@@ -120,14 +124,14 @@ vec3 applyNormalMap(vec3 normal, vec2 uv)
       // Grayscale height: slope from central differences, +Z up.
       vec2 px = 1.0 / vec2(textureSize(uNormalMap, 0));
       const vec3 lum = vec3(0.2126, 0.7152, 0.0722);
-      float hl = dot(texture(uNormalMap, uv - vec2(px.x, 0.0)).rgb, lum);
-      float hr = dot(texture(uNormalMap, uv + vec2(px.x, 0.0)).rgb, lum);
-      float hd = dot(texture(uNormalMap, uv - vec2(0.0, px.y)).rgb, lum);
-      float hu = dot(texture(uNormalMap, uv + vec2(0.0, px.y)).rgb, lum);
+      float hl = dot(texture(uNormalMap, uv - vec2(px.x, 0.0), uLodBias).rgb, lum);
+      float hr = dot(texture(uNormalMap, uv + vec2(px.x, 0.0), uLodBias).rgb, lum);
+      float hd = dot(texture(uNormalMap, uv - vec2(0.0, px.y), uLodBias).rgb, lum);
+      float hu = dot(texture(uNormalMap, uv + vec2(0.0, px.y), uLodBias).rgb, lum);
       sampled = normalize(vec3((hl - hr) * 2.0, (hd - hu) * 2.0, 1.0));
    }
    else
-      sampled = texture(uNormalMap, uv).rgb * 2.0 - 1.0;
+      sampled = texture(uNormalMap, uv, uLodBias).rgb * 2.0 - 1.0;
    sampled.xy *= uNormalStrength;
    return normalize(tbn * sampled);
 }

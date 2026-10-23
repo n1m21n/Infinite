@@ -27,6 +27,7 @@ uniform float uIntensity;
 uniform float uPower;
 uniform float uMaxLevel;
 uniform vec2 uFullTexel;        // 1 / frame size
+uniform int uLevel0Shift;       // S8: frame -> AO size, log2 (1 half resolution, 0 full)
 // S6: with TAA, the slice directions and the first step turn every frame
 // (golden-ratio steps over the spatial 4x4 pattern) so the history averages
 // many more directions than 4 - small objects stop flickering. 0 = static.
@@ -41,15 +42,15 @@ const float PI = 3.14159265359;
 const float HALF_PI = 1.57079632679;
 
 // The view-space position of the depth sample under uv at a level: texel t
-// of level L holds the full-size pixel t * 2^(L+1) (hq_ao_depth), so x / y
-// come from that pixel's centre, exactly.
+// of level L holds the full-size pixel t * 2^(L+1) (hq_ao_depth; 2^L at full
+// AO resolution), so x / y come from that pixel's centre, exactly.
 vec3 viewPos(vec2 uv, float level)
 {
    int L = int(level);
    ivec2 size = textureSize(uZ, L);
    ivec2 t = clamp(ivec2(uv * vec2(size)), ivec2(0), size - 1);
    float z = texelFetch(uZ, t, L).r;
-   vec2 ndc = (vec2(t << (L + 1)) + 0.5) * uFullTexel * 2.0 - 1.0;
+   vec2 ndc = (vec2(t << (L + uLevel0Shift)) + 0.5) * uFullTexel * 2.0 - 1.0;
    if (uOrtho == 1)
       return vec3((ndc - uProjOffset) / uProjInfo.xy, z);
    return vec3(-z * (ndc + uProjInfo.zw) / uProjInfo.xy, z);
@@ -84,7 +85,7 @@ void main()
       return;
    vec2 uv = (vec2(p) + 0.5) / vec2(uSize);
    vec3 origin = viewPos(uv, 0.0);
-   ivec2 np = min(2 * p, textureSize(uNormal, 0) - 1); // the pixel level 0 took its depth from
+   ivec2 np = min(p << uLevel0Shift, textureSize(uNormal, 0) - 1); // the pixel level 0 took its depth from
    vec3 normal = texelFetch(uNormal, np, 0).xyz;
    if (origin.z <= uFarZ * 0.9999 || dot(normal, normal) < 0.25)
    {

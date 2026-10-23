@@ -987,4 +987,7 @@ float3 GenericToneMapper::operator()(float3 x) const noexcept {
 - No per-object motion vectors for TAA (camera reprojection only).
 - Cascade split computation, shadow bias derivation and the full `ShadowSample_EVSSM` (blocker search + penumbra, lines 210-388 of `surface_shadowing.fs`) are summarised, not reproduced here.
 - `GT7ToneMapper`, `AgxToneMapper` math not reproduced.
+- (S8, 2026-10-23) The ACES matrices of 7.1 were then read from `filament/src/details/ColorSpaceUtils.h`
+  and the full `aces::ACES()` from `filament/src/ToneMapper.cpp` at the same commit; they are in
+  `shaders/hq_finish.frag.glsl` (column-major, in the header's order).
 - SAO (`saoImpl.fs`, the default `aoType`) is not detailed: GTAO is what was asked for. Note `AmbientOcclusionOptions::aoType` defaults to **SAO**, not GTAO.

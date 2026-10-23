@@ -61,7 +61,17 @@ O plano da 0.71 (Render 3D HQ com referência no Filament + varredura de lentid�
 `HQ-071-STRATEGY.md`, em sessões S0-S9 e P1 com estado na seção 6. A lista abaixo é a de antes
 desse plano e entra nele como P1 (desempenho) e S4-S7 (render).
 
-### Próxima sessão: S8 (pós + presets)
+### Próxima sessão: P1 (lentidão), depois S9
+
+Estado (2026-10-23): S8 feita (pós próprio `HqPost`: bloom e ACES do Filament, render scale com FSR,
+RCAS pós-TAA, viés de mip, GTAO cheio, presets Performance / Balanced / High; detalhes e custos no
+§12 do doc). P1: começar pelo Noise PointZ (~5 ms de GPU na F; o curl 4D avalia 18 ruídos 4D por
+ponto, 16 gradientes cada - cachear os gradientes da célula entre as amostras ±e do curl, bit a bit
+igual), depois os itens da estratégia §4. S9: capturas BEFORE/AFTER, tabela §13, revisão, release.
+Pendente de decisão do dono: o tonemap padrão do HQ continua o ACES do Render 3D; o padrão do
+Filament (ACES legacy) é a opção 5.
+
+### Sessão anterior: S8 (pós + presets)
 
 Estado (2026-10-23): branch `feature/render3d-hq`, S0 a S7 feitas e commitadas (sem push). Detalhes por
 sessão em `RENDER-3D-HQ-FILAMENT.md` §6-§11 (S7 no fim do §8). Exemplos: `examples/hq/raster/` e

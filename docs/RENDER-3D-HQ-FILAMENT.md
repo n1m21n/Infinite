@@ -399,10 +399,79 @@ de |f(t+1) − 2f(t) + f(t−1)|): 0,00745 sem TAA → 0,00281 com (2,7× menos)
 só HQ, `perf.ps1` 5 rodadas): 11,68 → 12,42 ms (+0,74 ms). Visual: bordas de esferas e do nó suaves,
 moiré das partículas da cena B bem menor (capturas `build/hq/s6`).
 
-Fica para depois: viés de mip −1 nas texturas com TAA (o Filament usa) e nitidez pós-TAA (RCAS do
-FSR 1, já no kit) se a imagem parecer macia demais; `depthDisocclusion` do Filament só se aparecer
-ghosting em desoclusão.
+Feito na S8: viés de mip −1 nas texturas com TAA e nitidez pós-TAA (RCAS), ver §12. Fica para
+depois: `depthDisocclusion` do Filament só se aparecer ghosting em desoclusão.
 ## 12. Pós, presets e parâmetros (S8)
+
+O HQ deixou de usar o `Render3DPost` do Render 3D (que fica como estava): o acabamento é o
+`HqPost` (`src/nodes/render_hq/HqPost.*`), com o bloom e o tonemap do Filament.
+
+- **Bloom do Filament** (`hq_bloom_down.frag`, `hq_bloom_up.frag`, notas §6): um passe 2× com o
+  threshold (subtrativo, `max(0, c − threshold)`, e o corte de destaques `1/(1 + max·1/1000)` do
+  `highlight` 1000) e, sem TAA, a média de Karis contra vagalumes (com TAA desligada, como no
+  Filament); passes 2× até a altura ficar a até 2× de 384 linhas (1080p: 540); a cadeia de
+  `levels` níveis com o filtro de 9 amostras (nível par) ou o de 13 (Jimenez, ímpar); de baixo para
+  cima, cada nível soma o de baixo pela tenda 3×3. Composição em HDR linear **antes do tonemap**:
+  `cena + bloom · força / níveis` (modo ADD). Diferença do Filament: o upsample lê o nível de destino
+  e grava a soma numa textura própria, em vez de `blend ONE, ONE` no próprio nível (mesma soma, sem
+  mexer no estado de blend que os nós 2D compartilham).
+- **Parâmetros do bloom** (as chaves do Render 3D, outro significado): `bloom` = força do Filament
+  (0 desliga); `bloomThreshold` = o que é subtraído (1,0 = o do Filament; 0 = sem threshold);
+  `bloomRadius` = número de níveis × 10 (0,6 = os 6 do Filament; até 11).
+- **Tonemaps**: os cinco do Render 3D (mesmo código, mesma ordem) e mais dois do Filament: 5
+  "Filament ACES (legacy)" (`ACESLegacyToneMapper`, o padrão do Filament: ACES RRT+ODT com o reforço
+  de brilho 1/0,6) e 6 "Filament ACES" (`ACESToneMapper`, sem o reforço). Portados do
+  `ToneMapper.cpp` com as matrizes do `ColorSpaceUtils.h` (lidos no S8: as notas não tinham as
+  matrizes); a cena é Rec.709 linear, então passa para Rec.2020 e volta em volta da curva, como faz
+  o color grading do Filament. O padrão do nó continua o ACES do Render 3D (1): trocar o padrão muda o
+  visual de todo patch novo, decisão do dono. Saída sRGB com gama 2,2 e dither, como o Render 3D (o
+  Filament usa a OETF sRGB exata).
+- **Exposição**: o multiplicador do Render 3D, aplicado no sombreamento (antes do bloom, como a
+  pré-exposição do Filament); não é EV100.
+- **Render scale** (`upscale`, chave do Render 3D: nativo, 1,5×, 1,7×, 2×, 3×): o quadro inteiro
+  (pré-passe, sombra, GTAO, TAA, bloom, tonemap) é feito no tamanho de saída ÷ razão e o FSR 1 do kit
+  (`Render3DTemporal::Upscale`, EASU + RCAS) leva ao tamanho de saída, como no Render 3D.
+- **Nitidez** (`sharpness`, 0-1): RCAS do FSR 1 depois do TAA, também em tamanho nativo
+  (`Render3DTemporal::Sharpen`, função nova do kit; o Render 3D não a chama). 0 = sem RCAS nativo (a
+  `sharpness` 0 do TAA do Filament, padrão do HQ); com upscale, `(1 − sharpness) × 2` stops, a
+  conta do Render 3D.
+- **Viés de mip** das texturas de material: −1 com TAA (o `lodBias` do Filament) e −log2(razão) com
+  render scale (`hq_surface.frag`, `uLodBias`).
+- **GTAO em resolução cheia** (`aoFullRes`, a `resolution 1.0` do Filament): a cadeia de
+  profundidade e o kernel recebem o deslocamento do nível 0 (`uLevel0Shift`).
+- **Presets** (no fim do corpo do nó; não são um parâmetro salvo: cada um grava os parâmetros de
+  verdade, que continuam editáveis, e o menu mostra o preset que eles batem, ou "Custom"):
+
+  | Preset | Mapa de sombra | GTAO | TAA | Render scale |
+  |---|---|---|---|---|
+  | Performance | 1024 | desligado | sim | FSR 1,5× |
+  | Balanced (= padrão do HQ) | 2048 | meia resolução | sim | nativo |
+  | High | 4096 | resolução cheia | sim | nativo |
+
+Parâmetros novos no fim do `VisitParams`: `upscale`, `sharpness`, `aoFullRes` (patches antigos abrem
+iguais: sem a chave, nativo, sem RCAS, GTAO em meia resolução).
+
+**Check** (`HQTEST`): bloom liga × desliga (a imagem ganha luz, finita), os 7 tonemaps finitos e os
+dois do Filament diferentes entre si e do ACES do Render 3D (o legacy mais claro), RCAS e GTAO cheio
+mudam a imagem, e cada preset grava os seus parâmetros, mantém o tamanho de saída (o Performance
+desenha abaixo dele) e tem o custo medido. Capturas (`build/hq/s8_before` × `build/hq/s8`): G e H
+saem **idênticas bit a bit** (o acabamento novo reproduz o antigo sem bloom); A, B, C, E, F e I só
+diferem pela animação (órbita, ruído no tempo); a D (partículas emissivas, bloom 0,8) troca o halo
+largo que tingia o quadro inteiro por um brilho mais concentrado, e o HQ da D caiu de 1,8 para
+1,2 ms.
+
+**Custo** (`perf.ps1`, 3 rodadas intercaladas, quadro inteiro em ms, 1080p, RTX 4060 Laptop):
+
+| Cena | Performance | Balanced | High |
+|---|---|---|---|
+| A materiais (sombras) | 1,84 | 2,02 | 2,11 |
+| B partículas (sombras, órbita) | 1,57 | 1,62 | 2,25 |
+| F 1M de esferas (sem sombras; ~5 ms são do Noise PointZ) | 7,98 | 9,60 | 10,02 |
+| I 100k cubos de metal (sombras) | 2,73 | 3,47 | 4,12 |
+
+Bloom antigo (`Render3DPost`) × novo, cena D, executável da S7 × S8 (`-RefExe`): **8,45 → 7,49 ms**
+(−11%); A (sem bloom) 1,64 → 1,52 (ruído). Em 500×500 (`HQTEST`, CPU + GPU): Performance 0,17,
+Balanced 0,22, High 0,27 ms por quadro.
 ## 13. Benchmarks medidos e capturas BEFORE/AFTER (S9)
 ## 14. Licenças
 
@@ -417,6 +486,9 @@ ghosting em desoclusão.
 | `shaders/hq_sphere_deferred.frag.glsl` | montagem de `surface_shading_model_standard.fs` (via `hqShade`, como as esferas da S3) |
 | `shaders/hq_taa.comp.glsl` | `filament/src/materials/antiAliasing/taa/taa.mat`; valores de `Options.h` `TemporalAntiAliasingOptions`; jitter de `PostProcessManager.cpp` (via o kit da 0.70) |
 | `shaders/hq_ao_blur.comp.glsl`, `ssaoVisibility()` em `hq_lighting.glsl` | `filament/src/materials/ssao/bilateralBlur.mat`; upsample de `shaders/src/surface_ambient_occlusion.fs` |
+| `shaders/hq_bloom_down.frag.glsl` | `filament/src/materials/bloom/bloomDownsample2x.mat`, `bloomDownsample9.mat`, `bloomDownsample.mat`; valores de `Options.h` `BloomOptions`; cadeia de `PostProcessManager.cpp` `bloom()` |
+| `shaders/hq_bloom_up.frag.glsl` | `filament/src/materials/bloom/bloomUpsample.mat` (caminho HIGH, tenda 3×3) |
+| `shaders/hq_finish.frag.glsl` (tonemaps 5 e 6, composição do bloom) | `filament/src/ToneMapper.cpp` (`ACESLegacyToneMapper`, `ACESToneMapper`, namespace `aces`), matrizes de `filament/src/details/ColorSpaceUtils.h`, ordem de `materials/colorGrading/colorGrading.mat` |
 
 Também listado em `THIRD_PARTY_NOTICES.md`. Nenhum código do Filament é linkado.
 ## 15. Problemas conhecidos e o que falta

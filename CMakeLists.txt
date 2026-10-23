@@ -592,7 +592,7 @@ if(INFINITE_ENABLE_RENDER_HQ)
     # ---- Render 3D HQ (Turbo 0.71) -------------------------------------------
     # Its renderer is a module: without it, HqStub.cpp answers and the node
     # draws as Render 3D. Shaders are shaders/hq_*.glsl (embedded below).
-    target_sources(Infinite PRIVATE src/nodes/render_hq/HqRenderer.cpp)
+    target_sources(Infinite PRIVATE src/nodes/render_hq/HqRenderer.cpp src/nodes/render_hq/HqPost.cpp)
     message(STATUS "Render 3D HQ: ON")
 else()
     target_sources(Infinite PRIVATE src/nodes/render_hq/HqStub.cpp)

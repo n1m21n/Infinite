@@ -50,7 +50,25 @@ public:
       v.Bool("aoShow", aoShow);
       // S6 (Render 3D's key; on by default for the HQ, set in the constructor).
       v.Bool("taa", taa);
+      // S8: render scale and sharpening (Render 3D's keys), GTAO resolution.
+      v.Int("upscale", upscale); v.Float("sharpness", sharpness);
+      v.Bool("aoFullRes", aoFullRes);
    }
+
+   // S8: the HQ's tonemaps - Render 3D's five, then Filament's ACES legacy
+   // (Filament's default) and ACES.
+   static const std::vector<std::string>& TonemapNames();
+   // S8: quality presets - each sets the real params (shadow map size, GTAO
+   // on / off and resolution, TAA, render scale); the params stay editable
+   // and the preset shown is the one they match ("Custom" when none does).
+   enum Preset { kPresetPerformance = 0, kPresetBalanced = 1, kPresetHigh = 2, kPresetCustom = 3 };
+   static const std::vector<std::string>& PresetNames();
+   void ApplyPreset(int preset);
+   int MatchingPreset() const;
+
+   // S8: GTAO at the full frame size (Filament's resolution 1.0; the High
+   // preset) instead of half.
+   bool aoFullRes = false;
 
    // S5: GTAO on the indirect light, on by default (the finished picture);
    // radius in world units, intensity 0..1; aoShow draws it alone. Radius 1,

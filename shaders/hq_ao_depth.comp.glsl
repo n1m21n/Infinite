@@ -19,6 +19,7 @@ uniform int uMode;
 uniform ivec2 uSrcSize;
 uniform ivec2 uDstSize;
 uniform vec3 uProjParams; // proj m[10], m[14], ortho flag
+uniform int uLevel0Shift; // S8: frame -> AO size, log2 (1 half resolution, 0 full)
 
 // View-space z (negative in front of the camera) of a hardware depth.
 float viewZ(float windowZ)
@@ -34,7 +35,7 @@ void main()
    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
    if (any(greaterThanEqual(p, uDstSize)))
       return;
-   ivec2 s = min(2 * p, uSrcSize - 1);
+   ivec2 s = min(uMode == 0 ? (p << uLevel0Shift) : 2 * p, uSrcSize - 1);
    float z = uMode == 0 ? viewZ(texelFetch(uDepth, s, 0).r) : imageLoad(uSrc, s).r;
    imageStore(uDst, p, vec4(z));
 }

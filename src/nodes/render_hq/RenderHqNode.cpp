@@ -26,6 +26,69 @@ RenderHqNode::RenderHqNode()
    shadowSoftness = 0.0f;
    // S6: TAA on (the HQ has no MSAA: the TAA is its anti-aliasing).
    taa = true;
+   // S8: no sharpening at native size by default (Filament's TAA sharpness 0).
+   sharpness = 0.0f;
+}
+
+const std::vector<std::string>& RenderHqNode::TonemapNames()
+{
+   static const std::vector<std::string> names = [] {
+      std::vector<std::string> n = Render3DNode::TonemapNames();
+      n.push_back("Filament ACES (legacy)");
+      n.push_back("Filament ACES");
+      return n;
+   }();
+   return names;
+}
+
+namespace
+{
+   // S8: what each preset sets. Performance: 1024 map, no GTAO, FSR from 1.5x
+   // below; Balanced: the HQ defaults (2048 map, half-resolution GTAO);
+   // High: 4096 map, full-resolution GTAO. TAA is on in all three (the HQ's
+   // only anti-aliasing).
+   struct HqPreset
+   {
+      int shadowQuality;
+      bool ao, aoFullRes, taa;
+      int upscale;
+   };
+   const HqPreset kHqPresets[3] = {
+      { 0, false, false, true, 1 },
+      { 1, true, false, true, 0 },
+      { 2, true, true, true, 0 },
+   };
+}
+
+const std::vector<std::string>& RenderHqNode::PresetNames()
+{
+   static const std::vector<std::string> names = { "Performance", "Balanced", "High", "Custom" };
+   return names;
+}
+
+void RenderHqNode::ApplyPreset(int preset)
+{
+   if (preset < 0 || preset > kPresetHigh)
+      return;
+   const HqPreset& p = kHqPresets[preset];
+   shadowQuality = p.shadowQuality;
+   ao = p.ao;
+   aoFullRes = p.aoFullRes;
+   taa = p.taa;
+   upscale = p.upscale;
+}
+
+int RenderHqNode::MatchingPreset() const
+{
+   for (int i = 0; i <= kPresetHigh; i++)
+   {
+      const HqPreset& p = kHqPresets[i];
+      // GTAO's resolution does not matter while it is off.
+      if (shadowQuality == p.shadowQuality && ao == p.ao && (!ao || aoFullRes == p.aoFullRes) && taa == p.taa &&
+          upscale == p.upscale)
+         return i;
+   }
+   return kPresetCustom;
 }
 
 RenderHqNode::~RenderHqNode() = default;
@@ -76,6 +139,17 @@ void RenderHqNode::CookIfNeeded(int frameId)
    f.frameId = frameId;
    f.width = std::max(16, (int)width);
    f.height = std::max(16, (int)height);
+   // S8: render scale - drawn at the output size / ratio (Render 3D's
+   // ratios), FSR 1 brings it back up.
+   static const float kUpscaleRatios[] = { 1.0f, 1.5f, 1.7f, 2.0f, 3.0f };
+   const float upRatio = kUpscaleRatios[std::clamp(upscale, 0, 4)];
+   if (upRatio > 1.0f)
+   {
+      f.outWidth = f.width;
+      f.outHeight = f.height;
+      f.width = std::max(16, (int)std::lround((float)f.width / upRatio));
+      f.height = std::max(16, (int)std::lround((float)f.height / upRatio));
+   }
 
    // The sources first: a texture or PointZ upstream cooks into this frame.
    const std::vector<IGeometrySource*>& draw = CollectDraw();
@@ -166,10 +240,15 @@ void RenderHqNode::CookIfNeeded(int frameId)
    f.dt = mLastCookSeconds < 0.0 ? 1.0f / 60.0f : (float)std::clamp(now - mLastCookSeconds, 0.0, 0.1);
    mLastCookSeconds = now;
    f.reuseStill = reuseStill;
+   // S8: Filament's bloom levels from the radius (0.6, the default, gives
+   // Filament's 6), RCAS, GTAO resolution.
+   f.bloomLevels = std::clamp((int)std::lround(bloomRadius * 10.0f), 1, 11);
+   f.sharpness = std::clamp(sharpness, 0.0f, 1.0f);
+   f.aoFullRes = aoFullRes;
 
    mOut = mRenderer->Render(f);
-   mOutW = f.width;
-   mOutH = f.height;
+   mOutW = f.outWidth > 0 ? f.outWidth : f.width;
+   mOutH = f.outHeight > 0 ? f.outHeight : f.height;
    if (!mRenderer->LastReused()) // S7: a reused still frame is the same image
       mRevision++;
    mWhy = mOut == 0 ? mRenderer->Error() : std::string();

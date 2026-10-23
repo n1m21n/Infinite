@@ -1765,7 +1765,8 @@
       NodeSeparator("output", colW);
       ModSlider("width", &n->width, 64.0f, 8192.0f, "%.0f", colW);
       ModSlider("height", &n->height, 64.0f, 8192.0f, "%.0f", colW);
-      DropdownButton("tonemap", Render3DNode::TonemapNames(), n->tonemap,
+      // S8: + Filament's ACES (legacy, its default) and ACES.
+      DropdownButton("tonemap", RenderHqNode::TonemapNames(), n->tonemap,
                      [n](int i) { n->tonemap = i; }, colW);
       ModSlider("exposure", &n->exposure, 0.1f, 4.0f, "%.3f", colW);
       ColorSwatch("background", n->bgColor, n);
@@ -1851,6 +1852,17 @@
       // S6: last, so the controls above keep their ordinals.
       NodeSeparator("anti-aliasing", colW);
       ModCheckbox("TAA", &n->taa);
+      // S8: after the TAA, so every control above keeps its ordinal. The
+      // preset sets the real params below and above; it shows the one they
+      // match. Render scale is FSR 1 (EASU + RCAS); sharpness is RCAS after
+      // the TAA (also at native size, off at 0).
+      NodeSeparator("quality", colW);
+      DropdownButton("preset", RenderHqNode::PresetNames(), n->MatchingPreset(),
+                     [n](int i) { PushUndoCheckpoint(); n->ApplyPreset(i); }, colW);
+      DropdownButton("render scale", Render3DNode::UpscaleNames(), n->upscale,
+                     [n](int i) { PushUndoCheckpoint(); n->upscale = i; }, colW);
+      ModSlider("sharpness", &n->sharpness, 0.0f, 1.0f, "%.2f", colW);
+      ModCheckbox("full-res GTAO", &n->aoFullRes);
       ImGui::EndGroup();
    }
 

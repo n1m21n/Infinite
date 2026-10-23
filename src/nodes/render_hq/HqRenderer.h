@@ -51,7 +51,9 @@ struct HqFrame
    float envGround[3] = { 0.16f, 0.14f, 0.13f };
    float bg[3] = { 0.04f, 0.04f, 0.06f }; // sRGB, written as is where nothing is drawn
    float exposure = 1.0f;
-   int tonemap = 1; // Render 3D's list: none / ACES / Reinhard / AgX / Neutral
+   // Render 3D's list (none / ACES / Reinhard / AgX / Neutral), then S8's
+   // Filament ACES legacy (Filament's default) and Filament ACES.
+   int tonemap = 1;
    float bloom = 0.0f, bloomThreshold = 1.0f, bloomRadius = 0.6f;
    // S4: the first directional / sun light (or the built-in one) casts.
    bool shadows = true;
@@ -71,14 +73,24 @@ struct HqFrame
    // S7: a still scene may return the last image (false: draw every frame -
    // the self-test's timings).
    bool reuseStill = true;
+   // S8: Filament's bloom (HqPost) with bloomLevels levels; render scale -
+   // the frame is drawn at width x height and FSR 1 brings it to outWidth x
+   // outHeight (0 = no upscale); sharpness: RCAS after the TAA (0 = none at
+   // native size; with the upscale, Render 3D's (1 - sharpness) x 2 stops);
+   // GTAO at the full frame size instead of Filament's half.
+   int bloomLevels = 6;
+   int outWidth = 0, outHeight = 0;
+   float sharpness = 0.0f;
+   bool aoFullRes = false;
 };
 
 class HqRenderer
 {
 public:
    virtual ~HqRenderer() {}
-   // Draws the frame and returns the finished RGBA8 texture (width x height),
-   // 0 when it could not (Error() says why). Leaves the GL state as it found it.
+   // Draws the frame and returns the finished RGBA8 texture (width x height,
+   // or outWidth x outHeight when S8's render scale upscales it), 0 when it
+   // could not (Error() says why). Leaves the GL state as it found it.
    virtual unsigned int Render(const HqFrame& frame) = 0;
    // The frame's depth (hardware 0..1), for nodes drawn after it.
    virtual unsigned int DepthTexture() const = 0;

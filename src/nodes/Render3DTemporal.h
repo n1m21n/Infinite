@@ -55,6 +55,9 @@ public:
    // sharpenStops: RCAS strength in stops (0 = strongest). Returns 0 when the
    // shaders are not available (the caller keeps the internal-size image).
    unsigned int Upscale(unsigned int src, int iw, int ih, int ow, int oh, float sharpenStops);
+   // Turbo 0.71 (S8): RCAS alone on RGBA8 sRGB `src` (w x h, no resize) -
+   // Render 3D HQ's sharpening after its TAA. Same targets as Upscale().
+   unsigned int Sharpen(unsigned int src, int w, int h, float sharpenStops);
 
    void Release();
 

@@ -6263,6 +6263,124 @@
             all = all && ok;
          }
 
+         // S8: Filament's bloom adds light, every tonemap is finite and the two
+         // Filament ones differ (legacy is brighter), RCAS and full-res GTAO
+         // change the picture, and each preset sets its params, keeps the
+         // output size (Performance renders below it, FSR brings it up) and
+         // has its cost measured.
+         if (HqModuleBuilt())
+         {
+            auto frameOf = [&]() { return read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight()); };
+            auto meanDiff = [](const std::vector<float>& a, const std::vector<float>& b) {
+               if (a.empty() || a.size() != b.size())
+                  return 1.0;
+               double d = 0.0;
+               for (size_t i = 0; i < a.size(); i++)
+                  d += std::fabs(a[i] - b[i]);
+               return d / (double)a.size();
+            };
+            auto mean = [](const std::vector<float>& a) {
+               double s = 0.0;
+               for (size_t i = 0; i < a.size(); i++)
+                  if (i % 4 != 3)
+                     s += a[i];
+               return a.empty() ? 0.0 : s / (double)(a.size() / 4 * 3);
+            };
+            auto finiteAll = [](const std::vector<float>& a) {
+               bool ok = !a.empty();
+               for (size_t i = 0; ok && i < a.size(); i++)
+                  ok = std::isfinite(a[i]);
+               return ok;
+            };
+            const int savedTonemap = hq.tonemap, savedUpscale = hq.upscale, savedShadowQuality = hq.shadowQuality;
+            const float savedBloom = hq.bloom, savedThreshold = hq.bloomThreshold, savedSharpness = hq.sharpness;
+            const bool savedTaa = hq.taa, savedAo = hq.ao, savedAoFull = hq.aoFullRes;
+            hq.taa = false;
+            while (glGetError() != GL_NO_ERROR) {}
+
+            hq.bloom = 0.0f;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> noBloom = frameOf();
+            hq.bloom = 0.5f;
+            hq.bloomThreshold = 0.0f; // everything blooms: the light added is certain
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> bloomed = frameOf();
+            hq.bloom = savedBloom;
+            hq.bloomThreshold = savedThreshold;
+            const double bloomDiff = meanDiff(bloomed, noBloom), bloomGain = mean(bloomed) - mean(noBloom);
+            bool ok = finiteAll(bloomed) && bloomDiff > 1e-3 && bloomGain > 0.0;
+            printf("  bloom (Filament, 6 levels): diff %.5f, mean +%.5f, finite %d  %s\n", bloomDiff, bloomGain,
+                   finiteAll(bloomed) ? 1 : 0, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            std::vector<std::vector<float>> tone;
+            bool toneFinite = true;
+            for (int t = 0; t < (int)RenderHqNode::TonemapNames().size(); t++)
+            {
+               hq.tonemap = t;
+               hq.CookIfNeeded(++frame);
+               tone.push_back(frameOf());
+               toneFinite = toneFinite && finiteAll(tone.back());
+            }
+            hq.tonemap = savedTonemap;
+            const bool sevenTones = tone.size() == 7;
+            const double legacyVsFit = sevenTones ? meanDiff(tone[5], tone[1]) : 0.0;
+            const double legacyGain = sevenTones ? mean(tone[5]) - mean(tone[6]) : 0.0;
+            ok = toneFinite && sevenTones && legacyVsFit > 1e-3 && legacyGain > 0.0;
+            printf("  tonemaps x%zu: finite %d, Filament legacy vs ACES fit %.5f, legacy - ACES %.5f  %s\n", tone.size(),
+                   toneFinite ? 1 : 0, legacyVsFit, legacyGain, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> soft = frameOf();
+            hq.sharpness = 1.0f;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> sharp = frameOf();
+            hq.sharpness = savedSharpness;
+            hq.ao = true;
+            hq.aoFullRes = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> aoHalf = frameOf();
+            hq.aoFullRes = true;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> aoFull = frameOf();
+            hq.aoFullRes = savedAoFull;
+            const double rcas = meanDiff(sharp, soft), aoRes = meanDiff(aoFull, aoHalf);
+            ok = finiteAll(sharp) && finiteAll(aoFull) && rcas > 1e-4 && aoRes > 1e-5;
+            printf("  RCAS at native size: diff %.5f; GTAO full vs half resolution: diff %.5f  %s\n", rcas, aoRes,
+                   ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            // Presets: params, size, cost (CPU + GPU per frame, glFinish: test only).
+            const int w = hq.GetOutputWidth(), h = hq.GetOutputHeight();
+            for (int p = RenderHqNode::kPresetPerformance; p <= RenderHqNode::kPresetHigh; p++)
+            {
+               hq.ApplyPreset(p);
+               hq.CookIfNeeded(++frame);
+               glFinish();
+               const auto t0 = std::chrono::steady_clock::now();
+               for (int k = 0; k < 20; k++)
+                  hq.CookIfNeeded(++frame);
+               glFinish();
+               const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 20.0;
+               const std::vector<float> px = frameOf();
+               const GLenum err = glGetError();
+               ok = hq.MatchingPreset() == p && hq.GetOutputWidth() == w && hq.GetOutputHeight() == h && finiteAll(px) &&
+                    err == GL_NO_ERROR;
+               printf("  preset %s: map %d, GTAO %s, render scale %s, out %dx%d, %.2f ms/frame, gl 0x%x  %s\n",
+                      RenderHqNode::PresetNames()[(size_t)p].c_str(), 1024 << hq.shadowQuality,
+                      hq.ao ? (hq.aoFullRes ? "full" : "half") : "off", Render3DNode::UpscaleNames()[(size_t)hq.upscale].c_str(),
+                      hq.GetOutputWidth(), hq.GetOutputHeight(), ms, err, ok ? "ok" : "FAIL");
+               all = all && ok;
+            }
+            hq.upscale = savedUpscale;
+            hq.shadowQuality = savedShadowQuality;
+            hq.ao = savedAo;
+            hq.aoFullRes = savedAoFull;
+            hq.taa = savedTaa;
+            hq.CookIfNeeded(++frame);
+         }
+
          // S3: PointZ points as sphere impostors and PointZ triangles straight
          // from the GPU; then 30 frames with the camera orbiting and an object
          // moving (the picture follows, stays finite; GPU time per frame).
