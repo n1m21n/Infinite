@@ -138,6 +138,10 @@ private:
    unsigned int mPointVao = 0, mPointVbo = 0;
    int mPointCount = 0;
    unsigned long long mLastPointRevision = (unsigned long long)-1;
+   // GPU points (core/GpuPoints.h): same round points, read from the source's
+   // textures by gl_VertexID, so this VAO has no attributes at all.
+   unsigned int mGpuPointVao = 0;
+   Mat4 mLastPointMatrix;
 
    // Orbit camera. Distance/target are auto-framed to the mesh bounds the
    // first time a mesh arrives, then left alone so a user's own zoom sticks

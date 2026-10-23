@@ -310,6 +310,16 @@ namespace
       "uniform vec3 uCamPos;\n"
       "uniform int uSpriteSizeMode;\n" // 0 world, 1 screen (constant pixel size)
       "uniform mat4 uView;\n"
+      // GPU points (core/GpuPoints.h): the sprite's position, size and colour
+      // come from two textures by instance index instead of from aInstance /
+      // aInstanceColor. uPointModel is the source's model x pointMatrix and
+      // uPointSizeScale the same factor the CPU path folds into each scale.
+      "uniform int uGpuPoints;\n"
+      "uniform sampler2D uPointPos;\n"
+      "uniform sampler2D uPointColor;\n"
+      "uniform int uPointTexW;\n"
+      "uniform mat4 uPointModel;\n"
+      "uniform float uPointSizeScale;\n"
       "out vec4 vLightSpacePos;\n"
       "out vec3 vWorldPos;\n"
       "out vec3 vLocalPos;\n"
@@ -320,9 +330,17 @@ namespace
       "void main() {\n"
       "   vec3 worldPos;\n"
       "   vec3 worldNormal;\n"
+      "   vec3 instanceColor = aInstanceColor;\n"
       "   if (uIsSprite == 1) {\n"
       "      vec3 instancePos = aInstance[3].xyz;\n"
       "      float instanceScale = aInstance[0][0];\n"
+      "      if (uGpuPoints == 1) {\n"
+      "         ivec2 texel = ivec2(gl_InstanceID % uPointTexW, gl_InstanceID / uPointTexW);\n"
+      "         vec4 point = texelFetch(uPointPos, texel, 0);\n"
+      "         instancePos = (uPointModel * vec4(point.xyz, 1.0)).xyz;\n"
+      "         instanceScale = point.w * uPointSizeScale;\n"
+      "         instanceColor = texelFetch(uPointColor, texel, 0).rgb;\n"
+      "      }\n"
       "      float sizeScale = instanceScale;\n"
       "      if (uSpriteSizeMode == 1) {\n"
       "         vec3 viewPos = (uView * vec4(instancePos, 1.0)).xyz;\n"
@@ -344,7 +362,7 @@ namespace
       "   vUv = aUv;\n"
       // White when there is no per-instance colour, so the fragment shader can
       // multiply unconditionally rather than branching on it.
-      "   vInstanceColor = (uInstanceColored == 1) ? aInstanceColor : vec3(1.0);\n"
+      "   vInstanceColor = (uInstanceColored == 1) ? instanceColor : vec3(1.0);\n"
       // Sprites carry their colour on aInstanceColor, not aVertexColor - the
       // mesh domain and the point-cloud domain never mix on the same draw.
       "   vVertexColor = (uHasVertexColor == 1 && uIsSprite == 0) ? aVertexColor : vec3(1.0);\n"
@@ -1188,6 +1206,13 @@ bool Render3DNode::EnsureEnvBgShader()
    return true;
 }
 
+// GetGpuPoints() first: a GPU point producer builds its CPU cloud only when
+// someone asks for it, and a presence test must not be that someone.
+static bool IsCloudSource(IGeometrySource* s)
+{
+   return s->GetGpuPoints() != nullptr || s->GetPointCloud() != nullptr;
+}
+
 bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
 {
    outLo[0] = outLo[1] = outLo[2] = 1e30f;
@@ -1204,7 +1229,7 @@ bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
       // its source's model matrix into every particle position before ever
       // touching mGpu[i].lo/hi), so pushing them through mDraw[i]'s model
       // matrix here too would double-transform them.
-      const bool isCloud = mDraw[i]->GetPointCloud() != nullptr;
+      const bool isCloud = IsCloudSource(mDraw[i]);
       const Mat4 model = isCloud ? Mat4::Identity() : mDraw[i]->GetModelMatrix();
       // The eight corners through the matrix: a rotated box's true extent
       // cannot be had from transforming the min and max alone.
@@ -1552,6 +1577,13 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       sig.material[i] = source->GetMaterial();
       sig.mapping[i] = source->GetMappingTransform();
       sig.modelMatrix[i] = source->GetModelMatrix();
+      // A Transform over GPU points moves them by pointMatrix, not by a new
+      // revision or model matrix, so the signature has to see it.
+      if (const GpuPoints* gp = source->GetGpuPoints())
+      {
+         sig.cloudRev[i] = gp->revision;
+         sig.modelMatrix[i] = Mat4::Multiply(sig.modelMatrix[i], gp->pointMatrix);
+      }
       if (auto* instancer = FindInstancer(source))
       {
          sig.instanceRev[i] = instancer->InstanceRevision();
@@ -2040,7 +2072,7 @@ void Render3DNode::CookOnce(int frameId)
    // different way of filling that buffer.
    auto drawCloudSlot = [&](int i, IGeometrySource* cloud)
    {
-      const std::vector<Particle>& points = *cloud->GetPointCloud();
+      const GpuPoints* gpuPoints = cloud->GetGpuPoints();
       GpuMesh& gpu = mGpu[i];
 
       const bool sourceChanged = gpu.source != (const void*)cloud;
@@ -2090,36 +2122,35 @@ void Render3DNode::CookOnce(int frameId)
       const Material material = cloud->GetMaterial();
       const unsigned int surface = cloud->GetSurfaceTexture();
 
-      const unsigned long long revision = cloud->PointCloudRevision();
-      if (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model))
-      {
-         // A billboard has no orientation of its own to carry the rest of the
-         // matrix, so only a uniform-ish scale - the length of the model's
-         // own X basis vector - survives a Scale node upstream.
-         const float scaleX = std::sqrt(model.m[0]*model.m[0] + model.m[1]*model.m[1] + model.m[2]*model.m[2]);
-         // p.scale is a relative multiplier (see IGeometrySource::PointBaseSize),
-         // not a world-space size - without this, Image to Points' default
-         // p.scale=1.0 draws a sprite ~100x too large next to its own
-         // mini-viewport, and at higher density/pointSize can push the total
-         // shaded fill far enough to trip Windows' GPU watchdog (TDR).
-         const float baseSize = cloud->PointBaseSize();
+      // A billboard has no orientation of its own to carry the rest of the
+      // matrix, so only a uniform-ish scale - the length of the model's
+      // own X basis vector - survives a Scale node upstream.
+      const float scaleX = std::sqrt(model.m[0]*model.m[0] + model.m[1]*model.m[1] + model.m[2]*model.m[2]);
+      // p.scale is a relative multiplier (see IGeometrySource::PointBaseSize),
+      // not a world-space size - without this, Image to Points' default
+      // p.scale=1.0 draws a sprite ~100x too large next to its own
+      // mini-viewport, and at higher density/pointSize can push the total
+      // shaded fill far enough to trip Windows' GPU watchdog (TDR).
+      const float baseSize = cloud->PointBaseSize();
+      static const double kSampleMultiplier[4] = { 1.0, 2.0, 4.0, 8.0 };
+      const double sampleMult = kSampleMultiplier[std::max(0, std::min(3, samples))];
 
-         // Defensive backstop, independent of the units fix above: estimate
-         // total shaded fragments this cloud will cost (instance count x
-         // screen-space sprite area x MSAA samples) and, if it blows past a
-         // budget, shrink the sprite radius rather than dropping instances -
-         // a visibly-small cloud beats a cloud that silently has fewer points
-         // than it actually contains. Windows has no equivalent of macOS's
-         // soft stall here: its GPU watchdog (TDR) hard-resets the driver
-         // (and the process with it) after ~2s of an unresponsive frame.
+      // Defensive backstop, independent of the units fix above: estimate
+      // total shaded fragments this cloud will cost (instance count x
+      // screen-space sprite area x MSAA samples) and, if it blows past a
+      // budget, shrink the sprite radius rather than dropping instances -
+      // a visibly-small cloud beats a cloud that silently has fewer points
+      // than it actually contains. Windows has no equivalent of macOS's
+      // soft stall here: its GPU watchdog (TDR) hard-resets the driver
+      // (and the process with it) after ~2s of an unresponsive frame.
+      auto fillClamp = [&](size_t pointCount)
+      {
          const float kDeg2Rad = 3.14159265358979323846f / 180.0f;
          const float visibleHeight = 2.0f * camDistance * std::tan(fov * 0.5f * kDeg2Rad);
          const float pixelsPerUnit = visibleHeight > 1e-6f ? (float)mHeight / visibleHeight : 0.0f;
-         static const double kSampleMultiplier[4] = { 1.0, 2.0, 4.0, 8.0 };
-         const double sampleMult = kSampleMultiplier[std::max(0, std::min(3, samples))];
          const float spriteRadiusPixels = baseSize * scaleX * pixelsPerUnit;
          const double perSpriteArea = 4.0 * (double)spriteRadiusPixels * (double)spriteRadiusPixels;
-         const double estimatedFill = (double)points.size() * perSpriteArea * sampleMult;
+         const double estimatedFill = (double)pointCount * perSpriteArea * sampleMult;
          const double kFillBudget = 5.0e8; // shaded samples/frame; the TDR-triggering case in the brief was ~2.5e10
          float clampScale = 1.0f;
          if (estimatedFill > kFillBudget && perSpriteArea > 0.0)
@@ -2134,6 +2165,74 @@ void Render3DNode::CookOnce(int frameId)
             }
          }
          mLastFillClamp = clampScale;
+         return clampScale;
+      };
+
+      // GPU points (core/GpuPoints.h): nothing to build or upload, the vertex
+      // shader reads each sprite from the source's textures by instance index.
+      // Same sizing, clamp and material as the CPU branch below.
+      const bool gpuDraw = gpuPoints != nullptr && gpuPoints->count > 0 && gpuPoints->posTex != 0 &&
+                           gpuPoints->colorTex != 0 && gpuPoints->texW > 0;
+      float gpuSizeScale = 0.0f;
+      Mat4 gpuPointModel = Mat4::Identity();
+      if (gpuPoints != nullptr)
+      {
+         if (gpu.instanceAttribsOn)
+         {
+            // The sprites come from textures; per-instance arrays left on
+            // here would be read past their end. Forget the CPU upload too,
+            // so falling back to it later rebuilds rather than reusing it.
+            for (int col = 0; col < 4; col++)
+            {
+               glDisableVertexAttribArray(3 + col);
+               glVertexAttribDivisor(3 + col, 0);
+            }
+            glDisableVertexAttribArray(7);
+            glVertexAttribDivisor(7, 0);
+            gpu.instanceAttribsOn = false;
+         }
+         gpu.instanceRevision = 0;
+         gpu.instanceCount = 0;
+         gpu.hasBounds = false;
+         if (!gpuDraw)
+            return;
+
+         const size_t live = gpuPoints->liveCount >= 0 ? (size_t)gpuPoints->liveCount : (size_t)gpuPoints->count;
+         gpuSizeScale = scaleX * fillClamp(live);
+         gpuPointModel = Mat4::Multiply(model, gpuPoints->pointMatrix);
+
+         // World bounds for SceneBounds: the point-space box through the
+         // full matrix, grown by the largest sprite radius.
+         if (gpuPoints->hasBounds)
+         {
+            gpu.lo[0] = gpu.lo[1] = gpu.lo[2] = 1e30f;
+            gpu.hi[0] = gpu.hi[1] = gpu.hi[2] = -1e30f;
+            const float r = gpuPoints->maxHalfSize * gpuSizeScale;
+            for (int corner = 0; corner < 8; corner++)
+            {
+               const float c[3] = {
+                  (corner & 1) ? gpuPoints->hi[0] : gpuPoints->lo[0],
+                  (corner & 2) ? gpuPoints->hi[1] : gpuPoints->lo[1],
+                  (corner & 4) ? gpuPoints->hi[2] : gpuPoints->lo[2]
+               };
+               for (int k = 0; k < 3; k++)
+               {
+                  const float w = gpuPointModel.m[k] * c[0] + gpuPointModel.m[4 + k] * c[1] +
+                                  gpuPointModel.m[8 + k] * c[2] + gpuPointModel.m[12 + k];
+                  gpu.lo[k] = std::min(gpu.lo[k], w - r);
+                  gpu.hi[k] = std::max(gpu.hi[k], w + r);
+               }
+            }
+            gpu.hasBounds = true;
+         }
+         gpu.instanceCount = gpuPoints->count;
+      }
+
+      const unsigned long long revision = gpuDraw ? 0 : cloud->PointCloudRevision();
+      if (!gpuDraw && (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model)))
+      {
+         const std::vector<Particle>& points = *cloud->GetPointCloud();
+         const float clampScale = fillClamp(points.size());
 
          std::vector<Mat4> xforms;
          std::vector<float> colors;
@@ -2219,6 +2318,22 @@ void Render3DNode::CookOnce(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanceColored"), 1);
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 1);
+      glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), gpuDraw ? 1 : 0);
+      if (gpuDraw)
+      {
+         // Units 11/12: above every unit the material maps, env and shadow
+         // use (0-10), inside GL 3.3's guaranteed 16 vertex-shader units.
+         glActiveTexture(GL_TEXTURE11);
+         glBindTexture(GL_TEXTURE_2D, gpuPoints->posTex);
+         glActiveTexture(GL_TEXTURE12);
+         glBindTexture(GL_TEXTURE_2D, gpuPoints->colorTex);
+         glActiveTexture(GL_TEXTURE0);
+         glUniform1i(glGetUniformLocation(mProgram, "uPointPos"), 11);
+         glUniform1i(glGetUniformLocation(mProgram, "uPointColor"), 12);
+         glUniform1i(glGetUniformLocation(mProgram, "uPointTexW"), gpuPoints->texW);
+         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uPointModel"), 1, GL_FALSE, gpuPointModel.m);
+         glUniform1f(glGetUniformLocation(mProgram, "uPointSizeScale"), gpuSizeScale);
+      }
       glUniform3fv(glGetUniformLocation(mProgram, "uBaseColor"), 1, material.color);
       glUniform1f(glGetUniformLocation(mProgram, "uMetallic"), material.metallic);
       glUniform1f(glGetUniformLocation(mProgram, "uRoughness"), material.roughness);
@@ -2271,12 +2386,13 @@ void Render3DNode::CookOnce(int frameId)
 
       // A source with both a mesh and a point cloud (Mesh to Points, Image
       // to Points) draws as sprites, not triangles - the cloud wins.
-      if (source->GetPointCloud() != nullptr)
+      if (IsCloudSource(source))
       {
          drawCloudSlot(i, source);
          return;
       }
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 0);
+      glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), 0);
 
       const Mesh& mesh = source->GetMesh();
       // HasGeometry(), not Empty(): a vertices-only mesh (Points to
@@ -2667,7 +2783,7 @@ void Render3DNode::CookOnce(int frameId)
    // same reason as above.
    auto isTranslucentMesh = [&](IGeometrySource* s)
    {
-      if (s == nullptr || s->GetPointCloud() != nullptr)
+      if (s == nullptr || IsCloudSource(s))
          return false;
       const Material m = s->GetMaterial();
       return (m.opacity < 0.999f || m.textureAlpha) && m.transmission <= 0.001f;
@@ -2677,7 +2793,7 @@ void Render3DNode::CookOnce(int frameId)
    for (int i = 0; i < (int)mDraw.size(); i++)
    {
       IGeometrySource* s = mDraw[i];
-      if (s != nullptr && s->GetPointCloud() == nullptr && s->GetMaterial().transmission > 0.001f)
+      if (s != nullptr && !IsCloudSource(s) && s->GetMaterial().transmission > 0.001f)
       {
          anyTransmissive = true;
          break;
@@ -2692,7 +2808,7 @@ void Render3DNode::CookOnce(int frameId)
       // Transmissive slots are deferred to the pass below, which needs a
       // snapshot of everything opaque drawn first - sampling the buffer this
       // same draw is writing to would be a feedback loop.
-      if (s->GetPointCloud() == nullptr && anyTransmissive && s->GetMaterial().transmission > 0.001f)
+      if (!IsCloudSource(s) && anyTransmissive && s->GetMaterial().transmission > 0.001f)
          continue;
       // Translucent (opacity < 1) meshes wait for the sorted pass below: drawn
       // in slot order with depth write on, a nearer one drawn first hides a

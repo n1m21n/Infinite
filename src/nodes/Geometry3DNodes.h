@@ -8,6 +8,7 @@
 #include "ImageCable.h"
 #include "GLUtil.h"
 #include "Mesh.h"
+#include "GpuPoints.h"
 
 // Surface properties handed to the renderer. A struct rather than a row of
 // out-params: this already carried five, and every material feature after this
@@ -286,6 +287,12 @@ public:
    // Points) returns 1.0f; a source that documents p.scale as a 0-1-ish
    // multiplier of its own cell size (Image to Points) returns that cell size.
    virtual float PointBaseSize() const { return 1.0f; }
+   // The same points as GetPointCloud(), already on the GPU (core/GpuPoints.h).
+   // nullptr by default, and that default is the safety rule: a node that
+   // changes points in a way it cannot express as GpuPoints::pointMatrix must
+   // not forward it, so Render 3D falls back to reading its GetPointCloud().
+   // Render 3D and the mini viewport prefer this; nothing else reads it.
+   virtual const GpuPoints* GetGpuPoints() { return nullptr; }
    virtual const Polyline* GetCurve() { return nullptr; }
    virtual unsigned long long CurveStamp() { return 0; }
 };
