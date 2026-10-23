@@ -19,6 +19,7 @@ namespace app
             [i]() -> INode* { return ShapeNode::CreateFor(i); }, "Source");
       }
       REGISTER_NODE(FormulaNode, Formula, "Source");
+      REGISTER_NODE(ShadertoyNode, Shadertoy, "Source");
       REGISTER_NODE(FieldPixelNode, FieldPixel, "Source");
       REGISTER_NODE(SketchNode, Sketch, "Source");
       REGISTER_NODE(TextNode, Text, "Source");

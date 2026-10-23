@@ -139,3 +139,19 @@ private:
    GLUtil::Fbo mOut;
    int mLastCookFrame = -1;
 };
+
+// Shadertoy as its own node: the same engine as Formula's Shadertoy mode (see above), registered
+// under its own name so Formula stays a compact expression node. It is always in Shadertoy mode;
+// older patches that saved a Formula in that mode load as this type (PatchLoad.cpp).
+class ShadertoyNode : public FormulaNode
+{
+public:
+   static INode* Create() { return new ShadertoyNode(); }
+   ShadertoyNode() { mode = kShadertoy; }
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      FormulaNode::VisitParams(v);
+      mode = kShadertoy;   // a saved or hand-written `mode 0` cannot turn it back into an expression
+   }
+};

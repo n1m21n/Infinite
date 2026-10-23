@@ -2305,9 +2305,18 @@ namespace app
       }
       {
          AudioKnobRow row(3);
-         row.KnobInt("chord", &n->chordSize, 2, 6);
-         row.KnobInt("steps", &n->progSteps, 1, ChorderNode::kProgCells);
-         row.Knob("harmonics", &n->upperHarmonics, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         // notes = how many notes stack into each chord (3 = triad, 4 = seventh, 5+ = ninth, 11th).
+         // length = how many chords the progression strip below plays before it loops.
+         // oct up = chance a chord gets one extra tone doubled an octave higher (airier voicing).
+         row.KnobInt("notes", &n->chordSize, 2, 6);
+         if (ImGui::IsItemHovered())
+            gNodeHoverTip = "Notes per chord: 3 = triad, 4 = with a 7th, 5-6 = 9th and 11th colour";
+         row.KnobInt("length", &n->progSteps, 1, ChorderNode::kProgCells);
+         if (ImGui::IsItemHovered())
+            gNodeHoverTip = "Chords before the progression loops (uses the cells below; random mode ignores it)";
+         row.Knob("oct up", &n->upperHarmonics, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
+         if (ImGui::IsItemHovered())
+            gNodeHoverTip = "Chance a chord gets an extra note an octave above one of its tones";
          row.End();
       }
       {

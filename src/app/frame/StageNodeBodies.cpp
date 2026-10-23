@@ -253,12 +253,17 @@ void DrawNodeBodies(FrameCtx& fc)
             const float pinSpacing = (inputs > 4) ? 8.0f : 12.0f;
             // A long pin header (Render 3D: 9 pins, Material: 9) would otherwise set the node's width and leave an
             // empty strip beside the params columns. Wrap it into rows no wider than two param columns.
-            const float wrapW = kParamWidth * 2.0f + 16.0f + 48.0f;
+            // Shadertoy's four iChannel pins show as ch0..ch3 in a 2x2 block: the full names in one row were wider than
+            // the whole param column and stretched every slider and dropdown below to match.
+            const bool channelPins = dynamic_cast<FormulaNode*>(gn.node.get()) != nullptr && gn.node->InputLabel(0) != nullptr;
+            const float wrapW = channelPins ? 2.0f * (kPinHit + 4.0f + 24.0f) + 12.0f : kParamWidth * 2.0f + 16.0f + 48.0f;
             float rowUsed = 0.0f;
             for (int slot = 0; slot < inputs; slot++)
             {
                char label[24];
-               if (const char* named = gn.node->InputLabel(slot))
+               if (channelPins)
+                  snprintf(label, sizeof(label), "ch%d", slot);
+               else if (const char* named = gn.node->InputLabel(slot))
                   snprintf(label, sizeof(label), "%s", named);
                else if (inputs == 1)
                   snprintf(label, sizeof(label), "in"); // R6: no bare pin dot
