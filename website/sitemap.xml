@@ -4,6 +4,7 @@
   <url><loc>https://infinitedevices.org/library.html</loc><lastmod>2026-10-23</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/blog/</loc><lastmod>2026-10-23</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/blog/raymarching-signed-distance-fields-in-real-time-glsl.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/blog/real-time-fluid-simulation-in-glsl.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/reaction-diffusion-simulation-in-real-time-glsl.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/blog/lorenz-attractor-interactive-simulation.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
