@@ -34,6 +34,7 @@ void FrameTest_TRANSPORTTEST(int frameId, GLFWwindow* window);
 void FrameTest_ARRANGESAMPLEEXPORTTEST(int frameId, GLFWwindow* window);
 void FrameTest_ARRANGEVIDEOTEST(int frameId, GLFWwindow* window);
 void FrameTest_ARRANGEMARKERTEST(int frameId, GLFWwindow* window);
+void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window);
 void FrameTest_ARRANGEKEYSTEST(int frameId, GLFWwindow* window);
 void FrameTest_ARRANGEWAVETEST(int frameId, GLFWwindow* window);
 void FrameTest_CLIPMODBYPASSTEST(int frameId, GLFWwindow* window);

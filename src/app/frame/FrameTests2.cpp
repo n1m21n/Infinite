@@ -3546,4 +3546,140 @@ void FrameTest_FINDTEST(int frameId, GLFWwindow* window)
       printf("%s\n", ok ? "FIND TEST OK" : "FIND TEST FAIL");
    }
 }
+
+// Session view (P5): a 3-track, 4-scene grid with filled slots, scene 1 launched. Frame 4 builds
+// and launches, frame 8 checks the playback model, frame 10 checks Stop All and the save/load
+// round trip, then the panel is put back in Session view for the screenshot (IMAGERESYNTH_SCREENSHOT).
+void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_SESSIONVIEWTEST") == nullptr)
+      return;
+   static bool ok = true;
+   static uint64_t laneA1 = 0, laneA2 = 0, laneV1 = 0;
+   auto check = [&](bool cond, const char* what)
+   {
+      printf("SESSIONVIEWTEST %s: %s\n", what, cond ? "OK" : "FAIL");
+      if (!cond)
+         ok = false;
+   };
+   if (frameId == 4)
+   {
+      NewPatch();
+      Transport& tr = Transport::Instance();
+      tr.SetPlaying(false);
+      tr.SetTempo(120.0f);
+      tr.SeekBeats(0.0);
+      tr.SetLaunchQuantize(0); // launch right at the playhead: nothing to wait for
+      GraphNode* src = SpawnNode("Wavetable", "Synths", 0.0f, 0.0f);
+      const uint64_t srcUid = src != nullptr ? src->uid : 0;
+      ArrangeEdit([&]()
+      {
+         while (!gArrange.lanes.empty())
+            Arrange::RemoveLane(gArrange, gArrange.lanes.front().id);
+         laneA1 = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+         laneA2 = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+         laneV1 = Arrange::AddLane(gArrange, Arrange::kLaneVideo);
+         Arrange::FindLane(gArrange, laneA1)->name = "Drums";
+         Arrange::FindLane(gArrange, laneA2)->name = "Bass";
+         Arrange::FindLane(gArrange, laneV1)->name = "Visuals";
+         const char* names[4] = { "Intro", "Verse", "", "Drop" };
+         const float tempos[4] = { 0.0f, 0.0f, 0.0f, 128.0f };
+         for (int i = 0; i < 4; ++i)
+         {
+            Arrange::Scene sc;
+            sc.name = names[i];
+            sc.tempo = tempos[i];
+            gArrange.scenes.push_back(sc);
+         }
+         auto fill = [&](uint64_t laneId, int row, int bars, const char* name)
+         {
+            Arrange::Lane* l = Arrange::FindLane(gArrange, laneId);
+            if ((int)l->slots.size() <= row)
+               l->slots.resize((size_t)row + 1);
+            Arrange::SessionSlot& ss = l->slots[(size_t)row];
+            ss.clip.length = (Arrange::Tick)bars * Arrange::kTicksPerBar;
+            ss.clip.name = name;
+            ss.clip.srcUid = srcUid;
+            if (row == 1)
+               ss.followAction = Arrange::kFollowNext;
+         };
+         fill(laneA1, 0, 2, "Kick");
+         fill(laneA1, 1, 2, "Kick+Hat");
+         fill(laneA1, 3, 4, "Break");
+         fill(laneA2, 0, 2, "Sub");
+         fill(laneA2, 3, 4, "Wobble");
+         fill(laneV1, 1, 4, "Tunnel");
+         Arrange::Normalize(gArrange);
+      });
+      gArrangePanelOpen = true;
+      gArrangePanelHeight = 700.0f;
+      gArrangeSessionView = true;
+      check(gArrange.scenes.size() == 4 && Arrange::FindLane(gArrange, laneA1)->slots.size() == 4, "grid built");
+      ArrangeSessionLaunchScene(0);
+      check(Transport::Instance().IsPlaying(), "launching while stopped starts the transport");
+   }
+   if (frameId == 8)
+   {
+      const Arrange::Model& pm = ArrangePlaybackModel();
+      auto synthClips = [&](uint64_t laneId)
+      {
+         int n = 0;
+         const Arrange::Lane* l = Arrange::FindLane(pm, laneId);
+         if (l != nullptr)
+            for (const Arrange::Clip& c : l->clips)
+               n += (c.id & (1ull << 62)) != 0 ? 1 : 0;
+         return n;
+      };
+      check(&pm != &gArrange, "playback model is a launched copy");
+      check(synthClips(laneA1) > 0 && synthClips(laneA2) > 0, "scene 1 clips appear on both audio tracks");
+      check(synthClips(laneV1) == 0, "the video track had no slot in scene 1");
+      check(Arrange::FindLane(gArrange, laneA1)->clips.empty(), "launching never edits the arrangement");
+      ArrangeSessionLaunchScene(3);
+      check(Transport::Instance().Beats() >= 0.0 && Arrange::FindLane(gArrange, laneA1)->slots.size() == 4, "scene 4 launch keeps the slots");
+   }
+   if (frameId == 10)
+   {
+      // Save/load round trip of slots and scenes.
+      const std::string path = "/tmp/infinite-sessionviewtest.ifp";
+      SpawnNode("Oscillator", "Synthesizers", 200.0f, 0.0f);
+      const bool saved = SavePatchTo(path);
+      check(saved, "patch saves");
+      const std::vector<Arrange::Scene> scenesBefore = gArrange.scenes;
+      const size_t a1Slots = Arrange::FindLane(gArrange, laneA1)->slots.size();
+      const std::string firstName = Arrange::FindLane(gArrange, laneA1)->slots[0].clip.name;
+      const int follow = Arrange::FindLane(gArrange, laneA1)->slots[1].followAction;
+      const bool loaded = saved && LoadPatchFrom(path);
+      check(loaded, "patch loads");
+      remove(path.c_str());
+      bool same = loaded && gArrange.scenes.size() == scenesBefore.size() && gArrange.lanes.size() == 3;
+      for (size_t i = 0; same && i < scenesBefore.size(); ++i)
+         same = gArrange.scenes[i].name == scenesBefore[i].name && gArrange.scenes[i].tempo == scenesBefore[i].tempo;
+      const Arrange::Lane* l0 = gArrange.lanes.empty() ? nullptr : &gArrange.lanes[0];
+      same = same && l0 != nullptr && l0->slots.size() == a1Slots && l0->slots[0].clip.name == firstName &&
+             l0->slots[1].followAction == follow;
+      check(same, "scenes, slots and follow actions round trip");
+      if (loaded && l0 != nullptr)
+      {
+         laneA1 = gArrange.lanes[0].id;
+         // Stop All with the transport stopped clears the schedule at once.
+         ArrangeSessionLaunchScene(0);
+         ArrangeSessionStopAll();
+         Transport::Instance().SetPlaying(false);
+      }
+   }
+   if (frameId == 14)
+   {
+      check(&ArrangePlaybackModel() == &gArrange, "Stop All / transport stop gives the plain arrangement back");
+      // Leave a launched, Session-view frame for the screenshot.
+      gArrangeSessionView = true;
+      gArrangePanelOpen = true;
+      ArrangeSessionLaunchScene(1);
+   }
+   if (frameId == 20)
+   {
+      printf("%s\n", ok ? "SESSION VIEW TEST OK" : "SESSION VIEW TEST FAIL");
+      if (getenv("IMAGERESYNTH_SCREENSHOT") == nullptr)
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+   }
+}
 }

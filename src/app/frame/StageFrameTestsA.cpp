@@ -1378,6 +1378,7 @@ void DrawFrameTestsA(FrameCtx& fc)
       // WP6: time display, snap grid, markers, playhead keys, scrub-on-release.
       // Drives the same functions the panel's keys and gestures call.
       FrameTest_ARRANGEMARKERTEST(frameId, window);
+      FrameTest_SESSIONVIEWTEST(frameId, window);
 
       // v0.6 2.3: timeline fit, zoom step and loop in/out.
       FrameTest_ARRANGEKEYSTEST(frameId, window);
