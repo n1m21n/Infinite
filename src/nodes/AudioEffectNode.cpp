@@ -297,6 +297,12 @@ void AudioEffectNode::VisitParams(ParamVisitor& v)
    v.Float("mix", mix);
    for (size_t i = 0; i < mDef.params.size(); i++)
       v.Float(mDef.params[i].name.c_str(), mParamValues[i]);
+   // A patch file, OSC or RPC set stores any finite float; the knobs bind
+   // only the UI. Kernels trust the def's range (Stereo's width scales the
+   // side signal by it), so hold every param to it, as the knobs do.
+   mix = std::clamp(mix, 0.0f, 1.0f);
+   for (size_t i = 0; i < mDef.params.size(); i++)
+      mParamValues[i] = std::clamp(mParamValues[i], mDef.params[i].minVal, mDef.params[i].maxVal);
    if (mDef.hasFile)
       v.Text("file", filePath);
 }
