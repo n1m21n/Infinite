@@ -1330,13 +1330,13 @@ namespace app
       }
       {
          AudioKnobRow row(2);
-         row.KnobInt("repeats", &n->repeats, 1, 8);
+         row.KnobInt("repeats", &n->repeats, 1, NoteEchoNode::kMaxRepeats);
          row.Knob("decay", &n->decay, 0.0f, 100.0f, "%.0f%%", kKnobSmall);
          row.End();
       }
       {
          AudioKnobRow row(2);
-         row.KnobInt("transpose", &n->transposePerRepeat, -12, 12);
+         row.KnobInt("transpose", &n->transposePerRepeat, -NoteEchoNode::kMaxTransposePerRepeat, NoteEchoNode::kMaxTransposePerRepeat);
          bool muteDryBool = n->muteDry;
          if (row.Checkbox("Mute Dry##echoMuteDry", &muteDryBool))
             n->muteDry = muteDryBool;

@@ -573,7 +573,13 @@ public:
    int rateMode = 1;               // 0 = synced (rateBeats), 1 = free (rateSeconds)
    float rateBeats = 0.25f;        // beats per tap, synced mode (default 1/16)
    float rateSeconds = 0.15f;      // 0.02..2, free mode
-   int repeats = 3;                // 1..8
+   // A patch or remote set can store any int; the audio side clamps to these.
+   // The repeat-id map keys voiceId * 16 + repeat, so more than 15 repeats
+   // made two voices share keys and a note-off released the wrong voice.
+   static constexpr int kMaxRepeats = 8;
+   static constexpr int kMaxTransposePerRepeat = 12;
+   static_assert(kMaxRepeats < 16, "repeat ids are keyed voiceId * 16 + repeat");
+   int repeats = 3;                // 1..kMaxRepeats
    float decay = 60.0f;            // 0..100 percent, velocity multiplier per repeat
    int transposePerRepeat = 0;     // -12..12 semitones, applied cumulatively per repeat
    bool muteDry = false;           // true = swallow the original event, only repeats sound

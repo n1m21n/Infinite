@@ -237,6 +237,9 @@ namespace
          { "Quantizer", [] { return QuantizerNode::Create(); }, [](INode* n) { static_cast<QuantizerNode*>(n)->div = 3; }, false },
          { "Glide", [] { return GlideNode::Create(); }, [](INode* n) { static_cast<GlideNode*>(n)->glideMs = 100.0f; }, false },
          { "Note Echo", [] { return NoteEchoNode::Create(); }, nullptr, false },
+         // Past 15 repeats the repeat-id keys (voiceId * 16 + k) of two voices overlap; set directly,
+         // as a retaining param writer would, so only the audio side's clamp stands in the way.
+         { "Note Echo x20", [] { return NoteEchoNode::Create(); }, [](INode* n) { static_cast<NoteEchoNode*>(n)->repeats = 20; }, false },
          { "Note Router", [] { return NoteRouterNode::Create(); }, nullptr, false },
          { "Note Merge", [] { return NoteMergeNode::Create(); }, nullptr, false },
          { "Note Switcher", [] { return NoteSwitcherNode::Create(); }, nullptr, false },
@@ -703,6 +706,13 @@ namespace
          check("Chorder", "root", c->root, 0, 11);
          check("Chorder", "scale", c->scale, 0, MusicTime::kNumScaleTypes - 1);
          check("Chorder", "chordSize", c->chordSize, 2, 6);
+
+         std::unique_ptr<INode> ne(NoteEchoNode::Create());
+         load(ne.get(), { "repeats", "transposePerRepeat" });
+         auto* e = static_cast<NoteEchoNode*>(ne.get());
+         check("Note Echo", "repeats", e->repeats, 1, NoteEchoNode::kMaxRepeats);
+         check("Note Echo", "transposePerRepeat", e->transposePerRepeat, -NoteEchoNode::kMaxTransposePerRepeat,
+               NoteEchoNode::kMaxTransposePerRepeat);
       }
       // In-range values load unchanged; a root past B keeps its pitch class.
       std::unique_ptr<INode> ch(ChorderNode::Create());

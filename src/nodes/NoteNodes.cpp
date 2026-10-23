@@ -2192,9 +2192,10 @@ public:
       mRateMode.store(n.rateMode, std::memory_order_relaxed);
       mRateBeats.store(n.rateBeats, std::memory_order_relaxed);
       mRateSeconds.store(n.rateSeconds, std::memory_order_relaxed);
-      mRepeats.store(n.repeats, std::memory_order_relaxed);
+      mRepeats.store(std::clamp(n.repeats, 1, NoteEchoNode::kMaxRepeats), std::memory_order_relaxed);
       mDecay.store(n.decay, std::memory_order_relaxed);
-      mTransposeStep.store(n.transposePerRepeat, std::memory_order_relaxed);
+      mTransposeStep.store(std::clamp(n.transposePerRepeat, -NoteEchoNode::kMaxTransposePerRepeat,
+                                      NoteEchoNode::kMaxTransposePerRepeat), std::memory_order_relaxed);
       mMuteDry.store(n.muteDry, std::memory_order_relaxed);
    }
 
@@ -2260,6 +2261,8 @@ void NoteEchoNode::VisitParams(ParamVisitor& v)
    v.Float("decay", decay);
    v.Int("transposePerRepeat", transposePerRepeat);
    v.Bool("muteDry", muteDry);
+   repeats = std::clamp(repeats, 1, kMaxRepeats);
+   transposePerRepeat = std::clamp(transposePerRepeat, -kMaxTransposePerRepeat, kMaxTransposePerRepeat);
 }
 
 AudioNode* NoteEchoNode::GetAudioNode()
