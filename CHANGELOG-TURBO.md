@@ -1,5 +1,22 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.71 (in progress, branch feature/render3d-hq)
+
+Plan: `docs/plans/HQ-071-STRATEGY.md`; technical notes: `docs/RENDER-3D-HQ-FILAMENT.md`.
+
+- **New node: Render 3D HQ** (work in progress) - a second 3D renderer next to Render 3D, wired the
+  same way, with techniques ported from Google Filament (Apache-2.0): depth prepass, physically
+  based materials (Filament's BRDF with multiple-scattering energy compensation, clear coat, sheen,
+  specular anti-aliasing), image-based lighting from the HDRI with no seam. PointZ particles,
+  shadows, ambient occlusion and TAA come in the next steps. Built with `INFINITE_ENABLE_RENDER_HQ`
+  (on); without it the node draws as Render 3D and says so.
+- **Fix, visible in saved patches: Sphere, Cylinder, Cone, Torus Knot, Helix, Pyramid and the tubes
+  of Curve / Curve Ops / L-System were wound inside out.** Back-face culling then drew the inside of
+  their far half: the right outline, but lighting and reflections inverted in depth (a light from
+  behind looked like a light from the front; a polished metal sphere reflected the floor on top).
+  They now face outwards like the other shapes (`tests/unit/MeshTests.cpp` checks 21 of them), so
+  these objects light and reflect correctly in Render 3D, RTX and the HQ.
+
 ## 0.70.0-turbo (2026-10-22, branch turbo/next, waiting for the owner's test and merge)
 
 Plan: `docs/plans/NEXT-STRATEGY.md` (milestones, gate) and `docs/plans/NEXT-BACKLOG.md` (item IDs).

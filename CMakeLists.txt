@@ -24,6 +24,7 @@ option(INFINITE_ENABLE_DIRECTML_MATTING "Accelerate Remove Background with Windo
 option(INFINITE_ENABLE_AVX2 "Compile with /arch:AVX2 (any x64 CPU from ~2013 on)" ON)
 option(INFINITE_ENABLE_ASIO "ASIO driver support (downloads the Steinberg ASIO SDK, GPLv3)" ON)
 option(INFINITE_ENABLE_RTX "RTX render mode: NVIDIA OptiX ray tracing (full edition; needs the CUDA Toolkit to build)" ON)
+option(INFINITE_ENABLE_RENDER_HQ "Render 3D HQ node: Filament-referenced PBR, particle impostors, shadows, GTAO, TAA (OFF: it draws as Render 3D)" ON)
 option(INFINITE_ENABLE_LTCG "Whole-program optimization (/GL + /LTCG) in Release; slower link" OFF)
 option(INFINITE_ENABLE_TRACY "Tracy profiler zones, CPU and GL GPU (BSD-3); connect the Tracy v0.11.1 GUI" OFF)
 
@@ -290,6 +291,7 @@ add_executable(Infinite WIN32
     src/nodes/Render3DCull.cpp
     src/nodes/Render3DMotion.cpp
     src/nodes/Render3DFxNode.cpp
+    src/nodes/render_hq/RenderHqNode.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
     src/nodes/Text3DNode.cpp
@@ -586,6 +588,16 @@ if(INFINITE_ENABLE_RTX AND INFINITE_ENABLE_GPL)
                         "building without it. Install the CUDA Toolkit or set INFINITE_CUDA_ROOT.")
     endif()
 endif()
+if(INFINITE_ENABLE_RENDER_HQ)
+    # ---- Render 3D HQ (Turbo 0.71) -------------------------------------------
+    # Its renderer is a module: without it, HqStub.cpp answers and the node
+    # draws as Render 3D. Shaders are shaders/hq_*.glsl (embedded below).
+    target_sources(Infinite PRIVATE src/nodes/render_hq/HqRenderer.cpp)
+    message(STATUS "Render 3D HQ: ON")
+else()
+    target_sources(Infinite PRIVATE src/nodes/render_hq/HqStub.cpp)
+    message(STATUS "Render 3D HQ: OFF (the node draws as Render 3D)")
+endif()
 if(NOT INFINITE_RTX_BUILT)
     target_sources(Infinite PRIVATE src/nodes/RtxStub.cpp)
 endif()
@@ -827,7 +839,9 @@ FetchContent_MakeAvailable(doctest)
 add_executable(InfiniteUnitTests EXCLUDE_FROM_ALL
     tests/unit/UnitMain.cpp
     tests/unit/PatchTests.cpp
-    src/core/Patch.cpp)
+    tests/unit/MeshTests.cpp # Turbo 0.71 (S1)
+    src/core/Patch.cpp
+    src/core/Mesh.cpp)
 target_include_directories(InfiniteUnitTests PRIVATE src src/core "${doctest_SOURCE_DIR}")
 target_compile_definitions(InfiniteUnitTests PRIVATE NOMINMAX _USE_MATH_DEFINES)
 target_compile_options(InfiniteUnitTests PRIVATE /utf-8 /permissive- /Zc:char8_t- /Zc:__cplusplus)

@@ -148,6 +148,11 @@ unsigned int Render3DTemporal::BuildComputeShader(const char* name)
    return BuildCompute(name);
 }
 
+std::string Render3DTemporal::LoadShaderSource(const char* name)
+{
+   return ShaderSource(name);
+}
+
 void Render3DTemporal::Release()
 {
    DeleteTexture(mMotion);

@@ -152,7 +152,9 @@ namespace Primitives
          {
             const unsigned int a = (unsigned int)(i * (s + 1) + j);
             const unsigned int b = a + (unsigned int)s + 1;
-            PushQuad(mesh, a, b, b + 1, a + 1);
+            // Turbo 0.71: counter-clockwise seen from outside (it was the other
+            // way, so back-face culling showed the inside of the far half).
+            PushQuad(mesh, a, a + 1, b + 1, b);
          }
       }
       return mesh;
@@ -215,10 +217,10 @@ namespace Primitives
          {
             const unsigned int a = (unsigned int)(i * (s + 1) + j);
             const unsigned int b = a + (unsigned int)s + 1;
-            PushQuad(mesh, a, b, b + 1, a + 1);
+            PushQuad(mesh, a, a + 1, b + 1, b); // Turbo 0.71: CCW from outside (as Sphere)
          }
 
-      // caps
+      // caps (Turbo 0.71: CCW seen from outside - they were flipped too)
       for (int cap = 0; cap < 2; cap++)
       {
          const bool top = (cap == 0);
@@ -240,11 +242,11 @@ namespace Primitives
             const unsigned int a = center + 1 + (unsigned int)j;
             if (top)
             {
-               mesh.indices.push_back(center); mesh.indices.push_back(a); mesh.indices.push_back(a + 1);
+               mesh.indices.push_back(center); mesh.indices.push_back(a + 1); mesh.indices.push_back(a);
             }
             else
             {
-               mesh.indices.push_back(center); mesh.indices.push_back(a + 1); mesh.indices.push_back(a);
+               mesh.indices.push_back(center); mesh.indices.push_back(a); mesh.indices.push_back(a + 1);
             }
          }
       }
@@ -383,7 +385,7 @@ namespace Primitives
          {
             const unsigned int a = (unsigned int)(i * (sid + 1) + j);
             const unsigned int b = a + (unsigned int)sid + 1;
-            PushQuad(mesh, a, b, b + 1, a + 1);
+            PushQuad(mesh, a, a + 1, b + 1, b); // Turbo 0.71: CCW from outside (as Sphere)
          }
       return mesh;
    }
@@ -3171,11 +3173,14 @@ namespace Primitives
          const float x0 = std::cos(t0) * radius, z0 = std::sin(t0) * radius;
          const float x1 = std::cos(t1) * radius, z1 = std::sin(t1) * radius;
 
-         float ax = x1 - x0, az = z1 - z0;
-         float bx = -x0, by = apexY - baseY, bz = -z0;
-         float nx = az * by - 0.0f * bz;
-         float ny = 0.0f * bx - ax * bz;
-         float nz = ax * by - 0.0f * bx;
+         // Turbo 0.71: the face is (p1, p0, apex), counter-clockwise seen from
+         // outside, and its normal is that winding's cross product (the old
+         // one had y and z wrong and the face wound the other way).
+         const float ex = x0 - x1, ez = z0 - z1;          // p0 - p1
+         const float fx = -x1, fy = apexY - baseY, fz = -z1; // apex - p1
+         float nx = 0.0f * fz - ez * fy;
+         float ny = ez * fx - ex * fz;
+         float nz = ex * fy - 0.0f * fx;
          const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
          if (len > 1e-6f) { nx /= len; ny /= len; nz /= len; }
 
@@ -3183,8 +3188,8 @@ namespace Primitives
          PushVertex(mesh, x0, baseY, z0, nx, ny, nz, 0.0f, 0.0f);
          PushVertex(mesh, x1, baseY, z1, nx, ny, nz, 1.0f, 0.0f);
          PushVertex(mesh, 0.0f, apexY, 0.0f, nx, ny, nz, 0.5f, 1.0f);
-         mesh.indices.push_back(base);
          mesh.indices.push_back(base + 1);
+         mesh.indices.push_back(base);
          mesh.indices.push_back(base + 2);
       }
 
@@ -3196,11 +3201,11 @@ namespace Primitives
          PushVertex(mesh, std::cos(t) * radius, baseY, std::sin(t) * radius,
                     0.0f, -1.0f, 0.0f, 0.5f + std::cos(t) * 0.5f, 0.5f + std::sin(t) * 0.5f);
       }
-      for (int j = 0; j < n; j++)
+      for (int j = 0; j < n; j++) // Turbo 0.71: CCW seen from below
       {
          mesh.indices.push_back(centre);
-         mesh.indices.push_back(centre + 1 + (unsigned int)j + 1);
          mesh.indices.push_back(centre + 1 + (unsigned int)j);
+         mesh.indices.push_back(centre + 1 + (unsigned int)j + 1);
       }
       return mesh;
    }
@@ -3264,10 +3269,10 @@ namespace Primitives
       const int stride = n + 1;
       for (int i = 0; i < seg; i++)
          for (int j = 0; j < n; j++)
-            PushQuad(mesh, (unsigned int)(i * stride + j),
-                     (unsigned int)((i + 1) * stride + j),
+            PushQuad(mesh, (unsigned int)(i * stride + j), // Turbo 0.71: CCW from outside
+                     (unsigned int)(i * stride + j + 1),
                      (unsigned int)((i + 1) * stride + j + 1),
-                     (unsigned int)(i * stride + j + 1));
+                     (unsigned int)((i + 1) * stride + j));
       return mesh;
    }
 
@@ -4196,10 +4201,10 @@ namespace MeshOps
       const int stride = n + 1;
       for (size_t i = 0; i + 1 < rings; i++)
          for (int j = 0; j < n; j++)
-            PushQuad(mesh, (unsigned int)(i * stride + j),
-                     (unsigned int)((i + 1) * stride + j),
+            PushQuad(mesh, (unsigned int)(i * stride + j), // Turbo 0.71: CCW from outside
+                     (unsigned int)(i * stride + j + 1),
                      (unsigned int)((i + 1) * stride + j + 1),
-                     (unsigned int)(i * stride + j + 1));
+                     (unsigned int)((i + 1) * stride + j));
       return mesh;
    }
 }

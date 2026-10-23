@@ -40,6 +40,7 @@ namespace
          { "Camera", "3DScene" }, { "Light", "3DScene" }, { "HDRI", "3DScene" },
          { "Material", "3DScene" }, { "Mapping", "3DScene" }, { "Render 3D", "3DScene" },
          { "Render 3D FX", "3DScene" }, // Turbo 0.70
+         { "Render 3D HQ", "3DScene" }, // Turbo 0.71 (S1)
          { "Resynthesize", "Effects" },
          { "Macro Knob", "Macros" }, { "Macro XY", "Macros" },
          { "Comment", "Utility" }, { "Group", "Utility" }, { "Null", "Utility" }, { "Viewport", "Utility" },

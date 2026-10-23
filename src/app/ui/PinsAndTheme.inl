@@ -427,6 +427,7 @@
       REGISTER_NODE(EnvironmentNode, HDRI, "3D");
       REGISTER_NODE(Render3DNode, Render 3D, "3D");
       REGISTER_NODE(Render3DFxNode, Render 3D FX, "3D"); // Turbo 0.70
+      REGISTER_NODE(RenderHqNode, Render 3D HQ, "3D"); // Turbo 0.71 (S1)
       REGISTER_NODE(DrawNode, Draw, "Source");
       REGISTER_NODE(ResynthNode, Resynthesize, "Resynth");
       REGISTER_NODE(FitNode, Fit, "Compositing");

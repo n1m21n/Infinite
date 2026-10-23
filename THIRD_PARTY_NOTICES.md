@@ -29,6 +29,7 @@ under the same licence). Code inside `src/gpl/` is GPL-3.0 (`src/gpl/LICENSE`); 
 | signalsmith-stretch | MIT | time stretch |
 | shine | LGPL-2.0 | MP3 encoding |
 | Tracy v0.11.1 (optional, `INFINITE_ENABLE_TRACY`, off by default) | BSD-3-Clause | profiler client, both editions; fetched at configure time, not in release builds |
+| Google Filament @ 13be3649 (techniques ported into `shaders/hq_brdf.glsl`, `shaders/hq_ibl.frag.glsl`; no Filament code is linked) | Apache-2.0, © Google LLC | Render 3D HQ (0.71): BRDF, image-based lighting, DFG table, specular AA and AO terms rewritten in GLSL 4.5; each ported file starts with the source path, commit and changes (`docs/RENDER-3D-HQ-FILAMENT.md` section 14) |
 | AMD FidelityFX Super Resolution 1 v1.0.2 (`ffx_a.h`, `ffx_fsr1.h`) | MIT, © 2021 Advanced Micro Devices | Render 3D's upscale (EASU + RCAS), both editions; the two headers are fetched at configure time and compiled into the exe (GLSL) and into Render3DTemporal.cpp (constants) |
 
 `ffmpeg.exe`, when present next to the exe, is a separate program with its own licence (most

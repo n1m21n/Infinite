@@ -5870,6 +5870,10 @@
          auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
          Render3DFxNode fx;
          fx.Input().Connect(r);
+         // Turbo 0.71: since the winding fix the knot is drawn from outside
+         // (convex, few creases), so AO needs a radius that reaches where the
+         // tube crosses itself to change the picture measurably.
+         fx.aoRadius = 1.0f;
          static unsigned int sFbo = 0;
          int frame = 3000000;
          bool all = true;
@@ -5960,6 +5964,236 @@
          check("RTX render: passes through", 1.5f, 1.0f, 24.0f, 4.0f, 0.1f, false);
          r->renderMode = savedMode;
          printf("%s\n", all ? "R3DFXTEST OK" : "R3DFXTEST FAIL - BUG");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+      // Turbo 0.71 (S1): Render 3D HQ on the 3D test scene, next to its Render
+      // 3D - it draws the same sources (something lit over the background, at
+      // its own size, after a resize too), with no GL error or NaN, leaves the
+      // FBO / viewport as it found them, and the Render 3D picture stays the
+      // same. Without the module it must still give a picture (Render 3D's).
+      if (getenv("INFINITE_HQTEST") != nullptr && frameId == 20)
+      {
+         auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
+         static unsigned int sFbo = 0;
+         auto read = [&](unsigned int tex, int w, int h) {
+            std::vector<float> px;
+            if (tex == 0 || !GLUtil::ReadTexturePixels(sFbo, tex, w, h, px))
+               px.clear();
+            return px;
+         };
+         int frame = 4000000;
+         r->CookIfNeeded(++frame);
+         const std::vector<float> before = read(r->GetOutputTexture(), r->GetOutputWidth(), r->GetOutputHeight());
+
+         RenderHqNode hq;
+         for (int s = 0; s < Render3DNode::kSlots; s++)
+            hq.geometry[s] = r->geometry[s];
+         bool all = true;
+         while (glGetError() != GL_NO_ERROR) {}
+         auto check = [&](int w, int h) {
+            hq.width = (float)w;
+            hq.height = (float)h;
+            GLint vpBefore[4], fboBefore = 0;
+            glGetIntegerv(GL_VIEWPORT, vpBefore);
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fboBefore);
+            hq.CookIfNeeded(++frame);
+            GLint vpAfter[4], fboAfter = 0;
+            glGetIntegerv(GL_VIEWPORT, vpAfter);
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fboAfter);
+            const bool stateKept = fboAfter == fboBefore && std::equal(vpBefore, vpBefore + 4, vpAfter);
+            const int ow = hq.GetOutputWidth(), oh = hq.GetOutputHeight();
+            const std::vector<float> px = read(hq.GetOutputTexture(), ow, oh);
+            const GLenum err = glGetError();
+            // Lit pixels: brighter than the background by a clear margin.
+            const float bg = (hq.bgColor[0] + hq.bgColor[1] + hq.bgColor[2]) / 3.0f;
+            bool finite = !px.empty();
+            size_t lit = 0;
+            for (size_t i = 0; i + 3 < px.size(); i += 4)
+            {
+               finite = finite && std::isfinite(px[i]) && std::isfinite(px[i + 1]) && std::isfinite(px[i + 2]);
+               if ((px[i] + px[i + 1] + px[i + 2]) / 3.0f > bg + 0.1f)
+                  lit++;
+            }
+            const double coverage = px.empty() ? 0.0 : (double)lit / (double)(px.size() / 4);
+            const bool active = HqModuleBuilt() ? (hq.HqActive() && hq.Status().empty()) : !hq.Status().empty();
+            const bool drew = !HqModuleBuilt() || (hq.HqDrawCalls() == 2 && hq.HqTriangles() > 0 && hq.HqSkipped() == 0);
+            const bool sized = !HqModuleBuilt() || (ow == w && oh == h);
+            const bool ok = active && drew && sized && finite && stateKept && err == GL_NO_ERROR && coverage > 0.02;
+            printf("  %dx%d: module %s, out %dx%d, %zu tris / %zu draws, lit %.1f%%, finite %d, state %s, gl 0x%x  %s\n", w,
+                   h, hq.HqActive() ? "on" : "off (Render 3D)", ow, oh, hq.HqTriangles(), hq.HqDrawCalls(),
+                   coverage * 100.0, finite ? 1 : 0, stateKept ? "kept" : "CHANGED", err, ok ? "ok" : "FAIL");
+            if (!hq.Status().empty())
+               printf("    status: %s\n", hq.Status().c_str());
+            all = all && ok;
+            if (const char* png = getenv("INFINITE_HQTEST_PNG")) // eyeball it (bottom-up rows)
+            {
+               std::vector<unsigned char> rgba(px.size());
+               for (size_t k = 0; k < px.size(); k++)
+                  rgba[k] = (unsigned char)std::clamp(px[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+               if (!rgba.empty())
+                  stbi_write_png(png, ow, oh, 4, rgba.data(), ow * 4);
+            }
+         };
+         check(640, 360);
+         check(500, 500); // resized targets
+
+         // S2: Filament's model over the range of a Material (polished metal,
+         // clear coat, sheen) changes the picture and keeps it finite.
+         {
+            auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+            const std::vector<float> plain = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            const float saved[4] = { g0->metallic, g0->roughness, g0->clearcoat, g0->sheen };
+            g0->metallic = 1.0f;
+            g0->roughness = 0.05f;
+            g0->clearcoat = 1.0f;
+            g0->sheen = 1.0f;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> shiny = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            const GLenum err = glGetError();
+            g0->metallic = saved[0];
+            g0->roughness = saved[1];
+            g0->clearcoat = saved[2];
+            g0->sheen = saved[3];
+            bool finite = !shiny.empty() && shiny.size() == plain.size();
+            double diff = 0.0;
+            for (size_t i = 0; finite && i < shiny.size(); i++)
+            {
+               finite = std::isfinite(shiny[i]);
+               diff += std::fabs(shiny[i] - plain[i]);
+            }
+            diff /= (double)std::max<size_t>(1, shiny.size());
+            const bool ok = finite && err == GL_NO_ERROR && (!HqModuleBuilt() || diff > 1e-3);
+            printf("  metal + clear coat + sheen: diff %.5f, finite %d, gl 0x%x  %s\n", diff, finite ? 1 : 0, err,
+                   ok ? "ok" : "FAIL");
+            all = all && ok;
+         }
+
+         // S4: shadows (map + contact) change the picture, stay finite, and a
+         // still scene keeps its shadow map (same picture, cook after cook).
+         if (HqModuleBuilt())
+         {
+            hq.CookIfNeeded(++frame); // the materials the check above restored
+            const std::vector<float> lit = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.shadowsEnabled = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> unlit = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.shadowsEnabled = true;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> again = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            const GLenum err = glGetError();
+            bool finite = !lit.empty() && lit.size() == unlit.size() && lit.size() == again.size();
+            double diff = 0.0, still = 0.0;
+            for (size_t i = 0; finite && i < lit.size(); i++)
+            {
+               finite = std::isfinite(lit[i]) && std::isfinite(again[i]);
+               diff += std::fabs(lit[i] - unlit[i]);
+               still += std::fabs(lit[i] - again[i]);
+            }
+            diff /= (double)std::max<size_t>(1, lit.size());
+            still /= (double)std::max<size_t>(1, lit.size());
+            const bool ok = finite && err == GL_NO_ERROR && diff > 1e-4 && still < 1e-6;
+            printf("  shadows: on vs off diff %.5f, on vs on again %.7f, finite %d, gl 0x%x  %s\n", diff, still,
+                   finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+         }
+
+         // S3: PointZ points as sphere impostors and PointZ triangles straight
+         // from the GPU; then 30 frames with the camera orbiting and an object
+         // moving (the picture follows, stays finite; GPU time per frame).
+         if (HqModuleBuilt())
+         {
+            auto setF = [](PopNode* n, const char* key, int comp, float v) {
+               const int i = n->Def().ParamIndex(key);
+               if (i >= 0) n->Values().f[(size_t)(n->Def().FloatOffset(i) + comp)] = v;
+            };
+            auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+            std::unique_ptr<PopNode> grid(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+            setF(grid.get(), "rows", 0, 100.0f);
+            setF(grid.get(), "cols", 0, 100.0f);
+            setF(grid.get(), "kind", 0, 2.0f); // points
+            RenderHqNode ph;
+            ph.width = 640.0f;
+            ph.height = 360.0f;
+            ph.geometry[0] = grid.get();
+            auto lit = [&](const std::vector<float>& px, bool& finite) {
+               const float bg = (ph.bgColor[0] + ph.bgColor[1] + ph.bgColor[2]) / 3.0f;
+               size_t n = 0;
+               finite = !px.empty();
+               for (size_t i = 0; i + 3 < px.size(); i += 4)
+               {
+                  finite = finite && std::isfinite(px[i]) && std::isfinite(px[i + 1]) && std::isfinite(px[i + 2]);
+                  if ((px[i] + px[i + 1] + px[i + 2]) / 3.0f > bg + 0.1f)
+                     n++;
+               }
+               return px.empty() ? 0.0 : (double)n / (double)(px.size() / 4);
+            };
+            while (glGetError() != GL_NO_ERROR) {}
+            ph.CookIfNeeded(++frame);
+            bool finite = false;
+            double cover = lit(read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight()), finite);
+            GLenum err = glGetError();
+            bool ok = ph.HqSpheres() == 10000 && ph.HqSkipped() == 0 && finite && cover > 0.01 && err == GL_NO_ERROR;
+            printf("  PointZ 100x100 points: %zu spheres, lit %.1f%%, finite %d, gl 0x%x  %s\n", ph.HqSpheres(),
+                   cover * 100.0, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            setF(grid.get(), "kind", 0, 0.0f); // polygons
+            ph.CookIfNeeded(++frame);
+            cover = lit(read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight()), finite);
+            err = glGetError();
+            ok = ph.HqTriangles() > 0 && ph.HqSpheres() == 0 && finite && cover > 0.01 && err == GL_NO_ERROR;
+            printf("  PointZ 100x100 polygons: %zu triangles from the GPU, lit %.1f%%, finite %d, gl 0x%x  %s\n",
+                   ph.HqTriangles(), cover * 100.0, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            setF(grid.get(), "kind", 0, 2.0f);
+            ph.geometry[1] = g0;
+            const float savedX = g0->posX;
+            ph.CookIfNeeded(++frame);
+            const std::vector<float> first = read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight());
+            glFinish(); // test only: wall time of the frames below includes the GPU
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int k = 0; k < 30; k++)
+            {
+               ph.camAzimuth += 3.0f;
+               g0->posX += 0.02f;
+               ph.CookIfNeeded(++frame);
+            }
+            glFinish();
+            const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 30.0;
+            const std::vector<float> last = read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight());
+            g0->posX = savedX;
+            err = glGetError();
+            double moved = 0.0;
+            for (size_t i = 0; i < last.size() && i < first.size(); i++)
+               moved += std::fabs(last[i] - first[i]);
+            moved /= (double)std::max<size_t>(1, last.size());
+            lit(last, finite);
+            ok = finite && moved > 1e-3 && err == GL_NO_ERROR && ph.HqSpheres() == 10000;
+            printf("  orbit + moving object, 30 frames: diff %.4f, %.2f ms/frame (CPU+GPU), finite %d, gl 0x%x  %s\n",
+                   moved, ms, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+            if (const char* png = getenv("INFINITE_HQTEST_PNG3")) // eyeball the spheres (bottom-up rows)
+            {
+               std::vector<unsigned char> rgba(last.size());
+               for (size_t k = 0; k < last.size(); k++)
+                  rgba[k] = (unsigned char)std::clamp(last[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+               if (!rgba.empty())
+                  stbi_write_png(png, ph.GetOutputWidth(), ph.GetOutputHeight(), 4, rgba.data(), ph.GetOutputWidth() * 4);
+            }
+         }
+
+         // Render 3D: the same picture after the HQ drew in between.
+         r->CookIfNeeded(++frame);
+         const std::vector<float> after = read(r->GetOutputTexture(), r->GetOutputWidth(), r->GetOutputHeight());
+         double diff = 0.0;
+         for (size_t i = 0; i < after.size() && i < before.size(); i++)
+            diff += std::fabs(after[i] - before[i]);
+         diff /= (double)std::max<size_t>(1, after.size());
+         const bool same = !before.empty() && before.size() == after.size() && diff < 1e-6;
+         printf("  Render 3D unchanged next to it: diff %.7f  %s\n", diff, same ? "ok" : "FAIL");
+         all = all && same;
+         printf("%s\n", all ? "HQTEST OK" : "HQTEST FAIL - BUG");
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
       // Turbo 0.70: a Material's texture reaches an Instance PointZ's copies in
