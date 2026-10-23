@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include "platform/AppPaths.h"
+
 #ifndef INFINITE_VERSION_STRING
 #define INFINITE_VERSION_STRING "0.0.0"
 #endif
@@ -107,7 +109,7 @@ namespace Provenance
       const auto comments = VorbisComments();
       if (comments.empty())
          return false;
-      FILE* in = std::fopen(path.c_str(), "rb");
+      FILE* in = AppPaths::OpenFile(path, "rb");
       if (in == nullptr)
          return false;
       uint8_t head[42];
@@ -138,7 +140,7 @@ namespace Provenance
                                  (uint8_t)((body.size() >> 8) & 0xFF),
                                  (uint8_t)(body.size() & 0xFF) };
       const std::string tmp = path + ".credit.tmp";
-      FILE* out = std::fopen(tmp.c_str(), "wb");
+      FILE* out = AppPaths::OpenFile(tmp, "wb");
       if (out == nullptr)
       {
          std::fclose(in);
@@ -156,9 +158,12 @@ namespace Provenance
       }
       std::fclose(in);
       ok = (std::fclose(out) == 0) && ok;
-      if (!ok || std::rename(tmp.c_str(), path.c_str()) != 0)
+      std::error_code ec;
+      if (ok)
+         std::filesystem::rename(AppPaths::FsPath(tmp), AppPaths::FsPath(path), ec);
+      if (!ok || ec)
       {
-         std::remove(tmp.c_str());
+         std::filesystem::remove(AppPaths::FsPath(tmp), ec);
          return false;
       }
       return true;
