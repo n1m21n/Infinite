@@ -71,6 +71,16 @@ namespace WavetableShaperDsp
    // (0 = full bandwidth .. kMipLevels-1 = fundamental only).
    inline float ReadAtMip(double phase01, int table, float position, float mipPos)
    {
+      // NaN/inf input reaches here as a NaN phase (and slew mip) through the
+      // oversampler; std::clamp passes NaN on and the (int) casts below are
+      // then undefined. Read the table's zero point instead - AudioEffectNode
+      // already resets the kernel and drops the block (B-K-023).
+      if (!std::isfinite(phase01))
+         phase01 = 0.0;
+      if (!(mipPos >= 0.0f))
+         mipPos = 0.0f;
+      if (!(position >= 0.0f))
+         position = 0.0f;
       const float posClamped = std::clamp(position, 0.0f, 1.0f);
       const float framePos = posClamped * (float)(Wavetable::kFrames - 1);
       const int frameLo = (int)framePos;
