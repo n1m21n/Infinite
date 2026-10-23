@@ -85,10 +85,9 @@ public:
    }
 
    // ---- set block ----
-   // A group marked as a block is one section of a patch in a live set: the
-   // Show Set window steps through blocks in `order`, and a block that is off
-   // stops its members cooking (pictures hold black, sound fades out over
-   // Show Set's fade time).
+   // A group marked as a block has a power button in its frame. A block that
+   // is off stops its members cooking (pictures hold black, sound fades out).
+   // `order` is the order blocks were made in, which picks each one's colour.
    bool block = false;
    bool on = true;
    int order = 0;

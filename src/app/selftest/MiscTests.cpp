@@ -27,10 +27,10 @@ namespace app
 {
 // ==================================================== INFINITE_BLOCKSETTEST
 //
-// Set blocks: Show Set's Next plays the next block and switches the others off, at
-// once on a stopped transport and on Show Set's quantize grid while playing; a node in an off block
-// gives no picture (its cable resolves to nothing) and its sound ramps to silence
-// and stops; the block params survive a save. Pre-GL: nothing here draws.
+// Set blocks: a block's power button switches its members off and on; a node in an off
+// block gives no picture (its cable resolves to nothing) and its sound ramps to silence
+// and stops; Show Set's Next never touches blocks; the block params survive a save.
+// Pre-GL: nothing here draws.
 bool RunBlockSetTest()
 {
    bool ok = true;
@@ -61,18 +61,24 @@ bool RunBlockSetTest()
    printf("BLOCKSET make %s (blocks %d)\n", made ? "OK" : "FAIL", (int)blocks.size());
    ok &= made;
 
-   // Stopped transport: GO lands at once on the block after the current one.
-   Transport& tr = Transport::Instance();
-   tr.SetPlaying(false);
-   ShowSetStep(+1);   // no patches in the show set: the step is the block's
+   // Show Set's Next / Previous step patches only: with no patches they leave every block as it is.
+   ShowSetStep(+1);
+   ShowSetStep(-1);
+   BlockSetUpdate();
+   const bool untouched = b1->on && b2->on && !picNode->blockOff && !pic2Node->blockOff;
+   printf("BLOCKSET show set leaves blocks %s\n", untouched ? "OK" : "FAIL");
+   ok &= untouched;
+
+   // Power off: only that block's members stop.
+   b1->on = false;
    BlockSetUpdate();
    ImageCable cable;
    cable.Connect(picNode);
    AudioNode* an = AudioNodeOfAny(sndNode);
-   const bool switched = SetBlockCurrent() == 1 && !b1->on && b2->on && picNode->blockOff && cable.Resolved() == nullptr &&
+   const bool switched = b2->on && picNode->blockOff && !pic2Node->blockOff && cable.Resolved() == nullptr &&
                          an != nullptr && an->blockGainTarget.load() == 0.0f;
-   printf("BLOCKSET go stopped %s (current %d, off %d, cable %s)\n", switched ? "OK" : "FAIL", SetBlockCurrent(),
-          picNode->blockOff ? 1 : 0, cable.Resolved() == nullptr ? "black" : "live");
+   printf("BLOCKSET power off %s (off %d, other off %d, cable %s)\n", switched ? "OK" : "FAIL",
+          picNode->blockOff ? 1 : 0, pic2Node->blockOff ? 1 : 0, cable.Resolved() == nullptr ? "black" : "live");
    ok &= switched;
 
    // The sound ramps out over the fade and then the engine skips the node.
@@ -118,30 +124,16 @@ bool RunBlockSetTest()
       ok &= faded && back && snapped;
    }
 
-   // Playing with a bar grid: GO waits for the bar line, then lands.
-   const int oldQ = ShowSetQuantize();
-   ShowSetQuantize() = MusicTime::kLaunchBar;
-   tr.SetPlaying(true);
-   const double beat0 = tr.Beats();
-   ShowSetStep(+1);
-   const bool endStays = SetBlockPending() == -1 && SetBlockCurrent() == 1;   // past the last block, nothing to step to
-   ShowSetStep(-1);
+   // Power on again: the members cook.
+   b1->on = true;
    BlockSetUpdate();
-   const bool waiting = SetBlockPending() == 0 && SetBlockCurrent() == 1;
-   const double bar = MusicTime::NextLaunchBeat(beat0, MusicTime::kLaunchBar, 1e-3);
-   // Tick clamps a step to 0.25 s, so walk the clock to just past the bar line.
-   while (tr.Beats() < bar + 0.05)
-      tr.Tick(0.1f);
-   BlockSetUpdate();
-   const bool landed = SetBlockPending() == -1 && SetBlockCurrent() == 0 && b1->on && !b2->on && !picNode->blockOff;
-   printf("BLOCKSET go on bar %s (end stays %d, waited %d, landed %d)\n", endStays && waiting && landed ? "OK" : "FAIL",
-          endStays ? 1 : 0, waiting ? 1 : 0, landed ? 1 : 0);
-   ok &= endStays && waiting && landed;
-   tr.SetPlaying(false);
-   ShowSetQuantize() = oldQ;
+   const bool backOn = !picNode->blockOff && cable.Resolved() != nullptr;
+   printf("BLOCKSET power on %s\n", backOn ? "OK" : "FAIL");
+   ok &= backOn;
 
    // Saved params round-trip into a fresh group.
    b2->order = 7;
+   b2->on = false;
    std::vector<std::pair<std::string, std::string>> saved;
    Patch::SaveParams(b2, saved);
    GroupNode copy;

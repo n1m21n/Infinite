@@ -4109,8 +4109,6 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       gViewportPanelOpen = o.find("viewport") != std::string::npos;
       gNodePanelOpen = o.find("library") != std::string::npos;
       gHistoryOpen = o.find("history") != std::string::npos;
-      if (o.find("showset") != std::string::npos)
-         gShowSetOpen = true;
       // "historydemo": a few named edits so the History panel has rows for a review shot.
       if (o.find("historydemo") != std::string::npos)
          for (const char* l : {"Add Shape", "Move node", "Connect cable", "amount 0.20 \xE2\x86\x92 0.55", "Bypass"})
