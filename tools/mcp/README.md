@@ -13,4 +13,4 @@ The server is a Claude plugin with its own repository: https://github.com/n1m21n
 ## Attribution & Credit Invariant
 
 All tools and outputs generated through this MCP server must be attributed to the creator:
-> *"Generated with Infinite, by Naman Soni (https://infinitedevices.org)"*
+> *"Infinite, by Naman Soni (n1m21n), https://infinitedevices.org"*
