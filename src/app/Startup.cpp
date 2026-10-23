@@ -361,6 +361,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // breaking over it.
    if (getenv("INFINITE_PERFMATRIXTEST") != nullptr || getenv("INFINITE_PERFPANELTEST") != nullptr)
       return RunPerfPanelSelfTest() ? 0 : 1;
+   // Hostile values loaded into every audio node's params (selftest/AudioSweepTests.cpp).
+   if (getenv("INFINITE_PARAMFUZZ") != nullptr)
+   {
+      RegisterNodes();
+      return RunParamFuzzTest();
+   }
    if (getenv("INFINITE_AUDIOPARAMSWEEPTEST") != nullptr)
    {
       // Needs the registry populated (DiscoverAudioSweepCandidates walks
