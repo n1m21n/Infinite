@@ -508,10 +508,10 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_SAVEMEDIATEST") != nullptr)
       return RunSaveWithMediaTest() ? 0 : 1;
 
-   if (getenv("INFINITE_BLOCKSETTEST") != nullptr)
+   if (getenv("INFINITE_GROUPPOWERTEST") != nullptr)
    {
       RegisterNodes(); // spawns real groups and nodes; nothing cooks or draws, no GL involved
-      return RunBlockSetTest() ? 0 : 1;
+      return RunGroupPowerTest() ? 0 : 1;
    }
 
    if (getenv("INFINITE_APPEARANCETEST") != nullptr)

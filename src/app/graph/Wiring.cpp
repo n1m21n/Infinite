@@ -160,7 +160,8 @@ namespace app
 
       data.scenes.clear();
       for (const Arrange::Scene& sc : m.scenes)
-         data.scenes.push_back({ sc.tempo, sc.name, sc.quantize, sc.additive });
+         data.scenes.push_back({ sc.tempo, sc.name, sc.quantize, sc.additive, sc.followNext, sc.followBars });
+      data.sessionQuantize = m.sessionQuantize;
 
       Patch::ArrangeSettingsRecord& a = data.arrangeSettings;
       // Saved, not recomputed as max-id + 1: a clip deleted after taking a
@@ -265,7 +266,8 @@ namespace app
       }
 
       for (const Patch::SceneRecord& r : data.scenes)
-         m.scenes.push_back({ r.name, r.tempo, r.quantize, r.additive });
+         m.scenes.push_back({ r.name, r.tempo, r.quantize, r.additive, r.followNext, r.followBars });
+      m.sessionQuantize = data.sessionQuantize;
       // Every slot row has a scene, so a hand-edited file can't hide a slot.
       for (const Arrange::Lane& lane : m.lanes)
          while (m.scenes.size() < lane.slots.size())

@@ -21,6 +21,21 @@ Code: `src/app/panels/ArrangeSessionGrid.cpp` (panel), `ArrangeSession.cpp` (eng
 
 Also: double-click a cell opens the inspector; inline rename on the cell.
 
+## Session fixes (2026-10-23, branch `feature/session-fixes`)
+
+- Session Audio (`AudioMode::Session`): toolbar chip and top-bar badge; launching turns it on. In this mode
+  `ArrangePlaybackModel()` holds only launched slots; the Timeline's clips are stripped from the copy.
+- GarageBand clicks: a click on a playing clip or scene stops it on the grid, on a queued one takes the launch back.
+  Cmd-click selects only. An empty cell's click selects it (paste target); double-click adds a clip.
+- Scene selection: click a scene, then Delete / Cmd+D / Enter / Up / Down.
+- Copy, Cut, Paste, Duplicate, Delete in the slot menu and on the keys (one queued action path, test kinds 3-5).
+- Toolbar mirrors the Timeline's: Monitor | Play, Record, Stop All, Quantize | Inspector; pinned right Session Audio
+  and Render Take (presets the Timeline render range to the last take and opens its Render dialog).
+- `gArrange.sessionQuantize` (patch `sessionmeta`), the default for every "Session Default" clip and scene.
+- Scene `followNext` / `followBars` (patch `scenemeta` trailing fields): "Then Play Next Scene" after the scene's
+  length or N bars, wrapping and skipping empty rows.
+- Inspector Launch card for slot clips: Mode, Quantize, Loop, Length, Then (follow action), After.
+
 ## Checks at close
 
 `INFINITE_SESSIONVIEWTEST` passes; hygiene driver 54/54; design ratchet colours 0, raw widgets 433; i18n 0 missing.
@@ -29,8 +44,8 @@ Also: double-click a cell opens the inspector; inline rename on the cell.
 
 - Multi-select and drag within the grid (move, Alt-copy, scene reorder).
 - Group tracks and scenes.
-- Legato; quantize 1/4 beat and 4 bars; scene follow actions, colour, time signature.
-- Inspector "Launch" section; same-track video transition on launch.
+- Legato; quantize 1/4 beat and 4 bars; scene colour, time signature.
+- Same-track video transition on launch.
 - Overlap-rule tests (two scenes additive, video layering).
 - Panel persistence in the patch.
 - Dropping onto a filled cell leaves the old clip's hidden sample node orphaned (same as Clear).

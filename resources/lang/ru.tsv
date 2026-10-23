@@ -1356,7 +1356,6 @@ Loop In / Out	Начало / конец петли
 Loop On / Off	Петля вкл. / выкл.
 MIDI learn	MIDI learn
 MIT licensed	Лицензия MIT
-Make block	Создать блок
 Markers	Маркеры
 Mixes audio in 3D for headphones and plays it straight to the output (no output pin; it also records its own WAV/FLAC, 16 or 24 bit, always facing front): each input is a dot around a head, and its angle, distance and height (scroll on a dot) change how it is heard. Drop a cable on the empty + pin to add a source; alt-drag a dot for its level; H pins a source in front of your head. Ears use a measured dummy-head set (MIT KEMAR) or a spherical-head model; a limiter holds -1 dB and the meter shows loudness. Head tracking (AirPods Pro/Max etc.) works on macOS 14+ only and turns the room with your head; elsewhere the head stays fixed.	Сводит звук в 3D для наушников и проигрывает его прямо на выход (выходного пина нет; он также записывает собственный WAV/FLAC, 16 или 24 бит, всегда лицом вперёд): каждый вход — точка вокруг головы, и её угол, расстояние и высота (прокрутка на точке) меняют то, как она звучит. Бросьте кабель на пустой пин +, чтобы добавить источник; перетаскивание точки с Alt меняет её уровень; H закрепляет источник перед головой. Уши используют измеренный набор искусственной головы (MIT KEMAR) или модель сферической головы; лимитер держит -1 дБ, а индикатор показывает громкость. Отслеживание головы (AirPods Pro/Max и т. п.) работает только в macOS 14+ и поворачивает комнату вместе с головой; в остальных системах голова неподвижна.
 Name	Название
@@ -1404,7 +1403,6 @@ Reduces triangle count while keeping the overall shape (quadric error edge colla
 Refresh all to scan your folders	Обновите всё, чтобы просканировать папки
 Releases	Релизы
 Relinked 	Перепривязано:
-Remove block	Удалить блок
 Render Timeline	Рендер Timeline
 Rendering	Рендеринг
 Restart to update	Перезапустить для обновления
@@ -1496,8 +1494,6 @@ version %s is available (you have %s) - click to update, right-click to dismiss	
 %d bar	%d такт
 %d bars	%d тактов
 Add a track in Timeline view, then drop audio or video files onto its cells here.	Добавьте дорожку в виде «Таймлайн», затем перетащите аудио- или видеофайлы на её ячейки здесь.
-Clear Slot	Очистить слот
-Click to launch. Right-click for follow actions.	Щёлкните для запуска. Правый щелчок — последующие действия.
 Delete Scene	Удалить сцену
 Duplicate Scene	Дублировать сцену
 Empty slot: drop a video or image file here	Пустой слот: перетащите сюда видео- или файл изображения
@@ -1506,14 +1502,11 @@ Follow Action	Последующее действие
 Follow After	Через
 Insert Scene Above	Вставить сцену выше
 Launch Scene	Запустить сцену
-Launch this row on every track (right-click to rename or set a tempo)	Запустить эту строку на каждой дорожке (правый щелчок — переименовать или задать темп)
 Launching this scene sets the project tempo. 0 leaves the tempo alone.	Запуск сцены задаёт темп проекта. 0 оставляет темп без изменений.
 No Follow Action	Нет действия
 No tracks yet	Дорожек пока нет
-Paste Selected Clip	Вставить выбранный клип
 Place on Timeline at Playhead	Поместить на таймлайн в позиции маркера
 Random	Случайно
-Record to Timeline: what the launched clips play is written into the arrangement.	Запись на таймлайн: то, что играют запущенные клипы, записывается в аранжировку.
 Right-click to rename this scene or set its tempo	Правый щелчок — переименовать сцену или задать её темп
 Scene %d	Сцена %d
 Scene name	Название сцены
@@ -1521,9 +1514,7 @@ Select one clip on this kind of track in Timeline view first.	Сначала в�
 Session: launch clips by scene	Сессия: запуск клипов по сценам
 Stop	Стоп
 Stop Track	Остановить дорожку
-Stop every track: the whole panel goes back to playing the Timeline	Остановить все дорожки: вся панель снова играет таймлайн
 Stop this track	Остановить эту дорожку
-Stop this track: it goes back to playing the Timeline	Остановить эту дорожку: она снова играет таймлайн
 Tempo: unchanged	Темп: без изменений
 This slot is inactive	Этот слот неактивен
 This slot's source is missing	Источник этого слота отсутствует
@@ -1545,19 +1536,14 @@ Ungroup Track	Убрать дорожку из группы
 8 Bars	8 тактов
 Clip Length	Длина клипа
 Gate	Гейт
-Global	Глобально
 Keep Other Tracks Playing	Не останавливать другие дорожки
 Launch Mode	Режим запуска
 Launch Quantize	Квантование запуска
 Loop Length	Длина цикла
 None	Нет
-Toggle	Переключатель
 Trigger	Триггер
-Duplicate Slot	Дублировать ячейку
 Launch Row in Group	Запустить ряд в группе
 Add a video or audio track	Добавить видео- или аудиодорожку
-Click to add a clip. You can also drop a video or image file here.	Нажмите, чтобы добавить клип. Можно также перетащить сюда видео или изображение.
-Click to add a clip. You can also drop an audio file here.	Нажмите, чтобы добавить клип. Можно также перетащить сюда аудиофайл.
 Session	Сессия
 Show Session	Показать сессию
 Close Session	Закрыть сессию
@@ -1572,7 +1558,6 @@ Copies this scene's clips onto the Timeline at the playhead. Render from the Tim
 Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first	Показать или скрыть закреплённую панель Session (запуск клипов). Все клавиши ниже работают, только когда панель в фокусе - сначала щёлкните внутри
 Move Cell	Переместить ячейку
 Move the cell cursor between tracks and scenes; a clip under it is selected	Перемещает курсор ячейки между дорожками и сценами; клип под ним выбирается
-Launch the clip under the cursor; on an empty cell, add an unassigned clip there	Запускает клип под курсором; в пустой ячейке добавляет неназначенный клип
 Launch every clip of the cursor's scene	Запускает все клипы сцены под курсором
 Copy / Cut / Paste Clip	Копировать / вырезать / вставить клип
 Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind	Копирует или вырезает слот (вместе с настройками запуска) и вставляет его на дорожку того же типа
@@ -1587,7 +1572,55 @@ Mute the clip (it draws hatched) or bring it back	Отключает клип (�
 Add Scene	Добавить сцену
 Add a scene row at the bottom	Добавляет строку сцены внизу
 Stop All	Остановить все
-Stop every playing clip; each track goes back to the Timeline	Останавливает все играющие клипы; каждая дорожка возвращается к таймлайну
 Abandon a click-to-assign on a clip, otherwise clear the selection	Отменяет назначение клипа щелчком, иначе снимает выделение
 Monitor: Visible. Shows the video the launched clips produce.	Монитор: виден. Показывает видео запущенных клипов.
 Clip Inspector: Open	Инспектор клипа: открыт
+Turn the group off: its nodes stop cooking and go silent	Выключить группу: её ноды перестают обрабатываться и замолкают
+Turn the group on	Включить группу
+Turn Group Off	Выключить группу
+Turn Group On	Включить группу
+After	Через
+Click to launch this row on every track, click again to stop it. Right-click for its tempo and what plays next.	Щелчок запускает эту строку на всех дорожках, повторный щелчок останавливает. Правый щелчок — темп и что играет дальше.
+Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions.	Щелчок запускает, повторный щелчок останавливает. Cmd-щелчок выделяет. Правый щелчок — копирование, вставка и последующие действия.
+Clip	Клип
+Copy	Копировать
+Cut	Вырезать
+Double-click to add a clip. Click selects the cell to paste into. You can also drop a video or image file here.	Двойной щелчок добавляет клип. Щелчок выбирает ячейку для вставки. Сюда также можно перетащить видео или изображение.
+Double-click to add a clip. Click selects the cell to paste into. You can also drop an audio file here.	Двойной щелчок добавляет клип. Щелчок выбирает ячейку для вставки. Сюда также можно перетащить аудиофайл.
+Enable Session Audio	Включить звук сессии
+Follow Action: what this track plays once this clip has run for Follow After	Последующее действие: что играет эта дорожка, когда клип отыграл время «Следовать через»
+How long one pass of the clip runs before it loops (or stops, with Loop off)	Сколько длится один проход клипа перед повтором (или остановкой, если цикл выключен)
+Launch Quantize: launches and stops wait for this grid line, so everything stays in time	Квантование запуска: запуски и остановки ждут этой линии сетки, чтобы всё было в такт
+Length	Длина
+Mode	Режим
+Next Scene After	Следующая сцена через
+Off	Выкл
+On	Вкл
+Paste Selected Timeline Clip	Вставить выбранный клип таймлайна
+Record your performance: the clips and scenes you launch are written into the Timeline, ready to render with Render Take.	Запишите выступление: запущенные клипы и сцены записываются в таймлайн, их можно отрендерить через «Рендер дубля».
+Recording: every clip and scene you launch is written into the Timeline. Click to stop.	Запись: каждый запущенный клип и сцена записываются в таймлайн. Щёлкните, чтобы остановить.
+Render Take	Рендер дубля
+Render the last recording, audio and video, to a movie file in a folder you choose	Отрендерить последнюю запись, звук и видео, в видеофайл в выбранной папке
+Scene Length	Длина сцены
+Scenes	Сцены
+Session Audio On	Звук сессии включён
+Session Audio: you hear and see the clips you launch here; the Timeline's clips stay silent	Звук сессии: вы слышите и видите клипы, запущенные здесь; клипы таймлайна молчат
+Session Default	По умолчанию сессии
+Stop All (.): every track stops at the next quantize point	Остановить всё (.): каждая дорожка останавливается в следующей точке квантования
+Stop Scene	Остановить сцену
+Stop this track at the next quantize point	Остановить эту дорожку в следующей точке квантования
+The Session's launched clips are driving audio. Click to hand it back to the canvas.	Звуком управляют запущенные клипы сессии. Щёлкните, чтобы вернуть его холсту.
+The Session's launched clips will drive audio once the engine is started.	Звуком будут управлять запущенные клипы сессии, когда движок запустится.
+Then	Затем
+Then Play Next Scene	Затем играть следующую сцену
+Trigger: a click starts it, a click while it plays stops it. Gate: it plays while you hold the mouse or key.	Триггер: щелчок запускает, щелчок во время игры останавливает. Гейт: играет, пока удерживаете мышь или клавишу.
+When this scene has played, the next scene launches. Turn it on for every scene to play them in order.	Когда эта сцена отыграла, запускается следующая. Включите для каждой сцены, чтобы играть их по порядку.
+Launch / Stop	Запуск / Стоп
+Launch or stop the scene and select it: Delete removes it, the Duplicate shortcut copies it, Up / Down move the selection	Запустить или остановить сцену и выделить её: Delete удаляет, сочетание «Дублировать» копирует, Вверх / Вниз двигают выделение
+Launch the clip; on a playing or waiting clip, stop it at the next quantize point. Enter on an empty cell adds a clip	Запустить клип; играющий или ожидающий клип останавливается в следующей точке квантования. Enter на пустой ячейке добавляет клип
+Select Clip	Выделить клип
+Select Scene	Выделить сцену
+Select a clip without launching it, for copy and paste. A click on an empty cell selects it as the paste target	Выделить клип без запуска, для копирования и вставки. Щелчок по пустой ячейке выбирает её как место вставки
+Stop every playing clip at the next quantize point	Остановить все играющие клипы в следующей точке квантования
+Session at Bottom	Сессия снизу
+Session at Top	Сессия сверху

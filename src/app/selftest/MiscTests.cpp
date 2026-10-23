@@ -25,13 +25,13 @@
 
 namespace app
 {
-// ==================================================== INFINITE_BLOCKSETTEST
+// ==================================================== INFINITE_GROUPPOWERTEST
 //
-// Set blocks: a block's power button switches its members off and on; a node in an off
-// block gives no picture (its cable resolves to nothing) and its sound ramps to silence
-// and stops; Show Set's Next never touches blocks; the block params survive a save.
+// Group power: a group's power button switches its members off and on; a node in an off
+// group gives no picture (its cable resolves to nothing) and its sound ramps to silence
+// and stops; Show Set's Next never touches groups; the switch survives a save.
 // Pre-GL: nothing here draws.
-bool RunBlockSetTest()
+bool RunGroupPowerTest()
 {
    bool ok = true;
    // gNodes is a vector: a GraphNode* lasts only until the next spawn, so keep the nodes and indices.
@@ -49,35 +49,34 @@ bool RunBlockSetTest()
    INode* pic2Node = spawn("Formula", "Source", 640.0f, 40.0f, iPic2);
    if (b1 == nullptr || b2 == nullptr || picNode == nullptr || sndNode == nullptr || pic2Node == nullptr)
    {
-      printf("BLOCKSET TEST FAIL (could not spawn)\n");
+      printf("GROUPPOWER TEST FAIL (could not spawn)\n");
       return false;
    }
    gGroupMembers[b1] = { iPic, iSnd };
    gGroupMembers[b2] = { iPic2 };
-   MakeBlock(b1, true);
-   MakeBlock(b2, true);
-   const std::vector<GroupNode*> blocks = SetBlocks();
-   const bool made = blocks.size() == 2 && blocks[0] == b1 && blocks[1] == b2 && b1->on && b2->on;
-   printf("BLOCKSET make %s (blocks %d)\n", made ? "OK" : "FAIL", (int)blocks.size());
+   // A new group is on: its members cook.
+   GroupPowerUpdate();
+   const bool made = b1->on && b2->on && !picNode->blockOff && !pic2Node->blockOff;
+   printf("GROUPPOWER new groups on %s\n", made ? "OK" : "FAIL");
    ok &= made;
 
    // Show Set's Next / Previous step patches only: with no patches they leave every block as it is.
    ShowSetStep(+1);
    ShowSetStep(-1);
-   BlockSetUpdate();
+   GroupPowerUpdate();
    const bool untouched = b1->on && b2->on && !picNode->blockOff && !pic2Node->blockOff;
-   printf("BLOCKSET show set leaves blocks %s\n", untouched ? "OK" : "FAIL");
+   printf("GROUPPOWER show set leaves groups %s\n", untouched ? "OK" : "FAIL");
    ok &= untouched;
 
    // Power off: only that block's members stop.
    b1->on = false;
-   BlockSetUpdate();
+   GroupPowerUpdate();
    ImageCable cable;
    cable.Connect(picNode);
    AudioNode* an = AudioNodeOfAny(sndNode);
    const bool switched = b2->on && picNode->blockOff && !pic2Node->blockOff && cable.Resolved() == nullptr &&
                          an != nullptr && an->blockGainTarget.load() == 0.0f;
-   printf("BLOCKSET power off %s (off %d, other off %d, cable %s)\n", switched ? "OK" : "FAIL",
+   printf("GROUPPOWER power off %s (off %d, other off %d, cable %s)\n", switched ? "OK" : "FAIL",
           picNode->blockOff ? 1 : 0, pic2Node->blockOff ? 1 : 0, cable.Resolved() == nullptr ? "black" : "live");
    ok &= switched;
 
@@ -119,38 +118,29 @@ bool RunBlockSetTest()
       an->blockGainTarget.store(1.0f);
       an->blockSnap.store(true);
       an->BlockSilent();
-      printf("BLOCKSET fade %s (half-way %.3f, then %.3f, silent %d; back in %.3f -> %.3f; new node silent %d)\n",
+      printf("GROUPPOWER fade %s (half-way %.3f, then %.3f, silent %d; back in %.3f -> %.3f; new node silent %d)\n",
              faded && back && snapped ? "OK" : "FAIL", mid, end, silent ? 1 : 0, backFirst, backLast, snapped ? 1 : 0);
       ok &= faded && back && snapped;
    }
 
    // Power on again: the members cook.
    b1->on = true;
-   BlockSetUpdate();
+   GroupPowerUpdate();
    const bool backOn = !picNode->blockOff && cable.Resolved() != nullptr;
-   printf("BLOCKSET power on %s\n", backOn ? "OK" : "FAIL");
+   printf("GROUPPOWER power on %s\n", backOn ? "OK" : "FAIL");
    ok &= backOn;
 
    // Saved params round-trip into a fresh group.
-   b2->order = 7;
    b2->on = false;
    std::vector<std::pair<std::string, std::string>> saved;
    Patch::SaveParams(b2, saved);
    GroupNode copy;
    Patch::LoadParams(&copy, saved);
-   const bool kept = copy.block && !copy.on && copy.order == 7;
-   printf("BLOCKSET save %s\n", kept ? "OK" : "FAIL");
+   const bool kept = !copy.on;
+   printf("GROUPPOWER save %s\n", kept ? "OK" : "FAIL");
    ok &= kept;
 
-   // A plain group again: its nodes cook as before.
-   MakeBlock(b1, false);
-   MakeBlock(b2, false);
-   BlockSetUpdate();
-   const bool cleared = SetBlocks().empty() && !pic2Node->blockOff;
-   printf("BLOCKSET remove %s\n", cleared ? "OK" : "FAIL");
-   ok &= cleared;
-
-   printf("BLOCKSET TEST %s\n", ok ? "OK" : "FAIL");
+   printf("GROUPPOWER TEST %s\n", ok ? "OK" : "FAIL");
    fflush(stdout);
    return ok;
 }

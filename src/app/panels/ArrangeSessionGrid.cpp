@@ -11,6 +11,7 @@
 #include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/PanelFrame.h"
+#include "app/ui/design/components/SectionCard.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/UiAnim.h"
 #include "app/ui/design/TokenColors.h"
@@ -33,11 +34,13 @@ namespace app
          I18N_KEY("No Follow Action"), I18N_KEY("Next"), I18N_KEY("Previous"), I18N_KEY("Random"), I18N_KEY("Stop")
       };
       const int kFollowBarChoices[] = { 1, 2, 4, 8, 16, 32, 64 };
-      // Index = quantize + 1: -1 follows the transport's setting.
+      // Index = quantize + 1: -1 follows the Session's own quantize (the toolbar's).
       const char* const kQuantNames[5] = {
-         I18N_KEY("Global"), I18N_KEY("None"), I18N_KEY("1 Beat"), I18N_KEY("1 Bar"), I18N_KEY("2 Bars")
+         I18N_KEY("Session Default"), I18N_KEY("None"), I18N_KEY("1 Beat"), I18N_KEY("1 Bar"), I18N_KEY("2 Bars")
       };
-      const char* const kModeNames[3] = { I18N_KEY("Trigger"), I18N_KEY("Gate"), I18N_KEY("Toggle") };
+      const char* const kModeNames[2] = { I18N_KEY("Trigger"), I18N_KEY("Gate") };
+      // Scene "Then Play Next Scene" timing: 0 = the scene's length.
+      const int kSceneFollowBars[] = { 0, 1, 2, 4, 8, 16 };
       struct LoopChoice { const char* name; double bars; };
       const LoopChoice kLoopChoices[] = {
          { I18N_KEY("Clip Length"), 0.0 }, { I18N_KEY("1/4 Bar"), 0.25 }, { I18N_KEY("1/2 Bar"), 0.5 },
@@ -47,6 +50,8 @@ namespace app
       // The keyboard cursor: the last cell clicked or arrowed to (an empty cell has no clip id to select).
       uint64_t sCurLaneId = 0;
       int sCurRow = -1;
+      // The selected scene (a click on the scene column); -1 = a cell has the keys.
+      int sSelScene = -1;
       // Copy / cut buffer for slots (a slot keeps its launch settings; the lane type gates where it can land).
       struct SlotClipboard { bool has = false; int laneType = 0; Arrange::SessionSlot slot; };
       SlotClipboard sSlotClip;
@@ -267,6 +272,32 @@ namespace app
          }
       }
 
+      // Pastes the copied slot (clip and launch settings) into a cell, replacing what is there.
+      void PasteSlotAt(uint64_t laneId, int row)
+      {
+         const Arrange::Lane* target = Arrange::FindLane(gArrange, laneId);
+         if (!sSlotClip.has || target == nullptr || sSlotClip.laneType != target->type || row < 0)
+            return;
+         Arrange::SessionSlot copy = sSlotClip.slot;
+         uint64_t made = 0;
+         ArrangeEdit([&]() {
+            if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+            {
+               EnsureRow(*l, row);
+               copy.clip.id = made = gArrange.NewId();
+               l->slots[(size_t)row] = copy;
+               gArrange.revision++;
+            }
+         });
+         if (made != 0)
+         {
+            gArrangeSel = { made };
+            gArrangeSelAnchor = made;
+            gArrangeFlashClipId = made;
+            gArrangeFlashStart = ImGui::GetTime();
+         }
+      }
+
       void DrawSlotMenu()
       {
          if (!MenuParts::BeginPopup("##sessionslotctx"))
@@ -288,10 +319,13 @@ namespace app
          {
             if (MenuParts::Item(L("Add Clip")))
                AddSlotClip(laneId, row);
+            const bool canPaste = sSlotClip.has && sSlotClip.laneType == lane->type;
+            if (MenuParts::Item(L("Paste"), MODKEY "+V", false, canPaste))
+               PasteSlotAt(laneId, row);
             if (lane->groupId != 0 && MenuParts::Item(L("Launch Row in Group")))
                ArrangeSessionLaunchGroupRow(lane->groupId, row);
             const Arrange::Clip* sel = SelectedClipOfType(lane->type);
-            if (MenuParts::Item(L("Paste Selected Clip"), nullptr, false, sel != nullptr) && sel != nullptr)
+            if (MenuParts::Item(L("Paste Selected Timeline Clip"), nullptr, false, sel != nullptr) && sel != nullptr)
             {
                Arrange::Clip c = *sel;
                ArrangeEdit([&]() {
@@ -313,6 +347,64 @@ namespace app
                ArrangeSessionStopLane(laneId);
          }
          MenuParts::EndPopup();
+      }
+
+      void InsertSceneAt(int row)
+      {
+         ArrangeEdit([&]() {
+            while ((int)gArrange.scenes.size() < row)
+               gArrange.scenes.push_back(Arrange::Scene{});
+            gArrange.scenes.insert(gArrange.scenes.begin() + row, Arrange::Scene{});
+            for (Arrange::Lane& l : gArrange.lanes)
+               if ((int)l.slots.size() > row)
+                  l.slots.insert(l.slots.begin() + row, Arrange::SessionSlot{});
+            gArrange.revision++;
+         });
+      }
+
+      void DuplicateScene(int row)
+      {
+         if (row < 0 || row >= (int)gArrange.scenes.size())
+            return;
+         ArrangeEdit([&]() {
+            gArrange.scenes.insert(gArrange.scenes.begin() + row + 1, gArrange.scenes[(size_t)row]);
+            for (Arrange::Lane& l : gArrange.lanes)
+            {
+               if ((int)l.slots.size() <= row)
+                  continue;
+               Arrange::SessionSlot copy = l.slots[(size_t)row];
+               if (copy.Has())
+                  copy.clip.id = gArrange.NewId();
+               l.slots.insert(l.slots.begin() + row + 1, copy);
+            }
+            gArrange.revision++;
+         });
+         sSelScene = row + 1;
+      }
+
+      void DeleteScene(int row)
+      {
+         if (row < 0 || row >= (int)gArrange.scenes.size())
+            return;
+         ArrangeEdit([&]() {
+            gArrange.scenes.erase(gArrange.scenes.begin() + row);
+            for (Arrange::Lane& l : gArrange.lanes)
+               if ((int)l.slots.size() > row)
+                  l.slots.erase(l.slots.begin() + row);
+            gArrange.revision++;
+         });
+         gArrangeSel.clear();
+         sSelScene = gArrange.scenes.empty() ? -1 : std::min(row, (int)gArrange.scenes.size() - 1);
+      }
+
+      void EditScene(int row, const std::function<void(Arrange::Scene&)>& fn)
+      {
+         ArrangeEdit([&]() {
+            while ((int)gArrange.scenes.size() <= row)
+               gArrange.scenes.push_back(Arrange::Scene{});
+            fn(gArrange.scenes[(size_t)row]);
+            gArrange.revision++;
+         });
       }
 
       void DrawSceneMenu()
@@ -376,14 +468,31 @@ namespace app
          }
          bool addOn = row < (int)gArrange.scenes.size() && gArrange.scenes[(size_t)row].additive;
          if (MenuParts::Check(L("Keep Other Tracks Playing"), &addOn))
-            ArrangeEdit([&]() {
-               while ((int)gArrange.scenes.size() <= row)
-                  gArrange.scenes.push_back(Arrange::Scene{});
-               gArrange.scenes[(size_t)row].additive = addOn;
-               gArrange.revision++;
-            });
+            EditScene(row, [&](Arrange::Scene& sc) { sc.additive = addOn; });
+         // Scenes in order: when this one has played, the next one launches (Ableton's scene follow action).
+         bool nextOn = row < (int)gArrange.scenes.size() && gArrange.scenes[(size_t)row].followNext;
+         if (MenuParts::Check(L("Then Play Next Scene"), &nextOn))
+            EditScene(row, [&](Arrange::Scene& sc) { sc.followNext = nextOn; });
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("When this scene has played, the next scene launches. Turn it on for every scene to play them in order."));
+         if (MenuParts::SubMenu(L("Next Scene After"), nextOn))
+         {
+            const int cur = row < (int)gArrange.scenes.size() ? gArrange.scenes[(size_t)row].followBars : 0;
+            for (int bars : kSceneFollowBars)
+            {
+               char label[32];
+               if (bars == 0)
+                  snprintf(label, sizeof(label), "%s", T("Scene Length"));
+               else
+                  snprintf(label, sizeof(label), bars == 1 ? T("%d bar") : T("%d bars"), bars);
+               if (MenuParts::Choice(label, cur == bars) && cur != bars)
+                  EditScene(row, [&](Arrange::Scene& sc) { sc.followBars = bars; });
+            }
+            ImGui::EndMenu();
+         }
          MenuParts::Separator();
-         if (MenuParts::Item(L("Launch Scene")))
+         const ArrangeSessionSceneState sceneSt = ArrangeSessionSceneQuery(row);
+         if (MenuParts::Item(sceneSt.playing ? L("Stop Scene") : L("Launch Scene")))
             ArrangeSessionLaunchScene(row);
          if (MenuParts::Item(L("Send Scene to Timeline")))
          {
@@ -392,38 +501,12 @@ namespace app
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Copies this scene's clips onto the Timeline at the playhead. Render from the Timeline."));
          if (MenuParts::Item(L("Insert Scene Above")))
-            ArrangeEdit([&]() {
-               while ((int)gArrange.scenes.size() < row)
-                  gArrange.scenes.push_back(Arrange::Scene{});
-               gArrange.scenes.insert(gArrange.scenes.begin() + row, Arrange::Scene{});
-               for (Arrange::Lane& l : gArrange.lanes)
-                  if ((int)l.slots.size() > row)
-                     l.slots.insert(l.slots.begin() + row, Arrange::SessionSlot{});
-               gArrange.revision++;
-            });
+            InsertSceneAt(row);
          const bool real = row < (int)gArrange.scenes.size();
-         if (MenuParts::Item(L("Duplicate Scene"), nullptr, false, real))
-            ArrangeEdit([&]() {
-               gArrange.scenes.insert(gArrange.scenes.begin() + row + 1, gArrange.scenes[(size_t)row]);
-               for (Arrange::Lane& l : gArrange.lanes)
-               {
-                  if ((int)l.slots.size() <= row)
-                     continue;
-                  Arrange::SessionSlot copy = l.slots[(size_t)row];
-                  if (copy.Has())
-                     copy.clip.id = gArrange.NewId();
-                  l.slots.insert(l.slots.begin() + row + 1, copy);
-               }
-               gArrange.revision++;
-            });
-         if (MenuParts::Item(L("Delete Scene"), nullptr, false, real))
-            ArrangeEdit([&]() {
-               gArrange.scenes.erase(gArrange.scenes.begin() + row);
-               for (Arrange::Lane& l : gArrange.lanes)
-                  if ((int)l.slots.size() > row)
-                     l.slots.erase(l.slots.begin() + row);
-               gArrange.revision++;
-            });
+         if (MenuParts::Item(L("Duplicate Scene"), MODKEY "+D", false, real))
+            DuplicateScene(row);
+         if (MenuParts::Item(L("Delete Scene"), "Backspace", false, real))
+            DeleteScene(row);
          MenuParts::EndPopup();
       }
    }
@@ -468,16 +551,10 @@ namespace app
       const bool gridHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
       const float pulse = QueuedPulse();
 
-      // ---- corner: Record to Timeline ----
+      // ---- corner: the scene column's header (Record and Stop All live in the toolbar) ----
       {
-         const bool rec = ArrangeSessionRecording();
-         ImGui::SetCursorScreenPos(ImVec2(o.x + kGap, o.y + kGap));
-         if (ActionButton::Draw(rec ? "Recording##sessrec" : "Record##sessrec",
-                                ImVec2(kSceneColW - 2.0f * kGap, kHeaderH - 2.0f * kGap),
-                                rec ? ActionButton::Kind::Record : ActionButton::Kind::Plain))
-            ArrangeSessionSetRecording(!rec);
-         if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Record to Timeline: what the launched clips play is written into the arrangement."));
+         const float th = ImGui::GetTextLineHeight();
+         dl->AddText(ImVec2(o.x + kGap + 9.0f, o.y + (kHeaderH - th) * 0.5f), TextCol(0.55f), T("Scenes"));
       }
 
       // ---- track headers ----
@@ -547,10 +624,18 @@ namespace app
          ImGui::SetCursorScreenPos(a);
          ImGui::InvisibleButton("##scene", ImVec2(b.x - a.x, b.y - a.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
          const bool hov = ImGui::IsItemHovered();
-         if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && (rowHasClip || anyLaunched))
-            ArrangeSessionLaunchScene(row);
+         // A click selects the scene (Delete removes it, Cmd+D duplicates it) and launches it, or stops it
+         // when it is already playing or waiting to launch. Cmd-click only selects.
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+         {
+            sSelScene = row;
+            gArrangeSel.clear();
+            if (!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeySuper && (rowHasClip || anyLaunched))
+               ArrangeSessionLaunchScene(row);
+         }
          if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
          {
+            sSelScene = row;
             sSceneCtxRow = row;
             const std::string nm = realScene ? gArrange.scenes[(size_t)row].name : std::string();
             snprintf(sSceneNameBuf, sizeof(sSceneNameBuf), "%s", nm.c_str());
@@ -558,26 +643,25 @@ namespace app
             ImGui::OpenPopup("##sessionscenectx");
          }
          if (hov)
-            HelpTip("%s", rowHasClip ? T("Launch this row on every track (right-click to rename or set a tempo)")
+            HelpTip("%s", rowHasClip ? T("Click to launch this row on every track, click again to stop it. Right-click for its tempo and what plays next.")
                                      : T("Right-click to rename this scene or set its tempo"));
          ImGui::PopID();
          dl->AddRectFilled(a, b, TextCol(hov ? 0.10f : 0.05f), tok::radius_field);
          const float cy = (a.y + b.y) * 0.5f;
          // Scene state: playing = every filled cell of the row is running (a ring sweeps with the clip),
          // queued = the launch is waiting for the quantize point (the play glyph pulses on the beat).
-         bool rowPlaying = false, rowQueued = false;
+         const ArrangeSessionSceneState sceneSt = ArrangeSessionSceneQuery(row);
+         const bool rowPlaying = sceneSt.playing;
+         const bool rowQueued = sceneSt.queued || sceneSt.next;
          float rowProgress = 0.0f;
          for (const Arrange::Lane& l : gArrange.lanes)
-            if (SlotOf(l, row) != nullptr)
+            if (rowPlaying && SlotOf(l, row) != nullptr)
             {
-               const ArrangeSessionSlotState sst = ArrangeSessionQuery(l.id, row);
-               if (sst.playing && !rowPlaying)
-               {
-                  rowPlaying = true;
-                  rowProgress = sst.progress;
-               }
-               rowQueued = rowQueued || sst.queued;
+               rowProgress = ArrangeSessionQuery(l.id, row).progress;
+               break;
             }
+         if (sSelScene == row)
+            dl->AddRect(a, b, TextCol(0.70f), tok::radius_field, 0, 1.5f);
          if (rowPlaying)
             dl->AddRectFilled(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.10f), tok::radius_field);
          if (rowPlaying)
@@ -633,6 +717,8 @@ namespace app
                   gArrangeAssigningClipId = 0;
                   gArrangeAssignTargetIds.clear();
                }
+               sSelScene = -1;
+               const bool selectOnly = ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeySuper;
                if (ss != nullptr && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                {
                   // Double-click opens (or closes) the inspector on this clip, as in the Timeline.
@@ -643,15 +729,21 @@ namespace app
                }
                else if (ss != nullptr)
                {
-                  ArrangeSessionLaunch(laneId, row);
+                  // GarageBand: a click launches the cell, a click on a playing (or waiting) cell stops it
+                  // at the next quantize point. Cmd-click only selects, for copy and paste.
+                  if (!selectOnly)
+                     ArrangeSessionLaunch(laneId, row);
                   gArrangeSel = { ss->clip.id };
                   gArrangeSelAnchor = ss->clip.id;
                }
-               else
+               else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                   AddSlotClip(laneId, row);
+               else
+                  gArrangeSel.clear();   // an empty cell is selected as the paste target
             }
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
             {
+               sSelScene = -1;
                sCurLaneId = laneId;
                sCurRow = row;
                sCtxLaneId = laneId;
@@ -724,7 +816,7 @@ namespace app
                DrawFollowBadge(dl, ImVec2(b.x - 6.0f, cy), *ss, WithAlpha(ink, 0.8f));
                if (hov)
                   HelpTip("%s", muted ? (src == nullptr ? T("This slot's source is missing") : T("This slot is inactive"))
-                                      : T("Click to launch. Right-click for follow actions."));
+                                      : T("Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions."));
             }
             else
             {
@@ -733,13 +825,13 @@ namespace app
                dl->AddRectFilled(a, b, TextCol(hov ? 0.08f : 0.035f), tok::radius_field);
                if (hov)
                {
-                  // A plus: click adds an unassigned clip to this cell.
+                  // A plus: a double-click adds an unassigned clip to this cell.
                   const ImVec2 pc((a.x + b.x) * 0.5f, cy);
                   const ImU32 pcol = TextCol(0.55f);
                   dl->AddLine(ImVec2(pc.x - 6.0f, pc.y), ImVec2(pc.x + 6.0f, pc.y), pcol, 1.5f);
                   dl->AddLine(ImVec2(pc.x, pc.y - 6.0f), ImVec2(pc.x, pc.y + 6.0f), pcol, 1.5f);
-                  HelpTip("%s", isVideo ? T("Click to add a clip. You can also drop a video or image file here.")
-                                        : T("Click to add a clip. You can also drop an audio file here."));
+                  HelpTip("%s", isVideo ? T("Double-click to add a clip. Click selects the cell to paste into. You can also drop a video or image file here.")
+                                        : T("Double-click to add a clip. Click selects the cell to paste into. You can also drop an audio file here."));
                }
             }
 
@@ -820,20 +912,9 @@ namespace app
             const float alpha = !canStop ? 0.22f : (ls.stopQueued ? 0.9f * pulse : 0.85f);
             DrawStopSquare(dl, ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), 9.0f, TextCol(alpha));
             if (hov)
-               HelpTip("%s", T("Stop this track: it goes back to playing the Timeline"));
+               HelpTip("%s", T("Stop this track at the next quantize point"));
          }
          ImGui::PopID();
-      }
-
-      // ---- footer: Stop All ----
-      {
-         ImGui::SetCursorScreenPos(ImVec2(o.x + kGap, footerTop + kGap));
-         ImGui::BeginDisabled(!anyLaunched);
-         if (ActionButton::Draw("Stop All##sessstopall", ImVec2(kSceneColW - 2.0f * kGap, kFooterH - 2.0f * kGap)))
-            ArrangeSessionStopAll();
-         ImGui::EndDisabled();
-         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            HelpTip("%s", T("Stop every track: the whole panel goes back to playing the Timeline"));
       }
 
       // Hairline under the headers and above the stop row: the grid's frame.
@@ -862,7 +943,7 @@ namespace app
 
    namespace
    {
-      enum class MenuAction { None, PlaceOnTimeline, Duplicate, Clear };
+      enum class MenuAction { None, PlaceOnTimeline, Duplicate, Clear, Copy, Cut, Paste };
       struct PendingMenuAction
       {
          MenuAction kind = MenuAction::None;
@@ -880,12 +961,34 @@ namespace app
       if (a.kind == MenuAction::None)
          return;
       Arrange::Lane* lane = Arrange::FindLane(gArrange, a.laneId);
+      if (a.kind == MenuAction::Paste)   // the one action an empty cell takes
+      {
+         PasteSlotAt(a.laneId, a.row);
+         return;
+      }
       if (lane == nullptr || a.row < 0 || a.row >= (int)lane->slots.size() || !lane->slots[(size_t)a.row].Has())
          return;
       const uint64_t laneId = a.laneId;
       const int row = a.row;
       switch (a.kind)
       {
+         case MenuAction::Copy:
+         case MenuAction::Cut:
+            sSlotClip = { true, lane->type, lane->slots[(size_t)row] };
+            if (a.kind == MenuAction::Cut)
+            {
+               ArrangeEdit([&]() {
+                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+                  {
+                     l->slots[(size_t)row] = Arrange::SessionSlot{};
+                     gArrange.revision++;
+                  }
+               });
+               gArrangeSel.clear();
+            }
+            break;
+         case MenuAction::Paste:
+            break;
          case MenuAction::PlaceOnTimeline:
          {
             const Arrange::Tick at = std::max<Arrange::Tick>(0, Arrange::BeatsToTicks(Transport::Instance().Beats()));
@@ -898,6 +1001,8 @@ namespace app
             break;
          }
          case MenuAction::Duplicate:
+         {
+            uint64_t made = 0;
             ArrangeEdit([&]() {
                Arrange::Lane* l = Arrange::FindLane(gArrange, laneId);
                if (l == nullptr)
@@ -910,11 +1015,19 @@ namespace app
                while ((int)gArrange.scenes.size() <= dst)
                   gArrange.scenes.push_back(Arrange::Scene{});
                Arrange::SessionSlot copy = l->slots[(size_t)row];
-               copy.clip.id = gArrange.NewId();
+               copy.clip.id = made = gArrange.NewId();
                l->slots[(size_t)dst] = copy;
                gArrange.revision++;
             });
+            if (made != 0)
+            {
+               gArrangeSel = { made };
+               gArrangeSelAnchor = made;
+               gArrangeFlashClipId = made;
+               gArrangeFlashStart = ImGui::GetTime();
+            }
             break;
+         }
          case MenuAction::Clear:
             ArrangeEdit([&]() {
                if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
@@ -949,10 +1062,13 @@ namespace app
       });
    }
 
-   // Test hook: 0 = Place on Timeline, 1 = Duplicate, 2 = Clear, queued and applied exactly as the menu does it.
+   // Test hook: 0 = Place on Timeline, 1 = Duplicate, 2 = Clear, 3 = Copy, 4 = Paste, 5 = Cut, queued and applied
+   // exactly as the menu does it.
    void ArrangeSessionRunActionForTest(int kind, uint64_t laneId, int row)
    {
-      sMenuAction = { kind == 0 ? MenuAction::PlaceOnTimeline : (kind == 1 ? MenuAction::Duplicate : MenuAction::Clear), laneId, row };
+      static const MenuAction kKinds[6] = { MenuAction::PlaceOnTimeline, MenuAction::Duplicate, MenuAction::Clear,
+                                            MenuAction::Copy, MenuAction::Paste, MenuAction::Cut };
+      sMenuAction = { kKinds[std::clamp(kind, 0, 5)], laneId, row };
       ArrangeSessionApplyMenuAction();
    }
 
@@ -965,7 +1081,8 @@ namespace app
       const uint64_t laneId = gArrange.lanes[(size_t)loc.lane].id;
       const int row = loc.slot;
       const Arrange::SessionSlot ss = gArrange.lanes[(size_t)loc.lane].slots[(size_t)row];
-      if (MenuParts::Item(L("Launch")))
+      const ArrangeSessionSlotState slotSt = ArrangeSessionQuery(laneId, row);
+      if (MenuParts::Item((slotSt.playing || slotSt.queued) && ss.launchMode != 1 ? L("Stop") : L("Launch")))
          ArrangeSessionLaunch(laneId, row);
       const uint64_t grp = gArrange.lanes[(size_t)loc.lane].groupId;
       if (grp != 0 && MenuParts::Item(L("Launch Row in Group")))
@@ -1042,7 +1159,7 @@ namespace app
       }
       if (MenuParts::SubMenu(L("Launch Mode")))
       {
-         for (int m = 0; m < 3; m++)
+         for (int m = 0; m < 2; m++)
             if (MenuParts::Choice(L(kModeNames[m]), ss.launchMode == m) && ss.launchMode != m)
                ArrangeEdit([&]() {
                   if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
@@ -1056,17 +1173,136 @@ namespace app
       MenuParts::Separator();
       // Destructive rows are queued, not run: the shared menu still holds pointers into the slot and lane vectors
       // and keeps reading them for the rest of this frame. ArrangeSessionApplyMenuAction() runs them after it closes.
+      if (MenuParts::Item(L("Cut"), MODKEY "+X"))
+         sMenuAction = {MenuAction::Cut, laneId, row};
+      if (MenuParts::Item(L("Copy"), MODKEY "+C"))
+         sMenuAction = {MenuAction::Copy, laneId, row};
+      const bool canPaste = sSlotClip.has && sSlotClip.laneType == gArrange.lanes[(size_t)loc.lane].type;
+      if (MenuParts::Item(L("Paste"), MODKEY "+V", false, canPaste))
+         sMenuAction = {MenuAction::Paste, laneId, row};
+      if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
+         sMenuAction = {MenuAction::Duplicate, laneId, row};
+      if (MenuParts::Item(L("Delete"), "Backspace"))
+         sMenuAction = {MenuAction::Clear, laneId, row};
+      MenuParts::Separator();
       if (MenuParts::Item(L("Place on Timeline at Playhead")))
          sMenuAction = {MenuAction::PlaceOnTimeline, laneId, row};
-      if (MenuParts::Item(L("Duplicate Slot")))
-         sMenuAction = {MenuAction::Duplicate, laneId, row};
-      if (MenuParts::Item(L("Clear Slot")))
-         sMenuAction = {MenuAction::Clear, laneId, row};
+   }
+
+   // The inspector's Launch card for a session slot: how a click plays it, where it lands, how long it runs and
+   // what plays after it. Returns false (draws nothing) for a Timeline clip.
+   bool DrawArrangeSessionSlotInspector(uint64_t clipId, float fieldW)
+   {
+      const Arrange::Loc loc = Arrange::FindSlot(gArrange, clipId);
+      if (loc.lane < 0 || loc.slot < 0)
+         return false;
+      const uint64_t laneId = gArrange.lanes[(size_t)loc.lane].id;
+      const int row = loc.slot;
+      const Arrange::SessionSlot ss = gArrange.lanes[(size_t)loc.lane].slots[(size_t)row];
+      auto edit = [&](const std::function<void(Arrange::SessionSlot&)>& fn) {
+         ArrangeEdit([&]() {
+            if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+               if (row < (int)l->slots.size())
+               {
+                  fn(l->slots[(size_t)row]);
+                  gArrange.revision++;
+               }
+         });
+      };
+      // A field-well dropdown, value only (no chevron).
+      auto combo = [&](const char* label, const char* id, const char* cur, const std::function<void()>& items) {
+         SectionCard::RowLabel(label);
+         ImGui::SetNextItemWidth(fieldW);
+         FieldWell::PushStyle();
+         const bool open = MenuParts::BeginCombo(id, cur, ImGuiComboFlags_NoArrowButton);
+         FieldWell::PopStyle();
+         if (open)
+         {
+            items();
+            MenuParts::EndCombo();
+         }
+      };
+      char buf[48];
+      SectionCard::Begin(T("Launch"));
+      combo(T("Mode"), "##slotmode", L(kModeNames[ss.launchMode == 1 ? 1 : 0]), [&]() {
+         for (int m = 0; m < 2; m++)
+            if (MenuParts::Choice(L(kModeNames[m]), ss.launchMode == m) && ss.launchMode != m)
+               edit([&](Arrange::SessionSlot& s) { s.launchMode = m; });
+      });
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Trigger: a click starts it, a click while it plays stops it. Gate: it plays while you hold the mouse or key."));
+      combo(T("Quantize"), "##slotquant", L(kQuantNames[std::clamp(ss.quantize, -1, 3) + 1]), [&]() {
+         for (int q = -1; q <= 3; q++)
+            if (MenuParts::Choice(L(kQuantNames[q + 1]), ss.quantize == q) && ss.quantize != q)
+               edit([&](Arrange::SessionSlot& s) { s.quantize = q; });
+      });
+      SectionCard::RowLabel(T("Loop"));
+      bool loopOn = ss.loop;
+      if (ChipButton::Draw(loopOn ? L("On##slotloop") : L("Off##slotloop"), loopOn, tok::tile, fieldW))
+         edit([&](Arrange::SessionSlot& s) { s.loop = !loopOn; });
+      const char* lenName = T("Clip Length");
+      for (const LoopChoice& lc : kLoopChoices)
+         if (ss.loopTicks == (Arrange::Tick)(lc.bars * (double)Arrange::kTicksPerBar))
+            lenName = L(lc.name);
+      combo(T("Length"), "##slotlooplen", lenName, [&]() {
+         for (const LoopChoice& lc : kLoopChoices)
+         {
+            const Arrange::Tick want = (Arrange::Tick)(lc.bars * (double)Arrange::kTicksPerBar);
+            if (MenuParts::Choice(L(lc.name), ss.loopTicks == want) && ss.loopTicks != want)
+               edit([&](Arrange::SessionSlot& s) { s.loopTicks = want; });
+         }
+      });
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("How long one pass of the clip runs before it loops (or stops, with Loop off)"));
+      combo(T("Then"), "##slotfollow", L(kFollowNames[std::clamp(ss.followAction, 0, Arrange::kFollowCount - 1)]), [&]() {
+         for (int a = 0; a < Arrange::kFollowCount; a++)
+            if (MenuParts::Choice(L(kFollowNames[a]), ss.followAction == a) && ss.followAction != a)
+               edit([&](Arrange::SessionSlot& s) { s.followAction = a; });
+      });
+      if (ImGui::IsItemHovered())
+         HelpTip("%s", T("Follow Action: what this track plays once this clip has run for Follow After"));
+      ImGui::BeginDisabled(ss.followAction == Arrange::kFollowNone);
+      snprintf(buf, sizeof(buf), ss.followBars == 1 ? T("%d bar") : T("%d bars"), ss.followBars);
+      combo(T("After"), "##slotfollowafter", buf, [&]() {
+         for (int bars : kFollowBarChoices)
+         {
+            char label[32];
+            snprintf(label, sizeof(label), bars == 1 ? T("%d bar") : T("%d bars"), bars);
+            if (MenuParts::Choice(label, ss.followBars == bars) && ss.followBars != bars)
+               edit([&](Arrange::SessionSlot& s) { s.followBars = bars; });
+         }
+      });
+      ImGui::EndDisabled();
+      return true;
    }
 
    namespace
    {
       bool sSessionShowMonitor = true;
+
+      ImU32 RecordDotCol()
+      {
+         const tok::Rgba8& c = IsThemeLight() ? tok::action_record.light : tok::action_record.dark;
+         return IM_COL32(c.r, c.g, c.b, 255);
+      }
+
+      // Session Audio on: the launched clips own the output (starting the device if it is off). Off hands audio
+      // back to the canvas and leaves the device running, as the Timeline's chip does.
+      void SetSessionAudio(bool on)
+      {
+         if (!on)
+         {
+            gAudioMode = AudioMode::Canvas;
+            return;
+         }
+         gAudioMode = AudioMode::Session;
+         if (AudioEngine::Instance().SampleRate() <= 0.0)
+         {
+            gAudioStartError.clear();
+            if (!StartAudioEngine(gAudioStartError))
+               fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
+         }
+      }
 
       // The video the launched clips produce, drawn at the panel's own size. The composite itself runs after the cook
       // loop into gArrangeMonitorTarget; this only asks for a size and shows the texture.
@@ -1130,6 +1366,35 @@ namespace app
             return;
          const bool cmd = io.KeySuper || io.KeyCtrl;
          auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+         // A selected scene takes the keys: Delete removes it, Cmd+D duplicates it, Enter launches it, Up/Down move.
+         if (sSelScene >= 0 && gArrangeSel.empty())
+         {
+            const int maxScene = std::max(kMinRows, (int)gArrange.scenes.size()) - 1;
+            sSelScene = std::min(sSelScene, maxScene);
+            if (!cmd && (pressed(ImGuiKey_Delete) || pressed(ImGuiKey_Backspace)))
+               DeleteScene(sSelScene);
+            else if (cmd && pressed(ImGuiKey_D))
+               DuplicateScene(sSelScene);
+            else if (!cmd && !io.KeyAlt && (pressed(ImGuiKey_Enter) || pressed(ImGuiKey_KeypadEnter)))
+               ArrangeSessionLaunchScene(sSelScene);
+            else if (!cmd && pressed(ImGuiKey_UpArrow))
+               sSelScene = std::max(0, sSelScene - 1);
+            else if (!cmd && pressed(ImGuiKey_DownArrow))
+               sSelScene = std::min(maxScene, sSelScene + 1);
+            else if (!cmd && !io.KeyShift && !io.KeyAlt && pressed(ImGuiKey_Period))
+               ArrangeSessionStopAll();
+            else if (!cmd && pressed(ImGuiKey_Escape))
+               sSelScene = -1;
+            else if (!cmd && (pressed(ImGuiKey_RightArrow) || pressed(ImGuiKey_LeftArrow)))
+            {
+               // Step from the scene into its row's first cell.
+               sCurRow = sSelScene;
+               sCurLaneId = gArrange.lanes[0].id;
+               sSelScene = -1;
+               SelectCursorCell();
+            }
+            return;
+         }
          SessionCursorFromSelection();
          int laneIdx = -1;
          for (size_t i = 0; i < gArrange.lanes.size(); i++)
@@ -1168,34 +1433,18 @@ namespace app
          }
          else if (cmd && pressed(ImGuiKey_C) && ss != nullptr)
          {
-            sSlotClip = { true, lane.type, *ss };
+            sMenuAction = { MenuAction::Copy, sCurLaneId, sCurRow };
+            ArrangeSessionApplyMenuAction();
          }
          else if (cmd && pressed(ImGuiKey_X) && ss != nullptr)
          {
-            sSlotClip = { true, lane.type, *ss };
-            sMenuAction = { MenuAction::Clear, sCurLaneId, sCurRow };
+            sMenuAction = { MenuAction::Cut, sCurLaneId, sCurRow };
             ArrangeSessionApplyMenuAction();
          }
-         else if (cmd && pressed(ImGuiKey_V) && sSlotClip.has && sSlotClip.laneType == lane.type)
+         else if (cmd && pressed(ImGuiKey_V))
          {
-            const uint64_t laneId = sCurLaneId;
-            const int row = sCurRow;
-            Arrange::SessionSlot copy = sSlotClip.slot;
-            uint64_t made = 0;
-            ArrangeEdit([&]() {
-               if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
-               {
-                  EnsureRow(*l, row);
-                  copy.clip.id = made = gArrange.NewId();
-                  l->slots[(size_t)row] = copy;
-                  gArrange.revision++;
-               }
-            });
-            if (made != 0)
-            {
-               gArrangeSel = { made };
-               gArrangeSelAnchor = made;
-            }
+            sMenuAction = { MenuAction::Paste, sCurLaneId, sCurRow };
+            ArrangeSessionApplyMenuAction();
          }
          else if (cmd && pressed(ImGuiKey_D) && ss != nullptr)
          {
@@ -1255,13 +1504,16 @@ namespace app
          ArrangePollMediaImports();
          const ImVec2 panelSize = ImGui::GetContentRegionAvail();
 
-         // Toolbar: what only Session needs. Right-click it for the dock side and Close.
+         // Toolbar, laid out like the Timeline's: Monitor | Play, Record, Stop All, Quantize | Inspector, and pinned
+         // right the audio mode chip (and Render Take once a take exists). Right-click it for Close.
          const float toolbarTop = ImGui::GetCursorScreenPos().y;
-         ImGui::AlignTextToFramePadding();
-         ImGui::TextUnformatted(T("Session"));
-         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_4, ImGui::GetItemRectMin().y));
-         // Icon buttons, drawn like the Timeline toolbar's: the same monitor and edit glyphs, a lit chip while on.
+         const ImVec2 toolbarOrigin = ImGui::GetCursorScreenPos();
          const ImU32 iconCol = ImGui::GetColorU32(ImGuiCol_Text);
+         auto itemCentre = []() {
+            return ImVec2((ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                          (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f);
+         };
+         auto nextTo = [](float gap) { ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + gap, ImGui::GetItemRectMin().y)); };
          ActionButton::Scoped() = sSessionShowMonitor ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
          if (ActionButton::Draw("##sessionmonitortoggle", ImVec2(30, tok::tile)))
             sSessionShowMonitor = !sSessionShowMonitor;
@@ -1280,7 +1532,73 @@ namespace app
             tdl->AddLine(ImVec2(c.x, br.y), ImVec2(c.x, br.y + 2.5f), icol, 1.4f);
             tdl->AddLine(ImVec2(c.x - 3.5f, br.y + 2.5f), ImVec2(c.x + 3.5f, br.y + 2.5f), icol, 1.4f);
          }
-         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_1, ImGui::GetItemRectMin().y));
+         nextTo(tok::space_4);
+
+         // Play / Pause: the shared transport. Playing from here hands audio to the Session.
+         Transport& tr = Transport::Instance();
+         const bool playing = tr.IsPlaying();
+         ActionButton::Scoped() = playing ? ActionButton::Kind::Go : ActionButton::Kind::Plain;
+         if (ActionButton::Draw("##sessionplay", ImVec2(30, tok::tile)))
+         {
+            if (!playing && gAudioMode != AudioMode::Session)
+               SetSessionAudio(true);
+            LaunchRequestTogglePlay();
+         }
+         ActionButton::Scoped() = ActionButton::Kind::Plain;
+         if (ImGui::IsItemHovered())
+            HelpTip(playing ? T("Pause (Space)") : T("Play (Space)"));
+         if (playing)
+            glyph::DrawPlayerPause(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md, tok::U32(tok::pal::c_FFFFFFFF));
+         else
+            glyph::DrawPlayerPlay(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md, iconCol);
+         nextTo(tok::space_1);
+
+         // Record: what you launch is written into the Timeline as clips; Render Take turns it into a movie.
+         const bool rec = ArrangeSessionRecording();
+         ActionButton::Scoped() = rec ? ActionButton::Kind::Record : ActionButton::Kind::Plain;
+         if (ActionButton::Draw("##sessionrecord", ImVec2(30, tok::tile)))
+            ArrangeSessionSetRecording(!rec);
+         ActionButton::Scoped() = ActionButton::Kind::Plain;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", rec ? T("Recording: every clip and scene you launch is written into the Timeline. Click to stop.")
+                              : T("Record your performance: the clips and scenes you launch are written into the Timeline, ready to render with Render Take."));
+         glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md,
+                     rec ? tok::U32(tok::pal::c_FFFFFFFF) : RecordDotCol(), IconsInfinite::RecordFill);
+         nextTo(tok::space_1);
+
+         // Stop All: every track stops at the next quantize point.
+         const bool anyLaunched = ArrangeSessionAnyLaunched();
+         ImGui::BeginDisabled(!anyLaunched);
+         if (ActionButton::Draw("##sessionstopall", ImVec2(30, tok::tile)))
+            ArrangeSessionStopAll();
+         ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            HelpTip("%s", T("Stop All (.): every track stops at the next quantize point"));
+         glyph::Draw(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md, WithAlpha(iconCol, anyLaunched ? 1.0f : 0.35f),
+                     IconsInfinite::StopFill);
+         nextTo(tok::space_1);
+
+         // Quantize: where launches and stops land, for every clip and scene left on Session Default.
+         {
+            const int q = std::clamp(gArrange.sessionQuantize, 0, 3);
+            char qlabel[48];
+            snprintf(qlabel, sizeof(qlabel), "%s##sessionquant", L(kQuantNames[q + 1]));
+            if (ChipButton::Draw(qlabel, false, tok::tile))
+               ImGui::OpenPopup("##sessionquantpop");
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", T("Launch Quantize: launches and stops wait for this grid line, so everything stays in time"));
+            if (MenuParts::BeginPopup("##sessionquantpop"))
+            {
+               for (int v = 0; v <= 3; v++)
+                  if (MenuParts::Choice(L(kQuantNames[v + 1]), q == v) && q != v)
+                     ArrangeEdit([&]() {
+                        gArrange.sessionQuantize = v;
+                        gArrange.revision++;
+                     });
+               MenuParts::EndPopup();
+            }
+         }
+         nextTo(tok::space_4);
          const bool inspWasOpen = gArrangeClipSettingsPanelOpen;
          ActionButton::Scoped() = inspWasOpen ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
          if (ActionButton::Draw("##sessioninspectortoggle", ImVec2(30, tok::tile)))
@@ -1288,11 +1606,46 @@ namespace app
          ActionButton::Scoped() = ActionButton::Kind::Plain;
          if (ImGui::IsItemHovered())
             HelpTip("%s", inspWasOpen ? T("Clip Inspector: Open") : T("Settings of the selected clip. Double-click a clip to open it."));
-         {
-            const ImVec2 c((ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f, (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f);
-            glyph::DrawEdit(ImGui::GetWindowDrawList(), c, tok::icon_md, inspWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol);
-         }
+         glyph::DrawEdit(ImGui::GetWindowDrawList(), itemCentre(), tok::icon_md, inspWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol);
          const float toolbarBottom = ImGui::GetItemRectMax().y;
+
+         // Pinned right: Session Audio (the twin of the Timeline's chip), and Render Take left of it.
+         {
+            const ImVec2 saved = ImGui::GetCursorScreenPos();
+            const bool sessionMode = gAudioMode == AudioMode::Session;
+            const char* audioLabel = sessionMode ? T("Session Audio On") : T("Enable Session Audio");
+            const float audioW = ImGui::CalcTextSize(audioLabel).x + 2.0f * tok::space_2;
+            const float right = ImGui::GetWindowPos().x + ImGui::GetWindowSize().x - ImGui::GetStyle().WindowPadding.x;
+            ImGui::SetCursorScreenPos(ImVec2(right - audioW, toolbarOrigin.y));
+            if (ChipButton::Draw(audioLabel, sessionMode, tok::tile))
+               SetSessionAudio(!sessionMode);
+            if (ImGui::IsItemHovered())
+               HelpTip("%s", !gAudioStartError.empty() && AudioEngine::Instance().SampleRate() <= 0.0
+                                ? gAudioStartError.c_str()
+                                : T("Session Audio: you hear and see the clips you launch here; the Timeline's clips stay silent"));
+            Arrange::Tick from = 0, to = 0;
+            if (ArrangeSessionLastTake(from, to))
+            {
+               const char* takeLabel = T("Render Take");
+               const float takeW = ImGui::CalcTextSize(takeLabel).x + 2.0f * tok::space_2;
+               ImGui::SetCursorScreenPos(ImVec2(right - audioW - tok::space_1 - takeW, toolbarOrigin.y));
+               if (ChipButton::Draw(takeLabel, false, tok::tile))
+               {
+                  // The take is already on the Timeline: render its span with the Timeline's dialog (audio and
+                  // video together, saved to the folder you pick there).
+                  ArrangeEdit([&]() {
+                     gArrange.settings.renderRangeKind = kArrangeRangeCustom;
+                     gArrange.settings.renderRangeStart = from;
+                     gArrange.settings.renderRangeEnd = to;
+                  });
+                  gArrangePanelOpen = true;
+                  gArrangeRenderPopupRequest = true;
+               }
+               if (ImGui::IsItemHovered())
+                  HelpTip("%s", T("Render the last recording, audio and video, to a movie file in a folder you choose"));
+            }
+            ImGui::SetCursorScreenPos(saved);
+         }
          {
             const ImVec2 m = ImGui::GetIO().MousePos;
             const ImVec2 o = ImGui::GetWindowPos();
@@ -1303,6 +1656,25 @@ namespace app
          }
          if (MenuParts::BeginPopup("##sessiondockctx"))
          {
+            // Session shares the Timeline's dock edge, so either panel's menu moves both.
+            if (MenuParts::SubMenu(L("Dock Position")))
+            {
+               const bool panelTop = gArrange.settings.dockSide == 1;
+               if (MenuParts::Item(L("Session at Bottom"), nullptr, !panelTop) && panelTop)
+               {
+                  gArrange.settings.dockSide = 0;
+                  gArrange.revision++;
+                  gPatchDirty = true;
+               }
+               if (MenuParts::Item(L("Session at Top"), nullptr, panelTop) && !panelTop)
+               {
+                  gArrange.settings.dockSide = 1;
+                  gArrange.revision++;
+                  gPatchDirty = true;
+               }
+               ImGui::EndMenu();
+            }
+            ImGui::Dummy(ImVec2(0.0f, tok::space_1));
             if (MenuParts::Item(L("Close Session")))
                gSessionPanelOpen = false;
             MenuParts::EndPopup();

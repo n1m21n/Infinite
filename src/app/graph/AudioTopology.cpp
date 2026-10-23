@@ -221,7 +221,7 @@ namespace app
 
    bool ArrangeTimelineRoutingActive()
    {
-      return gAudioMode == AudioMode::Timeline ||
+      return gAudioMode != AudioMode::Canvas ||
              (gOfflineRender.active && gOfflineRender.arrangeDriven && gOfflineRender.timelineAudio) ||
              (gArrangeWavRender.active && gArrangeWavRender.timelineAudio);
    }

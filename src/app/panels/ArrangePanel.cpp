@@ -1018,6 +1018,14 @@ namespace app
             }
             ImGui::EndDisabled();
             ImGui::SetCursorScreenPos(savedCursor);
+            // Session's Render Take: the range is already set.
+            if (gArrangeRenderPopupRequest && !ArrangeRenderBusy())
+            {
+               if (rset.renderFolder.empty())
+                  rset.renderFolder = AppPaths::DesktopDir();
+               ImGui::OpenPopup("##arrangeRenderPopup");
+            }
+            gArrangeRenderPopupRequest = false;
 
             if (ImGui::GetFrameCount() == 30 && getenv("INFINITE_RENDERPOPUPTEST") != nullptr)   // design review shot
             {

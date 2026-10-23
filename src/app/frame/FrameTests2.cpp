@@ -3612,10 +3612,13 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
          fill(laneV1, 1, 4, "Tunnel");
          Arrange::FindLane(gArrange, laneA1)->slots[3].loop = false;
          Arrange::FindLane(gArrange, laneA1)->slots[3].quantize = 3;
-         Arrange::FindLane(gArrange, laneA1)->slots[3].launchMode = 2;
+         Arrange::FindLane(gArrange, laneA1)->slots[3].launchMode = 1;
          Arrange::FindLane(gArrange, laneA2)->slots[0].loopTicks = Arrange::kTicksPerBar;
          gArrange.scenes[1].quantize = 2;
          gArrange.scenes[1].additive = true;
+         gArrange.scenes[2].followNext = true;
+         gArrange.scenes[2].followBars = 2;
+         gArrange.sessionQuantize = 0;   // the Session's own grid: launch right at the playhead too
          Arrange::Normalize(gArrange);
       });
       gArrangePanelOpen = false;
@@ -3636,6 +3639,7 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       }
       ArrangeSessionLaunchScene(0);
       check(Transport::Instance().IsPlaying(), "launching while stopped starts the transport");
+      check(gAudioMode == AudioMode::Session, "launching hands audio to the Session");
    }
    if (frameId == 8)
    {
@@ -3690,11 +3694,13 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       {
          const Arrange::Lane* a1 = &gArrange.lanes[0];
          const Arrange::Lane* a2 = &gArrange.lanes[1];
-         check(a1->slots.size() > 3 && !a1->slots[3].loop && a1->slots[3].quantize == 3 && a1->slots[3].launchMode == 2 &&
+         check(a1->slots.size() > 3 && !a1->slots[3].loop && a1->slots[3].quantize == 3 && a1->slots[3].launchMode == 1 &&
                a1->slots[0].loop && a1->slots[0].quantize == -1 &&
                a2->slots[0].loopTicks == Arrange::kTicksPerBar &&
                gArrange.scenes[1].quantize == 2 && gArrange.scenes[1].additive && !gArrange.scenes[0].additive,
                "launch settings round trip");
+         check(gArrange.scenes[2].followNext && gArrange.scenes[2].followBars == 2 && !gArrange.scenes[0].followNext &&
+               gArrange.sessionQuantize == 0, "scene follow and the Session quantize round trip");
       }
       if (loaded && l0 != nullptr)
       {
@@ -3705,9 +3711,49 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
          Transport::Instance().SetPlaying(false);
       }
    }
+   if (frameId == 11)
+   {
+      // GarageBand clicks: a click on a playing clip stops it on the grid, a second click on a queued one takes
+      // it back. Session audio plays only launched clips, never the Timeline's.
+      check(!ArrangeSessionAnyLaunched(), "Stop All / transport stop ends every launch");
+      laneA2 = gArrange.lanes[1].id;
+      laneV1 = gArrange.lanes[2].id;
+      ArrangeSessionRunActionForTest(0, laneA1, 0);   // a Timeline clip on the Drums track
+      ArrangeEdit([&]() { gArrange.sessionQuantize = 2; });
+      ArrangeSessionLaunch(laneA1, 0);                // stopped: lands at once and starts the transport
+      check(gAudioMode == AudioMode::Session && Transport::Instance().IsPlaying(), "a clip launch starts Session audio");
+   }
+   if (frameId == 12)
+   {
+      check(ArrangeSessionQuery(laneA1, 0).playing, "the launched clip plays");
+      const Arrange::Model& pm = ArrangePlaybackModel();
+      bool onlySlots = &pm != &gArrange;
+      for (const Arrange::Lane& l : pm.lanes)
+         for (const Arrange::Clip& c : l.clips)
+            onlySlots = onlySlots && (c.id & (1ull << 62)) != 0;
+      check(onlySlots && !Arrange::FindLane(gArrange, laneA1)->clips.empty(), "Session audio leaves the Timeline's clips silent");
+      ArrangeSessionLaunch(laneA1, 0);
+      check(ArrangeSessionLaneQuery(laneA1).stopQueued, "clicking the playing clip queues its stop on the next bar");
+      ArrangeSessionLaunch(laneA2, 0);
+      ArrangeSessionLaunch(laneA2, 0);
+      check(ArrangeSessionLaneQuery(laneA2).playingSlot < 0 && !ArrangeSessionQuery(laneA2, 0).queued,
+            "clicking a queued clip again takes the launch back");
+   }
+   if (frameId == 13)
+   {
+      check(!ArrangeSessionQuery(laneA2, 0).queued && !ArrangeSessionQuery(laneA2, 0).playing, "the taken-back clip never starts");
+      ArrangeEdit([&]() { gArrange.scenes[0].followNext = true; });
+      ArrangeSessionLaunchScene(0);
+      check(ArrangeSessionSceneQuery(1).next, "Then Play Next Scene queues the next scene with clips");
+      ArrangeSessionStopAll();
+      check(!ArrangeSessionSceneQuery(1).next, "Stop All drops the queued next scene");
+      ArrangeEdit([&]() { gArrange.scenes[0].followNext = false; });
+      Transport::Instance().SetPlaying(false);
+      gAudioMode = AudioMode::Canvas;
+   }
    if (frameId == 14)
    {
-      check(&ArrangePlaybackModel() == &gArrange, "Stop All / transport stop gives the plain arrangement back");
+      check(&ArrangePlaybackModel() == &gArrange, "canvas audio gives the plain arrangement back");
       // Leave a launched, Session-view frame for the screenshot.
       gArrangePanelOpen = false;
       gSessionPanelOpen = true;
@@ -3753,6 +3799,21 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       ArrangeSessionRunActionForTest(2, laneA1, 0);
       ArrangeSessionRunActionForTest(1, laneA1, 99);
       check(Arrange::FindLane(gArrange, laneA1)->slots.size() >= 1, "actions on a cleared or missing slot are no-ops");
+      {
+         // Copy / Paste / Cut: the copy is a new clip with the same launch settings; a video cell refuses audio.
+         const Arrange::SessionSlot sub = Arrange::FindLane(gArrange, laneA2)->slots[0];
+         ArrangeSessionRunActionForTest(3, laneA2, 0);
+         ArrangeSessionRunActionForTest(4, laneA2, 5);
+         const Arrange::Lane* l2 = Arrange::FindLane(gArrange, laneA2);
+         check(l2->slots.size() > 5 && l2->slots[5].Has() && l2->slots[5].clip.id != sub.clip.id &&
+               l2->slots[5].clip.name == sub.clip.name && l2->slots[5].loopTicks == sub.loopTicks, "Copy and Paste make a new clip in an empty cell");
+         check(gArrangeSel.size() == 1 && *gArrangeSel.begin() == l2->slots[5].clip.id, "the pasted clip is selected");
+         ArrangeSessionRunActionForTest(4, laneV1, 0);
+         const Arrange::Lane* v1 = Arrange::FindLane(gArrange, laneV1);
+         check(v1->slots.empty() || !v1->slots[0].Has(), "an audio clip is never pasted onto a video track");
+         ArrangeSessionRunActionForTest(5, laneA2, 5);
+         check(!Arrange::FindLane(gArrange, laneA2)->slots[5].Has(), "Cut empties the cell");
+      }
       check(Arrange::Validate(gArrange, nullptr), "arrangement still validates");
    }
    if (frameId == 18)

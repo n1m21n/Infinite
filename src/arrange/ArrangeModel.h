@@ -242,7 +242,7 @@ namespace Arrange
       bool loop         = true;   // false = one-shot: plays once, then the track goes quiet
       Tick loopTicks    = 0;      // 0 = the clip's length; else the loop is this long (<= clip length)
       int  quantize     = -1;     // -1 = the transport's launch quantize, else MusicTime::kLaunch*
-      int  launchMode   = 0;      // 0 trigger, 1 gate (plays while held), 2 toggle (click again stops)
+      int  launchMode   = 0;      // 0 trigger, 1 gate (plays while held). Clicking a playing clip always stops it
       Tick LoopLen() const { return loopTicks > 0 && loopTicks < clip.length ? loopTicks : clip.length; }
       bool Has() const { return clip.length > 0; }
    };
@@ -253,6 +253,8 @@ namespace Arrange
       float tempo = 0.0f;         // > 0 sets the project tempo when the scene launches
       int   quantize = -1;        // -1 = global; else MusicTime::kLaunch*. Wins over each clip's own
       bool  additive = false;     // true = tracks the scene has no clip on keep playing
+      bool  followNext = false;   // true = after followBars, the next scene launches (wraps to the first)
+      int   followBars = 0;       // 0 = the scene's length (its longest loop), else bars
    };
 
    struct Lane
@@ -357,6 +359,7 @@ namespace Arrange
       std::vector<Marker>     markers;   // sorted by pos
       std::vector<TrackGroup> trackGroups;
       std::vector<Scene>      scenes;    // session view rows
+      int sessionQuantize = 2;           // MusicTime::kLaunch*: where a Global launch/stop lands (default 1 bar)
       Settings                settings;
       uint64_t            nextId  = 1; // persisted; never recomputed as max+1
       uint64_t            revision = 0; // bumped by every op that changed data

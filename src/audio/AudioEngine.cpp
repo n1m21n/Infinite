@@ -1246,7 +1246,7 @@ void AudioEngine::RunEntry(AudioTopologyEntry& entry, ProcessList* list, int num
          outputPtrs[o] = nullptr;
       }
    }
-   // Faded out by a switched-off set block: silence, and no work.
+   // Faded out by a switched-off group: silence, and no work.
    if (entry.node->BlockSilent())
    {
       for (int o = 0; o < numOuts; o++)

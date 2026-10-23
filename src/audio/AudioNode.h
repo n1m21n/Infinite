@@ -63,8 +63,8 @@ public:
    // (the canvas Cook times overlay); read by the main thread.
    std::atomic<float> costMs { 0.0f };
 
-   // ---- set blocks ----
-   // A set block switched off fades this node's outputs to silence over
+   // ---- group power ----
+   // A group switched off fades this node's outputs to silence over
    // blockFadeSeconds (both written by the main thread), so the switch never
    // clicks; once silent the engine stops running the node until the block
    // comes back on, when it fades in the same way.

@@ -607,7 +607,7 @@ elif [ "$OS" = "Linux" ]; then
     exit 1
   fi
 elif [ -f "$BUILD_DIR/CMakeCache.txt" ]; then
-  if ! cmake --build "$BUILD_DIR" -j8 2>&1 | tee /tmp/infinite_build.log; then
+  if ! python3 scripts/ibuild.py run -- cmake --build "$BUILD_DIR" -j"$(python3 scripts/ibuild.py jobs 2>/dev/null || echo 2)" 2>&1 | tee /tmp/infinite_build.log; then
     echo "BUILD FAILED — see /tmp/infinite_build.log"
     exit 1
   fi
@@ -617,7 +617,7 @@ else
     echo "CONFIGURE FAILED — see /tmp/infinite_build.log"
     exit 1
   fi
-  if ! cmake --build "$BUILD_DIR" -j8 2>&1 | tee -a /tmp/infinite_build.log; then
+  if ! python3 scripts/ibuild.py run -- cmake --build "$BUILD_DIR" -j"$(python3 scripts/ibuild.py jobs 2>/dev/null || echo 2)" 2>&1 | tee -a /tmp/infinite_build.log; then
     echo "BUILD FAILED — see /tmp/infinite_build.log"
     exit 1
   fi
