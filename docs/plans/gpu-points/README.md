@@ -177,8 +177,21 @@ points land inside that cloud; 600,000 alive at 600k/s, past the CPU cap. Parity
 (`glFenceSync`, `glClientWaitSync`, `glGetBufferSubData`, `glUniform1ui`, MRT, `GL_SAMPLES_PASSED`)
 is GL 3.0-3.3 core and in glad; shaders stay `#version 150`; no `Platform::` code.
 
-**Left for the next session.**
-- `tools/gen-patch-skill.py` has not been re-run for the new `emit` pin and params. Against the dev
-  (Debug) build `--describe` spun for 9+ minutes in `Sketch3DNode::CookIfNeeded` (freeing a very
-  large mesh, not particle code); run it against a Release build.
-- B11 scene B (particles) GPU on/off on a Release build, then steps 8-12.
+**Patch facts.** `tools/gen-patch-skill.py` re-run against the Release build (2026-10-24): 16 s, no
+hang. The 9+ minute spin in `Sketch3DNode::CookIfNeeded` seen on the Debug build does not happen in
+Release, so it is a Debug-only cost (freeing a very large mesh unoptimised), not a hang.
+
+### B11 scene B, particles (Mac14,7 Release universal, 1080p, 2026-10-24, two rounds each)
+
+Frame p50 / p99 ms, fps p50, cook ms p50. Off = `INFINITE_GPU_POINTS=0` (the CPU sim, capped at
+200k; it keeps a few short of the ask because births stop at the cap).
+
+| Particles | off, round 1 | off, round 2 | on, round 1 | on, round 2 |
+|---|---|---|---|---|
+| 10k | 7.93 / 38.66, 126, cook 0.94 | 8.40 / 14.60, 119, cook 0.94 | 8.24 / 27.53, 121, cook 0.78 | 7.42 / 16.06, 135, cook 0.76 |
+| 100k | 25.03 / 117.89, 40, cook 9.73 | 15.92 / 50.01, 63, cook 4.51 | 9.29 / 17.04, 108, cook 0.77 | 10.67 / 17.53, 94, cook 0.95 |
+| 200k | 27.21 / 84.47, 37, cook 8.70 | 24.67 / 52.36, 41, cook 8.87 | 11.18 / 16.59, 90, cook 1.07 | 10.45 / 15.28, 96, cook 0.97 |
+
+- **Step 7 pays:** 200k particles 37-41 → 90-96 fps, 100k 40-63 → 94-108 fps, and the p99 drops
+  from 50-118 ms to 15-18 ms (the CPU sim's cook, 4.5-9.7 ms, is gone: ~1 ms on the GPU).
+- 10k is the same either way (~120-135 fps): the frame is the rest of the render, not the sim.

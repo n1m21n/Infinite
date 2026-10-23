@@ -701,7 +701,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-338 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+339 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -766,13 +766,13 @@ R"AISKILL(| `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
 | `Null 3D` | geo:geometry | out:geometry | 0 | bypass |
 | `Ocean` | texture:image | out:geometry | 29 | bypass |
 | `Octahedron` | texture:image | out:geometry | 51 | bypass |
-| `Particle System` | none | out:geometry | 23 | bypass |
+| `Particle System` | emit:geometry | out:geometry | 30 | bypass |
 | `Plane` | texture:image | out:geometry | 51 | bypass |
 | `Points to Vertices` | points:geometry | out:geometry | 18 | bypass |
 | `Prism` | texture:image | out:geometry | 51 | bypass |
 | `Proximity Lines` | points:geometry | out:geometry | 12 | bypass |
 | `Pyramid` | texture:image | out:geometry | 51 | bypass |
-| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 45 |  |
+| `Render 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, camera:camera, light_1:light, light_2:light, light_3:light, env:environment | out:image | 51 |  |
 | `Resynthesize 3D` | geo:geometry | out:geometry | 13 | bypass |
 | `Revolve` | profile:geometry | out:geometry | 4 | bypass |
 | `Rigid Bodies` | geo:geometry | out:geometry | 24 | bypass |
@@ -850,7 +850,7 @@ R"AISKILL(| `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
 | `Feedback` | input:image | out:image | 1 | bypass |
 | `Fit` | input:image | out:image | 8 | bypass |
 | `Fluid` | image:image, force:image, obstacles:image | out:image | 12 |  |
-| `Group` | none | out:image | 4 | bypass |
+| `Group` | none | out:image | 5 | bypass |
 | `Layer Stack` | input:image, input_2:image, input_3:image, input_4:image | out:image | 12 |  |
 | `Null` | in:image | out:image | 0 | bypass |
 | `Optical Flow` | image:image | out:image | 6 | bypass |
@@ -976,13 +976,13 @@ R"AISKILL(| `Pattern` | none | out:modulator | 24 | bypass |
 |---|---|---|---|---|
 | `Arpeggiator` | notes:note | out:note | 9 | bypass |
 | `Bouncing Balls` | none | out:note | 9 | bypass |
-| `Chorder` | none | out:note | 10 | bypass |
+| `Chorder` | none | out:note | 28 | bypass |
 | `Field Notes` | notes:note | notes:note | 6 | bypass |
 | `Gate` | notes:note | out:note | 1 | bypass |
 | `Glide` | notes:note | out:note | 1 | bypass |
 | `Humanizer` | notes:note | out:note | 2 | bypass |
 | `Keyboard` | none | out:note | 5 | bypass |
-| `MIDI File` | none | out:note | 6 | bypass |
+| `MIDI File` | none | out:note | 7 | bypass |
 | `MIDI Notes` | none | out:note | 6 | hardware: refused headless, bypass |
 | `Note Capturer` | notes:note | out:note | 2 | bypass |
 | `Note Echo` | notes:note | out:note | 7 | bypass |
@@ -1026,7 +1026,7 @@ R"AISKILL(| `Pattern` | none | out:modulator | 24 | bypass |
 | `Draw` | input:image | out:image | 13 | bypass |
 | `Ellipse` | none | out:image | 20 | bypass |
 | `FieldPixel` | none | out:image | 9 | bypass |
-| `Formula` | none | out:image | 8 | bypass |
+| `Formula` | none | out:image | 25 | bypass |
 | `Gear` | none | out:image | 20 | bypass |
 | `Heart` | none | out:image | 20 | bypass |
 | `Hexagon` | none | out:image | 20 | bypass |
@@ -1048,6 +1048,7 @@ R"AISKILL(| `Pattern` | none | out:modulator | 24 | bypass |
 | `Text` | none | out:image | 20 | bypass |
 | `Texture` | none | out:image | 47 | bypass |
 | `Triangle` | none | out:image | 20 | bypass |
+| `VMPC` | notes:note | video:image, audio:audio | 165 | bypass |
 | `Video` | none | video:image, audio:audio | 7 | bypass |
 | `Video In` | none | out:image | 4 | hardware: refused headless, bypass |
 
