@@ -70,7 +70,7 @@ mapa esperava os limites; pedido do dono). S5 (GTAO) no commit seguinte, sem pus
 - S5: `RENDER-3D-HQ-FILAMENT.md` §10 - `hq_ao_depth/hq_gtao/hq_ao_blur.comp.glsl`, `RunAo()` depois do
   pré-passe, `ssaoVisibility()` em `hq_lighting.glsl` (upsample bilateral), só na luz indireta.
   Parâmetros `ao`, `aoRadius` (1,0), `aoIntensity`, `aoShow`. +0,5 ms na F a 1080p.
-- Cenas de teste versionadas (pedido do dono): `examples/hq/G_shadow_contact.inf` (sombra embaixo de
+- Cenas de teste versionadas (pedido do dono): `examples/hq/{raster,filament}/G_shadow_contact.inf` (sombra embaixo de
   objetos encostados / a 2 e 20 cm do chão, materiais variados) e `H_ao_contact.inf` (vinco chão-parede
   e contatos, com um terceiro render HQ em "só AO"), geradas pelo `scripts/make_hq_scenes.py`.
 

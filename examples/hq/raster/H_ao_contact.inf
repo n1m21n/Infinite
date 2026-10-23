@@ -2,7 +2,7 @@ infinite-patch 1
 # turbo-mod-range
 node 1 3DScene Render 3D
   uid 1
-  pos 1600 600
+  pos 1040 0
   flags 1 0 0 0 1 0
   f width 1920
   f height 1080
@@ -17,88 +17,100 @@ node 1 3DScene Render 3D
 end
 node 2 3DScene Camera
   uid 2
-  pos 1200 200
+  pos 520 0
   flags 1 0 0 0 1 0
   i projection 0
   f fov 40
-  f distance 7.5
-  f azimuth 90
-  f elevation 12
+  f distance 8
+  f azimuth 70
+  f elevation 35
   f targetX 0
-  f targetY 0.5
+  f targetY 0.6
   f targetZ 0
   f orbitPerBeat 0
 end
 node 3 3DScene HDRI
   uid 3
-  pos 1200 0
+  pos 520 560
   flags 1 0 0 0 1 0
-  s path hq_media/studio.hdr
-  f intensity 0.8
+  s path ../hq_media/studio.hdr
+  f intensity 1
   f rotation 0
 end
 node 4 3DScene Light
   uid 4
-  pos 1200 400
+  pos 520 1120
   flags 1 0 0 0 1 0
   i type 0
-  f azimuth -40
-  f elevation 50
+  f azimuth 30
+  f elevation 45
   c color 1 0.97 0.92
-  f intensity 2.5
+  f intensity 2
 end
 node 5 3DScene Geometry
   uid 5
-  pos 200 100
+  pos 0 0
   flags 1 0 0 0 1 0
-  i shape 2
-  f posX -3.3
-  f posY 0.8
-  f scale 1.6
-  c color 1 0.78 0.34
-  f metallic 1
-  f roughness 0.15
+  i shape 1
+  f posY 1.5
+  f posZ -2
+  f scaleX 10
+  f scaleY 3
+  f scaleZ 0.2
+  c color 0.75 0.75 0.76
+  f roughness 0.9
 end
 node 6 3DScene Geometry
   uid 6
-  pos 200 220
+  pos 0 560
   flags 1 0 0 0 1 0
-  i shape 2
-  f posX -1.1
-  f posY 1
-  f scale 1.6
-  c color 0.75 0.12 0.1
+  i shape 1
+  f posX -2.4
+  f posY 0.5
+  f posZ -1.4
+  c color 0.85 0.85 0.85
   f metallic 0
-  f roughness 0.35
-  f clearcoat 1
+  f roughness 0.9
 end
 node 7 3DScene Geometry
   uid 7
-  pos 200 340
+  pos 0 1120
   flags 1 0 0 0 1 0
-  i shape 1
-  f posX 1.1
-  f posY 0.52
-  f scale 1
-  c color 0.2 0.4 0.8
+  i shape 2
+  f posX -0.6
+  f posY 0.8
+  f scale 1.6
+  c color 0.1 0.35 0.85
   f metallic 0
-  f roughness 0.7
+  f roughness 0.15
 end
 node 8 3DScene Geometry
   uid 8
-  pos 200 460
+  pos 0 1680
   flags 1 0 0 0 1 0
   i shape 5
-  f posX 3.1
+  f posX 1.4
   f posY 0.5
   f scale 1
-  c color 0.95 0.64 0.54
+  c color 0.9 0.9 0.92
   f metallic 1
-  f roughness 0.3
+  f roughness 0.1
 end
 node 9 3DScene Geometry
   uid 9
-  pos 200 900
+  pos 0 2240
+  flags 1 0 0 0 1 0
+  i shape 7
+  f posX 3
+  f posY 0.75
+  f scale 0.9
+  c color 0.55 0.55 0.58
+  f metallic 1
+  f roughness 0.6
+end
+node 10 3DScene Geometry
+  uid 10
+  pos 0 2800
   flags 1 0 0 0 1 0
   i shape 1
   f scaleX 30
@@ -109,39 +121,25 @@ node 9 3DScene Geometry
   f metallic 0
   f roughness 0.8
 end
-node 10 3DScene Group 3D
-  uid 10
-  pos 1000 600
-  flags 1 0 0 0 1 0
-end
-node 11 Output Output
+node 11 3DScene Group 3D
   uid 11
-  pos 2000 600
+  pos 520 1680
   flags 1 0 0 0 1 0
 end
-node 12 3DScene Render 3D HQ
+node 12 Output Output
   uid 12
-  pos 1600 1000
+  pos 2020 0
   flags 1 0 0 0 1 0
-  f width 1920
-  f height 1080
-  i tonemap 1
-  f exposure 1
-  f envIntensity 1
-  b envAsBackground 1
 end
-geo 10 0 5
-geo 10 1 6
-geo 10 2 7
-geo 10 3 8
-geo 10 4 9
-geo 1 0 10
+geo 11 0 6
+geo 11 1 7
+geo 11 2 8
+geo 11 3 9
+geo 11 4 5
+geo 11 5 10
+geo 1 0 11
 geo 1 4 2
 geo 1 5 4
 cable 1 8 3
-cable 11 0 1
-geo 12 0 10
-geo 12 4 2
-geo 12 5 4
-cable 12 8 3
+cable 12 0 1
 transport 120 4 4 0 0

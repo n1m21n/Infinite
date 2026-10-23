@@ -35,13 +35,14 @@ there, not from memory).
 
 ## Reference scenes and captures
 
-Scenes: `examples/hq/A..F_*.inf` (regenerate with `python scripts/make_hq_scenes.py`; HDRI with
-`scripts/make_hq_studio_hdr.py`). From S1 on, each scene also carries a Render 3D HQ wired to the
-same sources, camera, lights and HDRI (extend `make_hq_scenes.py`, do not edit the .inf by hand).
+Scenes A-H, one renderer per patch: `examples/hq/raster/*.inf` (Render 3D) and
+`examples/hq/filament/*.inf` (Render 3D HQ) (regenerate with `python scripts/make_hq_scenes.py`; HDRI with
+`scripts/make_hq_studio_hdr.py`). Both folders hold the same scenes with the same sources, camera,
+lights and HDRI (extend `make_hq_scenes.py`, do not edit the .inf by hand).
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File .claude\skills\run-turbo-tests\capture.ps1 -PatchFiles examples\hq
-powershell -NoProfile -ExecutionPolicy Bypass -File .claude\skills\run-turbo-tests\capture.ps1 -PatchFiles examples\hq -Type "Render 3D HQ" -OutDir build\hq\after
+powershell -NoProfile -ExecutionPolicy Bypass -File .claude\skills\run-turbo-tests\capture.ps1 -PatchFiles examples\hq\raster
+powershell -NoProfile -ExecutionPolicy Bypass -File .claude\skills\run-turbo-tests\capture.ps1 -PatchFiles examples\hq\filament -Type "Render 3D HQ" -OutDir build\hq\after
 ```
 
 Each node of `-Type` is saved as `<OutDir>\<scene>_<nodeIndex>.png` (upright, opaque) and its frame

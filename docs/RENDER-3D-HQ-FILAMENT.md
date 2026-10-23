@@ -117,7 +117,7 @@ comum em `app/frame/Startup.inl:1832`, lista do driver em `driver.ps1` (`'NOME:q
 
 ## 5. Cenas de referência e linha de base (S0)
 
-Cenas em `examples/hq/` (geradas por `scripts/make_hq_scenes.py`; HDRI procedural de estúdio
+Cenas em `examples/hq/raster/` (Render 3D) e `examples/hq/filament/` (Render 3D HQ), um renderizador por patch, nós em colunas sem sobreposição (pedido do dono, 2026-10-23; antes os dois renderizadores dividiam o patch) (geradas por `scripts/make_hq_scenes.py`; HDRI procedural de estúdio
 `examples/hq/hq_media/studio.hdr` por `scripts/make_hq_studio_hdr.py`, sem licença de terceiros):
 A estúdio de materiais (6 esferas PBR + chão), B estúdio de partículas (90k pontos, luz lateral,
 câmera em órbita), C nuvem generativa (partículas na GPU), D partículas emissivas (bloom), E

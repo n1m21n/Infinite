@@ -1,13 +1,15 @@
-"""Writes the Render 3D HQ reference scenes (0.71, S0) to examples/hq/*.inf.
+"""Writes the Render 3D HQ reference scenes (0.71) to examples/hq.
 
-Each scene is rendered by the original Render 3D; from S1 on the same file gets
-a Render 3D HQ next to it (same sources, camera, lights, HDRI: add_hq_twins)
-for BEFORE / AFTER captures. Output stays on Render 3D. 1920 x 1080. Missing keys take the node defaults, so only what
-matters is written. The HDRI is examples/hq/hq_media/studio.hdr
-(scripts/make_hq_studio_hdr.py).
+Every scene twice, one renderer per patch: examples/hq/raster/<scene>.inf
+through Render 3D and examples/hq/filament/<scene>.inf through Render 3D HQ
+(same sources, camera, lights, HDRI; to_filament). Nodes are laid out in
+columns by graph depth (layout). 1920 x 1080. Missing keys take the node
+defaults, so only what matters is written. The HDRI is
+examples/hq/hq_media/studio.hdr (scripts/make_hq_studio_hdr.py).
 
   A  material_studio     six PBR spheres (polished / rough metal, dielectric,
-                         glossy plastic, emissive, normal-mapped) on a floor
+                         glossy plastic, emissive, normal-mapped) on a floor;
+                         an LFO turns the HDRI (one turn every 32 beats)
   B  particle_studio     ~90k static points, side light, orbiting camera
   C  generative_cloud    GPU particles in curl turbulence (~200k alive)
   D  emissive_particles  glowing particles on black, bloom
@@ -19,14 +21,16 @@ matters is written. The HDRI is examples/hq/hq_media/studio.hdr
                          camera - the case behind the 0.71 Render 3D fix
   H  ao_contact          ambient occlusion at contacts and creases: a wall
                          corner, matte / plastic / metal / rough objects on the
-                         floor, plus a third render in "AO only" (HQ aoShow)
+                         floor (HQ: tick "show AO only" to see it alone)
 
 Usage: python scripts/make_hq_scenes.py
 """
 import os
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "examples", "hq")
-HDRI = "hq_media/studio.hdr"
+# The patches sit in examples/hq/raster and examples/hq/filament; the HDRI
+# they share is examples/hq/hq_media (relative paths resolve next to the .inf).
+HDRI = "../hq_media/studio.hdr"
 
 
 class Patch:
@@ -122,21 +126,58 @@ HQ_KEYS = {"width", "height", "projection", "fov", "orthoHeight", "camDistance",
            "camElevation", "targetX", "targetY", "targetZ", "near", "far", "lightAzimuth",
            "lightElevation", "lightColor", "lightIntensity", "envSky", "envHorizon", "envGround",
            "envIntensity", "envAsBackground", "bg", "tonemap", "exposure", "bloom",
-           "bloomThreshold", "bloomRadius"}
+           "bloomThreshold", "bloomRadius", "shadows", "shadowQuality", "shadowSoftness",
+           "contactShadows", "ao", "aoRadius", "aoIntensity", "aoShow"}
 
 
-def add_hq_twins(p):
-    # A Render 3D HQ under every Render 3D, with the same params it knows and
-    # the same geo / cable inputs.
-    for i, (cat, typ, params, (x, y)) in enumerate(list(p.nodes), 1):
-        if typ != "Render 3D":
-            continue
-        hq_params = {k: v for k, v in params.items() if k.split("_", 1)[1] in HQ_KEYS}
-        hq = p.node(cat, "Render 3D HQ", x, y + 400, **hq_params)
-        for line in list(p.links):
-            kind, dst, slot, src = line.split()
-            if int(dst) == i:
-                p.links.append("%s %d %s %s" % (kind, hq, slot, src))
+def to_filament(p):
+    # The same scene through Render 3D HQ: each Render 3D becomes one, in
+    # place (same index, so every cable stays), keeping the params it reads.
+    for i, (cat, typ, params, pos) in enumerate(p.nodes):
+        if typ == "Render 3D":
+            hq_params = {k: v for k, v in params.items() if k.split("_", 1)[1] in HQ_KEYS}
+            p.nodes[i] = (cat, "Render 3D HQ", hq_params, pos)
+    return p
+
+
+SCENE_TYPES = {"Camera", "Light", "HDRI", "LFO"}
+RENDER_TYPES = {"Render 3D", "Render 3D HQ"}
+COL_W, ROW_H, RENDER_W = 520, 560, 980
+
+
+def layout(p):
+    # Columns by depth in the graph (a source at 0, each consumer one right of
+    # its deepest input), nodes stacked in each column with room for their
+    # bodies. Camera / light / HDRI / LFO go in the column just left of the
+    # renderer; the output (and anything after a renderer) clears its wide body.
+    inputs = {i: set() for i in range(1, len(p.nodes) + 1)}
+    for line in p.links:
+        kind, dst, _slot, src = line.split()[:4]
+        if kind in ("geo", "cable"):
+            inputs[int(dst)].add(int(src))
+    depth = {}
+
+    def d(i):
+        if i not in depth:
+            typ = p.nodes[i - 1][1]
+            srcs = [s for s in inputs[i] if p.nodes[s - 1][1] not in SCENE_TYPES]
+            depth[i] = 0 if typ in SCENE_TYPES or not srcs else 1 + max(d(s) for s in srcs)
+        return depth[i]
+
+    for i in inputs:
+        d(i)
+    render_col = max([depth[i] for i in inputs if p.nodes[i - 1][1] in RENDER_TYPES] or [1])
+    for i in inputs:
+        if p.nodes[i - 1][1] in SCENE_TYPES:
+            depth[i] = max(render_col - 1, 0)
+    rows = {}
+    for i in sorted(inputs):
+        col = depth[i]
+        row = rows.get(col, 0)
+        rows[col] = row + 1
+        x = col * COL_W + (RENDER_W - COL_W if col > render_col else 0)
+        cat, typ, params, _pos = p.nodes[i - 1]
+        p.nodes[i - 1] = (cat, typ, params, (x, row * ROW_H))
     return p
 
 
@@ -172,6 +213,10 @@ def scene_a():
     p.geo(r, 0, group)
     wire(p, r, cam, light, env)
     output(p, r)
+    # The studio turns: an LFO saw sweeps the HDRI's rotation over its whole
+    # range (-180..180, so the wrap is seamless), one turn every 32 beats.
+    lfo = p.node("Modulators", "LFO", 0, 0, i_shape=2, i_rateMode=0, f_rateBeats=32.0, f_low=0.0, f_high=1.0)
+    p.links.append("mod %d rotation %d 0 0 1 0" % (env, lfo))
     return p
 
 
@@ -330,11 +375,6 @@ def scene_h():
     p.geo(r, 0, group)
     wire(p, r, cam, light, env)
     output(p, r)
-    # "AO only": not a twin (add_hq_twins only follows Render 3D nodes).
-    ao = p.node("3DScene", "Render 3D HQ", 1600, 1400, f_width=1920, f_height=1080, i_tonemap=1,
-                b_shadows=True, b_envAsBackground=True, b_aoShow=True)
-    p.geo(ao, 0, group)
-    wire(p, ao, cam, light, env)
     return p
 
 
@@ -351,12 +391,15 @@ SCENES = {
 
 
 def main():
-    os.makedirs(OUT_DIR, exist_ok=True)
-    for name, make in SCENES.items():
-        path = os.path.join(OUT_DIR, name + ".inf")
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write(add_hq_twins(make()).text())
-        print("wrote", os.path.normpath(path))
+    # One renderer per patch: raster/ (Render 3D) and filament/ (Render 3D HQ).
+    for variant, convert in (("raster", lambda p: p), ("filament", to_filament)):
+        out_dir = os.path.join(OUT_DIR, variant)
+        os.makedirs(out_dir, exist_ok=True)
+        for name, make in SCENES.items():
+            path = os.path.join(out_dir, name + ".inf")
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(layout(convert(make())).text())
+            print("wrote", os.path.normpath(path))
 
 
 if __name__ == "__main__":

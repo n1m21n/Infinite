@@ -1,27 +1,21 @@
 infinite-patch 1
 # turbo-mod-range
-node 1 3DScene Render 3D
+node 1 3DScene Render 3D HQ
   uid 1
-  pos 1600 600
+  pos 1560 0
   flags 1 0 0 0 1 0
   f width 1920
   f height 1080
-  i renderMode 0
-  i samples 2
-  b shadows 0
+  b shadows 1
   i shadowQuality 1
   i tonemap 1
   f exposure 1
-  f envIntensity 0.15
-  b envAsBackground 0
-  c bg 0 0 0
-  f bloom 0.8
-  f bloomThreshold 0.6
-  f bloomRadius 0.6
+  f envIntensity 1
+  b envAsBackground 1
 end
 node 2 3DScene Camera
   uid 2
-  pos 1200 200
+  pos 1040 0
   flags 1 0 0 0 1 0
   i projection 0
   f fov 40
@@ -33,27 +27,27 @@ node 2 3DScene Camera
   f targetZ 0
   f orbitPerBeat 0.02
 end
-node 3 3DScene HDRI
+node 3 3DScene Light
   uid 3
-  pos 1200 0
+  pos 1040 560
   flags 1 0 0 0 1 0
-  s path hq_media/studio.hdr
-  f intensity 0.15
-  f rotation 0
+  i type 0
+  f azimuth -40
+  f elevation 35
+  c color 1 0.97 0.92
+  f intensity 2
 end
-node 4 3DScene Material
+node 4 3DScene HDRI
   uid 4
-  pos 900 1200
+  pos 1040 1120
   flags 1 0 0 0 1 0
-  c color 1 0.45 0.1
-  f metallic 0
-  f roughness 0.5
-  c emissionColor 1 0.5 0.15
-  f emission 6
+  s path ../hq_media/studio.hdr
+  f intensity 1
+  f rotation 0
 end
 node 5 PointZ Grid PointZ
   uid 5
-  pos 0 1200
+  pos 0 0
   flags 1 0 0 0 1 0
   f sizeX 3
   f sizeY 3
@@ -65,7 +59,7 @@ node 5 PointZ Grid PointZ
 end
 node 6 PointZ Noise PointZ
   uid 6
-  pos 300 1200
+  pos 520 0
   flags 1 0 0 0 1 0
   s attrib P
   i type 2
@@ -77,7 +71,7 @@ node 6 PointZ Noise PointZ
 end
 node 7 PointZ Particle PointZ
   uid 7
-  pos 600 1200
+  pos 1040 1680
   flags 1 0 0 0 1 0
   i birth 0
   f rate 60000
@@ -100,32 +94,14 @@ node 7 PointZ Particle PointZ
 end
 node 8 Output Output
   uid 8
-  pos 2000 600
+  pos 2540 0
   flags 1 0 0 0 1 0
-end
-node 9 3DScene Render 3D HQ
-  uid 9
-  pos 1600 1000
-  flags 1 0 0 0 1 0
-  f width 1920
-  f height 1080
-  i tonemap 1
-  f exposure 1
-  f envIntensity 0.15
-  b envAsBackground 0
-  c bg 0 0 0
-  f bloom 0.8
-  f bloomThreshold 0.6
-  f bloomRadius 0.6
 end
 geo 6 0 5
 geo 7 0 6
-geo 4 0 7
-geo 1 0 4
+geo 1 0 7
 geo 1 4 2
-cable 1 8 3
+geo 1 5 3
+cable 1 8 4
 cable 8 0 1
-geo 9 0 4
-geo 9 4 2
-cable 9 8 3
 transport 120 4 4 0 0

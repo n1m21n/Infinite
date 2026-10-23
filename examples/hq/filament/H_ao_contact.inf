@@ -1,13 +1,11 @@
 infinite-patch 1
 # turbo-mod-range
-node 1 3DScene Render 3D
+node 1 3DScene Render 3D HQ
   uid 1
-  pos 1600 600
+  pos 1040 0
   flags 1 0 0 0 1 0
   f width 1920
   f height 1080
-  i renderMode 0
-  i samples 2
   b shadows 1
   i shadowQuality 1
   i tonemap 1
@@ -17,7 +15,7 @@ node 1 3DScene Render 3D
 end
 node 2 3DScene Camera
   uid 2
-  pos 1200 200
+  pos 520 0
   flags 1 0 0 0 1 0
   i projection 0
   f fov 40
@@ -31,15 +29,15 @@ node 2 3DScene Camera
 end
 node 3 3DScene HDRI
   uid 3
-  pos 1200 0
+  pos 520 560
   flags 1 0 0 0 1 0
-  s path hq_media/studio.hdr
+  s path ../hq_media/studio.hdr
   f intensity 1
   f rotation 0
 end
 node 4 3DScene Light
   uid 4
-  pos 1200 400
+  pos 520 1120
   flags 1 0 0 0 1 0
   i type 0
   f azimuth 30
@@ -49,7 +47,7 @@ node 4 3DScene Light
 end
 node 5 3DScene Geometry
   uid 5
-  pos 200 600
+  pos 0 0
   flags 1 0 0 0 1 0
   i shape 1
   f posY 1.5
@@ -62,7 +60,7 @@ node 5 3DScene Geometry
 end
 node 6 3DScene Geometry
   uid 6
-  pos 200 100
+  pos 0 560
   flags 1 0 0 0 1 0
   i shape 1
   f posX -2.4
@@ -74,7 +72,7 @@ node 6 3DScene Geometry
 end
 node 7 3DScene Geometry
   uid 7
-  pos 200 220
+  pos 0 1120
   flags 1 0 0 0 1 0
   i shape 2
   f posX -0.6
@@ -86,7 +84,7 @@ node 7 3DScene Geometry
 end
 node 8 3DScene Geometry
   uid 8
-  pos 200 340
+  pos 0 1680
   flags 1 0 0 0 1 0
   i shape 5
   f posX 1.4
@@ -98,7 +96,7 @@ node 8 3DScene Geometry
 end
 node 9 3DScene Geometry
   uid 9
-  pos 200 460
+  pos 0 2240
   flags 1 0 0 0 1 0
   i shape 7
   f posX 3
@@ -110,7 +108,7 @@ node 9 3DScene Geometry
 end
 node 10 3DScene Geometry
   uid 10
-  pos 200 900
+  pos 0 2800
   flags 1 0 0 0 1 0
   i shape 1
   f scaleX 30
@@ -123,35 +121,13 @@ node 10 3DScene Geometry
 end
 node 11 3DScene Group 3D
   uid 11
-  pos 1000 600
+  pos 520 1680
   flags 1 0 0 0 1 0
 end
 node 12 Output Output
   uid 12
-  pos 2000 600
+  pos 2020 0
   flags 1 0 0 0 1 0
-end
-node 13 3DScene Render 3D HQ
-  uid 13
-  pos 1600 1400
-  flags 1 0 0 0 1 0
-  f width 1920
-  f height 1080
-  i tonemap 1
-  b shadows 1
-  b envAsBackground 1
-  b aoShow 1
-end
-node 14 3DScene Render 3D HQ
-  uid 14
-  pos 1600 1000
-  flags 1 0 0 0 1 0
-  f width 1920
-  f height 1080
-  i tonemap 1
-  f exposure 1
-  f envIntensity 1
-  b envAsBackground 1
 end
 geo 11 0 6
 geo 11 1 7
@@ -164,12 +140,4 @@ geo 1 4 2
 geo 1 5 4
 cable 1 8 3
 cable 12 0 1
-geo 13 0 11
-geo 13 4 2
-geo 13 5 4
-cable 13 8 3
-geo 14 0 11
-geo 14 4 2
-geo 14 5 4
-cable 14 8 3
 transport 120 4 4 0 0
