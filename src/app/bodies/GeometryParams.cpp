@@ -1877,7 +1877,7 @@ namespace app
 
       // Both columns draw every row every frame: a row that does not apply right now is greyed, never
       // dropped, so nothing grows, shifts or leaves a gap when a switch flips or a param is added.
-      // Left: output, camera, points, raster (25 rows). Right: light, shadows, environment, quality (25 rows).
+      // Left: output, camera, points, raster (26 rows). Right: light, shadows, environment, quality (28 rows).
       char label[64];
       // Same clamp the renderer applies (Render3DNode::Cook): a patch can hold any int here.
       const int aaIndex = std::clamp(n->samples, 0, (int)Render3DNode::SampleNames().size() - 1);
@@ -1903,6 +1903,11 @@ namespace app
       DropdownButton("tonemap", Render3DNode::TonemapNames(), n->tonemap,
                      [n](int i) { n->tonemap = i; }, colW);
       ModSlider("exposure", &n->exposure, 0.1f, 4.0f, "%.3f", colW);
+      // HDR lights the scene in float and tonemaps once at the end, so bloom
+      // sees light above white. Only the beauty pass has light to keep.
+      ImGui::BeginDisabled(n->renderPass != 0);
+      ModCheckbox("hdr", &n->hdr);
+      ImGui::EndDisabled();
       ColorSwatch("background", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f, "%.3f", colW);
       ModCheckbox("16-bit float output", &n->floatOutput);
@@ -1992,6 +1997,13 @@ namespace app
       ModSlider("focus distance", &n->focusDistance, 0.3f, 30.0f, "%.3f", colW);
       ImGui::EndDisabled();
       ModSliderInt("offline supersample", &n->supersample, 1, 64, colW);
+      ImGui::BeginDisabled(!n->HdrActive());
+      ModSlider("bloom", &n->bloom, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::BeginDisabled(n->bloom <= 0.0f);
+      ModSlider("bloom threshold", &n->bloomThreshold, 0.5f, 8.0f, "%.2f", colW);
+      ModSlider("bloom radius", &n->bloomRadius, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
+      ImGui::EndDisabled();
 
       ImGui::EndGroup();
    }

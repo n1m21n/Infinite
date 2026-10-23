@@ -544,6 +544,7 @@ set(COMMON_SOURCES
     src/app/selftest/I18nTests.cpp
     src/app/selftest/MiscTests.cpp
     src/app/selftest/VmpcTests.cpp
+    src/app/selftest/Render3DHdrTests.cpp
     src/app/selftest/SpatialTests.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
@@ -722,6 +723,7 @@ set(COMMON_SOURCES
     src/nodes/MidiOutNode.cpp
     src/nodes/Geometry3DNodes.cpp
     src/nodes/Render3DPost.cpp
+    src/nodes/Render3DHdr.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
     src/nodes/Text3DNode.cpp

@@ -5749,6 +5749,7 @@ void SavePatchWithMediaInteractive();
 bool RunSaveWithMediaTest();
 bool RunFormulaShadertoyTest();
 bool RunVmpcTest();
+bool RunRender3DHdrTest();
 bool RunBlockSetTest();
 extern bool gShowSaveMediaModal;
 
