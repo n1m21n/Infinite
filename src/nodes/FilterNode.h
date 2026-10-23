@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <vector>
 
@@ -73,6 +74,12 @@ public:
          else
             v.Float(def.uniformName.c_str(), mParamValues[i][0]);
       }
+      // A patch file, OSC or RPC set stores any finite float; the knobs bind
+      // only the UI. Shaders trust the def's range (dither loops uMode + 1
+      // times, so 1e9 hung the GPU), so hold every param to it, as the knobs do.
+      for (size_t i = 0; i < mDef.params.size(); i++)
+         if (mDef.params[i].type != FilterParamDef::Type::Color && mDef.params[i].minVal < mDef.params[i].maxVal)
+            mParamValues[i][0] = std::clamp(mParamValues[i][0], mDef.params[i].minVal, mDef.params[i].maxVal);
       v.Bool("headroom", mHeadroom);
    }
 
