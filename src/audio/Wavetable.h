@@ -91,7 +91,8 @@ namespace Wavetable
    // two different bandwidths and buzz as `position` moves.
    inline float Sample(const float* frameLo, const float* frameHi, float frameFrac, double phase01)
    {
-      phase01 -= floor(phase01);
+      // (int)NaN below is undefined; a NaN/inf phase reads frame position 0.
+      phase01 = std::isfinite(phase01) ? phase01 - floor(phase01) : 0.0;
       const double x = phase01 * (double)kFrameSize;
       const int i0 = (int)x & (kFrameSize - 1);
       const int i1 = (i0 + 1) & (kFrameSize - 1);
