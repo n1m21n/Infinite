@@ -77,7 +77,7 @@ the steps above, in the order they will be done:
 9. Twist and Displacement run on GPU points when their input has them. Done (section below).
 10. Field Modifier compiles to GLSL (`src/core/field/ElementGlslBackend.cpp`) when its input is GPU
     points. Done (section below).
-11. Model 3D reads `.ply` point clouds as points.
+11. Model 3D reads `.ply` point clouds as points. Done (section below).
 12. Field Modifier presets for point jobs: random size, random colour, colour from image, stagger
     over index, age to colour.
 
@@ -301,3 +301,45 @@ A kernel with state stays mesh-only and passes points through untouched.
 
 **Parity.** Shaders stay `#version 150`. The pass uses `uint`/`uvec2` maths (GLSL 1.30+) and
 `glUniform2ui`, which is GL 3.0 core and in glad. There is no `Platform::` or `#ifdef` code.
+
+## Step 11: Model 3D reads `.ply` point clouds as points (2026-10-24, dev build)
+
+A `.ply` with no faces (a scan, a photogrammetry dump, a Gaussian-splat export) now loads as a
+point cloud. Before this step, ModelIO and the portable importer only ever returned triangles, so
+such a file loaded as nothing. The new reader is `src/core/PlyPoints.cpp`: plain C++ over the file's
+bytes, the same code on all three platforms.
+
+**What it reads.**
+- Bodies: ascii, binary_little_endian and binary_big_endian.
+- Positions: x/y/z. Normals: nx/ny/nz, kept as the particle's orientation hint.
+- Colour: red/green/blue (or r/g/b). Integer types are scaled to their range; floats are 0..1.
+  A splat export without rgb takes its colour from `f_dc_0..2` (0.5 + 0.2821 x f_dc).
+- Every other property is skipped (any type). Elements before the vertices are skipped if their
+  rows have a fixed size.
+- To tell a point cloud from a mesh, only the first 64 KB (the header) is read. A mesh `.ply` goes
+  on to the model loader exactly as before.
+
+**Model 3D with points.**
+- The mesh is empty and `GetPointCloud()` carries the points. They are fitted and recentred like a
+  mesh ("fit to unit size", "recentre").
+- A new `point size` slider (saved as `pointSize`, default 0.005, modulatable) sets each sprite's
+  half-size. Patches saved before this step load with the default.
+- `GetGpuPoints()` uploads the points once per load or point-size change (`GpuPointsGL::Upload`).
+- The body line reads "N points". Decoded clouds share an `AssetCache` across nodes, like meshes.
+
+**Checks.**
+- `GPUPOINTSTEST` step 11 section, all pass:
+  - The same 300 points written four ways (ascii with uchar colour and normals; little-endian with
+    float colour and a double to skip; big-endian with ushort colour and an empty face element; a
+    splat with f_dc) all parse to the same positions and colours (error 0, splat 1e-7).
+  - A `.ply` with faces reads as a mesh, and Model 3D still loads it as 2 triangles. Truncated and
+    non-PLY bytes are refused.
+  - Model 3D fits a cloud to a unit box, keeps its colours, and moves the point revision only when
+    the point size changes. Ascii and binary files load alike.
+  - GPU points are offered only on the GPU path, and the texels equal the cloud (error 0).
+  - The cloud behind a Transform draws the CPU frame on the GPU path (0 pixels differ).
+- `run-infinite-hygiene --group 3d` 23/23 and `render-pipeline-sweep` 23/23.
+
+**Parity.** No `Platform::` code and no `#ifdef`. The file opens through `AppPaths::FsPath`, so a
+UTF-8 path works on Windows. Binary reads assemble bytes explicitly, so endianness does not depend
+on the host. The Windows open dialog already lists `*.ply`.

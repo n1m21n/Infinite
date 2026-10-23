@@ -1036,6 +1036,13 @@ namespace app
          if (!n->Path().empty())
             n->Load(n->Path());
       }
+
+      // A face-less .ply loads as points; their size is the only point knob.
+      if (n->IsPointCloud() || gParamRegisterOnly)
+      {
+         NodeSeparator("points");
+         ModSlider("point size", &n->pointSize, 0.0005f, 0.05f);
+      }
    }
 
 

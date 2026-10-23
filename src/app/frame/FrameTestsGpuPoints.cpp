@@ -4,6 +4,10 @@
 #include "app/AppShared.h"
 
 #include "GpuPoints.h"
+#include "PlyPoints.h"
+
+#include <filesystem>
+#include <fstream>
 
 // Geometry3DNodes.cpp: route opaque mesh draws through the no-discard program.
 void Render3DSetOpaqueVariantForTest(bool enabled);
@@ -813,6 +817,261 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
       report("Field Modifier over Image to Points + Transform: GPU points, frame matches the CPU frame",
              offered && d.Drawn() && d.Match());
       GpuPointsGL::SetEnabledForTest(wasEnabled);
+   }
+
+   // Step 11: Model 3D reads a face-less .ply as points. The same 300 points
+   // are written as ascii (uchar colour), binary little-endian (float colour,
+   // an extra double to skip) and binary big-endian (ushort colour); all three
+   // must parse to the same points. A splat export takes its colour from
+   // f_dc, and a .ply with faces still loads as a mesh. Model 3D's points are
+   // fitted like a mesh, uploaded as GPU points equal to the cloud, and drawn
+   // behind a Transform the same on both paths.
+   {
+      const int n = 300;
+      std::vector<float> xyz, rgb;
+      for (int i = 0; i < n; i++)
+      {
+         const float a = (float)i * 0.21f;
+         xyz.push_back(std::cos(a) * (2.0f + (float)i * 0.01f));
+         xyz.push_back((float)i * 0.02f - 3.0f);
+         xyz.push_back(std::sin(a) * 2.0f);
+         // Multiples of 1/255, so uchar, ushort (x 257) and float hold them exactly.
+         rgb.push_back((float)((i * 7) % 256) / 255.0f);
+         rgb.push_back((float)((i * 13 + 40) % 256) / 255.0f);
+         rgb.push_back((float)(255 - i % 256) / 255.0f);
+      }
+      auto put = [](std::string& out, const void* v, int width, bool big)
+      {
+         const unsigned char* b = (const unsigned char*)v;
+         for (int k = 0; k < width; k++)
+            out.push_back((char)b[big ? width - 1 - k : k]); // the test host is little-endian
+      };
+
+      std::string ascii = "ply\nformat ascii 1.0\ncomment made by GPUPOINTSTEST\nelement vertex 300\n"
+                          "property float x\nproperty float y\nproperty float z\nproperty float nx\n"
+                          "property float ny\nproperty float nz\nproperty uchar red\nproperty uchar green\n"
+                          "property uchar blue\nend_header\n";
+      std::string little = "ply\r\nformat binary_little_endian 1.0\r\nelement vertex 300\r\nproperty float x\r\n"
+                           "property float y\r\nproperty float z\r\nproperty double intensity\r\nproperty float red\r\n"
+                           "property float green\r\nproperty float blue\r\nend_header\r\n";
+      std::string big = "ply\nformat binary_big_endian 1.0\nelement vertex 300\nproperty float x\nproperty float y\n"
+                        "property float z\nproperty ushort red\nproperty ushort green\nproperty ushort blue\n"
+                        "element face 0\nproperty list uchar int vertex_indices\nend_header\n";
+      std::string splat = "ply\nformat binary_little_endian 1.0\nelement vertex 300\nproperty float x\nproperty float y\n"
+                          "property float z\nproperty float f_dc_0\nproperty float f_dc_1\nproperty float f_dc_2\n"
+                          "property float opacity\nend_header\n";
+      for (int i = 0; i < n; i++)
+      {
+         char row[256];
+         snprintf(row, sizeof(row), "%.9g %.9g %.9g 0 1 0 %d %d %d\n", xyz[i * 3], xyz[i * 3 + 1], xyz[i * 3 + 2],
+                  (int)std::lround(rgb[i * 3] * 255.0f), (int)std::lround(rgb[i * 3 + 1] * 255.0f),
+                  (int)std::lround(rgb[i * 3 + 2] * 255.0f));
+         ascii += row;
+         const double intensity = i * 0.5;
+         for (int k = 0; k < 3; k++)
+            put(little, &xyz[i * 3 + k], 4, false);
+         put(little, &intensity, 8, false);
+         for (int k = 0; k < 3; k++)
+            put(little, &rgb[i * 3 + k], 4, false);
+         for (int k = 0; k < 3; k++)
+            put(big, &xyz[i * 3 + k], 4, true);
+         for (int k = 0; k < 3; k++)
+         {
+            const unsigned short c = (unsigned short)(std::lround(rgb[i * 3 + k] * 255.0f) * 257);
+            put(big, &c, 2, true);
+         }
+         for (int k = 0; k < 3; k++)
+            put(splat, &xyz[i * 3 + k], 4, false);
+         for (int k = 0; k < 3; k++)
+         {
+            const float dc = (rgb[i * 3 + k] - 0.5f) / 0.28209479f;
+            put(splat, &dc, 4, false);
+         }
+         const float opacity = 1.0f;
+         put(splat, &opacity, 4, false);
+      }
+      const std::string mesh = "ply\nformat ascii 1.0\nelement vertex 4\nproperty float x\nproperty float y\n"
+                               "property float z\nelement face 2\nproperty list uchar int vertex_indices\nend_header\n"
+                               "0 0 0\n1 0 0\n1 1 0\n0 1 0\n3 0 1 2\n3 0 2 3\n";
+
+      auto parse = [](const std::string& bytes, PlyPoints::Cloud& c, std::string& err)
+      {
+         return PlyPoints::Parse((const unsigned char*)bytes.data(), bytes.size(), c, err);
+      };
+      auto cloudErr = [&](const PlyPoints::Cloud& c, float& errP, float& errC)
+      {
+         errP = errC = 1e9f;
+         if ((int)c.points.size() != n)
+            return false;
+         errP = errC = 0.0f;
+         for (int i = 0; i < n; i++)
+         {
+            const Particle& p = c.points[i];
+            errP = std::max(errP, std::fabs(p.px - xyz[i * 3]) + std::fabs(p.py - xyz[i * 3 + 1]) +
+                                  std::fabs(p.pz - xyz[i * 3 + 2]));
+            errC = std::max(errC, std::fabs(p.r - rgb[i * 3]) + std::fabs(p.g - rgb[i * 3 + 1]) +
+                                  std::fabs(p.b - rgb[i * 3 + 2]));
+         }
+         return true;
+      };
+      struct Case { const char* name; const std::string* bytes; float colourTol; };
+      const Case cases[] = {
+         { "ascii, uchar colour, normals", &ascii, 1e-6f },
+         { "binary little-endian, float colour, a double to skip", &little, 1e-6f },
+         { "binary big-endian, ushort colour, an empty face element", &big, 1e-6f },
+         { "Gaussian splat, colour from f_dc", &splat, 1e-5f },
+      };
+      for (const Case& c : cases)
+      {
+         PlyPoints::Cloud cloud;
+         std::string err;
+         const PlyPoints::Kind kind = parse(*c.bytes, cloud, err);
+         float errP = 0.0f, errC = 0.0f;
+         const bool sized = kind == PlyPoints::Kind::kPoints && cloudErr(cloud, errP, errC);
+         printf(".ply %s: kind %d, %zu points, err pos %.7f colour %.7f %s\n", c.name, (int)kind, cloud.points.size(),
+                errP, errC, err.c_str());
+         char label[200];
+         snprintf(label, sizeof(label), ".ply %s: reads as the same points and colours", c.name);
+         report(label, sized && cloud.hasColor && errP < 1e-5f && errC < c.colourTol);
+      }
+      {
+         PlyPoints::Cloud cloud;
+         std::string err;
+         const bool meshKind = parse(mesh, cloud, err) == PlyPoints::Kind::kMesh;
+         const std::string cut = little.substr(0, little.size() - 10);
+         const bool cutErr = parse(cut, cloud, err) == PlyPoints::Kind::kError;
+         const bool junkErr = parse(std::string("solid cube\n"), cloud, err) == PlyPoints::Kind::kError;
+         report(".ply with faces reads as a mesh; truncated or non-PLY bytes are refused", meshKind && cutErr && junkErr);
+      }
+
+      // Through files and Model 3D.
+      std::error_code ec;
+      const std::filesystem::path dir = std::filesystem::temp_directory_path(ec) / "infinite_gpupointstest_ply";
+      std::filesystem::create_directories(dir, ec);
+      auto write = [&](const char* name, const std::string& bytes)
+      {
+         const std::filesystem::path path = dir / name;
+         std::ofstream f(path, std::ios::binary | std::ios::trunc);
+         f.write(bytes.data(), (std::streamsize)bytes.size());
+         return path.string();
+      };
+      const std::string asciiPath = write("cloud_ascii.ply", ascii);
+      const std::string littlePath = write("cloud_le.ply", little);
+      const std::string meshPath = write("quad.ply", mesh);
+
+      ModelSourceNode meshModel;
+      const bool meshLoaded = meshModel.Load(meshPath);
+      printf("Model 3D quad.ply: %s\n", meshModel.Status().c_str());
+      report("Model 3D: a .ply with faces still loads as a mesh",
+             meshLoaded && !meshModel.IsPointCloud() && meshModel.TriangleCount() == 2 &&
+             meshModel.GetPointCloud() == nullptr && meshModel.GetGpuPoints() == nullptr);
+
+      ModelSourceNode model;
+      model.pointSize = 0.03f;
+      const bool loaded = model.Load(asciiPath);
+      printf("Model 3D cloud_ascii.ply: %s\n", model.Status().c_str());
+      const std::vector<Particle>* pts = model.GetPointCloud();
+      bool fitted = false, coloured = false;
+      if (pts != nullptr && (int)pts->size() == n)
+      {
+         float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+         float errC = 0.0f, errS = 0.0f;
+         for (int i = 0; i < n; i++)
+         {
+            const Particle& p = (*pts)[i];
+            const float q[3] = { p.px, p.py, p.pz };
+            for (int k = 0; k < 3; k++)
+            {
+               lo[k] = std::min(lo[k], q[k]);
+               hi[k] = std::max(hi[k], q[k]);
+            }
+            errC = std::max(errC, std::fabs(p.r - rgb[i * 3]) + std::fabs(p.g - rgb[i * 3 + 1]) +
+                                  std::fabs(p.b - rgb[i * 3 + 2]));
+            errS = std::max(errS, std::fabs(p.scale - 0.03f));
+         }
+         const float extent = std::max(hi[0] - lo[0], std::max(hi[1] - lo[1], hi[2] - lo[2]));
+         float centre = 0.0f;
+         for (int k = 0; k < 3; k++)
+            centre = std::max(centre, std::fabs(hi[k] + lo[k]) * 0.5f);
+         fitted = std::fabs(extent - 1.0f) < 1e-4f && centre < 1e-4f;
+         coloured = errC < 1e-6f && errS < 1e-7f && (*pts)[0].hasColor;
+      }
+      report("Model 3D: a face-less .ply loads as points, fitted and recentred, with the file's colours",
+             loaded && model.IsPointCloud() && model.PointCount() == (size_t)n && model.GetMesh().vertices.empty() &&
+             fitted && coloured);
+
+      const unsigned long long rev0 = model.PointCloudRevision();
+      const bool steady = model.PointCloudRevision() == rev0;
+      model.pointSize = 0.02f;
+      const bool moves = model.PointCloudRevision() != rev0 && (*model.GetPointCloud())[0].scale == 0.02f;
+      ModelSourceNode littleModel;
+      const bool sameAcross = littleModel.Load(littlePath) && littleModel.PointCount() == (size_t)n;
+      float acrossErr = 0.0f;
+      if (sameAcross)
+         for (int i = 0; i < n; i++)
+         {
+            const Particle& a = (*model.GetPointCloud())[i];
+            const Particle& b = (*littleModel.GetPointCloud())[i];
+            acrossErr = std::max(acrossErr, std::fabs(a.px - b.px) + std::fabs(a.py - b.py) + std::fabs(a.pz - b.pz));
+         }
+      report("Model 3D: point size moves the revision only when it changes; ascii and binary files load alike",
+             steady && moves && sameAcross && acrossErr < 1e-5f);
+
+      GpuPointsGL::SetEnabledForTest(false);
+      const bool cpuNone = model.GetGpuPoints() == nullptr;
+      GpuPointsGL::SetEnabledForTest(true);
+      const GpuPoints* g = model.GetGpuPoints();
+      float errP = 1e9f, errW = 1e9f, errC = 1e9f;
+      if (g != nullptr && g->count == n)
+      {
+         std::vector<float> pos((size_t)g->texW * (size_t)g->texH * 4), col(pos.size());
+         glBindTexture(GL_TEXTURE_2D, g->posTex);
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, pos.data());
+         glBindTexture(GL_TEXTURE_2D, g->colorTex);
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, col.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         errP = errW = errC = 0.0f;
+         for (int i = 0; i < n; i++)
+         {
+            const Particle& p = (*model.GetPointCloud())[i];
+            errP = std::max(errP, std::fabs(pos[i * 4] - p.px) + std::fabs(pos[i * 4 + 1] - p.py) +
+                                  std::fabs(pos[i * 4 + 2] - p.pz));
+            errW = std::max(errW, std::fabs(pos[i * 4 + 3] - p.scale * model.PointBaseSize()));
+            errC = std::max(errC, std::fabs(col[i * 4] - p.r) + std::fabs(col[i * 4 + 1] - p.g) +
+                                  std::fabs(col[i * 4 + 2] - p.b));
+         }
+      }
+      printf("Model 3D GPU points: err pos %.7f size %.7f colour %.7f\n", errP, errW, errC);
+      report("Model 3D: GPU points only on the GPU path, texels equal the cloud, revision follows it",
+             cpuNone && g != nullptr && g->revision == model.PointCloudRevision() && errP < 1e-6f && errW < 1e-6f &&
+             errC < 1e-6f);
+
+      GeometryOpNode modelXf;
+      modelXf.op = GeometryOpNode::kTransform;
+      modelXf.input = &model;
+      modelXf.rotY = 25.0f;
+      modelXf.offsetX = 0.0f;
+      modelXf.scaleX = modelXf.scaleY = modelXf.scaleZ = 1.6f;
+      auto renderModel = [&](bool gpu)
+      {
+         GpuPointsGL::SetEnabledForTest(gpu);
+         Render3DNode r; // fresh, for the same reason as renderOnce
+         r.geometry[0] = &modelXf;
+         r.CookIfNeeded(frame++);
+         return ReadRgba(r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight());
+      };
+      const std::vector<unsigned char> cpuF = renderModel(false);
+      const std::vector<unsigned char> gpuF = renderModel(true);
+      const bool offered = modelXf.GetGpuPoints() != nullptr;
+      model.bypassed = true;
+      const std::vector<unsigned char> emptyF = renderModel(true);
+      model.bypassed = false;
+      const FrameDiff d = CompareFrames(cpuF, gpuF, emptyF);
+      printf("Model 3D .ply behind a Transform: drawn %zu, differ %zu (max %d)\n", d.drawn, d.differ, d.maxDiff);
+      report("Model 3D .ply behind a Transform: GPU points, frame matches the CPU frame",
+             offered && d.Drawn() && d.Match());
+      GpuPointsGL::SetEnabledForTest(wasEnabled);
+      std::filesystem::remove_all(dir, ec);
    }
 
    printf("%s\n", allOk ? "GPU POINTS TEST OK" : "GPU POINTS TEST FAIL");

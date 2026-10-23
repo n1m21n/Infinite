@@ -187,7 +187,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
 | `Mirror` | geo:geometry | out:geometry | 72 | bypass |
 | `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
-| `Model 3D` | texture:image | out:geometry | 27 | bypass |
+| `Model 3D` | texture:image | out:geometry | 28 | bypass |
 | `Normals` | geo:geometry | out:geometry | 72 | bypass |
 | `Null 3D` | geo:geometry | out:geometry | 0 | bypass |
 | `Ocean` | texture:image | out:geometry | 29 | bypass |
