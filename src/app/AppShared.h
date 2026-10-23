@@ -5750,6 +5750,7 @@ bool RunSaveWithMediaTest();
 bool RunFormulaShadertoyTest();
 bool RunVmpcTest();
 bool RunRender3DHdrTest();
+bool RunRender3DPanoTest();
 bool RunBlockSetTest();
 extern bool gShowSaveMediaModal;
 

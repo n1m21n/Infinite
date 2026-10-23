@@ -1126,6 +1126,15 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return ok ? 0 : 1;
    }
 
+   if (getenv("INFINITE_R3DPANOTEST") != nullptr)
+   {
+      // Renders a real cube six ways, so it needs the GL context.
+      const bool ok = RunRender3DPanoTest();
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      return ok ? 0 : 1;
+   }
+
    if (getenv("INFINITE_FORMULASTTEST") != nullptr)
    {
       // Formula's Shadertoy mode compiles and cooks real passes, so it needs the GL context.

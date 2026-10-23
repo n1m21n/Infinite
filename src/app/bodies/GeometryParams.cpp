@@ -1877,7 +1877,7 @@ namespace app
 
       // Both columns draw every row every frame: a row that does not apply right now is greyed, never
       // dropped, so nothing grows, shifts or leaves a gap when a switch flips or a param is added.
-      // Left: output, camera, points, raster (26 rows). Right: light, shadows, environment, quality (28 rows).
+      // Left: output, camera, points, raster (27 rows). Right: light, shadows, environment, quality (28 rows).
       char label[64];
       // Same clamp the renderer applies (Render3DNode::Cook): a patch can hold any int here.
       const int aaIndex = std::clamp(n->samples, 0, (int)Render3DNode::SampleNames().size() - 1);
@@ -1922,11 +1922,22 @@ namespace app
          ImGui::BeginDisabled(n->camera != nullptr);
          DropdownButton("projection", Render3DNode::ProjectionNames(), n->projection,
                         [n](int i) { n->projection = i; }, colW);
-         // One slot, two meanings: the field of view for perspective, the view height for orthographic.
-         if (n->projection == 0)
-            ModSlider("fov", &n->fov, 10.0f, 120.0f, "%.3f", colW);
-         else
+         // One slot, three meanings: the field of view for perspective, the view
+         // height for orthographic, the dome's angle for a fisheye. A 360 or a
+         // cubemap always sees everything, so fov stays, greyed.
+         if (n->projection == Render3DNode::kOrthographic)
             ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f, "%.3f", colW);
+         else if (n->projection == Render3DNode::kFisheye)
+            ModSlider("dome angle", &n->domeAngle, 180.0f, 220.0f, "%.0f\xC2\xB0", colW);
+         else
+         {
+            ImGui::BeginDisabled(n->projection != Render3DNode::kPerspective);
+            ModSlider("fov", &n->fov, 10.0f, 120.0f, "%.3f", colW);
+            ImGui::EndDisabled();
+         }
+         ImGui::BeginDisabled(n->projection != Render3DNode::kFisheye);
+         ModSlider("dome tilt", &n->domeTilt, 0.0f, 90.0f, "%.0f\xC2\xB0", colW);
+         ImGui::EndDisabled();
          ModSlider("distance", &n->camDistance, 0.3f, 20.0f, "%.3f", colW);
          ModSlider("orbit", &n->camAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0", colW);
          ModSlider("elevation", &n->camElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0", colW);
@@ -1992,8 +2003,10 @@ namespace app
       ImGui::BeginDisabled(n->aoStrength <= 0.0f);
       ModSlider("occlusion radius", &n->aoRadius, 0.05f, 3.0f, "%.3f", colW);
       ImGui::EndDisabled();
+      ImGui::BeginDisabled(n->PanoActive()); // a panorama has no focal plane
       ModSlider("depth of field", &n->dofAperture, 0.0f, 4.0f, "%.3f", colW);
-      ImGui::BeginDisabled(n->dofAperture <= 0.0f);
+      ImGui::EndDisabled();
+      ImGui::BeginDisabled(n->dofAperture <= 0.0f || n->PanoActive());
       ModSlider("focus distance", &n->focusDistance, 0.3f, 30.0f, "%.3f", colW);
       ImGui::EndDisabled();
       ModSliderInt("offline supersample", &n->supersample, 1, 64, colW);

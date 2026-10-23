@@ -25,7 +25,7 @@ namespace
       "Klein Bottle", "Gear 3D", "Star 3D", "Disc", "Arrow 3D"
    };
    const std::vector<std::string> kShadingNames = { "Lit", "Normals", "UV", "Flat" };
-   const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
+   const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic", "Equirect 360", "Cubemap 3x2", "Fisheye dome" };
    const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position" };
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
    const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
@@ -1245,6 +1245,7 @@ Render3DNode::~Render3DNode()
    ReleaseTargets();
    ReleasePost();
    ReleaseHdr();
+   ReleasePano();
    ReleaseShadowTargets();
    for (GpuMesh& gpu : mGpu)
       ReleaseGpuMesh(gpu);
@@ -1593,6 +1594,12 @@ void Render3DNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
 
+   if (PanoActive())
+   {
+      CookPano(frameId);
+      return;
+   }
+   mPanoValid = false;
    // Supersampling only ever adds passes on an offline render; a live cook is
    // always the single pass so the real-time cost never changes.
    if (supersample > 1 && !mInAccumulate && renderPass == 0 && Transport::Instance().IsOfflineMode() && Accumulate(frameId))
@@ -1605,8 +1612,8 @@ void Render3DNode::CookOnce(int frameId)
    if (!EnsureShader())
       return;
 
-   const int w = GLUtil::TargetSide(width, 16);
-   const int h = GLUtil::TargetSide(height, 16);
+   const int w = mFaceOverride >= 0 ? mFaceSide : GLUtil::TargetSide(width, 16);
+   const int h = mFaceOverride >= 0 ? mFaceSide : GLUtil::TargetSide(height, 16);
    const int wantSamples =
       kSampleCounts[std::max(0, std::min(samples, (int)(sizeof(kSampleCounts) / sizeof(int)) - 1))];
    if (!EnsureResources(w, h, wantSamples))
@@ -1652,7 +1659,7 @@ void Render3DNode::CookOnce(int frameId)
    // would silently recapture the prior frame's pixels under a new
    // timestamp - so a take always redraws, matching NodeViewport's fix.
    SceneSignature sceneSig = BuildSceneSignature();
-   if (mHasSceneBuilt && sceneSig == mSceneBuilt && !Transport::Instance().IsOfflineMode())
+   if (mFaceOverride < 0 && mHasSceneBuilt && sceneSig == mSceneBuilt && !Transport::Instance().IsOfflineMode())
    {
       mLastUploads = 0;
       return;
@@ -1687,6 +1694,35 @@ void Render3DNode::CookOnce(int frameId)
       proj = (projection == 1)
          ? Mat4::Orthographic(orthoHeight, aspect, nearPlane, farPlane)
          : Mat4::Perspective(fov * 3.14159265f / 180.0f, aspect, nearPlane, farPlane);
+   }
+   if (mFaceOverride >= 0)
+   {
+      // One 90 degree face of the cube around the eye, in the GL cube map's
+      // face order and orientation. The basis turns with the camera's orbit
+      // but stays level (world up), so a 360 or a dome never has a tilted
+      // horizon; elevation only moves the eye.
+      static const float kFaceDir[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+      static const float kFaceUp[6][3] = { { 0, -1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 }, { 0, -1, 0 }, { 0, -1, 0 } };
+      float fwd[3] = { -view.m[2], 0.0f, -view.m[10] };
+      const float flen = std::sqrt(fwd[0] * fwd[0] + fwd[2] * fwd[2]);
+      if (flen > 1e-4f) { fwd[0] /= flen; fwd[2] /= flen; }
+      else { fwd[0] = 0.0f; fwd[2] = -1.0f; } // looking straight up or down
+      const float basis[3][3] = { { -fwd[2], 0.0f, fwd[0] }, // right
+                                  { 0.0f, 1.0f, 0.0f },      // up
+                                  { -fwd[0], 0.0f, -fwd[2] } }; // back
+      float dir[3], up[3], target[3];
+      for (int k = 0; k < 3; k++)
+      {
+         dir[k] = up[k] = 0.0f;
+         for (int a = 0; a < 3; a++)
+         {
+            dir[k] += basis[a][k] * kFaceDir[mFaceOverride][a];
+            up[k] += basis[a][k] * kFaceUp[mFaceOverride][a];
+         }
+         target[k] = eye[k] + dir[k];
+      }
+      view = Mat4::LookAt(eye, target, up);
+      proj = Mat4::Perspective(3.14159265f * 0.5f, 1.0f, nearPlane, farPlane);
    }
    mLastCamera.view = view;
    mLastCamera.proj = proj;
@@ -2791,10 +2827,10 @@ void Render3DNode::CookOnce(int frameId)
       Bench::ConditionalGpuStageTimer benchPost(benchPassRing, "r3d_post", frameId);
       RunPost(proj, proj.m[11] == 0.0f, w, h);
    }
-   if (HdrActive())
+   if (HdrActive() && mFaceOverride < 0) // a panorama runs the finish once, on the unwrapped picture
    {
       Bench::ConditionalGpuStageTimer benchHdr(benchPassRing, "r3d_hdr", frameId);
-      RunHdr(w, h);
+      RunHdr(mColorTex, mDepthTex, w, h, mFbo);
    }
 
    // --- restore, or every 2D node after this draws wrongly ------------

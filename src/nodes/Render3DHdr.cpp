@@ -157,9 +157,9 @@ void Render3DNode::ReleaseHdr()
       if (*p != 0) { glDeleteProgram(*p); *p = 0; }
 }
 
-void Render3DNode::RunHdr(int w, int h)
+void Render3DNode::RunHdr(unsigned int colorTex, unsigned int depthTex, int w, int h, unsigned int dstFbo)
 {
-   if (!EnsureHdrShaders() || mColorTex == 0 || mDepthTex == 0)
+   if (!EnsureHdrShaders() || colorTex == 0 || depthTex == 0)
       return;
    if (!GLUtil::EnsureFbo(mHdrOut, w, h, GL_RGBA16F, "Render3D_HDR"))
       return;
@@ -173,7 +173,7 @@ void Render3DNode::RunHdr(int w, int h)
 
    const int keepBg = mEnvBgDrawn ? 0 : 1;
    const float amount = std::clamp(bloom, 0.0f, 1.0f);
-   unsigned int bloomTex = mColorTex; // a real texture even when unused
+   unsigned int bloomTex = colorTex; // a real texture even when unused
    if (amount > 0.0f)
    {
       // Half size down to the last level at least 8 px on its short side.
@@ -192,8 +192,8 @@ void Render3DNode::RunHdr(int w, int h)
       {
          const float threshold = std::clamp(bloomThreshold, 0.5f, 8.0f);
          GLUtil::RunShaderPass(mBloomDown[0], mProgBloomPre, [&]() {
-            Bind(mProgBloomPre, 0, mColorTex, "uSrc");
-            Bind(mProgBloomPre, 1, mDepthTex, "uDepth");
+            Bind(mProgBloomPre, 0, colorTex, "uSrc");
+            Bind(mProgBloomPre, 1, depthTex, "uDepth");
             glUniform2f(glGetUniformLocation(mProgBloomPre, "uTexel"), 1.0f / (float)w, 1.0f / (float)h);
             glUniform1i(glGetUniformLocation(mProgBloomPre, "uKeepBg"), keepBg);
             glUniform1f(glGetUniformLocation(mProgBloomPre, "uThreshold"), threshold);
@@ -226,10 +226,10 @@ void Render3DNode::RunHdr(int w, int h)
       }
    }
 
-   const float bloomAmount = bloomTex != mColorTex ? amount : 0.0f;
+   const float bloomAmount = bloomTex != colorTex ? amount : 0.0f;
    GLUtil::RunShaderPass(mHdrOut, mProgHdr, [&]() {
-      Bind(mProgHdr, 0, mColorTex, "uColor");
-      Bind(mProgHdr, 1, mDepthTex, "uDepth");
+      Bind(mProgHdr, 0, colorTex, "uColor");
+      Bind(mProgHdr, 1, depthTex, "uDepth");
       Bind(mProgHdr, 2, bloomTex, "uBloom");
       glUniform1f(glGetUniformLocation(mProgHdr, "uBloomAmount"), bloomAmount);
       glUniform1i(glGetUniformLocation(mProgHdr, "uTonemap"), std::clamp(tonemap, 0, (int)TonemapNames().size() - 1));
@@ -238,7 +238,7 @@ void Render3DNode::RunHdr(int w, int h)
    glActiveTexture(GL_TEXTURE0);
 
    glBindFramebuffer(GL_READ_FRAMEBUFFER, mHdrOut.fbo);
-   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dstFbo);
    glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

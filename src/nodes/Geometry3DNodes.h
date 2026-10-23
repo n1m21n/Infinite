@@ -536,9 +536,9 @@ public:
 
    ~Render3DNode() override;
 
-   unsigned int GetOutputTexture() override { return mColorTex; }
-   int GetOutputWidth() const override { return mWidth; }
-   int GetOutputHeight() const override { return mHeight; }
+   unsigned int GetOutputTexture() override { return mPanoValid ? mPano.tex : mColorTex; }
+   int GetOutputWidth() const override { return mPanoValid ? mPano.w : mWidth; }
+   int GetOutputHeight() const override { return mPanoValid ? mPano.h : mHeight; }
    void CookIfNeeded(int frameId) override;
    unsigned long long TextureRevision() const override { return mRevision; }
 
@@ -602,7 +602,15 @@ public:
 
    float width = 1024.0f;
    float height = 1024.0f;
-   int projection = 0;      // perspective / orthographic
+   // perspective / orthographic / equirect 360 / cubemap 3x2 / fisheye dome.
+   // The last three render six 90 degree cube faces from the camera's eye and
+   // resample them into the output (Render3DPano.cpp); they need the built-in
+   // camera, so a patched Camera node keeps its own projection.
+   int projection = 0;
+   enum { kPerspective = 0, kOrthographic = 1, kEquirect = 2, kCubemap3x2 = 3, kFisheye = 4 };
+   float domeAngle = 180.0f; // fisheye: the field across the dome circle, degrees
+   float domeTilt = 0.0f;    // fisheye: 0 = the dome centre looks straight up, 90 = straight ahead
+   bool PanoActive() const { return projection >= kEquirect && camera == nullptr; }
    float fov = 45.0f;
    float orthoHeight = 1.5f;
    float camDistance = 3.0f;
@@ -705,7 +713,7 @@ public:
       v.Float("width", width); v.Float("height", height);
       v.Int("renderPass", renderPass);
       v.Int("projection", projection); v.Float("fov", fov);
-      v.Float("orthoHeight", orthoHeight); v.Float("camDistance", camDistance);
+      v.Float("orthoHeight", orthoHeight); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt); v.Float("camDistance", camDistance);
       v.Float("camAzimuth", camAzimuth); v.Float("camElevation", camElevation);
       v.Float("targetX", targetX); v.Float("targetY", targetY); v.Float("targetZ", targetZ);
       v.Float("near", nearPlane); v.Float("far", farPlane);
@@ -921,8 +929,25 @@ private:
    bool mHdrShadersTried = false;
    bool mEnvBgDrawn = false;
    bool EnsureHdrShaders();
-   void RunHdr(int w, int h);
+   void RunHdr(unsigned int colorTex, unsigned int depthTex, int w, int h, unsigned int dstFbo);
    void ReleaseHdr();
+
+   // 360 / dome (Render3DPano.cpp): six faces into a cube map, then one
+   // resample pass to the chosen layout. mFaceOverride >= 0 while CookOnce is
+   // drawing face N at mFaceSide.
+   void CookPano(int frameId);
+   bool EnsurePanoShaders();
+   void ReleasePano();
+   int mFaceOverride = -1;
+   int mFaceSide = 0;
+   bool mPanoValid = false;
+   bool mHasPanoSig = false;
+   SceneSignature mPanoSig;
+   GLUtil::Fbo mPano, mPanoDepth;
+   unsigned int mCubeColor = 0, mCubeDepth = 0, mCubeFbo = 0;
+   int mCubeSide = 0;
+   unsigned int mProgCubeCopy = 0, mProgPano = 0;
+   bool mPanoShadersTried = false;
    void CookOnce(int frameId);
    bool Accumulate(int frameId);
    // Multisampled draw target, blitted into the above. Unused when samples == 0.
