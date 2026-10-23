@@ -21,7 +21,7 @@ Infinite bridges this gap by exposing its entire C++20 engine through the **Mode
                |
          (JSON-RPC stdio)
                v
-  [tools/mcp/infinite_mcp.py]
+  [Infinite plugin server.py] 
                |
       (Headless C++ Engine)
                v
@@ -70,7 +70,7 @@ Now your assistant has nine tools (ask the server for `tools/list` to see their 
 - `infinite_render_field_modifier`: deforms a mesh with a Field modifier.
 - `infinite_validate_patch`: checks a patch for errors.
 
-The Python SDK also ships an MCP server (`tools/mcp/infinite_mcp.py`, from a checkout) with its own tool names.
+The Python SDK also ships an MCP server (`server.py` in the [Infinite Claude plugin](https://github.com/n1m21n/infinite-claude-plugin)) with its own tool names.
 
 ## Using the Python SDK
 
