@@ -109,7 +109,7 @@ case "$cmd" in
     [ -n "$slug" ] && [ -n "$br" ] && [ -f "$brief" ] || { echo "usage: $0 handoff <slug> <branch> <brief-file>" >&2; exit 2; }
     dest="docs/handoff/$slug.md"
     { echo "# Hand-off: $slug"; echo; echo "Branch: \`$br\` (create it off main; you own it, the other laptop never edits it)."
-      echo "Follow docs/plans/two-laptops/README.md: add a claim row, commit per step, commit WIP at the end, remove the claim."
+      echo "Follow docs/plans/two-laptops/README.md: commit per step, commit WIP at the end."
       echo "Do not merge to main or push origin; the Primary does that after \`fetch\`."; echo; cat "$brief"; } > "$HOME/.handoff.tmp"
     remote "mkdir -p $REPO/docs/handoff" >/dev/null
     scp -q $SSH_OPTS "$HOME/.handoff.tmp" "namansoni@$PEER_HOST:$REPO/$dest" 2>&1 | grep -v '\.cargo/env'

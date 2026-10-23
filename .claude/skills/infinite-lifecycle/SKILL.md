@@ -1,6 +1,6 @@
 ---
 name: infinite-lifecycle
-description: "The process the owner and every agent follow on Infinite: three loops (quality, build, rule), 12 build stages with gates, lanes with a done check each (code and non-code), session claims, who decides what when the owner is away, and which rule wins. Use at the start of every session and every new ask (read docs/NOW.md first), whenever a decision has to be made without the owner, when unsure which skill or lane applies, when a gate fails, after a release, and monthly for the rule audit."
+description: "The process the owner and every agent follow on Infinite: three loops (quality, build, rule), 12 build stages with gates, lanes with a done check each (code and non-code), who decides what when the owner is away, and which rule wins. Use at the start of every new ask, whenever a decision has to be made without the owner, when unsure which skill or lane applies, when a gate fails, after a release, and monthly for the rule audit."
 ---
 
 ## When to use (full scope)
@@ -13,22 +13,19 @@ an owning skill disagree on a detail, the owning skill wins and this file gets f
 
 Every session, in this order:
 
-1. Read `docs/NOW.md` (current goal, claims, open quests, decisions). Regenerate its facts with
-   `python3 tools/lifecycle/now.py` if they are older than a day.
-2. Add your row under **Claims** before touching anything (section 7).
-3. Route the ask (section 2), run its lane (section 3), pass its gates (section 4).
-4. On finishing: remove your claim, record decisions, regenerate `NOW.md`.
+1. Read `docs/DECISIONS.md` (the owner's standing decisions) and check `git worktree list` and
+   `git branch` so you don't take a branch another session is on.
+2. Route the ask (section 2), run its lane (section 3), pass its gates (section 4).
+3. On finishing: record any owner decision that matters later in `docs/DECISIONS.md`.
 
 Paths are relative to the repo root.
 
 ---
 
-## 1. The bird's-eye view: three loops around one page
+## 1. The bird's-eye view: three loops
 
 ```mermaid
 flowchart TB
-    NOW[("docs/NOW.md<br/>goal · claims · quests · decisions")]
-
     subgraph QUALITY["QUALITY LOOP · per release"]
         direction LR
         Q1["Release goal<br/>what this release makes right"] --> Q2["Ship<br/>owner says go"]
@@ -40,7 +37,7 @@ flowchart TB
 
     subgraph BUILD["BUILD LOOP · per ask"]
         direction LR
-        B1["Ask / bug"] --> B2["Claim + triage → lane"] --> B3["Stages 1-10<br/>with gates"] --> B4["Merged = closed"]
+        B1["Ask / bug"] --> B2["Triage → lane"] --> B3["Stages 1-10<br/>with gates"] --> B4["Merged = closed"]
     end
 
     subgraph RULE["RULE LOOP · monthly"]
@@ -50,9 +47,6 @@ flowchart TB
         R4 --> R2
     end
 
-    NOW --> B1
-    Q1 --> NOW
-    B4 --> NOW
     B4 -. "release content" .-> Q2
     Q5 -. "gate that leaked" .-> R1
     B3 -. "corrections" .-> R1
@@ -61,12 +55,12 @@ flowchart TB
 
 | Loop | Question it answers | Cadence | Output |
 |---|---|---|---|
-| Quality | Is each release more right than the last? | Each release | Quality table in `NOW.md`; for every escaped fix, the gate that missed it |
+| Quality | Is each release more right than the last? | Each release | For every escaped fix, the gate that missed it (section 9) |
 | Build | Is this change correct, safe and finished? | Each ask | A merged branch (closed) |
 | Rule | Are our rules still true, consistent and worth their words? | Monthly, or when two rules collide | Retired or merged rules |
 
 **The release measure is quality, not downloads.** Downloads, stars and site visits move with
-outreach and viral moments, so they say little about a release; `NOW.md` shows them as context
+outreach and viral moments, so they say little about a release; they are context
 only. A release is judged by what escaped it (owner decision, 2026-10-12).
 
 ---
@@ -75,8 +69,7 @@ only. A release is judged by what escaped it (owner decision, 2026-10-12).
 
 ```mermaid
 flowchart TD
-    Start["Session start"] --> ReadNow["Read docs/NOW.md"] --> Claim["Add claim row"]
-    Claim --> Ask{"What came in?"}
+    Start["Session start"] --> Ask{"What came in?"}
 
     Ask -- "bug, crash, screenshot" --> Bug["bug-blast-radius → write-fix-brief"]
     Ask -- "feature / node idea" --> Tri["triage agent<br/>lens map + branch"]
@@ -92,7 +85,7 @@ flowchart TD
     Lane -- "one node / component" --> L2["Lane 2: Standard"]
     Lane -- "subsystem, platform,<br/>new invariant" --> L3["Lane 3: Major"]
 
-    L1 & L2 & L3 & NC --> Done["Done check"] --> Merge["Merge = closed"] --> Upd["Release claim, record decisions,<br/>now.py"]
+    L1 & L2 & L3 & NC --> Done["Done check"] --> Merge["Merge = closed"] --> Upd["Record owner decisions<br/>in DECISIONS.md"]
 ```
 
 | Ask | Go to (in order) |
@@ -128,13 +121,13 @@ flowchart LR
     end
     subgraph L2["LANE 2 · STANDARD"]
         direction TB
-        b0["3 · lenses (Mode A)"] --> b1["4 · branch + 1 quest"] --> b2["5 · engine + drawer"] --> b3["6-7 · presets, help text"]
+        b0["3 · lenses (Mode A)"] --> b1["4 · branch"] --> b2["5 · engine + drawer"] --> b3["6-7 · presets, help text"]
         b3 --> b4["8 · code review + param truth"] --> b5["9 · driver.sh --group + sweeps"] --> b6["10 · verify-gate → merge"]
     end
     subgraph L3["LANE 3 · MAJOR"]
         direction TB
         c0["1 · pillar + licence"] --> c1["2 · baseline / re-survey"] --> c2["3 · all lenses + semi-brain + plan doc"]
-        c2 --> c3["4 · epic, ≤5 open quests"] --> c4["5 · multi-file + 3 platforms"] --> c5["6-7 · content, manual, i18n"]
+        c2 --> c3["4 · branch per ask"] --> c4["5 · multi-file + 3 platforms"] --> c5["6-7 · content, manual, i18n"]
         c5 --> c6["8 · four standards + invariant audit"] --> c7["9 · --full + ab.sh + render-check"] --> c8["10 · verify-gate → merge"]
     end
 ```
@@ -143,7 +136,7 @@ flowchart LR
 |---|---|---|
 | 1 Micro | One file, no new state, no new param, no new invariant | Builds; `driver.sh --fast` passes; diff is only the intended files; merged |
 | 2 Standard | One node, preset, panel or component | Lane 1 + `driver.sh --group <area>` and the area's sweep pass; help text and presets in; every new control has a `ParamRef` or a reason; saves and loads; `verify-gate` read |
-| 3 Major | Subsystem, platform, threading, new invariant, new file format | Lane 2 + plan doc in `docs/plans/<x>/` closed; baseline A/B shows no regression on touched paths; builds on macOS, Windows, Linux; `invariant-interaction-audit` done; quest ledger linked |
+| 3 Major | Subsystem, platform, threading, new invariant, new file format | Lane 2 + plan doc in `docs/plans/<x>/` closed; baseline A/B shows no regression on touched paths; builds on macOS, Windows, Linux; `invariant-interaction-audit` done |
 
 **Every bug fix, any lane:** adds the regression test that would have caught it, and names in its
 commit message which gate should have caught it (feeds the quality loop).
@@ -175,7 +168,7 @@ flowchart TD
     end
     subgraph PLAN["PLAN"]
         G2 -- yes --> S3["3 · Plan<br/>lenses, hotspots, profiles"] --> G3{"G3 every lens<br/>marked?"}
-        G3 -- yes --> S4["4 · Set up<br/>claim, branch, quest"] --> G4{"G4 isolated,<br/>≤5 open?"}
+        G3 -- yes --> S4["4 · Set up<br/>branch, worktree"] --> G4{"G4 isolated?"}
     end
     subgraph MAKE["MAKE (parallel tracks)"]
         G4 -- yes --> S5["5 · Code"] & S6["6 · Content"] & S7["7 · Docs & i18n"]
@@ -196,7 +189,7 @@ flowchart TD
     G1 -- "no" --> Park["Park: docs/plans/parked-ideas.md"]
     G2 -- "noisy" --> S2
     G3 -- "lens missed" --> S3
-    G4 -- "bundled / over cap" --> S4
+    G4 -- "bundled" --> S4
     G5 -- "missing wiring" --> S5
     G5 -- "design can't hold" --> S3
     G6 -- "fails" --> S6
@@ -218,10 +211,10 @@ A failed test is a code problem (5) unless the test proves the design wrong (3).
 
 | # | Stage | Gate: pass when | On fail, go to | Owning skill / tool |
 |---|---|---|---|---|
-| 1 | Strategy | Maps to a pillar P1-P8 and to the release goal in `NOW.md`; no copyleft source read | Park in `parked-ideas.md` | `docs/plans/re-survey/README.md`, AGENTS invariant 1, `BRAND.md` |
+| 1 | Strategy | Maps to a pillar P1-P8 and to the release goal; no copyleft source read | Park in `parked-ideas.md` | `docs/plans/re-survey/README.md`, AGENTS invariant 1, `BRAND.md` |
 | 2 | Research & baseline | Baseline repeats on a quiet machine | Re-run 2 | `run-infinite-hygiene` (efficient routes), `tools/re-survey/` |
 | 3 | Plan | Every lens marked Primary / Touched / Clear, coupling rules applied | Re-open 3 | `codebase-lenses`, `codebase-navigation`, `semi-brain`, `infinite-planner` |
-| 4 | Set up | Claim row added; one ask per branch; ≤5 open quests | Split the ask, or park a quest | `git-branch-workflow`, `tools/roadmap/` |
+| 4 | Set up | One ask per branch, its own worktree | Split the ask | `git-branch-workflow` |
 | 5 | Code | Two-object node split kept, `ParamRef`s registered, all three `Platform::` sides | 5; or 3 if the design can't hold | `new-*-node`, `field-*`, `windows-parity`, `linux-parity` |
 | 6 | Content | Presets, templates and library build | 6 | `field-*-presets`, `tools/library/`, `tools/templates/` |
 | 7 | Docs & i18n | Help text in all four tables, both directions; manual and fonts rebuilt if touched | 7 | `tools/manual/`, `tools/i18n/`, node-help-coverage rule |
@@ -229,7 +222,7 @@ A failed test is a code problem (5) unless the test proves the design wrong (3).
 | 9 | Test & perf | Driver tier for the lane passes; goldens match; touched perf paths no worse; known-failure lists didn't grow | 5 (fail), 3 (perf), 2 (baseline drift) | `run-infinite-hygiene`, `tools/render-check.py`, `scripts/bench/ab.sh` |
 | 10 | Merge | `verify-gate` read; `git add` explicit paths only; merged to main = **closed** | Clean the diff | `git-branch-workflow`, `verify-gate` |
 | 11 | Release | Owner asked; CI green on 3 platforms; notes match code = **shipped** | `ci-failure-triage` → 5; or fix notes | `ship-infinite`, `release-notes-audit` |
-| 12 | Measure quality | Quality table in `NOW.md` read; every escaped fix has a named leaking gate and a regression test | Rule loop for the leaking gate | `tools/lifecycle/now.py`, `semi-brain`, memory |
+| 12 | Measure quality | Every escaped fix has a named leaking gate and a regression test | Rule loop for the leaking gate | section 9, `semi-brain`, memory |
 
 **Bugs are not a stage.** They enter at the front door (section 2), get the nine questions from
 `bug-blast-radius`, and run a lane like any other ask.
@@ -251,32 +244,32 @@ stage 9 runs only that profile's checks.
 
 ## 6. Who decides what, and working while the owner is away
 
-| The agent decides (records it in `NOW.md` if it matters later) | The owner decides |
+| The agent decides | The owner decides |
 |---|---|
 | Implementation, naming, file layout | The release goal: what this release makes right |
 | Which lane, which skills, which tests | Anything a user sees for the first time (new UI, new behaviour, brand wording) |
 | Design choices inside a plan doc (settle them, no open questions) | Releases, pushes, tags |
-| Splitting an ask into branches; parking quests over the cap | Spending money, licensed downloads, accounts |
+| Splitting an ask into branches | Spending money, licensed downloads, accounts |
 | Fixing a fact in a skill or doc | Retiring a live rule that has no successor |
-| Retiring a rule that is provably superseded or duplicated (note it in Decisions) | Deleting work: branches with unmerged commits, assets, media, tags |
+| Retiring a rule that is provably superseded or duplicated (say so in the commit message) | Deleting work: branches with unmerged commits, assets, media, tags |
 
 **When the owner is away:**
 
 ```mermaid
 flowchart TD
     D["A decision is needed"] --> W{"Owner's column?"}
-    W -- no --> Do["Decide, record in NOW.md Decisions, continue"]
-    W -- yes --> Q["Add to NOW.md 'Waiting on owner'<br/>with a recommended answer"] --> Alt{"Other agent-decidable work<br/>inside the release goal?"}
+    W -- no --> Do["Decide, continue"]
+    W -- yes --> Q["Note it for the owner<br/>with a recommended answer"] --> Alt{"Other agent-decidable work<br/>inside the release goal?"}
     Alt -- yes --> Pick["Do it (order below)"]
-    Alt -- no --> Stop["Stop cleanly: claim released,<br/>branch committed, NOW.md updated"]
+    Alt -- no --> Stop["Stop cleanly:<br/>branch committed"]
 ```
 
 Order for picking next work with no ask: (1) a red gate on main (CI, known-failure growth),
-(2) an escaped fix from the quality table with no regression test, (3) the top open quest,
+(2) an escaped fix with no regression test, (3) the next item of the approved plan,
 (4) a rule-audit item the agent may settle. Never start a new feature unasked.
 
-When the owner is back: **one decision per message**, recommended answer first, recorded in
-`NOW.md` so it is never asked again.
+When the owner is back: **one decision per message**, recommended answer first; an answer that matters later goes
+in `docs/DECISIONS.md` so it is never asked again.
 
 **Precedence when two instructions disagree** (highest first):
 
@@ -289,20 +282,12 @@ When the owner is back: **one decision per message**, recommended answer first, 
 
 ---
 
-## 7. Claims: several sessions, one repo
+## 7. Several sessions, one repo
 
-Several sessions and worktrees run at once. Before touching anything, add one row under
-**Claims** in `docs/NOW.md`:
-
-| Session | Branch / worktree | Quest | Uses | Since |
-|---|---|---|---|---|
-| short name | `feature/x` at `../infinte-x` | R123 | bench, daemon, main build, film render | ISO date-time |
-
-- Read the table first. Don't take a branch or a shared resource someone else holds.
-- "Uses" names shared resources: the bench machine (only one benchmark at a time), the semi-brain
-  daemon, the main build, long renders.
-- Remove your row when the branch merges or the session stops. A row older than 24 hours with no
-  commit on its branch is stale; the next session may remove it and say so in Decisions.
+Several sessions and worktrees run at once. Before touching anything, run `git worktree list` and
+`git branch --sort=-committerdate | head`: don't take a branch or worktree another session holds.
+Only one benchmark runs at a time on the bench machine. The two-laptop rules are in AGENTS.md and
+`docs/plans/two-laptops/README.md`.
 
 ---
 
@@ -318,7 +303,7 @@ flowchart TD
     F2 --> F3["Scrub draft release notes"] --> F4["Log why: parked-ideas.md + semi-brain"]
 
     Kind -- rule --> R1{"Superseded or<br/>duplicated?"}
-    R1 -- yes --> R2["Agent retires it, notes it in Decisions"]
+    R1 -- yes --> R2["Agent retires it, says so in the commit"]
     R1 -- no --> R3["Owner keeps, merges or retires"]
     R2 & R3 --> R4["Remove the MEMORY.md / AGENTS.md line"]
 
@@ -334,7 +319,7 @@ Not every trial dies: the video decode thread was removed and later reapplied (`
 
 ## 9. The quality loop in practice
 
-`python3 tools/lifecycle/now.py` writes, for the latest release against the one before:
+For the latest release against the one before, measure:
 
 | Measure | What it is | Want |
 |---|---|---|
@@ -346,7 +331,7 @@ Not every trial dies: the video decode thread was removed and later reapplied (`
 
 For each escaped fix: find the gate that should have caught it (usually 8 or 9), add the
 regression test if the fix didn't, and if the same gate leaks twice, open a rule-loop item for
-that gate's skill. The release goal card in `NOW.md` names what the next release makes right.
+that gate's skill.
 
 ---
 
@@ -369,12 +354,12 @@ or it doesn't get written.
 
 | When | Agent | Owner |
 |---|---|---|
-| Session start | Read `NOW.md`, add claim, regenerate facts if older than a day | |
+| Session start | Read `docs/DECISIONS.md`, check worktrees and branches | |
 | Each ask | Route → lane → done check | Ask, or leave it to section 6 |
-| Each merge | Release claim, record decisions, `now.py` | |
+| Each merge | Record owner decisions that matter later | |
 | Each release | Stage 11 when asked, then stage 12 | Says go; sets the next release goal |
 | Monthly | Rule audit; settle what it may | The items brought one at a time |
-| Any time | | Drop decisions or user signals into `NOW.md` |
+| Any time | | Tell the agent decisions or user signals |
 
 Architecture diagrams (layers, threads, dataflow, the two-object node) live in
 `docs/ARCHITECTURE_FLOWS.md`, not here.

@@ -1,8 +1,8 @@
 # Infinite AI Agent Instructions & Skills Index
 
-**Start every session by reading `docs/NOW.md`, then follow `infinite-lifecycle` (the process) in every decision, including when the owner is away.**
+**Start every session by reading `docs/DECISIONS.md` (the owner's standing decisions), then follow `infinite-lifecycle` (the process) in every decision, including when the owner is away.**
 
-**Two laptops:** run `hostname -s` and read the Laptops section of `docs/NOW.md`. The Pro (`Namans-MacBook-Pro-366`) is Primary: only it merges `main` and pushes `origin`. The Air (`Namans-MacBook-Air`) is Secondary + Marketing: it works in its own worktree on `air/<slug>` branches, commits, and stops. Rules: `docs/plans/two-laptops/README.md`.
+**Two laptops:** run `hostname -s` to know which laptop you are. The Pro (`Namans-MacBook-Pro-366`) is Primary: only it merges `main` and pushes `origin`. The Air (`Namans-MacBook-Air`) is Secondary + Marketing: it works in its own worktree on `air/<slug>` branches, commits, and stops. Rules: `docs/plans/two-laptops/README.md`.
 
 This repository contains dedicated skills and runbooks in `.claude/skills/<name>/SKILL.md` (also symlinked to `.agents/skills/`).
 Whenever working on tasks in this repository, **you must consult and follow the relevant skill document before taking action**.
@@ -64,7 +64,7 @@ One owner per topic: if two files seem to disagree, the skill named in this tabl
 | `infinite-code-review` | Process | Review code against Infinite's four standards |
 | `semi-brain` | Process | Query the distilled brain before non-trivial architecture calls |
 | `prior-art-scout` | Process | Search peer repos and public fixes for platform/audio/packaging problems |
-| `infinite-lifecycle` | Process | The map: product/build/rule loops, 12 stages + gates, lanes with done checks, who decides, rule precedence; read `docs/NOW.md` first |
+| `infinite-lifecycle` | Process | The map: product/build/rule loops, 12 stages + gates, lanes with done checks, who decides, rule precedence |
 | `git-branch-workflow` | Process | Branch-per-feature workflow for this repo |
 | `windows-parity` | Platform | Writing Windows-safe code from macOS |
 | `linux-parity` | Platform | Writing Linux-safe code; the container+Xvfb rig |

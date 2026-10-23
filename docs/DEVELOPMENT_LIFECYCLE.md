@@ -1,18 +1,15 @@
 # How work moves through Infinite
 
 The full process lives in one place: [`.claude/skills/infinite-lifecycle/SKILL.md`](../.claude/skills/infinite-lifecycle/SKILL.md).
-This page is the short version for people. Where we are right now: [`docs/NOW.md`](NOW.md).
+This page is the short version for people. The owner's standing decisions: [`docs/DECISIONS.md`](DECISIONS.md).
 
-## Three loops around one page
+## Three loops
 
 ```mermaid
 flowchart LR
-    NOW[("NOW.md")]
     Q["QUALITY loop · per release<br/>goal → ship → measure escapes → name the leaking gate"]
-    B["BUILD loop · per ask<br/>claim → triage → lane → 12 stages with gates → merged"]
+    B["BUILD loop · per ask<br/>triage → lane → 12 stages with gates → merged"]
     R["RULE loop · monthly<br/>rule audit → keep / merge / retire"]
-    NOW --> B --> NOW
-    Q --> NOW
     B -. release content .-> Q
     Q -. leaking gate .-> R
     B -. corrections .-> R -. fewer, truer rules .-> B
@@ -28,7 +25,7 @@ flowchart LR
 | Phase | Stages | Done means |
 |---|---|---|
 | Frame | 1 Strategy · 2 Research & baseline | Fits a pillar and the release goal; baseline repeats |
-| Plan | 3 Plan · 4 Set up | Every concern lens marked; claim row added; one branch, ≤5 open quests |
+| Plan | 3 Plan · 4 Set up | Every concern lens marked; one branch per ask |
 | Make | 5 Code · 6 Content · 7 Docs & i18n | Contracts kept on 3 platforms; presets compile; help covered |
 | Check | 8 Review · 9 Test & perf | Invariants hold; tests, goldens and perf order pass |
 | Land | 10 Merge · 11 Release · 12 Measure | Merged = closed; released (owner's call) = shipped; escapes traced to a gate |
@@ -38,10 +35,6 @@ subsystems run all of them (Lane 3). Films, patches, brand and research have the
 with done checks.
 
 ## Tools
-
-```bash
-python3 tools/lifecycle/now.py
-```
 
 ```bash
 python3 tools/lifecycle/rule_audit.py --memory ~/.claude/projects/-Users-namansoni-infinte/memory

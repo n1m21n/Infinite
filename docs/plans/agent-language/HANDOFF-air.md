@@ -14,7 +14,7 @@ purpose (not in the gate). The job ends by writing `out/final.json` (the verdict
 4. Append a "Phase 2 results" section to `docs/plans/agent-language/README.md` under Results: the
    per-model table, T4, T7, VERDICT (KEEP-GOING / STOP / INCONCLUSIVE), spend, the skipped dev arms, the
    Opus stalls (one session 48 min, API side, no effect on tokens). Commit, no attribution lines.
-5. Remove your claim row `air-agent-language-pilot` from `docs/NOW.md`. Do not merge to main or push.
+5. Do not merge to main or push.
 6. Tell the owner: verdict, the numbers behind it, and that the film dialect (`FILM.md`) goes ahead only if
    KEEP-GOING; `film_check` is already shipped either way.
 
