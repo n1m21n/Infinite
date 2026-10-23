@@ -110,4 +110,11 @@ void OscillatorNode::VisitParams(ParamVisitor& v)
    v.Float("ampDecay", engine.ampDecay);
    v.Float("ampSustain", engine.ampSustain);
    v.Float("ampRelease", engine.ampRelease);
+   // The knobs' ranges; see WavetableEngine::ClampToRange.
+   engine.ClampToRange();
+   engine.warpRatio = std::max(engine.warpRatio, 1.0f); // the sync knob starts at 1
+   frequency = std::clamp(frequency, 20.0f, 8000.0f);
+   glide = std::clamp(glide, 0.0f, 2.0f);
+   pitchBend = std::clamp(pitchBend, -2.0f, 2.0f);
+   fmDepth = std::clamp(fmDepth, 0.0f, 2.0f);
 }

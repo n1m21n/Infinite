@@ -87,6 +87,12 @@ struct WavetableEngine
    float filterRelease = 300.0f; // ms
 
    bool on = true;
+
+   // Holds every float to its knob's range. A patch file, OSC or RPC set
+   // stores any finite float and the knobs bind only the UI; volume reaches
+   // the output unclamped (B-K-033). Wavetable and Oscillator call it after
+   // loading.
+   void ClampToRange();
 };
 
 // The parameter surface AudioWavetableNode renders from, decoupled from

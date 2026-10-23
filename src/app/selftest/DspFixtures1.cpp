@@ -537,6 +537,48 @@ bool RunWavetableFixture()
       all &= noteOk;
    }
 
+   // Analog params past the knob range are clamped on load (B-K-034). 1e9
+   // passes Patch's int-range drop; volume, osc levels, resonance and drive
+   // reached the voice unclamped, and the free-running voice went NaN or
+   // ~1e9 loud. Every float at +-1e9 must load in range and render bounded.
+   {
+      float worst = 0.0f;
+      bool inRange = true;
+      for (const char* big : { "1e9", "-1e9" })
+      {
+         AnalogNode an;
+         std::vector<std::pair<std::string, std::string>> params;
+         Patch::SaveParams(&an, params);
+         for (auto& kv : params)
+            if (kv.first.rfind("f ", 0) == 0)
+               kv.second = big;
+         Patch::LoadParams(&an, params);
+         inRange &= an.volume >= 0.0f && an.volume <= 1.0f && an.resonance >= 0.0f && an.resonance <= 1.0f &&
+                    an.drive >= 0.0f && an.drive <= 1.0f && an.voices >= 1.0f && an.voices <= 7.0f;
+         AudioNode* audio = an.GetAudioNode();
+         an.CookIfNeeded(1);
+         audio->PrepareToPlay(sampleRate, numFrames);
+         std::vector<float> l(numFrames), r(numFrames);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = numFrames;
+         for (int b = 0; b < 32; b++)
+         {
+            audio->ProcessBlock(nullptr, 0, buf);
+            for (int i = 0; i < numFrames; i++)
+               worst = std::isfinite(l[i]) && std::isfinite(r[i])
+                          ? std::max(worst, std::max(std::fabs(l[i]), std::fabs(r[i])))
+                          : INFINITY;
+         }
+      }
+      const bool ok = worst < 4.0f && inRange;
+      printf("DSPTEST analog params past the knob range: peak %.3g, in range %d  %s\n", worst, inRange,
+             ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
    // Free-running render of one configured engine, used by the warp and
    // filter checks below. A fresh node per call, so no phase, filter or
    // smoothing state carries between configurations - which is what makes
@@ -864,6 +906,60 @@ bool RunWavetableFixture()
       all &= gainOk;
    }
 
+   // A patch value past a knob's range is clamped on load (B-K-033). 1e9
+   // passes Patch's int-range drop, and engine volume reached the output
+   // unclamped: a free-running Wavetable or Oscillator at volume 1e9 was
+   // ~1e9 loud. Every float at +-1e9 must load in range and render bounded.
+   {
+      auto peakOf = [](const std::vector<float>& v) {
+         float p = 0.0f;
+         for (float x : v)
+            p = std::isfinite(x) ? std::max(p, std::fabs(x)) : INFINITY;
+         return p;
+      };
+      auto hostile = [](INode& n, const char* big) {
+         std::vector<std::pair<std::string, std::string>> params;
+         Patch::SaveParams(&n, params);
+         for (auto& kv : params)
+            if (kv.first.rfind("f ", 0) == 0)
+               kv.second = big;
+         Patch::LoadParams(&n, params);
+      };
+      std::vector<float> loud, all1e9;
+      RenderFree([](WavetableNode& wt) { Patch::LoadParams(&wt, { { "f a.volume", "1e9" } }); }, loud);
+      float worst = peakOf(loud);
+      for (const char* big : { "1e9", "-1e9" })
+      {
+         RenderFree([&](WavetableNode& wt) { hostile(wt, big); }, all1e9);
+         worst = std::max(worst, peakOf(all1e9));
+      }
+      bool inRange = true;
+      for (const char* big : { "1e9", "-1e9" })
+      {
+         OscillatorNode osc;
+         hostile(osc, big);
+         inRange &= osc.engine.volume >= 0.0f && osc.engine.volume <= 1.0f && osc.frequency >= 20.0f &&
+                    osc.frequency <= 8000.0f && osc.engine.warpRatio >= 1.0f && osc.engine.warpRatio <= 16.0f;
+         AudioNode* audio = osc.GetAudioNode();
+         osc.CookIfNeeded(1);
+         audio->PrepareToPlay(sampleRate, numFrames);
+         std::vector<float> l(numFrames), r(numFrames);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = numFrames;
+         for (int b = 0; b < 16; b++)
+         {
+            audio->ProcessBlock(nullptr, 0, buf);
+            worst = std::max(worst, std::max(peakOf(l), peakOf(r)));
+         }
+      }
+      const bool ok = worst < 4.0f && inRange;
+      printf("DSPTEST wavetable/oscillator params past the knob range: peak %.3g, oscillator in range %d  %s\n", worst,
+             inRange, ok ? "OK" : "FAIL");
+      all &= ok;
+   }
 
    return all;
 }
