@@ -123,9 +123,11 @@ def has_params(t, kind):
     return any(p.get("kind") == kind for p in t["params"])
 
 
-def patch_for(t, kind, value, sig_path=None):
+def patch_for(t, kind, value, sig_path=None, file_path=None):
     """(patch text, is_audio_only). value None = the base run. kind signal
-    feeds audio inputs from sig_path instead of the synth."""
+    feeds audio inputs from sig_path instead of the synth. file_path, when
+    given, is a file player's file in the other kinds: without one Molder's
+    generation loop and every per-file loop never runs (B-K-029)."""
     lines = ["infinite-patch 1", f"node 1 {t['category']} {t['type']}", "  id a"]
     if value is not None and kind not in ("mod", "signal"):
         v = value.split("=", 1)[1] if kind == "text" else value
@@ -140,6 +142,8 @@ def patch_for(t, kind, value, sig_path=None):
     if by_file:
         lines.append(f"  s {file_key} {sig_path}")
         lines += SIGNAL_EXTRA.get(t["type"], [])
+    elif file_path and file_key is not None and kind != "text":  # text fuzzes the path itself
+        lines.append(f"  s {file_key} {file_path}")
     lines.append("end")
     used, wires = [], []
 
@@ -317,7 +321,8 @@ def fuzz_type(binp, out, kind, t, prior, max_timeout, write):
             write(t["type"], label, "SKIP", "(base timed out)", 0, 0, "ok")
             continue
         sig = signal_wav(out, "base" if v == "base" else v) if kind == "signal" else None
-        text, audio = patch_for(t, kind, None if v == "base" else v, sig)
+        clean = signal_wav(out, "clean") if kind in ("int", "float", "mod") else None  # no burst: a plain sine
+        text, audio = patch_for(t, kind, None if v == "base" else v, sig, clean)
         tag = f"{kind}-{safe}-{label.lstrip('-').replace('.', '')}{'n' if label.startswith('-') else ''}"
         signal = kind == "signal" and audio
         rc, codes, reports, secs, tail, prev = run_case(binp, out, tag, text, audio,
@@ -414,6 +419,10 @@ def selftest():
     assert not has_params(t | {"outputs": [{"kind": "modulator"}]}, "signal")
     assert has_params(rec, "signal") and not has_params(rec | {"params": []}, "signal")
     assert label_of("text", "big=AAA") == "big" and label_of("int", "-5") == "-5"
+    text, _ = patch_for(rec, "int", "2147483647", None, "/x/clean.wav")
+    assert "  s filePath /x/clean.wav" in text and "fsig" not in text, text
+    text, _ = patch_for(rec, "text", "path=../x", None, "/x/clean.wav")
+    assert "/x/clean.wav" not in text, text
     print("param_fuzz selftest ok")
 
 

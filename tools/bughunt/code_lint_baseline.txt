@@ -13,3 +13,11 @@ loaded-index	src/nodes/OscillatorNode.cpp	waveform -> [waveform] in src/app/bodi
 loaded-index	src/nodes/PredictiveModulatorNode.h	rank -> [rank] in src/app/bodies
 loaded-index	src/nodes/PredictiveRhythmNode.cpp	root -> [root] in src/app/bodies
 loaded-index	src/nodes/WaveTerrainNode.cpp	filterType -> [filterType] in src/app/bodies
+loaded-loop	src/nodes/AudioNodes.cpp	bands -> loop bound bands
+unbounded-int	src/app/bodies/GeometryParams.cpp	bevelSegments [1,3] not bounded outside the UI
+unbounded-int	src/app/bodies/GeometryParams.cpp	chladniM [1,12] not bounded outside the UI
+unbounded-int	src/app/bodies/GeometryParams.cpp	chladniN [1,12] not bounded outside the UI
+unbounded-int	src/app/bodies/GeometryParams.cpp	paletteOffset [0,32] not bounded outside the UI
+unbounded-int	src/app/bodies/GeometryParams.cpp	screwSteps [3,256] not bounded outside the UI
+unbounded-int	src/app/bodies/GeometryParams.cpp	triangleBudget [2000,500000] not bounded outside the UI
+unbounded-int	src/app/bodies/SamplerBodies.cpp	seed [1,9999] not bounded outside the UI
