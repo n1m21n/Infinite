@@ -87,7 +87,25 @@ only: `texelFetch`, MRT, `GL_SAMPLES_PASSED`, RGBA32F render targets are all cor
   `#version 150` (`texelFetch`, `gl_InstanceID`); no `Platform::` or `#ifdef` code. Sampler units:
   `uPointPos`/`uPointColor` sit on 11/12 when drawing and default to 0 otherwise, which holds only
   `sampler2D`s (the one `sampler2DShadow` is on 1), so strict drivers see no mixed-type unit.
-- B11 before/after: pending a Release build.
+- B11 before/after: below.
+
+## B11 before/after (Mac14,7 Release universal, 1080p, steps 1-4, 2026-10-23)
+
+`INFINITE_GPU_POINTS=0` (before) against the default (after), same binary, `tools/bench.py b11`.
+
+| Row | before: frame p50 / p99 / CPU cook / GPU cook (ms) | after | fps p50 |
+|---|---|---|---|
+| A video→points 57.6k | 15.05 / 28.03 / 3.98 / 8.38 | 9.99 / 19.60 / 0.40 / 5.17 | 66 → 100 |
+| A video→points 230k | 33.60 / 70.18 / 10.88 / 20.55 | 16.60 / 26.07 / 1.60 / 8.52 | 30 → 60 |
+| A video→points 262k | 36.62 / 61.86 / 12.04 / 23.34 | 16.72 / 35.52 / 3.15 / 9.02 | 27 → 60 |
+| B particles 10k / 100k / 200k | 6.82 / 12.42 / 19.53 | 6.94 / 12.16 / 21.46 | unchanged |
+| C instanced cubes 10k / 100k | 12.80 / 42.19 | 14.33 / 42.45 | unchanged |
+
+A is the one the GPU path touches: about 2.2x at 230k-262k, the CPU cook down 4-7x, and the GPU
+cook less than half (no `glGetTexImage` stall, no 262k `Mat4` upload). B and C do not reach the
+path (Particle System offers no GPU points); their spread is run-to-run noise: B 200k re-runs
+were 20.6 / 20.5 before and 23.4 / 20.2 after, C 10k 13.6 / 11.9 before and 12.3 / 12.6 after.
+They stay fill-bound (step 5) and CPU-sim-bound (step 7).
 
 Step 6 is larger than its line above: Render 3D's instanced draw, its shadow pass, translucent
 instance sorting, the scene signature and ~25 other files read `InstanceTransforms()` on the CPU.
