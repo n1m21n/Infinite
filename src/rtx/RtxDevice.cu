@@ -108,7 +108,10 @@ namespace
       {
          const float phi = atan2f(d.z, d.x) + params.envRotation;
          const float theta = acosf(fminf(fmaxf(d.y, -1.0f), 1.0f));
-         const float4 c = tex2D<float4>(params.envTex, phi / (2.0f * kPi) + 0.5f, theta / kPi);
+         // Turbo 0.70: v flipped like the raster's dirToEquirect (the same GL
+         // texture): theta / pi showed the HDRI upside down, so the mirrors
+         // reflected the ground where the raster shows the sky.
+         const float4 c = tex2D<float4>(params.envTex, phi / (2.0f * kPi) + 0.5f, 1.0f - theta / kPi);
          return make_float3(c.x, c.y, c.z) * params.envIntensity;
       }
       const float t = clamp01(d.y * 0.5f + 0.5f);
@@ -159,6 +162,37 @@ namespace
       return (diff + spec) * nl;
    }
 
+   // Turbo 0.70 (X1): a world point (w = 1) or direction (w = 0) through last
+   // frame's camera, in this frame's pixel units; x < 0 = behind it.
+   // `sample`: where this sample sits in the pixel grid now; the result is
+   // moved by the same motion from the pixel's centre, so the sub-pixel jitter
+   // does not land in the history fetch (it blurred everything over frames).
+   __device__ float2 prevPixel(float4 p, float2 sample, int x, int y)
+   {
+      const float4 c = mulM4(params.prevViewProj, p);
+      if (c.w <= 1e-6f)
+         return make_float2(-1.0f, -1.0f);
+      const float px = (c.x / c.w * 0.5f + 0.5f) * params.width, py = (c.y / c.w * 0.5f + 0.5f) * params.height;
+      return make_float2((float)x + 0.5f + (px - sample.x), (float)y + 0.5f + (py - sample.y));
+   }
+
+   // Turbo 0.70: light reaching the camera after a diffuse bounce, capped (one
+   // sample of a small bright source otherwise lands as a white speck the
+   // denoisers smear into blotches). What the first hit shows, and a mirror's
+   // reflection of it (the sun in a near-mirror metal is a real highlight),
+   // are left alone.
+   __device__ void addLight(float3& L, float3 v, bool capped)
+   {
+      constexpr float kIndirectMax = 8.0f;
+      if (capped)
+      {
+         const float m = maxc(v);
+         if (m > kIndirectMax)
+            v *= kIndirectMax / m;
+      }
+      L += v;
+   }
+
    __device__ void traceRadiance(float3 ro, float3 rd, RtxHit& h)
    {
       unsigned long long p = reinterpret_cast<unsigned long long>(&h);
@@ -179,6 +213,36 @@ namespace
       return h.hit != 0;
    }
 
+   // Turbo 0.70 (X1): where the point `world` on the current hit was last
+   // frame. A particle (PartId) is found by its id in the ring of last frame's
+   // places, so births and deaths do not matter; otherwise through the
+   // instance's previous transform while the list kept its order (same
+   // count); else where it is now (no motion of its own).
+   __device__ float3 previousPoint(const RtxGeomData& g, float3 world, int prim, bool sphere, float3 centre)
+   {
+      if (params.prevRing != nullptr && g.partId != nullptr)
+      {
+         const unsigned int at = sphere ? (unsigned int)prim : optixGetInstanceId();
+         const unsigned int id = (unsigned int)fmaxf(g.partId[(size_t)at * g.partIdStride] + 0.5f, 0.0f) + 1u;
+         const RtxPrevSlot& s = params.prevRing[RtxRingSlot(id, g.ringKey, params.ringMask)];
+         if (s.id != id || s.key != g.ringKey)
+            return world; // born this frame
+         if (sphere)
+            return world + make_float3(s.t[3], s.t[7], s.t[11]) - centre;
+         const float3 o = optixTransformPointFromWorldToObjectSpace(world);
+         return make_float3(s.t[0] * o.x + s.t[1] * o.y + s.t[2] * o.z + s.t[3],
+                            s.t[4] * o.x + s.t[5] * o.y + s.t[6] * o.z + s.t[7],
+                            s.t[8] * o.x + s.t[9] * o.y + s.t[10] * o.z + s.t[11]);
+      }
+      const unsigned int idx = optixGetInstanceIndex();
+      if (params.prevInst == nullptr || idx >= params.prevInstCount)
+         return world;
+      const float3 o = optixTransformPointFromWorldToObjectSpace(world);
+      const float* t = params.prevInst[idx].transform;
+      return make_float3(t[0] * o.x + t[1] * o.y + t[2] * o.z + t[3], t[4] * o.x + t[5] * o.y + t[6] * o.z + t[7],
+                         t[8] * o.x + t[9] * o.y + t[10] * o.z + t[11]);
+   }
+
    // Colour, texture, material of the hit primitive into `h`.
    __device__ void fillMaterial(const RtxGeomData& g, int i0, int i1, int i2, float b1, float b2, RtxHit& h)
    {
@@ -189,20 +253,61 @@ namespace
          const float* c0 = g.color + (size_t)i0 * g.colorStride;
          const float* c1 = g.color + (size_t)i1 * g.colorStride;
          const float* c2 = g.color + (size_t)i2 * g.colorStride;
-         base *= toLin(make_float3(c0[0] * b0 + c1[0] * b1 + c2[0] * b2, c0[1] * b0 + c1[1] * b1 + c2[1] * b2,
-                                   c0[2] * b0 + c1[2] * b1 + c2[2] * b2));
+         // Turbo 0.70: as the raster (vVertexColor), not linearised - the
+         // same colours came out darker and redder here.
+         base *= make_float3(c0[0] * b0 + c1[0] * b1 + c2[0] * b2, c0[1] * b0 + c1[1] * b1 + c2[1] * b2,
+                             c0[2] * b0 + c1[2] * b1 + c2[2] * b2);
       }
       if (g.instColor != nullptr)
       {
          const float* c = g.instColor + (size_t)optixGetInstanceId() * g.instColorStride;
-         base *= toLin(make_float3(c[0], c[1], c[2]));
+         base *= make_float3(c[0], c[1], c[2]); // Turbo 0.70: as the raster's vInstanceColor
       }
-      if (g.tex != 0 && g.uv != nullptr)
+      float u = 0.0f, v = 0.0f;
+      if (g.uv != nullptr)
       {
          const float* t0 = g.uv + (size_t)i0 * g.uvStride;
          const float* t1 = g.uv + (size_t)i1 * g.uvStride;
          const float* t2 = g.uv + (size_t)i2 * g.uvStride;
-         const float u = t0[0] * b0 + t1[0] * b1 + t2[0] * b2, v = t0[1] * b0 + t1[1] * b1 + t2[1] * b2;
+         u = t0[0] * b0 + t1[0] * b1 + t2[0] * b2;
+         v = t0[1] * b0 + t1[1] * b1 + t2[1] * b2;
+      }
+      if (g.instTexMode != 0)
+      {
+         // Turbo 0.70: the raster's instanceTexel(), per copy.
+         const unsigned int id = optixGetInstanceId();
+         float t = 0.0f;
+         if (g.instTexFrom == 1)
+            t = (float)id;
+         else if (g.instTexFrom == 2)
+         {
+            unsigned int hh = id * 2654435761u;
+            hh ^= hh >> 15; hh *= 0x846ca68bu; hh ^= hh >> 16;
+            t = (float)(hh & 0xffffu);
+         }
+         else if (g.instTexIdx != nullptr)
+            t = g.instTexIdx[(size_t)id * g.instTexIdxStride];
+         int idx = (int)floorf(t + 0.5f);
+         float4 tc;
+         if (g.instTexMode == 2)
+         {
+            const int cols = max(1, g.atlasCols), rows = max(1, g.atlasRows), cells = cols * rows;
+            idx = ((idx % cells) + cells) % cells;
+            const float cx = (float)(idx % cols), cy = (float)(rows - 1 - idx / cols);
+            const float fu = fminf(fmaxf(u - floorf(u), 0.001f), 0.999f);
+            const float fv = fminf(fmaxf(v - floorf(v), 0.001f), 0.999f);
+            tc = tex2D<float4>(g.instTex[0], (cx + fu) / (float)cols, (cy + fv) / (float)rows);
+         }
+         else
+         {
+            const int n = max(1, g.instTexCount);
+            idx = ((idx % n) + n) % n;
+            tc = tex2D<float4>(g.instTex[idx], u, v);
+         }
+         base *= toLin(make_float3(tc.x, tc.y, tc.z));
+      }
+      else if (g.tex != 0 && g.uv != nullptr)
+      {
          const float4 tc = tex2D<float4>(g.tex, u, v);
          base *= toLin(make_float3(tc.x, tc.y, tc.z));
       }
@@ -248,6 +353,8 @@ extern "C" __global__ void __closesthit__tri()
    h.t = optixGetRayTmax();
    h.n = n;
    h.ng = ng;
+   h.prevP = previousPoint(g, optixGetWorldRayOrigin() + optixGetWorldRayDirection() * h.t, prim, false,
+                           make_float3(0, 0, 0));
    fillMaterial(g, (int)i0, (int)i1, (int)i2, bc.x, bc.y, h);
 }
 
@@ -264,6 +371,7 @@ extern "C" __global__ void __closesthit__sphere()
    h.t = optixGetRayTmax();
    h.n = n;
    h.ng = n;
+   h.prevP = previousPoint(g, hitP, prim, true, centre);
    fillMaterial(g, prim, prim, prim, 0.0f, 0.0f, h);
 }
 
@@ -282,6 +390,8 @@ extern "C" __global__ void __raygen__render()
 
    float3 sum = make_float3(0, 0, 0), albedo = make_float3(0, 0, 0), nrm = make_float3(0, 0, 0);
    float cover = 0.0f;
+   float2 mv = make_float2(-1.0f, -1.0f); // Turbo 0.70 (X1): first sample's first hit
+   float4 gb = make_float4(0.0f, 0.0f, 0.0f, -1.0f);
    for (int sp = 0; sp < params.spp; sp++)
    {
       const float u = (x + rnd(s)) / params.width, v = (y + rnd(s)) / params.height;
@@ -308,13 +418,19 @@ extern "C" __global__ void __raygen__render()
 
       float3 L = make_float3(0, 0, 0), thr = make_float3(1, 1, 1);
       int passes = 0;
+      bool viaDiffuse = false; // Turbo 0.70: the last bounce took the diffuse lobe
+      bool diffused = false;   // ... or any bounce before it (addLight caps)
       for (int bounce = 0; bounce <= params.bounces; bounce++)
       {
          RtxHit h;
          traceRadiance(ro, rd, h);
          if (!h.hit)
          {
-            L += thr * envColor(rd);
+            if (bounce == 0 && sp == 0 && params.hasPrev)
+               mv = prevPixel(make_float4(rd.x, rd.y, rd.z, 0.0f), make_float2(u * params.width, v * params.height), x, y);
+            // Turbo 0.70: diffuse light from the environment tinted like the
+            // raster's image-based diffuse (ambient * 3).
+            addLight(L, thr * (viaDiffuse ? envColor(rd) * params.ambientTint : envColor(rd)), diffused);
             break;
          }
          const float3 pos = ro + rd * h.t;
@@ -331,6 +447,14 @@ extern "C" __global__ void __raygen__render()
             cover += 1.0f;
             albedo += h.base;
             nrm += mulM3(params.viewRot, h.n);
+            if (sp == 0)
+            {
+               // The g-buffer every frame (next frame compares against it).
+               gb = make_float4(h.n.x, h.n.y, h.n.z, h.t);
+               if (params.hasPrev)
+                  mv = prevPixel(make_float4(h.prevP.x, h.prevP.y, h.prevP.z, 1.0f),
+                                 make_float2(u * params.width, v * params.height), x, y);
+            }
          }
          const bool inside = dot(h.ng, rd) > 0.0f;
          float3 nf = dot(h.n, rd) > 0.0f ? -h.n : h.n;
@@ -338,13 +462,19 @@ extern "C" __global__ void __raygen__render()
          if (dot(nf, ngf) < 0.0f)
             nf = ngf;
          const float3 vv = -rd;
-         const float metal = h.metal, a = fmaxf(h.rough, 0.03f) * fmaxf(h.rough, 0.03f);
+         // Turbo 0.70: the raster's roughness floor (0.045), same highlights.
+         const float metal = h.metal, a = fmaxf(h.rough, 0.045f) * fmaxf(h.rough, 0.045f);
          const float3 base = h.base;
-         L += thr * h.emission;
+         addLight(L, thr * h.emission, diffused);
          const float3 f0 = lerp(make_float3(0.04f, 0.04f, 0.04f), base, metal);
+         if (bounce == 0 && params.rim > 0.0f) // Turbo 0.70: the raster's rim
+         {
+            const float edge = 1.0f - clamp01(dot(nf, vv));
+            L += thr * base * (edge * edge * edge * params.rim);
+         }
 
          // Next-event estimation: one shadow ray per light (glass lets it through dimmed).
-         L += thr * base * (1.0f - metal) * params.ambient * (1.0f - h.trans);
+         addLight(L, thr * base * (1.0f - metal) * params.ambient * (1.0f - h.trans), diffused);
          for (int i = 0; i < params.lightCount; i++)
          {
             const RtxLight& lt = params.lights[i];
@@ -368,7 +498,8 @@ extern "C" __global__ void __raygen__render()
                continue;
             if (occluded(pos + ngf * 1e-3f, ldir, dist - 2e-3f))
                continue;
-            L += thr * evalBsdf(nf, vv, ldir, base, metal, a, f0) * lt.color * (att * (1.0f - h.trans * (1.0f - metal)));
+            addLight(L, thr * evalBsdf(nf, vv, ldir, base, metal, a, f0) * lt.color * (att * (1.0f - h.trans * (1.0f - metal))),
+                     diffused);
          }
 
          // Sample the next direction.
@@ -376,6 +507,7 @@ extern "C" __global__ void __raygen__render()
          if (h.trans > 0.0f && rnd(s) < h.trans * (1.0f - metal))
          {
             const float3 hm = sampleGgxH(nf, a, s);
+            viaDiffuse = false;
             const float eta = inside ? h.ior : 1.0f / h.ior;
             const float c = clamp01(dot(vv, hm));
             float r0 = (1.0f - h.ior) / (1.0f + h.ior);
@@ -400,11 +532,17 @@ extern "C" __global__ void __raygen__render()
          {
             const float nv = fmaxf(dot(nf, vv), 1e-4f);
             const float3 fv = fres(nv, f0);
-            const float pSpec = metal > 0.99f ? 1.0f : fminf(fmaxf(maxc(fv) + metal, 0.1f), 0.9f);
+            // Turbo 0.70: lobe chosen by its actual weight. The old 10% floor
+            // on the diffuse lobe sent a near-mirror metal (0.97) one ray in
+            // ten into a lobe worth ~2%, carried at 10x - most of its grain.
+            const float specW = maxc(fv);
+            const float diffW = (1.0f - specW) * (1.0f - metal) * fmaxf(maxc(base), 1e-3f);
+            const float pSpec = metal > 0.99f ? 1.0f : fminf(fmaxf(specW / fmaxf(specW + diffW, 1e-6f), 0.05f), 0.98f);
             if (rnd(s) < pSpec)
             {
                const float3 hm = sampleGgxH(nf, a, s);
                nd = rd - hm * (2.0f * dot(rd, hm));
+               viaDiffuse = false;
                const float nl = dot(nf, nd);
                if (nl <= 0.0f)
                   break;
@@ -417,6 +555,8 @@ extern "C" __global__ void __raygen__render()
                float3 t, b;
                basis(nf, t, b);
                nd = normalize(t * (r * cosf(phi)) + b * (r * sinf(phi)) + nf * sqrtf(fmaxf(1.0f - r1, 0.0f)));
+               viaDiffuse = true;
+               diffused = true;
                thr *= (make_float3(1, 1, 1) - fv) * (1.0f - metal) * base / (1.0f - pSpec);
             }
             ro = pos + ngf * 1e-3f;
@@ -450,4 +590,9 @@ extern "C" __global__ void __raygen__render()
                                     al.z * wOld + albedo.z * wNew, 1.0f);
    params.normal[pix] = make_float4(no.x * wOld + nrm.x * wNew, no.y * wOld + nrm.y * wNew,
                                     no.z * wOld + nrm.z * wNew, 0.0f);
+   if (params.motion != nullptr)
+   {
+      params.motion[pix] = mv;
+      params.gbuf[pix] = gb;
+   }
 }

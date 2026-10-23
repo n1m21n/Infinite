@@ -264,9 +264,15 @@
          // fullscreen is allowed to minimise or drop behind the editor when
          // focus moves to monitor 1. A Win32 topmost window remains visible
          // on the projector and SWP_NOACTIVATE lets the editor keep focus.
+         // Turbo 0.70: undecorated for GLFW too before placing it. GLFW adds
+         // the frame of the style it believes the window has, so a decorated
+         // window placed here and made borderless afterwards came out a frame
+         // larger than the monitor - and, topmost, its edge covered the top
+         // rows of the monitor below (the editor's menu bar).
+         glfwSetWindowAttrib(pw.window, GLFW_DECORATED, GLFW_FALSE);
+         Platform::ConfigureOutputWindow(pw.window, true, true, true);
          glfwSetWindowPos(pw.window, mx, my);
          glfwSetWindowSize(pw.window, mode->width, mode->height);
-         Platform::ConfigureOutputWindow(pw.window, true, true, true);
          pw.fullscreen = true;
          pw.monitorIndex = monitorIndex;
       }
@@ -283,6 +289,7 @@
             x = mx + (mw - width) / 2;
             y = my + (mh - height) / 2;
          }
+         glfwSetWindowAttrib(pw.window, GLFW_DECORATED, GLFW_TRUE); // Turbo 0.70: see above
          Platform::ConfigureOutputWindow(pw.window, false, false, false);
          glfwSetWindowPos(pw.window, x, y);
          glfwSetWindowSize(pw.window, width, height);

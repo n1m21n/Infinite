@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.62.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.70.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -25,6 +25,7 @@ option(INFINITE_ENABLE_AVX2 "Compile with /arch:AVX2 (any x64 CPU from ~2013 on)
 option(INFINITE_ENABLE_ASIO "ASIO driver support (downloads the Steinberg ASIO SDK, GPLv3)" ON)
 option(INFINITE_ENABLE_RTX "RTX render mode: NVIDIA OptiX ray tracing (full edition; needs the CUDA Toolkit to build)" ON)
 option(INFINITE_ENABLE_LTCG "Whole-program optimization (/GL + /LTCG) in Release; slower link" OFF)
+option(INFINITE_ENABLE_TRACY "Tracy profiler zones, CPU and GL GPU (BSD-3); connect the Tracy v0.11.1 GUI" OFF)
 
 # GLFW is built from source and linked statically.
 include(FetchContent)
@@ -285,6 +286,10 @@ add_executable(Infinite WIN32
     src/nodes/MidiNodes.cpp
     src/nodes/Geometry3DNodes.cpp
     src/nodes/Render3DPost.cpp
+    src/nodes/Render3DTemporal.cpp
+    src/nodes/Render3DCull.cpp
+    src/nodes/Render3DMotion.cpp
+    src/nodes/Render3DFxNode.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
     src/nodes/Text3DNode.cpp
@@ -333,6 +338,8 @@ add_executable(Infinite WIN32
     src/pop/PopOpsB2.cpp
     src/pop/PopOpsB3.cpp
     src/pop/PopOpsPlatform.cpp
+    src/pop/GpuAlgo.cpp
+    src/pop/ParticleGpu.cpp
     src/nodes/CurveNode.cpp
     src/nodes/OutputNode.cpp
     src/nodes/SyphonInNode.cpp
@@ -770,3 +777,57 @@ if(INFINITE_ENABLE_LTCG)
     target_compile_options(Infinite PRIVATE $<$<CONFIG:Release>:/GL>)
     target_link_options(Infinite PRIVATE $<$<CONFIG:Release>:/LTCG>)
 endif()
+
+# Turbo 0.70 (F2): Tracy profiler client (BSD-3, both editions), off by default.
+# On demand: nothing is recorded until the Tracy GUI (same version) connects.
+# Zones: frame stages, PointZ cooks and kernels, Render 3D, post, 3D previews
+# (src/core/Profile.h).
+if(INFINITE_ENABLE_TRACY)
+    set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(tracy
+        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+        GIT_TAG v0.11.1
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(tracy)
+    target_link_libraries(Infinite PRIVATE TracyClient)
+    target_compile_definitions(Infinite PRIVATE INFINITE_TRACY=1)
+endif()
+
+# Turbo 0.70 (A5, R5): GLSL from shaders/ compiled into the exe (EmbeddedFile, see
+# cmake/EmbedFiles.cmake), with AMD FidelityFX FSR 1's two headers (MIT, both editions):
+# Render 3D's FSR upscale includes them in its shaders and computes their constants on
+# the CPU. Fetched as files at configure time, like doctest below.
+FetchContent_Declare(ffx_a
+    URL https://raw.githubusercontent.com/GPUOpen-Effects/FidelityFX-FSR/v1.0.2/ffx-fsr/ffx_a.h
+    DOWNLOAD_NO_EXTRACT TRUE)
+FetchContent_Declare(ffx_fsr1
+    URL https://raw.githubusercontent.com/GPUOpen-Effects/FidelityFX-FSR/v1.0.2/ffx-fsr/ffx_fsr1.h
+    DOWNLOAD_NO_EXTRACT TRUE)
+FetchContent_MakeAvailable(ffx_a ffx_fsr1)
+file(GLOB INFINITE_SHADER_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shaders/*.glsl")
+set(_embed_files ${INFINITE_SHADER_FILES} "${ffx_a_SOURCE_DIR}/ffx_a.h" "${ffx_fsr1_SOURCE_DIR}/ffx_fsr1.h")
+string(JOIN "|" _embed_arg ${_embed_files})
+set(_embed_out "${CMAKE_BINARY_DIR}/generated/EmbeddedFiles.cpp")
+add_custom_command(OUTPUT "${_embed_out}"
+    COMMAND ${CMAKE_COMMAND} "-DFILES=${_embed_arg}" "-DOUT=${_embed_out}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedFiles.cmake"
+    DEPENDS ${_embed_files} cmake/EmbedFiles.cmake
+    COMMENT "Embedding shaders" VERBATIM)
+target_sources(Infinite PRIVATE "${_embed_out}")
+target_include_directories(Infinite PRIVATE "${ffx_a_SOURCE_DIR}" "${ffx_fsr1_SOURCE_DIR}")
+
+# Turbo 0.70 (A7): unit tests (doctest, MIT) for code that needs no window and no
+# GL context, starting with the patch reader / writer. Not part of the normal
+# build; test-windows.bat builds and runs it (UNITTEST). doctest is one header,
+# fetched as a file (its own CMakeLists predates CMake 4's minimum).
+FetchContent_Declare(doctest
+    URL https://raw.githubusercontent.com/doctest/doctest/v2.4.11/doctest/doctest.h
+    DOWNLOAD_NO_EXTRACT TRUE)
+FetchContent_MakeAvailable(doctest)
+add_executable(InfiniteUnitTests EXCLUDE_FROM_ALL
+    tests/unit/UnitMain.cpp
+    tests/unit/PatchTests.cpp
+    src/core/Patch.cpp)
+target_include_directories(InfiniteUnitTests PRIVATE src src/core "${doctest_SOURCE_DIR}")
+target_compile_definitions(InfiniteUnitTests PRIVATE NOMINMAX _USE_MATH_DEFINES)
+target_compile_options(InfiniteUnitTests PRIVATE /utf-8 /permissive- /Zc:char8_t- /Zc:__cplusplus)

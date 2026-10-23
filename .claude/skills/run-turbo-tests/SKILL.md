@@ -20,6 +20,10 @@ test-windows.bat -Only AUDIOPARAMSWEEPTEST,AUDIOTEARDOWNSWEEPTEST   :: audio swe
 test-windows.bat -Only TRANSFORMSWEEPTEST,MAPPINGSWEEPTEST,REVISIONSWEEPTEST,RENDER3DCACHESWEEPTEST :: geometry sweeps
 test-windows.bat -Config Debug    :: test the Debug build
 test-windows.bat -ShotOnly        :: build + screenshot only
+test-windows.bat -Perf            :: suite + perf regression run (perf.ps1)
+test-windows.bat -PerfOnly -SkipBuild :: perf run only
+test-windows.bat -Compat          :: suite + patch corpus vs reference (compat.ps1)
+test-windows.bat -Mit             :: MIT edition (build\windows-vs2022-mit, results in build\test-results-mit)
 ```
 
 `test-windows.bat` forwards every argument to
@@ -91,3 +95,47 @@ one after the other: two instances at once delay Text nodes past the probe frame
   which can outlast the frame budget on a machine with many plugins.
 - Close Infinite-Turbo before running: the build refuses while it is open.
 - Screenshot resolution follows the fixture framebuffer and DPI scale.
+
+## Profiling switches (Turbo 0.70)
+
+- `INFINITE_FRAMEPROF=1`: CPU (and GPU) ms per frame stage, slowest node bodies. A body time can be
+  the CPU waiting on a full GPU queue - check with GPUPROF before optimising it.
+- `INFINITE_GPUPROF=1`: GPU ms per debug group (Render 3D, shadow, post, Preview 3D, each PointZ
+  operator), every 120 frames.
+- `INFINITE_GLDEBUG=1` / `=sync`: GL errors and performance warnings, with the frame number; `sync`
+  names the debug group and the calling code line.
+- Tracy: build with `-DINFINITE_ENABLE_TRACY=ON` and connect the Tracy v0.11.1 GUI.
+
+## Unit tests (A7, Turbo 0.70)
+
+Every run (unless `-Exe` points at a foreign build) builds the `InfiniteUnitTests` target
+(doctest, `tests\unit\*.cpp`, not part of the normal build) and runs it as UNITTEST; log in
+`build\test-results\UNITTEST.log`. Put code that needs no window and no GL context here
+instead of a frame-driven self-test: add the .cpp under test to the target's source list in
+CMakeLists.txt. A known gap is written as a case marked `doctest::may_fail(true)` with the item ID.
+
+## Perf regression (F1, Turbo 0.70)
+
+`perf.ps1` plays every patch in `perf-corpus.txt` (copied with its `_media` folder into
+`build\perf\corpus`) with the patchcompat probe in play mode, `INFINITE_FRAMEPROF` and
+`INFINITE_PERF_UNCAPPED` (VSync and frame limiter off), 3 runs, median per metric. Results:
+`build\perf\results.json` and `build\perf\report.txt`.
+
+The gate is an A/B in the same session: `-RefExe build\perf-ref\Infinite-Turbo.exe` runs the
+reference and the candidate alternately, so clock and thermal drift hit both (the same build moved
+~20% between sessions, twice the threshold). `-Perf` in the driver does this whenever
+`build\perf-ref` exists. Fails when frameMs, cpu.total, gpu.total, render3d or a node GPU time
+>= 0.5 ms is more than 10% and 0.5 ms worse; stages and node CPU times are reported only.
+
+`build\perf-ref` is a frozen copy of a Release folder (robocopy /MIR). For turbo/next it is the M0
+build (v0.62.0 + the `INFINITE_PERF_UNCAPPED` probe + F3 markers): v0.62.0 itself cannot run
+uncapped. Refresh it only when the owner accepts a new cost level, and say so.
+`perf-baseline.json` (`-UpdateBaseline`) is only a cross-session trend.
+
+## Patch corpus gate (C3, Turbo 0.70)
+
+`compat.ps1` stages `compat-corpus.txt` (files or folders, `_media` siblings included, numbered
+names) into `build\compat\corpus`, runs `patchcompat.ps1`, then `compare-patchcompat.py --gate`
+against `build\compat\ref`. Record the reference once with the reference build:
+`compat.ps1 -RecordRef` (for turbo/next: the v0.62.0 build). Report: `build\compat\report.md`.
+

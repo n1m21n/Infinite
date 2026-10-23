@@ -1,6 +1,7 @@
 #include "Render3DPost.h"
 
 #include "core/GLUtil.h"
+#include "core/Profile.h"
 #include "platform/OpenGLHeaders.h"
 
 #include <algorithm>
@@ -235,6 +236,15 @@ namespace
       "   vec4 src = texture(uSrc, vUv);\n"
       "   if (uPassthrough == 1) { fragColor = src; return; }\n"
       "   vec3 c = src.rgb;\n"
+      // Turbo 0.70 (R4): TAA - uDepth holds the geometry's share of the pixel.
+      // The cleared background (uBg, alpha uBgOpacity) is taken back out so it is
+      // not tonemapped with the scene, and put back exactly at the end.
+      "   float cov = uBgKey == 4 ? clamp(texture(uDepth, vUv).r, 0.0, 1.0) : 1.0;\n"
+      "   float sceneA = src.a;\n"
+      "   if (uBgKey == 4 && cov > 0.001) {\n"
+      "      c = max((src.rgb - (1.0 - cov) * uBg) / cov, vec3(0.0));\n"
+      "      sceneA = (src.a - (1.0 - cov) * uBgOpacity) / cov;\n"
+      "   }\n"
       "   vec3 glow = vec3(0.0);\n"
       "   if (uBloom > 0.0) {\n"
       "      vec3 b = vec3(0.0); float wsum = 0.0;\n"
@@ -264,6 +274,13 @@ namespace
       "      alpha = mix(uBgOpacity, 1.0, clamp(src.a, 0.0, 1.0));\n"
       "   } else if (uBgKey == 3) {\n" // path traced over its own environment
       "      alpha = mix(uBgOpacity, 1.0, clamp(src.a, 0.0, 1.0));\n"
+      "   } else if (uBgKey == 4) {\n" // Turbo 0.70 (R4): TAA, coverage from uDepth
+      "      vec3 g = glow;\n"
+      "      if (uTonemap == 1) g = aces(g); else if (uTonemap == 2) g = g / (g + vec3(1.0));\n"
+      "      else if (uTonemap == 3) g = agx(g); else if (uTonemap == 4) g = neutral(g);\n"
+      "      vec3 bgOut = 1.0 - (1.0 - uBg) * (1.0 - pow(clamp(g, 0.0, 1.0), vec3(1.0 / 2.2)));\n"
+      "      c = cov > 0.001 ? mix(bgOut, c, cov) : bgOut;\n"
+      "      alpha = mix(uBgOpacity, clamp(sceneA, 0.0, 1.0), cov);\n"
       "   }\n"
       "   vec2 p = floor(gl_FragCoord.xy);\n"
       "   c += (fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;\n"
@@ -388,6 +405,7 @@ const char* Render3DPost::PanoGlsl()
 
 unsigned int Render3DPost::Panorama(unsigned int faceArray, int w, int h, int mode, float domeAngle, float domeTilt)
 {
+   GLUtil::DebugScope debugGroup("Render 3D: panorama"); // Turbo 0.70 (F3)
    if (mPanoProgram == 0)
    {
       const std::string src = std::string("#version 330 core\n"
@@ -598,6 +616,12 @@ unsigned int Render3DPost::Finish(unsigned int src, int w, int h, int tonemap, f
               depthTex != 0 ? 1 : 0, 1.0f);
 }
 
+unsigned int Render3DPost::FinishTaa(unsigned int src, unsigned int coverage, int w, int h, int tonemap, float bloom,
+                                     float bloomThreshold, float bloomRadius, const float bg[3], float bgOpacity)
+{
+   return Run(src, w, h, tonemap, bloom, bloomThreshold, bloomRadius, false, coverage, bg, 4, bgOpacity);
+}
+
 unsigned int Render3DPost::FinishCoverage(unsigned int src, int w, int h, int tonemap, float bloom,
                                           float bloomThreshold, float bloomRadius, const float bg[3], float bgOpacity,
                                           bool envBackground)
@@ -609,6 +633,9 @@ unsigned int Render3DPost::Run(unsigned int src, int w, int h, int tonemap, floa
                                float bloomRadius, bool passthrough, unsigned int depthTex, const float bg[3],
                                int keyMode, float bgOpacity)
 {
+   GLUtil::DebugScope debugGroup("Render 3D: post"); // Turbo 0.70 (F3): GPU captures
+   INF_PROFILE_ZONE("Render 3D: post"); // Turbo 0.70 (F2)
+   INF_PROFILE_GPU_ZONE("Render 3D: post");
    if (!EnsurePrograms())
       return 0;
    EnsureTargets(w, h);

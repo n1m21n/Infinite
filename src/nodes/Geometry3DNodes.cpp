@@ -1,10 +1,14 @@
 #include "Geometry3DNodes.h"
 #include "RtxBackend.h"
+#include "core/GLUtil.h"
+#include "core/Profile.h"
 
 #include "platform/OpenGLHeaders.h"
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <cmath>
 
 #include "Transport.h"
@@ -109,6 +113,20 @@ namespace
       glVertexAttribPointer(loc, std::min(size, buf->Comps()), GL_FLOAT, GL_FALSE,
                             buf->Comps() * (GLsizei)sizeof(float), (void*)0);
       glVertexAttribDivisor(loc, divisor ? 1 : 0);
+   }
+
+   // Turbo 0.70 (R1): the attribute BindPopAttrib just bound (the last buffer
+   // it kept), as Render3DCull reads it.
+   Render3DCull::Stream KeptStream(const std::vector<std::shared_ptr<const void>>& keep, int size)
+   {
+      Render3DCull::Stream st;
+      if (keep.empty())
+         return st;
+      const auto buf = std::static_pointer_cast<const pop::PopBuffer>(keep.back());
+      st.buf = buf->Gpu();
+      st.size = std::min(size, buf->Comps());
+      st.stride = buf->Comps();
+      return st;
    }
 
    // Bounds of a PointZ for a draw slot, without waiting on the GPU.
@@ -340,6 +358,15 @@ namespace
       "in vec3 aInstanceColor;\n" // per-instance tint, divisor 1
       "in vec3 aVertexColor;\n"   // per-vertex tint, from Mesh::vertexColor
       "in float aInstanceTex;\n"  // per-instance texture index (Instance PointZ), divisor 1
+      // Turbo 0.70 (R1): a culled draw's instance number from before culling.
+      "in uint aInstanceIndex;\n"
+      "uniform int uInstanceRemap;\n"
+      // Turbo 0.70 (R1): uIsSprite 2 = LOD quad of an instance, standing in
+      // for the mesh's box (centre, half extents) through the instance matrix:
+      // facing the camera, with the box's projected area and the normal of
+      // its face the camera sees most of.
+      "uniform vec3 uLodCentre;\n"
+      "uniform vec3 uLodHalf;\n"
       "uniform int uInstTexFrom;\n" // 0 the attribute, 1 instance number, 2 random per instance
       "flat out float vInstTex;\n"
       "uniform mat4 uModel;\n"
@@ -360,15 +387,17 @@ namespace
       "uniform int uSpriteSizeMode;\n" // 0 world, 1 screen (constant pixel size)
       "uniform mat4 uView;\n"
       "out vec4 vLightSpacePos;\n"
-      "out vec3 vWorldPos;\n"
-      "out vec3 vLocalPos;\n"
-      "out vec3 vNormal;\n"
-      "out vec2 vUv;\n"
+      "out vec3 vWorldPosIn;\n"
+      "out vec3 vLocalPosIn;\n"
+      "out vec3 vNormalIn;\n"
+      "out vec2 vUvIn;\n"
+
       "out vec3 vInstanceColor;\n"
-      "out vec3 vVertexColor;\n"
+      "out vec3 vVertexColorIn;\n"
       "void main() {\n"
       "   vec3 worldPos;\n"
       "   vec3 worldNormal;\n"
+      "   vec3 boxC = vec3(0.0), boxA0 = vec3(0.0), boxA1 = vec3(0.0), boxA2 = vec3(0.0);\n"
       "   if (uIsSprite == 1) {\n"
       "      vec3 instancePos = aInstance[3].xyz;\n"
       "      float instanceScale = aInstance[0][0];\n"
@@ -379,6 +408,27 @@ namespace
       "      }\n"
       "      worldPos = instancePos + (uCamRight * aPos.x + uCamUp * aPos.y) * sizeScale;\n"
       "      worldNormal = normalize(uCamPos - worldPos);\n"
+      "   } else if (uIsSprite == 2) {\n"
+      "      vec3 centre = (aInstance * vec4(uLodCentre, 1.0)).xyz;\n"
+      "      vec3 toCam = normalize(uCamPos - centre);\n"
+      "      vec3 ax0 = aInstance[0].xyz * uLodHalf.x;\n"
+      "      vec3 ax1 = aInstance[1].xyz * uLodHalf.y;\n"
+      "      vec3 ax2 = aInstance[2].xyz * uLodHalf.z;\n"
+      // Each face pair as an area vector (4 |a x b|, along its normal).
+      "      vec3 f0 = 4.0 * cross(ax1, ax2), f1 = 4.0 * cross(ax2, ax0), f2 = 4.0 * cross(ax0, ax1);\n"
+      "      float d0 = dot(f0, toCam), d1 = dot(f1, toCam), d2 = dot(f2, toCam);\n"
+      "      float area = abs(d0) + abs(d1) + abs(d2);\n"
+      // The normal of the face the camera sees most of: an area-weighted
+      // average of a box's faces is the view direction itself, and lit that
+      // way every copy mirrors what is behind the camera.
+      "      vec3 n = (abs(d0) >= abs(d1) && abs(d0) >= abs(d2)) ? sign(d0) * f0\n"
+      "             : (abs(d1) >= abs(d2) ? sign(d1) * f1 : sign(d2) * f2);\n"
+      // Turbo 0.70: a quad covering the box's bounding sphere; the
+      // fragment shader cuts the box's exact silhouette and faces out of it.
+      "      float radius = sqrt(dot(ax0, ax0) + dot(ax1, ax1) + dot(ax2, ax2));\n"
+      "      worldPos = centre + (uCamRight * aPos.x + uCamUp * aPos.y) * (1.2 * radius);\n"
+      "      worldNormal = dot(n, n) > 0.0 ? normalize(n) : toCam;\n"
+      "      boxC = centre; boxA0 = ax0; boxA1 = ax1; boxA2 = ax2;\n"
       "   } else {\n"
       "      mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
       "      vec4 world = model * vec4(aPos, 1.0);\n"
@@ -387,20 +437,31 @@ namespace
       "         ? normalize(mat3(model) * aNormal)\n"
       "         : normalize(uNormalMatrix * aNormal);\n"
       "   }\n"
-      "   vWorldPos = worldPos;\n"
-      "   vLocalPos = aPos;\n"
-      "   vNormal = worldNormal;\n"
-      "   vUv = aUv;\n"
+      "   vWorldPosIn = worldPos;\n"
+      "   vLocalPosIn = aPos;\n"
+      "   vNormalIn = worldNormal;\n"
+      "   vUvIn = aUv;\n"
+
       // White when there is no per-instance colour, so the fragment shader can
       // multiply unconditionally rather than branching on it.
       "   vInstanceColor = (uInstanceColored == 1) ? aInstanceColor : vec3(1.0);\n"
       // Sprites carry their colour on aInstanceColor, not aVertexColor - the
       // mesh domain and the point-cloud domain never mix on the same draw.
-      "   vVertexColor = (uHasVertexColor == 1 && uIsSprite == 0) ? aVertexColor : vec3(1.0);\n"
+      "   vVertexColorIn = (uHasVertexColor == 1 && uIsSprite == 0) ? aVertexColor : vec3(1.0);\n"
+      // Turbo 0.70 (R1): a LOD impostor's box (world centre, two half axes
+      // and the third's length) in varyings the quad does not otherwise use -
+      // no extra varyings, so the millions of ordinary vertices pay nothing.
+      "   if (uIsSprite == 2) {\n"
+      "      vLocalPosIn = boxC;\n"
+      "      vNormalIn = boxA0;\n"
+      "      vVertexColorIn = boxA1;\n"
+      "      vUvIn = vec2(length(boxA2), 0.0);\n"
+      "   }\n"
       "   float instTex = aInstanceTex;\n"
-      "   if (uInstTexFrom == 1) instTex = float(gl_InstanceID);\n"
+      "   int instanceId = (uInstanceRemap == 1) ? int(aInstanceIndex) : gl_InstanceID;\n"
+      "   if (uInstTexFrom == 1) instTex = float(instanceId);\n"
       "   else if (uInstTexFrom == 2) {\n"
-      "      uint h = uint(gl_InstanceID) * 2654435761u;\n"
+      "      uint h = uint(instanceId) * 2654435761u;\n"
       "      h ^= h >> 15; h *= 0x846ca68bu; h ^= h >> 16;\n"
       "      instTex = float(h & 0xffffu);\n"
       "   }\n"
@@ -411,12 +472,22 @@ namespace
 
    const char* kFragSrc =
       "#version 150\n"
-      "in vec3 vWorldPos;\n"
-      "in vec3 vLocalPos;\n"
-      "in vec3 vNormal;\n"
-      "in vec2 vUv;\n"
+      "in vec3 vWorldPosIn;\n"
+      "in vec3 vLocalPosIn;\n"
+      "in vec3 vNormalIn;\n"
+      "in vec2 vUvIn;\n"
+
+      "uniform vec3 uLodCentre;\n"
+      "uniform vec3 uLodHalf;\n"
+      // Turbo 0.70: what the rest of this shader reads - the interpolated
+      // values, or for a LOD impostor the box's own surface under the pixel.
+      "vec3 vWorldPos;\n"
+      "vec3 vLocalPos;\n"
+      "vec3 vNormal;\n"
+      "vec2 vUv;\n"
       "in vec3 vInstanceColor;\n"
-      "in vec3 vVertexColor;\n"
+      "in vec3 vVertexColorIn;\n"
+      "vec3 vVertexColor;\n"
       "flat in float vInstTex;\n"
       "in vec4 vLightSpacePos;\n"
       // Instance PointZ textures: 1 picks one of uInstTexCount images by the
@@ -724,6 +795,40 @@ namespace
       "}\n"
       "\n"
       "void main() {\n"
+      "   vWorldPos = vWorldPosIn;\n"
+      "   vLocalPos = vLocalPosIn;\n"
+      "   vNormal = vNormalIn;\n"
+      "   vUv = vUvIn;\n"
+      "   vVertexColor = vVertexColorIn;\n"
+      // Turbo 0.70 (R1): the LOD impostor - the view ray against the copy's
+      // box (slabs in the box's own frame, where it is [-1, 1]^3): exact
+      // silhouette, face normal, UV and object position, so a far copy looks
+      // like its box instead of a flat card. Depth stays the quad's (the box
+      // centre): writing gl_FragDepth would cost early-z on every draw.
+      "   if (uIsSprite == 2) {\n"
+      // The box as the vertex shader packed it; the third axis from the
+      // other two (instance matrices have no shear, the box is symmetric).
+      "      vec3 boxC = vLocalPosIn, a0 = vNormalIn, a1 = vVertexColorIn;\n"
+      "      vec3 a2 = normalize(cross(a0, a1)) * vUvIn.x;\n"
+      "      vVertexColor = vec3(1.0);\n"
+      "      mat3 Mi = inverse(mat3(a0, a1, a2));\n"
+      "      vec3 dir = normalize(vWorldPosIn - uCamPos);\n"
+      "      vec3 ro = Mi * (uCamPos - boxC), rd = Mi * dir;\n"
+      "      vec3 inv = 1.0 / rd;\n"
+      "      vec3 t1 = (-1.0 - ro) * inv, t2 = (1.0 - ro) * inv;\n"
+      "      vec3 tn = min(t1, t2), tf = max(t1, t2);\n"
+      "      float tNear = max(max(tn.x, tn.y), tn.z), tFar = min(min(tf.x, tf.y), tf.z);\n"
+      "      if (tFar < max(tNear, 0.0)) discard;\n"
+      "      float t = max(tNear, 0.0);\n"
+      "      vec3 lp = ro + rd * t, a = abs(lp);\n"
+      "      vec3 ln = (a.x >= a.y && a.x >= a.z) ? vec3(sign(lp.x), 0.0, 0.0)\n"
+      "              : (a.y >= a.z ? vec3(0.0, sign(lp.y), 0.0) : vec3(0.0, 0.0, sign(lp.z)));\n"
+      "      vWorldPos = uCamPos + dir * t;\n"
+      "      vNormal = normalize(transpose(Mi) * ln);\n"
+      "      vLocalPos = uLodCentre + lp * uLodHalf;\n"
+      "      vec2 fuv = ln.x != 0.0 ? lp.zy : (ln.y != 0.0 ? lp.xz : lp.xy);\n"
+      "      vUv = fuv * 0.5 + 0.5;\n"
+      "   }\n"
       "   if (uIsSprite == 1 && uSpriteShape == 0) {\n"
       "      vec2 d = vUv * 2.0 - 1.0;\n"
       "      if (dot(d, d) > 1.0) discard;\n"
@@ -1288,6 +1393,13 @@ const std::vector<std::string>& Render3DNode::RenderModeNames()
 
 void Render3DNode::RtxDeleter::operator()(RtxBackend* p) const { delete p; }
 
+const std::vector<std::string>& Render3DNode::UpscaleNames()
+{
+   static const std::vector<std::string> kNames = { "Native", "FSR quality (1.5x)", "FSR balanced (1.7x)",
+                                                    "FSR performance (2x)", "FSR ultra perf. (3x)" };
+   return kNames;
+}
+
 const std::vector<std::string>& Render3DNode::RtxDenoiseNames()
 {
    static const std::vector<std::string> kNames = { "Auto", "AI (best)", "Fast", "Off" };
@@ -1309,6 +1421,8 @@ Render3DNode::~Render3DNode()
    ReleaseShadowTargets();
    for (GpuMesh& gpu : mGpu)
       ReleaseGpuMesh(gpu);
+   for (Render3DMotion::Slot& s : mMotionSlots) // Turbo 0.70
+      s.Release();
    if (mProgram != 0) glDeleteProgram(mProgram);
    if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
    if (mEnvBgProgram != 0) glDeleteProgram(mEnvBgProgram);
@@ -1362,6 +1476,7 @@ bool Render3DNode::EnsureShader()
    glBindAttribLocation(mProgram, 7, "aInstanceColor");
    glBindAttribLocation(mProgram, 8, "aVertexColor");
    glBindAttribLocation(mProgram, 9, "aInstanceTex");
+   glBindAttribLocation(mProgram, Render3DCull::kIndexLoc, "aInstanceIndex"); // Turbo 0.70 (R1)
    glAttachShader(mProgram, vert);
    glAttachShader(mProgram, frag);
    glLinkProgram(mProgram);
@@ -1711,6 +1826,9 @@ void Render3DNode::CookIfNeeded(int frameId)
       std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
       ~CookTimer() { gRender3DCookSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); }
    } cookTimer;
+   GLUtil::DebugScope debugGroup("Render 3D"); // Turbo 0.70 (F3): GPU captures
+   INF_PROFILE_ZONE("Render 3D"); // Turbo 0.70 (F2)
+   INF_PROFILE_GPU_ZONE("Render 3D");
    // Turbo 0.61: raster 360 renders six faces and reprojects them (Cook360);
    // path traced 360 traces the panorama's rays directly (below).
    if (panorama > 0 && m360Face < 0 && (renderMode == 0 || (mRtxTried && !mRtx)) && renderPass == 0)
@@ -1732,8 +1850,18 @@ void Render3DNode::CookIfNeeded(int frameId)
    if (!EnsureShader())
       return;
 
-   const int w = m360Face >= 0 ? m360FaceSize : std::max(16, (int)width);
-   const int h = m360Face >= 0 ? m360FaceSize : std::max(16, (int)height);
+   // Turbo 0.70 (R5): render scale. The scene's targets (w x h) are the output
+   // size over the ratio; FSR brings the finished image back to outW x outH.
+   // Not for data passes and 360 faces, whose pixels must stay exact.
+   const int outW = m360Face >= 0 ? m360FaceSize : std::max(16, (int)width);
+   const int outH = m360Face >= 0 ? m360FaceSize : std::max(16, (int)height);
+   const bool sceneImage = renderPass == 0 && m360Face < 0;
+   static const float kUpscaleRatios[] = { 1.0f, 1.5f, 1.7f, 2.0f, 3.0f };
+   const float upRatio = sceneImage ? kUpscaleRatios[std::clamp(upscale, 0, 4)] : 1.0f;
+   const int w = upRatio > 1.0f ? std::max(16, (int)std::lround(outW / upRatio)) : outW;
+   const int h = upRatio > 1.0f ? std::max(16, (int)std::lround(outH / upRatio)) : outH;
+   mOutW = outW;
+   mOutH = outH;
    const int wantSamples =
       kSampleCounts[std::max(0, std::min(samples, (int)(sizeof(kSampleCounts) / sizeof(int)) - 1))];
    if (!EnsureResources(w, h, wantSamples))
@@ -1781,13 +1909,23 @@ void Render3DNode::CookIfNeeded(int frameId)
    const bool pathTraced = renderMode == 1 && renderPass == 0 && !(mRtxTried && !mRtx);
    const bool sceneChanged = !(mHasSceneBuilt && sceneSig == mSceneBuilt);
    const bool ptAccumulating = pathTraced && (!mRtx || mRtx->Samples() < ptSamples);
-   if (!sceneChanged && !ptAccumulating)
+   // Turbo 0.70 (R4): TAA keeps drawing a still scene, one jitter step a
+   // frame, until kTaaStillFrames samples are in the history.
+   const bool taaOn = taa && sceneImage && !pathTraced;
+   if (taaOn != mTaaWasOn)
+   {
+      mTemporal.ResetHistory();
+      mTaaWasOn = taaOn;
+   }
+   const bool taaRefining = taaOn && !sceneChanged && mTaaStill < kTaaStillFrames;
+   if (!sceneChanged && !ptAccumulating && !taaRefining)
       return;
+   mTaaStill = sceneChanged ? 0 : mTaaStill + 1;
    mSceneBuilt = sceneSig;
    mHasSceneBuilt = true;
    NodeWorkCounter()++;
 
-   const float aspect = (float)w / (float)h;
+   const float aspect = (float)outW / (float)outH;
 
    float eye[3];
    Mat4 view, proj;
@@ -1825,7 +1963,18 @@ void Render3DNode::CookIfNeeded(int frameId)
       view = Mat4::Multiply(face, view);
       proj = Mat4::Perspective(3.14159265f * 0.5f, 1.0f, nearPlane, farPlane);
    }
-   const Mat4 viewProj = Mat4::Multiply(proj, view);
+   // Turbo 0.70 (R4): this frame's sub-pixel jitter. Only the drawing uses it;
+   // LastCamera (Volume), the motion vectors' "last frame" and RTX get the
+   // plain camera.
+   float jitterX = 0.0f, jitterY = 0.0f;
+   Mat4 drawProj = proj;
+   if (taaOn)
+   {
+      Render3DTemporal::JitterOffset(mTemporal.JitterIndex(), jitterX, jitterY);
+      drawProj = Render3DTemporal::JitteredProjection(proj, jitterX, jitterY, w, h);
+   }
+   const Mat4 viewProjPlain = Mat4::Multiply(proj, view);
+   const Mat4 viewProj = Mat4::Multiply(drawProj, view);
    mLastCamera.view = view;
    mLastCamera.proj = proj;
    mLastCamera.eye[0] = eye[0]; mLastCamera.eye[1] = eye[1]; mLastCamera.eye[2] = eye[2];
@@ -1875,6 +2024,19 @@ void Render3DNode::CookIfNeeded(int frameId)
       lightCount = 1;
    }
 
+   // Turbo 0.70 (R1): how the instanced slots are culled, in the shadow pass
+   // and the main pass. INFINITE_R3D_CULL=force culls every instanced slot
+   // (CULLTEST), =off none.
+   static const int sCullEnv = []
+   {
+      const char* e = std::getenv("INFINITE_R3D_CULL");
+      if (e == nullptr) return 0;
+      if (std::strcmp(e, "force") == 0) return 1;
+      if (std::strcmp(e, "off") == 0) return 2;
+      return 0;
+   }();
+   const int cullMode = cullOverride >= 0 ? cullOverride : sCullEnv;
+
    // --- shadow pass ---------------------------------------------------
    // Depth from the light's point of view, rendered before the main pass and
    // sampled by it. Only the first light casts, and only when it has a
@@ -1882,6 +2044,7 @@ void Render3DNode::CookIfNeeded(int frameId)
    bool shadowsActive = false;
    if (shadowsEnabled && lightTypes[0] != 1 && EnsureShadowShader())
    {
+      GLUtil::DebugScope shadowGroup("Render 3D: shadow"); // Turbo 0.70 (F3)
       const int wantSize = kShadowSizes[std::max(0, std::min(shadowQuality, 2))];
       float sceneLo[3], sceneHi[3];
       if (EnsureShadowResources(wantSize) && SceneBounds(sceneLo, sceneHi))
@@ -1953,6 +2116,45 @@ void Render3DNode::CookIfNeeded(int frameId)
                                    mGpu[i].instanceAttribsOn;
             glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uModel"), 1, GL_FALSE, model.m);
             glUniform1i(glGetUniformLocation(mShadowProgram, "uInstanced"), instanced ? 1 : 0);
+            // Turbo 0.70 (R1): with `lod pixels` on, the many-copies slots cast
+            // only the copies inside the light's view that cover at least that
+            // many shadow-map texels; a smaller one's shadow is under a texel
+            // or two. Same GPU sort as the main pass, no readback.
+            bool shadowCulled = false;
+            GpuMesh& sg = mGpu[i];
+            if (instanced && lodPixels > 0.0f && sg.hasMeshBounds && cullMode != 2 &&
+                (sg.instanceCount >= kCullMinInstances || cullMode == 1) && Render3DCull::Available())
+            {
+               Render3DCull::Request req;
+               std::copy(std::begin(sg.instStreams), std::end(sg.instStreams), std::begin(req.streams));
+               float half[3];
+               for (int k = 0; k < 3; k++)
+               {
+                  half[k] = 0.5f * (sg.meshHi[k] - sg.meshLo[k]);
+                  req.localSphere[k] = 0.5f * (sg.meshLo[k] + sg.meshHi[k]);
+               }
+               req.localSphere[3] = std::sqrt(half[0] * half[0] + half[1] * half[1] + half[2] * half[2]);
+               req.count = sg.instanceCount;
+               req.viewProj = mLightViewProj;
+               Render3DCull::FrustumPlanes(mLightViewProj, req.planes);
+               // Orthographic: w = 1, so this turns world size into texels.
+               req.projScaleY = lightProj.m[5] * (float)mShadowSize * 0.5f;
+               req.lodPixels = lodPixels;
+               req.indexCount = sg.indexCount;
+               if (!sg.shadowCull)
+                  sg.shadowCull = std::make_shared<Render3DCull>();
+               const bool sorted = sg.shadowCull->Run(req);
+               glUseProgram(mShadowProgram); // Run leaves no program bound
+               if (sorted)
+               {
+                  sg.shadowCull->Bind(0);
+                  sg.shadowCull->Draw(0, GL_TRIANGLES);
+                  sg.shadowCull->Restore();
+                  shadowCulled = true;
+               }
+            }
+            if (shadowCulled)
+               continue;
             if (instanced)
                glDrawElementsInstanced(GL_TRIANGLES, mGpu[i].indexCount, GL_UNSIGNED_INT,
                                        nullptr, (GLsizei)mGpu[i].instanceCount);
@@ -2032,6 +2234,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             }
             g.instCount = pts.pointCount;
             g.instColorBuf = gpuOf(pts, pop::attr::Color, g.instColorComps);
+            g.partIdBuf = gpuOf(pts, pop::attr::PartId, g.partIdComps); // Turbo 0.70 (X1): particles' motion
             return true;
          };
          for (IGeometrySource* src : mDraw)
@@ -2060,6 +2263,7 @@ void Render3DNode::CookIfNeeded(int frameId)
                   g.radiusBuf = gpuOf(*pd, pop::attr::PScale, rc);
                   g.radiusScale = baseSize * (g.radiusBuf != 0 ? 1.0f : 0.02f);
                   g.colorBuf = gpuOf(*pd, pop::attr::Color, g.colorComps);
+                  g.partIdBuf = gpuOf(*pd, pop::attr::PartId, g.partIdComps); // Turbo 0.70 (X1)
                   g.pointCount = pd->pointCount;
                   g.key = keyOf(src, pd->revision);
                }
@@ -2110,6 +2314,32 @@ void Render3DNode::CookIfNeeded(int frameId)
                if (inst != nullptr && inst->pointCount > 0 &&
                    !popInstances(*inst, g.model, inst->instanceScale, inst->instanceAlign, g))
                   continue;
+               // Turbo 0.70: Instance PointZ's per-copy textures, by the raster's
+               // rules: the pins replace the material texture; the atlas grid
+               // cuts the first pin, or the material texture without one.
+               if (inst != nullptr && inst->pointCount > 0 && inst->instanceLook.texMode != 0)
+               {
+                  const pop::PopData::InstanceLook& look = inst->instanceLook;
+                  g.instTexMode = look.texMode;
+                  g.instTexFrom = look.texFrom;
+                  g.atlasCols = look.atlasCols;
+                  g.atlasRows = look.atlasRows;
+                  g.instTexCount = std::min(look.texCount, 4);
+                  for (int k = 0; k < g.instTexCount; k++)
+                     g.instTex[k] = look.tex[k];
+                  if (g.instTexCount == 0)
+                  {
+                     if (look.texMode == 2 && g.surfaceTex != 0)
+                     {
+                        g.instTex[0] = g.surfaceTex;
+                        g.instTexCount = 1;
+                     }
+                     else
+                        g.instTexMode = 0;
+                  }
+                  if (g.instTexMode != 0 && look.texFrom == 0)
+                     g.instTexIdxBuf = gpuOf(*inst, pop::attr::TexIndex, g.instTexIdxComps);
+               }
                geo.push_back(std::move(g));
                continue;
             }
@@ -2155,6 +2385,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             env.ground[k] = envGround[k];
             env.ambient[k] = ambientColor[k];
          }
+         env.rim = rimIntensity; // Turbo 0.70: raster parity
          mRtx->SetScene(geo, lights, env);
          RtxBackend::Frame f;
          f.width = w;
@@ -2168,9 +2399,20 @@ void Render3DNode::CookIfNeeded(int frameId)
          f.domeTilt = domeTilt;
          f.bounces = ptBounces;
          f.maxSamples = std::max(1, ptSamples);
+         // Turbo 0.70: samples per frame fitted to ~5 ms of tracing
+         // (INFINITE_RTX_BUDGET_MS overrides; 0 = one per frame, as before).
+         static const float sRtxBudgetMs = []
+         {
+            const char* e = std::getenv("INFINITE_RTX_BUDGET_MS");
+            return e != nullptr ? std::max(0.0f, (float)std::atof(e)) : 5.0f;
+         }();
+         f.traceBudgetMs = sRtxBudgetMs;
          f.restart = sceneChanged;
          f.exposure = exposure;
          f.denoise = rtxDenoise;
+         // Turbo 0.70: motion blur, and OptiX's 2x model in place of FSR when
+         // the AI denoiser is chosen at render scale 2x.
+         f.upscale2x = rtxDenoise == 1 && upRatio == 2.0f;
          traced = mRtx->Render(f);
          mRtxKeep.clear();
          if (traced == 0 && !mRtx->Error().empty())
@@ -2180,12 +2422,20 @@ void Render3DNode::CookIfNeeded(int frameId)
       }
       if (traced != 0)
       {
+         // Turbo 0.70: the 2x model's image is already twice the trace.
+         const int rs = mRtx->OutputScale();
+         const int fw = w * rs, fh = h * rs;
          if (envAsBackground && hasEnvMap)
-            mPostOut = mPost.FinishCoverage(traced, w, h, tonemap, bloom, bloomThreshold, bloomRadius, bgColor,
+            mPostOut = mPost.FinishCoverage(traced, fw, fh, tonemap, bloom, bloomThreshold, bloomRadius, bgColor,
                                             bgOpacity, true);
          else
-            mPostOut = mPost.FinishCoverage(traced, w, h, tonemap, bloom, bloomThreshold, bloomRadius, bgColor,
+            mPostOut = mPost.FinishCoverage(traced, fw, fh, tonemap, bloom, bloomThreshold, bloomRadius, bgColor,
                                             bgOpacity);
+         // Turbo 0.70 (R5, X4): traced at the internal size, FSR to the output
+         // (after the 2x model, only the rounding left, if any).
+         if ((fw != outW || fh != outH) && mPostOut != 0)
+            if (unsigned int up = mTemporal.Upscale(mPostOut, fw, fh, outW, outH, (1.0f - sharpness) * 2.0f))
+               mPostOut = up;
          if (!prevDepth) glDisable(GL_DEPTH_TEST);
          if (!prevCull) glDisable(GL_CULL_FACE);
          if (!prevBlend) glDisable(GL_BLEND);
@@ -2282,6 +2532,13 @@ void Render3DNode::CookIfNeeded(int frameId)
 
    glUniformMatrix4fv(glGetUniformLocation(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
    glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, view.m);
+   // Turbo 0.70 (R1): the frustum the instanced slots are culled against.
+   // INFINITE_R3D_CULL=force culls every instanced slot (CULLTEST), =off none.
+   float cullPlanes[6][4];
+   Render3DCull::FrustumPlanes(viewProj, cullPlanes);
+   mLastCulledSlots = 0;
+   mCookSerial++;
+   glUniform1i(glGetUniformLocation(mProgram, "uInstanceRemap"), 0);
    glUniform3fv(glGetUniformLocation(mProgram, "uCamRight"), 1, camRight);
    glUniform3fv(glGetUniformLocation(mProgram, "uCamUp"), 1, camUp);
    glUniform1i(glGetUniformLocation(mProgram, "uSpriteShape"), spriteShape);
@@ -2328,6 +2585,11 @@ void Render3DNode::CookIfNeeded(int frameId)
    // equirect base is 2^maxLod wide (maxLod = floor(log2(max(w, h)))).
    const int envW = (int)std::exp2(envMaxLod);
    const bool ibl = hasEnvMap && mPost.EnsureIbl(envTex, envW, std::max(1, envW / 2), envMaxLod, envRevision);
+   // Turbo 0.70: a rebuild runs the prefilter passes and leaves no program
+   // bound - every uniform after this, for the whole frame, was dropped
+   // (GL_INVALID_OPERATION, found with INFINITE_GLDEBUG=sync) on the frame
+   // a patch loads or the HDRI changes.
+   glUseProgram(mProgram);
    glUniform1i(glGetUniformLocation(mProgram, "uHasIbl"), ibl ? 1 : 0);
    if (ibl)
    {
@@ -2701,6 +2963,7 @@ void Render3DNode::CookIfNeeded(int frameId)
          }
          gpu.vertexCount = popData->pointCount;
          gpu.hasBounds = PopSlotBounds(gpu, *popData, gpu.lo, gpu.hi);
+         gpu.hasMeshBounds = false; // Turbo 0.70 (R1): asked for again when culling
          gpu.meshRevision = revision;
          mLastUploads++;
       }
@@ -2759,6 +3022,8 @@ void Render3DNode::CookIfNeeded(int frameId)
             }
          }
          gpu.hasBounds = gpu.lo[0] <= gpu.hi[0];
+         for (int k = 0; k < 3; k++) { gpu.meshLo[k] = gpu.lo[k]; gpu.meshHi[k] = gpu.hi[k]; }
+         gpu.hasMeshBounds = gpu.hasBounds;
 
          gpu.meshRevision = revision;
          gpu.indexCount = (int)mesh.indices.size();
@@ -2893,6 +3158,8 @@ void Render3DNode::CookIfNeeded(int frameId)
             std::vector<pop::BufferPtr> cols;
             std::string err;
             gpu.popInstKeep.clear();
+            for (Render3DCull::Stream& st : gpu.instStreams)
+               st = Render3DCull::Stream();
             if (pop::InstanceMatrices(*popInst, groupMatrix.m, popInst->instanceScale, popInst->instanceAlign, cols, err) &&
                 cols.size() == 4)
             {
@@ -2903,11 +3170,24 @@ void Render3DNode::CookIfNeeded(int frameId)
                   glEnableVertexAttribArray(3 + col);
                   glVertexAttribPointer(3 + col, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
                   glVertexAttribDivisor(3 + col, 1);
+                  gpu.instStreams[Render3DCull::kCol0 + col] = { cols[(size_t)col]->Gpu(), 4, 4, 0 };
                }
                BindPopAttrib(9, *popInst, pop::attr::TexIndex, 1, gpu.popInstKeep, true);
+               gpu.instStreams[Render3DCull::kTexIndex] = KeptStream(gpu.popInstKeep, 1);
+               gpu.partIdBuf = 0; // Turbo 0.70: the motion blur's by-id lookup
+               if (const pop::PopAttrib* id = popInst->Find(pop::attr::PartId))
+                  if (id->buffer && id->buffer->Count() >= popInst->pointCount)
+                  {
+                     gpu.popInstKeep.push_back(id->buffer);
+                     gpu.partIdBuf = id->buffer->Gpu();
+                     gpu.partIdComps = id->buffer->Comps();
+                  }
                gpu.instanceColored = popInst->Has(pop::attr::Color);
                if (gpu.instanceColored)
+               {
                   BindPopAttrib(7, *popInst, pop::attr::Color, 3, gpu.popInstKeep, true);
+                  gpu.instStreams[Render3DCull::kColor] = KeptStream(gpu.popInstKeep, 3);
+               }
                else
                {
                   glDisableVertexAttribArray(7);
@@ -2957,6 +3237,8 @@ void Render3DNode::CookIfNeeded(int frameId)
             glBufferData(GL_ARRAY_BUFFER, uploadXforms->size() * sizeof(Mat4), uploadXforms->data(),
                          GL_STATIC_DRAW);
             // a mat4 attribute is four consecutive vec4 slots
+            for (Render3DCull::Stream& st : gpu.instStreams)
+               st = Render3DCull::Stream();
             for (int col = 0; col < 4; col++)
             {
                const unsigned int loc = 3 + col;
@@ -2964,6 +3246,7 @@ void Render3DNode::CookIfNeeded(int frameId)
                glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(Mat4),
                                      (void*)(size_t)(col * 4 * sizeof(float)));
                glVertexAttribDivisor(loc, 1);
+               gpu.instStreams[Render3DCull::kCol0 + col] = { gpu.instanceVbo, 4, 16, col * 4 };
             }
             // Per-instance colours travel in their own buffer rather than being
             // packed into the transform, so the common case - instances sharing
@@ -2979,6 +3262,7 @@ void Render3DNode::CookIfNeeded(int frameId)
                glEnableVertexAttribArray(7);
                glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
                glVertexAttribDivisor(7, 1);
+               gpu.instStreams[Render3DCull::kColor] = { gpu.instanceColorVbo, 3, 3, 0 };
             }
             else
             {
@@ -3052,8 +3336,84 @@ void Render3DNode::CookIfNeeded(int frameId)
       }
       else if (instanced)
       {
-         glDrawElementsInstanced(gpu.primMode, gpu.indexCount, GL_UNSIGNED_INT,
-                                 nullptr, (GLsizei)gpu.instanceCount);
+         // Turbo 0.70 (R1): many copies, some of them off screen or (with
+         // `lodPixels`) tiny - sorted on the GPU, drawn by indirect draws. The
+         // shadow pass above sorts them against the light only with `lodPixels`.
+         bool culled = false;
+         if (gpu.primMode == GL_TRIANGLES && cullMode != 2 &&
+             (gpu.instanceCount >= kCullMinInstances || cullMode == 1) && Render3DCull::Available())
+         {
+            if (popData != nullptr && !gpu.hasMeshBounds)
+            {
+               if (!gpu.popMeshBounds)
+                  gpu.popMeshBounds = std::make_shared<pop::AsyncBounds>();
+               gpu.hasMeshBounds = popData->BoundsAsync(*static_cast<pop::AsyncBounds*>(gpu.popMeshBounds.get()),
+                                                        gpu.meshLo, gpu.meshHi);
+            }
+            // lo / hi are the copies' world box only for an Instance PointZ.
+            // Without LOD the sort pays only when a good share of the copies is
+            // off screen: 305k cubes with a sliver outside cost 0.7 ms a frame
+            // more than drawing them all.
+            const bool allOnScreen = popInstanced && gpu.hasBounds &&
+                                     Render3DCull::InsideFraction(cullPlanes, gpu.lo, gpu.hi) > 0.75f;
+            if (gpu.hasMeshBounds && (lodPixels > 0.0f || !allOnScreen || cullMode == 1))
+            {
+               Render3DCull::Request req;
+               std::copy(std::begin(gpu.instStreams), std::end(gpu.instStreams), std::begin(req.streams));
+               float half[3];
+               for (int k = 0; k < 3; k++)
+               {
+                  half[k] = 0.5f * (gpu.meshHi[k] - gpu.meshLo[k]);
+                  req.localSphere[k] = 0.5f * (gpu.meshLo[k] + gpu.meshHi[k]);
+               }
+               req.localSphere[3] = std::sqrt(half[0] * half[0] + half[1] * half[1] + half[2] * half[2]);               req.count = gpu.instanceCount;
+               req.viewProj = viewProj;
+               std::memcpy(req.planes, cullPlanes, sizeof(cullPlanes));
+               req.projScaleY = proj.m[5] * (float)h * 0.5f;
+               req.lodPixels = std::max(0.0f, lodPixels);
+               req.indexCount = gpu.indexCount;
+               if (!gpu.cull)
+                  gpu.cull = std::make_shared<Render3DCull>();
+               const bool sorted = gpu.cull->Run(req);
+               glUseProgram(mProgram);
+               if (sorted)
+               {
+                  const GLint remapLoc = glGetUniformLocation(mProgram, "uInstanceRemap");
+                  glUniform1i(remapLoc, 1);
+                  gpu.cull->Bind(0);
+                  gpu.cull->Draw(0, GL_TRIANGLES);
+                  gpu.cull->Restore();
+                  if (req.lodPixels > 0.0f)
+                  {
+                     // The small copies: one quad each, the size of the mesh's box.
+                     glBindVertexArray(gpu.cull->QuadVao());
+                     gpu.cull->Bind(1);
+                     glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 2);
+                     glUniform3fv(glGetUniformLocation(mProgram, "uLodCentre"), 1, req.localSphere);
+                     glUniform3fv(glGetUniformLocation(mProgram, "uLodHalf"), 1, half);
+                     glUniform1i(glGetUniformLocation(mProgram, "uHasVertexColor"), 0);
+                     gpu.cull->Draw(1, GL_TRIANGLES);
+                     glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 0);
+                     glBindVertexArray(gpu.vao);
+                     mLastDrawCalls++;
+                  }
+                  glUniform1i(remapLoc, 0);
+                  culled = true;
+                  mLastCulledSlots++;
+                  gpu.cullCook = mCookSerial;
+                  gpu.cullLod = req.lodPixels > 0.0f;
+                  for (int k = 0; k < 3; k++)
+                  {
+                     gpu.lodCentre[k] = req.localSphere[k];
+                     gpu.lodHalf[k] = half[k];
+                  }
+               }
+            }
+         }
+         if (!culled)
+            glDrawElementsInstanced(gpu.primMode, gpu.indexCount, GL_UNSIGNED_INT,
+                                    nullptr, (GLsizei)gpu.instanceCount);
+         // Culled: the count before culling (the drawn one stays on the GPU).
          if (gpu.primMode == GL_TRIANGLES)
             mLastTriangles += (size_t)(gpu.indexCount / 3) * (size_t)gpu.instanceCount;
       }
@@ -3133,6 +3493,11 @@ void Render3DNode::CookIfNeeded(int frameId)
       // farther one that should show through it.
       if (isTranslucentMesh(s))
          continue;
+      // Turbo 0.70: GPUPROF / captures, one group per slot (R1 measures them).
+      static const char* const kSlotGroups[] = { "Render 3D: opaque slot 0", "Render 3D: opaque slot 1",
+                                                 "Render 3D: opaque slot 2", "Render 3D: opaque slot 3",
+                                                 "Render 3D: opaque slot 4+" };
+      GLUtil::DebugScope slotGroup(kSlotGroups[std::min(i, 4)]);
       drawSlot(i);
    }
 
@@ -3254,17 +3619,141 @@ void Render3DNode::CookIfNeeded(int frameId)
       glBindFramebuffer(GL_READ_FRAMEBUFFER, mMsFbo);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
       glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-      if (mDepthWanted || bgKey)
+      if (mDepthWanted || bgKey || taaOn)
          glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
-   mDepthResolved = !multisampling || mDepthWanted || bgKey;
+   mDepthResolved = !multisampling || mDepthWanted || bgKey || taaOn;
+
+   // Turbo 0.70: the velocity pass - each opaque mesh again into a velocity
+   // target, with its copies' matrices last frame (by PartId or index), the
+   // culled slots through the same lists and LOD quads. For the TAA (moving
+   // surfaces keep their history) and for a Render 3D FX that asked
+   // (RequestVelocity). Only while something moves.
+   bool velocityReady = false;
+   const bool velocityAsked = mVelocityAsked > 0;
+   if (mVelocityAsked > 0)
+      mVelocityAsked--;
+   const bool motionBlurOn = (velocityAsked || taaOn) && renderPass == 0 && m360Face < 0 && sceneChanged;
+   const Mat4 mbPrevViewProj = mMbPrevViewProj;
+   if (motionBlurOn && mMbHavePrev)
+   {
+      GLUtil::DebugScope mbGroup("Render 3D: velocity");
+      if (mMotionSlots.size() < mGpu.size())
+         mMotionSlots.resize(mGpu.size());
+      // Last frame's matrices for every Instance PointZ slot (compute, before the pass).
+      for (int i = 0; i < (int)mDraw.size() && i < (int)mGpu.size(); i++)
+      {
+         IGeometrySource* s = mDraw[i];
+         GpuMesh& gpu = mGpu[i];
+         Render3DMotion::Slot& ms = mMotionSlots[(size_t)i];
+         if (ms.source != (const void*)s)
+         {
+            ms.lastCount = -1;
+            ms.havePrevModel = false;
+            ms.source = s;
+         }
+         if (s != nullptr && !IsSpriteSource(s) && gpu.popInstanced && gpu.instanceCount > 0)
+            mMotion.PrevInstances(ms, (unsigned int)i + 1u, gpu.instStreams, gpu.partIdBuf, gpu.partIdComps,
+                                  gpu.instanceCount);
+      }
+      if (mMotion.BeginVelocity(w, h, viewProjPlain, mbPrevViewProj, camRight, camUp))
+      {
+         for (int i = 0; i < (int)mDraw.size() && i < (int)mGpu.size(); i++)
+         {
+            IGeometrySource* s = mDraw[i];
+            GpuMesh& gpu = mGpu[i];
+            Render3DMotion::Slot& ms = mMotionSlots[(size_t)i];
+            if (s == nullptr || IsSpriteSource(s) || gpu.vao == 0 || gpu.indexCount == 0 ||
+                gpu.primMode != GL_TRIANGLES || isTranslucentMesh(s))
+               continue;
+            const bool instanced = gpu.instanceAttribsOn && gpu.instanceCount > 0;
+            const Mat4 model = s->GetModelMatrix();
+            const Mat4 prevModel = ms.havePrevModel ? ms.prevModel : model;
+            const unsigned int prevMat = instanced && gpu.popInstanced ? ms.prevMat : 0u;
+            if (instanced && gpu.cull && gpu.cullCook == mCookSerial)
+            {
+               // The copies the opaque pass drew, as it drew them.
+               glBindVertexArray(gpu.vao);
+               gpu.cull->Bind(0);
+               mMotion.SetVelocityDraw(true, prevMat, true, false, nullptr, nullptr, model, prevModel);
+               gpu.cull->Draw(0, GL_TRIANGLES);
+               gpu.cull->Restore();
+               if (gpu.cullLod)
+               {
+                  glBindVertexArray(gpu.cull->QuadVao());
+                  gpu.cull->Bind(1);
+                  mMotion.SetVelocityDraw(true, prevMat, true, true, gpu.lodCentre, gpu.lodHalf, model, prevModel);
+                  gpu.cull->Draw(1, GL_TRIANGLES);
+               }
+               continue;
+            }
+            mMotion.DrawVelocity(gpu.vao, GL_TRIANGLES, gpu.indexCount, gpu.instanceCount, instanced, prevMat, model,
+                                 prevModel);
+         }
+         mMotion.EndVelocity();
+         velocityReady = true;
+      }
+   }
+   mVelocityReady = velocityReady;
+   if (velocityReady)
+   {
+      mVelocityPrevViewProj = mbPrevViewProj;
+      mVelocityViewProj = viewProjPlain;
+   }
+   // This frame's camera and placements are next frame's "last".
+   if (motionBlurOn)
+   {
+      if (mMotionSlots.size() < mGpu.size())
+         mMotionSlots.resize(mGpu.size());
+      for (int i = 0; i < (int)mDraw.size() && i < (int)mMotionSlots.size(); i++)
+         if (IGeometrySource* s = mDraw[i])
+         {
+            // Turbo 0.70: the source too (with the same reset the velocity
+            // pass does on a change): that pass resets a slot whose source
+            // differs, which threw away the placement recorded here and gave
+            // the first moving frame no motion.
+            Render3DMotion::Slot& ms = mMotionSlots[(size_t)i];
+            if (ms.source != (const void*)s)
+            {
+               ms.lastCount = -1;
+               ms.source = s;
+            }
+            ms.prevModel = s->GetModelMatrix();
+            ms.havePrevModel = true;
+         }
+      mMbPrevViewProj = viewProjPlain;
+   }
+   mMbHavePrev = motionBlurOn;
+
+   // Turbo 0.70 (MV, R4): camera motion vectors from the depth, then the
+   // jittered frame blended into the TAA history, still in linear HDR.
+   unsigned int sceneTex = mColorTex;
+   if (taaOn)
+   {
+      // Turbo 0.70: with the velocity pass, moving copies keep their history
+      // (camera-only motion smeared everything that moved on its own).
+      mTemporal.MotionVectors(mDepthBuffer, w, h, viewProj, viewProjPlain, jitterX, jitterY,
+                              velocityReady ? mMotion.VelocityTexture() : 0u);
+      if (unsigned int resolved = mTemporal.ResolveTaa(mColorTex, mDepthBuffer, w, h))
+         sceneTex = resolved;
+   }
 
    // Turbo 0.61: HDR finish - bloom, tonemap, sRGB. The plain background
    // colour stays exactly what it was (keyed by depth); data passes are copied.
-   mPostOut = mPost.Finish(mColorTex, w, h, tonemap, bloom, bloomThreshold, bloomRadius, renderPass != 0,
-                           bgKey ? mDepthBuffer : 0, bgColor);
+   if (taaOn && bgKey && sceneTex != mColorTex)
+      mPostOut = mPost.FinishTaa(sceneTex, mTemporal.CoverageTexture(), w, h, tonemap, bloom, bloomThreshold,
+                                 bloomRadius, bgColor, bgOpacity);
+   else
+      mPostOut = mPost.Finish(sceneTex, w, h, tonemap, bloom, bloomThreshold, bloomRadius, renderPass != 0,
+                              bgKey ? mDepthBuffer : 0, bgColor);
+   // Turbo 0.70 (R5): FSR 1 from the internal size to the output size, on the
+   // tonemapped image (what EASU is made for). Sharpness 1 = RCAS at full
+   // strength (0 stops), 0 = 2 stops softer.
+   if (upRatio > 1.0f && mPostOut != 0)
+      if (unsigned int up = mTemporal.Upscale(mPostOut, w, h, outW, outH, (1.0f - sharpness) * 2.0f))
+         mPostOut = up;
 
    // --- restore, or every 2D node after this draws wrongly ------------
    if (!prevDepth) glDisable(GL_DEPTH_TEST);

@@ -21,6 +21,10 @@ Usage (from the repo root, or via test-windows.bat):
                            AUDIOTEARDOWNSWEEPTEST, DELETECRASHTEST
      -ShotOnly             build + screenshot only
      -TimeoutSec 180       per-check timeout (a hung check is killed and reported [HANG])
+     -Perf                 also run perf.ps1 (perf corpus vs perf-baseline.json, > 10% fails)
+     -PerfOnly             build (unless -SkipBuild) + perf.ps1 only
+     -Mit                  build and test the MIT edition (build\windows-vs2022-mit)
+     -Compat               also run compat.ps1 (patch corpus vs reference, ok -> crash/hang fails)
 Exit code: 0 when everything passed, 1 otherwise.
 #>
 param(
@@ -30,6 +34,11 @@ param(
    [switch]$Quick,
    [switch]$ShotOnly,
    [int]$TimeoutSec = 180,
+   [switch]$Perf,
+   [switch]$PerfOnly,
+   [switch]$Compat,
+   # MIT edition (INFINITE_ENABLE_GPL=OFF, no RTX module) in build\windows-vs2022-mit.
+   [switch]$Mit,
    # Run the suite against another build (e.g. dist\Infinite-Turbo-Windows-x64\Infinite-Turbo.exe)
    # to tell a regression from an old failure. Implies -SkipBuild.
    [string]$Exe
@@ -38,12 +47,14 @@ param(
 $ErrorActionPreference = 'Continue'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 Set-Location $root
-$bin = Join-Path $root "build\windows-vs2022\$Config\Infinite-Turbo.exe"
+$buildDir = if ($Mit) { 'build\windows-vs2022-mit' } else { 'build\windows-vs2022' }
+$bin = Join-Path $root "$buildDir\$Config\Infinite-Turbo.exe"
 if ($Exe) { $bin = (Resolve-Path $Exe).Path; $SkipBuild = $true }
-$out = Join-Path $root 'build\test-results'
+$out = Join-Path $root $(if ($Mit) { 'build\test-results-mit' } else { 'build\test-results' })
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 Get-ChildItem -LiteralPath $out -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 $summary = Join-Path $out 'summary.txt'
+$outRel = $out.Substring($root.Length + 1) # for messages: build\test-results or build\test-results-mit
 
 function Say([string]$text) { Write-Host $text; Add-Content -LiteralPath $summary -Value $text -Encoding UTF8 }
 
@@ -57,9 +68,9 @@ $tests = @(
    'MESHOPTEST:30','TEXT3DTEST:30','PATHOCEANTEST:35','SHADOWTEST:35','MATFRAMETEST:35',
    'MAPTEST:35','PADPATHTEST:35','BUGTEST:35','FIXTEST:35','3DTEST:35',
    'TRANSFORMSWEEPTEST:10','MAPPINGSWEEPTEST:10','REVISIONSWEEPTEST:10','ENVTEST:14',
-   'TOPPARITYTEST:10','PORTEDTEST:14','RTXTEST:45','PANORAMATEST:45','COLLECTMEDIATEST:1',
+   'TOPPARITYTEST:10','PORTEDTEST:14','RTXTEST:45','PANORAMATEST:45','TAATEST:45','RTXTEXTEST:35','R3DFXTEST:30','LINKDELTEST:12','CULLTEST:10','COLLECTMEDIATEST:1',
    'PHASEATEST:35','PHASECTEST:35','PHASEDTEST:35','PHASEETEST:35','PHASEFTEST:35',
-   'WRAPTEST:35','GEOWAVEUTEST:10','POPTEST:10','LIVETEST:35','PHASE1TEST:35','DELETECRASHTEST:8','AUDIOGRAPHTEST:8',
+   'WRAPTEST:35','GEOWAVEUTEST:10','POPTEST:10','POPEQUIVTEST:10','POPTFTEST:10','FOREIGNKEYTEST:10','GPUALGOTEST:6','PARTICLEGPUTEST:6','LIVETEST:35','PHASE1TEST:35','DELETECRASHTEST:8','AUDIOGRAPHTEST:8',
    'DRAGTEST:35','WTDRAGTEST:35','AUDIOPARAMSWEEPTEST:1','AUDIOTEARDOWNSWEEPTEST:10',
    'AUDIOPDCTEST:1','VOICEMODTEST:1','MOVELOGTEST:1','MOVESTATSTEST:1','AUDIOLIFECYCLETEST:8','AUDIORECOVERYTEST:8',
    'SAMPLERDRAGTEST:600','MEDIADRAGTEST:600','PLUGINDRAGTEST:600'
@@ -77,18 +88,33 @@ if ($Only) {
    $tests = $wanted | ForEach-Object { if ($known.ContainsKey($_)) { $known[$_] } else { "${_}:60" } }
 }
 
-Say ("Infinite-Turbo self-tests  {0:yyyy-MM-dd HH:mm}  config={1}" -f (Get-Date), $Config)
+Say ("Infinite-Turbo self-tests  {0:yyyy-MM-dd HH:mm}  config={1}  edition={2}" -f (Get-Date), $Config, $(if ($Mit) { 'MIT' } else { 'full' }))
 
 # ---------------------------------------------------------------- build
 if (-not $SkipBuild) {
    Say '== Build'
    $buildArgs = @('nopack')
    if ($Config -eq 'Debug') { $buildArgs += 'debug' }
+   if ($Mit) { $buildArgs += 'mit' }
    & "$root\build-windows.bat" @buildArgs 2>&1 |
       Tee-Object -FilePath (Join-Path $out 'build.log') | Out-Host
-   if ($LASTEXITCODE -ne 0) { Say 'BUILD FAILED - see build\test-results\build.log'; exit 1 }
+   if ($LASTEXITCODE -ne 0) { Say "BUILD FAILED - see $outRel\build.log"; exit 1 }
 }
 if (-not (Test-Path -LiteralPath $bin)) { Say "binary not found: $bin"; exit 1 }
+
+# Perf regression run (F1): build\perf\report.txt, exit 1 on regression.
+function Invoke-Perf {
+   Say '== Perf (perf.ps1, details in build\perf\report.txt)'
+   # A/B against the frozen reference build when there is one (build\perf-ref, see SKILL.md).
+   $refExe = Join-Path $root 'build\perf-ref\Infinite-Turbo.exe'
+   $perfArgs = @('-Exe', $bin)
+   if (Test-Path -LiteralPath $refExe) { $perfArgs += @('-RefExe', $refExe) }
+   & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'perf.ps1') @perfArgs | Out-Host
+   $ok = $LASTEXITCODE -eq 0
+   Say ("  [{0}]  PERF" -f $(if ($ok) { 'pass' } else { 'FAIL' }))
+   return $ok
+}
+if ($PerfOnly) { exit ($(if (Invoke-Perf) { 0 } else { 1 })) }
 
 function Invoke-Check([string]$name, [hashtable]$vars, [string]$log) {
    foreach ($k in $vars.Keys) { Set-Item -Path "Env:$k" -Value $vars[$k] }
@@ -112,11 +138,28 @@ $fail = 0; $pass = 0; $failed = @()
 Say '== Visual smoke (screenshot)'
 $shot = Join-Path $out 'screenshot.png'
 $rc = Invoke-Check 'SCREENSHOT' @{ IMAGERESYNTH_SCREENSHOT = $shot; INFINITE_SHOWCASE = '1' } (Join-Path $out 'SCREENSHOT.log')
-if (Test-Path -LiteralPath $shot) { Say "  [pass]  SCREENSHOT  -> build\test-results\screenshot.png" ; $pass++ }
+if (Test-Path -LiteralPath $shot) { Say "  [pass]  SCREENSHOT  -> $outRel\screenshot.png" ; $pass++ }
 else { Say "  [FAIL]  SCREENSHOT (exit $rc)"; $fail++; $failed += 'SCREENSHOT' }
 if ($ShotOnly) { exit ($(if ($fail) { 1 } else { 0 })) }
 
 # ---------------------------------------------------------------- suite
+# Unit tests (A7, doctest): no window, no GL - built here because the target is
+# not part of the normal build. Skipped for a foreign -Exe (no build dir to use).
+if (-not $Exe) {
+   Say '== Unit tests (InfiniteUnitTests, doctest)'
+   $cache = Join-Path $root "$buildDir\CMakeCache.txt"
+   $cmakeExe = if (Test-Path -LiteralPath $cache) { (Get-Content -LiteralPath $cache | Select-String '^CMAKE_COMMAND:INTERNAL=(.*)').Matches[0].Groups[1].Value } else { $null }
+   $unitLog = Join-Path $out 'UNITTEST.log'
+   if ($cmakeExe) {
+      & $cmakeExe --build (Join-Path $root $buildDir) --config $Config --target InfiniteUnitTests *> $unitLog
+      $unitExe = Join-Path $root "$buildDir\$Config\InfiniteUnitTests.exe"
+      if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $unitExe)) { & $unitExe *>> $unitLog }
+      $summaryLine = Get-Content -LiteralPath $unitLog | Where-Object { $_ -match 'test cases:' } | Select-Object -Last 1
+      if ($LASTEXITCODE -eq 0) { Say "  [pass]  UNITTEST  - $summaryLine"; $pass++ }
+      else { Say "  [FAIL]  UNITTEST  - see $outRel\UNITTEST.log"; $fail++; $failed += 'UNITTEST' }
+   } else { Say "  [FAIL]  UNITTEST  - no CMake cache in $buildDir"; $fail++; $failed += 'UNITTEST' }
+}
+
 Say ("== Self-test suite ({0} checks)" -f $tests.Count)
 foreach ($spec in $tests) {
    $name, $frames = $spec.Split(':')
@@ -124,17 +167,17 @@ foreach ($spec in $tests) {
    $rc = Invoke-Check $name @{ ("INFINITE_$name") = '1'; INFINITE_EXITAFTER = $frames } $log
    $text = if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -ErrorAction SilentlyContinue } else { @() }
    if ($rc -eq 'HANG') {
-      Say "  [HANG]  $name - killed after ${TimeoutSec}s, see build\test-results\$name.log"
+      Say "  [HANG]  $name - killed after ${TimeoutSec}s, see $outRel\$name.log"
       $fail++; $failed += "$name (hang)"; continue
    }
    if ($rc -ne 0) {
-      Say ("  [CRASH] {0} - exit code {1} (0x{2:X8}), see build\test-results\{0}.log" -f $name, $rc, ([int64]$rc -band 0xffffffff))
+      Say ("  [CRASH] {0} - exit code {1} (0x{2:X8}), see $outRel\{0}.log" -f $name, $rc, ([int64]$rc -band 0xffffffff))
       $fail++; $failed += "$name (crash)"; continue
    }
    # Case-sensitive: "0 failed" in a summary line is not a failure.
    $bad = $text | Where-Object { $_ -cmatch 'FAIL' -or $_ -cmatch 'BUG$' }
    if ($bad) {
-      Say "  [FAIL]  $name - see build\test-results\$name.log"
+      Say "  [FAIL]  $name - see $outRel\$name.log"
       $bad | Select-Object -First 12 | ForEach-Object { Say "          $_" }
       $fail++; $failed += $name
    } elseif (-not $text) {
@@ -145,6 +188,15 @@ foreach ($spec in $tests) {
       Say ("  [pass]  {0}  {1}" -f $name, $(if ($verdict) { "- $verdict" } else { '' }))
       $pass++
    }
+}
+
+if ($Perf) {
+   if (Invoke-Perf) { $pass++ } else { $fail++; $failed += 'PERF' }
+}
+if ($Compat) {
+   Say '== Patch compatibility (compat.ps1, details in build\compat\report.md)'
+   & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'compat.ps1') -Exe $bin | Out-Host
+   if ($LASTEXITCODE -eq 0) { Say '  [pass]  COMPAT'; $pass++ } else { Say '  [FAIL]  COMPAT'; $fail++; $failed += 'COMPAT' }
 }
 
 Say '== Summary'

@@ -238,6 +238,8 @@ float remap(float x, float a, float b, float c, float d) { return c + (x - a) * 
 
    const char* KernelPreamble() { return kPreamble; }
 
+   std::string KernelDefaultLiteral(const std::string& name, int comps) { return DefaultLiteral(name, comps); }
+
    const char* GlslType(int comps)
    {
       static const char* k[] = { "float", "float", "vec2", "vec3", "vec4" };
@@ -270,7 +272,9 @@ float remap(float x, float a, float b, float c, float d) { return c + (x - a) * 
    {
       attribNames.clear();
       varyings.clear();
-      std::string src = "#version 150\n";
+      // Turbo 0.70: GLSL 1.50 has no `precise`; a body may use it (to match the
+      // CPU bit for bit on the compute backend) and still build here.
+      std::string src = "#version 150\n#define precise\n";
       src += "uniform int uCount;\nuniform float uTime;\nuniform float uBeat;\nuniform float uDelta;\n"
              "uniform int uFrame;\nuniform float uSeed;\nuniform sampler2D uImage;\nuniform int uHasImage;\n";
       for (const KernelUniform& u : uniforms)
@@ -337,6 +341,115 @@ float remap(float x, float a, float b, float c, float d) { return c + (x - a) * 
          src += "   o_" + w.name + " = " + w.name + ";\n";
       src += "}\n";
 
+      return src;
+   }
+
+   // Turbo 0.70 (P1, docs/adr/0001-pointz-compute-backend.md): the same kernel
+   // as a compute shader. Every attribute is a tightly packed float[] SSBO
+   // (never vec3[]: std430 pads it to 16 bytes); reads follow the vertex-attribute
+   // rules of the transform-feedback path, so both give the same numbers:
+   //   rc_<name> = components in the buffer, 0 = absent (the attribute's default);
+   //   a buffer with fewer components than the type fills them with 0, 0, 0, 1.
+   // Bindings: reads 0.., writes after them, lookups after those.
+   std::string BuildComputeSource(const KernelSpec& spec, const std::vector<KernelUniform>& uniforms)
+   {
+      std::string src = "#version 430\nlayout(local_size_x = 256) in;\n";
+      src += "uniform int uCount;\nuniform float uTime;\nuniform float uBeat;\nuniform float uDelta;\n"
+             "uniform int uFrame;\nuniform float uSeed;\nuniform sampler2D uImage;\nuniform int uHasImage;\n";
+      for (const KernelUniform& u : uniforms)
+         src += std::string("uniform ") + UniformDecl(u.type) + " " + u.name + ";\n";
+      int binding = 0;
+      char line[512];
+      for (const KernelIO& r : spec.reads)
+      {
+         snprintf(line, sizeof(line),
+                  "layout(std430, binding = %d) readonly buffer PzR_%s { float r_%s[]; };\nuniform int rc_%s;\n",
+                  binding++, r.name.c_str(), r.name.c_str(), r.name.c_str());
+         src += line;
+      }
+      for (const KernelIO& w : spec.writes)
+      {
+         snprintf(line, sizeof(line), "layout(std430, binding = %d) writeonly buffer PzW_%s { float w_%s[]; };\n",
+                  binding++, w.name.c_str(), w.name.c_str());
+         src += line;
+      }
+      for (const KernelIO& l : spec.lookups)
+      {
+         const std::string& ln = l.as.empty() ? l.name : l.as;
+         snprintf(line, sizeof(line),
+                  "layout(std430, binding = %d) readonly buffer PzL_%s { float t_%s[]; };\nuniform int c_%s;\n"
+                  "uniform int n_%s;\n",
+                  binding++, ln.c_str(), ln.c_str(), ln.c_str(), ln.c_str());
+         src += line;
+      }
+      src += kPreamble;
+      // No derivatives outside a fragment shader: level 0, as the vertex path samples.
+      src += "vec4 sampleImage(vec2 uv) { return uHasImage != 0 ? textureLod(uImage, uv, 0.0) : vec4(1.0); }\n";
+      for (const KernelIO& l : spec.lookups)
+      {
+         const std::string& ln = l.as.empty() ? l.name : l.as;
+         const std::string t = GlslType(l.comps);
+         std::string f = t + " fetch_" + ln + "(int i)\n{\n   i = clamp(i, 0, max(0, n_" + ln + " - 1));\n";
+         f += "   int b = i * c_" + ln + ";\n";
+         if (l.comps == 1)
+            f += "   return t_" + ln + "[b];\n";
+         else
+         {
+            f += "   return " + t + "(";
+            for (int c = 0; c < l.comps; c++)
+            {
+               if (c > 0)
+                  f += ", ";
+               f += "(c_" + ln + " > " + std::to_string(c) + " ? t_" + ln + "[b + " + std::to_string(c) + "] : " +
+                    (l.name == attr::Color && c == 3 ? "1.0" : "0.0") + ")";
+            }
+            f += ");\n";
+         }
+         f += "}\n";
+         src += f;
+      }
+      src += spec.decls;
+      src += "\nvoid main()\n{\n   int id = int(gl_GlobalInvocationID.x);\n   if (id >= uCount)\n      return;\n";
+      for (const KernelIO& r : spec.reads)
+      {
+         const std::string& n = r.name;
+         src += std::string("   ") + GlslType(r.comps) + " " + n + " = " + DefaultLiteral(n, r.comps) + ";\n";
+         src += "   if (rc_" + n + " > 0)\n   {\n      int pz_i = id * rc_" + n + ";\n";
+         if (r.comps == 1)
+            src += "      " + n + " = r_" + n + "[pz_i];\n";
+         else
+         {
+            src += "      " + n + " = " + GlslType(r.comps) + "(";
+            for (int c = 0; c < r.comps; c++)
+            {
+               if (c > 0)
+                  src += ", ";
+               src += "(rc_" + n + " > " + std::to_string(c) + " ? r_" + n + "[pz_i + " + std::to_string(c) + "] : " +
+                      (c == 3 ? "1.0" : "0.0") + ")";
+            }
+            src += ");\n";
+         }
+         src += "   }\n";
+      }
+      for (const KernelIO& w : spec.writes)
+      {
+         bool alsoRead = false;
+         for (const KernelIO& r : spec.reads)
+            alsoRead = alsoRead || r.name == w.name;
+         if (!alsoRead)
+            src += std::string("   ") + GlslType(w.comps) + " " + w.name + " = " + DefaultLiteral(w.name, w.comps) + ";\n";
+      }
+      src += "   {\n" + spec.body + "\n   }\n";
+      for (const KernelIO& w : spec.writes)
+      {
+         if (w.comps == 1)
+            src += "   w_" + w.name + "[id] = " + w.name + ";\n";
+         else
+            for (int c = 0; c < w.comps; c++)
+               src += "   w_" + w.name + "[id * " + std::to_string(w.comps) + " + " + std::to_string(c) + "] = " + w.name +
+                      "[" + std::to_string(c) + "];\n";
+      }
+      src += "}\n";
       return src;
    }
 }

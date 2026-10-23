@@ -10,6 +10,9 @@
 #include "GLUtil.h"
 #include "Mesh.h"
 #include "nodes/Render3DPost.h"
+#include "nodes/Render3DTemporal.h"
+#include "nodes/Render3DCull.h"
+#include "nodes/Render3DMotion.h"
 
 // Surface properties handed to the renderer. A struct rather than a row of
 // out-params: this already carried five, and every material feature after this
@@ -518,8 +521,9 @@ public:
       return mPostOut != 0 ? mPostOut : mColorTex;
    }
    // A raster 360's internal targets are face-sized; its output is the panorama.
-   int GetOutputWidth() const override { return mPanoOut != 0 ? m360OutW : mWidth; }
-   int GetOutputHeight() const override { return mPanoOut != 0 ? m360OutH : mHeight; }
+   // Turbo 0.70 (R5): with render scale the targets are smaller than the output.
+   int GetOutputWidth() const override { return mPanoOut != 0 ? m360OutW : (mOutW > 0 ? mOutW : mWidth); }
+   int GetOutputHeight() const override { return mPanoOut != 0 ? m360OutH : (mOutH > 0 ? mOutH : mHeight); }
    void CookIfNeeded(int frameId) override;
    unsigned long long TextureRevision() const override { return mRevision; }
 
@@ -576,6 +580,18 @@ public:
          mHasSceneBuilt = false; // draw again so depth is resolved
       }
    }
+   // Turbo 0.70: how every pixel of the last render moved since the frame
+   // before (Render3DMotion's velocity target at the render's internal size:
+   // pixels, now - last frame, B = 1 where geometry), for a node after it
+   // (Render 3D FX's motion blur); 0 until something moves while asked for.
+   // Asking keeps it made for the next few renders.
+   void RequestVelocity() { mVelocityAsked = 4; }
+   unsigned int VelocityTexture() const { return mVelocityReady ? mMotion.VelocityTexture() : 0; }
+   int VelocityWidth() const { return mMotion.VelocityWidth(); }
+   int VelocityHeight() const { return mMotion.VelocityHeight(); }
+   // The unjittered cameras it is relative to: last frame's and this one's.
+   const Mat4& VelocityPrevViewProj() const { return mVelocityPrevViewProj; }
+   const Mat4& VelocityViewProj() const { return mVelocityViewProj; }
 
    size_t LastTriangleCount() const { return mLastTriangles; }
    size_t LastDrawCalls() const { return mLastDrawCalls; }
@@ -704,7 +720,37 @@ public:
       v.Int("renderMode", renderMode); v.Int("ptSamples", ptSamples); v.Int("ptBounces", ptBounces);
       v.Int("panorama", panorama); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt);
       v.Int("rtxDenoise", rtxDenoise);
+      v.Bool("taa", taa); v.Int("upscale", upscale); v.Float("sharpness", sharpness);
+      v.Float("lodPixels", lodPixels);
    }
+
+   // Turbo 0.70 (R4): temporal anti-aliasing - every frame drawn with a
+   // different sub-pixel camera jitter and blended into a history (raster
+   // only; RTX has its own accumulation). A still scene keeps refining for
+   // kTaaStillFrames frames, then the cached image is reused as before.
+   bool taa = false;
+   static constexpr int kTaaStillFrames = 16;
+   // Turbo 0.70 (R5): render scale - the scene is drawn at the output size
+   // divided by the ratio and AMD FSR 1 upscales it (EASU) and sharpens it
+   // (RCAS, `sharpness` 0..1). 0 native, 1 quality 1.5x, 2 balanced 1.7x,
+   // 3 performance 2x, 4 ultra performance 3x. Raster and RTX.
+   int upscale = 0;
+   float sharpness = 0.8f;
+   static const std::vector<std::string>& UpscaleNames();
+   int TaaHistoryFrames() const { return mTemporal.HistoryFrames(); } // TAATEST
+   // Turbo 0.70 (R1): instanced slots with many copies are culled on the GPU
+   // (frustum) when part of them is off screen, and with `lodPixels` > 0 a
+   // copy smaller than that on screen is drawn as a camera-facing quad. 0 =
+   // every copy drawn whole, as before.
+   float lodPixels = 0.0f;
+   // Turbo 0.70 (R1): below this the cull pass costs more than it saves (a
+   // ~7.5k-particle slot measured +27% GPU with it on every frame).
+   static constexpr int kCullMinInstances = 32768;
+   // CULLTEST: -1 = INFINITE_R3D_CULL (auto, force, off), else 0 auto, 1
+   // force, 2 off. Not a parameter, so InvalidateScene() redraws after a change.
+   int cullOverride = -1;
+   int LastCulledSlots() const { return mLastCulledSlots; }
+   void InvalidateScene() { mHasSceneBuilt = false; }
 
 private:
    // One set of GPU buffers per input slot, kept across frames. Re-uploading a
@@ -754,6 +800,29 @@ private:
       // Non-blocking bounds of a GPU-resident PointZ (pop::GpuBoundsAsync):
       // waiting on a 1x1 read every frame stalled the whole GPU pipeline.
       std::shared_ptr<void> popBounds;
+      // Turbo 0.70 (R1): the mesh's own object-space box (lo / hi above hold
+      // the instances' world box once a PointZ instances it) and the GPU
+      // culling of its instances.
+      float meshLo[3] = { 0, 0, 0 };
+      float meshHi[3] = { 0, 0, 0 };
+      bool hasMeshBounds = false;
+      std::shared_ptr<void> popMeshBounds;
+      std::shared_ptr<Render3DCull> cull;
+      std::shared_ptr<Render3DCull> shadowCull; // its own lists: the light's view
+      // The instance attributes as bound to the VAO (recorded where they are
+      // bound, so culling asks GL for nothing).
+      Render3DCull::Stream instStreams[Render3DCull::kStreams];
+      // Turbo 0.70: the copies' PartId (Instance PointZ over particles), for
+      // the motion blur's last-frame matrices; 0 = none.
+      unsigned int partIdBuf = 0;
+      int partIdComps = 1;
+      // Turbo 0.70: the opaque draw of cook number cullCook went through `cull`
+      // (its lists still bound to the copies), with LOD quads when cullLod -
+      // the velocity pass draws the same lists.
+      int cullCook = -1;
+      bool cullLod = false;
+      float lodCentre[3] = { 0, 0, 0 };
+      float lodHalf[3] = { 0, 0, 0 };
    };
 
    bool EnsureResources(int w, int h, int sampleCount);
@@ -878,6 +947,23 @@ private:
    unsigned int mFbo = 0;
    unsigned int mColorTex = 0;
    Render3DPost mPost;        // Turbo 0.61: IBL maps + HDR finish
+   // Turbo 0.70 (M4): motion vectors, TAA, FSR upscale. mOutW/H: the output
+   // size the internal mWidth/mHeight targets are scaled to (0 = same).
+   Render3DTemporal mTemporal;
+   int mOutW = 0, mOutH = 0;
+   int mTaaStill = 0;         // frames drawn since the scene last changed (TAA refining)
+   bool mTaaWasOn = false;
+   int mLastCulledSlots = 0;  // Turbo 0.70 (R1): slots drawn through Render3DCull last cook
+   // Turbo 0.70: the velocity pass (TAA, Render 3D FX) - per slot state, the
+   // camera last frame, who asked.
+   Render3DMotion mMotion;
+   std::vector<Render3DMotion::Slot> mMotionSlots;
+   Mat4 mMbPrevViewProj;
+   bool mMbHavePrev = false;
+   int mVelocityAsked = 0;
+   bool mVelocityReady = false;
+   int mCookSerial = 0; // counts the renders (GpuMesh::cullCook)
+   Mat4 mVelocityPrevViewProj, mVelocityViewProj;
    // Turbo 0.62: renderMode 1. Deleter defined in the .cpp, where the type is complete.
    struct RtxDeleter { void operator()(class RtxBackend* p) const; };
    std::unique_ptr<class RtxBackend, RtxDeleter> mRtx;

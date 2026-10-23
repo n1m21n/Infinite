@@ -247,7 +247,9 @@
          // starting on it never reaches the canvas.
          const ImVec2 dispSize = tio.DisplaySize;
          const bool haveGraph = gGraphScreenSize.x > 300.0f && gGraphScreenSize.y > 300.0f;
-         const ImVec2 dragBase = haveGraph
+         // Turbo 0.70: a point no node covers when CanvasHooks found one (frame 2).
+         const ImVec2 dragBase = gDragTestHaveEmpty ? gDragTestEmptyScreen
+            : haveGraph
             ? ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.50f, gGraphScreenTL.y + gGraphScreenSize.y * 0.55f)
             : ImVec2(dispSize.x * 0.50f, dispSize.y * 0.60f);
          switch (frameId)

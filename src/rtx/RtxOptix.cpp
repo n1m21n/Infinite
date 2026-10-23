@@ -137,6 +137,7 @@ namespace
       }
       unsigned int Render(const Frame& frame) override;
       int Samples() const override { return mSamples; }
+      int OutputScale() const override { return mOutScale; }
       double LastMs() const override { return mLastMs; }
       const std::string& Error() const override { return mError; }
 
@@ -174,7 +175,7 @@ namespace
       struct Slots
       {
          size_t pos = kNone, normal = kNone, uv = kNone, color = kNone, idx = kNone, radius = kNone,
-                inst[4] = { kNone, kNone, kNone, kNone }, instColor = kNone;
+                inst[4] = { kNone, kNone, kNone, kNone }, instColor = kNone, instTexIdx = kNone, partId = kNone;
       };
 
       bool Fail(const std::string& what)
@@ -196,7 +197,7 @@ namespace
          cuGetErrorName(r, &name);
          return Fail(std::string("CUDA ") + what + ": " + (name ? name : "error"));
       }
-      bool EnsureOutput(int w, int h);
+      bool EnsureOutput(int w, int h, int scale);
       bool EnsureArena(size_t bytes);
       TexReg* RegisterTex(unsigned int tex);
       bool BuildGas(const Geometry& g, const Slots& s, CUdeviceptr arena, Gas& out, RtxGeomData& data);
@@ -212,6 +213,39 @@ namespace
       OptixPipeline mPipeline = nullptr;
       CUmodule mKernels = nullptr;
       CUfunction mBuildInstances = nullptr, mRadii = nullptr, mDemod = nullptr, mAtrous = nullptr, mRemod = nullptr;
+      // Turbo 0.70 (X1): temporal accumulation of a moving scene (rtxReproject):
+      // ping-pong history (colour, frames) and first-hit g-buffers, motion,
+      // and the last frame's camera and instances.
+      CUfunction mReproject = nullptr;
+      CUdeviceptr mHistC[2] = { 0, 0 }, mHistN[2] = { 0, 0 }, mGbuf[2] = { 0, 0 }, mMotion = 0;
+      int mHistCur = 0;
+      bool mHistValid = false;
+      float mHistViewProj[16] = {};
+      CUdeviceptr mPrevInst = 0;
+      size_t mPrevInstBytes = 0, mPrevInstCount = 0;
+      bool mPrevValid = false; // last frame's camera, instances and g-buffer belong to this scene
+      CUdeviceptr mRing = 0;   // RtxPrevSlot x mRingSlots: last frame's particle places by PartId
+      size_t mRingSlots = 0;
+      CUfunction mRingStore = nullptr;
+      // Turbo 0.70: OptiX's temporal denoisers - AI on a moving scene, and its
+      // 2x upscaling sibling (Frame::upscale2x) - each with its own state,
+      // last output and internal guide layers (ping-pong).
+      struct TemporalAi
+      {
+         OptixDenoiser d = nullptr;
+         bool tried = false;
+         int w = 0, h = 0, scale = 1, cur = 0;
+         CUdeviceptr state = 0, scratch = 0, guide[2] = { 0, 0 }, prevOut = 0;
+         size_t stateBytes = 0, scratchBytes = 0, guideBytes = 0;
+         bool havePrev = false;
+      };
+      bool EnsureTemporalAi(TemporalAi& t, OptixDenoiserModelKind kind, int w, int h, int scale);
+      bool RunTemporalAi(TemporalAi& t, CUdeviceptr input, CUdeviceptr output, bool fresh);
+      void ReleaseTemporalAi(TemporalAi& t);
+      TemporalAi mAiTemporal, mAiUpscale;
+      CUfunction mFlowKernel = nullptr, mMotionBlur = nullptr, mUpscale2x = nullptr;
+      CUdeviceptr mFlow = 0, mAvgColor = 0, mOutTmp = 0;
+      int mOutScale = 1; // the output texture is mOutScale * mW x mOutScale * mH
       CUdeviceptr mRaygenRec = 0, mMissRec = 0;
       OptixDenoiser mDenoiser = nullptr;
       CUdeviceptr mDenState = 0, mDenScratch = 0, mIntensity = 0;
@@ -249,6 +283,10 @@ namespace
       int mFrameNo = 0;
       unsigned int mSeed = 1;
       double mLastMs = 0.0;
+      // Turbo 0.70: trace time per sample (smoothed) and the last frame's
+      // samples, for Frame::traceBudgetMs.
+      double mMsPerSample = 0.0;
+      int mLastSpp = 1;
       std::string mError;
    };
 
@@ -388,6 +426,16 @@ namespace
          why = "RTX: helper kernels did not load";
          return false;
       }
+      if (cuModuleGetFunction(&mReproject, mKernels, "rtxReproject") != CUDA_SUCCESS) // Turbo 0.70 (X1): optional
+         mReproject = nullptr;
+      if (cuModuleGetFunction(&mFlowKernel, mKernels, "rtxFlow") != CUDA_SUCCESS) // Turbo 0.70: optional
+         mFlowKernel = nullptr;
+      if (cuModuleGetFunction(&mMotionBlur, mKernels, "rtxMotionBlur") != CUDA_SUCCESS)
+         mMotionBlur = nullptr;
+      if (cuModuleGetFunction(&mUpscale2x, mKernels, "rtxUpscale2x") != CUDA_SUCCESS)
+         mUpscale2x = nullptr;
+      if (cuModuleGetFunction(&mRingStore, mKernels, "rtxRingStore") != CUDA_SUCCESS)
+         mRingStore = nullptr;
 
       SbtRecord<Empty> rg = {}, ms = {};
       optixSbtRecordPackHeader(mRaygen, &rg);
@@ -403,6 +451,7 @@ namespace
       if (optixDenoiserCreate(mOx, OPTIX_DENOISER_MODEL_KIND_HDR, &dop, &mDenoiser) != OPTIX_SUCCESS)
          mDenoiser = nullptr; // traces without denoising
       cuMemAlloc(&mIntensity, sizeof(float));
+      cuMemAlloc(&mAvgColor, 3 * sizeof(float)); // Turbo 0.70: the 2x model's average colour
       return true;
    }
 
@@ -433,12 +482,15 @@ namespace
          cuGraphicsUnregisterResource(mArenaRes);
       if (mPboRes)
          cuGraphicsUnregisterResource(mPboRes);
-      const CUdeviceptr bufs[] = { mAccum, mAverage, mAlbedo, mNormal, mTmp[0], mTmp[1], mIas, mRaygenRec, mMissRec, mDenState, mDenScratch,
-                                   mIntensity };
+      const CUdeviceptr bufs[] = { mAccum, mAverage, mAlbedo, mNormal, mTmp[0], mTmp[1], mHistC[0], mHistC[1], mHistN[0],
+                                   mHistN[1], mGbuf[0], mGbuf[1], mMotion, mPrevInst, mFlow, mAvgColor, mOutTmp, mRing, mIas,
+                                   mRaygenRec, mMissRec, mDenState, mDenScratch, mIntensity };
       for (CUdeviceptr b : bufs)
          if (b)
             cuMemFree(b);
       mFrame.Release();
+      ReleaseTemporalAi(mAiTemporal);
+      ReleaseTemporalAi(mAiUpscale);
       if (mDenoiser)
          optixDenoiserDestroy(mDenoiser);
       if (mPipeline)
@@ -474,31 +526,85 @@ namespace
          glDeleteTextures(1, &mTex);
    }
 
-   bool RtxOptix::EnsureOutput(int w, int h)
+   bool RtxOptix::EnsureOutput(int w, int h, int scale)
    {
-      if (w == mW && h == mH && mTex != 0)
+      if (w == mW && h == mH && scale == mOutScale && mTex != 0)
          return true;
-      CUdeviceptr* bufs[] = { &mAccum, &mAverage, &mAlbedo, &mNormal, &mTmp[0], &mTmp[1] };
-      for (CUdeviceptr* b : bufs)
-         if (*b)
+      if (w != mW || h != mH || mAccum == 0)
+      {
+         CUdeviceptr* bufs[] = { &mAccum, &mAverage, &mAlbedo, &mNormal, &mTmp[0], &mTmp[1], &mHistC[0], &mHistC[1],
+                                 &mGbuf[0], &mGbuf[1] };
+         // Turbo 0.70 (X1): the smaller per-pixel buffers (frames, motion, flow).
+         CUdeviceptr* small[] = { &mHistN[0], &mHistN[1], &mMotion, &mFlow };
+         const size_t smallBytes[] = { 4, 4, 8, 8 };
+         for (CUdeviceptr* b : bufs)
+            if (*b)
+            {
+               cuMemFree(*b);
+               *b = 0;
+            }
+         for (CUdeviceptr* b : small)
+            if (*b)
+            {
+               cuMemFree(*b);
+               *b = 0;
+            }
+         mW = mH = 0;
+         const size_t bytes = (size_t)w * h * 16;
+         for (CUdeviceptr* b : bufs)
+            if (!Check(cuMemAlloc(b, bytes), "output buffers"))
+               return false;
+         for (size_t k = 0; k < 4; k++)
+            if (!Check(cuMemAlloc(small[k], (size_t)w * h * smallBytes[k]), "output buffers"))
+               return false;
+         if (mDenoiser)
          {
-            cuMemFree(*b);
-            *b = 0;
+            OptixDenoiserSizes sz = {};
+            if (optixDenoiserComputeMemoryResources(mDenoiser, w, h, &sz) == OPTIX_SUCCESS)
+            {
+               if (mDenState)
+                  cuMemFree(mDenState);
+               if (mDenScratch)
+                  cuMemFree(mDenScratch);
+               mDenStateBytes = sz.stateSizeInBytes;
+               mDenScratchBytes = std::max(sz.withoutOverlapScratchSizeInBytes, sz.computeIntensitySizeInBytes);
+               cuMemAlloc(&mDenState, mDenStateBytes);
+               cuMemAlloc(&mDenScratch, mDenScratchBytes);
+               if (optixDenoiserSetup(mDenoiser, mStream, w, h, mDenState, mDenStateBytes, mDenScratch,
+                                      mDenScratchBytes) != OPTIX_SUCCESS)
+               {
+                  optixDenoiserDestroy(mDenoiser);
+                  mDenoiser = nullptr;
+               }
+            }
          }
+         mW = w;
+         mH = h;
+         mSamples = 0;
+         mHistValid = false;
+         mPrevValid = false;
+      }
+
+      // Turbo 0.70: the output (texture, its pixel buffer, the motion blur's
+      // copy) is `scale` times the frame - 2 when OptiX's 2x model upscales.
+      const int ow = w * scale, oh = h * scale;
+      const size_t outBytes = (size_t)ow * oh * 16;
       if (mPboRes)
       {
          cuGraphicsUnregisterResource(mPboRes);
          mPboRes = nullptr;
       }
-      mW = mH = 0;
-      const size_t bytes = (size_t)w * h * 16;
-      for (CUdeviceptr* b : bufs)
-         if (!Check(cuMemAlloc(b, bytes), "output buffers"))
-            return false;
+      if (mOutTmp)
+      {
+         cuMemFree(mOutTmp);
+         mOutTmp = 0;
+      }
+      if (!Check(cuMemAlloc(&mOutTmp, outBytes), "output buffers"))
+         return false;
       if (mPbo == 0)
          glGenBuffers(1, &mPbo);
       glBindBuffer(GL_PIXEL_UNPACK_BUFFER, mPbo);
-      glBufferData(GL_PIXEL_UNPACK_BUFFER, (GLsizeiptr)bytes, nullptr, GL_STREAM_DRAW);
+      glBufferData(GL_PIXEL_UNPACK_BUFFER, (GLsizeiptr)outBytes, nullptr, GL_STREAM_DRAW);
       glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
       if (!Check(cuGraphicsGLRegisterBuffer(&mPboRes, mPbo, CU_GRAPHICS_REGISTER_FLAGS_WRITE_DISCARD), "output buffer"))
          return false;
@@ -506,36 +612,131 @@ namespace
          glDeleteTextures(1, &mTex);
       glGenTextures(1, &mTex);
       glBindTexture(GL_TEXTURE_2D, mTex);
-      glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, w, h);
+      glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, ow, oh);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glBindTexture(GL_TEXTURE_2D, 0);
-      if (mDenoiser)
+      mOutScale = scale;
+      return true;
+   }
+
+   // Turbo 0.70: one of OptiX's temporal models (TEMPORAL, or TEMPORAL_UPSCALE2X
+   // with scale 2), made the first time it is asked for and sized to the frame.
+   bool RtxOptix::EnsureTemporalAi(TemporalAi& t, OptixDenoiserModelKind kind, int w, int h, int scale)
+   {
+      if (!t.tried)
       {
-         OptixDenoiserSizes sz = {};
-         if (optixDenoiserComputeMemoryResources(mDenoiser, w, h, &sz) == OPTIX_SUCCESS)
-         {
-            if (mDenState)
-               cuMemFree(mDenState);
-            if (mDenScratch)
-               cuMemFree(mDenScratch);
-            mDenStateBytes = sz.stateSizeInBytes;
-            mDenScratchBytes = std::max(sz.withoutOverlapScratchSizeInBytes, sz.computeIntensitySizeInBytes);
-            cuMemAlloc(&mDenState, mDenStateBytes);
-            cuMemAlloc(&mDenScratch, mDenScratchBytes);
-            if (optixDenoiserSetup(mDenoiser, mStream, w, h, mDenState, mDenStateBytes, mDenScratch, mDenScratchBytes) !=
-                OPTIX_SUCCESS)
-            {
-               optixDenoiserDestroy(mDenoiser);
-               mDenoiser = nullptr;
-            }
-         }
+         t.tried = true;
+         OptixDenoiserOptions dop = {};
+         dop.guideAlbedo = 1;
+         dop.guideNormal = 1;
+         if (optixDenoiserCreate(mOx, kind, &dop, &t.d) != OPTIX_SUCCESS)
+            t.d = nullptr;
       }
-      mW = w;
-      mH = h;
-      mSamples = 0;
+      if (t.d == nullptr)
+         return false;
+      if (t.w == w && t.h == h && t.scale == scale)
+         return true;
+      const OptixDenoiser keep = t.d;
+      t.d = nullptr; // ReleaseTemporalAi frees the memory only
+      ReleaseTemporalAi(t);
+      t.d = keep;
+      OptixDenoiserSizes sz = {};
+      if (optixDenoiserComputeMemoryResources(t.d, (unsigned)w, (unsigned)h, &sz) != OPTIX_SUCCESS)
+         return false;
+      t.stateBytes = sz.stateSizeInBytes;
+      t.scratchBytes = std::max(sz.withoutOverlapScratchSizeInBytes,
+                                std::max(sz.computeIntensitySizeInBytes, sz.computeAverageColorSizeInBytes));
+      t.guideBytes = sz.internalGuideLayerPixelSizeInBytes;
+      const size_t outPixels = (size_t)w * scale * (size_t)h * scale;
+      if (cuMemAlloc(&t.state, t.stateBytes) != CUDA_SUCCESS || cuMemAlloc(&t.scratch, t.scratchBytes) != CUDA_SUCCESS ||
+          cuMemAlloc(&t.prevOut, outPixels * 16) != CUDA_SUCCESS)
+         return false;
+      if (t.guideBytes > 0)
+         for (int k = 0; k < 2; k++)
+         {
+            if (cuMemAlloc(&t.guide[k], outPixels * t.guideBytes) != CUDA_SUCCESS)
+               return false;
+            cuMemsetD8Async(t.guide[k], 0, outPixels * t.guideBytes, mStream);
+         }
+      if (optixDenoiserSetup(t.d, mStream, (unsigned)w, (unsigned)h, t.state, t.stateBytes, t.scratch, t.scratchBytes) !=
+          OPTIX_SUCCESS)
+         return false;
+      t.w = w;
+      t.h = h;
+      t.scale = scale;
+      t.havePrev = false;
+      return true;
+   }
+
+   void RtxOptix::ReleaseTemporalAi(TemporalAi& t)
+   {
+      const CUdeviceptr bufs[] = { t.state, t.scratch, t.guide[0], t.guide[1], t.prevOut };
+      for (CUdeviceptr b : bufs)
+         if (b)
+            cuMemFree(b);
+      t.state = t.scratch = t.guide[0] = t.guide[1] = t.prevOut = 0;
+      t.w = t.h = 0;
+      t.havePrev = false;
+      if (t.d)
+      {
+         optixDenoiserDestroy(t.d);
+         t.d = nullptr;
+      }
+   }
+
+   // Turbo 0.70: denoise `input` (the frame's size) into `output` (scale times
+   // it) with a temporal model, its flow from mFlow; `fresh` = no usable last
+   // frame (a cut). Keeps this output and the internal guides for next frame.
+   bool RtxOptix::RunTemporalAi(TemporalAi& t, CUdeviceptr input, CUdeviceptr output, bool fresh)
+   {
+      const unsigned iw = (unsigned)mW, ih = (unsigned)mH, ow = iw * (unsigned)t.scale, oh = ih * (unsigned)t.scale;
+      auto img = [](CUdeviceptr data, unsigned w, unsigned h, unsigned pixel, OptixPixelFormat fmt) {
+         OptixImage2D im = {};
+         im.data = data;
+         im.width = w;
+         im.height = h;
+         im.rowStrideInBytes = w * pixel;
+         im.pixelStrideInBytes = pixel;
+         im.format = fmt;
+         return im;
+      };
+      const bool usePrev = t.havePrev && !fresh;
+      if (!usePrev && t.scale == 1)
+         cuMemcpyDtoDAsync(t.prevOut, input, (size_t)ow * oh * 16, mStream);
+      else if (!usePrev)
+         cuMemsetD8Async(t.prevOut, 0, (size_t)ow * oh * 16, mStream);
+      OptixDenoiserLayer layer = {};
+      layer.input = img(input, iw, ih, 16, OPTIX_PIXEL_FORMAT_FLOAT4);
+      layer.previousOutput = img(t.prevOut, ow, oh, 16, OPTIX_PIXEL_FORMAT_FLOAT4);
+      layer.output = img(output, ow, oh, 16, OPTIX_PIXEL_FORMAT_FLOAT4);
+      OptixDenoiserGuideLayer guide = {};
+      guide.albedo = img(mAlbedo, iw, ih, 16, OPTIX_PIXEL_FORMAT_FLOAT4);
+      guide.normal = img(mNormal, iw, ih, 16, OPTIX_PIXEL_FORMAT_FLOAT4);
+      guide.flow = img(mFlow, iw, ih, 8, OPTIX_PIXEL_FORMAT_FLOAT2);
+      if (t.guideBytes > 0)
+      {
+         guide.previousOutputInternalGuideLayer =
+            img(t.guide[1 - t.cur], ow, oh, (unsigned)t.guideBytes, OPTIX_PIXEL_FORMAT_INTERNAL_GUIDE_LAYER);
+         guide.outputInternalGuideLayer =
+            img(t.guide[t.cur], ow, oh, (unsigned)t.guideBytes, OPTIX_PIXEL_FORMAT_INTERNAL_GUIDE_LAYER);
+      }
+      optixDenoiserComputeIntensity(t.d, mStream, &layer.input, mIntensity, t.scratch, t.scratchBytes);
+      optixDenoiserComputeAverageColor(t.d, mStream, &layer.input, mAvgColor, t.scratch, t.scratchBytes);
+      OptixDenoiserParams dprm = {};
+      dprm.denoiseAlpha = OPTIX_DENOISER_ALPHA_MODE_COPY;
+      dprm.hdrIntensity = mIntensity;
+      dprm.hdrAverageColor = mAvgColor;
+      dprm.blendFactor = 0.0f;
+      dprm.temporalModeUsePreviousLayers = usePrev ? 1u : 0u;
+      if (optixDenoiserInvoke(t.d, mStream, &dprm, t.state, t.stateBytes, &guide, &layer, 1, 0, 0, t.scratch,
+                              t.scratchBytes) != OPTIX_SUCCESS)
+         return false;
+      cuMemcpyDtoDAsync(t.prevOut, output, (size_t)ow * oh * 16, mStream);
+      t.cur = 1 - t.cur;
+      t.havePrev = true;
       return true;
    }
 
@@ -882,7 +1083,7 @@ namespace
          glBindBuffer(GL_PIXEL_UNPACK_BUFFER, mPbo);
          glBindTexture(GL_TEXTURE_2D, mTex);
          glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_RGBA, GL_FLOAT, nullptr);
+         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW * mOutScale, mH * mOutScale, GL_RGBA, GL_FLOAT, nullptr);
          glBindTexture(GL_TEXTURE_2D, 0);
          glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
          mUpload = false;
@@ -901,6 +1102,12 @@ namespace
          float ms = 0.0f;
          if (cuEventElapsedTime(&ms, mEvStart, mEvEnd) == CUDA_SUCCESS)
             mLastMs = ms;
+         float traceMs = 0.0f;
+         if (cuEventElapsedTime(&traceMs, mEvGeo, mEvTrace) == CUDA_SUCCESS && mLastSpp > 0)
+         {
+            const double per = (double)traceMs / mLastSpp;
+            mMsPerSample = mMsPerSample <= 0.0 ? per : mMsPerSample * 0.8 + per * 0.2;
+         }
          if (mProf)
          {
             float a = 0.0f, b = 0.0f, c = 0.0f;
@@ -924,7 +1131,12 @@ namespace
       mTexObjects.clear();
       mFrame.Reset();
 
-      if (!EnsureOutput(f.width, f.height))
+      // Turbo 0.70: OptiX's 2x model, when asked for and available, doubles the output.
+      const int scale =
+         f.upscale2x && EnsureTemporalAi(mAiUpscale, OPTIX_DENOISER_MODEL_KIND_TEMPORAL_UPSCALE2X, f.width, f.height, 2)
+            ? 2
+            : 1;
+      if (!EnsureOutput(f.width, f.height, scale))
          return false;
       if (f.restart)
          mSamples = 0;
@@ -967,7 +1179,12 @@ namespace
             for (int c = 0; c < 4; c++)
                place(g.instCols[c], (size_t)g.instCount * 16, s.inst[c]);
             place(g.instColorBuf, (size_t)g.instCount * g.instColorComps * 4, s.instColor);
+            place(g.instTexIdxBuf, (size_t)g.instCount * g.instTexIdxComps * 4, s.instTexIdx); // Turbo 0.70
          }
+         // Turbo 0.70 (X1): PartId per copy, or per sphere.
+         const size_t ids = g.instCount > 0 ? (size_t)g.instCount : (g.kind == Geometry::kSpheres ? n : 0);
+         if (ids > 0 && g.cpuCentres.empty())
+            place(g.partIdBuf, ids * g.partIdComps * 4, s.partId);
       }
       if (!EnsureArena(std::max<size_t>(arenaUsed, 256)))
          return false;
@@ -985,6 +1202,13 @@ namespace
       for (size_t i = 0; i < mGeo.size(); i++)
          if (RegisterTex(mGeo[i].surfaceTex) != nullptr)
             geoTex[i] = mGeo[i].surfaceTex;
+      // Turbo 0.70: Instance PointZ's per-copy textures, 4 per geometry.
+      std::vector<unsigned int> geoInstTex(mGeo.size() * 4, 0);
+      for (size_t i = 0; i < mGeo.size(); i++)
+         if (mGeo[i].instTexMode != 0)
+            for (int k = 0; k < 4; k++)
+               if (RegisterTex(mGeo[i].instTex[k]) != nullptr)
+                  geoInstTex[i * 4 + (size_t)k] = mGeo[i].instTex[k];
       const unsigned int envTex = RegisterTex(mEnv.tex) != nullptr ? mEnv.tex : 0;
       std::vector<CUgraphicsResource> res = { mArenaRes, mPboRes };
       for (auto& kv : mTexs)
@@ -1043,6 +1267,20 @@ namespace
       };
       std::vector<GpuInst> gpuInst;
       size_t instTotal = 0;
+      // Turbo 0.70 (X1): geometries whose particles the motion vectors follow
+      // by PartId (rtxRingStore after the trace).
+      struct RingJob
+      {
+         unsigned int key;
+         const float* ids;
+         int idStride;
+         int count;
+         size_t instFirst; // kNone: spheres
+         const float* centres;
+         int centreStride;
+         Mat4 model;
+      };
+      std::vector<RingJob> ringJobs;
       for (size_t i = 0; i < mGeo.size(); i++)
       {
          const Geometry& g = mGeo[i];
@@ -1051,15 +1289,59 @@ namespace
          if (!BuildGas(g, slots[i], arena, gas, rec.data))
             return false;
          rec.data.tex = texObj(geoTex[i]);
+         if (g.instTexMode != 0 && g.instCount > 0)
+         {
+            rec.data.instTexMode = g.instTexMode;
+            rec.data.instTexFrom = g.instTexFrom;
+            rec.data.instTexCount = g.instTexCount;
+            rec.data.atlasCols = g.atlasCols;
+            rec.data.atlasRows = g.atlasRows;
+            for (int k = 0; k < 4; k++)
+               rec.data.instTex[k] = texObj(geoInstTex[i * 4 + (size_t)k]);
+            // A pin that did not register (format) falls back to the first.
+            for (int k = 1; k < 4; k++)
+               if (rec.data.instTex[k] == 0)
+                  rec.data.instTex[k] = rec.data.instTex[0];
+            if (rec.data.instTex[0] == 0)
+               rec.data.instTexMode = 0;
+            if (slots[i].instTexIdx != kNone)
+            {
+               rec.data.instTexIdx = (const float*)(arena + slots[i].instTexIdx);
+               rec.data.instTexIdxStride = g.instTexIdxComps;
+            }
+         }
          if (slots[i].instColor != kNone && g.instColorComps >= 3)
          {
             rec.data.instColor = (const float*)(arena + slots[i].instColor);
             rec.data.instColorStride = g.instColorComps;
          }
+         // Copies of a mesh by their id, or a cloud's spheres by theirs.
+         const bool gpuInstanced = g.instCount > 0 && slots[i].inst[0] != kNone && slots[i].inst[3] != kNone;
+         const bool followIds =
+            slots[i].partId != kNone && (gpuInstanced ? g.kind != Geometry::kSpheres : g.kind == Geometry::kSpheres);
+         if (followIds)
+         {
+            rec.data.partId = (const float*)(arena + slots[i].partId);
+            rec.data.partIdStride = g.partIdComps;
+            rec.data.ringKey = (unsigned int)records.size();
+         }
          optixSbtRecordPackHeader(g.kind == Geometry::kSpheres ? mHitSphere : mHitTri, &rec);
          const unsigned int sbt = (unsigned int)records.size();
          records.push_back(rec);
-         if (g.instCount > 0 && slots[i].inst[0] != kNone && slots[i].inst[3] != kNone)
+         if (followIds)
+         {
+            RingJob job;
+            job.key = sbt;
+            job.ids = rec.data.partId;
+            job.idStride = g.partIdComps;
+            job.count = gpuInstanced ? g.instCount : g.pointCount;
+            job.instFirst = gpuInstanced ? instTotal : kNone;
+            job.centres = rec.data.pos;
+            job.centreStride = rec.data.posStride;
+            job.model = g.model;
+            ringJobs.push_back(job);
+         }
+         if (gpuInstanced)
          {
             GpuInst gi = { instTotal, g.instCount, {}, gas.handle, sbt };
             for (int c = 0; c < 4; c++)
@@ -1089,6 +1371,30 @@ namespace
       const size_t instCount = instTotal + hostInst.size();
       if (instCount == 0 || records.empty())
          return Fail("nothing to trace");
+      // Turbo 0.70 (X1): the PartId ring, at least twice the particles (a
+      // resize clears it: one frame without their own motion).
+      {
+         size_t particles = 0;
+         for (const RingJob& j : ringJobs)
+            particles += (size_t)j.count;
+         size_t slotsWanted = 1024;
+         while (slotsWanted < particles * 2)
+            slotsWanted <<= 1;
+         if (!ringJobs.empty() && slotsWanted != mRingSlots)
+         {
+            if (mRing)
+               cuMemFree(mRing);
+            mRing = 0;
+            mRingSlots = 0;
+            if (cuMemAlloc(&mRing, slotsWanted * sizeof(RtxPrevSlot)) == CUDA_SUCCESS)
+            {
+               cuMemsetD8Async(mRing, 0, slotsWanted * sizeof(RtxPrevSlot), mStream);
+               mRingSlots = slotsWanted;
+            }
+            else
+               mRing = 0;
+         }
+      }
       const CUdeviceptr inst = mFrame.Get(instCount * sizeof(OptixInstance));
       if (inst == 0)
          return Fail("out of GPU memory for the instances");
@@ -1161,6 +1467,15 @@ namespace
       p.height = mH;
       p.samples = mSamples;
       p.spp = std::max(1, f.spp);
+      if (f.traceBudgetMs > 0.0f)
+      {
+         // Turbo 0.70: as many samples as fit the budget (a first frame, with
+         // no timing yet, takes 4), never past the accumulation's end.
+         const int fit = mMsPerSample > 0.0 ? (int)(f.traceBudgetMs / mMsPerSample) : 4;
+         p.spp = std::clamp(fit, 1, 32);
+      }
+      p.spp = std::max(1, std::min(p.spp, std::max(1, f.maxSamples - mSamples)));
+      mLastSpp = p.spp;
       p.seed = mSeed++;
       p.bounces = std::clamp(f.bounces, 1, 16);
       const Mat4 inv = Mat4::Inverse(f.viewProj);
@@ -1201,12 +1516,77 @@ namespace
       p.sky = ToLin3(mEnv.sky);
       p.horizon = ToLin3(mEnv.horizon);
       p.ground = ToLin3(mEnv.ground);
+      const float3 tint = ToLin3(mEnv.ambient);
+      p.ambientTint = make_float3(tint.x * 3.0f, tint.y * 3.0f, tint.z * 3.0f);
+      p.rim = mEnv.rim;
+      // Turbo 0.70 (X1): a moving scene (restart every frame) accumulates over
+      // time instead, reprojected through last frame's camera and instances
+      // (those only while the list keeps its length, so its order).
+      // Motion is also what the motion blur, the temporal AI and the 2x model
+      // need; the accumulation itself only for "auto", "AI" and "fast".
+      const bool moving = f.restart && f.panorama == 0;
+      const bool temporal = mReproject != nullptr && moving && f.denoise != 3;
+      const bool wantMotion = moving && (temporal || f.motionBlur > 0.0f || mOutScale == 2);
+      p.motion = (float2*)mMotion;
+      p.gbuf = (float4*)mGbuf[mHistCur];
+      p.hasPrev = wantMotion && mPrevValid ? 1 : 0;
+      std::memcpy(p.prevViewProj, mHistViewProj, sizeof(p.prevViewProj));
+      if (p.hasPrev && mPrevInst != 0 && mPrevInstCount == instCount)
+      {
+         p.prevInst = (const OptixInstance*)mPrevInst;
+         p.prevInstCount = (unsigned int)instCount;
+      }
+      if (p.hasPrev && mRing != 0 && mRingStore != nullptr && !ringJobs.empty())
+      {
+         p.prevRing = (const RtxPrevSlot*)mRing;
+         p.ringMask = (unsigned int)(mRingSlots - 1);
+      }
       const CUdeviceptr dp = mFrame.Get(sizeof(RtxParams));
       cuMemcpyHtoDAsync(dp, &p, sizeof(p), mStream);
       cuEventRecord(mEvGeo, mStream);
       if (!Check(optixLaunch(mPipeline, mStream, dp, sizeof(RtxParams), &sbt, (unsigned)mW, (unsigned)mH, 1), "launch"))
          return false;
       mSamples += p.spp;
+      // Turbo 0.70 (X1): this frame's instances are next frame's "previous"
+      // (after the launch in the stream, which read the old ones).
+      if (wantMotion)
+      {
+         const size_t bytes = instCount * sizeof(OptixInstance);
+         if (bytes > mPrevInstBytes)
+         {
+            if (mPrevInst)
+               cuMemFree(mPrevInst);
+            mPrevInstBytes = Align(bytes + bytes / 4, 1u << 16);
+            if (cuMemAlloc(&mPrevInst, mPrevInstBytes) != CUDA_SUCCESS)
+            {
+               mPrevInst = 0;
+               mPrevInstBytes = 0;
+            }
+         }
+         if (mPrevInst != 0)
+            cuMemcpyDtoDAsync(mPrevInst, inst, bytes, mStream);
+         mPrevInstCount = mPrevInst != 0 ? instCount : 0;
+         // ... and the particles' places by PartId.
+         if (mRing != 0 && mRingStore != nullptr)
+            for (const RingJob& j : ringJobs)
+            {
+               CUdeviceptr ring = mRing;
+               unsigned int mask = (unsigned int)(mRingSlots - 1);
+               CUdeviceptr ip = j.instFirst != kNone ? inst + j.instFirst * sizeof(OptixInstance) : 0;
+               CUdeviceptr cp = (CUdeviceptr)j.centres, idp = (CUdeviceptr)j.ids;
+               int cs = j.centreStride, is = j.idStride, count = j.count;
+               unsigned int key = j.key;
+               struct Model34
+               {
+                  float m[12];
+               } model;
+               for (int r = 0; r < 3; r++)
+                  for (int c = 0; c < 4; c++)
+                     model.m[r * 4 + c] = j.model.m[c * 4 + r];
+               void* dk[] = { &ring, &mask, &ip, &cp, &cs, &model, &idp, &is, &count, &key };
+               cuLaunchKernel(mRingStore, (unsigned)((count + 255) / 256), 1, 1, 256, 1, 1, 0, mStream, dk, nullptr);
+            }
+      }
       cuEventRecord(mEvTrace, mStream);
 
       // 6. Denoise into the output pixel buffer (or copy the plain average).
@@ -1220,15 +1600,82 @@ namespace
          im.format = OPTIX_PIXEL_FORMAT_FLOAT4;
          return im;
       };
+      // Turbo 0.70 (X1): a moving scene's frames accumulate through
+      // rtxReproject first; what follows filters that (never fed back).
+      CUdeviceptr src = mAverage;
+      const int prevIdx = 1 - mHistCur;
+      const unsigned gx = (unsigned)((mW + 15) / 16), gy = (unsigned)((mH + 15) / 16);
+      if (temporal)
+      {
+         CUdeviceptr cur = mAverage, mo = mMotion, g = mGbuf[mHistCur], pg = mGbuf[prevIdx], hc = mHistC[prevIdx],
+                     hn = mHistN[prevIdx], oc = mHistC[mHistCur], on = mHistN[mHistCur];
+         int w = mW, h = mH;
+         float maxN = 24.0f;
+         int useHist = mHistValid && p.hasPrev ? 1 : 0;
+         void* dr[] = { &cur, &mo, &g, &pg, &hc, &hn, &oc, &on, &w, &h, &maxN, &useHist };
+         cuLaunchKernel(mReproject, gx, gy, 1, 16, 16, 1, 0, mStream, dr, nullptr);
+         src = mHistC[mHistCur];
+         mHistValid = true;
+      }
+      else
+         mHistValid = false; // a still scene accumulates on its own; motion starts afresh
+      // This frame's g-buffer is next frame's "previous".
+      if (wantMotion)
+         mHistCur = prevIdx;
+      mPrevValid = wantMotion;
+      std::memcpy(mHistViewProj, f.viewProj.m, sizeof(mHistViewProj));
+
+      // Turbo 0.70: the flow OptiX's temporal models read (none without motion).
+      auto makeFlow = [&]()
+      {
+         if (p.hasPrev && mFlowKernel != nullptr)
+         {
+            CUdeviceptr mo = mMotion, fl = mFlow;
+            int w = mW, h = mH;
+            void* df[] = { &mo, &fl, &w, &h };
+            cuLaunchKernel(mFlowKernel, gx, gy, 1, 16, 16, 1, 0, mStream, df, nullptr);
+         }
+         else
+            cuMemsetD8Async(mFlow, 0, (size_t)mW * mH * 8, mStream);
+      };
+
       bool denoised = false;
       // Auto: the fast filter while things move (the AI denoiser costs ~20 ms
       // at 1080p), the AI one once the image is accumulating on a still scene.
-      const int mode = f.denoise == 0 ? (f.restart || mSamples <= p.spp ? 2 : 1) : f.denoise;
-      if (mode == 2)
+      int mode = f.denoise == 0 ? (f.restart || mSamples <= p.spp ? 2 : 1) : f.denoise;
+      if (mOutScale == 2)
+      {
+         // Turbo 0.70: OptiX's temporal 2x model, moving or still.
+         makeFlow();
+         denoised = RunTemporalAi(mAiUpscale, src, out, !p.hasPrev);
+         if (!denoised && mUpscale2x != nullptr)
+         {
+            CUdeviceptr in = src, o = out;
+            int w = mW, h = mH;
+            void* du[] = { &in, &o, &w, &h };
+            cuLaunchKernel(mUpscale2x, (unsigned)((2 * w + 15) / 16), (unsigned)((2 * h + 15) / 16), 1, 16, 16, 1, 0,
+                           mStream, du, nullptr);
+            denoised = true;
+         }
+      }
+      else if (mode == 1 && f.restart)
+      {
+         // Turbo 0.70: AI on a moving scene is OptiX's temporal model (flow from
+         // the motion vectors); the plain HDR model on a few samples a frame
+         // painted blotches. Without it, the fast filter.
+         if (EnsureTemporalAi(mAiTemporal, OPTIX_DENOISER_MODEL_KIND_TEMPORAL, mW, mH, 1))
+         {
+            makeFlow();
+            denoised = RunTemporalAi(mAiTemporal, src, out, !p.hasPrev);
+         }
+         if (!denoised)
+            mode = 2;
+      }
+      if (mode == 2 && !denoised)
       {
          const int n = mW * mH;
          const unsigned blocks = (unsigned)((n + 255) / 256);
-         CUdeviceptr avg = mAverage, alb = mAlbedo, nrm = mNormal, a = mTmp[0], b = mTmp[1];
+         CUdeviceptr avg = src, alb = mAlbedo, nrm = mNormal, a = mTmp[0], b = mTmp[1];
          int count = n, w = mW, h = mH;
          void* d0[] = { &avg, &alb, &a, &count };
          cuLaunchKernel(mDemod, blocks, 1, 1, 256, 1, 1, 0, mStream, d0, nullptr);
@@ -1245,10 +1692,10 @@ namespace
          cuLaunchKernel(mRemod, blocks, 1, 1, 256, 1, 1, 0, mStream, d2, nullptr);
          denoised = true;
       }
-      else if (mode == 1 && mDenoiser)
+      else if (mode == 1 && !denoised && mDenoiser)
       {
          OptixDenoiserLayer layer = {};
-         layer.input = image(mAverage);
+         layer.input = image(src);
          layer.output = image(out);
          OptixDenoiserGuideLayer guide = {};
          guide.albedo = image(mAlbedo);
@@ -1262,7 +1709,18 @@ namespace
                                         mDenScratch, mDenScratchBytes) == OPTIX_SUCCESS;
       }
       if (!denoised)
-         cuMemcpyDtoDAsync(out, mAverage, (size_t)mW * mH * 16, mStream);
+         cuMemcpyDtoDAsync(out, src, (size_t)mW * mH * 16, mStream);
+      // Turbo 0.70: motion blur, along each pixel's own motion since last frame.
+      if (f.motionBlur > 0.0f && mMotionBlur != nullptr && p.hasPrev)
+      {
+         const size_t outBytes = (size_t)mW * mOutScale * mH * mOutScale * 16;
+         cuMemcpyDtoDAsync(mOutTmp, out, outBytes, mStream);
+         CUdeviceptr in = mOutTmp, o = out, mo = mMotion;
+         int w = mW, h = mH, sc = mOutScale;
+         float shutter = std::min(f.motionBlur, 2.0f);         void* db[] = { &in, &o, &mo, &w, &h, &sc, &shutter };
+         cuLaunchKernel(mMotionBlur, (unsigned)((w * sc + 15) / 16), (unsigned)((h * sc + 15) / 16), 1, 16, 16, 1, 0,
+                        mStream, db, nullptr);
+      }
       cuEventRecord(mEvEnd, mStream);
       mTimed = true;
       mUpload = true;

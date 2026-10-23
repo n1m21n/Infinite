@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.62.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.70.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -75,6 +75,7 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Instance PointZ** | draws a shape at every point in one GPU draw call (P, N aim, PScale, Rotate, Color, Active per instance) |
 | **Group 3D** | up to 8 objects through one pin, nestable, 64 per Render 3D |
 | **Render passes** | Render 3D outputs colour, linear depth, raw Z, normals or position |
+| **Render 3D FX** | after a Render 3D: ambient occlusion, screen-space reflections, depth of field, motion blur (shutter up to 8 frames), from the render's depth and motion |
 | **From upstream** | Delaunay Mesh, Voronoi Cells, Curve Ops, Decimate, Material bump (height map) and texture alpha, red-border warning on a 3D pin fed the wrong kind |
 
 ### Video and output

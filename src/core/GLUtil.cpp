@@ -2,6 +2,8 @@
 #include "platform/OpenGLHeaders.h"
 #include "GLUtil.h"
 #include <algorithm>
+#include <atomic>
+#include <map>
 #include <cstring>
 #include <string>
 #include <unordered_map>
@@ -13,6 +15,17 @@
 #include <fstream>
 #include <iterator>
 #include "platform/SettingsPaths.h"
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <dbghelp.h>
+#pragma comment(lib, "dbghelp.lib")
+#endif
 
 namespace GLUtil
 {
@@ -142,7 +155,7 @@ namespace GLUtil
       sQuadVaos.erase(found);
    }
 
-   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat, const char* /*label*/)
+   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat, const char* label)
    {
       if (w <= 0 || h <= 0)
          return false;
@@ -179,6 +192,8 @@ namespace GLUtil
          return false;
       }
 
+      LabelObject(GL_TEXTURE, fbo.tex, label);
+      LabelObject(GL_FRAMEBUFFER, fbo.fbo, label);
       fbo.w = w;
       fbo.h = h;
       fbo.internalFormat = internalFormat;
@@ -204,6 +219,39 @@ namespace GLUtil
       constexpr unsigned long long kScratchIdleFrames = 300;
       std::vector<ScratchEntry> sScratch; // a handful of entries at most
       unsigned long long sScratchFrame = 0;
+
+      // Turbo 0.70: INFINITE_GPUPROF=1 - every debug group is also timed on the
+      // GPU (timestamp queries at push and pop, read two frames later without
+      // waiting) and the average per group is printed every 120 frames: which
+      // pass the GPU spends a frame on, by the same names as captures.
+      bool GpuProfOn()
+      {
+         static const bool on = getenv("INFINITE_GPUPROF") != nullptr;
+         return on;
+      }
+      struct GpuZone
+      {
+         std::string name;
+         GLuint q0 = 0, q1 = 0;
+         unsigned long long frame = 0;
+      };
+      std::vector<GLuint> sFreeQueries;
+      std::vector<GpuZone> sOpenZones, sDoneZones;
+      std::map<std::string, std::pair<double, int>> sZoneTotals; // ms, calls
+      unsigned long long sProfStart = 0;
+
+      GLuint TakeQuery()
+      {
+         if (sFreeQueries.empty())
+         {
+            GLuint q[64];
+            glGenQueries(64, q);
+            sFreeQueries.assign(q, q + 64);
+         }
+         const GLuint q = sFreeQueries.back();
+         sFreeQueries.pop_back();
+         return q;
+      }
    }
 
    Fbo* AcquireScratchFbo(int w, int h, unsigned int internalFormat)
@@ -289,6 +337,46 @@ namespace GLUtil
    void EndFrameScratchFbos()
    {
       ++sScratchFrame;
+      // INFINITE_GPUPROF: collect zones from two frames ago, report every 120.
+      if (GpuProfOn())
+      {
+         size_t used = 0;
+         for (; used < sDoneZones.size(); used++)
+         {
+            GpuZone& z = sDoneZones[used];
+            if (z.frame + 2 > sScratchFrame)
+               break;
+            GLint ready = 0;
+            glGetQueryObjectiv(z.q1, GL_QUERY_RESULT_AVAILABLE, &ready);
+            if (!ready)
+               break;
+            GLuint64 t0 = 0, t1 = 0;
+            glGetQueryObjectui64v(z.q0, GL_QUERY_RESULT, &t0);
+            glGetQueryObjectui64v(z.q1, GL_QUERY_RESULT, &t1);
+            auto& tot = sZoneTotals[z.name];
+            tot.first += (double)(t1 - t0) * 1e-6;
+            tot.second++;
+            sFreeQueries.push_back(z.q0);
+            sFreeQueries.push_back(z.q1);
+         }
+         sDoneZones.erase(sDoneZones.begin(), sDoneZones.begin() + (std::ptrdiff_t)used);
+         if (sProfStart == 0)
+            sProfStart = sScratchFrame;
+         if (sScratchFrame - sProfStart >= 120)
+         {
+            const double frames = (double)(sScratchFrame - sProfStart);
+            std::vector<std::pair<double, std::string>> rows;
+            for (const auto& kv : sZoneTotals)
+               rows.push_back({ kv.second.first / frames, kv.first });
+            std::sort(rows.rbegin(), rows.rend());
+            printf("GPUPROF (ms per frame, nested groups include their children):");
+            for (size_t i = 0; i < rows.size() && i < 12; i++)
+               printf(" [%s %.2f]", rows[i].second.c_str(), rows[i].first);
+            printf("\n");
+            sZoneTotals.clear();
+            sProfStart = sScratchFrame;
+         }
+      }
       for (size_t i = 0; i < sScratch.size();)
       {
          if (sScratchFrame - sScratch[i].lastUsedFrame > kScratchIdleFrames)
@@ -891,5 +979,166 @@ namespace GLUtil
          glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
       return got;
+   }
+
+   // Turbo 0.70 (F3): GL_KHR_debug groups, labels and debug output.
+   namespace
+   {
+      bool KhrDebug()
+      {
+         static const bool has = GLEW_VERSION_4_3 || GLEW_KHR_debug;
+         return has;
+      }
+
+      // Open debug groups, innermost last (main thread). With synchronous
+      // output (INFINITE_GLDEBUG=sync) the callback runs inside the failing
+      // call, so it can say which group the message came from.
+      std::vector<std::string> sGroups;
+      bool sSyncOutput = false;
+
+      // Synchronous errors: the calling code, from the PDB next to the exe
+      // (Release builds link /DEBUG:FULL). Once per calling site, at most 32.
+      void PrintCallers()
+      {
+#ifdef _WIN32
+         static std::vector<DWORD64> sShown;
+         static bool sSymbols = false;
+         HANDLE process = GetCurrentProcess();
+         if (!sSymbols)
+         {
+            SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+            sSymbols = SymInitialize(process, nullptr, TRUE) != FALSE;
+         }
+         void* frames[24];
+         const USHORT n = CaptureStackBackTrace(0, 24, frames, nullptr);
+         int printed = 0;
+         for (USHORT i = 0; i < n && printed < 8; i++)
+         {
+            alignas(SYMBOL_INFO) char buf[sizeof(SYMBOL_INFO) + 256];
+            SYMBOL_INFO* sym = reinterpret_cast<SYMBOL_INFO*>(buf);
+            sym->SizeOfStruct = sizeof(SYMBOL_INFO);
+            sym->MaxNameLen = 255;
+            DWORD64 disp = 0;
+            if (!sSymbols || !SymFromAddr(process, (DWORD64)frames[i], &disp, sym))
+               continue;
+            // Skip this file's frames and the driver's.
+            IMAGEHLP_LINE64 line = {};
+            line.SizeOfStruct = sizeof(line);
+            DWORD lineDisp = 0;
+            if (!SymGetLineFromAddr64(process, (DWORD64)frames[i], &lineDisp, &line))
+               continue;
+            if (strstr(line.FileName, "GLUtil.cpp") != nullptr)
+               continue;
+            if (printed == 0)
+            {
+               // The first frame outside this file is the site: report it once.
+               const DWORD64 site = (DWORD64)frames[i];
+               if (sShown.size() >= 32 || std::find(sShown.begin(), sShown.end(), site) != sShown.end())
+                  return;
+               sShown.push_back(site);
+            }
+            fprintf(stderr, "    at %s (%s:%lu)\n", sym->Name, line.FileName, line.LineNumber);
+            printed++;
+         }
+#endif
+      }
+
+      void GLAPIENTRY DebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/,
+                                    const GLchar* message, const void* /*user*/)
+      {
+         if (severity == GL_DEBUG_SEVERITY_NOTIFICATION || type == GL_DEBUG_TYPE_PUSH_GROUP ||
+             type == GL_DEBUG_TYPE_POP_GROUP)
+            return;
+         // The driver may call this from its own thread.
+         static std::atomic<int> sCount{ 0 };
+         static const int sMax = getenv("INFINITE_GLDEBUG_MAX") ? atoi(getenv("INFINITE_GLDEBUG_MAX")) : 200;
+         const int n = ++sCount;
+         if (n > sMax)
+         {
+            if (n == sMax + 1)
+               fprintf(stderr, "GL debug: further messages suppressed (INFINITE_GLDEBUG_MAX)\n");
+            return;
+         }
+         const char* kind = type == GL_DEBUG_TYPE_ERROR                ? "error"
+                            : type == GL_DEBUG_TYPE_PERFORMANCE         ? "performance"
+                            : type == GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR  ? "undefined behaviour"
+                            : type == GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR ? "deprecated"
+                                                                        : "other";
+         std::string where;
+         if (sSyncOutput)
+         {
+            for (const std::string& g : sGroups)
+               where += (where.empty() ? " in " : " > ") + g;
+            if (where.empty())
+               where = " outside any group";
+         }
+         // sScratchFrame counts main-loop frames (EndFrameScratchFbos).
+         fprintf(stderr, "GL debug [%s, id %u, source 0x%x, frame %llu]%s: %s\n", kind, id, source, sScratchFrame,
+                 where.c_str(), message);
+         if (sSyncOutput && (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_PERFORMANCE))
+            PrintCallers();
+      }
+   }
+
+   void PushDebugGroup(const char* name)
+   {
+      if (GpuProfOn())
+      {
+         GpuZone z;
+         z.name = name != nullptr ? name : "";
+         z.q0 = TakeQuery();
+         glQueryCounter(z.q0, GL_TIMESTAMP);
+         sOpenZones.push_back(std::move(z));
+      }
+      if (!KhrDebug())
+         return;
+      glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, name != nullptr ? name : "");
+      if (sSyncOutput)
+         sGroups.push_back(name != nullptr ? name : "");
+   }
+
+   void PopDebugGroup()
+   {
+      if (GpuProfOn() && !sOpenZones.empty())
+      {
+         GpuZone z = std::move(sOpenZones.back());
+         sOpenZones.pop_back();
+         z.q1 = TakeQuery();
+         glQueryCounter(z.q1, GL_TIMESTAMP);
+         z.frame = sScratchFrame;
+         sDoneZones.push_back(std::move(z));
+      }
+      if (!KhrDebug())
+         return;
+      glPopDebugGroup();
+      if (sSyncOutput && !sGroups.empty())
+         sGroups.pop_back();
+   }
+
+   void LabelObject(unsigned int identifier, unsigned int object, const char* label)
+   {
+      if (KhrDebug() && object != 0 && label != nullptr)
+         glObjectLabel(identifier, object, -1, label);
+   }
+
+   void InstallDebugOutput()
+   {
+      const char* env = getenv("INFINITE_GLDEBUG");
+#ifdef NDEBUG
+      if (env == nullptr)
+         return;
+#endif
+      if (!KhrDebug())
+      {
+         fprintf(stderr, "GL debug: GL_KHR_debug not available\n");
+         return;
+      }
+      glEnable(GL_DEBUG_OUTPUT);
+      // "sync": slower, but each message names the debug group it came from.
+      sSyncOutput = env != nullptr && strcmp(env, "sync") == 0;
+      if (sSyncOutput)
+         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+      glDebugMessageCallback(DebugCallback, nullptr);
+      fprintf(stderr, "GL debug output on%s\n", sSyncOutput ? " (synchronous)" : "");
    }
 }

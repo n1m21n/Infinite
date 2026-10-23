@@ -2,6 +2,8 @@
 
 #include "PopOpsInternal.h"
 #include "PopCpu.h"
+#include "GpuAlgo.h"
+#include "PopGpu.h"
 
 #include <numeric>
 
@@ -70,6 +72,85 @@ namespace pop
          d.cook = [](CookCtx& c) {
             if (!NeedLines(c))
                return true;
+            // Turbo 0.70 (P6): a GPU-made line resampled by count on the GPU. The
+            // layout (which line, which row) comes from the topology, once per
+            // topology and count; the segments and lerp factors from the lengths
+            // summed on the GPU (gpu::ResampleStencil), every attribute through
+            // ApplyStencil - nothing comes down. By segment length the number of
+            // rows depends on the length itself, so that mode stays on the CPU.
+            {
+               const PopData& in = *c.Input(0);
+               bool onGpu = false;
+               for (const PopAttrib& at : in.attribs)
+                  onGpu = onGpu || !at.buffer->OnCpu();
+               if (c.I("by") == 0 && onGpu && gpu::Available())
+               {
+                  struct ResampleState : OpState
+                  {
+                     TopologyPtr src;
+                     int points = -1, count = 0;
+                     gpu::ResampleLayout layout;
+                     std::shared_ptr<PopTopology> topo;
+                  };
+                  ResampleState& s = c.State<ResampleState>();
+                  const int want = std::max(2, c.I("count"));
+                  if (s.src != in.topo || s.points != in.pointCount || s.count != want)
+                  {
+                     std::vector<uint32_t> pts, start, len, rowStrip, rowJ, offs = { 0 };
+                     std::vector<float> den;
+                     auto o = NewTopo();
+                     int strips = 0;
+                     for (const Strip& st : Strips(in.Topo()))
+                     {
+                        const int n = (int)st.pts.size() + (st.closed ? 1 : 0);
+                        if (n < 2)
+                           continue;
+                        const int count = st.closed ? std::max(3, want) : want;
+                        const int rows = st.closed ? count - 1 : count;
+                        start.push_back((uint32_t)pts.size());
+                        len.push_back((uint32_t)n);
+                        den.push_back((float)(count - 1));
+                        for (int p : st.pts)
+                           pts.push_back((uint32_t)p);
+                        if (st.closed)
+                           pts.push_back((uint32_t)st.pts.front());
+                        std::vector<uint32_t> strip;
+                        for (int j = 0; j < rows; j++)
+                        {
+                           strip.push_back((uint32_t)rowJ.size());
+                           rowStrip.push_back((uint32_t)strips);
+                           rowJ.push_back((uint32_t)j);
+                           offs.push_back(offs.back() + 2);
+                        }
+                        o->AddStrip(strip, st.closed);
+                        strips++;
+                     }
+                     gpu::ResampleLayout& l = s.layout;
+                     l.strips = strips;
+                     l.rows = (int)rowJ.size();
+                     l.ptsCount = (int)pts.size();
+                     l.pts = gpu::UintBuffer(pts);
+                     l.start = gpu::UintBuffer(start);
+                     l.len = gpu::UintBuffer(len);
+                     l.den = MakeBuffer(den.empty() ? std::vector<float>(1, 1.0f) : std::move(den), 1);
+                     l.rowStrip = gpu::UintBuffer(rowStrip);
+                     l.rowJ = gpu::UintBuffer(rowJ);
+                     l.offs = gpu::UintBuffer(offs);
+                     s.topo = o;
+                     s.src = in.topo;
+                     s.points = in.pointCount;
+                     s.count = want;
+                  }
+                  gpu::GpuStencil stencil;
+                  if (gpu::ResampleStencil(in, s.layout, stencil))
+                     if (auto out = gpu::ApplyStencil(in, stencil))
+                     {
+                        out->topo = s.topo;
+                        c.out = out;
+                        return true;
+                     }
+               }
+            }
             Arrays a = Load(*c.Input(0));
             PointBuilder b(a);
             auto o = NewTopo();
@@ -112,11 +193,78 @@ namespace pop
          d.cook = [](CookCtx& c) {
             if (!NeedLines(c))
                return true;
+            const int div = std::max(1, c.I("div"));
+            const bool smooth = c.I("interp") == 1;
+            // Turbo 0.70 (P6): a GPU-made line divided on the GPU - the same
+            // Copy / Lerp / Catmull-Rom rows as below as a stencil, built once per
+            // topology and settings, applied by gpu::ApplyStencil (same numbers).
+            {
+               const PopData& in = *c.Input(0);
+               bool onGpu = false;
+               for (const PopAttrib& at : in.attribs)
+                  onGpu = onGpu || !at.buffer->OnCpu();
+               if (onGpu && gpu::Available())
+               {
+                  struct DivideState : OpState
+                  {
+                     TopologyPtr src;
+                     int points = -1, div = 0;
+                     bool smooth = false;
+                     gpu::GpuStencil stencil;
+                     std::shared_ptr<PopTopology> topo;
+                  };
+                  DivideState& s = c.State<DivideState>();
+                  if (s.src != in.topo || s.points != in.pointCount || s.div != div || s.smooth != smooth)
+                  {
+                     gpu::RowStencil b;
+                     auto o = NewTopo();
+                     for (const Strip& st : Strips(in.Topo()))
+                     {
+                        const int n = (int)st.pts.size();
+                        if (n < 2)
+                           continue;
+                        auto at = [&](int i) {
+                           return st.closed ? st.pts[(size_t)((i % n + n) % n)] : st.pts[(size_t)std::max(0, std::min(n - 1, i))];
+                        };
+                        std::vector<uint32_t> strip;
+                        const int segs = st.closed ? n : n - 1;
+                        for (int k = 0; k < segs; k++)
+                           for (int j = 0; j < div; j++)
+                           {
+                              const float u = (float)j / div;
+                              if (!smooth || j == 0)
+                              {
+                                 strip.push_back(j == 0 ? b.Copy((uint32_t)at(k)) : b.Lerp((uint32_t)at(k), (uint32_t)at(k + 1), u));
+                                 continue;
+                              }
+                              const float u2 = u * u, u3 = u2 * u;
+                              const float w[4] = { 0.5f * (-u3 + 2 * u2 - u), 0.5f * (3 * u3 - 5 * u2 + 2),
+                                                   0.5f * (-3 * u3 + 4 * u2 + u), 0.5f * (u3 - u2) };
+                              const int idx[4] = { at(k - 1), at(k), at(k + 1), at(k + 2) };
+                              strip.push_back(b.Weighted(idx, w, 4));
+                           }
+                        if (!st.closed)
+                           strip.push_back(b.Copy((uint32_t)st.pts.back()));
+                        o->AddStrip(strip, st.closed);
+                     }
+                     s.stencil = gpu::Upload(b);
+                     s.topo = o;
+                     s.src = in.topo;
+                     s.points = in.pointCount;
+                     s.div = div;
+                     s.smooth = smooth;
+                  }
+                  if (auto out = gpu::ApplyStencil(in, s.stencil))
+                  {
+                     out->topo = s.topo;
+                     c.out = out;
+                     return true;
+                  }
+               }
+            }
             Arrays a = Load(*c.Input(0));
             PointBuilder b(a);
             auto o = NewTopo();
-            const int div = std::max(1, c.I("div"));
-            const bool smooth = c.I("interp") == 1;
             for (const Strip& s : Strips(c.Input(0)->Topo()))
             {
                const int n = (int)s.pts.size();
@@ -256,8 +404,99 @@ namespace pop
             if (!NeedLines(c))
                return true;
             const PopData& in = *c.Input(0);
-            std::vector<float> P = in.Read(attr::P, 3);
             const float k = c.F("strength");
+            // Turbo 0.70 (P6): a GPU-made line relaxed on the GPU. Each point's
+            // two neighbours and whether it moves are built once per topology;
+            // every pass is a kernel with the CPU's formula (`precise`: no fused
+            // multiply-add on compute, so the same numbers).
+            const PopAttrib* pAttr = in.Find(attr::P);
+            if (pAttr != nullptr && !pAttr->buffer->OnCpu() && gpu::Available() && c.I("iter") > 0)
+            {
+               struct SmoothState : OpState
+               {
+                  TopologyPtr src; // kept alive: the pointer is the cache key
+                  int points = -1;
+                  bool ends = false;
+                  BufferPtr a0, a1, move;
+               };
+               SmoothState& s = c.State<SmoothState>();
+               const bool ends = c.Bl("ends");
+               if (s.src != in.topo || s.points != in.pointCount || s.ends != ends)
+               {
+                  const size_t n = (size_t)in.pointCount;
+                  std::vector<float> a0(n, 0.0f), a1(n, 0.0f), mv(n, 0.0f);
+                  for (const Strip& st : Strips(in.Topo()))
+                  {
+                     const int sn = (int)st.pts.size();
+                     for (int j = 0; j < sn; j++)
+                     {
+                        const bool end = !st.closed && (j == 0 || j == sn - 1);
+                        if (end && !ends)
+                           continue;
+                        const int p = st.pts[(size_t)j];
+                        if (p < 0 || (size_t)p >= n)
+                           continue;
+                        a0[(size_t)p] = (float)st.pts[(size_t)(j > 0 ? j - 1 : (st.closed ? sn - 1 : 0))];
+                        a1[(size_t)p] = (float)st.pts[(size_t)(j + 1 < sn ? j + 1 : (st.closed ? 0 : sn - 1))];
+                        mv[(size_t)p] = 1.0f;
+                     }
+                  }
+                  s.a0 = MakeBuffer(std::move(a0), 1);
+                  s.a1 = MakeBuffer(std::move(a1), 1);
+                  s.move = MakeBuffer(std::move(mv), 1);
+                  s.src = in.topo;
+                  s.points = in.pointCount;
+                  s.ends = ends;
+               }
+               auto io = [](const char* name, int comps) {
+                  KernelIO x;
+                  x.name = name;
+                  x.comps = comps;
+                  x.input = 0;
+                  return x;
+               };
+               KernelSpec spec;
+               spec.reads = { io(attr::P, 3), io("PzA0", 1), io("PzA1", 1), io("PzMove", 1) };
+               spec.lookups = { io(attr::P, 3) };
+               spec.writes = { io(attr::P, 3) };
+               spec.body = "if (PzMove > 0.5)\n"
+                           "{\n"
+                           "   vec3 a = fetch_P(int(PzA0));\n"
+                           "   vec3 b = fetch_P(int(PzA1));\n"
+                           "   precise vec3 mid = 0.5 * (a + b);\n"
+                           "   precise vec3 moved = P + (mid - P) * uK;\n"
+                           "   P = moved;\n"
+                           "}\n";
+               KernelUniform uK;
+               uK.name = "uK";
+               uK.type = KernelUniform::kFloat;
+               uK.v[0] = k;
+               auto cur = ShallowCopy(in);
+               cur->Set("PzA0", s.a0);
+               cur->Set("PzA1", s.a1);
+               cur->Set("PzMove", s.move);
+               bool ok = true;
+               for (int it = 0; it < c.I("iter") && ok; it++)
+               {
+                  KernelEnv env = c.env;
+                  env.lookupData[0] = cur.get();
+                  std::vector<BufferPtr> out;
+                  std::string err;
+                  ok = RunKernel(spec, *cur, { uK }, env, out, err);
+                  if (ok)
+                  {
+                     auto next = ShallowCopy(*cur);
+                     next->Set(attr::P, out[0]);
+                     cur = next;
+                  }
+               }
+               if (ok)
+               {
+                  c.out->Set(attr::P, cur->Find(attr::P)->buffer);
+                  return true;
+               }
+            }
+            std::vector<float> P = in.Read(attr::P, 3);
             const auto strips = Strips(in.Topo());
             for (int it = 0; it < c.I("iter"); it++)
                for (const Strip& s : strips)

@@ -73,24 +73,45 @@ def main():
     ap.add_argument("report")
     ap.add_argument("--img-tol", type=float, default=0.04)
     ap.add_argument("--mod-tol", type=float, default=0.02)
+    ap.add_argument("--gate", action="store_true",
+                    help="Turbo 0.70: exit 1 when a patch regresses (ok -> crash / hang / nojson)")
     args = ap.parse_args()
 
     sr, sn = load_status(args.ref), load_status(args.new)
-    names = sorted(set(sr) | set(sn))
+    # Turbo 0.70: pair runs by patch name (without compat.ps1's "NNN_" order
+    # prefix; the k-th patch of a repeated name with the k-th), so a patch
+    # added to a corpus folder does not shift every pair after it.
+    def keyed(status):
+        seen, out = collections.Counter(), {}
+        for run in sorted(status):
+            head, _, tail = run.partition("_")
+            base = tail if head.isdigit() and tail else run
+            out[(base, seen[base])] = run
+            seen[base] += 1
+        return out
+    kr, kn = keyed(sr), keyed(sn)
+    keys = sorted(set(kr) | set(kn))
+    names = [k[0] if k[1] == 0 else "%s (%d)" % (k[0], k[1] + 1) for k in keys]
+    new_only = [n for k, n in zip(keys, names) if k not in kr]
     verdicts = collections.Counter()
     regressions, fixed, differing = [], [], []
     unknown_types = collections.Counter()
     unknown_keys = collections.Counter()
     ref_unknown_types = collections.Counter()
     clean = 0
-    for name in names:
-        vr, vn = sr.get(name, "missing"), sn.get(name, "missing")
+    for key, name in zip(keys, names):
+        rrun, nrun = kr.get(key), kn.get(key)
+        vr = sr.get(rrun, "missing") if rrun else "no reference"
+        vn = sn.get(nrun, "missing") if nrun else "missing"
         verdicts[vn] += 1
-        if vr == "ok" and vn != "ok":
+        if rrun is None:
+            pass  # a patch added since the reference: listed below, not a regression
+        elif vr == "ok" and vn != "ok":
             regressions.append("%s: %s -> %s" % (name, vr, vn))
         elif vr != "ok" and vn == "ok":
             fixed.append("%s: %s -> %s" % (name, vr, vn))
-        jr, jn = load_json(args.ref, name), load_json(args.new, name)
+        jr = load_json(args.ref, rrun) if rrun else None
+        jn = load_json(args.new, nrun) if nrun else None
         if jn:
             for t in jn.get("unknownTypes", []):
                 unknown_types[t] += 1
@@ -119,6 +140,9 @@ def main():
     L.append("## Fixed (not ok in ref, ok in new): %d" % len(fixed))
     L += ["- " + r for r in fixed]
     L.append("")
+    L.append("## New patches, no reference yet (record one with -RecordRef): %d" % len(new_only))
+    L += ["- " + n for n in new_only]
+    L.append("")
     L.append("## Unknown node types in new (patches using each)")
     for t, c in unknown_types.most_common():
         L.append("- %s: %d" % (t, c))
@@ -140,6 +164,8 @@ def main():
         f.write("\n".join(L) + "\n")
     print("report: %s (%d regressions, %d differing, %d unknown types, %d unknown keys)"
           % (args.report, len(regressions), len(differing), len(unknown_types), len(unknown_keys)))
+    if args.gate and regressions:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

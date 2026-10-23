@@ -29,11 +29,22 @@ namespace pop
    // back to a pool keyed by size and kernel outputs take them from there.
    // Only GPU-side writes (transform feedback) reuse a store, so reuse never
    // makes the CPU wait for a draw that still reads it.
+   // Turbo 0.70 (F5): a freed store waits two frames before it is handed out
+   // again. Reused at once, a kernel wrote a store that this frame's draws
+   // (or an async copy) still read, and the GPU had to finish those first.
    namespace
    {
+      struct PendingStore
+      {
+         unsigned int id;
+         size_t bytes;
+         unsigned long long frame;
+      };
       struct GpuPool
       {
          std::unordered_map<size_t, std::vector<unsigned int>> free;
+         std::vector<PendingStore> pending;
+         unsigned long long frame = 0;
          size_t bytes = 0;
          int entries = 0;
       };
@@ -80,9 +91,25 @@ namespace pop
          glDeleteBuffers(1, &id);
          return;
       }
-      p.free[bytes].push_back(id);
+      p.pending.push_back({ id, bytes, p.frame });
       p.bytes += bytes;
       p.entries++;
+   }
+
+   void EndFrameGpuPool()
+   {
+      GpuPool& p = Pool();
+      p.frame++;
+      size_t keep = 0;
+      for (size_t i = 0; i < p.pending.size(); i++)
+      {
+         const PendingStore& s = p.pending[i];
+         if (s.frame + 2 <= p.frame)
+            p.free[s.bytes].push_back(s.id);
+         else
+            p.pending[keep++] = s;
+      }
+      p.pending.resize(keep);
    }
 
    PopBuffer::~PopBuffer()

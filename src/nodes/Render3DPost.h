@@ -37,6 +37,12 @@ public:
    // show the environment, so only the alpha follows coverage.
    unsigned int FinishCoverage(unsigned int src, int w, int h, int tonemap, float bloom, float bloomThreshold,
                                float bloomRadius, const float bg[3], float bgOpacity, bool envBackground = false);
+   // Turbo 0.70 (R4): TAA output over the plain background. `coverage` (R16F,
+   // w x h) is the geometry's share of each pixel, averaged with the TAA
+   // history: the cleared background is taken out before the tonemap and put
+   // back after, so a soft edge keeps the exact background colour and alpha.
+   unsigned int FinishTaa(unsigned int src, unsigned int coverage, int w, int h, int tonemap, float bloom,
+                          float bloomThreshold, float bloomRadius, const float bg[3], float bgOpacity);
    unsigned int Output() const { return mOutTex; }
 
    // 360: the six cube faces (RGBA8 2D array, Render3DNode's face order and

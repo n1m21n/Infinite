@@ -1,4 +1,6 @@
 #include "NodeViewport.h"
+#include "GLUtil.h"
+#include "Profile.h"
 
 #include "platform/OpenGLHeaders.h"
 #include <algorithm>
@@ -68,6 +70,13 @@ namespace
       "uniform vec3 uCamPos;\n"
       "uniform sampler2D uTexture;\n"
       "uniform int uHasTexture;\n"
+      // Turbo 0.70: the Material's main sliders show in the thumbnail -
+      // metallic, roughness and specular shape a GGX highlight and a simple
+      // sky reflection, emission adds on top. Still one light, no shadows.
+      "uniform float uMetallic;\n"
+      "uniform float uRoughness;\n"
+      "uniform float uSpecular;\n"
+      "uniform vec3 uEmission;\n"
       "void main() {\n"
       "   vec3 n = normalize(vNormal);\n"
       "   if (!gl_FrontFacing) n = -n;\n"
@@ -77,8 +86,23 @@ namespace
       "   float ndl = max(dot(n, l), 0.0);\n"
       "   vec3 viewDir = normalize(uCamPos - vWorldPos);\n"
       "   vec3 halfVec = normalize(l + viewDir);\n"
-      "   float spec = pow(max(dot(n, halfVec), 0.0), 24.0) * 0.15;\n"
-      "   vec3 color = base * (0.35 + ndl * 0.8) + vec3(spec);\n"
+      "   float metal = clamp(uMetallic, 0.0, 1.0);\n"
+      "   float rough = clamp(uRoughness, 0.04, 1.0);\n"
+      "   float ndv = max(dot(n, viewDir), 1e-3);\n"
+      "   float ndh = max(dot(n, halfVec), 0.0);\n"
+      "   vec3 f0 = mix(vec3(0.08 * clamp(uSpecular, 0.0, 1.0)), base, metal);\n"
+      "   vec3 F = f0 + (1.0 - f0) * pow(1.0 - max(dot(halfVec, viewDir), 0.0), 5.0);\n"
+      "   float a2 = rough * rough * rough * rough;\n"
+      "   float d = ndh * ndh * (a2 - 1.0) + 1.0;\n"
+      "   float D = a2 / (3.14159 * d * d);\n"
+      "   float k = (rough + 1.0) * (rough + 1.0) / 8.0;\n"
+      "   float G = ndl / (ndl * (1.0 - k) + k) * ndv / (ndv * (1.0 - k) + k);\n"
+      "   vec3 spec = min(F * D * G / (4.0 * ndl * ndv + 1e-4), vec3(8.0)) * ndl * 0.8;\n"
+      "   vec3 r = reflect(-viewDir, n);\n"
+      "   vec3 sky = mix(vec3(0.16, 0.16, 0.18), vec3(0.85, 0.88, 0.95), clamp(r.y * 0.5 + 0.5, 0.0, 1.0));\n"
+      "   vec3 Fr = f0 + (max(vec3(1.0 - rough), f0) - f0) * pow(1.0 - ndv, 5.0);\n"
+      "   vec3 env = mix(sky, vec3(0.45), rough) * Fr;\n"
+      "   vec3 color = base * (1.0 - metal) * (0.35 + ndl * 0.8) + spec + env + uEmission;\n"
       "   fragColor = vec4(color, 1.0);\n"
       "}\n";
 
@@ -573,6 +597,9 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
 {
    if (geo == nullptr)
       return 0;
+   GLUtil::DebugScope debugGroup("Preview 3D"); // Turbo 0.70 (F3): GPU captures
+   INF_PROFILE_ZONE("Preview 3D"); // Turbo 0.70 (F2)
+   INF_PROFILE_GPU_ZONE("Preview 3D");
    // Turbo 0.62: PointZ never goes through GetMesh() here (see BindPop).
    static const Mesh kNoMesh;
    const pop::PopData* pd = geo->GetPop();
@@ -809,6 +836,13 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    glUniformMatrix4fv(glGetUniformLocation(program, "uViewProj"), 1, GL_FALSE, viewProj.m);
    glUniformMatrix3fv(glGetUniformLocation(program, "uNormalMatrix"), 1, GL_FALSE, normalMatrix);
    glUniform3fv(glGetUniformLocation(program, "uBaseColor"), 1, material.color);
+   // Turbo 0.70: the rest of the Material the thumbnail shows.
+   glUniform1f(glGetUniformLocation(program, "uMetallic"), material.metallic);
+   glUniform1f(glGetUniformLocation(program, "uRoughness"), material.roughness);
+   glUniform1f(glGetUniformLocation(program, "uSpecular"), material.specular);
+   const float emission[3] = { material.emissionColor[0] * material.emission, material.emissionColor[1] * material.emission,
+                               material.emissionColor[2] * material.emission };
+   glUniform3fv(glGetUniformLocation(program, "uEmission"), 1, emission);
    glUniform3fv(glGetUniformLocation(program, "uCamPos"), 1, eye);
    const float lightDir[3] = { 0.4f, 0.85f, 0.35f };
    glUniform3fv(glGetUniformLocation(program, "uLightDir"), 1, lightDir);

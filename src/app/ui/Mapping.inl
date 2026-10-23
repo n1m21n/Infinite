@@ -342,6 +342,13 @@
          if (slot >= 0 && slot < Switcher3DNode::kSlots)
             sw3->inputs[slot] = nullptr;
       }
+      // Turbo 0.70: any other geometry pin (PointZ operators, Material, ...).
+      // Without this a PointZ -> PointZ cable "deleted" in the editor stayed in
+      // the node's inputs and came back the next frame.
+      else if (IGeometrySource** geoSlot = dst->node->GeometryInputSlot(GraphNode::InputSlotFromPin(dstPin)))
+      {
+         *geoSlot = nullptr;
+      }
       else if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst->node.get()))
       {
          audio->fileSource = nullptr;

@@ -424,9 +424,13 @@ namespace MasterDsp
          to.a2 = from.a2;
       }
 
+      // Turbo 0.70: the floor is 0.01 ms. It was 0.01 s (the max was taken
+      // after the ms -> s conversion), so every time under 10 ms - the
+      // compressor's 0.1..10 ms attack range, a short limiter release - ran
+      // as 10 ms. Found by AUDIOPARAMSWEEPTEST's input-step stage.
       float TimeCoef(float ms) const
       {
-         return (float)std::exp(-1.0 / (std::max(0.01, (double)ms * 0.001) * mSampleRate));
+         return (float)std::exp(-1.0 / (std::max(0.01, (double)ms) * 0.001 * mSampleRate));
       }
 
       void CompWet(float* L, float* R, int N)

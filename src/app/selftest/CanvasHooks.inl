@@ -1087,6 +1087,26 @@
 
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
       {
+         // Turbo 0.70: params a paste re-derives on purpose, so a copy differs
+         // from its source there by design (none are lost on save/load, which
+         // is checked separately below without exceptions).
+         // - Drum Sequencer: a lane's trims are clamped to 0..1 (end >= start)
+         //   when the pasted lane reloads its sample; the test's mutator
+         //   pushes them out of range. In range they must match.
+         // - Looper: a pasted Looper gets its own loop id and file, so it
+         //   never shares (and overwrites) the original's recorded audio.
+         auto PasteDerivedKey = [](const std::string& type, const std::string& key, const std::string& want,
+                                   const std::string& got) {
+            if (type == "Looper")
+               return key == "s loopId" || key == "s loopFile";
+            if (type == "Drum Sequencer" && key.rfind("f lane", 0) == 0 &&
+                (key.size() > 6 && (key.compare(key.size() - 6, 6, "_start") == 0 || key.compare(key.size() - 4, 4, "_end") == 0)))
+            {
+               const float w = std::strtof(want.c_str(), nullptr), g = std::strtof(got.c_str(), nullptr);
+               return g >= 0.0f && g <= 1.0f && (w < 0.0f || w > 1.0f);
+            }
+            return false;
+         };
          // Every node type that declares params must survive both paths that
          // restore a node from bare settings: copy/paste (CopyParams) and
          // patch load (Patch::LoadParams). This is what caught FormulaNode,
@@ -1136,10 +1156,24 @@
                CopyParams(b.get(), a.get());
                std::vector<std::pair<std::string, std::string>> paramsB;
                Patch::SaveParams(b.get(), paramsB);
-               if (paramsB != paramsA)
+               // Turbo 0.70: the keys a paste re-derives on purpose (see
+               // kPasteDerived) are left out; every other key must match, and
+               // the list names the ones that did not.
+               std::string diffKeys;
+               {
+                  std::map<std::string, std::string> wantA(paramsA.begin(), paramsA.end());
+                  std::map<std::string, std::string> gotB(paramsB.begin(), paramsB.end());
+                  std::set<std::string> allKeys;
+                  for (const auto& kv : wantA) allKeys.insert(kv.first);
+                  for (const auto& kv : gotB) allKeys.insert(kv.first);
+                  for (const std::string& k : allKeys)
+                     if (wantA[k] != gotB[k] && !PasteDerivedKey(name, k, wantA[k], gotB[k]))
+                        diffKeys += " " + k;
+               }
+               if (!diffKeys.empty())
                {
                   copyFails++;
-                  copyFailNames.push_back(name);
+                  copyFailNames.push_back(name + " (" + diffKeys.substr(1) + ")");
                }
 
                std::unique_ptr<INode> c(NodeFactory::Instance().MakeNode(name));
@@ -1550,7 +1584,619 @@
          printf("%s\n", ok ? "PHASE E OK" : "SUSPECT");
       }
 
-      if (getenv("INFINITE_POPTEST") != nullptr && frameId == 4)
+      // Turbo 0.70 (P3): Particle PointZ, GPU engine against the CPU engine, same
+      // seed and params, 90 frames of births, deaths, drag, damping, random
+      // velocity, jitter, size and colour over life (rule R5). Same random draws,
+      // so the same particles: counts and ids exactly, positions to float noise.
+      if (getenv("INFINITE_PARTICLEGPUTEST") != nullptr && frameId == 3)
+      {
+         std::unique_ptr<PopNode> grid(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+         std::unique_ptr<PopNode> cpu(static_cast<PopNode*>(PopNode::CreateFor("Particle PointZ")));
+         std::unique_ptr<PopNode> gpu(static_cast<PopNode*>(PopNode::CreateFor("Particle PointZ")));
+         auto set = [](PopNode* n, const char* key, float v) {
+            n->Values().f[(size_t)n->Def().FloatOffset(n->Def().ParamIndex(key))] = v;
+         };
+         for (PopNode* n : { cpu.get(), gpu.get() })
+         {
+            n->inputs[0] = grid.get();
+            set(n, "rate", 3000.0f);
+            set(n, "life", 0.5f);
+            set(n, "lifeVar", 0.5f);
+            set(n, "velRand", 0.5f);
+            set(n, "jitter", 0.1f);
+            set(n, "drag", 0.2f);
+            set(n, "damp", 0.1f);
+            set(n, "sizeBirth", 1.0f);
+            set(n, "sizeDeath", 0.0f);
+            set(n, "colorLife", 1.0f);
+         }
+         set(cpu.get(), "engine", 0.0f);
+         set(gpu.get(), "engine", 1.0f);
+         int frame = 1000;
+         int maxSeen = 0;
+         for (int f = 0; f < 90; f++)
+         {
+            grid->CookIfNeeded(++frame);
+            cpu->CookIfNeeded(frame);
+            gpu->CookIfNeeded(frame);
+            maxSeen = std::max(maxSeen, cpu->PointCount());
+         }
+         const pop::PopData* a = cpu->GetPop();
+         const pop::PopData* b = gpu->GetPop();
+         const int na = a ? a->pointCount : -1, nb = b ? b->pointCount : -1;
+         bool ok = a != nullptr && b != nullptr && na == nb && na > 0 && gpu->CookError().empty();
+         auto cmp = [&](const char* name, int comps, double tol) {
+            if (!ok)
+               return;
+            const std::vector<float> va = a->Read(name, comps), vb = b->Read(name, comps);
+            double worst = 0.0;
+            for (size_t k = 0; k < va.size() && k < vb.size(); k++)
+               worst = std::max(worst, std::fabs((double)va[k] - (double)vb[k]) / (1.0 + std::fabs((double)va[k])));
+            const bool pass = va.size() == vb.size() && worst <= tol;
+            printf("  %-14s max rel diff %.3g  %s\n", name, worst, pass ? "ok" : "FAIL");
+            ok = ok && pass;
+         };
+         printf("  particles: CPU %d, GPU %d (peak %d), gpu error '%s'\n", na, nb, maxSeen, gpu->CookError().c_str());
+         cmp(pop::attr::PartId, 1, 0.0);
+         cmp(pop::attr::PartAge, 1, 0.0);
+         cmp(pop::attr::PartLifeSpan, 1, 0.0);
+         cmp(pop::attr::P, 3, 1e-4);
+         cmp(pop::attr::PartVel, 3, 1e-4);
+         cmp(pop::attr::PScale, 1, 1e-4);
+         cmp(pop::attr::Color, 4, 1e-4);
+
+         // Killing through the force chain: Particle -> Group (PartDeath inside
+         // a sphere) -> Null tagged as the target, for each engine.
+         {
+            std::unique_ptr<PopNode> loops[2][3];
+            const char* tags[2] = { "particlegputest_cpu", "particlegputest_gpu" };
+            for (int e = 0; e < 2; e++)
+            {
+               loops[e][0].reset(static_cast<PopNode*>(PopNode::CreateFor("Particle PointZ")));
+               loops[e][1].reset(static_cast<PopNode*>(PopNode::CreateFor("Group PointZ")));
+               loops[e][2].reset(static_cast<PopNode*>(PopNode::CreateFor("Null PointZ")));
+               PopNode* p = loops[e][0].get();
+               PopNode* grp = loops[e][1].get();
+               PopNode* nul = loops[e][2].get();
+               p->inputs[0] = grid.get();
+               grp->inputs[0] = p;
+               nul->inputs[0] = grp;
+               set(p, "rate", 3000.0f);
+               set(p, "life", 0.6f);
+               set(p, "velRand", 0.8f);
+               set(p, "engine", (float)e);
+               grp->Values().s[(size_t)grp->Def().ParamIndex("name")] = "PartDeath";
+               set(grp, "by", 1.0f); // sphere
+               set(grp, "radius", 0.35f);
+               nul->Values().s[(size_t)nul->Def().ParamIndex("tag")] = tags[e];
+               p->Values().s[(size_t)p->Def().ParamIndex("target")] = tags[e];
+            }
+            for (int f = 0; f < 90; f++)
+            {
+               grid->CookIfNeeded(++frame);
+               for (int e = 0; e < 2; e++)
+                  for (int k = 0; k < 3; k++)
+                     loops[e][k]->CookIfNeeded(frame);
+            }
+            const pop::PopData* ca = loops[0][0]->GetPop();
+            const pop::PopData* cb = loops[1][0]->GetPop();
+            bool deathOk = ca != nullptr && cb != nullptr && ca->pointCount == cb->pointCount && ca->pointCount > 0 &&
+                           loops[1][0]->CookError().empty();
+            if (deathOk)
+               deathOk = ca->Read(pop::attr::PartId, 1) == cb->Read(pop::attr::PartId, 1);
+            printf("  PartDeath loop: CPU %d, GPU %d particles, same ids %s\n", ca ? ca->pointCount : -1,
+                   cb ? cb->pointCount : -1, deathOk ? "ok" : "FAIL");
+            ok = ok && deathOk;
+         }
+         printf("%s\n", ok ? "PARTICLEGPUTEST OK" : "PARTICLEGPUTEST FAIL - BUG");
+      }
+
+      // Turbo 0.70 (P2): the GPU primitives (src/pop/GpuAlgo) against plain CPU
+      // loops, on sizes around the 512-element scan block and two scan levels.
+      if (getenv("INFINITE_GPUALGOTEST") != nullptr && frameId == 3)
+      {
+         auto upload = [](const void* data, size_t bytes) {
+            GLuint b = 0;
+            glGenBuffers(1, &b);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, b);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, (GLsizeiptr)std::max<size_t>(bytes, 4), data, GL_DYNAMIC_COPY);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+            return b;
+         };
+         auto download = [](GLuint b, void* out, size_t bytes) {
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, b);
+            glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, (GLsizeiptr)bytes, out);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+         };
+         uint32_t rng = 12345u;
+         auto next = [&rng]() {
+            rng = rng * 1664525u + 1013904223u;
+            return rng >> 8;
+         };
+         bool all = true;
+         for (int n : { 1, 7, 512, 513, 1000, 262144, 1000003 })
+         {
+            std::vector<uint32_t> in((size_t)n), flags((size_t)n);
+            for (int i = 0; i < n; i++)
+            {
+               in[(size_t)i] = next() % 7u;
+               flags[(size_t)i] = (next() % 3u) == 0u ? 1u : 0u;
+            }
+            // Scan.
+            std::vector<uint32_t> want((size_t)n);
+            uint32_t run = 0;
+            for (int i = 0; i < n; i++)
+            {
+               want[(size_t)i] = run;
+               run += in[(size_t)i];
+            }
+            const GLuint bIn = upload(in.data(), (size_t)n * 4), bOut = upload(nullptr, (size_t)n * 4),
+                         bTot = upload(nullptr, 4);
+            const bool ranScan = pop::gpu::ExclusiveScanU32(bIn, bOut, n, bTot);
+            std::vector<uint32_t> got((size_t)n);
+            uint32_t tot = 0;
+            download(bOut, got.data(), (size_t)n * 4);
+            download(bTot, &tot, 4);
+            const bool scanOk = ranScan && got == want && tot == run;
+            // Compaction.
+            std::vector<uint32_t> wantIdx;
+            for (int i = 0; i < n; i++)
+               if (flags[(size_t)i] != 0u)
+                  wantIdx.push_back((uint32_t)i);
+            const GLuint bFlags = upload(flags.data(), (size_t)n * 4), bIdx = upload(nullptr, (size_t)n * 4),
+                         bCount = upload(nullptr, 4);
+            const bool ranCompact = pop::gpu::CompactIndices(bFlags, n, bIdx, bCount);
+            uint32_t kept = 0;
+            download(bCount, &kept, 4);
+            std::vector<uint32_t> gotIdx(kept <= (uint32_t)n ? kept : 0u);
+            if (!gotIdx.empty())
+               download(bIdx, gotIdx.data(), gotIdx.size() * 4);
+            const bool compactOk = ranCompact && kept == wantIdx.size() && gotIdx == wantIdx;
+            // Gather rows of 3 floats by the kept indices (count read on the GPU).
+            std::vector<float> src((size_t)n * 3);
+            for (size_t k = 0; k < src.size(); k++)
+               src[k] = (float)k * 0.5f;
+            const GLuint bSrc = upload(src.data(), src.size() * 4), bDst = upload(nullptr, src.size() * 4);
+            const bool ranGather = pop::gpu::GatherRows(bSrc, 3, bIdx, bCount, n, bDst);
+            bool gatherOk = ranGather && compactOk;
+            if (gatherOk && !wantIdx.empty())
+            {
+               std::vector<float> dst(wantIdx.size() * 3);
+               download(bDst, dst.data(), dst.size() * 4);
+               for (size_t k = 0; k < wantIdx.size() && gatherOk; k++)
+                  for (int c = 0; c < 3; c++)
+                     gatherOk = gatherOk && dst[k * 3 + (size_t)c] == src[(size_t)wantIdx[k] * 3 + (size_t)c];
+            }
+            printf("  n=%-8d scan %s  compact %s (%u kept)  gather %s\n", n, scanOk ? "ok" : "FAIL",
+                   compactOk ? "ok" : "FAIL", kept, gatherOk ? "ok" : "FAIL");
+            all = all && scanOk && compactOk && gatherOk;
+            const GLuint del[] = { bIn, bOut, bTot, bFlags, bIdx, bCount, bSrc, bDst };
+            glDeleteBuffers(8, del);
+         }
+         // P5: Delete PointZ on a GPU-made input gathers the kept rows on the
+         // GPU; they must be exactly the input's rows picked on the CPU.
+         {
+            std::unique_ptr<PopNode> grid(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+            std::unique_ptr<PopNode> noise(static_cast<PopNode*>(PopNode::CreateFor("Noise PointZ")));
+            std::unique_ptr<PopNode> del(static_cast<PopNode*>(PopNode::CreateFor("Delete PointZ")));
+            noise->inputs[0] = grid.get();
+            del->inputs[0] = noise.get();
+            auto set = [](PopNode* n, const char* key, float v) {
+               n->Values().f[(size_t)n->Def().FloatOffset(n->Def().ParamIndex(key))] = v;
+            };
+            set(del.get(), "by", 2.0f); // every Nth
+            set(del.get(), "nth", 3.0f);
+            int frame = 5000;
+            grid->CookIfNeeded(++frame);
+            noise->CookIfNeeded(frame);
+            del->CookIfNeeded(frame);
+            const pop::PopData* src = noise->GetPop();
+            const pop::PopData* got = del->GetPop();
+            bool delOk = src != nullptr && got != nullptr && del->CookError().empty();
+            int kept = got ? got->pointCount : -1;
+            if (delOk)
+            {
+               const std::vector<float> ps = src->Read(pop::attr::P, 3), pg = got->Read(pop::attr::P, 3);
+               std::vector<float> want;
+               for (int i = 0; i < src->pointCount; i++)
+                  if (i % 3 != 0)
+                     want.insert(want.end(), ps.begin() + (size_t)i * 3, ps.begin() + (size_t)i * 3 + 3);
+               delOk = pg == want;
+            }
+            printf("  Delete PointZ every 3rd, GPU-made input: %d kept  %s\n", kept, delOk ? "ok" : "FAIL");
+            all = all && delOk;
+
+            // P5: Merge PointZ of a GPU-made and a CPU-made input joins on the
+            // GPU; rows, attributes and faces must be the inputs' in order.
+            std::unique_ptr<PopNode> merge(static_cast<PopNode*>(PopNode::CreateFor("Merge PointZ")));
+            merge->inputs[0] = noise.get();
+            merge->inputs[1] = grid.get();
+            merge->CookIfNeeded(frame);
+            const pop::PopData* m = merge->GetPop();
+            const pop::PopData* g = grid->GetPop();
+            bool mergeOk = m != nullptr && g != nullptr && src != nullptr && merge->CookError().empty() &&
+                           m->pointCount == src->pointCount + g->pointCount &&
+                           m->Topo().tris.size() == src->Topo().tris.size() + g->Topo().tris.size();
+            for (const char* name : { pop::attr::P, pop::attr::N, pop::attr::Tex })
+            {
+               if (!mergeOk)
+                  break;
+               std::vector<float> want = src->Read(name, 3);
+               const std::vector<float> wb = g->Read(name, 3);
+               want.insert(want.end(), wb.begin(), wb.end());
+               mergeOk = m->Read(name, 3) == want;
+            }
+            printf("  Merge PointZ (GPU-made + CPU-made): %d points  %s\n", m ? m->pointCount : -1, mergeOk ? "ok" : "FAIL");
+            all = all && mergeOk;
+
+            // P5: Normal PointZ (smooth) of a GPU-made input on the GPU against the
+            // CPU sum (FaceNormals: per face in order, then normalise).
+            std::unique_ptr<PopNode> normal(static_cast<PopNode*>(PopNode::CreateFor("Normal PointZ")));
+            normal->inputs[0] = noise.get();
+            normal->CookIfNeeded(frame);
+            const pop::PopData* nd = normal->GetPop();
+            bool normalOk = nd != nullptr && src != nullptr && normal->CookError().empty() && normal->CookWarning().empty();
+            double worstN = 0.0;
+            if (normalOk)
+            {
+               const std::vector<float> P = src->Read(pop::attr::P, 3), got = nd->Read(pop::attr::N, 3);
+               std::vector<float> want(P.size(), 0.0f);
+               const std::vector<uint32_t>& tris = src->Topo().tris;
+               for (size_t i = 0; i + 2 < tris.size(); i += 3)
+               {
+                  const float* p0 = &P[(size_t)tris[i] * 3];
+                  const float* p1 = &P[(size_t)tris[i + 1] * 3];
+                  const float* p2 = &P[(size_t)tris[i + 2] * 3];
+                  const float e1[3] = { p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2] };
+                  const float e2[3] = { p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2] };
+                  const float cr[3] = { e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2],
+                                        e1[0] * e2[1] - e1[1] * e2[0] };
+                  for (int k = 0; k < 3; k++)
+                     for (int j = 0; j < 3; j++)
+                        want[(size_t)tris[i + (size_t)k] * 3 + (size_t)j] += cr[j];
+               }
+               for (size_t v = 0; v + 2 < want.size(); v += 3)
+               {
+                  const float l = std::sqrt(want[v] * want[v] + want[v + 1] * want[v + 1] + want[v + 2] * want[v + 2]);
+                  if (l > 1e-12f)
+                     for (int j = 0; j < 3; j++)
+                        want[v + (size_t)j] /= l;
+               }
+               normalOk = got.size() == want.size();
+               for (size_t k = 0; normalOk && k < got.size(); k++)
+                  worstN = std::max(worstN, (double)std::fabs(got[k] - want[k]));
+               normalOk = normalOk && worstN <= 1e-5;
+            }
+            printf("  Normal PointZ (smooth), GPU-made input: max diff %.3g  %s\n", worstN, normalOk ? "ok" : "FAIL");
+            all = all && normalOk;
+
+            // P5: Facet PointZ (unique points, flat normals) of a GPU-made input:
+            // P is exactly the face corners, N the CPU's flat face normal.
+            std::unique_ptr<PopNode> facet(static_cast<PopNode*>(PopNode::CreateFor("Facet PointZ")));
+            facet->inputs[0] = noise.get();
+            facet->CookIfNeeded(frame);
+            const pop::PopData* fd = facet->GetPop();
+            bool facetOk = fd != nullptr && src != nullptr && facet->CookError().empty();
+            double worstF = 0.0;
+            if (facetOk)
+            {
+               const std::vector<float> P = src->Read(pop::attr::P, 3);
+               const std::vector<uint32_t>& tris = src->Topo().tris;
+               const size_t corners = tris.size() / 3 * 3;
+               std::vector<float> wantP, wantN;
+               for (size_t i = 0; i < corners; i += 3)
+               {
+                  const float* p0 = &P[(size_t)tris[i] * 3];
+                  const float* p1 = &P[(size_t)tris[i + 1] * 3];
+                  const float* p2 = &P[(size_t)tris[i + 2] * 3];
+                  const float e1[3] = { p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2] };
+                  const float e2[3] = { p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2] };
+                  float nn[3] = { e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0] };
+                  const float l = std::sqrt(nn[0] * nn[0] + nn[1] * nn[1] + nn[2] * nn[2]);
+                  if (l > 1e-12f)
+                     for (float& v : nn)
+                        v /= l;
+                  for (int k = 0; k < 3; k++)
+                  {
+                     wantP.insert(wantP.end(), P.begin() + (size_t)tris[i + (size_t)k] * 3,
+                                  P.begin() + (size_t)tris[i + (size_t)k] * 3 + 3);
+                     wantN.insert(wantN.end(), nn, nn + 3);
+                  }
+               }
+               const std::vector<float> gotN = fd->Read(pop::attr::N, 3);
+               facetOk = fd->pointCount == (int)corners && fd->Read(pop::attr::P, 3) == wantP && gotN.size() == wantN.size();
+               for (size_t k = 0; facetOk && k < gotN.size(); k++)
+                  worstF = std::max(worstF, (double)std::fabs(gotN[k] - wantN[k]));
+               facetOk = facetOk && worstF <= 1e-5;
+            }
+            printf("  Facet PointZ (unique points), GPU-made input: %d points, normal max diff %.3g  %s\n",
+                   fd ? fd->pointCount : -1, worstF, facetOk ? "ok" : "FAIL");
+            all = all && facetOk;
+
+            // P5: Subdivide PointZ on lines of a GPU-made input (2 levels of
+            // Chaikin) against the same loop on the CPU: P bit for bit.
+            std::unique_ptr<PopNode> circle(static_cast<PopNode*>(PopNode::CreateFor("Circle PointZ")));
+            std::unique_ptr<PopNode> wobble(static_cast<PopNode*>(PopNode::CreateFor("Noise PointZ")));
+            std::unique_ptr<PopNode> subdiv(static_cast<PopNode*>(PopNode::CreateFor("Subdivide PointZ")));
+            wobble->inputs[0] = circle.get();
+            subdiv->inputs[0] = wobble.get();
+            set(subdiv.get(), "levels", 2.0f);
+            circle->CookIfNeeded(frame);
+            wobble->CookIfNeeded(frame);
+            subdiv->CookIfNeeded(frame);
+            const pop::PopData* ld = wobble->GetPop();
+            const pop::PopData* sd = subdiv->GetPop();
+            bool subOk = ld != nullptr && sd != nullptr && subdiv->CookError().empty() && ld->Topo().HasLines();
+            if (subOk)
+            {
+               std::vector<float> P = ld->Read(pop::attr::P, 3);
+               pop::PopTopology topo = ld->Topo();
+               const float smooth = 1.0f;
+               for (int lv = 0; lv < 2; lv++)
+               {
+                  std::vector<float> np;
+                  pop::PopTopology nt;
+                  auto copyRow = [&](uint32_t i) {
+                     np.insert(np.end(), P.begin() + (size_t)i * 3, P.begin() + (size_t)i * 3 + 3);
+                     return (uint32_t)(np.size() / 3 - 1);
+                  };
+                  auto lerpRow = [&](uint32_t i, uint32_t j, float q) {
+                     const float w0 = 1.0f - q, w1 = q;
+                     for (int k = 0; k < 3; k++)
+                     {
+                        float v = 0.0f;
+                        v += P[(size_t)i * 3 + (size_t)k] * w0;
+                        v += P[(size_t)j * 3 + (size_t)k] * w1;
+                        np.push_back(v);
+                     }
+                     return (uint32_t)(np.size() / 3 - 1);
+                  };
+                  for (size_t si = 0; si < topo.StripCount(); si++)
+                  {
+                     const int st = topo.lineStart[si], n = topo.lineCount[si];
+                     const bool closed = topo.lineClosed[si] && n > 2;
+                     std::vector<uint32_t> strip;
+                     const int segs = closed ? n : n - 1;
+                     if (!closed)
+                        strip.push_back(copyRow(topo.lineVerts[(size_t)st]));
+                     for (int k = 0; k < segs; k++)
+                     {
+                        const uint32_t i0 = topo.lineVerts[(size_t)(st + k)], i1 = topo.lineVerts[(size_t)(st + (k + 1) % n)];
+                        strip.push_back(lerpRow(i0, i1, 0.25f * smooth));
+                        strip.push_back(lerpRow(i0, i1, 1.0f - 0.25f * smooth));
+                     }
+                     if (!closed)
+                        strip.push_back(copyRow(topo.lineVerts[(size_t)(st + n - 1)]));
+                     nt.AddStrip(strip, closed);
+                  }
+                  P = np;
+                  topo = nt;
+               }
+               subOk = sd->pointCount == (int)(P.size() / 3) && sd->Read(pop::attr::P, 3) == P &&
+                       sd->Topo().StripCount() == topo.StripCount();
+            }
+            printf("  Subdivide PointZ (lines, 2 levels), GPU-made input: %d points  %s\n", sd ? sd->pointCount : -1,
+                   subOk ? "ok" : "FAIL");
+            all = all && subOk;
+
+            // P6: Line Smooth PointZ (4 passes) on a GPU-made line: P bit for bit
+            // the CPU passes.
+            std::unique_ptr<PopNode> relax(static_cast<PopNode*>(PopNode::CreateFor("Line Smooth PointZ")));
+            relax->inputs[0] = wobble.get();
+            relax->CookIfNeeded(frame);
+            const pop::PopData* rd = relax->GetPop();
+            bool relaxOk = ld != nullptr && rd != nullptr && relax->CookError().empty();
+            if (relaxOk)
+            {
+               std::vector<float> P = ld->Read(pop::attr::P, 3);
+               const pop::PopTopology& lt = ld->Topo();
+               for (int it = 0; it < 4; it++)
+                  for (size_t si = 0; si < lt.StripCount(); si++)
+                  {
+                     const int st = lt.lineStart[si], n = lt.lineCount[si];
+                     const bool closed = lt.lineClosed[si] != 0;
+                     std::vector<float> next(P);
+                     for (int j = 0; j < n; j++)
+                     {
+                        if (!closed && (j == 0 || j == n - 1))
+                           continue;
+                        const int a0 = (int)lt.lineVerts[(size_t)(st + (j > 0 ? j - 1 : (closed ? n - 1 : 0)))];
+                        const int a1 = (int)lt.lineVerts[(size_t)(st + (j + 1 < n ? j + 1 : (closed ? 0 : n - 1)))];
+                        const int p = (int)lt.lineVerts[(size_t)(st + j)];
+                        for (int q = 0; q < 3; q++)
+                        {
+                           const float mid = 0.5f * (P[(size_t)a0 * 3 + q] + P[(size_t)a1 * 3 + q]);
+                           next[(size_t)p * 3 + q] = P[(size_t)p * 3 + q] + (mid - P[(size_t)p * 3 + q]) * 0.5f;
+                        }
+                     }
+                     P.swap(next);
+                  }
+               relaxOk = rd->Read(pop::attr::P, 3) == P;
+            }
+            printf("  Line Smooth PointZ (4 passes), GPU-made input: %s\n", relaxOk ? "ok" : "FAIL");
+            all = all && relaxOk;
+
+            // P6: Line Divide PointZ (Catmull-Rom, 4 per segment) on a GPU-made
+            // line: P bit for bit the PointBuilder rows.
+            std::unique_ptr<PopNode> divide(static_cast<PopNode*>(PopNode::CreateFor("Line Divide PointZ")));
+            divide->inputs[0] = wobble.get();
+            divide->CookIfNeeded(frame);
+            const pop::PopData* dd = divide->GetPop();
+            bool divideOk = ld != nullptr && dd != nullptr && divide->CookError().empty();
+            if (divideOk)
+            {
+               const std::vector<float> P = ld->Read(pop::attr::P, 3);
+               const pop::PopTopology& lt = ld->Topo();
+               std::vector<float> want;
+               auto rowOf = [&](const int* idx, const float* w, int n) {
+                  for (int q = 0; q < 3; q++)
+                  {
+                     float v = 0.0f;
+                     for (int k = 0; k < n; k++)
+                        v += P[(size_t)idx[k] * 3 + (size_t)q] * w[k];
+                     want.push_back(v);
+                  }
+               };
+               for (size_t si = 0; si < lt.StripCount(); si++)
+               {
+                  const int st = lt.lineStart[si], n = lt.lineCount[si];
+                  const bool closed = lt.lineClosed[si] != 0;
+                  if (n < 2)
+                     continue;
+                  auto at = [&](int i) {
+                     const int j = closed ? ((i % n + n) % n) : std::max(0, std::min(n - 1, i));
+                     return (int)lt.lineVerts[(size_t)(st + j)];
+                  };
+                  const int segs = closed ? n : n - 1;
+                  for (int k = 0; k < segs; k++)
+                     for (int j = 0; j < 4; j++)
+                     {
+                        const float u = (float)j / 4;
+                        if (j == 0)
+                        {
+                           const int p = at(k);
+                           want.insert(want.end(), P.begin() + (size_t)p * 3, P.begin() + (size_t)p * 3 + 3);
+                           continue;
+                        }
+                        const float u2 = u * u, u3 = u2 * u;
+                        const float w[4] = { 0.5f * (-u3 + 2 * u2 - u), 0.5f * (3 * u3 - 5 * u2 + 2),
+                                             0.5f * (-3 * u3 + 4 * u2 + u), 0.5f * (u3 - u2) };
+                        const int idx[4] = { at(k - 1), at(k), at(k + 1), at(k + 2) };
+                        rowOf(idx, w, 4);
+                     }
+                  if (!closed)
+                  {
+                     const int p = at(n - 1);
+                     want.insert(want.end(), P.begin() + (size_t)p * 3, P.begin() + (size_t)p * 3 + 3);
+                  }
+               }
+               divideOk = dd->Read(pop::attr::P, 3) == want;
+            }
+            printf("  Line Divide PointZ (smooth, 4), GPU-made input: %d points  %s\n", dd ? dd->pointCount : -1,
+                   divideOk ? "ok" : "FAIL");
+            all = all && divideOk;
+
+            // P5 (Turbo 0.70): an operator's GPU path against its own CPU path on
+            // the same GPU-made line (gpu::ForceCpuForTest): the result stays on
+            // the GPU; topology and every attribute bit for bit, except N within
+            // 1e-5 (the GPU's sqrt and divide).
+            auto sameAsCpu = [&](const char* type, const std::function<void(PopNode*)>& setup, double tol) {
+               // A fresh line each time: a read-back input has a CPU copy and
+               // rightly takes the CPU path.
+               std::unique_ptr<PopNode> ring(static_cast<PopNode*>(PopNode::CreateFor("Circle PointZ")));
+               std::unique_ptr<PopNode> line(static_cast<PopNode*>(PopNode::CreateFor("Noise PointZ")));
+               line->inputs[0] = ring.get();
+               ring->CookIfNeeded(frame);
+               line->CookIfNeeded(frame);
+               std::unique_ptr<PopNode> g(static_cast<PopNode*>(PopNode::CreateFor(type)));
+               std::unique_ptr<PopNode> r(static_cast<PopNode*>(PopNode::CreateFor(type)));
+               for (PopNode* nd : { g.get(), r.get() })
+               {
+                  nd->inputs[0] = line.get();
+                  setup(nd);
+               }
+               g->CookIfNeeded(frame);
+               pop::gpu::ForceCpuForTest(true);
+               r->CookIfNeeded(frame);
+               pop::gpu::ForceCpuForTest(false);
+               const pop::PopData* gd = g->GetPop();
+               const pop::PopData* rd = r->GetPop();
+               bool ok = gd != nullptr && rd != nullptr && g->CookError().empty() && r->CookError().empty() &&
+                         gd->pointCount > 0 && gd->pointCount == rd->pointCount && gd->Topo().tris == rd->Topo().tris;
+               const pop::PopAttrib* gp = ok ? gd->Find(pop::attr::P) : nullptr;
+               const bool stayed = gp != nullptr && !gp->buffer->OnCpu();
+               double worstN = 0.0;
+               std::string bad;
+               if (ok)
+                  for (const pop::PopAttrib& ra : rd->attribs)
+                  {
+                     const pop::PopAttrib* ga = gd->Find(ra.name);
+                     const int comps = ra.buffer->Comps();
+                     if (ga == nullptr || ga->buffer->Comps() != comps)
+                     {
+                        bad += " " + ra.name + "(missing)";
+                        continue;
+                     }
+                     const std::vector<float> want = rd->Read(ra.name, comps), got = gd->Read(ra.name, comps);
+                     if (ra.name == pop::attr::N)
+                     {
+                        for (size_t q = 0; q < want.size() && q < got.size(); q++)
+                           worstN = std::max(worstN, (double)std::fabs(want[q] - got[q]));
+                        if (worstN > 1e-5 || want.size() != got.size())
+                           bad += " N";
+                     }
+                     else if (tol > 0.0)
+                     {
+                        double worst = want.size() == got.size() ? 0.0 : 1e9;
+                        for (size_t q = 0; q < want.size() && q < got.size(); q++)
+                           worst = std::max(worst, (double)std::fabs(want[q] - got[q]));
+                        if (worst > tol)
+                           bad += " " + ra.name;
+                     }
+                     else if (want != got)
+                        bad += " " + ra.name;
+                  }
+               ok = ok && stayed && bad.empty();
+               printf("  %s, GPU-made line: %d points, stays on GPU %d, N max diff %.3g%s  %s %s\n", type,
+                      gd ? gd->pointCount : -1, stayed ? 1 : 0, worstN, bad.c_str(), ok ? "ok" : "FAIL",
+                      g->CookWarning().c_str());
+               return ok;
+            };
+            all = sameAsCpu("Revolve PointZ", [&](PopNode* n) { set(n, "angle", 270.0f); set(n, "div", 24.0f); }, 0.0) && all;
+            all = sameAsCpu("Revolve PointZ", [&](PopNode* n) { set(n, "axis", 2.0f); }, 0.0) && all;
+            all = sameAsCpu("Extrude PointZ", [&](PopNode* n) { set(n, "steps", 3.0f); }, 0.0) && all;
+            // P6: Line Resample by count - lengths from the GPU's sqrt, so within 1e-5.
+            all = sameAsCpu("Line Resample PointZ", [&](PopNode* n) { set(n, "count", 150.0f); }, 1e-5) && all;
+            all = sameAsCpu("Line Resample PointZ", [&](PopNode* n) { set(n, "count", 7.0f); }, 1e-5) && all;
+         }
+         printf("%s\n", all ? "GPUALGOTEST OK" : "GPUALGOTEST FAIL - BUG");
+      }
+
+      // Turbo 0.70 (C2): param lines a node does not read (an upstream or newer
+      // patch) survive load + save, raw, next to the node's own keys.
+      if (getenv("INFINITE_FOREIGNKEYTEST") != nullptr)
+      {
+         if (frameId == 3)
+         {
+            const std::string text = "infinite-patch 1\n"
+                                     "node 0 PointZ Noise PointZ\n"
+                                     "  f fromUpstream 0.25\n"
+                                     "  s upstreamText hello world\n"
+                                     "end\n";
+            Patch::Data in;
+            std::string err;
+            if (Patch::ReadText(text, in, err))
+               ApplyPatchData(in);
+            else
+               printf("FOREIGNKEYTEST FAIL - read: %s\n", err.c_str());
+         }
+         if (frameId == 6)
+         {
+            const Patch::Data out = BuildPatchData();
+            bool number = false, textLine = false;
+            int own = 0;
+            for (const Patch::NodeRecord& n : out.nodes)
+               for (const auto& kv : n.params)
+               {
+                  if (kv.first == "f fromUpstream")
+                     number = kv.second == "0.25";
+                  else if (kv.first == "s upstreamText")
+                     textLine = kv.second == "hello world";
+                  else
+                     own++;
+               }
+            printf("FOREIGNKEYTEST unread number kept=%d, unread text kept=%d, own keys=%d  %s\n", number ? 1 : 0,
+                   textLine ? 1 : 0, own, (number && textLine && own > 0 && out.nodes.size() == 1) ? "OK" : "FAIL");
+         }
+      }
+
+      // Turbo 0.70 (P1): INFINITE_POPEQUIVTEST runs the same fixture with both
+      // kernel backends (pop::RunKernel prints a POPEQUIV line per kernel; a
+      // "POPEQUIV FAIL" fails the check); INFINITE_POPTFTEST on the
+      // transform-feedback fallback only.
+      if ((getenv("INFINITE_POPTEST") != nullptr || getenv("INFINITE_POPEQUIVTEST") != nullptr ||
+           getenv("INFINITE_POPTFTEST") != nullptr) &&
+          frameId == 4)
       {
          // PointZ family on the real GPU: every operator cooks (its kernels
          // compile on this driver), GPU results match the CPU, Render 3D
@@ -5190,6 +5836,230 @@
       // ptSamples, and the finished image covers the geometry like the raster.
       // Without the module or an RTX GPU it draws raster and says SKIP.
       const bool panoTest = getenv("INFINITE_PANORAMATEST") != nullptr;
+      // Turbo 0.70: deleting a PointZ -> PointZ cable (the Delete key's and the
+      // editor's path, DisconnectLinkById) empties the input and the cable
+      // stays gone.
+      if (getenv("INFINITE_LINKDELTEST") != nullptr && (frameId == 3 || frameId == 8))
+      {
+         const int dstPin = gNodes[1].InputPinId(0);
+         const LinkInfo* found = nullptr;
+         for (const LinkInfo& l : gLinks)
+            if (l.dstPin == dstPin)
+               found = &l;
+         if (frameId == 3)
+         {
+            printf("before: cable %s\n", found != nullptr ? "drawn" : "MISSING");
+            if (found != nullptr)
+               DisconnectLinkById(found->id);
+         }
+         else
+         {
+            const bool empty = *gNodes[1].node->GeometryInputSlot(0) == nullptr;
+            const bool ok = empty && found == nullptr;
+            printf("after delete: input %s, cable %s  %s\n", empty ? "empty" : "STILL SET",
+                   found != nullptr ? "STILL DRAWN" : "gone", ok ? "LINKDELTEST OK" : "LINKDELTEST FAIL - BUG");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+      // Turbo 0.70: Render 3D FX on the 3D test scene - each effect changes the
+      // picture, all off passes it through, no NaN / GL error, with MSAA and
+      // with render scale, and an RTX render passes through.
+      if (getenv("INFINITE_R3DFXTEST") != nullptr && frameId == 20)
+      {
+         auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
+         auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+         Render3DFxNode fx;
+         fx.Input().Connect(r);
+         static unsigned int sFbo = 0;
+         int frame = 3000000;
+         bool all = true;
+         auto read = [&](unsigned int tex, int w, int h) {
+            std::vector<float> px;
+            if (tex == 0 || !GLUtil::ReadTexturePixels(sFbo, tex, w, h, px))
+               px.clear();
+            return px;
+         };
+         // Several cooks: Render 3D renders the depth / velocity FX asked for
+         // the cook before.
+         auto cook = [&](float moveX) {
+            for (int k = 0; k < 3; k++)
+            {
+               g0->posX += moveX;
+               ++frame;
+               r->CookIfNeeded(frame);
+               fx.CookIfNeeded(frame);
+            }
+         };
+         auto setFx = [&](float ao, float ssr, float dof, float shutter) {
+            fx.aoAmount = ao;
+            fx.reflections = ssr;
+            fx.dofBlur = dof;
+            fx.shutter = shutter;
+         };
+         auto check = [&](const char* what, float ao, float ssr, float dof, float shutter, float move, bool expectChange) {
+            setFx(ao, ssr, dof, shutter);
+            cook(move);
+            const int w = fx.GetOutputWidth(), h = fx.GetOutputHeight();
+            const std::vector<float> in = read(r->GetOutputTexture(), r->GetOutputWidth(), r->GetOutputHeight());
+            const std::vector<float> out = read(fx.GetOutputTexture(), w, h);
+            const GLenum err = glGetError();
+            bool finite = !out.empty();
+            double diff = 0.0;
+            for (size_t i = 0; i < out.size(); i++)
+            {
+               finite = finite && std::isfinite(out[i]);
+               if (i < in.size())
+                  diff += std::fabs(out[i] - in[i]);
+            }
+            diff /= (double)std::max<size_t>(1, out.size());
+            const bool sameSize = w == r->GetOutputWidth() && h == r->GetOutputHeight() && in.size() == out.size();
+            const bool ok = finite && sameSize && err == GL_NO_ERROR && (expectChange ? diff > 1e-3 : diff < 1e-6);
+            printf("  %-44s size %dx%d diff %.5f finite %d gl 0x%x  %s\n", what, w, h, diff, finite ? 1 : 0, err,
+                   ok ? "ok" : "FAIL");
+            all = all && ok;
+         };
+         while (glGetError() != GL_NO_ERROR) {}
+         check("all effects off: passes through", 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, false);
+         check("ambient occlusion", 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, true);
+         check("screen-space reflections", 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, true);
+         check("depth of field", 0.0f, 0.0f, 24.0f, 0.0f, 0.0f, true);
+         check("motion blur (moving object)", 0.0f, 0.0f, 0.0f, 4.0f, 0.15f, true);
+         {
+            // The render's velocity target carries the object's motion.
+            const std::vector<float> vel = read(r->VelocityTexture(), r->VelocityWidth(), r->VelocityHeight());
+            float maxLen = 0.0f;
+            for (size_t i = 0; i + 3 < vel.size(); i += 4)
+               if (vel[i + 2] > 0.5f)
+                  maxLen = std::max(maxLen, std::sqrt(vel[i] * vel[i] + vel[i + 1] * vel[i + 1]));
+            const bool moved = maxLen > 1.0f;
+            printf("  %-44s max %.2f px  %s\n", "velocity of the moving object", maxLen, moved ? "ok" : "FAIL");
+            all = all && moved;
+            if (const char* png = getenv("INFINITE_R3DFXTEST_PNG")) // eyeball the motion blur (bottom-up rows)
+            {
+               const int w = fx.GetOutputWidth(), h = fx.GetOutputHeight();
+               const std::vector<float> px = read(fx.GetOutputTexture(), w, h);
+               std::vector<unsigned char> rgba(px.size());
+               for (size_t k = 0; k < px.size(); k++)
+                  rgba[k] = (unsigned char)std::clamp(px[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+               if (!rgba.empty())
+                  stbi_write_png(png, w, h, 4, rgba.data(), w * 4);
+            }
+         }
+         check("all four together", 1.0f, 0.6f, 12.0f, 2.0f, 0.1f, true);
+         const int savedSamples = r->samples;
+         r->samples = 3;
+         check("ambient occlusion with MSAA", 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, true);
+         r->samples = savedSamples;
+         const int savedUpscale = r->upscale;
+         r->upscale = 3;
+         check("ambient occlusion with render scale 2x (FSR)", 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, true);
+         r->upscale = savedUpscale;
+         const int savedMode = r->renderMode;
+         r->renderMode = 1;
+         r->ptSamples = 4;
+         check("RTX render: passes through", 1.5f, 1.0f, 24.0f, 4.0f, 0.1f, false);
+         r->renderMode = savedMode;
+         printf("%s\n", all ? "R3DFXTEST OK" : "R3DFXTEST FAIL - BUG");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+      // Turbo 0.70: a Material's texture reaches an Instance PointZ's copies in
+      // raster and in RTX, with the Material over the instances or on their
+      // shape: the picture changes when the albedo texture is connected.
+      if (getenv("INFINITE_RTXTEXTEST") != nullptr && frameId == 30)
+      {
+         auto setF = [](PopNode* n, const char* key, int comp, float v)
+         {
+            const int i = n->Def().ParamIndex(key);
+            if (i >= 0) n->Values().f[(size_t)(n->Def().FloatOffset(i) + comp)] = v;
+         };
+         bool all = true;
+         unsigned long long frame = 2000000;
+         // Layouts: 0 Material over the instances, 1 Material on the shape,
+         // 2 Material over the instances cut as an atlas (instance texture 2),
+         // 3 an image on the instance's own texture pin (instance texture 1).
+         for (int layout = 0; layout < 4; layout++)
+            for (int mode = 0; mode < 2; mode++)
+            {
+               std::unique_ptr<PopNode> grid(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+               std::unique_ptr<PopNode> box(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+               std::unique_ptr<PopNode> inst(static_cast<PopNode*>(PopNode::CreateFor("Instance PointZ")));
+               std::unique_ptr<MaterialNode> mat(new MaterialNode());
+               setF(grid.get(), "rows", 0, 3.0f);
+               setF(grid.get(), "cols", 0, 3.0f);
+               setF(inst.get(), "scale", 0, 0.3f);
+               mat->color[0] = mat->color[1] = mat->color[2] = 1.0f;
+               inst->inputs[0] = grid.get();
+               Render3DNode render;
+               render.width = 256.0f; render.height = 256.0f;
+               render.camDistance = 3.0f;
+               render.renderMode = mode;
+               render.ptSamples = 1;
+               if (layout == 1)
+               {
+                  mat->input = box.get(); // Material on the shape
+                  inst->inputs[1] = mat.get();
+                  render.geometry[0] = inst.get();
+               }
+               else
+               {
+                  inst->inputs[1] = box.get(); // Material over the instances
+                  mat->input = inst.get();
+                  render.geometry[0] = mat.get();
+               }
+               if (layout == 2)
+               {
+                  setF(inst.get(), "texMode", 0, 2.0f);
+                  setF(inst.get(), "texFrom", 0, 1.0f);
+               }
+               if (layout == 3)
+               {
+                  setF(inst.get(), "texMode", 0, 1.0f);
+                  setF(inst.get(), "texFrom", 0, 1.0f);
+               }
+               auto shoot = [&]()
+               {
+                  render.InvalidateScene();
+                  ++frame;
+                  grid->CookIfNeeded((int)frame);
+                  box->CookIfNeeded((int)frame);
+                  mat->CookIfNeeded((int)frame);
+                  inst->CookIfNeeded((int)frame);
+                  render.CookIfNeeded((int)frame);
+                  const int w = render.GetOutputWidth(), h = render.GetOutputHeight();
+                  std::vector<unsigned char> px((size_t)w * h * 4);
+                  GLuint fbo = 0;
+                  glGenFramebuffers(1, &fbo);
+                  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+                  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render.GetOutputTexture(), 0);
+                  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+                  glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+                  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                  glDeleteFramebuffers(1, &fbo);
+                  return px;
+               };
+               shoot();
+               const std::vector<unsigned char> plain = shoot();
+               if (layout == 3)
+                  inst->ImageInputSlot(inst->Def().inputs)->Connect(gNodes[3].node.get());
+               else
+                  mat->TextureInput().Connect(gNodes[3].node.get());
+               shoot();
+               const std::vector<unsigned char> textured = shoot();
+               double diff = 0.0;
+               for (size_t i = 0; i < plain.size() && i < textured.size(); i++)
+                  diff += std::abs((int)plain[i] - (int)textured[i]);
+               diff /= (double)std::max<size_t>(1, plain.size());
+               const bool skipped = mode == 1 && !render.RtxStatus().empty();
+               const bool ok = skipped || diff > 2.0;
+               static const char* kLayouts[4] = { "Material over Instance PointZ", "Material on the instanced shape",
+                                                  "Material over Instance PointZ, atlas", "Instance PointZ image pin" };
+               printf("  %s, %s: mean change with the texture %.2f  %s\n", kLayouts[layout],
+                      mode == 0 ? "raster" : "RTX", diff, skipped ? "SKIP" : (ok ? "ok" : "FAIL"));
+               all = all && ok;
+            }
+         printf("%s\n", all ? "RTXTEXTEST OK" : "RTXTEXTEST FAIL - BUG");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
       if ((getenv("INFINITE_RTXTEST") != nullptr || panoTest) && frameId == 40)
       {
          auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
@@ -5220,6 +6090,138 @@
                 coverage * 100.0, err, skipped ? "SKIP (" : "", skipped ? r->RtxStatus().c_str() : "",
                 skipped ? ")" : "", ok ? "OK" : "FAIL");
          glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+      // Turbo 0.70 (R1): GPU culling of an instanced slot draws the same
+      // pixels as the plain draw (forced, and on its own when part of the
+      // copies is off screen), and the LOD quads cover about the same area.
+      if (getenv("INFINITE_CULLTEST") != nullptr && frameId == 6)
+      {
+         bool all = true;
+         auto report = [&](const char* what, bool ok)
+         {
+            printf("  %-62s %s\n", what, ok ? "ok" : "FAIL");
+            all = all && ok;
+         };
+         auto setF = [](PopNode* n, const char* key, int comp, float v)
+         {
+            const int i = n->Def().ParamIndex(key);
+            if (i >= 0) n->Values().f[(size_t)(n->Def().FloatOffset(i) + comp)] = v;
+         };
+         std::unique_ptr<PopNode> grid(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+         std::unique_ptr<PopNode> box(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+         std::unique_ptr<PopNode> inst(static_cast<PopNode*>(PopNode::CreateFor("Instance PointZ")));
+         // 200 x 200 = 40k instances: above Render3DNode::kCullMinInstances.
+         setF(grid.get(), "rows", 0, 200.0f);
+         setF(grid.get(), "cols", 0, 200.0f);
+         setF(grid.get(), "size", 0, 8.0f);
+         setF(grid.get(), "size", 1, 8.0f);
+         setF(inst.get(), "scale", 0, 0.04f);
+         inst->inputs[0] = grid.get();
+         inst->inputs[1] = box.get();
+         Render3DNode render;
+         render.width = 320.0f; render.height = 240.0f;
+         render.camDistance = 2.5f;
+         render.geometry[0] = inst.get();
+         unsigned long long frame = 1000000;
+         auto draw = [&](int mode, float lod, unsigned long long& hash, size_t& lit)
+         {
+            render.cullOverride = mode;
+            render.lodPixels = lod;
+            render.InvalidateScene();
+            grid->CookIfNeeded(++frame);
+            box->CookIfNeeded(frame);
+            inst->CookIfNeeded(frame);
+            render.CookIfNeeded(frame);
+            const int w = render.GetOutputWidth(), h = render.GetOutputHeight();
+            std::vector<unsigned char> px((size_t)w * h * 4);
+            GLuint fbo = 0;
+            glGenFramebuffers(1, &fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render.GetOutputTexture(), 0);
+            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+            glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDeleteFramebuffers(1, &fbo);
+            hash = 1469598103934665603ull;
+            lit = 0;
+            for (size_t i = 0; i < px.size(); i++)
+            {
+               hash = (hash ^ px[i]) * 1099511628211ull;
+               if (i % 4 == 0 && px[i] + px[i + 1] + px[i + 2] > 60)
+                  lit++;
+            }
+            return render.LastCulledSlots();
+         };
+         unsigned long long hOff = 0, hForce = 0, hAuto = 0, hLod = 0;
+         size_t litOff = 0, litForce = 0, litAuto = 0, litLod = 0;
+         draw(2, 0.0f, hOff, litOff); // warm-up: uploads, async bounds
+         draw(2, 0.0f, hOff, litOff);
+         const int cOff = draw(2, 0.0f, hOff, litOff);
+         const int cForce = draw(1, 0.0f, hForce, litForce);
+         const int cAuto = draw(0, 0.0f, hAuto, litAuto);
+         const int cLod = draw(0, 1000.0f, hLod, litLod);
+         const GLenum err = glGetError();
+         const size_t pixels = (size_t)render.GetOutputWidth() * render.GetOutputHeight();
+         printf("  copies %d, lit pixels off %zu force %zu auto %zu lod %zu, culled slots %d %d %d %d, gl 0x%x\n",
+                grid->PointCount(), litOff, litForce, litAuto, litLod, cOff, cForce, cAuto, cLod, err);
+         report("the scene has many copies, some off screen", grid->PointCount() >= Render3DNode::kCullMinInstances &&
+                                                               litOff > pixels / 4 && litOff < pixels);
+         report("off draws the plain way", cOff == 0);
+         report("forced culling draws the same pixels", cForce == 1 && hForce == hOff);
+         report("culling on its own (copies off screen), same pixels", cAuto == 1 && hAuto == hOff);
+         const double ratio = litOff ? (double)litLod / (double)litOff : 0.0;
+         report("LOD quads cover about the same area", cLod == 1 && ratio > 0.8 && ratio < 1.25);
+         report("no GL error", err == GL_NO_ERROR);
+         printf("%s\n", all ? "CULLTEST OK" : "CULLTEST FAIL - BUG");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+      // Turbo 0.70 (R4, R5): TAA + FSR 2x on a still scene. The output keeps
+      // the node's size (the targets are half of it), the history fills to
+      // kTaaStillFrames and then the render is cached again (same frame
+      // count and the same pixels ten frames later), and the picture covers
+      // the geometry like the plain raster.
+      static int sTaaFrames30 = -1;
+      static unsigned long long sTaaHash30 = 0;
+      if (getenv("INFINITE_TAATEST") != nullptr && (frameId == 30 || frameId == 40))
+      {
+         auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
+         const int w = r->GetOutputWidth(), h = r->GetOutputHeight();
+         std::vector<unsigned char> px((size_t)w * h * 4);
+         GLuint fbo = 0;
+         glGenFramebuffers(1, &fbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, r->GetOutputTexture(), 0);
+         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+         glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+         glDeleteFramebuffers(1, &fbo);
+         unsigned long long hash = 1469598103934665603ull;
+         size_t lit = 0;
+         for (size_t i = 0; i < px.size(); i++)
+         {
+            hash = (hash ^ px[i]) * 1099511628211ull;
+            if (i % 4 == 0 && px[i] + px[i + 1] + px[i + 2] > 60)
+               lit++;
+         }
+         if (frameId == 30)
+         {
+            sTaaFrames30 = r->TaaHistoryFrames();
+            sTaaHash30 = hash;
+         }
+         else
+         {
+            const double coverage = (double)lit / (double)std::max(1, w * h);
+            const GLenum err = glGetError();
+            const bool sized = w == 702 && h == 498;
+            const bool converged = sTaaFrames30 >= Render3DNode::kTaaStillFrames &&
+                                   r->TaaHistoryFrames() == sTaaFrames30 && hash == sTaaHash30;
+            const bool ok = sized && converged && coverage > 0.03 && coverage < 0.95 && err == GL_NO_ERROR;
+            if (const char* png = getenv("INFINITE_TAATEST_PNG"))
+               stbi_write_png(png, w, h, 4, px.data(), w * 4);
+            printf("TAATEST %dx%d history=%d/%d still=%s coverage=%.1f%% gl=0x%x %s\n", w, h, r->TaaHistoryFrames(),
+                   sTaaFrames30, hash == sTaaHash30 ? "same" : "changed", coverage * 100.0, err, ok ? "OK" : "FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
       }
       if (getenv("INFINITE_3DTEST") != nullptr &&
           (frameId == 4 || frameId == 8 || frameId == 12 || frameId == 16 ||
@@ -5559,6 +6561,38 @@
             printf("start   node canvas pos = (%.0f, %.0f) viewAnchor=(%.0f,%.0f)\n",
                    gDragTestNodePos.x, gDragTestNodePos.y,
                    gDragTestViewAnchor.x, gDragTestViewAnchor.y);
+            // Turbo 0.70: the point of a grid over the graph farthest from every
+            // node, for the pan phase to start on (a fixed point fell on a node
+            // once Render 3D grew; the injected mouse also lands ~30 px off).
+            auto clearance = [](ImVec2 s) {
+               float best = 1e9f;
+               for (const auto& gn : gNodes)
+               {
+                  const ImVec2 tl = ed::CanvasToScreen(ed::GetNodePosition(gn.NodeId()));
+                  const ImVec2 sz = ed::GetNodeSize(gn.NodeId());
+                  const float dx = std::max(std::max(tl.x - s.x, s.x - (tl.x + sz.x)), 0.0f);
+                  const float dy = std::max(std::max(tl.y - s.y, s.y - (tl.y + sz.y)), 0.0f);
+                  best = std::min(best, std::sqrt(dx * dx + dy * dy));
+               }
+               return best;
+            };
+            float bestClear = -1.0f;
+            for (int gy = 1; gy < 16; gy++)
+               for (int gx = 1; gx < 16; gx++)
+               {
+                  // The drag moves +160,+120 from here, so keep that inside the graph.
+                  const ImVec2 s(gGraphScreenTL.x + (gGraphScreenSize.x - 180.0f) * gx / 16.0f,
+                                 gGraphScreenTL.y + (gGraphScreenSize.y - 140.0f) * gy / 16.0f);
+                  const float c = clearance(s);
+                  if (c > bestClear)
+                  {
+                     bestClear = c;
+                     gDragTestEmptyScreen = s;
+                  }
+               }
+            gDragTestHaveEmpty = bestClear >= 60.0f;
+            printf("pan start (%.0f,%.0f), %.0f px from the nearest node\n",
+                   gDragTestEmptyScreen.x, gDragTestEmptyScreen.y, bestClear);
          }
          if (frameId == 9)
          {

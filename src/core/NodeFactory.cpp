@@ -39,6 +39,7 @@ namespace
          { "Particle System", "3DSource" }, { "Cloth", "3DSource" },
          { "Camera", "3DScene" }, { "Light", "3DScene" }, { "HDRI", "3DScene" },
          { "Material", "3DScene" }, { "Mapping", "3DScene" }, { "Render 3D", "3DScene" },
+         { "Render 3D FX", "3DScene" }, // Turbo 0.70
          { "Resynthesize", "Effects" },
          { "Macro Knob", "Macros" }, { "Macro XY", "Macros" },
          { "Comment", "Utility" }, { "Group", "Utility" }, { "Null", "Utility" }, { "Viewport", "Utility" },

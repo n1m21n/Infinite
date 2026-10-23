@@ -6,6 +6,8 @@
 #include <cstring>
 
 #include "Transport.h"
+#include "core/GLUtil.h"
+#include "core/Profile.h"
 #include "platform/OpenGLHeaders.h"
 
 namespace
@@ -121,6 +123,37 @@ const char* PopNode::InputLabel(int slot) const
    return nullptr;
 }
 
+// Turbo 0.70: the shape input of an Instance PointZ, whose material its copies
+// carry; null for every other operator.
+static IGeometrySource* InstanceShape(const pop::PopDef* def, IGeometrySource* const* inputs, bool bypassed)
+{
+   return (!bypassed && def != nullptr && def->name == "Instance PointZ") ? inputs[1] : nullptr;
+}
+
+Material PopNode::GetMaterial() const
+{
+   IGeometrySource* s = InstanceShape(mDef, inputs, bypassed);
+   return s != nullptr ? s->GetMaterial() : Material();
+}
+
+unsigned int PopNode::GetSurfaceTexture()
+{
+   IGeometrySource* s = InstanceShape(mDef, inputs, bypassed);
+   return s != nullptr ? s->GetSurfaceTexture() : 0;
+}
+
+unsigned int PopNode::GetMaterialTexture(int map)
+{
+   IGeometrySource* s = InstanceShape(mDef, inputs, bypassed);
+   return s != nullptr ? s->GetMaterialTexture(map) : 0;
+}
+
+unsigned long long PopNode::SurfaceTextureRevision() const
+{
+   IGeometrySource* s = InstanceShape(mDef, inputs, bypassed);
+   return s != nullptr ? s->SurfaceTextureRevision() : 0;
+}
+
 IGeometrySource** PopNode::GeometryInputSlot(int slot)
 {
    return (slot >= 0 && slot < mDef->inputs && slot < kMaxInputs) ? &inputs[slot] : nullptr;
@@ -140,6 +173,16 @@ int PopNode::InputPinCount() const
 int PopNode::ImageCount() const
 {
    return mDef->imageInput ? std::clamp(mDef->imageCount, 1, 4) : 0;
+}
+
+void PopNode::BeforeLoadParams()
+{
+   for (const auto& kv : mDef->savedBefore)
+   {
+      const int pi = mDef->ParamIndex(kv.first);
+      if (pi >= 0)
+         mValues.f[(size_t)mDef->FloatOffset(pi)] = kv.second;
+   }
 }
 
 void PopNode::VisitParams(ParamVisitor& v)
@@ -340,6 +383,9 @@ void PopNode::CookIfNeeded(int frameId)
       }
       glQueryCounter(mGpuQ[mGpuRing][0], GL_TIMESTAMP);
    }
+   GLUtil::DebugScope debugGroup(mDef->name); // Turbo 0.70 (F3): one group per PointZ cook in GPU captures
+   INF_PROFILE_ZONE_DYN("PointZ cook", mDef->name); // Turbo 0.70 (F2)
+   INF_PROFILE_GPU_ZONE_DYN(mDef->name);
    const auto t0 = std::chrono::steady_clock::now();
    const bool ok = mDef->cook ? mDef->cook(c) : false;
    if (gpuTimes)

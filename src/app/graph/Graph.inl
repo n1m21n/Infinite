@@ -118,6 +118,8 @@
          return 3; // image (the dye), force, obstacles
       if (dynamic_cast<VolumeNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<Render3DFxNode*>(gn.node.get()) != nullptr) // Turbo 0.70
+         return 1;
       if (dynamic_cast<NdiOutNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<PredictiveColoringNode*>(gn.node.get()) != nullptr)
@@ -299,6 +301,8 @@
          return slot == 0 ? &fluid->Input() : (slot == 1 ? &fluid->Force() : (slot == 2 ? &fluid->Obstacles() : nullptr));
       if (auto* vol = dynamic_cast<VolumeNode*>(gn.node.get()))
          return slot == 0 ? &vol->Input() : nullptr;
+      if (auto* fx = dynamic_cast<Render3DFxNode*>(gn.node.get())) // Turbo 0.70
+         return slot == 0 ? &fx->Input() : nullptr;
       if (auto* ndiOut = dynamic_cast<NdiOutNode*>(gn.node.get()))
          return slot == 0 ? &ndiOut->Input() : nullptr;
       if (auto* pc = dynamic_cast<PredictiveColoringNode*>(gn.node.get()))

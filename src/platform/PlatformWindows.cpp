@@ -662,14 +662,40 @@ namespace Platform
       return !indices.empty();
    }
 
+   // Turbo 0.70: one installed font family (GDI), vertical "@" variants skipped.
+   static int CALLBACK CollectFontFamily(const LOGFONTW* lf, const TEXTMETRICW*, DWORD, LPARAM param)
+   {
+      if (lf->lfFaceName[0] == L'@')
+         return 1;
+      char utf8[LF_FACESIZE * 4];
+      const int n = WideCharToMultiByte(CP_UTF8, 0, lf->lfFaceName, -1, utf8, (int)sizeof(utf8), nullptr, nullptr);
+      if (n > 1)
+         reinterpret_cast<std::vector<std::string>*>(param)->push_back(utf8);
+      return 1;
+   }
+
    const std::vector<std::string>& AvailableFontFamilies()
    {
+      // Turbo 0.70: the installed families straight from Windows, plus JUCE's.
+      // JUCE alone came back empty when asked early, and the "Arial" fallback
+      // then stayed cached for the whole session (the font lists showed only it).
       EnsureJuceInitialised();
       static std::vector<std::string> fonts;
-      if (fonts.empty())
+      static bool onlyFallback = true;
+      if (onlyFallback)
       {
+         fonts.clear();
+         if (HDC dc = GetDC(nullptr))
+         {
+            LOGFONTW lf = {};
+            lf.lfCharSet = DEFAULT_CHARSET;
+            EnumFontFamiliesExW(dc, &lf, CollectFontFamily, (LPARAM)&fonts, 0);
+            ReleaseDC(nullptr, dc);
+         }
          for (const auto& name : juce::Font::findAllTypefaceNames()) fonts.push_back(name.toStdString());
          std::sort(fonts.begin(), fonts.end());
+         fonts.erase(std::unique(fonts.begin(), fonts.end()), fonts.end());
+         onlyFallback = fonts.empty();
          if (fonts.empty()) fonts.push_back("Arial");
       }
       return fonts;

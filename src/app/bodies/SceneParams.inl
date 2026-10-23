@@ -1723,7 +1723,39 @@
                                 n->RtxMs());
       }
 
+      // Turbo 0.70 (R4, R5): anti-aliasing and render scale, at the end so no
+      // earlier control's modulation / MIDI-learn ordinal moves.
+      NodeSeparator("quality", colW);
+      ModCheckbox("TAA", &n->taa);
+      // Turbo 0.70 (R1): before the conditional sharpness, so its ordinal holds.
+      ModSlider("lod pixels", &n->lodPixels, 0.0f, 16.0f, "%.1f", colW);
+      DropdownButton("upscale", Render3DNode::UpscaleNames(), n->upscale,
+                     [n](int i) { PushUndoCheckpoint(); n->upscale = i; }, colW);
+      if (n->upscale > 0)
+         ModSlider("sharpness", &n->sharpness, 0.0f, 1.0f, "%.2f", colW);
+
       ImGui::EndGroup();
+   }
+
+   // Turbo 0.70: Render 3D FX - one section per effect; each is off at 0.
+   void DrawRender3DFxParams(Render3DFxNode* n)
+   {
+      if (!n->HasRender())
+         ImGui::TextDisabled("needs a Render 3D on its input");
+      else if (!n->HasDepth())
+         ImGui::TextDisabled("waiting for the render's depth (raster mode)");
+      NodeSeparator("ambient occlusion");
+      ModSlider("amount", &n->aoAmount, 0.0f, 2.0f, "%.2f");
+      ModSlider("radius", &n->aoRadius, 0.02f, 4.0f, "%.2f");
+      NodeSeparator("reflections");
+      ModSlider("strength", &n->reflections, 0.0f, 1.0f, "%.2f");
+      ModSlider("distance", &n->reflectDistance, 0.2f, 20.0f, "%.1f");
+      NodeSeparator("depth of field");
+      ModSlider("blur", &n->dofBlur, 0.0f, 48.0f, "%.1f");
+      ModSlider("focus distance", &n->focusDistance, 0.05f, 50.0f, "%.2f");
+      ModSlider("focus range", &n->focusRange, 0.0f, 10.0f, "%.2f");
+      NodeSeparator("motion blur");
+      ModSlider("shutter (frames)", &n->shutter, 0.0f, 8.0f, "%.2f");
    }
 
    void DrawBlendParams(BlendNode* n)

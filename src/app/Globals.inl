@@ -1094,6 +1094,10 @@
    bool gViewport3DHoveredNow = false;
    bool gViewport3DOwnsDrag = false;
    ImVec2 gDragTestNodeScreen(0.0f, 0.0f);
+   // Turbo 0.70: DRAGTEST's pan starts on a point no node covers (found each
+   // run), so a node body growing a row cannot swallow the canvas drag.
+   ImVec2 gDragTestEmptyScreen(0.0f, 0.0f);
+   bool gDragTestHaveEmpty = false;
    ImVec2 gDragTestNodePos(0.0f, 0.0f);
    ImVec2 gTestMouse(0.0f, 0.0f);
    // Screen rects of the Wavetable node's draggable visualizers, republished

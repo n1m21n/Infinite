@@ -1,0 +1,7 @@
+# Patch compatibility corpus for compat.ps1 (C3): one .inf or one folder (searched recursively for
+# .inf) per line, absolute or repo-relative paths, forward slashes. Each patch is copied with its
+# "<name>_media" sibling folder into build/compat/corpus, so the originals are never opened.
+assets/examples
+test+turbo.inf
+superSynthMCP.inf
+C:/Users/veeja/Desktop/__infinite

@@ -19,10 +19,12 @@ namespace Platform
          outError = "empty image data";
          return false;
       }
-      stbi_set_flip_vertically_on_load(1);
+      // Turbo 0.70: this thread's flag only. The global one raced with an HDRI
+      // loading on the main thread, which then came out upside down.
+      stbi_set_flip_vertically_on_load_thread(1);
       int w = 0, h = 0, comp = 0;
       stbi_uc* data = stbi_load_from_memory(bytes.data(), (int)bytes.size(), &w, &h, &comp, 4);
-      stbi_set_flip_vertically_on_load(0); // the flag is global: leave it as other users expect
+      stbi_set_flip_vertically_on_load_thread(0);
       if (data == nullptr)
       {
          const char* why = stbi_failure_reason();

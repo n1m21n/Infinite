@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "INode.h"
 
@@ -64,6 +66,10 @@ struct GraphNode
    bool hasBipolarParams = false;   // ditto: true if any binding on this node is bipolar - "mod±"
    bool hasPaletteColors = false;   // ditto, for the collapsed "pal" tag
    int colorTag = 0;                // Turbo: user colour marker, 0 = none (saved in the patch)
+   // Turbo 0.70 (C2): param lines from the file this build's node does not
+   // read (an upstream or newer patch), written back on save so a round trip
+   // through Turbo keeps them (docs/patch-format.md).
+   std::vector<std::pair<std::string, std::string>> foreignParams;
 
    // Where to place the node the first frame it appears (canvas coords).
    float spawnX = 0.0f;

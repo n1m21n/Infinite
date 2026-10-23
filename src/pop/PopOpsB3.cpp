@@ -5,6 +5,7 @@
 #include "PopOpsInternal.h"
 #include "PopCpu.h"
 #include "PopGpu.h"
+#include "ParticleGpu.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -461,8 +462,14 @@ namespace pop
                       C("colorBirth", "colour at birth", 1.0f, 1.0f, 1.0f, "colorLife=1"),
                       C("colorDeath", "colour at death", 1.0f, 0.3f, 0.1f, "colorLife=1"),
                       F("turb", "turbulence", 0.0f, 0.0f, 50.0f), F("turbScale", "turbulence scale", 1.0f, 0.05f, 20.0f),
-                      F("turbSpeed", "turbulence speed", 1.0f, 0.0f, 10.0f) };
+                      F("turbSpeed", "turbulence speed", 1.0f, 0.0f, 10.0f),
+                      // Turbo 0.70 (P3): the particles on the GPU (ParticleGpu.cpp).
+                      // New nodes start on GPU; a patch saved before keeps CPU.
+                      M("engine", "engine", { "CPU", "GPU" }, 1) };
+         d.savedBefore = { { "engine", 0.0f } };
          d.cook = [](CookCtx& c) {
+            if (c.I("engine") == 1 && CookParticleGpu(c))
+               return true;
             ParticleState& s = c.State<ParticleState>();
             const PopData* src = c.Input(0);
             if (c.reset || !s.init)
@@ -1264,6 +1271,9 @@ namespace pop
             take(c.S("scale3Attr"), attr::Scale);
             take(c.S("rotAttr"), attr::Rotate);
             take(c.S("activeAttr"), attr::Active);
+            // Turbo 0.70 (X1): a particle's id rides along (shared buffer, no
+            // copy) - Render 3D's RTX motion vectors follow each copy by it.
+            take(attr::PartId, attr::PartId);
             if (c.Bl("useColor"))
                take(c.S("colorAttr"), attr::Color);
             PopData::InstanceLook& look = inst->instanceLook;

@@ -21,17 +21,49 @@ struct RtxGeomData
    int normalStride;
    const float* uv;        // uvStride per point, or null
    int uvStride;
-   const float* color;     // colorStride per point (rgb[a], sRGB), or null
+   const float* color;     // colorStride per point (rgb[a]), or null
    int colorStride;
    const float* radius;    // spheres: final radius per point
-   const float* instColor; // instColorStride per instance (sRGB), or null
+   // Turbo 0.70: both colours multiply the linear albedo as they are - what
+   // the raster does (vVertexColor, vInstanceColor).
+   const float* instColor; // instColorStride per instance, or null
    int instColorStride;
    // Material, already linear.
    float3 base;
    float metal, rough, opacity, ior, trans;
    float3 emission;
    CUtexObject tex;        // surface colour (sRGB, normalized), 0 = none
+   // Turbo 0.70: Instance PointZ's per-copy textures, as the raster draws
+   // them (instanceLook): mode 0 off, 1 pick instTex[idx % count], 2 atlas
+   // cell idx of instTex[0]; idx from the TexIndex attribute (from 0), the
+   // copy's number (1) or a hash of it (2). Replaces `tex` when on.
+   CUtexObject instTex[4];
+   int instTexMode, instTexFrom, instTexCount, atlasCols, atlasRows;
+   const float* instTexIdx; // instTexIdxStride per instance, or null
+   int instTexIdxStride;
+   // Turbo 0.70 (X1): PartId per copy (instanced) or per sphere, or null - the
+   // motion vectors find a particle's last-frame place by it (RtxParams::prevRing)
+   // when births and deaths reorder the list; ringKey tells geometries apart.
+   const float* partId;
+   int partIdStride;
+   unsigned int ringKey;
 };
+
+// Turbo 0.70 (X1): one particle's place last frame, by PartId: an instance's
+// object-to-world transform (row-major 3x4), or a sphere's world centre in
+// t[3], t[7], t[11]. id = PartId + 1 (0 = empty).
+struct RtxPrevSlot
+{
+   float t[12];
+   unsigned int id;
+   unsigned int key;
+   unsigned int pad[2];
+};
+
+__host__ __device__ inline unsigned int RtxRingSlot(unsigned int id, unsigned int key, unsigned int mask)
+{
+   return ((id * 2654435761u) ^ (key * 40503u + 0x9e3779b9u)) & mask;
+}
 
 struct RtxLight
 {
@@ -71,6 +103,27 @@ struct RtxParams
    CUtexObject envTex; // equirect HDRI (linear float), 0 = gradient
    float envRotation, envIntensity;
    float3 sky, horizon, ground; // linear
+
+   // Turbo 0.70 (X1): what the temporal accumulation of a moving scene needs,
+   // from each pixel's first sample: where its first hit was last frame (in
+   // pixels, x < 0 = nowhere) and that hit's world normal + distance (w < 0 =
+   // background). The previous frame's instances (same order) give a moving
+   // copy its own motion; 0 = only the camera's.
+   float2* motion;
+   float4* gbuf;
+   const OptixInstance* prevInst;
+   unsigned int prevInstCount;
+   float prevViewProj[16];
+   int hasPrev;
+   const RtxPrevSlot* prevRing; // by PartId (null = none), ringMask + 1 slots
+   unsigned int ringMask;
+
+   // Turbo 0.70: the raster's look on the same scene. Its image-based diffuse
+   // is the environment times ambient * 3 (Render 3D's ambient colour), here
+   // the environment reached by a diffuse bounce; its rim adds
+   // base * (1 - n.v)^3 * rim at the first hit.
+   float3 ambientTint; // linear
+   float rim;
 };
 
 // Payload carried by radiance rays (pointer split over two registers).
@@ -83,4 +136,5 @@ struct RtxHit
    float3 base;   // linear albedo after vertex / instance colour and texture
    float metal, rough, opacity, ior, trans;
    float3 emission;
+   float3 prevP;  // Turbo 0.70 (X1): the hit point where it was last frame (world)
 };

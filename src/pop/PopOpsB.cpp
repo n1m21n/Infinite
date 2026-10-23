@@ -4,6 +4,8 @@
 
 #include "PopOpsInternal.h"
 #include "PopCpu.h"
+#include "GpuAlgo.h"
+#include "platform/OpenGLHeaders.h"
 
 #include <map>
 #include <cstring>
@@ -60,9 +62,73 @@ namespace pop
          return o;
       }
 
+      // Turbo 0.70 (P5): the kept rows gathered on the GPU. The mask is known on
+      // the CPU, so the indices and the count are too: no attribute comes down,
+      // nothing goes up but the index list. Null when compute is unavailable.
+      // in's rows `rows` (indices known on the CPU) as a new PopData, gathered on
+      // the GPU; no topology. Null when compute is unavailable or a gather fails.
+      std::shared_ptr<PopData> GatherPointsGpu(const PopData& in, const std::vector<uint32_t>& rows)
+      {
+         if (!gpu::Available())
+            return nullptr;
+         const int n = in.pointCount;
+         auto out = std::make_shared<PopData>();
+         const int kept = (int)rows.size();
+         out->pointCount = kept;
+         if (kept > 0)
+         {
+            const uint32_t countValue = (uint32_t)kept;
+            const unsigned int rowsBuf = AcquireGpuBuffer(rows.size() * 4), countBuf = AcquireGpuBuffer(4);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, rowsBuf);
+            glBufferSubData(GL_COPY_WRITE_BUFFER, 0, (GLsizeiptr)(rows.size() * 4), rows.data());
+            glBindBuffer(GL_COPY_WRITE_BUFFER, countBuf);
+            glBufferSubData(GL_COPY_WRITE_BUFFER, 0, 4, &countValue);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+            bool ok = true;
+            for (const PopAttrib& at : in.attribs)
+            {
+               if (at.buffer->Count() < n)
+                  continue;
+               const int comps = at.buffer->Comps();
+               const unsigned int dst = AcquireGpuBuffer((size_t)kept * (size_t)comps * sizeof(float));
+               ok = ok && gpu::GatherRows(at.buffer->Gpu(), comps, rowsBuf, countBuf, kept, dst);
+               out->Set(at.name, std::make_shared<PopBuffer>(dst, kept, comps));
+            }
+            ReleaseGpuBuffer(rowsBuf, rows.size() * 4);
+            ReleaseGpuBuffer(countBuf, 4);
+            if (!ok)
+               return nullptr;
+         }
+         return out;
+      }
+
+      std::shared_ptr<PopData> KeepPointsGpu(const PopData& in, const std::vector<char>& keep)
+      {
+         const int n = in.pointCount;
+         std::vector<uint32_t> rows;
+         std::vector<int> map((size_t)n, -1);
+         for (int i = 0; i < n; i++)
+            if (keep[(size_t)i])
+            {
+               map[(size_t)i] = (int)rows.size();
+               rows.push_back((uint32_t)i);
+            }
+         auto out = GatherPointsGpu(in, rows);
+         if (out)
+            out->topo = RemapTopo(in.Topo(), map);
+         return out;
+      }
+
       // Points kept by mask, everything else follows.
       std::shared_ptr<PopData> KeepPoints(const PopData& in, const std::vector<char>& keep)
       {
+         // A GPU-made input is gathered on the GPU instead of coming down whole.
+         bool onGpu = false;
+         for (const PopAttrib& at : in.attribs)
+            onGpu = onGpu || !at.buffer->OnCpu();
+         if (onGpu)
+            if (auto gpuOut = KeepPointsGpu(in, keep))
+               return gpuOut;
          Arrays a = Load(in);
          std::vector<int> map((size_t)a.count, -1);
          PointBuilder b(a);
@@ -110,6 +176,179 @@ namespace pop
             if (n[0] == 0.0f && n[1] == 0.0f && n[2] == 0.0f) n[2] = 1.0f;
          }
          return N;
+      }
+
+      // Turbo 0.70 (P5): FaceNormals of a PopData whose P is on the GPU, on the
+      // GPU. The faces around each point (CSR, in face order, as FaceNormals
+      // sums them) are built once per topology into `cache`; a kernel per point
+      // sums the face normals from P read in place - nothing comes down. Same
+      // sums (precise); the sqrt and divide may differ by an ulp.
+      struct GpuNormalsCache
+      {
+         TopologyPtr topo; // kept alive: the pointer is the cache key
+         int points = -1;
+         std::shared_ptr<PopData> adj;
+      };
+      BufferPtr GpuFaceNormals(const PopData& d, const TopologyPtr& topo, bool flip, const KernelEnv& baseEnv,
+                               GpuNormalsCache& cache, std::string& err)
+      {
+         const PopTopology& t = *topo;
+         if (cache.topo != topo || cache.points != d.pointCount)
+         {
+            const int n = d.pointCount;
+            std::vector<float> start((size_t)n, 0.0f), count((size_t)n, 0.0f), tris, faces;
+            std::vector<std::vector<uint32_t>> around((size_t)n);
+            const size_t faceCount = t.tris.size() / 3;
+            for (size_t f = 0; f < faceCount; f++)
+               for (int k = 0; k < 3; k++)
+                  if (t.tris[f * 3 + (size_t)k] < (uint32_t)n)
+                     around[t.tris[f * 3 + (size_t)k]].push_back((uint32_t)f);
+            for (int v = 0; v < n; v++)
+            {
+               start[(size_t)v] = (float)faces.size();
+               count[(size_t)v] = (float)around[(size_t)v].size();
+               for (uint32_t f : around[(size_t)v])
+                  faces.push_back((float)f);
+            }
+            tris.reserve(faceCount * 3);
+            for (size_t i = 0; i < faceCount * 3; i++)
+               tris.push_back((float)t.tris[i]);
+            cache.adj = std::make_shared<PopData>();
+            cache.adj->Set("PzAdjStart", MakeBuffer(std::move(start), 1));
+            cache.adj->Set("PzAdjCount", MakeBuffer(std::move(count), 1));
+            cache.adj->Set("PzAdjFace", MakeBuffer(faces.empty() ? std::vector<float>(1, 0.0f) : std::move(faces), 1));
+            cache.adj->Set("PzTri", MakeBuffer(tris.empty() ? std::vector<float>(1, 0.0f) : std::move(tris), 1));
+            cache.topo = topo;
+            cache.points = n;
+         }
+         KernelSpec spec;
+         auto lookup = [](const char* name, int comps, int input) {
+            KernelIO io;
+            io.name = name;
+            io.comps = comps;
+            io.input = input;
+            return io;
+         };
+         spec.lookups = { lookup(attr::P, 3, 0), lookup("PzAdjStart", 1, 1), lookup("PzAdjCount", 1, 1),
+                          lookup("PzAdjFace", 1, 1), lookup("PzTri", 1, 1) };
+         KernelIO nOut;
+         nOut.name = attr::N;
+         nOut.comps = 3;
+         spec.writes = { nOut };
+         spec.body = "int s = int(fetch_PzAdjStart(id));\n"
+                     "int cnt = int(fetch_PzAdjCount(id));\n"
+                     "precise vec3 n = vec3(0.0);\n"
+                     "for (int k = 0; k < cnt; k++)\n"
+                     "{\n"
+                     "   int f = int(fetch_PzAdjFace(s + k)) * 3;\n"
+                     "   precise vec3 p0 = fetch_P(int(fetch_PzTri(f)));\n"
+                     "   precise vec3 e1 = fetch_P(int(fetch_PzTri(f + 1))) - p0;\n"
+                     "   precise vec3 e2 = fetch_P(int(fetch_PzTri(f + 2))) - p0;\n"
+                     "   n += vec3(e1.y * e2.z - e1.z * e2.y, e1.z * e2.x - e1.x * e2.z, e1.x * e2.y - e1.y * e2.x);\n"
+                     "}\n"
+                     "float l = sqrt(n.x * n.x + n.y * n.y + n.z * n.z);\n"
+                     "if (l > 1e-12)\n"
+                     "   n = n / l;\n"
+                     "if (uFlip != 0)\n"
+                     "   n = -n;\n"
+                     "if (n.x == 0.0 && n.y == 0.0 && n.z == 0.0)\n"
+                     "   n.z = 1.0;\n"
+                     "N = n;\n";
+         KernelUniform flipU;
+         flipU.name = "uFlip";
+         flipU.type = KernelUniform::kInt;
+         flipU.i = flip ? 1 : 0;
+         KernelEnv env = baseEnv;
+         env.lookupData[0] = &d;
+         env.lookupData[1] = cache.adj.get();
+         std::vector<BufferPtr> out;
+         if (!RunKernel(spec, d, { flipU }, env, out, err) || out.empty())
+            return nullptr;
+         return out[0];
+      }
+
+      // Turbo 0.70 (P5): P of the rows of `d` (on the GPU) moved by one matrix per
+      // group, row r by group rows->PzGroup[r]: the four columns are rows of
+      // `mats` (PzM0..PzM3). `translate` adds column 3 only (q + t, as the CPU
+      // offsets), else P = M * P in TransformArrays' order; precise, so the same
+      // floats. With rows->PzTex, Tex is set from it. In place on d.
+      bool GpuMoveRows(PopData& d, const PopData& rows, const PopData& mats, bool translate, const KernelEnv& baseEnv,
+                       std::string& err)
+      {
+         const PopAttrib* group = rows.Find("PzGroup");
+         const PopAttrib* tex = rows.Find("PzTex");
+         if (group == nullptr)
+            return false;
+         d.Set("PzGroup", group->buffer);
+         if (tex != nullptr)
+            d.Set("PzTex", tex->buffer);
+         KernelSpec spec;
+         auto io = [](const char* name, int comps, int input) {
+            KernelIO k;
+            k.name = name;
+            k.comps = comps;
+            k.input = input;
+            return k;
+         };
+         spec.reads = { io(attr::P, 3, 0), io("PzGroup", 1, 0) };
+         spec.writes = { io(attr::P, 3, 0) };
+         spec.lookups = { io("PzM0", 4, 1), io("PzM1", 4, 1), io("PzM2", 4, 1), io("PzM3", 4, 1) };
+         spec.body = "int g = int(PzGroup);\n"
+                     "precise vec3 q = P;\n"
+                     "vec4 c3 = fetch_PzM3(g);\n";
+         if (translate)
+            spec.body += "precise vec3 r = q + c3.xyz;\n"
+                         "P = r;\n";
+         else
+            spec.body += "vec4 c0 = fetch_PzM0(g);\n"
+                         "vec4 c1 = fetch_PzM1(g);\n"
+                         "vec4 c2 = fetch_PzM2(g);\n"
+                         "precise float x = c0.x * q.x + c1.x * q.y + c2.x * q.z + c3.x;\n"
+                         "precise float y = c0.y * q.x + c1.y * q.y + c2.y * q.z + c3.y;\n"
+                         "precise float z = c0.z * q.x + c1.z * q.y + c2.z * q.z + c3.z;\n"
+                         "P = vec3(x, y, z);\n";
+         if (tex != nullptr)
+         {
+            spec.reads.push_back(io("PzTex", 3, 0));
+            spec.writes.push_back(io(attr::Tex, 3, 0));
+            spec.body += "Tex = PzTex;\n";
+         }
+         KernelEnv env = baseEnv;
+         env.lookupData[0] = &d;
+         env.lookupData[1] = &mats;
+         std::vector<BufferPtr> out;
+         const bool ok = RunKernel(spec, d, {}, env, out, err) && out.size() == spec.writes.size();
+         d.Remove("PzGroup");
+         d.Remove("PzTex");
+         if (!ok)
+            return false;
+         d.Set(attr::P, out[0]);
+         if (tex != nullptr)
+            d.Set(attr::Tex, out[1]);
+         return true;
+      }
+
+      // Matrices as the four column rows GpuMoveRows looks up.
+      std::shared_ptr<PopData> MatrixTable(const std::vector<Mat4>& ms)
+      {
+         std::vector<float> col[4];
+         for (const Mat4& m : ms)
+            for (int c = 0; c < 4; c++)
+               col[c].insert(col[c].end(), m.m + c * 4, m.m + c * 4 + 4);
+         auto t = std::make_shared<PopData>();
+         t->Set("PzM0", MakeBuffer(std::move(col[0]), 4));
+         t->Set("PzM1", MakeBuffer(std::move(col[1]), 4));
+         t->Set("PzM2", MakeBuffer(std::move(col[2]), 4));
+         t->Set("PzM3", MakeBuffer(std::move(col[3]), 4));
+         return t;
+      }
+
+      bool AnyOnGpu(const PopData& d)
+      {
+         for (const PopAttrib& at : d.attribs)
+            if (!at.buffer->OnCpu())
+               return true;
+         return false;
       }
 
       // Spatial hash weld: map each point to a representative within `dist`.
@@ -411,20 +650,24 @@ mat3 copyAlign(vec3 from, vec3 to)
                                      "has is given to all (defaults where missing).", 4);
          d.inputLabels = { "A", "B", "C", "D" };
          d.cook = [](CookCtx& c) {
-            std::vector<Arrays> parts;
             std::vector<const PopData*> datas;
             for (int i = 0; i < 4; i++)
                if (const PopData* in = c.Input(i))
-               {
-                  parts.push_back(Load(*in));
                   datas.push_back(in);
-               }
-            if (parts.empty())
+            if (datas.empty())
                return true;
-            std::vector<const Arrays*> ptrs;
-            for (const Arrays& a : parts)
-               ptrs.push_back(&a);
-            Arrays merged = Concat(ptrs);
+            // Turbo 0.70 (P5): a GPU-made input is joined by GPU copies (same
+            // rules as the CPU Concat); the CPU path stays for CPU-only inputs and
+            // for an attribute shaped differently in two inputs.
+            bool onGpu = false;
+            for (const PopData* in : datas)
+               for (const PopAttrib& at : in->attribs)
+                  onGpu = onGpu || !at.buffer->OnCpu();
+            std::shared_ptr<PopData> gpuMerged = onGpu ? gpu::ConcatRows(datas) : nullptr;
+            std::vector<Arrays> parts;
+            if (!gpuMerged)
+               for (const PopData* in : datas)
+                  parts.push_back(Load(*in));
             auto topo = NewTopo();
             uint32_t base = 0;
             bool allPoints = true;
@@ -444,7 +687,16 @@ mat3 copyAlign(vec3 from, vec3 to)
                base += (uint32_t)datas[p]->pointCount;
             }
             topo->pointPrims = allPoints;
-            c.out = Store(std::move(merged), topo);
+            if (gpuMerged)
+            {
+               gpuMerged->topo = topo;
+               c.out = gpuMerged;
+               return true;
+            }
+            std::vector<const Arrays*> ptrs;
+            for (const Arrays& a : parts)
+               ptrs.push_back(&a);
+            c.out = Store(Concat(ptrs), topo);
             return true;
          };
          defs.push_back(d);
@@ -571,8 +823,26 @@ mat3 copyAlign(vec3 from, vec3 to)
             if (!PassInput(c))
                return true;
             const PopData& in = *c.Input(0);
-            Arrays a = Load(in);
             const PopTopology& t = in.Topo();
+            // Turbo 0.70 (P5): smooth normals of a GPU-made input on the GPU
+            // (GpuFaceNormals) - nothing comes down.
+            const PopAttrib* pAttr = in.Find(attr::P);
+            if (c.I("mode") == 0 && t.HasFaces() && pAttr != nullptr && !pAttr->buffer->OnCpu() && gpu::Available())
+            {
+               struct NormalState : OpState
+               {
+                  GpuNormalsCache normals;
+               };
+               GpuNormalsCache& cache = c.State<NormalState>().normals;
+               std::string err;
+               if (BufferPtr n = GpuFaceNormals(in, in.topo, c.Bl("flip"), c.env, cache, err))
+               {
+                  c.out->Set(attr::N, n);
+                  return true;
+               }
+               c.warning = err; // falls through to the CPU path
+            }
+            Arrays a = Load(in);
             std::vector<float> N;
             if (c.I("mode") == 0)
             {
@@ -618,8 +888,72 @@ mat3 copyAlign(vec3 from, vec3 to)
             const PopData* in = c.Input(0);
             if (in == nullptr)
                return true;
-            Arrays a = Load(*in);
             const PopTopology& t = in->Topo();
+            // Turbo 0.70 (P5): unique points of a GPU-made input on the GPU - a
+            // gather by the face indices, sequential faces (kept per topology),
+            // flat normals by a kernel reading each face's corners.
+            const PopAttrib* pAttr = in->Find(attr::P);
+            if (c.I("mode") == 0 && pAttr != nullptr && !pAttr->buffer->OnCpu() && gpu::Available())
+            {
+               struct FacetState : OpState
+               {
+                  TopologyPtr src; // kept alive: the pointer is the cache key
+                  size_t corners = 0;
+                  std::shared_ptr<PopTopology> seq;
+               };
+               FacetState& s = c.State<FacetState>();
+               const size_t corners = t.tris.size() / 3 * 3;
+               if (s.src != in->topo || s.corners != corners)
+               {
+                  s.seq = NewTopo();
+                  s.seq->tris.resize(corners);
+                  for (size_t i = 0; i < corners; i++)
+                     s.seq->tris[i] = (uint32_t)i;
+                  s.src = in->topo;
+                  s.corners = corners;
+               }
+               std::vector<uint32_t> rows(t.tris.begin(), t.tris.begin() + (std::ptrdiff_t)corners);
+               if (auto out = GatherPointsGpu(*in, rows))
+               {
+                  out->topo = s.seq;
+                  bool ok = true;
+                  if (c.Bl("normals") && corners > 0)
+                  {
+                     KernelSpec spec;
+                     KernelIO p;
+                     p.name = attr::P;
+                     p.comps = 3;
+                     p.input = 0;
+                     spec.lookups = { p };
+                     KernelIO n;
+                     n.name = attr::N;
+                     n.comps = 3;
+                     spec.writes = { n };
+                     spec.body = "int f = (id / 3) * 3;\n"
+                                 "vec3 p0 = fetch_P(f);\n"
+                                 "vec3 e1 = fetch_P(f + 1) - p0;\n"
+                                 "vec3 e2 = fetch_P(f + 2) - p0;\n"
+                                 "vec3 nn = vec3(e1.y * e2.z - e1.z * e2.y, e1.z * e2.x - e1.x * e2.z, e1.x * e2.y - e1.y * e2.x);\n"
+                                 "float l = sqrt(nn.x * nn.x + nn.y * nn.y + nn.z * nn.z);\n"
+                                 "if (l > 1e-12)\n"
+                                 "   nn = nn / l;\n"
+                                 "N = nn;\n";
+                     KernelEnv env = c.env;
+                     env.lookupData[0] = out.get();
+                     std::vector<BufferPtr> res;
+                     std::string err;
+                     ok = RunKernel(spec, *out, {}, env, res, err);
+                     if (ok)
+                        out->Set(attr::N, res[0]);
+                  }
+                  if (ok)
+                  {
+                     c.out = out;
+                     return true;
+                  }
+               }
+            }
+            Arrays a = Load(*in);
             if (c.I("mode") == 0)
             {
                PointBuilder b(a);
@@ -1105,6 +1439,83 @@ mat3 copyAlign(vec3 from, vec3 to)
             float dir[3];
             c.V3("dir", dir);
             const int steps = std::max(1, c.I("steps"));
+            // Turbo 0.70 (P5): GPU-made lines extruded on the GPU. Each step's
+            // copies are a stencil, the step's offset (dir * f, the CPU's floats)
+            // is added in a kernel and N comes from GpuFaceNormals. Stencil and
+            // topology are built once per topology and steps; the offsets again
+            // when the direction moves. Faces still go through MeshOps (CPU).
+            if (AnyOnGpu(*in) && gpu::Available())
+            {
+               struct ExtrudeState : OpState
+               {
+                  TopologyPtr src;
+                  int points = -1, steps = 0;
+                  gpu::GpuStencil stencil;
+                  std::shared_ptr<PopData> rows, mats;
+                  std::shared_ptr<PopTopology> topo;
+                  float dir[3] = {};
+                  GpuNormalsCache normals;
+               };
+               ExtrudeState& s = c.State<ExtrudeState>();
+               if (s.src != in->topo || s.points != in->pointCount || s.steps != steps)
+               {
+                  gpu::RowStencil b;
+                  std::vector<float> group;
+                  auto o = NewTopo();
+                  for (size_t si = 0; si < t.StripCount(); si++)
+                  {
+                     const int st = t.lineStart[si], n = t.lineCount[si];
+                     const uint32_t base = (uint32_t)b.Rows();
+                     for (int j = 0; j <= steps; j++)
+                        for (int k = 0; k < n; k++)
+                        {
+                           b.Copy(t.lineVerts[(size_t)(st + k)]);
+                           group.push_back((float)j);
+                        }
+                     const int segs = (t.lineClosed[si] && n > 2) ? n : n - 1;
+                     for (int j = 0; j < steps; j++)
+                        for (int k = 0; k < segs; k++)
+                        {
+                           const uint32_t a0 = base + (uint32_t)(j * n + k), a1 = base + (uint32_t)(j * n + (k + 1) % n);
+                           const uint32_t b0 = a0 + (uint32_t)n, b1 = a1 + (uint32_t)n;
+                           o->tris.insert(o->tris.end(), { a0, a1, b1, a0, b1, b0 });
+                        }
+                  }
+                  s.stencil = gpu::Upload(b);
+                  s.rows = std::make_shared<PopData>();
+                  s.rows->Set("PzGroup", MakeBuffer(std::move(group), 1));
+                  s.topo = o;
+                  s.src = in->topo;
+                  s.points = in->pointCount;
+                  s.steps = steps;
+                  s.mats.reset();
+               }
+               if (!s.mats || !std::equal(dir, dir + 3, s.dir))
+               {
+                  std::vector<Mat4> ms;
+                  for (int j = 0; j <= steps; j++)
+                  {
+                     const float f = (float)j / steps;
+                     ms.push_back(Mat4::Translation(dir[0] * f, dir[1] * f, dir[2] * f));
+                  }
+                  s.mats = MatrixTable(ms);
+                  std::copy(dir, dir + 3, s.dir);
+               }
+               std::string err;
+               if (s.stencil.rows > 0)
+                  if (auto out = gpu::ApplyStencil(*in, s.stencil))
+                  {
+                     out->topo = s.topo;
+                     if (GpuMoveRows(*out, *s.rows, *s.mats, true, c.env, err))
+                        if (BufferPtr nb = GpuFaceNormals(*out, out->topo, false, c.env, s.normals, err))
+                        {
+                           out->Set(attr::N, nb);
+                           c.out = out;
+                           return true;
+                        }
+                  }
+               c.warning = err; // falls through to the CPU path
+            }
             Arrays a = Load(*in);
             PointBuilder b(a);
             auto o = NewTopo();
@@ -1165,6 +1576,85 @@ mat3 copyAlign(vec3 from, vec3 to)
                PassInput(c);
                c.warning = "needs faces or lines";
                return true;
+            }
+            // Turbo 0.70 (P5): lines of a GPU-made input subdivided on the GPU.
+            // Each level's stencil (copies and Chaikin lerps, in the CPU loop's
+            // order) and topology are built once per input topology / levels /
+            // smooth; gpu::WeightedRows applies them, bit for bit the CPU sums.
+            bool onGpu = false;
+            for (const PopAttrib& at : in->attribs)
+               onGpu = onGpu || !at.buffer->OnCpu();
+            if (onGpu && gpu::Available())
+            {
+               struct Level
+               {
+                  gpu::GpuStencil stencil;
+                  std::shared_ptr<PopTopology> topo;
+               };
+               struct SubdivState : OpState
+               {
+                  TopologyPtr src;
+                  int points = -1, levels = 0;
+                  float smooth = -1.0f;
+                  std::vector<Level> steps;
+               };
+               SubdivState& s = c.State<SubdivState>();
+               if (s.src != in->topo || s.points != in->pointCount || s.levels != levels || s.smooth != smooth)
+               {
+                  s.steps.clear();
+                  const PopTopology* ct = &t;
+                  std::shared_ptr<PopTopology> keepAlive;
+                  for (int lv = 0; lv < levels; lv++)
+                  {
+                     gpu::RowStencil b;
+                     auto o = NewTopo();
+                     for (size_t si = 0; si < ct->StripCount(); si++)
+                     {
+                        const int st = ct->lineStart[si], n = ct->lineCount[si];
+                        const bool closed = ct->lineClosed[si] && n > 2;
+                        std::vector<uint32_t> strip;
+                        const int segs = closed ? n : n - 1;
+                        if (!closed)
+                           strip.push_back(b.Copy(ct->lineVerts[(size_t)st]));
+                        for (int k = 0; k < segs; k++)
+                        {
+                           const uint32_t i0 = ct->lineVerts[(size_t)(st + k)], i1 = ct->lineVerts[(size_t)(st + (k + 1) % n)];
+                           const float q = 0.25f * smooth;
+                           strip.push_back(b.Lerp(i0, i1, q));
+                           strip.push_back(b.Lerp(i0, i1, 1.0f - q));
+                        }
+                        if (!closed)
+                           strip.push_back(b.Copy(ct->lineVerts[(size_t)(st + n - 1)]));
+                        o->AddStrip(strip, closed);
+                     }
+                     Level L;
+                     L.stencil = gpu::Upload(b);
+                     L.topo = o;
+                     s.steps.push_back(L);
+                     keepAlive = o;
+                     ct = keepAlive.get();
+                  }
+                  s.src = in->topo;
+                  s.points = in->pointCount;
+                  s.levels = levels;
+                  s.smooth = smooth;
+               }
+               std::shared_ptr<PopData> cur = ShallowCopy(*in);
+               bool ok = true;
+               for (const Level& L : s.steps)
+               {
+                  auto next = gpu::ApplyStencil(*cur, L.stencil);
+                  ok = next != nullptr;
+                  if (!ok)
+                     break;
+                  next->topo = L.topo;
+                  cur = next;
+               }
+               if (ok)
+               {
+                  c.out = cur;
+                  return true;
+               }
             }
             std::shared_ptr<PopData> cur = ShallowCopy(*in);
             for (int lv = 0; lv < levels; lv++)
@@ -1279,6 +1769,108 @@ mat3 copyAlign(vec3 from, vec3 to)
             if (in == nullptr)
                return true;
             const PopTopology& t = in->Topo();
+            // Turbo 0.70 (P5): a GPU-made profile revolved on the GPU. The rings'
+            // copies are a stencil, each ring's matrix (the CPU's floats) moves P
+            // in a kernel, Tex comes from a table and N from GpuFaceNormals.
+            // Stencil, tables and topology are built once per topology and
+            // divisions; the matrices again when the angle, axis or origin move.
+            const PopAttrib* inTex = in->Find(attr::Tex);
+            if (AnyOnGpu(*in) && gpu::Available() && (inTex == nullptr || inTex->buffer->Comps() == 3))
+            {
+               struct RevolveState : OpState
+               {
+                  TopologyPtr src;
+                  int points = -1, div = 0, rings = 0, n = 0;
+                  gpu::GpuStencil stencil;
+                  std::shared_ptr<PopData> rows, mats;
+                  std::shared_ptr<PopTopology> topo;
+                  float key[6] = {};
+                  GpuNormalsCache normals;
+               };
+               RevolveState& s = c.State<RevolveState>();
+               const int div = std::max(3, c.I("div"));
+               const bool full = c.F("angle") >= 359.999f;
+               const int rings = full ? div : div + 1;
+               if (s.src != in->topo || s.points != in->pointCount || s.div != div || s.rings != rings)
+               {
+                  std::vector<uint32_t> profile;
+                  if (t.HasLines())
+                     for (int k = 0; k < t.lineCount[0]; k++) profile.push_back(t.lineVerts[(size_t)(t.lineStart[0] + k)]);
+                  else
+                     for (int i = 0; i < in->pointCount; i++) profile.push_back((uint32_t)i);
+                  const int n = (int)profile.size();
+                  s.stencil = gpu::GpuStencil();
+                  s.n = n;
+                  if (n >= 2)
+                  {
+                     gpu::RowStencil b;
+                     std::vector<float> group, tex;
+                     for (int j = 0; j < rings; j++)
+                        for (int k = 0; k < n; k++)
+                        {
+                           b.Copy(profile[(size_t)k]);
+                           group.push_back((float)j);
+                           tex.insert(tex.end(), { (float)j / div, (float)k / (n - 1), 0.0f });
+                        }
+                     auto topo = NewTopo();
+                     for (int j = 0; j < div; j++)
+                        for (int k = 0; k + 1 < n; k++)
+                        {
+                           const uint32_t a0 = (uint32_t)(j * n + k), a1 = a0 + 1;
+                           const uint32_t b0 = (uint32_t)(((j + 1) % rings) * n + k), b1 = b0 + 1;
+                           topo->tris.insert(topo->tris.end(), { a0, b0, b1, a0, b1, a1 });
+                        }
+                     s.stencil = gpu::Upload(b);
+                     s.rows = std::make_shared<PopData>();
+                     s.rows->Set("PzGroup", MakeBuffer(std::move(group), 1));
+                     s.rows->Set("PzTex", MakeBuffer(std::move(tex), 3));
+                     s.topo = topo;
+                  }
+                  s.src = in->topo;
+                  s.points = in->pointCount;
+                  s.div = div;
+                  s.rings = rings;
+                  s.mats.reset();
+               }
+               if (s.n < 2)
+               {
+                  c.warning = "needs a line (or points in order) as the profile";
+                  return true;
+               }
+               float o[3];
+               c.V3("origin", o);
+               const float key[6] = { c.F("angle"), (float)c.I("axis"), o[0], o[1], o[2], (float)div };
+               if (!s.mats || !std::equal(key, key + 6, s.key))
+               {
+                  const float ang = c.F("angle") * kPi / 180.0f;
+                  const int ax = c.I("axis");
+                  std::vector<Mat4> ms;
+                  for (int j = 0; j < rings; j++)
+                  {
+                     const float th = ang * (float)j / div;
+                     const Mat4 R = ax == 0 ? Mat4::RotationX(th) : (ax == 1 ? Mat4::RotationY(th) : Mat4::RotationZ(th));
+                     ms.push_back(Mat4::Multiply(Mat4::Translation(o[0], o[1], o[2]),
+                                                 Mat4::Multiply(R, Mat4::Translation(-o[0], -o[1], -o[2]))));
+                  }
+                  s.mats = MatrixTable(ms);
+                  std::copy(key, key + 6, s.key);
+               }
+               std::string err;
+               if (auto out = gpu::ApplyStencil(*in, s.stencil))
+               {
+                  out->topo = s.topo;
+                  if (GpuMoveRows(*out, *s.rows, *s.mats, false, c.env, err))
+                     if (BufferPtr nb = GpuFaceNormals(*out, out->topo, false, c.env, s.normals, err))
+                     {
+                        out->Set(attr::N, nb);
+                        out->dims[0] = rings;
+                        out->dims[1] = s.n;
+                        c.out = out;
+                        return true;
+                     }
+               }
+               c.warning = err; // falls through to the CPU path
+            }
             Arrays a = Load(*in);
             std::vector<int> profile;
             if (t.HasLines())

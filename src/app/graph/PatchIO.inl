@@ -57,6 +57,16 @@
          rec.showPreview = gn.showPreview;
          rec.colorTag = gn.colorTag;
          Patch::SaveParams(gn.node.get(), rec.params);
+         // Turbo 0.70 (C2): lines it did not read go back too, unless the
+         // node writes that key itself now.
+         for (const auto& kv : gn.foreignParams)
+         {
+            bool known = false;
+            for (const auto& own : rec.params)
+               known = known || own.first == kv.first;
+            if (!known)
+               rec.params.push_back(kv);
+         }
          data.nodes.push_back(std::move(rec));
 
          for (int slot = 0; slot < InputCountFor(gn); slot++)
@@ -489,6 +499,21 @@
          if (data.revision < 2 && (rec.hasFlags || rec.line == 0))
             spawned->node->BeforeLoadParams();
          Patch::LoadParams(spawned->node.get(), rec.params);
+         // Turbo 0.70 (C2): keep the lines this node does not read (the keys
+         // its VisitParams does not visit) for the next save.
+         {
+            std::vector<std::pair<std::string, std::string>> own;
+            Patch::SaveParams(spawned->node.get(), own);
+            spawned->foreignParams.clear();
+            for (const auto& kv : rec.params)
+            {
+               bool known = false;
+               for (const auto& o : own)
+                  known = known || o.first == kv.first;
+               if (!known)
+                  spawned->foreignParams.push_back(kv);
+            }
+         }
          ReloadDerivedState(spawned->node.get());
          // Phase 4 (selection as an input): rewrites a saved kDeleteSelected/
          // kTransformSelected/kExtrudeSelected `op` integer to its general

@@ -73,7 +73,8 @@ namespace
          def.params.push_back({ "lfoAmount", -1.0f, 1.0f, 0.0f });
          def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f, false, { { "lfoAmount", 1.0f } } });
          def.params.push_back(
-            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter, false,
+              { { "sync", 1.0f }, { "lfoAmount", 1.0f } }, { 0.0f, 1.0f, (float)(MusicTime::kNumRateDivisions - 1) } });
          def.params.push_back(
             { "rate", 0.02f, 5.0f, 0.5f, false, { { "sync", 0.0f }, { "lfoAmount", 1.0f } } });
          def.makeKernel = []() { return std::make_unique<AudioFilterKernel>(); };
@@ -273,7 +274,9 @@ namespace
          // specific two-channel test signal. A real (non-quadrature, non-
          // perfectly-periodic) signal has genuine amplitude variation across
          // a 72-sample span, where release is very much audible.
-         def.params.push_back({ "release", 5.0f, 1000.0f, 100.0f });
+         // Turbo 0.70: the sweep's input-step stage (the tone drops 30 dB and
+         // comes back) gives release a level change to follow.
+         def.params.push_back({ "release", 5.0f, 1000.0f, 100.0f, false, { { "threshold", -30.0f } }, { 5.0f, 1000.0f } });
          def.params.push_back({ "inGain", -12.0f, 24.0f, 0.0f });
          def.params.push_back({ "outGain", -24.0f, 12.0f, 0.0f });
 
@@ -313,7 +316,8 @@ namespace
          def.params.push_back({ "bounce", 0.0f, 1.0f, 0.0f, false, kShortPathPrereq });
          def.params.push_back({ "sync", 0.0f, 1.0f, 1.0f });
          def.params.push_back(
-            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kEighth });
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kEighth, false,
+              { { "sync", 1.0f } }, { 0.0f, 1.0f, (float)(MusicTime::kNumRateDivisions - 1) } });
          // Only audible while sync is off. Deliberately far from the
          // rateDiv default's 250ms (see kShortPathPrereq above) so toggling
          // `sync` itself is observable, and short enough (3ms = 132 samples)
@@ -505,7 +509,7 @@ namespace
          def.params.push_back({ "pitch", -24.0f, 24.0f, 0.0f });
          // At 0 st the shifter is a transparent 1-sample delay, so `grain` (the
          // splice distance) only has anything to act on once there is a shift.
-         def.params.push_back({ "grain", 10.0f, 250.0f, 80.0f, false, { { "pitch", 7.0f } } });
+         def.params.push_back({ "grain", 10.0f, 250.0f, 80.0f, false, { { "pitch", 7.0f } }, { 20.0f, 240.0f } });
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, { { "pitch", 7.0f } } });
          // Appended, never inserted (saved patches' param order). Phase-vocoder
          // mode for chords/mixes; adds 4096 samples of latency (see the kernel).
@@ -534,7 +538,8 @@ namespace
          def.params.push_back({ "feedback", 0.0f, 0.9f, 0.0f });
          def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f });
          def.params.push_back(
-            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter, false,
+              { { "sync", 1.0f } }, { 0.0f, 1.0f, (float)(MusicTime::kNumRateDivisions - 1) } });
          // `rate` (free Hz) is only read while sync is off - same
          // prerequisite-gating precedent as Delay/Stutter's own free-time
          // param, for the same reason (AUDIOPARAMSWEEPTEST's short probe
@@ -566,7 +571,8 @@ namespace
          def.params.push_back({ "feedback", -0.95f, 0.95f, 0.5f });
          def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f });
          def.params.push_back(
-            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter, false,
+              { { "sync", 1.0f } }, { 0.0f, 1.0f, (float)(MusicTime::kNumRateDivisions - 1) } });
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.2f, false, { { "sync", 0.0f } } });
          def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.params.push_back({ "spread", 0.0f, 1.0f, 0.5f });
@@ -596,7 +602,8 @@ namespace
          def.params.push_back({ "spread", 0.0f, 1.0f, 0.5f });
          def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f });
          def.params.push_back(
-            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter, false,
+              { { "sync", 1.0f } }, { 0.0f, 1.0f, (float)(MusicTime::kNumRateDivisions - 1) } });
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.3f, false, { { "sync", 0.0f } } });
          // Output of the allpass cascade fed back into its input: deepens the
          // notches into the resonant swoosh of a Phase 90 / Small Stone.
@@ -680,7 +687,8 @@ namespace
          static const std::vector<EffectParamPrereq> kStutterShortPathPrereq = { { "sync", 0.0f } };
          def.params.push_back({ "sync", 0.0f, 1.0f, 1.0f });
          def.params.push_back(
-            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter, false,
+              { { "sync", 1.0f } }, { 0.0f, 1.0f, (float)(MusicTime::kNumRateDivisions - 1) } });
          def.params.push_back({ "timeMs", 1.0f, 2000.0f, 3.0f, false, kStutterShortPathPrereq });
          def.params.push_back({ "steps", 2.0f, 16.0f, 8.0f, false, kStutterShortPathPrereq });
          def.params.push_back({ "gateMask", 0.0f, 65535.0f, 65535.0f, false, kStutterShortPathPrereq });
@@ -748,7 +756,8 @@ namespace
          def.params.push_back({ "stereoPhase", 0.0f, 180.0f, 0.0f });
          def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f });
          def.params.push_back(
-            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kEighth });
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kEighth, false,
+              { { "sync", 1.0f } }, { 0.0f, 1.0f, (float)(MusicTime::kNumRateDivisions - 1) } });
          def.params.push_back({ "rate", 0.05f, 20.0f, 5.0f, false, { { "sync", 0.0f } } });
          def.makeKernel = []() { return std::make_unique<TremoloKernel>(); };
          defs.push_back(std::move(def));
@@ -911,6 +920,10 @@ namespace
          def.params.push_back({ "damping", 0.0f, 1.0f, 0.5f });
          def.params.push_back({ "pos", 0.0f, 1.0f, 0.3f });
          def.params.push_back({ "modes", 1.0f, 32.0f, 16.0f });
+         // Turbo 0.70: the shape's modes are solved on a worker thread; the
+         // sweep (with a cube on the geometry pin) waits for them.
+         for (EffectParamDef& p : def.params)
+            p.asyncSettle = true;
          def.makeKernel = []() { return std::make_unique<ShapeResonatorKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -932,6 +945,10 @@ namespace
          def.params.push_back({ "distance", 0.0f, 1.0f, 0.5f });
          def.params.push_back({ "decay", 0.1f, ConvolutionKernel::kMaxSeconds, 1.8f });
          def.params.push_back({ "spread", 0.0f, 1.0f, 1.0f });
+         // Turbo 0.70: every design param rebuilds the impulse response on the
+         // kernel's worker thread; the sweep waits for it (asyncSettle).
+         for (EffectParamDef& p : def.params)
+            p.asyncSettle = true;
          def.makeKernel = []() { return std::make_unique<ConvolutionKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -984,8 +1001,131 @@ namespace
          // on the sweep's probe, so `mix` only shows with the threshold
          // pulled down - same prerequisite as its detector-side params.
          { "Dynamics", { "mix", 0.0f, 1.0f, 1.0f, false, { { "threshold", -30.0f } } } },
+         // Turbo 0.70: `mix` where the effect's defaults make wet equal dry -
+         // Stereo at width 1, Transient Shaper at 0 dB attack, Limiter with a
+         // threshold above the probe tone (0.4 peak) - so the blend has
+         // something to blend. Same reasoning for Limiter's release.
+         { "Stereo", { "mix", 0.0f, 1.0f, 1.0f, false, { { "width", 2.0f } } } },
+         { "Transient Shaper", { "mix", 0.0f, 1.0f, 1.0f, false, { { "attack", 18.0f } } } },
+         { "Limiter", { "mix", 0.0f, 1.0f, 1.0f, false, { { "threshold", -30.0f } } } },
+         // Super Mixer: fxOpen only unfolds the FX panel; the compressor and
+         // limiter settings act once their stage is on and engaged.
+         { "Super Mixer", { "fxOpen", 0.0f, 1.0f, 0.0f, true } },
+         { "Super Mixer", { "fxCompAttackMs", 0.1f, 200.0f, 10.0f, false, { { "fxCompOn", 1.0f }, { "fxCompThreshDb", -40.0f } } } },
+         // The lookahead lands at most every 0.25 s (real time, so a drag does
+         // not duck over and over) - asyncSettle gives it that time.
+         { "Super Mixer", { "fxLimLookaheadMs", 0.0f, 10.0f, 1.5f, false, { { "fxLimOn", 1.0f }, { "fxLimCeilingDb", -24.0f } }, {}, "", true } },
+         { "Super Mixer", { "fxLimAutoRelease", 0.0f, 1.0f, 1.0f, false, { { "fxLimOn", 1.0f }, { "fxLimCeilingDb", -24.0f } } } },
+         // Mixer opens with 8 channels; 9-12 exist once `channels` is raised.
+         { "Mixer", { "gain8", -60.0f, 12.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "gain9", -60.0f, 12.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "gain10", -60.0f, 12.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "gain11", -60.0f, 12.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "pan8", -1.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "pan9", -1.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "pan10", -1.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "pan11", -1.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "mute8", 0.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "mute9", 0.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "mute10", 0.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "mute11", 0.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "solo8", 0.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "solo9", 0.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "solo10", 0.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
+         { "Mixer", { "solo11", 0.0f, 1.0f, 0.0f, false, { { "channels", 12.0f } } } },
       };
       return extra;
+   }
+}
+
+namespace
+{
+   // Turbo 0.70: sweep declarations for nodes with many indexed params or
+   // whose output needs something the generic rig cannot make (see
+   // EffectParamDef::skipReason). Built once.
+   const std::vector<std::pair<std::string, EffectParamDef>>& GeneratedSweepDefs()
+   {
+      static const std::vector<std::pair<std::string, EffectParamDef>> defs = []
+      {
+         std::vector<std::pair<std::string, EffectParamDef>> d;
+         auto add = [&d](const char* node, EffectParamDef def) { d.push_back({ node, std::move(def) }); };
+         auto skip = [&add](const char* node, const char* param, const char* why)
+         {
+            EffectParamDef def;
+            def.name = param;
+            def.skipReason = why;
+            add(node, std::move(def));
+         };
+         // Punch FX: a pad sounds while its note (36 + pad by default) is
+         // held; the rig holds 69, so each pad is probed with its note on 69.
+         {
+            EffectParamDef effect;
+            effect.name = "effect";
+            effect.prerequisites = { { "engage", 1.0f } };
+            add("Punch FX", effect);
+            EffectParamDef latch;
+            latch.name = "latch";
+            latch.prerequisites = { { "pad0note", 69.0f } };
+            add("Punch FX", latch);
+            for (int p = 0; p < 16; p++)
+            {
+               const std::string fx = "pad" + std::to_string(p) + "fx", note = "pad" + std::to_string(p) + "note";
+               EffectParamDef a;
+               a.name = fx;
+               a.prerequisites = { { note, 69.0f } };
+               a.testCandidates = { 1.0f, 5.0f, 12.0f, 20.0f };
+               add("Punch FX", a);
+               EffectParamDef b;
+               b.name = note;
+               b.testCandidates = { 69.0f };
+               add("Punch FX", b);
+            }
+         }
+         // Note Stack: each extra voice acts only when it is switched on.
+         for (int i = 0; i < 8; i++)
+         {
+            EffectParamDef semi;
+            semi.name = "semi" + std::to_string(i);
+            semi.prerequisites = { { "enabled" + std::to_string(i), 1.0f } };
+            add("Note Stack", semi);
+         }
+         {
+            EffectParamDef g;
+            g.name = "useGlobalScale";
+            g.prerequisites = { { "enabled0", 1.0f } };
+            add("Note Stack", g);
+         }
+         // Spatial Mixer.
+         {
+            EffectParamDef bass;
+            bass.name = "bassHz";
+            bass.testCandidates = { 400.0f, 1000.0f }; // the probe tone is 300 Hz
+            // A source straight ahead reaches both ears alike - nothing to
+            // fold to mono; to the side the ears differ.
+            bass.prerequisites = { { "az0", 90.0f } };
+            add("Spatial Mixer", bass);
+            EffectParamDef lim;
+            lim.name = "limiter";
+            lim.prerequisites = { { "out", 18.0f } }; // only engages above its ceiling
+            add("Spatial Mixer", lim);
+            for (int s = 0; s < 12; s++)
+               skip("Spatial Mixer", ("lock" + std::to_string(s)).c_str(),
+                    "head-lock: only differs while head tracking turns the listener (a sensor)");
+            skip("Spatial Mixer", "trackMode", "head tracking needs AirPods / webcam motion");
+            skip("Spatial Mixer", "bit24", "export file setting, no effect on live audio");
+            skip("Spatial Mixer", "formatIndex", "export file setting, no effect on live audio");
+            skip("Spatial Mixer", "live", "graph latency alignment done by the engine, not this node's output");
+         }
+         // Nodes that play recorded or learned content the rig cannot make.
+         skip("Looper", "*", "plays back a recorded loop; nothing is recorded in the generic rig");
+         skip("Note Looper", "*", "plays back recorded notes; nothing is recorded in the generic rig");
+         skip("Pattern Player", "*", "needs a pattern from its source clip");
+         skip("Predictive Notes", "*", "answers with notes it learned from what it heard over time");
+         skip("MPC Out", "*", "routes an MPC pad, which needs samples loaded in an MPC");
+         skip("Transport Control", "*", "drives the global transport (tempo, key, meter, click)");
+         return d;
+      }();
+      return defs;
    }
 }
 
@@ -1006,6 +1146,9 @@ const EffectParamDef* FindEffectParamDef(const std::string& nodeName, const std:
       break;
    }
    for (const auto& entry : ExtraParamDefs())
+      if (entry.first == nodeName && entry.second.name == paramName)
+         return &entry.second;
+   for (const auto& entry : GeneratedSweepDefs())
       if (entry.first == nodeName && entry.second.name == paramName)
          return &entry.second;
    return nullptr;

@@ -119,6 +119,11 @@ namespace pop
       std::string animKey;
       char tier = 'A';
       std::vector<ParamSpec> params;
+      // Turbo 0.70: params whose absence from a saved patch means "saved before
+      // this existed" - set to these values before the saved ones load
+      // (INode::BeforeLoadParams), so old patches keep their behaviour while a
+      // node made from the picker gets the param's default.
+      std::vector<std::pair<std::string, float>> savedBefore;
       std::function<bool(CookCtx&)> cook;
 
       int ParamIndex(const std::string& key) const;

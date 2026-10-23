@@ -99,6 +99,8 @@ namespace pop
    // its store back when it dies.
    unsigned int AcquireGpuBuffer(size_t bytes);
    void ReleaseGpuBuffer(unsigned int id, size_t bytes);
+   // Once per main-loop frame: stores freed two frames ago become reusable.
+   void EndFrameGpuPool();
 
    BufferPtr MakeBuffer(std::vector<float>&& values, int comps);
    // n copies of one value.

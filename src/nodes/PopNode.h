@@ -53,6 +53,7 @@ public:
    INode* BypassSource() override { return dynamic_cast<INode*>(inputs[0]); }
    const char* InputLabel(int slot) const override;
    void VisitParams(ParamVisitor& v) override;
+   void BeforeLoadParams() override; // Turbo 0.70: PopDef::savedBefore
    IGeometrySource** GeometryInputSlot(int slot) override;
    ImageCable* ImageInputSlot(int slot) override;
    int InputPinCount() const override;
@@ -64,7 +65,13 @@ public:
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
-   Material GetMaterial() const override { return Material(); }
+   // Turbo 0.70: Instance PointZ draws copies of its shape, so a Material on
+   // the shape input reaches Render 3D (raster and RTX) as it does on top.
+   // Every other operator keeps the old answer (no material of its own).
+   Material GetMaterial() const override;
+   unsigned int GetSurfaceTexture() override;
+   unsigned int GetMaterialTexture(int map) override;
+   unsigned long long SurfaceTextureRevision() const override;
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
    const Polyline* GetCurve() override;

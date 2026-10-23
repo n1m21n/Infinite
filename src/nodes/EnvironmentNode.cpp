@@ -113,10 +113,26 @@ void EnvironmentNode::Upload(const float* pixels, int w, int h)
       }
    }
 
+   // Turbo 0.70: RGBA - CUDA cannot map a 3-channel GL texture, so the RTX
+   // mode never saw the HDRI (it fell back to the sky gradient without a
+   // word). Rows arrive bottom first from both loaders (see Load).
+   std::vector<float> rgba((size_t)w * (size_t)h * 4);
+   for (int y = 0; y < h; y++)
+   {
+      const float* src = sanitized.data() + (size_t)y * (size_t)w * 3;
+      float* dst = rgba.data() + (size_t)y * (size_t)w * 4;
+      for (int x = 0; x < w; x++)
+      {
+         dst[x * 4 + 0] = src[x * 3 + 0];
+         dst[x * 4 + 1] = src[x * 3 + 1];
+         dst[x * 4 + 2] = src[x * 3 + 2];
+         dst[x * 4 + 3] = 1.0f;
+      }
+   }
    if (mTex == 0)
       glGenTextures(1, &mTex);
    glBindTexture(GL_TEXTURE_2D, mTex);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, w, h, 0, GL_RGB, GL_FLOAT, sanitized.data());
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, rgba.data());
    glGenerateMipmap(GL_TEXTURE_2D);
    const GLenum err = glGetError();
    if (err != GL_NO_ERROR)
@@ -165,7 +181,12 @@ bool EnvironmentNode::Load(const std::string& path)
       }
 
       int w = 0, h = 0, channels = 0;
+      // Turbo 0.70: bottom row first, as the EXR loader gives it and as GL
+      // and Render 3D's dirToEquirect expect (top first showed the HDRI upside
+      // down). This thread's flag only (the glTF decoder sets its own).
+      stbi_set_flip_vertically_on_load_thread(1);
       float* pixels = stbi_loadf_from_memory(file.data(), (int)file.size(), &w, &h, &channels, 3);
+      stbi_set_flip_vertically_on_load_thread(0);
       if (pixels == nullptr)
       {
          mLastError = stbi_failure_reason() ? stbi_failure_reason() : "could not decode HDR image";

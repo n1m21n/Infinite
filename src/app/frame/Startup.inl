@@ -242,6 +242,8 @@
       return 1;
    }
    StartupTrace("startup: OpenGL initialized");
+   GLUtil::InstallDebugOutput(); // Turbo 0.70 (F3): debug builds or INFINITE_GLDEBUG=1
+   INF_PROFILE_GPU_CONTEXT(); // Turbo 0.70 (F2): Tracy GPU zones, when built with it
    if (getenv("INFINITE_SYSINFO") != nullptr)
       SysInfo::PrintAndExit(window, INFINITE_TURBO_VERSION);
    RuntimeLog::Write("OpenGL %d.%d core context: %s | %s", gGLContextMajor, gGLContextMinor,
@@ -1447,6 +1449,13 @@
          *gNodes[15].node->GeometryInputSlot(0) = geo(13);
          *gNodes[16].node->GeometryInputSlot(0) = geo(13);
       }
+      // Turbo 0.70: LINKDELTEST - two PointZ nodes and the cable between them.
+      else if (getenv("INFINITE_LINKDELTEST") != nullptr)
+      {
+         SpawnNode("Box PointZ", "PointZ", 40.0f, 40.0f);
+         SpawnNode("Transform PointZ", "PointZ", 400.0f, 40.0f);
+         *gNodes[1].node->GeometryInputSlot(0) = dynamic_cast<IGeometrySource*>(gNodes[0].node.get());
+      }
       else if (getenv("INFINITE_TOPPARITYTEST") != nullptr)
       {
          // Turbo (TOP parity): Common page, Crop/Transform/Blend/Switcher/
@@ -1820,8 +1829,8 @@
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Render 3D", "3D", 700.0f, 40.0f);
       }
-      else if (getenv("INFINITE_3DTEST") != nullptr || getenv("INFINITE_RTXTEST") != nullptr ||
-               getenv("INFINITE_PANORAMATEST") != nullptr)
+      else if (getenv("INFINITE_3DTEST") != nullptr || getenv("INFINITE_RTXTEST") != nullptr || getenv("INFINITE_RTXTEXTEST") != nullptr || getenv("INFINITE_R3DFXTEST") != nullptr ||
+               getenv("INFINITE_PANORAMATEST") != nullptr || getenv("INFINITE_TAATEST") != nullptr)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Geometry", "3D", 40.0f, 500.0f);
@@ -1838,7 +1847,8 @@
          r->geometry[0] = g0;
          r->geometry[1] = g1;
          // RTX: a static scene, or the animated Noise restarts the average every frame.
-         if (getenv("INFINITE_RTXTEST") == nullptr && getenv("INFINITE_PANORAMATEST") == nullptr)
+         if (getenv("INFINITE_RTXTEST") == nullptr && getenv("INFINITE_PANORAMATEST") == nullptr &&
+             getenv("INFINITE_TAATEST") == nullptr)
             g0->TextureInput().Connect(gNodes[3].node.get());
          r->width = 700.0f; r->height = 700.0f;
          r->samples = 0; // the antialias check below turns it on at frame 4
@@ -1846,6 +1856,18 @@
          {
             r->renderMode = 1; // Turbo 0.62: the same scene, RTX
             r->ptSamples = 32;
+         }
+         // Turbo 0.70 (R4, R5): a still scene with TAA and FSR 2x, at an output
+         // size whose half is odd (rounding of the internal size).
+         // INFINITE_TAATEST=taa / fsr / plain draws just one of them (or
+         // neither), to compare the pictures (INFINITE_TAATEST_PNG).
+         if (const char* taaTest = getenv("INFINITE_TAATEST"))
+         {
+            const std::string mode = taaTest;
+            r->taa = mode != "fsr" && mode != "plain";
+            r->upscale = (mode == "taa" || mode == "plain") ? 0 : 3;
+            r->width = 702.0f;
+            r->height = 498.0f;
          }
          // Turbo 0.61: 360 output (raster by default; INFINITE_PANORAMA=1|2 picks
          // equirect / cubemap, also under RTXTEST).

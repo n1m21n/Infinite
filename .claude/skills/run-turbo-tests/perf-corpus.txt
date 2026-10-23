@@ -1,0 +1,3 @@
+# Perf corpus for perf.ps1: one .inf per line, absolute path. Each patch is copied with its
+# "<name>_media" sibling folder into build\perf\corpus; the original is never opened.
+C:\Users\veeja\Desktop\__infinite\collect01\3d_noise_teste 56fps.inf

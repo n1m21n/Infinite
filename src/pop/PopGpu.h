@@ -72,6 +72,12 @@ namespace pop
    // to locations 1..) and transform feedback varyings it uses.
    std::string BuildKernelSource(const KernelSpec& spec, const std::vector<KernelUniform>& uniforms,
                                  std::vector<std::string>& attribNames, std::vector<std::string>& varyings);
+   // GLSL literal of an attribute's default value (what a kernel local starts as).
+   std::string KernelDefaultLiteral(const std::string& name, int comps);
+   // Turbo 0.70 (P1): the same kernel as a GL 4.3 compute shader over float[]
+   // SSBOs. RunKernel uses it by default (INFINITE_POP_BACKEND=tf forces the
+   // transform-feedback path, =both runs both and prints POPEQUIV lines).
+   std::string BuildComputeSource(const KernelSpec& spec, const std::vector<KernelUniform>& uniforms);
 
    // Runs `spec` over every point of `in`. On success `out` holds one new
    // buffer per entry of spec.writes, in order.
@@ -86,6 +92,7 @@ namespace pop
    struct AsyncBounds
    {
       unsigned int pbo = 0;
+      unsigned int result = 0; // Turbo 0.70 (F6): its own reduction target, in video memory
       void* fence = nullptr;
       bool have = false;
       int comps = 3;

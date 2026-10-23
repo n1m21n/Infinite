@@ -55,6 +55,14 @@ struct EffectParamDef
    // generic small-number sequence reaches relative to the sweep rig's fixed
    // probe note (69) - Note Filter's rangeLow (0..127) is the first case.
    std::vector<float> testCandidates;
+   // Turbo 0.70: why the generic sweep cannot observe this param headless
+   // (a sensor, an export setting, content the rig has no way to make). The
+   // sweep reports it SKIP with this reason - never a pass. On a "*" entry it
+   // covers any of the node's params that the rig could not move.
+   std::string skipReason;
+   // Turbo 0.70: the change lands after worker-thread work (an impulse
+   // response rebuild); the sweep keeps cooking and waits for it.
+   bool asyncSettle = false;
 };
 
 // Selects a node's visualizer draw function - the visualizer is the one

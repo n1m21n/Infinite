@@ -57,6 +57,18 @@ public:
 
       Material material;
       unsigned int surfaceTex = 0;
+      // Turbo 0.70: Instance PointZ's per-copy textures (PopData::InstanceLook,
+      // as the raster draws them): mode 0 off, 1 pick by index, 2 atlas grid;
+      // index from the TexIndex attribute (instTexIdxBuf), the copy's number
+      // or a hash of it. Replaces surfaceTex when on.
+      int instTexMode = 0, instTexFrom = 0, instTexCount = 0, atlasCols = 1, atlasRows = 1;
+      unsigned int instTex[4] = { 0, 0, 0, 0 };
+      unsigned int instTexIdxBuf = 0;
+      int instTexIdxComps = 1;
+      // Turbo 0.70 (X1): PartId per copy (instanced) or per sphere, 0 = none -
+      // the motion vectors follow a particle by it through births and deaths.
+      unsigned int partIdBuf = 0;
+      int partIdComps = 1;
    };
 
    struct Light
@@ -77,6 +89,8 @@ public:
       float intensity = 1.0f;
       float sky[3] = {}, horizon[3] = {}, ground[3] = {}; // sRGB
       float ambient[3] = {};                               // sRGB
+      // Turbo 0.70: Render 3D's rim term, drawn the raster's way (parity).
+      float rim = 0.0f;
    };
 
    struct Frame
@@ -88,10 +102,21 @@ public:
       float domeAngle = 180.0f, domeTilt = 0.0f;
       int bounces = 4;
       int spp = 1;            // samples per pixel this frame
+      // Turbo 0.70: > 0 picks the samples per frame instead (1..32) so the
+      // trace takes about this long, from the last frames' time per sample. A
+      // moving scene restarts every frame: one sample left the denoiser too
+      // little to work with while the trace cost well under a millisecond.
+      float traceBudgetMs = 0.0f;
       int maxSamples = 256;   // accumulation stops here while nothing changes
       bool restart = false;   // something moved: drop the accumulation
       int denoise = 0; // 0 auto (fast while moving, AI when still), 1 AI, 2 fast, 3 off
       float exposure = 1.0f;
+      // Turbo 0.70: how long the shutter stays open, in frames (0 = no motion
+      // blur): each pixel is blurred along its own motion since last frame.
+      float motionBlur = 0.0f;
+      // Turbo 0.70: the AI denoiser also doubles the size (OptiX's 2x model);
+      // OutputScale() says whether it did.
+      bool upscale2x = false;
    };
 
    virtual ~RtxBackend() {}
@@ -100,6 +125,8 @@ public:
    // Traces and returns an RGBA32F GL texture (alpha = coverage), or 0.
    virtual unsigned int Render(const Frame& frame) = 0;
    virtual int Samples() const = 0;
+   // Turbo 0.70: the last Render's texture is this many times the frame's size.
+   virtual int OutputScale() const { return 1; }
    virtual double LastMs() const = 0;
    virtual const std::string& Error() const = 0;
 };

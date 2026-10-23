@@ -1060,6 +1060,7 @@
       PollPredictionAutosave();
 
       GLUtil::EndFrameScratchFbos();
+      pop::EndFrameGpuPool(); // Turbo 0.70 (F5)
       ++frameId;
 
       // Patch shortcuts. Handled outside the node editor so its own Cmd-key

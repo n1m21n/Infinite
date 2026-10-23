@@ -22,7 +22,8 @@ namespace GLUtil
    // Lazily (re)allocates the FBO's color texture to the requested size and
    // internal format (default GL_RGBA8, matching prior behavior). Pass
    // GL_RGBA16F for nodes that need HDR range or unclamped simulation state.
-   // `label` names the target for upstream's GPU memory bench; unused in Turbo.
+   // `label` names the target for upstream's GPU memory bench; in Turbo it
+   // labels the texture and framebuffer for GPU captures (F3).
    bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat = GL_RGBA8,
                   const char* label = "Fbo");
    void DestroyFbo(Fbo& fbo);
@@ -147,4 +148,29 @@ namespace GLUtil
       int mLastW = 0, mLastH = 0;
       unsigned int mLastFormat = 0, mLastType = 0;
    };
+
+   // Turbo 0.70 (F3): names for GPU captures (RenderDoc, Nsight Graphics).
+   // Debug groups bracket a piece of GPU work, labels name GL objects; both
+   // need GL_KHR_debug (core in 4.3) and are no-ops without it, so a push
+   // and its pop always agree. Main GL context only.
+   void PushDebugGroup(const char* name);
+   void PopDebugGroup();
+   // `identifier` is GL_TEXTURE, GL_FRAMEBUFFER, GL_BUFFER, GL_PROGRAM...
+   void LabelObject(unsigned int identifier, unsigned int object, const char* label);
+   class DebugScope
+   {
+   public:
+      explicit DebugScope(const char* name) { PushDebugGroup(name); }
+      explicit DebugScope(const std::string& name) { PushDebugGroup(name.c_str()); }
+      ~DebugScope() { PopDebugGroup(); }
+      DebugScope(const DebugScope&) = delete;
+      DebugScope& operator=(const DebugScope&) = delete;
+   };
+   // Debug builds, or INFINITE_GLDEBUG=1: GL_DEBUG_OUTPUT with a callback that
+   // prints errors, undefined behaviour and performance warnings to stderr
+   // (the first 200). INFINITE_GLDEBUG=sync also names the debug group each
+   // message came from and, for errors and performance warnings, the calling
+   // code (synchronous output, slower; symbols from the exe's PDB). Call
+   // once, with the main context current.
+   void InstallDebugOutput();
 }

@@ -1,5 +1,333 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.70.0-turbo (2026-10-22, branch turbo/next, waiting for the owner's test and merge)
+
+Plan: `docs/plans/NEXT-STRATEGY.md` (milestones, gate) and `docs/plans/NEXT-BACKLOG.md` (item IDs).
+
+Measured on the 1080p PointZ reference patch against 0.62 (same machine, interleaved runs): frame
+19.9 -> 14.4 ms (-28%) as saved; with GPU particles 10.0 ms; with GPU particles and `lod pixels` 4,
+7.3 ms. 27 corpus patches open with the same picture as 0.62.
+
+### Fixes from the owner's test
+- **Deleting a PointZ -> PointZ cable works**: the editor removed it but the input kept its source
+  (`DisconnectLinkById` had no generic geometry-pin case), so it came back the next frame. Every
+  node's geometry pin is now cleared (`LINKDELTEST`).
+- **Textures on instances in RTX**: RTX now draws Instance PointZ's per-copy textures (image pins,
+  pick by index, atlas grid, by the raster's rules), and a Material on the instance's **shape** input
+  reaches the copies in raster and RTX (it was dropped in both). `RTXTEXTEST` checks Material over the
+  instances, on the shape, as an atlas and the image pin, raster and RTX.
+- **RTX on a moving scene: temporal accumulation with motion vectors** (X1, SVGF's temporal half;
+  replaces the blind blend of the first test, which left trails behind every moving copy). Each
+  pixel's first hit says where it was last frame - through the previous camera and each instance's
+  previous transform, so moving copies and particles reproject too - and `rtxReproject` keeps the
+  history only where the surface matches (distance and normal), clamped to the current neighbourhood,
+  up to 24 frames. The motion is taken from the pixel centre, not the jittered sample (that blurred
+  the picture over frames). The fast filter and the AI denoiser read the accumulated image.
+- **HDRI: upright, and seen by RTX at all.** The HDRI node uploaded the image top row first, so the
+  previews and the raster background showed it upside down; it is now uploaded bottom row first
+  (GL's convention, which Render 3D's sampling already assumed). **Visible in saved patches**: an
+  HDRI background and the reflections and lighting it gives now come out the right way up
+  (a vertical flip no rotation could undo) - the compat run lists exactly these patches
+  (3d_noise_teste_56fps, paartCubes) as differing, nothing else. It was also a 3-channel texture,
+  which CUDA cannot map: RTX never saw the HDRI and lit everything with the sky gradient. Now RGBA,
+  and RTX samples it the raster's way. The global stb_image "flip" flag that the glTF texture decoder
+  toggled could also flip an HDRI loading at the same time; that decoder now uses the per-thread flag.
+- **RTX matches the raster's look where they differed by mistake**: vertex and instance colours as
+  the raster uses them (they were linearised a second time - redder, darker), the raster's rim term
+  and ambient-tinted image-based diffuse, its roughness floor (0.045).
+- **Less RTX grain**: the lobe of a near-mirror metal is chosen by its actual weight (one ray in ten
+  went to a diffuse lobe worth ~2% and came back 10x), light after a diffuse bounce is capped against
+  fireflies (a mirror's reflection is not), the fast filter leaves the background alone and costs
+  4 ms instead of 7 at 1080p. "AI" uses the fast filter while the scene moves (the AI denoiser on a
+  few samples a frame painted blotches for ~20 ms) and takes over once it holds still.
+- Measured on the owner's patch (1080p, animated, as saved: AI, FSR 1.5x): trace 4.7 ms + denoise
+  2.0 ms; no trails, no blur, edges as crisp as the raster. Still darker and redder than the raster:
+  the copies are dense mirrors, and in RTX most of their reflections see the neighbouring copies
+  (orange on orange), where the raster's image-based light assumes an open sky - a difference of
+  model, not a bug.
+- **New node: Render 3D FX** (3D category; patched right after a Render 3D, the way upstream's
+  Volume reads the render's camera and depth, so Render 3D itself stays close to upstream). From the
+  render's depth and motion: **ambient occlusion** (contact shadows; on by default), **screen-space
+  reflections**, **depth of field** (focus distance and range) and **motion blur** with a shutter of
+  up to 8 frames (the third test showed why one frame was not enough: slow particles move 1-3 px a
+  frame). Each effect is off at 0; with any other image, or an RTX render, the picture passes
+  through. Render 3D gains `RequestVelocity()` / `VelocityTexture()` next to its `RequestDepth()`.
+- Render 3D FX review (before the commit): **motion blur did not show on a moving object**, for two
+  reasons. The velocity pass's bookkeeping dropped each slot's last placement on the first moving
+  frame (the slot's source was not recorded with it), so that frame had no motion; and the blur
+  averaged each pixel along its own motion only, so an object smeared inside its own silhouette and
+  never over the background. The blur is now McGuire et al.'s reconstruction filter: each tile's
+  longest motion, the longest that can reach each tile (as far as a streak reaches, not just the
+  next tile), a per-pixel jittered gather weighted by depth - a surface in front streaks over what
+  is behind it, never the reverse, and a fast object shows what is behind it through its blur. New
+  check `R3DFXTEST`: each effect changes the picture, all off passes it through, no NaN or GL error,
+  with MSAA and render scale, the moving object's velocity reaches the pass, an RTX render passes
+  through (`INFINITE_R3DFXTEST_PNG` saves the motion-blurred frame).
+- **TAA keeps moving objects sharp**: its motion vectors were the camera's only, so every copy or
+  particle that moved on its own was reprojected to the wrong place and the history clipping
+  smeared it (the soft, "not crisp" picture of the third test). The TAA now runs Render 3D's
+  velocity pass while the scene moves - each copy's matrix last frame, found by `PartId` (or index
+  while the count holds), through the same culled lists and LOD quads as the opaque pass.
+- The interim `motionBlur` param on Render 3D (never released) is gone; RTX's motion blur kernel
+  stays for its 0.72 rework.
+- **Particles keep their motion through births and deaths**: copies of an Instance PointZ over
+  particles (and RTX's particle spheres) are followed by `PartId` - a ring of last frame's matrices
+  on the GPU, in both modes - instead of by index, which the compaction of dead particles
+  reshuffles. The RTX temporal accumulation and the motion blur both use it. Instance PointZ now
+  passes `PartId` on with its points (shared buffer, no copy).
+- **AI denoiser while things move = OptiX's temporal model** (flow from the motion vectors), and at
+  render scale 2x with AI chosen, **OptiX's temporal 2x upscaler** replaces FSR 1 for RTX (FSR 1
+  enlarged the path tracer's grain). Both are slow at 1080p (~25-30 ms on an RTX 4060): "Auto" and
+  "Fast" stay the real-time choices; "AI (best)" is for renders that can wait.
+- HDRI review: `.hdr` files are now read bottom row first by stb_image itself (thread-local flag),
+  like the EXR loader already did - the first fix flipped every image at upload and would have
+  turned EXR environments upside down.
+- **Font lists**: Text 3D's font dropdown showed only "Arial" - JUCE's family list came back empty
+  when first asked and the fallback stayed cached; the families now come from Windows itself (GDI)
+  plus JUCE's. Text PointZ's `font` is now the same dropdown (it was a text field).
+- **Output fullscreen on a monitor above or beside the editor** no longer covers the editor's top
+  rows: the output window was placed while GLFW still counted a frame around it, so it came out a
+  frame larger than its monitor (and it is topmost).
+- **The Material node's preview shows the material**: the thumbnail shader used only colour and
+  texture; metallic, roughness, specular and emission now shape it (GGX highlight, sky reflection).
+
+### Render quality (after the owner's 1M-cube test patch)
+- **RTX traces several samples per frame** (Frame::traceBudgetMs, ~5 ms; `INFINITE_RTX_BUDGET_MS`
+  overrides, 0 = one as before): a moving scene restarts the accumulation every frame and the trace
+  cost ~0.6 ms for one sample while the AI denoiser spent 10-20 ms inventing the picture from it.
+  Measured on the owner's patch (1080p): 1 -> ~8 samples per frame, cubes keep their faces, the
+  grain is mostly gone.
+- **LOD copies are exact boxes**: the quad that stands in for a far copy now intersects the view ray
+  with the copy's box per pixel - exact silhouette, face normal, UV and object position - instead of
+  a flat card lit by one face (the "ghost" look at `lod pixels` 11.5). Still 2 triangles per copy;
+  depth stays the quad's (no `gl_FragDepth`, so early-z holds for every draw). CULLTEST: the LOD
+  covers 99.8% of the real boxes' pixels.
+- Still to come (0.71): a hybrid mode (raster first hit + traced reflections and shadows), the
+  usual answer for animated scenes; the OptiX temporal denoiser and 2x upscaler (above) are too slow
+  at 1080p for real time.
+
+### Audio: every param reaches the audio thread (AUDIOPARAMSWEEPTEST green)
+- **Fixed: Super Mixer's compressor attack below 10 ms did nothing** - `MasterChain::TimeCoef`
+  floored every time constant at 10 ms (the max was taken after converting ms to s), which also
+  stretched a short automatic limiter release.
+- The sweep rig: the note consumer is registered before the held note (synths ran their first
+  blocks silent, hiding most of their params); windows of blocks, a note-off, a running transport,
+  an input step and worker-thread settling make time-based params observable; extra input pins get
+  their own tone; a cube feeds geometry pins. Gated params declare their prerequisites (rateDiv needs
+  sync, Mixer channels 9-12 need 12 channels, Punch FX pads their note, ...). What the rig cannot
+  drive headless is SKIP with its reason, never pass. 1758 FAILs -> 0.
+- ROUNDTRIPTEST: copy/paste accepts only the values a paste re-derives by design (Drum Sequencer's
+  out-of-range trims clamped, a pasted Looper's own loop id and file); every other key must match.
+
+Moves to 0.71: C4, U1-U3, F4 (GlState: also removes the `glGet` state queries the GPU helpers
+still make per call), A1/A2, X1's spatial half (SVGF's variance-guided filter; the temporal half
+is in), the RTX hybrid mode, one multi-draw for all slots and Hi-Z (R1), R3, P2 sort, Subdivide / Extrude of faces on the GPU, Line Resample by length, the
+4-byte count readback of GPU particles with `PartDeath`, M6 (V1-V5, C1).
+
+### M0: measure and protect
+- **Perf regression run** (F1): `test-windows.bat -Perf` / `-PerfOnly` plays the perf corpus
+  (`perf-corpus.txt`, starting with the 1080p PointZ reference patch) three times with VSync and the
+  frame limiter off (`INFINITE_PERF_UNCAPPED`), keeps the median frame, CPU, GPU, Render 3D and
+  per-node GPU times, and fails when one is more than 10% and 0.5 ms worse than
+  `perf-baseline.json`. Per-node CPU times are reported only: they swing up to ~70% between
+  identical runs.
+- **Patch corpus gate** (C3): `test-windows.bat -Compat` opens 27 patches (examples, test patches,
+  the user's patches and lessons) and fails when one goes from ok to crash / hang against the
+  v0.62.0 reference; `compare-patchcompat.py --gate`.
+- **MIT edition in the driver** (F7): `test-windows.bat -Mit` builds and tests
+  `build\windows-vs2022-mit`; verified: same two known failures as the full edition, and Render 3D's
+  RTX mode reports "RTX is not in this build".
+- **GPU capture markers** (F3): debug groups for each PointZ cook (named after the operator),
+  Render 3D (shadow, post, panorama) and 3D previews; render targets labelled. `INFINITE_GLDEBUG=1`
+  (or a Debug build) prints GL errors and performance warnings with the frame number;
+  `INFINITE_GLDEBUG=sync` also names the debug group and the calling code (file:line, from the
+  PDB) of each error and performance warning; `INFINITE_GLDEBUG_MAX` raises the 200-message cap.
+- **Built-in GPU profiler**: `INFINITE_GPUPROF=1` times every debug group on the GPU (timestamp
+  queries read two frames later, no waiting) and prints the average ms per group every 120 frames
+  (Render 3D, its shadow and post passes, 3D previews, each PointZ operator). On the reference patch
+  with GPU particles it showed the frame is GPU-bound in Render 3D's main and shadow passes (the
+  per-node CPU times in FRAMEPROF were the CPU waiting on that). Measured there: 3D previews 1.1 ms,
+  shadow pass 1.3 ms, instance matrices 0.16 ms, MSAA 8x vs 2x 1.2 ms - the rest is drawing the
+  instanced geometry twice (main + shadow), the case for GPU culling and LOD (R1). New groups:
+  "Render 3D: opaque slot", "PointZ instance matrices".
+
+### M2 start: PointZ kernels as compute shaders (P1)
+- **Compute backend, now the default** for every GPU PointZ operator
+  (`docs/adr/0001-pointz-compute-backend.md`): the same kernel specs generated as GL 4.3 compute
+  shaders over packed float SSBOs; no four-output limit; lookups read buffers directly instead of a
+  texture made per call. Transform feedback stays as the fallback (a kernel that does not build as
+  compute, or `INFINITE_POP_BACKEND=tf`) and is tested by the new `POPTFTEST` check. The patch
+  corpus renders identically to v0.62.0 (27/27).
+- **GPU primitives** (P2, `src/pop/GpuAlgo`): exclusive scan, stream compaction of indices and an
+  indirect-dispatch gather - the count never comes back to the CPU. `GPUALGOTEST` checks them
+  against CPU loops from 1 to 1,000,003 elements (two scan levels): identical.
+
+### Particle PointZ on the GPU (P3)
+- **New `engine` param (CPU / GPU)**, at the end of the list: a Particle PointZ made from the picker
+  runs on the GPU; a patch saved before keeps the CPU engine (the new `PopDef::savedBefore`, through
+  `INode::BeforeLoadParams`), so old patches behave exactly as they did.
+- The GPU engine keeps the particles in GPU buffers from birth to death: integration, ageing and size
+  / colour over life are kernels, the dead are removed by GPU stream compaction, births gather their
+  source rows on the GPU. The CPU only draws the random numbers - same generator and order as the
+  CPU engine, so a seed gives the same particles - and counts the living per birth cohort with the
+  same float operations the kernel uses: no readback, no per-frame upload.
+- **Equivalence** (`PARTICLEGPUTEST`, 90 frames of births, deaths, drag, damping, random velocity,
+  jitter, size and colour over life): same count and ids, ages and life spans identical, positions,
+  velocities, sizes and colours within 1.2e-7.
+- **Speed** (A/B against the M0 reference build): the reference patch with its Particle on GPU,
+  frame 19.1 -> 9.7 ms (~52 -> ~103 fps; Particle GPU 3.5 -> 0.06 ms, Render 3D 14.6 -> 1.6 ms, no
+  more upload of every particle each frame). A 1,000,000-particle variant: 150 -> 30 ms; the
+  simulation itself is 1.8 ms, the rest is drawing a box instance per particle (R1 / R8).
+- A `PartDeath` attribute from the force chain (e.g. Group PointZ named PartDeath in the loop) kills
+  on the GPU too; from then on that node's count comes from the GPU (a 4-byte readback a frame, the
+  one place the GPU engine waits). `PARTICLEGPUTEST` runs such a loop on both engines: same count,
+  same ids.
+- The transform-feedback fallback runs kernels with more than four outputs as passes of four (ADR
+  0001, step 4); the particle kernels (5 and 7 outputs) match compute bit for bit (`POPEQUIVTEST`).
+
+### PointZ topology on the GPU (P5, first part)
+- **Delete PointZ on a GPU-made input** gathers the kept points on the GPU (the mask, and so the
+  indices and the count, are known on the CPU) instead of bringing every attribute down and up
+  again; faces and lines are remapped as before. `GPUALGOTEST` checks the kept rows are exactly the
+  input's.
+- **Merge PointZ with a GPU-made input** joins by GPU buffer copies (`gpu::ConcatRows`, the CPU
+  Concat's rules: an attribute any input has is given to all, defaults where missing); the CPU path
+  stays for CPU-only inputs and for an attribute shaped differently in two inputs. Particle PointZ's
+  GPU engine shares the same helper. `GPUALGOTEST` checks rows, attributes and faces.
+- **Normal PointZ (smooth) of a GPU-made input** runs on the GPU: the faces around each point are
+  built once per topology (in face order, as the CPU sums them) and a kernel per point sums the face
+  normals from P in place. Identical to the CPU result (max difference 0, `GPUALGOTEST`).
+- **Facet PointZ (unique points) of a GPU-made input** gathers the face corners on the GPU,
+  keeps the sequential faces per topology and computes the flat normals in a kernel. P exactly the
+  corners, normals identical to the CPU (`GPUALGOTEST`).
+- **Subdivide PointZ on lines of a GPU-made input** runs on the GPU: each level's Chaikin stencil
+  and topology are built once per input topology, the new primitive `gpu::WeightedRows` applies them
+  (summed in the CPU's order with `precise`, so no fused multiply-add): bit for bit the CPU result
+  (`GPUALGOTEST`). Faces still subdivide on the CPU (MeshOps).
+- **Line Smooth PointZ on a GPU-made line** relaxes on the GPU (P6): neighbours built once per
+  topology, one kernel per pass with the CPU's formula, bit for bit (`GPUALGOTEST`). Kernel bodies
+  may now use `precise` (no fused multiply-add on compute; the transform-feedback fallback defines
+  it away for GLSL 1.50).
+- **Line Divide PointZ on a GPU-made line** (linear or Catmull-Rom) divides on the GPU, bit for bit
+  (`GPUALGOTEST`). Subdivide and Divide now share `gpu::RowStencil` / `ApplyStencil`: a recipe of
+  output rows written like PointBuilder (Copy / Lerp / Weighted), built once per topology.
+- **Revolve PointZ and Extrude PointZ (lines) on a GPU-made profile** stay on the GPU (P5): the
+  copies are a stencil, each ring's matrix / each step's offset (the CPU's floats) moves P in a
+  kernel with `precise`, Revolve's Tex comes from a table and the normals from the shared
+  `GpuFaceNormals` (Normal PointZ uses it too, now with the CPU's (0, 0, 1) for a point with no
+  area around it). P, Tex and topology bit for bit; N within 2e-7. Extrude on faces still goes
+  through MeshOps on the CPU.
+- **Line Resample PointZ by count on a GPU-made line** stays on the GPU (P6): each line's length
+  is summed on the GPU in the CPU's order (one thread per line), each new point finds its segment
+  by binary search (the CPU's forward scan gives the same segment) and every attribute is lerped by
+  `ApplyStencil`. Within 1e-5 of the CPU (the GPU's sqrt and divide). "By segment length" stays on
+  the CPU: there the number of points depends on the length, which would need a readback.
+- `GPUALGOTEST` now checks each of these against its own CPU path on the same GPU-made line
+  (`gpu::ForceCpuForTest`), and that the result stays on the GPU.
+
+### Render 3D: motion vectors, TAA and FSR upscale (M4: MV, R4, R5, X4 first part)
+- **TAA** (new `TAA` checkbox in Render 3D's new "quality" section): every frame is drawn with a
+  different sub-pixel camera jitter (16 Halton steps) and blended into a history in linear HDR
+  before the tonemap - variance clipping in YCoCg against ghosting, a Catmull-Rom history fetch,
+  luminance-weighted blending against fireflies. A still scene keeps refining for 16 frames and is
+  then cached again as before. The edge against the plain background stays soft and the background
+  colour exact: the TAA also averages the geometry's coverage of each pixel and the HDR finish takes
+  the cleared background out before the tonemap and puts it back after (new key mode in
+  Render3DPost).
+- **Motion vectors** (MV, the base shared with the RTX temporal denoiser, X1): camera motion from
+  the depth buffer and last frame's camera (`Render3DTemporal`). Surfaces that move by themselves
+  are not in them yet (no per-vertex history): the history clipping limits the smear on them.
+- **Render scale + AMD FSR 1** (new `upscale` dropdown, `sharpness` slider): the scene is drawn at the
+  output size over 1.5x / 1.7x / 2x / 3x and AMD FidelityFX Super Resolution 1 (MIT, both editions)
+  brings it back - EASU upscale then RCAS sharpening, on the tonemapped image. Works for raster and
+  RTX (traced at the smaller size). The output keeps the node's size. FSR expects an anti-aliased
+  input: use it with TAA (or MSAA).
+- New keys at the end of Render 3D's params (`taa`, `upscale`, `sharpness`); missing = off, so old
+  patches render exactly as before. New check `TAATEST` (TAA + FSR 2x on a still scene: output
+  size, convergence, cached after it, coverage); `INFINITE_TAATEST=taa|fsr|plain` writes each variant
+  for comparison (`INFINITE_TAATEST_PNG`).
+- Shaders now live in `shaders/*.glsl` (A5), compiled into the exe by `cmake/EmbedFiles.cmake` and
+  read with `EmbeddedFile()`; the FSR headers are fetched at configure time.
+- **Measured** on the reference patch (1080p, RTX 4060, one run each, `INFINITE_GPUPROF`). The raster
+  render there is bound by geometry, not pixels (a quarter of the pixels saves only 13% of Render 3D's
+  GPU time), so the raster gain comes from replacing MSAA:
+
+  | Variant | Frame | Render 3D GPU |
+  |---|---|---|
+  | as saved (MSAA 8x) | 9.93 ms | 8.38 ms |
+  | TAA, no MSAA | 8.32 ms (-16%) | 6.85 ms |
+  | TAA + FSR 1.5x, no MSAA | 8.04 ms (-19%) | 6.54 ms |
+  | RTX native | 17.06 ms | trace 3.0 + denoise 5.9 ms |
+  | RTX + FSR 1.5x | 11.68 ms (-32%) | trace 1.4 + denoise 2.5 ms |
+  | RTX + FSR 2x | 10.25 ms (-40%) | trace 0.9 + denoise 1.45 ms |
+
+  TAA costs 0.25 ms at 1080p (motion vectors 0.03 ms), FSR 0.19 ms.
+
+### Render 3D: GPU culling and LOD of instances (R1, first part)
+- An instanced slot with 32768+ copies (Instance PointZ, or a CPU instancer) is sorted on the GPU
+  when a good share of it (over 25% of its box, tested on the CPU) is off screen, or with `lod
+  pixels` on: a compute pass tests each copy's bounding sphere against the
+  frustum, stable compaction + gathers (`pop::gpu`) build the kept copies' attributes and the draw
+  reads its count from the GPU (`glDrawElementsIndirect`) - nothing is read back, no `glGet`
+  (`src/nodes/Render3DCull.*`, `shaders/render3d_instance_cull.comp.glsl`). The copies keep their
+  order and their original number (`aInstanceIndex`, used by the per-instance texture choice), so the
+  picture is the same.
+- Fixed (gate): a 4096 threshold and "any part off screen" sorted the reference patch's 305k boxes
+  every frame for a sliver outside the view, 0.7 ms more than drawing them all (seen as Particle
+  PointZ +27% in PERF). Now: 32768 copies and a quarter of the box off screen.
+- With `lod pixels` on, the **shadow pass** sorts the same slots against the light's view (same GPU
+  pass, sizes in shadow-map texels): a copy smaller than that casts no shadow, a texel or two that
+  the soft shadow filter hides anyway. Off (0) draws every copy, as before.
+- New `lod pixels` slider (quality section, key `lodPixels` at the end of the params; 0 = off, old
+  patches unchanged): a copy smaller than that on screen is drawn as one camera-facing quad with
+  its box's projected area, lit with the normal of the face the camera sees most of.
+- New check `CULLTEST`: forced and automatic culling give the plain draw's pixels bit for bit; LOD
+  quads cover the same area (98%). `INFINITE_R3D_CULL=force|off` for A/B.
+- **Measured** on the reference patch (1080p, 305k boxes of 2-3 px in slot 1): culling alone
+  changes nothing there (everything is on screen); `lod pixels` 4: slot 1 3.91 -> 1.98 ms,
+  Render 3D 8.44 -> 6.52 ms, frame 9.98 -> 8.07 ms (-19%), picture visually the same. With the
+  shadow pass culled too (GPU particles, `ref_lod4_gpu.inf` vs `ref_particles_gpu.inf`): frame
+  10.03 -> 7.26 ms (-28%).
+- `DRAGTEST`: the pan phase starts on the graph point farthest from every node (it started on a
+  fixed point that the taller Render 3D node now covered, so the pan never armed - test only).
+
+### Patch files
+- **Lines a node does not read now survive a save** (C2): a patch from upstream or a newer build,
+  saved in Turbo, keeps those param lines (`GraphNode::foreignParams`); a key the node writes itself
+  wins. `FOREIGNKEYTEST` checks it end to end. (Copy / paste of a node still drops them.)
+- **Equivalence (R5):** `INFINITE_POP_BACKEND=both` runs both backends and prints one `POPEQUIV` line
+  per distinct kernel. Every kernel of the reference patch, POPTEST and PORTEDTEST (about 40): max
+  difference 0, bit-identical. New check `POPEQUIVTEST` in the suite.
+- **Speed with compute** (reference patch, A/B against the M0 reference build): frame 18.4 ->
+  14.05 ms (-24%; 15.3 ms with transform feedback), Transform PointZ GPU 0.52 -> 0.04 ms,
+  Copy PointZ 0.54 -> 0.07 ms, Noise PointZ 1.89 -> 1.53 ms. Particle PointZ 2.8 -> 3.65 ms (to
+  look at in P3).
+
+### Fixes and speed (found with the M0 tools)
+- **Render 3D lost every uniform on the frame its image-based lighting was (re)built** (patch load,
+  HDRI change): the prefilter passes left no program bound, so ~190 GL_INVALID_OPERATION a frame and
+  one frame drawn with stale uniforms. The program is bound again after the rebuild.
+- **PointZ bounds no longer stall the pipeline** (F6): every slot's async bounds reduction cleared
+  one shared result buffer while the previous slot's copy was still queued, a pipeline sync per
+  PointZ slot per frame. Each reduction now has its own buffer. Reference patch, A/B in the same
+  session: frame 18.4 -> 15.3 ms (-17%), Render 3D cook 14.4 -> 12.7 ms.
+- **GPU buffer pool waits two frames before reusing a store** (F5): a kernel no longer overwrites a
+  buffer that this frame's draws or async copies still read. Particle PointZ GPU time 3.4 -> 2.8 ms,
+  Render 3D cook 12.7 -> 11.1 ms (frame time unchanged: the frame is now bound elsewhere).
+- **Tracy profiler** (F2), optional: `cmake -DINFINITE_ENABLE_TRACY=ON` fetches Tracy v0.11.1
+  (BSD-3) and adds CPU zones per frame stage, PointZ cook (named after the operator) and kernel,
+  Render 3D, its post and the 3D previews, plus GL GPU zones. On demand: no measurable cost until
+  the Tracy GUI (v0.11.1) connects (reference patch 15.28 ms with, 15.25 ms without). Off by default
+  and in release builds; `src/core/Profile.h`.
+- **Unit tests** (A7): `InfiniteUnitTests` (doctest 2.4.11, MIT, one header fetched at configure time;
+  not part of the normal build) runs in every `test-windows.bat` as UNITTEST. First suite: the .inf
+  reader and writer (every param type, escapes, nodes, cables, Turbo and upstream `mod` lines,
+  unknown lines skipped), 7 cases; the C2 gap (unread keys dropped on save) is an expected failure
+  until it is fixed.
+- Docs: `docs/patch-format.md` (C2; found: unread param keys and unknown lines are dropped on the
+  next save), `docs/pointz-gpu-status.md` (P11, 86 operators, first heuristic pass).
+- Skills: `turbo-branch-workflow`, `turbo-code-review`; `run-turbo-tests` documents the new switches.
+
 ## 0.62.0-turbo (2026-10-22)
 
 GPU first: an animated PointZ patch at 1080p went from ~17 fps to ~52 fps (raster) on an RTX 4060,

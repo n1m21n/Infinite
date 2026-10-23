@@ -49,6 +49,11 @@
 #include "core/NodeFactory.h"
 #include "core/CategoryColors.h"
 #include "core/GLUtil.h"
+#include "core/Profile.h"
+#include "pop/GpuAlgo.h" // Turbo 0.70 (P2): GPUALGOTEST
+#ifdef INFINITE_TRACY
+#include <tracy/TracyC.h>
+#endif
 #include "core/GraphNode.h"
 #include "core/FilterDefs.h"
 #include "core/BlendModes.h"
@@ -197,6 +202,7 @@ static const char* kTurboBuildDate = __DATE__ " " __TIME__;
 #include "nodes/OpticalFlowNode.h"
 #include "nodes/FluidNode.h"
 #include "nodes/VolumeNode.h"
+#include "nodes/Render3DFxNode.h" // Turbo 0.70
 #include "nodes/NdiInNode.h"
 #include "nodes/NdiOutNode.h"
 #include "nodes/SweepRevolveNodes.h"
@@ -318,8 +324,39 @@ namespace
       }
       int frames = 0;
       bool on = getenv("INFINITE_FRAMEPROF") != nullptr;
+#ifdef INFINITE_TRACY
+      // Turbo 0.70 (F2): each stage is also a Tracy zone, ended by the next
+      // Mark (literal names: Tracy keeps a static source location per zone).
+      TracyCZoneCtx stageZone = {};
+      bool stageOpen = false;
+      void TracyStage(int i)
+      {
+         if (stageOpen)
+         {
+            TracyCZoneEnd(stageZone);
+            stageOpen = false;
+         }
+         switch (i + 1)
+         {
+         case 1: { TracyCZoneN(z, "events+setup", 1); stageZone = z; break; }
+         case 2: { TracyCZoneN(z, "menu+canvas", 1); stageZone = z; break; }
+         case 3: { TracyCZoneN(z, "node bodies", 1); stageZone = z; break; }
+         case 4: { TracyCZoneN(z, "links+panels", 1); stageZone = z; break; }
+         case 5: { TracyCZoneN(z, "modulation", 1); stageZone = z; break; }
+         case 6: { TracyCZoneN(z, "cook", 1); stageZone = z; break; }
+         case 7: { TracyCZoneN(z, "ui draw", 1); stageZone = z; break; }
+         case 8: { TracyCZoneN(z, "swap", 1); stageZone = z; break; }
+         case 9: { TracyCZoneN(z, "after", 1); stageZone = z; break; }
+         default: return;
+         }
+         stageOpen = true;
+      }
+#endif
       void Mark(int i)
       {
+#ifdef INFINITE_TRACY
+         TracyStage(i);
+#endif
          if (!on)
             return;
          const double now = glfwGetTime();
@@ -416,6 +453,8 @@ int main(int argc, char** argv)
       gFrameProf.Mark(4);
       #include "app/frame/Cook.inl" // expressions, modulation, cooking, rendering, swap
       gFrameProf.Mark(9);
+      INF_PROFILE_GPU_COLLECT(); // Turbo 0.70 (F2): Tracy, when built with it
+      INF_PROFILE_FRAME();
    }
 
    #include "app/frame/Shutdown.inl" // shutdown with watchdog

@@ -96,6 +96,25 @@
             case pop::ParamSpec::kText:
             {
                std::string& s = v.s[i];
+               // Turbo 0.70: a font (Text PointZ) is picked from the installed families.
+               if (p.key == "font")
+               {
+                  const std::vector<std::string>& families = Platform::AvailableFontFamilies();
+                  int current = 0;
+                  for (size_t f = 0; f < families.size(); f++)
+                     if (families[f] == s)
+                        current = (int)f;
+                  DropdownButton(p.label.c_str(), families, current,
+                                 [&s, &families](int f)
+                                 {
+                                    if (f >= 0 && f < (int)families.size())
+                                    {
+                                       PushUndoCheckpoint();
+                                       s = families[(size_t)f];
+                                    }
+                                 });
+                  break;
+               }
                const bool code = p.key == "code" || p.key == "table";
                ImGui::TextDisabled("%s", p.label.c_str());
                const std::string id = "##popText_" + p.key;

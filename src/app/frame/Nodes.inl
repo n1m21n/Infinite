@@ -704,6 +704,8 @@
                DrawLightParams(n);
             else if (auto* n = dynamic_cast<Render3DNode*>(gn.node.get()))
                DrawRender3DParams(n);
+            else if (auto* n = dynamic_cast<Render3DFxNode*>(gn.node.get())) // Turbo 0.70
+               DrawRender3DFxParams(n);
             else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
                DrawImageAnalyzeParams(n);
             else if (auto* n = dynamic_cast<NullModulatorNode*>(gn.node.get()))

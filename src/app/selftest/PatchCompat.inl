@@ -14,6 +14,14 @@
          const bool compatPlay = getenv("INFINITE_PATCHCOMPAT_PLAY") != nullptr;
          if (!compatPlay)
             Transport::Instance().SetPlaying(false);
+         // Turbo 0.70: INFINITE_PERF_UNCAPPED=1 (perf.ps1) turns VSync and the
+         // frame limiter off every frame (a loaded patch or settings may turn
+         // them back on), so the frame time is the patch's cost, not the display's.
+         if (getenv("INFINITE_PERF_UNCAPPED") != nullptr)
+         {
+            gVsync = false;
+            gTargetFps = 0;
+         }
          static auto sCompatT0 = std::chrono::steady_clock::now();
          static double sCompatMs = 0.0;
          static int sCompatFrames = 0;
