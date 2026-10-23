@@ -1,6 +1,7 @@
 #include "WavetableNode.h"
 #include "WavetableSynthCore.h"
 
+#include <algorithm>
 #include <utility>
 
 // -------------------------------------------------------------- main thread
@@ -160,5 +161,43 @@ void WavetableNode::VisitParams(ParamVisitor& v)
       v.Float((p + "filterDecay").c_str(), s.filterDecay);
       v.Float((p + "filterSustain").c_str(), s.filterSustain);
       v.Float((p + "filterRelease").c_str(), s.filterRelease);
+      s.ClampToRange();
    }
+   mix = std::clamp(mix, 0.0f, 1.0f);
+   volume = std::clamp(volume, 0.0f, 1.0f);
+   frequency = std::clamp(frequency, 20.0f, 8000.0f);
+   glide = std::clamp(glide, 0.0f, 2.0f);
+   pitchBend = std::clamp(pitchBend, -2.0f, 2.0f);
+   fmDepth = std::clamp(fmDepth, 0.0f, 2.0f);
+}
+
+void WavetableEngine::ClampToRange()
+{
+   constexpr float kMaxEnvMs = 4000.0f;
+   position = std::clamp(position, 0.0f, 1.0f);
+   volume = std::clamp(volume, 0.0f, 1.0f);
+   pan = std::clamp(pan, -1.0f, 1.0f);
+   detune = std::clamp(detune, 0.0f, 100.0f);
+   stereoWidth = std::clamp(stereoWidth, 0.0f, 1.0f);
+   fine = std::clamp(fine, -50.0f, 50.0f);
+   phase = std::clamp(phase, 0.0f, 1.0f);
+   phaseRandomize = std::clamp(phaseRandomize, 0.0f, 1.0f);
+   warpAmount = std::clamp(warpAmount, 0.0f, 1.0f);
+   warpRatio = std::clamp(warpRatio, 0.25f, 16.0f);
+   cutoff = std::clamp(cutoff, 20.0f, 18000.0f);
+   resonance = std::clamp(resonance, 0.0f, 1.0f);
+   ampAttack = std::clamp(ampAttack, 0.0f, kMaxEnvMs);
+   ampDecay = std::clamp(ampDecay, 0.0f, kMaxEnvMs);
+   ampSustain = std::clamp(ampSustain, 0.0f, 1.0f);
+   ampRelease = std::clamp(ampRelease, 0.0f, kMaxEnvMs);
+   pitchAmount = std::clamp(pitchAmount, -48.0f, 48.0f);
+   pitchAttack = std::clamp(pitchAttack, 0.0f, kMaxEnvMs);
+   pitchDecay = std::clamp(pitchDecay, 0.0f, kMaxEnvMs);
+   pitchSustain = std::clamp(pitchSustain, 0.0f, 1.0f);
+   pitchRelease = std::clamp(pitchRelease, 0.0f, kMaxEnvMs);
+   filterAmount = std::clamp(filterAmount, -8.0f, 8.0f);
+   filterAttack = std::clamp(filterAttack, 0.0f, kMaxEnvMs);
+   filterDecay = std::clamp(filterDecay, 0.0f, kMaxEnvMs);
+   filterSustain = std::clamp(filterSustain, 0.0f, 1.0f);
+   filterRelease = std::clamp(filterRelease, 0.0f, kMaxEnvMs);
 }
