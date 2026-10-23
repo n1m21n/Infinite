@@ -731,6 +731,18 @@ bool RunEffectMixAndLimiterFixture()
       all &= ok;
    }
 
+   // Render 3D and Fit size their targets from a float any patch, OSC or RPC
+   // set can hold; 1e9 failed the render, 16000 asked the GPU for gigabytes.
+   {
+      const bool ok = GLUtil::TargetSide(1e9f, 16) == GLUtil::kMaxTargetSide &&
+                      GLUtil::TargetSide(-1e9f, 16) == 16 &&
+                      GLUtil::TargetSide(std::nanf(""), 1) == 1 &&
+                      GLUtil::TargetSide(1920.0f, 16) == 1920 &&
+                      GLUtil::TargetSide(8.0f, 16) == 16;
+      printf("DSPTEST render target sides are capped: %s\n", ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
    return all;
 }
 }
