@@ -70,7 +70,7 @@ OrbStack is a VM and holds RAM while up. `ibuild linux` starts it only for the j
 
 ## Rule 6 - Make builds cheaper (one-time, ask first)
 
-- **ccache**: `brew install ccache`. ibuild uses it automatically on a fresh configure (existing dirs: re-run cmake with `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache`). Biggest win for worktrees and clean rebuilds. Cap it: `ccache -M 5G`.
+- **ccache** (installed 2026-10-23; `brew install` is broken on this Mac - its extract sandbox is killed - so it was unpacked from the cached bottle and relocated by hand; if `ccache` ever stops launching, re-run `brew fetch ccache` and redo that relocation, do not use `brew link openssl@4`, it unlinks openssl@3). ibuild uses it automatically on a fresh configure (existing dirs: re-run cmake with `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache`). Biggest win for worktrees and clean rebuilds. Cap it: `ccache -M 5G`.
 - **ninja** (`brew install ninja`) schedules better than Makefiles, but needs a fresh configure; do it only with the owner's yes.
 - Disk: remove `build-dev`/`build-asan`/worktree builds once merged (keep-disk-footprint-low).
 
