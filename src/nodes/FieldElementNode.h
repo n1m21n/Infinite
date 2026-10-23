@@ -9,6 +9,7 @@
 #include "field/ParamTable.h"
 #include "field/PinTable.h"
 #include "field/FieldDevice.h"
+#include "field/ElementGlslBackend.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -19,7 +20,7 @@ public:
    static INode* Create() { return new FieldElementNode(); }
 
    FieldElementNode();
-   ~FieldElementNode() override = default;
+   ~FieldElementNode() override;
 
    // INode overrides
    unsigned int GetOutputTexture() override { return 0; }
@@ -168,9 +169,15 @@ public:
    const std::vector<unsigned char>* InstanceSelection() const override { return input ? input->InstanceSelection() : nullptr; }
    unsigned long long InstanceSelectionRevision() const override { return input ? input->InstanceSelectionRevision() : 0; }
    const std::vector<Mat4>* InstanceTransformOverride() const override { return input ? input->InstanceTransformOverride() : nullptr; }
-   const std::vector<Particle>* GetPointCloud() override { return input ? input->GetPointCloud() : nullptr; }
-   const GpuPoints* GetGpuPoints() override { return input ? input->GetGpuPoints() : nullptr; }
-   unsigned long long PointCloudRevision() override { return input ? input->PointCloudRevision() : 0; }
+   // Points (P8 step 10): a kernel that writes P, Cd or the `size` attrib
+   // runs over the input's point cloud too - on the GPU, compiled to GLSL
+   // (ElementGlslBackend.h), when the input has GPU points and the kernel
+   // compiles; on the CPU cloud otherwise. Anything else passes the points on.
+   const std::vector<Particle>* GetPointCloud() override;
+   const GpuPoints* GetGpuPoints() override;
+   unsigned long long PointCloudRevision() override;
+   // Why the kernel stays on the CPU for GPU points ("" when it does not).
+   const std::string& PointGpuFallback() const { return mPointGlsl.error; }
    float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
    unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
@@ -300,4 +307,49 @@ private:
    // so without this, CookIfNeeded's needRebuild gate never fires and the
    // mesh silently goes stale relative to the slider.
    size_t mLastParamHash = 0;
+
+   // Points (P8 step 10). CookIfNeeded records the cook's time and params
+   // (mPointT ...) for the point paths, which run lazily on their own store
+   // and VM so a mesh cook and a point pass never share registers.
+   bool ActsOnPoints() const;
+   void FillPointEnv(Field::ExecutionEnv& env) const;
+   Field::ElementGlslResult mPointGlsl;
+   bool mPointWrites = false;
+   bool mPointReadsAge = false;
+   double mPointT = 0.0;
+   bool mPointHasT = false;
+   double mPointDt = 1.0 / 60.0;
+   double mPointFrame = 0.0;
+   double mPointAge = 0.0;
+   std::map<std::string, float> mPointParams;
+   size_t mPointParamHash = 0;
+   Field::ElementStore mPointStore;
+   Field::ElementVM mPointVM;
+
+   struct PointSignature
+   {
+      const void* upstream = nullptr;
+      unsigned long long upstreamRevision = 0;
+      const void* program = nullptr;
+      size_t paramHash = 0;
+      double t = 0.0;
+      double age = 0.0;
+      bool operator==(const PointSignature& o) const
+      {
+         return upstream == o.upstream && upstreamRevision == o.upstreamRevision && program == o.program &&
+                paramHash == o.paramHash && t == o.t && age == o.age;
+      }
+   };
+   PointSignature mPointStamp;
+   bool mHasPointStamp = false;
+   unsigned long long mPointRevision = 0;
+   std::vector<Particle> mPointCache;
+   unsigned long long mPointCacheRevision = 0;
+
+   GpuPoints mGpuPoints;
+   GpuPointsGL::Target mGpuTarget;
+   unsigned int mGpuProgram = 0;
+   const void* mGpuProgramFor = nullptr;
+   unsigned long long mGpuBuiltRevision = 0;
+   bool mGpuBuiltValid = false;
 };

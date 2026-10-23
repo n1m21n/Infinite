@@ -17,7 +17,18 @@ namespace Field
          ElementCompiledCode& compiled;
          int nextReg = 0;
          std::unordered_map<std::string, int> localRegs;
+         // Lanes each local currently holds, so a compound assignment knows
+         // whether to broadcast its right-hand side: `v += 1.0` on a vec3
+         // local used to run with the rhs's one lane and bump only v.x.
+         std::unordered_map<std::string, int> localLanes;
          std::unordered_set<std::string> stateNames;
+         // Element-loop `attrib`s. Each lives in one register for the whole
+         // element (loaded at the top, see EmitElementBytecode) and is written
+         // back to the store after every assignment. They used to be stored
+         // only on their first assignment, with the name then re-pointed at
+         // that statement's right-hand side, so `size = 1` / `size *= 2` left
+         // 1 in the store and `heat += 0.5` read back 0.5.
+         std::unordered_set<std::string> attribNames;
          bool isPrologue = false;
 
          // Build step 23: bases this block reads with `.at()`, in first-seen
@@ -61,6 +72,60 @@ namespace Field
             mov.src1 = srcReg;
             mov.lanes = lanes;
             compiled.code.push_back(mov);
+         }
+
+         // A local's first assignment adopts the right-hand side's register.
+         // When that register already belongs to another local (`b = a`), the
+         // two names would share it and `b += 1` would move `a` too, so the
+         // value is copied into a register of its own first.
+         int OwnRegister(int rhsReg, int lanes)
+         {
+            for (const auto& kv : localRegs)
+            {
+               if (kv.second == rhsReg)
+               {
+                  int r = AllocReg();
+                  EmitMove(r, rhsReg, lanes);
+                  return r;
+               }
+            }
+            return rhsReg;
+         }
+
+         void EmitAttribWriteBack(const std::string& name)
+         {
+            if (isPrologue || attribNames.find(name) == attribNames.end()) return;
+            auto it = localRegs.find(name);
+            if (it == localRegs.end()) return;
+            ElemInstruction st;
+            st.op = ElemOpcode::OpStoreAttrib;
+            st.src1 = it->second;
+            st.stringData = name + ":=";
+            auto ln = localLanes.find(name);
+            st.lanes = (ln != localLanes.end()) ? ln->second : 1;
+            compiled.code.push_back(st);
+         }
+
+         // Every local a `for` statement assigns, first-seen order, with the
+         // width its first assignment gives it (3 for a component write).
+         static void CollectLoopTargets(const IRStmtPtr& st, std::vector<std::pair<std::string, int>>& out)
+         {
+            if (!st) return;
+            if (st->kind == IRStmtKind::Assign)
+            {
+               const std::string& n = st->assignTarget;
+               if (n == "P" || n == "N" || n == "uv" || n == "Cd") return;
+               for (const auto& o : out)
+                  if (o.first == n) return;
+               const int lanes = !st->assignField.empty() ? 3 : (st->rvalueExpr ? std::max(1, std::min(4, st->rvalueExpr->type.lanes)) : 1);
+               out.push_back({ n, lanes });
+               return;
+            }
+            CollectLoopTargets(st->forInit, out);
+            for (const auto* list : { &st->thenStmts, &st->elseStmts, &st->forBody })
+               for (const auto& c : *list)
+                  CollectLoopTargets(c, out);
+            CollectLoopTargets(st->forStep, out);
          }
 
          int AddConstant(double val)
@@ -480,6 +545,8 @@ namespace Field
                            }
                            else
                            {
+                              auto ln = localLanes.find(stmt->assignTarget);
+                              const int oldLanes = (ln != localLanes.end()) ? ln->second : lanes;
                               ElemInstruction bin;
                               if (stmt->assignOp == "+=") bin.op = ElemOpcode::OpAdd;
                               else if (stmt->assignOp == "-=") bin.op = ElemOpcode::OpSub;
@@ -488,11 +555,14 @@ namespace Field
                               bin.dst = oldReg;
                               bin.src1 = oldReg;
                               bin.src2 = rhsReg;
-                              bin.lanes = lanes;
-                              bin.src1Lanes = bin.lanes;
-                              bin.src2Lanes = bin.lanes;
+                              bin.lanes = std::max(oldLanes, lanes);
+                              bin.src1Lanes = oldLanes;
+                              bin.src2Lanes = lanes;
                               compiled.code.push_back(bin);
+                              lanes = bin.lanes;
                            }
+                           localLanes[stmt->assignTarget] = lanes;
+                           EmitAttribWriteBack(stmt->assignTarget);
 
                            // Re-publish the frame var on EVERY assignment, not only the
                            // first. The element loop reads a hoisted local through
@@ -597,17 +667,22 @@ namespace Field
                            vCtor.argLanes.assign(argRegs.size(), 1);
                            compiled.code.push_back(vCtor);
                            localRegs[stmt->assignTarget] = newVecReg;
+                           localLanes[stmt->assignTarget] = totalLanes;
+                           EmitAttribWriteBack(stmt->assignTarget);
                         }
                      }
                      else if (isPrologue)
                      {
+                        const int lanes = stmt->rvalueExpr ? stmt->rvalueExpr->type.lanes : 1;
+                        rhsReg = OwnRegister(rhsReg, lanes);
                         ElemInstruction inst;
                         inst.op = ElemOpcode::OpStoreFrameVar;
                         inst.src1 = rhsReg;
                         inst.stringData = stmt->assignTarget;
-                        inst.lanes = stmt->rvalueExpr ? stmt->rvalueExpr->type.lanes : 1;
+                        inst.lanes = lanes;
                         compiled.code.push_back(inst);
                         localRegs[stmt->assignTarget] = rhsReg;
+                        localLanes[stmt->assignTarget] = lanes;
                      }
                      else
                      {
@@ -629,7 +704,9 @@ namespace Field
                            inst.lanes = stmt->rvalueExpr ? stmt->rvalueExpr->type.lanes : 1;
                         }
                         compiled.code.push_back(inst);
-                        localRegs[stmt->assignTarget] = rhsReg;
+                        const int lanes = stmt->rvalueExpr ? stmt->rvalueExpr->type.lanes : 1;
+                        localRegs[stmt->assignTarget] = OwnRegister(rhsReg, lanes);
+                        localLanes[stmt->assignTarget] = lanes;
                      }
                   }
                   break;
@@ -697,6 +774,33 @@ namespace Field
 
                case IRStmtKind::For:
                {
+                  // A name the loop assigns that is not a local yet (a prologue
+                  // value, or one first assigned in the body) gets its register
+                  // here, loaded by name once before the loop. The body is
+                  // emitted once and runs many times: left to the body, the
+                  // first assignment re-ran every trip as a first assignment,
+                  // so `s = 0` / `for (...) { s += x }` ended at x, not 4x.
+                  if (!isPrologue)
+                  {
+                     std::vector<std::pair<std::string, int>> targets;
+                     CollectLoopTargets(stmt, targets);
+                     for (const auto& tg : targets)
+                     {
+                        if (localRegs.count(tg.first) || stateNames.count(tg.first)) continue;
+                        const int reg = AllocReg();
+                        ElemInstruction ld;
+                        ld.op = ElemOpcode::OpLoadAttrib;
+                        ld.dst = reg;
+                        ld.stringData = tg.first;
+                        ld.lanes = tg.second;
+                        compiled.code.push_back(ld);
+                        localRegs[tg.first] = reg;
+                        localLanes[tg.first] = tg.second;
+                        // Written back like an attrib, so storage that reads the
+                        // name per element (reduce over a local) still sees it.
+                        attribNames.insert(tg.first);
+                     }
+                  }
                   if (stmt->forInit) EmitStmt(stmt->forInit);
 
                   int loopHead = (int)compiled.code.size();
@@ -788,6 +892,22 @@ namespace Field
                le.compiled.code.push_back(inst);
                le.localRegs[ds.name] = reg;
             }
+         }
+         for (const auto& da : ir.declaredAttribs)
+         {
+            if (le.stateNames.count(da.first) || le.localRegs.count(da.first)) continue;
+            const int lanes = FieldType::GetLanesForType(da.second);
+            if (lanes <= 0) continue;
+            int reg = le.AllocReg();
+            ElemInstruction inst;
+            inst.op = ElemOpcode::OpLoadAttrib;
+            inst.dst = reg;
+            inst.stringData = da.first;
+            inst.lanes = lanes;
+            le.compiled.code.push_back(inst);
+            le.localRegs[da.first] = reg;
+            le.localLanes[da.first] = lanes;
+            le.attribNames.insert(da.first);
          }
          for (const auto& s : ir.elementLoop)
          {
@@ -1593,6 +1713,32 @@ namespace Field
       }
 
       return true;
+   }
+
+   bool ElementVM::RunPrologue(const ElementProgram& prog, size_t count, const ExecutionEnv& env, std::string& outError)
+   {
+      outError.clear();
+      if (mFrameRegisters.size() < (size_t)prog.prologue.numRegisters)
+         mFrameRegisters.resize(prog.prologue.numRegisters);
+      mFrameVars.clear();
+      ElementExecContext frameCtx;
+      frameCtx.inElementLoop = false;
+      frameCtx.count = count;
+      bool ran = false;
+      return ExecuteBlock(prog.prologue, mFrameRegisters, env, frameCtx, ran, outError);
+   }
+
+   int ElementVM::ResolveName(const std::string& name, const ExecutionEnv& env, size_t count, double out[4]) const
+   {
+      for (int l = 0; l < 4; ++l) out[l] = 0.0;
+      auto it = mFrameVars.find(name);
+      if (it != mFrameVars.end())
+      {
+         for (int l = 0; l < 4; ++l) out[l] = it->second.v[l];
+         return std::max(1, std::min(4, it->second.lanes));
+      }
+      LoadEnvScalar(name, env, count, out[0]);
+      return 1;
    }
 
    bool ElementVM::Execute(const ElementProgram& prog,

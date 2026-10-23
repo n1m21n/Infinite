@@ -2,8 +2,11 @@
 #include "field/FieldLex.h"
 #include "field/FieldParse.h"
 #include "Transport.h"
+#include "GLUtil.h"
+#include "gl3.h"
 
 #include <algorithm>
+#include <cmath>
 
 const std::vector<FieldElementNode::Preset>& FieldElementNode::Presets()
 {
@@ -443,6 +446,42 @@ FieldElementNode::FieldElementNode()
    Apply();
 }
 
+namespace
+{
+   bool ReadsName(const Field::IRNodePtr& n, const char* name)
+   {
+      if (!n) return false;
+      if (n->kind == Field::IRKind::Variable && n->varName == name) return true;
+      for (const auto& c : n->children)
+         if (ReadsName(c, name)) return true;
+      return false;
+   }
+   bool ReadsName(const Field::IRStmtPtr& s, const char* name)
+   {
+      if (!s) return false;
+      for (const Field::IRNodePtr& n : { s->rvalueExpr, s->ifCond, s->forCond, s->expr, s->attribInitExpr })
+         if (ReadsName(n, name)) return true;
+      for (const auto* list : { &s->thenStmts, &s->elseStmts, &s->forBody })
+         for (const auto& t : *list)
+            if (ReadsName(t, name)) return true;
+      return ReadsName(s->forInit, name) || ReadsName(s->forStep, name);
+   }
+   bool ReadsName(const Field::ElementIRProgram& p, const char* name)
+   {
+      for (const auto* list : { &p.prologue, &p.elementLoop, &p.postLoop })
+         for (const auto& s : *list)
+            if (ReadsName(s, name)) return true;
+      return false;
+   }
+}
+
+FieldElementNode::~FieldElementNode()
+{
+   GpuPointsGL::DestroyTarget(mGpuTarget);
+   if (mGpuProgram != 0)
+      glDeleteProgram(mGpuProgram);
+}
+
 bool FieldElementNode::Apply()
 {
    pinRefusal.clear();
@@ -524,6 +563,17 @@ bool FieldElementNode::Apply()
       mStore.DeclareAttrib(decl.first, decl.second);
    }
 
+   // Points (P8 step 10): what the kernel does to a point cloud. A kernel
+   // with state cells keeps its bank per mesh element and leaves points alone.
+   const Field::MeshWriteMask& wm = prog->WriteMask();
+   mPointWrites = prog->declaredStates.empty() &&
+                  (wm.wroteP || wm.wroteCd || wm.WroteAttrib(Field::ElementStore::kPointSizeAttrib));
+   mPointGlsl = Field::EmitElementPointGlsl(irProgram);
+   mPointReadsAge = ReadsName(irProgram, "age");
+   mPointAge = 0.0;
+   for (const auto& decl : prog->declaredAttribs)
+      mPointStore.DeclareAttrib(decl.first, decl.second);
+
    mProgram = prog;
    mLastError.clear();
    mMeshRevision = NextMeshRevision();
@@ -547,6 +597,7 @@ void FieldElementNode::CookIfNeeded(int frameId)
    {
       mState.ResetAll();
       mStateAge = 0.0f;
+      mPointAge = 0.0;
       mLastResetEpoch = currentEpoch;
    }
 
@@ -554,6 +605,31 @@ void FieldElementNode::CookIfNeeded(int frameId)
    {
       Apply();
    }
+
+   double t = Transport::Instance().Seconds();
+
+   std::map<std::string, float> paramValues = mParamTable.ValueMap();
+   size_t paramHash = 0;
+   for (const auto& kv : paramValues)
+   {
+      paramHash ^= std::hash<std::string>{}(kv.first) + 0x9e3779b9 + (paramHash << 6) + (paramHash >> 2);
+      paramHash ^= std::hash<float>{}(kv.second) + 0x9e3779b9 + (paramHash << 6) + (paramHash >> 2);
+   }
+
+   // The point paths run later, when a consumer asks (GetPointCloud /
+   // GetGpuPoints), so they read this cook's values from here. Recorded
+   // before the mesh path, which returns early on a points-only input.
+   if (!mPointHasT || t != mPointT)
+   {
+      mPointDt = mPointHasT ? t - mPointT : 1.0 / 60.0;
+      mPointT = t;
+      mPointHasT = true;
+   }
+   mPointFrame = (double)frameId;
+   mPointParams = paramValues;
+   mPointParamHash = paramHash;
+   if (mPointReadsAge)
+      mPointAge += 1.0;
 
    // With nothing wired into `input`, act as a generator instead of a
    // modifier - same shape as DistributePointsInGridNode's no-input point
@@ -596,16 +672,6 @@ void FieldElementNode::CookIfNeeded(int frameId)
       upRev = (unsigned long long)n;
    }
    const Mesh& inMesh = *srcMesh;
-
-   double t = Transport::Instance().Seconds();
-
-   std::map<std::string, float> paramValues = mParamTable.ValueMap();
-   size_t paramHash = 0;
-   for (const auto& kv : paramValues)
-   {
-      paramHash ^= std::hash<std::string>{}(kv.first) + 0x9e3779b9 + (paramHash << 6) + (paramHash >> 2);
-      paramHash ^= std::hash<float>{}(kv.second) + 0x9e3779b9 + (paramHash << 6) + (paramHash >> 2);
-   }
 
    bool needRebuild = (upRev != mLastUpstreamRevision) ||
                       (mProgram && mProgram->isTimeDependent && (float)t != mLastEvalT) ||
@@ -663,4 +729,170 @@ void FieldElementNode::CookIfNeeded(int frameId)
    mMeshRevision = NextMeshRevision();
    mLastUpstreamRevision = upRev;
    mLastEvalT = (float)t;
+}
+
+// ============================================================ Points
+
+bool FieldElementNode::ActsOnPoints() const
+{
+   return input != nullptr && !bypassed && mProgram != nullptr && mPointWrites;
+}
+
+void FieldElementNode::FillPointEnv(Field::ExecutionEnv& env) const
+{
+   env.t = mPointT;
+   env.dt = mPointDt;
+   env.frame = mPointFrame;
+   // `age` counts cooks since the last reset; with no state bank there is
+   // nothing else for it to count.
+   env.age = mPointAge;
+   env.params = &mPointParams;
+   env.state = nullptr;
+}
+
+unsigned long long FieldElementNode::PointCloudRevision()
+{
+   if (input == nullptr)
+      return 0;
+   if (!ActsOnPoints())
+      return input->PointCloudRevision();
+   PointSignature sig;
+   sig.upstream = input;
+   sig.upstreamRevision = input->PointCloudRevision();
+   sig.program = mProgram.get();
+   sig.paramHash = mPointParamHash;
+   sig.t = mProgram->isTimeDependent ? mPointT : 0.0;
+   sig.age = mPointReadsAge ? mPointAge : 0.0;
+   if (!mHasPointStamp || !(sig == mPointStamp))
+   {
+      mPointStamp = sig;
+      mHasPointStamp = true;
+      mPointRevision = NextMeshRevision();
+   }
+   return mPointRevision;
+}
+
+const std::vector<Particle>* FieldElementNode::GetPointCloud()
+{
+   if (input == nullptr)
+      return nullptr;
+   const std::vector<Particle>* src = input->GetPointCloud();
+   if (src == nullptr || !ActsOnPoints())
+      return src;
+   const unsigned long long rev = PointCloudRevision();
+   if (mPointCacheRevision == rev)
+      return &mPointCache;
+   mPointStore.FromParticles(*src);
+   Field::ExecutionEnv env;
+   FillPointEnv(env);
+   std::string err;
+   if (mPointVM.Execute(*mProgram, mPointStore, env, err))
+      mPointStore.ToParticles(mPointCache, mProgram->WriteMask(), *src);
+   else
+      mPointCache = *src;
+   mPointCacheRevision = rev;
+   return &mPointCache;
+}
+
+const GpuPoints* FieldElementNode::GetGpuPoints()
+{
+   if (input == nullptr)
+      return nullptr;
+   const GpuPoints* src = input->GetGpuPoints();
+   if (src == nullptr || !ActsOnPoints())
+      return src;
+   // A kernel the GLSL backend could not copy exactly runs on the CPU
+   // cloud: no GPU points here sends every consumer there.
+   if (!mPointGlsl.error.empty())
+      return nullptr;
+   if (mGpuProgramFor != mProgram.get())
+   {
+      if (mGpuProgram != 0)
+         glDeleteProgram(mGpuProgram);
+      mGpuProgramFor = mProgram.get();
+      mGpuBuiltValid = false;
+      const std::string fs = std::string(GpuPointsGL::kPointPassHeader) + mPointGlsl.source;
+      std::string compileErr;
+      mGpuProgram = GLUtil::CompileProgram(fs.c_str(), &compileErr);
+      if (mGpuProgram == 0)
+         mPointGlsl.error = "GLSL compile: " + compileErr;
+   }
+   if (mGpuProgram == 0)
+      return nullptr;
+
+   const unsigned long long rev = PointCloudRevision();
+   if (!mGpuBuiltValid || mGpuBuiltRevision != rev)
+   {
+      mGpuBuiltRevision = rev;
+      Field::ExecutionEnv env;
+      FillPointEnv(env);
+      const size_t count = (size_t)std::max(0, src->count);
+      std::string err;
+      mPointVM.RunPrologue(*mProgram, count, env, err);
+      const float baseSize = input->PointBaseSize();
+      mGpuBuiltValid = GpuPointsGL::RunPointPass(mGpuTarget, mGpuPoints, *src, mGpuProgram, [&]()
+      {
+         glUniform1f(glGetUniformLocation(mGpuProgram, "fld_baseSize"), baseSize);
+         for (const auto& u : mPointGlsl.uniforms)
+         {
+            double v[4] = { 0.0, 0.0, 0.0, 0.0 };
+            const int n = mPointVM.ResolveName(u.varName, env, count, v);
+            if (n == 1)
+               v[1] = v[2] = v[3] = v[0];
+            const int loc = glGetUniformLocation(mGpuProgram, u.glslName.c_str());
+            if (u.lanes == 1) glUniform1f(loc, (float)v[0]);
+            else if (u.lanes == 2) glUniform2f(loc, (float)v[0], (float)v[1]);
+            else if (u.lanes == 3) glUniform3f(loc, (float)v[0], (float)v[1], (float)v[2]);
+            else glUniform4f(loc, (float)v[0], (float)v[1], (float)v[2], (float)v[3]);
+         }
+         for (const auto& r : mPointGlsl.rands)
+         {
+            double speed = r.speedLiteral;
+            if (!r.speedIsLiteral)
+            {
+               double v[4] = { 0.0, 0.0, 0.0, 0.0 };
+               mPointVM.ResolveName(r.speedName, env, count, v);
+               speed = v[0];
+            }
+            unsigned int lo = 0, hi = 0;
+            Field::ElementRandTimeWord(r.isSh, speed, env.t, lo, hi);
+            glUniform2ui(glGetUniformLocation(mGpuProgram, r.glslName.c_str()), lo, hi);
+         }
+      }, "FieldModifier_GpuPoints");
+      if (!mGpuBuiltValid)
+         return nullptr;
+
+      // A kernel that moves P can put a point anywhere, so no bounds then;
+      // otherwise the source box after its matrix.
+      mGpuPoints.hasBounds = src->hasBounds && !mPointGlsl.writesP;
+      if (mGpuPoints.hasBounds)
+      {
+         float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+         const Mat4& pm = src->pointMatrix;
+         for (int c = 0; c < 8; c++)
+         {
+            const float x = (c & 1) ? src->hi[0] : src->lo[0];
+            const float y = (c & 2) ? src->hi[1] : src->lo[1];
+            const float z = (c & 4) ? src->hi[2] : src->lo[2];
+            for (int k = 0; k < 3; k++)
+            {
+               const float w = pm.m[k] * x + pm.m[4 + k] * y + pm.m[8 + k] * z + pm.m[12 + k];
+               lo[k] = std::min(lo[k], w);
+               hi[k] = std::max(hi[k], w);
+            }
+         }
+         for (int k = 0; k < 3; k++)
+         {
+            mGpuPoints.lo[k] = lo[k];
+            mGpuPoints.hi[k] = hi[k];
+         }
+      }
+   }
+   // A `size` of 0 hides a point, so a kernel that writes it leaves the
+   // live count unknown.
+   mGpuPoints.liveCount = mPointGlsl.writesSize ? -1 : src->liveCount;
+   mGpuPoints.maxHalfSize = src->maxHalfSize;
+   mGpuPoints.count = src->count;
+   mGpuPoints.revision = rev;
+   return &mGpuPoints;
 }

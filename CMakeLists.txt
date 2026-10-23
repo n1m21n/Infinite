@@ -601,6 +601,7 @@ set(COMMON_SOURCES
     src/core/field/FieldSwizzle.cpp
     src/core/field/ElementStore.cpp
     src/core/field/ElementBackend.cpp
+    src/core/field/ElementGlslBackend.cpp
     src/core/field/FieldState.cpp
     src/core/field/FieldCycles.cpp
     src/core/field/ParamTable.cpp

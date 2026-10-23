@@ -187,6 +187,54 @@ namespace Field
       }
    }
 
+   void ElementStore::FromParticles(const std::vector<Particle>& points)
+   {
+      const size_t n = points.size();
+      Resize(n);
+      for (size_t i = 0; i < n; ++i)
+      {
+         const Particle& p = points[i];
+         mPx[i] = p.px; mPy[i] = p.py; mPz[i] = p.pz;
+         mNx[i] = p.nx; mNy[i] = p.ny; mNz[i] = p.nz;
+         mU[i] = 0.0f; mV[i] = 0.0f;
+         mCr[i] = p.r; mCg[i] = p.g; mCb[i] = p.b;
+      }
+      mHasInputVertexColor = false;
+
+      for (auto& pair : mUserAttribs)
+      {
+         UserAttrib& ua = pair.second;
+         for (int l = 0; l < ua.lanes; ++l)
+         {
+            float initVal = (l < (int)ua.initValues.size()) ? ua.initValues[l] : 0.0f;
+            std::fill(ua.data[l].begin(), ua.data[l].end(), initVal);
+         }
+      }
+      auto size = mUserAttribs.find(kPointSizeAttrib);
+      if (size != mUserAttribs.end() && size->second.lanes == 1)
+      {
+         for (size_t i = 0; i < n; ++i)
+            size->second.data[0][i] = points[i].scale;
+      }
+   }
+
+   void ElementStore::ToParticles(std::vector<Particle>& out, const MeshWriteMask& mask, const std::vector<Particle>& source) const
+   {
+      const size_t n = std::min(mCount, source.size());
+      out.assign(source.begin(), source.begin() + (std::ptrdiff_t)n);
+      const std::vector<float>* size = nullptr;
+      if (mask.WroteAttrib(kPointSizeAttrib))
+         size = GetAttribLane(kPointSizeAttrib, 0);
+      for (size_t i = 0; i < n; ++i)
+      {
+         Particle& p = out[i];
+         if (mask.wroteP) { p.px = mPx[i]; p.py = mPy[i]; p.pz = mPz[i]; }
+         if (mask.wroteN) { p.nx = mNx[i]; p.ny = mNy[i]; p.nz = mNz[i]; }
+         if (mask.wroteCd) { p.r = mCr[i]; p.g = mCg[i]; p.b = mCb[i]; p.hasColor = true; }
+         if (size && i < size->size()) p.scale = std::max(0.0f, (*size)[i]);
+      }
+   }
+
    void ElementStore::ToMeshExact(Mesh& outMesh, const MeshWriteMask& mask) const
    {
       outMesh.vertices.resize(mCount);

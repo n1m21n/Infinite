@@ -189,6 +189,15 @@ namespace Field
          return true;
       }
 
+      // For a kernel run somewhere else (the GPU points pass, see
+      // ElementGlslBackend.h): the prologue alone, as Execute() would run it
+      // over `count` elements, then the value the element loop would see for
+      // a name no element storage owns - a hoisted prologue variable, else
+      // t/dt/frame/age/count/a param/a sibling, the order loadByName uses.
+      // ResolveName returns the lanes written to out (1 for an env scalar).
+      bool RunPrologue(const ElementProgram& prog, size_t count, const ExecutionEnv& env, std::string& outError);
+      int ResolveName(const std::string& name, const ExecutionEnv& env, size_t count, double out[4]) const;
+
    private:
       // ONE interpreter for both banks. The prologue and the element loop used to be
       // two near-duplicate switches over the same ElemOpcode set, and they had already

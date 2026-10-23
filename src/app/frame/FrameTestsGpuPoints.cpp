@@ -685,6 +685,136 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
       GpuPointsGL::SetEnabledForTest(wasEnabled);
    }
 
+   // Step 10: Field Modifier compiled to GLSL. Each kernel runs over Mesh to
+   // Points (a CPU-made cloud, every point alive) on both paths, and the GPU
+   // texels, read back, must hold the CPU cloud's position, sprite size and
+   // colour point for point. One kernel also renders behind the Transform
+   // (an upstream pointMatrix) and must draw the CPU frame. A kernel the
+   // backend cannot copy must offer no GPU points and still act on the CPU
+   // cloud.
+   {
+      GeometryNode ball;
+      ball.shape = 2;
+      MeshToPointsNode ballPts;
+      ballPts.input = &ball;
+      ballPts.pointSize = 0.05f;
+
+      struct Kernel { const char* name; const char* code; bool gpu; };
+      const Kernel kernels[] = {
+         { "wave over t", "P.y += sin(P.x * 4.0 + t * 3.0) * 0.2\n", true },
+         { "colour from index and P", "Cd = vec3(fract(i * 0.37), 0.5, clamp(1.0 - P.y, 0.0, 1.0))\n", true },
+         { "random size", "attrib float size = 1\nsize = rand(0.25, 2.0, 1.0, i)\n", true },
+         { "params, prologue, if/else",
+           "param float amp = 0.3 [0.0, 1.0]\nk = amp * 2.0\nd = length(P) * 0.0 + P.y\n"
+           "if (d > 0.13) { P *= 1.0 + k } else { P.x -= k }\n", true },
+         { "for loop, swizzle, smoothstep",
+           "s = 0.0\nfor (j = 0; j < 4; j += 1) { s += P.x * 0.1 }\nP.z += s\n"
+           "Cd.xy = vec2(smoothstep(-1.0, 1.0, P.y), step(0.0, P.x))\n", true },
+         { "divide by zero, pow, mod, sh",
+           "z = P.y - P.y\nP.x = P.x / z + pow(abs(P.y), 1.5)\nP /= z\n"
+           "Cd = vec3(mod(i, 7.0) / 7.0, sh(0.0, 1.0, 4.0, i), noise(2.0))\n", true },
+         { "normal read (CPU only)", "P += N * 0.2\n", false },
+      };
+
+      auto readTex = [](unsigned int tex, int w, int h)
+      {
+         std::vector<float> px((size_t)w * (size_t)h * 4, 0.0f);
+         glBindTexture(GL_TEXTURE_2D, tex);
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         return px;
+      };
+
+      for (const Kernel& k : kernels)
+      {
+         FieldElementNode fe;
+         fe.input = &ballPts;
+         fe.code = k.code;
+         const bool compiled = fe.Apply();
+         GpuPointsGL::SetEnabledForTest(false);
+         ball.CookIfNeeded(frame);
+         ballPts.CookIfNeeded(frame);
+         fe.CookIfNeeded(frame++);
+         const bool cpuNone = fe.GetGpuPoints() == nullptr;
+         std::vector<Particle> cpuCloud;
+         if (const std::vector<Particle>* cc = fe.GetPointCloud())
+            cpuCloud = *cc;
+
+         GpuPointsGL::SetEnabledForTest(true);
+         fe.CookIfNeeded(frame - 1 + 1000000); // a new cook at the same time
+         const GpuPoints* g = fe.GetGpuPoints();
+         const std::vector<Particle>& before = ballPts.GetPoints();
+         float moved = 0.0f;
+         if (before.size() == cpuCloud.size())
+            for (size_t i = 0; i < cpuCloud.size(); i++)
+               moved = std::max(moved, std::fabs(before[i].px - cpuCloud[i].px) + std::fabs(before[i].py - cpuCloud[i].py) +
+                                       std::fabs(before[i].pz - cpuCloud[i].pz) + std::fabs(before[i].r - cpuCloud[i].r) +
+                                       std::fabs(before[i].g - cpuCloud[i].g) + std::fabs(before[i].b - cpuCloud[i].b) +
+                                       std::fabs(before[i].scale - cpuCloud[i].scale));
+         char label[200];
+         if (!k.gpu)
+         {
+            printf("Field Modifier, %s: fallback \"%s\", moved %.3f\n", k.name, fe.PointGpuFallback().c_str(), moved);
+            snprintf(label, sizeof(label), "Field Modifier, %s: no GPU points, CPU cloud still modified", k.name);
+            report(label, compiled && g == nullptr && !fe.PointGpuFallback().empty() && moved > 0.01f);
+            continue;
+         }
+
+         float errP = 0.0f, errW = 0.0f, errC = 0.0f;
+         bool same = g != nullptr && !cpuCloud.empty() && g->count == (int)cpuCloud.size();
+         if (same)
+         {
+            const std::vector<float> pos = readTex(g->posTex, g->texW, g->texH);
+            const std::vector<float> col = readTex(g->colorTex, g->texW, g->texH);
+            const float base = fe.PointBaseSize();
+            for (size_t i = 0; i < cpuCloud.size(); i++)
+            {
+               const Particle& p = cpuCloud[i];
+               const float* q = &pos[i * 4];
+               const float* c = &col[i * 4];
+               errP = std::max(errP, std::fabs(q[0] - p.px) + std::fabs(q[1] - p.py) + std::fabs(q[2] - p.pz));
+               errW = std::max(errW, std::fabs(q[3] - (p.alive ? p.scale * base : 0.0f)));
+               errC = std::max(errC, std::fabs(c[0] - p.r) + std::fabs(c[1] - p.g) + std::fabs(c[2] - p.b));
+            }
+         }
+         printf("Field Modifier, %s: %zu points, moved %.3f, err pos %.6f size %.6f colour %.6f%s%s\n", k.name,
+                cpuCloud.size(), moved, errP, errW, errC, fe.PointGpuFallback().empty() ? "" : ", fallback: ",
+                fe.PointGpuFallback().c_str());
+         snprintf(label, sizeof(label), "Field Modifier, %s: CPU path offers no GPU points, GPU path does", k.name);
+         report(label, compiled && cpuNone && g != nullptr);
+         snprintf(label, sizeof(label), "Field Modifier, %s: changes the points", k.name);
+         report(label, moved > 0.01f);
+         snprintf(label, sizeof(label), "Field Modifier, %s: GPU texels match the CPU cloud", k.name);
+         report(label, same && errP < 1e-3f && errW < 1e-4f && errC < 1e-3f);
+      }
+
+      // The wave kernel behind the Transform, drawn.
+      FieldElementNode wave;
+      wave.input = &xf;
+      wave.code = kernels[0].code;
+      wave.Apply();
+      auto renderWave = [&](bool gpu)
+      {
+         GpuPointsGL::SetEnabledForTest(gpu);
+         Render3DNode r; // fresh, for the same reason as renderOnce
+         r.geometry[0] = &wave;
+         r.CookIfNeeded(frame++);
+         return ReadRgba(r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight());
+      };
+      const std::vector<unsigned char> cpuF = renderWave(false);
+      const std::vector<unsigned char> gpuF = renderWave(true);
+      const bool offered = wave.GetGpuPoints() != nullptr;
+      i2p.bypassed = true;
+      const std::vector<unsigned char> emptyF = renderWave(true);
+      i2p.bypassed = false;
+      const FrameDiff d = CompareFrames(cpuF, gpuF, emptyF);
+      printf("Field Modifier over Image to Points + Transform: drawn %zu, differ %zu (max %d)\n", d.drawn, d.differ,
+             d.maxDiff);
+      report("Field Modifier over Image to Points + Transform: GPU points, frame matches the CPU frame",
+             offered && d.Drawn() && d.Match());
+      GpuPointsGL::SetEnabledForTest(wasEnabled);
+   }
+
    printf("%s\n", allOk ? "GPU POINTS TEST OK" : "GPU POINTS TEST FAIL");
 }
 

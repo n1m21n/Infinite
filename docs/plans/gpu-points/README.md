@@ -75,7 +75,8 @@ the steps above, in the order they will be done:
 
 8. Mesh to Points outputs GPU points. Done (section below).
 9. Twist and Displacement run on GPU points when their input has them. Done (section below).
-10. Field Modifier compiles to GLSL (`src/core/field/GlslBackend.cpp`) when its input is GPU points.
+10. Field Modifier compiles to GLSL (`src/core/field/ElementGlslBackend.cpp`) when its input is GPU
+    points. Done (section below).
 11. Model 3D reads `.ply` point clouds as points.
 12. Field Modifier presets for point jobs: random size, random colour, colour from image, stagger
     over index, age to colour.
@@ -237,3 +238,66 @@ lazy CPU cloud after a GPU frame equals the CPU run (max error 0). `run-infinite
 23/23 and `render-pipeline-sweep` 23/23, both against `build-dev` with steps 8-9 in.
 Parity: the pass uses `texelFetch`, MRT and `glUniformMatrix4fv` (GL 3.0-3.3 core, in glad);
 shaders stay `#version 150`; no `Platform::` or `#ifdef` code.
+
+## Step 10: Field Modifier on points, on the GPU (2026-10-24, dev build)
+
+Field Modifier (`FieldElementNode`) now acts on point clouds. Without GPU points it runs the
+element VM over the cloud (`ElementStore::FromParticles` / `ToParticles`). With GPU points it runs
+the kernel as one fragment pass per point: `Field::EmitElementPointGlsl` turns the element loop
+into GLSL behind `kPointPassHeader`. The CPU still runs the prologue (`ElementVM::RunPrologue`) and
+passes its values in as uniforms, so only the per-element maths moves. The pass reruns only when
+the upstream revision, program, params, `t` or `age` change.
+
+**New attrib `size`.** On points, `size` reads the point's scale (W / point size) and writing it
+sets the scale (negative clamps to 0; a hidden point stays hidden). A Cd write gives the cloud
+colour. Meshes ignore `size`.
+
+**Semantics copied from the VM, not GLSL's.**
+- `/` and `%` by 0 give 0, and `P /= 0` keeps P.
+- Comparisons and `if()` read lane 0.
+- sqrt and log clamp their argument; normalize of a zero vector is 0.
+- smoothstep with equal edges is a step.
+- rand/noise/sh hash the same 29 bits. The time half is computed on the CPU per call site and
+  passed in as a `uvec2`; the seed half is computed in the shader with 64-bit maths on two uints.
+
+**VM fixes found by the GPU/CPU compare** (both paths behave the same now; FIELDELEMENTTEST
+section 18):
+- A prologue value or new local assigned inside a `for` body re-ran its first assignment on every
+  trip, so `s = 0; for (...) { s += x }` gave x, not 4x. Loop targets are now bound once, before
+  the loop.
+- A copied local aliased its source's register, so a compound assign wrote through to the source.
+- Compound assigns of mixed widths (`vec3 += scalar`) took the rhs width; they now keep the wider.
+
+**Stays on the CPU** (the node passes `PointGpuFallback()` text; points are still modified on the
+CPU):
+- state cells, reduce, `.at()` neighbour reads, a post-loop pass, image reads, graph statements;
+- reading or writing N (GPU points carry no normal);
+- a local that changes width;
+- a rand speed that is not a literal or a frame value.
+
+A kernel with state stays mesh-only and passes points through untouched.
+
+**Known limits.**
+- The GPU runs in float, not double.
+- A `for` loop stops after 4096 trips.
+- `pow` of a negative base with a non-integer exponent gives 0 on the GPU, NaN on the CPU.
+- On a Particle System, `i` and `count` are per texel: count is the capacity, not the live count.
+- maxElements does not truncate points.
+- Publish reads the mesh VM only.
+
+**Checks.**
+- `GPUPOINTSTEST` step 10 section, all pass. Six kernels run over a sphere's 738 Mesh to Points
+  samples: wave over t; colour from index and P; random size; params, prologue and if/else; for
+  loop, swizzle and smoothstep; divide by zero, pow, mod, sh and noise. For each kernel:
+  - with the path off there are no GPU points; with it on there are;
+  - the points change;
+  - the readback texels equal the CPU cloud (position and size error 0, colour 1.8e-5).
+- An N kernel falls back and still modifies the CPU cloud.
+- The wave kernel over Image to Points + Transform draws a frame equal to the CPU frame (0 pixels
+  differ).
+- FIELDELEMENTTEST 18/18 sections OK; FIELDTEST, FIELDSTATETEST, FIELDTRANSFERTEST,
+  FIELDPARAMTEST, FIELDPIXELTEST and FIELDSAMPLETEST OK.
+- `run-infinite-hygiene --group 3d` 23/23 and `render-pipeline-sweep` 23/23, against `build-dev`.
+
+**Parity.** Shaders stay `#version 150`. The pass uses `uint`/`uvec2` maths (GLSL 1.30+) and
+`glUniform2ui`, which is GL 3.0 core and in glad. There is no `Platform::` or `#ifdef` code.

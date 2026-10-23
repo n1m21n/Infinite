@@ -1666,6 +1666,92 @@ int RunFieldElementTest()
       else { printf("SECTION 17 (reduce over a plain element-domain local reads real per-element data): FAIL\n"); allOk = false; }
    }
 
+   // 18. Locals the GPU points backend (P8 step 10) copies, pinned on the VM
+   // first: an attrib reassigned reads its new value, `b = a; b += 1` leaves
+   // `a` alone (b gets its own register), a vec3 `+= 1.0` adds to every lane,
+   // a loop updates one register per local every trip (the body is emitted
+   // once), and the `size` attrib carries a point's scale in and out.
+   {
+      bool secOk = true;
+      const int N = 4;
+      struct Case { const char* name; const char* code; bool useY; float want[N]; };
+      const Case cases[] = {
+         { "attrib reassign", "attrib float h = 0\nh = P.x\nh = h * 2.0\nP.y = h\n", true,
+           { 0.0f, 2.0f / 3.0f, 4.0f / 3.0f, 2.0f } },
+         { "copy then compound", "a = P.x\nb = a\nb += 1.0\nP.y = a + b * 0.0\n", true,
+           { 0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f } },
+         { "vec3 += scalar", "v = P\nv += 1.0\nP.y = v.z\n", true, { 1.0f, 1.0f, 1.0f, 1.0f } },
+         { "loop accumulates a prologue value", "s = 0.0\nfor (j = 0; j < 4; j += 1) { s += P.x }\nP.y = s\n", true,
+           { 0.0f, 4.0f / 3.0f, 8.0f / 3.0f, 4.0f } },
+         { "loop accumulates an element local", "q = P.x\nfor (j = 0; j < 3; j += 1) { q += 1.0 }\nP.y = q\n", true,
+           { 3.0f, 3.0f + 1.0f / 3.0f, 3.0f + 2.0f / 3.0f, 4.0f } },
+      };
+      for (const Case& c : cases)
+      {
+         std::vector<float> xs, ys;
+         std::string err;
+         if (!runElementCooks(c.code, N, 1, xs, ys, err))
+         {
+            printf("Locals: FAIL - %s: %s\n", c.name, err.c_str());
+            secOk = false;
+            continue;
+         }
+         for (int i = 0; i < N; ++i)
+            if (std::fabs(ys[(size_t)i] - c.want[i]) > 1e-4f)
+            {
+               printf("Locals: FAIL - %s: P.y[%d] = %.4f, expected %.4f\n", c.name, i, ys[(size_t)i], c.want[i]);
+               secOk = false;
+               break;
+            }
+      }
+
+      FieldElementNode node;
+      node.code = "attrib float size = 1\nsize *= 2.0\nCd.x = size\n";
+      if (!node.Apply())
+      {
+         printf("Locals: FAIL - size kernel: %s\n", node.LastError().c_str());
+         secOk = false;
+      }
+      else
+      {
+         std::vector<Particle> pts(3), out;
+         pts[0].scale = 0.5f;
+         pts[1].scale = 1.0f;
+         pts[2].scale = 2.0f;
+         Field::ElementStore store;
+         for (const auto& decl : node.Program()->declaredAttribs)
+            store.DeclareAttrib(decl.first, decl.second);
+         store.FromParticles(pts);
+         Field::ElementVM vm;
+         Field::ExecutionEnv env;
+         std::string err;
+         if (!vm.Execute(*node.Program(), store, env, err))
+         {
+            printf("Locals: FAIL - size kernel did not run: %s\n", err.c_str());
+            secOk = false;
+         }
+         else
+         {
+            store.ToParticles(out, node.Program()->WriteMask(), pts);
+            for (size_t i = 0; i < pts.size() && i < out.size(); ++i)
+               if (std::fabs(out[i].scale - pts[i].scale * 2.0f) > 1e-5f || std::fabs(out[i].r - pts[i].scale * 2.0f) > 1e-5f)
+               {
+                  printf("Locals: FAIL - size: point %zu scale %.3f r %.3f, expected %.3f\n", i, out[i].scale, out[i].r,
+                         pts[i].scale * 2.0f);
+                  secOk = false;
+               }
+            if (out.size() != pts.size())
+            {
+               printf("Locals: FAIL - size: %zu points out of %zu\n", out.size(), pts.size());
+               secOk = false;
+            }
+         }
+      }
+
+      if (secOk) printf("SECTION 18 (Locals, Attribs and the Point Size Attrib): OK\n");
+      else { printf("SECTION 18 (Locals, Attribs and the Point Size Attrib): FAIL\n"); allOk = false; }
+   }
+
    printf("INFINITE_FIELDELEMENTTEST: %s\n", allOk ? "OK" : "FAIL");
    return allOk ? 0 : 1;
 }
