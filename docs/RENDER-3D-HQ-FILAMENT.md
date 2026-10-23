@@ -475,6 +475,51 @@ Bloom antigo (`Render3DPost`) × novo, cena D, executável da S7 × S8 (`-RefExe
 (−11%); A (sem bloom) 1,64 → 1,52 (ruído). Em 500×500 (`HQTEST`, CPU + GPU): Performance 0,17,
 Balanced 0,22, High 0,27 ms por quadro.
 ## 13. Benchmarks medidos e capturas BEFORE/AFTER (S9)
+
+**Capturas** (`capture.ps1`, quadro 150, 1920×1080): BEFORE = `examples/hq/raster` com o Render 3D
+(`build/hq/s9_before`), AFTER = `examples/hq/filament` com o HQ no preset Balanced, o padrão
+(`build/hq/s9_after`). Olhadas lado a lado, cena por cena:
+
+| Cena | O que muda do Render 3D para o HQ |
+|---|---|
+| A materiais | metais e dielétricos do Filament (o ouro e o cromo refletem o estúdio, o vermelho e o azul saturam sem escurecer), sombras de contato suaves, o chão neutro (o IBL do HDRI no lugar do céu azulado) |
+| B partículas | as esferas têm volume e oclusão entre si (GTAO), as faixas de pontos ganham relevo; no Render 3D viram um plano chapado |
+| C nuvem generativa | a mesma silhueta; esferas sombreadas, bordas sem serrilhado (TAA) |
+| D partículas emissivas | o bloom do Filament: o brilho fica junto da forma, sem tingir o quadro inteiro |
+| E geometria + partículas | o nó de cobre igual; as partículas com sombreamento e sombra |
+| F 1M de pontos | o Render 3D mostra um recorte claro e chapado; o HQ mostra cada dobra do ruído (esferas, GTAO, TAA) |
+| G sombra de contato | a sombra encosta nos objetos; o vermelho e o azul mais saturados (o Render 3D os escurece) |
+| H AO de contato | o GTAO escurece os cantos entre a parede, o chão e os objetos |
+| I 100k cubos | instâncias de metal com sombra e AO (ver o defeito corrigido abaixo) |
+
+**Defeito achado nas capturas e corrigido na S9**: na cena I, o chão aparecia como uma lâmina cor de
+cobre entre as instâncias (existia desde a S7). No pré-passe, só as malhas diferidas (instâncias sem
+mapas) gravavam o id do slot no attachment 3; o chão, uma malha forward desenhada depois, passava
+na frente das instâncias sem regravar o id, e o passe diferido sombreava esses pixels de novo, com o
+material das instâncias e a normal do chão. Agora toda malha forward grava o id 0 ("nenhum"). Check
+novo no `HQTEST`: as instâncias vermelhas dentro de uma caixa desenhada depois delas devem dar a
+mesma imagem que a caixa sozinha (diferença máxima 0,0000; sem a correção, 0,651).
+
+**Benchmarks** (`perf.ps1 -Runs 3`, as 18 cenas intercaladas na mesma sessão, mediana do quadro
+inteiro em ms, 1920×1080, RTX 4060 Laptop, VSync e limitador desligados; executável da S9):
+
+| Cena | Render 3D | Render 3D HQ | HQ × raster |
+|---|---|---|---|
+| A materiais (sombras) | 3,31 | 2,90 | −12% |
+| B partículas (sombras, órbita) | 2,60 | 2,74 | +5% (+0,14 ms) |
+| C nuvem generativa | 5,16 | 2,55 | −50% |
+| D partículas emissivas (bloom) | 8,63 | 7,57 | −12% |
+| E geometria + partículas | 2,34 | 2,30 | −2% |
+| F 1M de esferas | 11,86 | 5,61 | −53% |
+| G sombra de contato | 1,06 | 1,04 | −2% |
+| H AO de contato | 1,16 | 1,18 | +2% (ruído) |
+| I 100k cubos de metal | 2,99 | 2,99 | igual |
+
+O HQ desenha mais (GTAO, TAA, sombra filtrada, esferas de verdade) e custa o mesmo ou menos: o
+pré-passe sombreia cada pixel uma vez, as esferas e as instâncias usam o passe diferido (S7) e a
+cena parada é reaproveitada depois de o TAA assentar. Na B, o HQ fica 0,14 ms acima numa cena leve
+em que ele roda GTAO e TAA e o Render 3D não. Na F, o Render 3D sozinho custa 10,7 ms (FRAMEPROF `render3d`). Os números das sessões
+anteriores (S3-S8, P1) estão no §8, §10-§12 e na §6 da estratégia.
 ## 14. Licenças
 
 | Arquivo | Portado de (Filament @ 13be3649, Apache-2.0, © Google LLC) |
@@ -494,3 +539,42 @@ Balanced 0,22, High 0,27 ms por quadro.
 
 Também listado em `THIRD_PARTY_NOTICES.md`. Nenhum código do Filament é linkado.
 ## 15. Problemas conhecidos e o que falta
+
+Estado ao fim da S9 (2026-10-23). Nada abaixo bloqueia a 0.71; os itens marcados "dono" esperam uma
+decisão dele.
+
+**Decisões do dono**
+- **Tonemap padrão do HQ**: continua o ACES do Render 3D (1), para um patch novo do HQ sair com o mesmo
+  "look" do Render 3D. O padrão do Filament é a opção 5 (Filament ACES legacy), mais clara. Trocar o
+  padrão muda todo patch novo; os salvos guardam o tonemap e não mudam.
+- **Noise PointZ curl 4D (P1)**: as posições diferem do kernel anterior em até ~2e-5 (tolerância
+  documentada, 1e-4 no `POPTEST`); bit a bit não dá, porque o driver arredonda as duas formas do código
+  de um jeito diferente.
+- **Preview 3D**: ~2 ms de GPU no patch de referência (já atualiza um quadro sim, outro não); gastar
+  menos muda a UI.
+- **Costura do HDRI no fundo do Render 3D** (achado nas capturas da S9, existe desde antes da 0.71):
+  uma linha vertical tracejada clara no fundo das cenas B, C, E, F e I do `examples/hq/raster`. O fundo
+  lê o equirretangular com `texture()` (`Geometry3DNodes.cpp`, `dirToEquirect`), e na volta do
+  `atan` (u de 1 para 0) a derivada salta e o mip vai para o menor. A correção é uma linha (`textureLod`
+  ou `textureGrad`), mas o Render 3D está congelado e ela muda os 3 patches do compat com HDRI. O HQ não
+  tem a costura.
+
+**Limitações do HQ (0.71)**
+- Linhas de PointZ (line strips) não são desenhadas; o painel as conta como "skipped".
+- Só a primeira luz direcional (ou o sol embutido) projeta sombra; um mapa só, sem cascatas.
+- Render 3D FX depois do HQ deixa a imagem passar: o FX lê a profundidade e a velocidade do pipeline
+  do Render 3D, que o HQ não preenche. O HQ já tem o próprio GTAO; reflexos em tela, profundidade de
+  campo e motion blur para o HQ ficam para depois.
+- Sem MSAA: o anti-aliasing do HQ é o TAA (desligá-lo deixa serrilhado). O `depthDisocclusion` do TAA
+  do Filament não foi portado (não apareceu ghosting nas cenas de referência).
+- Sem RTX: o modo RTX continua só no Render 3D (decisão do dono: RTX fica para a 0.72).
+- Saída sRGB com gama 2,2 e dither, como o Render 3D; o Filament usa a OETF sRGB exata.
+- Particle PointZ (motor CPU, P1) abaixo de ~10 fps: a cópia por linhas cobre ~0,2 s de nascimentos;
+  se a cópia pronta for mais velha que isso, aquele quadro lê as linhas direto da GPU (mesmo resultado,
+  com uma espera). Com o app em tempo real isso não acontece.
+
+**O que falta (fora da 0.71)**
+- F4 (cache de estado GL): `glGetUniformLocation` por quadro no `Render3DTemporal::Upscale` / `Sharpen`
+  e `glGet*` dos helpers de GPU (regra "zero glGet por quadro").
+- Sombras em cascata (CSM) e sombra de mais de uma luz no HQ; reflexos em tela no HQ.
+- Linhas de PointZ no HQ (tubos ou linhas com largura).

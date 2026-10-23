@@ -4,12 +4,29 @@
 
 Plan: `docs/plans/HQ-071-STRATEGY.md`; technical notes: `docs/RENDER-3D-HQ-FILAMENT.md`.
 
-- **New node: Render 3D HQ** (work in progress) - a second 3D renderer next to Render 3D, wired the
-  same way, with techniques ported from Google Filament (Apache-2.0): depth prepass, physically
-  based materials (Filament's BRDF with multiple-scattering energy compensation, clear coat, sheen,
-  specular anti-aliasing), image-based lighting from the HDRI with no seam. PointZ particles,
-  shadows, ambient occlusion and TAA come in the next steps. Built with `INFINITE_ENABLE_RENDER_HQ`
-  (on); without it the node draws as Render 3D and says so.
+- **New node: Render 3D HQ** - a second 3D renderer next to Render 3D, wired the same way (geometry
+  A-D, camera, three lights, HDRI), with techniques ported from Google Filament @ 13be3649
+  (Apache-2.0, rewritten in GLSL; no Filament code is linked). Render 3D is unchanged. Example
+  scenes in `examples/hq/filament/`, and the same scenes for Render 3D in `examples/hq/raster/`.
+  - Depth prepass, so each pixel is shaded once; physically based materials (Filament's BRDF with
+    multiple-scattering energy compensation, clear coat, sheen, specular anti-aliasing, the
+    Material node's 8 maps and Mapping); image-based lighting from the HDRI with no seam.
+  - PointZ points drawn as round, lit spheres straight from their GPU buffers; Instance PointZ
+    copies; PointZ triangles. Spheres and plain instances are shaded in one deferred pass.
+  - Shadows from the sun (Filament's PCF, soft option, contact shadows), GTAO ambient occlusion,
+    Filament's TAA with per-object and per-particle motion (the HQ's anti-aliasing: no jagged
+    edges or flickering small objects), Filament's bloom and its ACES tonemaps next to Render 3D's,
+    render scale with FSR 1, RCAS sharpening.
+  - Quality presets Performance / Balanced / High set the real params (shadow map size, GTAO on
+    and its resolution, render scale). A still scene reuses its last frame once the TAA settles.
+  - Measured on the reference scenes (whole frame, 1080p, RTX 4060 Laptop): as fast as Render 3D or
+    faster on 8 of 9 scenes while drawing more - 1M spheres 11.86 -> 5.61 ms, the generative cloud
+    5.16 -> 2.55 ms; +0.14 ms on the particle studio. Details: `docs/RENDER-3D-HQ-FILAMENT.md`
+    section 13.
+  - Not in the HQ yet: PointZ lines, shadows from more than one light, Render 3D FX after it (the
+    picture passes through), RTX (stays in Render 3D). Known issues: section 15 of the same doc.
+  - Built with `INFINITE_ENABLE_RENDER_HQ` (on, both editions); without it the node draws as
+    Render 3D and says so.
 - **Faster (P1, measured A/B against the S7 build, whole frame, 1080p):** the owner's reference
   patch 14.64 -> 10.11 ms (-31%), the HQ's 1M-point scene 9.65 -> 5.68 ms (-41%), Render 3D's
   1M-point scene 15.76 -> 11.92 ms (-24%).
@@ -21,10 +38,6 @@ Plan: `docs/plans/HQ-071-STRATEGY.md`; technical notes: `docs/RENDER-3D-HQ-FILAM
     back to the CPU every frame (305k points with every attribute under `inherit`); it now draws
     the next births ahead, in the same order, and copies back only those rows: the same particles
     bit for bit, 3.57 -> 0.20 ms of GPU.
-- **Render 3D HQ, S8**: its own finish with Filament's bloom (threshold, 6 levels, before the
-  tonemap) and Filament's ACES tonemaps next to Render 3D's, render scale with FSR 1, RCAS
-  sharpening after the TAA, mip bias under TAA, full-resolution GTAO, and quality presets
-  (Performance / Balanced / High) that set the real params. Scene D's bloom costs 11% less.
 - **Fix, visible in saved patches: Sphere, Cylinder, Cone, Torus Knot, Helix, Pyramid and the tubes
   of Curve / Curve Ops / L-System were wound inside out.** Back-face culling then drew the inside of
   their far half: the right outline, but lighting and reflections inverted in depth (a light from

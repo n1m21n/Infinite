@@ -12,8 +12,9 @@
 //
 // Draws triangle meshes (Geometry, Group 3D, mesh operators), PointZ triangles
 // straight from their GPU buffers, and PointZ points as sphere impostors (S3:
-// hq_sphere.*, one instanced strip per source, no CPU copy). PointZ line strips
-// and Instance PointZ are counted in LastSkipped() (instancing: S7).
+// hq_sphere.*, one instanced strip per source, no CPU copy) and Instance PointZ
+// as instanced meshes (S7). PointZ line strips are not drawn: they are counted
+// in LastSkipped().
 
 #include "HqRenderer.h"
 
@@ -1644,10 +1645,13 @@ namespace
             glUniform1i(mPre.instanced, mSlots[i].instanced ? 1 : 0);
             glUniform1i(mPre.instColored, mSlots[i].instColored ? 1 : 0);
             // S7: a deferred slot also writes its colour and id (attachment 3).
+            // S9: a forward mesh writes id 0 there, so where it covers a
+            // deferred slot drawn before it (a floor over instances) the
+            // deferred pass does not shade it again with that slot's material.
             const GLenum meshTargets[4] = { GL_NONE, GL_COLOR_ATTACHMENT1, taaOn ? GL_COLOR_ATTACHMENT2 : GL_NONE,
-                                            deferredMesh[i] ? GL_COLOR_ATTACHMENT3 : GL_NONE };
+                                            GL_COLOR_ATTACHMENT3 };
             glDrawBuffers(4, meshTargets);
-            glUniform1f(mPre.slotId, (float)(i + 1));
+            glUniform1f(mPre.slotId, deferredMesh[i] ? (float)(i + 1) : 0.0f);
             glBindVertexArray(mSlots[i].vao);
             if (mSlots[i].instanced) // S7: Instance PointZ
                glDrawElementsInstanced(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr,

@@ -6607,6 +6607,43 @@
                printf("  Instance PointZ (10k boxes): %zu triangles, %zu skipped, lit %.1f%%, finite %d, gl 0x%x  %s\n",
                       pi.HqTriangles(), pi.HqSkipped(), coverI * 100.0, finiteI ? 1 : 0, err, ok ? "ok" : "FAIL");
                all = all && ok;
+
+               // S9: the same instances, red, inside a white box drawn after
+               // them (a forward mesh): the picture is the box's alone - the
+               // deferred pass must not paint the instances' material where
+               // the box covers them (scene I's floor turned copper).
+               std::unique_ptr<MaterialNode> red(new MaterialNode());
+               red->color[0] = 1.0f;
+               red->color[1] = red->color[2] = 0.0f;
+               red->input = inst.get();
+               std::unique_ptr<PopNode> shell(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+               for (int k = 0; k < 3; k++)
+                  setF(shell.get(), "size", k, 2.5f);
+               RenderHqNode covered, alone;
+               for (RenderHqNode* n : { &covered, &alone })
+               {
+                  n->width = 320.0f;
+                  n->height = 180.0f;
+                  n->taa = false;
+                  n->reuseStill = false;
+               }
+               covered.geometry[0] = red.get();
+               covered.geometry[1] = shell.get();
+               alone.geometry[1] = shell.get();
+               ++frame;
+               red->CookIfNeeded(frame);
+               covered.CookIfNeeded(frame);
+               alone.CookIfNeeded(frame);
+               const std::vector<float> pc = read(covered.GetOutputTexture(), covered.GetOutputWidth(), covered.GetOutputHeight());
+               const std::vector<float> pa = read(alone.GetOutputTexture(), alone.GetOutputWidth(), alone.GetOutputHeight());
+               double hidden = pc.empty() || pc.size() != pa.size() ? 1.0 : 0.0;
+               for (size_t i = 0; i < pc.size() && i < pa.size(); i++)
+                  hidden = std::max(hidden, (double)std::fabs(pc[i] - pa[i]));
+               err = glGetError();
+               ok = covered.HqSkipped() == 0 && hidden < 0.02 && err == GL_NO_ERROR;
+               printf("  instances hidden by a mesh drawn after them: max diff %.4f against the mesh alone, gl 0x%x  %s\n",
+                      hidden, err, ok ? "ok" : "FAIL");
+               all = all && ok;
             }
             if (const char* png = getenv("INFINITE_HQTEST_PNG3")) // eyeball the spheres (bottom-up rows)
             {

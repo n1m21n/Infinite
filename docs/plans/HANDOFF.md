@@ -61,7 +61,18 @@ O plano da 0.71 (Render 3D HQ com referência no Filament + varredura de lentid�
 `HQ-071-STRATEGY.md`, em sessões S0-S9 e P1 com estado na seção 6. A lista abaixo é a de antes
 desse plano e entra nele como P1 (desempenho) e S4-S7 (render).
 
-### Próxima sessão: S9 (validação final e release)
+### Próximo passo: aval do dono para o release da 0.71
+
+Estado (2026-10-23): S0 a S9 e P1 feitas e commitadas na `feature/render3d-hq` (sem push). S9: capturas
+BEFORE/AFTER das 9 cenas olhadas, um defeito achado e corrigido (cena I, chão cor de cobre entre as
+instâncias; check novo no `HQTEST`), benchmarks no §13 do `RENDER-3D-HQ-FILAMENT.md` (HQ <= Render 3D
+em 8 de 9 cenas), problemas conhecidos no §15, CHANGELOG 0.71 reescrito. Falta, só com o aval dele:
+merge em `turbo/next` → `turbo/windows-only`, versão 0.71.0 (CMakeLists, README, PACKAGE_MANIFEST),
+tag `v0.71.0`. Decisões dele (§15): tonemap padrão do HQ, tolerância do Noise curl, custo do Preview
+3D, e se corrige a costura do HDRI no fundo do Render 3D (uma linha; muda os 3 patches do compat com
+HDRI).
+
+### Sessão anterior: S9 (validação final e release)
 
 Estado (2026-10-23): S8 e P1 feitas e commitadas (sem push). S8: pós próprio `HqPost` (bloom e ACES do
 Filament, render scale com FSR, RCAS pós-TAA, viés de mip, GTAO cheio, presets; §12 do doc). P1: Noise
