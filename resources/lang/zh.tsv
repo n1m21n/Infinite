@@ -1569,3 +1569,25 @@ Settings of the selected clip. Double-click a clip to open it.	所选片段的�
 Add to Session	添加到会话
 Send Scene to Timeline	将场景发送到时间轴
 Copies this scene's clips onto the Timeline at the playhead. Render from the Timeline.	将此场景的片段复制到时间轴播放头处。请在时间轴中渲染。
+Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first	切换停靠的会话面板（片段启动器）。下面每个按键都需要会话面板获得焦点——请先在其中点击
+Move Cell	移动单元格
+Move the cell cursor between tracks and scenes; a clip under it is selected	在轨道和场景之间移动单元格光标；光标下的片段会被选中
+Launch the clip under the cursor; on an empty cell, add an unassigned clip there	启动光标下的片段；在空单元格上则添加一个未指定的片段
+Launch every clip of the cursor's scene	启动光标所在场景的所有片段
+Copy / Cut / Paste Clip	复制 / 剪切 / 粘贴片段
+Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind	复制或剪切一个槽位（连同启动设置），并粘贴到同类型的轨道上
+Duplicate Clip	复制片段
+Copy the clip into the next free cell below it	将片段复制到其下方下一个空闲单元格
+Clear Clip	清除片段
+Empty the cell under the cursor	清空光标下的单元格
+Rename Clip	重命名片段
+Rename the clip under the cursor	重命名光标下的片段
+Enable / Disable Clip	启用 / 禁用片段
+Mute the clip (it draws hatched) or bring it back	静音片段（显示为斜线）或恢复
+Add Scene	添加场景
+Add a scene row at the bottom	在底部添加一行场景
+Stop All	全部停止
+Stop every playing clip; each track goes back to the Timeline	停止所有正在播放的片段；每条轨道回到时间轴
+Abandon a click-to-assign on a clip, otherwise clear the selection	取消片段的点击指定，否则清除选择
+Monitor: Visible. Shows the video the launched clips produce.	监视器：可见。显示已启动片段产生的视频。
+Clip Inspector: Open	片段检查器：已打开

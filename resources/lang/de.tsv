@@ -1569,3 +1569,25 @@ Settings of the selected clip. Double-click a clip to open it.	Einstellungen des
 Add to Session	Zur Session hinzufügen
 Send Scene to Timeline	Szene an Timeline senden
 Copies this scene's clips onto the Timeline at the playhead. Render from the Timeline.	Kopiert die Clips dieser Szene an der Abspielposition auf die Timeline. Rendern erfolgt in der Timeline.
+Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first	Das angedockte Session-Panel (Clip-Launcher) ein-/ausblenden. Jede Taste unten braucht den Fokus im Session-Panel - zuerst hineinklicken
+Move Cell	Zelle bewegen
+Move the cell cursor between tracks and scenes; a clip under it is selected	Zellenmarker zwischen Spuren und Szenen bewegen; ein Clip darunter wird ausgewählt
+Launch the clip under the cursor; on an empty cell, add an unassigned clip there	Den Clip unter dem Cursor starten; in einer leeren Zelle einen nicht zugewiesenen Clip anlegen
+Launch every clip of the cursor's scene	Alle Clips der Szene unter dem Cursor starten
+Copy / Cut / Paste Clip	Clip kopieren / ausschneiden / einfügen
+Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind	Einen Slot kopieren oder ausschneiden (samt Startoptionen) und auf einer Spur gleicher Art einfügen
+Duplicate Clip	Clip duplizieren
+Copy the clip into the next free cell below it	Den Clip in die nächste freie Zelle darunter kopieren
+Clear Clip	Clip leeren
+Empty the cell under the cursor	Die Zelle unter dem Cursor leeren
+Rename Clip	Clip umbenennen
+Rename the clip under the cursor	Den Clip unter dem Cursor umbenennen
+Enable / Disable Clip	Clip aktivieren / deaktivieren
+Mute the clip (it draws hatched) or bring it back	Den Clip stummschalten (er wird schraffiert) oder zurückholen
+Add Scene	Szene hinzufügen
+Add a scene row at the bottom	Unten eine Szenenzeile hinzufügen
+Stop All	Alle stoppen
+Stop every playing clip; each track goes back to the Timeline	Alle laufenden Clips stoppen; jede Spur kehrt zur Timeline zurück
+Abandon a click-to-assign on a clip, otherwise clear the selection	Eine Klick-Zuweisung eines Clips abbrechen, sonst die Auswahl aufheben
+Monitor: Visible. Shows the video the launched clips produce.	Monitor: Sichtbar. Zeigt das Video der gestarteten Clips.
+Clip Inspector: Open	Clip-Inspektor: Geöffnet

@@ -1569,3 +1569,25 @@ Settings of the selected clip. Double-click a clip to open it.	Настройк�
 Add to Session	Добавить в сессию
 Send Scene to Timeline	Отправить сцену на таймлайн
 Copies this scene's clips onto the Timeline at the playhead. Render from the Timeline.	Копирует клипы сцены на таймлайн в позицию курсора. Рендер выполняется на таймлайне.
+Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first	Показать или скрыть закреплённую панель Session (запуск клипов). Все клавиши ниже работают, только когда панель в фокусе - сначала щёлкните внутри
+Move Cell	Переместить ячейку
+Move the cell cursor between tracks and scenes; a clip under it is selected	Перемещает курсор ячейки между дорожками и сценами; клип под ним выбирается
+Launch the clip under the cursor; on an empty cell, add an unassigned clip there	Запускает клип под курсором; в пустой ячейке добавляет неназначенный клип
+Launch every clip of the cursor's scene	Запускает все клипы сцены под курсором
+Copy / Cut / Paste Clip	Копировать / вырезать / вставить клип
+Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind	Копирует или вырезает слот (вместе с настройками запуска) и вставляет его на дорожку того же типа
+Duplicate Clip	Дублировать клип
+Copy the clip into the next free cell below it	Копирует клип в следующую свободную ячейку ниже
+Clear Clip	Очистить клип
+Empty the cell under the cursor	Очищает ячейку под курсором
+Rename Clip	Переименовать клип
+Rename the clip under the cursor	Переименовывает клип под курсором
+Enable / Disable Clip	Включить / выключить клип
+Mute the clip (it draws hatched) or bring it back	Отключает клип (рисуется штриховкой) или возвращает его
+Add Scene	Добавить сцену
+Add a scene row at the bottom	Добавляет строку сцены внизу
+Stop All	Остановить все
+Stop every playing clip; each track goes back to the Timeline	Останавливает все играющие клипы; каждая дорожка возвращается к таймлайну
+Abandon a click-to-assign on a clip, otherwise clear the selection	Отменяет назначение клипа щелчком, иначе снимает выделение
+Monitor: Visible. Shows the video the launched clips produce.	Монитор: виден. Показывает видео запущенных клипов.
+Clip Inspector: Open	Инспектор клипа: открыт

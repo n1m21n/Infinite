@@ -8,6 +8,7 @@
 #include "app/ui/design/components/PillGroup.h"
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/ActionButton.h"
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/GlyphDraw.h"
@@ -1230,7 +1231,7 @@ namespace app
                gArrange.revision++;
             });
          }
-         else if (cmd && pressed(ImGuiKey_Period))
+         else if (!cmd && !io.KeyShift && !io.KeyAlt && pressed(ImGuiKey_Period))   // Cmd+. is the global Panic
             ArrangeSessionStopAll();
          else if (!cmd && pressed(ImGuiKey_Escape))
          {
@@ -1259,15 +1260,38 @@ namespace app
          ImGui::AlignTextToFramePadding();
          ImGui::TextUnformatted(T("Session"));
          ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_4, ImGui::GetItemRectMin().y));
-         if (ChipButton::Draw(sSessionShowMonitor ? "Monitor##sessmon" : "Monitor Off##sessmon", sSessionShowMonitor, tok::tile))
+         // Icon buttons, drawn like the Timeline toolbar's: the same monitor and edit glyphs, a lit chip while on.
+         const ImU32 iconCol = ImGui::GetColorU32(ImGuiCol_Text);
+         ActionButton::Scoped() = sSessionShowMonitor ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
+         if (ActionButton::Draw("##sessionmonitortoggle", ImVec2(30, tok::tile)))
             sSessionShowMonitor = !sSessionShowMonitor;
+         ActionButton::Scoped() = ActionButton::Kind::Plain;
          if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Show the video the launched clips produce."));
+            HelpTip("%s", sSessionShowMonitor ? T("Monitor: Visible. Shows the video the launched clips produce.") : T("Show the video the launched clips produce."));
+         {
+            const ImVec2 c((ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f, (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f);
+            ImDrawList* tdl = ImGui::GetWindowDrawList();
+            const ImU32 icol = sSessionShowMonitor ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol;
+            const ImVec2 tl(c.x - 6.5f, c.y - 5.5f), br(c.x + 6.5f, c.y + 3.5f);
+            if (sSessionShowMonitor)
+               tdl->AddRectFilled(tl, br, icol, 1.5f);
+            else
+               tdl->AddRect(tl, br, icol, 1.5f, 0, 1.4f);
+            tdl->AddLine(ImVec2(c.x, br.y), ImVec2(c.x, br.y + 2.5f), icol, 1.4f);
+            tdl->AddLine(ImVec2(c.x - 3.5f, br.y + 2.5f), ImVec2(c.x + 3.5f, br.y + 2.5f), icol, 1.4f);
+         }
          ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_1, ImGui::GetItemRectMin().y));
-         if (ChipButton::Draw(gArrangeClipSettingsPanelOpen ? "Inspector##sessinsp" : "Inspector Off##sessinsp", gArrangeClipSettingsPanelOpen, tok::tile))
+         const bool inspWasOpen = gArrangeClipSettingsPanelOpen;
+         ActionButton::Scoped() = inspWasOpen ? ActionButton::Kind::Selected : ActionButton::Kind::Plain;
+         if (ActionButton::Draw("##sessioninspectortoggle", ImVec2(30, tok::tile)))
             gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
+         ActionButton::Scoped() = ActionButton::Kind::Plain;
          if (ImGui::IsItemHovered())
-            HelpTip("%s", T("Settings of the selected clip. Double-click a clip to open it."));
+            HelpTip("%s", inspWasOpen ? T("Clip Inspector: Open") : T("Settings of the selected clip. Double-click a clip to open it."));
+         {
+            const ImVec2 c((ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f, (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f);
+            glyph::DrawEdit(ImGui::GetWindowDrawList(), c, tok::icon_md, inspWasOpen ? tok::U32(tok::pal::c_FFFFFFFF) : iconCol);
+         }
          const float toolbarBottom = ImGui::GetItemRectMax().y;
          {
             const ImVec2 m = ImGui::GetIO().MousePos;

@@ -1569,3 +1569,25 @@ Settings of the selected clip. Double-click a clip to open it.	選択したク�
 Add to Session	セッションに追加
 Send Scene to Timeline	シーンをタイムラインへ送る
 Copies this scene's clips onto the Timeline at the playhead. Render from the Timeline.	このシーンのクリップを再生ヘッド位置のタイムラインにコピーします。レンダリングはタイムラインで行います。
+Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first	ドッキングしたセッションパネル（クリップランチャー）を切り替えます。以下のキーはセッションパネルにフォーカスがある時のみ有効です。先にパネル内をクリックしてください
+Move Cell	セルを移動
+Move the cell cursor between tracks and scenes; a clip under it is selected	トラックとシーンの間でセルカーソルを移動します。その下のクリップが選択されます
+Launch the clip under the cursor; on an empty cell, add an unassigned clip there	カーソル下のクリップを起動します。空のセルでは未割り当てのクリップを追加します
+Launch every clip of the cursor's scene	カーソルのシーンのすべてのクリップを起動します
+Copy / Cut / Paste Clip	クリップをコピー / カット / ペースト
+Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind	スロットをコピーまたはカットし（起動設定も一緒）、同じ種類のトラックにペーストします
+Duplicate Clip	クリップを複製
+Copy the clip into the next free cell below it	クリップを下の次の空きセルにコピーします
+Clear Clip	クリップをクリア
+Empty the cell under the cursor	カーソル下のセルを空にします
+Rename Clip	クリップの名前を変更
+Rename the clip under the cursor	カーソル下のクリップの名前を変更します
+Enable / Disable Clip	クリップを有効 / 無効
+Mute the clip (it draws hatched) or bring it back	クリップをミュート（斜線表示）または元に戻します
+Add Scene	シーンを追加
+Add a scene row at the bottom	下にシーン行を追加します
+Stop All	すべて停止
+Stop every playing clip; each track goes back to the Timeline	再生中のクリップをすべて停止し、各トラックはタイムラインに戻ります
+Abandon a click-to-assign on a clip, otherwise clear the selection	クリップのクリック割り当てをキャンセル、それ以外は選択を解除します
+Monitor: Visible. Shows the video the launched clips produce.	モニター：表示中。起動したクリップの映像を表示します。
+Clip Inspector: Open	クリップインスペクター：表示中

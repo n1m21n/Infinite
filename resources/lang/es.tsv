@@ -1569,3 +1569,25 @@ Settings of the selected clip. Double-click a clip to open it.	Ajustes del clip 
 Add to Session	Añadir a Sesión
 Send Scene to Timeline	Enviar escena a la línea de tiempo
 Copies this scene's clips onto the Timeline at the playhead. Render from the Timeline.	Copia los clips de esta escena en la línea de tiempo en el cursor. Renderiza desde la línea de tiempo.
+Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first	Mostrar u ocultar el panel Sesión acoplado (lanzador de clips). Cada tecla de abajo necesita el panel Sesión enfocado: haz clic dentro primero
+Move Cell	Mover celda
+Move the cell cursor between tracks and scenes; a clip under it is selected	Mueve el cursor de celda entre pistas y escenas; se selecciona el clip que haya debajo
+Launch the clip under the cursor; on an empty cell, add an unassigned clip there	Lanza el clip bajo el cursor; en una celda vacía, añade allí un clip sin asignar
+Launch every clip of the cursor's scene	Lanza todos los clips de la escena del cursor
+Copy / Cut / Paste Clip	Copiar / cortar / pegar clip
+Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind	Copia o corta un slot (con sus ajustes de lanzamiento) y pégalo en una pista del mismo tipo
+Duplicate Clip	Duplicar clip
+Copy the clip into the next free cell below it	Copia el clip en la siguiente celda libre debajo
+Clear Clip	Vaciar clip
+Empty the cell under the cursor	Vacía la celda bajo el cursor
+Rename Clip	Renombrar clip
+Rename the clip under the cursor	Renombra el clip bajo el cursor
+Enable / Disable Clip	Activar / desactivar clip
+Mute the clip (it draws hatched) or bring it back	Silencia el clip (se dibuja rayado) o lo recupera
+Add Scene	Añadir escena
+Add a scene row at the bottom	Añade una fila de escena al final
+Stop All	Detener todo
+Stop every playing clip; each track goes back to the Timeline	Detiene todos los clips en reproducción; cada pista vuelve a la línea de tiempo
+Abandon a click-to-assign on a clip, otherwise clear the selection	Cancela la asignación por clic de un clip; si no, borra la selección
+Monitor: Visible. Shows the video the launched clips produce.	Monitor: visible. Muestra el vídeo de los clips lanzados.
+Clip Inspector: Open	Inspector de clip: abierto
