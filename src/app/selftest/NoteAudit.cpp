@@ -707,6 +707,12 @@ namespace
          check("Chorder", "scale", c->scale, 0, MusicTime::kNumScaleTypes - 1);
          check("Chorder", "chordSize", c->chordSize, 2, 6);
 
+         std::unique_ptr<INode> ne(NoteEchoNode::Create());
+         load(ne.get(), { "repeats", "transposePerRepeat" });
+         auto* e = static_cast<NoteEchoNode*>(ne.get());
+         check("Note Echo", "repeats", e->repeats, 1, NoteEchoNode::kMaxRepeats);
+         check("Note Echo", "transposePerRepeat", e->transposePerRepeat, -NoteEchoNode::kMaxTransposePerRepeat,
+               NoteEchoNode::kMaxTransposePerRepeat);
       }
       // In-range values load unchanged; a root past B keeps its pitch class.
       std::unique_ptr<INode> ch(ChorderNode::Create());
