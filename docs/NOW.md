@@ -25,7 +25,7 @@ Claims from the Air start with `air-`. Full rules, sync and dispatch: `docs/plan
 
 | Session | Branch / worktree | Quest | Uses | Since |
 |---|---|---|---|---|
-| Agent (credit-metadata) | `feature/agent-credit-metadata` / `worktrees/credit-metadata` | agent credit: Provenance.h, export metadata, MCP attribution | exporters, MCP servers, docs | 2026-10-22 |
+| (none) | | | | |
 
 ## Waiting on owner (one at a time, recommended answer first)
 
