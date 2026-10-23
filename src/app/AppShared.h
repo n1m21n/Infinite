@@ -4954,6 +4954,7 @@ bool ArrangeAudioRebuildIfStale();
    void ArrangeSessionTick();
    void ArrangeSessionLaunch(uint64_t laneId, int slot);
    void ArrangeSessionRelease(uint64_t laneId, int slot);
+   void ArrangeSessionLaunchGroupRow(uint64_t groupId, int row);
    void ArrangeSessionStopLane(uint64_t laneId);
    void ArrangeSessionStopAll();
    void ArrangeSessionLaunchScene(int scene);

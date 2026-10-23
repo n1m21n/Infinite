@@ -251,6 +251,8 @@ namespace app
          }
          else
          {
+            if (lane->groupId != 0 && MenuParts::Item(L("Launch Row in Group")))
+               ArrangeSessionLaunchGroupRow(lane->groupId, row);
             if (MenuParts::Item(L("Add Clip")))
             {
                uint64_t made = 0;
@@ -751,6 +753,9 @@ namespace app
       const Arrange::SessionSlot ss = gArrange.lanes[(size_t)loc.lane].slots[(size_t)row];
       if (MenuParts::Item(L("Launch")))
          ArrangeSessionLaunch(laneId, row);
+      const uint64_t grp = gArrange.lanes[(size_t)loc.lane].groupId;
+      if (grp != 0 && MenuParts::Item(L("Launch Row in Group")))
+         ArrangeSessionLaunchGroupRow(grp, row);
       if (MenuParts::SubMenu(L("Follow Action")))
       {
          for (int a = 0; a < Arrange::kFollowCount; a++)
@@ -845,6 +850,23 @@ namespace app
             Arrange::PlaceOverwrite(gArrange, laneId, c, nullptr);
          });
       }
+      if (MenuParts::Item(L("Duplicate Slot")))
+         ArrangeEdit([&]() {
+            Arrange::Lane* l = Arrange::FindLane(gArrange, laneId);
+            if (l == nullptr)
+               return;
+            int dst = row + 1;
+            while (dst < (int)l->slots.size() && l->slots[(size_t)dst].Has())
+               dst++;
+            if ((int)l->slots.size() <= dst)
+               l->slots.resize((size_t)dst + 1);
+            while ((int)gArrange.scenes.size() <= dst)
+               gArrange.scenes.push_back(Arrange::Scene{});
+            Arrange::SessionSlot copy = l->slots[(size_t)row];
+            copy.clip.id = gArrange.NewId();
+            l->slots[(size_t)dst] = copy;
+            gArrange.revision++;
+         });
       if (MenuParts::Item(L("Clear Slot")))
       {
          ArrangeEdit([&]() {

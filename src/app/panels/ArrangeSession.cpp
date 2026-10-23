@@ -524,6 +524,29 @@ namespace app
    }
 
 
+   // One row, only on the tracks of one track group (Ableton's group slot).
+   void ArrangeSessionLaunchGroupRow(uint64_t groupId, int row)
+   {
+      if (groupId == 0 || row < 0)
+         return;
+      bool any = false;
+      for (const Arrange::Lane& lane : gArrange.lanes)
+         any = any || (lane.groupId == groupId && SlotAt(lane, row) != nullptr);
+      if (!any)
+         return;
+      const Tick at = LaunchTick(true);
+      for (const Arrange::Lane& lane : gArrange.lanes)
+      {
+         if (lane.groupId != groupId)
+            continue;
+         if (SlotAt(lane, row) != nullptr)
+            Schedule(lane.id, at, row);
+         else if (sSchedule.find(lane.id) != sSchedule.end())
+            Schedule(lane.id, at, -1);
+      }
+   }
+
+
    void ArrangeSessionLaunchScene(int scene)
    {
       if (scene < 0 || scene >= (int)gArrange.scenes.size())
