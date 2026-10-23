@@ -6333,6 +6333,14 @@ void BuildBenchB4Scene(const std::string& scaleStr, const std::string& shadowStr
 
 void BuildBenchB6Scene(int n, bool collapsed, float& outMaxX, float& outMaxY, int& outDragNodeIdx);
 
+// B11 points (P8 phase 0): scene "a" video > Image to Points > Transform,
+// "b" Particle System, "c" Particle System > Instance on Points (cubes).
+// n is the point count asked for (the Image to Points grid is square, so "a"
+// rounds to the nearest density). outPointsIdx is the node whose cloud size
+// the report quotes.
+bool BuildBenchB11Scene(const std::string& scene, int n, const std::string& clipPath,
+                        int& outRender3DIdx, int& outOutputIdx, int& outPointsIdx, std::string& outError);
+
 bool BuildBenchB8Scene(const std::vector<std::string>& clipPaths, bool withSyphon, bool withCamera, int windows,
                               std::vector<int>& outClipIdx, std::vector<int>& outOutputIdx,
                               int& outSyphonIdx, int& outCameraIdx, std::string& outError);

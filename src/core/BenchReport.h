@@ -455,6 +455,8 @@ namespace Bench
       // Media I/O (B8): per-clip decode/upload, per-window present, Syphon/
       // Spout publish, camera. Built by the fixture; null = not measured.
       nlohmann::json mediaIo = nullptr;
+      // Points (B11): asked/count/filled/fill_s. Null = not measured.
+      nlohmann::json points = nullptr;
 
       // Slow-frame attribution (B3, B8): Bench::FrameTail::Report(). null = not measured.
       nlohmann::json slowFrames = nullptr;

@@ -3,6 +3,7 @@
 
 Usage:
   python3 tools/bench.py b9 [--scene b2|b4|all] [--frames N] [--app PATH]
+  python3 tools/bench.py b11 [--scene a|b|c|all] [--n N] [--app PATH] [--json-out FILE]
   python3 tools/bench.py b2 [--scale s|m|l] [--anim 0|1] [--app PATH]
   python3 tools/bench.py b4 [--scale s|m|l] [--shadow off|1024|2048|4096] [--anim 0|1] [--app PATH]
   python3 tools/bench.py b1 [--buffer 64|128|256|512] [--seconds S] [--app PATH]
@@ -61,6 +62,8 @@ def bench_label(r, variant):
         v = variant.replace(",gputimers=0", "")
     elif b == "B9":
         v = kv.get("scene", "?")
+    elif b == "B11":
+        v = "%s-%s" % (kv.get("scene", "?"), kv.get("n", "?"))
     elif b == "B10":
         v = "%ss-anim%s" % (kv.get("seconds", "?"), kv.get("anim", "1"))
     elif b == "B5":
@@ -330,6 +333,55 @@ def cmd_b9(args):
     return 0
 
 
+# B11 points (P8 phase 0, docs/plans/perf/benchmark-suite.md): the plan's sizes per scene.
+# Scene a's Image to Points grid is square and capped at 512 (262,144 points), so its
+# 920k row is clamped by the node and reported as such.
+B11_MATRIX = {
+    "a": [57600, 230400, 921600],
+    "b": [10000, 100000, 200000],
+    "c": [10000, 100000],
+}
+
+
+def cmd_b11(args):
+    app = args.app or default_app_path()
+    if not os.path.exists(app):
+        print(f"Error: binary '{app}' does not exist. Build first via: scripts/ibuild.py build", file=sys.stderr)
+        return 1
+    scenes = ["a", "b", "c"] if args.scene == "all" else [args.scene]
+    rows = []
+    for s in scenes:
+        for n in ([args.n] if args.n else B11_MATRIX[s]):
+            print(f"Running B11 points scene={s} n={n} ...", file=sys.stderr)
+            env = {"INFINITE_BENCH_B11": s, "INFINITE_BENCH_B11N": str(n)}
+            if s == "a":
+                env["INFINITE_BENCH_B8MEDIA"] = str(Path(__file__).resolve().parent.parent / "bench" / "media")
+            try:
+                results, out, err, code = run_process_for_json(app, env, exitafter=100000)
+            except Exception as e:  # noqa: BLE001  a crash in one row must not lose the others
+                print(f"  failed: {e}", file=sys.stderr)
+                continue
+            if not results:
+                print(f"  no BENCH_JSON (exit {code}):\n{err[-2000:]}", file=sys.stderr)
+                continue
+            rows += results
+    print(f"{'scene':<6}{'asked':>9}{'points':>9}{'filled':>8}{'p50 ms':>9}{'p99 ms':>9}{'fps p50':>9}{'cook ms':>9}{'tris':>11}")
+    for r in rows:
+        kv = _kv(r.get("variant"))
+        pts = r.get("points") or {}
+        fm = r.get("frame_ms") or {}
+        p50 = fm.get("p50", 0) or 0
+        print(f"{kv.get('scene', '?'):<6}{pts.get('asked', 0):>9}{pts.get('count', 0):>9}{str(pts.get('filled')):>8}"
+              f"{p50:>9.2f}{fm.get('p99', 0):>9.2f}{1000.0 / max(p50, 0.001):>9.1f}"
+              f"{(r.get('stages_cpu_ms') or {}).get('cook', 0):>9.2f}{r.get('tris', 0):>11,}")
+    if args.json_out and rows:
+        with open(args.json_out, "w") as f:
+            for r in rows:
+                f.write(json.dumps(r) + "\n")
+        print(f"Saved results to {args.json_out}", file=sys.stderr)
+    return 0 if rows else 1
+
+
 def main():
     parser = argparse.ArgumentParser(description="Infinite Performance Benchmark Suite CLI")
     subparsers = parser.add_subparsers(dest="command")
@@ -341,6 +393,14 @@ def main():
     p_b9.add_argument("--app", type=str, default=None, help="Path to Infinite executable")
     p_b9.add_argument("--json-out", type=str, default=None, help="File to write jsonl results")
     p_b9.set_defaults(func=cmd_b9)
+
+    # B11
+    p_b11 = subparsers.add_parser("b11", help="Run B11 (points: P8 phase 0)")
+    p_b11.add_argument("--scene", choices=["a", "b", "c", "all"], default="all")
+    p_b11.add_argument("--n", type=int, default=0, help="One point count instead of the plan's sizes")
+    p_b11.add_argument("--app", type=str, default=None, help="Path to Infinite executable")
+    p_b11.add_argument("--json-out", type=str, default=None, help="File to write jsonl results")
+    p_b11.set_defaults(func=cmd_b11)
 
     # Compare
     p_cmp = subparsers.add_parser("compare", help="Compare two benchmark result files")

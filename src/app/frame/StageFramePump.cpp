@@ -17,6 +17,7 @@ void DrawFramePump(FrameCtx& fc)
    auto& isBenchB6 = fc.isBenchB6;
    auto& isBenchB9 = fc.isBenchB9;
    auto& isBenchB8 = fc.isBenchB8;
+   auto& isBenchB11 = fc.isBenchB11;
    auto& benchB6Stages = fc.benchB6Stages;
    auto& benchStagesSample = fc.benchStagesSample;
    auto& benchStagesCpuSample = fc.benchStagesCpuSample;
@@ -46,16 +47,19 @@ void DrawFramePump(FrameCtx& fc)
       isBenchB6 = (getenv("INFINITE_BENCH_B6") != nullptr || getenv("INFINITE_BENCH_B6NODES") != nullptr || getenv("INFINITE_BENCH_B6MODE") != nullptr || getenv("INFINITE_BENCH_B6COLLAPSED") != nullptr);
       isBenchB9 = (getenv("INFINITE_BENCH_B9SCENE") != nullptr || getenv("INFINITE_BENCH_B9") != nullptr || getenv("INFINITE_BENCH_B9MEMORY") != nullptr);
       isBenchB8 = getenv("INFINITE_BENCH_B8") != nullptr;
+      isBenchB11 = getenv("INFINITE_BENCH_B11") != nullptr;
       // B8 samples the same span as B6 and uses B6's stage split (links and
       // cook_all get their own stages).
       benchB6Stages = isBenchB6 || isBenchB8;
       sBenchB8Sampling = isBenchB8 && frameId >= 32 && frameId < sBenchB8TotalFrames;
+      const bool sBenchB11Sampling = isBenchB11 && sBenchB11SampleStart >= 0 &&
+         frameId >= sBenchB11SampleStart && frameId < sBenchB11SampleStart + 120;
       benchStagesSample = ((isBenchB5c || isBenchB2 || isBenchB4) && (frameId >= 32 && frameId < 152)) ||
                                      (isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames)) ||
-                                     sBenchB8Sampling;
+                                     sBenchB8Sampling || sBenchB11Sampling;
       benchStagesCpuSample = ((isBenchB5c || isBenchB2 || isBenchB4 || isBenchB9 || isBenchB3) && (frameId >= 32 && frameId < 152)) ||
                                         (isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames)) ||
-                                        sBenchB8Sampling;
+                                        sBenchB8Sampling || sBenchB11Sampling;
       // B2 per-node GPU split: time each Render 3D / filter draw by node type
       // instead of the enclosing "cook" stage (GL timer queries cannot nest).
       // B8 always splits: the clip and camera uploads run inside Output's
@@ -65,7 +69,7 @@ void DrawFramePump(FrameCtx& fc)
                                    (isBenchB4 && getenv("INFINITE_BENCH_B4PASSES") != nullptr) ||
                                    isBenchB8;
 
-      if (isBenchB5c || isBenchB2 || isBenchB4 || isBenchB6 || isBenchB8)
+      if (isBenchB5c || isBenchB2 || isBenchB4 || isBenchB6 || isBenchB8 || isBenchB11)
          sGpuTimerRing.Poll(frameId);
 
       gFrameStart = glfwGetTime();

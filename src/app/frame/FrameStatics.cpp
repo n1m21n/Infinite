@@ -8,6 +8,8 @@ namespace app
    std::string sBenchB2Variant;
    int sBenchB4CamIdx = -1;
    int sBenchB4LfoIdx = -1;
+   int sBenchB11PointsIdx = -1;
+   int sBenchB11SampleStart = -1;
    std::string sBenchB9Scene;
    std::string sBenchB9Variant;
    double sBenchB9RssBuiltMb = -1.0;

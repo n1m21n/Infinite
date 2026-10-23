@@ -127,6 +127,7 @@ Report both.
 | **B8** | Media I/O *(built, see README)* | 2-4 video clips 1080p/4K playing, camera in, 2-3 projector windows, Syphon/Spout out | Decode ms, upload ms, per-window present ms |
 | **B9** | Memory footprint | B2/B4 at l scale | RSS progression, linear regression slope (MB/100f), peak RSS, estimated GPU memory breakdown (textures, render targets, shadow maps, mesh buffers, instance buffers) |
 | **B10** | Offline render and A/V sync *(missing)* | Arrangement render of B3 for 30 s | Realtime factor, A/V drift (reuse `av-sync-sweep`'s checks) |
+| **B11** | Points (P8 phase 0) | `INFINITE_BENCH_B11=a\|b\|c`, `INFINITE_BENCH_B11N=<points>`. (a) looping 1080p clip > Image to Points (square grid, max 512² = 262k) > Transform (spin) > Render 3D; (b) Particle System at its cap; (c) Particle System > Instance on Points (cubes). The 120-frame window opens once the cloud holds 95% of the asked count (or after 30 s, reported `filled:false`). Run: `tools/bench.py b11` | frame p50/p99, cook ms, `points.count` |
 
 ## 5. Deliverables
 
