@@ -584,6 +584,60 @@ bool RunEffectMixAndLimiterFixture()
       all &= ok;
    }
 
+   // A gain past the knob's range is clamped on load (B-K-032). 1e9 dB passes
+   // Patch's int-range drop; 10^(1e9/20) is inf, and silence times inf is
+   // NaN out of Gain. Mixer and Audio In share the -60..12 dB range; Velocity
+   // Curve's curve of -1 sent 1/velocity downstream.
+   {
+      int bad = 0;
+      auto expect = [&](const char* what, float got, float lo, float hi) {
+         if (!(got >= lo && got <= hi))
+         {
+            printf("DSPTEST   %s = %g, outside %g..%g\n", what, got, lo, hi);
+            bad++;
+         }
+      };
+      long long nonFinite = 0;
+      for (const char* big : { "1e9", "-1e9" })
+      {
+         GainNode gain;
+         Patch::LoadParams(&gain, { { "f gainDb", big } });
+         expect("Gain gainDb", gain.gainDb, -60.0f, 12.0f);
+         AudioNode* an = gain.GetAudioNode();
+         gain.CookIfNeeded(1);
+         an->PrepareToPlay(sampleRate, 64);
+         float l[64] = {}, r[64] = {};
+         float* po[2] = { l, r };
+         AudioBuffer bo;
+         bo.channels = po;
+         bo.numChannels = 2;
+         bo.numFrames = 64;
+         an->ProcessBlock(nullptr, 0, bo);
+         for (int i = 0; i < 64; i++)
+            nonFinite += !std::isfinite(l[i]) + !std::isfinite(r[i]);
+
+         MixerNode mixer;
+         Patch::LoadParams(&mixer, { { "f gain0", big }, { "f pan0", big } });
+         expect("Mixer gain0", mixer.gainDb[0], -60.0f, 12.0f);
+         expect("Mixer pan0", mixer.pan[0], -1.0f, 1.0f);
+
+         AudioInputNode in;
+         Patch::LoadParams(&in, { { "f gainDb", big } });
+         expect("Audio In gainDb", in.gainDb, -60.0f, 12.0f);
+
+         std::unique_ptr<INode> vc(VelocityCurveNode::Create());
+         Patch::LoadParams(vc.get(), { { "f curve", big } });
+         expect("Velocity Curve curve", static_cast<VelocityCurveNode*>(vc.get())->curve, 0.25f, 4.0f);
+      }
+      std::unique_ptr<INode> vc(VelocityCurveNode::Create());
+      Patch::LoadParams(vc.get(), { { "f curve", "-1" } });
+      expect("Velocity Curve curve -1", static_cast<VelocityCurveNode*>(vc.get())->curve, 0.25f, 4.0f);
+      const bool ok = bad == 0 && nonFinite == 0;
+      printf("DSPTEST gain and curve past the knob range are clamped: %d out of range, Gain 1e9 dB %lld non-finite  %s\n",
+             bad, nonFinite, ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
    return all;
 }
 }
