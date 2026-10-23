@@ -154,6 +154,10 @@ void RenderHqNode::CookIfNeeded(int frameId)
    f.shadowSize = 1024 << std::clamp(shadowQuality, 0, 2);
    f.shadowSoftness = std::max(0.0f, shadowSoftness);
    f.contactShadows = contactShadows;
+   f.ao = ao;
+   f.aoRadius = std::max(0.001f, aoRadius);
+   f.aoIntensity = std::max(0.0f, aoIntensity);
+   f.aoShow = aoShow;
 
    mOut = mRenderer->Render(f);
    mOutW = f.width;

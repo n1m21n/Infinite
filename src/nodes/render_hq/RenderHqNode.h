@@ -45,7 +45,20 @@ public:
       // S4 (Render 3D's keys where it has the same setting).
       v.Bool("shadows", shadowsEnabled); v.Int("shadowQuality", shadowQuality);
       v.Float("shadowSoftness", shadowSoftness); v.Bool("contactShadows", contactShadows);
+      // S5.
+      v.Bool("ao", ao); v.Float("aoRadius", aoRadius); v.Float("aoIntensity", aoIntensity);
+      v.Bool("aoShow", aoShow);
    }
+
+   // S5: GTAO on the indirect light, on by default (the finished picture);
+   // radius in world units, intensity 0..1; aoShow draws it alone. Radius 1,
+   // not Filament's 0.3 m: Infinite scenes are built around 1-unit objects
+   // (the default camera sits 3 away), and with Filament's falloff 0.3 only
+   // reached a thin line at each contact.
+   bool ao = true;
+   float aoRadius = 1.0f;
+   float aoIntensity = 1.0f;
+   bool aoShow = false;
 
    // S4: screen-space contact shadows for the shadowed light. Off by default,
    // as in Filament (~2 ms at 1080p over a million-particle surface).

@@ -61,34 +61,27 @@ O plano da 0.71 (Render 3D HQ com referência no Filament + varredura de lentid�
 `HQ-071-STRATEGY.md`, em sessões S0-S9 e P1 com estado na seção 6. A lista abaixo é a de antes
 desse plano e entra nele como P1 (desempenho) e S4-S7 (render).
 
-### Próxima sessão: S5 (GTAO)
+### Próxima sessão: S6 (TAA do Filament)
 
-Estado (2026-10-23): branch `feature/render3d-hq`, S0 a S4 feitas e **commitadas nessa branch** com o
-OK do dono (sem merge em `turbo/windows-only`, sem push). Feito até aqui:
-- S1: nó `Render 3D HQ` (`src/nodes/render_hq/`, deriva de `Render3DNode`), módulo atrás de
-  `INFINITE_ENABLE_RENDER_HQ` (OFF = stub), check `HQTEST`, cenas com HQ ao lado (`add_hq_twins`).
-- Correção do enrolamento (OK do dono): Sphere, Cylinder/Cone, TorusKnot, Helix, Pyramid e
-  `MeshOps::TubeAlong` em `src/core/Mesh.cpp`; teste `tests/unit/MeshTests.cpp` (21 formas).
-- S2: BRDF + IBL do Filament (`hq_brdf.glsl`, `hq_ibl.frag.glsl`, `hq_lighting.glsl` = `hqShade()`).
-- S3: PointZ de pontos como esferas (`hq_sphere.*`: buffers da PointZ direto como atributos
-  instanciados, quad no plano tangente + `depth_greater`, saída antecipada contra a cópia da
-  profundidade); PointZ com triângulos pela GPU.
-- S4: sombra estável da 1ª luz direcional/sol (`hq_shadows.glsl`, `UpdateShadows()`: ajuste aos
-  casters sem o chão, texel preso, mapa reaproveitado quando nada muda, PCF LOW / PCSS-lite,
-  partículas como point sprites no mapa), contact shadows opcionais (desligadas, como no Filament).
-- Medidas, capturas e detalhes: `RENDER-3D-HQ-FILAMENT.md` §6-§9 e §14; BEFORE em `build/hq/before/`,
-  AFTER em `build/hq/after/`. Gate completo da S3: 74/74, perf ok, compat 0 regressões.
+Estado (2026-10-23): branch `feature/render3d-hq`, S0 a S5 feitas. Commits: `87e33c07` (S0-S4),
+`0a370ae5` (sombra do Render 3D embaixo dos objetos: passe de sombra sem culling + redesenho quando o
+mapa esperava os limites; pedido do dono). S5 (GTAO) no commit seguinte, sem push. Tudo o que foi feito:
+- S1-S4: ver `RENDER-3D-HQ-FILAMENT.md` §6-§9 (nó, PBR, esferas, sombras).
+- S5: `RENDER-3D-HQ-FILAMENT.md` §10 - `hq_ao_depth/hq_gtao/hq_ao_blur.comp.glsl`, `RunAo()` depois do
+  pré-passe, `ssaoVisibility()` em `hq_lighting.glsl` (upsample bilateral), só na luz indireta.
+  Parâmetros `ao`, `aoRadius` (1,0), `aoIntensity`, `aoShow`. +0,5 ms na F a 1080p.
+- Cenas de teste versionadas (pedido do dono): `examples/hq/G_shadow_contact.inf` (sombra embaixo de
+  objetos encostados / a 2 e 20 cm do chão, materiais variados) e `H_ao_contact.inf` (vinco chão-parede
+  e contatos, com um terceiro render HQ em "só AO"), geradas pelo `scripts/make_hq_scenes.py`.
 
-S5, plano já estudado (`filament-notes.md` §4, porte do `gtaoImpl.fs`): logo depois do pré-passe
-(a cópia de profundidade já existe), (1) profundidade linear em metros, R32F com mips em grade
-rotacionada (`mipmapDepth.mat`); (2) GTAO em meia resolução, 4 fatias x 3 passos, raio 0,3 m,
-`thicknessHeuristic` 0,004, ruído 4x4 da Activision, normal de view lida do alvo do pré-passe (não
-reconstruída), saída (visibilidade, profundidade); (3) blur bilateral separável de 11 amostras com o
-peso do Filament `max(0, 1 - (dDepth/0,05)^2)`; (4) em `hqShade()`, `diffuseAO = min(AO do Material,
-SSAO)` só na luz indireta, AO especular de Lagarde e multi-bounce já existentes; (5) parâmetros novos
-no fim (`ao`, `aoRadius`, `aoIntensity`, `aoShow` para depuração) e um caso no `HQTEST` (AO liga x
-desliga, finito, órbita). Cenas A/E para comparar; medir a F só HQ (variante com o Render 3D em 16x16,
-gerada à parte e apagada depois). Depois: S6 (TAA), S7 (1M), S8, S9.
+S6, plano (`filament-notes.md` §5): jitter Halton(2,3) x16 pulando os 409 primeiros, reprojeção de
+câmera (o Filament não tem buffer de velocidade; o HQ deve usar o de `Render3DMotion` para objetos e
+partículas por `PartId`), histórico com Catmull-Rom, reconstrução Lanczos-2 da entrada, caixa de
+vizinhança 5/9 amostras com clipping por raio no RGB tonemapeado, feedback 0,12, `varianceGamma` 0,7.
+Decidir se reaproveita `Render3DTemporal` (TAA da 0.70, FSR) ou porta o `taa.mat` em shader próprio
+`hq_taa.comp.glsl` (recomendado: porte próprio + kit de movimento compartilhado). O AO e as contact
+shadows ficam mais limpos com TAA (ruído 4x4 do GTAO integrado no tempo). Check: teste de ghosting com
+movimento rápido no `HQTEST`, capturas A-F, perf F. Depois: S7 (1M), S8, S9.
 
 ## Próximos passos (0.71), por valor medido
 

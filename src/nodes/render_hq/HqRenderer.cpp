@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <memory>
 #include <unordered_map>
 
@@ -97,7 +98,12 @@ namespace
    const int kDfgSize = 128;
    // Texture units of the shading passes (set once at link).
    const int kUnitIrr = 0, kUnitPref = 1, kUnitDfg = 2, kUnitShadow = 3, kUnitMap0 = 4;
-   const int kUnitShadowRaw = 12, kUnitSceneDepth = 13, kUnitLast = 13;
+   const int kUnitShadowRaw = 12, kUnitSceneDepth = 13, kUnitSsao = 14, kUnitLast = 14;
+   // S5: Filament's AmbientOcclusionOptions (resolution 0.5, bilateralThreshold
+   // in metres, power) and the depth chain's levels (kLog2LodRate 3 reaches
+   // level 4 at the largest GTAO radius on screen).
+   const float kAoBilateralThreshold = 0.05f, kAoPower = 1.0f;
+   const int kAoMaxLevels = 5;
    // S4: Filament's ShadowOptions defaults (polygonOffsetConstant / Slope,
    // normalBias in texels) and contact shadows' maxShadowDistance.
    const float kPolygonOffsetConstant = 0.5f, kPolygonOffsetSlope = 2.0f;
@@ -173,6 +179,7 @@ namespace
       int envRotation = -1, envIntensity = -1, envSky = -1, envHorizon = -1, envGround = -1, exposure = -1;
       int shadowLight = -1, lightViewProj = -1, shadowTexel = -1, shadowNormalBias = -1, shadowConstBias = -1;
       int shadowDepthRange = -1, shadowSoftness = -1, contactShadows = -1, projParams = -1;
+      int ssao = -1, frameTexel = -1;
 
       void Load(unsigned int p)
       {
@@ -214,6 +221,9 @@ namespace
          shadowSoftness = loc("uShadowSoftness");
          contactShadows = loc("uContactShadows");
          projParams = loc("uProjParams");
+         ssao = loc("uSsao");
+         frameTexel = loc("uFrameTexel");
+         glUniform1i(loc("uSsaoMap"), kUnitSsao);
          // Samplers sit on fixed units (the program is bound by the caller).
          glUniform1i(loc("uIrrEnv"), kUnitIrr);
          glUniform1i(loc("uPrefEnv"), kUnitPref);
@@ -234,6 +244,13 @@ namespace
          glUniform1f(shadowSoftness, st.softness);
          glUniform1i(contactShadows, st.contact);
          glUniform4fv(projParams, 1, st.proj);
+      }
+
+      // S5: 0 no SSAO, 1 on, 2 show it alone; the map is on kUnitSsao.
+      void SetAo(int mode, int w, int h) const
+      {
+         glUniform1i(ssao, mode);
+         glUniform2f(frameTexel, 1.0f / (float)std::max(1, w), 1.0f / (float)std::max(1, h));
       }
 
       // Camera, lights and environment: once per pass (program bound).
@@ -364,6 +381,15 @@ namespace
          unsigned int id = 0;
          int mode = -1, perceptualRoughness = -1, srcTexels = -1, srcMaxLod = -1;
       };
+      // S5: GTAO's three compute passes (hq_ao_depth, hq_gtao, hq_ao_blur).
+      struct AoPrograms
+      {
+         unsigned int depth = 0, gtao = 0, blur = 0;
+         int dMode = -1, dSrcSize = -1, dDstSize = -1, dProjParams = -1;
+         int gSize = -1, gProjInfo = -1, gProjOffset = -1, gOrtho = -1, gFarZ = -1, gProjectionScale = -1;
+         int gRadius = -1, gInvRadiusSquared = -1, gIntensity = -1, gPower = -1, gMaxLevel = -1, gFullTexel = -1;
+         int bSize = -1, bAxis = -1, bFarZ = -1, bEdgeInv = -1;
+      };
 
       bool EnsurePrograms();
       bool EnsureTargets(int w, int h);
@@ -373,6 +399,8 @@ namespace
       void Upload(const std::vector<IGeometrySource*>& draw);
       void ResetSlot(Slot& slot, Kind kind);
       ShadowState UpdateShadows(const HqFrame& f, const std::vector<IGeometrySource*>& draw);
+      bool EnsureAo();
+      void RunAo(const HqFrame& f);
       void Release();
 
       PrepassProgram mPre;
@@ -390,6 +418,12 @@ namespace
       int mShadowSize = 0;
       std::vector<unsigned long long> mShadowSig; // what the map was last drawn from
       unsigned int mDepthCopy = 0, mDepthCopyFbo = 0;
+      // S5: view-z chain (R32F, mips) and the AO ping-pong pair (RG16F:
+      // visibility, view z) at half the frame size; mAo[0] holds the result.
+      AoPrograms mAoProg;
+      bool mAoTried = false;
+      unsigned int mAoZ = 0, mAo[2] = { 0, 0 };
+      int mAoW = 0, mAoH = 0, mAoLevels = 0;
       unsigned int mIblSource = 0;
       unsigned long long mIblRevision = 0;
       int mW = 0, mH = 0;
@@ -524,6 +558,21 @@ namespace
       // real one is attached (no feedback loop).
       makeTex(mDepthCopy, GL_DEPTH_COMPONENT24, "Render 3D HQ: depth copy");
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+      // S5: the AO targets at half the frame size (Filament's resolution 0.5).
+      mAoW = std::max(1, (w + 1) / 2);
+      mAoH = std::max(1, (h + 1) / 2);
+      mAoLevels = 1;
+      while (mAoLevels < kAoMaxLevels && (std::min(mAoW, mAoH) >> mAoLevels) >= 1)
+         mAoLevels++;
+      for (unsigned int* t : { &mAoZ, &mAo[0], &mAo[1] })
+         if (*t != 0)
+            glDeleteTextures(1, t);
+      mAoZ = MakeTexture(mAoW, mAoH, mAoLevels, GL_R32F, false, "Render 3D HQ: AO view z");
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      // Bilinear: the shading pass upsamples the result.
+      mAo[0] = MakeTexture(mAoW, mAoH, 1, GL_RG16F, false, "Render 3D HQ: AO");
+      mAo[1] = MakeTexture(mAoW, mAoH, 1, GL_RG16F, false, "Render 3D HQ: AO blur");
       glBindTexture(GL_TEXTURE_2D, 0);
 
       if (mFbo == 0)
@@ -549,6 +598,120 @@ namespace
       mW = w;
       mH = h;
       return true;
+   }
+
+   bool HqRendererGl::EnsureAo()
+   {
+      AoPrograms& a = mAoProg;
+      if (mAoTried)
+         return a.depth != 0 && a.gtao != 0 && a.blur != 0;
+      mAoTried = true;
+      a.depth = Render3DTemporal::BuildComputeShader("hq_ao_depth.comp.glsl");
+      a.gtao = Render3DTemporal::BuildComputeShader("hq_gtao.comp.glsl");
+      a.blur = Render3DTemporal::BuildComputeShader("hq_ao_blur.comp.glsl");
+      if (a.depth == 0 || a.gtao == 0 || a.blur == 0)
+         return false;
+      auto loc = [](unsigned int p, const char* n) { return glGetUniformLocation(p, n); };
+      a.dMode = loc(a.depth, "uMode");
+      a.dSrcSize = loc(a.depth, "uSrcSize");
+      a.dDstSize = loc(a.depth, "uDstSize");
+      a.dProjParams = loc(a.depth, "uProjParams");
+      a.gSize = loc(a.gtao, "uSize");
+      a.gProjInfo = loc(a.gtao, "uProjInfo");
+      a.gProjOffset = loc(a.gtao, "uProjOffset");
+      a.gOrtho = loc(a.gtao, "uOrtho");
+      a.gFarZ = loc(a.gtao, "uFarZ");
+      a.gProjectionScale = loc(a.gtao, "uProjectionScale");
+      a.gRadius = loc(a.gtao, "uRadius");
+      a.gInvRadiusSquared = loc(a.gtao, "uInvRadiusSquared");
+      a.gIntensity = loc(a.gtao, "uIntensity");
+      a.gPower = loc(a.gtao, "uPower");
+      a.gMaxLevel = loc(a.gtao, "uMaxLevel");
+      a.gFullTexel = loc(a.gtao, "uFullTexel");
+      a.bSize = loc(a.blur, "uSize");
+      a.bAxis = loc(a.blur, "uAxis");
+      a.bFarZ = loc(a.blur, "uFarZ");
+      a.bEdgeInv = loc(a.blur, "uEdgeInv");
+      return true;
+   }
+
+   // S5: GTAO from this frame's prepass (depth copy + view normals) into
+   // mAo[0] at half the frame size: depth chain, kernel, bilateral blur X / Y.
+   void HqRendererGl::RunAo(const HqFrame& f)
+   {
+      GLUtil::DebugScope group("Render 3D HQ: GTAO");
+      const AoPrograms& a = mAoProg;
+      const Mat4& P = f.proj;
+      const bool ortho = P.m[15] == 1.0f;
+      const float farZ = ortho ? (1.0f - P.m[14]) / P.m[10] : -P.m[14] / (1.0f + P.m[10]);
+      auto groups = [](int n) { return (GLuint)((n + 7) / 8); };
+      const GLbitfield barrier = GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT;
+
+      // View z: level 0 from the depth copy, each next level from the one before.
+      glUseProgram(a.depth);
+      glUniform3f(a.dProjParams, P.m[10], P.m[14], ortho ? 1.0f : 0.0f);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, mDepthCopy);
+      int srcW = f.width, srcH = f.height;
+      for (int level = 0; level < mAoLevels; level++)
+      {
+         const int dw = std::max(1, mAoW >> level), dh = std::max(1, mAoH >> level);
+         glUniform1i(a.dMode, level == 0 ? 0 : 1);
+         glUniform2i(a.dSrcSize, srcW, srcH);
+         glUniform2i(a.dDstSize, dw, dh);
+         if (level > 0)
+            glBindImageTexture(0, mAoZ, level - 1, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+         glBindImageTexture(1, mAoZ, level, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+         glDispatchCompute(groups(dw), groups(dh), 1);
+         glMemoryBarrier(barrier);
+         srcW = dw;
+         srcH = dh;
+      }
+      glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+      glBindImageTexture(1, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+      // The kernel.
+      const float radius = std::max(f.aoRadius, 0.001f);
+      glUseProgram(a.gtao);
+      glUniform2i(a.gSize, mAoW, mAoH);
+      glUniform4f(a.gProjInfo, P.m[0], P.m[5], P.m[8], P.m[9]);
+      glUniform2f(a.gProjOffset, P.m[12], P.m[13]);
+      glUniform1i(a.gOrtho, ortho ? 1 : 0);
+      glUniform1f(a.gFarZ, farZ);
+      glUniform1f(a.gProjectionScale, std::min(0.5f * P.m[0] * (float)mAoW, 0.5f * P.m[5] * (float)mAoH));
+      glUniform1f(a.gRadius, radius);
+      glUniform1f(a.gInvRadiusSquared, 1.0f / (radius * radius));
+      glUniform1f(a.gIntensity, std::max(f.aoIntensity, 0.0f));
+      glUniform1f(a.gPower, kAoPower);
+      glUniform1f(a.gMaxLevel, (float)(mAoLevels - 1));
+      glUniform2f(a.gFullTexel, 1.0f / (float)f.width, 1.0f / (float)f.height);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, mAoZ);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, mNormal);
+      glBindImageTexture(0, mAo[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
+      glDispatchCompute(groups(mAoW), groups(mAoH), 1);
+      glMemoryBarrier(barrier);
+
+      // Bilateral blur: X into mAo[1], Y back into mAo[0].
+      glUseProgram(a.blur);
+      glUniform2i(a.bSize, mAoW, mAoH);
+      glUniform1f(a.bFarZ, farZ);
+      glUniform1f(a.bEdgeInv, 1.0f / kAoBilateralThreshold);
+      glActiveTexture(GL_TEXTURE0);
+      for (int pass = 0; pass < 2; pass++)
+      {
+         glUniform2i(a.bAxis, pass == 0 ? 1 : 0, pass == 0 ? 0 : 1);
+         glBindTexture(GL_TEXTURE_2D, mAo[pass]);
+         glBindImageTexture(0, mAo[1 - pass], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
+         glDispatchCompute(groups(mAoW), groups(mAoH), 1);
+         glMemoryBarrier(barrier);
+      }
+      glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      glActiveTexture(GL_TEXTURE0);
    }
 
    // One full-screen pass of the IBL program into a level of `tex` (the
@@ -1000,7 +1163,10 @@ namespace
       bool anySpheres = false;
       for (size_t i = 0; i < draw.size(); i++)
          anySpheres = anySpheres || (mSlots[i].drawable && mSlots[i].kind == kSpheres);
-      const bool depthCopy = shadow.contact || anySpheres;
+      // S5: GTAO reads the depth copy and the prepass normals.
+      const bool aoOn = f.ao && EnsureAo();
+      const int aoMode = aoOn ? (f.aoShow ? 2 : 1) : 0;
+      const bool depthCopy = shadow.contact || anySpheres || aoOn;
 
       glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
       glViewport(0, 0, f.width, f.height);
@@ -1028,6 +1194,7 @@ namespace
          glUniform1i(mSph.earlyDepth, prepass == 0 && depthCopy ? 1 : 0);
          mSph.lit.SetFrame(f, ibl);
          mSph.lit.SetShadow(shadow);
+         mSph.lit.SetAo(aoMode, f.width, f.height);
       };
       auto drawSpheres = [&](size_t i, bool shade) {
          const Mat4 model = draw[i]->GetModelMatrix();
@@ -1093,6 +1260,8 @@ namespace
          glBlitFramebuffer(0, 0, f.width, f.height, 0, 0, f.width, f.height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
          glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
       }
+      if (aoOn)
+         RunAo(f);
 
       const GLenum colourOnly[2] = { GL_COLOR_ATTACHMENT0, GL_NONE };
       glDrawBuffers(2, colourOnly);
@@ -1136,12 +1305,15 @@ namespace
          glBindSampler(kUnitShadowRaw, mRawSampler);
          glActiveTexture(GL_TEXTURE0 + kUnitSceneDepth);
          glBindTexture(GL_TEXTURE_2D, depthCopy ? mDepthCopy : 0);
+         glActiveTexture(GL_TEXTURE0 + kUnitSsao);
+         glBindTexture(GL_TEXTURE_2D, aoOn ? mAo[0] : 0);
 
          glEnable(GL_CULL_FACE);
          glUseProgram(mSurf.id);
          glUniformMatrix4fv(mSurf.viewProj, 1, GL_FALSE, viewProj.m);
          mSurf.lit.SetFrame(f, ibl);
          mSurf.lit.SetShadow(shadow);
+         mSurf.lit.SetAo(aoMode, f.width, f.height);
          for (size_t i = 0; i < draw.size(); i++)
          {
             if (!mSlots[i].drawable || mSlots[i].kind == kSpheres)
@@ -1215,7 +1387,8 @@ namespace
          if (s.ibo != 0) glDeleteBuffers(1, &s.ibo);
       }
       mSlots.clear();
-      unsigned int* textures[] = { &mColor, &mNormal, &mDepth, &mPref, &mIrr, &mDfg, &mShadowTex, &mDepthCopy };
+      unsigned int* textures[] = { &mColor, &mNormal, &mDepth, &mPref, &mIrr, &mDfg, &mShadowTex, &mDepthCopy,
+                                   &mAoZ, &mAo[0], &mAo[1] };
       for (unsigned int* t : textures)
       {
          if (*t != 0)
@@ -1230,7 +1403,8 @@ namespace
       if (mRawSampler != 0) glDeleteSamplers(1, &mRawSampler);
       mShadowFbo = mDepthCopyFbo = mCmpSampler = mRawSampler = 0;
       if (mEmptyVao != 0) glDeleteVertexArrays(1, &mEmptyVao);
-      unsigned int* programs[] = { &mPre.id, &mSurf.id, &mSph.id, &mShadowProg.id, &mSphShadow.id, &mBg.id, &mIbl.id };
+      unsigned int* programs[] = { &mPre.id, &mSurf.id, &mSph.id, &mShadowProg.id, &mSphShadow.id, &mBg.id, &mIbl.id,
+                                   &mAoProg.depth, &mAoProg.gtao, &mAoProg.blur };
       for (unsigned int* p : programs)
       {
          if (*p != 0)

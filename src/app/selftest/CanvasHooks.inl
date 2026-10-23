@@ -6097,6 +6097,65 @@
             all = all && ok;
          }
 
+         // S5: GTAO darkens the indirect light (on vs off differ, finite), the
+         // "AO only" view has occluded and open pixels, and its GPU cost.
+         if (HqModuleBuilt())
+         {
+            hq.ao = true;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> on = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.ao = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> off = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.ao = true;
+            hq.aoShow = true;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> only = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.aoShow = false;
+            // Cost: the same frame with and without GTAO (CPU + GPU, glFinish: test only).
+            auto timeIt = [&](bool aoOn) {
+               hq.ao = aoOn;
+               hq.CookIfNeeded(++frame);
+               glFinish();
+               const auto t0 = std::chrono::steady_clock::now();
+               for (int k = 0; k < 20; k++)
+                  hq.CookIfNeeded(++frame);
+               glFinish();
+               return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 20.0;
+            };
+            const double msOff = timeIt(false), msOn = timeIt(true);
+            const GLenum err = glGetError();
+            bool finite = !on.empty() && on.size() == off.size() && on.size() == only.size();
+            double diff = 0.0;
+            size_t occluded = 0, open = 0;
+            for (size_t i = 0; finite && i < on.size(); i++)
+            {
+               finite = std::isfinite(on[i]) && std::isfinite(only[i]);
+               diff += std::fabs(on[i] - off[i]);
+               // "AO only" goes through the tonemap: open (1) reads ~0.9; the
+               // dark background (nothing drawn) is left out.
+               if (i % 4 == 0 && only[i] > 0.1f)
+               {
+                  if (only[i] < 0.75f) occluded++;
+                  if (only[i] > 0.85f) open++;
+               }
+            }
+            diff /= (double)std::max<size_t>(1, on.size());
+            const bool ok = finite && err == GL_NO_ERROR && diff > 1e-4 && occluded > 0 && open > 0;
+            printf("  GTAO: on vs off diff %.5f, AO only %zu occluded / %zu open px, %.2f ms vs %.2f off (%dx%d), "
+                   "finite %d, gl 0x%x  %s\n", diff, occluded, open, msOn, msOff, hq.GetOutputWidth(),
+                   hq.GetOutputHeight(), finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+            if (const char* png = getenv("INFINITE_HQTEST_PNGAO")) // eyeball the AO (bottom-up rows)
+            {
+               std::vector<unsigned char> rgba(only.size());
+               for (size_t k = 0; k < only.size(); k++)
+                  rgba[k] = (unsigned char)std::clamp(only[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+               if (!rgba.empty())
+                  stbi_write_png(png, hq.GetOutputWidth(), hq.GetOutputHeight(), 4, rgba.data(), hq.GetOutputWidth() * 4);
+            }
+         }
+
          // S3: PointZ points as sphere impostors and PointZ triangles straight
          // from the GPU; then 30 frames with the camera orbiting and an object
          // moving (the picture follows, stays finite; GPU time per frame).

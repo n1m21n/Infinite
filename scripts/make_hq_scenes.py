@@ -13,6 +13,13 @@ matters is written. The HDRI is examples/hq/hq_media/studio.hdr
   D  emissive_particles  glowing particles on black, bloom
   E  geometry_particles  a metal torus knot inside a particle cloud
   F  points_1m           1M points displaced by animated noise (benchmark)
+  G  shadow_contact      shadows right under objects resting on / just above
+                         the floor (gold sphere touching, clear-coat sphere
+                         20 cm up, rough cube 2 cm up, copper cylinder), low
+                         camera - the case behind the 0.71 Render 3D fix
+  H  ao_contact          ambient occlusion at contacts and creases: a wall
+                         corner, matte / plastic / metal / rough objects on the
+                         floor, plus a third render in "AO only" (HQ aoShow)
 
 Usage: python scripts/make_hq_scenes.py
 """
@@ -267,6 +274,70 @@ def scene_f():
     return p
 
 
+def group_of(p, sources, x=1000, y=600):
+    g = p.node("3DScene", "Group 3D", x, y)
+    for slot, src in enumerate(sources):
+        p.geo(g, slot, src)
+    return g
+
+
+def scene_g():
+    # Shadows under objects on / just above the floor, seen from low down.
+    # Unit sphere radius 0.5 (scale 1.6 -> 0.8); cube and cylinder 1 tall.
+    p = Patch()
+    r = render(p)
+    cam = camera(p, 7.5, 90.0, 12.0, ty=0.5)
+    env = hdri(p, 0.8)
+    light = sun(p, -40.0, 50.0, 2.5)
+    objs = [
+        p.node("3DScene", "Geometry", 200, 100, i_shape=2, f_posX=-3.3, f_posY=0.80, f_scale=1.6,
+               c_color=(1.0, 0.78, 0.34), f_metallic=1.0, f_roughness=0.15),               # gold, touching
+        p.node("3DScene", "Geometry", 200, 220, i_shape=2, f_posX=-1.1, f_posY=1.00, f_scale=1.6,
+               c_color=(0.75, 0.12, 0.10), f_metallic=0.0, f_roughness=0.35, f_clearcoat=1.0),  # 20 cm up
+        p.node("3DScene", "Geometry", 200, 340, i_shape=1, f_posX=1.1, f_posY=0.52, f_scale=1.0,
+               c_color=(0.20, 0.40, 0.80), f_metallic=0.0, f_roughness=0.7),                # 2 cm up
+        p.node("3DScene", "Geometry", 200, 460, i_shape=5, f_posX=3.1, f_posY=0.5, f_scale=1.0,
+               c_color=(0.95, 0.64, 0.54), f_metallic=1.0, f_roughness=0.3),                # copper, touching
+    ]
+    p.geo(r, 0, group_of(p, objs + [floor(p)]))
+    wire(p, r, cam, light, env)
+    output(p, r)
+    return p
+
+
+def scene_h():
+    # Ambient occlusion at contacts and creases: a floor-wall corner and
+    # objects resting on the floor, from 35 degrees up. A third render (HQ,
+    # aoShow) shows the occlusion alone.
+    p = Patch()
+    r = render(p)
+    cam = camera(p, 8.0, 70.0, 35.0, ty=0.6)
+    env = hdri(p)
+    light = sun(p, 30.0, 45.0, 2.0)   # in front of the wall, from the right
+    wall = p.node("3DScene", "Geometry", 200, 600, i_shape=1, f_posY=1.5, f_posZ=-2.0,
+                  f_scaleX=10.0, f_scaleY=3.0, f_scaleZ=0.2, c_color=(0.75, 0.75, 0.76), f_roughness=0.9)
+    objs = [
+        p.node("3DScene", "Geometry", 200, 100, i_shape=1, f_posX=-2.4, f_posY=0.5, f_posZ=-1.4,
+               c_color=(0.85, 0.85, 0.85), f_metallic=0.0, f_roughness=0.9),                # matte, against the wall
+        p.node("3DScene", "Geometry", 200, 220, i_shape=2, f_posX=-0.6, f_posY=0.8, f_scale=1.6,
+               c_color=(0.10, 0.35, 0.85), f_metallic=0.0, f_roughness=0.15),               # glossy plastic
+        p.node("3DScene", "Geometry", 200, 340, i_shape=5, f_posX=1.4, f_posY=0.5, f_scale=1.0,
+               c_color=(0.9, 0.9, 0.92), f_metallic=1.0, f_roughness=0.1),                  # polished metal
+        p.node("3DScene", "Geometry", 200, 460, i_shape=7, f_posX=3.0, f_posY=0.75, f_scale=0.9,
+               c_color=(0.55, 0.55, 0.58), f_metallic=1.0, f_roughness=0.6),                # rough steel knot
+    ]
+    group = group_of(p, objs + [wall, floor(p)])
+    p.geo(r, 0, group)
+    wire(p, r, cam, light, env)
+    output(p, r)
+    # "AO only": not a twin (add_hq_twins only follows Render 3D nodes).
+    ao = p.node("3DScene", "Render 3D HQ", 1600, 1400, f_width=1920, f_height=1080, i_tonemap=1,
+                b_shadows=True, b_envAsBackground=True, b_aoShow=True)
+    p.geo(ao, 0, group)
+    wire(p, ao, cam, light, env)
+    return p
+
+
 SCENES = {
     "A_material_studio": scene_a,
     "B_particle_studio": scene_b,
@@ -274,6 +345,8 @@ SCENES = {
     "D_emissive_particles": scene_d,
     "E_geometry_particles": scene_e,
     "F_points_1m": scene_f,
+    "G_shadow_contact": scene_g,
+    "H_ao_contact": scene_h,
 }
 
 

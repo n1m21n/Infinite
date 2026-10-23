@@ -58,6 +58,12 @@ struct HqFrame
    int shadowSize = 2048;
    float shadowSoftness = 0.0f; // 0 = PCF; > 0 = soft (PCSS-lite), the light's size
    bool contactShadows = false;
+   // S5: GTAO on the indirect light (Filament's AmbientOcclusionOptions:
+   // radius in world units, intensity 0..1); aoShow draws the occlusion alone.
+   bool ao = true;
+   float aoRadius = 1.0f;
+   float aoIntensity = 1.0f;
+   bool aoShow = false;
 };
 
 class HqRenderer

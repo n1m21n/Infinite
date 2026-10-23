@@ -288,6 +288,38 @@ desligadas por padrão). Cena B só HQ (câmera em órbita, sombras): 1,8 ms. `H
 desligadas mudam a imagem; cozinhar de novo a cena parada dá a mesma imagem (mapa reaproveitado);
 órbita + objeto em movimento continua ok (0,28 ms/quadro a 640×360).
 ## 10. GTAO (S5)
+
+Três passes de compute logo depois do pré-passe (que já deixa a cópia de profundidade e a normal de
+view), em `HqRendererGl::RunAo()`:
+1. **Cadeia de profundidade** (`hq_ao_depth.comp`): nível 0 em **meia resolução** (a `resolution 0.5`
+   do Filament) com o z de view de um pixel por bloco 2×2, e até 5 níveis seguintes do mesmo jeito
+   (R32F). Diferença do Filament: sempre o mesmo canto do bloco, não a grade rotacionada. Com a grade
+   rotacionada, o kernel reconstruía a posição a partir do centro do texel, e um chão visto em ângulo
+   rasante saía em listras horizontais (linhas alternadas, achado na cena A). Agora `viewPos()`
+   reconstrói a posição exata do pixel de onde veio cada amostra.
+2. **Kernel** (`hq_gtao.comp`, porte do `gtaoImpl.fs`): 4 fatias × 3 passos, ruído 4×4 da Activision,
+   atualização de horizonte com falloff `dist²/r² × 2` e `thicknessHeuristic` 0,004, integral do arco
+   ponderada pelo cosseno, `power` 1, `intensity`. Normal lida do alvo do pré-passe (não reconstruída).
+   Sem bent normals nem bitmasks (desligados no Filament também). Saída RG16F (visibilidade, z de view).
+3. **Blur bilateral separável** (`hq_ao_blur.comp`): 11 amostras, Gaussiana sigma 4 (o MEDIUM do
+   Filament), peso `max(0, 1 − (dz/0,05 m)²)`, pixels de fundo ignorados.
+
+**Aplicação** (`hq_lighting.glsl`, `ssaoVisibility()`): upsample bilateral de 4 amostras com a
+profundidade guardada no `.g` (o caminho HIGH do Filament; sem ele a borda de baixo das esferas
+pegava o AO do chão atrás delas e saía pontilhada). Como no Filament, entra só na luz indireta:
+`indirectAO = min(AO do Material, SSAO)` alimenta o IBL difuso (com multi-bounce), o AO especular
+de Lagarde, sheen, clear coat e a luz "ambiente" do Render 3D. A luz direta continua só com a
+micro-sombra do mapa de AO do Material.
+
+**Parâmetros** (no fim do `VisitParams`): `ao` (ligado por padrão no HQ), `aoRadius`, `aoIntensity`,
+`aoShow` (depuração: só a visibilidade, ainda com tonemap). **Raio padrão 1,0, não os 0,3 m do
+Filament**: com o falloff do Filament só contam amostras até ~0,4 r, e nas cenas do Infinite (objetos
+de 1-2 unidades, câmera padrão a 3) 0,3 virava um fio no contato. Medido num vinco de 90° (cubo no
+chão, tonemap desligado): visibilidade ~0,7 no vinco depois do blur (teórico 0,5 antes).
+
+**Custo** (cena F, 1080p, só o HQ, mediana de 5 rodadas intercaladas do `perf.ps1`): 12,66 → 13,2 ms
+(+0,5 ms). `HQTEST`: AO ligado × desligado muda a imagem, "só AO" tem pixels ocluídos e abertos,
+0,17 × 0,13 ms a 500×500.
 ## 11. TAA (S6)
 ## 12. Pós, presets e parâmetros (S8)
 ## 13. Benchmarks medidos e capturas BEFORE/AFTER (S9)
@@ -299,6 +331,9 @@ desligadas mudam a imagem; cozinhar de novo a cena parada dá a mesma imagem (ma
 | `shaders/hq_ibl.frag.glsl` | `libs/ibl/src/CubemapIBL.cpp` (DFV_Multiscatter, amostragem GGX), `tools/cmgen/src/cmgen.cpp` (nível → rugosidade) |
 | `shaders/hq_surface.frag.glsl`, `shaders/hq_lighting.glsl` | montagem de `surface_shading_model_standard.fs` e `surface_light_indirect.fs` (os termos vêm do `hq_brdf.glsl`) |
 | `shaders/hq_shadows.glsl` | técnicas de `shaders/src/surface_shadowing.fs` como as notas descrevem (PCF LOW de Castaño, contact shadows); valores de `LightManager.h` `ShadowOptions` |
+| `shaders/hq_ao_depth.comp.glsl` | `filament/src/materials/ssao/mipmapDepth.mat` (sem a grade rotacionada, ver §10) |
+| `shaders/hq_gtao.comp.glsl` | `filament/src/materials/ssao/gtaoImpl.fs`, `gtao.mat`; valores de `Options.h` `AmbientOcclusionOptions` / `Gtao` |
+| `shaders/hq_ao_blur.comp.glsl`, `ssaoVisibility()` em `hq_lighting.glsl` | `filament/src/materials/ssao/bilateralBlur.mat`; upsample de `shaders/src/surface_ambient_occlusion.fs` |
 
 Também listado em `THIRD_PARTY_NOTICES.md`. Nenhum código do Filament é linkado.
 ## 15. Problemas conhecidos e o que falta

@@ -40,6 +40,10 @@ uniform vec3 uEnvSky;
 uniform vec3 uEnvHorizon;
 uniform vec3 uEnvGround;
 uniform float uExposure;
+// S5: screen-space AO (GTAO, hq_gtao.comp) - 0 off, 1 on, 2 show it alone.
+uniform int uSsao;
+uniform sampler2D uSsaoMap;  // (visibility, view z) at the AO size
+uniform vec2 uFrameTexel;    // 1 / frame size: gl_FragCoord -> uv
 
 struct HqSurface
 {
@@ -75,6 +79,32 @@ vec3 diffuseIrradiance(vec3 n)
    return gradientEnv(n, uEnvSky, uEnvHorizon, uEnvGround) * uEnvIntensity;
 }
 
+// S5: the half-size GTAO at this pixel, depth-aware: the 4 bilinear taps
+// weighted by how close their view z is to this fragment's, so a silhouette
+// does not pick up the occlusion of what is behind it (Filament's upsampling
+// at HIGH quality, surface_ambient_occlusion.fs; edge distance = the blur's
+// 0.05 m bilateral threshold).
+float ssaoVisibility()
+{
+   vec2 size = vec2(textureSize(uSsaoMap, 0));
+   vec2 st = gl_FragCoord.xy * uFrameTexel * size - 0.5;
+   vec2 base = floor(st);
+   vec2 f = st - base;
+   float z = -linearDepth(gl_FragCoord.z);
+   float sum = 0.0, weights = 0.0;
+   for (int k = 0; k < 4; k++)
+   {
+      ivec2 o = ivec2(k & 1, k >> 1);
+      vec2 s = texelFetch(uSsaoMap, clamp(ivec2(base) + o, ivec2(0), ivec2(size) - 1), 0).rg;
+      float bilinear = (o.x == 1 ? f.x : 1.0 - f.x) * (o.y == 1 ? f.y : 1.0 - f.y);
+      float d = (s.y - z) * 20.0;
+      float w = bilinear * max(1e-4, 1.0 - d * d);
+      sum += s.x * w;
+      weights += w;
+   }
+   return sum / max(weights, 1e-6);
+}
+
 // Linear HDR radiance towards the camera (exposure not applied).
 vec3 hqShade(HqSurface s)
 {
@@ -82,6 +112,11 @@ vec3 hqShade(HqSurface s)
    float metallic = clamp(s.metallic, 0.0, 1.0);
    float clearCoat = clamp(s.clearCoat, 0.0, 1.0);
    float ao = s.ao;
+   // S5: indirect light sees min(material AO, SSAO) (Filament's diffuseAO);
+   // direct light keeps only the material's micro-shadowing.
+   float indirectAO = ao;
+   if (uSsao != 0)
+      indirectAO = min(ao, ssaoVisibility());
 
    // Pixel parameters (surface_shading_lit.fs order): specular AA on the
    // geometric normal, clear coat roughens the base, clamp, square.
@@ -119,7 +154,7 @@ vec3 hqShade(HqSurface s)
       vec3 radiance = toLinear(uLightColor[i]) * uLightIntensity[i];
       if (uLightType[i] == 3) // ambient (Render 3D's): flat diffuse
       {
-         col += diffuseColor * radiance * ao;
+         col += diffuseColor * radiance * indirectAO;
          continue;
       }
       vec3 l;
@@ -191,16 +226,16 @@ vec3 hqShade(HqSurface s)
    vec3 r = reflect(-v, n);
    vec3 Fr = E * prefilteredRadiance(getSpecularDominantDirection(n, r, roughness), perceptualRoughness);
    Fr *= energyCompensation;
-   float specularAO = SpecularAO_Lagarde(NoV, ao, roughness);
+   float specularAO = SpecularAO_Lagarde(NoV, indirectAO, roughness);
    vec3 Fd = diffuseColor * diffuseIrradiance(n) * (1.0 - E);
    // Multi-bounce AO is on by default on the desktop (singleBounceAO = 1).
-   Fd *= gtaoMultiBounce(ao, diffuseColor);
+   Fd *= gtaoMultiBounce(indirectAO, diffuseColor);
    Fr *= gtaoMultiBounce(specularAO, f0);
    if (hasSheen)
    {
       Fd *= sheenScaling;
       Fr *= sheenScaling;
-      Fr += sheenDFG * sheenColor * SpecularAO_Lagarde(NoV, ao, sheenRoughness) *
+      Fr += sheenDFG * sheenColor * SpecularAO_Lagarde(NoV, indirectAO, sheenRoughness) *
             prefilteredRadiance(r, sheenPerceptualRoughness);
    }
    if (clearCoat > 0.0)
@@ -210,8 +245,10 @@ vec3 hqShade(HqSurface s)
       Fd *= 1.0 - Fc;
       Fr *= 1.0 - Fc;
       Fr += prefilteredRadiance(reflect(-v, geoN), clearCoatPerceptualRoughness) *
-            (SpecularAO_Lagarde(clearCoatNoV, ao, clearCoatRoughness) * Fc);
+            (SpecularAO_Lagarde(clearCoatNoV, indirectAO, clearCoatRoughness) * Fc);
    }
    col += Fd + Fr;
+   if (uSsao == 2)
+      return vec3(indirectAO); // S5 debug: the occlusion alone
    return col + s.emissive;
 }

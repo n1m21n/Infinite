@@ -1839,6 +1839,15 @@
          ModSlider("softness", &n->shadowSoftness, 0.0f, 4.0f, "%.3f", colW);
          ModCheckbox("contact shadows", &n->contactShadows);
       }
+      // S5: after the shadows, so their ordinals stay.
+      NodeSeparator("ambient occlusion", colW);
+      ModCheckbox("GTAO", &n->ao);
+      if (n->ao)
+      {
+         ModSlider("radius", &n->aoRadius, 0.01f, 3.0f, "%.3f", colW);
+         ModSlider("intensity", &n->aoIntensity, 0.0f, 1.0f, "%.3f", colW);
+         ModCheckbox("show AO only", &n->aoShow);
+      }
       ImGui::EndGroup();
    }
 
