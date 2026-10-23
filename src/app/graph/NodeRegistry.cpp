@@ -484,13 +484,16 @@ namespace app
             return false;
          for (size_t k = 0; k < la.slots.size(); k++)
             if (la.slots[k].followAction != lb.slots[k].followAction ||
-                la.slots[k].followBars != lb.slots[k].followBars || !clipEq(la.slots[k].clip, lb.slots[k].clip))
+                la.slots[k].followBars != lb.slots[k].followBars || la.slots[k].loop != lb.slots[k].loop ||
+                la.slots[k].loopTicks != lb.slots[k].loopTicks || la.slots[k].quantize != lb.slots[k].quantize ||
+                la.slots[k].launchMode != lb.slots[k].launchMode || !clipEq(la.slots[k].clip, lb.slots[k].clip))
                return false;
       }
       if (a.scenes.size() != b.scenes.size())
          return false;
       for (size_t i = 0; i < a.scenes.size(); i++)
-         if (a.scenes[i].name != b.scenes[i].name || a.scenes[i].tempo != b.scenes[i].tempo)
+         if (a.scenes[i].name != b.scenes[i].name || a.scenes[i].tempo != b.scenes[i].tempo ||
+             a.scenes[i].quantize != b.scenes[i].quantize || a.scenes[i].additive != b.scenes[i].additive)
             return false;
       for (size_t i = 0; i < a.markers.size(); i++)
          if (a.markers[i].id != b.markers[i].id || a.markers[i].pos != b.markers[i].pos ||

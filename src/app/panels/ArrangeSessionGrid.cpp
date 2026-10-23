@@ -30,6 +30,16 @@ namespace app
          I18N_KEY("No Follow Action"), I18N_KEY("Next"), I18N_KEY("Previous"), I18N_KEY("Random"), I18N_KEY("Stop")
       };
       const int kFollowBarChoices[] = { 1, 2, 4, 8, 16, 32, 64 };
+      // Index = quantize + 1: -1 follows the transport's setting.
+      const char* const kQuantNames[5] = {
+         I18N_KEY("Global"), I18N_KEY("None"), I18N_KEY("1 Beat"), I18N_KEY("1 Bar"), I18N_KEY("2 Bars")
+      };
+      const char* const kModeNames[3] = { I18N_KEY("Trigger"), I18N_KEY("Gate"), I18N_KEY("Toggle") };
+      struct LoopChoice { const char* name; double bars; };
+      const LoopChoice kLoopChoices[] = {
+         { I18N_KEY("Clip Length"), 0.0 }, { I18N_KEY("1/4 Bar"), 0.25 }, { I18N_KEY("1/2 Bar"), 0.5 },
+         { I18N_KEY("1 Bar"), 1.0 }, { I18N_KEY("2 Bars"), 2.0 }, { I18N_KEY("4 Bars"), 4.0 }, { I18N_KEY("8 Bars"), 8.0 }
+      };
 
       uint64_t sCtxLaneId = 0;
       int sCtxRow = -1;
@@ -334,6 +344,27 @@ namespace app
                }
             });
          }
+         if (MenuParts::SubMenu(L("Launch Quantize")))
+         {
+            const int cur = row < (int)gArrange.scenes.size() ? gArrange.scenes[(size_t)row].quantize : -1;
+            for (int q = -1; q <= 3; q++)
+               if (MenuParts::Choice(L(kQuantNames[q + 1]), cur == q) && cur != q)
+                  ArrangeEdit([&]() {
+                     while ((int)gArrange.scenes.size() <= row)
+                        gArrange.scenes.push_back(Arrange::Scene{});
+                     gArrange.scenes[(size_t)row].quantize = q;
+                     gArrange.revision++;
+                  });
+            ImGui::EndMenu();
+         }
+         bool addOn = row < (int)gArrange.scenes.size() && gArrange.scenes[(size_t)row].additive;
+         if (MenuParts::Check(L("Keep Other Tracks Playing"), &addOn))
+            ArrangeEdit([&]() {
+               while ((int)gArrange.scenes.size() <= row)
+                  gArrange.scenes.push_back(Arrange::Scene{});
+               gArrange.scenes[(size_t)row].additive = addOn;
+               gArrange.revision++;
+            });
          MenuParts::Separator();
          if (MenuParts::Item(L("Launch Scene")))
             ArrangeSessionLaunchScene(row);
@@ -550,6 +581,8 @@ namespace app
             ImGui::InvisibleButton("##cell", ImVec2(b.x - a.x, b.y - a.y), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
             const bool hov = ImGui::IsItemHovered();
             const bool held = ImGui::IsItemActive();
+            if (ss != nullptr && ImGui::IsItemDeactivated() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+               ArrangeSessionRelease(laneId, row);
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
             {
                if (ss != nullptr)
@@ -747,6 +780,58 @@ namespace app
                   }
                });
          }
+         ImGui::EndMenu();
+      }
+      MenuParts::Separator();
+      bool loopOn = ss.loop;
+      if (MenuParts::Check(L("Loop"), &loopOn))
+         ArrangeEdit([&]() {
+            if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+            {
+               l->slots[(size_t)row].loop = loopOn;
+               gArrange.revision++;
+            }
+         });
+      if (MenuParts::SubMenu(L("Loop Length")))
+      {
+         for (const LoopChoice& lc : kLoopChoices)
+         {
+            const Arrange::Tick want = (Arrange::Tick)(lc.bars * (double)Arrange::kTicksPerBar);
+            if (MenuParts::Choice(L(lc.name), ss.loopTicks == want) && ss.loopTicks != want)
+               ArrangeEdit([&]() {
+                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+                  {
+                     l->slots[(size_t)row].loopTicks = want;
+                     gArrange.revision++;
+                  }
+               });
+         }
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(L("Launch Quantize")))
+      {
+         for (int q = -1; q <= 3; q++)
+            if (MenuParts::Choice(L(kQuantNames[q + 1]), ss.quantize == q) && ss.quantize != q)
+               ArrangeEdit([&]() {
+                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+                  {
+                     l->slots[(size_t)row].quantize = q;
+                     gArrange.revision++;
+                  }
+               });
+         ImGui::EndMenu();
+      }
+      if (MenuParts::SubMenu(L("Launch Mode")))
+      {
+         for (int m = 0; m < 3; m++)
+            if (MenuParts::Choice(L(kModeNames[m]), ss.launchMode == m) && ss.launchMode != m)
+               ArrangeEdit([&]() {
+                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+                  {
+                     l->slots[(size_t)row].launchMode = m;
+                     gArrange.revision++;
+                  }
+               });
          ImGui::EndMenu();
       }
       MenuParts::Separator();

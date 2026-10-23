@@ -4953,6 +4953,7 @@ bool ArrangeAudioRebuildIfStale();
    // Once a frame, before ArrangeAudioRebuildIfStale.
    void ArrangeSessionTick();
    void ArrangeSessionLaunch(uint64_t laneId, int slot);
+   void ArrangeSessionRelease(uint64_t laneId, int slot);
    void ArrangeSessionStopLane(uint64_t laneId);
    void ArrangeSessionStopAll();
    void ArrangeSessionLaunchScene(int scene);

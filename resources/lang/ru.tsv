@@ -1536,3 +1536,20 @@ Add a track, then add clips to its cells or drop audio and video files onto them
 Add a video track, an audio track or a track group	Добавить видеодорожку, аудиодорожку или группу дорожек
 Group This Track	Сгруппировать эту дорожку
 Ungroup Track	Убрать дорожку из группы
+1 Bar	1 такт
+1 Beat	1 доля
+1/2 Bar	1/2 такта
+1/4 Bar	1/4 такта
+2 Bars	2 такта
+4 Bars	4 такта
+8 Bars	8 тактов
+Clip Length	Длина клипа
+Gate	Гейт
+Global	Глобально
+Keep Other Tracks Playing	Не останавливать другие дорожки
+Launch Mode	Режим запуска
+Launch Quantize	Квантование запуска
+Loop Length	Длина цикла
+None	Нет
+Toggle	Переключатель
+Trigger	Триггер

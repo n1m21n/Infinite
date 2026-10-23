@@ -125,6 +125,10 @@ namespace app
             r.sessionScene = (int)k;
             r.followAction = sl.followAction;
             r.followBars = sl.followBars;
+            r.slotLoop = sl.loop;
+            r.slotLoopTicks = (int)sl.loopTicks;
+            r.slotQuantize = sl.quantize;
+            r.slotLaunchMode = sl.launchMode;
             s.clips.push_back(std::move(r));
          }
          data.streams.push_back(std::move(s));
@@ -156,7 +160,7 @@ namespace app
 
       data.scenes.clear();
       for (const Arrange::Scene& sc : m.scenes)
-         data.scenes.push_back({ sc.tempo, sc.name });
+         data.scenes.push_back({ sc.tempo, sc.name, sc.quantize, sc.additive });
 
       Patch::ArrangeSettingsRecord& a = data.arrangeSettings;
       // Saved, not recomputed as max-id + 1: a clip deleted after taking a
@@ -228,6 +232,10 @@ namespace app
                sl.clip = std::move(clip);
                sl.followAction = std::clamp(c.followAction, 0, (int)Arrange::kFollowCount - 1);
                sl.followBars = std::clamp(c.followBars, Arrange::kFollowBarsMin, Arrange::kFollowBarsMax);
+               sl.loop = c.slotLoop;
+               sl.loopTicks = c.slotLoopTicks;
+               sl.quantize = c.slotQuantize;
+               sl.launchMode = c.slotLaunchMode;
                continue;
             }
             lane.clips.push_back(std::move(clip));
@@ -257,7 +265,7 @@ namespace app
       }
 
       for (const Patch::SceneRecord& r : data.scenes)
-         m.scenes.push_back({ r.name, r.tempo });
+         m.scenes.push_back({ r.name, r.tempo, r.quantize, r.additive });
       // Every slot row has a scene, so a hand-edited file can't hide a slot.
       for (const Arrange::Lane& lane : m.lanes)
          while (m.scenes.size() < lane.slots.size())

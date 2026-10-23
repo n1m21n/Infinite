@@ -413,6 +413,10 @@ namespace Patch
       int    sessionScene = -1;
       int    followAction = 0;
       int    followBars   = 4;
+      bool   slotLoop     = true;
+      int    slotLoopTicks = 0;
+      int    slotQuantize = -1;
+      int    slotLaunchMode = 0;
    };
 
    // Session view row (Arrange::Scene), one `scene` line each, in order.
@@ -420,6 +424,8 @@ namespace Patch
    {
       float tempo = 0.0f;         // > 0 = launching the scene sets the tempo
       std::string name;
+      int quantize = -1;
+      bool additive = false;
    };
 
    struct StreamRecord

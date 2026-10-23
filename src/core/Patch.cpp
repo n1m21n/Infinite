@@ -498,7 +498,8 @@ static void WriteBody(std::ostream& file, const Data& data)
       for (const ClipRecord& c : s.clips)
          if (c.sessionScene >= 0)
             file << "sessionslot " << i << " " << c.id << " " << c.sessionScene << " " << c.followAction << " "
-                 << c.followBars << "\n";
+                 << c.followBars << " " << (c.slotLoop ? 1 : 0) << " " << c.slotLoopTicks << " "
+                 << c.slotQuantize << " " << c.slotLaunchMode << "\n";
    }
    for (const MarkerRecord& mk : data.markers)
       file << "marker " << mk.id << " " << mk.posTick << " " << mk.color << " " << EscapeLine(mk.name) << "\n";
@@ -512,6 +513,9 @@ static void WriteBody(std::ostream& file, const Data& data)
    // token, added after it for the same reason.
    for (const SceneRecord& sc : data.scenes)
       file << "scene " << FloatToString(sc.tempo) << " " << EscapeLine(sc.name) << "\n";
+   for (size_t k = 0; k < data.scenes.size(); k++)
+      if (data.scenes[k].quantize != -1 || data.scenes[k].additive)
+         file << "scenemeta " << k << " " << data.scenes[k].quantize << " " << (data.scenes[k].additive ? 1 : 0) << "\n";
    for (const TrackGroupRecord& g : data.trackGroups)
       file << "trackgroup " << g.id << " " << g.color << " " << (g.enabled ? 1 : 0) << " "
            << (g.collapsed ? 1 : 0) << " " << g.parentGroupId << " " << EscapeLine(g.name) << "\n";
@@ -1249,7 +1253,25 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                   c.sessionScene = scene;
                   c.followAction = std::clamp(follow, 0, 4);
                   c.followBars = std::clamp(bars, 1, 64);
+                  int lp = 1, lt = 0, q = -1, lm = 0;   // later versions append these
+                  if (in >> lp >> lt >> q >> lm)
+                  {
+                     c.slotLoop = lp != 0;
+                     c.slotLoopTicks = std::clamp(lt, 0, 1 << 30);
+                     c.slotQuantize = std::clamp(q, -1, 3);
+                     c.slotLaunchMode = std::clamp(lm, 0, 2);
+                  }
                }
+         }
+      }
+      else if (tag == "scenemeta")
+      {
+         size_t idx = 0;
+         int q = -1, add = 0;
+         if (in >> idx >> q >> add && idx < outData.scenes.size())
+         {
+            outData.scenes[idx].quantize = std::clamp(q, -1, 3);
+            outData.scenes[idx].additive = add != 0;
          }
       }
       else if (tag == "scene")

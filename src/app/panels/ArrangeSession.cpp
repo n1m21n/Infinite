@@ -141,6 +141,16 @@ namespace app
          return slot;
       }
 
+      // The clip a slot repeats: its length cut to the loop length.
+      Arrange::Clip LoopClip(const Arrange::SessionSlot& ss)
+      {
+         Arrange::Clip c = ss.clip;
+         c.length = ss.LoopLen();
+         c.fadeOut = std::min(c.fadeOut, c.length);
+         c.fadeIn = std::min(c.fadeIn, c.length);
+         return c;
+      }
+
       void ExpandLane(const Arrange::Lane& lane, const std::vector<SessSeg>& segs, Tick horizon,
                       std::vector<SessRun>& out)
       {
@@ -157,11 +167,13 @@ namespace app
                   break;
                Tick runEnd = t1;
                Tick follow = -1;
+               if (!ss->loop)
+                  runEnd = std::min(runEnd, cursor + ss->LoopLen());   // one-shot
                if (ss->followAction != Arrange::kFollowNone)
                {
                   const Tick f = cursor + (Tick)std::clamp(ss->followBars, Arrange::kFollowBarsMin,
                                                            Arrange::kFollowBarsMax) * Arrange::kTicksPerBar;
-                  if (f < t1)
+                  if (f < runEnd)
                   {
                      runEnd = f;
                      follow = f;
@@ -272,7 +284,7 @@ namespace app
             const Arrange::Lane* lane = Arrange::FindLane(gArrange, r.laneId);
             const Arrange::SessionSlot* ss = lane ? SlotAt(*lane, r.slot) : nullptr;
             if (ss != nullptr && r.to > lo)
-               PlaceRepeats(sPlay, r.laneId, r.slot, ss->clip, r.from, std::max(lo, r.from), r.to, true);
+               PlaceRepeats(sPlay, r.laneId, r.slot, LoopClip(*ss), r.from, std::max(lo, r.from), r.to, true);
          }
       }
 
@@ -292,7 +304,7 @@ namespace app
       // Where a launch or stop asked for now lands: the next launch-grid line
       // while playing; right here when stopped (the click starts the
       // transport) or with no grid.
-      Tick LaunchTick(bool startTransport)
+      Tick LaunchTick(bool startTransport, int quantize = -1)
       {
          Transport& tr = Transport::Instance();
          if (!tr.IsPlaying())
@@ -304,7 +316,7 @@ namespace app
             }
             return NowTick();
          }
-         return std::max<Tick>(0, Arrange::BeatsToTicks(MusicTime::NextLaunchBeat(tr.Beats(), tr.LaunchQuantize())));
+         return std::max<Tick>(0, Arrange::BeatsToTicks(MusicTime::NextLaunchBeat(tr.Beats(), quantize >= 0 ? quantize : tr.LaunchQuantize())));
       }
 
       void Schedule(uint64_t laneId, Tick at, int slot)
@@ -342,7 +354,7 @@ namespace app
                   break;
                }
             if (!found)
-               sRecLog.push_back(SessRecEntry{ r.laneId, r.slot, r.from, to, ss->clip });
+               sRecLog.push_back(SessRecEntry{ r.laneId, r.slot, r.from, to, LoopClip(*ss) });
          }
       }
 
@@ -467,7 +479,24 @@ namespace app
          ArrangeSessionStopLane(laneId);
          return;
       }
-      Schedule(laneId, LaunchTick(true), slot);
+      const Arrange::SessionSlot* ss = SlotAt(*lane, slot);
+      // Toggle: clicking the playing clip stops it.
+      if (ss->launchMode == 2 && ArrangeSessionLaneQuery(laneId).playingSlot == slot)
+      {
+         ArrangeSessionStopLane(laneId);
+         return;
+      }
+      Schedule(laneId, LaunchTick(true, ss->quantize), slot);
+   }
+
+
+   // The mouse let go of a cell: a Gate clip plays only while held.
+   void ArrangeSessionRelease(uint64_t laneId, int slot)
+   {
+      const Arrange::Lane* lane = Arrange::FindLane(gArrange, laneId);
+      const Arrange::SessionSlot* ss = lane ? SlotAt(*lane, slot) : nullptr;
+      if (ss != nullptr && ss->launchMode == 1)
+         ArrangeSessionStopLane(laneId);
    }
 
 
@@ -504,12 +533,13 @@ namespace app
          any = any || SlotAt(lane, scene) != nullptr;
       if (!any && sSchedule.empty())
          return;
-      const Tick at = LaunchTick(any);
+      const Tick at = LaunchTick(any, gArrange.scenes[(size_t)scene].quantize);
+      const bool additive = gArrange.scenes[(size_t)scene].additive;
       for (const Arrange::Lane& lane : gArrange.lanes)
       {
          if (SlotAt(lane, scene) != nullptr)
             Schedule(lane.id, at, scene);
-         else if (sSchedule.find(lane.id) != sSchedule.end())
+         else if (!additive && sSchedule.find(lane.id) != sSchedule.end())
             Schedule(lane.id, at, -1);
       }
       const float tempo = gArrange.scenes[(size_t)scene].tempo;

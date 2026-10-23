@@ -1536,3 +1536,20 @@ Add a track, then add clips to its cells or drop audio and video files onto them
 Add a video track, an audio track or a track group	ビデオトラック、オーディオトラック、またはトラックグループを追加
 Group This Track	このトラックをグループ化
 Ungroup Track	トラックのグループ化を解除
+1 Bar	1小節
+1 Beat	1拍
+1/2 Bar	1/2小節
+1/4 Bar	1/4小節
+2 Bars	2小節
+4 Bars	4小節
+8 Bars	8小節
+Clip Length	クリップの長さ
+Gate	ゲート
+Global	グローバル
+Keep Other Tracks Playing	他のトラックを再生し続ける
+Launch Mode	起動モード
+Launch Quantize	起動クオンタイズ
+Loop Length	ループの長さ
+None	なし
+Toggle	トグル
+Trigger	トリガー

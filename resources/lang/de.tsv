@@ -1536,3 +1536,20 @@ Add a track, then add clips to its cells or drop audio and video files onto them
 Add a video track, an audio track or a track group	Videospur, Audiospur oder Spurgruppe hinzufügen
 Group This Track	Diese Spur gruppieren
 Ungroup Track	Spur aus Gruppe lösen
+1 Bar	1 Takt
+1 Beat	1 Schlag
+1/2 Bar	1/2 Takt
+1/4 Bar	1/4 Takt
+2 Bars	2 Takte
+4 Bars	4 Takte
+8 Bars	8 Takte
+Clip Length	Cliplänge
+Gate	Gate
+Global	Global
+Keep Other Tracks Playing	Andere Spuren weiterspielen
+Launch Mode	Startmodus
+Launch Quantize	Start-Quantisierung
+Loop Length	Loop-Länge
+None	Keine
+Toggle	Umschalten
+Trigger	Trigger

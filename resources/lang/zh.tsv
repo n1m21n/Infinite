@@ -1536,3 +1536,20 @@ Add a track, then add clips to its cells or drop audio and video files onto them
 Add a video track, an audio track or a track group	添加视频轨道、音频轨道或轨道组
 Group This Track	将此轨道编组
 Ungroup Track	取消轨道编组
+1 Bar	1 小节
+1 Beat	1 拍
+1/2 Bar	1/2 小节
+1/4 Bar	1/4 小节
+2 Bars	2 小节
+4 Bars	4 小节
+8 Bars	8 小节
+Clip Length	片段长度
+Gate	门控
+Global	全局
+Keep Other Tracks Playing	保持其他轨道播放
+Launch Mode	启动模式
+Launch Quantize	启动量化
+Loop Length	循环长度
+None	无
+Toggle	切换
+Trigger	触发

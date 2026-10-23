@@ -1536,3 +1536,20 @@ Add a track, then add clips to its cells or drop audio and video files onto them
 Add a video track, an audio track or a track group	Añadir una pista de vídeo, una de audio o un grupo de pistas
 Group This Track	Agrupar esta pista
 Ungroup Track	Sacar la pista del grupo
+1 Bar	1 compás
+1 Beat	1 pulso
+1/2 Bar	1/2 compás
+1/4 Bar	1/4 compás
+2 Bars	2 compases
+4 Bars	4 compases
+8 Bars	8 compases
+Clip Length	Duración del clip
+Gate	Gate
+Global	Global
+Keep Other Tracks Playing	Mantener otras pistas sonando
+Launch Mode	Modo de lanzamiento
+Launch Quantize	Cuantización de lanzamiento
+Loop Length	Duración del bucle
+None	Ninguna
+Toggle	Alternar
+Trigger	Disparo

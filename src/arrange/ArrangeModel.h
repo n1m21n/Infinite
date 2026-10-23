@@ -237,6 +237,13 @@ namespace Arrange
       Clip clip;                  // clip.start is unused (always 0); length > 0 = filled
       int  followAction = kFollowNone;
       int  followBars   = 4;      // kFollowBarsMin..kFollowBarsMax
+      // Launch settings (Ableton's Launch box). Defaults reproduce the
+      // original behaviour: loop forever at the clip's length, global quantize.
+      bool loop         = true;   // false = one-shot: plays once, then the track goes quiet
+      Tick loopTicks    = 0;      // 0 = the clip's length; else the loop is this long (<= clip length)
+      int  quantize     = -1;     // -1 = the transport's launch quantize, else MusicTime::kLaunch*
+      int  launchMode   = 0;      // 0 trigger, 1 gate (plays while held), 2 toggle (click again stops)
+      Tick LoopLen() const { return loopTicks > 0 && loopTicks < clip.length ? loopTicks : clip.length; }
       bool Has() const { return clip.length > 0; }
    };
 
@@ -244,6 +251,8 @@ namespace Arrange
    {
       std::string name;           // empty = auto ("Scene 1", ...)
       float tempo = 0.0f;         // > 0 sets the project tempo when the scene launches
+      int   quantize = -1;        // -1 = global; else MusicTime::kLaunch*. Wins over each clip's own
+      bool  additive = false;     // true = tracks the scene has no clip on keep playing
    };
 
    struct Lane

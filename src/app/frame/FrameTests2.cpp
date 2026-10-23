@@ -3610,6 +3610,12 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
          fill(laneA2, 0, 2, "Sub");
          fill(laneA2, 3, 4, "Wobble");
          fill(laneV1, 1, 4, "Tunnel");
+         Arrange::FindLane(gArrange, laneA1)->slots[3].loop = false;
+         Arrange::FindLane(gArrange, laneA1)->slots[3].quantize = 3;
+         Arrange::FindLane(gArrange, laneA1)->slots[3].launchMode = 2;
+         Arrange::FindLane(gArrange, laneA2)->slots[0].loopTicks = Arrange::kTicksPerBar;
+         gArrange.scenes[1].quantize = 2;
+         gArrange.scenes[1].additive = true;
          Arrange::Normalize(gArrange);
       });
       gArrangePanelOpen = true;
@@ -3646,6 +3652,16 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       check(&pm != &gArrange, "playback model is a launched copy");
       check(synthClips(laneA1) > 0 && synthClips(laneA2) > 0, "scene 1 clips appear on both audio tracks");
       check(synthClips(laneV1) == 0, "the video track had no slot in scene 1");
+      {
+         // Sub is 2 bars long with a 1-bar loop length: every repeat is 1 bar.
+         const Arrange::Lane* l2 = Arrange::FindLane(pm, laneA2);
+         bool oneBar = l2 != nullptr && !l2->clips.empty();
+         if (l2 != nullptr)
+            for (const Arrange::Clip& c : l2->clips)
+               if ((c.id & (1ull << 62)) != 0 && c.length > Arrange::kTicksPerBar)
+                  oneBar = false;
+         check(oneBar, "a loop length shorter than the clip repeats at the loop length");
+      }
       check(Arrange::FindLane(gArrange, laneA1)->clips.empty(), "launching never edits the arrangement");
       ArrangeSessionLaunchScene(3);
       check(Transport::Instance().Beats() >= 0.0 && Arrange::FindLane(gArrange, laneA1)->slots.size() == 4, "scene 4 launch keeps the slots");
@@ -3671,6 +3687,15 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       same = same && l0 != nullptr && l0->slots.size() == a1Slots && l0->slots[0].clip.name == firstName &&
              l0->slots[1].followAction == follow;
       check(same, "scenes, slots and follow actions round trip");
+      {
+         const Arrange::Lane* a1 = &gArrange.lanes[0];
+         const Arrange::Lane* a2 = &gArrange.lanes[1];
+         check(a1->slots.size() > 3 && !a1->slots[3].loop && a1->slots[3].quantize == 3 && a1->slots[3].launchMode == 2 &&
+               a1->slots[0].loop && a1->slots[0].quantize == -1 &&
+               a2->slots[0].loopTicks == Arrange::kTicksPerBar &&
+               gArrange.scenes[1].quantize == 2 && gArrange.scenes[1].additive && !gArrange.scenes[0].additive,
+               "launch settings round trip");
+      }
       if (loaded && l0 != nullptr)
       {
          laneA1 = gArrange.lanes[0].id;
