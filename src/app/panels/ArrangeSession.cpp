@@ -583,8 +583,19 @@ namespace app
    {
       ArrangeSessionSlotState st;
       const Tick now = NowTick();
+      Tick playingEnd = -1;
+      int playingSlot = -1;
+      for (const SessRun& r : sRuns)
+         if (r.laneId == laneId && r.from <= now && now < r.to)
+         {
+            playingEnd = r.to;
+            playingSlot = r.slot;
+         }
       for (const SessRun& r : sRuns)
       {
+         if (r.laneId == laneId && r.slot == slot && playingEnd >= 0 && r.from == playingEnd && slot != playingSlot &&
+             !r.explicitStart)
+            st.upNext = true;
          if (r.laneId != laneId || r.slot != slot)
             continue;
          if (r.from <= now && now < r.to)

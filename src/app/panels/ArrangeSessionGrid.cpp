@@ -274,10 +274,10 @@ namespace app
          }
          else
          {
-            if (lane->groupId != 0 && MenuParts::Item(L("Launch Row in Group")))
-               ArrangeSessionLaunchGroupRow(lane->groupId, row);
             if (MenuParts::Item(L("Add Clip")))
                AddSlotClip(laneId, row);
+            if (lane->groupId != 0 && MenuParts::Item(L("Launch Row in Group")))
+               ArrangeSessionLaunchGroupRow(lane->groupId, row);
             const Arrange::Clip* sel = SelectedClipOfType(lane->type);
             if (MenuParts::Item(L("Paste Selected Clip"), nullptr, false, sel != nullptr) && sel != nullptr)
             {
@@ -544,7 +544,28 @@ namespace app
          ImGui::PopID();
          dl->AddRectFilled(a, b, TextCol(hov ? 0.10f : 0.05f), tok::radius_field);
          const float cy = (a.y + b.y) * 0.5f;
-         glyph::DrawPlayerPlay(dl, ImVec2(a.x + 13.0f, cy), tok::icon_sm, rowHasClip ? TextCol(0.85f) : TextCol(0.25f), true);
+         // Scene state: playing = every filled cell of the row is running (a ring sweeps with the clip),
+         // queued = the launch is waiting for the quantize point (the play glyph pulses on the beat).
+         bool rowPlaying = false, rowQueued = false;
+         float rowProgress = 0.0f;
+         for (const Arrange::Lane& l : gArrange.lanes)
+            if (SlotOf(l, row) != nullptr)
+            {
+               const ArrangeSessionSlotState sst = ArrangeSessionQuery(l.id, row);
+               if (sst.playing && !rowPlaying)
+               {
+                  rowPlaying = true;
+                  rowProgress = sst.progress;
+               }
+               rowQueued = rowQueued || sst.queued;
+            }
+         if (rowPlaying)
+            dl->AddRectFilled(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.10f), tok::radius_field);
+         if (rowPlaying)
+            DrawProgressRing(dl, ImVec2(a.x + 13.0f, cy), 7.0f, rowProgress, TextCol(0.95f));
+         else
+            glyph::DrawPlayerPlay(dl, ImVec2(a.x + 13.0f, cy), tok::icon_sm,
+                                  rowQueued ? WithAlpha(TextCol(0.95f), pulse) : (rowHasClip ? TextCol(0.85f) : TextCol(0.25f)), true);
          const std::string label = SceneLabel(row);
          const float th = ImGui::GetTextLineHeight();
          float rightEdge = b.x - 6.0f;
@@ -633,6 +654,13 @@ namespace app
                   glyph::DrawPlayerPlay(dl, ic, tok::icon_sm, WithAlpha(ink, st.queued ? pulse : 0.85f), !st.queued);
                if (st.queued)
                   dl->AddRect(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.9f * pulse), tok::radius_field, 0, 1.5f);
+               if (st.upNext)
+               {
+                  // Up next (a follow action is about to start this clip): a steady inner outline and a chevron.
+                  dl->AddRect(ImVec2(a.x + 2.0f, a.y + 2.0f), ImVec2(b.x - 2.0f, b.y - 2.0f),
+                              WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.75f), tok::radius_field, 0, 1.0f);
+                  glyph::DrawChevronDown(dl, ImVec2(b.x - 14.0f, a.y + 8.0f), tok::icon_sm, WithAlpha(ink, 0.9f));
+               }
                const std::string label = SlotLabel(ss->clip);
                const float badgeW = ss->followAction != Arrange::kFollowNone ? 30.0f : 0.0f;
                dl->PushClipRect(a, ImVec2(b.x - 6.0f - badgeW, b.y), true);

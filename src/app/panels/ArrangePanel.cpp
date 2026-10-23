@@ -87,6 +87,12 @@ namespace app
             const bool ctxIsSlot = Arrange::FindSlot(gArrange, cid).lane >= 0;
             const int ctxLaneType = Arrange::LaneOfClip(gArrange, cid)->type;
             GraphNode* ctxNode = nodeForUid(cp->srcUid);
+            // A session slot's own settings lead the menu: launch, loop, quantize.
+            if (ctxIsSlot)
+            {
+               DrawArrangeSessionSlotMenuItems(cid);
+               MenuParts::Separator();
+            }
             // Fade In/Out and Compositing are per-clip-type (audio vs video)
             // settings - meaningless once the selection spans both, which
             // happens as soon as a mixed audio+video group (one video clip,
@@ -504,13 +510,9 @@ namespace app
             } // end else (single-clip specific properties)
 
             // Group, Ungroup, and Delete: available for both multi-selection and single-clip / group-selection
+            if (!ctxIsSlot)
+            {
             MenuParts::Separator();
-            if (ctxIsSlot)
-            {
-               DrawArrangeSessionSlotMenuItems(cid);
-            }
-            else
-            {
             if (MenuParts::Item(L("Group"), MODKEY "+G", false, ArrangeCanGroupSelection()))
                ArrangeGroupSelection();
             if (MenuParts::Item(L("Ungroup"), MODKEY "+Shift+G", false, ArrangeCanUngroupSelection()))

@@ -4962,6 +4962,7 @@ bool ArrangeAudioRebuildIfStale();
    {
       bool playing = false;
       bool queued = false;
+      bool upNext = false;   // a follow action will start this slot when the playing clip's run ends
       float progress = 0.0f; // 0..1 through the clip's current pass
    };
    ArrangeSessionSlotState ArrangeSessionQuery(uint64_t laneId, int slot);
