@@ -296,8 +296,8 @@ void Render3DNode::RunPost(const Mat4& proj, bool ortho, int w, int h)
 bool Render3DNode::Accumulate(int frameId)
 {
    const int n = std::max(2, std::min(supersample, 64));
-   const int w = std::max(16, (int)width);
-   const int h = std::max(16, (int)height);
+   const int w = GLUtil::TargetSide(width, 16);
+   const int h = GLUtil::TargetSide(height, 16);
    if (!EnsurePostShaders())
       return false;
    if (!GLUtil::EnsureFbo(mAccum[0], w, h, GL_RGBA32F, "Render3D_Accum") ||

@@ -15,6 +15,10 @@ such values in about a second.
 DESCRIBE.json comes from `Infinite --describe --out FILE` (about 16 s).
 Exit status is 1 when any value would change.
 
+Zero hits proves nothing for a Type.key no patch stores, or a type name that
+is misspelled. Those are listed as unseen ("Fit.width=0..1" style canaries
+showed several image types never store width).
+
 A knob range is what that knob draws in the probe's default state. It is not
 the param's domain. A central clamp from describe ranges was tried and dropped
 for that reason: Select draws selectC as 1..32, -1..1 or -3..3 by mode,
@@ -78,7 +82,9 @@ def parse_inf(text):
                     pass
 
 
-def scan(table, files):
+def scan(table, files, seen=None):
+    """Values outside their range. `seen` collects the (type, key) pairs met
+    and the bare types met as (type, None)."""
     hits = []
     for path in files:
         try:
@@ -87,6 +93,10 @@ def scan(table, files):
             continue
         for ty, key, v in parse_inf(text):
             r = table.get((ty, key))
+            if seen is not None:
+                seen.add((ty, None))
+                if r:
+                    seen.add((ty, key))
             if r and math.isfinite(v) and not (r[0] <= v <= r[1]):
                 hits.append((path, ty, key, v, r))
     return hits
@@ -114,8 +124,10 @@ def selftest():
     with tempfile.NamedTemporaryFile("w", suffix=".inf", delete=False) as f:
         f.write(inf)
     try:
-        h = scan(t, [f.name])
+        seen = set()
+        h = scan(t, [f.name], seen)
         assert len(h) == 1 and h[0][1:4] == ("Gain", "gainDb", 900.0), h
+        assert ("Gain", "gainDb") in seen and ("Torus Knot", None) in seen and ("Gain", "x") not in seen
     finally:
         os.unlink(f.name)
     print("selftest ok")
@@ -125,7 +137,7 @@ def main(argv):
     if argv[:1] == ["selftest"]:
         selftest()
         return 0
-    if not argv:
+    if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 2
     files = None
@@ -137,11 +149,19 @@ def main(argv):
     if argv[0] == "--knobs":
         table = knob_ranges(json.load(open(argv[1])), set(argv[2:]) or None)
     else:
-        table = dict(parse_spec(s) for s in argv)
+        specs = [parse_spec(s) for s in argv]
+        table = dict(specs)
+        if len(table) != len(specs):
+            print("the same Type.key is given twice; only the last range would be checked")
+            return 2
     files = tracked_inf() if files is None else files
-    hits = scan(table, files)
+    seen = set()
+    hits = scan(table, files, seen)
     for path, ty, key, v, (lo, hi) in hits:
         print("%s: %s.%s = %g outside %g..%g" % (os.path.relpath(path, ROOT), ty, key, v, lo, hi))
+    for ty, key in sorted(k for k in table if k not in seen):
+        why = "no patch stores it" if (ty, None) in seen else "no patch has this type; check the name"
+        print("unseen %s.%s: %s, so 0 hits proves nothing for it" % (ty, key, why))
     print("%d clamps, %d patches, %d values the clamp would change" % (len(table), len(files), len(hits)))
     return 1 if hits else 0
 

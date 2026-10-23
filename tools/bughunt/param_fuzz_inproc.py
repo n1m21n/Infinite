@@ -10,6 +10,9 @@ until the summary line prints.
 OUT.tsv rows: verdict, row, detail. A verdict is NAN, HOT or SLOW (the
 selftest's own flags), CRASH (the first sanitizer line or the exit code) or
 HANG (the alarm fired). Exit 1 if any row is written.
+
+Rows are written to OUT.tsv and printed as they are found, so a long run can
+be checked while it goes (`tail -f OUT.tsv`).
 """
 import argparse, os, re, signal, subprocess, sys
 
@@ -19,15 +22,20 @@ DONE = re.compile(r'^PARAMFUZZ \d+ types, \d+ rows, \d+ flagged')
 SAN = re.compile(r'(runtime error: .*|ERROR: AddressSanitizer: \S+.*)')
 
 
-def run_once(binary, types, after, alarm):
+def run_once(binary, types, after, alarm, on_line):
     env = dict(os.environ, INFINITE_PARAMFUZZ=types or '1')
     if after:
         env['INFINITE_PARAMFUZZ_AFTER'] = after
     else:
         env.pop('INFINITE_PARAMFUZZ_AFTER', None)
-    p = subprocess.run(['perl', '-e', f'alarm {alarm}; exec @ARGV', binary], env=env,
-                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
-    return p.returncode, p.stdout.splitlines()
+    p = subprocess.Popen(['perl', '-e', f'alarm {alarm}; exec @ARGV', binary], env=env,
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+    lines = []
+    for ln in p.stdout:
+        ln = ln.rstrip('\n')
+        lines.append(ln)
+        on_line(ln)
+    return p.wait(), lines
 
 
 def main():
@@ -38,33 +46,41 @@ def main():
     ap.add_argument('--alarm', type=int, default=1800)
     a = ap.parse_args()
     rows, after = [], ''
+    out = open(a.out, 'w')
+
+    def add(row):
+        rows.append(row)
+        out.write('\t'.join(row) + '\n')
+        out.flush()
+        print(f'{row[0]} {row[1]}: {row[2]}', flush=True)
+
     while True:
-        code, lines = run_once(a.binary, a.types, after, a.alarm)
-        last, san = None, None
-        for ln in lines:
+        st = {'last': None, 'san': None}
+
+        def on_line(ln):
             m = TRY.match(ln)
             if m:
-                last, san = m.group(1), None
-                continue
+                st['last'], st['san'] = m.group(1), None
+                return
             m = FLAG.match(ln)
             if m:
-                rows.append((m.group(1), m.group(2), m.group(3)))
-                continue
+                add((m.group(1), m.group(2), m.group(3)))
+                return
             m = SAN.search(ln)
-            if m and san is None:
-                san = m.group(1)
+            if m and st['san'] is None:
+                st['san'] = m.group(1)
+
+        code, lines = run_once(a.binary, a.types, after, a.alarm, on_line)
+        last, san = st['last'], st['san']
         if any(DONE.match(ln) for ln in lines):
             break
         if last is None or last == after:
             print(f'param_fuzz_inproc: no progress (exit {code}); last lines:', *lines[-5:], sep='\n  ')
             sys.exit(2)
         hang = code == 128 + signal.SIGALRM or code == -signal.SIGALRM
-        rows.append(('HANG' if hang else 'CRASH', last, san or f'exit {code}'))
-        print(f'{rows[-1][0]} {last}: {rows[-1][2]}', flush=True)
+        add(('HANG' if hang else 'CRASH', last, san or f'exit {code}'))
         after = last
-    with open(a.out, 'w') as f:
-        for r in rows:
-            f.write('\t'.join(r) + '\n')
+    out.close()
     print(f'param_fuzz_inproc: {len(rows)} rows flagged -> {a.out}')
     sys.exit(1 if rows else 0)
 

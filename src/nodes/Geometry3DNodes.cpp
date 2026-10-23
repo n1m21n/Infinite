@@ -1595,8 +1595,8 @@ void Render3DNode::CookOnce(int frameId)
    if (!EnsureShader())
       return;
 
-   const int w = std::max(16, (int)width);
-   const int h = std::max(16, (int)height);
+   const int w = GLUtil::TargetSide(width, 16);
+   const int h = GLUtil::TargetSide(height, 16);
    const int wantSamples =
       kSampleCounts[std::max(0, std::min(samples, (int)(sizeof(kSampleCounts) / sizeof(int)) - 1))];
    if (!EnsureResources(w, h, wantSamples))

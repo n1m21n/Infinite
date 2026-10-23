@@ -25,6 +25,17 @@ namespace GLUtil
    // internal format (default GL_RGBA8, matching prior behavior). Pass
    // GL_RGBA16F for nodes that need HDR range or unclamped simulation state.
    // `label` is the Bench::GpuMem tag B9 groups render targets by.
+   // A render target side from a size param: lo..kMaxTargetSide, NaN -> lo.
+   // A patch, OSC/RPC set or modulator can hold any float, and a side past
+   // the knob asked the GPU for gigabytes or failed the render (B-K-038).
+   constexpr int kMaxTargetSide = 8192;
+   inline int TargetSide(float v, int lo)
+   {
+      if (!(v >= (float)lo))
+         return lo;
+      return v > (float)kMaxTargetSide ? kMaxTargetSide : (int)v;
+   }
+
    bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat = GL_RGBA8,
                   const char* label = "Fbo");
    void DestroyFbo(Fbo& fbo);
