@@ -1529,3 +1529,10 @@ This slot is inactive	此槽位未启用
 This slot's source is missing	此槽位的源文件缺失
 Timeline: clips along the transport	时间线：沿走带排列的片段
 Unassigned	未分配
++ Audio Track	+ 音频轨道
++ Video Track	+ 视频轨道
+Add a scene (a row of clips that launch together)	添加场景（一起启动的一行片段）
+Add a track, then add clips to its cells or drop audio and video files onto them.	添加轨道，然后向其单元格添加片段，或把音频和视频文件拖放到上面。
+Add a video track, an audio track or a track group	添加视频轨道、音频轨道或轨道组
+Group This Track	将此轨道编组
+Ungroup Track	取消轨道编组

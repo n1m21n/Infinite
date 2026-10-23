@@ -1529,3 +1529,10 @@ This slot is inactive	このスロットは無効です
 This slot's source is missing	このスロットのソースが見つかりません
 Timeline: clips along the transport	タイムライン：トランスポートに沿ったクリップ
 Unassigned	未割り当て
++ Audio Track	+ オーディオトラック
++ Video Track	+ ビデオトラック
+Add a scene (a row of clips that launch together)	シーンを追加（まとめて起動するクリップの行）
+Add a track, then add clips to its cells or drop audio and video files onto them.	トラックを追加し、セルにクリップを追加するか、音声・動画ファイルをドロップします。
+Add a video track, an audio track or a track group	ビデオトラック、オーディオトラック、またはトラックグループを追加
+Group This Track	このトラックをグループ化
+Ungroup Track	トラックのグループ化を解除

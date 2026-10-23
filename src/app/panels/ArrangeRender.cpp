@@ -456,8 +456,7 @@ namespace app
 
       if (clip != nullptr)
       {
-         const Arrange::Loc cloc = Arrange::Find(gArrange, clipId);
-         const Arrange::Lane* owningLane = cloc.Valid() ? &gArrange.lanes[cloc.lane] : nullptr;
+         const Arrange::Lane* owningLane = Arrange::LaneOfClip(gArrange, clipId);
          const bool isVideo = owningLane != nullptr && owningLane->type == Arrange::kLaneVideo;
          const bool isSample = clip->sampleDropped;
 

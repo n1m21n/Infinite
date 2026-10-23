@@ -4552,6 +4552,7 @@ int ArrangeLaneTypeForNode(const GraphNode& gn);
 void ArrangePruneSelection();
 
 std::vector<uint64_t> ArrangeSelectionIds();
+uint64_t ArrangeSelectedSlotId();
 
 void ArrangeClickSelect(uint64_t clipId, bool toggle, bool singleMember);
 
@@ -4972,6 +4973,10 @@ bool ArrangeAudioRebuildIfStale();
    bool ArrangeSessionRecording();
    void ArrangeSessionSetRecording(bool on);
    void DrawArrangeSessionGrid();
+   // The grid asks for the shared clip menu on a slot; the panel opens it and clears the request.
+   bool ArrangeSessionTakeClipCtxRequest();
+   // The slot-only rows at the bottom of the clip menu: follow action, follow after, place on Timeline, clear.
+   void DrawArrangeSessionSlotMenuItems(uint64_t clipId);
 
 bool StartAudioEngine(std::string& outError);
 

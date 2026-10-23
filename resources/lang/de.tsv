@@ -1529,3 +1529,10 @@ This slot is inactive	Dieser Slot ist inaktiv
 This slot's source is missing	Die Quelle dieses Slots fehlt
 Timeline: clips along the transport	Timeline: Clips entlang des Transports
 Unassigned	Nicht zugewiesen
++ Audio Track	+ Audiospur
++ Video Track	+ Videospur
+Add a scene (a row of clips that launch together)	Szene hinzufügen (eine Reihe von Clips, die zusammen starten)
+Add a track, then add clips to its cells or drop audio and video files onto them.	Füge eine Spur hinzu und lege dann Clips in ihre Zellen oder ziehe Audio- und Videodateien darauf.
+Add a video track, an audio track or a track group	Videospur, Audiospur oder Spurgruppe hinzufügen
+Group This Track	Diese Spur gruppieren
+Ungroup Track	Spur aus Gruppe lösen

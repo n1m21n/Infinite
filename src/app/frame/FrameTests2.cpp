@@ -3597,6 +3597,7 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
             if ((int)l->slots.size() <= row)
                l->slots.resize((size_t)row + 1);
             Arrange::SessionSlot& ss = l->slots[(size_t)row];
+            ss.clip.id = gArrange.NewId();
             ss.clip.length = (Arrange::Tick)bars * Arrange::kTicksPerBar;
             ss.clip.name = name;
             ss.clip.srcUid = srcUid;
@@ -3615,6 +3616,18 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       gArrangePanelHeight = 700.0f;
       gArrangeSessionView = true;
       check(gArrange.scenes.size() == 4 && Arrange::FindLane(gArrange, laneA1)->slots.size() == 4, "grid built");
+      {
+         const uint64_t sid = Arrange::FindLane(gArrange, laneA1)->slots[0].clip.id;
+         check(sid != 0 && Arrange::FindClip(gArrange, sid) != nullptr, "FindClip resolves a slot clip id");
+         check(Arrange::FindSlot(gArrange, sid).slot == 0 && !Arrange::Find(gArrange, sid).Valid(), "slot ids are found as slots, not timeline clips");
+         check(Arrange::LaneOfClip(gArrange, sid) == Arrange::FindLane(gArrange, laneA1), "LaneOfClip finds the slot's track");
+         ArrangePruneSelection();   // settle the patch generation first
+         gArrangeSel = { sid };
+         ArrangePruneSelection();
+         check(gArrangeSel.size() == 1 && ArrangeSelectedSlotId() == sid, "a selected slot clip survives pruning");
+         check(ArrangeSelectionIds().empty(), "timeline ops never see a slot id");
+         gArrangeSel.clear();
+      }
       ArrangeSessionLaunchScene(0);
       check(Transport::Instance().IsPlaying(), "launching while stopped starts the transport");
    }

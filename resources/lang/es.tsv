@@ -1529,3 +1529,10 @@ This slot is inactive	Esta ranura está inactiva
 This slot's source is missing	Falta el origen de esta ranura
 Timeline: clips along the transport	Línea de tiempo: clips a lo largo del transporte
 Unassigned	Sin asignar
++ Audio Track	+ Pista de audio
++ Video Track	+ Pista de vídeo
+Add a scene (a row of clips that launch together)	Añadir una escena (una fila de clips que se lanzan juntos)
+Add a track, then add clips to its cells or drop audio and video files onto them.	Añade una pista y luego añade clips a sus celdas o suelta archivos de audio y vídeo sobre ellas.
+Add a video track, an audio track or a track group	Añadir una pista de vídeo, una de audio o un grupo de pistas
+Group This Track	Agrupar esta pista
+Ungroup Track	Sacar la pista del grupo

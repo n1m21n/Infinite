@@ -33,6 +33,48 @@ namespace app
 
       uint64_t sCtxLaneId = 0;
       int sCtxRow = -1;
+      bool sClipCtxRequest = false;
+      uint64_t sTrackCtxLaneId = 0;
+      constexpr float kAddColW = 40.0f;
+
+      void AddTrackOfType(int type)
+      {
+         ArrangeEdit([&]() {
+            const uint64_t id = Arrange::AddLane(gArrange, type);
+            if (Arrange::Lane* l = Arrange::FindLane(gArrange, id))
+               l->name = Arrange::UniqueLaneName(gArrange, type == Arrange::kLaneVideo ? "Video" : "Audio", type);
+         });
+      }
+
+      // One menu for the "+" column and a track header's right-click.
+      void DrawTrackMenu()
+      {
+         if (!MenuParts::BeginPopup("##sessiontrackctx"))
+            return;
+         if (MenuParts::Item(L("Add Video Track")))
+            AddTrackOfType(Arrange::kLaneVideo);
+         if (MenuParts::Item(L("Add Audio Track")))
+            AddTrackOfType(Arrange::kLaneAudio);
+         if (MenuParts::Item(L("Add Track Group")))
+            ArrangeEdit([&]() { Arrange::AddTrackGroup(gArrange, {}, "New Group"); });
+         const Arrange::Lane* l = Arrange::FindLane(gArrange, sTrackCtxLaneId);
+         if (l != nullptr)
+         {
+            MenuParts::Separator();
+            const uint64_t lid = l->id;
+            const uint64_t gid = l->groupId;
+            if (gid == 0)
+            {
+               if (MenuParts::Item(L("Group This Track")))
+                  ArrangeEdit([&]() { Arrange::AddTrackGroup(gArrange, { lid }, "Group"); });
+            }
+            else if (MenuParts::Item(L("Ungroup Track")))
+               ArrangeEdit([&]() { Arrange::RemoveTrackGroup(gArrange, gid, false); });
+            if (MenuParts::Item(L("Stop Track"), nullptr, false, ArrangeSessionLaneQuery(lid).playingSlot >= 0))
+               ArrangeSessionStopLane(lid);
+         }
+         MenuParts::EndPopup();
+      }
       int sSceneCtxRow = -1;
       char sSceneNameBuf[64] = {};
       float sSceneTempoEdit = 0.0f;
@@ -195,70 +237,32 @@ namespace app
          const Arrange::SessionSlot* ss = SlotOf(*lane, row);
          if (ss != nullptr)
          {
-            if (MenuParts::Item(L("Launch")))
-               ArrangeSessionLaunch(laneId, row);
-            if (MenuParts::SubMenu(L("Follow Action")))
-            {
-               for (int a = 0; a < Arrange::kFollowCount; a++)
-                  if (MenuParts::Choice(L(kFollowNames[a]), ss->followAction == a) && ss->followAction != a)
-                     ArrangeEdit([&]() {
-                        if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
-                        {
-                           l->slots[(size_t)row].followAction = a;
-                           gArrange.revision++;
-                        }
-                     });
-               ImGui::EndMenu();
-            }
-            // Greyed, not hidden, while there is no follow action to time.
-            if (MenuParts::SubMenu(L("Follow After"), ss->followAction != Arrange::kFollowNone))
-            {
-               for (int bars : kFollowBarChoices)
-               {
-                  char label[32];
-                  snprintf(label, sizeof(label), bars == 1 ? T("%d bar") : T("%d bars"), bars);
-                  if (MenuParts::Choice(label, ss->followBars == bars) && ss->followBars != bars)
-                     ArrangeEdit([&]() {
-                        if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
-                        {
-                           l->slots[(size_t)row].followBars = bars;
-                           gArrange.revision++;
-                        }
-                     });
-               }
-               ImGui::EndMenu();
-            }
-            bool active = ss->clip.enabled;
-            if (MenuParts::Check(L("Active"), &active))
-               ArrangeEdit([&]() {
-                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
-                  {
-                     l->slots[(size_t)row].clip.enabled = active;
-                     gArrange.revision++;
-                  }
-               });
-            MenuParts::Separator();
-            if (MenuParts::Item(L("Place on Timeline at Playhead")))
-            {
-               const Arrange::Tick at = std::max<Arrange::Tick>(0, Arrange::BeatsToTicks(Transport::Instance().Beats()));
-               Arrange::Clip c = ss->clip;
-               ArrangeEdit([&]() {
-                  c.id = 0;
-                  c.start = at;
-                  Arrange::PlaceOverwrite(gArrange, laneId, c, nullptr);
-               });
-            }
-            if (MenuParts::Item(L("Clear Slot")))
-               ArrangeEdit([&]() {
-                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
-                  {
-                     l->slots[(size_t)row] = Arrange::SessionSlot{};
-                     gArrange.revision++;
-                  }
-               });
+            // Filled slots use the shared clip menu (DrawArrangeClipContextMenu).
          }
          else
          {
+            if (MenuParts::Item(L("Add Clip")))
+            {
+               uint64_t made = 0;
+               ArrangeEdit([&]() {
+                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+                  {
+                     EnsureRow(*l, row);
+                     Arrange::Clip c;
+                     c.id = made = gArrange.NewId();
+                     c.start = 0;
+                     c.length = Arrange::kTicksPerBar;
+                     l->slots[(size_t)row].clip = c;
+                     gArrange.revision++;
+                  }
+               });
+               if (made != 0)
+               {
+                  gArrangeSel = { made };
+                  gArrangeSelAnchor = made;
+                  gArrangeAssigningClipId = made;
+               }
+            }
             const Arrange::Clip* sel = SelectedClipOfType(lane->type);
             if (MenuParts::Item(L("Paste Selected Clip"), nullptr, false, sel != nullptr) && sel != nullptr)
             {
@@ -381,7 +385,14 @@ namespace app
       {
          const ImVec2 o = ImGui::GetCursorScreenPos();
          EmptyState::Draw(o, ImVec2(o.x + avail.x, o.y + avail.y), T("No tracks yet"),
-                          T("Add a track in Timeline view, then drop audio or video files onto its cells here."));
+                          T("Add a track, then add clips to its cells or drop audio and video files onto them."));
+         ImGui::SetCursorScreenPos(ImVec2(o.x + avail.x * 0.5f - 130.0f, o.y + avail.y * 0.5f + 40.0f));
+         if (ActionButton::Draw(L("+ Video Track##sessaddv"), ImVec2(125, 0)))
+            AddTrackOfType(Arrange::kLaneVideo);
+         ImGui::SetCursorScreenPos(ImVec2(o.x + avail.x * 0.5f + 5.0f, o.y + avail.y * 0.5f + 40.0f));
+         if (ActionButton::Draw(L("+ Audio Track##sessadda"), ImVec2(125, 0)))
+            AddTrackOfType(Arrange::kLaneAudio);
+         ImGui::SetCursorScreenPos(o);
          ImGui::Dummy(avail);
          gArrangePendingBrowserDrop.pending = false;
          return;
@@ -390,14 +401,14 @@ namespace app
       int rows = std::max(kMinRows, (int)gArrange.scenes.size());
       for (const Arrange::Lane& l : gArrange.lanes)
          rows = std::max(rows, (int)l.slots.size());
-      const float colW = std::clamp((avail.x - kSceneColW) / (float)laneCount, kColMinW, kColMaxW);
+      const float colW = std::clamp((avail.x - kSceneColW - kAddColW) / (float)laneCount, kColMinW, kColMaxW);
 
       ImGui::BeginChild("##sessiongrid", avail, ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 o = ImGui::GetCursorScreenPos();
-      const float gridW = kSceneColW + colW * (float)laneCount;
+      const float gridW = kSceneColW + colW * (float)laneCount + kAddColW;
       const float bodyTop = o.y + kHeaderH;
-      const float footerTop = bodyTop + kRowH * (float)rows;
+      const float footerTop = bodyTop + kRowH * (float)(rows + 1);   // +1: the Add Scene row
       const ImVec2 mouse = ImGui::GetIO().MousePos;
       const bool gridHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
       const float pulse = QueuedPulse();
@@ -433,6 +444,43 @@ namespace app
          dl->AddText(ImVec2(a.x + 9.0f, (a.y + b.y - th) * 0.5f),
                      Arrange::LaneEffectivelyEnabled(gArrange, lane) ? TextCol(0.92f) : TextCol(0.40f), name.c_str());
          dl->PopClipRect();
+      }
+
+      for (int li = 0; li < laneCount; li++)
+      {
+         const float x0 = o.x + kSceneColW + colW * (float)li;
+         ImGui::SetCursorScreenPos(ImVec2(x0 + kGap, o.y + kGap));
+         ImGui::PushID(li);
+         ImGui::InvisibleButton("##hdr", ImVec2(colW - 2.0f * kGap, kHeaderH - 2.0f * kGap), ImGuiButtonFlags_MouseButtonRight);
+         ImGui::PopID();
+         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+         {
+            sTrackCtxLaneId = gArrange.lanes[(size_t)li].id;
+            ImGui::OpenPopup("##sessiontrackctx");
+         }
+      }
+      {
+         ImGui::SetCursorScreenPos(ImVec2(o.x + kSceneColW + colW * (float)laneCount + kGap, o.y + kGap));
+         if (ActionButton::Draw("+##sessaddtrack", ImVec2(kAddColW - 2.0f * kGap, kHeaderH - 2.0f * kGap)))
+         {
+            sTrackCtxLaneId = 0;
+            ImGui::OpenPopup("##sessiontrackctx");
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Add a video track, an audio track or a track group"));
+      }
+
+      // ---- add scene row ----
+      {
+         ImGui::SetCursorScreenPos(ImVec2(o.x + kGap, bodyTop + kRowH * (float)rows + kGap));
+         if (ActionButton::Draw("+ Scene##sessaddscene", ImVec2(kSceneColW - 2.0f * kGap, kRowH - 2.0f * kGap)))
+            ArrangeEdit([&]() {
+               while ((int)gArrange.scenes.size() < rows + 1)
+                  gArrange.scenes.push_back(Arrange::Scene{});
+               gArrange.revision++;
+            });
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Add a scene (a row of clips that launch together)"));
       }
 
       // ---- scene column ----
@@ -505,7 +553,11 @@ namespace app
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
             {
                if (ss != nullptr)
+               {
                   ArrangeSessionLaunch(laneId, row);
+                  gArrangeSel = { ss->clip.id };
+                  gArrangeSelAnchor = ss->clip.id;
+               }
                else if (ls.playingSlot >= 0)
                   ArrangeSessionStopLane(laneId);
             }
@@ -513,7 +565,15 @@ namespace app
             {
                sCtxLaneId = laneId;
                sCtxRow = row;
-               ImGui::OpenPopup("##sessionslotctx");
+               if (ss != nullptr)
+               {
+                  gArrangeSel = { ss->clip.id };
+                  gArrangeSelAnchor = ss->clip.id;
+                  gArrangeCtxClipId = ss->clip.id;
+                  sClipCtxRequest = true;
+               }
+               else
+                  ImGui::OpenPopup("##sessionslotctx");
             }
             const float cy = (a.y + b.y) * 0.5f;
             const float th = ImGui::GetTextLineHeight();
@@ -629,6 +689,7 @@ namespace app
 
       DrawSlotMenu();
       DrawSceneMenu();
+      DrawTrackMenu();
 
       ImGui::SetCursorScreenPos(o);
       ImGui::Dummy(ImVec2(gridW, footerTop + kFooterH - o.y));
@@ -637,5 +698,78 @@ namespace app
       ImGui::EndChild();
       // A browser drop that missed every cell is done with either way.
       gArrangePendingBrowserDrop.pending = false;
+   }
+
+   bool ArrangeSessionTakeClipCtxRequest()
+   {
+      const bool r = sClipCtxRequest;
+      sClipCtxRequest = false;
+      return r;
+   }
+
+   // The rows only a session slot has, appended to the shared clip menu.
+   void DrawArrangeSessionSlotMenuItems(uint64_t clipId)
+   {
+      const Arrange::Loc loc = Arrange::FindSlot(gArrange, clipId);
+      if (loc.lane < 0 || loc.slot < 0)
+         return;
+      const uint64_t laneId = gArrange.lanes[(size_t)loc.lane].id;
+      const int row = loc.slot;
+      const Arrange::SessionSlot ss = gArrange.lanes[(size_t)loc.lane].slots[(size_t)row];
+      if (MenuParts::Item(L("Launch")))
+         ArrangeSessionLaunch(laneId, row);
+      if (MenuParts::SubMenu(L("Follow Action")))
+      {
+         for (int a = 0; a < Arrange::kFollowCount; a++)
+            if (MenuParts::Choice(L(kFollowNames[a]), ss.followAction == a) && ss.followAction != a)
+               ArrangeEdit([&]() {
+                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+                  {
+                     l->slots[(size_t)row].followAction = a;
+                     gArrange.revision++;
+                  }
+               });
+         ImGui::EndMenu();
+      }
+      // Greyed, not hidden, while there is no follow action to time.
+      if (MenuParts::SubMenu(L("Follow After"), ss.followAction != Arrange::kFollowNone))
+      {
+         for (int bars : kFollowBarChoices)
+         {
+            char label[32];
+            snprintf(label, sizeof(label), bars == 1 ? T("%d bar") : T("%d bars"), bars);
+            if (MenuParts::Choice(label, ss.followBars == bars) && ss.followBars != bars)
+               ArrangeEdit([&]() {
+                  if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+                  {
+                     l->slots[(size_t)row].followBars = bars;
+                     gArrange.revision++;
+                  }
+               });
+         }
+         ImGui::EndMenu();
+      }
+      MenuParts::Separator();
+      if (MenuParts::Item(L("Place on Timeline at Playhead")))
+      {
+         const Arrange::Tick at = std::max<Arrange::Tick>(0, Arrange::BeatsToTicks(Transport::Instance().Beats()));
+         Arrange::Clip c = ss.clip;
+         ArrangeEdit([&]() {
+            c.id = 0;
+            c.start = at;
+            Arrange::PlaceOverwrite(gArrange, laneId, c, nullptr);
+         });
+      }
+      if (MenuParts::Item(L("Clear Slot")))
+      {
+         ArrangeEdit([&]() {
+            if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+            {
+               l->slots[(size_t)row] = Arrange::SessionSlot{};
+               gArrange.revision++;
+            }
+         });
+         gArrangeSel.clear();
+      }
    }
 }

@@ -67,6 +67,478 @@ namespace app
       return changed;
    }
 
+   // The clip right-click menu, shared by the Timeline lanes and the Session grid. `openClipCtx` opens it on this call.
+   void DrawArrangeClipContextMenu(bool openClipCtx)
+   {
+      auto nodeForUid = [](uint64_t uid) -> GraphNode* { return FindNodeByUid(uid); };
+      // ---- clip context menu (acts on the selection; ids only) ----
+      if (openClipCtx)
+         ImGui::OpenPopup("##arrangeclipctx");
+      if (MenuParts::BeginPopup("##arrangeclipctx"))
+      {
+         Arrange::Clip* cp = Arrange::FindClip(gArrange, gArrangeCtxClipId);
+         if (cp == nullptr)
+         {
+            ImGui::CloseCurrentPopup();
+         }
+         else
+         {
+            const uint64_t cid = cp->id;
+            const bool ctxIsSlot = Arrange::FindSlot(gArrange, cid).lane >= 0;
+            const int ctxLaneType = Arrange::LaneOfClip(gArrange, cid)->type;
+            GraphNode* ctxNode = nodeForUid(cp->srcUid);
+            // Fade In/Out and Compositing are per-clip-type (audio vs video)
+            // settings - meaningless once the selection spans both, which
+            // happens as soon as a mixed audio+video group (one video clip,
+            // one audio clip) gets selected as a unit. Only offer them when
+            // every selected clip shares the right-clicked clip's type.
+            bool ctxSelectionSingleType = true;
+            for (uint64_t selId : ArrangeSelectionIds())
+            {
+               const Arrange::Loc selLoc = Arrange::Find(gArrange, selId);
+               if (selLoc.Valid() && gArrange.lanes[selLoc.lane].type != ctxLaneType)
+               {
+                  ctxSelectionSingleType = false;
+                  break;
+               }
+            }
+
+            const std::vector<uint64_t> ctxSelIds = ArrangeSelectionIds();
+            if (ctxSelIds.size() > 1)
+            {
+               // Multi-clip selection: an intentionally minimal menu. Every
+               // other item below (Fade, Sync/Sample BPM, Compositing, Color
+               // Grade, Output, Group/Ungroup...) is single-clip-scoped and
+               // would either apply nonsensically or silently do nothing to
+               // the rest of the batch - only offer what unambiguously means
+               // the same thing across every selected clip.
+               if (MenuParts::Item(L("Rename"), MODKEY "+R"))
+               {
+                  const std::string label = !cp->name.empty() ? cp->name
+                     : (ctxNode != nullptr ? NodeTitle(*ctxNode) : std::string("Unassigned"));
+                  gArrangeRenamingClipId = cid;
+                  gArrangeRenameTargetIds.clear();
+                  for (uint64_t id : ctxSelIds)
+                     if (id != cid)
+                        gArrangeRenameTargetIds.push_back(id);
+                  snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
+               }
+               if (MenuParts::SubMenu(L("Color Tint")))
+               {
+                  const auto& kPaletteColors = kArrangePalette;
+                  for (int ci2 = 0; ci2 < 10; ci2++)
+                  {
+                     if (ci2 % 5 != 0) ImGui::SameLine();
+                     ImGui::PushID(ci2 + 700);
+                     const ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kPaletteColors[ci2].col);
+                     if (ImGui::ColorButton(kPaletteColors[ci2].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(24, 24)))
+                     {
+                        const float r = ci2 == 0 ? 0.0f : cVec.x;
+                        const float g = ci2 == 0 ? 0.0f : cVec.y;
+                        const float b = ci2 == 0 ? 0.0f : cVec.z;
+                        ArrangeEdit([&]()
+                        {
+                           for (uint64_t id : ctxSelIds)
+                           {
+                              Arrange::Clip* c = Arrange::FindClip(gArrange, id);
+                              if (c == nullptr || (c->colorR == r && c->colorG == g && c->colorB == b))
+                                 continue;
+                              c->colorR = r;
+                              c->colorG = g;
+                              c->colorB = b;
+                              gArrange.revision++;
+                           }
+                        });
+                     }
+                     ImGui::PopID();
+                  }
+                  ImGui::EndMenu();
+               }
+               // Assign Node...: only when every selected clip shares one
+               // lane type - a mixed audio+video batch has no single node
+               // type that fits both. ArrangeAssignClipSource itself still
+               // rejects any Sample clip in the batch (see its own comment),
+               // so a mixed Sample/Clip selection just leaves the Samples
+               // untouched rather than needing a separate check here.
+               if (ctxSelectionSingleType && MenuParts::Item(L("Assign Node...")))
+               {
+                  gArrangeAssigningClipId = cid;
+                  gArrangeAssignTargetIds.clear();
+                  for (uint64_t id : ctxSelIds)
+                     if (id != cid)
+                        gArrangeAssignTargetIds.push_back(id);
+                  ImGui::CloseCurrentPopup();
+               }
+            }
+            else
+            {
+            // Rename and Active/Bypass: apply to every clip type, mirroring
+            // the double-click-to-rename and '0'-key shortcuts this menu
+            // just gives an explicit, discoverable entry point for.
+            if (MenuParts::Item(L("Rename"), MODKEY "+R"))
+            {
+               const std::string label = !cp->name.empty() ? cp->name
+                  : (ctxNode != nullptr ? NodeTitle(*ctxNode) : std::string("Unassigned"));
+               gArrangeRenamingClipId = cid;
+               gArrangeRenameTargetIds.clear();
+               snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
+            }
+            if (MenuParts::Item(L("Active"), nullptr, cp->enabled))
+            {
+               if (ctxIsSlot)
+                  ArrangeEdit([&]() { cp->enabled = !cp->enabled; gArrange.revision++; });
+               else
+                  ArrangeToggleEnabledSelection();
+            }
+            MenuParts::Separator();
+            // Fade fields: live on the model, one undo entry per drag of a
+            // field (opened on the first change, pushed on deactivate, and
+            // only if something changed).
+            auto fieldGesture = [&](bool changed)
+            {
+               if (changed && !gArrangeGestureOpen)
+                  ArrangeGestureBegin();
+            };
+            auto fieldGestureEnd = [&]()
+            {
+               if (ImGui::IsItemDeactivated())
+                  ArrangeGestureEnd();
+            };
+            // Same fields, same units, same typing as the docked inspector -
+            // one shared widget rather than a second copy here, which is how
+            // the two drifted apart in the first place.
+            auto tickField = [&](const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
+                                 ArrangeTickUnit unit, Arrange::Tick* out) -> bool
+            {
+               return ArrangeTickField(label, cur, lo, hi, unit, 160.0f, out);
+            };
+            // Per clip-type settings only. Position and length are the
+            // mouse's (drag, trim handles, blade); clip gain and pan are
+            // deferred, the lane's own mix strip covers level for now.
+            if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneAudio)
+            {
+               Arrange::Tick nt = 0;
+               if (tickField("Fade In", cp->fadeIn, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->fadeIn = std::clamp<Arrange::Tick>(nt, 0, cp->length);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+               cp = Arrange::FindClip(gArrange, cid);
+               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->fadeOut = std::clamp<Arrange::Tick>(nt, 0, cp->length);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+
+               float gainDb = cp->gainDb;
+               ImGui::SetNextItemWidth(160.0f);
+               if (ArrangeSliderFloat("Gain", &gainDb, -60.0f, 12.0f, "%.1f dB"))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->gainDb = gainDb;
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+
+               cp = Arrange::FindClip(gArrange, cid);
+               float pan = cp->pan;
+               ImGui::SetNextItemWidth(160.0f);
+               if (ArrangeSliderFloat("Pan", &pan, -1.0f, 1.0f, "%.2f"))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->pan = std::clamp(pan, -1.0f, 1.0f);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+
+               cp = Arrange::FindClip(gArrange, cid);
+               float pitch = cp->pitch;
+               ImGui::SetNextItemWidth(160.0f);
+               if (ArrangeSliderFloat("Pitch", &pitch, -24.0f, 24.0f, "%.1f st"))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  // Pushed per-block onto the terminal's own sourceNode by
+                  // RunTopology's lookahead (ClipWindow::pitch), not written
+                  // here directly - a node can be the source of more than one
+                  // clip, and writing straight to it would make one clip's
+                  // pitch edit audible on every other clip sharing that node.
+                  cp->pitch = std::clamp(pitch, -24.0f, 24.0f);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+
+               // Sync to Tempo / Sample BPM: an Audio Sample-only concept
+               // (see Clip::sampleBpm's comment) - this menu used to show
+               // the checkbox for any single-lane-type audio selection,
+               // which meant it silently applied to a manually-patched
+               // Audio Clip too (step 5's consistency-sweep gap). Gated on
+               // sampleDropped here to match the docked Clip Settings panel.
+               cp = Arrange::FindClip(gArrange, cid);
+               if (cp->sampleDropped)
+               {
+                  bool syncToTempo = cp->syncToTempo;
+                  if (MenuParts::Check(L("Sync to Tempo"), &syncToTempo))
+                     ArrangeEdit([&]() { ArrangeSetSampleSync(cid, syncToTempo); });
+
+                  // Sample BPM only means something while synced (unsynced
+                  // plays at native speed), so it is locked while sync is off.
+                  cp = Arrange::FindClip(gArrange, cid);
+                  float sampleBpm = cp->sampleBpm;
+                  ImGui::BeginDisabled(!cp->syncToTempo);
+                  if (ArrangeDragFloat("Sample BPM", &sampleBpm, 0.1f, 20.0f, 999.0f, "%.2f", 160.0f))
+                  {
+                     fieldGesture(true);
+                     ArrangeSetSampleBpm(cid, sampleBpm);
+                  }
+                  fieldGestureEnd();
+                  if (const Arrange::Clip* ci = Arrange::FindClip(gArrange, cid))
+                  {
+                     if (ci->origBpm > 0.0f && ci->origBpm != ci->sampleBpm &&
+                         MenuParts::Item(L("Reset Sample BPM to Detected")))
+                     {
+                        const float detected = ci->origBpm;
+                        ArrangeEdit([&]() { ArrangeSetSampleBpm(cid, detected); });
+                     }
+                  }
+                  ImGui::EndDisabled();
+                  if (const Arrange::Clip* ci = Arrange::FindClip(gArrange, cid))
+                     ArrangeDrawSampleTempoInfo(*ci);
+               }
+
+               MenuParts::Separator();
+            }
+            else if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneVideo)
+            {
+               Arrange::Tick nt = 0;
+               if (tickField("Fade In", cp->fadeIn, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->fadeIn = std::clamp<Arrange::Tick>(nt, 0, cp->length);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+               cp = Arrange::FindClip(gArrange, cid);
+               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->fadeOut = std::clamp<Arrange::Tick>(nt, 0, cp->length);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+
+               cp = Arrange::FindClip(gArrange, cid);
+               float opacity = cp->opacity;
+               ImGui::SetNextItemWidth(160.0f);
+               if (ArrangeSliderFloat("Opacity", &opacity, 0.0f, 1.0f, "%.2f"))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->opacity = std::clamp(opacity, 0.0f, 1.0f);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+
+               MenuParts::Separator();
+            }
+
+            if (ctxSelectionSingleType && ctxLaneType != Arrange::kLaneAudio && MenuParts::SubMenu(L("Compositing")))
+            {
+               // How this clip lays over the lanes below it. Applies to every
+               // selected video clip, like Color Tint.
+               const int curMode = Arrange::FindClip(gArrange, cid)->blendMode;
+               const std::vector<std::string>& modes = BlendModes::NamesFor(curMode);
+               for (int m = 0; m < (int)modes.size(); m++)
+               {
+                  ImGui::PushID(m + 900);
+                  if (MenuParts::Item(modes[m].c_str(), nullptr, curMode == m))
+                  {
+                     ArrangeEdit([&]()
+                     {
+                        for (uint64_t id : ArrangeSelectionIds())
+                        {
+                           const Arrange::Loc loc = Arrange::Find(gArrange, id);
+                           if (!loc.Valid() || gArrange.lanes[loc.lane].type != Arrange::kLaneVideo)
+                              continue;
+                           Arrange::Clip& c = gArrange.lanes[loc.lane].clips[loc.index];
+                           if (c.blendMode == m)
+                              continue;
+                           c.blendMode = m;
+                           gArrange.revision++;
+                        }
+                     });
+                  }
+                  ImGui::PopID();
+               }
+               ImGui::EndMenu();
+            }
+
+            if (ctxLaneType == Arrange::kLaneVideo && MenuParts::SubMenu(L("Color Grade")))
+            {
+               // Basic grade only: brightness/contrast/saturation, consumed
+               // by the compositor as a per-clip shader pass. Defaults are a
+               // no-op (0/0/1) so this menu never needs a reset button.
+               cp = Arrange::FindClip(gArrange, cid);
+               float brightness = cp->colorBrightness;
+               ImGui::SetNextItemWidth(160.0f);
+               if (ArrangeSliderFloat("Brightness", &brightness, -1.0f, 1.0f, "%.2f"))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->colorBrightness = std::clamp(brightness, -1.0f, 1.0f);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+
+               cp = Arrange::FindClip(gArrange, cid);
+               float contrast = cp->colorContrast;
+               ImGui::SetNextItemWidth(160.0f);
+               if (ArrangeSliderFloat("Contrast", &contrast, -1.0f, 1.0f, "%.2f"))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->colorContrast = std::clamp(contrast, -1.0f, 1.0f);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+
+               cp = Arrange::FindClip(gArrange, cid);
+               float saturation = cp->colorSaturation;
+               ImGui::SetNextItemWidth(160.0f);
+               if (ArrangeSliderFloat("Saturation", &saturation, 0.0f, 2.0f, "%.2f"))
+               {
+                  fieldGesture(true);
+                  cp = Arrange::FindClip(gArrange, cid);
+                  cp->colorSaturation = std::clamp(saturation, 0.0f, 2.0f);
+                  gArrange.revision++;
+               }
+               fieldGestureEnd();
+
+               ImGui::EndMenu();
+            }
+
+            if (MenuParts::SubMenu(L("Color Tint")))
+            {
+               const auto& kPaletteColors = kArrangePalette; // shared with the marker colours
+               for (int ci2 = 0; ci2 < 10; ci2++)
+               {
+                  if (ci2 % 5 != 0) ImGui::SameLine();
+                  ImGui::PushID(ci2 + 700);
+                  const ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kPaletteColors[ci2].col);
+                  if (ImGui::ColorButton(kPaletteColors[ci2].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(24, 24)))
+                  {
+                     const float r = ci2 == 0 ? 0.0f : cVec.x;
+                     const float g = ci2 == 0 ? 0.0f : cVec.y;
+                     const float b = ci2 == 0 ? 0.0f : cVec.z;
+                     ArrangeEdit([&]()
+                     {
+                        for (uint64_t id : ArrangeSelectionIds())
+                        {
+                           Arrange::Clip* c = Arrange::FindClip(gArrange, id);
+                           if (c == nullptr || (c->colorR == r && c->colorG == g && c->colorB == b))
+                              continue;
+                           c->colorR = r;
+                           c->colorG = g;
+                           c->colorB = b;
+                           gArrange.revision++;
+                        }
+                     });
+                  }
+                  ImGui::PopID();
+               }
+               ImGui::EndMenu();
+            }
+
+            // Audio/Video Sample clips own a private node from the media
+            // import that made them - repointing one at a different node
+            // would defeat the whole point of a sample (see sampleDropped's
+            // doc comment in ArrangeModel.h). Only Audio/Video Clip can be
+            // reassigned.
+            cp = Arrange::FindClip(gArrange, cid);
+            if (cp != nullptr && !cp->sampleDropped && MenuParts::Item(L("Assign Node...")))
+            {
+               gArrangeAssigningClipId = cid;
+               gArrangeAssignTargetIds.clear();
+               ImGui::CloseCurrentPopup();
+            }
+
+            // Output: only for a source with more than one output of this
+            // lane's type (VideoSourceNode has one of each, so it gets none).
+            if (ctxNode != nullptr)
+            {
+               const std::vector<int> outs = ArrangeOutputsOfType(*ctxNode, ctxLaneType);
+               if (outs.size() > 1 && MenuParts::SubMenu(L("Output")))
+               {
+                  const int curOut = Arrange::FindClip(gArrange, cid)->srcOutput;
+                  for (int o : outs)
+                  {
+                     const char* outName = ctxNode->node->OutputLabel(o);
+                     char outItem[96];
+                     snprintf(outItem, sizeof(outItem), "%s##arrout%d", outName != nullptr ? outName : "out", o);
+                     if (MenuParts::Item(outItem, nullptr, curOut == o) && curOut != o)
+                     {
+                        ArrangeEdit([&]()
+                        {
+                           if (Arrange::Clip* c = Arrange::FindClip(gArrange, cid))
+                           {
+                              c->srcOutput = o;
+                              gArrange.revision++;
+                           }
+                        });
+                     }
+                  }
+                  ImGui::EndMenu();
+               }
+            }
+
+            } // end else (single-clip specific properties)
+
+            // Group, Ungroup, and Delete: available for both multi-selection and single-clip / group-selection
+            MenuParts::Separator();
+            if (ctxIsSlot)
+            {
+               DrawArrangeSessionSlotMenuItems(cid);
+            }
+            else
+            {
+            if (MenuParts::Item(L("Group"), MODKEY "+G", false, ArrangeCanGroupSelection()))
+               ArrangeGroupSelection();
+            if (MenuParts::Item(L("Ungroup"), MODKEY "+Shift+G", false, ArrangeCanUngroupSelection()))
+               ArrangeUngroupSelection();
+            if (MenuParts::Item(L("Delete"), "Backspace", false, !ctxSelIds.empty()))
+               ArrangeDeleteSelection();
+            }
+         }
+         MenuParts::EndPopup();
+      }
+      else if (gArrangeMixGestureLaneId != 0 && !ImGui::IsAnyItemActive())
+      {
+         // A mix-strip control vanished mid-gesture (its lane was deleted or
+         // scrolled away): its deactivate never ran.
+         if (gArrangeGestureOpen)
+            ArrangeGestureEnd();
+         gArrangeMixGestureLaneId = 0;
+      }
+      else if (gArrangeGestureOpen && gArrangeDrag.mode == kArrangeDragNone && gArrangeRenamingLaneId == 0 &&
+               gArrangeMarkerDragId == 0 && gArrangeMixGestureLaneId == 0)
+      {
+         // The popup closed with a field still mid-edit (click outside):
+         // its deactivate never ran, so close the gesture here.
+         ArrangeGestureEnd();
+      }
+
+   }
+
    void DrawArrangePanelContent()
    {
       // Every id this panel holds (selection, anchor, rename/context/assign
@@ -1258,7 +1730,12 @@ namespace app
 
       ImGui::Separator();
 
-      if (gArrangeSessionView) { DrawArrangeSessionGrid(); return; }
+      if (gArrangeSessionView)
+      {
+         DrawArrangeSessionGrid();
+         DrawArrangeClipContextMenu(ArrangeSessionTakeClipCtxRequest());
+         return;
+      }
 
       // Layout: Global Viewport Monitor alongside / above timeline lanes
       const bool isWide = panelSize.x >= 720.0f;
@@ -3662,459 +4139,7 @@ namespace app
       }
       dl->PopClipRect();
 
-      // ---- clip context menu (acts on the selection; ids only) ----
-      if (openClipCtx)
-         ImGui::OpenPopup("##arrangeclipctx");
-      if (MenuParts::BeginPopup("##arrangeclipctx"))
-      {
-         Arrange::Clip* cp = Arrange::FindClip(gArrange, gArrangeCtxClipId);
-         if (cp == nullptr)
-         {
-            ImGui::CloseCurrentPopup();
-         }
-         else
-         {
-            const uint64_t cid = cp->id;
-            const Arrange::Loc cloc = Arrange::Find(gArrange, cid);
-            const int ctxLaneType = gArrange.lanes[cloc.lane].type;
-            GraphNode* ctxNode = nodeForUid(cp->srcUid);
-            // Fade In/Out and Compositing are per-clip-type (audio vs video)
-            // settings - meaningless once the selection spans both, which
-            // happens as soon as a mixed audio+video group (one video clip,
-            // one audio clip) gets selected as a unit. Only offer them when
-            // every selected clip shares the right-clicked clip's type.
-            bool ctxSelectionSingleType = true;
-            for (uint64_t selId : ArrangeSelectionIds())
-            {
-               const Arrange::Loc selLoc = Arrange::Find(gArrange, selId);
-               if (selLoc.Valid() && gArrange.lanes[selLoc.lane].type != ctxLaneType)
-               {
-                  ctxSelectionSingleType = false;
-                  break;
-               }
-            }
-
-            const std::vector<uint64_t> ctxSelIds = ArrangeSelectionIds();
-            if (ctxSelIds.size() > 1)
-            {
-               // Multi-clip selection: an intentionally minimal menu. Every
-               // other item below (Fade, Sync/Sample BPM, Compositing, Color
-               // Grade, Output, Group/Ungroup...) is single-clip-scoped and
-               // would either apply nonsensically or silently do nothing to
-               // the rest of the batch - only offer what unambiguously means
-               // the same thing across every selected clip.
-               if (MenuParts::Item(L("Rename"), MODKEY "+R"))
-               {
-                  const std::string label = !cp->name.empty() ? cp->name
-                     : (ctxNode != nullptr ? NodeTitle(*ctxNode) : std::string("Unassigned"));
-                  gArrangeRenamingClipId = cid;
-                  gArrangeRenameTargetIds.clear();
-                  for (uint64_t id : ctxSelIds)
-                     if (id != cid)
-                        gArrangeRenameTargetIds.push_back(id);
-                  snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
-               }
-               if (MenuParts::SubMenu(L("Color Tint")))
-               {
-                  const auto& kPaletteColors = kArrangePalette;
-                  for (int ci2 = 0; ci2 < 10; ci2++)
-                  {
-                     if (ci2 % 5 != 0) ImGui::SameLine();
-                     ImGui::PushID(ci2 + 700);
-                     const ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kPaletteColors[ci2].col);
-                     if (ImGui::ColorButton(kPaletteColors[ci2].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(24, 24)))
-                     {
-                        const float r = ci2 == 0 ? 0.0f : cVec.x;
-                        const float g = ci2 == 0 ? 0.0f : cVec.y;
-                        const float b = ci2 == 0 ? 0.0f : cVec.z;
-                        ArrangeEdit([&]()
-                        {
-                           for (uint64_t id : ctxSelIds)
-                           {
-                              Arrange::Clip* c = Arrange::FindClip(gArrange, id);
-                              if (c == nullptr || (c->colorR == r && c->colorG == g && c->colorB == b))
-                                 continue;
-                              c->colorR = r;
-                              c->colorG = g;
-                              c->colorB = b;
-                              gArrange.revision++;
-                           }
-                        });
-                     }
-                     ImGui::PopID();
-                  }
-                  ImGui::EndMenu();
-               }
-               // Assign Node...: only when every selected clip shares one
-               // lane type - a mixed audio+video batch has no single node
-               // type that fits both. ArrangeAssignClipSource itself still
-               // rejects any Sample clip in the batch (see its own comment),
-               // so a mixed Sample/Clip selection just leaves the Samples
-               // untouched rather than needing a separate check here.
-               if (ctxSelectionSingleType && MenuParts::Item(L("Assign Node...")))
-               {
-                  gArrangeAssigningClipId = cid;
-                  gArrangeAssignTargetIds.clear();
-                  for (uint64_t id : ctxSelIds)
-                     if (id != cid)
-                        gArrangeAssignTargetIds.push_back(id);
-                  ImGui::CloseCurrentPopup();
-               }
-            }
-            else
-            {
-            // Rename and Active/Bypass: apply to every clip type, mirroring
-            // the double-click-to-rename and '0'-key shortcuts this menu
-            // just gives an explicit, discoverable entry point for.
-            if (MenuParts::Item(L("Rename"), MODKEY "+R"))
-            {
-               const std::string label = !cp->name.empty() ? cp->name
-                  : (ctxNode != nullptr ? NodeTitle(*ctxNode) : std::string("Unassigned"));
-               gArrangeRenamingClipId = cid;
-               gArrangeRenameTargetIds.clear();
-               snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", label.c_str());
-            }
-            if (MenuParts::Item(L("Active"), nullptr, cp->enabled))
-               ArrangeToggleEnabledSelection();
-            MenuParts::Separator();
-            // Fade fields: live on the model, one undo entry per drag of a
-            // field (opened on the first change, pushed on deactivate, and
-            // only if something changed).
-            auto fieldGesture = [&](bool changed)
-            {
-               if (changed && !gArrangeGestureOpen)
-                  ArrangeGestureBegin();
-            };
-            auto fieldGestureEnd = [&]()
-            {
-               if (ImGui::IsItemDeactivated())
-                  ArrangeGestureEnd();
-            };
-            // Same fields, same units, same typing as the docked inspector -
-            // one shared widget rather than a second copy here, which is how
-            // the two drifted apart in the first place.
-            auto tickField = [&](const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
-                                 ArrangeTickUnit unit, Arrange::Tick* out) -> bool
-            {
-               return ArrangeTickField(label, cur, lo, hi, unit, 160.0f, out);
-            };
-            // Per clip-type settings only. Position and length are the
-            // mouse's (drag, trim handles, blade); clip gain and pan are
-            // deferred, the lane's own mix strip covers level for now.
-            if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneAudio)
-            {
-               Arrange::Tick nt = 0;
-               if (tickField("Fade In", cp->fadeIn, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->fadeIn = std::clamp<Arrange::Tick>(nt, 0, cp->length);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-               cp = Arrange::FindClip(gArrange, cid);
-               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->fadeOut = std::clamp<Arrange::Tick>(nt, 0, cp->length);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               float gainDb = cp->gainDb;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Gain", &gainDb, -60.0f, 12.0f, "%.1f dB"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->gainDb = gainDb;
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float pan = cp->pan;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Pan", &pan, -1.0f, 1.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->pan = std::clamp(pan, -1.0f, 1.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float pitch = cp->pitch;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Pitch", &pitch, -24.0f, 24.0f, "%.1f st"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  // Pushed per-block onto the terminal's own sourceNode by
-                  // RunTopology's lookahead (ClipWindow::pitch), not written
-                  // here directly - a node can be the source of more than one
-                  // clip, and writing straight to it would make one clip's
-                  // pitch edit audible on every other clip sharing that node.
-                  cp->pitch = std::clamp(pitch, -24.0f, 24.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               // Sync to Tempo / Sample BPM: an Audio Sample-only concept
-               // (see Clip::sampleBpm's comment) - this menu used to show
-               // the checkbox for any single-lane-type audio selection,
-               // which meant it silently applied to a manually-patched
-               // Audio Clip too (step 5's consistency-sweep gap). Gated on
-               // sampleDropped here to match the docked Clip Settings panel.
-               cp = Arrange::FindClip(gArrange, cid);
-               if (cp->sampleDropped)
-               {
-                  bool syncToTempo = cp->syncToTempo;
-                  if (MenuParts::Check(L("Sync to Tempo"), &syncToTempo))
-                     ArrangeEdit([&]() { ArrangeSetSampleSync(cid, syncToTempo); });
-
-                  // Sample BPM only means something while synced (unsynced
-                  // plays at native speed), so it is locked while sync is off.
-                  cp = Arrange::FindClip(gArrange, cid);
-                  float sampleBpm = cp->sampleBpm;
-                  ImGui::BeginDisabled(!cp->syncToTempo);
-                  if (ArrangeDragFloat("Sample BPM", &sampleBpm, 0.1f, 20.0f, 999.0f, "%.2f", 160.0f))
-                  {
-                     fieldGesture(true);
-                     ArrangeSetSampleBpm(cid, sampleBpm);
-                  }
-                  fieldGestureEnd();
-                  if (const Arrange::Clip* ci = Arrange::FindClip(gArrange, cid))
-                  {
-                     if (ci->origBpm > 0.0f && ci->origBpm != ci->sampleBpm &&
-                         MenuParts::Item(L("Reset Sample BPM to Detected")))
-                     {
-                        const float detected = ci->origBpm;
-                        ArrangeEdit([&]() { ArrangeSetSampleBpm(cid, detected); });
-                     }
-                  }
-                  ImGui::EndDisabled();
-                  if (const Arrange::Clip* ci = Arrange::FindClip(gArrange, cid))
-                     ArrangeDrawSampleTempoInfo(*ci);
-               }
-
-               MenuParts::Separator();
-            }
-            else if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneVideo)
-            {
-               Arrange::Tick nt = 0;
-               if (tickField("Fade In", cp->fadeIn, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->fadeIn = std::clamp<Arrange::Tick>(nt, 0, cp->length);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-               cp = Arrange::FindClip(gArrange, cid);
-               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->fadeOut = std::clamp<Arrange::Tick>(nt, 0, cp->length);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float opacity = cp->opacity;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Opacity", &opacity, 0.0f, 1.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->opacity = std::clamp(opacity, 0.0f, 1.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               MenuParts::Separator();
-            }
-
-            if (ctxSelectionSingleType && ctxLaneType != Arrange::kLaneAudio && MenuParts::SubMenu(L("Compositing")))
-            {
-               // How this clip lays over the lanes below it. Applies to every
-               // selected video clip, like Color Tint.
-               const int curMode = Arrange::FindClip(gArrange, cid)->blendMode;
-               const std::vector<std::string>& modes = BlendModes::NamesFor(curMode);
-               for (int m = 0; m < (int)modes.size(); m++)
-               {
-                  ImGui::PushID(m + 900);
-                  if (MenuParts::Item(modes[m].c_str(), nullptr, curMode == m))
-                  {
-                     ArrangeEdit([&]()
-                     {
-                        for (uint64_t id : ArrangeSelectionIds())
-                        {
-                           const Arrange::Loc loc = Arrange::Find(gArrange, id);
-                           if (!loc.Valid() || gArrange.lanes[loc.lane].type != Arrange::kLaneVideo)
-                              continue;
-                           Arrange::Clip& c = gArrange.lanes[loc.lane].clips[loc.index];
-                           if (c.blendMode == m)
-                              continue;
-                           c.blendMode = m;
-                           gArrange.revision++;
-                        }
-                     });
-                  }
-                  ImGui::PopID();
-               }
-               ImGui::EndMenu();
-            }
-
-            if (ctxLaneType == Arrange::kLaneVideo && MenuParts::SubMenu(L("Color Grade")))
-            {
-               // Basic grade only: brightness/contrast/saturation, consumed
-               // by the compositor as a per-clip shader pass. Defaults are a
-               // no-op (0/0/1) so this menu never needs a reset button.
-               cp = Arrange::FindClip(gArrange, cid);
-               float brightness = cp->colorBrightness;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Brightness", &brightness, -1.0f, 1.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->colorBrightness = std::clamp(brightness, -1.0f, 1.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float contrast = cp->colorContrast;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Contrast", &contrast, -1.0f, 1.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->colorContrast = std::clamp(contrast, -1.0f, 1.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               cp = Arrange::FindClip(gArrange, cid);
-               float saturation = cp->colorSaturation;
-               ImGui::SetNextItemWidth(160.0f);
-               if (ArrangeSliderFloat("Saturation", &saturation, 0.0f, 2.0f, "%.2f"))
-               {
-                  fieldGesture(true);
-                  cp = Arrange::FindClip(gArrange, cid);
-                  cp->colorSaturation = std::clamp(saturation, 0.0f, 2.0f);
-                  gArrange.revision++;
-               }
-               fieldGestureEnd();
-
-               ImGui::EndMenu();
-            }
-
-            if (MenuParts::SubMenu(L("Color Tint")))
-            {
-               const auto& kPaletteColors = kArrangePalette; // shared with the marker colours
-               for (int ci2 = 0; ci2 < 10; ci2++)
-               {
-                  if (ci2 % 5 != 0) ImGui::SameLine();
-                  ImGui::PushID(ci2 + 700);
-                  const ImVec4 cVec = ImGui::ColorConvertU32ToFloat4(kPaletteColors[ci2].col);
-                  if (ImGui::ColorButton(kPaletteColors[ci2].name, cVec, ImGuiColorEditFlags_NoTooltip, ImVec2(24, 24)))
-                  {
-                     const float r = ci2 == 0 ? 0.0f : cVec.x;
-                     const float g = ci2 == 0 ? 0.0f : cVec.y;
-                     const float b = ci2 == 0 ? 0.0f : cVec.z;
-                     ArrangeEdit([&]()
-                     {
-                        for (uint64_t id : ArrangeSelectionIds())
-                        {
-                           Arrange::Clip* c = Arrange::FindClip(gArrange, id);
-                           if (c == nullptr || (c->colorR == r && c->colorG == g && c->colorB == b))
-                              continue;
-                           c->colorR = r;
-                           c->colorG = g;
-                           c->colorB = b;
-                           gArrange.revision++;
-                        }
-                     });
-                  }
-                  ImGui::PopID();
-               }
-               ImGui::EndMenu();
-            }
-
-            // Audio/Video Sample clips own a private node from the media
-            // import that made them - repointing one at a different node
-            // would defeat the whole point of a sample (see sampleDropped's
-            // doc comment in ArrangeModel.h). Only Audio/Video Clip can be
-            // reassigned.
-            cp = Arrange::FindClip(gArrange, cid);
-            if (cp != nullptr && !cp->sampleDropped && MenuParts::Item(L("Assign Node...")))
-            {
-               gArrangeAssigningClipId = cid;
-               gArrangeAssignTargetIds.clear();
-               ImGui::CloseCurrentPopup();
-            }
-
-            // Output: only for a source with more than one output of this
-            // lane's type (VideoSourceNode has one of each, so it gets none).
-            if (ctxNode != nullptr)
-            {
-               const std::vector<int> outs = ArrangeOutputsOfType(*ctxNode, ctxLaneType);
-               if (outs.size() > 1 && MenuParts::SubMenu(L("Output")))
-               {
-                  const int curOut = Arrange::FindClip(gArrange, cid)->srcOutput;
-                  for (int o : outs)
-                  {
-                     const char* outName = ctxNode->node->OutputLabel(o);
-                     char outItem[96];
-                     snprintf(outItem, sizeof(outItem), "%s##arrout%d", outName != nullptr ? outName : "out", o);
-                     if (MenuParts::Item(outItem, nullptr, curOut == o) && curOut != o)
-                     {
-                        ArrangeEdit([&]()
-                        {
-                           if (Arrange::Clip* c = Arrange::FindClip(gArrange, cid))
-                           {
-                              c->srcOutput = o;
-                              gArrange.revision++;
-                           }
-                        });
-                     }
-                  }
-                  ImGui::EndMenu();
-               }
-            }
-
-            } // end else (single-clip specific properties)
-
-            // Group, Ungroup, and Delete: available for both multi-selection and single-clip / group-selection
-            MenuParts::Separator();
-            if (MenuParts::Item(L("Group"), MODKEY "+G", false, ArrangeCanGroupSelection()))
-               ArrangeGroupSelection();
-            if (MenuParts::Item(L("Ungroup"), MODKEY "+Shift+G", false, ArrangeCanUngroupSelection()))
-               ArrangeUngroupSelection();
-            if (MenuParts::Item(L("Delete"), "Backspace", false, !ctxSelIds.empty()))
-               ArrangeDeleteSelection();
-         }
-         MenuParts::EndPopup();
-      }
-      else if (gArrangeMixGestureLaneId != 0 && !ImGui::IsAnyItemActive())
-      {
-         // A mix-strip control vanished mid-gesture (its lane was deleted or
-         // scrolled away): its deactivate never ran.
-         if (gArrangeGestureOpen)
-            ArrangeGestureEnd();
-         gArrangeMixGestureLaneId = 0;
-      }
-      else if (gArrangeGestureOpen && gArrangeDrag.mode == kArrangeDragNone && gArrangeRenamingLaneId == 0 &&
-               gArrangeMarkerDragId == 0 && gArrangeMixGestureLaneId == 0)
-      {
-         // The popup closed with a field still mid-edit (click outside):
-         // its deactivate never ran, so close the gesture here.
-         ArrangeGestureEnd();
-      }
+      DrawArrangeClipContextMenu(openClipCtx);
 
       // ---- "Add Clip" on an empty lane spot ----
       // Adds a one-bar unassigned clip and hands straight to the canvas

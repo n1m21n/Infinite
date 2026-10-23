@@ -360,11 +360,17 @@ namespace Arrange
    {
       int lane = -1;
       int index = -1;
+      int slot = -1;   // session slot row, set only by FindSlot (never by Find)
       bool Valid() const { return lane >= 0 && index >= 0; }
    };
 
    Loc Find(const Model& m, uint64_t clipId);
+   // A Timeline clip, else a session slot's clip (ids are unique across both).
    const Clip* FindClip(const Model& m, uint64_t clipId);
+   // A session slot's clip only: Loc.lane and Loc.slot, lane -1 when none.
+   Loc FindSlot(const Model& m, uint64_t clipId);
+   // The lane holding a Timeline clip or a slot clip.
+   const Lane* LaneOfClip(const Model& m, uint64_t clipId);
    Clip*       FindClip(Model& m, uint64_t clipId);
    // FindClip, then every lane's session slots. For code that fills a clip in
    // later by id (a dropped file's decode) and may be holding a slot's id.

@@ -1529,3 +1529,10 @@ This slot is inactive	Этот слот неактивен
 This slot's source is missing	Источник этого слота отсутствует
 Timeline: clips along the transport	Таймлайн: клипы вдоль транспорта
 Unassigned	Не назначено
++ Audio Track	+ Аудиодорожка
++ Video Track	+ Видеодорожка
+Add a scene (a row of clips that launch together)	Добавить сцену (ряд клипов, запускаемых вместе)
+Add a track, then add clips to its cells or drop audio and video files onto them.	Добавьте дорожку, затем добавьте клипы в её ячейки или перетащите на них аудио- и видеофайлы.
+Add a video track, an audio track or a track group	Добавить видеодорожку, аудиодорожку или группу дорожек
+Group This Track	Сгруппировать эту дорожку
+Ungroup Track	Убрать дорожку из группы

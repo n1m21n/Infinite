@@ -1030,14 +1030,14 @@ namespace app
       if (gArrangeClipboard.generation != gArrangePatchGeneration)
          gArrangeClipboard.items.clear();
       for (auto it = gArrangeSel.begin(); it != gArrangeSel.end();)
-         it = Arrange::Find(gArrange, *it).Valid() ? std::next(it) : gArrangeSel.erase(it);
-      if (gArrangeSelAnchor != 0 && !Arrange::Find(gArrange, gArrangeSelAnchor).Valid())
+         it = Arrange::FindClip(gArrange, *it) != nullptr ? std::next(it) : gArrangeSel.erase(it);
+      if (gArrangeSelAnchor != 0 && Arrange::FindClip(gArrange, gArrangeSelAnchor) == nullptr)
          gArrangeSelAnchor = 0;
-      if (gArrangeRenamingClipId != 0 && !Arrange::Find(gArrange, gArrangeRenamingClipId).Valid())
+      if (gArrangeRenamingClipId != 0 && Arrange::FindClip(gArrange, gArrangeRenamingClipId) == nullptr)
          gArrangeRenamingClipId = 0;
-      if (gArrangeCtxClipId != 0 && !Arrange::Find(gArrange, gArrangeCtxClipId).Valid())
+      if (gArrangeCtxClipId != 0 && Arrange::FindClip(gArrange, gArrangeCtxClipId) == nullptr)
          gArrangeCtxClipId = 0;
-      if (gArrangeAssigningClipId != 0 && !Arrange::Find(gArrange, gArrangeAssigningClipId).Valid())
+      if (gArrangeAssigningClipId != 0 && Arrange::FindClip(gArrange, gArrangeAssigningClipId) == nullptr)
          gArrangeAssigningClipId = 0;
    }
 
@@ -1045,7 +1045,23 @@ namespace app
    std::vector<uint64_t> ArrangeSelectionIds()
    {
       ArrangePruneSelection();
-      return std::vector<uint64_t>(gArrangeSel.begin(), gArrangeSel.end());
+      // Timeline clips only: every caller edits lane.clips by index. A selected
+      // session slot clip is reached through ArrangeSelectedSlotId().
+      std::vector<uint64_t> ids;
+      for (uint64_t id : gArrangeSel)
+         if (Arrange::Find(gArrange, id).Valid())
+            ids.push_back(id);
+      return ids;
+   }
+
+
+   uint64_t ArrangeSelectedSlotId()
+   {
+      ArrangePruneSelection();
+      for (uint64_t id : gArrangeSel)
+         if (Arrange::FindSlot(gArrange, id).lane >= 0)
+            return id;
+      return 0;
    }
 
 

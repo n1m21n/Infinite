@@ -339,13 +339,39 @@ Loc Find(const Model& m, uint64_t clipId)
 const Clip* FindClip(const Model& m, uint64_t clipId)
 {
    const Loc loc = Find(m, clipId);
-   return loc.Valid() ? &m.lanes[loc.lane].clips[loc.index] : nullptr;
+   if (loc.Valid())
+      return &m.lanes[loc.lane].clips[loc.index];
+   const Loc sl = FindSlot(m, clipId);
+   return sl.lane >= 0 ? &m.lanes[sl.lane].slots[sl.slot].clip : nullptr;
 }
 
 Clip* FindClip(Model& m, uint64_t clipId)
 {
+   return const_cast<Clip*>(FindClip(static_cast<const Model&>(m), clipId));
+}
+
+Loc FindSlot(const Model& m, uint64_t clipId)
+{
+   if (clipId == 0) return Loc{};
+   for (size_t li = 0; li < m.lanes.size(); li++)
+      for (size_t si = 0; si < m.lanes[li].slots.size(); si++)
+         if (m.lanes[li].slots[si].Has() && m.lanes[li].slots[si].clip.id == clipId)
+         {
+            Loc l;
+            l.lane = (int)li;
+            l.slot = (int)si;
+            return l;
+         }
+   return Loc{};
+}
+
+const Lane* LaneOfClip(const Model& m, uint64_t clipId)
+{
    const Loc loc = Find(m, clipId);
-   return loc.Valid() ? &m.lanes[loc.lane].clips[loc.index] : nullptr;
+   if (loc.Valid())
+      return &m.lanes[loc.lane];
+   const Loc sl = FindSlot(m, clipId);
+   return sl.lane >= 0 ? &m.lanes[sl.lane] : nullptr;
 }
 
 Clip* FindClipOrSlot(Model& m, uint64_t clipId)
