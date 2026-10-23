@@ -13,7 +13,7 @@ The bug-hunt kit. Each tool targets a bug class that earlier sprees found by han
 
    The last two found B-K-029 and B-K-030 after the int sweep passed both nodes.
 2. **Decoders:** `fuzz/build.sh` then 5–10 min per target (no app build needed).
-3. **Nodes:** `param_fuzz.py` with every kind against a sanitizer build of the app.
+3. **Nodes:** `INFINITE_PARAMFUZZ=1` first (minutes, one process), then `param_fuzz.py` with every kind against a sanitizer build of the app (hours, one launch per row).
 4. **Before a clamp fix ships:** `clamp_check.py "Type.key=LO..HI" ...` (under a second). It lists every tracked patch the clamp would change. Any hit means look before clamping.
 5. **Group:** `triage.py OUTDIR --stubs DIR` turns BAD rows into one draft finding per distinct bug.
 6. **Selftests under the sanitizer build:** `INFINITE_DSPTEST=1` and the other headless selftests. They reach states the sweeps don't. B-K-028 was found this way after the signal sweep missed it.
@@ -59,6 +59,20 @@ The sweep measures frames and audio, not note pairing. A note node that leaves n
 Float values are ±1e30, nan, inf, 1e9 and -1. 1e9 casts to int fine but can size a buffer. -1 is UB once it's cast to an unsigned seed.
 
 Resumable: re-running skips rows already written. `--types-from results.tsv` re-runs only the BAD types (the verify step after a fix).
+
+## INFINITE_PARAMFUZZ — every audio node, in process
+
+`INFINITE_PARAMFUZZ=1 Infinite` (or `=Type,Type` for a subset). Run it under `perl -e 'alarm N; exec @ARGV'`.
+
+It loads `1e9`, `-1e9`, `-1` and `0` into every float and int param of every audio node, one at a time, through `Patch::LoadParams`. That is the route a patch file, OSC, RPC and presets share. Each node then renders 0.26 s on the AUDIOPARAMSWEEPTEST rig: a drive tone on every audio input and a held note on note inputs.
+
+- **NAN:** a non-finite sample.
+- **HOT:** a peak past 100 (the drive tone peaks at 0.4).
+- **SLOW:** a row past 5 s.
+
+Every row prints `PARAMFUZZ try Type.key=value` before it runs, so after a crash or alarm the last line names the row.
+
+It covers the audio classes of `param_fuzz.py --kind float|int` in one process. It can't see frames, file loading or app-level wiring, so the app-launch sweep still owns those.
 
 ## tsan_selftests.sh — races
 
