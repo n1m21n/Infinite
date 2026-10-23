@@ -1558,3 +1558,8 @@ Launch Row in Group	グループ内の行を起動
 Add a video or audio track	ビデオまたはオーディオトラックを追加
 Click to add a clip. You can also drop a video or image file here.	クリックしてクリップを追加。動画または画像ファイルをここにドロップすることもできます。
 Click to add a clip. You can also drop an audio file here.	クリックしてクリップを追加。音声ファイルをここにドロップすることもできます。
+Session	セッション
+Show Session	セッションを表示
+Close Session	セッションを閉じる
+Show the video the launched clips produce.	起動したクリップが生成する映像を表示します。
+Session - launch clips by scene	セッション - シーン単位でクリップを起動

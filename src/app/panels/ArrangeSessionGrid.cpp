@@ -9,6 +9,7 @@
 #include "app/ui/design/components/EmptyState.h"
 #include "app/ui/design/components/ChipButton.h"
 #include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
@@ -411,10 +412,11 @@ namespace app
    }
 
 
-   void DrawArrangeSessionGrid()
+   void DrawArrangeSessionGrid(float width)
    {
       const bool isLight = IsThemeLight();
-      const ImVec2 avail = ImGui::GetContentRegionAvail();
+      ImVec2 avail = ImGui::GetContentRegionAvail();
+      avail.x = std::min(avail.x, width);
       const int laneCount = (int)gArrange.lanes.size();
 
       if (laneCount == 0)
@@ -770,6 +772,76 @@ namespace app
       return r;
    }
 
+   namespace
+   {
+      enum class MenuAction { None, PlaceOnTimeline, Duplicate, Clear };
+      struct PendingMenuAction
+      {
+         MenuAction kind = MenuAction::None;
+         uint64_t laneId = 0;
+         int row = 0;
+      };
+      PendingMenuAction sMenuAction;
+   }
+
+   // Runs the slot action a menu row queued. Call once the clip menu has ended so nothing still points into the model.
+   void ArrangeSessionApplyMenuAction()
+   {
+      const PendingMenuAction a = sMenuAction;
+      sMenuAction = {};
+      if (a.kind == MenuAction::None)
+         return;
+      Arrange::Lane* lane = Arrange::FindLane(gArrange, a.laneId);
+      if (lane == nullptr || a.row < 0 || a.row >= (int)lane->slots.size() || !lane->slots[(size_t)a.row].Has())
+         return;
+      const uint64_t laneId = a.laneId;
+      const int row = a.row;
+      switch (a.kind)
+      {
+         case MenuAction::PlaceOnTimeline:
+         {
+            const Arrange::Tick at = std::max<Arrange::Tick>(0, Arrange::BeatsToTicks(Transport::Instance().Beats()));
+            Arrange::Clip c = lane->slots[(size_t)row].clip;
+            ArrangeEdit([&]() {
+               c.id = 0;
+               c.start = at;
+               Arrange::PlaceOverwrite(gArrange, laneId, c, nullptr);
+            });
+            break;
+         }
+         case MenuAction::Duplicate:
+            ArrangeEdit([&]() {
+               Arrange::Lane* l = Arrange::FindLane(gArrange, laneId);
+               if (l == nullptr)
+                  return;
+               int dst = row + 1;
+               while (dst < (int)l->slots.size() && l->slots[(size_t)dst].Has())
+                  dst++;
+               if ((int)l->slots.size() <= dst)
+                  l->slots.resize((size_t)dst + 1);
+               while ((int)gArrange.scenes.size() <= dst)
+                  gArrange.scenes.push_back(Arrange::Scene{});
+               Arrange::SessionSlot copy = l->slots[(size_t)row];
+               copy.clip.id = gArrange.NewId();
+               l->slots[(size_t)dst] = copy;
+               gArrange.revision++;
+            });
+            break;
+         case MenuAction::Clear:
+            ArrangeEdit([&]() {
+               if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+               {
+                  l->slots[(size_t)row] = Arrange::SessionSlot{};
+                  gArrange.revision++;
+               }
+            });
+            gArrangeSel.clear();
+            break;
+         case MenuAction::None:
+            break;
+      }
+   }
+
    // The rows only a session slot has, appended to the shared clip menu.
    void DrawArrangeSessionSlotMenuItems(uint64_t clipId)
    {
@@ -868,43 +940,143 @@ namespace app
          ImGui::EndMenu();
       }
       MenuParts::Separator();
+      // Destructive rows are queued, not run: the shared menu still holds pointers into the slot and lane vectors
+      // and keeps reading them for the rest of this frame. ArrangeSessionApplyMenuAction() runs them after it closes.
       if (MenuParts::Item(L("Place on Timeline at Playhead")))
-      {
-         const Arrange::Tick at = std::max<Arrange::Tick>(0, Arrange::BeatsToTicks(Transport::Instance().Beats()));
-         Arrange::Clip c = ss.clip;
-         ArrangeEdit([&]() {
-            c.id = 0;
-            c.start = at;
-            Arrange::PlaceOverwrite(gArrange, laneId, c, nullptr);
-         });
-      }
+         sMenuAction = {MenuAction::PlaceOnTimeline, laneId, row};
       if (MenuParts::Item(L("Duplicate Slot")))
-         ArrangeEdit([&]() {
-            Arrange::Lane* l = Arrange::FindLane(gArrange, laneId);
-            if (l == nullptr)
-               return;
-            int dst = row + 1;
-            while (dst < (int)l->slots.size() && l->slots[(size_t)dst].Has())
-               dst++;
-            if ((int)l->slots.size() <= dst)
-               l->slots.resize((size_t)dst + 1);
-            while ((int)gArrange.scenes.size() <= dst)
-               gArrange.scenes.push_back(Arrange::Scene{});
-            Arrange::SessionSlot copy = l->slots[(size_t)row];
-            copy.clip.id = gArrange.NewId();
-            l->slots[(size_t)dst] = copy;
-            gArrange.revision++;
-         });
+         sMenuAction = {MenuAction::Duplicate, laneId, row};
       if (MenuParts::Item(L("Clear Slot")))
+         sMenuAction = {MenuAction::Clear, laneId, row};
+   }
+
+   namespace
+   {
+      bool sSessionShowMonitor = true;
+
+      // The video the launched clips produce, drawn at the panel's own size. The composite itself runs after the cook
+      // loop into gArrangeMonitorTarget; this only asks for a size and shows the texture.
+      void DrawSessionMonitor(float width)
       {
-         ArrangeEdit([&]() {
-            if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
-            {
-               l->slots[(size_t)row] = Arrange::SessionSlot{};
-               gArrange.revision++;
-            }
-         });
-         gArrangeSel.clear();
+         PushDockedPanelStyle(/*isChild=*/true);
+         ImGui::BeginChild("##sessionmonitor", ImVec2(width, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+         PopDockedPanelStyle();
+         const ImVec2 avail = ImGui::GetContentRegionAvail();
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         const ImVec2 br(origin.x + avail.x, origin.y + avail.y);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         DrawCheckerboardBackdrop(dl, origin, br);
+         if (CountActiveArrangeVideoClips(Transport::Instance().Beats()) > 0)
+         {
+            gArrangeMonitorTarget.requestW = std::max(16, (int)avail.x);
+            gArrangeMonitorTarget.requestH = std::max(16, (int)avail.y);
+            const unsigned int tex = gArrangeMonitorTarget.result.tex;
+            if (tex != 0)
+               dl->AddImage((ImTextureID)(intptr_t)tex, origin, br, ImVec2(0, 1), ImVec2(1, 0));
+         }
+         ImGui::Dummy(avail);
+         ImGui::EndChild();
       }
+
+      void DrawSessionPanelContent()
+      {
+         ArrangePruneSelection();
+         ArrangePollMediaImports();
+         const ImVec2 panelSize = ImGui::GetContentRegionAvail();
+
+         // Toolbar: what only Session needs. Right-click it for the dock side and Close.
+         const float toolbarTop = ImGui::GetCursorScreenPos().y;
+         ImGui::AlignTextToFramePadding();
+         ImGui::TextUnformatted(T("Session"));
+         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_4, ImGui::GetItemRectMin().y));
+         if (ChipButton::Draw(sSessionShowMonitor ? "Monitor##sessmon" : "Monitor Off##sessmon", sSessionShowMonitor, tok::tile))
+            sSessionShowMonitor = !sSessionShowMonitor;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Show the video the launched clips produce."));
+         const float toolbarBottom = ImGui::GetItemRectMax().y;
+         {
+            const ImVec2 m = ImGui::GetIO().MousePos;
+            const ImVec2 o = ImGui::GetWindowPos();
+            if (m.y >= toolbarTop && m.y < toolbarBottom && m.x >= o.x && m.x < o.x + panelSize.x &&
+                ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseReleased(ImGuiMouseButton_Right) &&
+                !ImGui::IsPopupOpen("##sessiondockctx"))
+               ImGui::OpenPopup("##sessiondockctx");
+         }
+         if (MenuParts::BeginPopup("##sessiondockctx"))
+         {
+            if (MenuParts::Item(L("Close Session")))
+               gSessionPanelOpen = false;
+            MenuParts::EndPopup();
+         }
+         {
+            const float ly = toolbarBottom + 2.0f;
+            ImGui::GetWindowDrawList()->AddLine(ImVec2(ImGui::GetWindowPos().x, ly), ImVec2(ImGui::GetWindowPos().x + panelSize.x, ly),
+                                                ImGui::GetColorU32(ImGuiCol_Separator));
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetStyle().WindowPadding.x, ly + 4.0f));
+         }
+
+         const bool isWide = panelSize.x >= 720.0f;
+         const bool showMon = isWide && sSessionShowMonitor;
+         const float monW = isWide ? std::clamp(panelSize.x * 0.28f, 180.0f, 320.0f) : 0.0f;
+         constexpr float kInspectorW = 244.0f;
+         // The inspector shows the selected slot clip; it opens from a cell (double-click) and closes with its own X.
+         const bool showInspector = gArrangeClipSettingsPanelOpen && ArrangeSelectedSlotId() != 0;
+         const float spacing = ImGui::GetStyle().ItemSpacing.x;
+         const ImVec2 rowOrigin = ImGui::GetCursorScreenPos();
+         const float rowW = ImGui::GetContentRegionAvail().x;
+         if (showMon)
+            DrawSessionMonitor(monW);
+         const float gridX = rowOrigin.x + (showMon ? monW + spacing : 0.0f);
+         ImGui::SetCursorScreenPos(ImVec2(gridX, rowOrigin.y));
+         const float gridW = std::max(1.0f, rowW - (gridX - rowOrigin.x) - (showInspector ? kInspectorW + spacing : 0.0f));
+         DrawArrangeSessionGrid(gridW);
+         if (showInspector)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(gridX + gridW + spacing, rowOrigin.y));
+            DrawArrangeClipSettingsChild(kInspectorW);
+         }
+         DrawArrangeClipContextMenu(ArrangeSessionTakeClipCtxRequest());
+      }
+   }
+
+   void DrawSessionPanelDocked(const char* id, const ImVec2& size)
+   {
+      const float kGrip = PanelFrame::kGap;
+      const int dock = ArrangePanelDock();   // 0 = bottom, 3 = top
+      const bool gripFirst = dock == 0;
+      ImGui::BeginChild(id, size, false);
+      gSessionPanelRectMin = ImGui::GetWindowPos();
+      gSessionPanelRectMax = ImVec2(gSessionPanelRectMin.x + ImGui::GetWindowSize().x, gSessionPanelRectMin.y + ImGui::GetWindowSize().y);
+      const ImVec2 inner = ImGui::GetContentRegionAvail();
+      auto grip = [&]()
+      {
+         ImGui::InvisibleButton("##sessionpanelgrip", ImVec2(std::max(1.0f, inner.x), kGrip));
+         DrawPanelSeam(false, gripFirst);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+         if (ImGui::IsItemActive())
+         {
+            gSessionPanelHeight += gripFirst ? -ImGui::GetIO().MouseDelta.y : ImGui::GetIO().MouseDelta.y;
+            gSessionPanelHeight = std::max(kSessionPanelMinHeight, gSessionPanelHeight);
+         }
+      };
+      if (gripFirst)
+         grip();
+      const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+      const ImVec2 cardSize(std::max(1.0f, inner.x), std::max(1.0f, inner.y - kGrip - gap.y));
+      PanelFrame::Insets in;
+      if (gripFirst)
+         in.t = 0.0f;
+      else
+         in.b = 0.0f;
+      PanelFrame::BeginCard("##sessionpanelinnercontent", cardSize, in);
+      DrawSessionPanelContent();
+      PanelFrame::EndCard();
+      if (!gripFirst)
+         grip();
+      const ImVec2 savedSpacing = ImGui::GetStyle().ItemSpacing;
+      ImGui::GetStyle().ItemSpacing = ImVec2(0.0f, 0.0f);
+      ImGui::EndChild();
+      ImGui::GetStyle().ItemSpacing = savedSpacing;
    }
 }

@@ -3618,9 +3618,9 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
          gArrange.scenes[1].additive = true;
          Arrange::Normalize(gArrange);
       });
-      gArrangePanelOpen = true;
-      gArrangePanelHeight = 700.0f;
-      gArrangeSessionView = true;
+      gArrangePanelOpen = false;
+      gSessionPanelOpen = true;
+      gSessionPanelHeight = 700.0f;
       check(gArrange.scenes.size() == 4 && Arrange::FindLane(gArrange, laneA1)->slots.size() == 4, "grid built");
       {
          const uint64_t sid = Arrange::FindLane(gArrange, laneA1)->slots[0].clip.id;
@@ -3709,8 +3709,8 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
    {
       check(&ArrangePlaybackModel() == &gArrange, "Stop All / transport stop gives the plain arrangement back");
       // Leave a launched, Session-view frame for the screenshot.
-      gArrangeSessionView = true;
-      gArrangePanelOpen = true;
+      gArrangePanelOpen = false;
+      gSessionPanelOpen = true;
       ArrangeSessionLaunchScene(1);
    }
    if (frameId == 20)

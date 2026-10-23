@@ -85,7 +85,15 @@ namespace app
          {
             const uint64_t cid = cp->id;
             const bool ctxIsSlot = Arrange::FindSlot(gArrange, cid).lane >= 0;
-            const int ctxLaneType = Arrange::LaneOfClip(gArrange, cid)->type;
+            const Arrange::Lane* ctxLane = Arrange::LaneOfClip(gArrange, cid);
+            if (ctxLane == nullptr)
+            {
+               ImGui::CloseCurrentPopup();
+               MenuParts::EndPopup();
+               ArrangeSessionApplyMenuAction();
+               return;
+            }
+            const int ctxLaneType = ctxLane->type;
             GraphNode* ctxNode = nodeForUid(cp->srcUid);
             // A session slot's own settings lead the menu: launch, loop, quantize.
             if (ctxIsSlot)
@@ -485,7 +493,8 @@ namespace app
                const std::vector<int> outs = ArrangeOutputsOfType(*ctxNode, ctxLaneType);
                if (outs.size() > 1 && MenuParts::SubMenu(L("Output")))
                {
-                  const int curOut = Arrange::FindClip(gArrange, cid)->srcOutput;
+                  const Arrange::Clip* outClip = Arrange::FindClip(gArrange, cid);
+                  const int curOut = outClip != nullptr ? outClip->srcOutput : -1;
                   for (int o : outs)
                   {
                      const char* outName = ctxNode->node->OutputLabel(o);
@@ -522,6 +531,7 @@ namespace app
             }
          }
          MenuParts::EndPopup();
+         ArrangeSessionApplyMenuAction();
       }
       else if (gArrangeMixGestureLaneId != 0 && !ImGui::IsAnyItemActive())
       {
@@ -1411,24 +1421,6 @@ namespace app
                ArrangeSetTimeDisplay(pickedUnit);
          }
 
-         // Timeline | Session: the same panel shows either the linear
-         // timeline or the clip launcher grid (gArrangeSessionView).
-         {
-            const ImVec2 unitEnd = ImGui::GetItemRectMax();
-            ImGui::SetCursorScreenPos(ImVec2(unitEnd.x + tok::space_4, ImGui::GetItemRectMin().y));
-            static const PillGroup::Segment kViewSegs[2] = { { "arrange.view.timeline", "Timeline" }, { "arrange.view.session", "Session" } };
-            const ImVec2 vp = ImGui::GetCursorScreenPos();
-            const UiLayout::Rect vr{ vp.x, vp.y, 150.0f, tok::tile };
-            const int pickedView = PillGroup::Draw("arrangeview", vr, kViewSegs, 2, gArrangeSessionView ? 1 : 0);
-            if (ImGui::IsMouseHoveringRect(ImVec2(vr.x, vr.y), ImVec2(vr.Right(), vr.Bottom())))
-               HelpTip(ImGui::GetIO().MousePos.x < vr.CenterX() ? T("Timeline: clips along the transport")
-                                                                 : T("Session: launch clips by scene"));
-            ImGui::SetCursorScreenPos(vp);
-            ImGui::Dummy(ImVec2(vr.w, vr.h));
-            if (pickedView >= 0)
-               gArrangeSessionView = (pickedView == 1);
-         }
-
          // Snap: the magnet toggles the grid off <-> the last division that
          // was on; the dropdown beside it picks the division. The grid is
          // Settings::snapDivision / snapTriplet (0 = off), in ticks, so it is
@@ -1731,13 +1723,6 @@ namespace app
       }
 
       ImGui::Separator();
-
-      if (gArrangeSessionView)
-      {
-         DrawArrangeSessionGrid();
-         DrawArrangeClipContextMenu(ArrangeSessionTakeClipCtxRequest());
-         return;
-      }
 
       // Layout: Global Viewport Monitor alongside / above timeline lanes
       const bool isWide = panelSize.x >= 720.0f;

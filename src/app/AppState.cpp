@@ -482,6 +482,12 @@ bool gHeadlessNeedProbe = false;
 
    float gArrangePanelHeight = 240.0f;
 
+   // The dockable Session panel: the clip launcher (tracks as columns, scenes as rows). Docks on the same side as the
+   // Arrangement Timeline.
+   bool  gSessionPanelOpen = false;
+
+   float gSessionPanelHeight = 300.0f;
+
    // The view axis is musical (WP6): pixels per quarter-note beat and the
    // leftmost visible beat, so clips (stored in ticks) hold still on screen
    // when the tempo changes. 40 px/beat is the old 80 px/s default at 120 bpm.
@@ -759,6 +765,10 @@ bool gHeadlessNeedProbe = false;
    ImVec2 gPerfPanelRectMin(0.0f, 0.0f);
 
    ImVec2 gPerfPanelRectMax(0.0f, 0.0f);
+
+   ImVec2 gSessionPanelRectMin(0.0f, 0.0f);
+
+   ImVec2 gSessionPanelRectMax(0.0f, 0.0f);
 
    std::map<std::pair<int, int>, float> gPerfPendingWrites;
 

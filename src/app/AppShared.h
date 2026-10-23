@@ -800,6 +800,12 @@ extern float gArrangePanelWidth;
 
 extern float gArrangePanelHeight;
 
+extern bool  gSessionPanelOpen;
+
+extern float gSessionPanelHeight;
+
+   inline const float kSessionPanelMinHeight = 160.0f;
+
 
    inline const float kArrangePanelMinWidth = 300.0f;
 
@@ -1181,6 +1187,10 @@ extern bool gPerfMatrixClaimedKeys;
 extern ImVec2 gPerfPanelRectMin;
 
 extern ImVec2 gPerfPanelRectMax;
+
+extern ImVec2 gSessionPanelRectMin;
+
+extern ImVec2 gSessionPanelRectMax;
 
 extern std::map<std::pair<int, int>, float> gPerfPendingWrites;
 
@@ -4763,6 +4773,7 @@ ArrangeRenderJob ArrangeBuildLaneScopedRenderJob(const std::vector<uint64_t>& la
 void ArrangeCommitLaneScopedRenderJob(ArrangeRenderJob job);
 
 void DrawArrangePanelDocked(const char* id, const ImVec2& size);
+void DrawSessionPanelDocked(const char* id, const ImVec2& size);
 
 void PerfPanelDockCombo();
 
@@ -4943,7 +4954,6 @@ bool ArrangeAudioRebuildIfStale();
 
 // ---- Session view (app/panels/ArrangeSession.cpp) ----
    // The Timeline panel shows the session grid instead of the lanes.
-   extern bool gArrangeSessionView;
    // What the audio scheduler and the video compositor play: gArrange, or,
    // while a session slot is launched, a copy with the launched slots
    // written in over the arrangement.
@@ -4975,11 +4985,15 @@ bool ArrangeAudioRebuildIfStale();
    bool ArrangeSessionAnyLaunched();
    bool ArrangeSessionRecording();
    void ArrangeSessionSetRecording(bool on);
-   void DrawArrangeSessionGrid();
+   void DrawArrangeSessionGrid(float width);
+   // The clip right-click menu shared by the Timeline lanes and the Session grid; `openClipCtx` opens it this call.
+   void DrawArrangeClipContextMenu(bool openClipCtx);
    // The grid asks for the shared clip menu on a slot; the panel opens it and clears the request.
    bool ArrangeSessionTakeClipCtxRequest();
    // The slot-only rows at the bottom of the clip menu: follow action, follow after, place on Timeline, clear.
    void DrawArrangeSessionSlotMenuItems(uint64_t clipId);
+   // Applies the slot action a menu row queued; call after the clip menu has ended.
+   void ArrangeSessionApplyMenuAction();
 
 bool StartAudioEngine(std::string& outError);
 

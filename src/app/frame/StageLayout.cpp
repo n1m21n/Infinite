@@ -16,6 +16,7 @@ void DrawLayout(FrameCtx& fc)
    auto& perfBottom = fc.perfBottom;
    auto& perfRight = fc.perfRight;
    auto& arrangeBottom = fc.arrangeBottom;
+   auto& sessionBottom = fc.sessionBottom;
    auto& arrangeRight = fc.arrangeRight;
    auto& graphHeight = fc.graphHeight;
    auto& dropInsideArrangePanel = fc.dropInsideArrangePanel;
@@ -107,6 +108,9 @@ void DrawLayout(FrameCtx& fc)
       arrangeRight = gArrangePanelOpen && ArrangePanelDock() == 1;
       const bool arrangeLeft = gArrangePanelOpen && ArrangePanelDock() == 2;
       const bool arrangeTop = gArrangePanelOpen && ArrangePanelDock() == 3;
+      // The Session panel docks on the Timeline's side (bottom or top).
+      sessionBottom = gSessionPanelOpen && ArrangePanelDock() == 0;
+      const bool sessionTop = gSessionPanelOpen && ArrangePanelDock() == 3;
 
       // Maintain keyboard focus states across docked panels and canvas regardless of dock order
       if ((ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)) &&
@@ -187,7 +191,7 @@ void DrawLayout(FrameCtx& fc)
          const float maxHeight = std::max(kViewportPanelMinHeight,
                                           room.y - 150.0f - (matrixVertical ? gModMatrixHeight : 0.0f)
                                                           - (perfVertical ? gPerfPanelHeight : 0.0f)
-                                                          - (arrangeVertical ? gArrangePanelHeight : 0.0f));
+                                                          - (arrangeVertical ? gArrangePanelHeight : 0.0f) - ((sessionTop || sessionBottom) ? gSessionPanelHeight : 0.0f));
          const float maxWidth = std::max(kViewportPanelMinWidth,
                                          room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
                                          (matrixHorizontal ? gModMatrixWidth : 0.0f) -
@@ -199,7 +203,7 @@ void DrawLayout(FrameCtx& fc)
          const float maxMatrixHeight = std::max(kModMatrixMinHeight,
                                                 room.y - 150.0f - (viewportVertical ? gViewportPanelHeight : 0.0f)
                                                                 - (perfVertical ? gPerfPanelHeight : 0.0f)
-                                                                - (arrangeVertical ? gArrangePanelHeight : 0.0f));
+                                                                - (arrangeVertical ? gArrangePanelHeight : 0.0f) - ((sessionTop || sessionBottom) ? gSessionPanelHeight : 0.0f));
          const float maxMatrixWidth = std::max(kModMatrixMinWidth,
                                                room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
                                                (viewportHorizontal ? gViewportPanelWidth : 0.0f) -
@@ -211,7 +215,7 @@ void DrawLayout(FrameCtx& fc)
          const float maxPerfHeight = std::max(kPerfPanelMinHeight,
                                               room.y - 150.0f - (viewportVertical ? gViewportPanelHeight : 0.0f)
                                                               - (matrixVertical ? gModMatrixHeight : 0.0f)
-                                                              - (arrangeVertical ? gArrangePanelHeight : 0.0f));
+                                                              - (arrangeVertical ? gArrangePanelHeight : 0.0f) - ((sessionTop || sessionBottom) ? gSessionPanelHeight : 0.0f));
          const float maxPerfWidth = std::max(kPerfPanelMinWidth,
                                              room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
                                              (viewportHorizontal ? gViewportPanelWidth : 0.0f) -
@@ -223,7 +227,8 @@ void DrawLayout(FrameCtx& fc)
          const float maxArrangeHeight = std::max(kArrangePanelMinHeight,
                                                  room.y - 150.0f - (viewportVertical ? gViewportPanelHeight : 0.0f)
                                                                  - (matrixVertical ? gModMatrixHeight : 0.0f)
-                                                                 - (perfVertical ? gPerfPanelHeight : 0.0f));
+                                                                 - (perfVertical ? gPerfPanelHeight : 0.0f)
+                                                                 - ((sessionTop || sessionBottom) ? gSessionPanelHeight : 0.0f));
          const float maxArrangeWidth = std::max(kArrangePanelMinWidth,
                                                 room.x - 200.0f - (gNodePanelOpen ? kNodePanelWidth : 0.0f) -
                                                 (viewportHorizontal ? gViewportPanelWidth : 0.0f) -
@@ -231,6 +236,12 @@ void DrawLayout(FrameCtx& fc)
                                                 (perfHorizontal ? gPerfPanelWidth : 0.0f));
          gArrangePanelHeight = std::min(std::max(gArrangePanelHeight, kArrangePanelMinHeight), maxArrangeHeight);
          gArrangePanelWidth = std::min(std::max(gArrangePanelWidth, kArrangePanelMinWidth), maxArrangeWidth);
+         const float maxSessionHeight = std::max(kSessionPanelMinHeight,
+                                                 room.y - 150.0f - (viewportVertical ? gViewportPanelHeight : 0.0f)
+                                                                 - (matrixVertical ? gModMatrixHeight : 0.0f)
+                                                                 - (perfVertical ? gPerfPanelHeight : 0.0f)
+                                                                 - (arrangeVertical ? gArrangePanelHeight : 0.0f));
+         gSessionPanelHeight = std::min(std::max(gSessionPanelHeight, kSessionPanelMinHeight), maxSessionHeight);
       }
 
       // Measured before the top/left panels below consume any of it, so the
@@ -253,6 +264,7 @@ void DrawLayout(FrameCtx& fc)
       if (matrixTop   || matrixBottom)   { topBottom += gModMatrixHeight;     topBottomRows++; }
       if (perfTop     || perfBottom)     { topBottom += gPerfPanelHeight;     topBottomRows++; }
       if (arrangeTop  || arrangeBottom)  { topBottom += gArrangePanelHeight;  topBottomRows++; }
+      if (sessionTop  || sessionBottom)  { topBottom += gSessionPanelHeight;  topBottomRows++; }
       // No ItemSpacing term: every docked panel is laid out flush (its
       // Draw*Docked zeroes the spacing around its own outer child, and the
       // SameLine chaining below passes an explicit 0 gap), so reserving a
@@ -274,6 +286,8 @@ void DrawLayout(FrameCtx& fc)
          DrawPerfPanelDocked("##perfpanel_top", ImVec2(0, gPerfPanelHeight));
       if (arrangeTop)
          DrawArrangePanelDocked("##arrangepanel_top", ImVec2(0, gArrangePanelHeight));
+      if (sessionTop)
+         DrawSessionPanelDocked("##sessionpanel_top", ImVec2(0, gSessionPanelHeight));
       if (viewportLeft)
       {
          DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));

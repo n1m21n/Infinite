@@ -20,7 +20,6 @@
 
 namespace app
 {
-   bool gArrangeSessionView = false;
 
    namespace
    {

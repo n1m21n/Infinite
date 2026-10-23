@@ -156,6 +156,7 @@ void DrawSidePanels(FrameCtx& fc)
    auto& perfRight = fc.perfRight;
    auto& arrangeBottom = fc.arrangeBottom;
    auto& arrangeRight = fc.arrangeRight;
+   auto& sessionBottom = fc.sessionBottom;
    auto& graphHeight = fc.graphHeight;
    auto& timerNodeBodies = *fc.timerNodeBodies;
    auto& timerNodeBodiesGpu = *fc.timerNodeBodiesGpu;
@@ -693,6 +694,8 @@ void DrawSidePanels(FrameCtx& fc)
          DrawPerfPanelDocked("##perfpanel_bottom", ImVec2(0, gPerfPanelHeight));
       if (arrangeBottom)
          DrawArrangePanelDocked("##arrangepanel_bottom", ImVec2(0, gArrangePanelHeight));
+      if (sessionBottom)
+         DrawSessionPanelDocked("##sessionpanel_bottom", ImVec2(0, gSessionPanelHeight));
 
       ImGui::End();
 

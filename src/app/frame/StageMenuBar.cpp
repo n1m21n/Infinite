@@ -39,10 +39,13 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railArrange", groupTop + 3.0f * step, IconsInfinite::Cube, nullptr, gArrangePanelOpen,
                        T("Arrangement timeline")))
       gArrangePanelOpen = !gArrangePanelOpen;
-   if (PanelRail::Item("##railHistory", groupTop + 4.0f * step, IconsInfinite::History, nullptr, gHistoryOpen,
+   if (PanelRail::Item("##railSession", groupTop + 4.0f * step, IconsInfinite::Play, nullptr, gSessionPanelOpen,
+                       T("Session - launch clips by scene")))
+      gSessionPanelOpen = !gSessionPanelOpen;
+   if (PanelRail::Item("##railHistory", groupTop + 5.0f * step, IconsInfinite::History, nullptr, gHistoryOpen,
                        T("Edit history - jump back to any earlier edit")))
       gHistoryOpen = !gHistoryOpen;
-   if (PanelRail::Item("##railSettings", groupTop + 5.0f * step, IconsInfinite::Settings, nullptr, gSettingsOpen,
+   if (PanelRail::Item("##railSettings", groupTop + 6.0f * step, IconsInfinite::Settings, nullptr, gSettingsOpen,
                        T("Settings")))
       gSettingsOpen = !gSettingsOpen;
    PanelRail::End();
@@ -390,6 +393,17 @@ void DrawMenuBar(FrameCtx& fc)
                   ImGui::SetNextItemWidth(150);
                   FieldWell::Slider(L("Height"), &gArrangePanelHeight,
                                      kArrangePanelMinHeight, 800.0f, "%.0f px");
+               }
+               ImGui::EndMenu();
+            }
+
+            if (MenuParts::SubMenu(L("Session")))
+            {
+               MenuParts::Check(L("Show Session"), &gSessionPanelOpen);
+               if (gSessionPanelOpen)
+               {
+                  ImGui::SetNextItemWidth(150);
+                  FieldWell::Slider(L("Height"), &gSessionPanelHeight, kSessionPanelMinHeight, 800.0f, "%.0f px");
                }
                ImGui::EndMenu();
             }

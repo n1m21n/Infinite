@@ -169,6 +169,10 @@ void DrawKeyboard(FrameCtx& fc)
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_T, false))
          gArrangePanelOpen = !gArrangePanelOpen;
 
+      // Shift+S: the docked Session panel (clip launcher)
+      if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_S, false))
+         gSessionPanelOpen = !gSessionPanelOpen;
+
       // Shift+U: the docked edit history
       if (!typing && shiftOnly && ImGui::IsKeyPressed(ImGuiKey_U, false))
          gHistoryOpen = !gHistoryOpen;

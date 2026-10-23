@@ -66,6 +66,7 @@ struct FrameCtx
    bool perfRight{};
    bool arrangeBottom{};
    bool arrangeRight{};
+   bool sessionBottom{};
    float graphHeight{};
    bool dropInsideArrangePanel{};
    std::optional<ConditionalStageTimer> timerNodeBodies;
