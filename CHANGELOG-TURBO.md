@@ -1,6 +1,6 @@
 # Infinite-Turbo (for Windows) - changelog
 
-## 0.71 (in progress, branch feature/render3d-hq)
+## 0.71.0-turbo (2026-10-23)
 
 Plan: `docs/plans/HQ-071-STRATEGY.md`; technical notes: `docs/RENDER-3D-HQ-FILAMENT.md`.
 
@@ -50,7 +50,7 @@ Plan: `docs/plans/HQ-071-STRATEGY.md`; technical notes: `docs/RENDER-3D-HQ-FILAM
   They now face outwards like the other shapes (`tests/unit/MeshTests.cpp` checks 21 of them), so
   these objects light and reflect correctly in Render 3D, RTX and the HQ.
 
-## 0.70.0-turbo (2026-10-22, branch turbo/next, waiting for the owner's test and merge)
+## 0.70.0-turbo (2026-10-23)
 
 Plan: `docs/plans/NEXT-STRATEGY.md` (milestones, gate) and `docs/plans/NEXT-BACKLOG.md` (item IDs).
 

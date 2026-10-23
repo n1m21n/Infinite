@@ -61,7 +61,13 @@ O plano da 0.71 (Render 3D HQ com referência no Filament + varredura de lentid�
 `HQ-071-STRATEGY.md`, em sessões S0-S9 e P1 com estado na seção 6. A lista abaixo é a de antes
 desse plano e entra nele como P1 (desempenho) e S4-S7 (render).
 
-### Próximo passo: aval do dono para o release da 0.71
+### 0.71.0 lançada (2026-10-23)
+
+`feature/render3d-hq` com merge em `turbo/next` e `turbo/windows-only`, versão 0.71.0 (CMakeLists,
+README, PACKAGE_MANIFEST, CHANGELOG), tag `v0.71.0`. **Sem push** (só com o OK do dono). Próxima
+versão: ver "Próximos passos" abaixo e a §15 do `RENDER-3D-HQ-FILAMENT.md` (o que ficou de fora do HQ).
+
+### Antes do release: aval do dono
 
 S9b (2026-10-23, commit cb26a7da, testado e aprovado pelo dono no app): retorno do teste dele (`buves_textMotion.inf`) - máscara de sombra em tela (sombra suave e de
 contato sem pontilhado), FXAA quando o TAA está desligado, relevo de altura filtrado no mip, opacidade /
