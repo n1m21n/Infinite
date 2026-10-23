@@ -4,6 +4,8 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-10-23 Owner: a group is a block. There is no separate "Make block": every group has a power
+  button in its frame, and off means its nodes stop cooking and go silent (fade out).
 - 2026-10-23 Owner: ASIO on Windows ships under Steinberg's proprietary ASIO licence (the owner signs
   the agreement); the SDK is fetched at build time, never committed. Quantized restart (E1) stays.
   The Session view of the Timeline (P5) is approved to build.

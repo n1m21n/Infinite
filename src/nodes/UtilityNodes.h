@@ -79,18 +79,12 @@ public:
       v.Text("label", label);
       v.Float("width", width); v.Float("height", height);
       v.Color("color", color);
-      v.Bool("block", block);
       v.Bool("on", on);
-      v.Int("order", order);
    }
 
-   // ---- set block ----
-   // A group marked as a block has a power button in its frame. A block that
-   // is off stops its members cooking (pictures hold black, sound fades out).
-   // `order` is the order blocks were made in, which picks each one's colour.
-   bool block = false;
+   // The power button in the frame. Off stops the members cooking (pictures
+   // hold black, sound fades out); on, they cook again.
    bool on = true;
-   int order = 0;
 };
 
 // --- Null (2D) ----------------------------------------------------------

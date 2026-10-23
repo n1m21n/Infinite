@@ -1356,7 +1356,6 @@ Loop In / Out	Начало / конец петли
 Loop On / Off	Петля вкл. / выкл.
 MIDI learn	MIDI learn
 MIT licensed	Лицензия MIT
-Make block	Создать блок
 Markers	Маркеры
 Mixes audio in 3D for headphones and plays it straight to the output (no output pin; it also records its own WAV/FLAC, 16 or 24 bit, always facing front): each input is a dot around a head, and its angle, distance and height (scroll on a dot) change how it is heard. Drop a cable on the empty + pin to add a source; alt-drag a dot for its level; H pins a source in front of your head. Ears use a measured dummy-head set (MIT KEMAR) or a spherical-head model; a limiter holds -1 dB and the meter shows loudness. Head tracking (AirPods Pro/Max etc.) works on macOS 14+ only and turns the room with your head; elsewhere the head stays fixed.	Сводит звук в 3D для наушников и проигрывает его прямо на выход (выходного пина нет; он также записывает собственный WAV/FLAC, 16 или 24 бит, всегда лицом вперёд): каждый вход — точка вокруг головы, и её угол, расстояние и высота (прокрутка на точке) меняют то, как она звучит. Бросьте кабель на пустой пин +, чтобы добавить источник; перетаскивание точки с Alt меняет её уровень; H закрепляет источник перед головой. Уши используют измеренный набор искусственной головы (MIT KEMAR) или модель сферической головы; лимитер держит -1 дБ, а индикатор показывает громкость. Отслеживание головы (AirPods Pro/Max и т. п.) работает только в macOS 14+ и поворачивает комнату вместе с головой; в остальных системах голова неподвижна.
 Name	Название
@@ -1404,7 +1403,6 @@ Reduces triangle count while keeping the overall shape (quadric error edge colla
 Refresh all to scan your folders	Обновите всё, чтобы просканировать папки
 Releases	Релизы
 Relinked 	Перепривязано:
-Remove block	Удалить блок
 Render Timeline	Рендер Timeline
 Rendering	Рендеринг
 Restart to update	Перезапустить для обновления
@@ -1591,3 +1589,7 @@ Stop every playing clip; each track goes back to the Timeline	Останавли
 Abandon a click-to-assign on a clip, otherwise clear the selection	Отменяет назначение клипа щелчком, иначе снимает выделение
 Monitor: Visible. Shows the video the launched clips produce.	Монитор: виден. Показывает видео запущенных клипов.
 Clip Inspector: Open	Инспектор клипа: открыт
+Turn the group off: its nodes stop cooking and go silent	Выключить группу: её ноды перестают обрабатываться и замолкают
+Turn the group on	Включить группу
+Turn Group Off	Выключить группу
+Turn Group On	Включить группу

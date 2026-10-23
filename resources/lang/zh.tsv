@@ -1356,7 +1356,6 @@ Loop In / Out	循环入点 / 出点
 Loop On / Off	循环开 / 关
 MIDI learn	MIDI 学习
 MIT licensed	MIT 许可
-Make block	创建区块
 Markers	标记
 Mixes audio in 3D for headphones and plays it straight to the output (no output pin; it also records its own WAV/FLAC, 16 or 24 bit, always facing front): each input is a dot around a head, and its angle, distance and height (scroll on a dot) change how it is heard. Drop a cable on the empty + pin to add a source; alt-drag a dot for its level; H pins a source in front of your head. Ears use a measured dummy-head set (MIT KEMAR) or a spherical-head model; a limiter holds -1 dB and the meter shows loudness. Head tracking (AirPods Pro/Max etc.) works on macOS 14+ only and turns the room with your head; elsewhere the head stays fixed.	为耳机做 3D 混音并直接播放到输出（没有输出引脚；它也会录制自己的 WAV/FLAC，16 或 24 位，始终面朝前方）：每个输入是头部周围的一个点，它的角度、距离和高度（在点上滚动滚轮）会改变听感。把连线拖到空的 + 引脚上可添加声源；按住 Alt 拖动一个点可调其电平；H 把声源固定在你的正前方。双耳使用实测的人工头数据集（MIT KEMAR）或球形头部模型；限幅器保持 -1 dB，表头显示响度。头部追踪（AirPods Pro/Max 等）仅在 macOS 14+ 上可用，会让空间随你的头转动；在其他系统上头部保持固定。
 Name	名称
@@ -1404,7 +1403,6 @@ Reduces triangle count while keeping the overall shape (quadric error edge colla
 Refresh all to scan your folders	全部刷新以扫描你的文件夹
 Releases	版本发布
 Relinked 	已重新链接：
-Remove block	移除区块
 Render Timeline	渲染 Timeline
 Rendering	正在渲染
 Restart to update	重启以更新
@@ -1591,3 +1589,7 @@ Stop every playing clip; each track goes back to the Timeline	停止所有正在
 Abandon a click-to-assign on a clip, otherwise clear the selection	取消片段的点击指定，否则清除选择
 Monitor: Visible. Shows the video the launched clips produce.	监视器：可见。显示已启动片段产生的视频。
 Clip Inspector: Open	片段检查器：已打开
+Turn the group off: its nodes stop cooking and go silent	关闭分组：组内节点停止运算并静音
+Turn the group on	打开分组
+Turn Group Off	关闭分组
+Turn Group On	打开分组

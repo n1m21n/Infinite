@@ -1356,7 +1356,6 @@ Loop In / Out	Loop-Anfang / -Ende
 Loop On / Off	Loop an / aus
 MIDI learn	MIDI Learn
 MIT licensed	MIT-lizenziert
-Make block	Block erstellen
 Markers	Marker
 Mixes audio in 3D for headphones and plays it straight to the output (no output pin; it also records its own WAV/FLAC, 16 or 24 bit, always facing front): each input is a dot around a head, and its angle, distance and height (scroll on a dot) change how it is heard. Drop a cable on the empty + pin to add a source; alt-drag a dot for its level; H pins a source in front of your head. Ears use a measured dummy-head set (MIT KEMAR) or a spherical-head model; a limiter holds -1 dB and the meter shows loudness. Head tracking (AirPods Pro/Max etc.) works on macOS 14+ only and turns the room with your head; elsewhere the head stays fixed.	Mischt Audio in 3D für Kopfhörer und spielt es direkt auf den Ausgang (kein Ausgangs-Pin; er nimmt auch sein eigenes WAV/FLAC in 16 oder 24 Bit auf, stets nach vorn gerichtet): Jeder Eingang ist ein Punkt um einen Kopf, und sein Winkel, seine Entfernung und Höhe (Scrollen auf einem Punkt) ändern, wie er klingt. Lege ein Kabel auf dem leeren +-Pin ab, um eine Quelle hinzuzufügen; Alt-Ziehen an einem Punkt ändert seinen Pegel; H heftet eine Quelle vor deinen Kopf. Die Ohren nutzen einen gemessenen Kunstkopf-Datensatz (MIT KEMAR) oder ein Kugelkopfmodell; ein Limiter hält -1 dB, und das Meter zeigt die Lautheit. Head-Tracking (AirPods Pro/Max usw.) funktioniert nur unter macOS 14+ und dreht den Raum mit deinem Kopf; anderswo bleibt der Kopf fest.
 Name	Name
@@ -1404,7 +1403,6 @@ Reduces triangle count while keeping the overall shape (quadric error edge colla
 Refresh all to scan your folders	Alle aktualisieren, um deine Ordner zu scannen
 Releases	Releases
 Relinked 	Neu verknüpft:
-Remove block	Block entfernen
 Render Timeline	Timeline rendern
 Rendering	Rendern
 Restart to update	Neustart zum Aktualisieren
@@ -1591,3 +1589,7 @@ Stop every playing clip; each track goes back to the Timeline	Alle laufenden Cli
 Abandon a click-to-assign on a clip, otherwise clear the selection	Eine Klick-Zuweisung eines Clips abbrechen, sonst die Auswahl aufheben
 Monitor: Visible. Shows the video the launched clips produce.	Monitor: Sichtbar. Zeigt das Video der gestarteten Clips.
 Clip Inspector: Open	Clip-Inspektor: Geöffnet
+Turn the group off: its nodes stop cooking and go silent	Gruppe ausschalten: ihre Nodes rechnen nicht mehr und verstummen
+Turn the group on	Gruppe einschalten
+Turn Group Off	Gruppe ausschalten
+Turn Group On	Gruppe einschalten

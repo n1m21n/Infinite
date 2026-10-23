@@ -260,8 +260,6 @@ void DrawMenuBar(FrameCtx& fc)
                gRequestGroup = true;
             if (MenuParts::Item(L("Ungroup"), MODKEY "+U"))
                gRequestUngroup = true;
-            if (MenuParts::Item(L("Make block")))
-               gRequestMakeBlock = true;
             MenuParts::Separator();
             if (MenuParts::Item(L("Add Node..."), "Shift+N"))
                gRequestAddNode = true;

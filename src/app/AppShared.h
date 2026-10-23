@@ -672,7 +672,6 @@ extern bool gRequestFitViewNodeZoom; // fit_view_node "zoom": scale up to fill t
 extern int gRequestSelectNodeIndex; // select this node alone on the next canvas frame (-1 = none)
 
 extern bool gRequestGroup;
-extern bool gRequestMakeBlock;   // wrap the selection in a group and make it a set block
 
 extern bool gRequestUngroup;
 
@@ -5714,12 +5713,10 @@ void PollOscListeners();
 // set, switched on the launch grid with an audio crossfade and a held picture.
 extern bool gShowSetOpen;
 
-// ---- Set blocks (graph/BlockSet.cpp) ----
-// A group marked as a block has a power button in its frame: switched off, its
-// members stop cooking (pictures hold black) and their sound fades out.
-std::vector<GroupNode*> SetBlocks();   // every block, in the order they were made
-void MakeBlock(GroupNode* g, bool block);
-void BlockSetUpdate();                 // once per frame, before cooking
+// ---- Group power (graph/GroupPower.cpp) ----
+// Every group has a power button in its frame: switched off, its members stop
+// cooking (pictures hold black) and their sound fades out.
+void GroupPowerUpdate();               // once per frame, before cooking
 int ShowSetSize();
 const std::string& ShowSetName(int i);
 const std::string& ShowSetEntryPath(int i);
@@ -5812,7 +5809,7 @@ bool RunFormulaShadertoyTest();
 bool RunVmpcTest();
 bool RunRender3DHdrTest();
 bool RunRender3DPanoTest();
-bool RunBlockSetTest();
+bool RunGroupPowerTest();
 extern bool gShowSaveMediaModal;
 
 // Templates (TemplatesWindow.cpp): the window, the empty-canvas invitation, and the open-as-untitled-copy.

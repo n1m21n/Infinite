@@ -1356,7 +1356,6 @@ Loop In / Out	ループ イン / アウト
 Loop On / Off	ループ オン / オフ
 MIDI learn	MIDI ラーン
 MIT licensed	MIT ライセンス
-Make block	ブロックを作成
 Markers	マーカー
 Mixes audio in 3D for headphones and plays it straight to the output (no output pin; it also records its own WAV/FLAC, 16 or 24 bit, always facing front): each input is a dot around a head, and its angle, distance and height (scroll on a dot) change how it is heard. Drop a cable on the empty + pin to add a source; alt-drag a dot for its level; H pins a source in front of your head. Ears use a measured dummy-head set (MIT KEMAR) or a spherical-head model; a limiter holds -1 dB and the meter shows loudness. Head tracking (AirPods Pro/Max etc.) works on macOS 14+ only and turns the room with your head; elsewhere the head stays fixed.	ヘッドホン向けに音声を 3D でミックスし、直接出力に再生します（出力ピンはありません。常に正面向きで、自前の WAV/FLAC を 16 または 24 ビットで録音もします）：各入力は頭の周りの点で、その角度、距離、高さ（点の上でスクロール）で聞こえ方が変わります。空の + ピンにケーブルをドロップしてソースを追加、点を Alt+ドラッグでレベル調整、H でソースを頭の正面に固定します。耳には実測のダミーヘッドデータ（MIT KEMAR）か球形頭部モデルを使い、リミッターが -1 dB を保ち、メーターがラウドネスを示します。ヘッドトラッキング（AirPods Pro/Max など）は macOS 14 以降でのみ動作し、頭の動きに合わせて空間が回ります。それ以外では頭は固定です。
 Name	名前
@@ -1404,7 +1403,6 @@ Reduces triangle count while keeping the overall shape (quadric error edge colla
 Refresh all to scan your folders	すべて更新してフォルダーをスキャン
 Releases	リリース
 Relinked 	再リンクしました：
-Remove block	ブロックを削除
 Render Timeline	Timeline をレンダリング
 Rendering	レンダリング中
 Restart to update	再起動して更新
@@ -1591,3 +1589,7 @@ Stop every playing clip; each track goes back to the Timeline	再生中のクリ
 Abandon a click-to-assign on a clip, otherwise clear the selection	クリップのクリック割り当てをキャンセル、それ以外は選択を解除します
 Monitor: Visible. Shows the video the launched clips produce.	モニター：表示中。起動したクリップの映像を表示します。
 Clip Inspector: Open	クリップインスペクター：表示中
+Turn the group off: its nodes stop cooking and go silent	グループをオフ：中のノードは処理を止めて無音になります
+Turn the group on	グループをオン
+Turn Group Off	グループをオフ
+Turn Group On	グループをオン

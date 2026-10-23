@@ -171,7 +171,7 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
    Transport::Instance().BeginFrameClock();
    // Set blocks: a GO waiting for the grid lands here, and every node learns
    // whether its block is off before anything cooks.
-   BlockSetUpdate();
+   GroupPowerUpdate();
    UpdatePerformanceMatrixMIDI();
    // Before any binding is read: which clip is under the playhead decides
    // which modulations are bypassed this frame.

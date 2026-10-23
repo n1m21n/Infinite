@@ -35,8 +35,8 @@ void DrawPopupsA(FrameCtx& fc)
                ed::SelectNode(gn->NodeId());
                gRequestUngroup = true;
             }
-            if (MenuParts::Item(g->block ? L("Remove block") : L("Make block")))
-               MakeBlock(g, !g->block);
+            if (MenuParts::Item(g->on ? L("Turn Group Off") : L("Turn Group On")))
+               g->on = !g->on;
             if (MenuParts::Item(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
@@ -156,15 +156,6 @@ void DrawPopupsA(FrameCtx& fc)
                   ed::SelectNode(gn->NodeId());
                }
                gRequestDuplicate = true;
-            }
-            if (GroupOwning(gn->index) == nullptr && MenuParts::Item(L("Make block")))
-            {
-               if (!ed::IsNodeSelected(gn->NodeId()))
-               {
-                  ed::ClearSelection();
-                  ed::SelectNode(gn->NodeId());
-               }
-               gRequestMakeBlock = true;
             }
             if (const std::vector<FactoryPresets::Preset>* presets = FactoryPresets::For(gn->typeName))
             {

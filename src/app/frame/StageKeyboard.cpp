@@ -514,10 +514,8 @@ void DrawKeyboard(FrameCtx& fc)
 
       // !gArrangeFocused: Cmd+G / Cmd+Shift+G group timeline clips while the
       // Arrangement panel has focus, and must not also group canvas nodes.
-      const bool makeBlock = gRequestMakeBlock;
-      gRequestMakeBlock = false;
       const bool doGroup =
-         makeBlock || gRequestGroup ||
+         gRequestGroup ||
          (!typing && !gArrangeFocused && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_G, false));
       const bool doUngroup =
          gRequestUngroup ||
@@ -679,12 +677,6 @@ void DrawKeyboard(FrameCtx& fc)
                      grp->width = gw;
                      grp->height = gh;
                      gGroupMembers[grp] = picked;
-                     if (makeBlock)
-                     {
-                        // Inside the "Group" undo step already taken above.
-                        gSuppressUndoCheckpoints = true;
-                        MakeBlock(grp, true);
-                     }
                   }
                   ed::ClearSelection();
                   gPendingSelect.push_back(ggn->NodeId());

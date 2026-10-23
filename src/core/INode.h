@@ -184,12 +184,12 @@ public:
    bool bypassed = false;
    virtual INode* BypassSource() { return nullptr; }
 
-   // --- set blocks ---------------------------------------------------------
-   // True while this node sits in a set block that is switched off (written
-   // every frame by BlockSetUpdate). Unlike bypass nothing passes through: a
+   // --- group power --------------------------------------------------------
+   // True while this node sits in a group that is switched off (written
+   // every frame by GroupPowerUpdate). Unlike bypass nothing passes through: a
    // cable reading it gets no picture (black) and it is not cooked.
    bool blockOff = false;
-   bool blockSeen = false;   // BlockSetUpdate has met this node (a new one starts at its block's level)
+   bool blockSeen = false;   // GroupPowerUpdate has met this node (a new one starts at its group's level)
 
    // The node's current problem, if any (missing file, plugin that would not load, compile error, no input
    // device). Polled while the node is drawn, so it must be cheap and must not touch the disk or the GPU.
