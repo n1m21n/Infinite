@@ -96,7 +96,7 @@ V1/V3 em `src/platform` + `src/core/Video*` correm junto com qualquer marco.
 5. Migração CPU→GPU: variável de equivalência rodando os dois caminhos, diferença 0 ou tolerância
    documentada; linha na tabela P11.
 6. Revisão de código (seção 5) sem achado crítico aberto.
-7. CHANGELOG-TURBO.md, TODO-TURBO.md e o checklist da seção 8 atualizados.
+7. CHANGELOG-TURBO.md, docs/plans/HANDOFF.md e o checklist da seção 8 atualizados.
 
 A versão (CMakeLists, README, PACKAGE_MANIFEST) muda só no merge final, para 0.70.0.
 

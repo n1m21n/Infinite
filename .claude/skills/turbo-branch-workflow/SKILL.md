@@ -40,7 +40,7 @@ sessions in `src/app` (main.cpp fragments) at the same time.
 5. CPU -> GPU migration of a PointZ operator: equivalence env var run (max diff 0 or a
    documented tolerance) and its row in `docs/pointz-gpu-status.md`.
 6. Review with `turbo-code-review` (plus `code-review` at medium, high for P1, P2, A1, A2, MV).
-7. `CHANGELOG-TURBO.md`, `TODO-TURBO.md` and the checklist in NEXT-STRATEGY.md updated.
+7. `CHANGELOG-TURBO.md`, `docs/plans/HANDOFF.md` and the checklist in NEXT-STRATEGY.md updated.
    Version numbers change only at the final merge (0.70.0).
 
 Builds: the owner allowed Claude to build and run the tests on turbo/next. Close nothing the
