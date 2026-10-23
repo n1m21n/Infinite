@@ -233,9 +233,13 @@ namespace PatchExplain
          const char* lane = s.type == Patch::kStreamAudio ? "audio" : "video";
          for (const Patch::ClipRecord& c : s.clips)
          {
-            std::string t = std::string("clip ") + lane + " lane " + std::to_string(s.id) + " \"" + c.name + "\" at beat " +
-                            Num((float)c.startTick / 960.0f + 1.0f) + ", " +
-                            Num((float)c.lengthTick / 960.0f) + " beats";
+            std::string t = c.sessionScene >= 0
+                               ? std::string("session slot ") + lane + " lane " + std::to_string(s.id) + " \"" + c.name +
+                                    "\" in scene " + std::to_string(c.sessionScene + 1) + ", " +
+                                    Num((float)c.lengthTick / 960.0f) + " beats"
+                               : std::string("clip ") + lane + " lane " + std::to_string(s.id) + " \"" + c.name + "\" at beat " +
+                                    Num((float)c.startTick / 960.0f + 1.0f) + ", " +
+                                    Num((float)c.lengthTick / 960.0f) + " beats";
             std::string src = "unassigned";
             for (const Patch::NodeRecord& n : data.nodes)
                if (c.srcUid != 0 && n.uid == c.srcUid)

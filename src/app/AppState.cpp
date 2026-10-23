@@ -1455,6 +1455,7 @@ bool gHeadlessNeedProbe = false;
    // UINT64_MAX is "never built": revision starts at 0 and only climbs, so
    // it can never equal the sentinel and the first frame always builds.
    uint64_t gArrangeAudioBuiltRevision = UINT64_MAX;
+   uint64_t gArrangeAudioBuiltSessionGen = 0;
 
    bool gArrangeAudioBuiltRouting = false;
 

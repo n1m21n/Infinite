@@ -439,6 +439,35 @@ namespace app
       if (a.lanes.size() != b.lanes.size() || a.markers.size() != b.markers.size() ||
           a.trackGroups.size() != b.trackGroups.size())
          return false;
+      // Every saved field of one clip; timeline clips and session slots alike.
+      auto clipEq = [](const Arrange::Clip& ca, const Arrange::Clip& cb) -> bool
+      {
+         if (ca.id != cb.id || ca.start != cb.start || ca.length != cb.length || ca.srcUid != cb.srcUid ||
+             ca.srcOutput != cb.srcOutput || ca.fadeIn != cb.fadeIn || ca.fadeOut != cb.fadeOut ||
+             ca.gainDb != cb.gainDb || ca.enabled != cb.enabled || ca.groupId != cb.groupId || ca.name != cb.name ||
+             ca.colorR != cb.colorR || ca.colorG != cb.colorG || ca.colorB != cb.colorB ||
+             ca.blendMode != cb.blendMode || ca.pan != cb.pan || ca.pitch != cb.pitch ||
+             ca.opacity != cb.opacity || ca.colorBrightness != cb.colorBrightness ||
+             ca.colorContrast != cb.colorContrast || ca.colorSaturation != cb.colorSaturation ||
+             ca.retrigger != cb.retrigger ||
+             // Sample-dropped/BPM-sync fields (step 3) - previously
+             // missing here entirely, which meant a gesture-based Sample
+             // BPM/sync-toggle edit could be silently dropped as "no
+             // change" by ArrangeGestureEnd instead of pushing an undo
+             // step.
+             ca.sampleDropped != cb.sampleDropped || ca.syncToTempo != cb.syncToTempo ||
+             ca.sampleBpm != cb.sampleBpm || ca.origBpm != cb.origBpm ||
+             ca.sourceDurationSeconds != cb.sourceDurationSeconds ||
+             ca.sourceOffsetSeconds != cb.sourceOffsetSeconds ||
+             ca.speed != cb.speed || ca.reverse != cb.reverse ||
+             // Per-clip modulation bypass: without this a bypass toggle
+             // compares equal and ArrangeGestureEnd drops it as "no
+             // change", so it would never reach the undo stack - the same
+             // trap the Sample BPM fields above fell into.
+             ca.bypassedModParams != cb.bypassedModParams)
+            return false;
+         return true;
+      };
       for (size_t i = 0; i < a.lanes.size(); i++)
       {
          const Arrange::Lane& la = a.lanes[i];
@@ -449,35 +478,20 @@ namespace app
              la.name != lb.name || la.clips.size() != lb.clips.size())
             return false;
          for (size_t k = 0; k < la.clips.size(); k++)
-         {
-            const Arrange::Clip& ca = la.clips[k];
-            const Arrange::Clip& cb = lb.clips[k];
-            if (ca.id != cb.id || ca.start != cb.start || ca.length != cb.length || ca.srcUid != cb.srcUid ||
-                ca.srcOutput != cb.srcOutput || ca.fadeIn != cb.fadeIn || ca.fadeOut != cb.fadeOut ||
-                ca.gainDb != cb.gainDb || ca.enabled != cb.enabled || ca.groupId != cb.groupId || ca.name != cb.name ||
-                ca.colorR != cb.colorR || ca.colorG != cb.colorG || ca.colorB != cb.colorB ||
-                ca.blendMode != cb.blendMode || ca.pan != cb.pan || ca.pitch != cb.pitch ||
-                ca.opacity != cb.opacity || ca.colorBrightness != cb.colorBrightness ||
-                ca.colorContrast != cb.colorContrast || ca.colorSaturation != cb.colorSaturation ||
-                ca.retrigger != cb.retrigger ||
-                // Sample-dropped/BPM-sync fields (step 3) - previously
-                // missing here entirely, which meant a gesture-based Sample
-                // BPM/sync-toggle edit could be silently dropped as "no
-                // change" by ArrangeGestureEnd instead of pushing an undo
-                // step.
-                ca.sampleDropped != cb.sampleDropped || ca.syncToTempo != cb.syncToTempo ||
-                ca.sampleBpm != cb.sampleBpm || ca.origBpm != cb.origBpm ||
-                ca.sourceDurationSeconds != cb.sourceDurationSeconds ||
-                ca.sourceOffsetSeconds != cb.sourceOffsetSeconds ||
-                ca.speed != cb.speed || ca.reverse != cb.reverse ||
-                // Per-clip modulation bypass: without this a bypass toggle
-                // compares equal and ArrangeGestureEnd drops it as "no
-                // change", so it would never reach the undo stack - the same
-                // trap the Sample BPM fields above fell into.
-                ca.bypassedModParams != cb.bypassedModParams)
+            if (!clipEq(la.clips[k], lb.clips[k]))
                return false;
-         }
+         if (la.slots.size() != lb.slots.size())
+            return false;
+         for (size_t k = 0; k < la.slots.size(); k++)
+            if (la.slots[k].followAction != lb.slots[k].followAction ||
+                la.slots[k].followBars != lb.slots[k].followBars || !clipEq(la.slots[k].clip, lb.slots[k].clip))
+               return false;
       }
+      if (a.scenes.size() != b.scenes.size())
+         return false;
+      for (size_t i = 0; i < a.scenes.size(); i++)
+         if (a.scenes[i].name != b.scenes[i].name || a.scenes[i].tempo != b.scenes[i].tempo)
+            return false;
       for (size_t i = 0; i < a.markers.size(); i++)
          if (a.markers[i].id != b.markers[i].id || a.markers[i].pos != b.markers[i].pos ||
              a.markers[i].name != b.markers[i].name || a.markers[i].color != b.markers[i].color)

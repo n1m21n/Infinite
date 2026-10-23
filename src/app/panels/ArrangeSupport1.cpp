@@ -540,9 +540,10 @@ namespace app
    void CollectArrangeVideoLayers(double beat, std::vector<ArrangeVideoLayer>& out)
    {
       out.clear();
-      for (size_t li = gArrange.lanes.size(); li-- > 0;)
+      const Arrange::Model& playModel = ArrangePlaybackModel();
+      for (size_t li = playModel.lanes.size(); li-- > 0;)
       {
-         const Arrange::Lane& lane = gArrange.lanes[li];
+         const Arrange::Lane& lane = playModel.lanes[li];
          if (lane.type != Arrange::kLaneVideo)
             continue;
          if (!gArrangeRenderActiveLaneScope.empty() && !gArrangeRenderActiveLaneScope.count(lane.id))
@@ -556,7 +557,7 @@ namespace app
                continue;
             // Lanes never overlap, so this is the lane's only candidate
             // whether or not it turns out to be usable.
-            if (c.enabled && c.srcUid != 0 && Arrange::LaneEffectivelyEnabled(gArrange, lane))
+            if (c.enabled && c.srcUid != 0 && Arrange::LaneEffectivelyEnabled(playModel, lane))
             {
                GraphNode* gn = FindNodeByUid(c.srcUid);
                int srcOutput = c.srcOutput;
@@ -646,7 +647,7 @@ namespace app
    void ArrangeSeekVideoSampleSources(double beat)
    {
       const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
-      for (const Arrange::Lane& lane : gArrange.lanes)
+      for (const Arrange::Lane& lane : ArrangePlaybackModel().lanes)
       {
          if (lane.type != Arrange::kLaneVideo)
             continue;

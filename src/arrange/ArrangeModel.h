@@ -221,6 +221,31 @@ namespace Arrange
              ClipSpeedFactor(c);
    }
 
+   // Session view (clip launcher). A lane's session slots sit beside its
+   // timeline clips: same Clip struct, same source nodes, same engine. A slot
+   // is empty when its clip has length 0. Slot index = scene row; a lane's
+   // slots vector may be shorter than Model::scenes (the tail is empty).
+   // While a slot is launched it plays instead of the lane's timeline clips;
+   // a stopped lane goes back to the arrangement. Launch state itself is
+   // runtime-only (app/panels/ArrangeSession.cpp), never saved.
+   enum FollowAction { kFollowNone = 0, kFollowNext, kFollowPrev, kFollowRandom, kFollowStop, kFollowCount };
+   constexpr int kFollowBarsMin = 1;
+   constexpr int kFollowBarsMax = 64;
+
+   struct SessionSlot
+   {
+      Clip clip;                  // clip.start is unused (always 0); length > 0 = filled
+      int  followAction = kFollowNone;
+      int  followBars   = 4;      // kFollowBarsMin..kFollowBarsMax
+      bool Has() const { return clip.length > 0; }
+   };
+
+   struct Scene
+   {
+      std::string name;           // empty = auto ("Scene 1", ...)
+      float tempo = 0.0f;         // > 0 sets the project tempo when the scene launches
+   };
+
    struct Lane
    {
       uint64_t id        = 0;
@@ -237,6 +262,7 @@ namespace Arrange
       float    colorR = 0.0f, colorG = 0.0f, colorB = 0.0f; // 0,0,0 = default type accent
       float    rowHeight = 0.0f;  // 0 = default row height; drag-resized via the row's bottom border
       std::vector<Clip> clips;    // always sorted by start, never overlapping
+      std::vector<SessionSlot> slots; // session view, index = scene row
    };
 
    // A track group: a named, colored container for lanes AND other track
@@ -321,6 +347,7 @@ namespace Arrange
       std::vector<Lane>       lanes;
       std::vector<Marker>     markers;   // sorted by pos
       std::vector<TrackGroup> trackGroups;
+      std::vector<Scene>      scenes;    // session view rows
       Settings                settings;
       uint64_t            nextId  = 1; // persisted; never recomputed as max+1
       uint64_t            revision = 0; // bumped by every op that changed data
@@ -339,6 +366,9 @@ namespace Arrange
    Loc Find(const Model& m, uint64_t clipId);
    const Clip* FindClip(const Model& m, uint64_t clipId);
    Clip*       FindClip(Model& m, uint64_t clipId);
+   // FindClip, then every lane's session slots. For code that fills a clip in
+   // later by id (a dropped file's decode) and may be holding a slot's id.
+   Clip*       FindClipOrSlot(Model& m, uint64_t clipId);
    const Lane* FindLane(const Model& m, uint64_t laneId);
    Lane*       FindLane(Model& m, uint64_t laneId);
    int         LaneIndex(const Model& m, uint64_t laneId);

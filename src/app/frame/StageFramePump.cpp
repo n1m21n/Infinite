@@ -397,6 +397,7 @@ void DrawFramePump(FrameCtx& fc)
       // stayed), made onsets land a UI frame late, and reset PDC at every
       // boundary. One topology now covers the whole arrangement, and clip
       // boundaries never rebuild.
+      ArrangeSessionTick();
       ArrangeAudioRebuildIfStale();
 
       // Update-checker worker handoff - once a frame, main thread only.

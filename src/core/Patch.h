@@ -405,6 +405,21 @@ namespace Patch
       // on every clip saved before this field existed, which is the same as
       // "nothing bypassed" - so an old patch loads identically.
       std::vector<int> bypassedModParams;
+      // Session view (Arrange::SessionSlot): >= 0 = this record is the
+      // stream's session slot in that scene row, not a timeline clip. Written
+      // as `slotclip` (same grammar as `cliptick`, so an older reader skips
+      // it and every follow-on clip* line finds no clip) plus a
+      // `sessionslot` line carrying these three.
+      int    sessionScene = -1;
+      int    followAction = 0;
+      int    followBars   = 4;
+   };
+
+   // Session view row (Arrange::Scene), one `scene` line each, in order.
+   struct SceneRecord
+   {
+      float tempo = 0.0f;         // > 0 = launching the scene sets the tempo
+      std::string name;
    };
 
    struct StreamRecord
@@ -500,6 +515,7 @@ namespace Patch
       std::vector<StreamRecord> streams; // arrangement timeline, clips nested
       std::vector<MarkerRecord> markers; // arrangement markers, sorted by pos
       std::vector<TrackGroupRecord> trackGroups;
+      std::vector<SceneRecord> scenes;   // session view rows
       ArrangeSettingsRecord arrangeSettings;
       ViewportRecord viewport;
       // True when the file used an `id` line or a word where an index goes, so

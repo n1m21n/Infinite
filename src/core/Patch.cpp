@@ -425,7 +425,7 @@ static void WriteBody(std::ostream& file, const Data& data)
       // positions and reinterpreting them as ticks would silently corrupt
       // every pre-tick patch. New tag, new grammar, old tag stays readable.
       for (const ClipRecord& c : s.clips)
-         file << "cliptick " << i << " " << c.id << " " << c.startTick << " " << c.lengthTick << " "
+         file << (c.sessionScene >= 0 ? "slotclip " : "cliptick ") << i << " " << c.id << " " << c.startTick << " " << c.lengthTick << " "
               << c.srcUid << " " << c.srcOutput << " " << c.fadeInTick << " " << c.fadeOutTick << " "
               << FloatToString(c.gainDb) << " " << (c.enabled ? 1 : 0) << " " << c.groupId << " "
               << FloatToString(c.colorR) << " " << FloatToString(c.colorG) << " " << FloatToString(c.colorB) << " "
@@ -493,6 +493,12 @@ static void WriteBody(std::ostream& file, const Data& data)
       for (const ClipRecord& c : s.clips)
          if (c.speed != 1.0f || c.reverse)
             file << "clipspeed " << i << " " << c.id << " " << FloatToString(c.speed) << " " << (c.reverse ? 1 : 0) << "\n";
+      // Session view slots (see ClipRecord::sessionScene): which row, and the
+      // slot's follow action. Own tag, written only for slot records.
+      for (const ClipRecord& c : s.clips)
+         if (c.sessionScene >= 0)
+            file << "sessionslot " << i << " " << c.id << " " << c.sessionScene << " " << c.followAction << " "
+                 << c.followBars << "\n";
    }
    for (const MarkerRecord& mk : data.markers)
       file << "marker " << mk.id << " " << mk.posTick << " " << mk.color << " " << EscapeLine(mk.name) << "\n";
@@ -504,6 +510,8 @@ static void WriteBody(std::ostream& file, const Data& data)
    // stay append-only and an older reader (which still parses that slot as
    // collapsed, harmlessly) doesn't shift. `parentGroupId` is the new 5th
    // token, added after it for the same reason.
+   for (const SceneRecord& sc : data.scenes)
+      file << "scene " << FloatToString(sc.tempo) << " " << EscapeLine(sc.name) << "\n";
    for (const TrackGroupRecord& g : data.trackGroups)
       file << "trackgroup " << g.id << " " << g.color << " " << (g.enabled ? 1 : 0) << " "
            << (g.collapsed ? 1 : 0) << " " << g.parentGroupId << " " << EscapeLine(g.name) << "\n";
@@ -1227,7 +1235,38 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                }
          }
       }
-      else if (tag == "cliptick")
+      else if (tag == "sessionslot")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         int scene = -1, follow = 0, bars = 4;
+         if (in >> streamIdx >> clipId >> scene >> follow >> bars &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0 && scene >= 0 && scene < 4096)
+         {
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId && c.sessionScene >= 0)
+               {
+                  c.sessionScene = scene;
+                  c.followAction = std::clamp(follow, 0, 4);
+                  c.followBars = std::clamp(bars, 1, 64);
+               }
+         }
+      }
+      else if (tag == "scene")
+      {
+         SceneRecord sc;
+         if (in >> sc.tempo)
+         {
+            if (!std::isfinite(sc.tempo) || sc.tempo < 0.0f || sc.tempo > 999.0f) sc.tempo = 0.0f;
+            std::string raw;
+            std::getline(in, raw);
+            if (!raw.empty() && raw[0] == ' ')
+               raw.erase(0, 1);
+            sc.name = UnescapeLine(raw);
+            outData.scenes.push_back(sc);
+         }
+      }
+      else if (tag == "cliptick" || tag == "slotclip")
       {
          int streamIdx = -1;
          ClipRecord c;
@@ -1260,6 +1299,8 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
             if (!rawName.empty() && rawName[0] == ' ')
                rawName.erase(0, 1);
             c.name = UnescapeLine(rawName);
+            if (tag == "slotclip")
+               c.sessionScene = 0; // the row arrives on the `sessionslot` line
             outData.streams[streamIdx].clips.push_back(c);
          }
       }

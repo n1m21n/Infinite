@@ -197,6 +197,21 @@ void Normalize(Model& m)
       SortLane(l);
       ResolveOverlaps(l);
       if (l.id == 0) l.id = m.NewId();
+      // Session slots: a slot clip has no timeline position and no clip group.
+      for (SessionSlot& sl : l.slots)
+      {
+         sl.clip.start = 0;
+         sl.clip.groupId = 0;
+         if (sl.clip.length < 0) sl.clip.length = 0;
+         if (sl.clip.srcOutput < 0) sl.clip.srcOutput = 0;
+         if (!std::isfinite(sl.clip.gainDb)) sl.clip.gainDb = 0.0f;
+         sl.clip.gainDb = std::clamp(sl.clip.gainDb, -60.0f, 12.0f);
+         if (sl.clip.length > 0) ClampFades(sl.clip);
+         sl.followAction = std::clamp(sl.followAction, 0, (int)kFollowCount - 1);
+         sl.followBars = std::clamp(sl.followBars, kFollowBarsMin, kFollowBarsMax);
+      }
+      while (m.scenes.size() < l.slots.size())
+         m.scenes.push_back(Scene());
    }
    std::stable_sort(m.markers.begin(), m.markers.end(),
                     [](const Marker& a, const Marker& b) { return a.pos < b.pos; });
@@ -224,6 +239,8 @@ void Normalize(Model& m)
       {
          claim(l.id);
          for (Clip& c : l.clips) claim(c.id);
+         for (SessionSlot& sl : l.slots)
+            if (sl.Has()) claim(sl.clip.id);
       }
       for (Marker& mk : m.markers) claim(mk.id);
       for (TrackGroup& g : m.trackGroups) claim(g.id);
@@ -329,6 +346,19 @@ Clip* FindClip(Model& m, uint64_t clipId)
 {
    const Loc loc = Find(m, clipId);
    return loc.Valid() ? &m.lanes[loc.lane].clips[loc.index] : nullptr;
+}
+
+Clip* FindClipOrSlot(Model& m, uint64_t clipId)
+{
+   if (Clip* c = FindClip(m, clipId))
+      return c;
+   if (clipId == 0)
+      return nullptr;
+   for (Lane& lane : m.lanes)
+      for (SessionSlot& s : lane.slots)
+         if (s.Has() && s.clip.id == clipId)
+            return &s.clip;
+   return nullptr;
 }
 
 int LaneIndex(const Model& m, uint64_t laneId)
@@ -1055,6 +1085,9 @@ bool DuplicateLane(Model& m, uint64_t laneId, uint64_t* outLaneId)
          c.groupId = it->second;
       }
    }
+   for (SessionSlot& sl : nl.slots)
+      if (sl.Has())
+         sl.clip.id = m.NewId();
    m.lanes.insert(m.lanes.begin() + i + 1, nl);
    m.revision++;
    if (outLaneId) *outLaneId = nl.id;
@@ -1118,8 +1151,12 @@ bool ClearSource(Model& m, uint64_t uid)
    if (uid == 0) return false;
    bool changed = false;
    for (Lane& l : m.lanes)
+   {
       for (Clip& c : l.clips)
          if (c.srcUid == uid) { c.srcUid = 0; changed = true; }
+      for (SessionSlot& sl : l.slots)
+         if (sl.clip.srcUid == uid) { sl.clip.srcUid = 0; changed = true; }
+   }
    if (changed) m.revision++;
    return changed;
 }

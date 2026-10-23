@@ -503,6 +503,8 @@ set(COMMON_SOURCES
     src/app/graph/Wiring.cpp
     src/app/panels/ArrangePanel.cpp
     src/app/panels/ArrangeRender.cpp
+    src/app/panels/ArrangeSession.cpp
+    src/app/panels/ArrangeSessionGrid.cpp
     src/app/panels/ArrangeSupport1.cpp
     src/app/panels/ArrangeSupport2.cpp
     src/app/panels/HelpWindows.cpp

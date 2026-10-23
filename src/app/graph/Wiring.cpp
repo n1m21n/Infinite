@@ -3,6 +3,90 @@
 
 namespace app
 {
+   namespace
+   {
+      Patch::ClipRecord ArrangeClipToRecord(const Arrange::Clip& c)
+      {
+         Patch::ClipRecord r;
+         r.id = c.id;
+         r.startTick = c.start;
+         r.lengthTick = c.length;
+         r.srcUid = c.srcUid;
+         r.srcOutput = c.srcOutput;
+         r.fadeInTick = c.fadeIn;
+         r.fadeOutTick = c.fadeOut;
+         r.gainDb = c.gainDb;
+         r.pan = c.pan;
+         r.enabled = c.enabled;
+         r.groupId = c.groupId;
+         r.name = c.name;
+         r.colorR = c.colorR;
+         r.colorG = c.colorG;
+         r.colorB = c.colorB;
+         r.blendMode = c.blendMode;
+         r.pitch = c.pitch;
+         r.syncToTempo = c.syncToTempo;
+         r.opacity = c.opacity;
+         r.colorBrightness = c.colorBrightness;
+         r.colorContrast = c.colorContrast;
+         r.colorSaturation = c.colorSaturation;
+         r.retrigger = c.retrigger;
+         r.sampleDropped = c.sampleDropped;
+         r.sampleBpm = c.sampleBpm;
+         r.origBpm = c.origBpm;
+         r.sourceDurationSeconds = c.sourceDurationSeconds;
+         r.sourceOffsetSeconds = c.sourceOffsetSeconds;
+         r.speed = c.speed;
+         r.reverse = c.reverse;
+         r.bypassedModParams = c.bypassedModParams;
+         return r;
+      }
+
+      Arrange::Clip ArrangeClipFromRecord(const Patch::ClipRecord& c, int streamBlendMode,
+                                          const std::function<uint64_t(int)>& resolveLegacy)
+      {
+         Arrange::Clip clip;
+         clip.id = c.id;
+         clip.start = c.startTick;
+         clip.length = c.lengthTick;
+         clip.srcUid = c.srcUid;
+         if (clip.srcUid == 0 && c.legacySrcIndex >= 0 && resolveLegacy)
+            clip.srcUid = resolveLegacy(c.legacySrcIndex);
+         clip.srcOutput = c.srcOutput;
+         clip.fadeIn = c.fadeInTick;
+         clip.fadeOut = c.fadeOutTick;
+         clip.gainDb = c.gainDb;
+         clip.pan = c.pan;
+         clip.enabled = c.enabled;
+         clip.groupId = c.groupId;
+         clip.name = c.name;
+         clip.colorR = c.colorR;
+         clip.colorG = c.colorG;
+         clip.colorB = c.colorB;
+         clip.blendMode = (c.blendMode >= 0) ? c.blendMode : streamBlendMode;
+         clip.pan = c.pan;
+         clip.pitch = c.pitch;
+         clip.syncToTempo = c.syncToTempo;
+         clip.opacity = c.opacity;
+         clip.colorBrightness = c.colorBrightness;
+         clip.colorContrast = c.colorContrast;
+         clip.colorSaturation = c.colorSaturation;
+         clip.retrigger = c.retrigger;
+         clip.sampleDropped = c.sampleDropped;
+         clip.sampleBpm = c.sampleBpm;
+         // origBpm is the detected tempo, display only. It is written only
+         // when > 0, so a missing line (-1, the load sentinel) means "none
+         // detected" or a patch that predates detection - never a tempo.
+         clip.origBpm = (c.origBpm > 0.0f) ? c.origBpm : 0.0f;
+         clip.sourceDurationSeconds = c.sourceDurationSeconds;
+         clip.sourceOffsetSeconds = c.sourceOffsetSeconds;
+         clip.speed = c.speed;
+         clip.reverse = c.reverse;
+         clip.bypassedModParams = c.bypassedModParams;
+         return clip;
+      }
+   }
+
    // Arrange::Model <-> Patch::Data. Straight field copies in both directions:
    // both sides are already ticks, so nothing here is lossy and nothing here
    // needs the transport.
@@ -29,39 +113,18 @@ namespace app
          s.colorB = lane.colorB;
          s.rowHeight = lane.rowHeight;
          for (const Arrange::Clip& c : lane.clips)
+            s.clips.push_back(ArrangeClipToRecord(c));
+         // Session slots ride in the same list, flagged by sessionScene.
+         for (size_t k = 0; k < lane.slots.size(); k++)
          {
-            Patch::ClipRecord r;
-            r.id = c.id;
-            r.startTick = c.start;
-            r.lengthTick = c.length;
-            r.srcUid = c.srcUid;
-            r.srcOutput = c.srcOutput;
-            r.fadeInTick = c.fadeIn;
-            r.fadeOutTick = c.fadeOut;
-            r.gainDb = c.gainDb;
-            r.pan = c.pan;
-            r.enabled = c.enabled;
-            r.groupId = c.groupId;
-            r.name = c.name;
-            r.colorR = c.colorR;
-            r.colorG = c.colorG;
-            r.colorB = c.colorB;
-            r.blendMode = c.blendMode;
-            r.pitch = c.pitch;
-            r.syncToTempo = c.syncToTempo;
-            r.opacity = c.opacity;
-            r.colorBrightness = c.colorBrightness;
-            r.colorContrast = c.colorContrast;
-            r.colorSaturation = c.colorSaturation;
-            r.retrigger = c.retrigger;
-            r.sampleDropped = c.sampleDropped;
-            r.sampleBpm = c.sampleBpm;
-            r.origBpm = c.origBpm;
-            r.sourceDurationSeconds = c.sourceDurationSeconds;
-            r.sourceOffsetSeconds = c.sourceOffsetSeconds;
-            r.speed = c.speed;
-            r.reverse = c.reverse;
-            r.bypassedModParams = c.bypassedModParams;
+            const Arrange::SessionSlot& sl = lane.slots[k];
+            if (!sl.Has())
+               continue;
+            Patch::ClipRecord r = ArrangeClipToRecord(sl.clip);
+            r.startTick = 0;
+            r.sessionScene = (int)k;
+            r.followAction = sl.followAction;
+            r.followBars = sl.followBars;
             s.clips.push_back(std::move(r));
          }
          data.streams.push_back(std::move(s));
@@ -90,6 +153,10 @@ namespace app
          r.name = g.name;
          data.trackGroups.push_back(std::move(r));
       }
+
+      data.scenes.clear();
+      for (const Arrange::Scene& sc : m.scenes)
+         data.scenes.push_back({ sc.tempo, sc.name });
 
       Patch::ArrangeSettingsRecord& a = data.arrangeSettings;
       // Saved, not recomputed as max-id + 1: a clip deleted after taking a
@@ -150,44 +217,19 @@ namespace app
          lane.rowHeight = s.rowHeight;
          for (const Patch::ClipRecord& c : s.clips)
          {
-            Arrange::Clip clip;
-            clip.id = c.id;
-            clip.start = c.startTick;
-            clip.length = c.lengthTick;
-            clip.srcUid = c.srcUid;
-            if (clip.srcUid == 0 && c.legacySrcIndex >= 0 && resolveLegacy)
-               clip.srcUid = resolveLegacy(c.legacySrcIndex);
-            clip.srcOutput = c.srcOutput;
-            clip.fadeIn = c.fadeInTick;
-            clip.fadeOut = c.fadeOutTick;
-            clip.gainDb = c.gainDb;
-            clip.pan = c.pan;
-            clip.enabled = c.enabled;
-            clip.groupId = c.groupId;
-            clip.name = c.name;
-            clip.colorR = c.colorR;
-            clip.colorG = c.colorG;
-            clip.colorB = c.colorB;
-            clip.blendMode = (c.blendMode >= 0) ? c.blendMode : s.blendMode;
-            clip.pan = c.pan;
-            clip.pitch = c.pitch;
-            clip.syncToTempo = c.syncToTempo;
-            clip.opacity = c.opacity;
-            clip.colorBrightness = c.colorBrightness;
-            clip.colorContrast = c.colorContrast;
-            clip.colorSaturation = c.colorSaturation;
-            clip.retrigger = c.retrigger;
-            clip.sampleDropped = c.sampleDropped;
-            clip.sampleBpm = c.sampleBpm;
-            // origBpm is the detected tempo, display only. It is written only
-            // when > 0, so a missing line (-1, the load sentinel) means "none
-            // detected" or a patch that predates detection - never a tempo.
-            clip.origBpm = (c.origBpm > 0.0f) ? c.origBpm : 0.0f;
-            clip.sourceDurationSeconds = c.sourceDurationSeconds;
-            clip.sourceOffsetSeconds = c.sourceOffsetSeconds;
-            clip.speed = c.speed;
-            clip.reverse = c.reverse;
-            clip.bypassedModParams = c.bypassedModParams;
+            Arrange::Clip clip = ArrangeClipFromRecord(c, s.blendMode, resolveLegacy);
+            if (c.sessionScene >= 0)
+            {
+               // A session slot: rows beyond the scene list grow it below.
+               if ((size_t)c.sessionScene >= lane.slots.size())
+                  lane.slots.resize((size_t)c.sessionScene + 1);
+               Arrange::SessionSlot& sl = lane.slots[(size_t)c.sessionScene];
+               clip.start = 0;
+               sl.clip = std::move(clip);
+               sl.followAction = std::clamp(c.followAction, 0, (int)Arrange::kFollowCount - 1);
+               sl.followBars = std::clamp(c.followBars, Arrange::kFollowBarsMin, Arrange::kFollowBarsMax);
+               continue;
+            }
             lane.clips.push_back(std::move(clip));
          }
          m.lanes.push_back(std::move(lane));
@@ -213,6 +255,13 @@ namespace app
          g.name = r.name;
          m.trackGroups.push_back(std::move(g));
       }
+
+      for (const Patch::SceneRecord& r : data.scenes)
+         m.scenes.push_back({ r.name, r.tempo });
+      // Every slot row has a scene, so a hand-edited file can't hide a slot.
+      for (const Arrange::Lane& lane : m.lanes)
+         while (m.scenes.size() < lane.slots.size())
+            m.scenes.push_back({});
 
       const Patch::ArrangeSettingsRecord& a = data.arrangeSettings;
       m.settings.timeDisplay = a.timeDisplay;

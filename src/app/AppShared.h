@@ -4745,7 +4745,7 @@ int OfflineAudioBlockFrames();
 bool ArrangeMediaKindForPath(const std::string& path, Arrange::ImportMediaKind& outKind);
 
 void ArrangeImportMediaFile(const std::string& path, uint64_t laneId, Arrange::Tick atTick,
-                               Arrange::ImportMediaKind kind);
+                               Arrange::ImportMediaKind kind, int sessionScene = -1);
 
 void ArrangeRespawnCloneNode(uint64_t clipId);
 
@@ -4915,6 +4915,8 @@ extern std::unordered_map<uint64_t, ArrangeTerminalComp> gArrangeTerminalComp;
 
 extern uint64_t gArrangeAudioBuiltRevision;
 
+extern uint64_t gArrangeAudioBuiltSessionGen;
+
 extern bool gArrangeAudioBuiltRouting;
 
 extern std::set<uint64_t> gArrangeRetriggerConflictClipIds;
@@ -4937,6 +4939,39 @@ void ForceAudioRepare();
 void RebuildAudioTopology();
 
 bool ArrangeAudioRebuildIfStale();
+
+// ---- Session view (app/panels/ArrangeSession.cpp) ----
+   // The Timeline panel shows the session grid instead of the lanes.
+   extern bool gArrangeSessionView;
+   // What the audio scheduler and the video compositor play: gArrange, or,
+   // while a session slot is launched, a copy with the launched slots
+   // written in over the arrangement.
+   const Arrange::Model& ArrangePlaybackModel();
+   // Moves whenever ArrangePlaybackModel() changed without gArrange.revision.
+   uint64_t ArrangeSessionGeneration();
+   // Once a frame, before ArrangeAudioRebuildIfStale.
+   void ArrangeSessionTick();
+   void ArrangeSessionLaunch(uint64_t laneId, int slot);
+   void ArrangeSessionStopLane(uint64_t laneId);
+   void ArrangeSessionStopAll();
+   void ArrangeSessionLaunchScene(int scene);
+   struct ArrangeSessionSlotState
+   {
+      bool playing = false;
+      bool queued = false;
+      float progress = 0.0f; // 0..1 through the clip's current pass
+   };
+   ArrangeSessionSlotState ArrangeSessionQuery(uint64_t laneId, int slot);
+   struct ArrangeSessionLaneState
+   {
+      int playingSlot = -1;
+      bool stopQueued = false;
+   };
+   ArrangeSessionLaneState ArrangeSessionLaneQuery(uint64_t laneId);
+   bool ArrangeSessionAnyLaunched();
+   bool ArrangeSessionRecording();
+   void ArrangeSessionSetRecording(bool on);
+   void DrawArrangeSessionGrid();
 
 bool StartAudioEngine(std::string& outError);
 

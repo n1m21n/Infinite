@@ -1001,8 +1001,10 @@ namespace app
 
    // Spawn the right node type for dropped media, place a clip in the lane,
    // and dispatch the decode job to the background import thread.
+   // sessionScene >= 0 fills that session slot of the lane instead of placing
+   // a clip on the timeline at atTick (a file dropped onto a Session cell).
    void ArrangeImportMediaFile(const std::string& path, uint64_t laneId, Arrange::Tick atTick,
-                               Arrange::ImportMediaKind kind)
+                               Arrange::ImportMediaKind kind, int sessionScene)
    {
       int laneIdx = -1;
       for (size_t i = 0; i < gArrange.lanes.size(); i++)
@@ -1066,7 +1068,21 @@ namespace app
          // is preserved untouched until the user explicitly requests tempo sync.
          c.syncToTempo = false;
          c.sampleBpm = (float)bpm;
-         Arrange::PlaceOverwrite(gArrange, laneId, c, &clipId);
+         if (sessionScene >= 0)
+         {
+            Arrange::Lane& lane = gArrange.lanes[laneIdx];
+            if ((int)lane.slots.size() <= sessionScene)
+               lane.slots.resize((size_t)sessionScene + 1);
+            while ((int)gArrange.scenes.size() <= sessionScene)
+               gArrange.scenes.push_back(Arrange::Scene{});
+            c.start = 0;
+            c.id = gArrange.NewId();
+            lane.slots[(size_t)sessionScene].clip = c;
+            clipId = c.id;
+            gArrange.revision++;
+         }
+         else
+            Arrange::PlaceOverwrite(gArrange, laneId, c, &clipId);
       });
       if (clipId == 0)
       {
@@ -1081,10 +1097,13 @@ namespace app
       pending.kind = kind;
       gArrangePendingImports.push_back(pending);
 
-      gArrangeSel = { clipId };
-      gArrangeSelAnchor = clipId;
-      gArrangeFlashClipId = clipId;
-      gArrangeFlashStart = ImGui::GetTime();
+      if (sessionScene < 0)
+      {
+         gArrangeSel = { clipId };
+         gArrangeSelAnchor = clipId;
+         gArrangeFlashClipId = clipId;
+         gArrangeFlashStart = ImGui::GetTime();
+      }
       gPatchDirty = true;
    }
 
@@ -1330,7 +1349,7 @@ namespace app
                printf("Arrange media import failed for %s: %s\n", r.path.c_str(), r.error.c_str());
             // Leave the clip in place but no longer pending - it just stays
             // silent/blank, same as any other clip whose node never loaded.
-            if (Arrange::Clip* c = Arrange::FindClip(gArrange, pending.clipId))
+            if (Arrange::Clip* c = Arrange::FindClipOrSlot(gArrange, pending.clipId))
             {
                c->importPending = false;
                gArrange.revision++;
@@ -1349,7 +1368,7 @@ namespace app
          else
             static_cast<ImageSourceNode*>(gn->node.get())->LoadFromDecoded(r.imagePixels, r.width, r.height, r.path);
 
-         if (Arrange::Clip* c = Arrange::FindClip(gArrange, pending.clipId))
+         if (Arrange::Clip* c = Arrange::FindClipOrSlot(gArrange, pending.clipId))
          {
             c->importPending = false;
             // A clone (paste/duplicate/split) already has a correct

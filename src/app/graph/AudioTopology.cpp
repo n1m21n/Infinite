@@ -360,16 +360,18 @@ namespace app
          // itself every block, so this schedule never goes stale on a tempo
          // edit alone.
          std::unordered_map<std::string, size_t> indexOfKey;
+         // The arrangement, or with launched session slots written in.
+         const Arrange::Model& playModel = ArrangePlaybackModel();
          bool anySolo = false;
-         for (const Arrange::Lane& lane : gArrange.lanes)
+         for (const Arrange::Lane& lane : playModel.lanes)
             anySolo = anySolo || (lane.type == Arrange::kLaneAudio && lane.solo);
-         for (const Arrange::Lane& lane : gArrange.lanes)
+         for (const Arrange::Lane& lane : playModel.lanes)
          {
             if (lane.type != Arrange::kLaneAudio)
                continue;
             if (!gArrangeRenderActiveLaneScope.empty() && !gArrangeRenderActiveLaneScope.count(lane.id))
                continue;
-            if (!Arrange::LaneEffectivelyEnabled(gArrange, lane))
+            if (!Arrange::LaneEffectivelyEnabled(playModel, lane))
                continue;
             // Mixer's rule: muted, or someone else is soloed. Gain 0 rather
             // than skipping the lane, so its clips keep their live waveform.
@@ -891,6 +893,7 @@ namespace app
       // whichever of the ~40 graph-edit call sites got here first.
       gArrangeAudioBuiltRevision = gArrange.revision;
       gArrangeAudioBuiltRouting = timelineRouting;
+      gArrangeAudioBuiltSessionGen = ArrangeSessionGeneration();
       gAudioTopologyRebuildCount++;
       ReapArrangeTerminalCompensation();
    }
@@ -911,6 +914,7 @@ namespace app
       if (gOfflineRender.active)
          return false;
       if (gArrange.revision == gArrangeAudioBuiltRevision &&
+          ArrangeSessionGeneration() == gArrangeAudioBuiltSessionGen &&
           ArrangeTimelineRoutingActive() == gArrangeAudioBuiltRouting)
          return false;
       const unsigned long long before = gAudioTopologyRebuildCount;
