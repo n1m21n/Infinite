@@ -145,6 +145,10 @@ This is the question that most often changes the plan. Work through:
   counts, sampling order, random draws, or default values changes how an
   already-saved `.patch` looks when reopened. Say so explicitly — silently
   changing a user's saved work is a worse bug than the one being fixed.
+  For a fix that clamps a param range, measure this rather than reason
+  about it. Run `tools/bughunt/clamp_check.py "Type.key=LO..HI"`. It lists
+  every tracked patch the clamp would change. A knob range is not the
+  param's domain: modes and other gestures write past it.
 - **Does the fix create redundancy?** If it adds a second budget, a second
   cache, or a second guard next to one that already exists, the two will
   drift. Prefer removing the broken one to adding a correct one beside it.
