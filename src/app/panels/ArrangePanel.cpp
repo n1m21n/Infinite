@@ -937,6 +937,23 @@ namespace app
                ArrangeSetTimeDisplay(pickedUnit);
          }
 
+         // Timeline | Session: the same panel shows either the linear
+         // timeline or the clip launcher grid (gArrangeSessionView).
+         ImGui::SameLine(0.0f, tok::space_4);
+         {
+            static const PillGroup::Segment kViewSegs[2] = { { "arrange.view.timeline", "Timeline" }, { "arrange.view.session", "Session" } };
+            const ImVec2 vp = ImGui::GetCursorScreenPos();
+            const UiLayout::Rect vr{ vp.x, vp.y, 150.0f, tok::tile };
+            const int pickedView = PillGroup::Draw("arrangeview", vr, kViewSegs, 2, gArrangeSessionView ? 1 : 0);
+            if (ImGui::IsMouseHoveringRect(ImVec2(vr.x, vr.y), ImVec2(vr.Right(), vr.Bottom())))
+               HelpTip(ImGui::GetIO().MousePos.x < vr.CenterX() ? T("Timeline: clips along the transport")
+                                                                 : T("Session: launch clips by scene"));
+            ImGui::SetCursorScreenPos(vp);
+            ImGui::Dummy(ImVec2(vr.w, vr.h));
+            if (pickedView >= 0)
+               gArrangeSessionView = (pickedView == 1);
+         }
+
          // Snap: the magnet toggles the grid off <-> the last division that
          // was on; the dropdown beside it picks the division. The grid is
          // Settings::snapDivision / snapTriplet (0 = off), in ticks, so it is
@@ -1239,6 +1256,8 @@ namespace app
       }
 
       ImGui::Separator();
+
+      if (gArrangeSessionView) { DrawArrangeSessionGrid(); return; }
 
       // Layout: Global Viewport Monitor alongside / above timeline lanes
       const bool isWide = panelSize.x >= 720.0f;

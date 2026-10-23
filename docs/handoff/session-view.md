@@ -50,6 +50,28 @@ Infinite-Turbo fork; this is a fresh implementation."
   - Empty state when there are no tracks.
 - **CMakeLists.txt**: both new files are listed.
 
+## State at handover (checked 2026-10-23)
+
+- Branch `feature/session-view`, HEAD `8e3fba88` ("WIP Session view (P5)"),
+  working tree clean.
+- Steps 1 and 2 below are **not applied**. `gArrangeSessionView` and
+  `DrawArrangeSessionGrid()` are declared in `AppShared.h` but nothing in
+  `ArrangePanel.cpp` calls them yet, so the view cannot be reached from the UI.
+- Nothing has been compiled, so every "written" item above is unverified.
+- No fixture, translations or design-ratchet run exist yet.
+
+## Rules for whoever picks this up
+
+- Read `docs/DECISIONS.md` and the `timeline-arrangement-architecture` and
+  `infinite-design-system` skills first. Follow `git-branch-workflow`: commit
+  per step on this branch.
+- Only the Pro (`Namans-MacBook-Pro-366`) merges to `main` or pushes. On the Air,
+  commit and stop after step 8.
+- Don't run UI-scripting (Control your Mac) to check the grid. Use the
+  `INFINITE_SESSIONVIEWTEST` screenshot instead (step 6).
+- Fix compile errors in the grid file by matching the existing component APIs.
+  Don't add new components or tokens to make it compile.
+
 ## Left to do, in order
 
 1. **Toolbar toggle.** In `src/app/panels/ArrangePanel.cpp`, add a
@@ -93,6 +115,15 @@ Infinite-Turbo fork; this is a fresh implementation."
 8. **Review.** Look at the screenshot in light and dark, then show the owner.
 9. **Merge.** Commit, merge to `main` with `--no-ff`, and push. Only the Pro
    does this.
+
+**Done means:** it builds, the ratchet is unchanged (colours 0, raw widgets 433),
+`INFINITE_I18NTEST` and `INFINITE_SESSIONVIEWTEST` pass, hygiene matches the
+baseline, the owner has seen the light and dark screenshots, and the merge is on
+`main`. "Closed" is not "shipped": a release happens only when the owner asks.
+
+**If something fails and can't be fixed in a step:** leave the branch unmerged,
+commit what works, and add the failure and its cause under "State at handover"
+in this file.
 
 ## Other open items (not P5)
 
