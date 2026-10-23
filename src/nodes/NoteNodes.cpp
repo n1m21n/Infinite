@@ -1443,7 +1443,13 @@ void VelocityCurveNode::CookIfNeeded(int frameId)
    mAudioNode->SetCurve(curve);
 }
 
-void VelocityCurveNode::VisitParams(ParamVisitor& v) { v.Float("curve", curve); }
+void VelocityCurveNode::VisitParams(ParamVisitor& v)
+{
+   v.Float("curve", curve);
+   // The knob's range. A patch's curve of -1 sent 1/velocity downstream
+   // (inf for velocity 0); a remote set stores any finite float.
+   curve = std::clamp(curve, 0.25f, 4.0f);
+}
 
 AudioNode* VelocityCurveNode::GetAudioNode()
 {

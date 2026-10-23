@@ -14,6 +14,9 @@
 namespace
 {
    constexpr int kGainDbParam = 0;
+   // The gain knobs' and faders' range (Gain, Mixer, Audio In).
+   constexpr float kMinGainDb = -60.0f;
+   constexpr float kMaxGainDb = 12.0f;
 }
 
 // ----------------------------------------------------------------------- Gain
@@ -79,6 +82,9 @@ void GainNode::CookIfNeeded(int frameId)
 void GainNode::VisitParams(ParamVisitor& v)
 {
    v.Float("gainDb", gainDb);
+   // A patch file, OSC or RPC set stores any finite float; 10^(dB/20) is inf
+   // past ~770 dB and the knob binds only the UI. Hold it to the knob's range.
+   gainDb = std::clamp(gainDb, kMinGainDb, kMaxGainDb);
 }
 
 AudioNode* GainNode::GetAudioNode()
@@ -267,6 +273,8 @@ void MixerNode::VisitParams(ParamVisitor& v)
       v.Float(kPanNames[i], pan[i]);
       v.Bool(kMuteNames[i], mute[i]);
       v.Bool(kSoloNames[i], solo[i]);
+      gainDb[i] = std::clamp(gainDb[i], kMinGainDb, kMaxGainDb); // as GainNode
+      pan[i] = std::clamp(pan[i], -1.0f, 1.0f);
    }
 }
 
@@ -707,6 +715,7 @@ void AudioInputNode::CookIfNeeded(int frameId)
 void AudioInputNode::VisitParams(ParamVisitor& v)
 {
    v.Float("gainDb", gainDb);
+   gainDb = std::clamp(gainDb, kMinGainDb, kMaxGainDb); // as GainNode
    v.Int("channelMode", channelMode);
    v.Int("deviceId", deviceId);
    v.Text("deviceName", deviceName);
