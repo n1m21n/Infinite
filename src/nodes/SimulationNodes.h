@@ -28,13 +28,21 @@ class ParticleSystemNode : public INode, public IGeometrySource
 public:
    enum EmitShape { kPoint = 0, kSphere, kBox, kDisc, kEmitShapeCount };
 
+   // The GPU simulation's ceiling (one 1024 x 1024 state texture); the CPU
+   // fallback (INFINITE_GPU_POINTS=0, or no float render targets) keeps its
+   // old 200k.
+   static constexpr int kGpuMaxParticles = 1024 * 1024;
+   static constexpr int kCpuMaxParticles = 200000;
+
    static INode* Create() { return new ParticleSystemNode(); }
    static const std::vector<std::string>& EmitShapeNames();
+   ~ParticleSystemNode() override;
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
+   const std::string& CookWarning() const override { return mCookWarning; }
 
    // No mesh of its own - a pure point cloud. See GetPointCloud() below for
    // the component that actually carries its data.
@@ -43,20 +51,32 @@ public:
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override { return Material(); }
 
-   const std::vector<Particle>& GetPoints() { return mParticles; }
+   // On the GPU path the particles live in textures (GetGpuPoints()); these
+   // read them back the first time a CPU consumer asks in a cook.
+   const std::vector<Particle>& GetPoints() { EnsureCpuParticles(); return mParticles; }
    unsigned long long PointRevision() { return mRevision; }
    const std::vector<Particle>* GetPointCloud() override
    {
       if (bypassed)
          return nullptr;
+      EnsureCpuParticles();
       return &mParticles;
    }
    unsigned long long PointCloudRevision() override { return bypassed ? 0 : mRevision; }
+   const GpuPoints* GetGpuPoints() override;
 
-   size_t AliveCount() const { return mAliveCount; }
+   // Alive particles. On the GPU path it comes from an occlusion query and
+   // lags the simulation by a cook.
+   size_t AliveCount() const;
+   bool OnGpu() const { return mGpuActive; }
    // Threads used to step the particles: 0 picks from the machine (up to 8). Tests set it to compare.
    static int sMaxThreads;
    void Reset();
+
+   // Optional geometry to be born on: a mesh's surface, or a cloud's points.
+   IGeometrySource* emitSource = nullptr;
+   IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &emitSource : nullptr; }
+   const char* InputLabel(int) const override { return "emit"; }
 
    int maxParticles = 4000;
    float emitRate = 200.0f;      // particles per second
@@ -82,6 +102,24 @@ public:
 
    float seed = 0.0f;
 
+   // Born on the "emit" pin's geometry instead of the shape (when connected).
+   bool emitFromInput = false;
+   // Added along the birth point's normal: a surface's normal, the radial
+   // direction of the sphere and box shapes, up for the disc, the launch
+   // direction for a point.
+   float speedAlongNormal = 0.0f;
+   // Emitting from geometry: each particle keeps the colour of the point or
+   // surface it was born on for its whole life (start/end colour unused).
+   bool copySourceColor = true;
+   // Drag and turbulence are divided by it; gravity is not.
+   float mass = 1.0f;
+   // Multiplies the simulation clock: 0 freezes, 4 runs four times as fast.
+   float timeScale = 1.0f;
+   // Shape of the start->end size and colour blends over a life:
+   // t^curve, so 1 is linear and both endpoints are always reached.
+   float sizeCurve = 1.0f;
+   float colorCurve = 1.0f;
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("maxParticles", maxParticles); v.Float("emitRate", emitRate);
@@ -96,16 +134,43 @@ public:
       v.Float("startSize", startSize); v.Float("endSize", endSize);
       v.Color("startColor", startColor); v.Color("endColor", endColor);
       v.Float("seed", seed);
+      v.Bool("emitFromInput", emitFromInput); v.Float("speedAlongNormal", speedAlongNormal);
+      v.Bool("copySourceColor", copySourceColor); v.Float("mass", mass);
+      v.Float("timeScale", timeScale);
+      v.Float("sizeCurve", sizeCurve); v.Float("colorCurve", colorCurve);
    }
 
 private:
+   // A birth point: world-space position, normal and colour.
+   struct EmitSample
+   {
+      float p[3];
+      float n[3];
+      float c[3];
+   };
+
    void Step(float dt);
    void Emit(int count);
-
    void StepRange(size_t begin, size_t end, float dt);
+   int Cap() const;
+   void PullEmitSamples();
+   void BirthShape(unsigned int& rng, float pos[3], float nrm[3]) const;
+
+   // GPU path (fragment-shader ping-pong; GL 4.1 has no compute).
+   bool EnsureGpu(int cap);
+   void ReleaseGpu();
+   void ClearGpuState();
+   void GpuStep(float dt, int births);
+   void GpuPresent();
+   void ReadCountQuery();
+   void ReadBoundsIfReady();
+   void UpdateGpuBounds();
+   void EnsureCpuParticles();
+
    std::vector<Particle> mParticles;
    size_t mAliveCount = 0;
    unsigned long long mRevision = 0;
+   std::string mCookWarning;
 
    // Leftover simulation time not yet consumed by a whole fixed step.
    float mAccumulator = 0.0f;
@@ -113,6 +178,62 @@ private:
    float mEmitCarry = 0.0f;   // fractional particles owed from the last step
    unsigned int mRandState = 1;
    int mLastCookFrame = -1;
+
+   // Birth points from the emit pin, rebuilt when its geometry changes.
+   std::vector<EmitSample> mEmitSamples;
+   const void* mEmitSamplesFrom = nullptr;
+   unsigned long long mEmitSamplesRevision = 0;
+   Mat4 mEmitSamplesModel;
+   bool mEmitSamplesCloud = false;
+   size_t mEmitSamplesInstances = 0;
+   unsigned long long mEmitSamplesStamp = 0;   // bumps on every rebuild (the GPU table follows it)
+   bool mEmitHasBounds = false;
+   float mEmitLo[3] = { 0, 0, 0 };
+   float mEmitHi[3] = { 0, 0, 0 };
+   // The emit pin's GPU points, when it has them (sampled in the shader).
+   const GpuPoints* mEmitGpu = nullptr;
+   Mat4 mEmitGpuModel;
+   bool EmittingFromInput() const { return emitFromInput && (mEmitGpu != nullptr || !mEmitSamples.empty()); }
+
+   bool mGpuActive = false;        // this run is simulated on the GPU
+   bool mGpuFailed = false;        // shaders or targets unavailable: CPU from now on
+   bool mGpuClearPending = true;   // Reset() ran: clear the state textures at the next cook
+   int mGpuCap = 0;                // slots in the state textures
+   int mGpuTexH = 0;
+   unsigned int mSimFbo[2] = { 0, 0 };
+   unsigned int mSimTex[2][3] = { { 0, 0, 0 }, { 0, 0, 0 } };   // pos+age, vel+life, colour
+   int mSimRead = 0;               // which of the pair holds the current state
+   unsigned int mSimProgram = 0;
+   unsigned int mPresentProgram = 0;
+   unsigned int mBoundsProgram = 0;
+   unsigned int mEmitTex = 0;      // mEmitSamples as texels (3 per sample)
+   int mEmitTexCount = 0;
+   unsigned long long mEmitTexStamp = 0;
+   GpuPointsGL::Target mOut;
+   GpuPoints mGpuPoints;
+   unsigned long long mBirths = 0; // since the last reset: the ring cursor and each birth's id
+   unsigned int mCountQuery = 0;
+   bool mCountPending = false;
+   bool mCountStale = false;       // the last present ran with a count already in flight
+   unsigned int mResets = 0;       // Reset() calls, so a count from before one is dropped
+   unsigned int mCountResets = 0;
+   long long mLiveCount = 0;
+   // Bounds: a min/max reduction read back through a PBO a cook late.
+   unsigned int mBoundsFbo[3] = { 0, 0, 0 };
+   unsigned int mBoundsTex[3][2] = { { 0, 0 }, { 0, 0 }, { 0, 0 } };
+   int mBoundsW[3] = { 0, 0, 0 };
+   int mBoundsH[3] = { 0, 0, 0 };
+   unsigned int mBoundsPbo = 0;
+   bool mBoundsPending = false;
+   void* mBoundsSync = nullptr;    // GLsync fence after the PBO read
+   bool mBoundsValid = false;
+   float mBoundsLo[3] = { 0, 0, 0 };
+   float mBoundsHi[3] = { 0, 0, 0 };
+   float mBoundsMaxSpeed = 0.0f;
+   double mSimSeconds = 0.0;       // simulated time since the reset
+   double mBoundsIssuedAt = 0.0;   // mSimSeconds when the pending reduction ran
+   double mBoundsAt = 0.0;         // ... and when the read-back one ran
+   unsigned long long mCpuRevision = 0;   // mParticles holds this revision's readback
 };
 
 // --- Cloth / Soft Body --------------------------------------------------

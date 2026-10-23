@@ -567,14 +567,14 @@ namespace app
 
    void DrawParticleSystemParams(ParticleSystemNode* n)
    {
-      ImGui::TextDisabled("%zu alive", n->AliveCount());
+      ImGui::TextDisabled(n->OnGpu() ? "%zu alive (GPU)" : "%zu alive", n->AliveCount());
       if (ActionButton::Column("Reset", kParamWidth))
          n->Reset();
 
       NodeSeparator("emitter");
       DropdownButton("shape", ParticleSystemNode::EmitShapeNames(), n->emitShape,
                      [n](int i) { n->emitShape = i; });
-      ModSliderInt("max particles", &n->maxParticles, 16, 50000);
+      ModSliderInt("max particles", &n->maxParticles, 16, ParticleSystemNode::kGpuMaxParticles);
       ModSlider("rate / sec", &n->emitRate, 0.0f, 3000.0f);
       ModSlider("radius", &n->emitRadius, 0.0f, 3.0f);
       ModSlider("lifetime", &n->lifetime, 0.1f, 20.0f);
@@ -589,7 +589,7 @@ namespace app
       ModSlider("dir z", &n->dirZ, -1.0f, 1.0f);
 
       bool psSaved = false;
-      const bool psOpen = BeginAdvancedFold("showMoreParticles", 9, 2, psSaved);   // forces + over life
+      const bool psOpen = BeginAdvancedFold("showMoreParticles", 14, 2, psSaved);   // forces + over life + emit/time
       if (psOpen)
          NodeSeparator("forces");
       ModSlider("gravity x", &n->gravityX, -10.0f, 10.0f);
@@ -606,7 +606,25 @@ namespace app
       ColorSwatch("start colour", n->startColor, n);
       ColorSwatch("end colour", n->endColor, n);
       ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f", kParamWidth, false, 1.0f);
+
+      // Appended after seed so every older row keeps its modulation slot.
+      if (psOpen)
+         NodeSeparator("emit & time");
+      ModCheckbox("emit from input", &n->emitFromInput);
+      ModSlider("speed along normal", &n->speedAlongNormal, -10.0f, 10.0f);
+      ModCheckbox("copy source colour", &n->copySourceColor);
+      ModSlider("mass", &n->mass, 0.1f, 10.0f);
+      ModSlider("time scale", &n->timeScale, 0.0f, 4.0f);
+      ModSlider("size curve", &n->sizeCurve, 0.1f, 10.0f);
+      ModSlider("colour curve", &n->colorCurve, 0.1f, 10.0f);
       gParamRegisterOnly = psSaved;
+
+      if (!n->CookWarning().empty())
+      {
+         PushTextWrapWidth(kPreviewSize);
+         ImGui::TextUnformatted(n->CookWarning().c_str());
+         PopTextWrapWidth();
+      }
    }
 
 

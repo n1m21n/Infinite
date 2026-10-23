@@ -143,3 +143,42 @@ absolute numbers. Frame p50 / p99 ms, fps p50.
   (108 per cube) and is fill-bound at 0.9-3.2 fps either way; the per-frame `Mat4` build it removes is
   ~1-2 ms of a 300-1100 ms frame. It matters where the cloud changes every frame and the copies are
   cheap (small stamps, particles into Instance on Points); its frame compare passes.
+
+## Step 7: Particle System on the GPU (2026-10-23)
+
+**Design.** Particle `i` lives in texel `(i % texW, i / texW)` of three ping-pong state textures:
+A = position + age (RGBA32F), B = velocity + life (RGBA32F, life 0 = dead or never born),
+C = birth colour (RGBA16F). One fullscreen pass per 120 Hz step births that step's particles into
+a ring of slots (cursor = births so far mod the cap) and integrates every live one with the CPU
+path's maths (gravity, the same value noise for turbulence, drag, Euler). A present pass writes the
+`GpuPoints` textures every consumer reads (w = size, 0 for dead) inside an occlusion query, which
+gives the alive count a cook later. Bounds come from a 3-level 16x16 min/max reduction read back
+through a PBO + fence, never waited on, and padded by top speed and acceleration times the lag.
+CPU consumers (MetaBall, Proximity Lines, the readout) get a readback the first time they ask.
+
+**What differs from the CPU path, on purpose.**
+- Each birth draws its random numbers from a hash of its birth number, not a running generator:
+  a rewind replays exactly, and the run matches the CPU run statistically, not number for number.
+  The CPU path is unchanged for existing patches (same generator calls, same maths at the defaults).
+- At the cap the ring replaces the oldest particles; the CPU path drops new births.
+- Caps: 1,048,576 on the GPU, 200,000 on the CPU fallback (`INFINITE_GPU_POINTS=0`, or float render
+  targets missing; a failed shader switches the node to CPU for the session).
+
+**New params** (appended after `seed`, so saved modulation keeps its slots): an `emit` geometry
+pin with `emit from input` (born on a mesh's surface, area-weighted, or on a cloud's points; GPU
+points are sampled in the shader without a readback), `speed along normal`, `copy source colour`,
+`mass` (divides drag and turbulence), `time scale`, `size curve`, `colour curve` (t^curve).
+
+**Checks.** `GPUPOINTSTEST` step 7 section, all pass: a beam with nothing random gives 3000 alive
+on both paths with the same mean height; a random spray gives 15925 vs 15936 alive and the same
+spread; a rewind replays a bit-identical checksum; every particle lies inside the offered bounds;
+births on a cube land on its surface in its colour on both paths; births on Image to Points' GPU
+points land inside that cloud; 600,000 alive at 600k/s, past the CPU cap. Parity: every new call
+(`glFenceSync`, `glClientWaitSync`, `glGetBufferSubData`, `glUniform1ui`, MRT, `GL_SAMPLES_PASSED`)
+is GL 3.0-3.3 core and in glad; shaders stay `#version 150`; no `Platform::` code.
+
+**Left for the next session.**
+- `tools/gen-patch-skill.py` has not been re-run for the new `emit` pin and params. Against the dev
+  (Debug) build `--describe` spun for 9+ minutes in `Sketch3DNode::CookIfNeeded` (freeing a very
+  large mesh, not particle code); run it against a Release build.
+- B11 scene B (particles) GPU on/off on a Release build, then steps 8-12.
