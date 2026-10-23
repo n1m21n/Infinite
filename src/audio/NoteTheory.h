@@ -276,7 +276,10 @@ namespace NoteTheory
       const int fifth = MusicTime::DegreeToNote(d + 4, 0, 0, scale) - r;
       const bool minorThird = third == 3;
       const char* suffix = (minorThird && fifth == 6) ? "\xC2\xB0" : (!minorThird && fifth == 8) ? "+" : "";
-      snprintf(out, outSize, "%s%s", (minorThird ? kLower : kUpper)[std::min(d, 11)], suffix);
+      // Pick the table as a pointer, then index it: GCC 13 miscompiles `(c ? arrayA : arrayB)[i]`
+      // and read the wrong entry ("I" for degree 4 in major), even at -O0. Clang was fine.
+      const char* const* names = minorThird ? kLower : kUpper;
+      snprintf(out, outSize, "%s%s", names[std::min(d, 11)], suffix);
    }
 
    // Well-known chord progressions as scale degrees (0 = I; -1 = hold the chord before), written

@@ -4218,10 +4218,11 @@ std::vector<uint8_t> EncodePng16(int w, int h, const uint16_t* rgba, int level);
                      bytes->insert(bytes->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
                   },
                   &png, job.w, job.h, 4, job.rgba8.data(), job.w * 4);
+               // Credit chunks first, then sRGB, so sRGB stays right after IHDR (both insert there).
                if (!png.empty())
-                  png = ContactSheet::TagSrgb(png);
+                  png = ContactSheet::TagSrgb(Provenance::StampPng(png.data(), png.size()));
             }
-            if (!png.empty())
+            if (!job.rgba16.empty() && !png.empty())
                png = Provenance::StampPng(png.data(), png.size());
             if (!png.empty())
                if (FILE* f = AppPaths::OpenFile(job.path, "wb"))

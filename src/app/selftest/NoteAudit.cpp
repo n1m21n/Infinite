@@ -43,6 +43,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <map>
 
@@ -976,9 +977,11 @@ bool RunRestartTest()
       std::vector<uint8_t> bytes = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0, 'M', 'T', 'r', 'k',
                                      0, 0, 0, (uint8_t)sizeof(trk) };
       bytes.insert(bytes.end(), trk, trk + sizeof(trk));
-      const std::string path = "/tmp/infinite_restarttest.mid";
+      // The system temp folder: "/tmp" does not exist on Windows, so the file was never written there.
+      const std::filesystem::path file = std::filesystem::temp_directory_path() / "infinite_restarttest.mid";
+      const std::string path = file.u8string();
       {
-         std::ofstream f(path, std::ios::binary);
+         std::ofstream f(file, std::ios::binary);
          f.write((const char*)bytes.data(), (std::streamsize)bytes.size());
       }
       auto* mf = static_cast<MidiFileNode*>(MidiFileNode::Create());

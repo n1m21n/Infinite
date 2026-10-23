@@ -128,8 +128,10 @@ namespace app
          &png, w, h, 4, rgba, w * 4);
       if (!ok || png.empty())
          return false;
-      png = ContactSheet::TagSrgb(png);
+      // Credit chunks first, then the sRGB tag, so sRGB sits right after IHDR where
+      // readers (and headless_smoke.sh) look for it; both insert straight after IHDR.
       png = Provenance::StampPng(png.data(), png.size());
+      png = ContactSheet::TagSrgb(png);
       FILE* f = AppPaths::OpenFile(path, "wb");
       if (f == nullptr)
          return false;
