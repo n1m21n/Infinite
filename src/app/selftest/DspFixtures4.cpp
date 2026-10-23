@@ -201,6 +201,61 @@ bool RunEffectMixAndLimiterFixture()
       all &= ok;
    }
 
+   // 1d) A patch value in float range but past the def's range is clamped to
+   //     it. 1e9 passes 1c; the knobs bind only the UI, and Stereo scaled its
+   //     side signal by a width of 1e9 (B-K-031). Every param stores inside
+   //     its range and a sine comes out finite; Stereo stays near unity.
+   {
+      int outOfRange = 0, nonFinite = 0, checked = 0;
+      for (const EffectDef& def : GetEffectDefs())
+      {
+         for (const char* big : { "1e9", "-1e9" })
+         {
+            auto node = MakeEffect(def, 1.0f, sampleRate);
+            std::vector<std::pair<std::string, std::string>> hostile;
+            Patch::SaveParams(node.get(), hostile);
+            for (auto& kv : hostile)
+               if (kv.first.rfind("f ", 0) == 0)
+                  kv.second = big;
+            Patch::LoadParams(node.get(), hostile);
+            bool inRange = node->mix >= 0.0f && node->mix <= 1.0f;
+            for (size_t i = 0; i < def.params.size(); i++)
+               inRange &= node->Param(i) >= def.params[i].minVal && node->Param(i) <= def.params[i].maxVal;
+            node->CookIfNeeded(2);
+            std::vector<std::vector<float>> out;
+            DelayTest::RunSamples(*node, (int)(0.25 * sampleRate), 2,
+                                  [&](int i, int) { return 0.25f * std::sin(2.0f * (float)M_PI * 440.0f * (float)i / (float)sampleRate); },
+                                  &out);
+            long long bad = 0;
+            for (const auto& ch : out)
+               for (float s : ch)
+                  bad += !std::isfinite(s);
+            if (!inRange || bad > 0)
+               printf("DSPTEST   %s at %s: %s, %lld non-finite samples\n", def.name.c_str(), big,
+                      inRange ? "in range" : "OUT OF RANGE", bad);
+            outOfRange += !inRange;
+            nonFinite += bad > 0;
+            checked++;
+         }
+      }
+      auto stereo = MakeEffect(*FindEffectDef("Stereo"), 1.0f, sampleRate);
+      Patch::LoadParams(stereo.get(), { { "f width", "1e9" } });
+      stereo->CookIfNeeded(2);
+      std::vector<std::vector<float>> out;
+      DelayTest::RunSamples(*stereo, (int)(0.25 * sampleRate), 2,
+                            [&](int i, int ch) { return (ch == 0 ? 0.25f : -0.25f) * std::sin(2.0f * (float)M_PI * 440.0f * (float)i / (float)sampleRate); },
+                            &out);
+      float stereoPeak = 0.0f;
+      for (const auto& ch : out)
+         for (float s : ch)
+            stereoPeak = std::max(stereoPeak, std::fabs(s));
+      const bool ok = outOfRange == 0 && nonFinite == 0 && checked > 0 && stereoPeak < 1.0f;
+      printf("DSPTEST patch values past a param's range are clamped: %d loads, %d out of range, %d non-finite, "
+             "Stereo width 1e9 peak %.3g  %s\n",
+             checked, outOfRange, nonFinite, stereoPeak, ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
    const EffectDef* limiterDef = FindEffectDef("Limiter");
    if (limiterDef == nullptr)
    {
