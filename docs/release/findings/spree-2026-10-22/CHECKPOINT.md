@@ -6,12 +6,15 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
 
 ## Where things stand
 
-- **Findings:** 54 filed (B-A-001 … B-K-036). Every one is fixed except three:
+- **Findings:** 56 filed (B-A-001 … B-K-038). Every one is fixed except three:
   - B-G-001 and B-H-001: P3, need a quiet-Mac re-run.
   - B-J-001: the Windows headless hang, P5.
 - **New on 2026-10-23, evening** (merged to main):
   - **INFINITE_PARAMFUZZ** (`tools/bughunt/param_fuzz_inproc.py`): in-process fuzz of every audio node, one key at a time at ±1e9, -1 and 0, flagging NaN, HOT (peak > 100) and SLOW. The full run takes minutes; the app sweep took hours. The driver restarts past UBSan aborts.
   - **B-K-036:** sample-player params (Audio File, Slicer, PaulStretch, Molder, Granular, Sampler, Drum Sequencer) skipped the knob range. Volume 1e9 played 5e8 loud, and pitch or speed 1e9 overflowed the read position. Each node now clamps to its knob range.
+  - **B-K-037:** Set Color's palette offset near INT_MAX overflowed int (UB only; release picked a valid swatch). The swatch math is now 64-bit.
+  - **B-K-038:** image size params had no upper cap. Text width 1e9 asked for 4 TB and aborted the app; Render 3D, Fit and 9 other generators failed or asked the GPU for gigabytes. All 13 sites now use `GLUtil::TargetSide` (lo..8192).
+  - Tools: `clamp_check.py` lists unseen keys (0 hits proves nothing for them) and refuses repeated keys; `param_fuzz_inproc.py` streams rows as found.
   - Lead: Audio In `deviceId` 1e9 took 15 s in one run (hardware lookup). Not chased.
   - `build-tsan` in main was deleted to free disk; rebuild it before the next TSan run.
 - **New on 2026-10-23, afternoon** (from the float sweep's 1e9 rows; all merged to main):
@@ -69,8 +72,6 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
   - HOTAUDIO: Oscillator ±1e30, Stereo 1e30.
 
   Check these again after the re-sweep. Those values are now dropped on load, but they can still be typed into the inspector or reached through an expression.
-- **Render 3D and Fit at 1e9:** E_RENDER, an uncapped FBO size. S4.
-- **paletteOffset overflow** at GeometryOpNodes.cpp:1276. S4.
 - **CSG under ASan:** Difference and Intersect time out on the base row, and Union takes about 92 s. Re-time them on a release build (item 5 above).
 - **Molder render timing:** the analysis still runs on a worker thread, and `--audio-summary` doesn't wait for it. Its seed is now restored on reload (B-K-025).
 

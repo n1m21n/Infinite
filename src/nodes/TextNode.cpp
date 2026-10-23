@@ -1,6 +1,7 @@
 #include "TextNode.h"
 
 #include "core/gl3.h"
+#include "core/GLUtil.h"
 #include "../platform/Platform.h"
 
 #include <algorithm>
@@ -63,8 +64,8 @@ void TextNode::CookIfNeeded(int frameId)
    mBuiltWidth = width; mBuiltHeight = height;
    mHasBuilt = true;
 
-   mWidth = std::max(16, (int)width);
-   mHeight = std::max(16, (int)height);
+   mWidth = GLUtil::TargetSide(width, 16);
+   mHeight = GLUtil::TargetSide(height, 16);
 
    mPixels.assign((size_t)mWidth * mHeight * 4, 0);
 

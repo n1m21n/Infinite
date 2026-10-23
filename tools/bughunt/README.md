@@ -83,6 +83,8 @@ It covers the audio classes of `param_fuzz.py --kind float|int` in one process. 
 
 ## clamp_check.py — a clamp's blast radius on saved patches
 
+It lists every Type.key no patch stores (or a type name no patch has) as `unseen`: 0 hits proves nothing for those. A repeated Type.key is refused, since only the last range would be checked.
+
 `clamp_check.py "Type.key=LO..HI" ...` or `clamp_check.py --knobs DESCRIBE.json [Type ...]`
 
 Parses every tracked `.inf` (855 on 2026-10-23) and prints each saved float that the given range would change. Exit 1 on any hit. `--in DIR` scans another folder, such as a user's patch folder.

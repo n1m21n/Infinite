@@ -331,8 +331,8 @@ void ReactionDiffusionNode::CookIfNeeded(int frameId)
    }
    else
    {
-      w = std::max(8, (int)width);
-      h = std::max(8, (int)height);
+      w = GLUtil::TargetSide(width, 8);
+      h = GLUtil::TargetSide(height, 8);
    }
 
    if (mState[mFront].w != w || mState[mFront].h != h)

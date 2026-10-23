@@ -530,8 +530,8 @@ void FormulaNode::CookIfNeeded(int frameId)
    if (animate)
       mClock = (float)Transport::Instance().Seconds();
 
-   const int w = std::max(4, (int)width);
-   const int h = std::max(4, (int)height);
+   const int w = GLUtil::TargetSide(width, 4);
+   const int h = GLUtil::TargetSide(height, 4);
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
@@ -686,8 +686,8 @@ void FormulaNode::CookShadertoy(int frameId)
    const float delta = mFrame == 0 ? 0.0f : std::max(0.0f, mClock - mLastTime);
    mLastTime = mClock;
 
-   const int w = std::max(4, (int)width);
-   const int h = std::max(4, (int)height);
+   const int w = GLUtil::TargetSide(width, 4);
+   const int h = GLUtil::TargetSide(height, 4);
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
