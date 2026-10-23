@@ -1,0 +1,44 @@
+infinite-patch 1
+# Spectral Additive Organ Synth: drawbar additive synthesizer with key-click transient attack
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i rangeLow 48
+  i rangeHigh 76
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float sub = 0.7 [0.0, 1.0]\nparam float drawbar8 = 0.95 [0.0, 1.0]\nparam float drawbar5 = 0.55 [0.0, 1.0]\nparam float drawbar4 = 0.75 [0.0, 1.0]\nparam float drawbar2 = 0.45 [0.0, 1.0]\nparam float click = 0.65 [0.0, 1.0]\nparam float drive = 1.8 [1.0, 4.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float p4 = 0\nstate float p5 = 0\nstate float env = 0\nstate float clickEnv = 0\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0)\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.2, env * 0.9992)\nclickEnv = if(targetEnv > env, 1.0, clickEnv * 0.99)\n\npStep = clamp(freq, 20.0, 4000.0) / sr\np1 = (p1 + pStep * 0.5) % 1.0\np2 = (p2 + pStep * 1.0) % 1.0\np3 = (p3 + pStep * 1.5) % 1.0\np4 = (p4 + pStep * 2.0) % 1.0\np5 = (p5 + pStep * 3.0) % 1.0\n\ns1 = sin(6.2831853 * p1) * sub\ns2 = sin(6.2831853 * p2) * drawbar8\ns3 = sin(6.2831853 * p3) * drawbar5\ns4 = sin(6.2831853 * p4) * drawbar4\ns5 = sin(6.2831853 * p5) * drawbar2\n\nclickNoise = sin(6.2831853 * (p5 * 5.1)) * clickEnv * click * 0.4\nsummed = (s1 + s2 + s3 + s4 + s5 + clickNoise) * 0.35\nu = summed * drive\nsat = u / (1.0 + abs(u) * 0.3)\n\nout = sat * env * 0.45\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1 0.42 0.21
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Spectral Additive Organ Synth. Additive tonewheel organ model with harmonic drawbars.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

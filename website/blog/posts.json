@@ -9,6 +9,15 @@
   "url": "https://infinitedevices.org/blog/raymarching-signed-distance-fields-in-real-time-glsl.html"
  },
  {
+  "slug": "real-time-fluid-simulation-in-glsl",
+  "title": "Real-time fluid simulation in GLSL: Navier-Stokes and dye advection",
+  "description": "How to implement real-time Eulerian fluid simulation in GLSL: velocity advection, multigrid pressure solves, vorticity confinement, and audio reactivity.",
+  "date": "2026-10-23",
+  "updated": "2026-10-23",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/real-time-fluid-simulation-in-glsl.html"
+ },
+ {
   "slug": "reaction-diffusion-simulation-in-real-time-glsl",
   "title": "Reaction-diffusion simulation in real-time GLSL",
   "description": "How to build a reaction-diffusion simulation in real-time GLSL shaders and nodes, creating generative Turing patterns with audio-reactive parameter modulation.",

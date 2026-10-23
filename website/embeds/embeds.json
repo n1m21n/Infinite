@@ -139,7 +139,7 @@
     {
       "slug": "hyperbolic-kaleidoscope",
       "title": "Hyperbolic Kaleidoscope",
-      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
+      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
     },
     {
       "slug": "bioluminescent-abyss",
@@ -189,7 +189,17 @@
     {
       "slug": "hyperbolic-tessellation",
       "title": "Hyperbolic Tessellation",
-      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes."
+      "description": "Poincar\u00e9 disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes."
+    },
+    {
+      "slug": "accretion-disk",
+      "title": "Accretion Disk",
+      "description": "Relativistic black hole gravitational lensing with Kerr photon ring, glowing Keplerian accretion disk and event horizon shadow."
+    },
+    {
+      "slug": "chromatic-quasicrystal",
+      "title": "Chromatic Quasicrystal",
+      "description": "Aperiodic eight-fold quasicrystalline plane wave interference with iridescent diffraction vertices and audio-reactive phase resonance."
     }
   ]
 }

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="paper">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P855CS2V');</script>
+  <!-- End Google Tag Manager -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script src="../theme.js?v=2"></script>
+  <title>Real-time fluid simulation in GLSL | Infinite</title>
+  <meta name="description" content="How to implement real-time Eulerian fluid simulation in GLSL: velocity advection, multigrid pressure solves, vorticity confinement, and audio reactivity.">
+  <link rel="canonical" href="https://infinitedevices.org/blog/real-time-fluid-simulation-in-glsl.html">
+  <meta property="og:title" content="Real-time fluid simulation in GLSL | Infinite">
+  <meta property="og:description" content="How to implement real-time Eulerian fluid simulation in GLSL: velocity advection, multigrid pressure solves, vorticity confinement, and audio reactivity.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/blog_real_time_fluid_simulation_in_glsl.png">
+  <meta property="og:url" content="https://infinitedevices.org/blog/real-time-fluid-simulation-in-glsl.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Real-time fluid simulation in GLSL | Infinite">
+  <meta name="twitter:description" content="How to implement real-time Eulerian fluid simulation in GLSL: velocity advection, multigrid pressure solves, vorticity confinement, and audio reactivity.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/blog_real_time_fluid_simulation_in_glsl.png">
+  <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
+  <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css?v=36336012">
+  <link rel="stylesheet" href="../style.css?v=d046c735">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=823c9183">
+  <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ZC4TYX1WCL');
+  </script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Real-time fluid simulation in GLSL: Navier-Stokes and dye advection", "description": "How to implement real-time Eulerian fluid simulation in GLSL: velocity advection, multigrid pressure solves, vorticity confinement, and audio reactivity.", "datePublished": "2026-10-23", "dateModified": "2026-10-23", "mainEntityOfPage": "https://infinitedevices.org/blog/real-time-fluid-simulation-in-glsl.html", "url": "https://infinitedevices.org/blog/real-time-fluid-simulation-in-glsl.html", "image": ["https://infinitedevices.org/assets/blog_real_time_fluid_simulation_in_glsl.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "fluid simulation, glsl shaders, navier-stokes, creative coding, real-time graphics", "wordCount": 3003, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "Real-time fluid simulation in GLSL: Navier-Stokes and dye advection", "item": "https://infinitedevices.org/blog/real-time-fluid-simulation-in-glsl.html"}]}</script>
+  <link rel="stylesheet" href="../system.css?v=23625436">
+  <link rel="stylesheet" href="../scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="../neumo.css?v=3a020cee">
+  <link rel="stylesheet" href="../search.css?v=96e10ca3">
+</head>
+<body class="blog-page blog-post">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="../index.html#top" class="brand" aria-label="Infinite home">
+        <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+      <button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span class="search-label">Search</span></button>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+          <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+          <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+        </div>
+      </div>
+      <div class="nav-group" data-current>
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+        </div>
+      </div>
+      <a class="btn btn-primary nav-sheet-cta" href="../index.html#setup">Download Infinite</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn hide-sm" aria-label="View on GitHub" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn sm-only" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <article class="post">
+      <div class="container post-wrap">
+        <nav class="crumbs mono" aria-label="Breadcrumb"><a href="../index.html">Infinite</a> / <a href="./">Blog</a></nav>
+        <header class="post-head">
+          <p class="post-kicker mono">Creative</p>
+          <h1>Real-time fluid simulation in GLSL: Navier-Stokes and dye advection</h1>
+          <p class="post-lede">How to implement real-time Eulerian fluid simulation in GLSL: velocity advection, multigrid pressure solves, vorticity confinement, and audio reactivity.</p>
+          <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">23 October 2026 · 14 min read</span></span></p>
+        </header>
+        <figure class="post-hero"><img src="../assets/blog_real_time_fluid_simulation_in_glsl.png" alt="Real-time fluid simulation in GLSL diagram showing velocity advection, pressure Poisson solve, vorticity confinement, and audio-reactive dye mixing" width="1200" height="675" decoding="async"></figure>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#what-is-real-time-fluid-simulation-in-glsl">What is real-time fluid simulation in GLSL</a></li><li><a href="#the-navier-stokes-equations-and-grid-discretisation">The Navier-Stokes equations and grid discretisation</a></li><li><a href="#semi-lagrangian-advection-and-velocity-transport">Semi-Lagrangian advection and velocity transport</a></li><li><a href="#making-the-flow-divergence-free-with-pressure-projection">Making the flow divergence-free with pressure projection</a></li><li><a href="#preserving-turbulence-with-vorticity-confinement">Preserving turbulence with vorticity confinement</a></li><li><a href="#solid-boundaries-and-obstacle-interaction">Solid boundaries and obstacle interaction</a></li><li><a href="#audio-reactive-forces-and-optical-flow-injection-in-infinite">Audio-reactive forces and optical flow injection in Infinite</a></li><li><a href="#building-the-real-time-node-network-in-infinite">Building the real-time node network in Infinite</a></li><li><a href="#honest-technical-limits-and-gpu-performance">Honest technical limits and GPU performance</a></li><li><a href="#summary-and-patch-architecture">Summary and patch architecture</a></li></ol></details>
+        <div class="prose">
+<p>Implementing real-time fluid simulation in GLSL provides creative coders and visual artists with an organic medium for live performance, interactive installations, and audiovisual synthesis. Unlike particle-based systems or static procedural distortions, a Navier-Stokes fluid solver models the conservation of mass and momentum across a continuous vector field. When applied to visual media, live video feeds and generative graphics become dynamic dyes that swirl, fold, and disperse according to physical laws.</p>
+<p>In real-time audiovisual software such as <a href="https://infinitedevices.org/">Infinite</a>, fluid dynamics can be driven directly by incoming sound and camera motion. Because audio frequency bands and optical flow vectors can be mapped to velocity injection points, the fluid reacts with zero perceptible delay to live musical performance.</p>
+<p>This guide walks through the complete mathematical and architectural implementation of an Eulerian fluid solver on the GPU: the staggered Marker-and-Cell (MAC) grid layout, unconditionally stable semi-Lagrangian advection, geometric multigrid Poisson solvers for incompressibility, vorticity confinement for preserving turbulence, and live audio-reactive modulation.</p>
+<figure><img src="https://infinitedevices.org/assets/blog_real_time_fluid_simulation_in_glsl.png" alt="Real-time fluid simulation in GLSL diagram showing velocity advection, pressure Poisson solve, vorticity confinement, and audio-reactive dye mixing" width="1200" height="675" loading="lazy" decoding="async"><figcaption>Real-time fluid simulation in GLSL diagram showing velocity advection, pressure Poisson solve, vorticity confinement, and audio-reactive dye mixing</figcaption></figure>
+<h2 id="what-is-real-time-fluid-simulation-in-glsl">What is real-time fluid simulation in GLSL</h2>
+<p>Computer graphics divides fluid simulation into two primary paradigms: Lagrangian and Eulerian.</p>
+<p>The Lagrangian approach treats the fluid as a discrete collection of moving particles, commonly implemented via Smoothed Particle Hydrodynamics (SPH). Each particle carries its own position, velocity, and mass. While intuitive, particle methods require expensive spatial hashing and neighbour search routines on the GPU, making high-resolution simulations computationally heavy.</p>
+<p>The Eulerian approach fixes the coordinate frame in space and observes fluid quantities flowing through a stationary grid of cells. Each cell tracks local velocity, pressure, and passive dye concentration. Because GPU fragment shaders and framebuffers operate natively on two-dimensional pixel grids, the Eulerian formulation maps directly to hardware textures:</p>
+<ol><li>Velocity field: a two-component floating-point texture storing horizontal velocity <code>u</code> and vertical velocity <code>v</code>.</li><li>Pressure field: a single-component scalar texture storing local hydrostatic pressure <code>p</code>.</li><li>Dye field: an RGBA colour texture storing graphic media, video, or synthetic pigmentation carried passively by the flow.</li></ol>
+<p>By executing successive rendering passes across offscreen framebuffer objects (FBOs), the graphics card computes each phase of the fluid equations in parallel for millions of cells at sixty frames per second.</p>
+<h2 id="the-navier-stokes-equations-and-grid-discretisation">The Navier-Stokes equations and grid discretisation</h2>
+<p>Incompressible fluid flow is governed by the Navier-Stokes equations:</p>
+<pre><code class="language-text">∂u/∂t = -(u · ∇)u - (1/ρ)∇p + ν∇²u + f
+∇ · u = 0</code></pre>
+<p>Here:</p>
+<ul><li><code>u</code> is the velocity vector field <code>(u, v)</code>.</li><li><code>-(u · ∇)u</code> represents advection, the transport of velocity along itself.</li><li><code>-(1/ρ)∇p</code> is the pressure gradient force that accelerates fluid from high to low pressure regions.</li><li><code>ν∇²u</code> accounts for kinematic viscosity, causing momentum to diffuse across adjacent layers.</li><li><code>f</code> denotes external body forces, such as gravity, user mouse stirrers, or audio impulses.</li><li><code>∇ · u = 0</code> enforces incompressibility, meaning the volume of any parcel of fluid remains strictly constant over time.</li></ul>
+<p>Solving these partial differential equations on a discrete grid requires careful cell alignment. In a naive collocated grid, both velocity components <code>(u, v)</code> and pressure <code>p</code> are stored at the exact centre of each cell. When central differences are computed to evaluate pressure gradients and velocity divergence, adjacent cells skip their immediate neighbours:</p>
+<pre><code class="language-text">∂p/∂x ≈ (p[i+1, j] - p[i-1, j]) / (2 * Δx)</code></pre>
+<p>This causes an odd-even decoupling known as the checkerboard instability, where high-frequency oscillatory pressure fields register a false divergence of zero.</p>
+<p>To eliminate this artifact without artificial damping, production solvers employ a staggered Marker-and-Cell (MAC) grid layout:</p>
+<ul><li>The horizontal velocity component <code>u</code> is stored on the vertical cell faces between cell <code>(i-1, j)</code> and <code>(i, j)</code>.</li><li>The vertical velocity component <code>v</code> is stored on the horizontal cell faces between cell <code>(i, j-1)</code> and <code>(i, j)</code>.</li><li>The pressure <code>p</code> and passive dye <code>c</code> are stored at the geometric centre of cell <code>(i, j)</code>.</li></ul>
+<p>On a staggered grid, divergence is evaluated across immediate face values:</p>
+<pre><code class="language-text">div[i, j] = (u_face[i+1, j] - u_face[i, j]) / Δx + (v_face[i, j+1] - v_face[i, j]) / Δy</code></pre>
+<p>Every face velocity couples directly to the pressure of the two cells sharing that face. The resulting discretisation guarantees that when the pressure Poisson equation converges, the velocity field leaves zero divergence behind.</p>
+<h2 id="semi-lagrangian-advection-and-velocity-transport">Semi-Lagrangian advection and velocity transport</h2>
+<p>Advection describes how moving fluid transports both external properties (such as colour and temperature) and its own velocity. Standard explicit finite-difference schemes suffer from the Courant-Friedrichs-Lewy (CFL) stability condition: if the fluid velocity multiplied by the time step exceeds the cell width (<code>|u| * Δt &amp;gt; Δx</code>), the numerical scheme explodes into floating-point infinities.</p>
+<p>In 1999, Jos Stam introduced unconditionally stable semi-Lagrangian advection to computer graphics. Rather than asking where a parcel of fluid will travel in the future, semi-Lagrangian advection looks backward in time.</p>
+<p>For every grid cell <code>x</code>, the solver traces a virtual particle backward along the current velocity field to determine its origin point <code>x_prev</code> at the previous time step:</p>
+<pre><code class="language-text">x_prev = x - u(x) * Δt</code></pre>
+<p>The new value at cell <code>x</code> is then sampled from the previous state at position <code>x_prev</code> using bilinear interpolation:</p>
+<pre><code class="language-glsl">// GLSL fragment shader for semi-Lagrangian advection
+#version 150
+
+uniform sampler2D uVelocity;
+uniform sampler2D uSource;
+uniform float uDeltaTime;
+uniform vec2 uTexelSize;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+void main()
+{
+    // Sample the current velocity at this location
+    vec2 vel = texture(uVelocity, vUv).xy;
+
+    // Backtrack along the velocity vector
+    vec2 prevPos = vUv - vel * uDeltaTime * uTexelSize;
+
+    // Sample the transported quantity with bilinear hardware filtering
+    fragColor = texture(uSource, prevPos);
+}</code></pre>
+<p>Because bilinear texture sampling on modern graphics hardware is executed directly inside fixed-function texture units, semi-Lagrangian advection runs with minimal shader cost. Even under extreme velocities and large time steps, the algorithm cannot diverge, as the interpolated value is always bounded by the minimum and maximum values of the surrounding texels.</p>
+<p>The inherent trade-off of semi-Lagrangian advection is numerical dissipation. Repeated bilinear interpolation acts as an unintended low-pass filter, gradually smoothing out sharp velocity gradients and subtle eddies over time.</p>
+<h2 id="making-the-flow-divergence-free-with-pressure-projection">Making the flow divergence-free with pressure projection</h2>
+<p>After advection and the application of external forces, the provisional velocity field <code>w</code> is generally divergent (<code>∇ · w ≠ 0</code>). Compressible fluid would bunch up or create vacuums; an incompressible liquid must satisfy <code>∇ · u = 0</code>.</p>
+<p>The Helmholtz-Hodge decomposition theorem states that any smooth vector field <code>w</code> can be uniquely resolved into the sum of a divergence-free vector field <code>u</code> and the gradient of a scalar potential <code>p</code>:</p>
+<pre><code class="language-text">w = u + ∇p</code></pre>
+<p>Taking the divergence of both sides yields the Poisson equation for pressure:</p>
+<pre><code class="language-text">∇ · w = ∇ · u + ∇²p
+∇²p = ∇ · w    (since ∇ · u = 0)</code></pre>
+<p>Once the scalar pressure field <code>p</code> is obtained by solving this Poisson system, the final divergence-free velocity field is calculated by subtracting the pressure gradient:</p>
+<pre><code class="language-text">u = w - ∇p</code></pre>
+<h3 id="multigrid-v-cycles-versus-standard-jacobi-relaxation">Multigrid V-cycles versus standard Jacobi relaxation</h3>
+<p>On a discrete two-dimensional grid, the Laplacian operator <code>∇²p</code> is approximated by a five-point stencil:</p>
+<pre><code class="language-text">(p[i+1, j] + p[i-1, j] + p[i, j+1] + p[i, j-1] - 4 * p[i, j]) / (Δx²) = div[i, j]</code></pre>
+<p>Rearranging this formula yields the standard Jacobi relaxation step:</p>
+<pre><code class="language-text">p_new[i, j] = 0.25 * (p[i+1, j] + p[i-1, j] + p[i, j+1] + p[i, j-1] - Δx² * div[i, j])</code></pre>
+<p>Simple Jacobi iteration dampens high-frequency error quickly, but eliminates low-frequency, long-wavelength pressure differences very slowly. Resolving pressure across a 1920x1080 grid using Jacobi relaxation alone requires between 80 and 150 render passes per frame, which places severe strain on GPU memory bandwidth.</p>
+<p>Infinite solves this bottleneck using a geometric multigrid V-cycle solver across five hierarchical grid levels (<code>kMaxLevels = 5</code>):</p>
+<ol><li>Pre-smoothing: two Jacobi relaxation passes are performed on the finest simulation grid (Level 0).</li><li>Residual calculation: the remaining error <code>r = div - ∇²p</code> is computed.</li><li>Restriction: the residual and obstacle masks are downsampled to a half-resolution grid (Level 1).</li><li>Recursive descent: this restriction repeats down through Level 4, where the entire screen is represented by a coarse 120x68 grid.</li><li>Coarse solve: at the lowest level, long-wavelength pressure modes span only a handful of pixels, allowing ten Jacobi iterations to propagate pressure across the entire domain.</li><li>Prolongation: the coarse correction is bilinearly upsampled, added back to the finer level, and followed by two post-smoothing Jacobi passes.</li></ol>
+<p>A single five-level multigrid V-cycle with twenty total iterations achieves tighter divergence-free convergence than 120 brute-force Jacobi iterations, leaving ample GPU headroom for real-time video compositing and audio DSP.</p>
+<h2 id="preserving-turbulence-with-vorticity-confinement">Preserving turbulence with vorticity confinement</h2>
+<p>Because semi-Lagrangian advection introduces numerical dissipation, fine vortices and turbulent swirls tend to decay quickly. In creative coding and visual effects, this loss of rotational energy makes fluids look like thick syrup rather than water or air.</p>
+<p>To restore this lost turbulence without destabilising the solver, Infinite employs vorticity confinement, originally formulated by Steinhoff and Underhill and adapted for graphics by Ronald Fedkiw.</p>
+<p>Vorticity measures the local rotation or spin of the fluid:</p>
+<pre><code class="language-text">ω = ∇ × u = (∂v/∂x - ∂u/∂y)</code></pre>
+<p>In two dimensions, vorticity is a scalar quantity. The gradient of the absolute vorticity points toward the centre of local vortices:</p>
+<pre><code class="language-text">η = ∇|ω| / (|∇|ω| + 1e-5)</code></pre>
+<p>The normal vector <code>η</code> is perpendicular to the vortex axis. The confinement force is calculated as the cross product of <code>η</code> and the vorticity vector:</p>
+<pre><code class="language-text">f_vort = ε * (η × ω) * Δx</code></pre>
+<p>In GLSL, this evaluates to:</p>
+<pre><code class="language-glsl">// GLSL fragment shader for vorticity confinement
+#version 150
+
+uniform sampler2D uVelocity;
+uniform float uVorticityStrength;
+uniform vec2 uTexelSize;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+void main()
+{
+    // Compute local curl (vorticity)
+    float uT = texture(uVelocity, vUv + vec2(0.0, uTexelSize.y)).x;
+    float uB = texture(uVelocity, vUv - vec2(0.0, uTexelSize.y)).x;
+    float vR = texture(uVelocity, vUv + vec2(uTexelSize.x, 0.0)).y;
+    float vL = texture(uVelocity, vUv - vec2(uTexelSize.x, 0.0)).y;
+    
+    float curl = 0.5 * ((vR - vL) - (uT - uB));
+
+    // Sample curl magnitude in neighbouring cells
+    float cT = abs(texture(uVelocity, vUv + vec2(0.0, uTexelSize.y)).z);
+    float cB = abs(texture(uVelocity, vUv - vec2(0.0, uTexelSize.y)).z);
+    float cR = abs(texture(uVelocity, vUv + vec2(uTexelSize.x, 0.0)).z);
+    float cL = abs(texture(uVelocity, vUv - vec2(uTexelSize.x, 0.0)).z);
+
+    // Find the gradient of curl magnitude
+    vec2 eta = 0.5 * vec2(cR - cL, cT - cB);
+    float len = length(eta);
+    if (len &lt; 1e-5) {
+        fragColor = vec4(0.0);
+        return;
+    }
+    eta /= len;
+
+    // Confinement force: F = epsilon * (eta_y, -eta_x) * curl
+    vec2 force = uVorticityStrength * vec2(eta.y, -eta.x) * curl;
+    fragColor = vec4(force, curl, 1.0);
+}</code></pre>
+<p>Applying this corrective force before the pressure projection step injects angular momentum back into emerging eddies. Fine rotational details remain crisp and swirling indefinitely without causing instability.</p>
+<h2 id="solid-boundaries-and-obstacle-interaction">Solid boundaries and obstacle interaction</h2>
+<p>To allow fluid to flow naturally around visual elements, text, or logos, the solver must handle solid obstacles.</p>
+<p>In Infinite, obstacles are provided as a single-channel luminance texture where bright pixels represent solid barriers. Two physical boundary conditions must be satisfied at obstacle surfaces:</p>
+<ol><li>No-penetration condition: fluid cannot flow through a solid wall. The velocity normal to the wall must be zero (<code>u · n = 0</code>).</li><li>Free-slip or no-slip tangential condition: for low-viscosity aesthetic fluids, free-slip boundaries (where tangential velocity slides unhindered) produce clean, non-sticky circulation.</li></ol>
+<p>In the staggered MAC grid, wall boundaries are enforced during the divergence and pressure solve passes. When evaluating the divergence of cell <code>(i, j)</code>, any face touching a solid cell or the outer boundary of the texture is flagged as a wall:</p>
+<pre><code class="language-glsl">bool solidAt(sampler2D obs, ivec2 q, ivec2 sz) {
+    if (q.x &lt; 0 || q.y &lt; 0 || q.x &gt;= sz.x || q.y &gt;= sz.y) return true;
+    return texelFetch(obs, q, 0).r &gt; 0.5;
+}
+
+float faceU(sampler2D vt, sampler2D obs, ivec2 p, ivec2 sz) {
+    bool wall = solidAt(obs, p, sz) || solidAt(obs, p - ivec2(1, 0), sz);
+    return wall ? 0.0 : texelFetch(vt, p, 0).x;
+}</code></pre>
+<p>In the pressure solve, the pressure gradient across a solid face is set to zero (<code>∂p/∂n = 0</code>), ensuring that the projection pass does not reintroduce flow into solid barriers. The fluid cleanly wraps around obstacle contours, creating realistic wake patterns and stagnation points.</p>
+<h2 id="audio-reactive-forces-and-optical-flow-injection-in-infinite">Audio-reactive forces and optical flow injection in Infinite</h2>
+<p>A fluid simulation becomes truly compelling in creative performance when connected to sound and real-time motion.</p>
+<p>In Infinite, the node canvas combines audio synthesis, DSP analysis, 3D graphics, and 2D GLSL compositing within a single executable timeline. The <code>Fluid</code> node exposes three primary inputs:</p>
+<ul><li><code>image</code>: the passive dye carried by the flow. Video clips, generative <a href="https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html">Shader</a> nodes, or live webcam streams can be cabled here.</li><li><code>force</code>: a two-component velocity vector field that stirs the fluid each frame.</li><li><code>obstacles</code>: an image mask defining impenetrable solid surfaces.</li></ul>
+<h3 id="coupling-with-the-optical-flow-node">Coupling with the Optical Flow node</h3>
+<p>One of the most expressive ways to drive the fluid is through the <code>Optical Flow</code> node. Based on pyramidal Lucas-Kanade feature tracking (Bouguet 2001), <code>Optical Flow</code> computes the instantaneous motion between consecutive video frames across multiple resolution levels.</p>
+<p>When set to raw output mode, <code>Optical Flow</code> writes horizontal motion into the red channel and vertical motion into the green channel as floating-point pixels per frame. Cabled into the <code>force</code> pin of the <code>Fluid</code> node, dancer movements, camera gestures, or animated geometric shapes physically push and stir the fluid dye with zero manual calibration.</p>
+<h3 id="modulating-fluid-physics-with-audio-analysis">Modulating fluid physics with audio analysis</h3>
+<p>To synchronise fluid dynamics with electronic music, audio frequency content is extracted via the <code>Audio Analyze</code> node:</p>
+<pre><code class="language-text">[Audio In / Synth] ---&gt; [Audio Analyze (8-Band FFT)]
+                             |
+                             +---&gt; band 0 (sub-bass) ---&gt; [Fluid].forceGain
+                             |
+                             +---&gt; band 3 (snare/mid) ---&gt; [Fluid].vorticity
+                             |
+                             +---&gt; band 7 (high hat)  ---&gt; [Fluid].stirrerStrength</code></pre>
+<ol><li>Sub-bass punch: cabling the lowest FFT band into <code>forceGain</code> amplifies the velocity response on kick drum transients, causing sudden outward explosive bursts.</li><li>Vorticity modulation: connecting the snare or mid-frequency transient band to <code>vorticity</code> triggers intricate curling smoke patterns on snare hits, which relax back into smooth laminar flow during quiet passages.</li><li>Built-in stirrer automation: the <code>Fluid</code> node includes built-in rotational stirrers (<code>Orbit</code>, <code>Pulse</code>, <code>Spin</code>). By modulating <code>stirrerStrength</code> with a tempo-synced <code>LFO</code> or <code>Envelope</code> node, the entire fluid volume sustains an organic ambient circulation even when external forces pause.</li></ol>
+<p>Because Infinite computes parameter modulation, audio DSP, and GPU frame rendering synchronously within the same tick loop, there is zero buffer latency between audio peaks and graphical reaction.</p>
+<h2 id="building-the-real-time-node-network-in-infinite">Building the real-time node network in Infinite</h2>
+<p>Setting up this audiovisual pipeline in Infinite requires five nodes cabled together on the canvas:</p>
+<ol><li>Add a <code>Video</code> or <code>Shape</code> node to provide visual content. Connect its output to the <code>image</code> pin of a <code>Fluid</code> node.</li><li>Add a <code>Video In</code> node receiving a live camera stream. Cable its output into an <code>Optical Flow</code> node.</li><li>Set <code>Optical Flow</code> parameter <code>view</code> to <code>0</code> (Raw motion vectors) and cable its output into the <code>force</code> pin of <code>Fluid</code>.</li><li>Add an <code>Audio In</code> node patched into an <code>Audio Analyze</code> node.</li><li>In the modulation matrix or by dragging modulation cables:</li></ol>
+<ul><li>Map FFT Band 0 (sub-bass) to <code>Fluid</code> parameter <code>forceGain</code> (range <code>0.5</code> to <code>3.0</code>).</li><li>Map FFT Band 2 (low-mids) to <code>Fluid</code> parameter <code>vorticity</code> (range <code>0.1</code> to <code>0.6</code>).</li><li>Map an <code>LFO</code> node running at a 1/2-bar division to <code>Fluid</code> parameter <code>stirrerStrength</code>.</li></ul>
+<ol><li>Add an <code>Output</code> node and connect <code>Fluid</code>'s output to project the final rendered artwork.</li></ol>
+<p>To view alternative internal states during rehearsal, the <code>Fluid</code> node's <code>view</code> parameter allows switching the display from <code>Dye</code> to <code>Velocity</code> (visualised as colour hue and brightness), <code>Pressure</code> gradients, or <code>Obstacles</code>.</p>
+<p>The resulting patch and dozens of related creative coding templates are available to explore in the <a href="https://infinitedevices.org/library.html">Infinite patch library</a>.</p>
+<h2 id="honest-technical-limits-and-gpu-performance">Honest technical limits and GPU performance</h2>
+<p>While real-time Eulerian fluid simulation in GLSL produces striking visuals, practical production environments have distinct constraints:</p>
+<ol><li>Memory bandwidth and fillrate: Eulerian simulations are memory-bandwidth bound. A full-resolution 4K (3840x2160) grid requires reading and writing tens of gigabytes per second across multiple FBO passes. In practice, setting the <code>resolution</code> parameter to <code>1</code> (half-resolution simulation grid) allows the velocity and pressure solves to run at 960x540 while the passive dye advection pass remains at full 1080p, preserving sharp visual edges while cutting GPU compute cost by 75 percent.</li><li>Two-dimensional planar flow: A 2D simulation does not account for vortex stretching, a three-dimensional physical phenomenon responsible for the energy cascade from large eddies down to microscopic scales. While 2D fluids produce convincing swirling sheets and marbling effects, they cannot simulate three-dimensional smoke plumes or tumbling spherical vortices.</li><li>Incompressible assumption: The solver assumes the medium has uniform, constant density. Sound waves (acoustic compression waves) do not propagate through the simulated fluid itself. The audio reactivity described here is achieved by external parametric coupling rather than physical acoustic simulation.</li></ol>
+<h2 id="summary-and-patch-architecture">Summary and patch architecture</h2>
+<p>Real-time fluid simulation in GLSL transforms standard video feeds and generative graphics into dynamic, physics-based audiovisual instruments.</p>
+<p>By combining the staggered MAC grid layout with unconditionally stable semi-Lagrangian advection, geometric multigrid Poisson projection, and vorticity confinement, high-resolution fluid dynamics can run smoothly at sixty frames per second on modern hardware. When modulated by live optical flow vectors and audio frequency analysis, the fluid responds organically to music and motion with zero latency.</p>
+<p>To experiment with native fluid dynamics, real-time shaders, and modular sound design, download <a href="https://infinitedevices.org/">Infinite</a> and explore our detailed guides on <a href="https://infinitedevices.org/blog/raymarching-signed-distance-fields-in-real-time-glsl.html">raymarching signed distance fields</a> and <a href="https://infinitedevices.org/blog/audio-reactive-glsl-shaders.html">audio-reactive GLSL shaders</a>.</p>
+        </div>
+        <aside class="post-cta" aria-label="Try Infinite">
+          <p class="hand">your turn</p>
+          <h2>Make something with it</h2>
+          <p>Infinite is free and open source for macOS, Windows and Linux. Start from a template in the Library, or read how the nodes fit together.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="../library.html">Browse the Library</a></p>
+        </aside>
+        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="raymarching-signed-distance-fields-in-real-time-glsl.html"><span class="mono">Creative</span><b>Raymarching signed distance fields in real-time GLSL</b></a><a class="rel-card" href="reaction-diffusion-simulation-in-real-time-glsl.html"><span class="mono">Creative</span><b>Reaction-diffusion simulation in real-time GLSL</b></a><a class="rel-card" href="audio-reactive-glsl-shaders.html"><span class="mono">Creative</span><b>Audio-reactive GLSL shaders: writing real-time visuals in Infinite</b></a></div></section>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <div class="signup-row">
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="../signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="../artists.html">Artists</a>
+          <a href="../musicians.html">Musicians</a>
+          <a href="../vjs.html">VJs</a>
+          <a href="../creative-coders.html">Creative coders</a>
+          <a href="../developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="../library.html">Library</a>
+          <a href="../artworks.html">Art gallery</a>
+          <a href="../nodes/">Nodes</a>
+          <a href="../embeds/">Embeds</a>
+          <a href="../extensions.html">Extensions</a>
+          <a href="../benchmarks.html">Benchmarks</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="../index.html#learn">Get started</a>
+          <a href="../philosophy.html">Philosophy</a>
+          <a href="../blog/">Blog</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
+          <a href="../assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
+          <a href="../assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="../assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
+    </div>
+  </footer>
+  <script src="../site.js?v=21" defer></script>
+<nav class="dock" id="dock" aria-label="Main">
+  <div class="dock-bar">
+    <span class="dock-thumb" aria-hidden="true"></span>
+    <a class="dock-stop" href="../index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+    <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" data-current aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+    <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+    <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+    <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+    <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+    <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+    <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+    <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+    <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+    <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+    <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+    <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+    <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+    <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+  </div>
+</nav>
+  <script src="../search.js?v=d89de447" defer></script>
+  <script src="../bird.js?v=d8c589b1" defer></script>
+</body>
+</html>

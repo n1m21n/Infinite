@@ -220,7 +220,7 @@
     },
     {
       "id": "rossler-attractor",
-      "name": "Rössler Attractor",
+      "name": "R\u00f6ssler Attractor",
       "kind": "Generator",
       "tags": [
         "chaos",
@@ -332,7 +332,7 @@
     },
     {
       "id": "mobius-strip-3d",
-      "name": "Möbius Strip 3D",
+      "name": "M\u00f6bius Strip 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -340,7 +340,7 @@
         "topology",
         "parametric"
       ],
-      "description": "Parametric non-orientable Möbius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
+      "description": "Parametric non-orientable M\u00f6bius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1246,7 +1246,7 @@
         "kaleidoscope",
         "visuals"
       ],
-      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
+      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -1725,7 +1725,7 @@
         "3d",
         "parametric"
       ],
-      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold Kähler manifold with interlocking compactified sheets.",
+      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold K\u00e4hler manifold with interlocking compactified sheets.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1928,7 +1928,7 @@
         "3d",
         "ruled-surface"
       ],
-      "description": "Eugène Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
+      "description": "Eug\u00e8ne Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2100,7 +2100,7 @@
         "minimal-surface",
         "topology"
       ],
-      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting Möbius band topology and Neil's parabola boundary.",
+      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting M\u00f6bius band topology and Neil's parabola boundary.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2235,7 +2235,7 @@
         "Audio-Reactive",
         "Tessellation"
       ],
-      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
+      "description": "Poincar\u00e9 disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -2243,6 +2243,198 @@
       "file": "assets/library/pixel/hyperbolic-tessellation.field",
       "preview": "assets/library/previews/hyperbolic-tessellation.jpg",
       "bytes": 2039
+    },
+    {
+      "id": "sprott-attractor",
+      "name": "Sprott Attractor",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math",
+        "sprott"
+      ],
+      "description": "Sprott minimal chaotic dynamical system with three-dimensional polynomial flow and velocity-mapped ribbon trails.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 6,
+      "file": "assets/library/sketch/sprott-attractor.js",
+      "preview": "assets/library/previews/sprott-attractor.jpg",
+      "bytes": 1942
+    },
+    {
+      "id": "apollonian-gasket",
+      "name": "Apollonian Gasket",
+      "kind": "Generator",
+      "tags": [
+        "fractal",
+        "math",
+        "geometry",
+        "circles"
+      ],
+      "description": "Fractal circle packing governed by the Descartes Circle Theorem with conformal phase pulsation and iridescent brand strokes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 6,
+      "file": "assets/library/sketch/apollonian-gasket.js",
+      "preview": "assets/library/previews/apollonian-gasket.jpg",
+      "bytes": 3631
+    },
+    {
+      "id": "plucker-conoid-3d",
+      "name": "Pl\u00fccker's Conoid 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "minimal",
+        "ruled"
+      ],
+      "description": "Ruled algebraic surface with multi-lobed helical symmetry, undulating contour ribs and orbiting quanta along generating lines.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 7,
+      "file": "assets/library/sketch/plucker-conoid-3d.js",
+      "preview": "assets/library/previews/plucker-conoid-3d.jpg",
+      "bytes": 2344
+    },
+    {
+      "id": "seifert-surface-3d",
+      "name": "Seifert Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "topology",
+        "knot"
+      ],
+      "description": "Orientable topological Seifert surface spanning a knotted boundary with dynamic ribbon twists and orbiting quanta.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 8,
+      "file": "assets/library/sketch/seifert-surface-3d.js",
+      "preview": "assets/library/previews/seifert-surface-3d.jpg",
+      "bytes": 3184
+    },
+    {
+      "id": "feedback-fm-lead-synth",
+      "name": "Feedback FM Lead Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "fm",
+        "audio",
+        "dsp"
+      ],
+      "description": "Two-operator frequency modulation synthesizer with nonlinear modulator self-feedback, resonant filter and dynamic decay envelope.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 6,
+      "file": "assets/templates/feedback-fm-lead-synth.inf",
+      "preview": "assets/library/previews/feedback-fm-lead-synth.jpg",
+      "bytes": 1938
+    },
+    {
+      "id": "spectral-additive-organ-synth",
+      "name": "Spectral Additive Organ Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "organ",
+        "additive",
+        "audio",
+        "dsp"
+      ],
+      "description": "Additive tonewheel organ synthesizer with five harmonic drawbars, percussive key-click transient attack and warm saturation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 7,
+      "file": "assets/templates/spectral-additive-organ-synth.inf",
+      "preview": "assets/library/previews/spectral-additive-organ-synth.jpg",
+      "bytes": 2017
+    },
+    {
+      "id": "stereo-pingpong-delay-fx",
+      "name": "Stereo Ping-Pong Delay FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "delay",
+        "stereo",
+        "dsp"
+      ],
+      "description": "Stereo cross-feedback ping-pong delay with tape-style lowpass damping, soft saturation and stereo width modulation.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/stereo-pingpong-delay-fx.inf",
+      "preview": "assets/library/previews/stereo-pingpong-delay-fx.jpg",
+      "bytes": 1921
+    },
+    {
+      "id": "tube-preamp-overdrive-fx",
+      "name": "Tube Preamp Overdrive FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "overdrive",
+        "tube",
+        "saturation",
+        "dsp"
+      ],
+      "description": "Asymmetric vacuum tube preamplifier model with dynamic grid-bias sag, warm harmonic saturation and tone tilt.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 6,
+      "file": "assets/templates/tube-preamp-overdrive-fx.inf",
+      "preview": "assets/library/previews/tube-preamp-overdrive-fx.jpg",
+      "bytes": 1689
+    },
+    {
+      "id": "accretion-disk",
+      "name": "Accretion Disk",
+      "kind": "Generator",
+      "tags": [
+        "Space",
+        "Physics",
+        "Motion",
+        "Colour"
+      ],
+      "description": "Relativistic black hole gravitational lensing with Kerr photon ring, glowing Keplerian accretion disk and event horizon shadow.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/accretion-disk.field",
+      "preview": "assets/library/previews/accretion-disk.jpg",
+      "bytes": 1794
+    },
+    {
+      "id": "chromatic-quasicrystal",
+      "name": "Chromatic Quasicrystal",
+      "kind": "Generator",
+      "tags": [
+        "Pattern",
+        "Crystal",
+        "Motion",
+        "Colour"
+      ],
+      "description": "Aperiodic eight-fold quasicrystalline plane wave interference with iridescent diffraction vertices and audio-reactive phase resonance.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/chromatic-quasicrystal.field",
+      "preview": "assets/library/previews/chromatic-quasicrystal.jpg",
+      "bytes": 1923
     }
   ]
 }

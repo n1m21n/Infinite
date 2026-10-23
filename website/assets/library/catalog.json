@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 187,
+ "count": 201,
  "items": [
   {
    "id": "first-sound",
@@ -398,6 +398,54 @@
    "file": "https://infinitedevices.org/assets/templates/frequency-shifter-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/frequency-shifter-fx.webp",
    "page": "https://infinitedevices.org/library/frequency-shifter-fx.html"
+  },
+  {
+   "id": "feedback-fm-lead-synth",
+   "name": "Feedback FM Lead Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Two-operator frequency modulation synthesizer with modulator self-feedback.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/feedback-fm-lead-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/feedback-fm-lead-synth.webp",
+   "page": "https://infinitedevices.org/library/feedback-fm-lead-synth.html"
+  },
+  {
+   "id": "spectral-additive-organ-synth",
+   "name": "Spectral Additive Organ Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Additive tonewheel organ synthesizer with harmonic drawbars and key-click.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/spectral-additive-organ-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/spectral-additive-organ-synth.webp",
+   "page": "https://infinitedevices.org/library/spectral-additive-organ-synth.html"
+  },
+  {
+   "id": "stereo-pingpong-delay-fx",
+   "name": "Stereo Ping-Pong Delay FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Stereo cross-feedback ping-pong delay with lowpass tape damping.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/stereo-pingpong-delay-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/stereo-pingpong-delay-fx.webp",
+   "page": "https://infinitedevices.org/library/stereo-pingpong-delay-fx.html"
+  },
+  {
+   "id": "tube-preamp-overdrive-fx",
+   "name": "Tube Preamp Overdrive FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Asymmetric vacuum tube preamplifier model with dynamic grid-bias sag.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.webp",
+   "page": "https://infinitedevices.org/library/tube-preamp-overdrive-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -2246,6 +2294,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/hyperbolic-tessellation.field",
    "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-tessellation.jpg",
    "page": "https://infinitedevices.org/library/hyperbolic-tessellation.html"
+  },
+  {
+   "id": "sprott-attractor",
+   "name": "Sprott Attractor",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Sprott minimal chaotic dynamical system with three-dimensional polynomial flow and velocity-mapped ribbon trails.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/sprott-attractor.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/sprott-attractor.jpg",
+   "page": "https://infinitedevices.org/library/sprott-attractor.html"
+  },
+  {
+   "id": "apollonian-gasket",
+   "name": "Apollonian Gasket",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Fractal circle packing governed by the Descartes Circle Theorem with conformal phase pulsation and iridescent brand strokes.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/apollonian-gasket.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/apollonian-gasket.jpg",
+   "page": "https://infinitedevices.org/library/apollonian-gasket.html"
+  },
+  {
+   "id": "plucker-conoid-3d",
+   "name": "Plücker's Conoid 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Ruled algebraic surface with multi-lobed helical symmetry, undulating contour ribs and orbiting quanta along generating lines.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/plucker-conoid-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/plucker-conoid-3d.jpg",
+   "page": "https://infinitedevices.org/library/plucker-conoid-3d.html"
+  },
+  {
+   "id": "seifert-surface-3d",
+   "name": "Seifert Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Orientable topological Seifert surface spanning a knotted boundary with dynamic ribbon twists and orbiting quanta.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/seifert-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/seifert-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/seifert-surface-3d.html"
+  },
+  {
+   "id": "feedback-fm-lead-synth",
+   "name": "Feedback FM Lead Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Two-operator frequency modulation synthesizer with nonlinear modulator self-feedback, resonant filter and dynamic decay envelope.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/feedback-fm-lead-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/feedback-fm-lead-synth.jpg",
+   "page": "https://infinitedevices.org/library/feedback-fm-lead-synth.html"
+  },
+  {
+   "id": "spectral-additive-organ-synth",
+   "name": "Spectral Additive Organ Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Additive tonewheel organ synthesizer with five harmonic drawbars, percussive key-click transient attack and warm saturation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/spectral-additive-organ-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/spectral-additive-organ-synth.jpg",
+   "page": "https://infinitedevices.org/library/spectral-additive-organ-synth.html"
+  },
+  {
+   "id": "stereo-pingpong-delay-fx",
+   "name": "Stereo Ping-Pong Delay FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Stereo cross-feedback ping-pong delay with tape-style lowpass damping, soft saturation and stereo width modulation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/stereo-pingpong-delay-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/stereo-pingpong-delay-fx.jpg",
+   "page": "https://infinitedevices.org/library/stereo-pingpong-delay-fx.html"
+  },
+  {
+   "id": "tube-preamp-overdrive-fx",
+   "name": "Tube Preamp Overdrive FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Asymmetric vacuum tube preamplifier model with dynamic grid-bias sag, warm harmonic saturation and tone tilt.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/tube-preamp-overdrive-fx.jpg",
+   "page": "https://infinitedevices.org/library/tube-preamp-overdrive-fx.html"
+  },
+  {
+   "id": "accretion-disk",
+   "name": "Accretion Disk",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Relativistic black hole gravitational lensing with Kerr photon ring, glowing Keplerian accretion disk and event horizon shadow.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/accretion-disk.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/accretion-disk.jpg",
+   "page": "https://infinitedevices.org/library/accretion-disk.html"
+  },
+  {
+   "id": "chromatic-quasicrystal",
+   "name": "Chromatic Quasicrystal",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Aperiodic eight-fold quasicrystalline plane wave interference with iridescent diffraction vertices and audio-reactive phase resonance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/chromatic-quasicrystal.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/chromatic-quasicrystal.jpg",
+   "page": "https://infinitedevices.org/library/chromatic-quasicrystal.html"
   }
  ]
 }

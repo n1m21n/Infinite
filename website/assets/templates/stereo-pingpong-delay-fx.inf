@@ -1,0 +1,49 @@
+infinite-patch 1
+# Stereo Ping-Pong Delay FX: cross-feedback ping-pong delay with damping and saturation
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 48
+  i rangeHigh 72
+end
+node 2 Synths Wavetable
+  id synth
+  pos 360 1024
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 720 1024
+  s code param float rate = 0.35 [0.05, 2.0]\nparam float feedback = 0.58 [0.0, 0.95]\nparam float damping = 0.45 [0.0, 1.0]\nparam float drive = 1.35 [1.0, 3.5]\nparam float mix = 0.5 [0.0, 1.0]\nstate float d1 = 0\nstate float d2 = 0\nstate float d3 = 0\nstate float d4 = 0\nstate float d5 = 0\nstate float d6 = 0\nstate float fbL = 0\nstate float fbR = 0\nstate float lpL = 0\nstate float lpR = 0\n\nxL = in + fbR * feedback\nxR = in + fbL * feedback\n\nsatL = (xL * drive) / (1.0 + abs(xL * drive) * 0.25)\nsatR = (xR * drive) / (1.0 + abs(xR * drive) * 0.25)\n\nc1 = clamp(rate * 0.4, 0.01, 0.35)\nd1 = d1 + c1 * (satL - d1)\nd2 = d2 + c1 * (d1 - d2)\nd3 = d3 + c1 * (d2 - d3)\n\nc2 = clamp(rate * 0.45, 0.01, 0.35)\nd4 = d4 + c2 * (satR - d4)\nd5 = d5 + c2 * (d4 - d5)\nd6 = d6 + c2 * (d5 - d6)\n\nfCut = clamp((5000.0 - damping * 3500.0) / sr * 2.0, 0.01, 0.45)\nlpL = lpL + fCut * (d3 - lpL)\nlpR = lpR + fCut * (d6 - lpR)\n\nfbL = lpL\nfbR = lpR\n\nwet = (lpL + lpR) * 0.5\nout = in * (1.0 - mix) + wet * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1100 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.306 0.949 0.722
+  f size 0.26
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Stereo Ping-Pong Delay FX. Cross-feedback delay with tape lowpass damping.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud fx 0 synth
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

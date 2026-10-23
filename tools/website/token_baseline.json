@@ -29,6 +29,10 @@
    "font-size": 4,
    "hex": 2
   },
+  "embeds/accretion-disk.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/analog_crt.html": {
    "font-size": 2,
    "hex": 5,
@@ -52,6 +56,10 @@
    "radius": 1
   },
   "embeds/chladni-cymatics.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/chromatic-quasicrystal.html": {
    "font-size": 2,
    "hex": 6
   },
