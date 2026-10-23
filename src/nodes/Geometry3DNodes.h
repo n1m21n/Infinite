@@ -664,7 +664,18 @@ public:
    // glClear, so it is already in the same encoded space the shader outputs.
    static const std::vector<std::string>& TonemapNames();
    float exposure = 1.0f;
-   int tonemap = 1; // none / ACES / Reinhard
+   int tonemap = 3; // none / ACES / Reinhard / AgX / Neutral; a loaded patch starts from ACES (BeforeLoadParams)
+
+   // HDR: the scene is drawn untonemapped into a 16-bit float target, bloom is
+   // taken from the light above `bloomThreshold`, and the tonemap runs once at
+   // the end over scene + bloom. On for a new node, off for a patch saved before
+   // it existed (BeforeLoadParams), so those render exactly as they did.
+   bool hdr = true;
+   float bloom = 0.0f;          // amount 0..1; 0 is off
+   float bloomThreshold = 1.0f; // linear light, 0.5..8
+   float bloomRadius = 0.5f;    // 0 tight .. 1 wide
+   bool HdrActive() const { return hdr && renderPass == 0; }
+   void BeforeLoadParams() override { hdr = false; tonemap = 1; }
    int ActiveSamples() const { return mActiveSamples; }
 
    // --- Render quality (v0.6 3.5). All off by default, so a patch saved before
@@ -708,6 +719,8 @@ public:
       v.Bool("depthTest", depthTest); v.Bool("cull", backfaceCull);
       v.Int("spriteShape", spriteShape); v.Int("spriteSizeMode", spriteSizeMode);
       v.Int("samples", samples); v.Int("tonemap", tonemap); v.Float("exposure", exposure);
+      v.Bool("hdr", hdr); v.Float("bloom", bloom);
+      v.Float("bloomThreshold", bloomThreshold); v.Float("bloomRadius", bloomRadius);
       v.Bool("shadows", shadowsEnabled); v.Int("shadowQuality", shadowQuality);
       v.Float("shadowBias", shadowBias); v.Float("shadowSoftness", shadowSoftness);
       v.Float("shadowStrength", shadowStrength);
@@ -901,6 +914,15 @@ private:
    bool EnsurePostShaders();
    void RunPost(const Mat4& proj, bool ortho, int w, int h);
    void ReleasePost();
+   // HDR finish (Render3DHdr.cpp): bloom chain, then tonemap, back into mColorTex.
+   static constexpr int kBloomLevels = 6;
+   GLUtil::Fbo mBloomDown[kBloomLevels], mBloomUp[kBloomLevels], mHdrOut;
+   unsigned int mProgBloomPre = 0, mProgBloomDown = 0, mProgBloomUp = 0, mProgHdr = 0;
+   bool mHdrShadersTried = false;
+   bool mEnvBgDrawn = false;
+   bool EnsureHdrShaders();
+   void RunHdr(int w, int h);
+   void ReleaseHdr();
    void CookOnce(int frameId);
    bool Accumulate(int frameId);
    // Multisampled draw target, blitted into the above. Unused when samples == 0.

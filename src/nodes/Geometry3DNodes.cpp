@@ -1,4 +1,5 @@
 #include "Geometry3DNodes.h"
+#include "Render3DTonemap.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -27,7 +28,7 @@ namespace
    const std::vector<std::string> kProjectionNames = { "Perspective", "Orthographic" };
    const std::vector<std::string> kRenderPassNames = { "Color", "Depth (Linear)", "Depth (Raw Z)", "Normals", "Position" };
    const std::vector<std::string> kSampleNames = { "Off", "2x", "4x", "8x" };
-   const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard" };
+   const std::vector<std::string> kTonemapNames = { "None", "ACES", "Reinhard", "AgX", "Neutral" };
    const std::vector<std::string> kShadowQualityNames = { "1024", "2048", "4096" };
    const std::vector<std::string> kSpriteShapeNames = { "Circle", "Square" };
    const Mesh kEmptyMesh;
@@ -234,6 +235,7 @@ namespace
       "vec3 acesFilm(vec3 x) {\n"
       "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
       "}\n"
+      R3D_TONEMAP_GLSL
       "vec2 dirToEquirect(vec3 d, float rot) {\n"
       "   float phi = atan(d.z, d.x) + rot;\n"
       "   float theta = acos(clamp(d.y, -1.0, 1.0));\n"
@@ -278,6 +280,8 @@ namespace
       "   col *= uExposure;\n"
       "   if (uTonemap == 1) col = acesFilm(col);\n"
       "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
+      "   else if (uTonemap == 3) col = agxTone(col);\n"
+      "   else if (uTonemap == 4) col = neutralTone(col);\n"
       "   fragColor = vec4(toSrgb(col), uBgOpacity);\n"
       "}\n";
 
@@ -476,6 +480,7 @@ namespace
       "vec3 acesFilm(vec3 x) {\n"
       "   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);\n"
       "}\n"
+      R3D_TONEMAP_GLSL
       "\n"
       "float ditherOffset() {\n"
       "   vec2 p = floor(gl_FragCoord.xy);\n"
@@ -821,6 +826,8 @@ namespace
       "   col *= uExposure;\n"
       "   if (uTonemap == 1) col = acesFilm(col);\n"
       "   else if (uTonemap == 2) col = col / (col + vec3(1.0));\n"
+      "   else if (uTonemap == 3) col = agxTone(col);\n"
+      "   else if (uTonemap == 4) col = neutralTone(col);\n"
       "   col = toSrgb(col) + ditherOffset();\n"
       "\n"
       "   if (uTransmission > 0.0) {\n"
@@ -1237,6 +1244,7 @@ Render3DNode::~Render3DNode()
 {
    ReleaseTargets();
    ReleasePost();
+   ReleaseHdr();
    ReleaseShadowTargets();
    for (GpuMesh& gpu : mGpu)
       ReleaseGpuMesh(gpu);
@@ -1315,11 +1323,13 @@ bool Render3DNode::EnsureShader()
 
 bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
 {
-   if (mFbo != 0 && mWidth == w && mHeight == h && mActiveSamples == sampleCount && mFloatTarget == floatOutput)
+   // HDR needs the float target to hold light above 1.0 until the tonemap at the end.
+   const bool wantFloat = floatOutput || HdrActive();
+   if (mFbo != 0 && mWidth == w && mHeight == h && mActiveSamples == sampleCount && mFloatTarget == wantFloat)
       return true;
 
    ReleaseTargets();
-   mFloatTarget = floatOutput;
+   mFloatTarget = wantFloat;
    const GLenum colorFmt = mFloatTarget ? GL_RGBA16F : GL_RGBA8;
    const GLenum colorType = mFloatTarget ? GL_HALF_FLOAT : GL_UNSIGNED_BYTE;
 
@@ -1874,6 +1884,7 @@ void Render3DNode::CookOnce(int frameId)
    // HDRI background: drawn first, into the just-cleared buffer, so it needs
    // neither depth testing nor a depth write - every geometry draw that
    // follows simply paints over it in the usual way.
+   mEnvBgDrawn = hasEnvMap && envAsBackground;
    if (hasEnvMap && envAsBackground && EnsureEnvBgShader())
    {
       if (mEnvBgVao == 0)
@@ -1898,7 +1909,7 @@ void Render3DNode::CookOnce(int frameId)
       glUniform3fv(glGetUniformLocation(mEnvBgProgram, "uEnvGround"), 1, envGround);
       glUniform1f(glGetUniformLocation(mEnvBgProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
       glUniform1f(glGetUniformLocation(mEnvBgProgram, "uExposure"), exposure);
-      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uTonemap"), tonemap);
+      glUniform1i(glGetUniformLocation(mEnvBgProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
       glUniform1f(glGetUniformLocation(mEnvBgProgram, "uBgOpacity"), bgOpacity);
 
       glBindVertexArray(mEnvBgVao);
@@ -1955,7 +1966,7 @@ void Render3DNode::CookOnce(int frameId)
    glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
    glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
    glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
-   glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), tonemap);
+   glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
    glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
    glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
    glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
@@ -2769,16 +2780,21 @@ void Render3DNode::CookOnce(int frameId)
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
       // Depth comes along only when the post stage or a Volume node will read it.
       glBlitFramebuffer(0, 0, w, h, 0, 0, w, h,
-                        GL_COLOR_BUFFER_BIT | ((PostActive() || mDepthWanted) ? GL_DEPTH_BUFFER_BIT : 0), GL_NEAREST);
+                        GL_COLOR_BUFFER_BIT | ((PostActive() || HdrActive() || mDepthWanted) ? GL_DEPTH_BUFFER_BIT : 0), GL_NEAREST);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
    }
 
-   mDepthResolved = !multisampling || PostActive() || mDepthWanted;
+   mDepthResolved = !multisampling || PostActive() || HdrActive() || mDepthWanted;
    if (PostActive())
    {
       Bench::ConditionalGpuStageTimer benchPost(benchPassRing, "r3d_post", frameId);
       RunPost(proj, proj.m[11] == 0.0f, w, h);
+   }
+   if (HdrActive())
+   {
+      Bench::ConditionalGpuStageTimer benchHdr(benchPassRing, "r3d_hdr", frameId);
+      RunHdr(w, h);
    }
 
    // --- restore, or every 2D node after this draws wrongly ------------
