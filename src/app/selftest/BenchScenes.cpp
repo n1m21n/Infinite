@@ -522,6 +522,23 @@ bool BuildBenchB11Scene(const std::string& scene, int n, const std::string& clip
    render->height = 1080.0f;
    outRender3DIdx = renderIdx;
 
+   // Cost-split knobs (P8): which part of the GPU time is fill, samples or
+   // shading. INFINITE_BENCH_B11_SAMPLES is Render 3D's sample index (0 off,
+   // 2 = 4x, the default); INFINITE_BENCH_B11_SIZE multiplies the point size.
+   if (const char* s = getenv("INFINITE_BENCH_B11_SAMPLES"))
+      render->samples = std::max(0, std::min(3, atoi(s)));
+   if (const char* s = getenv("INFINITE_BENCH_B11_SIZE"))
+   {
+      const float k = std::max(0.01f, (float)atof(s));
+      if (auto* pts = dynamic_cast<ImageToPointsNode*>(nodeAt(outPointsIdx)))
+         pts->pointSize *= k;
+      if (auto* ps = dynamic_cast<ParticleSystemNode*>(nodeAt(outPointsIdx)))
+      {
+         ps->startSize *= k;
+         ps->endSize *= k;
+      }
+   }
+
    const int outIdx = SpawnNode("Output", "Utility", 1040.0f, 0.0f)->index;
    if (ImageCable* in = CableFor(*FindNodeByIndex(outIdx), 0))
       in->Connect(nodeAt(renderIdx));
