@@ -724,6 +724,7 @@ set(COMMON_SOURCES
     src/nodes/Geometry3DNodes.cpp
     src/nodes/Render3DPost.cpp
     src/nodes/Render3DHdr.cpp
+    src/nodes/Render3DPano.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
     src/nodes/Text3DNode.cpp
