@@ -44,6 +44,9 @@ Variantes de teste do patch de referência em `build\perf\corpus\3d_noise_teste 
 ## Armadilhas que já custaram tempo
 
 - **Nunca editar fonte enquanto um build roda em segundo plano** (o build pega o meio da edição).
+- **`cmake` à mão só com `C:\Program Files\CMake\bin\cmake.exe`** (64 bits). O do VS Build Tools é 32
+  bits, vê `ProgramFiles` = `(x86)`, não acha o CUDA e regrava o projeto sem RTX (o `R3DFXTEST` cai no
+  caso RTX). Achado na S1, 2026-10-23.
 - GateGuard bloqueia a 1ª edição de cada arquivo: declarar os fatos e repetir. Em lote paralelo,
   uma edição pode passar e outra não: conferir e reaplicar a bloqueada logo.
 - Heredoc no Bash engole barras invertidas (vira `\t`, `\r`): escrever com Write/Edit ou Python
@@ -51,6 +54,58 @@ Variantes de teste do patch de referência em `build\perf\corpus\3d_noise_teste 
 - Tempo de CPU alto num node (FRAMEPROF) pode ser a CPU esperando a GPU: confirmar com GPUPROF.
 - Kernels PointZ: corpo pode usar `precise` (o fallback TF o define como vazio); SSBO sempre
   `float[]`, nunca `vec3[]`; padrão de equivalência bit a bit = `gpu::RowStencil` + `ApplyStencil`.
+
+## 0.71: comece por `docs/plans/HQ-071-STRATEGY.md`
+
+O plano da 0.71 (Render 3D HQ com referência no Filament + varredura de lentidão) está em
+`HQ-071-STRATEGY.md`, em sessões S0-S9 e P1 com estado na seção 6. A lista abaixo é a de antes
+desse plano e entra nele como P1 (desempenho) e S4-S7 (render).
+
+### Próximo passo: aval do dono para o release da 0.71
+
+S9b (2026-10-23, commit cb26a7da, testado e aprovado pelo dono no app): retorno do teste dele (`buves_textMotion.inf`) - máscara de sombra em tela (sombra suave e de
+contato sem pontilhado), FXAA quando o TAA está desligado, relevo de altura filtrado no mip, opacidade /
+alpha cutoff / textureAlpha do Material, 360 (equirect, cubemap, dome). Detalhes no §13 "S9b" do
+`RENDER-3D-HQ-FILAMENT.md`. Falta, só com o aval dele: merge e tag.
+
+Estado (2026-10-23): S0 a S9 e P1 feitas e commitadas na `feature/render3d-hq` (sem push). S9: capturas
+BEFORE/AFTER das 9 cenas olhadas, um defeito achado e corrigido (cena I, chão cor de cobre entre as
+instâncias; check novo no `HQTEST`), benchmarks no §13 do `RENDER-3D-HQ-FILAMENT.md` (HQ <= Render 3D
+em 8 de 9 cenas), problemas conhecidos no §15, CHANGELOG 0.71 reescrito. Falta, só com o aval dele:
+merge em `turbo/next` → `turbo/windows-only`, versão 0.71.0 (CMakeLists, README, PACKAGE_MANIFEST),
+tag `v0.71.0`. Decisões dele (§15): tonemap padrão do HQ, tolerância do Noise curl, custo do Preview
+3D, e se corrige a costura do HDRI no fundo do Render 3D (uma linha; muda os 3 patches do compat com
+HDRI).
+
+### Sessão anterior: S9 (validação final e release)
+
+Estado (2026-10-23): S8 e P1 feitas e commitadas (sem push). S8: pós próprio `HqPost` (bloom e ACES do
+Filament, render scale com FSR, RCAS pós-TAA, viés de mip, GTAO cheio, presets; §12 do doc). P1: Noise
+PointZ curl 4D com cache de gradientes e Particle PointZ (motor CPU) copiando só as linhas dos próximos
+nascimentos; patch de referência do dono 14,64 → 10,11 ms (detalhes na §6 da estratégia). S9: capturas
+BEFORE (Render 3D, `examples/hq/raster`) e AFTER (HQ, `examples/hq/filament`) de todas as cenas,
+tabela §13, doc completo, revisão de código, depois perguntar ao dono sobre o merge e a tag.
+Pendente de decisão do dono: (1) o tonemap padrão do HQ continua o ACES do Render 3D; o padrão do
+Filament (ACES legacy) é a opção 5; (2) o Noise curl 4D novo difere do anterior em até ~2e-5 (tolerância
+documentada; bit a bit não dá: o driver arredonda as duas formas do código diferente); (3) Preview 3D
+ainda custa ~2 ms de GPU no patch de referência (já atualiza meio a meio; menos que isso muda a UI).
+
+### Sessão anterior: S8 (pós + presets)
+
+Estado (2026-10-23): branch `feature/render3d-hq`, S0 a S7 feitas e commitadas (sem push). Detalhes por
+sessão em `RENDER-3D-HQ-FILAMENT.md` §6-§11 (S7 no fim do §8). Exemplos: `examples/hq/raster/` e
+`examples/hq/filament/` (cenas A-I, um renderizador por patch), gerados por `scripts/make_hq_scenes.py`.
+- Retornos do dono já atendidos: sombra embaixo dos objetos (Render 3D), exemplos separados e
+  organizados, HDRI girando na A, serrilhado e AO piscando (TAA, S6). Ele acha o HQ melhor que o RTX.
+  Olhar as capturas de `examples/hq/filament` a cada sessão, não só os números.
+- S7: HQ igual ou mais rápido que o raster em todos os benchmarks (tabela no §8). O que sobrou de custo
+  nas cenas de 1M é o Noise PointZ (~5 ms de GPU sobre 1M de pontos): item da P1.
+
+S8, plano: bloom do Filament (6 níveis, threshold, composição antes do tonemap; notas §6) no lugar do
+bloom do `Render3DPost` só no HQ; tonemaps (os do Infinite + o do Filament), exposição; presets
+Performance / Balanced / High com parâmetros reais (resolução do AO, tamanho do mapa de sombra, TAA,
+render scale com o FSR do kit) e a diferença medida; RCAS pós-TAA opcional. Depois: P1 (lentidão,
+começando pelo Noise PointZ), S9 (validação e release).
 
 ## Próximos passos (0.71), por valor medido
 

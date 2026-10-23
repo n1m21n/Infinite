@@ -1,5 +1,55 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.71 (in progress, branch feature/render3d-hq)
+
+Plan: `docs/plans/HQ-071-STRATEGY.md`; technical notes: `docs/RENDER-3D-HQ-FILAMENT.md`.
+
+- **New node: Render 3D HQ** - a second 3D renderer next to Render 3D, wired the same way (geometry
+  A-D, camera, three lights, HDRI), with techniques ported from Google Filament @ 13be3649
+  (Apache-2.0, rewritten in GLSL; no Filament code is linked). Render 3D is unchanged. Example
+  scenes in `examples/hq/filament/`, and the same scenes for Render 3D in `examples/hq/raster/`.
+  - Depth prepass, so each pixel is shaded once; physically based materials (Filament's BRDF with
+    multiple-scattering energy compensation, clear coat, sheen, specular anti-aliasing, the
+    Material node's 8 maps and Mapping); image-based lighting from the HDRI with no seam.
+  - PointZ points drawn as round, lit spheres straight from their GPU buffers; Instance PointZ
+    copies; PointZ triangles. Spheres and plain instances are shaded in one deferred pass.
+  - Shadows from the sun (Filament's PCF, soft option, contact shadows), GTAO ambient occlusion,
+    Filament's TAA with per-object and per-particle motion (the HQ's anti-aliasing: no jagged
+    edges or flickering small objects), Filament's bloom and its ACES tonemaps next to Render 3D's,
+    render scale with FSR 1, RCAS sharpening.
+  - Quality presets Performance / Balanced / High set the real params (shadow map size, GTAO on
+    and its resolution, render scale). A still scene reuses its last frame once the TAA settles.
+  - With TAA off (e.g. a texture sliding over its surface, which TAA smears), FXAA smooths the
+    edges. Soft and contact shadows are filtered in screen space: smooth penumbrae with or without
+    TAA. A bump from a grayscale height map no longer sparkles in the distance.
+  - The Material's opacity, alpha cutoff and texture alpha work as in Render 3D (transparent
+    surfaces keep their highlights, like glass), and the 360 output (equirect, cubemap, dome) too.
+  - Measured on the reference scenes (whole frame, 1080p, RTX 4060 Laptop): as fast as Render 3D or
+    faster on 8 of 9 scenes while drawing more - 1M spheres 11.86 -> 5.61 ms, the generative cloud
+    5.16 -> 2.55 ms; +0.14 ms on the particle studio. Details: `docs/RENDER-3D-HQ-FILAMENT.md`
+    section 13.
+  - Not in the HQ yet: PointZ lines, shadows from more than one light, Render 3D FX after it (the
+    picture passes through), RTX (stays in Render 3D). Known issues: section 15 of the same doc.
+  - Built with `INFINITE_ENABLE_RENDER_HQ` (on, both editions); without it the node draws as
+    Render 3D and says so.
+- **Faster (P1, measured A/B against the S7 build, whole frame, 1080p):** the owner's reference
+  patch 14.64 -> 10.11 ms (-31%), the HQ's 1M-point scene 9.65 -> 5.68 ms (-41%), Render 3D's
+  1M-point scene 15.76 -> 11.92 ms (-24%).
+  - Noise PointZ, curl over 4D gradient noise (the default of the HQ scenes and the reference
+    patch): each lattice cell's 16 gradients are hashed once and shared by the curl's samples
+    (1M points: 4.88 -> 1.31 ms of GPU). Same arithmetic; positions move by at most ~2e-5 (the
+    driver rounds the two code shapes a few ulps apart).
+  - Particle PointZ on the CPU engine (patches saved before 0.70) copied its whole GPU-made source
+    back to the CPU every frame (305k points with every attribute under `inherit`); it now draws
+    the next births ahead, in the same order, and copies back only those rows: the same particles
+    bit for bit, 3.57 -> 0.20 ms of GPU.
+- **Fix, visible in saved patches: Sphere, Cylinder, Cone, Torus Knot, Helix, Pyramid and the tubes
+  of Curve / Curve Ops / L-System were wound inside out.** Back-face culling then drew the inside of
+  their far half: the right outline, but lighting and reflections inverted in depth (a light from
+  behind looked like a light from the front; a polished metal sphere reflected the floor on top).
+  They now face outwards like the other shapes (`tests/unit/MeshTests.cpp` checks 21 of them), so
+  these objects light and reflect correctly in Render 3D, RTX and the HQ.
+
 ## 0.70.0-turbo (2026-10-22, branch turbo/next, waiting for the owner's test and merge)
 
 Plan: `docs/plans/NEXT-STRATEGY.md` (milestones, gate) and `docs/plans/NEXT-BACKLOG.md` (item IDs).

@@ -13,6 +13,7 @@
 #include "platform/OpenGLHeaders.h"
 #include "core/GLUtil.h"
 #include "core/Profile.h"
+#include "GpuAlgo.h" // Turbo 0.71 (P1): AsyncRows::RequestRows gathers on the GPU
 
 namespace pop
 {
@@ -619,26 +620,12 @@ namespace pop
       }
    }
 
-   void AsyncRows::Request(const PopData& d, const std::vector<std::string>& names)
+   AsyncRows::Slot* AsyncRows::BeginCopy(size_t bytes)
    {
       Latest(); // retire finished copies first
       Slot& s = mSlots[mNext];
       if (s.fence != nullptr) // both slots still in flight: skip this frame
-         return;
-      std::vector<const PopAttrib*> attrs;
-      std::vector<size_t> offs;
-      size_t bytes = 0;
-      for (const std::string& n : names)
-         if (const PopAttrib* a = d.Find(n))
-            if (a->buffer && a->buffer->Count() == d.pointCount)
-            {
-               attrs.push_back(a);
-               offs.push_back(bytes);
-               bytes += (size_t)d.pointCount * (size_t)a->buffer->Comps() * sizeof(float);
-               bytes = (bytes + 255) / 256 * 256;
-            }
-      if (attrs.empty() || bytes == 0)
-         return;
+         return nullptr;
       if (bytes > s.bytes)
       {
          if (s.buf)
@@ -657,12 +644,50 @@ namespace pop
          if (s.ptr == nullptr)
          {
             glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-            return;
+            return nullptr;
          }
       }
       glBindBuffer(GL_COPY_WRITE_BUFFER, s.buf);
       s.snap = Snapshot();
+      s.keep.clear();
+      return &s;
+   }
+
+   void AsyncRows::EndCopy(Slot& s)
+   {
+      glBindBuffer(GL_COPY_READ_BUFFER, 0);
+      glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+      s.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+      s.done = false;
+      glFlush(); // so the fence gets signalled without anyone waiting on it
+      mNext ^= 1;
+   }
+
+   void AsyncRows::Request(const PopData& d, const std::vector<std::string>& names)
+   {
+      std::vector<const PopAttrib*> attrs;
+      std::vector<size_t> offs;
+      size_t bytes = 0;
+      for (const std::string& n : names)
+         if (const PopAttrib* a = d.Find(n))
+            if (a->buffer && a->buffer->Count() == d.pointCount)
+            {
+               attrs.push_back(a);
+               offs.push_back(bytes);
+               bytes += (size_t)d.pointCount * (size_t)a->buffer->Comps() * sizeof(float);
+               bytes = (bytes + 255) / 256 * 256;
+            }
+      if (attrs.empty() || bytes == 0)
+      {
+         Latest();
+         return;
+      }
+      Slot* sp = BeginCopy(bytes);
+      if (sp == nullptr)
+         return;
+      Slot& s = *sp;
       s.snap.count = d.pointCount;
+      s.snap.sourceCount = d.pointCount;
       s.snap.revision = d.revision;
       for (size_t i = 0; i < attrs.size(); i++)
       {
@@ -674,12 +699,62 @@ namespace pop
          s.snap.comps.push_back(a->buffer->Comps());
          s.snap.data.push_back((const float*)((const char*)s.ptr + offs[i]));
       }
-      glBindBuffer(GL_COPY_READ_BUFFER, 0);
-      glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-      s.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-      s.done = false;
-      glFlush(); // so the fence gets signalled without anyone waiting on it
-      mNext ^= 1;
+      EndCopy(s);
+   }
+
+   void AsyncRows::RequestRows(const PopData& d, const std::vector<std::string>& names, const std::vector<int>& rows,
+                               unsigned long long first)
+   {
+      const int n = (int)rows.size();
+      std::vector<const PopAttrib*> attrs;
+      std::vector<size_t> offs;
+      size_t bytes = 0;
+      for (const std::string& name : names)
+         if (const PopAttrib* a = d.Find(name))
+            if (a->buffer && a->buffer->Count() == d.pointCount)
+            {
+               attrs.push_back(a);
+               offs.push_back(bytes);
+               bytes += (size_t)n * (size_t)a->buffer->Comps() * sizeof(float);
+               bytes = (bytes + 255) / 256 * 256;
+            }
+      if (attrs.empty() || n <= 0 || !gpu::Available())
+      {
+         Latest();
+         return;
+      }
+      Slot* sp = BeginCopy(bytes);
+      if (sp == nullptr)
+         return;
+      Slot& s = *sp;
+      std::vector<uint32_t> idx((size_t)n);
+      for (int k = 0; k < n; k++)
+         idx[(size_t)k] = (uint32_t)std::clamp(rows[(size_t)k], 0, std::max(0, d.pointCount - 1));
+      const BufferPtr idxBuf = gpu::UintBuffer(idx);
+      const BufferPtr countBuf = gpu::UintBuffer({ (uint32_t)n });
+      s.keep = { idxBuf, countBuf };
+      s.snap.count = n;
+      s.snap.sourceCount = d.pointCount;
+      s.snap.revision = d.revision;
+      s.snap.rows = rows;
+      s.snap.first = first;
+      // Each attribute's rows gathered into a GPU scratch buffer (pooled), then
+      // copied into the mapped slot: a few KB cross to the CPU, not the source.
+      for (size_t i = 0; i < attrs.size(); i++)
+      {
+         const PopAttrib* a = attrs[i];
+         const size_t len = (size_t)n * (size_t)a->buffer->Comps() * sizeof(float);
+         const unsigned int tmp = AcquireGpuBuffer(len);
+         gpu::GatherRows(a->buffer->Gpu(), a->buffer->Comps(), idxBuf->Gpu(), countBuf->Gpu(), n, tmp);
+         glBindBuffer(GL_COPY_WRITE_BUFFER, s.buf); // GatherRows binds its own buffers
+         glBindBuffer(GL_COPY_READ_BUFFER, tmp);
+         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, (GLintptr)offs[i], (GLsizeiptr)len);
+         ReleaseGpuBuffer(tmp, len); // reused two frames from now, after this copy ran
+         s.snap.names.push_back(a->name);
+         s.snap.comps.push_back(a->buffer->Comps());
+         s.snap.data.push_back((const float*)((const char*)s.ptr + offs[i]));
+      }
+      EndCopy(s);
    }
 
    const AsyncRows::Snapshot* AsyncRows::Latest()

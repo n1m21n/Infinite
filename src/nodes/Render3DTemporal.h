@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "Mesh.h"
 
 // Turbo 0.70 (M4): Render 3D's temporal pipeline and its upscaler.
@@ -53,12 +55,18 @@ public:
    // sharpenStops: RCAS strength in stops (0 = strongest). Returns 0 when the
    // shaders are not available (the caller keeps the internal-size image).
    unsigned int Upscale(unsigned int src, int iw, int ih, int ow, int oh, float sharpenStops);
+   // Turbo 0.71 (S8): RCAS alone on RGBA8 sRGB `src` (w x h, no resize) -
+   // Render 3D HQ's sharpening after its TAA. Same targets as Upscale().
+   unsigned int Sharpen(unsigned int src, int w, int h, float sharpenStops);
 
    void Release();
 
    // A compute program from shaders/<name> (EmbeddedFile, //@include lines
    // resolved), labelled; 0 with the log on stderr when it does not build.
    static unsigned int BuildComputeShader(const char* name);
+   // Turbo 0.71 (S1): shaders/<name> as text, //@include lines resolved
+   // (empty when it is not in this build) - Render 3D HQ's raster shaders.
+   static std::string LoadShaderSource(const char* name);
 
 private:
    bool EnsurePrograms();

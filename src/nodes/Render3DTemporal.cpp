@@ -148,6 +148,11 @@ unsigned int Render3DTemporal::BuildComputeShader(const char* name)
    return BuildCompute(name);
 }
 
+std::string Render3DTemporal::LoadShaderSource(const char* name)
+{
+   return ShaderSource(name);
+}
+
 void Render3DTemporal::Release()
 {
    DeleteTexture(mMotion);
@@ -342,6 +347,28 @@ unsigned int Render3DTemporal::Upscale(unsigned int src, int iw, int ih, int ow,
    glUniform2i(glGetUniformLocation(mRcasProgram, "uOutSize"), ow, oh);
    glBindImageTexture(0, mRcasOut, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
    glDispatchCompute(Groups(ow, 16), Groups(oh, 16), 1);
+   glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+   Unbind(1);
+   return mRcasOut;
+}
+
+unsigned int Render3DTemporal::Sharpen(unsigned int src, int w, int h, float sharpenStops)
+{
+   EnsurePrograms();
+   if (mRcasProgram == 0 || src == 0 || w <= 0 || h <= 0)
+      return 0;
+   EnsureUpscaleTargets(w, h);
+   GLUtil::DebugScope group("Render 3D HQ: RCAS");
+   varAU4(rcas);
+   FsrRcasCon(rcas, (AF1)std::max(0.0f, sharpenStops));
+   glUseProgram(mRcasProgram);
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, src);
+   glUniform1i(glGetUniformLocation(mRcasProgram, "uInput"), 0);
+   glUniform4uiv(glGetUniformLocation(mRcasProgram, "uCon0"), 1, rcas);
+   glUniform2i(glGetUniformLocation(mRcasProgram, "uOutSize"), w, h);
+   glBindImageTexture(0, mRcasOut, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+   glDispatchCompute(Groups(w, 16), Groups(h, 16), 1);
    glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
    Unbind(1);
    return mRcasOut;

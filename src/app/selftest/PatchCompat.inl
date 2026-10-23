@@ -81,6 +81,23 @@
                            rgba[k] = (unsigned char)std::clamp(px[k] * 255.0f + 0.5f, 0.0f, 255.0f);
                         stbi_write_png(dumpPng, w, h, 4, rgba.data(), w * 4);
                      }
+                     // Turbo 0.71 (S0): INFINITE_DUMPTYPE=<type name> + INFINITE_DUMPPNG=<base>
+                     // saves every node of that type as <base>_<index>.png, upright and opaque
+                     // (Render 3D vs Render 3D HQ BEFORE / AFTER captures).
+                     const char* dumpType = getenv("INFINITE_DUMPTYPE");
+                     if (dumpType != nullptr && dumpPng != nullptr && gn.typeName == dumpType)
+                     {
+                        std::vector<unsigned char> rgba(px.size());
+                        for (int yy = 0; yy < h; yy++)
+                           for (int xx = 0; xx < w; xx++)
+                              for (int c = 0; c < 4; c++)
+                              {
+                                 const float v = c == 3 ? 1.0f : px[((size_t)(h - 1 - yy) * w + xx) * 4 + c];
+                                 rgba[((size_t)yy * w + xx) * 4 + c] = (unsigned char)std::clamp(v * 255.0f + 0.5f, 0.0f, 255.0f);
+                              }
+                        const std::string file = std::string(dumpPng) + "_" + std::to_string(gn.index) + ".png";
+                        stbi_write_png(file.c_str(), w, h, 4, rgba.data(), w * 4);
+                     }
                      row += ", \"img\": [";
                      for (int gy = 0; gy < 4; gy++)
                         for (int gx = 0; gx < 4; gx++)

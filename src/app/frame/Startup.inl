@@ -1830,7 +1830,8 @@
          SpawnNode("Render 3D", "3D", 700.0f, 40.0f);
       }
       else if (getenv("INFINITE_3DTEST") != nullptr || getenv("INFINITE_RTXTEST") != nullptr || getenv("INFINITE_RTXTEXTEST") != nullptr || getenv("INFINITE_R3DFXTEST") != nullptr ||
-               getenv("INFINITE_PANORAMATEST") != nullptr || getenv("INFINITE_TAATEST") != nullptr)
+               getenv("INFINITE_PANORAMATEST") != nullptr || getenv("INFINITE_TAATEST") != nullptr ||
+               getenv("INFINITE_HQTEST") != nullptr) // Turbo 0.71 (S1)
       {
          SpawnNode("Geometry", "3D", 40.0f, 40.0f);
          SpawnNode("Geometry", "3D", 40.0f, 500.0f);
@@ -1848,7 +1849,7 @@
          r->geometry[1] = g1;
          // RTX: a static scene, or the animated Noise restarts the average every frame.
          if (getenv("INFINITE_RTXTEST") == nullptr && getenv("INFINITE_PANORAMATEST") == nullptr &&
-             getenv("INFINITE_TAATEST") == nullptr)
+             getenv("INFINITE_TAATEST") == nullptr && getenv("INFINITE_HQTEST") == nullptr)
             g0->TextureInput().Connect(gNodes[3].node.get());
          r->width = 700.0f; r->height = 700.0f;
          r->samples = 0; // the antialias check below turns it on at frame 4

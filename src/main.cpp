@@ -203,6 +203,7 @@ static const char* kTurboBuildDate = __DATE__ " " __TIME__;
 #include "nodes/FluidNode.h"
 #include "nodes/VolumeNode.h"
 #include "nodes/Render3DFxNode.h" // Turbo 0.70
+#include "nodes/render_hq/RenderHqNode.h" // Turbo 0.71 (S1)
 #include "nodes/NdiInNode.h"
 #include "nodes/NdiOutNode.h"
 #include "nodes/SweepRevolveNodes.h"
@@ -417,6 +418,10 @@ namespace
             extern double gRender3DCookSeconds;
             printf("FRAMEPROF render3d(incl. its sources)=%.1fms\n", gRender3DCookSeconds * 1000.0 / frames);
             gRender3DCookSeconds = 0.0;
+            extern double gRenderHqCookSeconds; // Turbo 0.71 (S1)
+            if (gRenderHqCookSeconds > 0.0)
+               printf("FRAMEPROF renderhq(incl. its sources)=%.1fms\n", gRenderHqCookSeconds * 1000.0 / frames);
+            gRenderHqCookSeconds = 0.0;
             printf("FRAMEPROF bodies:");
             for (size_t k = 0; k < top.size() && k < 8; k++)
                printf(" [%s %.1f]", top[k].second.c_str(), top[k].first * 1000.0 / frames);

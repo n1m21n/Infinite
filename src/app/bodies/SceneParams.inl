@@ -1737,6 +1737,154 @@
       ImGui::EndGroup();
    }
 
+   // Turbo 0.71 (S1): Render 3D HQ - the params it reads (RenderHqNode::
+   // VisitParams). New controls go at the end so earlier ordinals hold.
+   void DrawRenderHqParams(RenderHqNode* n)
+   {
+      const int connected = (int)n->FlattenedGeometry().size();
+      ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
+      if (n->HqActive())
+      {
+         ImGui::SameLine(0.0f, 16.0f);
+         ImGui::TextDisabled("%zu triangles, %zu spheres in %zu draw calls", n->HqTriangles(), n->HqSpheres(),
+                             n->HqDrawCalls());
+         if (n->HqSkipped() > 0)
+            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.35f, 1.0f), "%zu line / instance source%s not drawn yet",
+                               n->HqSkipped(), n->HqSkipped() == 1 ? "" : "s");
+      }
+      if (!n->Status().empty())
+         ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.35f, 1.0f), "%s", n->Status().c_str());
+
+      const float colW = kParamWidth;
+      const float gutter = 16.0f;
+
+      if (ModTriggerButton("Frame scene##renderHqFrameScene", ImVec2(colW, 0)))
+         FrameSceneInView(n);
+
+      ImGui::BeginGroup();
+      NodeSeparator("output", colW);
+      ModSlider("width", &n->width, 64.0f, 8192.0f, "%.0f", colW);
+      ModSlider("height", &n->height, 64.0f, 8192.0f, "%.0f", colW);
+      // S8: + Filament's ACES (legacy, its default) and ACES.
+      DropdownButton("tonemap", RenderHqNode::TonemapNames(), n->tonemap,
+                     [n](int i) { n->tonemap = i; }, colW);
+      ModSlider("exposure", &n->exposure, 0.1f, 4.0f, "%.3f", colW);
+      ColorSwatch("background", n->bgColor, n);
+
+      NodeSeparator("camera", colW);
+      if (n->camera != nullptr)
+         ImGui::TextDisabled("driven by a Camera node");
+      else
+      {
+         DropdownButton("projection", Render3DNode::ProjectionNames(), n->projection,
+                        [n](int i) { n->projection = i; }, colW);
+         if (n->projection == 0)
+            ModSlider("fov", &n->fov, 10.0f, 120.0f, "%.3f", colW);
+         else
+            ModSlider("ortho height", &n->orthoHeight, 0.2f, 8.0f, "%.3f", colW);
+         ModSlider("distance", &n->camDistance, 0.3f, 20.0f, "%.3f", colW);
+         ModSlider("orbit", &n->camAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0", colW);
+         ModSlider("elevation", &n->camElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0", colW);
+         ModSlider("target x", &n->targetX, -3.0f, 3.0f, "%.3f", colW);
+         ModSlider("target y", &n->targetY, -3.0f, 3.0f, "%.3f", colW);
+         ModSlider("target z", &n->targetZ, -3.0f, 3.0f, "%.3f", colW);
+      }
+      ImGui::EndGroup();
+
+      ImGui::SameLine(0.0f, gutter);
+      ImGui::BeginGroup();
+      NodeSeparator("light", colW);
+      int patchedLights = 0;
+      for (int i = 0; i < Render3DNode::kLightSlots; i++)
+         if (n->lights[i] != nullptr)
+            patchedLights++;
+      if (patchedLights > 0)
+         ImGui::TextDisabled("%d Light node%s patched", patchedLights, patchedLights == 1 ? "" : "s");
+      else
+      {
+         ModSlider("light orbit", &n->lightAzimuth, -180.0f, 180.0f, "%.1f\xC2\xB0", colW);
+         ModSlider("light height", &n->lightElevation, -85.9437f, 85.9437f, "%.1f\xC2\xB0", colW);
+         ColorSwatch("light", n->lightColor, n);
+         ModSlider("intensity", &n->lightIntensity, 0.0f, 4.0f, "%.3f", colW);
+      }
+
+      NodeSeparator("environment", colW);
+      if (n->envInput.IsConnected())
+      {
+         ImGui::TextDisabled("driven by an HDRI node");
+         ModCheckbox("use as background", &n->envAsBackground);
+      }
+      else
+      {
+         ColorSwatch("sky", n->envSky, n);
+         ColorSwatch("horizon", n->envHorizon, n);
+         ColorSwatch("ground", n->envGround, n);
+      }
+      ModSlider("env intensity", &n->envIntensity, 0.0f, 3.0f, "%.3f", colW);
+
+      NodeSeparator("glow", colW);
+      ModSlider("bloom", &n->bloom, 0.0f, 2.0f, "%.3f", colW);
+      if (n->bloom > 0.0f)
+      {
+         ModSlider("threshold", &n->bloomThreshold, 0.0f, 8.0f, "%.3f", colW);
+         ModSlider("radius", &n->bloomRadius, 0.0f, 1.0f, "%.3f", colW);
+      }
+
+      // S4: last on the body, so earlier controls keep their ordinals.
+      NodeSeparator("shadows", colW);
+      ModCheckbox("cast shadows", &n->shadowsEnabled);
+      if (n->shadowsEnabled)
+      {
+         DropdownButton("resolution", Render3DNode::ShadowQualityNames(), n->shadowQuality,
+                        [n](int i) { n->shadowQuality = i; }, colW);
+         ModSlider("softness", &n->shadowSoftness, 0.0f, 4.0f, "%.3f", colW);
+         ModCheckbox("contact shadows", &n->contactShadows);
+      }
+      // S5: after the shadows, so their ordinals stay.
+      NodeSeparator("ambient occlusion", colW);
+      ModCheckbox("GTAO", &n->ao);
+      if (n->ao)
+      {
+         ModSlider("radius", &n->aoRadius, 0.01f, 3.0f, "%.3f", colW);
+         ModSlider("intensity", &n->aoIntensity, 0.0f, 1.0f, "%.3f", colW);
+         ModCheckbox("show AO only", &n->aoShow);
+      }
+      // S6: last, so the controls above keep their ordinals.
+      NodeSeparator("anti-aliasing", colW);
+      ModCheckbox("TAA", &n->taa);
+      // S8: after the TAA, so every control above keeps its ordinal. The
+      // preset sets the real params below and above; it shows the one they
+      // match. Render scale is FSR 1 (EASU + RCAS); sharpness is RCAS after
+      // the TAA (also at native size, off at 0).
+      NodeSeparator("quality", colW);
+      DropdownButton("preset", RenderHqNode::PresetNames(), n->MatchingPreset(),
+                     [n](int i) { PushUndoCheckpoint(); n->ApplyPreset(i); }, colW);
+      DropdownButton("render scale", Render3DNode::UpscaleNames(), n->upscale,
+                     [n](int i) { PushUndoCheckpoint(); n->upscale = i; }, colW);
+      ModSlider("sharpness", &n->sharpness, 0.0f, 1.0f, "%.2f", colW);
+      ModCheckbox("full-res GTAO", &n->aoFullRes);
+      // S9: last, so every control above keeps its ordinal.
+      ModCheckbox("FXAA when TAA is off", &n->fxaa);
+      // S9: 360 output (equirect, cubemap 3x2, dome), as Render 3D's: six
+      // faces, no TAA between them (FXAA). The dome's sliders come last.
+      NodeSeparator("360", colW);
+      DropdownButton("360", Render3DNode::PanoramaNames(), n->panorama,
+                     [n](int i) {
+                        PushUndoCheckpoint();
+                        n->panorama = i;
+                        // The formats' own aspect: 2:1 equirect, 3:2 cubemap.
+                        if (i == 1) n->height = std::max(16.0f, n->width * 0.5f);
+                        else if (i == 2) n->height = std::max(16.0f, n->width * 2.0f / 3.0f);
+                        else if (i == 3) n->height = n->width; // dome: square domemaster
+                     }, colW);
+      if (n->panorama == 3)
+      {
+         ModSlider("dome angle", &n->domeAngle, 90.0f, 360.0f, "%.0f\xC2\xB0", colW);
+         ModSlider("dome tilt", &n->domeTilt, 0.0f, 90.0f, "%.0f\xC2\xB0", colW);
+      }
+      ImGui::EndGroup();
+   }
+
    // Turbo 0.70: Render 3D FX - one section per effect; each is off at 0.
    void DrawRender3DFxParams(Render3DFxNode* n)
    {

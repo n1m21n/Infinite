@@ -1,0 +1,83 @@
+infinite-patch 1
+# turbo-mod-range
+node 1 3DScene Render 3D HQ
+  uid 1
+  pos 1040 0
+  flags 1 0 0 0 1 0
+  f width 1920
+  f height 1080
+  b shadows 0
+  i shadowQuality 1
+  i tonemap 1
+  f exposure 1
+  f envIntensity 1
+  b envAsBackground 1
+end
+node 2 3DScene Camera
+  uid 2
+  pos 520 0
+  flags 1 0 0 0 1 0
+  i projection 0
+  f fov 40
+  f distance 10
+  f azimuth -30
+  f elevation 25
+  f targetX 0
+  f targetY 0
+  f targetZ 0
+  f orbitPerBeat 0
+end
+node 3 3DScene Light
+  uid 3
+  pos 520 560
+  flags 1 0 0 0 1 0
+  i type 0
+  f azimuth 90
+  f elevation 20
+  c color 1 0.97 0.92
+  f intensity 3
+end
+node 4 3DScene HDRI
+  uid 4
+  pos 520 1120
+  flags 1 0 0 0 1 0
+  s path ../hq_media/studio.hdr
+  f intensity 0.6
+  f rotation 0
+end
+node 5 PointZ Grid PointZ
+  uid 5
+  pos 0 0
+  flags 1 0 0 0 1 0
+  f sizeX 8
+  f sizeY 8
+  f sizeZ 0
+  i rows 1000
+  i cols 1000
+  i orient 1
+  i kind 2
+end
+node 6 PointZ Noise PointZ
+  uid 6
+  pos 520 1680
+  flags 1 0 0 0 1 0
+  s attrib P
+  i type 2
+  i mode 0
+  f amp 0.8
+  f freq 1.2
+  b use4d 1
+  f speed 0.3
+end
+node 7 Output Output
+  uid 7
+  pos 2020 0
+  flags 1 0 0 0 1 0
+end
+geo 6 0 5
+geo 1 0 6
+geo 1 4 2
+geo 1 5 3
+cable 1 8 4
+cable 7 0 1
+transport 120 4 4 0 0

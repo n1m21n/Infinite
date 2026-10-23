@@ -2094,10 +2094,13 @@ void Render3DNode::CookIfNeeded(int frameId)
          glEnable(GL_DEPTH_TEST);
          glDepthFunc(GL_LESS);
          glDepthMask(GL_TRUE);
-         // Front faces culled so the depth written is the back of each object.
-         // Peter-panning is easier to bias away than the acne you get otherwise.
-         glEnable(GL_CULL_FACE);
-         glCullFace(GL_FRONT);
+         // Turbo 0.71: no culling - the depth written is each object's side
+         // nearest the light, whatever its winding. Culling front faces kept the
+         // far side instead, a few centimetres above the floor under an object
+         // resting on it, and the bias (scaled by the whole scene, floor
+         // included) then lit the floor right under it: once the primitives'
+         // winding was fixed (0.71), shadows vanished below spheres and cubes.
+         glDisable(GL_CULL_FACE);
 
          glUseProgram(mShadowProgram);
          glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uLightViewProj"),
@@ -2171,6 +2174,12 @@ void Render3DNode::CookIfNeeded(int frameId)
             glEnable(GL_SCISSOR_TEST);
          shadowsActive = true;
       }
+      // Turbo 0.71: the bounds the map is fitted to come from the upload in
+      // the main pass below, so a new scene's first draw has no shadows. Draw
+      // again next cook: a still scene used to keep that first picture (a
+      // cache hit) and never showed its shadows.
+      else if (!mDraw.empty())
+         mHasSceneBuilt = false;
    }
 
    // --- save the GL state the 2D pipeline relies on -------------------

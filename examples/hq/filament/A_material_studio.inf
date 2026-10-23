@@ -1,0 +1,190 @@
+infinite-patch 1
+# turbo-mod-range
+node 1 3DScene Render 3D HQ
+  uid 1
+  pos 1560 0
+  flags 1 0 0 0 1 0
+  f width 1920
+  f height 1080
+  b shadows 1
+  i shadowQuality 1
+  i tonemap 1
+  f exposure 1
+  f envIntensity 1
+  b envAsBackground 1
+end
+node 2 3DScene Camera
+  uid 2
+  pos 1040 0
+  flags 1 0 0 0 1 0
+  i projection 0
+  f fov 40
+  f distance 12
+  f azimuth 90
+  f elevation 10
+  f targetX 0
+  f targetY 0.9
+  f targetZ 0
+  f orbitPerBeat 0
+end
+node 3 3DScene HDRI
+  uid 3
+  pos 1040 560
+  flags 1 0 0 0 1 0
+  s path ../hq_media/studio.hdr
+  f intensity 1
+  f rotation 0
+end
+node 4 3DScene Light
+  uid 4
+  pos 1040 1120
+  flags 1 0 0 0 1 0
+  i type 0
+  f azimuth -40
+  f elevation 35
+  c color 1 0.97 0.92
+  f intensity 2.5
+end
+node 5 3DScene Group 3D
+  uid 5
+  pos 1040 1680
+  flags 1 0 0 0 1 0
+end
+node 6 3DScene Geometry
+  uid 6
+  pos 0 0
+  flags 1 0 0 0 1 0
+  i shape 2
+  f posX -5
+  f posY 0.85
+  f scale 1.6
+  c color 1 0.78 0.34
+  f metallic 1
+  f roughness 0.05
+end
+node 7 3DScene Geometry
+  uid 7
+  pos 0 560
+  flags 1 0 0 0 1 0
+  i shape 2
+  f posX -3
+  f posY 0.85
+  f scale 1.6
+  c color 0.9 0.9 0.92
+  f metallic 1
+  f roughness 0.55
+end
+node 8 3DScene Geometry
+  uid 8
+  pos 0 1120
+  flags 1 0 0 0 1 0
+  i shape 2
+  f posX -1
+  f posY 0.85
+  f scale 1.6
+  c color 0.75 0.12 0.1
+  f metallic 0
+  f roughness 0.35
+end
+node 9 3DScene Geometry
+  uid 9
+  pos 0 1680
+  flags 1 0 0 0 1 0
+  i shape 2
+  f posX 1
+  f posY 0.85
+  f scale 1.6
+  c color 0.1 0.35 0.85
+  f metallic 0
+  f roughness 0.08
+  f clearcoat 1
+end
+node 10 3DScene Geometry
+  uid 10
+  pos 0 2240
+  flags 1 0 0 0 1 0
+  i shape 2
+  f posX 3
+  f posY 0.85
+  f scale 1.6
+  c color 0.05 0.05 0.05
+  f metallic 0
+  f roughness 0.5
+  c emissionColor 1 0.55 0.15
+  f emission 4
+end
+node 11 3DScene Geometry
+  uid 11
+  pos 0 2800
+  flags 1 0 0 0 1 0
+  i shape 2
+  f posX 5
+  f posY 0.85
+  f scale 1.6
+  c color 0.8 0.8 0.8
+  f metallic 0
+  f roughness 0.4
+end
+node 12 Source Texture
+  uid 12
+  pos 0 3360
+  flags 1 0 0 0 1 0
+  i textureType 0
+  f width 1024
+  f height 1024
+  f scale 6
+end
+node 13 3DScene Material
+  uid 13
+  pos 520 0
+  flags 1 0 0 0 1 0
+  c color 0.8 0.8 0.8
+  f metallic 0
+  f roughness 0.4
+  b normalBump 1
+  f normalStrength 1.5
+end
+node 14 3DScene Geometry
+  uid 14
+  pos 0 3920
+  flags 1 0 0 0 1 0
+  i shape 1
+  f scaleX 30
+  f scaleY 0.1
+  f scaleZ 30
+  f posY -0.05
+  c color 0.5 0.5 0.52
+  f metallic 0
+  f roughness 0.8
+end
+node 15 Output Output
+  uid 15
+  pos 2540 0
+  flags 1 0 0 0 1 0
+end
+node 16 Modulators LFO
+  uid 16
+  pos 1040 2240
+  flags 1 0 0 0 1 0
+  i shape 2
+  i rateMode 0
+  f rateBeats 32
+  f low 0
+  f high 1
+end
+geo 13 0 11
+cable 13 4 12
+geo 5 0 6
+geo 5 1 7
+geo 5 2 8
+geo 5 3 9
+geo 5 4 10
+geo 5 5 13
+geo 5 6 14
+geo 1 0 5
+geo 1 4 2
+geo 1 5 4
+cable 1 8 3
+cable 15 0 1
+mod 3 rotation 16 0 0 1 0
+transport 120 4 4 0 0

@@ -703,7 +703,14 @@
             else if (auto* n = dynamic_cast<LightNode*>(gn.node.get()))
                DrawLightParams(n);
             else if (auto* n = dynamic_cast<Render3DNode*>(gn.node.get()))
-               DrawRender3DParams(n);
+            {
+               // Turbo 0.71 (S1): Render 3D HQ derives from it. Tested in here: one
+               // more else-if hits MSVC's nesting limit (C1061) on this chain.
+               if (auto* hq = dynamic_cast<RenderHqNode*>(n))
+                  DrawRenderHqParams(hq);
+               else
+                  DrawRender3DParams(n);
+            }
             else if (auto* n = dynamic_cast<Render3DFxNode*>(gn.node.get())) // Turbo 0.70
                DrawRender3DFxParams(n);
             else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))

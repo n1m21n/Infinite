@@ -1,0 +1,107 @@
+infinite-patch 1
+# turbo-mod-range
+node 1 3DScene Render 3D HQ
+  uid 1
+  pos 1560 0
+  flags 1 0 0 0 1 0
+  f width 1920
+  f height 1080
+  b shadows 1
+  i shadowQuality 1
+  i tonemap 1
+  f exposure 1
+  f envIntensity 1
+  b envAsBackground 1
+end
+node 2 3DScene Camera
+  uid 2
+  pos 1040 0
+  flags 1 0 0 0 1 0
+  i projection 0
+  f fov 40
+  f distance 8
+  f azimuth -25
+  f elevation 15
+  f targetX 0
+  f targetY 1
+  f targetZ 0
+  f orbitPerBeat 0.02
+end
+node 3 3DScene Light
+  uid 3
+  pos 1040 560
+  flags 1 0 0 0 1 0
+  i type 0
+  f azimuth -40
+  f elevation 35
+  c color 1 0.97 0.92
+  f intensity 2
+end
+node 4 3DScene HDRI
+  uid 4
+  pos 1040 1120
+  flags 1 0 0 0 1 0
+  s path ../hq_media/studio.hdr
+  f intensity 1
+  f rotation 0
+end
+node 5 PointZ Grid PointZ
+  uid 5
+  pos 0 0
+  flags 1 0 0 0 1 0
+  f sizeX 3
+  f sizeY 3
+  f sizeZ 0
+  i rows 100
+  i cols 100
+  i orient 1
+  i kind 2
+end
+node 6 PointZ Noise PointZ
+  uid 6
+  pos 520 0
+  flags 1 0 0 0 1 0
+  s attrib P
+  i type 2
+  i mode 0
+  f amp 0.3
+  f freq 1.2
+  b use4d 1
+  f speed 0
+end
+node 7 PointZ Particle PointZ
+  uid 7
+  pos 1040 1680
+  flags 1 0 0 0 1 0
+  i birth 0
+  f rate 60000
+  f life 3
+  f lifeVar 0.1
+  f velX 0
+  f velY 0.3
+  f velZ 0
+  f velRand 0.2
+  f drag 2
+  f damp 0.6
+  i max 400000
+  b play 1
+  f sizeBirth 0.015
+  f sizeDeath 0.004
+  f turb 6
+  f turbScale 0.7
+  f turbSpeed 0.05
+  i engine 1
+end
+node 8 Output Output
+  uid 8
+  pos 2540 0
+  flags 1 0 0 0 1 0
+end
+geo 6 0 5
+geo 7 0 6
+geo 1 0 7
+geo 1 4 2
+geo 1 5 3
+cable 1 8 4
+cable 8 0 1
+transport 120 4 4 0 0

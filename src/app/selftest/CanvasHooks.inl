@@ -1645,6 +1645,50 @@
          cmp(pop::attr::PScale, 1, 1e-4);
          cmp(pop::attr::Color, 4, 1e-4);
 
+         // Turbo 0.71 (P1): the CPU engine over a GPU-made source copies back only
+         // the rows its next births can pick - against the whole-source copy it
+         // replaced, same frames, same seed: bit for bit (the source holds still,
+         // so the copies' ages do not matter).
+         {
+            std::unique_ptr<PopNode> wobble(static_cast<PopNode*>(PopNode::CreateFor("Noise PointZ")));
+            wobble->inputs[0] = grid.get();
+            set(wobble.get(), "amp", 0.3f);
+            std::unique_ptr<PopNode> full(static_cast<PopNode*>(PopNode::CreateFor("Particle PointZ")));
+            std::unique_ptr<PopNode> rowsOnly(static_cast<PopNode*>(PopNode::CreateFor("Particle PointZ")));
+            for (PopNode* n : { full.get(), rowsOnly.get() })
+            {
+               n->inputs[0] = wobble.get();
+               set(n, "engine", 0.0f);
+               set(n, "rate", 4000.0f);
+               set(n, "life", 0.6f);
+               set(n, "lifeVar", 0.5f);
+               set(n, "velRand", 0.5f);
+               set(n, "jitter", 0.05f);
+               set(n, "inherit", 1.0f);
+            }
+            for (int f = 0; f < 90; f++)
+            {
+               grid->CookIfNeeded(++frame);
+               wobble->CookIfNeeded(frame);
+               pop::SetParticleFullSourceCopyForTest(true);
+               full->CookIfNeeded(frame);
+               pop::SetParticleFullSourceCopyForTest(false);
+               rowsOnly->CookIfNeeded(frame);
+            }
+            const pop::PopData* fa = full->GetPop();
+            const pop::PopData* fb = rowsOnly->GetPop();
+            bool same = fa != nullptr && fb != nullptr && fa->pointCount == fb->pointCount && fa->pointCount > 0;
+            for (const pop::PopAttrib& at : same ? fa->attribs : std::vector<pop::PopAttrib>())
+            {
+               const int cc = at.buffer->Comps();
+               const std::vector<float> va = fa->Read(at.name, cc), vb = fb->Read(at.name, cc);
+               same = same && va.size() == vb.size() && std::memcmp(va.data(), vb.data(), va.size() * sizeof(float)) == 0;
+            }
+            printf("  CPU engine, row copies vs whole-source copy: %d vs %d particles, bit-equal %d\n",
+                   fa ? fa->pointCount : -1, fb ? fb->pointCount : -1, same ? 1 : 0);
+            ok = ok && same;
+         }
+
          // Killing through the force chain: Particle -> Group (PartDeath inside
          // a sphere) -> Null tagged as the target, for each engine.
          {
@@ -2238,6 +2282,57 @@
             }
          }
          printf("  %d cooks, %d with errors\n", cooked, failed);
+
+         // Turbo 0.71 (P1): Noise PointZ curl over 4D gradient noise - the
+         // cell-cached kernel against the plain one (90k points, P, a 4D offset
+         // instead of time so both cooks see the same input). Same arithmetic
+         // term for term, but the driver reassociates the two code shapes
+         // differently: a few ulps, amplified by the curl's 1/(2e) differences
+         // (measured 1.8e-5 on positions of +-4). Tolerance 1e-4, documented in
+         // docs/pointz-gpu-status.md.
+         {
+            std::unique_ptr<PopNode> grid(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+            std::unique_ptr<PopNode> nz(static_cast<PopNode*>(PopNode::CreateFor("Noise PointZ")));
+            auto setF = [](PopNode* n, const char* key, float v) {
+               const int i = n->Def().ParamIndex(key);
+               if (i >= 0) n->Values().f[(size_t)n->Def().FloatOffset(i)] = v;
+            };
+            setF(grid.get(), "rows", 300.0f);
+            setF(grid.get(), "cols", 300.0f);
+            setF(grid.get(), "sizeX", 6.0f);
+            setF(grid.get(), "sizeY", 6.0f);
+            setF(nz.get(), "type", 2.0f); // curl
+            setF(nz.get(), "use4d", 1.0f);
+            setF(nz.get(), "freq", 1.2f);
+            setF(nz.get(), "t4d", 3.7f);
+            setF(nz.get(), "amp", 0.8f);
+            nz->inputs[0] = grid.get();
+            nz->CookIfNeeded(++frame);
+            const std::vector<float> cached = nz->GetPop()->Read(pop::attr::P, 3);
+            pop::SetNoiseReferenceKernelForTest(true);
+            setF(nz.get(), "amp", 0.81f); // a param change forces the cooks with the other kernel
+            nz->CookIfNeeded(++frame);
+            setF(nz.get(), "amp", 0.8f);
+            nz->CookIfNeeded(++frame);
+            const std::vector<float> plain = nz->GetPop()->Read(pop::attr::P, 3);
+            pop::SetNoiseReferenceKernelForTest(false);
+            const bool same = !cached.empty() && cached.size() == plain.size() &&
+                              std::memcmp(cached.data(), plain.data(), cached.size() * sizeof(float)) == 0;
+            size_t moved = 0, differ = 0;
+            float maxDiff = 0.0f;
+            const std::vector<float> base = grid->GetPop()->Read(pop::attr::P, 3);
+            for (size_t i = 0; i < base.size() && i < cached.size(); i++)
+               moved += cached[i] != base[i] ? 1 : 0;
+            for (size_t i = 0; i < cached.size() && i < plain.size(); i++)
+            {
+               differ += cached[i] != plain[i] ? 1 : 0;
+               maxDiff = std::max(maxDiff, std::fabs(cached[i] - plain[i]));
+            }
+            printf("  noise curl 4D, cell-cached vs plain kernel: %zu floats, bit-equal %d (%zu differ, max %.3g), %zu moved\n",
+                   cached.size(), same ? 1 : 0, differ, maxDiff, moved);
+            report("Noise PointZ curl kernel matches the reference (1e-4)",
+                   cached.size() == plain.size() && !cached.empty() && maxDiff <= 1e-4f && moved > cached.size() / 2);
+         }
 
          // GPU kernel vs CPU: Transform PointZ translate on a known grid.
          {
@@ -5870,6 +5965,10 @@
          auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
          Render3DFxNode fx;
          fx.Input().Connect(r);
+         // Turbo 0.71: since the winding fix the knot is drawn from outside
+         // (convex, few creases), so AO needs a radius that reaches where the
+         // tube crosses itself to change the picture measurably.
+         fx.aoRadius = 1.0f;
          static unsigned int sFbo = 0;
          int frame = 3000000;
          bool all = true;
@@ -5960,6 +6059,763 @@
          check("RTX render: passes through", 1.5f, 1.0f, 24.0f, 4.0f, 0.1f, false);
          r->renderMode = savedMode;
          printf("%s\n", all ? "R3DFXTEST OK" : "R3DFXTEST FAIL - BUG");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+      // Turbo 0.71 (S1): Render 3D HQ on the 3D test scene, next to its Render
+      // 3D - it draws the same sources (something lit over the background, at
+      // its own size, after a resize too), with no GL error or NaN, leaves the
+      // FBO / viewport as it found them, and the Render 3D picture stays the
+      // same. Without the module it must still give a picture (Render 3D's).
+      if (getenv("INFINITE_HQTEST") != nullptr && frameId == 20)
+      {
+         auto* r = static_cast<Render3DNode*>(gNodes[2].node.get());
+         static unsigned int sFbo = 0;
+         auto read = [&](unsigned int tex, int w, int h) {
+            std::vector<float> px;
+            if (tex == 0 || !GLUtil::ReadTexturePixels(sFbo, tex, w, h, px))
+               px.clear();
+            return px;
+         };
+         int frame = 4000000;
+         r->CookIfNeeded(++frame);
+         const std::vector<float> before = read(r->GetOutputTexture(), r->GetOutputWidth(), r->GetOutputHeight());
+
+         RenderHqNode hq;
+         for (int s = 0; s < Render3DNode::kSlots; s++)
+            hq.geometry[s] = r->geometry[s];
+         hq.taa = false; // the checks below compare single frames; S6's block turns it on
+         hq.reuseStill = false; // S7: every cook draws (timings); the still check turns it on
+         bool all = true;
+         while (glGetError() != GL_NO_ERROR) {}
+         auto check = [&](int w, int h) {
+            hq.width = (float)w;
+            hq.height = (float)h;
+            GLint vpBefore[4], fboBefore = 0;
+            glGetIntegerv(GL_VIEWPORT, vpBefore);
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fboBefore);
+            hq.CookIfNeeded(++frame);
+            GLint vpAfter[4], fboAfter = 0;
+            glGetIntegerv(GL_VIEWPORT, vpAfter);
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fboAfter);
+            const bool stateKept = fboAfter == fboBefore && std::equal(vpBefore, vpBefore + 4, vpAfter);
+            const int ow = hq.GetOutputWidth(), oh = hq.GetOutputHeight();
+            const std::vector<float> px = read(hq.GetOutputTexture(), ow, oh);
+            const GLenum err = glGetError();
+            // Lit pixels: brighter than the background by a clear margin.
+            const float bg = (hq.bgColor[0] + hq.bgColor[1] + hq.bgColor[2]) / 3.0f;
+            bool finite = !px.empty();
+            size_t lit = 0;
+            for (size_t i = 0; i + 3 < px.size(); i += 4)
+            {
+               finite = finite && std::isfinite(px[i]) && std::isfinite(px[i + 1]) && std::isfinite(px[i + 2]);
+               if ((px[i] + px[i + 1] + px[i + 2]) / 3.0f > bg + 0.1f)
+                  lit++;
+            }
+            const double coverage = px.empty() ? 0.0 : (double)lit / (double)(px.size() / 4);
+            const bool active = HqModuleBuilt() ? (hq.HqActive() && hq.Status().empty()) : !hq.Status().empty();
+            const bool drew = !HqModuleBuilt() || (hq.HqDrawCalls() == 2 && hq.HqTriangles() > 0 && hq.HqSkipped() == 0);
+            const bool sized = !HqModuleBuilt() || (ow == w && oh == h);
+            const bool ok = active && drew && sized && finite && stateKept && err == GL_NO_ERROR && coverage > 0.02;
+            printf("  %dx%d: module %s, out %dx%d, %zu tris / %zu draws, lit %.1f%%, finite %d, state %s, gl 0x%x  %s\n", w,
+                   h, hq.HqActive() ? "on" : "off (Render 3D)", ow, oh, hq.HqTriangles(), hq.HqDrawCalls(),
+                   coverage * 100.0, finite ? 1 : 0, stateKept ? "kept" : "CHANGED", err, ok ? "ok" : "FAIL");
+            if (!hq.Status().empty())
+               printf("    status: %s\n", hq.Status().c_str());
+            all = all && ok;
+            if (const char* png = getenv("INFINITE_HQTEST_PNG")) // eyeball it (bottom-up rows)
+            {
+               std::vector<unsigned char> rgba(px.size());
+               for (size_t k = 0; k < px.size(); k++)
+                  rgba[k] = (unsigned char)std::clamp(px[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+               if (!rgba.empty())
+                  stbi_write_png(png, ow, oh, 4, rgba.data(), ow * 4);
+            }
+         };
+         check(640, 360);
+         check(500, 500); // resized targets
+
+         // S2: Filament's model over the range of a Material (polished metal,
+         // clear coat, sheen) changes the picture and keeps it finite.
+         {
+            auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+            const std::vector<float> plain = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            const float saved[4] = { g0->metallic, g0->roughness, g0->clearcoat, g0->sheen };
+            g0->metallic = 1.0f;
+            g0->roughness = 0.05f;
+            g0->clearcoat = 1.0f;
+            g0->sheen = 1.0f;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> shiny = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            const GLenum err = glGetError();
+            g0->metallic = saved[0];
+            g0->roughness = saved[1];
+            g0->clearcoat = saved[2];
+            g0->sheen = saved[3];
+            bool finite = !shiny.empty() && shiny.size() == plain.size();
+            double diff = 0.0;
+            for (size_t i = 0; finite && i < shiny.size(); i++)
+            {
+               finite = std::isfinite(shiny[i]);
+               diff += std::fabs(shiny[i] - plain[i]);
+            }
+            diff /= (double)std::max<size_t>(1, shiny.size());
+            const bool ok = finite && err == GL_NO_ERROR && (!HqModuleBuilt() || diff > 1e-3);
+            printf("  metal + clear coat + sheen: diff %.5f, finite %d, gl 0x%x  %s\n", diff, finite ? 1 : 0, err,
+                   ok ? "ok" : "FAIL");
+            all = all && ok;
+         }
+
+         // S4: shadows (map + contact) change the picture, stay finite, and a
+         // still scene keeps its shadow map (same picture, cook after cook).
+         if (HqModuleBuilt())
+         {
+            hq.CookIfNeeded(++frame); // the materials the check above restored
+            const std::vector<float> lit = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.shadowsEnabled = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> unlit = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.shadowsEnabled = true;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> again = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            const GLenum err = glGetError();
+            bool finite = !lit.empty() && lit.size() == unlit.size() && lit.size() == again.size();
+            double diff = 0.0, still = 0.0;
+            for (size_t i = 0; finite && i < lit.size(); i++)
+            {
+               finite = std::isfinite(lit[i]) && std::isfinite(again[i]);
+               diff += std::fabs(lit[i] - unlit[i]);
+               still += std::fabs(lit[i] - again[i]);
+            }
+            diff /= (double)std::max<size_t>(1, lit.size());
+            still /= (double)std::max<size_t>(1, lit.size());
+            const bool ok = finite && err == GL_NO_ERROR && diff > 1e-4 && still < 1e-6;
+            printf("  shadows: on vs off diff %.5f, on vs on again %.7f, finite %d, gl 0x%x  %s\n", diff, still,
+                   finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+         }
+
+         // S5: GTAO darkens the indirect light (on vs off differ, finite), the
+         // "AO only" view has occluded and open pixels, and its GPU cost.
+         if (HqModuleBuilt())
+         {
+            hq.ao = true;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> on = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.ao = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> off = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.ao = true;
+            hq.aoShow = true;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> only = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.aoShow = false;
+            // Cost: the same frame with and without GTAO (CPU + GPU, glFinish: test only).
+            auto timeIt = [&](bool aoOn) {
+               hq.ao = aoOn;
+               hq.CookIfNeeded(++frame);
+               glFinish();
+               const auto t0 = std::chrono::steady_clock::now();
+               for (int k = 0; k < 20; k++)
+                  hq.CookIfNeeded(++frame);
+               glFinish();
+               return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 20.0;
+            };
+            const double msOff = timeIt(false), msOn = timeIt(true);
+            const GLenum err = glGetError();
+            bool finite = !on.empty() && on.size() == off.size() && on.size() == only.size();
+            double diff = 0.0;
+            size_t occluded = 0, open = 0;
+            for (size_t i = 0; finite && i < on.size(); i++)
+            {
+               finite = std::isfinite(on[i]) && std::isfinite(only[i]);
+               diff += std::fabs(on[i] - off[i]);
+               // "AO only" goes through the tonemap: open (1) reads ~0.9; the
+               // dark background (nothing drawn) is left out.
+               if (i % 4 == 0 && only[i] > 0.1f)
+               {
+                  if (only[i] < 0.75f) occluded++;
+                  if (only[i] > 0.85f) open++;
+               }
+            }
+            diff /= (double)std::max<size_t>(1, on.size());
+            const bool ok = finite && err == GL_NO_ERROR && diff > 1e-4 && occluded > 0 && open > 0;
+            printf("  GTAO: on vs off diff %.5f, AO only %zu occluded / %zu open px, %.2f ms vs %.2f off (%dx%d), "
+                   "finite %d, gl 0x%x  %s\n", diff, occluded, open, msOn, msOff, hq.GetOutputWidth(),
+                   hq.GetOutputHeight(), finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+            if (const char* png = getenv("INFINITE_HQTEST_PNGAO")) // eyeball the AO (bottom-up rows)
+            {
+               std::vector<unsigned char> rgba(only.size());
+               for (size_t k = 0; k < only.size(); k++)
+                  rgba[k] = (unsigned char)std::clamp(only[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+               if (!rgba.empty())
+                  stbi_write_png(png, hq.GetOutputWidth(), hq.GetOutputHeight(), 4, rgba.data(), hq.GetOutputWidth() * 4);
+            }
+         }
+
+         // S6: TAA - a still scene converges (two late frames nearly equal) and
+         // differs from no TAA at the edges; an object that moves fast and stops
+         // leaves no ghost (the history settles to the still picture); cost.
+         if (HqModuleBuilt())
+         {
+            auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+            auto meanDiff = [](const std::vector<float>& a, const std::vector<float>& b) {
+               if (a.empty() || a.size() != b.size())
+                  return 1.0;
+               double d = 0.0;
+               for (size_t i = 0; i < a.size(); i++)
+                  d += std::fabs(a[i] - b[i]);
+               return d / (double)a.size();
+            };
+            auto frameOf = [&]() { return read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight()); };
+            hq.ao = false; // AO noise turns under TAA: keep this about the edges
+            hq.taa = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> plain = frameOf();
+            hq.taa = true;
+            for (int k = 0; k < 32; k++)
+               hq.CookIfNeeded(++frame);
+            const std::vector<float> settledA = frameOf();
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> settledB = frameOf();
+            const double still = meanDiff(settledA, settledB), edges = meanDiff(settledA, plain);
+            // Fast motion, then 40 still frames.
+            const float savedX = g0->posX;
+            for (int k = 0; k < 10; k++)
+            {
+               g0->posX += 0.08f;
+               hq.CookIfNeeded(++frame);
+            }
+            for (int k = 0; k < 40; k++)
+               hq.CookIfNeeded(++frame);
+            const std::vector<float> after = frameOf();
+            hq.taa = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> afterPlain = frameOf();
+            const double ghost = meanDiff(after, afterPlain);
+            g0->posX = savedX;
+            // Cost per frame, TAA on vs off (glFinish: test only).
+            auto timeIt = [&](bool on) {
+               hq.taa = on;
+               hq.CookIfNeeded(++frame);
+               glFinish();
+               const auto t0 = std::chrono::steady_clock::now();
+               for (int k = 0; k < 20; k++)
+                  hq.CookIfNeeded(++frame);
+               glFinish();
+               return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 20.0;
+            };
+            const double msOff = timeIt(false), msOn = timeIt(true);
+            hq.ao = true;
+            const GLenum err = glGetError();
+            bool finite = !after.empty();
+            for (size_t i = 0; finite && i < after.size(); i++)
+               finite = std::isfinite(after[i]) && std::isfinite(settledA[i]);
+            const bool ok = finite && err == GL_NO_ERROR && still < 0.004 && edges > 1e-4 &&
+                            ghost < std::max(1.5 * edges, 0.0015);
+            printf("  TAA: still %.5f, vs no TAA %.5f, after fast motion %.5f, %.2f ms vs %.2f off, finite %d, "
+                   "gl 0x%x  %s\n", still, edges, ghost, msOn, msOff, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+            if (const char* png = getenv("INFINITE_HQTEST_PNGTAA")) // eyeball it (bottom-up rows)
+            {
+               std::vector<unsigned char> rgba(settledA.size());
+               for (size_t k = 0; k < settledA.size(); k++)
+                  rgba[k] = (unsigned char)std::clamp(settledA[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+               if (!rgba.empty())
+                  stbi_write_png(png, hq.GetOutputWidth(), hq.GetOutputHeight(), 4, rgba.data(), hq.GetOutputWidth() * 4);
+            }
+         }
+
+         // S7: a still scene stops being drawn once the TAA has converged (the
+         // image and its revision stay), and drawing resumes when something moves.
+         if (HqModuleBuilt())
+         {
+            auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+            hq.reuseStill = true;
+            hq.taa = true;
+            for (int k = 0; k < 40; k++)
+               hq.CookIfNeeded(++frame);
+            const unsigned long long rev = hq.TextureRevision();
+            const std::vector<float> a = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.CookIfNeeded(++frame);
+            const bool reused = hq.HqReused() && hq.TextureRevision() == rev && hq.HqDrawCalls() > 0;
+            const std::vector<float> b = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            double d = 0.0;
+            for (size_t i = 0; i < a.size() && i < b.size(); i++)
+               d += std::fabs(a[i] - b[i]);
+            const float savedX = g0->posX;
+            g0->posX += 0.1f;
+            hq.CookIfNeeded(++frame);
+            const bool redrawn = !hq.HqReused() && hq.TextureRevision() != rev;
+            g0->posX = savedX;
+            hq.CookIfNeeded(++frame);
+            hq.reuseStill = false;
+            hq.taa = false;
+            const GLenum err = glGetError();
+            const bool ok = reused && d == 0.0 && redrawn && err == GL_NO_ERROR;
+            printf("  still scene: reused after TAA settled %d (same image %d), redrawn on a move %d, gl 0x%x  %s\n",
+                   reused ? 1 : 0, d == 0.0 ? 1 : 0, redrawn ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+         }
+
+         // S8: Filament's bloom adds light, every tonemap is finite and the two
+         // Filament ones differ (legacy is brighter), RCAS and full-res GTAO
+         // change the picture, and each preset sets its params, keeps the
+         // output size (Performance renders below it, FSR brings it up) and
+         // has its cost measured.
+         if (HqModuleBuilt())
+         {
+            auto frameOf = [&]() { return read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight()); };
+            auto meanDiff = [](const std::vector<float>& a, const std::vector<float>& b) {
+               if (a.empty() || a.size() != b.size())
+                  return 1.0;
+               double d = 0.0;
+               for (size_t i = 0; i < a.size(); i++)
+                  d += std::fabs(a[i] - b[i]);
+               return d / (double)a.size();
+            };
+            auto mean = [](const std::vector<float>& a) {
+               double s = 0.0;
+               for (size_t i = 0; i < a.size(); i++)
+                  if (i % 4 != 3)
+                     s += a[i];
+               return a.empty() ? 0.0 : s / (double)(a.size() / 4 * 3);
+            };
+            auto finiteAll = [](const std::vector<float>& a) {
+               bool ok = !a.empty();
+               for (size_t i = 0; ok && i < a.size(); i++)
+                  ok = std::isfinite(a[i]);
+               return ok;
+            };
+            const int savedTonemap = hq.tonemap, savedUpscale = hq.upscale, savedShadowQuality = hq.shadowQuality;
+            const float savedBloom = hq.bloom, savedThreshold = hq.bloomThreshold, savedSharpness = hq.sharpness;
+            const bool savedTaa = hq.taa, savedAo = hq.ao, savedAoFull = hq.aoFullRes;
+            hq.taa = false;
+            while (glGetError() != GL_NO_ERROR) {}
+
+            hq.bloom = 0.0f;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> noBloom = frameOf();
+            hq.bloom = 0.5f;
+            hq.bloomThreshold = 0.0f; // everything blooms: the light added is certain
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> bloomed = frameOf();
+            hq.bloom = savedBloom;
+            hq.bloomThreshold = savedThreshold;
+            const double bloomDiff = meanDiff(bloomed, noBloom), bloomGain = mean(bloomed) - mean(noBloom);
+            bool ok = finiteAll(bloomed) && bloomDiff > 1e-3 && bloomGain > 0.0;
+            printf("  bloom (Filament, 6 levels): diff %.5f, mean +%.5f, finite %d  %s\n", bloomDiff, bloomGain,
+                   finiteAll(bloomed) ? 1 : 0, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            std::vector<std::vector<float>> tone;
+            bool toneFinite = true;
+            for (int t = 0; t < (int)RenderHqNode::TonemapNames().size(); t++)
+            {
+               hq.tonemap = t;
+               hq.CookIfNeeded(++frame);
+               tone.push_back(frameOf());
+               toneFinite = toneFinite && finiteAll(tone.back());
+            }
+            hq.tonemap = savedTonemap;
+            const bool sevenTones = tone.size() == 7;
+            const double legacyVsFit = sevenTones ? meanDiff(tone[5], tone[1]) : 0.0;
+            const double legacyGain = sevenTones ? mean(tone[5]) - mean(tone[6]) : 0.0;
+            ok = toneFinite && sevenTones && legacyVsFit > 1e-3 && legacyGain > 0.0;
+            printf("  tonemaps x%zu: finite %d, Filament legacy vs ACES fit %.5f, legacy - ACES %.5f  %s\n", tone.size(),
+                   toneFinite ? 1 : 0, legacyVsFit, legacyGain, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> soft = frameOf();
+            hq.sharpness = 1.0f;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> sharp = frameOf();
+            hq.sharpness = savedSharpness;
+            hq.ao = true;
+            hq.aoFullRes = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> aoHalf = frameOf();
+            hq.aoFullRes = true;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> aoFull = frameOf();
+            hq.aoFullRes = savedAoFull;
+            const double rcas = meanDiff(sharp, soft), aoRes = meanDiff(aoFull, aoHalf);
+            ok = finiteAll(sharp) && finiteAll(aoFull) && rcas > 1e-4 && aoRes > 1e-5;
+            printf("  RCAS at native size: diff %.5f; GTAO full vs half resolution: diff %.5f  %s\n", rcas, aoRes,
+                   ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            // Presets: params, size, cost (CPU + GPU per frame, glFinish: test only).
+            const int w = hq.GetOutputWidth(), h = hq.GetOutputHeight();
+            for (int p = RenderHqNode::kPresetPerformance; p <= RenderHqNode::kPresetHigh; p++)
+            {
+               hq.ApplyPreset(p);
+               hq.CookIfNeeded(++frame);
+               glFinish();
+               const auto t0 = std::chrono::steady_clock::now();
+               for (int k = 0; k < 20; k++)
+                  hq.CookIfNeeded(++frame);
+               glFinish();
+               const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 20.0;
+               const std::vector<float> px = frameOf();
+               const GLenum err = glGetError();
+               ok = hq.MatchingPreset() == p && hq.GetOutputWidth() == w && hq.GetOutputHeight() == h && finiteAll(px) &&
+                    err == GL_NO_ERROR;
+               printf("  preset %s: map %d, GTAO %s, render scale %s, out %dx%d, %.2f ms/frame, gl 0x%x  %s\n",
+                      RenderHqNode::PresetNames()[(size_t)p].c_str(), 1024 << hq.shadowQuality,
+                      hq.ao ? (hq.aoFullRes ? "full" : "half") : "off", Render3DNode::UpscaleNames()[(size_t)hq.upscale].c_str(),
+                      hq.GetOutputWidth(), hq.GetOutputHeight(), ms, err, ok ? "ok" : "FAIL");
+               all = all && ok;
+            }
+            hq.upscale = savedUpscale;
+            hq.shadowQuality = savedShadowQuality;
+            hq.ao = savedAo;
+            hq.aoFullRes = savedAoFull;
+            hq.taa = savedTaa;
+            hq.CookIfNeeded(++frame);
+         }
+
+         // S9 (the owner's test patch): without TAA, FXAA smooths the edges;
+         // soft and contact shadows come out smooth (the screen-space mask: no
+         // dots); a Material's opacity blends and its alpha cutoff removes the
+         // mesh; 360 output (equirect, dome) at the right size.
+         if (HqModuleBuilt())
+         {
+            auto meanDiff = [](const std::vector<float>& a, const std::vector<float>& b) {
+               if (a.empty() || a.size() != b.size())
+                  return 1.0;
+               double d = 0.0;
+               for (size_t i = 0; i < a.size(); i++)
+                  d += std::fabs(a[i] - b[i]);
+               return d / (double)a.size();
+            };
+            // Mean |Laplacian| of the luminance: high-frequency energy (edges, noise).
+            auto highFreq = [](const std::vector<float>& a, int w, int h) {
+               if (a.size() != (size_t)w * h * 4 || w < 3 || h < 3)
+                  return 1.0;
+               auto lum = [&](int x, int y) {
+                  const float* p = &a[((size_t)y * w + x) * 4];
+                  return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+               };
+               double s = 0.0;
+               for (int y = 1; y < h - 1; y++)
+                  for (int x = 1; x < w - 1; x++)
+                     s += std::fabs(4.0 * lum(x, y) - lum(x - 1, y) - lum(x + 1, y) - lum(x, y - 1) - lum(x, y + 1));
+               return s / (double)((w - 2) * (h - 2));
+            };
+            const bool savedTaa = hq.taa, savedFxaa = hq.fxaa, savedContact = hq.contactShadows;
+            const float savedSoft = hq.shadowSoftness;
+            hq.taa = false;
+            while (glGetError() != GL_NO_ERROR) {}
+            const int w = hq.GetOutputWidth(), h = hq.GetOutputHeight();
+            auto shoot = [&]() {
+               hq.CookIfNeeded(++frame);
+               return read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            };
+
+            hq.fxaa = false;
+            const std::vector<float> aliased = shoot();
+            hq.fxaa = true;
+            const std::vector<float> smoothed = shoot();
+            const double hfAliased = highFreq(aliased, w, h), hfSmoothed = highFreq(smoothed, w, h);
+            bool ok = meanDiff(smoothed, aliased) > 1e-5 && hfSmoothed < hfAliased && glGetError() == GL_NO_ERROR;
+            printf("  FXAA without TAA: edge energy %.5f -> %.5f  %s\n", hfAliased, hfSmoothed, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            // Soft + contact shadows against the hard PCF: no more fine detail
+            // (the per-pixel noise of their filters would add it).
+            hq.fxaa = false;
+            hq.shadowSoftness = 0.0f;
+            hq.contactShadows = false;
+            const double hfHard = highFreq(shoot(), w, h);
+            hq.shadowSoftness = 2.0f;
+            hq.contactShadows = true;
+            const std::vector<float> softPx = shoot();
+            const double hfSoft = highFreq(softPx, w, h);
+            ok = !softPx.empty() && hfSoft <= hfHard * 1.02 && glGetError() == GL_NO_ERROR;
+            printf("  soft + contact shadows without TAA: detail %.5f against hard PCF %.5f  %s\n", hfSoft, hfHard,
+                   ok ? "ok" : "FAIL");
+            all = all && ok;
+            hq.shadowSoftness = savedSoft;
+            hq.contactShadows = savedContact;
+            hq.fxaa = savedFxaa;
+            hq.taa = savedTaa;
+
+            // Opacity and alpha cutoff: a red box inside a white one.
+            std::unique_ptr<PopNode> innerBox(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+            std::unique_ptr<PopNode> outerBox(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+            auto setSize = [](PopNode* n, float s) {
+               const int i = n->Def().ParamIndex("size");
+               for (int k = 0; i >= 0 && k < 3; k++)
+                  n->Values().f[(size_t)(n->Def().FloatOffset(i) + k)] = s;
+            };
+            setSize(innerBox.get(), 0.6f);
+            setSize(outerBox.get(), 2.5f);
+            std::unique_ptr<MaterialNode> redMat(new MaterialNode()), shellMat(new MaterialNode());
+            redMat->color[0] = 1.0f;
+            redMat->color[1] = redMat->color[2] = 0.0f;
+            redMat->input = innerBox.get();
+            shellMat->color[0] = shellMat->color[1] = shellMat->color[2] = 0.9f;
+            shellMat->input = outerBox.get();
+            RenderHqNode inner, both;
+            for (RenderHqNode* n : { &inner, &both })
+            {
+               n->width = 320.0f;
+               n->height = 180.0f;
+               n->taa = false;
+               n->reuseStill = false;
+               n->geometry[0] = redMat.get();
+            }
+            both.geometry[1] = shellMat.get();
+            auto shootNode = [&](RenderHqNode& n) {
+               ++frame;
+               redMat->CookIfNeeded(frame);
+               shellMat->CookIfNeeded(frame);
+               n.CookIfNeeded(frame);
+               return read(n.GetOutputTexture(), n.GetOutputWidth(), n.GetOutputHeight());
+            };
+            // Red minus green at the centre pixel.
+            auto redness = [](const std::vector<float>& px, int cw, int ch) {
+               const size_t i = ((size_t)(ch / 2) * cw + cw / 2) * 4;
+               return px.size() > i + 2 ? px[i] - px[i + 1] : 0.0f;
+            };
+            const std::vector<float> innerPx = shootNode(inner);
+            shellMat->opacity = 1.0f;
+            const std::vector<float> opaquePx = shootNode(both);
+            shellMat->opacity = 0.3f;
+            shellMat->alphaCutoff = 0.5f;
+            const std::vector<float> cutPx = shootNode(both);
+            shellMat->alphaCutoff = 0.0f;
+            shellMat->opacity = 0.5f;
+            const std::vector<float> glassPx = shootNode(both);
+            const float rOpaque = redness(opaquePx, 320, 180), rGlass = redness(glassPx, 320, 180);
+            const double cutDiff = meanDiff(cutPx, innerPx);
+            // Through the half-opaque box the red one shows: redder than the opaque white box.
+            ok = cutDiff < 0.002 && rGlass > rOpaque + 0.05f && meanDiff(glassPx, opaquePx) > 1e-3 &&
+                 glGetError() == GL_NO_ERROR;
+            printf("  Material alpha: cut by its cutoff = the scene without it (diff %.5f); opacity 0.5 shows the red box "
+                   "through (centre r-g %.3f, opaque %.3f)  %s\n",
+                   cutDiff, rGlass, rOpaque, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            // 360: equirect 2:1 and dome, at the asked size, lit and finite.
+            for (int mode : { 1, 3 })
+            {
+               RenderHqNode pano;
+               pano.width = 512.0f;
+               pano.height = mode == 1 ? 256.0f : 512.0f;
+               pano.panorama = mode;
+               pano.geometry[0] = redMat.get();
+               pano.geometry[1] = shellMat.get();
+               const std::vector<float> px = shootNode(pano);
+               bool finite = !px.empty();
+               double sum = 0.0;
+               for (size_t i = 0; finite && i < px.size(); i++)
+               {
+                  finite = std::isfinite(px[i]);
+                  sum += px[i];
+               }
+               const GLenum err = glGetError();
+               ok = finite && pano.GetOutputWidth() == 512 && pano.GetOutputHeight() == (int)pano.height &&
+                    sum / (double)std::max<size_t>(1, px.size()) > 0.01 && err == GL_NO_ERROR;
+               printf("  360 %s: %dx%d, mean %.4f, finite %d, gl 0x%x  %s\n",
+                      Render3DNode::PanoramaNames()[(size_t)mode].c_str(), pano.GetOutputWidth(), pano.GetOutputHeight(),
+                      sum / (double)std::max<size_t>(1, px.size()), finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+               all = all && ok;
+            }
+         }
+
+         // S3: PointZ points as sphere impostors and PointZ triangles straight
+         // from the GPU; then 30 frames with the camera orbiting and an object
+         // moving (the picture follows, stays finite; GPU time per frame).
+         if (HqModuleBuilt())
+         {
+            auto setF = [](PopNode* n, const char* key, int comp, float v) {
+               const int i = n->Def().ParamIndex(key);
+               if (i >= 0) n->Values().f[(size_t)(n->Def().FloatOffset(i) + comp)] = v;
+            };
+            auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+            std::unique_ptr<PopNode> grid(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+            setF(grid.get(), "rows", 0, 100.0f);
+            setF(grid.get(), "cols", 0, 100.0f);
+            setF(grid.get(), "kind", 0, 2.0f); // points
+            RenderHqNode ph;
+            ph.width = 640.0f;
+            ph.height = 360.0f;
+            ph.geometry[0] = grid.get();
+            auto lit = [&](const std::vector<float>& px, bool& finite) {
+               const float bg = (ph.bgColor[0] + ph.bgColor[1] + ph.bgColor[2]) / 3.0f;
+               size_t n = 0;
+               finite = !px.empty();
+               for (size_t i = 0; i + 3 < px.size(); i += 4)
+               {
+                  finite = finite && std::isfinite(px[i]) && std::isfinite(px[i + 1]) && std::isfinite(px[i + 2]);
+                  if ((px[i] + px[i + 1] + px[i + 2]) / 3.0f > bg + 0.1f)
+                     n++;
+               }
+               return px.empty() ? 0.0 : (double)n / (double)(px.size() / 4);
+            };
+            while (glGetError() != GL_NO_ERROR) {}
+            ph.CookIfNeeded(++frame);
+            bool finite = false;
+            double cover = lit(read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight()), finite);
+            GLenum err = glGetError();
+            bool ok = ph.HqSpheres() == 10000 && ph.HqSkipped() == 0 && finite && cover > 0.01 && err == GL_NO_ERROR;
+            printf("  PointZ 100x100 points: %zu spheres, lit %.1f%%, finite %d, gl 0x%x  %s\n", ph.HqSpheres(),
+                   cover * 100.0, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            setF(grid.get(), "kind", 0, 0.0f); // polygons
+            ph.CookIfNeeded(++frame);
+            cover = lit(read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight()), finite);
+            err = glGetError();
+            ok = ph.HqTriangles() > 0 && ph.HqSpheres() == 0 && finite && cover > 0.01 && err == GL_NO_ERROR;
+            printf("  PointZ 100x100 polygons: %zu triangles from the GPU, lit %.1f%%, finite %d, gl 0x%x  %s\n",
+                   ph.HqTriangles(), cover * 100.0, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            setF(grid.get(), "kind", 0, 2.0f);
+            ph.geometry[1] = g0;
+            const float savedX = g0->posX;
+            ph.CookIfNeeded(++frame);
+            const std::vector<float> first = read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight());
+            glFinish(); // test only: wall time of the frames below includes the GPU
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int k = 0; k < 30; k++)
+            {
+               ph.camAzimuth += 3.0f;
+               g0->posX += 0.02f;
+               ph.CookIfNeeded(++frame);
+            }
+            glFinish();
+            const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 30.0;
+            const std::vector<float> last = read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight());
+            g0->posX = savedX;
+            err = glGetError();
+            double moved = 0.0;
+            for (size_t i = 0; i < last.size() && i < first.size(); i++)
+               moved += std::fabs(last[i] - first[i]);
+            moved /= (double)std::max<size_t>(1, last.size());
+            lit(last, finite);
+            ok = finite && moved > 1e-3 && err == GL_NO_ERROR && ph.HqSpheres() == 10000;
+            printf("  orbit + moving object, 30 frames: diff %.4f, %.2f ms/frame (CPU+GPU), finite %d, gl 0x%x  %s\n",
+                   moved, ms, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+            // S6: flicker of small objects (10k spheres, GTAO on) under a slow
+            // orbit - the mean second difference in time |f(t+1) - 2 f(t) + f(t-1)|
+            // is low for smooth motion, high for shimmer. TAA must cut it.
+            {
+               auto flicker = [&](bool taaOn) {
+                  ph.taa = taaOn;
+                  ph.ao = true;
+                  std::vector<std::vector<float>> frames;
+                  for (int k = 0; k < 24; k++)
+                  {
+                     ph.camAzimuth += 0.25f;
+                     ph.CookIfNeeded(++frame);
+                     if (k >= 18)
+                        frames.push_back(read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight()));
+                  }
+                  double sum = 0.0;
+                  size_t n = 0;
+                  for (size_t t = 1; t + 1 < frames.size(); t++)
+                     for (size_t i = 0; i < frames[t].size(); i++)
+                        if (i % 4 != 3)
+                        {
+                           sum += std::fabs(frames[t + 1][i] - 2.0f * frames[t][i] + frames[t - 1][i]);
+                           n++;
+                        }
+                  return n ? sum / (double)n : 1.0;
+               };
+               const double off = flicker(false), on = flicker(true);
+               err = glGetError();
+               ok = err == GL_NO_ERROR && on < off;
+               printf("  small-object flicker (10k spheres, AO, slow orbit): %.5f without TAA, %.5f with  %s\n", off, on,
+                      ok ? "ok" : "FAIL");
+               all = all && ok;
+            }
+            // S7: Instance PointZ - a box on each of the 10k points, transforms
+            // from the GPU; nothing skipped, every copy's triangles drawn.
+            {
+               std::unique_ptr<PopNode> box(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+               std::unique_ptr<PopNode> inst(static_cast<PopNode*>(PopNode::CreateFor("Instance PointZ")));
+               inst->inputs[0] = grid.get();
+               inst->inputs[1] = box.get();
+               setF(inst.get(), "scale", 0, 0.02f);
+               RenderHqNode pi;
+               pi.width = 640.0f;
+               pi.height = 360.0f;
+               pi.geometry[0] = inst.get();
+               while (glGetError() != GL_NO_ERROR) {}
+               for (int k = 0; k < 3; k++)
+                  pi.CookIfNeeded(++frame);
+               bool finiteI = false;
+               const double coverI = lit(read(pi.GetOutputTexture(), pi.GetOutputWidth(), pi.GetOutputHeight()), finiteI);
+               err = glGetError();
+               ok = pi.HqSkipped() == 0 && pi.HqTriangles() >= 10000 * 12 && finiteI && coverI > 0.01 && err == GL_NO_ERROR;
+               printf("  Instance PointZ (10k boxes): %zu triangles, %zu skipped, lit %.1f%%, finite %d, gl 0x%x  %s\n",
+                      pi.HqTriangles(), pi.HqSkipped(), coverI * 100.0, finiteI ? 1 : 0, err, ok ? "ok" : "FAIL");
+               all = all && ok;
+
+               // S9: the same instances, red, inside a white box drawn after
+               // them (a forward mesh): the picture is the box's alone - the
+               // deferred pass must not paint the instances' material where
+               // the box covers them (scene I's floor turned copper).
+               std::unique_ptr<MaterialNode> red(new MaterialNode());
+               red->color[0] = 1.0f;
+               red->color[1] = red->color[2] = 0.0f;
+               red->input = inst.get();
+               std::unique_ptr<PopNode> shell(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+               for (int k = 0; k < 3; k++)
+                  setF(shell.get(), "size", k, 2.5f);
+               RenderHqNode covered, alone;
+               for (RenderHqNode* n : { &covered, &alone })
+               {
+                  n->width = 320.0f;
+                  n->height = 180.0f;
+                  n->taa = false;
+                  n->reuseStill = false;
+               }
+               covered.geometry[0] = red.get();
+               covered.geometry[1] = shell.get();
+               alone.geometry[1] = shell.get();
+               ++frame;
+               red->CookIfNeeded(frame);
+               covered.CookIfNeeded(frame);
+               alone.CookIfNeeded(frame);
+               const std::vector<float> pc = read(covered.GetOutputTexture(), covered.GetOutputWidth(), covered.GetOutputHeight());
+               const std::vector<float> pa = read(alone.GetOutputTexture(), alone.GetOutputWidth(), alone.GetOutputHeight());
+               double hidden = pc.empty() || pc.size() != pa.size() ? 1.0 : 0.0;
+               for (size_t i = 0; i < pc.size() && i < pa.size(); i++)
+                  hidden = std::max(hidden, (double)std::fabs(pc[i] - pa[i]));
+               err = glGetError();
+               ok = covered.HqSkipped() == 0 && hidden < 0.02 && err == GL_NO_ERROR;
+               printf("  instances hidden by a mesh drawn after them: max diff %.4f against the mesh alone, gl 0x%x  %s\n",
+                      hidden, err, ok ? "ok" : "FAIL");
+               all = all && ok;
+            }
+            if (const char* png = getenv("INFINITE_HQTEST_PNG3")) // eyeball the spheres (bottom-up rows)
+            {
+               std::vector<unsigned char> rgba(last.size());
+               for (size_t k = 0; k < last.size(); k++)
+                  rgba[k] = (unsigned char)std::clamp(last[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+               if (!rgba.empty())
+                  stbi_write_png(png, ph.GetOutputWidth(), ph.GetOutputHeight(), 4, rgba.data(), ph.GetOutputWidth() * 4);
+            }
+         }
+
+         // Render 3D: the same picture after the HQ drew in between.
+         r->CookIfNeeded(++frame);
+         const std::vector<float> after = read(r->GetOutputTexture(), r->GetOutputWidth(), r->GetOutputHeight());
+         double diff = 0.0;
+         for (size_t i = 0; i < after.size() && i < before.size(); i++)
+            diff += std::fabs(after[i] - before[i]);
+         diff /= (double)std::max<size_t>(1, after.size());
+         const bool same = !before.empty() && before.size() == after.size() && diff < 1e-6;
+         printf("  Render 3D unchanged next to it: diff %.7f  %s\n", diff, same ? "ok" : "FAIL");
+         all = all && same;
+         printf("%s\n", all ? "HQTEST OK" : "HQTEST FAIL - BUG");
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
       // Turbo 0.70: a Material's texture reaches an Instance PointZ's copies in
