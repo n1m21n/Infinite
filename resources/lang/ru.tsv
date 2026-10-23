@@ -1566,3 +1566,6 @@ Session - launch clips by scene	Сессия — запуск клипов по 
 Select one clip on this kind of track first.	Сначала выберите один клип на дорожке этого типа.
 Click a node on the canvas to assign it. Esc cancels.	Нажмите на узел на холсте, чтобы назначить его. Esc — отмена.
 Settings of the selected clip. Double-click a clip to open it.	Настройки выбранного клипа. Откройте двойным щелчком по клипу.
+Add to Session	Добавить в сессию
+Send Scene to Timeline	Отправить сцену на таймлайн
+Copies this scene's clips onto the Timeline at the playhead. Render from the Timeline.	Копирует клипы сцены на таймлайн в позицию курсора. Рендер выполняется на таймлайне.

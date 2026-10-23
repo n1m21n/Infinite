@@ -1854,6 +1854,57 @@ namespace app
    }
 
 
+   // The Session twin of AddNodeToArrangeTimeline: the node becomes a clip in the first empty cell of the first track
+   // of its type (a new track if there is none), and the Session panel opens on it.
+   uint64_t AddNodeToArrangeSession(int nodeIndex, int laneType, int srcOutput)
+   {
+      GraphNode* gn = FindNodeByIndex(nodeIndex);
+      if (gn == nullptr || gn->node == nullptr)
+         return 0;
+      if (laneType < 0)
+         laneType = ArrangeLaneTypeForNode(*gn);
+      if (laneType == Arrange::kLaneAudio ? !IsNodeAudioCompatible(*gn) : !IsNodeVideoCompatible(*gn))
+         return 0;
+      if (srcOutput < 0)
+         srcOutput = ArrangeDefaultOutput(*gn, laneType);
+      uint64_t made = 0;
+      ArrangeEdit([&]()
+      {
+         int lane = -1;
+         for (int i = 0; i < (int)gArrange.lanes.size(); i++)
+            if (gArrange.lanes[i].type == laneType) { lane = i; break; }
+         if (lane < 0)
+         {
+            const uint64_t laneId = Arrange::AddLane(gArrange, laneType);
+            lane = Arrange::LaneIndex(gArrange, laneId);
+         }
+         Arrange::Lane& l = gArrange.lanes[(size_t)lane];
+         int row = 0;
+         while (row < (int)l.slots.size() && l.slots[(size_t)row].Has())
+            row++;
+         if ((int)l.slots.size() <= row)
+            l.slots.resize((size_t)row + 1);
+         while ((int)gArrange.scenes.size() <= row)
+            gArrange.scenes.push_back(Arrange::Scene{});
+         Arrange::Clip c;
+         c.id = made = gArrange.NewId();
+         c.length = Arrange::kTicksPerBar;
+         c.srcUid = gn->uid;
+         c.srcOutput = srcOutput;
+         l.slots[(size_t)row].clip = c;
+         gArrange.revision++;
+      });
+      if (made != 0)
+      {
+         gSessionPanelOpen = true;
+         gArrangeSel = { made };
+         gArrangeSelAnchor = made;
+         gArrangeFlashClipId = made;
+         gArrangeFlashStart = ImGui::GetTime();
+      }
+      return made;
+   }
+
    // Adds an audio or video/image file drop onto the timeline at a given screen position.
    uint64_t AddFileToTimelineAt(const std::string& path, const ImVec2& screenPos)
    {

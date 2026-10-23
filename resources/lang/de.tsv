@@ -1566,3 +1566,6 @@ Session - launch clips by scene	Session – Clips szenenweise starten
 Select one clip on this kind of track first.	Wähle zuerst einen Clip auf dieser Art von Spur aus.
 Click a node on the canvas to assign it. Esc cancels.	Klicke auf einen Node im Canvas, um ihn zuzuweisen. Esc bricht ab.
 Settings of the selected clip. Double-click a clip to open it.	Einstellungen des gewählten Clips. Doppelklick auf einen Clip öffnet sie.
+Add to Session	Zur Session hinzufügen
+Send Scene to Timeline	Szene an Timeline senden
+Copies this scene's clips onto the Timeline at the playhead. Render from the Timeline.	Kopiert die Clips dieser Szene an der Abspielposition auf die Timeline. Rendern erfolgt in der Timeline.

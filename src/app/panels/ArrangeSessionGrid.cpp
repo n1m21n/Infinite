@@ -384,6 +384,12 @@ namespace app
          MenuParts::Separator();
          if (MenuParts::Item(L("Launch Scene")))
             ArrangeSessionLaunchScene(row);
+         if (MenuParts::Item(L("Send Scene to Timeline")))
+         {
+            ArrangeSessionSendSceneToTimeline(row);
+         }
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Copies this scene's clips onto the Timeline at the playhead. Render from the Timeline."));
          if (MenuParts::Item(L("Insert Scene Above")))
             ArrangeEdit([&]() {
                while ((int)gArrange.scenes.size() < row)
@@ -921,6 +927,25 @@ namespace app
          case MenuAction::None:
             break;
       }
+   }
+
+   // One copy of each track's clip for scene `row`, at the playhead, so the scene can be edited and rendered.
+   void ArrangeSessionSendSceneToTimeline(int row)
+   {
+      const Arrange::Tick at = std::max<Arrange::Tick>(0, Arrange::BeatsToTicks(Transport::Instance().Beats()));
+      ArrangeEdit([&]() {
+         for (size_t i = 0; i < gArrange.lanes.size(); i++)
+         {
+            const uint64_t laneId = gArrange.lanes[i].id;
+            if (row < 0 || (int)gArrange.lanes[i].slots.size() <= row || !gArrange.lanes[i].slots[(size_t)row].Has())
+               continue;
+            Arrange::Clip c = gArrange.lanes[i].slots[(size_t)row].clip;
+            c.id = 0;
+            c.start = at;
+            c.groupId = 0;
+            Arrange::PlaceOverwrite(gArrange, laneId, c, nullptr);
+         }
+      });
    }
 
    // Test hook: 0 = Place on Timeline, 1 = Duplicate, 2 = Clear, queued and applied exactly as the menu does it.

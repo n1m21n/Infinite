@@ -4610,6 +4610,7 @@ bool ArrangeDragUpdate(Arrange::Tick value, int laneDelta);
 bool ArrangeDragEnd();
 
 uint64_t AddNodeToArrangeTimeline(int nodeIndex, int laneType = -1, int srcOutput = -1);
+uint64_t AddNodeToArrangeSession(int nodeIndex, int laneType = -1, int srcOutput = -1);
 
 bool ArrangeAssignClipSource(uint64_t clipId, uint64_t uid);
 
@@ -4995,6 +4996,7 @@ bool ArrangeAudioRebuildIfStale();
    void DrawArrangeSessionSlotMenuItems(uint64_t clipId);
    // Applies the slot action a menu row queued; call after the clip menu has ended.
    void ArrangeSessionApplyMenuAction();
+void ArrangeSessionSendSceneToTimeline(int row);
 void ArrangeSessionRunActionForTest(int kind, uint64_t laneId, int row);
 
 bool StartAudioEngine(std::string& outError);

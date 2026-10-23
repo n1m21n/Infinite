@@ -3755,6 +3755,60 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       check(Arrange::FindLane(gArrange, laneA1)->slots.size() >= 1, "actions on a cleared or missing slot are no-ops");
       check(Arrange::Validate(gArrange, nullptr), "arrangement still validates");
    }
+   if (frameId == 18)
+   {
+      GraphNode* o = SpawnNode("Oscillator", "Synthesizers", 400.0f, 100.0f);
+      const uint64_t id = o != nullptr ? AddNodeToArrangeSession(o->index) : 0;
+      const Arrange::Loc loc = Arrange::FindSlot(gArrange, id);
+      check(id != 0 && loc.lane >= 0 && gArrange.lanes[(size_t)loc.lane].type == Arrange::kLaneAudio &&
+            Arrange::FindClip(gArrange, id)->srcUid == o->uid, "Add to Session puts a canvas node in a free cell");
+      check(!Arrange::Find(gArrange, id).Valid(), "Add to Session never touches the timeline");
+   }
+   if (frameId == 15)
+   {
+      const size_t n0 = Arrange::FindLane(gArrange, laneA2)->clips.size();
+      ArrangeSessionSendSceneToTimeline(3);   // Break + Wobble
+      check(Arrange::FindLane(gArrange, laneA2)->clips.size() == n0 + 1 && !Arrange::FindLane(gArrange, laneA1)->clips.empty(),
+            "Send Scene to Timeline copies each track's clip onto the timeline");
+      check(Arrange::FindLane(gArrange, laneV1)->clips.empty(), "a track with no clip in that scene gets nothing");
+   }
+   static uint64_t dropEmptyId = 0, dropFilledOld = 0, dropUnassignedOld = 0;
+   if (frameId == 17)
+   {
+      // Drop an audio file onto an empty cell, a filled cell and an unassigned clip's cell.
+      const std::string wav = "/tmp/infinite_sessionviewtest_drop.wav";
+      std::vector<float> inter(4410 * 2, 0.1f);
+      AudioRecordings::WriteWav(wav, inter.data(), 4410, 44100.0, 2);
+      Arrange::Lane* l = Arrange::FindLane(gArrange, laneA1);
+      ArrangeEdit([&]() {
+         if (l->slots.size() < 6)
+            l->slots.resize(6);
+         Arrange::Clip u;
+         u.id = gArrange.NewId();
+         u.length = Arrange::kTicksPerBar;
+         l->slots[4].clip = u;
+      });
+      dropFilledOld = Arrange::FindLane(gArrange, laneA1)->slots[1].clip.id;
+      dropUnassignedOld = Arrange::FindLane(gArrange, laneA1)->slots[4].clip.id;
+      ArrangeImportMediaFile(wav, laneA1, 0, Arrange::ImportMediaKind::Audio, 0);
+      ArrangeImportMediaFile(wav, laneA1, 0, Arrange::ImportMediaKind::Audio, 1);
+      ArrangeImportMediaFile(wav, laneA1, 0, Arrange::ImportMediaKind::Audio, 4);
+      ArrangeImportMediaFile(wav, laneV1, 0, Arrange::ImportMediaKind::Audio, 0);   // wrong kind: refused
+      check(Arrange::FindLane(gArrange, laneV1)->slots.empty() || !Arrange::FindLane(gArrange, laneV1)->slots[0].Has(),
+            "an audio file is refused on a video track's cell");
+      dropEmptyId = Arrange::FindLane(gArrange, laneA1)->slots[0].clip.id;
+   }
+   if (frameId == 19)
+   {
+      const Arrange::Lane* l = Arrange::FindLane(gArrange, laneA1);
+      check(l->slots[0].Has() && l->slots[0].clip.sampleDropped && !l->slots[0].clip.importPending, "drop on an empty cell fills it and decodes");
+      check(l->slots[1].clip.id != dropFilledOld && l->slots[1].clip.sampleDropped, "drop on a filled cell replaces its clip");
+      check(l->slots[4].clip.id != dropUnassignedOld && l->slots[4].clip.sampleDropped && l->slots[4].clip.srcUid != 0,
+            "drop on an unassigned clip's cell fills it");
+      check(l->slots[1].followAction == Arrange::kFollowNext, "a replaced slot keeps its launch settings");
+      check(gArrangePendingImports.empty(), "no import left pending");
+      (void)dropEmptyId;
+   }
    if (frameId == 20)
    {
       printf("%s\n", ok ? "SESSION VIEW TEST OK" : "SESSION VIEW TEST FAIL");

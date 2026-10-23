@@ -235,11 +235,21 @@ void DrawPopupsA(FrameCtx& fc)
                      AddNodeToArrangeTimeline(gn->index, Arrange::kLaneAudio);
                   ImGui::EndMenu();
                }
+               if (MenuParts::SubMenu(L("Add to Session")))
+               {
+                  if (MenuParts::Item(L("Video")))
+                     AddNodeToArrangeSession(gn->index, Arrange::kLaneVideo);
+                  if (MenuParts::Item(L("Audio")))
+                     AddNodeToArrangeSession(gn->index, Arrange::kLaneAudio);
+                  ImGui::EndMenu();
+               }
             }
             else if (IsNodeVideoCompatible(*gn) || IsNodeAudioCompatible(*gn))
             {
                if (MenuParts::Item(L("Add to Timeline")))
                   AddNodeToArrangeTimeline(gn->index);
+               if (MenuParts::Item(L("Add to Session")))
+                  AddNodeToArrangeSession(gn->index);
             }
             ProjectorWindow* projector = FindProjectorWindow(gn->index);
             if (CanShowInViewportPanel(*gn) && projector != nullptr)
