@@ -1,6 +1,7 @@
 #include "TextNode.h"
 
 #include "core/gl3.h"
+#include "core/GLUtil.h"
 #include "../platform/Platform.h"
 
 #include <algorithm>
