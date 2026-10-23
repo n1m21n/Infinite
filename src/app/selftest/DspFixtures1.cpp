@@ -537,6 +537,48 @@ bool RunWavetableFixture()
       all &= noteOk;
    }
 
+   // Analog params past the knob range are clamped on load (B-K-034). 1e9
+   // passes Patch's int-range drop; volume, osc levels, resonance and drive
+   // reached the voice unclamped, and the free-running voice went NaN or
+   // ~1e9 loud. Every float at +-1e9 must load in range and render bounded.
+   {
+      float worst = 0.0f;
+      bool inRange = true;
+      for (const char* big : { "1e9", "-1e9" })
+      {
+         AnalogNode an;
+         std::vector<std::pair<std::string, std::string>> params;
+         Patch::SaveParams(&an, params);
+         for (auto& kv : params)
+            if (kv.first.rfind("f ", 0) == 0)
+               kv.second = big;
+         Patch::LoadParams(&an, params);
+         inRange &= an.volume >= 0.0f && an.volume <= 1.0f && an.resonance >= 0.0f && an.resonance <= 1.0f &&
+                    an.drive >= 0.0f && an.drive <= 1.0f && an.voices >= 1.0f && an.voices <= 7.0f;
+         AudioNode* audio = an.GetAudioNode();
+         an.CookIfNeeded(1);
+         audio->PrepareToPlay(sampleRate, numFrames);
+         std::vector<float> l(numFrames), r(numFrames);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = numFrames;
+         for (int b = 0; b < 32; b++)
+         {
+            audio->ProcessBlock(nullptr, 0, buf);
+            for (int i = 0; i < numFrames; i++)
+               worst = std::isfinite(l[i]) && std::isfinite(r[i])
+                          ? std::max(worst, std::max(std::fabs(l[i]), std::fabs(r[i])))
+                          : INFINITY;
+         }
+      }
+      const bool ok = worst < 4.0f && inRange;
+      printf("DSPTEST analog params past the knob range: peak %.3g, in range %d  %s\n", worst, inRange,
+             ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
    // Free-running render of one configured engine, used by the warp and
    // filter checks below. A fresh node per call, so no phase, filter or
    // smoothing state carries between configurations - which is what makes
