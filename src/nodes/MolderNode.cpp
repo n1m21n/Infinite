@@ -526,6 +526,13 @@ void MolderNode::VisitParams(ParamVisitor& v)
    v.Int("seed", mSeed);
    v.Int("generation", mGeneration);
    mGeneration = std::clamp(mGeneration, 0, kMaxGeneration);
+   // A patch, OSC or RPC set stores any finite float; hold these to the knob
+   // ranges (B-K-036: volume 1e9 played ~5e8 loud, pitch or speed 1e9 overflowed
+   // the read position).
+   level = std::clamp(level, 0.0f, 2.0f);
+   start = std::clamp(start, 0.0f, 1.0f);
+   end = std::clamp(end, 0.0f, 1.0f);
+   pitch = std::clamp(pitch, -24.0f, 24.0f);
 }
 
 float MolderNode::HarmonicityPercent() const

@@ -567,6 +567,13 @@ void SlicerNode::VisitParams(ParamVisitor& v)
    v.Float("speed", speed);
    v.Float("volume", volume);
    v.Bool("crossthrough", crossthrough);
+   // A patch, OSC or RPC set stores any finite float; hold these to the knob
+   // ranges (B-K-036: volume 1e9 played ~5e8 loud, pitch or speed 1e9 overflowed
+   // the read position).
+   pitch = std::clamp(pitch, -24.0f, 24.0f);
+   finetune = std::clamp(finetune, -100.0f, 100.0f);
+   speed = std::clamp(speed, 0.25f, 4.0f);
+   volume = std::clamp(volume, 0.0f, 1.0f);
    // The detected (and possibly hand-dragged) markers, so a save/load or a
    // copy/paste doesn't have to re-run analysis - and, more importantly, so
    // manual marker edits survive at all.

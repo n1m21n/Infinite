@@ -669,6 +669,14 @@ void GranularNode::VisitParams(ParamVisitor& v)
    v.Float("start", start);
    v.Float("end", end);
    v.Bool("loop", loop);
+   // A patch, OSC or RPC set stores any finite float; hold these to the knob
+   // ranges (B-K-036: volume 1e9 played ~5e8 loud, pitch or speed 1e9 overflowed
+   // the read position).
+   volume = std::clamp(volume, 0.0f, 2.0f);
+   pitchShift = std::clamp(pitchShift, -24.0f, 24.0f);
+   fineTune = std::clamp(fineTune, -100.0f, 100.0f);
+   start = std::clamp(start, 0.0f, 1.0f);
+   end = std::clamp(end, 0.0f, 1.0f);
 }
 
 AudioNode* GranularNode::GetAudioNode()

@@ -294,6 +294,81 @@ bool RunEffectMixAndLimiterFixture()
       all &= ok;
    }
 
+   // 1f) Sample players: volume 1e9 from a patch played ~5e8 loud, and pitch or
+   //     speed 1e9 overflowed a float-to-int read position (B-K-036, found by
+   //     INFINITE_PARAMFUZZ). Each listed key stores inside its knob range.
+   {
+      struct Spec { const char* key; float lo, hi; };
+      struct Player { const char* name; std::function<INode*()> make; std::vector<Spec> specs; };
+      std::vector<std::string> drumKeys;
+      for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+         for (int step = 0; step < DrumSequencerNode::kMaxSteps; step++)
+            drumKeys.push_back("lane" + std::to_string(lane) + "_step" + std::to_string(step));
+      std::vector<Spec> drum = { { "volume", 0.0f, 1.0f } };
+      for (const std::string& k : drumKeys)
+         drum.push_back({ k.c_str(), 0.0f, 1.0f }); // step velocity, as the grid sets it
+      const std::vector<Player> players = {
+         { "Audio File", [] { return (INode*)new AudioFileNode(); },
+           { { "volume", 0.0f, 1.0f }, { "gain", 0.1f, 16.0f }, { "pitch", -24.0f, 24.0f } } },
+         { "Slicer", [] { return (INode*)new SlicerNode(); },
+           { { "pitch", -24.0f, 24.0f }, { "finetune", -100.0f, 100.0f }, { "speed", 0.25f, 4.0f }, { "volume", 0.0f, 1.0f } } },
+         { "PaulStretch", [] { return (INode*)new PaulStretchNode(); },
+           { { "volume", 0.0f, 2.0f }, { "pitch_shift", -24.0f, 24.0f }, { "fine_tune", -100.0f, 100.0f },
+             { "freq_shift", -1000.0f, 1000.0f } } },
+         { "Molder", [] { return (INode*)new MolderNode(); },
+           { { "level", 0.0f, 2.0f }, { "start", 0.0f, 1.0f }, { "end", 0.0f, 1.0f }, { "pitch", -24.0f, 24.0f } } },
+         { "Granular", [] { return (INode*)new GranularNode(); },
+           { { "volume", 0.0f, 2.0f }, { "pitchShift", -24.0f, 24.0f }, { "fineTune", -100.0f, 100.0f },
+             { "start", 0.0f, 1.0f }, { "end", 0.0f, 1.0f } } },
+         { "Sampler", [] { return (INode*)new SamplerNode(); },
+           { { "pitch", -24.0f, 24.0f }, { "finetune", -50.0f, 50.0f }, { "speed", -2.0f, 2.0f }, { "volume", 0.0f, 1.0f } } },
+         { "Drum Sequencer", [] { return (INode*)new DrumSequencerNode(); }, drum },
+      };
+      int outOfRange = 0, checked = 0;
+      for (const Player& pl : players)
+      {
+         for (const char* big : { "1e9", "-1e9" })
+         {
+            std::unique_ptr<INode> node(pl.make());
+            std::vector<std::pair<std::string, std::string>> hostile;
+            Patch::SaveParams(node.get(), hostile);
+            for (auto& kv : hostile)
+               if (kv.first.rfind("f ", 0) == 0)
+                  kv.second = big;
+            Patch::LoadParams(node.get(), hostile);
+            std::vector<std::pair<std::string, std::string>> after;
+            Patch::SaveParams(node.get(), after);
+            for (const Spec& sp : pl.specs)
+            {
+               const std::string key = std::string("f ") + sp.key;
+               bool found = false;
+               for (const auto& kv : after)
+               {
+                  if (kv.first != key)
+                     continue;
+                  found = true;
+                  const float v = std::strtof(kv.second.c_str(), nullptr);
+                  if (!(v >= sp.lo && v <= sp.hi))
+                  {
+                     printf("DSPTEST   %s.%s at %s: %g OUT OF RANGE\n", pl.name, sp.key, big, v);
+                     outOfRange++;
+                  }
+               }
+               if (!found)
+               {
+                  printf("DSPTEST   %s.%s: no such key\n", pl.name, sp.key);
+                  outOfRange++;
+               }
+               checked++;
+            }
+         }
+      }
+      const bool ok = outOfRange == 0 && checked > 0;
+      printf("DSPTEST sample player params past the knob range are clamped: %d values, %d out of range  %s\n",
+             checked, outOfRange, ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
    const EffectDef* limiterDef = FindEffectDef("Limiter");
    if (limiterDef == nullptr)
    {

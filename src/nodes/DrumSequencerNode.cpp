@@ -775,6 +775,7 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
       {
          snprintf(name, sizeof(name), "lane%d_step%d", lane, step);
          v.Float(name, stepVel[lane][step]);
+         stepVel[lane][step] = std::clamp(stepVel[lane][step], 0.0f, 1.0f); // the grid's range; 1e9 played ~3e8 loud (B-K-036)
       }
    }
    v.Int("rate", rate);
@@ -783,6 +784,7 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
    v.Int("steps", numSteps);
    v.Float("swing", swing);
    v.Float("volume", volume);
+   volume = std::clamp(volume, 0.0f, 1.0f);
    v.Bool("run", run);
    v.Text("patternName", patternName);
    v.Int("patternPart", patternPart);
