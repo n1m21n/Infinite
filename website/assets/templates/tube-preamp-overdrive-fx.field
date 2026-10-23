@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Tube Preamp Overdrive FX",
+    "author": "Infinite",
+    "description": "Asymmetric vacuum tube preamplifier model with dynamic grid-bias sag, warm harmonic saturation and tone tilt.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float drive = 2.5 [1.0, 8.0];\nparam float bias = 0.25 [-0.5, 0.5];\nparam float sag = 0.45 [0.0, 1.0];\nparam float tone = 0.55 [0.0, 1.0];\nparam float presence = 0.45 [0.0, 1.0];\nparam float mix = 1.0 [0.0, 1.0];\nstate float env = 0;\nstate float biasDrift = 0;\nstate float lpTone = 0;\nstate float hpPres = 0;\n\nenv = env + 0.004 * (abs(in) - env);\nbiasDrift = env * sag * 0.4;\n\nu = in * drive + bias - biasDrift;\nsat = u / (1.0 + abs(u) + 0.2 * (u * u));\n\nfTone = clamp((1200.0 + tone * 4800.0) / sr * 2.0, 0.01, 0.48);\nlpTone = lpTone + fTone * (sat - lpTone);\n\nfPres = clamp(2500.0 / sr * 2.0, 0.01, 0.48);\nhpPres = hpPres + fPres * (sat - hpPres);\npresSig = sat - hpPres;\n\nshaped = mix(lpTone, sat + presSig * presence * 0.8, tone);\nout = in * (1.0 - mix) + shaped * mix * 0.65;\n",
+    "params": {
+      "drive": 2.5,
+      "bias": 0.25,
+      "sag": 0.45,
+      "tone": 0.55,
+      "presence": 0.45,
+      "mix": 1.0
+    },
+    "nodeSettings": {}
+  }
+}

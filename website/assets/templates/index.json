@@ -529,6 +529,70 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "feedback-fm-lead-synth",
+      "name": "Feedback FM Lead Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Two-operator frequency modulation synthesizer with modulator self-feedback.",
+      "price": 0,
+      "preview": "assets/templates/feedback-fm-lead-synth.webp",
+      "file": "assets/templates/feedback-fm-lead-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "spectral-additive-organ-synth",
+      "name": "Spectral Additive Organ Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Additive tonewheel organ synthesizer with harmonic drawbars and key-click.",
+      "price": 0,
+      "preview": "assets/templates/spectral-additive-organ-synth.webp",
+      "file": "assets/templates/spectral-additive-organ-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "stereo-pingpong-delay-fx",
+      "name": "Stereo Ping-Pong Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Stereo cross-feedback ping-pong delay with lowpass tape damping.",
+      "price": 0,
+      "preview": "assets/templates/stereo-pingpong-delay-fx.webp",
+      "file": "assets/templates/stereo-pingpong-delay-fx.inf",
+      "nodes": [
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "tube-preamp-overdrive-fx",
+      "name": "Tube Preamp Overdrive FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Asymmetric vacuum tube preamplifier model with dynamic grid-bias sag.",
+      "price": 0,
+      "preview": "assets/templates/tube-preamp-overdrive-fx.webp",
+      "file": "assets/templates/tube-preamp-overdrive-fx.inf",
+      "nodes": [
+        "Analog",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

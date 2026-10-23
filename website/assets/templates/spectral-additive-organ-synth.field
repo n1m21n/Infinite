@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spectral Additive Organ Synth",
+    "author": "Infinite",
+    "description": "Additive tonewheel organ synthesizer with five harmonic drawbars, percussive key-click transient attack and warm saturation.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float sub = 0.7 [0.0, 1.0];\nparam float drawbar8 = 0.95 [0.0, 1.0];\nparam float drawbar5 = 0.55 [0.0, 1.0];\nparam float drawbar4 = 0.75 [0.0, 1.0];\nparam float drawbar2 = 0.45 [0.0, 1.0];\nparam float click = 0.65 [0.0, 1.0];\nparam float drive = 1.8 [1.0, 4.0];\nstate float p1 = 0;\nstate float p2 = 0;\nstate float p3 = 0;\nstate float p4 = 0;\nstate float p5 = 0;\nstate float env = 0;\nstate float clickEnv = 0;\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0);\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.2, env * 0.9992);\nclickEnv = if(targetEnv > env, 1.0, clickEnv * 0.99);\n\npStep = clamp(freq, 20.0, 4000.0) / sr;\np1 = (p1 + pStep * 0.5) % 1.0;\np2 = (p2 + pStep * 1.0) % 1.0;\np3 = (p3 + pStep * 1.5) % 1.0;\np4 = (p4 + pStep * 2.0) % 1.0;\np5 = (p5 + pStep * 3.0) % 1.0;\n\ns1 = sin(6.2831853 * p1) * sub;\ns2 = sin(6.2831853 * p2) * drawbar8;\ns3 = sin(6.2831853 * p3) * drawbar5;\ns4 = sin(6.2831853 * p4) * drawbar4;\ns5 = sin(6.2831853 * p5) * drawbar2;\n\nclickNoise = sin(6.2831853 * (p5 * 5.1)) * clickEnv * click * 0.4;\nsummed = (s1 + s2 + s3 + s4 + s5 + clickNoise) * 0.35;\nu = summed * drive;\nsat = u / (1.0 + abs(u) * 0.3);\n\nout = sat * env * 0.45;\n",
+    "params": {
+      "sub": 0.7,
+      "drawbar8": 0.95,
+      "drawbar5": 0.55,
+      "drawbar4": 0.75,
+      "drawbar2": 0.45,
+      "click": 0.65,
+      "drive": 1.8
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

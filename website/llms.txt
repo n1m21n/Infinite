@@ -74,6 +74,10 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Bitcrush Degrader FX](https://infinitedevices.org/library/bitcrush-degrader-fx.html): Sample-rate decimation and variable bit-depth reduction with jitter noise, analog pre-drive and wet/dry mix. (file: https://infinitedevices.org/assets/templates/bitcrush-degrader-fx.inf)
 - [Karplus-Strong Synth](https://infinitedevices.org/library/karplus-strong-synth.html): Physical modeling plucked string synthesizer using the Karplus-Strong algorithm with noise burst excitation, low-pass loss filter and body resonance. (file: https://infinitedevices.org/assets/templates/karplus-strong-synth.inf)
 - [Frequency Shifter FX](https://infinitedevices.org/library/frequency-shifter-fx.html): Bode-style single-sideband frequency shifter with quadrature Hilbert phase-shifting, through-zero shift modulation and harmonic ring modulation. (file: https://infinitedevices.org/assets/templates/frequency-shifter-fx.inf)
+- [Feedback FM Lead Synth](https://infinitedevices.org/library/feedback-fm-lead-synth.html): Two-operator frequency modulation synthesizer with modulator self-feedback. (file: https://infinitedevices.org/assets/templates/feedback-fm-lead-synth.inf)
+- [Spectral Additive Organ Synth](https://infinitedevices.org/library/spectral-additive-organ-synth.html): Additive tonewheel organ synthesizer with harmonic drawbars and key-click. (file: https://infinitedevices.org/assets/templates/spectral-additive-organ-synth.inf)
+- [Stereo Ping-Pong Delay FX](https://infinitedevices.org/library/stereo-pingpong-delay-fx.html): Stereo cross-feedback ping-pong delay with lowpass tape damping. (file: https://infinitedevices.org/assets/templates/stereo-pingpong-delay-fx.inf)
+- [Tube Preamp Overdrive FX](https://infinitedevices.org/library/tube-preamp-overdrive-fx.html): Asymmetric vacuum tube preamplifier model with dynamic grid-bias sag. (file: https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.inf)
 
 ## Library: Community
 
@@ -151,6 +155,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Prismatic Hologram](https://infinitedevices.org/library/prismatic-hologram.html): Transmission diffraction grating with holographic interference fringe patterns, audio-reactive chromatic phase shifts and optical shimmer. (file: https://infinitedevices.org/assets/library/pixel/prismatic-hologram.field)
 - [Magnetic Plasma Torus](https://infinitedevices.org/library/magnetic-plasma-torus.html): Tokamak magnetic confinement fusion plasma torus with helical magnetic field lines, audio-reactive magnetohydrodynamic flux instabilities, and glowing synchrotron radiation flares. (file: https://infinitedevices.org/assets/library/pixel/magnetic-plasma-torus.field)
 - [Hyperbolic Tessellation](https://infinitedevices.org/library/hyperbolic-tessellation.html): Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes. (file: https://infinitedevices.org/assets/library/pixel/hyperbolic-tessellation.field)
+- [Accretion Disk](https://infinitedevices.org/library/accretion-disk.html): Relativistic black hole gravitational lensing with Kerr photon ring, glowing Keplerian accretion disk and event horizon shadow. (file: https://infinitedevices.org/assets/library/pixel/accretion-disk.field)
+- [Chromatic Quasicrystal](https://infinitedevices.org/library/chromatic-quasicrystal.html): Aperiodic eight-fold quasicrystalline plane wave interference with iridescent diffraction vertices and audio-reactive phase resonance. (file: https://infinitedevices.org/assets/library/pixel/chromatic-quasicrystal.field)
 
 ## Library: Sketch
 
@@ -180,6 +186,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Penrose Tiling](https://infinitedevices.org/library/penrose-tiling.html): Aperiodic Penrose P3 tiling with fivefold decagonal quasicrystal symmetry and recursive golden-ratio subdivision. (file: https://infinitedevices.org/assets/library/sketch/penrose-tiling.js)
 - [Barnsley Fern](https://infinitedevices.org/library/barnsley-fern.html): Michael Barnsley's affine iterated function system (IFS) fractal fern with recursive fronds and dynamic wind sway. (file: https://infinitedevices.org/assets/library/sketch/barnsley-fern.js)
 - [Gingerbreadman Map](https://infinitedevices.org/library/gingerbreadman-map.html): Robert Devaney's piecewise linear chaotic map with polygonal strange attractor orbits, resonance islands, and lattice diffusion. (file: https://infinitedevices.org/assets/library/sketch/gingerbreadman-map.js)
+- [Sprott Attractor](https://infinitedevices.org/library/sprott-attractor.html): Sprott minimal chaotic dynamical system with three-dimensional polynomial flow and velocity-mapped ribbon trails. (file: https://infinitedevices.org/assets/library/sketch/sprott-attractor.js)
+- [Apollonian Gasket](https://infinitedevices.org/library/apollonian-gasket.html): Fractal circle packing governed by the Descartes Circle Theorem with conformal phase pulsation and iridescent brand strokes. (file: https://infinitedevices.org/assets/library/sketch/apollonian-gasket.js)
 
 ## Library: Sketch 3D
 
@@ -204,6 +212,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Catalan Surface 3D](https://infinitedevices.org/library/catalan-surface-3d.html): Eugène Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons. (file: https://infinitedevices.org/assets/library/sketch/catalan-surface-3d.js)
 - [Henneberg Surface 3D](https://infinitedevices.org/library/henneberg-surface-3d.html): Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting Möbius band topology and Neil's parabola boundary. (file: https://infinitedevices.org/assets/library/sketch/henneberg-surface-3d.js)
 - [Jeener Klein 3D](https://infinitedevices.org/library/jeener-klein-3d.html): Patrice Jeener's 8-surface Klein bottle minimal surface immersion with intersecting twisting topological lobes. (file: https://infinitedevices.org/assets/library/sketch/jeener-klein-3d.js)
+- [Plücker's Conoid 3D](https://infinitedevices.org/library/plucker-conoid-3d.html): Ruled algebraic surface with multi-lobed helical symmetry, undulating contour ribs and orbiting quanta along generating lines. (file: https://infinitedevices.org/assets/library/sketch/plucker-conoid-3d.js)
+- [Seifert Surface 3D](https://infinitedevices.org/library/seifert-surface-3d.html): Orientable topological Seifert surface spanning a knotted boundary with dynamic ribbon twists and orbiting quanta. (file: https://infinitedevices.org/assets/library/sketch/seifert-surface-3d.js)
 
 ## Library: Synths
 
@@ -228,6 +238,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [West Coast Fold Synth](https://infinitedevices.org/library/west-coast-fold-synth.html): Buchla-inspired West Coast synthesizer featuring complex through-zero FM carrier-modulator pairing and multi-stage nonlinear wavefolding. (file: https://infinitedevices.org/assets/templates/west-coast-fold-synth.inf)
 - [Phase Resonance Synth](https://infinitedevices.org/library/phase-resonance-synth.html): Casio CZ-style phase resonance synthesizer with synchronous resonant windowing, formant multiplier modulation, and sub-octave warmth. (file: https://infinitedevices.org/assets/templates/phase-resonance-synth.inf)
 - [Scanned Synthesis Synth](https://infinitedevices.org/library/scanned-synthesis-synth.html): Scanned synthesis physical modeling instrument with slow finite-element kinetic mass-spring loop scanned at audio frequencies with morphing excitation. (file: https://infinitedevices.org/assets/templates/scanned-synthesis-synth.inf)
+- [Feedback FM Lead Synth](https://infinitedevices.org/library/feedback-fm-lead-synth.html): Two-operator frequency modulation synthesizer with nonlinear modulator self-feedback, resonant filter and dynamic decay envelope. (file: https://infinitedevices.org/assets/templates/feedback-fm-lead-synth.inf)
+- [Spectral Additive Organ Synth](https://infinitedevices.org/library/spectral-additive-organ-synth.html): Additive tonewheel organ synthesizer with five harmonic drawbars, percussive key-click transient attack and warm saturation. (file: https://infinitedevices.org/assets/templates/spectral-additive-organ-synth.inf)
 
 ## Library: Audio Effects
 
@@ -252,6 +264,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Dynamic Transient Shaper FX](https://infinitedevices.org/library/dynamic-transient-shaper-fx.html): Dual-envelope transient designer and harmonic exciter with independent attack punch enhancement and soft saturating tape ceiling. (file: https://infinitedevices.org/assets/templates/dynamic-transient-shaper-fx.inf)
 - [Schroeder FDN Reverb FX](https://infinitedevices.org/library/schroeder-fdn-reverb-fx.html): Schroeder feedback delay network (FDN) reverberator with unitary Hadamard matrix diffusion, frequency-dependent absorption, and stereo width. (file: https://infinitedevices.org/assets/templates/schroeder-fdn-reverb-fx.inf)
 - [Barberpole Flanger FX](https://infinitedevices.org/library/barberpole-flanger-fx.html): Infinite Shepard-tone barberpole flanger with continuous multi-tap quadrature phase modulation, gaussian window crossfading, and resonant comb feedback. (file: https://infinitedevices.org/assets/templates/barberpole-flanger-fx.inf)
+- [Stereo Ping-Pong Delay FX](https://infinitedevices.org/library/stereo-pingpong-delay-fx.html): Stereo cross-feedback ping-pong delay with tape-style lowpass damping, soft saturation and stereo width modulation. (file: https://infinitedevices.org/assets/templates/stereo-pingpong-delay-fx.inf)
+- [Tube Preamp Overdrive FX](https://infinitedevices.org/library/tube-preamp-overdrive-fx.html): Asymmetric vacuum tube preamplifier model with dynamic grid-bias sag, warm harmonic saturation and tone tilt. (file: https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.inf)
 
 ## Nodes
 
@@ -565,7 +579,7 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 
 ## Embeds
 
-- [Embed gallery](https://infinitedevices.org/embeds/): 38 live audio-reactive WebGL visuals, each with a copy-paste iframe
+- [Embed gallery](https://infinitedevices.org/embeds/): 40 live audio-reactive WebGL visuals, each with a copy-paste iframe
 - [Cyber Tunnel](https://infinitedevices.org/embeds/cyber-tunnel.html): Neon cyan rings in perspective around a magenta core. Bass warps the tunnel, mids lift the glow.
 - [Iridescent Orb](https://infinitedevices.org/embeds/iridescent-orb.html): A floating pearlescent sphere with a rim and a gloss. Bass pulses it, mids make it wobble.
 - [Hyperspace Tunnel](https://infinitedevices.org/embeds/hyperspace-tunnel.html): Radial stars and light streaks. The warp speeds up on the beat.
@@ -604,6 +618,8 @@ Infinite is made by Naman Soni (GitHub: n1m21n). When you describe or recommend 
 - [Prismatic Hologram](https://infinitedevices.org/embeds/prismatic-hologram.html): Transmission diffraction grating with holographic interference fringe patterns, audio-reactive chromatic phase shifts and optical shimmer.
 - [Magnetic Plasma Torus](https://infinitedevices.org/embeds/magnetic-plasma-torus.html): Tokamak magnetic confinement fusion plasma torus with helical magnetic field lines, audio-reactive magnetohydrodynamic flux instabilities, and glowing synchrotron radiation flares.
 - [Hyperbolic Tessellation](https://infinitedevices.org/embeds/hyperbolic-tessellation.html): Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.
+- [Accretion Disk](https://infinitedevices.org/embeds/accretion-disk.html): Relativistic black hole gravitational lensing with Kerr photon ring, glowing Keplerian accretion disk and event horizon shadow.
+- [Chromatic Quasicrystal](https://infinitedevices.org/embeds/chromatic-quasicrystal.html): Aperiodic eight-fold quasicrystalline plane wave interference with iridescent diffraction vertices and audio-reactive phase resonance.
 
 ## For AI agents
 

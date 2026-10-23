@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Accretion Disk",
+    "author": "Infinite",
+    "description": "Relativistic black hole gravitational lensing with Kerr photon ring, glowing Keplerian accretion disk and event horizon shadow.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float spinSpeed = 1.4 [0.2, 4.0];\nparam float diskRadius = 1.8 [0.8, 3.5];\nparam float lensingPower = 0.42 [0.1, 1.2];\nparam float beaming = 0.75 [0.0, 1.5];\nparam float falloff = 4.5 [1.0, 10.0];\n\np = (uv - 0.5) * 2.2;\np.x = p.x * aspect;\n\nr = length(p);\nangle = atan2(p.y, p.x);\n\nrBent = r - (lensingPower * 0.18) / max(r, 0.08);\n\ndiskY = p.y * 2.8 + sin(p.x * 2.0) * 0.1;\nrDisk = sqrt(p.x * p.x + diskY * diskY);\n\ntheta = angle + (t * spinSpeed) * 1.5 / max(rDisk, 0.25);\nspiral = sin(theta * 3.0 + rDisk * 6.0) * 0.35;\n\nisco = 0.35;\niscoEdge = smoothstep(isco - 0.05, isco + 0.08, rDisk);\ndiskGlow = exp(-abs(rDisk - 0.75) * falloff) * iscoEdge;\n\ndoppler = 1.0 + beaming * (-p.x / max(rDisk, 0.1));\n\nphotonRing = exp(-abs(rBent - isco * 0.85) * 32.0) * 2.2;\n\nhorizonShadow = smoothstep(isco * 0.72, isco * 0.92, rBent);\n\nground = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.21);\nwhite = vec3(0.96, 0.98, 1.0);\n\ncolDisk = mix(ember, signal, clamp(doppler * 0.5, 0.0, 1.0));\nglow = diskGlow * doppler * 1.8;\n\ncol = ground;\ncol = col + colDisk * glow;\ncol = col + mix(signal, white, 0.7) * photonRing;\ncol = col * horizonShadow;\nalpha = 1.0;\n",
+    "params": {
+      "spinSpeed": 1.4,
+      "diskRadius": 1.8,
+      "lensingPower": 0.42,
+      "beaming": 0.75,
+      "falloff": 4.5
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}
