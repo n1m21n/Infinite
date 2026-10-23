@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Magnetar Quantum Flux",
+    "author": "Infinite",
+    "description": "Ultra-magnetized neutron star vacuum birefringence with twisted quantum electrodynamic flux tubes, pair-cascade polar jets, and relativistic synchrotron radiation.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float fieldStrength = 2.20 [0.5, 5.0];\nparam float spinSpeed = 1.60 [0.2, 4.0];\nparam float jetIntensity = 1.80 [0.2, 4.0];\nparam float twists = 4.00 [1.0, 8.0];\nparam float shimmer = 1.20 [0.2, 3.0];\n\np = (uv - 0.5) * 2.2;\np.x = p.x * aspect;\n\nr = length(p);\nangle = atan2(p.y, p.x);\n\nspinAngle = t * spinSpeed * 0.8;\nrotY = p.y * cos(spinAngle * 0.4) - p.x * sin(spinAngle * 0.4);\nrotX = p.x * cos(spinAngle * 0.4) + p.y * sin(spinAngle * 0.4);\n\n// Dipole magnetic flux arcs\ndipoleR = max(0.12, r);\nsinTheta = rotX / dipoleR;\ncosTheta = rotY / dipoleR;\n\nfluxLine = abs(dipoleR - sinTheta * sinTheta * 1.4 * fieldStrength);\nfluxGlow = exp(-fluxLine * 16.0);\n\n// Relativistic polar synchrotron jets\njetDist = abs(rotX) / max(0.15, abs(rotY) * 0.45 + 0.1);\njetCollimated = exp(-jetDist * 18.0) * exp(-abs(rotY) * 0.5) * jetIntensity;\n\n// Twisted quantum electrodynamic flux tubes\nhelicity = sin(angle * twists + dipoleR * 8.0 - spinAngle * 3.0);\ntubeGlow = exp(-abs(helicity) * 6.0) * exp(-dipoleR * 1.5);\n\n// Stellar crust core surface\ncoreMask = smoothstep(0.18, 0.22, r);\ncoreGlow = exp(-r * 8.0) * 3.5;\n\nground = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.21);\nemerald = vec3(0.306, 0.949, 0.722);\nwhite = vec3(0.96, 0.98, 1.0);\n\nplasmaCol = mix(ember, signal, sin(angle * 2.0 + t) * 0.5 + 0.5);\nplasmaCol = mix(plasmaCol, emerald, tubeGlow * 0.6);\n\ncol = ground;\ncol = col + plasmaCol * (fluxGlow * 1.8 + tubeGlow * 1.4) * shimmer;\ncol = col + mix(signal, white, 0.75) * jetCollimated * 2.2;\ncol = col + white * coreGlow;\ncol = col * smoothstep(2.2, 0.9, r);\nalpha = 1.0;\n",
+    "params": {
+      "fieldStrength": 2.2,
+      "spinSpeed": 1.6,
+      "jetIntensity": 1.8,
+      "twists": 4.0,
+      "shimmer": 1.2
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

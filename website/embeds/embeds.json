@@ -200,6 +200,16 @@
       "slug": "chromatic-quasicrystal",
       "title": "Chromatic Quasicrystal",
       "description": "Aperiodic eight-fold quasicrystalline plane wave interference with iridescent diffraction vertices and audio-reactive phase resonance."
+    },
+    {
+      "slug": "hyperbolic-disk-fractal",
+      "title": "Hyperbolic Disk Fractal",
+      "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent chromatic diffraction vertices."
+    },
+    {
+      "slug": "magnetar-quantum-flux",
+      "title": "Magnetar Quantum Flux",
+      "description": "Ultra-magnetized neutron star vacuum birefringence with twisted quantum electrodynamic flux tubes, pair-cascade polar jets, and relativistic synchrotron radiation."
     }
   ]
 }

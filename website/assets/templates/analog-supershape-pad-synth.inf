@@ -1,0 +1,44 @@
+infinite-patch 1
+# Analog Supershape Pad Synth: polyphonic pad synthesizer with 3 detuned cores, supershape wavefolding, and 4-pole diode filter
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 1.0
+  i rangeLow 40
+  i rangeHigh 76
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float detune = 0.35 [0.0, 1.0]\nparam float supershape = 0.55 [0.0, 1.5]\nparam float subLevel = 0.45 [0.0, 1.0]\nparam float cutoff = 3200.0 [200.0, 12000.0]\nparam float res = 0.65 [0.0, 0.95]\nparam float attack = 0.45 [0.02, 3.0]\nparam float release = 1.40 [0.1, 5.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float pSub = 0\nstate float env = 0\nstate float s1 = 0\nstate float s2 = 0\nstate float s3 = 0\nstate float s4 = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nattRate = clamp(1.0 / (sr * attack), 0.00005, 0.05)\nrelRate = clamp(1.0 / (sr * release), 0.00002, 0.02)\nenv = if(target > env, env + (target - env) * attRate, env - env * relRate)\n\npStep = clamp(freq, 20.0, 4000.0) / sr\nd = detune * 0.015\np1 = (p1 + pStep) % 1.0\np2 = (p2 + pStep * (1.0 + d)) % 1.0\np3 = (p3 + pStep * (1.0 - d)) % 1.0\npSub = (pSub + pStep * 0.5) % 1.0\n\nosc1 = sin(6.2831853 * p1)\nosc2 = sin(6.2831853 * p2)\nosc3 = sin(6.2831853 * p3)\nsubOsc = if(pSub < 0.5, 1.0, -1.0)\n\nrawMix = (osc1 + osc2 * 0.85 + osc3 * 0.85) * 0.4 + subOsc * subLevel * 0.3\nfold = rawMix + sin(rawMix * 4.0 * supershape) * supershape * 0.4\n\nfCut = clamp((cutoff + env * 4500.0) / sr * 2.0, 0.01, 0.45)\nfb = s4 * res * 3.4\nu = fold - fb / (1.0 + abs(fb) * 0.4)\nsatU = u / (1.0 + abs(u) * 0.3)\ns1 = s1 + fCut * (satU - s1)\ns2 = s2 + fCut * (s1 - s2)\ns3 = s3 + fCut * (s2 - s3)\ns4 = s4 + fCut * (s3 - s4)\n\nout = s4 * (0.2 + env * 0.8) * 0.45\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Analog Supershape Pad Synth. Detuned polyphonic pad with supershape wavefolding.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45
