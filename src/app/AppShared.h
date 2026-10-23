@@ -905,10 +905,12 @@ extern bool  gSessionClaimedKeys;
 extern bool  gArrangeFocused;
 
 
-   // Which of the two mutually exclusive audio routings is live (overhaul
+   // Which of the mutually exclusive audio routings is live (overhaul
    // WP3). Canvas = the node graph's own Audio Out nodes feed the device, the
    // arrangement is silent. Timeline = the arrangement's audio clips feed the
-   // device directly and every canvas Audio Out is bypassed.
+   // device directly and every canvas Audio Out is bypassed. Session = the
+   // same routing, but only launched Session clips play (the timeline's own
+   // clips are silent); launching a clip switches to it.
    //
    // Deliberately NOT persisted and NOT part of a patch: it is a monitoring
    // choice, not a property of the work, and a patch that silently reopened
@@ -919,7 +921,7 @@ extern bool  gArrangeFocused;
    // arrangement panel to be open and the transport to be playing, which made
    // hiding the panel or hitting pause change what the topology contained -
    // a rebuild-driven mode leak rather than a routing rule.
-   enum class AudioMode { Canvas, Timeline };
+   enum class AudioMode { Canvas, Timeline, Session };
 
 extern AudioMode gAudioMode;
 
@@ -4956,8 +4958,7 @@ bool ArrangeAudioRebuildIfStale();
 // ---- Session view (app/panels/ArrangeSession.cpp) ----
    // The Timeline panel shows the session grid instead of the lanes.
    // What the audio scheduler and the video compositor play: gArrange, or,
-   // while a session slot is launched, a copy with the launched slots
-   // written in over the arrangement.
+   // in Session audio mode, a copy holding only the launched slots.
    const Arrange::Model& ArrangePlaybackModel();
    // Moves whenever ArrangePlaybackModel() changed without gArrange.revision.
    uint64_t ArrangeSessionGeneration();
@@ -4983,9 +4984,20 @@ bool ArrangeAudioRebuildIfStale();
       bool stopQueued = false;
    };
    ArrangeSessionLaneState ArrangeSessionLaneQuery(uint64_t laneId);
+   struct ArrangeSessionSceneState
+   {
+      bool playing = false;   // every track with a clip in the row plays it
+      bool queued = false;    // waiting for the grid line
+      bool next = false;      // the scene a "Then Play Next Scene" goes to
+   };
+   ArrangeSessionSceneState ArrangeSessionSceneQuery(int scene);
    bool ArrangeSessionAnyLaunched();
    bool ArrangeSessionRecording();
    void ArrangeSessionSetRecording(bool on);
+   // The span the last Record to Timeline take wrote (false while recording or before any take).
+   bool ArrangeSessionLastTake(Arrange::Tick& from, Arrange::Tick& to);
+   // Set to open the Timeline's Render dialog next frame (Session's Render Take presets the range first).
+   extern bool gArrangeRenderPopupRequest;
    void DrawArrangeSessionGrid(float width);
    // The clip right-click menu shared by the Timeline lanes and the Session grid; `openClipCtx` opens it this call.
    void DrawArrangeClipContextMenu(bool openClipCtx);
@@ -4995,6 +5007,8 @@ bool ArrangeAudioRebuildIfStale();
    void DrawArrangeSessionSlotMenuItems(uint64_t clipId);
    // Applies the slot action a menu row queued; call after the clip menu has ended.
    void ArrangeSessionApplyMenuAction();
+   // The inspector's Launch card for a session slot clip; false (nothing drawn) for a Timeline clip.
+   bool DrawArrangeSessionSlotInspector(uint64_t clipId, float fieldW);
 void ArrangeSessionSendSceneToTimeline(int row);
 void ArrangeSessionRunActionForTest(int kind, uint64_t laneId, int row);
 

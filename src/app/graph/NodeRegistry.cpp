@@ -493,8 +493,11 @@ namespace app
          return false;
       for (size_t i = 0; i < a.scenes.size(); i++)
          if (a.scenes[i].name != b.scenes[i].name || a.scenes[i].tempo != b.scenes[i].tempo ||
-             a.scenes[i].quantize != b.scenes[i].quantize || a.scenes[i].additive != b.scenes[i].additive)
+             a.scenes[i].quantize != b.scenes[i].quantize || a.scenes[i].additive != b.scenes[i].additive ||
+             a.scenes[i].followNext != b.scenes[i].followNext || a.scenes[i].followBars != b.scenes[i].followBars)
             return false;
+      if (a.sessionQuantize != b.sessionQuantize)
+         return false;
       for (size_t i = 0; i < a.markers.size(); i++)
          if (a.markers[i].id != b.markers[i].id || a.markers[i].pos != b.markers[i].pos ||
              a.markers[i].name != b.markers[i].name || a.markers[i].color != b.markers[i].color)

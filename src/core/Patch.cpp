@@ -514,8 +514,11 @@ static void WriteBody(std::ostream& file, const Data& data)
    for (const SceneRecord& sc : data.scenes)
       file << "scene " << FloatToString(sc.tempo) << " " << EscapeLine(sc.name) << "\n";
    for (size_t k = 0; k < data.scenes.size(); k++)
-      if (data.scenes[k].quantize != -1 || data.scenes[k].additive)
-         file << "scenemeta " << k << " " << data.scenes[k].quantize << " " << (data.scenes[k].additive ? 1 : 0) << "\n";
+      if (data.scenes[k].quantize != -1 || data.scenes[k].additive || data.scenes[k].followNext)
+         file << "scenemeta " << k << " " << data.scenes[k].quantize << " " << (data.scenes[k].additive ? 1 : 0) << " "
+              << (data.scenes[k].followNext ? 1 : 0) << " " << data.scenes[k].followBars << "\n";
+   if (data.sessionQuantize != 2)
+      file << "sessionmeta " << data.sessionQuantize << "\n";
    for (const TrackGroupRecord& g : data.trackGroups)
       file << "trackgroup " << g.id << " " << g.color << " " << (g.enabled ? 1 : 0) << " "
            << (g.collapsed ? 1 : 0) << " " << g.parentGroupId << " " << EscapeLine(g.name) << "\n";
@@ -1259,7 +1262,7 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
                      c.slotLoop = lp != 0;
                      c.slotLoopTicks = std::clamp(lt, 0, 1 << 30);
                      c.slotQuantize = std::clamp(q, -1, 3);
-                     c.slotLaunchMode = std::clamp(lm, 0, 2);
+                     c.slotLaunchMode = lm == 1 ? 1 : 0;   // the old Toggle (2) is now how every clip behaves
                   }
                }
          }
@@ -1272,7 +1275,19 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          {
             outData.scenes[idx].quantize = std::clamp(q, -1, 3);
             outData.scenes[idx].additive = add != 0;
+            int fn = 0, fb = 0;   // later versions append these
+            if (in >> fn >> fb)
+            {
+               outData.scenes[idx].followNext = fn != 0;
+               outData.scenes[idx].followBars = std::clamp(fb, 0, 64);
+            }
          }
+      }
+      else if (tag == "sessionmeta")
+      {
+         int q = 2;
+         if (in >> q)
+            outData.sessionQuantize = std::clamp(q, 0, 3);
       }
       else if (tag == "scene")
       {

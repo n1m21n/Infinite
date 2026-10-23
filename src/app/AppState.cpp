@@ -1509,6 +1509,7 @@ bool gHeadlessNeedProbe = false;
    // ---- the export queue window (WP7) --------------------------------------
 
    bool gArrangeShowRenderQueue = false;
+   bool gArrangeRenderPopupRequest = false;
 
 
    // The export queue window is gone, so a job that fails to start used to

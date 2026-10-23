@@ -4,18 +4,24 @@
 // The idea comes from Ricardo Palmieri's Infinite-Turbo fork; this is a fresh
 // implementation.
 //
-// How it plays: nothing new reaches the audio thread. While any lane has a
-// launched slot, ArrangePlaybackModel() returns a copy of gArrange in which
-// each launched slot is written out as repeated clips over the arrangement
-// (PlaceOverwrite, so the timeline clips under it are cut away), up to a
-// horizon a few dozen bars ahead. RebuildAudioTopology and the video
+// How it plays: nothing new reaches the audio thread. In Session audio mode
+// (AudioMode::Session, which launching a clip switches to),
+// ArrangePlaybackModel() returns a copy of gArrange with the timeline's own
+// clips taken out and each launched slot written out as repeated clips, up to
+// a horizon a few dozen bars ahead. So Session plays only Session clips and
+// Timeline plays only timeline clips. RebuildAudioTopology and the video
 // compositor read that copy instead of gArrange, so a slot gets every clip
 // feature for free: retrigger, sample position lock, fades, gain, pan, blend
 // modes. A queued launch is already in the copy at its grid line, so its
 // onset is sample accurate. The copy is rebuilt when the schedule or the
 // arrangement changes, and when the playhead nears the horizon.
 //
-// Launch state is runtime only: never saved, cleared when the transport stops.
+// Launch and stop land on the session quantize grid (Model::sessionQuantize,
+// 1 bar by default) unless a clip or scene sets its own. Clicking a playing
+// clip or scene stops it on that grid; clicking a queued one cancels it.
+//
+// Launch state is runtime only: never saved, cleared when the transport stops
+// or when audio leaves Session mode.
 #include "app/AppShared.h"
 
 namespace app
@@ -70,10 +76,29 @@ namespace app
       // A scene's tempo, applied when its launch tick arrives.
       Tick sPendingTempoAt = -1;
       float sPendingTempo = 0.0f;
+      // The audio mode the copy was built for: Session strips timeline clips.
+      AudioMode sBuiltMode = AudioMode::Canvas;
+      // Scene follow ("Then Play Next Scene"): the next scene is already in
+      // the schedule at `at` (so it starts sample accurate); when the playhead
+      // reaches `at` it is launched properly, which sets its tempo and queues
+      // the scene after it.
+      struct SceneNext
+      {
+         int scene = -1;
+         Tick at = -1;
+      };
+      SceneNext sSceneNext;
       // Record to Timeline.
       bool sRecording = false;
       Tick sRecStart = 0;
       std::vector<SessRecEntry> sRecLog;
+      // The span the last take wrote into the arrangement (Render Take).
+      Tick sTakeFrom = -1;
+      Tick sTakeTo = -1;
+      // Where a launch started the stopped transport. The audio clock rebases
+      // as it starts and can land a few ms earlier; the first playing tick
+      // moves what was scheduled there onto the real start.
+      Tick sStartedAt = -1;
 
       Tick NowTick()
       {
@@ -258,11 +283,17 @@ namespace app
          }
       }
 
+      bool SessionMode()
+      {
+         return gAudioMode == AudioMode::Session;
+      }
+
       void Materialize(Tick now)
       {
          Compact(now);
          sRuns.clear();
-         sActive = AnyScheduled();
+         sBuiltMode = gAudioMode;
+         sActive = AnyScheduled() || SessionMode();
          if (!sActive)
          {
             sPlay = Arrange::Model{};
@@ -277,6 +308,9 @@ namespace app
          }
          sPlay = gArrange;
          sPlay.nextId = 1ull << 61;
+         if (SessionMode())
+            for (Arrange::Lane& lane : sPlay.lanes)
+               lane.clips.clear();   // Session audio: only launched slots play
          const Tick lo = std::max<Tick>(0, now - Arrange::kTicksPerBar);
          for (const SessRun& r : sRuns)
          {
@@ -287,11 +321,11 @@ namespace app
          }
       }
 
-      void EnsureTimelineAudio()
+      void EnsureSessionAudio()
       {
-         if (gAudioMode == AudioMode::Timeline)
+         if (gAudioMode == AudioMode::Session)
             return;
-         gAudioMode = AudioMode::Timeline;
+         gAudioMode = AudioMode::Session;
          if (AudioEngine::Instance().SampleRate() <= 0.0)
          {
             gAudioStartError.clear();
@@ -310,16 +344,20 @@ namespace app
          {
             if (startTransport)
             {
-               EnsureTimelineAudio();
+               EnsureSessionAudio();
                tr.SetPlaying(true);
+               sStartedAt = NowTick();
             }
             return NowTick();
          }
-         return std::max<Tick>(0, Arrange::BeatsToTicks(MusicTime::NextLaunchBeat(tr.Beats(), quantize >= 0 ? quantize : tr.LaunchQuantize())));
+         const int q = quantize >= 0 ? quantize : std::clamp(gArrange.sessionQuantize, 0, 3);
+         return std::max<Tick>(0, Arrange::BeatsToTicks(MusicTime::NextLaunchBeat(tr.Beats(), q)));
       }
 
       void Schedule(uint64_t laneId, Tick at, int slot)
       {
+         if (slot >= 0)
+            EnsureSessionAudio();
          std::vector<SessSeg>& segs = sSchedule[laneId];
          while (!segs.empty() && segs.back().at >= at)
             segs.pop_back();
@@ -331,6 +369,112 @@ namespace app
          }
          segs.push_back(SessSeg{ at, slot });
          sDirty = true;
+      }
+
+      // Takes back a launch of `slot` that has not started yet.
+      bool CancelQueued(uint64_t laneId, int slot)
+      {
+         auto it = sSchedule.find(laneId);
+         if (it == sSchedule.end())
+            return false;
+         const Tick now = NowTick();
+         std::vector<SessSeg>& segs = it->second;
+         const size_t before = segs.size();
+         segs.erase(std::remove_if(segs.begin(), segs.end(),
+                                   [&](const SessSeg& sg) { return sg.at > now && sg.slot == slot; }),
+                    segs.end());
+         if (segs.size() == before)
+            return false;
+         if (segs.empty())
+            sSchedule.erase(it);
+         sDirty = true;
+         return true;
+      }
+
+      // Drops the queued next scene of a scene follow (a manual launch or
+      // stop takes over).
+      void CancelSceneNext()
+      {
+         if (sSceneNext.scene < 0)
+            return;
+         const Tick now = NowTick();
+         for (auto& kv : sSchedule)
+         {
+            std::vector<SessSeg>& segs = kv.second;
+            segs.erase(std::remove_if(segs.begin(), segs.end(),
+                                      [&](const SessSeg& sg) { return sg.at > now && sg.at == sSceneNext.at; }),
+                       segs.end());
+         }
+         for (auto it = sSchedule.begin(); it != sSchedule.end();)
+            it = it->second.empty() ? sSchedule.erase(it) : std::next(it);
+         sSceneNext = SceneNext{};
+         sDirty = true;
+      }
+
+      bool SceneHasClips(int scene)
+      {
+         for (const Arrange::Lane& lane : gArrange.lanes)
+            if (SlotAt(lane, scene) != nullptr)
+               return true;
+         return false;
+      }
+
+      // How long a scene plays before "Then Play Next Scene": its own bar
+      // count, or its longest loop.
+      Tick SceneLength(int scene)
+      {
+         const Arrange::Scene& sc = gArrange.scenes[(size_t)scene];
+         if (sc.followBars > 0)
+            return (Tick)sc.followBars * Arrange::kTicksPerBar;
+         Tick len = 0;
+         for (const Arrange::Lane& lane : gArrange.lanes)
+            if (const Arrange::SessionSlot* ss = SlotAt(lane, scene))
+               len = std::max(len, ss->LoopLen());
+         return std::max<Tick>(len, Arrange::kTicksPerBar);
+      }
+
+      void ScheduleScene(int scene, Tick at)
+      {
+         const bool additive = gArrange.scenes[(size_t)scene].additive;
+         for (const Arrange::Lane& lane : gArrange.lanes)
+         {
+            if (SlotAt(lane, scene) != nullptr)
+               Schedule(lane.id, at, scene);
+            else if (!additive && sSchedule.find(lane.id) != sSchedule.end())
+               Schedule(lane.id, at, -1);
+         }
+      }
+
+      void LaunchSceneAt(int scene, Tick at)
+      {
+         ScheduleScene(scene, at);
+         const float tempo = gArrange.scenes[(size_t)scene].tempo;
+         if (tempo > 0.0f)
+         {
+            if (at <= NowTick())
+               Transport::Instance().SetTempo(tempo);
+            else
+            {
+               sPendingTempoAt = at;
+               sPendingTempo = tempo;
+            }
+         }
+         sSceneNext = SceneNext{};
+         const int n = (int)gArrange.scenes.size();
+         if (!gArrange.scenes[(size_t)scene].followNext || n == 0)
+            return;
+         // The next scene with clips, wrapping; an empty row is skipped (a
+         // lone scene just keeps looping).
+         for (int k = 1; k < n; k++)
+         {
+            const int next = (scene + k) % n;
+            if (!SceneHasClips(next))
+               continue;
+            const Tick nextAt = at + SceneLength(scene);
+            ScheduleScene(next, nextAt);
+            sSceneNext = SceneNext{ next, nextAt };
+            return;
+         }
       }
 
       void UpdateRecordLog(Tick now)
@@ -366,6 +510,15 @@ namespace app
          const Tick recStart = sRecStart;
          std::vector<SessRecEntry> log;
          log.swap(sRecLog);
+         for (const SessRecEntry& e : log)
+         {
+            const Tick lo = std::max(e.from, recStart);
+            const Tick hi = std::min(e.to, end);
+            if (hi <= lo)
+               continue;
+            sTakeFrom = sTakeFrom < 0 ? lo : std::min(sTakeFrom, lo);
+            sTakeTo = std::max(sTakeTo, hi);
+         }
          ArrangeEdit([&]()
          {
             for (const SessRecEntry& e : log)
@@ -414,6 +567,21 @@ namespace app
             sDirty = true;
          }
          sPendingTempoAt = -1;
+         sSceneNext = SceneNext{};
+      }
+      else if (!sPrevPlaying && sStartedAt >= 0 && now != sStartedAt)
+      {
+         const Tick shift = now - sStartedAt;
+         for (auto& kv : sSchedule)
+            for (SessSeg& s : kv.second)
+               s.at = std::max<Tick>(0, s.at + shift);
+         if (sPendingTempoAt >= 0)
+            sPendingTempoAt = std::max<Tick>(0, sPendingTempoAt + shift);
+         if (sSceneNext.scene >= 0)
+            sSceneNext.at = std::max<Tick>(0, sSceneNext.at + shift);
+         if (sRecording)
+            sRecStart = now;
+         sDirty = true;
       }
       else if (sPrevPlaying)
       {
@@ -440,11 +608,39 @@ namespace app
             }
             if (sPendingTempoAt >= 0)
                sPendingTempoAt = std::max<Tick>(0, sPendingTempoAt + shift);
+            if (sSceneNext.scene >= 0)
+               sSceneNext.at = std::max<Tick>(0, sSceneNext.at + shift);
             sDirty = true;
          }
       }
       sPrevBeats = beats;
       sPrevPlaying = playing;
+      if (playing)
+         sStartedAt = -1;
+
+      // Audio left Session mode (Timeline or canvas took over): launches end.
+      if (!SessionMode() && !sSchedule.empty())
+      {
+         if (sRecording && playing)
+         {
+            UpdateRecordLog(now);
+            CommitRecording(now);
+            sRecStart = now;
+         }
+         sSchedule.clear();
+         sSceneNext = SceneNext{};
+         sPendingTempoAt = -1;
+         sDirty = true;
+      }
+
+      if (sSceneNext.scene >= 0 && now >= sSceneNext.at)
+      {
+         const SceneNext next = sSceneNext;
+         if (next.scene < (int)gArrange.scenes.size())
+            LaunchSceneAt(next.scene, next.at);
+         else
+            sSceneNext = SceneNext{};
+      }
 
       if (sPendingTempoAt >= 0 && now >= sPendingTempoAt)
       {
@@ -453,9 +649,9 @@ namespace app
       }
 
       const bool wasActive = sActive;
-      const bool wantActive = AnyScheduled();
+      const bool wantActive = AnyScheduled() || SessionMode();
       if (sDirty || (wantActive && (sBuiltArrangeRevision != gArrange.revision || now > sHorizon - kRebuildLeadTicks)) ||
-          wantActive != wasActive)
+          wantActive != wasActive || sBuiltMode != gAudioMode)
       {
          Materialize(now);
          sBuiltArrangeRevision = gArrange.revision;
@@ -479,8 +675,13 @@ namespace app
          return;
       }
       const Arrange::SessionSlot* ss = SlotAt(*lane, slot);
-      // Toggle: clicking the playing clip stops it.
-      if (ss->launchMode == 2 && ArrangeSessionLaneQuery(laneId).playingSlot == slot)
+      CancelSceneNext();
+      // Clicking a queued clip takes the launch back; clicking the playing
+      // clip stops it on the grid (GarageBand's Live Loops). A Gate clip
+      // retriggers instead: it stops when the mouse lets go.
+      if (CancelQueued(laneId, slot))
+         return;
+      if (ss->launchMode != 1 && ArrangeSessionLaneQuery(laneId).playingSlot == slot)
       {
          ArrangeSessionStopLane(laneId);
          return;
@@ -509,12 +710,18 @@ namespace app
       }
       if (sSchedule.find(laneId) == sSchedule.end())
          return;
-      Schedule(laneId, LaunchTick(false), -1);
+      // Stops on the playing clip's own grid, as its launch did.
+      int quantize = -1;
+      if (const Arrange::Lane* lane = Arrange::FindLane(gArrange, laneId))
+         if (const Arrange::SessionSlot* ss = SlotAt(*lane, ArrangeSessionLaneQuery(laneId).playingSlot))
+            quantize = ss->quantize;
+      Schedule(laneId, LaunchTick(false, quantize), -1);
    }
 
 
    void ArrangeSessionStopAll()
    {
+      CancelSceneNext();
       std::vector<uint64_t> ids;
       for (const auto& kv : sSchedule)
          ids.push_back(kv.first);
@@ -533,6 +740,7 @@ namespace app
          any = any || (lane.groupId == groupId && SlotAt(lane, row) != nullptr);
       if (!any)
          return;
+      CancelSceneNext();
       const Tick at = LaunchTick(true);
       for (const Arrange::Lane& lane : gArrange.lanes)
       {
@@ -550,31 +758,48 @@ namespace app
    {
       if (scene < 0 || scene >= (int)gArrange.scenes.size())
          return;
-      bool any = false;
-      for (const Arrange::Lane& lane : gArrange.lanes)
-         any = any || SlotAt(lane, scene) != nullptr;
+      const bool any = SceneHasClips(scene);
       if (!any && sSchedule.empty())
          return;
-      const Tick at = LaunchTick(any, gArrange.scenes[(size_t)scene].quantize);
-      const bool additive = gArrange.scenes[(size_t)scene].additive;
+      // Clicking a queued scene takes it back; clicking the playing scene
+      // stops its tracks on the grid.
+      const ArrangeSessionSceneState st = ArrangeSessionSceneQuery(scene);
+      CancelSceneNext();
+      if (st.queued)
+      {
+         for (const Arrange::Lane& lane : gArrange.lanes)
+            CancelQueued(lane.id, scene);
+         return;
+      }
+      if (st.playing)
+      {
+         for (const Arrange::Lane& lane : gArrange.lanes)
+            if (SlotAt(lane, scene) != nullptr && ArrangeSessionLaneQuery(lane.id).playingSlot == scene)
+               ArrangeSessionStopLane(lane.id);
+         return;
+      }
+      LaunchSceneAt(scene, LaunchTick(any, gArrange.scenes[(size_t)scene].quantize));
+   }
+
+
+   // Playing = every track with a clip in the row plays it; queued = one of
+   // them is waiting to start it.
+   ArrangeSessionSceneState ArrangeSessionSceneQuery(int scene)
+   {
+      ArrangeSessionSceneState st;
+      int withClip = 0, playing = 0;
       for (const Arrange::Lane& lane : gArrange.lanes)
       {
-         if (SlotAt(lane, scene) != nullptr)
-            Schedule(lane.id, at, scene);
-         else if (!additive && sSchedule.find(lane.id) != sSchedule.end())
-            Schedule(lane.id, at, -1);
+         if (SlotAt(lane, scene) == nullptr)
+            continue;
+         withClip++;
+         const ArrangeSessionSlotState ss = ArrangeSessionQuery(lane.id, scene);
+         playing += ss.playing ? 1 : 0;
+         st.queued = st.queued || ss.queued;
       }
-      const float tempo = gArrange.scenes[(size_t)scene].tempo;
-      if (tempo > 0.0f)
-      {
-         if (at <= NowTick())
-            Transport::Instance().SetTempo(tempo);
-         else
-         {
-            sPendingTempoAt = at;
-            sPendingTempo = tempo;
-         }
-      }
+      st.playing = withClip > 0 && playing == withClip && !st.queued;
+      st.next = sSceneNext.scene == scene;
+      return st;
    }
 
 
@@ -650,6 +875,7 @@ namespace app
          sRecording = true;
          sRecStart = now;
          sRecLog.clear();
+         sTakeFrom = sTakeTo = -1;
          return;
       }
       if (Transport::Instance().IsPlaying())
@@ -659,5 +885,15 @@ namespace app
       }
       sRecording = false;
       sRecLog.clear();
+   }
+
+
+   bool ArrangeSessionLastTake(Arrange::Tick& from, Arrange::Tick& to)
+   {
+      if (sRecording || sTakeFrom < 0 || sTakeTo <= sTakeFrom)
+         return false;
+      from = sTakeFrom;
+      to = sTakeTo;
+      return true;
    }
 }

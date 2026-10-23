@@ -426,6 +426,8 @@ namespace Patch
       std::string name;
       int quantize = -1;
       bool additive = false;
+      bool followNext = false;
+      int followBars = 0;
    };
 
    struct StreamRecord
@@ -522,6 +524,7 @@ namespace Patch
       std::vector<MarkerRecord> markers; // arrangement markers, sorted by pos
       std::vector<TrackGroupRecord> trackGroups;
       std::vector<SceneRecord> scenes;   // session view rows
+      int sessionQuantize = 2;           // `sessionmeta` line; absent = 1 bar
       ArrangeSettingsRecord arrangeSettings;
       ViewportRecord viewport;
       // True when the file used an `id` line or a word where an index goes, so
