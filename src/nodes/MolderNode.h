@@ -127,6 +127,12 @@ public:
 
    uint32_t Seed() const { return (uint32_t)mSeed; }
    int Generation() const { return mGeneration; }
+   // BuildDesiredGenome replays one Mutate per generation on the main thread
+   // (about 0.2 us each), so a patch or remote set of 2^31 froze the UI for
+   // minutes on every re-render. Each Mutate pulls the genome 10% back toward
+   // the baseline, so nothing from before the last few hundred rolls survives
+   // anyway; no one reaches 10000 by clicking Roll.
+   static constexpr int kMaxGeneration = 10000;
 
    // ---- the eight exposed controls (Tier 1 - see SKILL.md) --------------
    float chaos = 0.4f;              // 0..1, mutation strength for the next roll
