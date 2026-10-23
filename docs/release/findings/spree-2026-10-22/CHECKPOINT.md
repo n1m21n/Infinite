@@ -1,4 +1,4 @@
-# Spree checkpoint, 2026-10-23 (afternoon)
+# Spree checkpoint, 2026-10-23 (evening)
 
 Resume from here. Everything below is merged into local **main**. Nothing is pushed.
 
@@ -6,9 +6,14 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
 
 ## Where things stand
 
-- **Findings:** 53 filed (B-A-001 … B-K-035). Every one is fixed except three:
+- **Findings:** 54 filed (B-A-001 … B-K-036). Every one is fixed except three:
   - B-G-001 and B-H-001: P3, need a quiet-Mac re-run.
   - B-J-001: the Windows headless hang, P5.
+- **New on 2026-10-23, evening** (merged to main):
+  - **INFINITE_PARAMFUZZ** (`tools/bughunt/param_fuzz_inproc.py`): in-process fuzz of every audio node, one key at a time at ±1e9, -1 and 0, flagging NaN, HOT (peak > 100) and SLOW. The full run takes minutes; the app sweep took hours. The driver restarts past UBSan aborts.
+  - **B-K-036:** sample-player params (Audio File, Slicer, PaulStretch, Molder, Granular, Sampler, Drum Sequencer) skipped the knob range. Volume 1e9 played 5e8 loud, and pitch or speed 1e9 overflowed the read position. Each node now clamps to its knob range.
+  - Lead: Audio In `deviceId` 1e9 took 15 s in one run (hardware lookup). Not chased.
+  - `build-tsan` in main was deleted to free disk; rebuild it before the next TSan run.
 - **New on 2026-10-23, afternoon** (from the float sweep's 1e9 rows; all merged to main):
   - **B-K-031:** effect params from a patch, OSC or RPC skipped the effect's range; Stereo width 1e9 made the output enormous. AudioEffectNode now clamps to the EffectDef ranges.
   - **B-K-032:** Gain, Mixer and Audio In gain past ~770 dB gave NaN; a Velocity Curve curve below 0.25 sent 1/velocity downstream.
@@ -51,7 +56,7 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
 ## Not yet run
 
 1. Finish the float re-sweep (paused, resumable, about 1,525 rows done) and triage its 1e9/-1 rows. Re-run the B-K-031..035 rows on the fixed build first.
-   - A faster route is an in-process headless param fuzz (seconds instead of hours) for the NaN and hot-audio classes.
+   - INFINITE_PARAMFUZZ now covers the NaN and hot-audio classes for audio nodes; the app sweep is still needed for visual nodes.
 2. `param_fuzz.py --kind text` and `--kind mod` over every type, on the ASan+UBSan build.
 3. The signal sweep again, on the ASan+UBSan build. The earlier sweep missed B-K-028.
 4. A coverage report from the fixed coverage build. Wipe the stale `$SP/prof` first.
