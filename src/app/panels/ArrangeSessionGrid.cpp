@@ -4,6 +4,13 @@
 //
 // The idea comes from Ricardo Palmieri's Infinite-Turbo fork; this is a fresh
 // implementation.
+#include "app/ui/design/components/MenuParts.h"
+#include "app/ui/design/components/PillGroup.h"
+#include "app/ui/design/components/EmptyState.h"
+#include "app/ui/design/components/ChipButton.h"
+#include "app/ui/design/components/FieldWell.h"
+#include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
 namespace app
