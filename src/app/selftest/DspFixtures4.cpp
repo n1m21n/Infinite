@@ -256,6 +256,44 @@ bool RunEffectMixAndLimiterFixture()
       all &= ok;
    }
 
+   // 1e) The same for image filters. Shaders take the def's range on trust:
+   //     dither loops uMode + 1 times, and uMode 1e9 hung the GPU (B-K-035).
+   //     Every filter param but colours stores inside its range at ±1e9.
+   //     Load only, no GL: the uniforms are the stored values.
+   {
+      int outOfRange = 0, checked = 0;
+      for (const FilterDef& def : GetFilterDefs())
+      {
+         for (const char* big : { "1e9", "-1e9" })
+         {
+            FilterNode node(def);
+            std::vector<std::pair<std::string, std::string>> hostile;
+            Patch::SaveParams(&node, hostile);
+            for (auto& kv : hostile)
+               if (kv.first.rfind("f ", 0) == 0)
+                  kv.second = big;
+            Patch::LoadParams(&node, hostile);
+            for (size_t i = 0; i < def.params.size(); i++)
+            {
+               const FilterParamDef& p = def.params[i];
+               if (p.type == FilterParamDef::Type::Color || !(p.minVal < p.maxVal))
+                  continue;
+               const float v = node.GetParamValue(i);
+               if (v < p.minVal || v > p.maxVal)
+               {
+                  printf("DSPTEST   %s.%s at %s: %g OUT OF RANGE\n", def.name.c_str(), p.uniformName.c_str(), big, v);
+                  outOfRange++;
+               }
+            }
+            checked++;
+         }
+      }
+      const bool ok = outOfRange == 0 && checked > 0;
+      printf("DSPTEST filter params past the def's range are clamped: %d loads, %d out of range  %s\n",
+             checked, outOfRange, ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
    const EffectDef* limiterDef = FindEffectDef("Limiter");
    if (limiterDef == nullptr)
    {
