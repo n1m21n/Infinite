@@ -73,7 +73,7 @@ Table, the Agent's stats) sees exactly what it saw before.
 The rest of the P8 plan's phases 1-2 (`claude-context/P8_POINTS_PLAN.md` section 4), not yet in
 the steps above, in the order they will be done:
 
-8. Mesh to Points outputs GPU points.
+8. Mesh to Points outputs GPU points. Done (section below).
 9. Twist and Displacement run on GPU points when their input has them.
 10. Field Modifier compiles to GLSL (`src/core/field/GlslBackend.cpp`) when its input is GPU points.
 11. Model 3D reads `.ply` point clouds as points.
@@ -195,3 +195,18 @@ Frame p50 / p99 ms, fps p50, cook ms p50. Off = `INFINITE_GPU_POINTS=0` (the CPU
 - **Step 7 pays:** 200k particles 37-41 → 90-96 fps, 100k 40-63 → 94-108 fps, and the p99 drops
   from 50-118 ms to 15-18 ms (the CPU sim's cook, 4.5-9.7 ms, is gone: ~1 ms on the GPU).
 - 10k is the same either way (~120-135 fps): the frame is the rest of the render, not the sim.
+
+## Step 8: Mesh to Points outputs GPU points (2026-10-24, dev build)
+
+Mesh to Points samples on the CPU as before and uploads the samples once per mesh revision
+(`GpuPointsGL::Upload`: 1024 texels a row, w = scale x point size, 0 for a dead point), so a
+Transform, Twist or Render 3D below it reads textures instead of rebuilding sprites from the cloud
+every frame. Its GPU points carry the CPU cloud's revision; the CPU cloud stays the one every other
+consumer reads.
+
+**Checks.** `GPUPOINTSTEST` step 8 section, all pass: a sphere's 738 samples behind a Transform
+give no GPU points with the path off and GPU points on both nodes with it on; count, live count
+and revision equal the CPU cloud's, and the revision is stable on a second ask; the frame matches
+the CPU frame (0 pixels differ). Group 3d and `render-pipeline-sweep`: see step 9 (run once over
+both). Parity: `glTexSubImage2D` and `glPixelStorei` are GL 1.x core; no shader, no `Platform::`
+code.

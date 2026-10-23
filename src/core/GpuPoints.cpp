@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
+#include <cmath>
 
 namespace GpuPointsGL
 {
@@ -105,5 +107,61 @@ namespace GpuPointsGL
       glBindFramebuffer(GL_FRAMEBUFFER, t.fbo);
       glDrawBuffers(2, bufs);
       glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+   }
+
+   bool Upload(Target& t, GpuPoints& out, const std::vector<Particle>& points, float baseSize, const char* label)
+   {
+      const int n = (int)points.size();
+      if (n <= 0)
+         return false;
+      const int w = std::min(n, 1024);
+      const int h = (n + w - 1) / w;
+      if (!EnsureTarget(t, w, h, label))
+         return false;
+
+      std::vector<float> pos((size_t)w * (size_t)h * 4, 0.0f);
+      std::vector<float> color((size_t)w * (size_t)h * 4, 0.0f);
+      float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+      float maxHalf = 0.0f;
+      int live = 0;
+      for (int i = 0; i < n; i++)
+      {
+         const Particle& p = points[(size_t)i];
+         float* q = &pos[(size_t)i * 4];
+         float* c = &color[(size_t)i * 4];
+         q[0] = p.px; q[1] = p.py; q[2] = p.pz;
+         c[0] = p.r; c[1] = p.g; c[2] = p.b; c[3] = 1.0f;
+         if (!p.alive)
+            continue; // w stays 0: hidden, like the CPU draw's skip
+         q[3] = p.scale * baseSize;
+         live++;
+         maxHalf = std::max(maxHalf, std::fabs(q[3]));
+         lo[0] = std::min(lo[0], p.px); hi[0] = std::max(hi[0], p.px);
+         lo[1] = std::min(lo[1], p.py); hi[1] = std::max(hi[1], p.py);
+         lo[2] = std::min(lo[2], p.pz); hi[2] = std::max(hi[2], p.pz);
+      }
+
+      glBindTexture(GL_TEXTURE_2D, t.posTex);
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_FLOAT, pos.data());
+      glBindTexture(GL_TEXTURE_2D, t.colorTex);
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_FLOAT, color.data());
+      glBindTexture(GL_TEXTURE_2D, 0);
+
+      out.posTex = t.posTex;
+      out.colorTex = t.colorTex;
+      out.texW = w;
+      out.texH = h;
+      out.count = n;
+      out.liveCount = live;
+      out.pointMatrix = Mat4::Identity();
+      out.hasBounds = live > 0;
+      for (int k = 0; k < 3; k++)
+      {
+         out.lo[k] = live > 0 ? lo[k] : 0.0f;
+         out.hi[k] = live > 0 ? hi[k] : 0.0f;
+      }
+      out.maxHalfSize = maxHalf;
+      return true;
    }
 }

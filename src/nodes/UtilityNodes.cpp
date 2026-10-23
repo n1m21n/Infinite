@@ -720,6 +720,27 @@ unsigned long long MeshToPointsNode::PointRevision()
    return mMeshRevision;
 }
 
+MeshToPointsNode::~MeshToPointsNode()
+{
+   GpuPointsGL::DestroyTarget(mGpuTarget);
+}
+
+const GpuPoints* MeshToPointsNode::GetGpuPoints()
+{
+   if (bypassed || !GpuPointsGL::Enabled())
+      return nullptr;
+   RebuildIfNeeded();
+   // Uploaded here rather than in RebuildIfNeeded: only a consumer drawing in
+   // a GL context asks, and a frame nobody draws the points in skips it.
+   if (mGpuUploadedRevision != mMeshRevision)
+   {
+      mGpuUploadedRevision = mMeshRevision;
+      mGpuValid = GpuPointsGL::Upload(mGpuTarget, mGpuPoints, mPoints, PointBaseSize(), "MeshToPoints_GpuPoints");
+      mGpuPoints.revision = mMeshRevision;
+   }
+   return mGpuValid ? &mGpuPoints : nullptr;
+}
+
 Material MeshToPointsNode::GetMaterial() const
 {
    if (inheritMaterial && input != nullptr)

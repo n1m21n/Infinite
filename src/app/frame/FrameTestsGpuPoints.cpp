@@ -26,6 +26,46 @@ namespace
       glBindTexture(GL_TEXTURE_2D, 0);
       return px;
    }
+
+   // The frame compare every step uses: a pixel differs when a channel moves
+   // by more than 2, and the frames match when at most 0.05% of them differ
+   // (float rounding on a sprite edge can flip a sample). `drawn` counts the
+   // pixels the CPU frame changed against a frame with nothing in it.
+   struct FrameDiff
+   {
+      size_t differ = 0, drawn = 0, total = 1;
+      int maxDiff = 0;
+      bool Match() const { return differ * 2000 <= total; }
+      bool Drawn() const { return drawn > total / 200; }
+   };
+
+   FrameDiff CompareFrames(const std::vector<unsigned char>& cpu, const std::vector<unsigned char>& gpu,
+                           const std::vector<unsigned char>& empty)
+   {
+      FrameDiff r;
+      r.total = std::max<size_t>(1, cpu.size() / 4);
+      if (cpu.size() != gpu.size())
+      {
+         r.differ = r.total;
+         return r;
+      }
+      for (size_t i = 0; i + 3 < cpu.size(); i += 4)
+      {
+         int d = 0, e = 0;
+         for (int c = 0; c < 3; c++)
+         {
+            d = std::max(d, std::abs((int)cpu[i + c] - (int)gpu[i + c]));
+            if (i + 3 < empty.size())
+               e = std::max(e, std::abs((int)cpu[i + c] - (int)empty[i + c]));
+         }
+         if (d > 2)
+            r.differ++;
+         if (e > 8)
+            r.drawn++;
+         r.maxDiff = std::max(r.maxDiff, d);
+      }
+      return r;
+   }
 }
 
 void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
@@ -493,6 +533,55 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
       GpuPointsGL::SetEnabledForTest(wasEnabled);
       tr.SetTempo(wasTempo);
       tr.SetPlaying(wasPlaying);
+   }
+
+   // Step 8: Mesh to Points uploads its samples as GPU points once per
+   // rebuild. A sphere's vertices through a Transform, CPU vs GPU.
+   {
+      GeometryNode sphere;
+      sphere.shape = 2;
+      MeshToPointsNode m2p;
+      m2p.input = &sphere;
+      m2p.mode = 0; // vertices
+      m2p.pointSize = 0.06f;
+      GeometryOpNode m2pXf;
+      m2pXf.op = GeometryOpNode::kTransform;
+      m2pXf.input = &m2p;
+      m2pXf.rotX = 30.0f;
+      m2pXf.offsetY = 0.1f;
+
+      auto renderM2p = [&](bool gpu)
+      {
+         GpuPointsGL::SetEnabledForTest(gpu);
+         Render3DNode r; // fresh, for the same reason as renderOnce
+         r.geometry[0] = &m2pXf;
+         r.CookIfNeeded(frame++);
+         return ReadRgba(r.GetOutputTexture(), r.GetOutputWidth(), r.GetOutputHeight());
+      };
+      const std::vector<unsigned char> cpuM2p = renderM2p(false);
+      const bool cpuNone = m2p.GetGpuPoints() == nullptr;
+      const std::vector<unsigned char> gpuM2p = renderM2p(true);
+      const GpuPoints* gp = m2p.GetGpuPoints();
+      const bool offered = gp != nullptr && m2pXf.GetGpuPoints() != nullptr;
+      const size_t cpuN = m2p.GetPoints().size();
+      const bool sameCount = gp != nullptr && (size_t)gp->count == cpuN && (size_t)gp->liveCount == cpuN;
+      const bool sameRevision = gp != nullptr && gp->revision == m2p.PointCloudRevision();
+      // A second ask with nothing changed re-uploads nothing.
+      const unsigned long long rev0 = gp ? gp->revision : 0;
+      const GpuPoints* again = m2p.GetGpuPoints();
+      const bool stable = again != nullptr && again->revision == rev0;
+      m2p.bypassed = true;
+      const std::vector<unsigned char> emptyM2p = renderM2p(true);
+      m2p.bypassed = false;
+
+      const FrameDiff d = CompareFrames(cpuM2p, gpuM2p, emptyM2p);
+      printf("mesh to points: %zu points, drawn %zu, differ %zu (max %d)\n", cpuN, d.drawn, d.differ, d.maxDiff);
+      report("Mesh to Points: no GPU points when the path is off", cpuNone);
+      report("Mesh to Points and its Transform offer GPU points", offered);
+      report("Mesh to Points: GPU count and revision match the CPU cloud", sameCount && sameRevision && stable);
+      report("Mesh to Points: the points are drawn", d.Drawn());
+      report("Mesh to Points: GPU frame matches the CPU frame", d.Match());
+      GpuPointsGL::SetEnabledForTest(wasEnabled);
    }
 
    printf("%s\n", allOk ? "GPU POINTS TEST OK" : "GPU POINTS TEST FAIL");

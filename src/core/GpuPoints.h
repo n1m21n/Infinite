@@ -65,4 +65,12 @@ namespace GpuPointsGL
    // attachment 0, `colorOut` to 1. Call with the target's FBO bound and the
    // program linked (GLSL 150 has no layout qualifiers to fix them).
    void BindOutputs(const Target& t, unsigned int program, const char* posOut, const char* colorOut);
+
+   // For a source whose points are made on the CPU (Mesh to Points, a .ply):
+   // writes `points` into `t` (resized to fit, 1024 texels a row) and fills
+   // `out` with the texels, count and bounds the way Render 3D's CPU cloud
+   // draw would read them: w = p.scale * baseSize, 0 for a dead particle.
+   // The caller sets out.revision. False (out untouched) for an empty cloud
+   // or a missing target.
+   bool Upload(Target& t, GpuPoints& out, const std::vector<Particle>& points, float baseSize, const char* label);
 }
