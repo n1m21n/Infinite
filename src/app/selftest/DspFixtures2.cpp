@@ -2945,9 +2945,9 @@ bool RunMolderFixture()
          Patch::SaveParams(&node, saved);
          for (auto& kv : saved)
          {
-            if (kv.first == "path") kv.second = wavPath;
-            if (kv.first == "seed") kv.second = "12345";
-            if (kv.first == "generation") kv.second = "4";
+            if (kv.first == "s path") kv.second = wavPath;
+            if (kv.first == "i seed") kv.second = "12345";
+            if (kv.first == "i generation") kv.second = "4";
          }
          MolderNode respawned;
          Patch::LoadParams(&respawned, saved);
