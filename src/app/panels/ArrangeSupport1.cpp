@@ -1974,11 +1974,12 @@ namespace app
    // clip already had exactly this source.
    bool ArrangeAssignClipSource(uint64_t clipId, uint64_t uid)
    {
-      const Arrange::Loc loc = Arrange::Find(gArrange, clipId);
+      // LaneOfClip covers slot clips too (Find is timeline-only).
+      const Arrange::Lane* clipLane = Arrange::LaneOfClip(gArrange, clipId);
       GraphNode* gn = FindNodeByUid(uid);
-      if (!loc.Valid() || gn == nullptr || gn->node == nullptr)
+      if (clipLane == nullptr || gn == nullptr || gn->node == nullptr)
          return false;
-      const int laneType = gArrange.lanes[loc.lane].type;
+      const int laneType = clipLane->type;
       if (laneType == Arrange::kLaneAudio ? !IsNodeAudioCompatible(*gn) : !IsNodeVideoCompatible(*gn))
          return false;
       const int out = ArrangeDefaultOutput(*gn, laneType);

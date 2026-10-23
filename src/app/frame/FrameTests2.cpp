@@ -3713,6 +3713,30 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       gSessionPanelOpen = true;
       ArrangeSessionLaunchScene(1);
    }
+   if (frameId == 16)
+   {
+      // Assign a canvas node to a slot clip (was timeline-only).
+      GraphNode* osc = SpawnNode("Oscillator", "Synthesizers", 300.0f, 100.0f);
+      uint64_t cid = 0;
+      ArrangeEdit([&]()
+      {
+         Arrange::Lane* l = Arrange::FindLane(gArrange, laneA2);
+         if (l != nullptr && l->slots.size() > 2)
+         {
+            Arrange::Clip c;
+            c.id = cid = gArrange.NewId();
+            c.length = Arrange::kTicksPerBar;
+            l->slots[2].clip = c;
+         }
+      });
+      const size_t undoBefore = gUndoStack.size();
+      check(cid != 0 && osc != nullptr && ArrangeAssignClipSource(cid, osc->uid), "assign node to an unassigned slot clip");
+      const Arrange::Clip* got = Arrange::FindClip(gArrange, cid);
+      check(got != nullptr && got->srcUid == osc->uid && gUndoStack.size() == undoBefore + 1, "slot clip source set with one undo entry");
+      gArrangeAssigningClipId = cid;
+      check(Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId) != nullptr, "assigning id resolves for a slot clip");
+      gArrangeAssigningClipId = 0;
+   }
    if (frameId == 20)
    {
       printf("%s\n", ok ? "SESSION VIEW TEST OK" : "SESSION VIEW TEST FAIL");

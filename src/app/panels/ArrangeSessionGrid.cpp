@@ -11,6 +11,7 @@
 #include "app/ui/design/components/FieldWell.h"
 #include "app/ui/design/components/PanelFrame.h"
 #include "app/ui/design/GlyphDraw.h"
+#include "app/ui/design/UiAnim.h"
 #include "app/ui/design/TokenColors.h"
 #include "app/AppShared.h"
 
@@ -253,6 +254,8 @@ namespace app
             gArrangeSel = { made };
             gArrangeSelAnchor = made;
             gArrangeAssigningClipId = made;
+            gArrangeFlashClipId = made;
+            gArrangeFlashStart = ImGui::GetTime();
          }
       }
 
@@ -296,7 +299,7 @@ namespace app
                });
             }
             if (sel == nullptr && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-               HelpTip("%s", T("Select one clip on this kind of track in Timeline view first."));
+               HelpTip("%s", T("Select one clip on this kind of track first."));
             MenuParts::Separator();
             if (MenuParts::Item(L("Stop Track"), nullptr, false, ArrangeSessionLaneQuery(laneId).playingSlot >= 0))
                ArrangeSessionStopLane(laneId);
@@ -654,6 +657,24 @@ namespace app
                   DrawProgressRing(dl, ic, 7.0f, st.progress, tok::U32(tok::pal::c_FFFFFFFF));
                else
                   glyph::DrawPlayerPlay(dl, ic, tok::icon_sm, WithAlpha(ink, st.queued ? pulse : 0.85f), !st.queued);
+               if (gArrangeAssigningClipId == ss->clip.id)
+               {
+                  // Waiting for a canvas node: the same cue as the Timeline's
+                  // target - a pulsing outline, steady under Reduce Motion.
+                  const float ap = UiAnim::ReduceMotion() ? 1.0f : 0.55f + 0.45f * std::sin((float)ImGui::GetTime() * 5.0f);
+                  dl->AddRect(ImVec2(a.x - 2.0f, a.y - 2.0f), ImVec2(b.x + 2.0f, b.y + 2.0f),
+                              WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), ap), tok::radius_field, 0, 2.5f);
+                  HelpTip("%s", T("Click a node on the canvas to assign it. Esc cancels."));
+               }
+               if (gArrangeFlashClipId == ss->clip.id)
+               {
+                  const float ft = (float)(ImGui::GetTime() - gArrangeFlashStart);
+                  if (ft >= 1.2f)
+                     gArrangeFlashClipId = 0;
+                  else
+                     dl->AddRect(ImVec2(a.x - 2.0f, a.y - 2.0f), ImVec2(b.x + 2.0f, b.y + 2.0f),
+                                 IM_COL32(255, 255, 255, (int)(255.0f * (1.0f - ft / 1.2f))), tok::radius_field, 0, 2.5f);
+               }
                if (st.queued)
                   dl->AddRect(a, b, WithAlpha(tok::U32(tok::pal::c_FFFFFFFF), 0.9f * pulse), tok::radius_field, 0, 1.5f);
                if (st.upNext)

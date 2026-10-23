@@ -168,12 +168,12 @@ void DrawSidePanels(FrameCtx& fc)
       // box (via ed::GetNodePosition/GetNodeSize, both canvas-space here
       // just like the param picker's mp above) and a click assigns it as the
       // clip's source.
-      if (gArrangeAssigningClipId != 0 && !Arrange::Find(gArrange, gArrangeAssigningClipId).Valid())
+      if (gArrangeAssigningClipId != 0 && Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId) == nullptr)
          gArrangeAssigningClipId = 0;
       if (gArrangeAssigningClipId != 0)
       {
-         const Arrange::Loc assignLoc = Arrange::Find(gArrange, gArrangeAssigningClipId);
-         const bool assignIsVideo = gArrange.lanes[assignLoc.lane].type == Arrange::kLaneVideo;
+         const Arrange::Lane* assignLane = Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId);
+         const bool assignIsVideo = assignLane->type == Arrange::kLaneVideo;
          const ImVec2 mp = ImGui::GetMousePos();
 
          GraphNode* hoveredCompatible = nullptr;

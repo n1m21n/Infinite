@@ -1563,3 +1563,5 @@ Show Session	Показать сессию
 Close Session	Закрыть сессию
 Show the video the launched clips produce.	Показать видео, которое создают запущенные клипы.
 Session - launch clips by scene	Сессия — запуск клипов по сценам
+Select one clip on this kind of track first.	Сначала выберите один клип на дорожке этого типа.
+Click a node on the canvas to assign it. Esc cancels.	Нажмите на узел на холсте, чтобы назначить его. Esc — отмена.
