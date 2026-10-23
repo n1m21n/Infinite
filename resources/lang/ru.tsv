@@ -1492,3 +1492,40 @@ v%s	=en
 v%s, %.0f MB download	v%s, загрузка %.0f МБ
 version %s	версия %s
 version %s is available (you have %s) - click to update, right-click to dismiss	доступна версия %s (у вас %s): щёлкните для обновления, правый щелчок — скрыть
+%.1f BPM on launch	%.1f BPM при запуске
+%d bar	%d такт
+%d bars	%d тактов
+Add a track in Timeline view, then drop audio or video files onto its cells here.	Добавьте дорожку в виде «Таймлайн», затем перетащите аудио- или видеофайлы на её ячейки здесь.
+Clear Slot	Очистить слот
+Click to launch. Right-click for follow actions.	Щёлкните для запуска. Правый щелчок — последующие действия.
+Delete Scene	Удалить сцену
+Duplicate Scene	Дублировать сцену
+Empty slot: drop a video or image file here	Пустой слот: перетащите сюда видео- или файл изображения
+Empty slot: drop an audio file here	Пустой слот: перетащите сюда аудиофайл
+Follow Action	Последующее действие
+Follow After	Через
+Insert Scene Above	Вставить сцену выше
+Launch Scene	Запустить сцену
+Launch this row on every track (right-click to rename or set a tempo)	Запустить эту строку на каждой дорожке (правый щелчок — переименовать или задать темп)
+Launching this scene sets the project tempo. 0 leaves the tempo alone.	Запуск сцены задаёт темп проекта. 0 оставляет темп без изменений.
+No Follow Action	Нет действия
+No tracks yet	Дорожек пока нет
+Paste Selected Clip	Вставить выбранный клип
+Place on Timeline at Playhead	Поместить на таймлайн в позиции маркера
+Random	Случайно
+Record to Timeline: what the launched clips play is written into the arrangement.	Запись на таймлайн: то, что играют запущенные клипы, записывается в аранжировку.
+Right-click to rename this scene or set its tempo	Правый щелчок — переименовать сцену или задать её темп
+Scene %d	Сцена %d
+Scene name	Название сцены
+Select one clip on this kind of track in Timeline view first.	Сначала выберите в виде «Таймлайн» один клип на дорожке этого типа.
+Session: launch clips by scene	Сессия: запуск клипов по сценам
+Stop	Стоп
+Stop Track	Остановить дорожку
+Stop every track: the whole panel goes back to playing the Timeline	Остановить все дорожки: вся панель снова играет таймлайн
+Stop this track	Остановить эту дорожку
+Stop this track: it goes back to playing the Timeline	Остановить эту дорожку: она снова играет таймлайн
+Tempo: unchanged	Темп: без изменений
+This slot is inactive	Этот слот неактивен
+This slot's source is missing	Источник этого слота отсутствует
+Timeline: clips along the transport	Таймлайн: клипы вдоль транспорта
+Unassigned	Не назначено

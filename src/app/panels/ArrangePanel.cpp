@@ -939,8 +939,9 @@ namespace app
 
          // Timeline | Session: the same panel shows either the linear
          // timeline or the clip launcher grid (gArrangeSessionView).
-         ImGui::SameLine(0.0f, tok::space_4);
          {
+            const ImVec2 unitEnd = ImGui::GetItemRectMax();
+            ImGui::SetCursorScreenPos(ImVec2(unitEnd.x + tok::space_4, ImGui::GetItemRectMin().y));
             static const PillGroup::Segment kViewSegs[2] = { { "arrange.view.timeline", "Timeline" }, { "arrange.view.session", "Session" } };
             const ImVec2 vp = ImGui::GetCursorScreenPos();
             const UiLayout::Rect vr{ vp.x, vp.y, 150.0f, tok::tile };

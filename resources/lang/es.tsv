@@ -1492,3 +1492,40 @@ v%s	=en
 v%s, %.0f MB download	v%s, descarga de %.0f MB
 version %s	versión %s
 version %s is available (you have %s) - click to update, right-click to dismiss	la versión %s está disponible (tienes %s): haz clic para actualizar, clic derecho para descartar
+%.1f BPM on launch	%.1f BPM al lanzar
+%d bar	%d compás
+%d bars	%d compases
+Add a track in Timeline view, then drop audio or video files onto its cells here.	Añade una pista en la vista Línea de tiempo y suelta aquí archivos de audio o vídeo en sus celdas.
+Clear Slot	Vaciar ranura
+Click to launch. Right-click for follow actions.	Clic para lanzar. Clic derecho para acciones de seguimiento.
+Delete Scene	Eliminar escena
+Duplicate Scene	Duplicar escena
+Empty slot: drop a video or image file here	Ranura vacía: suelta aquí un archivo de vídeo o imagen
+Empty slot: drop an audio file here	Ranura vacía: suelta aquí un archivo de audio
+Follow Action	Acción de seguimiento
+Follow After	Seguir tras
+Insert Scene Above	Insertar escena encima
+Launch Scene	Lanzar escena
+Launch this row on every track (right-click to rename or set a tempo)	Lanza esta fila en todas las pistas (clic derecho para renombrar o fijar un tempo)
+Launching this scene sets the project tempo. 0 leaves the tempo alone.	Al lanzar esta escena se fija el tempo del proyecto. 0 deja el tempo como está.
+No Follow Action	Sin acción de seguimiento
+No tracks yet	Aún no hay pistas
+Paste Selected Clip	Pegar clip seleccionado
+Place on Timeline at Playhead	Colocar en la línea de tiempo en el cabezal
+Random	Aleatorio
+Record to Timeline: what the launched clips play is written into the arrangement.	Grabar en la línea de tiempo: lo que reproducen los clips lanzados se escribe en el arreglo.
+Right-click to rename this scene or set its tempo	Clic derecho para renombrar esta escena o fijar su tempo
+Scene %d	Escena %d
+Scene name	Nombre de escena
+Select one clip on this kind of track in Timeline view first.	Primero selecciona un clip de este tipo de pista en la vista Línea de tiempo.
+Session: launch clips by scene	Sesión: lanza clips por escena
+Stop	Detener
+Stop Track	Detener pista
+Stop every track: the whole panel goes back to playing the Timeline	Detiene todas las pistas: todo el panel vuelve a reproducir la línea de tiempo
+Stop this track	Detener esta pista
+Stop this track: it goes back to playing the Timeline	Detiene esta pista: vuelve a reproducir la línea de tiempo
+Tempo: unchanged	Tempo: sin cambios
+This slot is inactive	Esta ranura está inactiva
+This slot's source is missing	Falta el origen de esta ranura
+Timeline: clips along the transport	Línea de tiempo: clips a lo largo del transporte
+Unassigned	Sin asignar

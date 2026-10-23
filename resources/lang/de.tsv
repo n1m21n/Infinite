@@ -1492,3 +1492,40 @@ v%s	=en
 v%s, %.0f MB download	v%s, %.0f MB Download
 version %s	Version %s
 version %s is available (you have %s) - click to update, right-click to dismiss	Version %s ist verfügbar (du hast %s): klicken zum Aktualisieren, Rechtsklick zum Ausblenden
+%.1f BPM on launch	%.1f BPM beim Starten
+%d bar	%d Takt
+%d bars	%d Takte
+Add a track in Timeline view, then drop audio or video files onto its cells here.	Füge in der Timeline-Ansicht eine Spur hinzu und ziehe dann Audio- oder Videodateien auf ihre Zellen.
+Clear Slot	Slot leeren
+Click to launch. Right-click for follow actions.	Klicken zum Starten. Rechtsklick für Folgeaktionen.
+Delete Scene	Szene löschen
+Duplicate Scene	Szene duplizieren
+Empty slot: drop a video or image file here	Leerer Slot: Video- oder Bilddatei hier ablegen
+Empty slot: drop an audio file here	Leerer Slot: Audiodatei hier ablegen
+Follow Action	Folgeaktion
+Follow After	Folgen nach
+Insert Scene Above	Szene darüber einfügen
+Launch Scene	Szene starten
+Launch this row on every track (right-click to rename or set a tempo)	Diese Zeile auf jeder Spur starten (Rechtsklick zum Umbenennen oder für ein Tempo)
+Launching this scene sets the project tempo. 0 leaves the tempo alone.	Beim Starten dieser Szene wird das Projekttempo gesetzt. 0 lässt das Tempo unverändert.
+No Follow Action	Keine Folgeaktion
+No tracks yet	Noch keine Spuren
+Paste Selected Clip	Ausgewählten Clip einfügen
+Place on Timeline at Playhead	Am Abspielkopf auf die Timeline legen
+Random	Zufall
+Record to Timeline: what the launched clips play is written into the arrangement.	In Timeline aufnehmen: Was die gestarteten Clips abspielen, wird in das Arrangement geschrieben.
+Right-click to rename this scene or set its tempo	Rechtsklick zum Umbenennen dieser Szene oder für ihr Tempo
+Scene %d	Szene %d
+Scene name	Szenenname
+Select one clip on this kind of track in Timeline view first.	Wähle zuerst in der Timeline-Ansicht einen Clip auf dieser Art von Spur aus.
+Session: launch clips by scene	Session: Clips szenenweise starten
+Stop	Stopp
+Stop Track	Spur stoppen
+Stop every track: the whole panel goes back to playing the Timeline	Alle Spuren stoppen: das ganze Panel spielt wieder die Timeline
+Stop this track	Diese Spur stoppen
+Stop this track: it goes back to playing the Timeline	Diese Spur stoppen: sie spielt wieder die Timeline
+Tempo: unchanged	Tempo: unverändert
+This slot is inactive	Dieser Slot ist inaktiv
+This slot's source is missing	Die Quelle dieses Slots fehlt
+Timeline: clips along the transport	Timeline: Clips entlang des Transports
+Unassigned	Nicht zugewiesen

@@ -1492,3 +1492,40 @@ v%s	=en
 v%s, %.0f MB download	v%s，下载 %.0f MB
 version %s	版本 %s
 version %s is available (you have %s) - click to update, right-click to dismiss	版本 %s 已发布（你使用的是 %s）：点击更新，右键忽略
+%.1f BPM on launch	启动时 %.1f BPM
+%d bar	%d 小节
+%d bars	%d 小节
+Add a track in Timeline view, then drop audio or video files onto its cells here.	请先在时间线视图中添加轨道，然后将音频或视频文件拖到这里的单元格上。
+Clear Slot	清空槽位
+Click to launch. Right-click for follow actions.	点击启动。右键查看后续动作。
+Delete Scene	删除场景
+Duplicate Scene	复制场景
+Empty slot: drop a video or image file here	空槽位：将视频或图像文件拖到此处
+Empty slot: drop an audio file here	空槽位：将音频文件拖到此处
+Follow Action	后续动作
+Follow After	跟随时间
+Insert Scene Above	在上方插入场景
+Launch Scene	启动场景
+Launch this row on every track (right-click to rename or set a tempo)	在每条轨道上启动此行（右键可重命名或设置速度）
+Launching this scene sets the project tempo. 0 leaves the tempo alone.	启动此场景会设置项目速度。0 表示不改变速度。
+No Follow Action	无后续动作
+No tracks yet	还没有轨道
+Paste Selected Clip	粘贴所选片段
+Place on Timeline at Playhead	放置到播放头处的时间线
+Random	随机
+Record to Timeline: what the launched clips play is written into the arrangement.	录制到时间线：已启动片段播放的内容会写入编排。
+Right-click to rename this scene or set its tempo	右键可重命名此场景或设置其速度
+Scene %d	场景 %d
+Scene name	场景名称
+Select one clip on this kind of track in Timeline view first.	请先在时间线视图中选择此类轨道上的一个片段。
+Session: launch clips by scene	会话：按场景启动片段
+Stop	停止
+Stop Track	停止轨道
+Stop every track: the whole panel goes back to playing the Timeline	停止所有轨道：整个面板恢复播放时间线
+Stop this track	停止此轨道
+Stop this track: it goes back to playing the Timeline	停止此轨道：恢复播放时间线
+Tempo: unchanged	速度：不变
+This slot is inactive	此槽位未启用
+This slot's source is missing	此槽位的源文件缺失
+Timeline: clips along the transport	时间线：沿走带排列的片段
+Unassigned	未分配

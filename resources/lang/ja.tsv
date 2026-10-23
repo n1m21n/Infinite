@@ -1492,3 +1492,40 @@ v%s	=en
 v%s, %.0f MB download	v%s、%.0f MB のダウンロード
 version %s	バージョン %s
 version %s is available (you have %s) - click to update, right-click to dismiss	バージョン %s が利用可能です（現在 %s）：クリックでアップデート、右クリックで閉じる
+%.1f BPM on launch	起動時 %.1f BPM
+%d bar	%d 小節
+%d bars	%d 小節
+Add a track in Timeline view, then drop audio or video files onto its cells here.	タイムラインビューでトラックを追加し、ここでそのセルにオーディオまたはビデオファイルをドロップします。
+Clear Slot	スロットをクリア
+Click to launch. Right-click for follow actions.	クリックで起動。右クリックでフォローアクション。
+Delete Scene	シーンを削除
+Duplicate Scene	シーンを複製
+Empty slot: drop a video or image file here	空のスロット：ビデオまたは画像ファイルをここにドロップ
+Empty slot: drop an audio file here	空のスロット：オーディオファイルをここにドロップ
+Follow Action	フォローアクション
+Follow After	フォロー時間
+Insert Scene Above	上にシーンを挿入
+Launch Scene	シーンを起動
+Launch this row on every track (right-click to rename or set a tempo)	この行をすべてのトラックで起動（右クリックで名前変更やテンポ設定）
+Launching this scene sets the project tempo. 0 leaves the tempo alone.	このシーンを起動するとプロジェクトのテンポが設定されます。0 ならテンポは変わりません。
+No Follow Action	フォローアクションなし
+No tracks yet	トラックがありません
+Paste Selected Clip	選択したクリップを貼り付け
+Place on Timeline at Playhead	再生ヘッドの位置でタイムラインに配置
+Random	ランダム
+Record to Timeline: what the launched clips play is written into the arrangement.	タイムラインに録音：起動したクリップの再生内容がアレンジに書き込まれます。
+Right-click to rename this scene or set its tempo	右クリックでこのシーンの名前変更やテンポ設定
+Scene %d	シーン %d
+Scene name	シーン名
+Select one clip on this kind of track in Timeline view first.	まずタイムラインビューでこの種類のトラック上のクリップを1つ選択してください。
+Session: launch clips by scene	セッション：シーンごとにクリップを起動
+Stop	停止
+Stop Track	トラックを停止
+Stop every track: the whole panel goes back to playing the Timeline	すべてのトラックを停止：パネル全体がタイムラインの再生に戻ります
+Stop this track	このトラックを停止
+Stop this track: it goes back to playing the Timeline	このトラックを停止：タイムラインの再生に戻ります
+Tempo: unchanged	テンポ：変更なし
+This slot is inactive	このスロットは無効です
+This slot's source is missing	このスロットのソースが見つかりません
+Timeline: clips along the transport	タイムライン：トランスポートに沿ったクリップ
+Unassigned	未割り当て
