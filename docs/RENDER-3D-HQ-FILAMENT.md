@@ -95,6 +95,25 @@ comum em `app/frame/Startup.inl:1832`, lista do driver em `driver.ps1` (`'NOME:q
   Ops, L-System), achado pelo mesmo teste, que agora cobre 21 formas sem `may_fail`. Suíte completa:
   71/72, e o único caso que caiu (`R3DFXTEST`, AO no knot) mudou porque o knot visto de fora tem menos
   vincos que o interior que se via antes; o teste passou a usar raio 1,0. BEFORE recapturado.
+- **Sombra do Render 3D sumindo embaixo dos objetos (verificação do dono, 2026-10-23, corrigido).**
+  Duas causas somadas, diagnosticadas numa cena com esfera encostada, esfera a 20 cm e cubo a 2 cm
+  do chão:
+  1. O passe de sombra usava `glCullFace(GL_FRONT)` e gravava o lado *de trás* de cada objeto.
+     Antes da correção do enrolamento isso gravava, sem querer, o lado virado para a luz; depois dela
+     passou a gravar a face de baixo, a centímetros do chão. O bias do Render 3D é em profundidade
+     normalizada e escala com a cena inteira, chão incluído (0,0025 × 5 × raio ≈ 25 cm com um chão
+     de 30 m, até ~70 cm com luz rasante), então o chão logo abaixo ficava iluminado: meia-lua clara
+     na cena A, sombra inteira sumida na cena de diagnóstico. Agora o passe não descarta faces e
+     grava o lado mais próximo da luz, qualquer que seja o enrolamento (modelos importados com faces
+     invertidas também).
+  2. Os limites a que o mapa é ajustado só existem depois do upload, que acontece no passe principal,
+     *depois* do passe de sombra. O primeiro desenho de uma cena saía sem sombra e, com a cena parada,
+     o cache nunca redesenhava (só aparecia quando algo mudava). Agora, se a sombra ficou esperando
+     os limites, o próximo quadro redesenha.
+  O HQ não tinha nenhum dos dois problemas (ajuste só aos objetos que projetam sombra, bias do
+  Filament em texels, limites antes do mapa). `SHADOWTEST`, `3DTEST`, `RENDER3DCACHESWEEPTEST`, `HQTEST`,
+  `CULLTEST`, `TAATEST` e `R3DFXTEST` ok. Muda a imagem de todo patch com sombra no Render 3D (de
+  propósito): o compat do gate vai acusar.
 
 ## 5. Cenas de referência e linha de base (S0)
 
