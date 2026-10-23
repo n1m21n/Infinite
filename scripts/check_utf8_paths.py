@@ -26,6 +26,7 @@ ALLOW = {
     ("src/app/Startup.cpp", 'const auto touch = [&](const char* name) { std::ofstream(dir / name) << "x"; };'),
     ("src/core/Extensions.cpp", 'std::ofstream(f).put(\'x\');'),
     ("src/core/Extensions.cpp", 'FILE* f = fopen(target.c_str(), "wb");'),
+    ("src/app/panels/Diagnostics.cpp", "std::ifstream f(p, std::ios::binary);"),
     ("src/core/ShareBundle.cpp", "std::ofstream f(dest, std::ios::binary);"),
     ("src/nodes/LooperNode.cpp", "std::ofstream f(tmp, std::ios::binary | std::ios::trunc);"),
     ("src/platform/common/SingleInstance.h", "std::ofstream f(tmp, std::ios::binary | std::ios::trunc);"),
