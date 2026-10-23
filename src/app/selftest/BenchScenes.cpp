@@ -529,6 +529,12 @@ bool BuildBenchB11Scene(const std::string& scene, int n, const std::string& clip
 
    for (GraphNode& gn : gNodes)
       gn.showParams = true;
+   // The point node's own sliders clamp past what a user can reach (Image to
+   // Points density 400 = 160k points, max particles 50,000), and a drawn
+   // slider writes its clamp back. Collapse that one body so the engine's own
+   // caps (512², 200k) are what the run measures.
+   if (GraphNode* gn = FindNodeByIndex(outPointsIdx))
+      gn->showParams = false;
    Transport::Instance().SetPlaying(true);
    return true;
 }
