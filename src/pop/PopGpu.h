@@ -129,6 +129,13 @@ namespace pop
          std::vector<int> comps;
          std::vector<const float*> data; // per attribute, count * comps floats
          unsigned long long revision = 0;
+         // Turbo 0.71 (P1): a RequestRows() copy holds only `rows` of the
+         // source (row k of data = source row rows[k]), tagged with the
+         // caller's sequence number of rows[0]; sourceCount is the source's
+         // point count then. A full copy has rows empty and sourceCount = count.
+         std::vector<int> rows;
+         unsigned long long first = 0;
+         int sourceCount = 0;
       };
       AsyncRows() = default;
       AsyncRows(const AsyncRows&) = delete;
@@ -136,6 +143,11 @@ namespace pop
       ~AsyncRows();
       // Copies `names` of `d` (P first; missing ones are left out).
       void Request(const PopData& d, const std::vector<std::string>& names);
+      // Turbo 0.71 (P1): the same for only `rows` of `d` (gathered on the GPU
+      // first, so a few rows of a large source cross to the CPU, not all of
+      // it); `first` tags the snapshot (see Snapshot::first).
+      void RequestRows(const PopData& d, const std::vector<std::string>& names, const std::vector<int>& rows,
+                       unsigned long long first);
       // The newest finished copy, or nullptr while none has finished yet.
       const Snapshot* Latest();
 
@@ -148,7 +160,12 @@ namespace pop
          void* fence = nullptr;
          bool done = false;
          Snapshot snap;
+         std::vector<BufferPtr> keep; // RequestRows: its index buffers, until the copy is done
       };
+      // The free slot sized for `bytes` and bound to GL_COPY_WRITE_BUFFER, or
+      // nullptr (both in flight, or no mapping).
+      Slot* BeginCopy(size_t bytes);
+      void EndCopy(Slot& s);
       Slot mSlots[2];
       int mNext = 0;
       int mReady = -1;

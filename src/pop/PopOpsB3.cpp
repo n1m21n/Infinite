@@ -23,6 +23,10 @@ namespace pop
 {
    using namespace popa;
 
+   // Turbo 0.71 (P1): see SetParticleFullSourceCopyForTest (PopOps.h).
+   static bool sParticleFullCopy = false;
+   void SetParticleFullSourceCopyForTest(bool on) { sParticleFullCopy = on; }
+
    namespace
    {
       PopDef Cpu(const char* name, const char* help, int inputs)
@@ -51,6 +55,24 @@ namespace pop
          // Turbo 0.62: last frame's source, read back without stalling.
          std::shared_ptr<AsyncRows> async;
          float Rnd() { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return (float)(rng & 0xffffff) / 16777215.0f; }
+         // Turbo 0.71 (P1): the next births' random numbers, drawn ahead in the
+         // order the births use them (u picks the source row), so only those
+         // rows of a GPU source are copied back; aheadFirst numbers ahead[0].
+         struct Pending
+         {
+            float u, jit[3], vr[3], lr;
+         };
+         std::deque<Pending> ahead;
+         unsigned long long aheadFirst = 0;
+         Pending DrawBirth()
+         {
+            Pending p;
+            p.u = Rnd();
+            for (int k = 0; k < 3; k++) p.jit[k] = Rnd();
+            for (int k = 0; k < 3; k++) p.vr[k] = Rnd();
+            p.lr = Rnd();
+            return p;
+         }
       };
 
       struct FrameState : OpState
@@ -606,15 +628,56 @@ namespace pop
                   };
                   std::vector<Draw> draws((size_t)births);
                   std::vector<int> rows((size_t)births);
-                  const int srcCount = snap ? snap->count : src->pointCount;
+                  const int srcCount = snap ? snap->sourceCount : src->pointCount;
+                  // Turbo 0.71 (P1): "rate" births take their numbers from the
+                  // queue drawn ahead (s.ahead, the same sequence in the same
+                  // order), topped up here when it runs short; "all" births
+                  // draw no row and leave it (it is dropped).
+                  const bool fromAhead = c.I("birth") == 0;
+                  if (!fromAhead)
+                     s.ahead.clear();
                   for (int b = 0; b < births; b++)
                   {
                      Draw& dr = draws[(size_t)b];
-                     dr.si = c.I("birth") == 1 ? std::min(b, srcCount - 1) : std::min(srcCount - 1, (int)(s.Rnd() * srcCount));
-                     for (int k = 0; k < 3; k++) dr.jit[k] = s.Rnd();
-                     for (int k = 0; k < 3; k++) dr.vr[k] = s.Rnd();
-                     dr.lr = s.Rnd();
+                     if (fromAhead)
+                     {
+                        if ((size_t)b >= s.ahead.size())
+                           s.ahead.push_back(s.DrawBirth());
+                        const ParticleState::Pending& pb = s.ahead[(size_t)b];
+                        dr.si = std::min(srcCount - 1, (int)(pb.u * srcCount));
+                        std::copy(pb.jit, pb.jit + 3, dr.jit);
+                        std::copy(pb.vr, pb.vr + 3, dr.vr);
+                        dr.lr = pb.lr;
+                     }
+                     else
+                     {
+                        dr.si = std::min(b, srcCount - 1);
+                        for (int k = 0; k < 3; k++) dr.jit[k] = s.Rnd();
+                        for (int k = 0; k < 3; k++) dr.vr[k] = s.Rnd();
+                        dr.lr = s.Rnd();
+                     }
                      rows[(size_t)b] = dr.si;
+                  }
+                  // Where each birth's row sits in the snapshot: a full copy holds
+                  // the source as is; a RequestRows copy holds the rows of the
+                  // queue as it stood (sequence snap->first on), used only when it
+                  // has every birth's row - else the plain path below.
+                  std::vector<int> snapRow(rows);
+                  if (snap != nullptr && !snap->rows.empty())
+                     for (int b = 0; b < births && snap != nullptr; b++)
+                     {
+                        const unsigned long long seq = s.aheadFirst + (unsigned long long)b;
+                        const unsigned long long at = seq - snap->first;
+                        if (!fromAhead || seq < snap->first || at >= snap->rows.size() ||
+                            snap->rows[(size_t)at] != rows[(size_t)b])
+                           snap = nullptr;
+                        else
+                           snapRow[(size_t)b] = (int)at;
+                     }
+                  if (fromAhead)
+                  {
+                     s.ahead.erase(s.ahead.begin(), s.ahead.begin() + births);
+                     s.aheadFirst += (unsigned long long)births;
                   }
                   Arrays sa;
                   if (snap != nullptr)
@@ -625,7 +688,7 @@ namespace pop
                         const int cc = snap->comps[k];
                         std::vector<float> v((size_t)births * cc);
                         for (int b = 0; b < births; b++)
-                           std::memcpy(&v[(size_t)b * cc], snap->data[k] + (size_t)rows[(size_t)b] * cc, cc * sizeof(float));
+                           std::memcpy(&v[(size_t)b * cc], snap->data[k] + (size_t)snapRow[(size_t)b] * cc, cc * sizeof(float));
                         sa.names.push_back(snap->names[k]);
                         sa.comps.push_back(cc);
                         sa.data.push_back(std::move(v));
@@ -697,7 +760,25 @@ namespace pop
                   for (const PopAttrib& at : src->attribs)
                      if (at.name != attr::P && at.name != attr::N)
                         names.push_back(at.name);
-               s.async->Request(*src, names);
+               if (c.I("birth") == 0 && !sParticleFullCopy)
+               {
+                  // Turbo 0.71 (P1): only the rows the next births can pick. dt
+                  // is capped at 0.1 s, so 0.2 s of births (plus the carry)
+                  // covers this copy and the one after it; their numbers are
+                  // drawn now, in the order the births will use them.
+                  const int maxP = std::max(1, c.I("max"));
+                  const double want = std::ceil(std::max(0.0, (double)c.F("rate")) * 0.2) + 2.0;
+                  const size_t ahead = (size_t)std::min(want, 2.0 * (double)maxP);
+                  while (s.ahead.size() < ahead)
+                     s.ahead.push_back(s.DrawBirth());
+                  const int count = src->pointCount;
+                  std::vector<int> rows(s.ahead.size());
+                  for (size_t k = 0; k < s.ahead.size(); k++)
+                     rows[k] = std::min(count - 1, (int)(s.ahead[k].u * count));
+                  s.async->RequestRows(*src, names, rows, s.aheadFirst);
+               }
+               else
+                  s.async->Request(*src, names);
             }
 
             // Turbo 0.61: size and colour over life (t = age / life span). PScale

@@ -10,6 +10,21 @@ Plan: `docs/plans/HQ-071-STRATEGY.md`; technical notes: `docs/RENDER-3D-HQ-FILAM
   specular anti-aliasing), image-based lighting from the HDRI with no seam. PointZ particles,
   shadows, ambient occlusion and TAA come in the next steps. Built with `INFINITE_ENABLE_RENDER_HQ`
   (on); without it the node draws as Render 3D and says so.
+- **Faster (P1, measured A/B against the S7 build, whole frame, 1080p):** the owner's reference
+  patch 14.64 -> 10.11 ms (-31%), the HQ's 1M-point scene 9.65 -> 5.68 ms (-41%), Render 3D's
+  1M-point scene 15.76 -> 11.92 ms (-24%).
+  - Noise PointZ, curl over 4D gradient noise (the default of the HQ scenes and the reference
+    patch): each lattice cell's 16 gradients are hashed once and shared by the curl's samples
+    (1M points: 4.88 -> 1.31 ms of GPU). Same arithmetic; positions move by at most ~2e-5 (the
+    driver rounds the two code shapes a few ulps apart).
+  - Particle PointZ on the CPU engine (patches saved before 0.70) copied its whole GPU-made source
+    back to the CPU every frame (305k points with every attribute under `inherit`); it now draws
+    the next births ahead, in the same order, and copies back only those rows: the same particles
+    bit for bit, 3.57 -> 0.20 ms of GPU.
+- **Render 3D HQ, S8**: its own finish with Filament's bloom (threshold, 6 levels, before the
+  tonemap) and Filament's ACES tonemaps next to Render 3D's, render scale with FSR 1, RCAS
+  sharpening after the TAA, mip bias under TAA, full-resolution GTAO, and quality presets
+  (Performance / Balanced / High) that set the real params. Scene D's bloom costs 11% less.
 - **Fix, visible in saved patches: Sphere, Cylinder, Cone, Torus Knot, Helix, Pyramid and the tubes
   of Curve / Curve Ops / L-System were wound inside out.** Back-face culling then drew the inside of
   their far half: the right outline, but lighting and reflections inverted in depth (a light from

@@ -1645,6 +1645,50 @@
          cmp(pop::attr::PScale, 1, 1e-4);
          cmp(pop::attr::Color, 4, 1e-4);
 
+         // Turbo 0.71 (P1): the CPU engine over a GPU-made source copies back only
+         // the rows its next births can pick - against the whole-source copy it
+         // replaced, same frames, same seed: bit for bit (the source holds still,
+         // so the copies' ages do not matter).
+         {
+            std::unique_ptr<PopNode> wobble(static_cast<PopNode*>(PopNode::CreateFor("Noise PointZ")));
+            wobble->inputs[0] = grid.get();
+            set(wobble.get(), "amp", 0.3f);
+            std::unique_ptr<PopNode> full(static_cast<PopNode*>(PopNode::CreateFor("Particle PointZ")));
+            std::unique_ptr<PopNode> rowsOnly(static_cast<PopNode*>(PopNode::CreateFor("Particle PointZ")));
+            for (PopNode* n : { full.get(), rowsOnly.get() })
+            {
+               n->inputs[0] = wobble.get();
+               set(n, "engine", 0.0f);
+               set(n, "rate", 4000.0f);
+               set(n, "life", 0.6f);
+               set(n, "lifeVar", 0.5f);
+               set(n, "velRand", 0.5f);
+               set(n, "jitter", 0.05f);
+               set(n, "inherit", 1.0f);
+            }
+            for (int f = 0; f < 90; f++)
+            {
+               grid->CookIfNeeded(++frame);
+               wobble->CookIfNeeded(frame);
+               pop::SetParticleFullSourceCopyForTest(true);
+               full->CookIfNeeded(frame);
+               pop::SetParticleFullSourceCopyForTest(false);
+               rowsOnly->CookIfNeeded(frame);
+            }
+            const pop::PopData* fa = full->GetPop();
+            const pop::PopData* fb = rowsOnly->GetPop();
+            bool same = fa != nullptr && fb != nullptr && fa->pointCount == fb->pointCount && fa->pointCount > 0;
+            for (const pop::PopAttrib& at : same ? fa->attribs : std::vector<pop::PopAttrib>())
+            {
+               const int cc = at.buffer->Comps();
+               const std::vector<float> va = fa->Read(at.name, cc), vb = fb->Read(at.name, cc);
+               same = same && va.size() == vb.size() && std::memcmp(va.data(), vb.data(), va.size() * sizeof(float)) == 0;
+            }
+            printf("  CPU engine, row copies vs whole-source copy: %d vs %d particles, bit-equal %d\n",
+                   fa ? fa->pointCount : -1, fb ? fb->pointCount : -1, same ? 1 : 0);
+            ok = ok && same;
+         }
+
          // Killing through the force chain: Particle -> Group (PartDeath inside
          // a sphere) -> Null tagged as the target, for each engine.
          {
@@ -2238,6 +2282,57 @@
             }
          }
          printf("  %d cooks, %d with errors\n", cooked, failed);
+
+         // Turbo 0.71 (P1): Noise PointZ curl over 4D gradient noise - the
+         // cell-cached kernel against the plain one (90k points, P, a 4D offset
+         // instead of time so both cooks see the same input). Same arithmetic
+         // term for term, but the driver reassociates the two code shapes
+         // differently: a few ulps, amplified by the curl's 1/(2e) differences
+         // (measured 1.8e-5 on positions of +-4). Tolerance 1e-4, documented in
+         // docs/pointz-gpu-status.md.
+         {
+            std::unique_ptr<PopNode> grid(static_cast<PopNode*>(PopNode::CreateFor("Grid PointZ")));
+            std::unique_ptr<PopNode> nz(static_cast<PopNode*>(PopNode::CreateFor("Noise PointZ")));
+            auto setF = [](PopNode* n, const char* key, float v) {
+               const int i = n->Def().ParamIndex(key);
+               if (i >= 0) n->Values().f[(size_t)n->Def().FloatOffset(i)] = v;
+            };
+            setF(grid.get(), "rows", 300.0f);
+            setF(grid.get(), "cols", 300.0f);
+            setF(grid.get(), "sizeX", 6.0f);
+            setF(grid.get(), "sizeY", 6.0f);
+            setF(nz.get(), "type", 2.0f); // curl
+            setF(nz.get(), "use4d", 1.0f);
+            setF(nz.get(), "freq", 1.2f);
+            setF(nz.get(), "t4d", 3.7f);
+            setF(nz.get(), "amp", 0.8f);
+            nz->inputs[0] = grid.get();
+            nz->CookIfNeeded(++frame);
+            const std::vector<float> cached = nz->GetPop()->Read(pop::attr::P, 3);
+            pop::SetNoiseReferenceKernelForTest(true);
+            setF(nz.get(), "amp", 0.81f); // a param change forces the cooks with the other kernel
+            nz->CookIfNeeded(++frame);
+            setF(nz.get(), "amp", 0.8f);
+            nz->CookIfNeeded(++frame);
+            const std::vector<float> plain = nz->GetPop()->Read(pop::attr::P, 3);
+            pop::SetNoiseReferenceKernelForTest(false);
+            const bool same = !cached.empty() && cached.size() == plain.size() &&
+                              std::memcmp(cached.data(), plain.data(), cached.size() * sizeof(float)) == 0;
+            size_t moved = 0, differ = 0;
+            float maxDiff = 0.0f;
+            const std::vector<float> base = grid->GetPop()->Read(pop::attr::P, 3);
+            for (size_t i = 0; i < base.size() && i < cached.size(); i++)
+               moved += cached[i] != base[i] ? 1 : 0;
+            for (size_t i = 0; i < cached.size() && i < plain.size(); i++)
+            {
+               differ += cached[i] != plain[i] ? 1 : 0;
+               maxDiff = std::max(maxDiff, std::fabs(cached[i] - plain[i]));
+            }
+            printf("  noise curl 4D, cell-cached vs plain kernel: %zu floats, bit-equal %d (%zu differ, max %.3g), %zu moved\n",
+                   cached.size(), same ? 1 : 0, differ, maxDiff, moved);
+            report("Noise PointZ curl kernel matches the reference (1e-4)",
+                   cached.size() == plain.size() && !cached.empty() && maxDiff <= 1e-4f && moved > cached.size() / 2);
+         }
 
          // GPU kernel vs CPU: Transform PointZ translate on a known grid.
          {

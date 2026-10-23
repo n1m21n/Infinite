@@ -134,6 +134,15 @@ namespace pop
    const std::vector<PopDef>& Registry();
    const PopDef* FindDef(const std::string& name);
 
+   // Turbo 0.71 (P1): Noise PointZ's curl over 4D gradient noise reuses each
+   // lattice cell's gradients across its samples; true puts the plain kernel
+   // back (the self-test's bit-for-bit reference).
+   void SetNoiseReferenceKernelForTest(bool on);
+   // Turbo 0.71 (P1): Particle PointZ (CPU engine) copies back only the rows
+   // its next births can pick from a GPU source; true copies the whole source
+   // again, as before (the self-test's reference).
+   void SetParticleFullSourceCopyForTest(bool on);
+
    // Registration of the two operator tiers (PopOpsA.cpp, PopOpsB.cpp).
    void RegisterTierA(std::vector<PopDef>& defs);
    void RegisterGenerators(std::vector<PopDef>& defs); // part of tier A (PopOpsGen.cpp)

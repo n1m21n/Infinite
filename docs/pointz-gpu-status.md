@@ -47,7 +47,7 @@ Resumo depois da leitura (2026-10-22): CPU 39, GPU 36, misto 7, pass-through 4 (
 | Copy PointZ | PopOpsB.cpp | misto (heur.) | - | - | | |
 | GLSL Create PointZ | PopOpsB3.cpp | misto (heur.) | - | - | | |
 | Normalize PointZ | PopOpsA.cpp | misto (heur.) | - | - | | |
-| Particle PointZ | PopOpsB3.cpp, ParticleGpu.cpp | GPU (`engine` = GPU; CPU legado para patches antigos) | GPU = CPU: contagem e ids exatos, atributos 1.2e-7 (PARTICLEGPUTEST) | ref.: 0,06 ms GPU (antes 3,5) | P3 | com PartDeath, contagem lida da GPU (4 bytes por frame) |
+| Particle PointZ | PopOpsB3.cpp, ParticleGpu.cpp | GPU (`engine` = GPU; CPU legado para patches antigos) | GPU = CPU: contagem e ids exatos, atributos 1.2e-7 (PARTICLEGPUTEST) | ref.: 0,06 ms GPU (antes 3,5) | P3 | com PartDeath, contagem lida da GPU (4 bytes por frame). 0.71 (P1): o motor CPU (patches antigos, como o de referência) copiava a fonte GPU inteira de volta todo quadro (305k pontos × todos os atributos com `inherit`); agora sorteia os próximos nascimentos adiantado (mesma sequência) e copia só essas linhas (`AsyncRows::RequestRows`): bit a bit igual (PARTICLEGPUTEST), 3,57 → 0,20 ms GPU no patch de referência |
 | Trail PointZ | PopOpsB3.cpp | misto (heur.) | - | - | | |
 | Box PointZ | PopOpsGen.cpp | CPU (gerador) (lido) | - | - | P5 | monta na CPU e sobe uma vez; só recalcula quando um parâmetro muda |
 | Cache PointZ | PopOpsB3.cpp | GPU (lido) | - | - | P4 | guarda referências aos buffers (`ShallowCopy`) |
@@ -92,7 +92,7 @@ Resumo depois da leitura (2026-10-22): CPU 39, GPU 36, misto 7, pass-through 4 (
 | Math Combine PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Math Mix PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Math PointZ | PopOpsA.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
-| Noise PointZ | PopOpsA.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
+| Noise PointZ | PopOpsA.cpp | GPU (lido) | TF = compute, dif. 0 (POPEQUIVTEST); 0.71 (P1) curl 4D com cache de gradientes × kernel anterior: tolerância documentada 1e-4, medido 1,8e-5 (POPTEST; a mesma conta termo a termo, o driver reassocia as duas formas alguns ulps à parte, ampliados pelo 1/(2e) do curl) | curl 4D, 1M de pontos (cena F): 4,88 → 1,31 ms GPU; patch de referência 1,63 → 0,41 | P1 (0.71) | o cache vale para o curl com ruído de gradiente 4D (o tipo padrão das cenas HQ e do patch de referência); os outros tipos não mudaram |
 | Phaser PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Point PointZ | PopOpsA2.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |
 | Projection PointZ | PopOpsA.cpp | GPU (heur.) | TF = compute, dif. 0 (POPEQUIVTEST) | - | | |

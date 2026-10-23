@@ -299,6 +299,8 @@ do `make_hq_scenes.py`):
 | cubos 100k / 1M, parados | 1,0 / 1,0 | 2,0 / 1,0 |
 
 Nas cenas animadas de 1M, ~5 ms são do próprio Noise PointZ (igual nos dois): a P1 olha isso.
+Depois da P1 (cache de gradientes no curl 4D): Noise 4,88 → 1,31 ms na F, e a F do HQ inteira
+9,65 → 5,68 ms por quadro (`perf.ps1 -RefExe` contra a S7).
 
 
 `shaders/hq_shadows.glsl` (amostragem), `hq_shadow.frag`, `hq_sphere_shadow.*` e

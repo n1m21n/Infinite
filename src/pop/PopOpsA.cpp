@@ -16,6 +16,10 @@ namespace pop
 {
    using namespace popa;
 
+   // Turbo 0.71 (P1): see SetNoiseReferenceKernelForTest (PopOps.h).
+   static bool sNoiseReferenceKernel = false;
+   void SetNoiseReferenceKernelForTest(bool on) { sNoiseReferenceKernel = on; }
+
    void RegisterKernelsA1(std::vector<PopDef>& defs)
    {
       // ---- Null / In / Out / Geometry to PointZ -------------------------------------
@@ -220,7 +224,8 @@ namespace pop
             static const int kLayer[8] = { 0, 1, 0, 2, 3, 1, 1, 0 };  // single, fbm, ridged, turbulence
             k.decls = "\n#define NBASE " + std::to_string(kBase[type]) + "\n#define NLAYER " + std::to_string(kLayer[type]) +
                       "\n#define NCURL " + std::string(type == 2 ? "1" : "0") + "\n#define N4D " + (use4d ? "1" : "0") +
-                      "\n#define NCOMPS " + std::to_string(t.comps) + "\n" + R"GLSL(
+                      "\n#define NCOMPS " + std::to_string(t.comps) + "\n#define NREF " +
+                      (sNoiseReferenceKernel ? "1" : "0") + "\n" + R"GLSL(
 float nBase(vec4 q, int id)
 {
 #if NBASE == 3
@@ -271,6 +276,68 @@ vec3 nPot(vec4 q, int id)
 {
    return vec3(nBase(q, id), nBase(q + vec4(31.4, 47.9, 11.3, 7.7), id), nBase(q + vec4(-23.7, 13.1, 61.7, -3.1), id));
 }
+#if NCURL == 1 && N4D == 1 && NBASE == 0 && NREF == 0
+// Turbo 0.71 (P1): the curl's samples sit 0.05 either side of q, almost
+// always in the same 4D lattice cell, so each potential channel hashes its
+// cell's 16 corner gradients once and every sample in that cell reuses them
+// (a sample in another cell takes gnoise4). The arithmetic after the hashes
+// is gnoise4's, term for term; the driver reassociates the two shapes a few
+// ulps apart (POPTEST checks it against NREF 1, tolerance 1e-4). Only the 12
+// samples the curl reads are taken. F (1M points): 4.88 -> 1.31 ms of GPU.
+void cellGrads4(ivec4 c, out vec4 g[16])
+{
+   for (int k = 0; k < 16; k++)
+      g[k] = latticeGrad4(c + ivec4(k & 1, (k >> 1) & 1, (k >> 2) & 1, k >> 3));
+}
+float gcube4c(vec4 g[16], int o, vec4 f, vec3 w)
+{
+   float n000 = dot(g[o], f);
+   float n100 = dot(g[o + 1], f - vec4(1, 0, 0, 0));
+   float n010 = dot(g[o + 2], f - vec4(0, 1, 0, 0));
+   float n110 = dot(g[o + 3], f - vec4(1, 1, 0, 0));
+   float n001 = dot(g[o + 4], f - vec4(0, 0, 1, 0));
+   float n101 = dot(g[o + 5], f - vec4(1, 0, 1, 0));
+   float n011 = dot(g[o + 6], f - vec4(0, 1, 1, 0));
+   float n111 = dot(g[o + 7], f - vec4(1, 1, 1, 0));
+   float x00 = mix(n000, n100, w.x), x10 = mix(n010, n110, w.x);
+   float x01 = mix(n001, n101, w.x), x11 = mix(n011, n111, w.x);
+   return mix(mix(x00, x10, w.y), mix(x01, x11, w.y), w.z);
+}
+float gnoise4c(vec4 p, ivec4 cell, vec4 g[16])
+{
+   ivec4 i = ivec4(floor(p));
+   if (any(notEqual(i, cell)))
+      return gnoise4(p);
+   vec4 f = p - floor(p);
+   vec4 w = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+   float a = gcube4c(g, 0, f, w.xyz);
+   float b = gcube4c(g, 8, f - vec4(0, 0, 0, 1), w.xyz);
+   return clamp(mix(a, b, w.w) * 1.9, -1.0, 1.0);
+}
+vec3 nCurl(vec4 q, int id)
+{
+   const float e = 0.05;
+   vec4 dx = vec4(e, 0.0, 0.0, 0.0), dy = vec4(0.0, e, 0.0, 0.0), dz = vec4(0.0, 0.0, e, 0.0);
+   const vec4 o1 = vec4(31.4, 47.9, 11.3, 7.7), o2 = vec4(-23.7, 13.1, 61.7, -3.1);
+   vec4 g[16];
+   // nPot's channel x (no offset), read at -+dy and -+dz.
+   ivec4 c = ivec4(floor(q));
+   cellGrads4(c, g);
+   float py0x = gnoise4c(q - dy, c, g), py1x = gnoise4c(q + dy, c, g);
+   float pz0x = gnoise4c(q - dz, c, g), pz1x = gnoise4c(q + dz, c, g);
+   // Channel y (+ o1), read at -+dx and -+dz.
+   c = ivec4(floor(q + o1));
+   cellGrads4(c, g);
+   float px0y = gnoise4c((q - dx) + o1, c, g), px1y = gnoise4c((q + dx) + o1, c, g);
+   float pz0y = gnoise4c((q - dz) + o1, c, g), pz1y = gnoise4c((q + dz) + o1, c, g);
+   // Channel z (+ o2), read at -+dx and -+dy.
+   c = ivec4(floor(q + o2));
+   cellGrads4(c, g);
+   float px0z = gnoise4c((q - dx) + o2, c, g), px1z = gnoise4c((q + dx) + o2, c, g);
+   float py0z = gnoise4c((q - dy) + o2, c, g), py1z = gnoise4c((q + dy) + o2, c, g);
+   return vec3((py1z - py0z) - (pz1y - pz0y), (pz1x - pz0x) - (px1z - px0z), (px1y - px0y) - (py1x - py0x)) / (2.0 * e);
+}
+#else
 vec3 nCurl(vec4 q, int id)
 {
    const float e = 0.05;
@@ -280,6 +347,7 @@ vec3 nCurl(vec4 q, int id)
    vec3 pz0 = nPot(q - dz, id), pz1 = nPot(q + dz, id);
    return vec3((py1.z - py0.z) - (pz1.y - pz0.y), (pz1.x - pz0.x) - (px1.z - px0.z), (px1.y - px0.y) - (py1.x - py0.x)) / (2.0 * e);
 }
+#endif
 )GLSL";
             k.body = Defines(t) + "   vec3 q3 = vec3(" + coord + ") * p_freq * p_scale + p_offset + vec3(p_seed * 17.31, p_seed * 3.7, 0.0);\n" + R"GLSL(
 #if N4D == 1
