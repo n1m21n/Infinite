@@ -64,6 +64,8 @@
   <url><loc>https://infinitedevices.org/embeds/voronoi-bioluminescence.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/ferrofluid-spikes.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/prismatic-hologram.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/magnetic-plasma-torus.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/hyperbolic-tessellation.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
@@ -253,6 +255,16 @@
   <url><loc>https://infinitedevices.org/library/dynamic-transient-shaper-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/ferrofluid-spikes.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/prismatic-hologram.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/barnsley-fern.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/gingerbreadman-map.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/henneberg-surface-3d.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/jeener-klein-3d.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/phase-resonance-synth.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/scanned-synthesis-synth.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/schroeder-fdn-reverb-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/barberpole-flanger-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/magnetic-plasma-torus.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hyperbolic-tessellation.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-23</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>

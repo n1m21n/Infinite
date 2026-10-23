@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Phase Resonance Synth",
+    "author": "Infinite",
+    "description": "Casio CZ-style phase resonance synthesizer with synchronous resonant windowing, formant multiplier modulation, and sub-octave warmth.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float resFreq = 1800.0 [200.0, 5200.0];\nparam float resDepth = 0.75 [0.0, 1.0];\nparam float windowType = 0.5 [0.0, 1.0];\nparam float subMix = 0.35 [0.0, 1.0];\nparam float filterCutoff = 6200.0 [300.0, 15000.0];\nstate float fundPhase = 0;\nstate float subPhase = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0);\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.22, env * 0.9994);\n\nfStep = clamp(freq, 20.0, 4000.0) / sr;\nfundPhase = (fundPhase + fStep) % 1.0;\nsubPhase = (subPhase + fStep * 0.5) % 1.0;\n\nfMult = clamp(resFreq / max(freq, 20.0), 1.0, 24.0);\nresPhase = (fundPhase * fMult) % 1.0;\ncarrier = cos(6.2831853 * resPhase);\n\nwinSaw = 1.0 - fundPhase;\nwinCos = cos(3.14159265 * fundPhase) * 0.5 + 0.5;\nwin = mix(winSaw, winCos, windowType);\n\nresonantSig = carrier * win * resDepth + sin(6.2831853 * fundPhase) * (1.0 - resDepth);\nsubSig = sin(6.2831853 * subPhase) * subMix;\n\nraw = (resonantSig * 1.4 + subSig) * env;\n\nfCut = clamp(filterCutoff / sr * 2.0, 0.01, 0.48);\nlp = lp + fCut * (raw - lp);\n\nout = lp * 0.82;\n",
+    "params": {
+      "resFreq": 1800.0,
+      "resDepth": 0.75,
+      "windowType": 0.5,
+      "subMix": 0.35,
+      "filterCutoff": 6200.0
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -220,7 +220,7 @@
     },
     {
       "id": "rossler-attractor",
-      "name": "R\u00f6ssler Attractor",
+      "name": "Rössler Attractor",
       "kind": "Generator",
       "tags": [
         "chaos",
@@ -332,7 +332,7 @@
     },
     {
       "id": "mobius-strip-3d",
-      "name": "M\u00f6bius Strip 3D",
+      "name": "Möbius Strip 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -340,7 +340,7 @@
         "topology",
         "parametric"
       ],
-      "description": "Parametric non-orientable M\u00f6bius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
+      "description": "Parametric non-orientable Möbius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1246,7 +1246,7 @@
         "kaleidoscope",
         "visuals"
       ],
-      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
+      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -1725,7 +1725,7 @@
         "3d",
         "parametric"
       ],
-      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold K\u00e4hler manifold with interlocking compactified sheets.",
+      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold Kähler manifold with interlocking compactified sheets.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1928,7 +1928,7 @@
         "3d",
         "ruled-surface"
       ],
-      "description": "Eug\u00e8ne Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
+      "description": "Eugène Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2051,6 +2051,198 @@
       "file": "assets/library/pixel/prismatic-hologram.field",
       "preview": "assets/library/previews/prismatic-hologram.jpg",
       "bytes": 2010
+    },
+    {
+      "id": "barnsley-fern",
+      "name": "Barnsley Fern",
+      "kind": "Generator",
+      "tags": [
+        "fractal",
+        "ifs",
+        "math",
+        "nature"
+      ],
+      "description": "Michael Barnsley's affine iterated function system (IFS) fractal fern with recursive fronds and dynamic wind sway.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/barnsley-fern.js",
+      "preview": "assets/library/previews/barnsley-fern.jpg",
+      "bytes": 2316
+    },
+    {
+      "id": "gingerbreadman-map",
+      "name": "Gingerbreadman Map",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "dynamical-system",
+        "math"
+      ],
+      "description": "Robert Devaney's piecewise linear chaotic map with polygonal strange attractor orbits, resonance islands, and lattice diffusion.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/gingerbreadman-map.js",
+      "preview": "assets/library/previews/gingerbreadman-map.jpg",
+      "bytes": 2104
+    },
+    {
+      "id": "henneberg-surface-3d",
+      "name": "Henneberg Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "minimal-surface",
+        "topology"
+      ],
+      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting Möbius band topology and Neil's parabola boundary.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 8,
+      "file": "assets/library/sketch/henneberg-surface-3d.js",
+      "preview": "assets/library/previews/henneberg-surface-3d.jpg",
+      "bytes": 2837
+    },
+    {
+      "id": "jeener-klein-3d",
+      "name": "Jeener Klein 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "klein-bottle",
+        "topology"
+      ],
+      "description": "Patrice Jeener's 8-surface Klein bottle minimal surface immersion with intersecting twisting topological lobes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 7,
+      "file": "assets/library/sketch/jeener-klein-3d.js",
+      "preview": "assets/library/previews/jeener-klein-3d.jpg",
+      "bytes": 2541
+    },
+    {
+      "id": "phase-resonance-synth",
+      "name": "Phase Resonance Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "phase-distortion",
+        "resonance",
+        "audio",
+        "dsp"
+      ],
+      "description": "Casio CZ-style phase resonance synthesizer with synchronous resonant windowing, formant multiplier modulation, and sub-octave warmth.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/phase-resonance-synth.inf",
+      "preview": "assets/library/previews/phase-resonance-synth.jpg",
+      "bytes": 1962
+    },
+    {
+      "id": "scanned-synthesis-synth",
+      "name": "Scanned Synthesis Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "physical-modeling",
+        "scanned-synthesis",
+        "audio",
+        "dsp"
+      ],
+      "description": "Scanned synthesis physical modeling instrument with slow finite-element kinetic mass-spring loop scanned at audio frequencies with morphing excitation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/scanned-synthesis-synth.inf",
+      "preview": "assets/library/previews/scanned-synthesis-synth.jpg",
+      "bytes": 2054
+    },
+    {
+      "id": "schroeder-fdn-reverb-fx",
+      "name": "Schroeder FDN Reverb FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "reverb",
+        "fdn",
+        "hadamard",
+        "dsp"
+      ],
+      "description": "Schroeder feedback delay network (FDN) reverberator with unitary Hadamard matrix diffusion, frequency-dependent absorption, and stereo width.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 6,
+      "file": "assets/templates/schroeder-fdn-reverb-fx.inf",
+      "preview": "assets/library/previews/schroeder-fdn-reverb-fx.jpg",
+      "bytes": 2283
+    },
+    {
+      "id": "barberpole-flanger-fx",
+      "name": "Barberpole Flanger FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "flanger",
+        "shepard-tone",
+        "modulation",
+        "dsp"
+      ],
+      "description": "Infinite Shepard-tone barberpole flanger with continuous multi-tap quadrature phase modulation, gaussian window crossfading, and resonant comb feedback.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/barberpole-flanger-fx.inf",
+      "preview": "assets/library/previews/barberpole-flanger-fx.jpg",
+      "bytes": 2265
+    },
+    {
+      "id": "magnetic-plasma-torus",
+      "name": "Magnetic Plasma Torus",
+      "kind": "Generator",
+      "tags": [
+        "Physics",
+        "Audio-Reactive",
+        "Plasma"
+      ],
+      "description": "Tokamak magnetic confinement fusion plasma torus with helical magnetic field lines, audio-reactive magnetohydrodynamic flux instabilities, and glowing synchrotron radiation flares.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/magnetic-plasma-torus.field",
+      "preview": "assets/library/previews/magnetic-plasma-torus.jpg",
+      "bytes": 1889
+    },
+    {
+      "id": "hyperbolic-tessellation",
+      "name": "Hyperbolic Tessellation",
+      "kind": "Generator",
+      "tags": [
+        "Geometry",
+        "Audio-Reactive",
+        "Tessellation"
+      ],
+      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/hyperbolic-tessellation.field",
+      "preview": "assets/library/previews/hyperbolic-tessellation.jpg",
+      "bytes": 2039
     }
   ]
 }

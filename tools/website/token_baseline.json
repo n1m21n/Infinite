@@ -109,6 +109,10 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/hyperbolic-tessellation.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/hyperspace-tunnel.html": {
    "font-size": 2,
    "hex": 6
@@ -137,6 +141,10 @@
    "radius": 1
   },
   "embeds/liquid-glass.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/magnetic-plasma-torus.html": {
    "font-size": 2,
    "hex": 6
   },

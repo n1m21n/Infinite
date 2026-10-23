@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Barberpole Flanger FX",
+    "author": "Infinite",
+    "description": "Infinite Shepard-tone barberpole flanger with continuous multi-tap quadrature phase modulation, gaussian window crossfading, and resonant comb feedback.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float rateHz = 0.35 [-2.0, 2.0];\nparam float depth = 0.65 [0.1, 1.0];\nparam float feedback = 0.52 [-0.9, 0.9];\nparam float warmth = 0.45 [0.0, 1.0];\nparam float mix = 0.5 [0.0, 1.0];\nstate float phase1 = 0;\nstate float s1 = 0;\nstate float s2 = 0;\nstate float s3 = 0;\nstate float s4 = 0;\nstate float fb = 0;\nstate float lp = 0;\n\nphase1 = (phase1 + rateHz / sr) % 1.0;\nphase1 = if(phase1 < 0.0, phase1 + 1.0, phase1);\n\np1 = phase1;\np2 = (p1 + 0.25) % 1.0;\np3 = (p1 + 0.50) % 1.0;\np4 = (p1 + 0.75) % 1.0;\n\n// Bell-shaped smooth fading window\nw1 = sin(3.14159265 * p1) * sin(3.14159265 * p1);\nw2 = sin(3.14159265 * p2) * sin(3.14159265 * p2);\nw3 = sin(3.14159265 * p3) * sin(3.14159265 * p3);\nw4 = sin(3.14159265 * p4) * sin(3.14159265 * p4);\n\nsatIn = tanh((in + fb * feedback) * (1.0 + warmth * 0.4));\n\nrate1 = clamp((1.0 - p1 * depth) * 0.15, 0.005, 0.3);\nrate2 = clamp((1.0 - p2 * depth) * 0.15, 0.005, 0.3);\nrate3 = clamp((1.0 - p3 * depth) * 0.15, 0.005, 0.3);\nrate4 = clamp((1.0 - p4 * depth) * 0.15, 0.005, 0.3);\n\ns1 = s1 + (satIn - s1) * rate1;\ns2 = s2 + (satIn - s2) * rate2;\ns3 = s3 + (satIn - s3) * rate3;\ns4 = s4 + (satIn - s4) * rate4;\n\nflanged = (s1 * w1 + s2 * w2 + s3 * w3 + s4 * w4) / (w1 + w2 + w3 + w4 + 0.0001);\nfb = flanged;\n\nlp = lp + clamp(6000.0 / sr * 2.0 * (1.0 - warmth * 0.3), 0.02, 0.48) * (flanged - lp);\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "rateHz": 0.35,
+      "depth": 0.65,
+      "feedback": 0.52,
+      "warmth": 0.45,
+      "mix": 0.5
+    },
+    "nodeSettings": {}
+  }
+}

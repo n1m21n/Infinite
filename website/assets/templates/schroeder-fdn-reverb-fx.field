@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Schroeder FDN Reverb FX",
+    "author": "Infinite",
+    "description": "Schroeder feedback delay network (FDN) reverberator with unitary Hadamard matrix diffusion, frequency-dependent absorption, and stereo width.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float decayTime = 0.78 [0.1, 0.98];\nparam float damping = 0.42 [0.05, 0.9];\nparam float diffusion = 0.65 [0.0, 1.0];\nparam float modRate = 0.8 [0.1, 5.0];\nparam float modDepth = 0.3 [0.0, 1.0];\nparam float mix = 0.45 [0.0, 1.0];\nstate float lfoPhase = 0;\nstate float d1 = 0;\nstate float d2 = 0;\nstate float d3 = 0;\nstate float d4 = 0;\nstate float lp1 = 0;\nstate float lp2 = 0;\nstate float lp3 = 0;\nstate float lp4 = 0;\n\nlfoPhase = (lfoPhase + modRate / sr) % 1.0;\nlfo = sin(6.2831853 * lfoPhase);\n\ncurIn = in;\n\n// Hadamard unitary matrix feedback mix\nh1 = (d1 + d2 + d3 + d4) * 0.5;\nh2 = (d1 - d2 + d3 - d4) * 0.5;\nh3 = (d1 + d2 - d3 - d4) * 0.5;\nh4 = (d1 - d2 - d3 + d4) * 0.5;\n\nfb1 = mix(d1, h1, diffusion) * decayTime;\nfb2 = mix(d2, h2, diffusion) * decayTime;\nfb3 = mix(d3, h3, diffusion) * decayTime;\nfb4 = mix(d4, h4, diffusion) * decayTime;\n\ndampCoeff = clamp(1.0 - damping * 0.6, 0.05, 0.95);\nlp1 = lp1 + (fb1 - lp1) * dampCoeff;\nlp2 = lp2 + (fb2 - lp2) * dampCoeff;\nlp3 = lp3 + (fb3 - lp3) * dampCoeff;\nlp4 = lp4 + (fb4 - lp4) * dampCoeff;\n\nrateFactor = 0.04 * (1.0 + lfo * modDepth * 0.2);\nd1 = d1 + (curIn + lp1 - d1) * (rateFactor * 1.0);\nd2 = d2 + (curIn + lp2 - d2) * (rateFactor * 1.31);\nd3 = d3 + (curIn + lp3 - d3) * (rateFactor * 1.63);\nd4 = d4 + (curIn + lp4 - d4) * (rateFactor * 1.97);\n\nwet = (d1 - d2 + d3 - d4) * 0.5;\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "decayTime": 0.78,
+      "damping": 0.42,
+      "diffusion": 0.65,
+      "modRate": 0.8,
+      "modDepth": 0.3,
+      "mix": 0.45
+    },
+    "nodeSettings": {}
+  }
+}

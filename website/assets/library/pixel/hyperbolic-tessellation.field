@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Hyperbolic Tessellation",
+    "author": "Infinite",
+    "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float audio_high = 0.5 [0.0, 2.0];\nparam float symmetry = 7.0 [3.0, 12.0];\nparam float warp = 0.4 [0.0, 1.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5) * 2.2;\nr = length(p);\na = atan2(p.y, p.x);\n\nrot = t * 0.25;\nang = a + rot;\n\n// Poincaré disk boundary\ndiskR = 0.95 + 0.08 * audio_bass;\ninside = smoothstep(diskR, diskR - 0.04, r);\n\n// Conformal reflection iterations\ncurrP = p;\nfor (int i = 0; i < 4; i++) {\n  lenSq = dot(currP, currP);\n  currP = if(lenSq > 0.65, currP * (0.65 / max(lenSq, 0.001)), currP);\n  currAng = atan2(currP.y, currP.x);\n  symAng = mod(currAng, 6.2831853 / symmetry) - 3.14159265 / symmetry;\n  currLen = length(currP);\n  currP = vec2(cos(symAng), sin(symAng)) * currLen;\n}\n\n// Audio-reactive metric tiles\ngrid = sin(currP.x * 14.0 + audio_mid * 3.0) * sin(currP.y * 14.0 + t * 1.5);\nedges = smoothstep(0.15, 0.0, abs(grid));\nhorizon = smoothstep(0.06, 0.0, abs(r - diskR));\n\nmidnight = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.208);\n\nspectral = mix(signal, emerald, sin(ang * 3.0 + t) * 0.5 + 0.5);\nspectral = mix(spectral, ember, edges * (0.3 + 0.7 * audio_high));\n\nglow = spectral * (edges * 1.5 + horizon * 2.0 + 0.25);\ncol = mix(midnight, glow, clamp(inside * (edges + 0.2) + horizon, 0.0, 1.0));\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "audio_high": 0.5,
+      "symmetry": 7.0,
+      "warp": 0.4
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

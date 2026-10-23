@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Magnetic Plasma Torus",
+    "author": "Infinite",
+    "description": "Tokamak magnetic confinement fusion plasma torus with helical magnetic field lines, audio-reactive magnetohydrodynamic flux instabilities, and glowing synchrotron radiation flares.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float audio_high = 0.5 [0.0, 2.0];\nparam float majorRadius = 0.35 [0.15, 0.6];\nparam float minorRadius = 0.12 [0.04, 0.25];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\nrot = t * 0.45;\nang = a + rot;\n\n// Torus coordinate mapping\ntorusDist = abs(r - majorRadius) - minorRadius * (1.0 + 0.3 * audio_bass);\n\n// Helical magnetic field line twist\nhelix = sin(ang * 8.0 + r * 28.0 - t * 3.5 + audio_mid * 4.0);\nfilaments = smoothstep(0.18, 0.02, abs(helix));\n\n// Plasma core and sheath glow\ncore = smoothstep(0.06, -0.02, torusDist);\nsheath = smoothstep(0.14, 0.0, abs(torusDist));\nflares = smoothstep(0.2, 0.0, abs(sin(ang * 16.0 - t * 5.0))) * sheath * (0.3 + 0.7 * audio_high);\n\nmidnight = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.208);\n\nplasmaCol = mix(ember, signal, sin(ang * 4.0 + t) * 0.5 + 0.5);\nplasmaCol = mix(plasmaCol, emerald, filaments * 0.7);\n\nglow = plasmaCol * (sheath * 1.6 + core * 1.2 + flares * 1.8 + filaments * 0.6);\ncol = mix(midnight, glow, clamp(core + sheath + filaments * 0.4 + flares, 0.0, 1.0));\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "audio_high": 0.5,
+      "majorRadius": 0.35,
+      "minorRadius": 0.12
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

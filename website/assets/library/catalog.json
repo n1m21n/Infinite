@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 177,
+ "count": 187,
  "items": [
   {
    "id": "first-sound",
@@ -2126,6 +2126,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/prismatic-hologram.field",
    "preview": "https://infinitedevices.org/assets/library/previews/prismatic-hologram.jpg",
    "page": "https://infinitedevices.org/library/prismatic-hologram.html"
+  },
+  {
+   "id": "barnsley-fern",
+   "name": "Barnsley Fern",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Michael Barnsley's affine iterated function system (IFS) fractal fern with recursive fronds and dynamic wind sway.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/barnsley-fern.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/barnsley-fern.jpg",
+   "page": "https://infinitedevices.org/library/barnsley-fern.html"
+  },
+  {
+   "id": "gingerbreadman-map",
+   "name": "Gingerbreadman Map",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Robert Devaney's piecewise linear chaotic map with polygonal strange attractor orbits, resonance islands, and lattice diffusion.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/gingerbreadman-map.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/gingerbreadman-map.jpg",
+   "page": "https://infinitedevices.org/library/gingerbreadman-map.html"
+  },
+  {
+   "id": "henneberg-surface-3d",
+   "name": "Henneberg Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting Möbius band topology and Neil's parabola boundary.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/henneberg-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/henneberg-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/henneberg-surface-3d.html"
+  },
+  {
+   "id": "jeener-klein-3d",
+   "name": "Jeener Klein 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Patrice Jeener's 8-surface Klein bottle minimal surface immersion with intersecting twisting topological lobes.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/jeener-klein-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/jeener-klein-3d.jpg",
+   "page": "https://infinitedevices.org/library/jeener-klein-3d.html"
+  },
+  {
+   "id": "phase-resonance-synth",
+   "name": "Phase Resonance Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Casio CZ-style phase resonance synthesizer with synchronous resonant windowing, formant multiplier modulation, and sub-octave warmth.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/phase-resonance-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/phase-resonance-synth.jpg",
+   "page": "https://infinitedevices.org/library/phase-resonance-synth.html"
+  },
+  {
+   "id": "scanned-synthesis-synth",
+   "name": "Scanned Synthesis Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Scanned synthesis physical modeling instrument with slow finite-element kinetic mass-spring loop scanned at audio frequencies with morphing excitation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/scanned-synthesis-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/scanned-synthesis-synth.jpg",
+   "page": "https://infinitedevices.org/library/scanned-synthesis-synth.html"
+  },
+  {
+   "id": "schroeder-fdn-reverb-fx",
+   "name": "Schroeder FDN Reverb FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Schroeder feedback delay network (FDN) reverberator with unitary Hadamard matrix diffusion, frequency-dependent absorption, and stereo width.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/schroeder-fdn-reverb-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/schroeder-fdn-reverb-fx.jpg",
+   "page": "https://infinitedevices.org/library/schroeder-fdn-reverb-fx.html"
+  },
+  {
+   "id": "barberpole-flanger-fx",
+   "name": "Barberpole Flanger FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Infinite Shepard-tone barberpole flanger with continuous multi-tap quadrature phase modulation, gaussian window crossfading, and resonant comb feedback.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/barberpole-flanger-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/barberpole-flanger-fx.jpg",
+   "page": "https://infinitedevices.org/library/barberpole-flanger-fx.html"
+  },
+  {
+   "id": "magnetic-plasma-torus",
+   "name": "Magnetic Plasma Torus",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Tokamak magnetic confinement fusion plasma torus with helical magnetic field lines, audio-reactive magnetohydrodynamic flux instabilities, and glowing synchrotron radiation flares.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/magnetic-plasma-torus.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/magnetic-plasma-torus.jpg",
+   "page": "https://infinitedevices.org/library/magnetic-plasma-torus.html"
+  },
+  {
+   "id": "hyperbolic-tessellation",
+   "name": "Hyperbolic Tessellation",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/hyperbolic-tessellation.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-tessellation.jpg",
+   "page": "https://infinitedevices.org/library/hyperbolic-tessellation.html"
   }
  ]
 }

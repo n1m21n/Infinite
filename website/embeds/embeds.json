@@ -139,7 +139,7 @@
     {
       "slug": "hyperbolic-kaleidoscope",
       "title": "Hyperbolic Kaleidoscope",
-      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
+      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling."
     },
     {
       "slug": "bioluminescent-abyss",
@@ -180,6 +180,16 @@
       "slug": "prismatic-hologram",
       "title": "Prismatic Hologram",
       "description": "Transmission diffraction grating with holographic interference fringe patterns, audio-reactive chromatic phase shifts and optical shimmer."
+    },
+    {
+      "slug": "magnetic-plasma-torus",
+      "title": "Magnetic Plasma Torus",
+      "description": "Tokamak magnetic confinement fusion plasma torus with helical magnetic field lines, audio-reactive magnetohydrodynamic flux instabilities, and glowing synchrotron radiation flares."
+    },
+    {
+      "slug": "hyperbolic-tessellation",
+      "title": "Hyperbolic Tessellation",
+      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes."
     }
   ]
 }
