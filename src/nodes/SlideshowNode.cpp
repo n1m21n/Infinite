@@ -322,8 +322,8 @@ void SlideshowNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
 
-   const int dstW = std::max(4, (int)width);
-   const int dstH = std::max(4, (int)height);
+   const int dstW = GLUtil::TargetSide(width, 4);
+   const int dstH = GLUtil::TargetSide(height, 4);
    const double hold = std::max(0.05f, holdDuration);
    const double fade = std::max(0.0f, transitionDuration);
    const double step = hold + fade;

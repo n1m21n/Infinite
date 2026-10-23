@@ -98,8 +98,8 @@ void RampNode::CookIfNeeded(int frameId)
 
    if (!EnsureShader())
       return;
-   const int w = std::max(4, (int)width);
-   const int h = std::max(4, (int)height);
+   const int w = GLUtil::TargetSide(width, 4);
+   const int h = GLUtil::TargetSide(height, 4);
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 

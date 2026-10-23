@@ -63,8 +63,8 @@ void FitNode::CookIfNeeded(int frameId)
    const int srcW = std::max(1, mInput.Width());
    const int srcH = std::max(1, mInput.Height());
 
-   int dstW = matchInput ? srcW : std::max(1, (int)width);
-   int dstH = matchInput ? srcH : std::max(1, (int)height);
+   int dstW = matchInput ? srcW : GLUtil::TargetSide(width, 1);
+   int dstH = matchInput ? srcH : GLUtil::TargetSide(height, 1);
 
    if (!EnsureShader())
       return;
