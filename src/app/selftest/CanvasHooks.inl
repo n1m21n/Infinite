@@ -6476,6 +6476,156 @@
             hq.CookIfNeeded(++frame);
          }
 
+         // S9 (the owner's test patch): without TAA, FXAA smooths the edges;
+         // soft and contact shadows come out smooth (the screen-space mask: no
+         // dots); a Material's opacity blends and its alpha cutoff removes the
+         // mesh; 360 output (equirect, dome) at the right size.
+         if (HqModuleBuilt())
+         {
+            auto meanDiff = [](const std::vector<float>& a, const std::vector<float>& b) {
+               if (a.empty() || a.size() != b.size())
+                  return 1.0;
+               double d = 0.0;
+               for (size_t i = 0; i < a.size(); i++)
+                  d += std::fabs(a[i] - b[i]);
+               return d / (double)a.size();
+            };
+            // Mean |Laplacian| of the luminance: high-frequency energy (edges, noise).
+            auto highFreq = [](const std::vector<float>& a, int w, int h) {
+               if (a.size() != (size_t)w * h * 4 || w < 3 || h < 3)
+                  return 1.0;
+               auto lum = [&](int x, int y) {
+                  const float* p = &a[((size_t)y * w + x) * 4];
+                  return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+               };
+               double s = 0.0;
+               for (int y = 1; y < h - 1; y++)
+                  for (int x = 1; x < w - 1; x++)
+                     s += std::fabs(4.0 * lum(x, y) - lum(x - 1, y) - lum(x + 1, y) - lum(x, y - 1) - lum(x, y + 1));
+               return s / (double)((w - 2) * (h - 2));
+            };
+            const bool savedTaa = hq.taa, savedFxaa = hq.fxaa, savedContact = hq.contactShadows;
+            const float savedSoft = hq.shadowSoftness;
+            hq.taa = false;
+            while (glGetError() != GL_NO_ERROR) {}
+            const int w = hq.GetOutputWidth(), h = hq.GetOutputHeight();
+            auto shoot = [&]() {
+               hq.CookIfNeeded(++frame);
+               return read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            };
+
+            hq.fxaa = false;
+            const std::vector<float> aliased = shoot();
+            hq.fxaa = true;
+            const std::vector<float> smoothed = shoot();
+            const double hfAliased = highFreq(aliased, w, h), hfSmoothed = highFreq(smoothed, w, h);
+            bool ok = meanDiff(smoothed, aliased) > 1e-5 && hfSmoothed < hfAliased && glGetError() == GL_NO_ERROR;
+            printf("  FXAA without TAA: edge energy %.5f -> %.5f  %s\n", hfAliased, hfSmoothed, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            // Soft + contact shadows against the hard PCF: no more fine detail
+            // (the per-pixel noise of their filters would add it).
+            hq.fxaa = false;
+            hq.shadowSoftness = 0.0f;
+            hq.contactShadows = false;
+            const double hfHard = highFreq(shoot(), w, h);
+            hq.shadowSoftness = 2.0f;
+            hq.contactShadows = true;
+            const std::vector<float> softPx = shoot();
+            const double hfSoft = highFreq(softPx, w, h);
+            ok = !softPx.empty() && hfSoft <= hfHard * 1.02 && glGetError() == GL_NO_ERROR;
+            printf("  soft + contact shadows without TAA: detail %.5f against hard PCF %.5f  %s\n", hfSoft, hfHard,
+                   ok ? "ok" : "FAIL");
+            all = all && ok;
+            hq.shadowSoftness = savedSoft;
+            hq.contactShadows = savedContact;
+            hq.fxaa = savedFxaa;
+            hq.taa = savedTaa;
+
+            // Opacity and alpha cutoff: a red box inside a white one.
+            std::unique_ptr<PopNode> innerBox(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+            std::unique_ptr<PopNode> outerBox(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+            auto setSize = [](PopNode* n, float s) {
+               const int i = n->Def().ParamIndex("size");
+               for (int k = 0; i >= 0 && k < 3; k++)
+                  n->Values().f[(size_t)(n->Def().FloatOffset(i) + k)] = s;
+            };
+            setSize(innerBox.get(), 0.6f);
+            setSize(outerBox.get(), 2.5f);
+            std::unique_ptr<MaterialNode> redMat(new MaterialNode()), shellMat(new MaterialNode());
+            redMat->color[0] = 1.0f;
+            redMat->color[1] = redMat->color[2] = 0.0f;
+            redMat->input = innerBox.get();
+            shellMat->color[0] = shellMat->color[1] = shellMat->color[2] = 0.9f;
+            shellMat->input = outerBox.get();
+            RenderHqNode inner, both;
+            for (RenderHqNode* n : { &inner, &both })
+            {
+               n->width = 320.0f;
+               n->height = 180.0f;
+               n->taa = false;
+               n->reuseStill = false;
+               n->geometry[0] = redMat.get();
+            }
+            both.geometry[1] = shellMat.get();
+            auto shootNode = [&](RenderHqNode& n) {
+               ++frame;
+               redMat->CookIfNeeded(frame);
+               shellMat->CookIfNeeded(frame);
+               n.CookIfNeeded(frame);
+               return read(n.GetOutputTexture(), n.GetOutputWidth(), n.GetOutputHeight());
+            };
+            // Red minus green at the centre pixel.
+            auto redness = [](const std::vector<float>& px, int cw, int ch) {
+               const size_t i = ((size_t)(ch / 2) * cw + cw / 2) * 4;
+               return px.size() > i + 2 ? px[i] - px[i + 1] : 0.0f;
+            };
+            const std::vector<float> innerPx = shootNode(inner);
+            shellMat->opacity = 1.0f;
+            const std::vector<float> opaquePx = shootNode(both);
+            shellMat->opacity = 0.3f;
+            shellMat->alphaCutoff = 0.5f;
+            const std::vector<float> cutPx = shootNode(both);
+            shellMat->alphaCutoff = 0.0f;
+            shellMat->opacity = 0.5f;
+            const std::vector<float> glassPx = shootNode(both);
+            const float rOpaque = redness(opaquePx, 320, 180), rGlass = redness(glassPx, 320, 180);
+            const double cutDiff = meanDiff(cutPx, innerPx);
+            // Through the half-opaque box the red one shows: redder than the opaque white box.
+            ok = cutDiff < 0.002 && rGlass > rOpaque + 0.05f && meanDiff(glassPx, opaquePx) > 1e-3 &&
+                 glGetError() == GL_NO_ERROR;
+            printf("  Material alpha: cut by its cutoff = the scene without it (diff %.5f); opacity 0.5 shows the red box "
+                   "through (centre r-g %.3f, opaque %.3f)  %s\n",
+                   cutDiff, rGlass, rOpaque, ok ? "ok" : "FAIL");
+            all = all && ok;
+
+            // 360: equirect 2:1 and dome, at the asked size, lit and finite.
+            for (int mode : { 1, 3 })
+            {
+               RenderHqNode pano;
+               pano.width = 512.0f;
+               pano.height = mode == 1 ? 256.0f : 512.0f;
+               pano.panorama = mode;
+               pano.geometry[0] = redMat.get();
+               pano.geometry[1] = shellMat.get();
+               const std::vector<float> px = shootNode(pano);
+               bool finite = !px.empty();
+               double sum = 0.0;
+               for (size_t i = 0; finite && i < px.size(); i++)
+               {
+                  finite = std::isfinite(px[i]);
+                  sum += px[i];
+               }
+               const GLenum err = glGetError();
+               ok = finite && pano.GetOutputWidth() == 512 && pano.GetOutputHeight() == (int)pano.height &&
+                    sum / (double)std::max<size_t>(1, px.size()) > 0.01 && err == GL_NO_ERROR;
+               printf("  360 %s: %dx%d, mean %.4f, finite %d, gl 0x%x  %s\n",
+                      Render3DNode::PanoramaNames()[(size_t)mode].c_str(), pano.GetOutputWidth(), pano.GetOutputHeight(),
+                      sum / (double)std::max<size_t>(1, px.size()), finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+               all = all && ok;
+            }
+         }
+
          // S3: PointZ points as sphere impostors and PointZ triangles straight
          // from the GPU; then 30 frames with the camera orbiting and an object
          // moving (the picture follows, stays finite; GPU time per frame).

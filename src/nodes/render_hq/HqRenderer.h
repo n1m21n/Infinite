@@ -82,6 +82,9 @@ struct HqFrame
    int outWidth = 0, outHeight = 0;
    float sharpness = 0.0f;
    bool aoFullRes = false;
+   // S9: FXAA on the finished image when the frame has no TAA (TAA off, or a
+   // 360 face) - without it nothing smooths the edges.
+   bool fxaa = true;
 };
 
 class HqRenderer

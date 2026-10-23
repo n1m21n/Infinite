@@ -19,6 +19,11 @@ Plan: `docs/plans/HQ-071-STRATEGY.md`; technical notes: `docs/RENDER-3D-HQ-FILAM
     render scale with FSR 1, RCAS sharpening.
   - Quality presets Performance / Balanced / High set the real params (shadow map size, GTAO on
     and its resolution, render scale). A still scene reuses its last frame once the TAA settles.
+  - With TAA off (e.g. a texture sliding over its surface, which TAA smears), FXAA smooths the
+    edges. Soft and contact shadows are filtered in screen space: smooth penumbrae with or without
+    TAA. A bump from a grayscale height map no longer sparkles in the distance.
+  - The Material's opacity, alpha cutoff and texture alpha work as in Render 3D (transparent
+    surfaces keep their highlights, like glass), and the 360 output (equirect, cubemap, dome) too.
   - Measured on the reference scenes (whole frame, 1080p, RTX 4060 Laptop): as fast as Render 3D or
     faster on 8 of 9 scenes while drawing more - 1M spheres 11.86 -> 5.61 ms, the generative cloud
     5.16 -> 2.55 ms; +0.14 ms on the particle studio. Details: `docs/RENDER-3D-HQ-FILAMENT.md`

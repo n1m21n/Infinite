@@ -10,6 +10,13 @@
 // mode is a PCSS-lite on the same depth map (blocker search + penumbra from
 // the blocker distance, 16-tap Poisson filter), not Filament's EVSM-based
 // PCSS. Include after hq_common.glsl, before hq_lighting.glsl.
+// S9: the soft mode's blocker search uses the disc as is (not rotated per
+// pixel: a rotated search found no blocker at some penumbra pixels, which
+// came out fully lit - the dotted, streaky edge seen without TAA); only the
+// filter is rotated, by a noise that also turns every frame under TAA. The
+// soft and contact terms are computed once per pixel into a screen-space
+// mask (hq_shadow_mask.comp, which defines HQ_COMPUTE) and smoothed with the
+// GTAO's bilateral blur; the shading passes read the mask (uShadowMaskOn).
 
 uniform mat4 uViewProj;
 uniform int uShadowLight;          // index of the shadowed light, -1 = none
@@ -24,11 +31,23 @@ uniform float uShadowSoftness;     // 0 = PCF low; > 0 = PCSS-lite (light size)
 uniform int uContactShadows;
 uniform sampler2D uSceneDepth;     // copy of this frame's depth (after the prepass)
 uniform vec4 uProjParams;          // proj m[10], m[14], ortho flag, contact distance
+// S9: the noise's frame under TAA (0 = the same every frame), and the
+// screen-space mask of the soft / contact terms (1 = read it).
+uniform int uShadowNoiseFrame;
+uniform int uShadowMaskOn;
+uniform sampler2D uShadowMask;     // (visibility, view z), frame size
 
 float interleavedGradientNoise(vec2 w)
 {
    const vec3 m = vec3(0.06711056, 0.00583715, 52.9829189);
    return fract(m.z * fract(dot(w, m.xy)));
+}
+
+// S9: Jimenez's interleaved gradient noise moved by 5.588238 pixels a frame
+// (its temporal form), so the TAA sees a new rotation every frame.
+float shadowNoise(vec2 pixel, float offset)
+{
+   return interleavedGradientNoise(pixel + offset + 5.588238 * float(uShadowNoiseFrame & 63));
 }
 
 // Castano 2013: 3x3 Gaussian over hardware 2x2 PCF in 4 taps.
@@ -60,7 +79,8 @@ const vec2 kPoisson[16] = vec2[](
 
 // PCSS-lite: average blocker depth in a search disc, penumbra width from the
 // blocker-receiver distance (a directional light whose half-angle tangent is
-// softness x 0.03), then a rotated 16-tap Poisson PCF of that width.
+// softness x 0.03), then a rotated 16-tap Poisson PCF of that width. S9: the
+// search disc is not rotated (neighbouring pixels agree on the blockers).
 float shadowPcss(vec3 position, float noise)
 {
    float angle = noise * 6.2831853;
@@ -72,7 +92,7 @@ float shadowPcss(vec3 position, float noise)
    float blockers = 0.0, sum = 0.0;
    for (int i = 0; i < 16; i++)
    {
-      float d = textureLod(uShadowDepth, position.xy + rot * kPoisson[i] * search, 0.0).r;
+      float d = textureLod(uShadowDepth, position.xy + kPoisson[i] * search, 0.0).r;
       if (d < position.z)
       {
          sum += d;
@@ -89,8 +109,9 @@ float shadowPcss(vec3 position, float noise)
    return lit / 16.0;
 }
 
-// Visibility of the shadowed light at a world point (1 = lit).
-float shadowVisibility(vec3 worldPos, vec3 geoN, vec3 l)
+// Visibility of the shadowed light at a world point (1 = lit); `pixel` seeds
+// the soft filter's rotation.
+float shadowVisibilityAt(vec3 worldPos, vec3 geoN, vec3 l, vec2 pixel)
 {
    // Normal bias: along the normal, a light-space texel scaled up as the light
    // grazes the surface; then the constant bias in depth.
@@ -102,7 +123,7 @@ float shadowVisibility(vec3 worldPos, vec3 geoN, vec3 l)
       return 1.0;
    position.z -= uShadowConstBias;
    if (uShadowSoftness > 0.0)
-      return shadowPcss(position, interleavedGradientNoise(gl_FragCoord.xy));
+      return shadowPcss(position, shadowNoise(pixel, 0.0));
    return shadowPcfLow(position);
 }
 
@@ -116,11 +137,11 @@ float linearDepth(float windowZ)
 }
 
 // Screen-space contact shadow: march towards the light in the depth buffer.
-float contactShadow(vec3 worldPos, vec3 l)
+float contactShadowAt(vec3 worldPos, vec3 l, vec2 pixel)
 {
    const int kSteps = 8;
    float dist = uProjParams.w;
-   float dither = interleavedGradientNoise(gl_FragCoord.xy + 17.0);
+   float dither = shadowNoise(pixel, 17.0);
    for (int i = 0; i < kSteps; i++)
    {
       float t = (float(i) + dither) / float(kSteps);
@@ -144,3 +165,18 @@ float contactShadow(vec3 worldPos, vec3 l)
    }
    return 1.0;
 }
+
+#ifndef HQ_COMPUTE
+// The shadowed light's visibility at this fragment. S9: from the mask when
+// the soft or contact term is on (computed and smoothed per pixel already),
+// else the plain PCF here.
+float shadowVisibility(vec3 worldPos, vec3 geoN, vec3 l)
+{
+   if (uShadowMaskOn == 1)
+      return texelFetch(uShadowMask, ivec2(gl_FragCoord.xy), 0).r;
+   float visibility = shadowVisibilityAt(worldPos, geoN, l, gl_FragCoord.xy);
+   if (uContactShadows == 1 && visibility > 0.0)
+      visibility *= contactShadowAt(worldPos, l, gl_FragCoord.xy);
+   return visibility;
+}
+#endif

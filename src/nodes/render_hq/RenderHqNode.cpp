@@ -9,7 +9,9 @@
 #include <cmath>
 
 #include "nodes/EnvironmentNode.h"
+#include "nodes/Render3DPost.h"
 #include "nodes/SceneNodes.h"
+#include "platform/OpenGLHeaders.h"
 
 // Its cook time (inclusive of the sources it pulls first), for
 // INFINITE_FRAMEPROF next to Render 3D's.
@@ -91,7 +93,63 @@ int RenderHqNode::MatchingPreset() const
    return kPresetCustom;
 }
 
-RenderHqNode::~RenderHqNode() = default;
+RenderHqNode::~RenderHqNode()
+{
+   if (mFaceArray != 0)
+      glDeleteTextures(1, &mFaceArray);
+}
+
+// S9: 360 output as Render 3D draws it (Cook360 there): six 90-degree faces
+// from the camera, turned from its orientation (Render3DPost::PanoFace), into
+// a texture array that Render 3D's panorama pass reprojects to equirect,
+// cubemap 3x2 or dome. The faces have no TAA (they share no history): FXAA
+// smooths them. Screen-space terms (GTAO, contact shadows) see one face at a
+// time, so they can step at the face seams.
+void RenderHqNode::Cook360(HqFrame& f)
+{
+   const int outW = std::max(16, (int)width), outH = std::max(16, (int)height);
+   const int face = std::clamp(panorama == 1 ? outW / 4 : (panorama == 3 ? outW / 2 : outW / 3), 64, 4096);
+   if (mFaceArray == 0 || mFaceSize != face)
+   {
+      if (mFaceArray != 0)
+         glDeleteTextures(1, &mFaceArray);
+      glGenTextures(1, &mFaceArray);
+      glBindTexture(GL_TEXTURE_2D_ARRAY, mFaceArray);
+      glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, face, face, 6);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+      mFaceSize = face;
+   }
+   if (!mPano)
+      mPano = std::make_unique<Render3DPost>();
+   f.width = f.height = face;
+   f.outWidth = f.outHeight = 0;
+   f.taa = false;
+   f.reuseStill = false;
+   f.proj = Mat4::Perspective((float)M_PI * 0.5f, 1.0f, nearPlane, farPlane);
+   const Mat4 cameraView = f.view;
+   mOut = 0;
+   for (int i = 0; i < 6; i++)
+   {
+      float fw[3], r[3], u[3];
+      Render3DPost::PanoFace(i, fw, r, u);
+      Mat4 turn = Mat4::Identity();
+      turn.m[0] = r[0]; turn.m[4] = r[1]; turn.m[8] = r[2];
+      turn.m[1] = u[0]; turn.m[5] = u[1]; turn.m[9] = u[2];
+      turn.m[2] = -fw[0]; turn.m[6] = -fw[1]; turn.m[10] = -fw[2];
+      f.view = Mat4::Multiply(turn, cameraView);
+      const unsigned int tex = mRenderer->Render(f);
+      if (tex == 0)
+         return;
+      glCopyImageSubData(tex, GL_TEXTURE_2D, 0, 0, 0, 0, mFaceArray, GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, face, face, 1);
+   }
+   mOut = mPano->Panorama(mFaceArray, outW, outH, panorama, domeAngle, domeTilt);
+   mOutW = outW;
+   mOutH = outH;
+}
 
 unsigned int RenderHqNode::GetOutputTexture()
 {
@@ -245,7 +303,15 @@ void RenderHqNode::CookIfNeeded(int frameId)
    f.bloomLevels = std::clamp((int)std::lround(bloomRadius * 10.0f), 1, 11);
    f.sharpness = std::clamp(sharpness, 0.0f, 1.0f);
    f.aoFullRes = aoFullRes;
+   f.fxaa = fxaa;
 
+   if (panorama > 0) // S9: 360
+   {
+      Cook360(f);
+      mRevision++;
+      mWhy = mOut == 0 ? mRenderer->Error() : std::string();
+      return;
+   }
    mOut = mRenderer->Render(f);
    mOutW = f.outWidth > 0 ? f.outWidth : f.width;
    mOutH = f.outHeight > 0 ? f.outHeight : f.height;

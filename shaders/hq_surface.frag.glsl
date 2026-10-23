@@ -12,6 +12,12 @@ in vec3 vLocalPos;
 in vec3 vInstColor; // S7: Instance PointZ colour (1 otherwise), multiplies as in Render 3D
 
 uniform int uShading; // Material: lit / normals / uv / flat
+// S9: Render 3D's alpha - opacity x the albedo map's alpha (textureAlpha),
+// dropped below the cutoff; blended slots output it (premultiplied blend).
+uniform int uBlended;
+uniform float uOpacity;
+uniform float uAlphaCutoff;
+uniform int uTextureAlpha;
 
 // Material maps (bit i of uMaps = MaterialMap i is bound), fixed units 4-11.
 uniform int uMaps;
@@ -121,14 +127,20 @@ vec3 applyNormalMap(vec3 normal, vec2 uv)
    vec3 sampled;
    if (uNormalBump == 1)
    {
-      // Grayscale height: slope from central differences, +Z up.
-      vec2 px = 1.0 / vec2(textureSize(uNormalMap, 0));
+      // Grayscale height: slope from central differences, +Z up. S9: taken
+      // at the mip the pixel covers (one texel of that level apart, the
+      // slope scaled back to one texel of level 0): up close the same as
+      // before; far away the height's detail is filtered instead of turning
+      // into normals that flicker from pixel to pixel and frame to frame.
+      float lod = max(textureQueryLod(uNormalMap, uv).y + uLodBias, 0.0);
+      float step = exp2(lod);
+      vec2 px = step / vec2(textureSize(uNormalMap, 0));
       const vec3 lum = vec3(0.2126, 0.7152, 0.0722);
-      float hl = dot(texture(uNormalMap, uv - vec2(px.x, 0.0), uLodBias).rgb, lum);
-      float hr = dot(texture(uNormalMap, uv + vec2(px.x, 0.0), uLodBias).rgb, lum);
-      float hd = dot(texture(uNormalMap, uv - vec2(0.0, px.y), uLodBias).rgb, lum);
-      float hu = dot(texture(uNormalMap, uv + vec2(0.0, px.y), uLodBias).rgb, lum);
-      sampled = normalize(vec3((hl - hr) * 2.0, (hd - hu) * 2.0, 1.0));
+      float hl = dot(textureLod(uNormalMap, uv - vec2(px.x, 0.0), lod).rgb, lum);
+      float hr = dot(textureLod(uNormalMap, uv + vec2(px.x, 0.0), lod).rgb, lum);
+      float hd = dot(textureLod(uNormalMap, uv - vec2(0.0, px.y), lod).rgb, lum);
+      float hu = dot(textureLod(uNormalMap, uv + vec2(0.0, px.y), lod).rgb, lum);
+      sampled = normalize(vec3((hl - hr) * 2.0 / step, (hd - hu) * 2.0 / step, 1.0));
    }
    else
       sampled = texture(uNormalMap, uv, uLodBias).rgb * 2.0 - 1.0;
@@ -149,7 +161,9 @@ void main()
    s.pos = vWorldPos;
    s.geoN = geoN;
    s.base = toLinear(uBaseColor) * vInstColor;
-   if (hasMap(kMapAlbedo)) s.base *= toLinear(sampleMap(uAlbedoMap, geoN, mapUv).rgb);
+   vec4 albedo = hasMap(kMapAlbedo) ? sampleMap(uAlbedoMap, geoN, mapUv) : vec4(1.0);
+   s.base *= toLinear(albedo.rgb);
+   float alpha = uOpacity * (uTextureAlpha == 1 ? albedo.a : 1.0);
    if (uShading == 3) { outColor = vec4(s.base * uExposure, 1.0); return; }
 
    s.perceptualRoughness = uRoughness;
@@ -168,5 +182,14 @@ void main()
    if (hasMap(kMapEmission)) s.emissive *= toLinear(sampleMap(uEmissionMap, geoN, mapUv).rgb);
    s.kernelRoughness = computeKernelRoughness(geoN, 0.15, 0.2);
 
+   // S9: dropped below the cutoff (here, after every derivative was taken).
+   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff)
+      discard;
+   if (uBlended == 1)
+   {
+      gDiffuseAlpha = alpha;
+      outColor = vec4(hqShade(s) * uExposure, alpha);
+      return;
+   }
    outColor = vec4(hqShade(s) * uExposure, 1.0);
 }

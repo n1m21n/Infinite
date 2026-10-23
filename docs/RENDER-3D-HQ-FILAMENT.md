@@ -520,6 +520,28 @@ pré-passe sombreia cada pixel uma vez, as esferas e as instâncias usam o passe
 cena parada é reaproveitada depois de o TAA assentar. Na B, o HQ fica 0,14 ms acima numa cena leve
 em que ele roda GTAO e TAA e o Render 3D não. Na F, o Render 3D sozinho custa 10,7 ms (FRAMEPROF `render3d`). Os números das sessões
 anteriores (S3-S8, P1) estão no §8, §10-§12 e na §6 da estratégia.
+
+### S9b: retorno do teste do dono (`buves_textMotion.inf`)
+
+O patch dele: chão de 289×273 com relevo de uma textura, 1024 cubos instanciados com um Material de
+opacidade 0,364, alpha cutoff 0,843, relevo forte de uma textura que desliza (`transform` animado), sombra
+4096 suave (2,8) com contact shadows, GTAO cheio, **TAA desligado**, tonemap Filament ACES legacy. O que
+ele viu e o que era:
+
+| Retorno | Causa | Correção |
+|---|---|---|
+| sombras "riscadas", pouco suaves | a busca de bloqueadores do PCSS girava por pixel: na borda da penumbra alguns pixels não achavam bloqueador e saíam 100% iluminados (pontos claros em diagonal, o padrão do ruído); sem TAA nada alisava o ruído do filtro | busca com o disco fixo (vizinhos concordam); o termo suave e o de contato calculados uma vez por pixel numa **máscara em tela** (`hq_shadow_mask.comp`: profundidade + normal do pré-passe) e alisados pelo blur bilateral do GTAO (para na borda de profundidade); com TAA, o ruído também gira a cada quadro |
+| arestas dos cubos sem anti-aliasing, imagem "dura" | sem TAA o HQ não tinha anti-aliasing nenhum (não há MSAA) | **FXAA** (`hq_fxaa.frag`, o algoritmo FXAA 3.11 de Lottes, a opção do Filament ao lado do TAA) na imagem final sempre que o quadro não tem TAA; parâmetro `fxaa` (ligado) |
+| cores piscando | o relevo de altura media a inclinação sempre a 1 texel do nível 0: de longe, a textura minimizada virava normais aleatórias de pixel para pixel (e de quadro para quadro com a textura deslizando) | a inclinação é medida no nível de mip que o pixel cobre (1 texel daquele nível, escalada de volta): de perto igual, de longe filtrada |
+| (achado) os cubos opacos no HQ, quase invisíveis no Render 3D | o HQ ignorava `opacity`, `alphaCutoff` e `textureAlpha` | as regras do Render 3D (alpha = opacidade × alpha do mapa de albedo; abaixo do cutoff o fragmento cai): slot com opacidade abaixo do cutoff some (e não faz sombra, como as máscaras do Filament); opacidade < 1 desenha depois de tudo, do mais longe para o mais perto, com o blending "transparent" do Filament (difuso multiplicado pelo alpha, especular inteiro, como vidro) |
+| sem as opções equirect, cubemap e dome | o HQ não tinha o 360 do Render 3D | **360** com as mesmas chaves (`panorama`, `domeAngle`, `domeTilt`): seis faces de 90° pelo HQ e o mesmo passe de reprojeção do Render 3D; as faces sem TAA (não têm histórico em comum), com FXAA |
+| "a imagem está dura, pouco realista" | quase tudo acima (serrilhado, pontilhado, cintilação); além disso, no patch: a única luz de preenchimento é um HDRI noturno a 0,18 (sombras quase pretas), relevo com força 1,8-2,4, raio do GTAO 2,5 (escurece largo) e o tonemap legacy (mais contraste) | as correções acima; os ajustes de cena ficam com o dono |
+
+O TAA continua o melhor anti-aliasing do HQ para cena sem textura deslizando: o histórico dele não
+acompanha um UV animado (a textura borra), e é por isso que o FXAA existe. Checks novos no `HQTEST`: FXAA
+reduz a energia de borda sem TAA; sombra suave + contato sem TAA sem mais detalhe fino que o PCF duro;
+o cutoff tira o mesh (diferença 0 contra a cena sem ele) e a opacidade 0,5 deixa ver o que está dentro;
+360 equirect 2:1 e dome no tamanho pedido. Exemplos A-I iguais a antes (só a animação muda).
 ## 14. Licenças
 
 | Arquivo | Portado de (Filament @ 13be3649, Apache-2.0, © Google LLC) |
@@ -536,6 +558,11 @@ anteriores (S3-S8, P1) estão no §8, §10-§12 e na §6 da estratégia.
 | `shaders/hq_bloom_down.frag.glsl` | `filament/src/materials/bloom/bloomDownsample2x.mat`, `bloomDownsample9.mat`, `bloomDownsample.mat`; valores de `Options.h` `BloomOptions`; cadeia de `PostProcessManager.cpp` `bloom()` |
 | `shaders/hq_bloom_up.frag.glsl` | `filament/src/materials/bloom/bloomUpsample.mat` (caminho HIGH, tenda 3×3) |
 | `shaders/hq_finish.frag.glsl` (tonemaps 5 e 6, composição do bloom) | `filament/src/ToneMapper.cpp` (`ACESLegacyToneMapper`, `ACESToneMapper`, namespace `aces`), matrizes de `filament/src/details/ColorSpaceUtils.h`, ordem de `materials/colorGrading/colorGrading.mat` |
+| `shaders/hq_surface.frag.glsl` (S9b: alpha) | o blending "transparent" e o modo "masked" do Filament (`docs/Materials.md`, `surface_shading_lit.fs`: difuso pré-multiplicado, especular não) |
+
+Sem código portado (S9b): `shaders/hq_fxaa.frag.glsl` é escrito a partir do algoritmo FXAA 3.11 de
+Timothy Lottes (NVIDIA), a opção sem histórico que o Filament oferece; `shaders/hq_shadow_mask.comp.glsl`
+é do Infinite-Turbo (reaproveita as funções de `hq_shadows.glsl` e o blur do GTAO).
 
 Também listado em `THIRD_PARTY_NOTICES.md`. Nenhum código do Filament é linkado.
 ## 15. Problemas conhecidos e o que falta
@@ -565,8 +592,15 @@ decisão dele.
 - Render 3D FX depois do HQ deixa a imagem passar: o FX lê a profundidade e a velocidade do pipeline
   do Render 3D, que o HQ não preenche. O HQ já tem o próprio GTAO; reflexos em tela, profundidade de
   campo e motion blur para o HQ ficam para depois.
-- Sem MSAA: o anti-aliasing do HQ é o TAA (desligá-lo deixa serrilhado). O `depthDisocclusion` do TAA
-  do Filament não foi portado (não apareceu ghosting nas cenas de referência).
+- Sem MSAA: o anti-aliasing do HQ é o TAA, ou o FXAA quando o TAA está desligado (S9b). O
+  `depthDisocclusion` do TAA do Filament não foi portado (não apareceu ghosting nas cenas de referência).
+- Transparência (S9b): ordenada por objeto, não por triângulo nem por instância (cópias de um Instance
+  PointZ translúcido se cruzam na ordem em que foram desenhadas); objetos translúcidos fazem sombra
+  inteira (como no Render 3D) e não entram no GTAO, na velocidade do TAA nem na máscara de sombra.
+  `transmission`, iridescência, anisotropia, subsurface e dispersão do Material ainda não são lidos.
+  Esferas (pontos de PointZ) continuam opacas.
+- 360 (S9b): seis quadros completos por quadro (o custo vezes seis, sem reaproveitar cena parada); o
+  GTAO e as sombras de contato veem uma face por vez e podem marcar a emenda entre faces.
 - Sem RTX: o modo RTX continua só no Render 3D (decisão do dono: RTX fica para a 0.72).
 - Saída sRGB com gama 2,2 e dither, como o Render 3D; o Filament usa a OETF sRGB exata.
 - Particle PointZ (motor CPU, P1) abaixo de ~10 fps: a cópia por linhas cobre ~0,2 s de nascimentos;

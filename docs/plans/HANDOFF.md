@@ -63,6 +63,12 @@ desse plano e entra nele como P1 (desempenho) e S4-S7 (render).
 
 ### Próximo passo: aval do dono para o release da 0.71
 
+S9b (2026-10-23, no working tree, **sem commit**: o dono pediu para resolver antes de commitar e fazer o
+merge): retorno do teste dele (`buves_textMotion.inf`) - máscara de sombra em tela (sombra suave e de
+contato sem pontilhado), FXAA quando o TAA está desligado, relevo de altura filtrado no mip, opacidade /
+alpha cutoff / textureAlpha do Material, 360 (equirect, cubemap, dome). Detalhes no §13 "S9b" do
+`RENDER-3D-HQ-FILAMENT.md`. Falta: o dono testar no app; depois commit, merge e tag com o aval dele.
+
 Estado (2026-10-23): S0 a S9 e P1 feitas e commitadas na `feature/render3d-hq` (sem push). S9: capturas
 BEFORE/AFTER das 9 cenas olhadas, um defeito achado e corrigido (cena I, chão cor de cobre entre as
 instâncias; check novo no `HQTEST`), benchmarks no §13 do `RENDER-3D-HQ-FILAMENT.md` (HQ <= Render 3D

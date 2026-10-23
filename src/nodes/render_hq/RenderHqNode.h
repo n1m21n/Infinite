@@ -12,6 +12,8 @@
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/render_hq/HqRenderer.h"
 
+class Render3DPost;
+
 class RenderHqNode : public Render3DNode
 {
 public:
@@ -53,6 +55,9 @@ public:
       // S8: render scale and sharpening (Render 3D's keys), GTAO resolution.
       v.Int("upscale", upscale); v.Float("sharpness", sharpness);
       v.Bool("aoFullRes", aoFullRes);
+      // S9: FXAA when TAA is off; 360 output (Render 3D's keys and modes).
+      v.Bool("fxaa", fxaa);
+      v.Int("panorama", panorama); v.Float("domeAngle", domeAngle); v.Float("domeTilt", domeTilt);
    }
 
    // S8: the HQ's tonemaps - Render 3D's five, then Filament's ACES legacy
@@ -69,6 +74,11 @@ public:
    // S8: GTAO at the full frame size (Filament's resolution 1.0; the High
    // preset) instead of half.
    bool aoFullRes = false;
+   // S9: Filament's FXAA on the finished image whenever the frame has no TAA
+   // (TAA off - e.g. a texture that slides over its surface, which the TAA
+   // history smears - or a 360 face). On by default: without it the HQ has no
+   // anti-aliasing at all when TAA is off.
+   bool fxaa = true;
 
    // S5: GTAO on the indirect light, on by default (the finished picture);
    // radius in world units, intensity 0..1; aoShow draws it alone. Radius 1,
@@ -105,4 +115,9 @@ private:
    int mLastFrame = -1;
    unsigned long long mRevision = 0;
    double mLastCookSeconds = -1.0; // S6: dt for particle velocity
+   // S9: 360 - the six faces (RGBA8 array) and Render 3D's reprojection.
+   void Cook360(HqFrame& f);
+   std::unique_ptr<Render3DPost> mPano;
+   unsigned int mFaceArray = 0;
+   int mFaceSize = 0;
 };

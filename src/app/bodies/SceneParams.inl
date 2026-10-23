@@ -1863,6 +1863,25 @@
                      [n](int i) { PushUndoCheckpoint(); n->upscale = i; }, colW);
       ModSlider("sharpness", &n->sharpness, 0.0f, 1.0f, "%.2f", colW);
       ModCheckbox("full-res GTAO", &n->aoFullRes);
+      // S9: last, so every control above keeps its ordinal.
+      ModCheckbox("FXAA when TAA is off", &n->fxaa);
+      // S9: 360 output (equirect, cubemap 3x2, dome), as Render 3D's: six
+      // faces, no TAA between them (FXAA). The dome's sliders come last.
+      NodeSeparator("360", colW);
+      DropdownButton("360", Render3DNode::PanoramaNames(), n->panorama,
+                     [n](int i) {
+                        PushUndoCheckpoint();
+                        n->panorama = i;
+                        // The formats' own aspect: 2:1 equirect, 3:2 cubemap.
+                        if (i == 1) n->height = std::max(16.0f, n->width * 0.5f);
+                        else if (i == 2) n->height = std::max(16.0f, n->width * 2.0f / 3.0f);
+                        else if (i == 3) n->height = n->width; // dome: square domemaster
+                     }, colW);
+      if (n->panorama == 3)
+      {
+         ModSlider("dome angle", &n->domeAngle, 90.0f, 360.0f, "%.0f\xC2\xB0", colW);
+         ModSlider("dome tilt", &n->domeTilt, 0.0f, 90.0f, "%.0f\xC2\xB0", colW);
+      }
       ImGui::EndGroup();
    }
 

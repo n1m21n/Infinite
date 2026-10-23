@@ -102,7 +102,8 @@ namespace
    // Texture units of the shading passes (set once at link).
    const int kUnitIrr = 0, kUnitPref = 1, kUnitDfg = 2, kUnitShadow = 3, kUnitMap0 = 4;
    const int kUnitShadowRaw = 12, kUnitSceneDepth = 13, kUnitSsao = 14;
-   const int kUnitSphereAlbedo = 15, kUnitSceneNormal = 16, kUnitLast = 16; // S7: deferred spheres
+   const int kUnitSphereAlbedo = 15, kUnitSceneNormal = 16; // S7: deferred spheres
+   const int kUnitShadowMask = 17, kUnitLast = 17; // S9: screen-space shadow mask
    // S5: Filament's AmbientOcclusionOptions (resolution 0.5, bilateralThreshold
    // in metres, power) and the depth chain's levels (kLog2LodRate 3 reaches
    // level 4 at the largest GTAO radius on screen).
@@ -119,6 +120,20 @@ namespace
    const float kNormalBiasTexels = 1.0f;
    const float kContactDistance = 0.3f;
 
+   // S9: how a mesh slot composites, by Render 3D's rules for its Material
+   // (alpha = opacity x the albedo map's alpha with textureAlpha; below the
+   // cutoff the fragment is dropped). Spheres stay opaque.
+   enum AlphaMode { kAlphaOpaque = 0, kAlphaBlended = 1, kAlphaCut = 2 };
+   AlphaMode MeshAlphaMode(IGeometrySource* src)
+   {
+      const Material m = src->GetMaterial();
+      if (m.alphaCutoff > 0.0f && m.opacity < m.alphaCutoff)
+         return kAlphaCut; // nothing is left above the cutoff
+      if (m.opacity < 0.999f || (m.textureAlpha && src->GetMaterialTexture(kMapAlbedo) != 0))
+         return kAlphaBlended;
+      return kAlphaOpaque;
+   }
+
    // What the shading passes need to sample the shadow map (S4).
    struct ShadowState
    {
@@ -127,6 +142,9 @@ namespace
       float texel = 0.0f, normalBias = 0.0f, constBias = 0.0f, depthRange = 1.0f, softness = 0.0f;
       int contact = 0;
       float proj[4] = { 0, 0, 0, 0 }; // proj m[10], m[14], ortho, contact distance
+      // S9: read the soft / contact terms from the screen-space mask; the
+      // noise's frame (turns under TAA).
+      int mask = 0, noiseFrame = 0;
    };
 
    unsigned int MakeTexture(int w, int h, int levels, GLenum internal, bool wrapU, const char* label)
@@ -188,6 +206,7 @@ namespace
       int envRotation = -1, envIntensity = -1, envSky = -1, envHorizon = -1, envGround = -1, exposure = -1;
       int shadowLight = -1, lightViewProj = -1, shadowTexel = -1, shadowNormalBias = -1, shadowConstBias = -1;
       int shadowDepthRange = -1, shadowSoftness = -1, contactShadows = -1, projParams = -1;
+      int shadowMaskOn = -1, shadowNoiseFrame = -1; // S9
       int ssao = -1, frameTexel = -1;
 
       void Load(unsigned int p)
@@ -230,6 +249,9 @@ namespace
          shadowSoftness = loc("uShadowSoftness");
          contactShadows = loc("uContactShadows");
          projParams = loc("uProjParams");
+         shadowMaskOn = loc("uShadowMaskOn");
+         shadowNoiseFrame = loc("uShadowNoiseFrame");
+         glUniform1i(loc("uShadowMask"), kUnitShadowMask);
          ssao = loc("uSsao");
          frameTexel = loc("uFrameTexel");
          glUniform1i(loc("uSsaoMap"), kUnitSsao);
@@ -253,6 +275,8 @@ namespace
          glUniform1f(shadowSoftness, st.softness);
          glUniform1i(contactShadows, st.contact);
          glUniform4fv(projParams, 1, st.proj);
+         glUniform1i(shadowMaskOn, st.mask);
+         glUniform1i(shadowNoiseFrame, st.noiseFrame);
       }
 
       // S5: 0 no SSAO, 1 on, 2 show it alone; the map is on kUnitSsao.
@@ -380,6 +404,7 @@ namespace
          int objLo = -1, objHi = -1;
          int instanced = -1, instColored = -1; // S7
          int lodBias = -1; // S8
+         int blended = -1, opacity = -1, alphaCutoff = -1, textureAlpha = -1; // S9
          LitLocs lit;
       };
       struct ShadowProgram
@@ -437,6 +462,13 @@ namespace
          unsigned int id = 0;
          int size = -1, jitter = -1, alpha = -1, historyValid = -1;
       };
+      // S9: hq_shadow_mask.comp - the soft / contact terms once per pixel.
+      struct ShadowMaskProgram
+      {
+         unsigned int id = 0;
+         int invViewProj = -1, viewMatrix = -1, lightDir = -1, size = -1, viewProj = -1;
+         LitLocs lit; // the shadow uniforms of hq_shadows.glsl
+      };
 
       bool EnsurePrograms();
       bool EnsureTargets(int w, int h, bool aoFullRes);
@@ -451,6 +483,9 @@ namespace
       void RunAo(const HqFrame& f, const Mat4& proj, int noiseFrame);
       bool EnsureTaa();
       unsigned int RunTaa(const HqFrame& f, const Mat4& viewProj, const Mat4& viewProjPlain, float jx, float jy);
+      bool EnsureShadowMask();
+      void RunShadowMask(const HqFrame& f, const Mat4& viewProj, const ShadowState& st);
+      unsigned int RunFxaa(unsigned int src, int w, int h);
       void Release();
 
       PrepassProgram mPre;
@@ -491,6 +526,17 @@ namespace
       Render3DTemporal mTemporal;
       Mat4 mPrevViewProj;
       bool mHavePrevViewProj = false;
+      // S9: the shadow mask (RG16F: visibility, view z) and its blur pair at
+      // the frame size; mShadowMask[0] holds the result.
+      ShadowMaskProgram mMaskProg;
+      bool mMaskTried = false;
+      unsigned int mShadowMask[2] = { 0, 0 };
+      int mMaskW = 0, mMaskH = 0;
+      int mShadowNoiseFrame = 0;
+      // S9: FXAA (hq_fxaa.frag) into its own RGBA8 target.
+      unsigned int mFxaaProg = 0, mFxaaOut = 0, mFxaaFbo = 0;
+      int mFxaaTexel = -1, mFxaaW = 0, mFxaaH = 0;
+      bool mFxaaTried = false;
       // S7: still scenes - what the last frame was drawn from, how many frames
       // in a row it stayed the same, the image it gave.
       std::vector<unsigned long long> mStillSig;
@@ -559,6 +605,10 @@ namespace
       mSurf.instanced = loc(s, "uInstanced");
       mSurf.instColored = loc(s, "uInstColored");
       mSurf.lodBias = loc(s, "uLodBias");
+      mSurf.blended = loc(s, "uBlended");
+      mSurf.opacity = loc(s, "uOpacity");
+      mSurf.alphaCutoff = loc(s, "uAlphaCutoff");
+      mSurf.textureAlpha = loc(s, "uTextureAlpha");
       mSurf.lit.Load(s);
       const char* mapNames[kMapCount] = { "uAlbedoMap", "uRoughnessMap", "uMetallicMap", "uNormalMap",
                                           "uAoMap", "uEmissionMap", "uClearcoatMap", "uSheenMap" };
@@ -838,6 +888,143 @@ namespace
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, 0);
       glActiveTexture(GL_TEXTURE0);
+   }
+
+   bool HqRendererGl::EnsureShadowMask()
+   {
+      if (mMaskTried)
+         return mMaskProg.id != 0;
+      mMaskTried = true;
+      ShadowMaskProgram& m = mMaskProg;
+      m.id = Render3DTemporal::BuildComputeShader("hq_shadow_mask.comp.glsl");
+      if (m.id == 0)
+         return false;
+      glUseProgram(m.id);
+      m.lit.Load(m.id); // the shadow uniforms and samplers (units as in the shading)
+      auto loc = [&m](const char* n) { return glGetUniformLocation(m.id, n); };
+      m.invViewProj = loc("uInvViewProj");
+      m.viewMatrix = loc("uViewMatrix");
+      m.lightDir = loc("uLightDir");
+      m.size = loc("uSize");
+      m.viewProj = loc("uViewProj");
+      glUniform1i(loc("uSceneNormalMap"), kUnitSceneNormal);
+      glUseProgram(0);
+      return true;
+   }
+
+   // S9: FXAA over the finished RGBA8 image (frames without TAA). Returns
+   // the anti-aliased texture, or 0 when the shader is missing.
+   unsigned int HqRendererGl::RunFxaa(unsigned int src, int w, int h)
+   {
+      if (!mFxaaTried)
+      {
+         mFxaaTried = true;
+         mFxaaProg = BuildProgram("hq_background.vert.glsl", "hq_fxaa.frag.glsl");
+         if (mFxaaProg != 0)
+         {
+            glUseProgram(mFxaaProg);
+            glUniform1i(glGetUniformLocation(mFxaaProg, "uSrc"), 0);
+            mFxaaTexel = glGetUniformLocation(mFxaaProg, "uTexel");
+         }
+      }
+      if (mFxaaProg == 0 || src == 0)
+         return 0;
+      GLUtil::DebugScope group("Render 3D HQ: FXAA");
+      if (mFxaaOut == 0 || mFxaaW != w || mFxaaH != h)
+      {
+         if (mFxaaOut != 0)
+            glDeleteTextures(1, &mFxaaOut);
+         mFxaaOut = MakeTexture(w, h, 1, GL_RGBA8, false, "Render 3D HQ: FXAA");
+         if (mFxaaFbo == 0)
+            glGenFramebuffers(1, &mFxaaFbo);
+         glBindFramebuffer(GL_FRAMEBUFFER, mFxaaFbo);
+         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mFxaaOut, 0);
+         glDrawBuffer(GL_COLOR_ATTACHMENT0);
+         mFxaaW = w;
+         mFxaaH = h;
+      }
+      glBindFramebuffer(GL_FRAMEBUFFER, mFxaaFbo);
+      glViewport(0, 0, w, h);
+      glDisable(GL_DEPTH_TEST);
+      glDisable(GL_BLEND);
+      glUseProgram(mFxaaProg);
+      glUniform2f(mFxaaTexel, 1.0f / (float)w, 1.0f / (float)h);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, src);
+      glBindVertexArray(mEmptyVao);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      return mFxaaOut;
+   }
+
+   // S9: the shadowed light's soft (PCSS) and contact terms per pixel from the
+   // prepass (depth copy, view normals) into mShadowMask[0], then the GTAO's
+   // bilateral blur X / Y over it - the per-pixel noise of both filters
+   // averages out along the surfaces instead of showing as dots.
+   void HqRendererGl::RunShadowMask(const HqFrame& f, const Mat4& viewProj, const ShadowState& st)
+   {
+      GLUtil::DebugScope group("Render 3D HQ: shadow mask");
+      const int w = f.width, h = f.height;
+      if (mShadowMask[0] == 0 || mMaskW != w || mMaskH != h)
+      {
+         for (unsigned int& t : mShadowMask)
+         {
+            if (t != 0)
+               glDeleteTextures(1, &t);
+            t = MakeTexture(w, h, 1, GL_RG16F, false, "Render 3D HQ: shadow mask");
+         }
+         mMaskW = w;
+         mMaskH = h;
+      }
+      const float* lv = f.lights[st.light].vec;
+      const float len = std::max(1e-6f, std::sqrt(lv[0] * lv[0] + lv[1] * lv[1] + lv[2] * lv[2]));
+      auto groups = [](int n) { return (GLuint)((n + 7) / 8); };
+      const GLbitfield barrier = GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT;
+
+      glActiveTexture(GL_TEXTURE0 + kUnitShadow);
+      glBindTexture(GL_TEXTURE_2D, mShadowTex);
+      glBindSampler(kUnitShadow, mCmpSampler);
+      glActiveTexture(GL_TEXTURE0 + kUnitShadowRaw);
+      glBindTexture(GL_TEXTURE_2D, mShadowTex);
+      glBindSampler(kUnitShadowRaw, mRawSampler);
+      glActiveTexture(GL_TEXTURE0 + kUnitSceneDepth);
+      glBindTexture(GL_TEXTURE_2D, mDepthCopy);
+      glActiveTexture(GL_TEXTURE0 + kUnitSceneNormal);
+      glBindTexture(GL_TEXTURE_2D, mNormal);
+
+      const ShadowMaskProgram& m = mMaskProg;
+      glUseProgram(m.id);
+      m.lit.SetShadow(st);
+      const Mat4 invViewProj = Mat4::Inverse(viewProj);
+      glUniformMatrix4fv(m.invViewProj, 1, GL_FALSE, invViewProj.m);
+      glUniformMatrix4fv(m.viewMatrix, 1, GL_FALSE, f.view.m);
+      glUniformMatrix4fv(m.viewProj, 1, GL_FALSE, viewProj.m);
+      glUniform3f(m.lightDir, lv[0] / len, lv[1] / len, lv[2] / len);
+      glUniform2i(m.size, w, h);
+      glBindImageTexture(0, mShadowMask[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
+      glDispatchCompute(groups(w), groups(h), 1);
+      glMemoryBarrier(barrier);
+
+      // The GTAO's blur: X into mShadowMask[1], Y back into mShadowMask[0].
+      const AoPrograms& a = mAoProg;
+      const Mat4& P = f.proj;
+      const bool ortho = P.m[15] == 1.0f;
+      const float farZ = ortho ? (1.0f - P.m[14]) / P.m[10] : -P.m[14] / (1.0f + P.m[10]);
+      glUseProgram(a.blur);
+      glUniform2i(a.bSize, w, h);
+      glUniform1f(a.bFarZ, farZ);
+      glUniform1f(a.bEdgeInv, 1.0f / kAoBilateralThreshold);
+      glActiveTexture(GL_TEXTURE0);
+      for (int pass = 0; pass < 2; pass++)
+      {
+         glUniform2i(a.bAxis, pass == 0 ? 1 : 0, pass == 0 ? 0 : 1);
+         glBindTexture(GL_TEXTURE_2D, mShadowMask[pass]);
+         glBindImageTexture(0, mShadowMask[1 - pass], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
+         glDispatchCompute(groups(w), groups(h), 1);
+         glMemoryBarrier(barrier);
+      }
+      glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
+      glBindTexture(GL_TEXTURE_2D, 0);
    }
 
    bool HqRendererGl::EnsureTaa()
@@ -1189,6 +1376,8 @@ namespace
          const Slot& slot = mSlots[i];
          if (!slot.drawable || !slot.hasBounds || (slot.instanced && !slot.instHasBounds))
             continue;
+         if (slot.kind != kSpheres && MeshAlphaMode(draw[i]) == kAlphaCut) // S9: casts nothing
+            continue;
          float olo[3], ohi[3];
          float pad = slot.kind == kSpheres ? slot.radiusScale : 0.0f;
          const float* blo = slot.lo;
@@ -1278,6 +1467,7 @@ namespace
          sig.push_back((unsigned long long)slot.pointCount);
          sig.push_back(slot.instanced ? slot.instRevision : 0); // S7
          sig.push_back((unsigned long long)slot.instanceCount);
+         sig.push_back(slot.kind != kSpheres && MeshAlphaMode(draw[i]) == kAlphaCut ? 1 : 0); // S9
          pushF(slot.radiusScale);
          for (float v : draw[i]->GetModelMatrix().m)
             pushF(v);
@@ -1318,7 +1508,9 @@ namespace
       glUniformMatrix4fv(mShadowProg.viewProj, 1, GL_FALSE, st.viewProj.m);
       for (size_t i = 0; i < draw.size(); i++)
       {
-         if (!mSlots[i].drawable || mSlots[i].kind == kSpheres)
+         // S9: a slot its alpha cutoff removes casts nothing either (Filament's
+         // masked shadows); blended ones cast as opaque, as in Render 3D.
+         if (!mSlots[i].drawable || mSlots[i].kind == kSpheres || MeshAlphaMode(draw[i]) == kAlphaCut)
             continue;
          const Mat4 model = draw[i]->GetModelMatrix();
          float normalMatrix[9];
@@ -1464,7 +1656,8 @@ namespace
                                  f.aoIntensity, f.sharpness };
          pushFs(knobs, (int)(sizeof(knobs) / sizeof(float)));
          // S8: bloom levels, the upscaled size, AO resolution.
-         sig.push_back((unsigned long long)f.bloomLevels | ((unsigned long long)f.aoFullRes << 8));
+         sig.push_back((unsigned long long)f.bloomLevels | ((unsigned long long)f.aoFullRes << 8) |
+                       ((unsigned long long)f.fxaa << 9)); // S9: FXAA
          sig.push_back(((unsigned long long)(unsigned int)f.outWidth << 32) | (unsigned int)f.outHeight);
          sig.push_back((unsigned long long)f.tonemap | ((unsigned long long)f.shadowSize << 8) |
                        ((unsigned long long)f.envAsBackground << 40) | ((unsigned long long)f.shadows << 41) |
@@ -1518,7 +1711,11 @@ namespace
       // S5: GTAO reads the depth copy and the prepass normals.
       const bool aoOn = f.ao && EnsureAo();
       const int aoMode = aoOn ? (f.aoShow ? 2 : 1) : 0;
-      const bool depthCopy = shadow.contact || anySpheres || aoOn;
+      // S9: the soft and contact terms go through the screen-space mask
+      // (it reads the depth copy and the GTAO's blur).
+      const bool maskOn = shadow.light >= 0 && (shadow.softness > 0.0f || shadow.contact) && EnsureAo() &&
+                          mAoProg.blur != 0 && EnsureShadowMask();
+      const bool depthCopy = shadow.contact || anySpheres || aoOn || maskOn;
       // S6: TAA - every frame drawn with a different sub-pixel jitter (the
       // shared kit's Halton(2,3) x16) and blended into a history (RunTaa).
       const bool taaOn = f.taa && EnsureTaa();
@@ -1567,11 +1764,17 @@ namespace
       // S7: shaded in the deferred full-screen pass, like the spheres - Instance
       // PointZ copies whose material has no maps and is lit (drawing a million
       // copies once instead of twice); everything else is shaded forward.
+      // S9: and how each mesh slot composites (opaque, blended after the rest,
+      // or cut away by its alpha cutoff).
+      std::vector<AlphaMode> alphaMode(draw.size(), kAlphaOpaque);
+      for (size_t i = 0; i < draw.size(); i++)
+         if (mSlots[i].drawable && mSlots[i].kind != kSpheres)
+            alphaMode[i] = MeshAlphaMode(draw[i]);
       std::vector<char> deferredMesh(draw.size(), 0);
       for (size_t i = 0; i < draw.size(); i++)
       {
          if (!mSlots[i].drawable || mSlots[i].kind == kSpheres || !mSlots[i].instanced ||
-             draw[i]->GetMaterial().shading != 0)
+             draw[i]->GetMaterial().shading != 0 || alphaMode[i] != kAlphaOpaque)
             continue;
          bool maps = false;
          for (int map = 0; map < kMapCount && !maps; map++)
@@ -1633,7 +1836,8 @@ namespace
          glUniform2f(mPre.frameSize, (float)f.width, (float)f.height);
          for (size_t i = 0; i < draw.size(); i++)
          {
-            if (!mSlots[i].drawable || mSlots[i].kind == kSpheres)
+            // S9: blended and cut slots leave the depth to what is behind them.
+            if (!mSlots[i].drawable || mSlots[i].kind == kSpheres || alphaMode[i] != kAlphaOpaque)
                continue;
             const Mat4 model = draw[i]->GetModelMatrix();
             float normalMatrix[9];
@@ -1691,6 +1895,14 @@ namespace
       }
       if (aoOn)
          RunAo(f, drawProj, taaOn ? mAoNoiseFrame++ : 0);
+      // S9: the shadow filters' noise turns every frame under TAA (it averages
+      // it); the soft / contact terms once per pixel, smoothed.
+      shadow.noiseFrame = taaOn ? mShadowNoiseFrame++ : 0;
+      if (maskOn)
+      {
+         RunShadowMask(f, viewProj, shadow);
+         shadow.mask = 1;
+      }
 
       const GLenum colourOnly[2] = { GL_COLOR_ATTACHMENT0, GL_NONE };
       glDrawBuffers(2, colourOnly);
@@ -1736,6 +1948,8 @@ namespace
          glBindTexture(GL_TEXTURE_2D, depthCopy ? mDepthCopy : 0);
          glActiveTexture(GL_TEXTURE0 + kUnitSsao);
          glBindTexture(GL_TEXTURE_2D, aoOn ? mAo[0] : 0);
+         glActiveTexture(GL_TEXTURE0 + kUnitShadowMask); // S9
+         glBindTexture(GL_TEXTURE_2D, shadow.mask ? mShadowMask[0] : 0);
 
          glEnable(GL_CULL_FACE);
          glUseProgram(mSurf.id);
@@ -1746,10 +1960,9 @@ namespace
          mSurf.lit.SetFrame(f, ibl);
          mSurf.lit.SetShadow(shadow);
          mSurf.lit.SetAo(aoMode, f.width, f.height);
-         for (size_t i = 0; i < draw.size(); i++)
-         {
-            if (!mSlots[i].drawable || mSlots[i].kind == kSpheres || deferredMesh[i]) // S7: deferred below
-               continue;
+         // One forward-shaded mesh slot (S9: blended = Filament's transparent
+         // mode, drawn after everything opaque).
+         auto drawSurface = [&](size_t i, bool blended) {
             IGeometrySource* src = draw[i];
             const Mat4 model = src->GetModelMatrix();
             float normalMatrix[9];
@@ -1759,6 +1972,10 @@ namespace
             glUniformMatrix3fv(mSurf.normalMatrix, 1, GL_FALSE, normalMatrix);
             glUniform1i(mSurf.shading, m.shading);
             mSurf.lit.SetMaterial(m);
+            glUniform1i(mSurf.blended, blended ? 1 : 0);
+            glUniform1f(mSurf.opacity, std::clamp(m.opacity, 0.0f, 1.0f));
+            glUniform1f(mSurf.alphaCutoff, m.alphaCutoff);
+            glUniform1i(mSurf.textureAlpha, m.textureAlpha ? 1 : 0);
             int maps = 0;
             for (int map = 0; map < kMapCount; map++)
             {
@@ -1794,6 +2011,13 @@ namespace
                mTriangles += (size_t)mSlots[i].indexCount / 3;
             }
             mDrawCalls++;
+         };
+         for (size_t i = 0; i < draw.size(); i++)
+         {
+            // S7: deferred below; S9: blended after everything opaque, cut ones never.
+            if (!mSlots[i].drawable || mSlots[i].kind == kSpheres || deferredMesh[i] || alphaMode[i] != kAlphaOpaque)
+               continue;
+            drawSurface(i, false);
          }
 
          // S7: spheres deferred - the prepass resolved their pixels (depth,
@@ -1834,6 +2058,45 @@ namespace
          }
          if (setUp)
             glEnable(GL_DEPTH_TEST);
+
+         // S9: opacity < 1 or alpha from the albedo map - Filament's
+         // "transparent" blending (premultiplied: the diffuse is scaled by
+         // alpha, the specular is not, as on glass), over everything opaque,
+         // farthest slot first, tested against the prepass depth and not
+         // writing it. They are not in the prepass (no GTAO, velocity or shadow
+         // mask under them), so their shadows are filtered here.
+         std::vector<std::pair<float, size_t>> blendOrder;
+         for (size_t i = 0; i < draw.size(); i++)
+            if (mSlots[i].drawable && mSlots[i].kind != kSpheres && alphaMode[i] == kAlphaBlended)
+            {
+               const Mat4 model = draw[i]->GetModelMatrix();
+               float c[3];
+               for (int k = 0; k < 3; k++)
+                  c[k] = 0.5f * (mSlots[i].lo[k] + mSlots[i].hi[k]);
+               float d2 = 0.0f;
+               for (int k = 0; k < 3; k++)
+               {
+                  const float w = model.m[k] * c[0] + model.m[4 + k] * c[1] + model.m[8 + k] * c[2] + model.m[12 + k];
+                  d2 += (w - f.eye[k]) * (w - f.eye[k]);
+               }
+               blendOrder.emplace_back(-d2, i);
+            }
+         if (!blendOrder.empty())
+         {
+            GLUtil::DebugScope blendGroup("Render 3D HQ: transparent");
+            std::sort(blendOrder.begin(), blendOrder.end());
+            glEnable(GL_CULL_FACE);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            glUseProgram(mSurf.id);
+            ShadowState direct = shadow;
+            direct.mask = 0; // the mask holds what is behind them
+            mSurf.lit.SetShadow(direct);
+            mSurf.lit.SetAo(0, f.width, f.height);
+            for (const auto& entry : blendOrder)
+               drawSurface(entry.second, true);
+            glDisable(GL_BLEND);
+         }
       }
 
       glDrawBuffers(1, both);
@@ -1868,6 +2131,10 @@ namespace
       else
          finished = mPost.Finish(mColor, f.width, f.height, post, envBackground ? 0 : 1, envBackground ? 0u : mDepth,
                                  f.bg, 1.0f);
+      // S9: no TAA, no anti-aliasing at all - FXAA on the finished image.
+      if (finished != 0 && !taaOn && f.fxaa)
+         if (unsigned int aa = RunFxaa(finished, f.width, f.height))
+            finished = aa;
       // S8: render scale - FSR 1 (EASU + RCAS) to the output size, as Render
       // 3D's upscale; at native size, RCAS alone when sharpness is up.
       const bool upscale = f.outWidth > 0 && f.outHeight > 0 && (f.outWidth != f.width || f.outHeight != f.height);
@@ -1900,7 +2167,10 @@ namespace
       mSlots.clear();
       unsigned int* textures[] = { &mColor, &mNormal, &mDepth, &mPref, &mIrr, &mDfg, &mShadowTex, &mDepthCopy,
                                    &mAoZ, &mAo[0], &mAo[1], &mVelocity, &mSphereAlbedo, &mTaaHist[0], &mTaaHist[1],
-                                   &mTaaCov[0], &mTaaCov[1] };
+                                   &mTaaCov[0], &mTaaCov[1], &mShadowMask[0], &mShadowMask[1], &mFxaaOut };
+      mMaskW = mMaskH = mFxaaW = mFxaaH = 0;
+      if (mFxaaFbo != 0) glDeleteFramebuffers(1, &mFxaaFbo);
+      mFxaaFbo = 0;
       for (unsigned int* t : textures)
       {
          if (*t != 0)
@@ -1916,7 +2186,7 @@ namespace
       mShadowFbo = mDepthCopyFbo = mCmpSampler = mRawSampler = 0;
       if (mEmptyVao != 0) glDeleteVertexArrays(1, &mEmptyVao);
       unsigned int* programs[] = { &mPre.id, &mSurf.id, &mSph.id, &mSphDef.id, &mShadowProg.id, &mSphShadow.id, &mBg.id, &mIbl.id,
-                                   &mAoProg.depth, &mAoProg.gtao, &mAoProg.blur, &mTaaProg.id };
+                                   &mAoProg.depth, &mAoProg.gtao, &mAoProg.blur, &mTaaProg.id, &mMaskProg.id, &mFxaaProg };
       for (unsigned int* p : programs)
       {
          if (*p != 0)

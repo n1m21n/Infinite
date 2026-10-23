@@ -105,6 +105,11 @@ float ssaoVisibility()
    return sum / max(weights, 1e-6);
 }
 
+// S9: the coverage a blended surface sets before hqShade (Filament's
+// "transparent" mode: the diffuse is premultiplied by it, the specular is
+// not); 1 for everything opaque.
+float gDiffuseAlpha = 1.0;
+
 // Linear HDR radiance towards the camera (exposure not applied).
 vec3 hqShade(HqSurface s)
 {
@@ -135,7 +140,8 @@ vec3 hqShade(HqSurface s)
    float iorF0 = pow((uIor - 1.0) / (uIor + 1.0), 2.0);
    vec3 dielectricF0 = vec3(clamp(iorF0 * 2.0 * uSpecular, 0.0, 1.0));
    vec3 f0 = s.base * metallic + dielectricF0 * (1.0 - metallic);
-   vec3 diffuseColor = (1.0 - metallic) * s.base;
+   // S9: Filament's transparent blending premultiplies the diffuse only.
+   vec3 diffuseColor = (1.0 - metallic) * s.base * gDiffuseAlpha;
 
    vec3 dfg = textureLod(uDfg, vec2(NoV, perceptualRoughness), 0.0).rgb;
    vec3 energyCompensation = 1.0 + f0 * (1.0 / max(dfg.y, 1e-4) - 1.0);
@@ -195,14 +201,10 @@ vec3 hqShade(HqSurface s)
       }
       // The material AO map shadows direct light too (micro-shadowing).
       float occlusion = s.hasAo ? computeMicroShadowing(NoL, ao) : 1.0;
-      // S4: the shadowed light - its map, then contact shadows where it is lit.
+      // S4: the shadowed light - its map, then contact shadows where it is lit
+      // (S9: both inside shadowVisibility, or from the screen-space mask).
       if (i == uShadowLight)
-      {
-         float visibility = shadowVisibility(s.pos, geoN, l);
-         if (uContactShadows == 1 && visibility > 0.0)
-            visibility *= contactShadow(s.pos, l);
-         occlusion *= visibility;
-      }
+         occlusion *= shadowVisibility(s.pos, geoN, l);
       if (clearCoat > 0.0)
       {
          float clearCoatNoH = s.normalMapped ? clamp(dot(geoN, h), 0.0, 1.0) : NoH;
