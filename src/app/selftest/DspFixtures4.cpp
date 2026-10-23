@@ -806,6 +806,24 @@ bool RunEffectMixAndLimiterFixture()
       all &= ok;
    }
 
+   // Set Color's palette offset is an int any patch, OSC or RPC set can hold.
+   // index + offset overflowed int at INT_MAX (UB); the swatch must stay in range.
+   {
+      int bad = 0;
+      const int offsets[] = { 0, 3, -5, INT_MAX, INT_MIN, INT_MAX - 1 };
+      const size_t indices[] = { 0, 1, 7, 199999 };
+      for (int off : offsets)
+         for (size_t i : indices)
+         {
+            const int s = PaletteSwatchIndex(i, off, 5);
+            if (s < 0 || s >= 5)
+               bad++;
+         }
+      const bool ok = bad == 0 && PaletteSwatchIndex(1, 3, 5) == 4 && PaletteSwatchIndex(0, -1, 5) == 4;
+      printf("DSPTEST palette offset at the int limits stays in range: %d bad  %s\n", bad, ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
    return all;
 }
 }

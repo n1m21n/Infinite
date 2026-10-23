@@ -795,6 +795,10 @@ private:
 //
 // Deliberately NOT a generic named-attribute writer - see docs/plans -
 // "source" is a fixed dropdown, not free text.
+// Which palette swatch element `index` gets, rotated by `offset`. Always in
+// 0..count-1 for any offset; a patch, OSC or RPC set can store any int.
+int PaletteSwatchIndex(size_t index, int offset, int count);
+
 class SetColorNode : public INode, public IGeometrySource
 {
 public:

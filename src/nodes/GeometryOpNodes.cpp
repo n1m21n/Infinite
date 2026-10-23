@@ -1200,6 +1200,15 @@ void WrapNode::CookIfNeeded(int frameId)
 
 // ======================================================== Set Color
 
+int PaletteSwatchIndex(size_t index, int offset, int count)
+{
+   // In 64 bits: index + INT_MAX overflowed int (B-K-037).
+   long long swatch = ((long long)(index % (size_t)count) + offset) % count;
+   if (swatch < 0)
+      swatch += count;
+   return (int)swatch;
+}
+
 namespace
 {
    const std::vector<std::string> kSetColorSourceNames = {
@@ -1273,10 +1282,7 @@ namespace
          }
          else
          {
-            int swatch = ((int)index + paletteOffset) % swatchCount;
-            if (swatch < 0)
-               swatch += swatchCount;
-            palette->GetSwatch(swatch, outRgb);
+            palette->GetSwatch(PaletteSwatchIndex(index, paletteOffset, swatchCount), outRgb);
          }
          break;
       }
