@@ -102,7 +102,7 @@ Claims from the Air start with `air-`. Full rules, sync and dispatch: `docs/plan
 
 <!-- FACTS:BEGIN (tools/lifecycle/now.py) -->
 
-_Generated 2026-10-23 00:00 UTC. Do not edit inside this block; rerun the tool._
+_Generated 2026-10-23 04:19 UTC. Do not edit inside this block; rerun the tool._
 
 ### Open quests (11) **over the cap of 5: park or close before adding**
 
@@ -122,8 +122,8 @@ _Generated 2026-10-23 00:00 UTC. Do not edit inside this block; rerun the tool._
 
 | Tag | Date | Downloads (context) |
 |---|---|---|
-| v0.6.0 | 2026-10-17 | 314 |
-| extensions | 2026-10-13 | 131 |
+| v0.6.0 | 2026-10-17 | 316 |
+| extensions | 2026-10-13 | 133 |
 | v0.5.0 | 2026-10-10 | 274 |
 | v0.4.7 | 2026-10-07 | 74 |
 
@@ -133,9 +133,9 @@ _Generated 2026-10-23 00:00 UTC. Do not edit inside this block; rerun the tool._
 
 | Measure | Value | Want |
 |---|---|---|
-| Escaped fixes: fixes after v0.6.0 touching src it changed | 4 332d1eb3 78643aa3 b71ca7c9 8700ed2f | 0, falling release to release |
+| Escaped fixes: fixes after v0.6.0 touching src it changed | 6 46cb1079 c50813ce 332d1eb3 78643aa3 b71ca7c9 8700ed2f | 0, falling release to release |
 | Reverts after v0.6.0 | 2 | 0 |
-| Fix-shaped commits after v0.6.0 (all) | 18 | context |
+| Fix-shaped commits after v0.6.0 (all) | 21 | context |
 | Known test failures (macOS / Linux) | 4 / 6 | never grows |
 | Open GitHub issues labelled bug | 0 | 0 |
 | Crash reports filed since v0.6.0 | 0 | 0 |
@@ -147,10 +147,10 @@ _Generated 2026-10-23 00:00 UTC. Do not edit inside this block; rerun the tool._
 
 ### Last merges to main
 
-- 2026-10-23 Merge remote-tracking branch 'origin/main'
-- 2026-10-22 Merge tooling/bughunt-kit: TSan selftest runner
-- 2026-10-22 Merge tooling/bughunt-kit: signal fuzzing, README (bug-hunt spree 2026-10-22)
-- 2026-10-22 Merge bugfix/decode-nonfinite-samples (bug-hunt spree 2026-10-22)
-- 2026-10-22 Merge bugfix/effect-nan-recovery: selftest
+- 2026-10-23 Merge chore/seo-ledger-queue
+- 2026-10-23 Merge feature/v06-3.7-bevel-inset: v0.6 UI pass before/after shots (generated facts keep main's)
+- 2026-10-23 Merge bugfix/text-node-move: Text/Displacement/Texture skip unchanged work, Material columns, cook and DSP cost sweeps
+- 2026-10-23 Merge feature/docs-shots: one-command docs screenshots, PDF guidelines, pdf_check
+- 2026-10-23 Merge feature/brand-themes: five brand-book themes, library thumbnails
 
 <!-- FACTS:END -->
