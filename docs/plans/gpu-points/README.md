@@ -63,10 +63,22 @@ Table, the Agent's stats) sees exactly what it saw before.
 4. Pixel check: a selftest renders the same Image to Points chain with the GPU path on and off and
    compares the frames; B11 A/B on the Release build.
 5. Fill cost for sprites and instances (B, C): a fragment path that skips the material features a
-   draw does not use, same pixels (checked by the same A/B frame compare).
+   draw does not use, same pixels (checked by the same A/B frame compare). Done as: opaque mesh
+   draws use a program with `discard` compiled out (a shader that can discard defeats the tile
+   GPU's hidden-surface removal), and clearcoat is skipped at 0.
 6. Instance on Points reads GPU points directly (removes its per-frame `Mat4` rebuild).
 7. Particle System on the GPU (fragment-shader ping-pong sim, GL 4.1 has no compute), new params
-   from the P8 plan, raised cap. Separate branch.
+   from the P8 plan, raised cap. On this branch as its own commit (design and status below).
+
+The rest of the P8 plan's phases 1-2 (`claude-context/P8_POINTS_PLAN.md` section 4), not yet in
+the steps above, in the order they will be done:
+
+8. Mesh to Points outputs GPU points.
+9. Twist and Displacement run on GPU points when their input has them.
+10. Field Modifier compiles to GLSL (`src/core/field/GlslBackend.cpp`) when its input is GPU points.
+11. Model 3D reads `.ply` point clouds as points.
+12. Field Modifier presets for point jobs: random size, random colour, colour from image, stagger
+    over index, age to colour.
 
 ## Done check (Lane 3)
 
@@ -111,3 +123,23 @@ Step 6 is larger than its line above: Render 3D's instanced draw, its shadow pas
 instance sorting, the scene signature and ~25 other files read `InstanceTransforms()` on the CPU.
 Its per-frame cost only exists when the cloud changes every frame, which nothing in steps 1-4 does,
 so it waits for the B11 numbers and naturally pairs with step 7 (GPU particles).
+
+## B11 steps 5-6 (Mac14,7 Release universal, 1080p, 2026-10-23, two rounds each)
+
+Load was ~4.8 (a Desktop Infinite and system daemons running), so read the pairs, not the
+absolute numbers. Frame p50 / p99 ms, fps p50.
+
+| Row | off, round 1 | off, round 2 | on, round 1 | on, round 2 |
+|---|---|---|---|---|
+| C 10k cubes, opaque variant (`INFINITE_RENDER3D_OPAQUE_VARIANT=0` = off) | 12.27 / 16.40, 82 | 16.51 / 20.79, 61 | 10.64 / 14.77, 94 | 10.31 / 16.50, 97 |
+| C 100k cubes, opaque variant | 44.96 / 64.93, 22 | 41.88 / 54.57, 24 | 33.28 / 114.97, 30 | 33.34 / 70.75, 30 |
+| D 57.6k video→points→cubes, GPU instances (`INFINITE_GPU_POINTS=0` = off) | 308.80 / 471.75, 3.2 | 314.38 / 459.69, 3.2 | 315.42 / 475.50, 3.2 | 307.70 / 447.01, 3.2 |
+| D 230k, GPU instances | 1147.16 / 1626.05, 0.9 | 1129.75 / 1621.62, 0.9 | 1133.22 / 1663.60, 0.9 | 1134.09 / 1634.07, 0.9 |
+
+- **Step 5 pays:** 100k cubes 22-24 → 30 fps, 10k cubes 61-82 → 94-97 fps, same pixels
+  (`GPUPOINTSTEST`). The 100k p99 got worse in both rounds (115 / 71 against 65 / 55); one long frame
+  per run, not chased here.
+- **Step 6 does not show in B11 D**, and should not be expected to: D draws 6.2M-24.9M triangles
+  (108 per cube) and is fill-bound at 0.9-3.2 fps either way; the per-frame `Mat4` build it removes is
+  ~1-2 ms of a 300-1100 ms frame. It matters where the cloud changes every frame and the copies are
+  cheap (small stamps, particles into Instance on Points); its frame compare passes.
