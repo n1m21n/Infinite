@@ -29,6 +29,7 @@
 #include "BenchMediaIo.h"
 
 #include "WinCommon.h"
+#include "core/Provenance.h"
 
 #include <codecapi.h> // eAVEncH264VProfile_High
 #include <mfapi.h>
@@ -1833,6 +1834,32 @@ namespace Platform
          return hr;
       }
 
+      // Credit in the MP4: the "Description" property of the file sink's
+      // metadata. Best effort - a failure here must never stop a recording, so
+      // every step falls through quietly. Call before BeginWriting.
+      void StampRecorderMetadata(IMFSinkWriter* writer)
+      {
+         const auto tags = Provenance::VideoTags();
+         if (writer == nullptr || tags.empty())
+            return;
+         IMFMetadataProvider* provider = nullptr;
+         if (FAILED(writer->GetServiceForStream(MF_SINK_WRITER_MEDIASINK, MF_METADATA_PROVIDER_SERVICE,
+                                                IID_PPV_ARGS(&provider))) || provider == nullptr)
+            return;
+         IMFMetadata* meta = nullptr;
+         if (SUCCEEDED(provider->GetMFMetadata(nullptr, 0, 0, &meta)) && meta != nullptr)
+         {
+            const std::wstring text = WinCommon::Utf8ToWide(Provenance::Comment());
+            PROPVARIANT v;
+            PropVariantInit(&v);
+            v.vt = VT_LPWSTR;
+            v.pwszVal = const_cast<LPWSTR>(text.c_str());
+            meta->SetProperty(L"Description", &v); // v points at `text`; not cleared on purpose
+         }
+         SafeRelease(&meta);
+         SafeRelease(&provider);
+      }
+
       // Adds the AAC audio stream. `inputRate` is whatever PCM we'll actually
       // feed; the output AAC rate matches when standard so no resampling is
       // needed, else 48k and the sink writer's inserted converter handles it.
@@ -2199,6 +2226,7 @@ namespace Platform
          }
       }
 
+      StampRecorderMetadata(rec->writer);
       hr = rec->writer->BeginWriting();
       if (FAILED(hr))
       {

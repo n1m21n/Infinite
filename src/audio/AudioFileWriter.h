@@ -61,6 +61,7 @@ private:
    // FLAC state (libFLAC stream encoder on Windows, named for the CoreAudio
    // handle it held before the port)
    void* mExtAudioFile = nullptr;
+   void* mFlacMeta = nullptr; // FLAC__StreamMetadata* (credit comment), freed at close
 
    // MP3 state
    void* mShineHandle = nullptr;

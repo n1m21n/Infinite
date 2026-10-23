@@ -1,5 +1,6 @@
 #include "AudioFileWriter.h"
 #include "shine.h"
+#include "core/Provenance.h"
 
 #include <algorithm>
 #include <cmath>
@@ -166,6 +167,12 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
             shine_close(shine);
             return false;
          }
+         const std::string id3 = Provenance::Id3v2Tag();
+         if (!id3.empty())
+         {
+            fwrite(id3.data(), 1, id3.size(), mMp3File);
+            mBytesWrittenDirect += (int64_t)id3.size();
+         }
          mShineHandle = (void*)shine;
          return true;
       }
@@ -296,6 +303,10 @@ void AudioFileWriter::CloseFlac()
       ExtAudioFileDispose(extRef);
       mExtAudioFile = nullptr;
 
+      // CoreAudio's encoder takes no metadata up front: add the credit as a
+      // Vorbis comment block now that the file is complete.
+      Provenance::StampFlacFile(mPath);
+
       // Update actual file size
       struct stat st;
       if (stat(mPath.c_str(), &st) == 0)
@@ -335,7 +346,21 @@ void AudioFileWriter::CloseWav()
       return;
 
    const uint32_t dataBytes = (uint32_t)(mFramesWritten * mNumChannels * (mBitDepth / 8));
-   const uint32_t riffSize = 36 + dataBytes;
+
+   // Credit chunk (LIST/INFO) after the audio; RIFF pads an odd data length.
+   uint32_t padBytes = 0;
+   const std::string info = Provenance::WavInfoChunk();
+   if (!info.empty())
+   {
+      fseek(mFile, 0, SEEK_END);
+      if (dataBytes & 1)
+      {
+         fputc(0, mFile);
+         padBytes = 1;
+      }
+      fwrite(info.data(), 1, info.size(), mFile);
+   }
+   const uint32_t riffSize = 36 + dataBytes + padBytes + (uint32_t)info.size();
 
    fseek(mFile, 4, SEEK_SET);
    WriteU32(mFile, riffSize);

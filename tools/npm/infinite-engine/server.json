@@ -1,0 +1,10 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.n1m21n/infinite-engine",
+  "description": "Infinite audiovisual engine for AI agents: sound, shaders and video patches. Free, MIT.",
+  "repository": { "url": "https://github.com/n1m21n/Infinite", "source": "github", "subfolder": "tools/npm/infinite-engine" },
+  "version": "0.6.0",
+  "packages": [
+    { "registry_type": "npm", "identifier": "infinite-engine", "version": "0.6.0", "transport": { "type": "stdio" } }
+  ]
+}

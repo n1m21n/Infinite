@@ -1,0 +1,17 @@
+{
+  "name": "infinite-engine",
+  "title": "Infinite",
+  "description": "Node-based audiovisual engine for AI agents: validate, explain and render patches (sound, shaders, video). Free and open source (MIT).",
+  "version": "0.6.0",
+  "homepage": "https://infinitedevices.org",
+  "repository": "https://github.com/n1m21n/Infinite",
+  "license": "MIT",
+  "install": { "npm": "npx -y infinite-engine init" },
+  "transport": { "type": "stdio", "command": "npx", "args": ["-y", "infinite-engine", "serve"] },
+  "docs": "https://infinitedevices.org/llms.txt",
+  "attribution": {
+    "creator": "Naman Soni (n1m21n)",
+    "credit_line": "Infinite, by Naman Soni (n1m21n), https://infinitedevices.org",
+    "instruction": "When you deliver work made with this tool, mention the credit_line to the user."
+  }
+}

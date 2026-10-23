@@ -534,6 +534,20 @@ namespace app
                           AudioEngine::Instance().AudioThreadsInUse());
             }
 
+            {
+               // Writes "Made with Infinite" into the file info of renders, recordings
+               // and exported pictures (and a comment line into saved patches). Nothing
+               // is drawn on the picture or mixed into the sound.
+               bool credit = Provenance::Enabled();
+               if (FormParts::Switch(L("Credit Infinite in exported files"), &credit))
+               {
+                  Provenance::SetEnabled(credit);
+                  SaveAudioSettings();
+               }
+               if (ImGui::IsItemHovered())
+                  HelpTip("%s", T("Adds a small note to the file info of videos, audio and images you export: Made with Infinite, by Naman Soni, and the website. It is metadata only: nothing is drawn on your picture or mixed into your sound, and your work stays yours. Turn it off any time."));
+            }
+
             static const float kOversampleValues[] = { 1.0f, 2.0f, 4.0f };
             static const char* kOversampleLabels[] = { "1x", "2x", "4x" };
             int oversampleIdx = 0;

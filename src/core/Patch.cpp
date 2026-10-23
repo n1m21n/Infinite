@@ -1,5 +1,6 @@
 #include "Patch.h"
 #include "BlendModes.h"
+#include "core/Provenance.h"
 
 #include <algorithm>
 #include <cmath>
@@ -264,6 +265,7 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
 static void WriteBody(std::ostream& file, const Data& data)
 {
    file << kMagic << " " << kVersion << "\n";
+   file << Provenance::PatchHeader(); // credit comment; the loader skips '#' lines
    // Blend modes 11..13 are the corrected Overlay/Soft Light/Hard Light; a file without this
    // line predates the fix and its clips are mapped to the (old) modes 32..34 on load.
    file << "blendfix 1\n";
