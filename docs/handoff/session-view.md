@@ -50,15 +50,22 @@ Infinite-Turbo fork; this is a fresh implementation."
   - Empty state when there are no tracks.
 - **CMakeLists.txt**: both new files are listed.
 
-## State at handover (checked 2026-10-23)
+## State at handover (updated 2026-10-23, Pro)
 
-- Branch `feature/session-view`, HEAD `8e3fba88` ("WIP Session view (P5)"),
-  working tree clean.
-- Steps 1 and 2 below are **not applied**. `gArrangeSessionView` and
-  `DrawArrangeSessionGrid()` are declared in `AppShared.h` but nothing in
-  `ArrangePanel.cpp` calls them yet, so the view cannot be reached from the UI.
-- Nothing has been compiled, so every "written" item above is unverified.
-- No fixture, translations or design-ratchet run exist yet.
+Steps 1-7 below are **done and green** on `feature/session-view`:
+
+- Toolbar Timeline | Session pill and the grid early return are in.
+- First build is clean. The grid file only needed missing includes.
+- Ratchet unchanged (colours 0, raw widgets 433). The pill is placed with
+  `SetCursorScreenPos`, not `SameLine`, to stay at 433.
+- 37 new strings translated into es/de/zh/ja/ru. `extract.py report` shows 0
+  missing, `INFINITE_I18NTEST` passes.
+- `INFINITE_SESSIONVIEWTEST` (FrameTests2.cpp) passes and is in the driver's
+  Tier 1 list. Driver `--auto`: 54 passed, 0 failed.
+- Screenshots (dark, and light via `INFINITE_THEME="Infinite Paper"`) look right.
+
+**Left:** step 8 (owner looks at the screenshots) and step 9 (merge `--no-ff`
+to `main`, push; Pro only). Not merged yet.
 
 ## Rules for whoever picks this up
 
