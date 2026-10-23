@@ -4,6 +4,7 @@
 // block, so what is measured is what a patch hears.
 #include "app/AppShared.h"
 #include <algorithm>
+#include <climits>
 #include <limits>
 
 namespace app
@@ -161,6 +162,42 @@ bool RunEffectMixAndLimiterFixture()
       const bool ok = stuck == 0 && checked > 0;
       printf("DSPTEST effect recovers from a NaN/inf block: %d effects checked, %d stuck  %s\n", checked, stuck,
              ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
+   // 1c) A patch value past int range is dropped like NaN. Enums and counts
+   //     are floats read back with (int)v, which was undefined for 1e30
+   //     (B-K-026: 20+ effect bodies, kernels and shader uniforms). Every
+   //     param keeps its default, an ordinary value still loads, and an int
+   //     past range saturates instead of overflowing atoi.
+   {
+      int changed = 0, checked = 0;
+      for (const EffectDef& def : GetEffectDefs())
+      {
+         auto node = MakeEffect(def, 1.0f, sampleRate);
+         std::vector<std::pair<std::string, std::string>> before, after;
+         Patch::SaveParams(node.get(), before);
+         for (const char* big : { "1e30", "-1e30", "3e9", "-2147483648" })
+         {
+            auto hostile = before;
+            for (auto& kv : hostile)
+               if (kv.first.rfind("f ", 0) == 0)
+                  kv.second = big;
+            Patch::LoadParams(node.get(), hostile);
+            Patch::SaveParams(node.get(), after);
+            changed += after != before;
+            checked++;
+         }
+      }
+      auto eq = MakeEffect(*FindEffectDef("EQ"), 1.0f, sampleRate);
+      Patch::LoadParams(eq.get(), { { "f mix", "0.25" } });
+      const bool plainOk = std::fabs(eq->mix - 0.25f) < 1e-6f;
+      MolderNode molder;
+      Patch::LoadParams(&molder, { { "i seed", "99999999999" } });
+      const bool intOk = molder.Seed() == (uint32_t)INT_MAX;
+      const bool ok = changed == 0 && checked > 0 && plainOk && intOk;
+      printf("DSPTEST patch values past int range are dropped: %d loads, %d changed a param, plain=%d int=%d  %s\n",
+             checked, changed, plainOk, intOk, ok ? "OK" : "FAIL");
       all &= ok;
    }
 

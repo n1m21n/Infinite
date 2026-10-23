@@ -3,6 +3,7 @@
 #include "core/Provenance.h"
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -174,13 +175,18 @@ namespace
       // passes NaN straight through, and one NaN in a feedback path (Delay's
       // line) silences the whole master until the node is removed. Patch
       // load, paste, and OSC/RPC param sets all arrive here.
+      // A value past what an int holds (|v| >= 2^31) is dropped the same way:
+      // enums, counts and sizes are stored as floats and read back with
+      // (int)v, which is undefined for those. Every other writer (sliders,
+      // typed values, modulation, expressions) already clamps to the param's
+      // range; only a file or remote set can carry 1e30.
       void Float(const char* name, float& value) override
       {
          auto it = values.find(std::string("f ") + name);
          if (it != values.end())
          {
             const float parsed = (float)atof(it->second.c_str());
-            if (std::isfinite(parsed))
+            if (std::isfinite(parsed) && std::fabs(parsed) < 2147483648.0f)
                value = parsed;
          }
       }
@@ -188,7 +194,11 @@ namespace
       {
          auto it = values.find(std::string("i ") + name);
          if (it != values.end())
-            value = atoi(it->second.c_str());
+         {
+            // atoi is undefined past int range; saturate instead.
+            const long long parsed = strtoll(it->second.c_str(), nullptr, 10);
+            value = (int)std::clamp<long long>(parsed, INT_MIN, INT_MAX);
+         }
       }
       void Bool(const char* name, bool& value) override
       {
