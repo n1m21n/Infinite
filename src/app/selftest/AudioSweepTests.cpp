@@ -819,6 +819,9 @@ int RunAudioParamSweepTest()
 // Each row's name is printed and flushed before it runs, so a crash or a hang
 // (run it under an alarm) names its row as the last line.
 // INFINITE_PARAMFUZZ=Type,Type limits the sweep to those node types.
+// INFINITE_PARAMFUZZ_AFTER=Type.key=value resumes after that row: the
+// sanitizer build stops at the first report, and
+// tools/bughunt/param_fuzz_inproc.py restarts it past each one.
 int RunParamFuzzTest()
 {
    using namespace AudioParamSweep;
@@ -845,6 +848,10 @@ int RunParamFuzzTest()
       }
    }
 
+   const char* afterEnv = getenv("INFINITE_PARAMFUZZ_AFTER");
+   const std::string after = afterEnv != nullptr ? afterEnv : "";
+   bool skipping = !after.empty();
+
    std::vector<AudioSweepCandidate> candidates =
       DiscoverAudioSweepCandidates([](const AudioNodeShape& s) { return s.HasAudioNode(); });
 
@@ -865,7 +872,13 @@ int RunParamFuzzTest()
             continue;
          for (const char* value : isFloat ? kFloatValues : kIntValues)
          {
-            printf("PARAMFUZZ try %s.%s=%s\n", cand.name.c_str(), base[k].first.c_str() + 2, value);
+            const std::string row = cand.name + "." + (base[k].first.c_str() + 2) + "=" + value;
+            if (skipping)
+            {
+               skipping = row != after;
+               continue;
+            }
+            printf("PARAMFUZZ try %s\n", row.c_str());
             fflush(stdout);
             const auto t0 = std::chrono::steady_clock::now();
             Rig rig;
@@ -899,8 +912,7 @@ int RunParamFuzzTest()
             if (flag != nullptr)
             {
                flagged++;
-               printf("PARAMFUZZ %s %s.%s=%s  non-finite %d, peak %.3g, %.1f s\n", flag, cand.name.c_str(),
-                      base[k].first.c_str() + 2, value, nonFinite, peak, sec);
+               printf("PARAMFUZZ %s %s  non-finite %d, peak %.3g, %.1f s\n", flag, row.c_str(), nonFinite, peak, sec);
             }
          }
       }
