@@ -66,7 +66,9 @@ Infinite --render hello.inf hello.mp4 --duration 4 --fps 30
 | `--frame` | Draws stills at 0, 1 and 2 seconds, and one contact sheet with each cell labelled by time. |
 | `--render` | Writes a video. |
 
-A star pulses and spins. That is a complete patch: one shape, one modulator, one output.
+A star pulses and spins. That is a complete patch: one shape, one modulator, one output. These are the three nodes it uses, as they look in the app:
+
+{{shot:node/Source/Shape/o|Shape}} {{shot:node/Modulators/LFO/o|LFO}} {{shot:node/Utility/Output/o|Output}}
 
 ## 3. The working loop
 
