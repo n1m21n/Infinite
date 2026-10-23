@@ -1,0 +1,24 @@
+=== fps + audio rate analysis sweep ===
+
+== Build ==
+skipped (--skip-build)
+
+== Asserted fixtures (1) ==
+  [FAIL]   FPSTEST - see /tmp/infinite_test_FPSTEST.log
+
+== Observation fixtures (1) - read these logs, they assert nothing ==
+  [read]   CACHETEST+SHOWCASE - /tmp/infinite_test_CACHETEST_SHOWCASE.log
+
+== Static checks ==
+  nodes    median_ms  max_ms    
+  1        0.03 0.16
+  50       0.04 0.27
+  200      0.10 0.52
+  500      0.12 1.20
+  read the numbers: cost should grow roughly linearly with node count.
+  A superlinear jump between 200 and 500 is the regression to chase.
+  [pass]   static checks
+
+== Result ==
+passed: 1   failed: 1
+failing: FPSTEST

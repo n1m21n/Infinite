@@ -1,0 +1,139 @@
+
+== Build ==
+skipped (--skip-build)
+
+== Transform propagation sweep ==
+  [pass] GeometryOpNode                   dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] DisplacementNode                 dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] AudioDisplacementNode            dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] SetColorNode                     dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] MeshResynthNode                  dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [SKIP] MeshToPointsNode                 — produced no comparable geometry
+  [pass] Null3DNode                       dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] MaterialNode                     dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] MappingNode                      dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] JoinGeometryNode                 dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [SKIP] DistributePointsOnFacesNode      — produced no comparable geometry
+  [pass] PointsToVerticesNode             dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] ProximityLinesNode               dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] MergeByDistanceNode              dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] WrapNode                         dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] ClothNode                        dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] Switcher3DNode                   dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] InstanceOnPointsNode(pointSource) dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] InstanceOnPointsNode(instanceShape) dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] PathNode(follow)                 dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+  [pass] GeometryTableNode                dx=5.00 dy=7.00 dz=3.00 (want 5.00 7.00 3.00)
+2 node(s) skipped (produced no comparable geometry) — see /tmp/infinite_transform_sweep.log for which.
+A skip usually means the fixture's probe mesh/mode doesn't suit that node
+(e.g. a boundary-follow needs an open mesh); it does not mean that node is fine.
+Transform propagation: all nodes correctly propagate the checked invariant.
+
+== Mapping-transform forwarding sweep ==
+  [pass] GeometryOpNode          
+  [pass] DisplacementNode        
+  [pass] AudioDisplacementNode   
+  [pass] SetColorNode            
+  [pass] MeshResynthNode         
+  [pass] MeshToPointsNode        
+  [pass] Null3DNode              
+  [pass] MaterialNode            
+  [pass] JoinGeometryNode        
+  [pass] DistributePointsOnFacesNode
+  [pass] PointsToVerticesNode    
+  [pass] ProximityLinesNode      
+  [pass] MergeByDistanceNode     
+  [pass] WrapNode                
+  [pass] ClothNode               
+  [pass] Switcher3DNode          
+  [pass] InstanceOnPointsNode    
+Mapping-transform forwarding: all nodes correctly propagate the checked invariant.
+
+== Revision stability sweep ==
+  [pass] GeometryOpNode                  
+  [pass] DisplacementNode(static texture)
+  [pass] AudioDisplacementNode(no audio) 
+  [pass] MeshResynthNode                 
+  [pass] SetColorNode                    
+  [pass] DistributePointsOnFacesNode     
+  [pass] PointsToVerticesNode            
+  [pass] MergeByDistanceNode             
+  [pass] ClothNode(constraint count stable)
+  [pass] Switcher3DNode(static slot stable)
+  [pass] Switcher3DNode(switch bumps revision)
+  [pass] Switcher3DNode(clock idle, no boundary crossed -> stable)
+  [pass] Switcher3DNode(clock idle, boundary crossed -> revision bumps)
+  [pass] Switcher3DNode(clock idle, boundary crossed -> active slot moves)
+Revision stability: all nodes correctly propagate the checked invariant.
+
+== Render 3D cache invalidation sweep ==
+  [pass] MeshToPointsNode                
+  [pass] DistributePointsOnFacesNode     
+  [pass] DistributePointsInGridNode      
+  [pass] CurveNode                       
+Render 3D cache invalidation: all nodes correctly propagate the checked invariant.
+
+== Instancing passthrough sweep ==
+  [pass] GeometryOpNode           
+  [pass] Null3DNode               
+  [pass] DisplacementNode         
+  [pass] MaterialNode             
+  [pass] SetColorNode             
+  [pass] MergeByDistanceNode      
+  [pass] WrapNode                 
+  [pass] Switcher3DNode           
+  [pass] MappingNode              
+  [pass] MeshResynthNode          
+  [pass] AudioDisplacementNode    
+  [pass] DistributePoints(scatter) 
+  [pass] MeshToPoints(scatter)    
+  [pass] PointsToVertices(scatter) 
+  [pass] JoinGeometry(scatter)    
+  [pass] Delete->DistributePoints 
+Instancing passthrough: all nodes correctly propagate the checked invariant.
+
+== Colour ownership sweep ==
+  [pass] GeometryOpNode (colourless-in)               
+  [pass] GeometryOpNode (coloured-in)                 
+  [pass] DisplacementNode (colourless-in)             
+  [pass] DisplacementNode (coloured-in)               
+  [pass] AudioDisplacementNode (colourless-in)        
+  [pass] AudioDisplacementNode (coloured-in)          
+  [pass] MeshResynthNode (colourless-in)              
+  [pass] MeshResynthNode (coloured-in)                
+  [pass] Null3DNode (colourless-in)                   
+  [pass] Null3DNode (coloured-in)                     
+  [pass] MaterialNode (colourless-in)                 
+  [pass] MaterialNode (coloured-in)                   
+  [pass] MappingNode (colourless-in)                  
+  [pass] MappingNode (coloured-in)                    
+  [pass] JoinGeometryNode (equal albedos)             
+  [pass] JoinGeometryNode (differing albedos)         
+  [pass] JoinGeometryNode (merge -> material -> merge) 
+  [pass] JoinGeometryNode (plain instances stay colourless) 
+  [pass] MergeByDistanceNode (colourless-in)          
+  [pass] MergeByDistanceNode (coloured-in)            
+  [pass] WrapNode (colourless-in)                     
+  [pass] WrapNode (coloured-in)                       
+  [pass] ClothNode (colourless-in)                    
+  [pass] ClothNode (coloured-in)                      
+  [pass] Switcher3DNode (colourless-in)               
+  [pass] Switcher3DNode (coloured-in)                 
+  [pass] FieldElementNode (colourless-in)             
+  [pass] FieldElementNode (coloured-in)               
+  [pass] SetColorNode (paints own colour)             
+  [pass] MeshToPointsNode (colourless-in)             
+  [pass] MeshToPointsNode (coloured-in)               
+  [pass] DistributePointsOnFacesNode (colourless-in)  
+  [pass] DistributePointsOnFacesNode (coloured-in)    
+  [pass] PointsToVerticesNode (colourless-in)         
+  [pass] PointsToVerticesNode (coloured-in)           
+  [pass] MetaBallNode (never carries B, by design)    
+  [pass] DistributePointsInGridNode (always authored) 
+  [pass] GeometryNode (never manufactures)            
+  [pass] Text3DNode (never manufactures)              
+  [pass] OceanNode (never manufactures)               
+  [pass] AudioRibbonNode (never manufactures)         
+Colour ownership: all nodes correctly propagate the checked invariant.
+
+all sweeps passed.

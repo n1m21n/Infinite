@@ -1,0 +1,33 @@
+infinite-patch 1
+node 1 3D Render 3D
+end
+node 101 3D Cube
+end
+node 102 3D Cube
+end
+node 103 3D Cube
+end
+node 104 3D Cube
+end
+node 105 3D Camera
+end
+node 106 3D Light
+end
+node 107 3D Light
+end
+node 108 3D Light
+end
+node 109 3D HDRI
+end
+node 110 Utility Output
+end
+geo 1 0 101
+geo 1 1 102
+geo 1 2 103
+geo 1 3 104
+geo 1 4 105
+geo 1 5 106
+geo 1 6 107
+geo 1 7 108
+cable 1 8 109
+cable 110 0 1

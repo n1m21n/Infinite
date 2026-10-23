@@ -1,0 +1,23 @@
+infinite-patch 1
+node 1 3D Switcher 3D
+end
+node 101 3D Cube
+end
+node 102 3D Cube
+end
+node 103 3D Cube
+end
+node 104 3D Cube
+end
+node 105 Utility Output
+end
+node 106 3D Render 3D
+  f width 512
+  f height 512
+end
+geo 1 0 101
+geo 1 1 102
+geo 1 2 103
+geo 1 3 104
+geo 106 0 1
+cable 105 0 106

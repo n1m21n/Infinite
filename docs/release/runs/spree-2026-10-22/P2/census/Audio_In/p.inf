@@ -1,0 +1,9 @@
+infinite-patch 1
+node 1 Utility Audio In
+end
+node 101 Utility Output
+end
+node 102 Source Shape
+end
+cable 101 0 102
+aud 101 1 1

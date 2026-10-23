@@ -1,0 +1,27 @@
+=== audio pipeline sweep ===
+
+== Build ==
+skipped (--skip-build)
+
+== Asserted fixtures (18) ==
+  [pass]   DSPTEST
+  [pass]   AUDIOPCMTEST
+  [pass]   AUDIOPDCTEST
+  [pass]   RESONATORTEST
+  [pass]   CYCLESHAPERTEST
+  [pass]   SPECBLURTEST
+  [pass]   KEYSNAPTEST
+  [pass]   SPECTRUMSLIDETEST
+  [pass]   MOLDERTEST
+  [pass]   GRAINMOLDERTEST
+  [pass]   AUDIOPARAMSWEEPTEST - 298 xfail (baselined blind spots), 0 new
+  [pass]   AUDIOGRAPHTEST
+  [pass]   AUDIOLIFECYCLETEST
+  [pass]   AUDIORECOVERYTEST
+  [pass]   AUDIOTEARDOWNSWEEPTEST
+  [pass]   NOTEFANOUTTEST
+  [pass]   NOTEREWIRESTRESSTEST
+  [pass]   TRANSPORTCLOCKTEST
+
+== Result ==
+passed: 18   failed: 0

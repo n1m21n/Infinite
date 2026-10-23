@@ -1,0 +1,15 @@
+infinite-patch 1
+node 1 Synths Wave Terrain
+end
+node 101 Source Formula
+end
+node 102 Notes Random Note Generator
+end
+node 103 Utility Output
+end
+node 104 Source Shape
+end
+cable 1 0 101
+note 1 1 102 0
+cable 103 0 104
+aud 103 1 1

@@ -1,0 +1,15 @@
+infinite-patch 1
+node 1 Prediction Predictive Notes
+end
+node 101 Notes Random Note Generator
+end
+node 102 Utility Output
+end
+node 103 Synths Oscillator
+end
+node 104 Source Shape
+end
+note 1 0 101 0
+note 103 0 1 0
+cable 102 0 104
+aud 102 1 103

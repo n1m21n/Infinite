@@ -1,0 +1,20 @@
+infinite-patch 1
+node 1 Modulators Palette
+end
+node 101 Source Formula
+end
+node 102 Utility Output
+end
+node 103 3D Cube
+end
+node 104 3D Set Vertex Color
+end
+node 105 3D Render 3D
+  f width 512
+  f height 512
+end
+cable 1 0 101
+geo 104 0 103
+geo 104 2 1
+geo 105 0 104
+cable 102 0 105

@@ -1,0 +1,36 @@
+
+== P11 platform contract - no _WIN32 in the node layer ==
+  [FAIL] 1 file(s) in src/nodes/ use _WIN32:
+         src/nodes/TrackNodeBase.cpp
+
+== P11 platform contract - every Platform:: declaration has both implementations ==
+  [FAIL] no macOS definition: MidiBindingName MidiChannelBend MidiChannelBendSlot MidiChannelPressure MidiChannelPressureSlot MidiChannelSlide MidiChannelSlideSlot MidiLastExpressionChannel MidiMpeEnabledCount MidiOutClose MidiOutListDevices MidiOutNowSeconds MidiOutOpen MidiOutSend MidiOutVirtualAvailable MidiPollProgramChange MidiProgramChangeSlot VideoFrameAtExact
+  [FAIL] no Windows definition (link error on CI): LoadImageFloatRGB LoadImageRGBA LoadImageRGBAFromMemory LoadModel MidiBindingName MidiChannelBend MidiChannelBendSlot MidiChannelPressure MidiChannelPressureSlot MidiChannelSlide MidiChannelSlideSlot MidiLastExpressionChannel MidiMpeEnabledCount MidiPollProgramChange MidiProgramChangeSlot VideoFrameAtExact
+
+== P11 platform contract - every Windows source is in the build ==
+  [pass] WIN32_SOURCES lists every src/platform/win/*.cpp
+
+== P13 dual-path numeric equivalence ==
+  7 dual-path file(s) - each needs a cross-branch assertion in RunDspTest():
+         src/audio/AudioWorkerPool.cpp
+         src/audio/AudioWorkerPool.h
+         src/audio/dsp/ClipTimeStretch.h
+         src/audio/dsp/MolderDsp.cpp
+         src/nodes/AnalyzeNodes.cpp
+         src/nodes/PaulStretchNode.cpp
+         src/nodes/TrackNodeBase.cpp
+  [pass] src/main.cpp or src/app references PortableFft (round-trip assertion present in the DSP test)
+
+== P2 shortcuts - nothing advertised is unwired ==
+  [pass] every key advertised in kShortcuts[] has a live handler reference
+  [pass] modifier handling accepts Ctrl and Cmd (MODKEY chords work on both platforms)
+
+== P3 settings & state location ==
+  [pass] no settings file written outside an AppPaths-derived directory
+
+== P10 crash diagnostics parity ==
+  [pass] InstallCrashHandler implemented on both platforms
+  [pass] AppendLogLine implemented on both platforms
+  [pass] main() installs the crash handler
+
+== static lane: 8 passed, 3 failed ==

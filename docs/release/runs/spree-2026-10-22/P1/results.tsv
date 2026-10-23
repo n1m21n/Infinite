@@ -1,0 +1,16 @@
+id	category	phase	gating	status	seconds	log
+ratchet	I	P1	yes	PASS	0	logs/ratchet.log
+lint-icons	I	P1	yes	PASS	0	logs/lint-icons.log
+motion-lint	I	P1	yes	PASS	1	logs/motion-lint.log
+contrast	I	P1	yes	PASS	0	logs/contrast.log
+i18n-lint	I	P1	yes	PASS	0	logs/i18n-lint.log
+shortcuts-static	I	P1	yes	FAIL	0	logs/shortcuts-static.log
+cable-static	I	P1	yes	PASS	1	logs/cable-static.log
+compositing-static	E	P1	yes	PASS	0	logs/compositing-static.log
+output-static	E	P1	yes	FAIL	1	logs/output-static.log
+param-truth	D	P1	info	PASS	0	logs/param-truth.log
+parity-static	J	P1	yes	FAIL	3	logs/parity-static.log
+data-ledger	G	P1	yes	FAIL	1	logs/data-ledger.log
+brand-lint	L	P1	yes	PASS	1	logs/brand-lint.log
+version-gate	L	P1	yes	PASS	2	logs/version-gate.log
+findings-selftest	L	P1	yes	PASS	0	logs/findings-selftest.log

@@ -1,0 +1,483 @@
+Tier 3: Full gate (152 checks + screenshot smoke)
+
+== Build ==
+skipped (--skip-build)
+
+== Visual smoke (screenshot) ==
+wrote /tmp/infinite_hygiene_shot.png — Read it to eyeball rendering (nodes, previews, chrome all draw correctly)
+
+== Self-test suite (152 checks) ==
+  [xfail] ALIASTEST — exited 1, baselined: "Cycle Shaper sine @ 500 Hz" reads -90.2 dB against its -105 dB gate, deterministically (2026-10-12, feature/mod-clock). CycleShaperKernel takes its params from plain std::atomic members (CycleShaperKernel.h) and touches neither ParamMailbox nor Transport, so the Block 2 modulation changes cannot reach it; the kernel and this gate were both changed in 49543f8f (quintic crossing estimation). Every other ALIASTEST case passes. Retune the gate or the kernel in the DSP track, not here.
+  [pass]  OVERSAMPLETEST  — OVERSAMPLETEST OK
+  [pass]  SYNTHSIMDTEST  — SYNTHSIMDTEST OK
+  [pass]  SATURATORTEST  — SATURATORTEST OK
+  [pass]  FMTEST  — FMTEST OK
+  [pass]  PARTIALSTEST  — PARTIALSTEST OK
+  [pass]  STRINGTEST  — STRINGTEST OK
+  [pass]  SHOWSETTEST  — SHOWSETTEST OK
+  [pass]  SHOWSAFETYTEST  — SHOWSAFETYTEST OK
+  [pass]  QUITSTALLTEST  — QUITSTALLTEST OK
+  [pass]  SPLITTERTEST  — SPLITTERTEST OK
+  [pass]  PITCHTEST  — PITCHTEST 13 gated case(s) at their limits  OK
+  [pass]  FXAUDIT  — FXAUDIT 28 effect(s), 19 flag(s) OK; QUALITY CHECK PASS (6 metrics, 142 rows, 12 exceptions)
+  [pass]  MODAUDIT  — MODAUDIT: PASS
+  [pass]  SYNTHAUDIT  — SYNTHAUDIT PASS (0 flags); QUALITY CHECK PASS (13 metrics, 134 rows, 0 exceptions)
+  [pass]  FACTORYPRESETTEST  — FACTORY PRESET TEST (97 presets, 11 types): OK
+  [pass]  CONVOLUTIONTEST  — CONVOLUTIONTEST OK
+  [pass]  NOTEAUDIT  — NOTEAUDIT PASS (2 flags); QUALITY CHECK PASS (3 metrics, 28 rows, 0 exceptions)
+  [pass]  IOAUDIT  — IOAUDIT PASS (0 flags); QUALITY CHECK PASS (2 metrics, 2 rows, 0 exceptions)
+  [pass]  GEOAUDIT  — GEOAUDIT PASS (24 flags); QUALITY CHECK PASS (5 metrics, 182 rows, 4 exceptions)
+  [xfail] COMPAUDIT — exited 1, baselined: 3 flags, all understood (2026-10-16, merged v0.6 main): FLUID divergence after projection 0.0039 (open) and 0.0040 (obstacle) at 120 iterations against the 1e-3 bar, falling about 1/iterations so the V-cycle is not converging as designed (more coarse sweeps gave 0.0030, so the coarsest solve is not the limit; velocity range and the high-frequency stirrer residual are next to look at), and the 1080p cost is 46.7 ms against the 3 ms bar. Ships in 0.6 as a dated known exception (2026-10-16); solver rework after release. Delete this line when the Fluid solver is fixed.
+  [pass]  NODETITLETEST  — NODETITLE PASS
+  [pass]  FILTERCURVECACHETEST  — FILTERCURVECACHE PASS
+  [pass]  FIELDTEST  — INFINITE_FIELDTEST: OK
+  [pass]  FIELDELEMENTTEST  — INFINITE_FIELDELEMENTTEST: OK
+  [pass]  FIELDPARAMTEST  — INFINITE_FIELDPARAMTEST: OK
+  [pass]  FIELDSTATETEST  — INFINITE_FIELDSTATETEST: OK
+  [pass]  FIELDTRANSFERTEST  — INFINITE_FIELDTRANSFERTEST: OK
+  [pass]  FIELDSAMPLETEST  — INFINITE_FIELDSAMPLETEST: OK
+  [pass]  UNDOTEST  — UNDO REDO OK
+  [pass]  ARRANGETEST  — arrange test: all  OK
+  [pass]  TRANSPORTTEST  — transport test: all  OK
+  [pass]  ARRANGEAUDIOTEST  — arrange audio test: all  OK
+  [pass]  ARRANGEVIDEOTEST  — arrange video test: all  OK
+  [pass]  ARRANGEEDITTEST  — arrange edit test: all  OK
+  [pass]  ARRANGEMARKERTEST  — arrange marker test: all  OK
+  [pass]  ARRANGERENDERTEST  — arrange render test: all  OK
+  [pass]  ARRANGEWAVETEST  — arrange wave test: all  OK
+  [pass]  CLIPMODBYPASSTEST  — clip mod bypass test: all  OK
+  [pass]  CLIPFIELDTEST  — clip field test: all  OK
+  [pass]  ARRANGESAMPLETEST  — arrange sample test: all  OK
+  [pass]  ARRANGESAMPLEEXPORTTEST  — WAV 6.000 s, 10 clicks, first at 1.001 s, worst grid error 1 ms; MP4 h264 320x180, 6.000 s, 180 frames
+  [pass]  UNDOPERFTEST  — BuildPatchData on 300 nodes: 2.552 ms (ceiling 50.0 ms)  OK
+  [pass]  PATCHTEST  — PATCH ROUND TRIP OK
+  [pass]  ROUNDTRIPTEST  — ROUND TRIP OK
+  [pass]  ROUNDTRIPTEST@de  — ROUND TRIP OK
+  [pass]  I18NTEST  — I18NTEST OK
+  [pass]  SYPHONPATCHTEST  — SYPHONPATCHTEST OK
+  [pass]  LAUNCHERCARDTEST  — LAUNCHER CARD TEST: played=1 callbacks-hit=0 OK
+  [pass]  PATCHLAYOUTTEST  — PATCHLAYOUTTEST OK
+  [pass]  PATCHLAYOUTLIVETEST  — PATCHLAYOUTLIVETEST OK
+  [pass]  KEYEDSTARTEST  — KEYEDSTARTEST OK
+  [pass]  GROUPTEST  — after ungroup: 1 groups left, 4 nodes, member freed=1, others kept=2  UNGROUP OK
+  [pass]  COMMENTTEST  — COMMENT OK
+  [pass]  HIDETEST  — after reopen: links=1 SURVIVED OK
+  [pass]  SELECTTEST  — SELECTION OK
+  [pass]  DISTRIBUTETEST  — DISTRIBUTE OK
+  [pass]  PHASE4TEST  — PHASE 4 OK
+  [pass]  INSTANCESELECTTEST  — instance select: 66 instances, 26 selected (mask size 66), stamp untouched=1, stable=1  INSTANCE SELECT OK
+  [pass]  MINIVIEWPORTTEST  — MINI VIEWPORT OK
+  [pass]  COLORTEST  — after  click: fill=(0.57, 0.41, 0.37)  PICKER RESPONDED OK
+  [pass]  MACROTEST  — after move: size=0.9010 rotation=-144.0000  INDEPENDENT OUTPUTS OK
+  [pass]  MODBOUNDSTEST  — MOD BOUNDS TEST OK
+  [pass]  MSEGTEST  — MSEGTEST OK
+  [pass]  VOICEMODTEST  — VOICEMODTEST OK
+  [pass]  VOICEMODFRAMETEST  — VOICEMODFRAMETEST OK
+  [pass]  MPCMODTEST  — MPC MOD TEST OK
+  [pass]  LOOPERTRIGTEST  — LOOPER TRIGGER TEST OK
+  [pass]  MIDILEARNTEST  — MIDILEARNTEST OK
+  [pass]  MODMATRIXTEST  — MOD MATRIX TEST OK
+  [pass]  GESTUREUNDOTEST  — GESTURE UNDO OK
+  [pass]  OFFLINECLOCKTEST  — OFFLINE CLOCK OK
+  [pass]  CULLDRIVENTEST  — CULL DRIVEN OK
+  [pass]  MODDROPDOWNUNDOTEST  — MOD DROPDOWN UNDO OK
+  [pass]  PALETTETEST  — PALETTE OK
+  [pass]  BYPASSTEST  — invert bypassed: output=(255,255,255) PASSED THROUGH OK
+  [pass]  BYPASSRULETEST  — BYPASSRULE PASS
+  [pass]  BYPASSSWEEPTEST  — BYPASSSWEEP PASS
+  [pass]  GEOTEST  — MESH UPLOAD CACHING OK
+  [pass]  MESHOPTEST  — to points (Cube(1)): verts 24->8, edges 30->18->12, faces 12  OK
+  [pass]  TEXT3DTEST  — TEXT 3D OK
+  [pass]  PATHOCEANTEST  — OCEAN OK
+  [pass]  SHADOWTEST  — SHADOWS OK
+  [pass]  MATFRAMETEST  — MATERIAL + FRAME OK
+  [pass]  MAPTEST  — MATERIAL MAPS OK
+  [pass]  PADPATHTEST  — PAD PATH OK
+  [pass]  BUGTEST  — BUGFIXES OK
+  [pass]  FIXTEST  — JOIN GEOMETRY OK
+  [pass]  3DTEST  — EMISSION OK
+  [pass]  TRANSFORMSWEEPTEST  — TRANSFORM SWEEP OK
+  [pass]  MAPPINGSWEEPTEST  — MAPPING SWEEP OK
+  [pass]  REVISIONSWEEPTEST  — REVISION SWEEP OK
+  [pass]  ENVTEST  — disconnected: corner=(10,10,15)  DISCONNECT FALLBACK OK
+  [pass]  PHASEATEST  — PHASE A OK
+  [pass]  PHASECTEST  — PHASE C OK
+  [pass]  PHASEDTEST  — PHASE D OK
+  [pass]  PHASEETEST  — PHASE E OK
+  [pass]  PHASEFTEST  — PHASE F OK
+  [pass]  WRAPTEST  — WRAP OK
+  [pass]  GROUP3DTEST  — GROUP3DTEST OK
+  [pass]  LIVETEST  — LIVE UPDATE OK
+  [pass]  PHASE1TEST  — phase1 particle system animates through render: particleRev 14->62, renderRev 12->60  OK
+  [pass]  DELETECRASHTEST  — delete-crash: 4 nodes survived cook, every field cleared=1  OK
+  [pass]  AUDIOGRAPHTEST  — audio delete-crash: survived cook, cleared=1  OK
+  [pass]  NEWPATCHAUDIOTEST  — new patch audio: before=0.4435 after=0.0000 retired left=0  NEWPATCH AUDIO OK
+  [pass]  AUTOSAVETEST  — AUTOSAVE ROUND TRIP OK
+  [pass]  VIDEOAUDIOTEST  — VIDEOAUDIOTEST OK
+  [pass]  VIDEOSPEEDTEST  — VIDEOLOOPWRAPTEST OK
+  [stale-baseline] DRAGTEST — now passes, delete its line from known-test-failures.txt
+  [pass]  KBCURSORTEST  — kbtest result: KBCURSOR OK
+  [pass]  NAVTEST  — navtest result: NAV OK
+  [pass]  ARRANGEKEYSTEST  — ARRANGEKEYS TEST OK
+  [pass]  NEWSYNTHTEST  — NEWSYNTH TEST OK
+  [pass]  DROPSOUNDTEST  — DROPSOUND TEST OK
+  [pass]  FINDTEST  — FIND TEST OK
+  [pass]  THEMECONTRASTTEST  — [THEMECONTRASTTEST] THEMECONTRASTTEST OK
+  [pass]  KBDISCRETETEST  — kbdiscrete result: KBDISCRETE OK
+  [pass]  WTDRAGTEST  — WTDRAG OK
+  [pass]  PINDUPTEST  — PINDUPTEST 338 nodes, 0 duplicate pin ids  OK
+  [pass]  UISCALETEST  — UISCALETEST 4 nodes at 1.0/1.5/2.0/1.25, sizes held  OK
+  [pass]  PERFMATRIXTEST  — [PERF MATRIX TEST] PASS
+  [xfail] Video  param 'loop' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Video  param 'speed' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Video  param 'audioEnabled' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Video  param 'volume' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Video  param 'trimStart' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Video  param 'trimEnd' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'gain8' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'pan8' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'mute8' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'solo8' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'gain9' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'pan9' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'mute9' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'solo9' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'gain10' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'pan10' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'mute10' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'solo10' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'gain11' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'pan11' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'mute11' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Mixer  param 'solo11' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Audio File  param 'gain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Audio File  param 'attack' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Audio File  param 'release' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Predictive Quantize  param 'mix' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Oscillator  param 'frequency' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Oscillator  param 'glide' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Oscillator  param 'fmMode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Oscillator  param 'phase' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Oscillator  param 'detune' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Oscillator  param 'cutoff' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Oscillator  param 'resonance' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Oscillator  param 'ampRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'frequency' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'glide' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'fmMode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.detune' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.stereoWidth' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.phase' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.phaseRandomize' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.warpMode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.warpAmount' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.warpRatio' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.cutoff' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.resonance' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.ampRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.pitchAttack' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.pitchDecay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.pitchSustain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.pitchRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.filterAmount' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.filterAttack' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.filterDecay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.filterSustain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'a.filterRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.on' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.table' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.position' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.volume' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.pan' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.unison' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.detune' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.stereoWidth' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.octave' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.semi' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.fine' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.phase' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.phaseRandomize' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.warpMode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.warpAmount' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.warpRatio' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.filterType' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.cutoff' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.resonance' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.ampAttack' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.ampDecay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.ampSustain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.ampRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.pitchAmount' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.pitchAttack' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.pitchDecay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.pitchSustain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.pitchRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.filterAmount' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.filterAttack' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.filterDecay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.filterSustain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wavetable  param 'b.filterRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] FM  param 'release1' — baselined, see audio-param-sweep-expected.txt
+  [xfail] FM  param 'release2' — baselined, see audio-param-sweep-expected.txt
+  [xfail] FM  param 'release3' — baselined, see audio-param-sweep-expected.txt
+  [xfail] FM  param 'release4' — baselined, see audio-param-sweep-expected.txt
+  [xfail] String  param 'release' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wave Terrain  param 'ratioA' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wave Terrain  param 'ratioB' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wave Terrain  param 'frequency' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wave Terrain  param 'glide' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wave Terrain  param 'ampRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wave Terrain  param 'filterAttack' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wave Terrain  param 'filterDecay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wave Terrain  param 'filterSustain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Wave Terrain  param 'filterRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'preset' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'knobD' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'frequency' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'glide' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'ampSustain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'ampRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'filterAttack' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'filterDecay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'filterSustain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Equation Synth  param 'filterRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'scanMode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'rate' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'position' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'rootFreq' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'fine' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'glide' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'detune' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'ampDecay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'ampSustain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectral Synth  param 'ampRelease' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Metallic  param 'frequency' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Metallic  param 'glide' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Sampler  param 'fadeOut' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Sampler  param 'loop' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Sampler  param 'rateFix' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Sampler  param 'reverse' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Sampler  param 'pingpong' — baselined, see audio-param-sweep-expected.txt
+  [xfail] PaulStretch  param 'loop' — baselined, see audio-param-sweep-expected.txt
+  [xfail] PaulStretch  param 'rateFix' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Molder  param 'snap' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Molder  param 'rateFix' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Grain Molder  param 'grain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Grain Molder  param 'amount' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Grain Molder  param 'key' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Grain Molder  param 'descending' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Grain Molder  param 'seed' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Grain Molder  param 'loop' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Grain Molder  param 'rateFix' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Grain Molder  param 'reverse' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Grain Molder  param 'pingpong' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'position' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'scan' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'grainLength' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'density' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'freeze' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'randomPos' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'randomLength' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'randomPitch' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'randomPan' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'reverseProb' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'pitchShift' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'fineTune' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'windowShape' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'pan' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'width' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Granular  param 'loop' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Field Synth  param 'maxVoices' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Field Synth  param 'exposeRmsOutput' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Field Synth  param 'field_nextParamId' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Drum Sequencer  param 'rateFix' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Drum Sequencer  param 'patternPart' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad0_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad0_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad0_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad0_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad1_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad1_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad1_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad1_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad2_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad2_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad2_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad2_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad3_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad3_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad3_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad3_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad4_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad4_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad4_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad4_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad5_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad5_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad5_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad5_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad6_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad6_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad6_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad6_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad7_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad7_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad7_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad7_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad8_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad8_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad8_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad8_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad9_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad9_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad9_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad9_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad10_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad10_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad10_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad10_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad11_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad11_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad11_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad11_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad12_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad12_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad12_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad12_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad13_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad13_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad13_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad13_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad14_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad14_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad14_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad14_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad15_mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad15_fadeout' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad15_sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'pad15_div' — baselined, see audio-param-sweep-expected.txt
+  [xfail] MPC  param 'selectedPad' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Looper  param 'take' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Looper  param 'syncStart' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Looper  param 'fadeIn' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Looper  param 'fadeOut' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Field Notes  param 'root' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Field Notes  param 'scale' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Field Notes  param 'field_nextParamId' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Field Notes  param 'p.hits' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Filter  param 'useGlobalScale' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Transpose  param 'useGlobalScale' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Pitch Bend  param 'bendSemitones' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Echo  param 'rateMode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Echo  param 'rateBeats' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Echo  param 'repeats' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Echo  param 'decay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Echo  param 'transposePerRepeat' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Router  param 'probability' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Switcher  param 'rateMode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Switcher  param 'rateBeats' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Switcher  param 'rateSeconds' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Switcher  param 'manual' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Switcher  param 'manualSlot' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Arpeggiator  param 'mode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Arpeggiator  param 'octaves' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Arpeggiator  param 'rateMode' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Arpeggiator  param 'rateBeats' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Arpeggiator  param 'rateSeconds' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Arpeggiator  param 'gatePercent' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Arpeggiator  param 'stepGates' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Arpeggiator  param 'useGlobalScale' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Arpeggiator  param 'stepTiming' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Stack  param 'useGlobalScale' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Capturer  param 'loop' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Note Capturer  param 'useGlobalScale' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Field Effect  param 'exposeRmsOutput' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Field Effect  param 'field_nextParamId' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Plugin  param 'plugin_accepts_notes' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Plugin  param 'plugin_sidechain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Plugin  param 'bypass' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Plugin  param 'map_slots' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Audio Filter  param 'rateDiv' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Dynamics  param 'sidechainExternal' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Limiter  param 'mix' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Limiter  param 'release' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Delay  param 'sync' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Delay  param 'rateDiv' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Reverb  param 'decay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Reverb  param 'damping' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Reverb  param 'predelay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Stereo  param 'mix' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Pitch Shifter  param 'grain' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Chorus  param 'rateDiv' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Flanger  param 'rateDiv' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Phaser  param 'rateDiv' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Transient Shaper  param 'mix' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Stutter  param 'rateDiv' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Tremolo  param 'rateDiv' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Spectrum Slide  param 'slide' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Shape Resonator  param 'tune' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Shape Resonator  param 'decay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Shape Resonator  param 'damping' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Shape Resonator  param 'pos' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Shape Resonator  param 'modes' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Convolution Reverb  param 'size' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Convolution Reverb  param 'shape' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Convolution Reverb  param 'material' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Convolution Reverb  param 'distance' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Convolution Reverb  param 'decay' — baselined, see audio-param-sweep-expected.txt
+  [xfail] Convolution Reverb  param 'spread' — baselined, see audio-param-sweep-expected.txt
+  [pass]  AUDIOPARAMSWEEPTEST  — 298 xfail (baselined blind spots, see /tmp/infinite_test_AUDIOPARAMSWEEPTEST_xfail.log), 0 new
+  [pass]  AUDIOTEARDOWNSWEEPTEST  — AUDIO TEARDOWN SWEEP OK
+  [pass]  AUDIOPDCTEST  — AUDIOPDCTEST OK
+  [pass]  RECSYNCTEST  — REC SYNC OK
+  [pass]  VIDEOEXACTTEST  — VIDEOEXACTTEST OK
+  [stale-baseline] RECEXPORTTEST — now passes, delete its line from known-test-failures.txt
+  [pass]  AUDIOLIFECYCLETEST  — AUDIO LIFECYCLE TEST OK
+  [pass]  AUDIORECOVERYTEST  — AUDIO RECOVERY TEST OK
+  [pass]  SAMPLERDRAGTEST  — SAMPLERDRAGTEST OK
+  [pass]  MEDIADRAGTEST  — MEDIADRAGTEST OK
+  [FAIL]  PLUGINDRAGTEST — see /tmp/infinite_test_PLUGINDRAGTEST.log
+          PLUGINDRAG drop onto node: id='' expected='' FAIL
+          PLUGINDRAGTEST FAIL
+  [pass]  PLUGINSCANTEST  — PLUGINSCANTEST OK
+  [pass]  PLUGINNODETEST  — PLUGINNODETEST sidechain VST3: pin at slot 1; unpatched -28.6 dB, loud key -40.6 dB, silent key -28.7 dB, unpatched again -28.6 dB  OK
+  [pass]  PLUGINCRASHTEST  — PLUGINCRASHTEST isolated AU's process killed: app alive, node ready=0, output peak 0.500, badge 'AUDelay stopped: it crashed again, this time in its own process, so Infinite kept running. Sound passes through it unchanged. Click to open the plugin list.'  OK
+  [pass]  MIDIBENDTEST  — MIDIBENDTEST OK
+  [pass]  VST3SCANTEST  — VST3SCANTEST OK
+  [pass]  AUTOSAVEMARKERTEST  — AUTOSAVE MARKER TEST OK
+  [pass]  PATCHWATCHTEST  — PATCHWATCHTEST OK
+  [pass]  RPCBATCHTEST  — RPCBATCHTEST OK
+  [pass]  OSCCONTROLTEST  — OSCCONTROLTEST OK
+  [FAIL]  HISTORYTEST — see /tmp/infinite_test_HISTORYTEST.log
+            [FAIL] a param edit is named by what changed
+            [FAIL] undo entry names survive the jump
+          HISTORYTEST FAIL
+  [pass]  PATCHOPENERTEST  — PATCHOPENERTEST OK
+  [pass]  CLIPBOARDTEST  — CLIPBOARDTEST OK
+  [pass]  REMOVEBGTEST  — REMOVEBGTEST OK
+  [pass]  CURVESLUTTEST  — curves lut rebuild count: after-edit=2 idle=2 NO SPURIOUS REBUILD OK
+  [pass]  IMGAUDIT  — IMGAUDIT 49 filter(s) + Curves + Blend, 10 flag(s) OK
+  [pass]  METALLICDECAYTEST  — METALLICDECAYTEST OK
+  [pass]  PREDCOLORTEST  — PREDCOLOR TEST: PASS
+  [pass]  PREDQUANTIZETEST  — [PREDQUANTIZETEST] All checks passed  OK
+  [pass]  PREDVELOCITYTEST  — [PREDVELOCITYTEST] All checks passed  OK
+  [pass]  PREDRHYTHMTEST  — [PREDRHYTHMTEST] OK
+
+== Design lints and gallery goldens ==
+  [pass]  design/contrast.py  — contrast: 42 pairs, 0 failing, 0 known
+  [pass]  design/motion_lint.py  — motion lint: 0 problem(s)
+  [pass]  design/ratchet.py  — ratchet: colours 0 (stored 0), raw widgets 433 (stored 433)
+  [pass]  design/golden.py  — dark: mean diff 0.0007, pixels >24: 0.0002%  ok
+
+== Summary ==
+passed: 152   failed: 2   xfail (known, see known-test-failures.txt): 2
+xfail checks: ALIASTEST COMPAUDIT
+stale baseline entries (now passing, delete these lines from known-test-failures.txt): DRAGTEST RECEXPORTTEST
+failing checks: PLUGINDRAGTEST HISTORYTEST
+
+Only these are real: xfail lines above are already accounted for in
+known-test-failures.txt — do not re-run them to confirm, that file IS
+the confirmation. If a failing check above isn't pre-existing, fix it;
+if it IS pre-existing and unrelated to your change, add a line to
+known-test-failures.txt (after confirming against source) instead of
+re-deriving that fact on every run.

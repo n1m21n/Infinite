@@ -1,0 +1,4 @@
+FAIL  load-bench: stale: sources changed after the newest result (quiet machine). Re-run: python3 tools/re-survey/load_bench.py run --track node:Analog+node:EQ --out ~/re-output/load-bench/analog-eq.md && python3 tools/re-survey/load_bench.py run --track node:Wavetable+node:Reverb --out ~/re-output/load-bench/wt-reverb.md
+FAIL  project-bench: stale: sources changed after the newest result (quiet machine). Re-run: python3 tools/re-survey/project_bench.py infinite --out ~/re-output/project-bench/results.md
+FAIL  stress: stale: sources changed after the newest result. Re-run: python3 tools/re-survey/stress_kit.py all
+FAIL  29 datasets + 1 repo sets: 0 without a consumer, 3 stale, 0 other

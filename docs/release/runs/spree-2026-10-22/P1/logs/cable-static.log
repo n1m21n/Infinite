@@ -1,0 +1,14 @@
+=== classes with an ImageCable member but absent from CableFor ===
+  (none)
+=== named in CableFor but with no InputCountFor row ===
+  (none)
+=== audio/note cable members without the generic slot accessor ===
+  (none)
+=== refusal messages missing from docs/reference/connection-rules.md ===
+  (none) - 38 messages, all documented
+=== special-cased in IsInputSlotCompatible (everything else falls through to the generic image/geometry/modulator rules) ===
+  DisplacementNode, ImageAnalyzeNode, MaterialNode, Render3DNode, SetColorNode, TrackNodeBase
+=== special-cased in WireInputSlot ===
+  CameraNode, IGeometrySource, IPaletteSource, LightNode, Render3DNode, SetColorNode
+
+CABLELOGICSWEEP 40 image-input types, 66 pin-count rows, 0 problem(s): OK

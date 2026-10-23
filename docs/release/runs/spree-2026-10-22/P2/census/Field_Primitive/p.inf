@@ -1,0 +1,11 @@
+infinite-patch 1
+node 1 3D Field Primitive
+end
+node 101 Utility Output
+end
+node 102 3D Render 3D
+  f width 512
+  f height 512
+end
+geo 102 0 1
+cable 101 0 102

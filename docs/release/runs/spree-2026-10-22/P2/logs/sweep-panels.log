@@ -1,0 +1,17 @@
+=== panels sweep ===
+
+== Build ==
+skipped (--skip-build)
+
+== Asserted fixtures (8) ==
+  [pass]   PERFMATRIXTEST
+  [pass]   BROWSERSORTTEST
+  [pass]   MODMATRIXTEST
+  [pass]   MODMATRIXGEOM
+  [pass]   MODMATRIXGEOM+MODMATRIXDOCK=0
+  [pass]   MODMATRIXGEOM+MODMATRIXDOCK=2
+  [pass]   MODMATRIXGEOM+MODMATRIXDOCK=3
+  [pass]   MINIVIEWPORTTEST
+
+== Result ==
+passed: 8   failed: 0

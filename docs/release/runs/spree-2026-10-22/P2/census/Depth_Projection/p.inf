@@ -1,0 +1,17 @@
+infinite-patch 1
+node 1 3D Depth Projection
+end
+node 101 Source Formula
+end
+node 102 Source Formula
+end
+node 103 Utility Output
+end
+node 104 3D Render 3D
+  f width 512
+  f height 512
+end
+cable 1 0 101
+cable 1 1 102
+geo 104 0 1
+cable 103 0 104

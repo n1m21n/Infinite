@@ -1,0 +1,33 @@
+=== render-pipeline-sweep ===
+
+== Build ==
+skipped (--skip-build)
+
+== Asserted fixtures (23) ==
+  [pass]   TRANSFORMSWEEPTEST
+  [pass]   MAPPINGSWEEPTEST
+  [pass]   REVISIONSWEEPTEST
+  [pass]   INSTANCESWEEPTEST
+  [pass]   RENDER3DCACHESWEEPTEST
+  [pass]   RENDER3DLIVETEST
+  [pass]   GEOTEST
+  [pass]   MESHOPTEST
+  [pass]   TEXT3DTEST
+  [pass]   PATHOCEANTEST
+  [pass]   PADPATHTEST
+  [pass]   WRAPTEST
+  [pass]   DISTRIBUTETEST
+  [pass]   PHASE4TEST
+  [pass]   INSTANCESELECTTEST
+  [pass]   SELECTTEST
+  [pass]   MATFRAMETEST
+  [pass]   MAPTEST
+  [pass]   SHADOWTEST
+  [pass]   ENVTEST
+  [pass]   3DTEST
+  [FAIL]   CLOTHTEST - see /tmp/infinite_test_CLOTHTEST.log
+  [pass]   PARTICLETEST
+
+== Result ==
+passed: 22   failed: 1
+failing: CLOTHTEST

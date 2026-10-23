@@ -1,0 +1,12 @@
+infinite-patch 1
+node 1 Modulators Note to CV
+end
+node 101 Notes Random Note Generator
+end
+node 102 Utility Output
+end
+node 103 Source Shape
+end
+note 1 0 101 0
+cable 102 0 103
+mod 103 5 1 0 0 1 0

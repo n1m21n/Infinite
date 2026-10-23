@@ -1,0 +1,9 @@
+infinite-patch 1
+node 1 Macros Macro Radio Selector
+end
+node 101 Utility Output
+end
+node 102 Source Shape
+end
+cable 101 0 102
+mod 102 5 1 0 0 1 0

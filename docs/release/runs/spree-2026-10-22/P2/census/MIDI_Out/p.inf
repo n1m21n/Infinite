@@ -1,0 +1,9 @@
+infinite-patch 1
+node 1 Utility MIDI Out
+end
+node 101 Notes Random Note Generator
+end
+node 102 Utility Output
+end
+note 1 0 101 0
+cable 102 0 1

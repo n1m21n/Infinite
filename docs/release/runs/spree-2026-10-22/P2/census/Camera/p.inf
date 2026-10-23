@@ -1,0 +1,14 @@
+infinite-patch 1
+node 1 3D Camera
+end
+node 101 Utility Output
+end
+node 102 3D Cube
+end
+node 103 3D Render 3D
+  f width 512
+  f height 512
+end
+geo 103 0 102
+geo 103 4 1
+cable 101 0 103

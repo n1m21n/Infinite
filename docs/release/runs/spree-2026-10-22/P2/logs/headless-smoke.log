@@ -1,0 +1,247 @@
+[pass] frame exit 0
+[pass] frame json ok
+[pass] frame png written
+[pass] frame dir two pngs
+[pass] render exit 0
+[pass] render 60 frames
+[pass] render has audio
+[pass] mp4 has audio track
+[pass] render --start 0: late tone not yet audible
+[pass] render --start 2: audio starts at 2 s, not 0
+[pass] bounce: Drive and Limiter land on the dry click (within 1 sample, --audio-summary)
+[pass] export: Drive and Limiter land on the dry click in the movie (within 2 samples)
+[pass] spatial-only patch passes strict validate
+[pass] spatial-only patch measures audio (sink = Spatial Mixer)
+[pass] render: Audio File volume reaches the movie (0.2 vs 0.8)
+[pass] render: a 600 s audio file under a 120 s take finishes
+[pass] render: that take's audio track is as long as its picture
+[pass] render: a r8k audio file exports
+[pass] render: a r96k audio file exports
+[pass] save: a write that fails partway reports it
+[pass] save: ...and leaves the previous file whole, no temp behind
+[pass] save: a patch in a non-ASCII folder saves and opens
+[pass] render3d: translucent slot order does not change the picture
+[pass] missing patch exit 3
+[pass] bad time exit 2
+[pass] bad container exit 2
+[pass] no Output exit 3
+[pass] validate bad patch exit 3
+[pass] validate reports E_UNKNOWN_TYPE
+[pass] validate reports W_UNKNOWN_PARAM
+[pass] validate reports E_KIND_MISMATCH
+[pass] validate reports E_BAD_SLOT
+[pass] validate reports E_DANGLING
+[pass] validate cites line numbers
+[pass] validate good patch exit 0
+[pass] describe one type
+[pass] describe unknown type exit 3
+UNSUPPORTED (log once): POSSIBLE ISSUE: unit 0 GLD_TEXTURE_INDEX_2D is unloadable and bound to sampler type (Float) - using zero texture because texture unloadable
+describe: never drawn: "Group"
+[pass] describe lists every type, exit 0
+[pass] describe Spatial Mixer exit 0 (no CoreMotion in headless)
+[pass] CRLF + BOM patch validates
+[pass] Blend describes 2 inputs
+[pass] Render 3D camera and env slot kinds
+[pass] topology g11_open_blend (W_OPEN_INPUT)
+[pass] topology g13_output_empty (W_OUTPUT_EMPTY W_UNUSED_NODE)
+[pass] topology g14_mixer12_by_name (-)
+[pass] topology g1_blend_slot2_bad (E_BAD_SLOT)
+[pass] topology g1_render3d_camera_ok (-)
+[pass] topology g2_fan_out_ok (-)
+[pass] topology g2_slot_taken (E_SLOT_TAKEN W_UNUSED_NODE)
+[pass] topology g3_bypass_blend (W_BYPASS_IGNORED)
+[pass] topology g4_bypass_fit_ok (-)
+[pass] topology g6_image_cycle (W_IMAGE_CYCLE)
+[pass] topology g7_feedback_loop_ok (-)
+[pass] topology g8_geo_cycle (W_IMAGE_CYCLE)
+[pass] topology g9_bad_param (E_BAD_PARAM)
+[pass] topology g9_mod_ok (-)
+[pass] topology g9_not_a_modulator (E_NOT_A_MODULATOR)
+[pass] field effect: validate exit 3, E_FIELD_COMPILE at line 8 names bogusfn
+[pass] field effect: same patch with sin( validates
+[pass] field effect: explain exit 3 with E_FIELD_COMPILE
+[pass] field effect: audio-summary exit 3 with E_FIELD_COMPILE, not a cable error
+[pass] field graph: validate exit 3, E_FIELD_COMPILE at line 5 names bogusfn
+[pass] field graph: same patch with sin( validates
+[pass] field graph: explain exit 3 with E_FIELD_COMPILE
+[pass] field graph: frame exit 3 with E_FIELD_COMPILE, not a cable error
+[pass] field modifier: validate exit 3, E_FIELD_COMPILE at line 8 names bogusfn
+[pass] field modifier: same patch with sin( validates
+[pass] field modifier: explain exit 3 with E_FIELD_COMPILE
+[pass] field modifier: frame exit 3 with E_FIELD_COMPILE, not a cable error
+[pass] field notes: validate exit 3, E_FIELD_COMPILE at line 5 names bogusfn
+[pass] field notes: same patch with sin( validates
+[pass] field notes: explain exit 3 with E_FIELD_COMPILE
+[pass] field notes: audio-summary exit 3 with E_FIELD_COMPILE, not a cable error
+[pass] field pixel: validate exit 3, E_FIELD_COMPILE at line 7 names bogusfn
+[pass] field pixel: same patch with sin( validates
+[pass] field pixel: explain exit 3 with E_FIELD_COMPILE
+[pass] field pixel: frame exit 3 with E_FIELD_COMPILE, not a cable error
+[pass] field primitive: validate exit 3, E_FIELD_COMPILE at line 5 names bogusfn
+[pass] field primitive: same patch with sin( validates
+[pass] field primitive: explain exit 3 with E_FIELD_COMPILE
+[pass] field primitive: frame exit 3 with E_FIELD_COMPILE, not a cable error
+[pass] field synth: validate exit 3, E_FIELD_COMPILE at line 5 names bogusfn
+[pass] field synth: same patch with sin( validates
+[pass] field synth: explain exit 3 with E_FIELD_COMPILE
+[pass] field synth: audio-summary exit 3 with E_FIELD_COMPILE, not a cable error
+[pass] formula equation: validate exit 3, E_FORMULA_COMPILE at line 5 names bogusfn
+[pass] formula equation: same patch with sin( validates
+[pass] formula equation: audio-summary exit 3 with E_FORMULA_COMPILE
+[pass] formula expr: validate exit 3, E_EXPR_COMPILE at line 10 names bogusfn
+[pass] formula expr: same patch with sin( validates
+[pass] formula expr: frame exit 3 with E_EXPR_COMPILE
+[pass] formula formula: validate exit 3, E_FORMULA_COMPILE at line 5 names bogusfn
+[pass] formula formula: same patch with sin( validates
+[pass] formula formula: frame exit 3 with E_FORMULA_COMPILE
+[pass] formula glob: validate exit 3, E_EXPR_COMPILE at line 10 names bogusfn
+[pass] formula glob: same patch with sin( validates
+[pass] formula glob: frame exit 3 with E_EXPR_COMPILE
+[pass] patch_1 validates 6/6 (probe barrier)
+[pass] describe registers off-screen nodes too
+[pass] strict: misspelled param exit 3
+[pass] strict: nothing rendered
+[pass] strict: error names line and nearest key
+[pass] lenient: misspelled param renders, exit 0
+[pass] lenient: still reported as a warning
+[pass] validate is strict by default
+[pass] validate --lenient exit 0
+[pass] strict: g3_bypass_blend exit 3
+[pass] lenient: g3_bypass_blend exit 0
+[pass] strict: g6_image_cycle exit 3
+[pass] lenient: g6_image_cycle exit 0
+[pass] strict: g11_open_blend exit 3
+[pass] lenient: g11_open_blend exit 0
+[pass] strict: g13_output_empty exit 3
+[pass] lenient: g13_output_empty exit 0
+[pass] strict: unused nodes stay advisory (patch_1)
+[pass] strict: all-at-once exit 3
+[pass] strict: all-at-once lists every problem
+[pass] names: numeric canonicalize
+[pass] names: named canonicalize
+[pass] names: named == numeric (byte-identical)
+[pass] names: crlf variant canonicalizes identically
+[pass] names: bom variant canonicalizes identically
+[pass] names: trail variant canonicalizes identically
+[pass] names: identical --frame PNGs
+[pass] names: patch_1 load-write byte-identical to baseline
+[pass] names: duplicate id reported
+[pass] names: bad id reported
+[pass] names: unknown reference exit 3
+[pass] names: out-of-order indices + named output validate
+[pass] names: out-of-order ids bind to their declared index
+[pass] names: named mod output resolves, lo/hi kept
+[pass] names: named output == numeric output (byte-identical)
+[pass] names: unknown output name exit 3 with the output list
+[pass] names: node index 0 rejected
+[pass] describe: keyed controls did not drop below the baseline
+[pass] describe: Shape 'size x' is key sizeX
+[pass] describe: Shape dropdown 'shape' is key shapeType (perturbation tier)
+[pass] frames-dir: --node taps a patch with no Output, 3 frames
+[pass] frames-dir: numbered PNGs 000000..000002
+[pass] frames-dir: frames.json describes the sequence
+[pass] frames-dir --alpha: the picture keeps its transparency
+[pass] frames-dir without --alpha: opaque PNGs
+[pass] frames-dir: --node with no such node exit 3
+[pass] frames-dir: no --duration exit 2
+[pass] frame without --node still needs an Output
+[pass] frame --node writes the tapped image
+[pass] set: a changed size changes the picture
+[pass] set: node by id word and by index give the same picture
+[pass] set: a dropdown option name is accepted
+[pass] set: unknown param exit 3
+[pass] set: non-number for a float exit 3
+[pass] set: malformed spec exit 2
+[pass] set: a bound control warns W_OVERRIDDEN_BY_MODULATION
+[pass] notes: three mapped events injected
+[pass] notes: an unmapped event type is listed, not played
+[pass] notes: W_UNMAPPED_EVENT is raised
+[pass] field synth: all 16 short notes are audible (voice pool recycles)
+[pass] field synth: a note's tail rings past note-off, then the voice frees
+[pass] notes: the 12th synth on one Keyboard gets notes (fan-out past 8)
+[pass] notes: 65 consumers on one note output raise W_NOTE_FANOUT
+[pass] arrangement: --timeline plays a sample clip at its beat, tempo-synced (120 BPM clip at 60 BPM)
+[pass] arrangement: --timeline with --output exits 2
+[pass] stems: one WAV per node
+[pass] stems: onsets land within 1 ms of the events, length = duration
+[pass] stems: a node with no audio output exits 3
+[pass] notes: --notes without --note-map exits 2
+[pass] stems: --stems without --stems-dir exits 2
+[pass] describe: Sampler 'Load...' is a file-path action
+[pass] describe: Shape lists its buttons in draw order
+[pass] describe: many node types report actions
+[pass] describe: no dropdown has an empty option list
+[pass] describe: Shape rows complete
+[pass] describe: Oscillator rows complete
+[pass] describe: Wavetable rows complete
+[pass] describe: Reverb rows complete
+[pass] describe: FieldPixel rows complete
+[pass] describe: LFO rows complete
+[pass] describe: Render 3D rows complete
+[pass] describe: Sampler rows complete
+[pass] describe: Mixer rows complete
+[pass] describe: Predictive Modulator rows complete
+[pass] describe: shapeType lists option names
+[pass] validate: W_OUT_OF_RANGE reported, advisory (exit 0)
+[pass] validate: GUI-saved patch_1 has zero range/internal hits
+[pass] keyed: canonicalize identical to numeric twin
+[pass] keyed: identical --frame PNGs
+[pass] keyed: misspelled key exit 3, nothing rendered
+[pass] keyed: error names line and nearest key sizeX
+[pass] format: image.inf validates strictly
+[pass] format: audio.inf validates strictly
+[pass] format: modulation.inf validates strictly
+[pass] authoring example: image.inf validates strictly
+[pass] authoring example: audio.inf validates strictly
+[pass] authoring example: modulation.inf validates strictly
+[pass] authoring example: image.inf renders a frame
+[pass] authoring example: modulation.inf renders a frame
+[pass] authoring example: audio.inf measures
+[FAIL] authoring skill is not stale (tools/gen-patch-skill.py --check)
+[pass] explain: patch_1 exit 0
+[pass] explain: patch_1 cable lines == cable records in the file
+[pass] explain: patch_1 geo lines == geo records in the file
+[pass] explain: patch_1 aud lines == aud records in the file
+[pass] explain: patch_1 note lines == note records in the file
+[pass] explain: patch_1 mod lines == mod records in the file
+[pass] explain: patch_1 pal lines == pal records in the file
+[pass] explain: patch_1 expr lines == expr records in the file
+[pass] explain: changed params by key, dropdown by option name
+[pass] explain: defaults hidden in text
+[pass] explain: cable names both ends and the slot
+[pass] explain --all: defaults listed and marked
+[pass] explain: audio and note wires carry slot names
+[pass] explain: mod shows key, source and resolved range
+[pass] explain: expr shows key and text
+[pass] explain: a driven param is marked, not shown as authored
+[pass] explain --json: graph line then status line
+[pass] explain depth: bypassed source says silent
+[pass] explain depth: ignored bypass is reported
+[pass] explain depth: both mod-loop edges flagged
+[pass] explain depth: geometry counts and world bbox
+[pass] explain depth: effective material
+[pass] explain depth: arrangement clip listed
+[pass] explain: strict, a misspelled param exits 3 with no graph
+[pass] explain --lenient: explains it anyway
+[pass] explain: missing patch exit 3
+[pass] explain: no patch exit 2
+[pass] release gate: version ordering cases
+[pass] summary: analyzer self-test (1 kHz sine at -20 dBFS reads -20 LUFS)
+[pass] summary: sine exit 0
+[pass] summary: sine loudest band is 1 kHz, 2 s at 48 kHz, no warnings
+[pass] summary: out.json has 32 bands, per-second loudness, LUFS == sine peak
+[pass] summary: --wav written
+[pass] summary: two runs give the same file
+[pass] summary: over full scale warns W_CLIPPING, still exit 0
+[pass] summary: silence warns W_SILENT, loudness null
+[pass] summary: no audio terminal exit 3 E_NO_AUDIO, nothing written
+[pass] summary: --output picks one of two audio terminals
+[pass] summary: --output on a non-terminal exit 3
+[pass] summary: no out.json exit 2
+[pass] summary: --wav outside --audio-summary exit 2
+[pass] summary: black patch reports 100 % black and W_BLACK_FRAME per frame
+[pass] summary: frame_stats per frame, 16-bin histogram sums to 1, sheet cells >= 480 px
+[pass] summary: contact sheet is an sRGB-tagged PNG
+[pass] summary: --contact-sheet outside --frame exit 2
+[pass] determinism: random-note synth patch renders identically twice
+[pass] determinism: the 40-node demo patch (modulators, Wave Terrain, effects) renders identically twice

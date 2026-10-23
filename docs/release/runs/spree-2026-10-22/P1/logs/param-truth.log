@@ -1,0 +1,116 @@
+Scanned 13 mailbox clamp(s) and 10 other mailbox transform(s) across src/nodes/*.{h,cpp}
+
+Scanned 26 mailbox clamp(s) and 17 other mailbox transform(s) across src/audio/dsp/*.{h,cpp} (28 effects in EffectDefs.cpp)
+
+No numeric range mismatches found.
+
+=== 2 clamp(s) not mechanically comparable - eyeball these ===
+
+  `filterCutoff` clamped to (20.0f, (float) at src/nodes/MetallicNode.cpp:263
+  `filterResonance` clamped to (0.5f, 10.0f) at src/nodes/MetallicNode.cpp:264
+
+=== 6 backend transform(s) - not a clamp, eyeball against the UI claim ===
+
+  `noise`: const float noise = std::max(0.0f, mMailbox.SmoothedValue(kParamNoise));
+    DSP (src/nodes/PartialsNode.cpp:250)
+    UI  (src/app/bodies/OscBodies.cpp:2191):  "noise" 0.0f..2.0f fmt="%.2f"
+
+  `semitones`: const float pitchSemis = mMailbox.SmoothedValue(kPitchParam) + mMailbox.SmoothedValue(kFinetuneParam) / 100.0f;
+    DSP (src/nodes/SamplerNode.cpp:393)
+    UI: no matching knob/slider call found in this node's Draw*Body
+
+  `pitch`: const float pitchSemis = mMailbox.SmoothedValue(kPitchParam) + mMailbox.SmoothedValue(kFinetuneParam) / 100.0f;
+    DSP (src/nodes/SamplerNode.cpp:393)
+    UI  (src/app/bodies/SamplerBodies.cpp:608):  "pitch" -24.0f..24.0f fmt="%.1f st"
+    UI  (src/app/bodies/SamplerBodies.cpp:431):  "pitch" -24.0f..24.0f fmt="%.1f st"
+
+  `finetune`: const float pitchSemis = mMailbox.SmoothedValue(kPitchParam) + mMailbox.SmoothedValue(kFinetuneParam) / 100.0f;
+    DSP (src/nodes/SamplerNode.cpp:393)
+    UI  (src/app/bodies/SamplerBodies.cpp:610):  "finetune" -100.0f..100.0f fmt="%.0f c"
+    UI  (src/app/bodies/SamplerBodies.cpp:429):  "finetune" -50.0f..50.0f fmt="%.0f c"
+
+  `pitch`: const float pitchSemis = mMailbox.SmoothedValue(kPitchParam) +
+    DSP (src/nodes/SlicerNode.cpp:225)
+    UI  (src/app/bodies/SamplerBodies.cpp:608):  "pitch" -24.0f..24.0f fmt="%.1f st"
+
+  `finetune`: mMailbox.SmoothedValue(kFinetuneParam) / 100.0f;
+    DSP (src/nodes/SlicerNode.cpp:226)
+    UI  (src/app/bodies/SamplerBodies.cpp:610):  "finetune" -100.0f..100.0f fmt="%.0f c"
+
+No AudioEffects range mismatches found.
+
+=== 2 AudioEffects clamp(s) not mechanically comparable - eyeball these ===
+
+  `rate` clamped to (100.0f, (float) at src/audio/dsp/BitcrushKernel.cpp:39
+  `grain` clamped to (10.0f, kMaxGrainMs) at src/audio/dsp/PitchShiftKernel.cpp:97
+
+=== 17 AudioEffects backend transform(s) - eyeball against EffectDefs.cpp ===
+
+  `rate` (ChorusKernel): rateHz = std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
+    DSP (src/audio/dsp/ChorusKernel.cpp:50)
+    EffectDefs.cpp:560:  declared 0.02f..5.0f
+
+  `feedback` (DelayKernel): const float feedbackFrac = mMailbox.SmoothedValue(kFeedbackPct) / 100.0f; // >1.0 is legal (self-oscillation)
+    DSP (src/audio/dsp/DelayKernel.cpp:73)
+    EffectDefs.cpp:342:  declared 0.0f..110.0f
+
+  `output` (DriveKernel): const float outputGain = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputDb));
+    DSP (src/audio/dsp/DriveKernel.cpp:26)
+    EffectDefs.cpp:444:  declared -24.0f..12.0f
+
+  `rate` (FlangerKernel): rateHz = std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
+    DSP (src/audio/dsp/FlangerKernel.cpp:47)
+    EffectDefs.cpp:587:  declared 0.02f..5.0f
+
+  `q` (FormantFilterKernel): const float q = std::max(0.5f, mMailbox.SmoothedValue(kQ));
+    DSP (src/audio/dsp/FormantFilterKernel.cpp:19)
+    EffectDefs.cpp:782:  declared 2.0f..30.0f
+
+  `rate` (PhaserKernel): rateHz = std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
+    DSP (src/audio/dsp/PhaserKernel.cpp:38)
+    EffectDefs.cpp:618:  declared 0.02f..5.0f
+
+  `decay` (ReverbKernel): const float decaySeconds = std::max(0.05f, mMailbox.SmoothedValue(kDecaySeconds));
+    DSP (src/audio/dsp/ReverbKernel.cpp:280)
+    EffectDefs.cpp:400:  declared 0.1f..20.0f
+
+  `decay` (ReverbKernel): const float decaySeconds = std::max(0.05f, mMailbox.SmoothedValue(kDecaySeconds));
+    DSP (src/audio/dsp/ReverbKernel.cpp:706)
+    EffectDefs.cpp:400:  declared 0.1f..20.0f
+
+  `predelay` (ReverbKernel): const float predelayMs = std::max(0.0f, mMailbox.SmoothedValue(kPredelayMs));
+    DSP (src/audio/dsp/ReverbKernel.cpp:282)
+    EffectDefs.cpp:402:  declared 0.0f..500.0f
+
+  `predelay` (ReverbKernel): const float predelayMs = std::max(0.0f, mMailbox.SmoothedValue(kPredelayMs));
+    DSP (src/audio/dsp/ReverbKernel.cpp:708)
+    EffectDefs.cpp:402:  declared 0.0f..500.0f
+
+  `freq` (RingModKernel): const float freqHz = std::max(0.0f, mMailbox.SmoothedValue(kFreqHz));
+    DSP (src/audio/dsp/RingModKernel.cpp:26)
+    EffectDefs.cpp:715:  declared 1.0f..5000.0f
+
+  `output` (SaturatorKernel): const float outputGain = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputDb));
+    DSP (src/audio/dsp/SaturatorKernel.cpp:132)
+    EffectDefs.cpp:476:  declared -24.0f..12.0f
+
+  `width` (StereoKernel): const float width = std::max(0.0f, mMailbox.SmoothedValue(kWidth));
+    DSP (src/audio/dsp/StereoKernel.cpp:27)
+    EffectDefs.cpp:503:  declared 0.0f..2.0f
+
+  `bassMono` (StereoKernel): const float bassMonoHz = std::max(0.0f, mMailbox.SmoothedValue(kBassMonoHz));
+    DSP (src/audio/dsp/StereoKernel.cpp:29)
+    EffectDefs.cpp:505:  declared 0.0f..500.0f
+
+  `rate` (TremoloKernel): rateHz = std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
+    DSP (src/audio/dsp/TremoloKernel.cpp:36)
+    EffectDefs.cpp:766:  declared 0.05f..20.0f
+
+  `table` (WavetableShaperKernel): const int table = (int)lroundf(mMailbox.SmoothedValue(kTable));
+    DSP (src/audio/dsp/WavetableShaperKernel.cpp:25)
+    EffectDefs.cpp:794:  declared 0.0f..(float)(Wavetable::NumTables() - 1)
+
+  `output` (WavetableShaperKernel): const float outputGain = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputDb));
+    DSP (src/audio/dsp/WavetableShaperKernel.cpp:30)
+    EffectDefs.cpp:809:  declared -24.0f..12.0f
+

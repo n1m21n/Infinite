@@ -1,0 +1,14 @@
+infinite-patch 1
+node 1 3D Audio Ribbon
+end
+node 101 Synths Oscillator
+end
+node 102 Utility Output
+end
+node 103 3D Render 3D
+  f width 512
+  f height 512
+end
+aud 1 0 101
+geo 103 0 1
+cable 102 0 103

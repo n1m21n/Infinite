@@ -1,0 +1,15 @@
+infinite-patch 1
+node 1 AudioEffects Dynamics
+end
+node 101 Synths Oscillator
+end
+node 102 Synths Oscillator
+end
+node 103 Utility Output
+end
+node 104 Source Shape
+end
+aud 1 0 101
+aud 1 1 102
+cable 103 0 104
+aud 103 1 1

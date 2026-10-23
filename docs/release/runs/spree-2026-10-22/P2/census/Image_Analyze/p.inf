@@ -1,0 +1,12 @@
+infinite-patch 1
+node 1 Modulators Image Analyze
+end
+node 101 Source Formula
+end
+node 102 Utility Output
+end
+node 103 Source Shape
+end
+cable 1 0 101
+cable 102 0 103
+mod 103 5 1 0 0 1 0

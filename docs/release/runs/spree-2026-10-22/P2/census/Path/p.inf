@@ -1,0 +1,15 @@
+infinite-patch 1
+node 1 Modulators Path
+end
+node 101 3D Cube
+end
+node 102 3D Cube
+end
+node 103 Utility Output
+end
+node 104 Source Shape
+end
+geo 1 0 101
+geo 1 1 102
+cable 103 0 104
+mod 104 5 1 0 0 1 0

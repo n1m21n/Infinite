@@ -1,0 +1,18 @@
+infinite-patch 1
+node 1 Compositing Switcher
+end
+node 101 Source Formula
+end
+node 102 Source Formula
+end
+node 103 Source Formula
+end
+node 104 Source Formula
+end
+node 105 Utility Output
+end
+cable 1 0 101
+cable 1 1 102
+cable 1 2 103
+cable 1 3 104
+cable 105 0 1

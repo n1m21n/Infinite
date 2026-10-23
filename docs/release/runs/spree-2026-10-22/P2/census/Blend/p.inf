@@ -1,0 +1,12 @@
+infinite-patch 1
+node 1 Compositing Blend
+end
+node 101 Source Formula
+end
+node 102 Source Formula
+end
+node 103 Utility Output
+end
+cable 1 0 101
+cable 1 1 102
+cable 103 0 1

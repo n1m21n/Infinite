@@ -1,0 +1,17 @@
+  Platform::LoadImageFloatRGB implemented on macOS only - it will not link, or will silently no-op, on the other OS
+  Platform::LoadImageRGBA implemented on macOS only - it will not link, or will silently no-op, on the other OS
+  Platform::LoadImageRGBAFromMemory implemented on macOS only - it will not link, or will silently no-op, on the other OS
+  Platform::LoadModel implemented on macOS only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiChannelBendSlot implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiChannelPressureSlot implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiChannelSlideSlot implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiLastExpressionChannel implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiOutClose implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiOutListDevices implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiOutNowSeconds implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiOutOpen implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiOutSend implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::MidiOutVirtualAvailable implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  Platform::sleep_for implemented on Windows only - it will not link, or will silently no-op, on the other OS
+  src/nodes/TrackNodeBase.cpp:178 has _WIN32 - the OS branch belongs behind a Platform:: seam, not in a node
+OUTPUTSWEEP 197 cross-platform Platform:: functions, 1 node-layer _WIN32 uses, 16 problem(s): PROBLEMS

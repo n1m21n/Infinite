@@ -72,13 +72,13 @@ def items(d): return d.get("outreach", {}).get("queue", {})
 
 def find(d, i):
     for url, v in items(d).items():
-        if v["id"] == i: return url, v
+        if str(v.get("id")) == str(i): return url, v
     sys.exit("no item " + i)
 
 
 def lst(top):
-    rows = sorted(((v["score"], u, v) for u, v in items(ledger()).items() if v["status"] == "open"), key=lambda r: -r[0])[:top]
-    for sc, u, v in rows: print("#%-3s %3d %-13s %s\n       %s" % (v["id"], sc, v["src"], v["title"][:90], u))
+    rows = sorted(((v.get("score", 0), u, v) for u, v in items(ledger()).items() if v.get("status") == "open"), key=lambda r: -r[0])[:top]
+    for sc, u, v in rows: print("#%-3s %3d %-13s %s\n       %s" % (v.get("id", "?"), sc, v.get("src", "?"), v.get("title", "")[:90], u))
 
 
 def brief(i):

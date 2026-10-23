@@ -101,9 +101,9 @@ Claims from the Air start with `air-`. Full rules, sync and dispatch: `docs/plan
 
 <!-- FACTS:BEGIN (tools/lifecycle/now.py) -->
 
-_Generated 2026-10-16 12:50 UTC. Do not edit inside this block; rerun the tool._
+_Generated 2026-10-23 00:00 UTC. Do not edit inside this block; rerun the tool._
 
-### Open quests (8) **over the cap of 5: park or close before adding**
+### Open quests (11) **over the cap of 5: park or close before adding**
 
 - R709 [later] Plan: re-survey: deconstruct competitors, one by one
 - R711 [later] Plan: Modulators to industry grade
@@ -113,38 +113,43 @@ _Generated 2026-10-16 12:50 UTC. Do not edit inside this block; rerun the tool._
 - R791 [later] Plan: Image effects to industry grade
 - R792 [later] Plan: Metal compute for particles and simulations (R556): design, scope and gates
 - R793 [later] Plan: v0.6 plan: quality lead
+- R803 [later] Plan: Ableton bridge
+- R804 [later] Plan: Blender bridge
+- R805 [later] Plan: Two laptops, two Claude accounts
 
 ### Releases
 
 | Tag | Date | Downloads (context) |
 |---|---|---|
-| extensions | 2026-10-13 | 11 |
-| v0.5.0 | 2026-10-10 | 249 |
+| v0.6.0 | 2026-10-17 | 314 |
+| extensions | 2026-10-13 | 131 |
+| v0.5.0 | 2026-10-10 | 274 |
 | v0.4.7 | 2026-10-07 | 74 |
-| v0.4.6 | 2026-10-01 | 166 |
 
-### Quality of extensions (since v0.5.0; the release measure)
+**`milestone.json` is stale**: targets v0.5.1 but v0.6.0 is out.
+
+### Quality of v0.6.0 (since extensions; the release measure)
 
 | Measure | Value | Want |
 |---|---|---|
-| Escaped fixes: fixes after extensions touching src it changed | 7 da62c225 7f002bee 79c8e6b4 e90f84fe d90f745a 89555bc0 9f5fd27d | 0, falling release to release |
-| Reverts after extensions | 1 | 0 |
-| Fix-shaped commits after extensions (all) | 40 | context |
+| Escaped fixes: fixes after v0.6.0 touching src it changed | 4 332d1eb3 78643aa3 b71ca7c9 8700ed2f | 0, falling release to release |
+| Reverts after v0.6.0 | 2 | 0 |
+| Fix-shaped commits after v0.6.0 (all) | 18 | context |
 | Known test failures (macOS / Linux) | 4 / 6 | never grows |
 | Open GitHub issues labelled bug | 0 | 0 |
-| Crash reports filed since extensions | 0 | 0 |
+| Crash reports filed since v0.6.0 | 0 | 0 |
 
 ### Reach (context only: moves with outreach, not with release quality)
 
-- GitHub (2026-10-16): 279 stars, 22 forks, 1977 downloads all-time
-- Website (2026-10-16, last 30 days): 1314 sessions, 899 users
+- GitHub (2026-10-22): 288 stars, 23 forks, 2426 downloads all-time
+- Website (2026-10-22, last 30 days): 1859 sessions, 1212 users
 
 ### Last merges to main
 
-- 2026-10-16 Merge feature/v06-3.7-bevel-inset (v0.6 Block 3)
-- 2026-10-16 Merge feature/v06-sound (v0.6 Block 2)
-- 2026-10-15 Merge bugfix/v06-audio-correctness (v0.6 Block 1)
-- 2026-10-13 Merge feature/extensions-seamless: pack store on its own release tag, Extensions tab status and app update row, Library category
-- 2026-10-13 Merge docs/v06-pro-verdict
+- 2026-10-23 Merge remote-tracking branch 'origin/main'
+- 2026-10-22 Merge tooling/bughunt-kit: TSan selftest runner
+- 2026-10-22 Merge tooling/bughunt-kit: signal fuzzing, README (bug-hunt spree 2026-10-22)
+- 2026-10-22 Merge bugfix/decode-nonfinite-samples (bug-hunt spree 2026-10-22)
+- 2026-10-22 Merge bugfix/effect-nan-recovery: selftest
 
 <!-- FACTS:END -->

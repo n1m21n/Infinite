@@ -1,0 +1,27 @@
+=== modulation-sweep ===
+
+== Build ==
+skipped (--skip-build)
+
+== Asserted fixtures (11) ==
+  [pass]   MODMATRIXTEST
+  [pass]   MODMATRIXGEOM
+  [pass]   MODBOUNDSTEST
+  [pass]   MPCMODTEST
+  [pass]   LOOPERTRIGTEST
+  [pass]   MACROTEST
+  [pass]   PERFMATRIXTEST
+  [pass]   MSEGTEST
+  [pass]   VOICEMODTEST
+  [pass]   VOICEMODFRAMETEST
+  [pass]   ROUNDTRIPTEST
+
+== Observation fixtures (1) - read these logs, they assert nothing ==
+  [read]   MODTEST - /tmp/infinite_test_MODTEST.log
+
+== Static checks ==
+wrote /Users/namansoni/Infinite/worktrees/main/docs/node_param_audit.md: 191 nodes, 1188 modulatable, 1 plain
+  [pass]   static checks
+
+== Result ==
+passed: 12   failed: 0

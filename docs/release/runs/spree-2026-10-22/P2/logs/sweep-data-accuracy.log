@@ -1,0 +1,26 @@
+=== data accuracy sweep ===
+
+== Build ==
+skipped (--skip-build)
+
+== Asserted fixtures (9) ==
+  [pass]   ROUNDTRIPTEST
+  [pass]   PATCHTEST
+  [pass]   AUTOSAVETEST
+  [pass]   AUTOSAVEMARKERTEST
+  [FAIL]   UTILTEST - see /tmp/infinite_test_UTILTEST.log
+  [pass]   REVISIONSWEEPTEST
+  [pass]   BYPASSTEST
+  [pass]   MODBOUNDSTEST
+  [pass]   IMAGERESYNTH_SELFTEST
+
+== Observation fixtures (1) - read these logs, they assert nothing ==
+  [read]   CACHETEST+SHOWCASE - /tmp/infinite_test_CACHETEST_SHOWCASE.log
+
+== Static checks ==
+COMPOSITINGSWEEP 151 cook bodies, 45 Pull calls, 0 problem(s): OK
+  [pass]   static checks
+
+== Result ==
+passed: 9   failed: 1
+failing: UTILTEST

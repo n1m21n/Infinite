@@ -1,0 +1,29 @@
+=== node UI/UX sweep ===
+
+== Build ==
+skipped (--skip-build)
+
+== Asserted fixtures (11) ==
+  [pass]   PINDUPTEST
+  [pass]   DRAGTEST
+  [pass]   HIDETEST
+  [pass]   WTDRAGTEST
+  [pass]   EQDRAGTEST
+  [pass]   MINIVIEWPORTTEST
+  [pass]   UNDOTEST
+  [pass]   GROUPTEST
+  [pass]   SAMPLERDRAGTEST
+  [pass]   MEDIADRAGTEST
+  [FAIL]   PLUGINDRAGTEST - see /tmp/infinite_test_PLUGINDRAGTEST.log
+
+== Observation fixtures (2) - read these logs, they assert nothing ==
+  [read]   SIZETEST - /tmp/infinite_test_SIZETEST.log
+  [read]   INPUTTEST - /tmp/infinite_test_INPUTTEST.log
+
+== Static checks ==
+  wrote docs/node_param_audit.md: 191 nodes, 1188 modulatable, 1 plain
+  [pass]   static checks
+
+== Result ==
+passed: 11   failed: 1
+failing: PLUGINDRAGTEST

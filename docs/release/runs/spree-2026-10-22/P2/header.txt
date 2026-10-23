@@ -1,0 +1,4 @@
+Release gate run 2026-10-22 07:30:10
+commit: 562ee6fc on main; dirty files: 5
+phase: P2   binary: /Users/namansoni/Infinite/worktrees/main/build/Infinite.app/Contents/MacOS/Infinite
+run folder: docs/release/runs/spree-2026-10-22/P2

@@ -1,0 +1,9 @@
+infinite-patch 1
+node 1 Utility Syphon Out
+end
+node 101 Source Formula
+end
+node 102 Utility Output
+end
+cable 1 0 101
+cable 102 0 1

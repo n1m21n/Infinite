@@ -1,0 +1,21 @@
+=== compositing / 2D pipeline sweep ===
+
+== Build ==
+skipped (--skip-build)
+
+== Asserted fixtures (4) ==
+  [pass]   IMAGERESYNTH_SELFTEST
+  [pass]   BYPASSTEST
+  [pass]   PALETTETEST
+  [pass]   REMOVEBGTEST
+
+== Observation fixtures (2) - read these logs, they assert nothing ==
+  [read]   RESYNTHTEST - /tmp/infinite_test_RESYNTHTEST.log
+  [read]   CACHETEST+SHOWCASE - /tmp/infinite_test_CACHETEST_SHOWCASE.log
+
+== Static checks ==
+COMPOSITINGSWEEP 151 cook bodies, 45 Pull calls, 0 problem(s): OK
+  [pass]   static checks
+
+== Result ==
+passed: 5   failed: 0

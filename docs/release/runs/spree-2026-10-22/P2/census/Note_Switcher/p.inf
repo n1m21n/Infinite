@@ -1,0 +1,24 @@
+infinite-patch 1
+node 1 Notes Note Switcher
+end
+node 101 Notes Random Note Generator
+end
+node 102 Notes Random Note Generator
+end
+node 103 Notes Random Note Generator
+end
+node 104 Notes Random Note Generator
+end
+node 105 Utility Output
+end
+node 106 Synths Oscillator
+end
+node 107 Source Shape
+end
+note 1 0 101 0
+note 1 1 102 0
+note 1 2 103 0
+note 1 3 104 0
+note 106 0 1 0
+cable 105 0 107
+aud 105 1 106
