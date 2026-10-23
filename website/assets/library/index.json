@@ -220,7 +220,7 @@
     },
     {
       "id": "rossler-attractor",
-      "name": "R\u00f6ssler Attractor",
+      "name": "Rössler Attractor",
       "kind": "Generator",
       "tags": [
         "chaos",
@@ -332,7 +332,7 @@
     },
     {
       "id": "mobius-strip-3d",
-      "name": "M\u00f6bius Strip 3D",
+      "name": "Möbius Strip 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -340,7 +340,7 @@
         "topology",
         "parametric"
       ],
-      "description": "Parametric non-orientable M\u00f6bius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
+      "description": "Parametric non-orientable Möbius ribbon with transverse tubular rungs, edge rails and orbiting satellites.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1246,7 +1246,7 @@
         "kaleidoscope",
         "visuals"
       ],
-      "description": "Non-Euclidean Poincar\u00e9 disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
+      "description": "Non-Euclidean Poincaré disk hyperbolic reflection group with audio-reactive conformal inversion and infinite geodesic tiling.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -1725,7 +1725,7 @@
         "3d",
         "parametric"
       ],
-      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold K\u00e4hler manifold with interlocking compactified sheets.",
+      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold Kähler manifold with interlocking compactified sheets.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1928,7 +1928,7 @@
         "3d",
         "ruled-surface"
       ],
-      "description": "Eug\u00e8ne Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
+      "description": "Eugène Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2100,7 +2100,7 @@
         "minimal-surface",
         "topology"
       ],
-      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting M\u00f6bius band topology and Neil's parabola boundary.",
+      "description": "Ernst Lebrecht Henneberg's non-orientable minimal surface (1875) with self-intersecting Möbius band topology and Neil's parabola boundary.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -2235,7 +2235,7 @@
         "Audio-Reactive",
         "Tessellation"
       ],
-      "description": "Poincar\u00e9 disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
+      "description": "Poincaré disk hyperbolic tessellation with infinite quasicrystal reflection symmetry, audio-reactive conformal metric warping, and iridescent spectral fringes.",
       "price": 0,
       "domain": "pixel",
       "category": "Pixel",
@@ -2284,7 +2284,7 @@
     },
     {
       "id": "plucker-conoid-3d",
-      "name": "Pl\u00fccker's Conoid 3D",
+      "name": "Plücker's Conoid 3D",
       "kind": "Generator",
       "tags": [
         "geometry",
@@ -2435,6 +2435,196 @@
       "file": "assets/library/pixel/chromatic-quasicrystal.field",
       "preview": "assets/library/previews/chromatic-quasicrystal.jpg",
       "bytes": 1923
+    },
+    {
+      "id": "hyperbolic-poincare-disk",
+      "name": "Hyperbolic Poincaré Disk",
+      "kind": "Generator",
+      "tags": [
+        "hyperbolic",
+        "math",
+        "geometry",
+        "poincare"
+      ],
+      "description": "Conformal Poincaré disk model with regular hyperbolic tiling, geodesic circular arcs and breathing non-Euclidean metric.",
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 7,
+      "file": "assets/library/sketch/hyperbolic-poincare-disk.js",
+      "price": 0,
+      "preview": "assets/library/previews/hyperbolic-poincare-disk.jpg",
+      "bytes": 4879
+    },
+    {
+      "id": "chladni-plate-harmonics",
+      "name": "Chladni Plate Harmonics",
+      "kind": "Generator",
+      "tags": [
+        "acoustics",
+        "chladni",
+        "math",
+        "resonance"
+      ],
+      "description": "Ernst Chladni acoustic nodal patterns on a vibrating square plate with dynamic modal indices and wandering sand quanta.",
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 7,
+      "file": "assets/library/sketch/chladni-plate-harmonics.js",
+      "price": 0,
+      "preview": "assets/library/previews/chladni-plate-harmonics.jpg",
+      "bytes": 4504
+    },
+    {
+      "id": "gyroid-minimal-surface-3d",
+      "name": "Gyroid Minimal Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "minimal",
+        "gyroid"
+      ],
+      "description": "Alan Schoen triply periodic minimal surface with interwoven enantiomorph labyrinth channels and orbiting quanta.",
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 7,
+      "file": "assets/library/sketch/gyroid-minimal-surface-3d.js",
+      "price": 0,
+      "preview": "assets/library/previews/gyroid-minimal-surface-3d.jpg",
+      "bytes": 3354
+    },
+    {
+      "id": "villarceau-circles-3d",
+      "name": "Villarceau Circles 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "torus",
+        "hopf"
+      ],
+      "description": "Yvon Villarceau bitangent diagonal circle families on a torus corresponding to the Hopf fibration fiber bundles.",
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 7,
+      "file": "assets/library/sketch/villarceau-circles-3d.js",
+      "price": 0,
+      "preview": "assets/library/previews/villarceau-circles-3d.jpg",
+      "bytes": 3149
+    },
+    {
+      "id": "inharmonic-chime-synth",
+      "name": "Inharmonic Chime Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "bell",
+        "chime",
+        "dsp"
+      ],
+      "description": "Metallic chime and acoustic bell physical synthesis using 6 Bessel-zero plate modes, strike transient, and high-frequency air absorption.",
+      "domain": "synth",
+      "category": "Synths",
+      "params": 6,
+      "file": "assets/templates/inharmonic-chime-synth.inf",
+      "price": 0,
+      "preview": "assets/library/previews/inharmonic-chime-synth.jpg",
+      "bytes": 2669
+    },
+    {
+      "id": "analog-supershape-pad-synth",
+      "name": "Analog Supershape Pad Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "pad",
+        "analog",
+        "supershape"
+      ],
+      "description": "Polyphonic pad synthesizer with 3 detuned polyphonic oscillator cores, Gielis supershape wave-folding, and a 4-pole diode filter.",
+      "domain": "synth",
+      "category": "Synths",
+      "params": 7,
+      "file": "assets/templates/analog-supershape-pad-synth.inf",
+      "price": 0,
+      "preview": "assets/library/previews/analog-supershape-pad-synth.jpg",
+      "bytes": 2346
+    },
+    {
+      "id": "multiband-tape-saturator-fx",
+      "name": "Multiband Tape Saturator FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "tape",
+        "saturation",
+        "multiband"
+      ],
+      "description": "Three-band crossover tape saturator with low-end magnetic head hysteresis, even/odd harmonic drive, and dynamic tape bias.",
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 6,
+      "file": "assets/templates/multiband-tape-saturator-fx.inf",
+      "price": 0,
+      "preview": "assets/library/previews/multiband-tape-saturator-fx.jpg",
+      "bytes": 1932
+    },
+    {
+      "id": "dimension-spatial-chorus-fx",
+      "name": "Dimension Spatial Chorus FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "chorus",
+        "spatial",
+        "bbd"
+      ],
+      "description": "Multi-stage bucket brigade chorus with out-of-phase dual LFO modulation, cross-coupled spatial diffusion, and warm analog tone.",
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 6,
+      "file": "assets/templates/dimension-spatial-chorus-fx.inf",
+      "price": 0,
+      "preview": "assets/library/previews/dimension-spatial-chorus-fx.jpg",
+      "bytes": 2378
+    },
+    {
+      "id": "hyperbolic-disk-fractal",
+      "name": "Hyperbolic Disk Fractal",
+      "kind": "Generator",
+      "tags": [
+        "Fractal",
+        "Geometry",
+        "Audio-Reactive",
+        "Colour"
+      ],
+      "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent diffraction vertices.",
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/hyperbolic-disk-fractal.field",
+      "price": 0,
+      "preview": "assets/library/previews/hyperbolic-disk-fractal.jpg",
+      "bytes": 2197
+    },
+    {
+      "id": "magnetar-quantum-flux",
+      "name": "Magnetar Quantum Flux",
+      "kind": "Generator",
+      "tags": [
+        "Space",
+        "Physics",
+        "Motion",
+        "Colour"
+      ],
+      "description": "Ultra-magnetized neutron star vacuum birefringence with twisted quantum electrodynamic flux tubes, pair-cascade polar jets, and relativistic synchrotron radiation.",
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/magnetar-quantum-flux.field",
+      "price": 0,
+      "preview": "assets/library/previews/magnetar-quantum-flux.jpg",
+      "bytes": 2279
     }
   ]
 }

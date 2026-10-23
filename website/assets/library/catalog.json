@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 201,
+ "count": 215,
  "items": [
   {
    "id": "first-sound",
@@ -446,6 +446,54 @@
    "file": "https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/tube-preamp-overdrive-fx.webp",
    "page": "https://infinitedevices.org/library/tube-preamp-overdrive-fx.html"
+  },
+  {
+   "id": "inharmonic-chime-synth",
+   "name": "Inharmonic Chime Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Metallic chime and acoustic bell physical synthesis using 6 Bessel-zero plate modes.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/inharmonic-chime-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/inharmonic-chime-synth.webp",
+   "page": "https://infinitedevices.org/library/inharmonic-chime-synth.html"
+  },
+  {
+   "id": "analog-supershape-pad-synth",
+   "name": "Analog Supershape Pad Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Polyphonic pad synthesizer with 3 detuned cores, supershape wavefolding, and 4-pole diode filter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/analog-supershape-pad-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/analog-supershape-pad-synth.webp",
+   "page": "https://infinitedevices.org/library/analog-supershape-pad-synth.html"
+  },
+  {
+   "id": "multiband-tape-saturator-fx",
+   "name": "Multiband Tape Saturator FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Three-band crossover tape saturator with low-end magnetic head hysteresis and dynamic tape bias.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/multiband-tape-saturator-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/multiband-tape-saturator-fx.webp",
+   "page": "https://infinitedevices.org/library/multiband-tape-saturator-fx.html"
+  },
+  {
+   "id": "dimension-spatial-chorus-fx",
+   "name": "Dimension Spatial Chorus FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Multi-stage bucket brigade chorus with out-of-phase dual LFO modulation and spatial diffusion.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.webp",
+   "page": "https://infinitedevices.org/library/dimension-spatial-chorus-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -2414,6 +2462,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/chromatic-quasicrystal.field",
    "preview": "https://infinitedevices.org/assets/library/previews/chromatic-quasicrystal.jpg",
    "page": "https://infinitedevices.org/library/chromatic-quasicrystal.html"
+  },
+  {
+   "id": "hyperbolic-poincare-disk",
+   "name": "Hyperbolic Poincaré Disk",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Conformal Poincaré disk model with regular hyperbolic tiling, geodesic circular arcs and breathing non-Euclidean metric.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/hyperbolic-poincare-disk.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-poincare-disk.jpg",
+   "page": "https://infinitedevices.org/library/hyperbolic-poincare-disk.html"
+  },
+  {
+   "id": "chladni-plate-harmonics",
+   "name": "Chladni Plate Harmonics",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Ernst Chladni acoustic nodal patterns on a vibrating square plate with dynamic modal indices and wandering sand quanta.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/chladni-plate-harmonics.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/chladni-plate-harmonics.jpg",
+   "page": "https://infinitedevices.org/library/chladni-plate-harmonics.html"
+  },
+  {
+   "id": "gyroid-minimal-surface-3d",
+   "name": "Gyroid Minimal Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Alan Schoen triply periodic minimal surface with interwoven enantiomorph labyrinth channels and orbiting quanta.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/gyroid-minimal-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/gyroid-minimal-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/gyroid-minimal-surface-3d.html"
+  },
+  {
+   "id": "villarceau-circles-3d",
+   "name": "Villarceau Circles 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Yvon Villarceau bitangent diagonal circle families on a torus corresponding to the Hopf fibration fiber bundles.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/villarceau-circles-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/villarceau-circles-3d.jpg",
+   "page": "https://infinitedevices.org/library/villarceau-circles-3d.html"
+  },
+  {
+   "id": "inharmonic-chime-synth",
+   "name": "Inharmonic Chime Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Metallic chime and acoustic bell physical synthesis using 6 Bessel-zero plate modes, strike transient, and high-frequency air absorption.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/inharmonic-chime-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/inharmonic-chime-synth.jpg",
+   "page": "https://infinitedevices.org/library/inharmonic-chime-synth.html"
+  },
+  {
+   "id": "analog-supershape-pad-synth",
+   "name": "Analog Supershape Pad Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Polyphonic pad synthesizer with 3 detuned polyphonic oscillator cores, Gielis supershape wave-folding, and a 4-pole diode filter.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/analog-supershape-pad-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/analog-supershape-pad-synth.jpg",
+   "page": "https://infinitedevices.org/library/analog-supershape-pad-synth.html"
+  },
+  {
+   "id": "multiband-tape-saturator-fx",
+   "name": "Multiband Tape Saturator FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Three-band crossover tape saturator with low-end magnetic head hysteresis, even/odd harmonic drive, and dynamic tape bias.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/multiband-tape-saturator-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/multiband-tape-saturator-fx.jpg",
+   "page": "https://infinitedevices.org/library/multiband-tape-saturator-fx.html"
+  },
+  {
+   "id": "dimension-spatial-chorus-fx",
+   "name": "Dimension Spatial Chorus FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Multi-stage bucket brigade chorus with out-of-phase dual LFO modulation, cross-coupled spatial diffusion, and warm analog tone.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/dimension-spatial-chorus-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/dimension-spatial-chorus-fx.jpg",
+   "page": "https://infinitedevices.org/library/dimension-spatial-chorus-fx.html"
+  },
+  {
+   "id": "hyperbolic-disk-fractal",
+   "name": "Hyperbolic Disk Fractal",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric warping, and iridescent diffraction vertices.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/hyperbolic-disk-fractal.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/hyperbolic-disk-fractal.jpg",
+   "page": "https://infinitedevices.org/library/hyperbolic-disk-fractal.html"
+  },
+  {
+   "id": "magnetar-quantum-flux",
+   "name": "Magnetar Quantum Flux",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Ultra-magnetized neutron star vacuum birefringence with twisted quantum electrodynamic flux tubes, pair-cascade polar jets, and relativistic synchrotron radiation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/magnetar-quantum-flux.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/magnetar-quantum-flux.jpg",
+   "page": "https://infinitedevices.org/library/magnetar-quantum-flux.html"
   }
  ]
 }

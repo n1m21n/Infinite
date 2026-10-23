@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Hyperbolic Disk Fractal",
+    "author": "Infinite",
+    "description": "Conformal hyperbolic Poincaré disk with infinite Apollonian circle inversions, audio-reactive conformal metric curvature, and iridescent chromatic diffraction vertices.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float zoom = 1.25 [0.5, 3.0];\nparam float curvature = 1.15 [0.2, 3.0];\nparam float spin = 0.35 [0.0, 2.0];\nparam float iterations = 6.0 [2.0, 10.0];\nparam float glow = 1.40 [0.2, 3.0];\n\np = (uv - 0.5) * (2.4 / zoom);\np.x = p.x * aspect;\n\nr = length(p);\nrotAngle = t * spin * 0.5;\ncosR = cos(rotAngle);\nsinR = sin(rotAngle);\np = vec2(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR);\n\ndiskBoundary = smoothstep(1.02, 0.98, r);\n\n// Poincaré disk conformal metric denominator (1 - r^2)\nmetric = 1.0 / max(0.001, 1.0 - r * r * curvature);\n\n// Iterative circle inversions\nz = p;\naccum = 0.0;\nmaxIter = floor(iterations);\nfor (i = 0; i < 8; i = i + 1) {\n  if (float(i) < maxIter) {\n    // Fold into fundamental domain\n    z = abs(z);\n    if (z.x < z.y) {\n      tmp = z.x;\n      z.x = z.y;\n      z.y = tmp;\n    }\n    // Circle inversion with radius r0\n    r0 = 0.58;\n    d2 = dot(z, z);\n    scaleInv = (r0 * r0) / max(0.08, d2);\n    z = z * scaleInv;\n    accum = accum + exp(-abs(d2 - r0 * r0) * 12.0);\n  }\n}\n\nhorizonRing = exp(-abs(r - 0.96) * 35.0) * 2.2;\n\nground = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nember = vec3(1.0, 0.42, 0.21);\nemerald = vec3(0.306, 0.949, 0.722);\nwhite = vec3(0.96, 0.98, 1.0);\n\nphase = accum * 0.45 + r * 3.5;\nvertexCol = mix(signal, emerald, sin(phase * 4.0) * 0.5 + 0.5);\nvertexCol = mix(vertexCol, ember, cos(phase * 2.5) * 0.5 + 0.5);\n\ncol = ground;\ncol = col + vertexCol * accum * glow * 0.45;\ncol = col + mix(signal, white, 0.8) * horizonRing;\ncol = col * diskBoundary;\nalpha = 1.0;\n",
+    "params": {
+      "zoom": 1.25,
+      "curvature": 1.15,
+      "spin": 0.35,
+      "iterations": 6.0,
+      "glow": 1.4
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

@@ -1,0 +1,49 @@
+infinite-patch 1
+# Multiband Tape Saturator FX: 3-band crossover tape saturation with magnetic head hysteresis
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 44
+  i rangeHigh 72
+end
+node 2 Synths Wavetable
+  id synth
+  pos 360 1024
+end
+node 3 AudioEffects Field Effect
+  id fx
+  pos 720 1024
+  s code param float driveLow = 1.80 [0.5, 5.0]\nparam float driveMid = 1.40 [0.5, 4.0]\nparam float driveHigh = 1.10 [0.5, 3.0]\nparam float bias = 0.25 [-0.5, 0.5]\nparam float warmth = 0.65 [0.0, 1.0]\nparam float mix = 1.00 [0.0, 1.0]\nstate float lpLow = 0\nstate float lpHpd = 0\nstate float hpHigh = 0\nstate float env = 0\nstate float biasDrift = 0\n\nenv = env + 0.003 * (abs(in) - env)\nbiasDrift = env * 0.35 * bias\n\nfLow = clamp(350.0 / sr * 2.0, 0.005, 0.45)\nlpLow = lpLow + fLow * (in - lpLow)\nsigLow = lpLow\n\nfHigh = clamp(3800.0 / sr * 2.0, 0.01, 0.45)\nhpHigh = hpHigh + fHigh * (in - hpHigh)\nsigHigh = in - hpHigh\n\nsigMid = in - sigLow - sigHigh\n\nuLow = (sigLow * driveLow + biasDrift)\nsatLow = uLow / (1.0 + abs(uLow) * 0.4)\n\nuMid = sigMid * driveMid\nsatMid = tanh(uMid * 1.25) * 0.85\n\nuHigh = sigHigh * driveHigh\nsatHigh = uHigh / (1.0 + abs(uHigh) + 0.3 * (uHigh * uHigh))\n\nprocessed = satLow * (1.0 + warmth * 0.25) + satMid + satHigh\nout = in * (1.0 - mix) + processed * mix * 0.72\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1100 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 1 0.42 0.21
+  f size 0.26
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Multiband Tape Saturator FX. 3-band tape saturation with magnetic hysteresis.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud fx 0 synth
+aud speakers 0 fx
+aud ana 0 fx
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

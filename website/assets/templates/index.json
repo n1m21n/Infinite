@@ -593,6 +593,70 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "inharmonic-chime-synth",
+      "name": "Inharmonic Chime Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Metallic chime and acoustic bell physical synthesis using 6 Bessel-zero plate modes.",
+      "price": 0,
+      "preview": "assets/templates/inharmonic-chime-synth.webp",
+      "file": "assets/templates/inharmonic-chime-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "analog-supershape-pad-synth",
+      "name": "Analog Supershape Pad Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Polyphonic pad synthesizer with 3 detuned cores, supershape wavefolding, and 4-pole diode filter.",
+      "price": 0,
+      "preview": "assets/templates/analog-supershape-pad-synth.webp",
+      "file": "assets/templates/analog-supershape-pad-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "multiband-tape-saturator-fx",
+      "name": "Multiband Tape Saturator FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Three-band crossover tape saturator with low-end magnetic head hysteresis and dynamic tape bias.",
+      "price": 0,
+      "preview": "assets/templates/multiband-tape-saturator-fx.webp",
+      "file": "assets/templates/multiband-tape-saturator-fx.inf",
+      "nodes": [
+        "Wavetable",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "dimension-spatial-chorus-fx",
+      "name": "Dimension Spatial Chorus FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Multi-stage bucket brigade chorus with out-of-phase dual LFO modulation and spatial diffusion.",
+      "price": 0,
+      "preview": "assets/templates/dimension-spatial-chorus-fx.webp",
+      "file": "assets/templates/dimension-spatial-chorus-fx.inf",
+      "nodes": [
+        "Wavetable",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

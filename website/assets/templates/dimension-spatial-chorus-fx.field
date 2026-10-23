@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dimension Spatial Chorus FX",
+    "author": "Infinite",
+    "description": "Multi-stage bucket brigade chorus with out-of-phase dual LFO modulation, cross-coupled spatial diffusion, and warm analog tone.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float rate = 0.45 [0.05, 3.0];\nparam float depth = 0.65 [0.0, 1.5];\nparam float spatial = 0.80 [0.0, 1.5];\nparam float feedback = 0.35 [0.0, 0.85];\nparam float tone = 0.60 [0.0, 1.0];\nparam float mix = 0.75 [0.0, 1.0];\nstate float lfoPhase = 0;\nstate float bbdL1 = 0;\nstate float bbdL2 = 0;\nstate float bbdL3 = 0;\nstate float bbdL4 = 0;\nstate float bbdR1 = 0;\nstate float bbdR2 = 0;\nstate float bbdR3 = 0;\nstate float bbdR4 = 0;\nstate float fbL = 0;\nstate float fbR = 0;\nstate float lpTone = 0;\n\nlfoStep = clamp(rate, 0.05, 10.0) / sr;\nlfoPhase = (lfoPhase + lfoStep) % 1.0;\n\nlfoL = sin(6.2831853 * lfoPhase) * depth * 0.12;\nlfoR = cos(6.2831853 * (lfoPhase + spatial * 0.25)) * depth * 0.12;\n\nxL = in + fbL * feedback * 0.5 - fbR * spatial * 0.2;\nxR = in + fbR * feedback * 0.5 - fbL * spatial * 0.2;\n\ncoeffL = clamp(0.18 + lfoL, 0.02, 0.45);\nbbdL1 = bbdL1 + coeffL * (xL - bbdL1);\nbbdL2 = bbdL2 + coeffL * (bbdL1 - bbdL2);\nbbdL3 = bbdL3 + coeffL * (bbdL2 - bbdL3);\nbbdL4 = bbdL4 + coeffL * (bbdL3 - bbdL4);\n\ncoeffR = clamp(0.18 + lfoR, 0.02, 0.45);\nbbdR1 = bbdR1 + coeffR * (xR - bbdR1);\nbbdR2 = bbdR2 + coeffR * (bbdR1 - bbdR2);\nbbdR3 = bbdR3 + coeffR * (bbdR2 - bbdR3);\nbbdR4 = bbdR4 + coeffR * (bbdR3 - bbdR4);\n\nfbL = bbdL4;\nfbR = bbdR4;\n\nchorusMix = (bbdL4 + bbdR4) * 0.5;\n\nfCut = clamp((1800.0 + tone * 6000.0) / sr * 2.0, 0.01, 0.45);\nlpTone = lpTone + fCut * (chorusMix - lpTone);\n\nout = in * (1.0 - mix) + lpTone * mix * 0.85;\n",
+    "params": {
+      "rate": 0.45,
+      "depth": 0.65,
+      "spatial": 0.8,
+      "feedback": 0.35,
+      "tone": 0.6,
+      "mix": 0.75
+    },
+    "nodeSettings": {}
+  }
+}

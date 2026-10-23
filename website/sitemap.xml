@@ -69,6 +69,8 @@
   <url><loc>https://infinitedevices.org/embeds/hyperbolic-tessellation.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/accretion-disk.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/chromatic-quasicrystal.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/hyperbolic-disk-fractal.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/magnetar-quantum-flux.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
@@ -118,6 +120,10 @@
   <url><loc>https://infinitedevices.org/library/spectral-additive-organ-synth.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/stereo-pingpong-delay-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/tube-preamp-overdrive-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/inharmonic-chime-synth.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-supershape-pad-synth.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/multiband-tape-saturator-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dimension-spatial-chorus-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
@@ -282,6 +288,16 @@
   <url><loc>https://infinitedevices.org/library/tube-preamp-overdrive-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/accretion-disk.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/chromatic-quasicrystal.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hyperbolic-poincare-disk.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/chladni-plate-harmonics.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/gyroid-minimal-surface-3d.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/villarceau-circles-3d.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/inharmonic-chime-synth.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-supershape-pad-synth.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/multiband-tape-saturator-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dimension-spatial-chorus-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hyperbolic-disk-fractal.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/magnetar-quantum-flux.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-23</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
