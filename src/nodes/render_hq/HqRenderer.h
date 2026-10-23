@@ -68,6 +68,9 @@ struct HqFrame
    // into a history); dt: seconds since the last frame (particle velocity).
    bool taa = true;
    float dt = 1.0f / 60.0f;
+   // S7: a still scene may return the last image (false: draw every frame -
+   // the self-test's timings).
+   bool reuseStill = true;
 };
 
 class HqRenderer
@@ -85,6 +88,9 @@ public:
    virtual size_t LastSpheres() const = 0;
    // Sources this version cannot draw yet (PointZ line strips, Instance PointZ: S7).
    virtual size_t LastSkipped() const = 0;
+   // S7: the last Render() returned the previous image untouched (a still
+   // scene whose TAA had converged): its texture revision need not move.
+   virtual bool LastReused() const = 0;
    virtual const std::string& Error() const = 0;
 };
 

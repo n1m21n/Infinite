@@ -6,10 +6,16 @@ in vec3 vNormal;
 in vec2 vUv;
 in vec4 vCurClip;
 in vec4 vPrevClip;
+in vec3 vInstColor;
 
 uniform mat4 uView;
 uniform float uRoughness;
 uniform vec2 uFrameSize;
+// S7: deferred slots (Instance PointZ without material maps) - the colour
+// and the slot (1-based) for hq_sphere_deferred.frag; written only when the
+// caller enables attachment 3.
+uniform float uSlotId;
+layout(location = 3) out vec4 outAlbedo;
 
 layout(location = 1) out vec4 outNormal;
 // S6: how far this surface moved on screen since last frame (pixels,
@@ -26,4 +32,5 @@ void main()
    vec2 v = vPrevClip.w > 1e-6 ? (vCurClip.xy / vCurClip.w - vPrevClip.xy / vPrevClip.w) * 0.5 * uFrameSize
                                : vec2(0.0);
    outVelocity = vec4(v, 1.0, 0.0);
+   outAlbedo = vec4(vInstColor, uSlotId / 255.0);
 }

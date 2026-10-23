@@ -61,26 +61,22 @@ O plano da 0.71 (Render 3D HQ com referência no Filament + varredura de lentid�
 `HQ-071-STRATEGY.md`, em sessões S0-S9 e P1 com estado na seção 6. A lista abaixo é a de antes
 desse plano e entra nele como P1 (desempenho) e S4-S7 (render).
 
-### Próxima sessão: S7 (GPU Points HQ + 1M)
+### Próxima sessão: S8 (pós + presets)
 
-Estado (2026-10-23): branch `feature/render3d-hq`, S0 a S6 feitas e commitadas (sem push). Commits:
-`87e33c07` S0-S4, `0a370ae5` sombra do Render 3D, `ff4cc756` S5 GTAO + cenas G/H, `fdca788b` exemplos
-em `examples/hq/raster/` e `examples/hq/filament/` (um renderizador por patch, HDRI girando na A), S6 no
-commit seguinte. Detalhes por sessão: `RENDER-3D-HQ-FILAMENT.md` §6-§11.
-- Retorno do dono que guiou a S6: serrilhado / resolução baixa no output e AO piscando em objetos
-  pequenos (resolvidos pelo TAA: bordas suaves, cintilação 2,7x menor, medido no `HQTEST`). Ele acha o
-  HQ melhor que o RTX. Ficar atento a não arrastar defeito visual para a próxima etapa: olhar as
-  capturas de `examples/hq/filament` (A-H) a cada sessão, não só os números.
-- Cenas de teste: `examples/hq/{raster,filament}/G_shadow_contact.inf` (sombra embaixo de objetos) e
-  `H_ao_contact.inf` (vinco chão-parede, contatos; no HQ marcar "show AO only"), geradas pelo
-  `scripts/make_hq_scenes.py`.
+Estado (2026-10-23): branch `feature/render3d-hq`, S0 a S7 feitas e commitadas (sem push). Detalhes por
+sessão em `RENDER-3D-HQ-FILAMENT.md` §6-§11 (S7 no fim do §8). Exemplos: `examples/hq/raster/` e
+`examples/hq/filament/` (cenas A-I, um renderizador por patch), gerados por `scripts/make_hq_scenes.py`.
+- Retornos do dono já atendidos: sombra embaixo dos objetos (Render 3D), exemplos separados e
+  organizados, HDRI girando na A, serrilhado e AO piscando (TAA, S6). Ele acha o HQ melhor que o RTX.
+  Olhar as capturas de `examples/hq/filament` a cada sessão, não só os números.
+- S7: HQ igual ou mais rápido que o raster em todos os benchmarks (tabela no §8). O que sobrou de custo
+  nas cenas de 1M é o Noise PointZ (~5 ms de GPU sobre 1M de pontos): item da P1.
 
-S7, plano: 1M de pontos estáveis e baratos no HQ - LOD das esferas por tamanho projetado (abaixo de
-~1-2 px desenhar um ponto/quad simples em vez do impostor com ray-sphere), culling por frustum na GPU
-(o `Render3DCull` do kit faz frustum + LOD para instâncias: avaliar reaproveitar), nada de readback.
-Benchmarks 100k / 1M / 2M estáticos e animados (cena F e variantes geradas no scratchpad). Instance
-PointZ (malhas instanciadas por ponto) ainda é ignorada pelo HQ (`LastSkipped`): entra aqui. Depois:
-S8 (pós/presets), P1 (lentidão), S9.
+S8, plano: bloom do Filament (6 níveis, threshold, composição antes do tonemap; notas §6) no lugar do
+bloom do `Render3DPost` só no HQ; tonemaps (os do Infinite + o do Filament), exposição; presets
+Performance / Balanced / High com parâmetros reais (resolução do AO, tamanho do mapa de sombra, TAA,
+render scale com o FSR do kit) e a diferença medida; RCAS pós-TAA opcional. Depois: P1 (lentidão,
+começando pelo Noise PointZ), S9 (validação e release).
 
 ## Próximos passos (0.71), por valor medido
 

@@ -165,10 +165,12 @@ void RenderHqNode::CookIfNeeded(int frameId)
    const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
    f.dt = mLastCookSeconds < 0.0 ? 1.0f / 60.0f : (float)std::clamp(now - mLastCookSeconds, 0.0, 0.1);
    mLastCookSeconds = now;
+   f.reuseStill = reuseStill;
 
    mOut = mRenderer->Render(f);
    mOutW = f.width;
    mOutH = f.height;
-   mRevision++;
+   if (!mRenderer->LastReused()) // S7: a reused still frame is the same image
+      mRevision++;
    mWhy = mOut == 0 ? mRenderer->Error() : std::string();
 }

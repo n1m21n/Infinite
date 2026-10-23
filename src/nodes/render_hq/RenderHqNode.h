@@ -66,6 +66,10 @@ public:
    // as in Filament (~2 ms at 1080p over a million-particle surface).
    bool contactShadows = false;
 
+   // S7: not a param - false makes every cook draw (the self-test's timings).
+   bool reuseStill = true;
+   bool HqReused() const { return mRenderer && mRenderer->LastReused(); }
+
    // True while the HQ renderer draws (false: module missing, drawing as Render 3D).
    bool HqActive() const { return mRenderer != nullptr; }
    const std::string& Status() const { return mWhy; }

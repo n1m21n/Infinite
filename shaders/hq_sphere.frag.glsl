@@ -26,6 +26,10 @@ layout(depth_greater) out float gl_FragDepth;
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outVelocity; // S6: prepass, as hq_prepass.frag (the centre's motion)
+// S7: prepass - the point's colour and its slot (1-based) for the deferred
+// shading pass (hq_sphere_deferred.frag), which shades each pixel once.
+layout(location = 3) out vec4 outAlbedo;
+uniform float uSlotId;
 
 //@include hq_common.glsl
 //@include hq_brdf.glsl
@@ -58,6 +62,7 @@ void main()
       vec2 v = vPrevClip.w > 1e-6 ? (vCurClip.xy / vCurClip.w - vPrevClip.xy / vPrevClip.w) * 0.5 * uFrameSize
                                   : vec2(0.0);
       outVelocity = vec4(v, 1.0, 0.0);
+      outAlbedo = vec4(vColor.rgb, uSlotId / 255.0); // RGBA8 target
       return;
    }
 

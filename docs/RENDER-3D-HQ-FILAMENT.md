@@ -250,7 +250,56 @@ knot). As cenas B, C e E (câmera em órbita) e F (pontos animados) são o teste
 
 (quadro inteiro, ms. "HQ só" = o Render 3D da cena reduzido a 16×16.) O HQ com esferas PBR de
 verdade sai mais barato que os sprites chapados do Render 3D na cena de 1M.
-## 9. Sombras e contact shadows (S4)
+
+### S7: esferas diferidas, Instance PointZ, benchmarks
+
+**Perfil primeiro** (`INFINITE_GPUPROF`, cena F, 1M de esferas, 1080p, TAA + AO): do "Render 3D HQ"
+de 12,2 ms, 5,1 ms eram do **Noise PointZ** (o nó de ruído sobre 1M de pontos, cozido dentro do HQ:
+item para a P1, fora do renderizador); o HQ em si: sombreamento 3,5 + pré-passe 2,8 + TAA 0,3 +
+GTAO 0,15. A 960×540 o sombreamento caiu para 2,0 e o pré-passe para 1,7: ~1,3-1,5 ms fixos de
+vértice/instância por passe (1M de quads) mais o custo por pixel. LOD por tamanho projetado não
+ajuda aqui (as esferas da F têm ~6 px); o desperdício era rasterizar 1M de quads de novo só para
+sombrear pixels que o pré-passe já resolveu.
+
+- **Sombreamento diferido das esferas**: o pré-passe das esferas grava também a cor do ponto e o
+  slot (attachment 3, RGBA8: cor 0..1, slot/255); o sombreamento vira um passe de tela cheia por
+  slot de esferas (`hq_sphere_deferred.frag`: posição da profundidade, normal do alvo do pré-passe,
+  material do slot, o mesmo `hqShade()`). Cada pixel é sombreado uma vez. F: sombreamento
+  3,5 → **0,21 ms**; o pré-passe subiu 2,8 → 3,3 ms (um alvo a mais); o renderizador 7,1 → **~4,2 ms**
+  (−40%). Imagem equivalente (capturas B, C, E de `build/hq/s6` × `build/hq/s7`).
+- **Instance PointZ** (antes ignorada pelo HQ): a forma (malha da PointZ ou da CPU) desenhada uma
+  vez por ponto com `glDrawElementsInstanced`, transformações de `pop::InstanceMatrices` na GPU
+  (atributos 3-6, o modelo da fonte já nelas), `Color` dos pontos (7) multiplicando a base como no
+  Render 3D, matriz de normal pelo cofator (certa com escala não uniforme). Entra no pré-passe, no
+  sombreamento, na sombra (ajuste pelo box assíncrono dos pontos + meia diagonal da forma) e no TAA
+  (movimento de câmera; instâncias não têm transformação do quadro anterior). `HQTEST`: 10k caixas,
+  120k triângulos, nada pulado. Cena nova `I_instances_100k` (100k cubos de metal sobre ruído).
+- **Instâncias diferidas**: cópias de Instance PointZ cujo material não tem mapas (e é "lit") também
+  vão para o passe de tela cheia (o pré-passe grava a cor da instância e o slot): 1M de cubos é
+  desenhado uma vez, não duas (cubos 1M animados 20,5 → 13,4 ms). Com mapas, sombreamento forward.
+- **Cena parada**: o renderizador monta uma assinatura (câmera, luzes, HDRI, parâmetros e, por fonte,
+  revisões da malha/PointZ e das instâncias, matriz de modelo, material; fonte com textura nunca é
+  "parada") e, enquanto ela não muda, deixa o TAA refinar 32 quadros (0,88^32: ~2% do primeiro) e
+  depois devolve a última imagem sem desenhar e sem avançar a revisão (os nós seguintes também
+  reaproveitam), como o cache do Render 3D. Sem TAA, já no quadro seguinte. `HQTEST`: reaproveitada
+  depois de assentar, mesma imagem, redesenha quando um objeto anda.
+
+**Benchmarks** (`perf.ps1`, 3 rodadas intercaladas, quadro inteiro em ms, 1080p, sem sombras, HDRI,
+câmera parada; "animada" = Noise PointZ com velocidade 0,3; variantes geradas no scratchpad a partir
+do `make_hq_scenes.py`):
+
+| Cena | Raster (Render 3D) | HQ |
+|---|---|---|
+| esferas 100k, animadas | 2,1 | **2,0** |
+| esferas 1M, animadas | 15,8 | **9,6** |
+| esferas 2M, animadas | 30,9 | **18,0** |
+| cubos (Instance PointZ) 100k, animados | 2,6 | **2,6** |
+| cubos 1M, animados | 15,6 | **13,4** |
+| esferas 100k / 1M / 2M, paradas | 0,9 / 0,9 / 0,8 | 1,0 / 0,9 / 0,9 |
+| cubos 100k / 1M, parados | 1,0 / 1,0 | 2,0 / 1,0 |
+
+Nas cenas animadas de 1M, ~5 ms são do próprio Noise PointZ (igual nos dois): a P1 olha isso.
+
 
 `shaders/hq_shadows.glsl` (amostragem), `hq_shadow.frag`, `hq_sphere_shadow.*` e
 `HqRendererGl::UpdateShadows()`:
@@ -365,6 +414,7 @@ ghosting em desoclusão.
 | `shaders/hq_shadows.glsl` | técnicas de `shaders/src/surface_shadowing.fs` como as notas descrevem (PCF LOW de Castaño, contact shadows); valores de `LightManager.h` `ShadowOptions` |
 | `shaders/hq_ao_depth.comp.glsl` | `filament/src/materials/ssao/mipmapDepth.mat` (sem a grade rotacionada, ver §10) |
 | `shaders/hq_gtao.comp.glsl` | `filament/src/materials/ssao/gtaoImpl.fs`, `gtao.mat`; valores de `Options.h` `AmbientOcclusionOptions` / `Gtao` |
+| `shaders/hq_sphere_deferred.frag.glsl` | montagem de `surface_shading_model_standard.fs` (via `hqShade`, como as esferas da S3) |
 | `shaders/hq_taa.comp.glsl` | `filament/src/materials/antiAliasing/taa/taa.mat`; valores de `Options.h` `TemporalAntiAliasingOptions`; jitter de `PostProcessManager.cpp` (via o kit da 0.70) |
 | `shaders/hq_ao_blur.comp.glsl`, `ssaoVisibility()` em `hq_lighting.glsl` | `filament/src/materials/ssao/bilateralBlur.mat`; upsample de `shaders/src/surface_ambient_occlusion.fs` |
 

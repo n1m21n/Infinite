@@ -9,6 +9,7 @@ in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vUv;
 in vec3 vLocalPos;
+in vec3 vInstColor; // S7: Instance PointZ colour (1 otherwise), multiplies as in Render 3D
 
 uniform int uShading; // Material: lit / normals / uv / flat
 
@@ -143,7 +144,7 @@ void main()
    HqSurface s;
    s.pos = vWorldPos;
    s.geoN = geoN;
-   s.base = toLinear(uBaseColor);
+   s.base = toLinear(uBaseColor) * vInstColor;
    if (hasMap(kMapAlbedo)) s.base *= toLinear(sampleMap(uAlbedoMap, geoN, mapUv).rgb);
    if (uShading == 3) { outColor = vec4(s.base * uExposure, 1.0); return; }
 

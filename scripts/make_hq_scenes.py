@@ -22,6 +22,8 @@ examples/hq/hq_media/studio.hdr (scripts/make_hq_studio_hdr.py).
   H  ao_contact          ambient occlusion at contacts and creases: a wall
                          corner, matte / plastic / metal / rough objects on the
                          floor (HQ: tick "show AO only" to see it alone)
+  I  instances_100k      ~100k metal boxes instanced on a noisy grid
+                         (Instance PointZ), orbiting camera
 
 Usage: python scripts/make_hq_scenes.py
 """
@@ -378,6 +380,29 @@ def scene_h():
     return p
 
 
+def scene_i():
+    # ~100k boxes instanced on a noisy grid (Instance PointZ), the shapes of
+    # the "1M cubes" patches; metal, lit from the side.
+    p = Patch()
+    r = render(p)
+    cam = camera(p, 9.0, -30.0, 28.0, ty=0.3, orbit=0.02)
+    light, env = sun(p, 60.0, 30.0, 2.5), hdri(p, 0.8)
+    g = points(p, 316, 6.0)
+    n = noise(p, 0.5, 0.2)
+    p.geo(n, 0, g)
+    box = p.node("PointZ", "Box PointZ", 0, 0)
+    inst = p.node("PointZ", "Instance PointZ", 0, 0, f_scale=0.016)
+    p.geo(inst, 0, n)
+    p.geo(inst, 1, box)
+    mat = p.node("3DScene", "Material", 0, 0, c_color=(0.9, 0.62, 0.45), f_metallic=1.0, f_roughness=0.3)
+    p.geo(mat, 0, inst)
+    p.geo(r, 0, mat)
+    p.geo(r, 1, floor(p))
+    wire(p, r, cam, light, env)
+    output(p, r)
+    return p
+
+
 SCENES = {
     "A_material_studio": scene_a,
     "B_particle_studio": scene_b,
@@ -387,6 +412,7 @@ SCENES = {
     "F_points_1m": scene_f,
     "G_shadow_contact": scene_g,
     "H_ao_contact": scene_h,
+    "I_instances_100k": scene_i,
 }
 
 

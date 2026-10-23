@@ -5989,6 +5989,7 @@
          for (int s = 0; s < Render3DNode::kSlots; s++)
             hq.geometry[s] = r->geometry[s];
          hq.taa = false; // the checks below compare single frames; S6's block turns it on
+         hq.reuseStill = false; // S7: every cook draws (timings); the still check turns it on
          bool all = true;
          while (glGetError() != GL_NO_ERROR) {}
          auto check = [&](int w, int h) {
@@ -6230,6 +6231,38 @@
             }
          }
 
+         // S7: a still scene stops being drawn once the TAA has converged (the
+         // image and its revision stay), and drawing resumes when something moves.
+         if (HqModuleBuilt())
+         {
+            auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+            hq.reuseStill = true;
+            hq.taa = true;
+            for (int k = 0; k < 40; k++)
+               hq.CookIfNeeded(++frame);
+            const unsigned long long rev = hq.TextureRevision();
+            const std::vector<float> a = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            hq.CookIfNeeded(++frame);
+            const bool reused = hq.HqReused() && hq.TextureRevision() == rev && hq.HqDrawCalls() > 0;
+            const std::vector<float> b = read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight());
+            double d = 0.0;
+            for (size_t i = 0; i < a.size() && i < b.size(); i++)
+               d += std::fabs(a[i] - b[i]);
+            const float savedX = g0->posX;
+            g0->posX += 0.1f;
+            hq.CookIfNeeded(++frame);
+            const bool redrawn = !hq.HqReused() && hq.TextureRevision() != rev;
+            g0->posX = savedX;
+            hq.CookIfNeeded(++frame);
+            hq.reuseStill = false;
+            hq.taa = false;
+            const GLenum err = glGetError();
+            const bool ok = reused && d == 0.0 && redrawn && err == GL_NO_ERROR;
+            printf("  still scene: reused after TAA settled %d (same image %d), redrawn on a move %d, gl 0x%x  %s\n",
+                   reused ? 1 : 0, d == 0.0 ? 1 : 0, redrawn ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+         }
+
          // S3: PointZ points as sphere impostors and PointZ triangles straight
          // from the GPU; then 30 frames with the camera orbiting and an object
          // moving (the picture follows, stays finite; GPU time per frame).
@@ -6337,6 +6370,29 @@
                ok = err == GL_NO_ERROR && on < off;
                printf("  small-object flicker (10k spheres, AO, slow orbit): %.5f without TAA, %.5f with  %s\n", off, on,
                       ok ? "ok" : "FAIL");
+               all = all && ok;
+            }
+            // S7: Instance PointZ - a box on each of the 10k points, transforms
+            // from the GPU; nothing skipped, every copy's triangles drawn.
+            {
+               std::unique_ptr<PopNode> box(static_cast<PopNode*>(PopNode::CreateFor("Box PointZ")));
+               std::unique_ptr<PopNode> inst(static_cast<PopNode*>(PopNode::CreateFor("Instance PointZ")));
+               inst->inputs[0] = grid.get();
+               inst->inputs[1] = box.get();
+               setF(inst.get(), "scale", 0, 0.02f);
+               RenderHqNode pi;
+               pi.width = 640.0f;
+               pi.height = 360.0f;
+               pi.geometry[0] = inst.get();
+               while (glGetError() != GL_NO_ERROR) {}
+               for (int k = 0; k < 3; k++)
+                  pi.CookIfNeeded(++frame);
+               bool finiteI = false;
+               const double coverI = lit(read(pi.GetOutputTexture(), pi.GetOutputWidth(), pi.GetOutputHeight()), finiteI);
+               err = glGetError();
+               ok = pi.HqSkipped() == 0 && pi.HqTriangles() >= 10000 * 12 && finiteI && coverI > 0.01 && err == GL_NO_ERROR;
+               printf("  Instance PointZ (10k boxes): %zu triangles, %zu skipped, lit %.1f%%, finite %d, gl 0x%x  %s\n",
+                      pi.HqTriangles(), pi.HqSkipped(), coverI * 100.0, finiteI ? 1 : 0, err, ok ? "ok" : "FAIL");
                all = all && ok;
             }
             if (const char* png = getenv("INFINITE_HQTEST_PNG3")) // eyeball the spheres (bottom-up rows)

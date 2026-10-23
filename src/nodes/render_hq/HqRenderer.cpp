@@ -98,7 +98,8 @@ namespace
    const int kDfgSize = 128;
    // Texture units of the shading passes (set once at link).
    const int kUnitIrr = 0, kUnitPref = 1, kUnitDfg = 2, kUnitShadow = 3, kUnitMap0 = 4;
-   const int kUnitShadowRaw = 12, kUnitSceneDepth = 13, kUnitSsao = 14, kUnitLast = 14;
+   const int kUnitShadowRaw = 12, kUnitSceneDepth = 13, kUnitSsao = 14;
+   const int kUnitSphereAlbedo = 15, kUnitSceneNormal = 16, kUnitLast = 16; // S7: deferred spheres
    // S5: Filament's AmbientOcclusionOptions (resolution 0.5, bilateralThreshold
    // in metres, power) and the depth chain's levels (kLog2LodRate 3 reaches
    // level 4 at the largest GTAO radius on screen).
@@ -106,6 +107,9 @@ namespace
    const int kAoMaxLevels = 5;
    // S6: Filament's TemporalAntiAliasingOptions feedback (weight of the new frame).
    const float kTaaFeedback = 0.12f;
+   // S7: frames a still scene keeps refining under TAA before the image is
+   // reused (0.88^32: ~2% of the first frame left in the history).
+   const int kStillFrames = 32;
    // S4: Filament's ShadowOptions defaults (polygonOffsetConstant / Slope,
    // normalBias in texels) and contact shadows' maxShadowDistance.
    const float kPolygonOffsetConstant = 0.5f, kPolygonOffsetSlope = 2.0f;
@@ -317,6 +321,7 @@ namespace
       size_t LastDrawCalls() const override { return mDrawCalls; }
       size_t LastSpheres() const override { return mSpheres; }
       size_t LastSkipped() const override { return mSkipped; }
+      bool LastReused() const override { return mReused; }
       const std::string& Error() const override { return mError; }
 
    private:
@@ -342,6 +347,18 @@ namespace
          // S6: last frame's model matrix (velocity), valid while the source stays.
          Mat4 prevModel;
          const void* prevSource = nullptr;
+         // S7: Instance PointZ - the mesh above drawn once per point, with the
+         // transforms pop::InstanceMatrices builds on the GPU (attributes 3-6,
+         // the source's model already in them) and the points' Color (7).
+         bool instanced = false, instColored = false;
+         int instanceCount = 0;
+         float instScale = 1.0f;
+         unsigned long long instRevision = 0;
+         Mat4 instGroup;
+         std::vector<pop::BufferPtr> instKeep;
+         std::shared_ptr<pop::AsyncBounds> instBounds;
+         float instLo[3] = { 0, 0, 0 }, instHi[3] = { 0, 0, 0 }; // the points (source space)
+         bool instHasBounds = false;
       };
       // Uniform locations, looked up once at link (none per frame).
       struct PrepassProgram
@@ -349,6 +366,7 @@ namespace
          unsigned int id = 0;
          int viewProj = -1, model = -1, normalMatrix = -1, view = -1, roughness = -1;
          int curViewProj = -1, prevViewProj = -1, prevModel = -1, frameSize = -1; // S6
+         int instanced = -1, instColored = -1, slotId = -1; // S7
       };
       struct SurfaceProgram
       {
@@ -357,12 +375,14 @@ namespace
          int shading = -1, maps = -1, normalBump = -1, normalStrength = -1;
          int mapSpace = -1, mapTranslate = -1, mapRotate = -1, mapScale = -1, triplanarBlend = -1;
          int objLo = -1, objHi = -1;
+         int instanced = -1, instColored = -1; // S7
          LitLocs lit;
       };
       struct ShadowProgram
       {
          unsigned int id = 0;
          int viewProj = -1, model = -1, normalMatrix = -1;
+         int instanced = -1; // S7
       };
       // Spheres in the shadow map: one point sprite each, a disc at the centre's depth.
       struct SphereShadowProgram
@@ -376,6 +396,14 @@ namespace
          int viewProj = -1, view = -1, model = -1, radiusScale = -1, ortho = -1, viewDir = -1, prepass = -1;
          int earlyDepth = -1;
          int curViewProj = -1, prevViewProj = -1, prevModel = -1, velDt = -1, frameSize = -1; // S6
+         int slotId = -1; // S7
+         LitLocs lit;
+      };
+      // S7: one full-screen pass per sphere slot (hq_sphere_deferred.frag).
+      struct SphereDeferredProgram
+      {
+         unsigned int id = 0;
+         int view = -1, viewProj = -1, invViewProj = -1, slotId = -1;
          LitLocs lit;
       };
       struct BackgroundProgram
@@ -411,6 +439,7 @@ namespace
       bool EnsureIbl(const HqFrame& f);
       void DrawFullscreenInto(unsigned int tex, int level, int w, int h);
       void Upload(const std::vector<IGeometrySource*>& draw);
+      void UploadInstances(Slot& slot, IGeometrySource* src, const pop::PopData* inst);
       void ResetSlot(Slot& slot, Kind kind);
       ShadowState UpdateShadows(const HqFrame& f, const std::vector<IGeometrySource*>& draw);
       bool EnsureAo();
@@ -422,6 +451,8 @@ namespace
       PrepassProgram mPre;
       SurfaceProgram mSurf;
       SphereProgram mSph;
+      SphereDeferredProgram mSphDef;
+      unsigned int mSphereAlbedo = 0; // S7: attachment 3 (point colour, slot id)
       ShadowProgram mShadowProg;
       SphereShadowProgram mSphShadow;
       BackgroundProgram mBg;
@@ -454,6 +485,12 @@ namespace
       Render3DTemporal mTemporal;
       Mat4 mPrevViewProj;
       bool mHavePrevViewProj = false;
+      // S7: still scenes - what the last frame was drawn from, how many frames
+      // in a row it stayed the same, the image it gave.
+      std::vector<unsigned long long> mStillSig;
+      int mStillFrames = 0;
+      unsigned int mLastOut = 0;
+      bool mReused = false;
       unsigned int mIblSource = 0;
       unsigned long long mIblRevision = 0;
       int mW = 0, mH = 0;
@@ -466,16 +503,19 @@ namespace
    bool HqRendererGl::EnsurePrograms()
    {
       if (mProgramsTried)
-         return mPre.id != 0 && mSurf.id != 0 && mSph.id != 0 && mShadowProg.id != 0 && mSphShadow.id != 0 && mBg.id != 0 && mIbl.id != 0;
+         return mPre.id != 0 && mSurf.id != 0 && mSph.id != 0 && mShadowProg.id != 0 && mSphShadow.id != 0 && mBg.id != 0 && mIbl.id != 0 &&
+                mSphDef.id != 0;
       mProgramsTried = true;
       mPre.id = BuildProgram("hq_surface.vert.glsl", "hq_prepass.frag.glsl");
       mSurf.id = BuildProgram("hq_surface.vert.glsl", "hq_surface.frag.glsl");
       mSph.id = BuildProgram("hq_sphere.vert.glsl", "hq_sphere.frag.glsl");
+      mSphDef.id = BuildProgram("hq_background.vert.glsl", "hq_sphere_deferred.frag.glsl");
       mShadowProg.id = BuildProgram("hq_surface.vert.glsl", "hq_shadow.frag.glsl");
       mSphShadow.id = BuildProgram("hq_sphere_shadow.vert.glsl", "hq_sphere_shadow.frag.glsl");
       mBg.id = BuildProgram("hq_background.vert.glsl", "hq_background.frag.glsl");
       mIbl.id = BuildProgram("hq_background.vert.glsl", "hq_ibl.frag.glsl");
-      if (mPre.id == 0 || mSurf.id == 0 || mSph.id == 0 || mShadowProg.id == 0 || mSphShadow.id == 0 || mBg.id == 0 || mIbl.id == 0)
+      if (mPre.id == 0 || mSurf.id == 0 || mSph.id == 0 || mShadowProg.id == 0 || mSphShadow.id == 0 || mBg.id == 0 || mIbl.id == 0 ||
+          mSphDef.id == 0)
       {
          mError = "Render 3D HQ: its shaders did not build (see the log)";
          return false;
@@ -490,6 +530,9 @@ namespace
       mPre.prevViewProj = loc(mPre.id, "uPrevViewProj");
       mPre.prevModel = loc(mPre.id, "uPrevModel");
       mPre.frameSize = loc(mPre.id, "uFrameSize");
+      mPre.instanced = loc(mPre.id, "uInstanced");
+      mPre.slotId = loc(mPre.id, "uSlotId");
+      mPre.instColored = loc(mPre.id, "uInstColored");
 
       const unsigned int s = mSurf.id;
       glUseProgram(s);
@@ -507,6 +550,8 @@ namespace
       mSurf.triplanarBlend = loc(s, "uTriplanarBlend");
       mSurf.objLo = loc(s, "uObjLo");
       mSurf.objHi = loc(s, "uObjHi");
+      mSurf.instanced = loc(s, "uInstanced");
+      mSurf.instColored = loc(s, "uInstColored");
       mSurf.lit.Load(s);
       const char* mapNames[kMapCount] = { "uAlbedoMap", "uRoughnessMap", "uMetallicMap", "uNormalMap",
                                           "uAoMap", "uEmissionMap", "uClearcoatMap", "uSheenMap" };
@@ -527,11 +572,22 @@ namespace
       mSph.prevModel = loc(mSph.id, "uPrevModel");
       mSph.velDt = loc(mSph.id, "uVelDt");
       mSph.frameSize = loc(mSph.id, "uFrameSize");
+      mSph.slotId = loc(mSph.id, "uSlotId");
       mSph.lit.Load(mSph.id);
+
+      glUseProgram(mSphDef.id);
+      mSphDef.view = loc(mSphDef.id, "uView");
+      mSphDef.viewProj = loc(mSphDef.id, "uViewProj");
+      mSphDef.invViewProj = loc(mSphDef.id, "uInvViewProj");
+      mSphDef.slotId = loc(mSphDef.id, "uSlotId");
+      mSphDef.lit.Load(mSphDef.id);
+      glUniform1i(loc(mSphDef.id, "uSphereAlbedo"), kUnitSphereAlbedo);
+      glUniform1i(loc(mSphDef.id, "uSceneNormal"), kUnitSceneNormal);
 
       mShadowProg.viewProj = loc(mShadowProg.id, "uViewProj");
       mShadowProg.model = loc(mShadowProg.id, "uModel");
       mShadowProg.normalMatrix = loc(mShadowProg.id, "uNormalMatrix");
+      mShadowProg.instanced = loc(mShadowProg.id, "uInstanced");
       mSphShadow.viewProj = loc(mSphShadow.id, "uViewProj");
       mSphShadow.model = loc(mSphShadow.id, "uModel");
       mSphShadow.radiusScale = loc(mSphShadow.id, "uRadiusScale");
@@ -615,6 +671,8 @@ namespace
       // S6: the prepass velocity (attachment 2) and the TAA history pairs
       // (linear: the history is read between pixels).
       makeTex(mVelocity, GL_RGBA16F, "Render 3D HQ: velocity");
+      // S7: RGBA8 (colour 0..1, slot id / 255): half the prepass bandwidth of 16F.
+      makeTex(mSphereAlbedo, GL_RGBA8, "Render 3D HQ: sphere colour + slot");
       for (unsigned int* t : { &mTaaHist[0], &mTaaHist[1], &mTaaCov[0], &mTaaCov[1] })
          if (*t != 0)
             glDeleteTextures(1, t);
@@ -631,6 +689,7 @@ namespace
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mColor, 0);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, mNormal, 0);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, mVelocity, 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, mSphereAlbedo, 0);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mDepth, 0);
       // Only when the targets are (re)made, never per frame.
       const bool complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
@@ -891,6 +950,11 @@ namespace
       slot.source = nullptr;
       slot.revision = 0;
       slot.kind = kind;
+      slot.instanced = false; // S7: the new VAO has no instance attributes
+      slot.instanceCount = 0;
+      slot.instRevision = 0;
+      slot.instKeep.clear();
+      slot.instHasBounds = false;
       glGenVertexArrays(1, &slot.vao);
    }
 
@@ -905,12 +969,8 @@ namespace
          slot.drawable = false;
          if (src == nullptr)
             continue;
-         // Instance PointZ: not drawn yet (S7).
-         if (src->GetPopInstances() != nullptr)
-         {
-            mSkipped++;
-            continue;
-         }
+         // S7: Instance PointZ - the shape below drawn once per point.
+         const pop::PopData* inst = src->GetPopInstances();
          // PointZ: drawn from its GPU buffers. Asking it for GetMesh() would
          // copy it back to the CPU.
          if (const pop::PopData* pd = src->GetPop())
@@ -960,6 +1020,7 @@ namespace
             if (slot.bounds && pd->BoundsAsync(*slot.bounds, slot.lo, slot.hi))
                slot.hasBounds = true;
             slot.drawable = true;
+            UploadInstances(slot, src, kind == kPopMesh ? inst : nullptr);
             continue;
          }
          const Mesh& mesh = src->GetMesh();
@@ -1012,9 +1073,75 @@ namespace
             slot.hasBounds = true;
          }
          slot.drawable = true;
+         UploadInstances(slot, src, inst);
       }
       glBindVertexArray(0);
       glBindBuffer(GL_ARRAY_BUFFER, 0);
+   }
+
+   // S7: Instance PointZ on a mesh slot - the per-point transforms (built on
+   // the GPU, rebuilt when the points or the source's model move) and Color
+   // into the slot's VAO; the points' box (async) for the shadow fit.
+   void HqRendererGl::UploadInstances(Slot& slot, IGeometrySource* src, const pop::PopData* inst)
+   {
+      if (inst == nullptr || inst->pointCount <= 0)
+      {
+         if (slot.instanced)
+         {
+            glBindVertexArray(slot.vao);
+            for (unsigned int a = 3; a <= 7; a++)
+            {
+               glDisableVertexAttribArray(a);
+               glVertexAttribDivisor(a, 0);
+            }
+            slot.instKeep.clear();
+         }
+         slot.instanced = false;
+         slot.instanceCount = 0;
+         slot.instRevision = 0;
+         slot.instHasBounds = false;
+         return;
+      }
+      const Mat4 group = src->GetModelMatrix();
+      if (!slot.instanced || slot.instRevision != inst->revision || !(slot.instGroup == group))
+      {
+         std::vector<pop::BufferPtr> cols;
+         std::string err;
+         slot.instKeep.clear();
+         slot.instanceCount = 0;
+         glBindVertexArray(slot.vao);
+         if (pop::InstanceMatrices(*inst, group.m, inst->instanceScale, inst->instanceAlign, cols, err) &&
+             cols.size() == 4)
+         {
+            for (int col = 0; col < 4; col++)
+            {
+               slot.instKeep.push_back(cols[(size_t)col]);
+               glBindBuffer(GL_ARRAY_BUFFER, cols[(size_t)col]->Gpu());
+               glEnableVertexAttribArray(3 + col);
+               glVertexAttribPointer(3 + col, 4, GL_FLOAT, GL_FALSE, 4 * (GLsizei)sizeof(float), (void*)0);
+               glVertexAttribDivisor(3 + col, 1);
+            }
+            slot.instColored = inst->Has(pop::attr::Color);
+            if (slot.instColored)
+               BindPopAttrib(7, *inst, pop::attr::Color, 4, true, slot.instKeep);
+            else
+            {
+               glDisableVertexAttribArray(7);
+               glVertexAttribDivisor(7, 0);
+            }
+            slot.instanceCount = inst->pointCount;
+         }
+         slot.instRevision = inst->revision;
+         slot.instGroup = group;
+         slot.instScale = inst->instanceScale;
+         slot.instanced = true;
+         if (!slot.instBounds)
+            slot.instBounds = std::make_shared<pop::AsyncBounds>();
+      }
+      if (inst->BoundsAsync(*slot.instBounds, slot.instLo, slot.instHi))
+         slot.instHasBounds = true;
+      if (slot.instanceCount <= 0)
+         slot.drawable = false;
    }
 
    // S4: the shadow map of the first directional / sun light. Fitted to the
@@ -1046,14 +1173,25 @@ namespace
       for (size_t i = 0; i < draw.size(); i++)
       {
          const Slot& slot = mSlots[i];
-         if (!slot.drawable || !slot.hasBounds)
+         if (!slot.drawable || !slot.hasBounds || (slot.instanced && !slot.instHasBounds))
             continue;
          float olo[3], ohi[3];
-         const float pad = slot.kind == kSpheres ? slot.radiusScale : 0.0f;
+         float pad = slot.kind == kSpheres ? slot.radiusScale : 0.0f;
+         const float* blo = slot.lo;
+         const float* bhi = slot.hi;
+         if (slot.instanced)
+         {
+            // S7: the points' box (source space), widened by the shape's half
+            // diagonal at the instance scale (PScale is not known here).
+            const float dx = slot.hi[0] - slot.lo[0], dy = slot.hi[1] - slot.lo[1], dz = slot.hi[2] - slot.lo[2];
+            pad = 0.5f * std::sqrt(dx * dx + dy * dy + dz * dz) * std::max(slot.instScale, 0.0f);
+            blo = slot.instLo;
+            bhi = slot.instHi;
+         }
          for (int k = 0; k < 3; k++)
          {
-            olo[k] = slot.lo[k] - pad;
-            ohi[k] = slot.hi[k] + pad;
+            olo[k] = blo[k] - pad;
+            ohi[k] = bhi[k] + pad;
          }
          const float ext[3] = { ohi[0] - olo[0], ohi[1] - olo[1], ohi[2] - olo[2] };
          const float big = std::max(ext[0], std::max(ext[1], ext[2]));
@@ -1124,6 +1262,8 @@ namespace
          sig.push_back((unsigned long long)(size_t)slot.source);
          sig.push_back(slot.revision);
          sig.push_back((unsigned long long)slot.pointCount);
+         sig.push_back(slot.instanced ? slot.instRevision : 0); // S7
+         sig.push_back((unsigned long long)slot.instanceCount);
          pushF(slot.radiusScale);
          for (float v : draw[i]->GetModelMatrix().m)
             pushF(v);
@@ -1171,9 +1311,15 @@ namespace
          model.NormalMatrix(normalMatrix);
          glUniformMatrix4fv(mShadowProg.model, 1, GL_FALSE, model.m);
          glUniformMatrix3fv(mShadowProg.normalMatrix, 1, GL_FALSE, normalMatrix);
+         glUniform1i(mShadowProg.instanced, mSlots[i].instanced ? 1 : 0);
          glBindVertexArray(mSlots[i].vao);
-         glDrawElements(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr);
+         if (mSlots[i].instanced) // S7: the transforms carry the model
+            glDrawElementsInstanced(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr,
+                                    mSlots[i].instanceCount);
+         else
+            glDrawElements(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr);
       }
+      glUniform1i(mShadowProg.instanced, 0);
       glDisable(GL_POLYGON_OFFSET_FILL); // spheres: the disc through the centre is the bias
       bool sphereSet = false;
       for (size_t i = 0; i < draw.size(); i++)
@@ -1209,7 +1355,7 @@ namespace
 
    unsigned int HqRendererGl::Render(const HqFrame& f)
    {
-      mTriangles = mDrawCalls = mSpheres = mSkipped = 0;
+      mReused = false;
       if (f.draw == nullptr || !EnsurePrograms())
          return 0;
 
@@ -1258,8 +1404,90 @@ namespace
          restore();
          return 0;
       }
+      const size_t lastCounts[4] = { mTriangles, mDrawCalls, mSpheres, mSkipped };
+      mTriangles = mDrawCalls = mSpheres = mSkipped = 0;
       Upload(*f.draw);
       const std::vector<IGeometrySource*>& draw = *f.draw;
+
+      // S7: everything a pixel depends on. While it stays the same, a frame
+      // under TAA keeps refining for kStillFrames and is then reused as is (at
+      // once without TAA), as Render 3D's cache does - a still 1M-copy scene
+      // stops costing a full redraw every frame. Textured materials (no
+      // content stamp for every map) never count as still.
+      std::vector<unsigned long long> sig;
+      bool stillable = f.reuseStill;
+      {
+         auto pushF = [&sig](float v) {
+            unsigned int bits;
+            std::memcpy(&bits, &v, sizeof(bits));
+            sig.push_back(bits);
+         };
+         auto pushFs = [&pushF](const float* v, int n) {
+            for (int k = 0; k < n; k++)
+               pushF(v[k]);
+         };
+         sig.push_back(((unsigned long long)f.width << 32) | (unsigned long long)f.height);
+         pushFs(f.view.m, 16);
+         pushFs(f.proj.m, 16);
+         for (int l = 0; l < f.lightCount; l++)
+         {
+            pushFs(f.lights[l].vec, 3);
+            pushFs(f.lights[l].color, 3);
+            pushF(f.lights[l].intensity);
+            pushF(f.lights[l].spotAngle);
+            pushF(f.lights[l].spotPenumbra);
+            sig.push_back((unsigned long long)f.lights[l].type);
+         }
+         sig.push_back((unsigned long long)f.envTex);
+         sig.push_back(f.envRevision);
+         pushF(f.envRotation);
+         pushF(f.envIntensity);
+         pushFs(f.envSky, 3);
+         pushFs(f.envHorizon, 3);
+         pushFs(f.envGround, 3);
+         pushFs(f.bg, 3);
+         const float knobs[] = { f.exposure, f.bloom, f.bloomThreshold, f.bloomRadius, f.shadowSoftness, f.aoRadius,
+                                 f.aoIntensity };
+         pushFs(knobs, (int)(sizeof(knobs) / sizeof(float)));
+         sig.push_back((unsigned long long)f.tonemap | ((unsigned long long)f.shadowSize << 8) |
+                       ((unsigned long long)f.envAsBackground << 40) | ((unsigned long long)f.shadows << 41) |
+                       ((unsigned long long)f.contactShadows << 42) | ((unsigned long long)f.ao << 43) |
+                       ((unsigned long long)f.aoShow << 44) | ((unsigned long long)f.taa << 45));
+         for (size_t i = 0; i < draw.size(); i++)
+         {
+            const Slot& slot = mSlots[i];
+            sig.push_back((unsigned long long)(size_t)draw[i]);
+            sig.push_back(slot.drawable ? 1 : 0);
+            if (!slot.drawable)
+               continue;
+            sig.push_back(slot.revision);
+            sig.push_back(slot.instanced ? slot.instRevision : 0);
+            pushFs(draw[i]->GetModelMatrix().m, 16);
+            const Material m = draw[i]->GetMaterial();
+            // Every 4-byte field; the last word is the bool textureAlpha plus padding.
+            static_assert(offsetof(Material, textureAlpha) + sizeof(unsigned int) == sizeof(Material),
+                          "Material: textureAlpha is no longer the last field");
+            const unsigned int* words = reinterpret_cast<const unsigned int*>(&m);
+            for (size_t w = 0; w < offsetof(Material, textureAlpha) / sizeof(unsigned int); w++)
+               sig.push_back(words[w]);
+            sig.push_back(m.textureAlpha ? 1 : 0);
+            for (int map = 0; map < kMapCount && stillable; map++)
+               stillable = draw[i]->GetMaterialTexture(map) == 0;
+         }
+      }
+      const bool same = stillable && mLastOut != 0 && sig == mStillSig;
+      mStillFrames = same ? mStillFrames + 1 : 0;
+      mReused = same && (!f.taa || mStillFrames > kStillFrames);
+      if (mReused)
+      {
+         mTriangles = lastCounts[0];
+         mDrawCalls = lastCounts[1];
+         mSpheres = lastCounts[2];
+         mSkipped = lastCounts[3];
+         restore();
+         return mLastOut;
+      }
+      mStillSig.swap(sig);
       // S4: the shadow map first (its own target), then the frame.
       ShadowState shadow = UpdateShadows(f, draw);
       shadow.contact = (shadow.light >= 0 && f.contactShadows) ? 1 : 0;
@@ -1299,8 +1527,8 @@ namespace
       glViewport(0, 0, f.width, f.height);
       glDepthMask(GL_TRUE);
       const GLenum both[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-      const GLenum all[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-      glDrawBuffers(3, all);
+      const GLenum all[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+      glDrawBuffers(4, all);
       const float zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
       // Alpha 1 where nothing is drawn: the finish keeps the clear's alpha
       // there (an opaque background, as Render 3D's default bg opacity 1).
@@ -1311,6 +1539,7 @@ namespace
       glClearBufferfv(GL_COLOR, 0, keyedBackground ? background : opaque);
       glClearBufferfv(GL_COLOR, 1, zero);
       glClearBufferfv(GL_COLOR, 2, zero);
+      glClearBufferfv(GL_COLOR, 3, zero); // S7: slot 0 = no sphere
       glClearBufferfv(GL_DEPTH, 0, &farDepth);
 
       const Mat4 viewProj = Mat4::Multiply(drawProj, f.view);
@@ -1318,6 +1547,20 @@ namespace
       auto prevModelOf = [&](size_t i, const Mat4& model) {
          return mSlots[i].prevSource == (const void*)draw[i] ? mSlots[i].prevModel : model;
       };
+      // S7: shaded in the deferred full-screen pass, like the spheres - Instance
+      // PointZ copies whose material has no maps and is lit (drawing a million
+      // copies once instead of twice); everything else is shaded forward.
+      std::vector<char> deferredMesh(draw.size(), 0);
+      for (size_t i = 0; i < draw.size(); i++)
+      {
+         if (!mSlots[i].drawable || mSlots[i].kind == kSpheres || !mSlots[i].instanced ||
+             draw[i]->GetMaterial().shading != 0)
+            continue;
+         bool maps = false;
+         for (int map = 0; map < kMapCount && !maps; map++)
+            maps = draw[i]->GetMaterialTexture(map) != 0;
+         deferredMesh[i] = maps ? 0 : 1;
+      }
       // Sphere rays: orthographic when the projection has no perspective row;
       // the camera looks down -Z of its view matrix.
       const int ortho = f.proj.m[15] == 1.0f ? 1 : 0;
@@ -1382,10 +1625,22 @@ namespace
             glUniformMatrix4fv(mPre.prevModel, 1, GL_FALSE, prevModelOf(i, model).m);
             glUniformMatrix3fv(mPre.normalMatrix, 1, GL_FALSE, normalMatrix);
             glUniform1f(mPre.roughness, draw[i]->GetMaterial().roughness);
+            glUniform1i(mPre.instanced, mSlots[i].instanced ? 1 : 0);
+            glUniform1i(mPre.instColored, mSlots[i].instColored ? 1 : 0);
+            // S7: a deferred slot also writes its colour and id (attachment 3).
+            const GLenum meshTargets[4] = { GL_NONE, GL_COLOR_ATTACHMENT1, taaOn ? GL_COLOR_ATTACHMENT2 : GL_NONE,
+                                            deferredMesh[i] ? GL_COLOR_ATTACHMENT3 : GL_NONE };
+            glDrawBuffers(4, meshTargets);
+            glUniform1f(mPre.slotId, (float)(i + 1));
             glBindVertexArray(mSlots[i].vao);
-            glDrawElements(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr);
+            if (mSlots[i].instanced) // S7: Instance PointZ
+               glDrawElementsInstanced(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr,
+                                       mSlots[i].instanceCount);
+            else
+               glDrawElements(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr);
          }
-         // Impostor quads face the camera whatever their winding.
+         // Impostor quads face the camera whatever their winding. S7: + the
+         // point colour and slot id (attachment 3) for the deferred shading.
          glDisable(GL_CULL_FACE);
          bool setUp = false;
          for (size_t i = 0; i < draw.size(); i++)
@@ -1393,8 +1648,14 @@ namespace
             if (!mSlots[i].drawable || mSlots[i].kind != kSpheres)
                continue;
             if (!setUp)
+            {
+               const GLenum sphereTargets[4] = { GL_NONE, GL_COLOR_ATTACHMENT1,
+                                                 taaOn ? GL_COLOR_ATTACHMENT2 : GL_NONE, GL_COLOR_ATTACHMENT3 };
+               glDrawBuffers(4, sphereTargets);
                sphereSetup(1);
+            }
             setUp = true;
+            glUniform1f(mSph.slotId, (float)(i + 1));
             drawSpheres(i, false);
          }
       }
@@ -1464,7 +1725,7 @@ namespace
          mSurf.lit.SetAo(aoMode, f.width, f.height);
          for (size_t i = 0; i < draw.size(); i++)
          {
-            if (!mSlots[i].drawable || mSlots[i].kind == kSpheres)
+            if (!mSlots[i].drawable || mSlots[i].kind == kSpheres || deferredMesh[i]) // S7: deferred below
                continue;
             IGeometrySource* src = draw[i];
             const Mat4 model = src->GetModelMatrix();
@@ -1495,25 +1756,61 @@ namespace
             glUniform1f(mSurf.triplanarBlend, mt.triplanarBlend);
             glUniform3fv(mSurf.objLo, 1, mSlots[i].lo);
             glUniform3fv(mSurf.objHi, 1, mSlots[i].hi);
+            glUniform1i(mSurf.instanced, mSlots[i].instanced ? 1 : 0);
+            glUniform1i(mSurf.instColored, mSlots[i].instColored ? 1 : 0);
             glBindVertexArray(mSlots[i].vao);
-            glDrawElements(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr);
-            mTriangles += (size_t)mSlots[i].indexCount / 3;
+            if (mSlots[i].instanced) // S7: Instance PointZ
+            {
+               glDrawElementsInstanced(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr,
+                                       mSlots[i].instanceCount);
+               mTriangles += (size_t)mSlots[i].indexCount / 3 * (size_t)mSlots[i].instanceCount;
+            }
+            else
+            {
+               glDrawElements(GL_TRIANGLES, mSlots[i].indexCount, GL_UNSIGNED_INT, nullptr);
+               mTriangles += (size_t)mSlots[i].indexCount / 3;
+            }
             mDrawCalls++;
          }
 
+         // S7: spheres deferred - the prepass resolved their pixels (depth,
+         // normal, colour, slot), so one full-screen pass per sphere slot
+         // shades each pixel once instead of drawing every quad again.
          glDisable(GL_CULL_FACE);
          bool setUp = false;
          for (size_t i = 0; i < draw.size(); i++)
          {
-            if (!mSlots[i].drawable || mSlots[i].kind != kSpheres)
+            if (!mSlots[i].drawable || (mSlots[i].kind != kSpheres && !deferredMesh[i]))
                continue;
             if (!setUp)
-               sphereSetup(0);
-            setUp = true;
-            drawSpheres(i, true);
-            mSpheres += (size_t)mSlots[i].pointCount;
+            {
+               glDisable(GL_DEPTH_TEST);
+               glUseProgram(mSphDef.id);
+               glUniformMatrix4fv(mSphDef.view, 1, GL_FALSE, f.view.m);
+               glUniformMatrix4fv(mSphDef.viewProj, 1, GL_FALSE, viewProj.m);
+               const Mat4 invViewProj = Mat4::Inverse(viewProj);
+               glUniformMatrix4fv(mSphDef.invViewProj, 1, GL_FALSE, invViewProj.m);
+               mSphDef.lit.SetFrame(f, ibl);
+               mSphDef.lit.SetShadow(shadow);
+               mSphDef.lit.SetAo(aoMode, f.width, f.height);
+               glActiveTexture(GL_TEXTURE0 + kUnitSphereAlbedo);
+               glBindTexture(GL_TEXTURE_2D, mSphereAlbedo);
+               glActiveTexture(GL_TEXTURE0 + kUnitSceneNormal);
+               glBindTexture(GL_TEXTURE_2D, mNormal);
+               glBindVertexArray(mEmptyVao);
+               setUp = true;
+            }
+            glUniform1f(mSphDef.slotId, (float)(i + 1));
+            mSphDef.lit.SetMaterial(draw[i]->GetMaterial());
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            if (mSlots[i].kind == kSpheres)
+               mSpheres += (size_t)mSlots[i].pointCount;
+            else
+               mTriangles += (size_t)mSlots[i].indexCount / 3 * (size_t)mSlots[i].instanceCount;
             mDrawCalls++;
          }
+         if (setUp)
+            glEnable(GL_DEPTH_TEST);
       }
 
       glDrawBuffers(1, both);
@@ -1536,13 +1833,16 @@ namespace
       {
          const unsigned int resolved = RunTaa(f, viewProj, viewProjPlain, jx, jy);
          if (envBackground)
-            return mPost.Finish(resolved, f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold, f.bloomRadius,
-                                false, 0u, f.bg);
-         return mPost.FinishTaa(resolved, mTaaCov[mTaaCur], f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold,
-                                f.bloomRadius, f.bg, 1.0f);
+            mLastOut = mPost.Finish(resolved, f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold, f.bloomRadius,
+                                    false, 0u, f.bg);
+         else
+            mLastOut = mPost.FinishTaa(resolved, mTaaCov[mTaaCur], f.width, f.height, f.tonemap, f.bloom,
+                                       f.bloomThreshold, f.bloomRadius, f.bg, 1.0f);
       }
-      return mPost.Finish(mColor, f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold, f.bloomRadius, false,
-                          envBackground ? 0u : mDepth, f.bg);
+      else
+         mLastOut = mPost.Finish(mColor, f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold, f.bloomRadius,
+                                 false, envBackground ? 0u : mDepth, f.bg);
+      return mLastOut;
    }
 
    void HqRendererGl::Release()
@@ -1555,7 +1855,7 @@ namespace
       }
       mSlots.clear();
       unsigned int* textures[] = { &mColor, &mNormal, &mDepth, &mPref, &mIrr, &mDfg, &mShadowTex, &mDepthCopy,
-                                   &mAoZ, &mAo[0], &mAo[1], &mVelocity, &mTaaHist[0], &mTaaHist[1],
+                                   &mAoZ, &mAo[0], &mAo[1], &mVelocity, &mSphereAlbedo, &mTaaHist[0], &mTaaHist[1],
                                    &mTaaCov[0], &mTaaCov[1] };
       for (unsigned int* t : textures)
       {
@@ -1571,7 +1871,7 @@ namespace
       if (mRawSampler != 0) glDeleteSamplers(1, &mRawSampler);
       mShadowFbo = mDepthCopyFbo = mCmpSampler = mRawSampler = 0;
       if (mEmptyVao != 0) glDeleteVertexArrays(1, &mEmptyVao);
-      unsigned int* programs[] = { &mPre.id, &mSurf.id, &mSph.id, &mShadowProg.id, &mSphShadow.id, &mBg.id, &mIbl.id,
+      unsigned int* programs[] = { &mPre.id, &mSurf.id, &mSph.id, &mSphDef.id, &mShadowProg.id, &mSphShadow.id, &mBg.id, &mIbl.id,
                                    &mAoProg.depth, &mAoProg.gtao, &mAoProg.blur, &mTaaProg.id };
       for (unsigned int* p : programs)
       {
