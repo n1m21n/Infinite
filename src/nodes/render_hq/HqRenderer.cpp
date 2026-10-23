@@ -104,6 +104,8 @@ namespace
    // level 4 at the largest GTAO radius on screen).
    const float kAoBilateralThreshold = 0.05f, kAoPower = 1.0f;
    const int kAoMaxLevels = 5;
+   // S6: Filament's TemporalAntiAliasingOptions feedback (weight of the new frame).
+   const float kTaaFeedback = 0.12f;
    // S4: Filament's ShadowOptions defaults (polygonOffsetConstant / Slope,
    // normalBias in texels) and contact shadows' maxShadowDistance.
    const float kPolygonOffsetConstant = 0.5f, kPolygonOffsetSlope = 2.0f;
@@ -337,12 +339,16 @@ namespace
          std::shared_ptr<pop::AsyncBounds> bounds;
          bool hasBounds = false; // lo / hi are known (shadow fit, Mapping)
          bool drawable = false;
+         // S6: last frame's model matrix (velocity), valid while the source stays.
+         Mat4 prevModel;
+         const void* prevSource = nullptr;
       };
       // Uniform locations, looked up once at link (none per frame).
       struct PrepassProgram
       {
          unsigned int id = 0;
          int viewProj = -1, model = -1, normalMatrix = -1, view = -1, roughness = -1;
+         int curViewProj = -1, prevViewProj = -1, prevModel = -1, frameSize = -1; // S6
       };
       struct SurfaceProgram
       {
@@ -369,6 +375,7 @@ namespace
          unsigned int id = 0;
          int viewProj = -1, view = -1, model = -1, radiusScale = -1, ortho = -1, viewDir = -1, prepass = -1;
          int earlyDepth = -1;
+         int curViewProj = -1, prevViewProj = -1, prevModel = -1, velDt = -1, frameSize = -1; // S6
          LitLocs lit;
       };
       struct BackgroundProgram
@@ -389,6 +396,13 @@ namespace
          int gSize = -1, gProjInfo = -1, gProjOffset = -1, gOrtho = -1, gFarZ = -1, gProjectionScale = -1;
          int gRadius = -1, gInvRadiusSquared = -1, gIntensity = -1, gPower = -1, gMaxLevel = -1, gFullTexel = -1;
          int bSize = -1, bAxis = -1, bFarZ = -1, bEdgeInv = -1;
+         int gNoiseFrame = -1; // S6
+      };
+      // S6: hq_taa.comp.
+      struct TaaProgram
+      {
+         unsigned int id = 0;
+         int size = -1, jitter = -1, alpha = -1, historyValid = -1;
       };
 
       bool EnsurePrograms();
@@ -400,7 +414,9 @@ namespace
       void ResetSlot(Slot& slot, Kind kind);
       ShadowState UpdateShadows(const HqFrame& f, const std::vector<IGeometrySource*>& draw);
       bool EnsureAo();
-      void RunAo(const HqFrame& f);
+      void RunAo(const HqFrame& f, const Mat4& proj, int noiseFrame);
+      bool EnsureTaa();
+      unsigned int RunTaa(const HqFrame& f, const Mat4& viewProj, const Mat4& viewProjPlain, float jx, float jy);
       void Release();
 
       PrepassProgram mPre;
@@ -424,6 +440,20 @@ namespace
       bool mAoTried = false;
       unsigned int mAoZ = 0, mAo[2] = { 0, 0 };
       int mAoW = 0, mAoH = 0, mAoLevels = 0;
+      int mAoNoiseFrame = 0;
+      // S6: TAA - the prepass velocity target (attachment 2), the history
+      // and coverage pairs (mTaaHist[mTaaCur] is the latest), the motion
+      // vectors and jitter of the shared kit, the unjittered camera last frame.
+      TaaProgram mTaaProg;
+      bool mTaaTried = false;
+      unsigned int mVelocity = 0;
+      unsigned int mTaaHist[2] = { 0, 0 }, mTaaCov[2] = { 0, 0 };
+      int mTaaCur = 0;
+      bool mTaaValid = false, mTaaWasOn = false;
+      int mJitterIndex = 0;
+      Render3DTemporal mTemporal;
+      Mat4 mPrevViewProj;
+      bool mHavePrevViewProj = false;
       unsigned int mIblSource = 0;
       unsigned long long mIblRevision = 0;
       int mW = 0, mH = 0;
@@ -456,6 +486,10 @@ namespace
       mPre.normalMatrix = loc(mPre.id, "uNormalMatrix");
       mPre.view = loc(mPre.id, "uView");
       mPre.roughness = loc(mPre.id, "uRoughness");
+      mPre.curViewProj = loc(mPre.id, "uCurViewProj");
+      mPre.prevViewProj = loc(mPre.id, "uPrevViewProj");
+      mPre.prevModel = loc(mPre.id, "uPrevModel");
+      mPre.frameSize = loc(mPre.id, "uFrameSize");
 
       const unsigned int s = mSurf.id;
       glUseProgram(s);
@@ -488,6 +522,11 @@ namespace
       mSph.viewDir = loc(mSph.id, "uViewDir");
       mSph.prepass = loc(mSph.id, "uPrepass");
       mSph.earlyDepth = loc(mSph.id, "uEarlyDepth");
+      mSph.curViewProj = loc(mSph.id, "uCurViewProj");
+      mSph.prevViewProj = loc(mSph.id, "uPrevViewProj");
+      mSph.prevModel = loc(mSph.id, "uPrevModel");
+      mSph.velDt = loc(mSph.id, "uVelDt");
+      mSph.frameSize = loc(mSph.id, "uFrameSize");
       mSph.lit.Load(mSph.id);
 
       mShadowProg.viewProj = loc(mShadowProg.id, "uViewProj");
@@ -573,6 +612,17 @@ namespace
       // Bilinear: the shading pass upsamples the result.
       mAo[0] = MakeTexture(mAoW, mAoH, 1, GL_RG16F, false, "Render 3D HQ: AO");
       mAo[1] = MakeTexture(mAoW, mAoH, 1, GL_RG16F, false, "Render 3D HQ: AO blur");
+      // S6: the prepass velocity (attachment 2) and the TAA history pairs
+      // (linear: the history is read between pixels).
+      makeTex(mVelocity, GL_RGBA16F, "Render 3D HQ: velocity");
+      for (unsigned int* t : { &mTaaHist[0], &mTaaHist[1], &mTaaCov[0], &mTaaCov[1] })
+         if (*t != 0)
+            glDeleteTextures(1, t);
+      mTaaHist[0] = MakeTexture(w, h, 1, GL_RGBA16F, false, "Render 3D HQ: TAA history A");
+      mTaaHist[1] = MakeTexture(w, h, 1, GL_RGBA16F, false, "Render 3D HQ: TAA history B");
+      mTaaCov[0] = MakeTexture(w, h, 1, GL_R16F, false, "Render 3D HQ: TAA coverage A");
+      mTaaCov[1] = MakeTexture(w, h, 1, GL_R16F, false, "Render 3D HQ: TAA coverage B");
+      mTaaValid = false;
       glBindTexture(GL_TEXTURE_2D, 0);
 
       if (mFbo == 0)
@@ -580,6 +630,7 @@ namespace
       glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mColor, 0);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, mNormal, 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, mVelocity, 0);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, mDepth, 0);
       // Only when the targets are (re)made, never per frame.
       const bool complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
@@ -628,6 +679,7 @@ namespace
       a.gPower = loc(a.gtao, "uPower");
       a.gMaxLevel = loc(a.gtao, "uMaxLevel");
       a.gFullTexel = loc(a.gtao, "uFullTexel");
+      a.gNoiseFrame = loc(a.gtao, "uNoiseFrame");
       a.bSize = loc(a.blur, "uSize");
       a.bAxis = loc(a.blur, "uAxis");
       a.bFarZ = loc(a.blur, "uFarZ");
@@ -637,11 +689,11 @@ namespace
 
    // S5: GTAO from this frame's prepass (depth copy + view normals) into
    // mAo[0] at half the frame size: depth chain, kernel, bilateral blur X / Y.
-   void HqRendererGl::RunAo(const HqFrame& f)
+   void HqRendererGl::RunAo(const HqFrame& f, const Mat4& proj, int noiseFrame)
    {
       GLUtil::DebugScope group("Render 3D HQ: GTAO");
       const AoPrograms& a = mAoProg;
-      const Mat4& P = f.proj;
+      const Mat4& P = proj; // what the depth was drawn with (jittered under TAA)
       const bool ortho = P.m[15] == 1.0f;
       const float farZ = ortho ? (1.0f - P.m[14]) / P.m[10] : -P.m[14] / (1.0f + P.m[10]);
       auto groups = [](int n) { return (GLuint)((n + 7) / 8); };
@@ -685,6 +737,7 @@ namespace
       glUniform1f(a.gPower, kAoPower);
       glUniform1f(a.gMaxLevel, (float)(mAoLevels - 1));
       glUniform2f(a.gFullTexel, 1.0f / (float)f.width, 1.0f / (float)f.height);
+      glUniform1i(a.gNoiseFrame, noiseFrame);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, mAoZ);
       glActiveTexture(GL_TEXTURE1);
@@ -712,6 +765,59 @@ namespace
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, 0);
       glActiveTexture(GL_TEXTURE0);
+   }
+
+   bool HqRendererGl::EnsureTaa()
+   {
+      if (mTaaTried)
+         return mTaaProg.id != 0;
+      mTaaTried = true;
+      mTaaProg.id = Render3DTemporal::BuildComputeShader("hq_taa.comp.glsl");
+      if (mTaaProg.id == 0)
+         return false;
+      mTaaProg.size = glGetUniformLocation(mTaaProg.id, "uSize");
+      mTaaProg.jitter = glGetUniformLocation(mTaaProg.id, "uJitter");
+      mTaaProg.alpha = glGetUniformLocation(mTaaProg.id, "uAlpha");
+      mTaaProg.historyValid = glGetUniformLocation(mTaaProg.id, "uHistoryValid");
+      return true;
+   }
+
+   // S6: this frame (mColor, drawn with the jitter jx / jy) blended into the
+   // history; returns the result (HDR RGBA16F), next frame's history.
+   unsigned int HqRendererGl::RunTaa(const HqFrame& f, const Mat4& viewProj, const Mat4& viewProjPlain, float jx,
+                                     float jy)
+   {
+      GLUtil::DebugScope group("Render 3D HQ: TAA");
+      // Camera motion from depth, the prepass velocity (B = 1) where things moved.
+      const unsigned int motion =
+         mTemporal.MotionVectors(mDepth, f.width, f.height, viewProj, viewProjPlain, jx, jy, mVelocity);
+      const int prev = mTaaCur, cur = 1 - mTaaCur;
+      glUseProgram(mTaaProg.id);
+      glUniform2i(mTaaProg.size, f.width, f.height);
+      glUniform2f(mTaaProg.jitter, jx, jy);
+      glUniform1f(mTaaProg.alpha, kTaaFeedback);
+      glUniform1i(mTaaProg.historyValid, mTaaValid && motion != 0 ? 1 : 0);
+      const unsigned int inputs[5] = { mColor, mTaaHist[prev], motion, mDepth, mTaaCov[prev] };
+      for (int unit = 0; unit < 5; unit++)
+      {
+         glActiveTexture(GL_TEXTURE0 + unit);
+         glBindTexture(GL_TEXTURE_2D, inputs[unit]);
+      }
+      glBindImageTexture(0, mTaaHist[cur], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+      glBindImageTexture(1, mTaaCov[cur], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R16F);
+      glDispatchCompute((GLuint)((f.width + 7) / 8), (GLuint)((f.height + 7) / 8), 1);
+      glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+      glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+      glBindImageTexture(1, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R16F);
+      for (int unit = 4; unit >= 0; unit--)
+      {
+         glActiveTexture(GL_TEXTURE0 + unit);
+         glBindTexture(GL_TEXTURE_2D, 0);
+      }
+      glUseProgram(0);
+      mTaaCur = cur;
+      mTaaValid = true;
+      return mTaaHist[cur];
    }
 
    // One full-screen pass of the IBL program into a level of `tex` (the
@@ -830,6 +936,7 @@ namespace
                   BindPopAttrib(1, *pd, pop::attr::PScale, 1, true, slot.keep);
                   BindPopAttrib(2, *pd, pop::attr::Color, 4, true, slot.keep);
                   BindPopAttrib(3, *pd, pop::attr::Active, 1, true, slot.keep);
+                  BindPopAttrib(4, *pd, pop::attr::PartVel, 3, true, slot.keep); // S6: velocity (0 when none)
                   slot.pointCount = pd->pointCount;
                   // Render 3D's sprite size: PScale x PointBaseSize, 0.02 without PScale.
                   slot.radiusScale = src->PointBaseSize() * (pd->Has(pop::attr::PScale) ? 1.0f : 0.02f);
@@ -1088,10 +1195,10 @@ namespace
          // The slot's VAO feeds the camera passes per instance; here one vertex
          // per point, so its divisors go to 0 for this draw and back after.
          glBindVertexArray(mSlots[i].vao);
-         for (unsigned int a = 0; a < 4; a++)
+         for (unsigned int a = 0; a < 5; a++)
             glVertexAttribDivisor(a, 0);
          glDrawArrays(GL_POINTS, 0, mSlots[i].pointCount);
-         for (unsigned int a = 0; a < 4; a++)
+         for (unsigned int a = 0; a < 5; a++)
             glVertexAttribDivisor(a, 1);
       }
       if (sphereSet)
@@ -1167,19 +1274,50 @@ namespace
       const bool aoOn = f.ao && EnsureAo();
       const int aoMode = aoOn ? (f.aoShow ? 2 : 1) : 0;
       const bool depthCopy = shadow.contact || anySpheres || aoOn;
+      // S6: TAA - every frame drawn with a different sub-pixel jitter (the
+      // shared kit's Halton(2,3) x16) and blended into a history (RunTaa).
+      const bool taaOn = f.taa && EnsureTaa();
+      if (taaOn != mTaaWasOn)
+      {
+         mTaaValid = false;
+         mTaaWasOn = taaOn;
+      }
+      float jx = 0.0f, jy = 0.0f;
+      Mat4 drawProj = f.proj;
+      if (taaOn)
+      {
+         Render3DTemporal::JitterOffset(mJitterIndex++, jx, jy);
+         drawProj = Render3DTemporal::JitteredProjection(f.proj, jx, jy, f.width, f.height);
+      }
+      const Mat4 viewProjPlain = Mat4::Multiply(f.proj, f.view);
+      const Mat4 prevViewProj = mHavePrevViewProj ? mPrevViewProj : viewProjPlain;
+      // Under TAA a plain background is the clear colour, taken out again by
+      // coverage in FinishTaa (the HDRI background is tonemapped like the rest).
+      const bool keyedBackground = taaOn && !envBackground;
 
       glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
       glViewport(0, 0, f.width, f.height);
       glDepthMask(GL_TRUE);
       const GLenum both[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-      glDrawBuffers(2, both);
+      const GLenum all[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+      glDrawBuffers(3, all);
       const float zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+      // Alpha 1 where nothing is drawn: the finish keeps the clear's alpha
+      // there (an opaque background, as Render 3D's default bg opacity 1).
+      // The colour is the background's under TAA (FinishTaa), else unused.
+      const float background[4] = { f.bg[0], f.bg[1], f.bg[2], 1.0f };
+      const float opaque[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
       const float farDepth = 1.0f;
-      glClearBufferfv(GL_COLOR, 0, zero);
+      glClearBufferfv(GL_COLOR, 0, keyedBackground ? background : opaque);
       glClearBufferfv(GL_COLOR, 1, zero);
+      glClearBufferfv(GL_COLOR, 2, zero);
       glClearBufferfv(GL_DEPTH, 0, &farDepth);
 
-      const Mat4 viewProj = Mat4::Multiply(f.proj, f.view);
+      const Mat4 viewProj = Mat4::Multiply(drawProj, f.view);
+      // S6: last frame's model matrix of a draw (this frame's when it is new).
+      auto prevModelOf = [&](size_t i, const Mat4& model) {
+         return mSlots[i].prevSource == (const void*)draw[i] ? mSlots[i].prevModel : model;
+      };
       // Sphere rays: orthographic when the projection has no perspective row;
       // the camera looks down -Z of its view matrix.
       const int ortho = f.proj.m[15] == 1.0f ? 1 : 0;
@@ -1195,12 +1333,17 @@ namespace
          mSph.lit.SetFrame(f, ibl);
          mSph.lit.SetShadow(shadow);
          mSph.lit.SetAo(aoMode, f.width, f.height);
+         glUniformMatrix4fv(mSph.curViewProj, 1, GL_FALSE, viewProjPlain.m);
+         glUniformMatrix4fv(mSph.prevViewProj, 1, GL_FALSE, prevViewProj.m);
+         glUniform1f(mSph.velDt, f.dt);
+         glUniform2f(mSph.frameSize, (float)f.width, (float)f.height);
       };
       auto drawSpheres = [&](size_t i, bool shade) {
          const Mat4 model = draw[i]->GetModelMatrix();
          // The model's scale on the radius (its first column's length).
          const float scale = std::sqrt(model.m[0] * model.m[0] + model.m[1] * model.m[1] + model.m[2] * model.m[2]);
          glUniformMatrix4fv(mSph.model, 1, GL_FALSE, model.m);
+         glUniformMatrix4fv(mSph.prevModel, 1, GL_FALSE, prevModelOf(i, model).m);
          glUniform1f(mSph.radiusScale, mSlots[i].radiusScale * scale);
          if (shade)
             mSph.lit.SetMaterial(draw[i]->GetMaterial());
@@ -1217,13 +1360,17 @@ namespace
       // --- prepass: depth, view normal + roughness ---------------------
       {
          GLUtil::DebugScope group("Render 3D HQ: prepass");
-         const GLenum normalOnly[2] = { GL_NONE, GL_COLOR_ATTACHMENT1 };
-         glDrawBuffers(2, normalOnly);
+         // S6: + the velocity target under TAA.
+         const GLenum prepassTargets[3] = { GL_NONE, GL_COLOR_ATTACHMENT1, taaOn ? GL_COLOR_ATTACHMENT2 : GL_NONE };
+         glDrawBuffers(3, prepassTargets);
          glDepthFunc(GL_LESS);
          glEnable(GL_CULL_FACE);
          glUseProgram(mPre.id);
          glUniformMatrix4fv(mPre.viewProj, 1, GL_FALSE, viewProj.m);
          glUniformMatrix4fv(mPre.view, 1, GL_FALSE, f.view.m);
+         glUniformMatrix4fv(mPre.curViewProj, 1, GL_FALSE, viewProjPlain.m);
+         glUniformMatrix4fv(mPre.prevViewProj, 1, GL_FALSE, prevViewProj.m);
+         glUniform2f(mPre.frameSize, (float)f.width, (float)f.height);
          for (size_t i = 0; i < draw.size(); i++)
          {
             if (!mSlots[i].drawable || mSlots[i].kind == kSpheres)
@@ -1232,6 +1379,7 @@ namespace
             float normalMatrix[9];
             model.NormalMatrix(normalMatrix);
             glUniformMatrix4fv(mPre.model, 1, GL_FALSE, model.m);
+            glUniformMatrix4fv(mPre.prevModel, 1, GL_FALSE, prevModelOf(i, model).m);
             glUniformMatrix3fv(mPre.normalMatrix, 1, GL_FALSE, normalMatrix);
             glUniform1f(mPre.roughness, draw[i]->GetMaterial().roughness);
             glBindVertexArray(mSlots[i].vao);
@@ -1261,7 +1409,7 @@ namespace
          glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
       }
       if (aoOn)
-         RunAo(f);
+         RunAo(f, drawProj, taaOn ? mAoNoiseFrame++ : 0);
 
       const GLenum colourOnly[2] = { GL_COLOR_ATTACHMENT0, GL_NONE };
       glDrawBuffers(2, colourOnly);
@@ -1371,9 +1519,28 @@ namespace
       glDrawBuffers(1, both);
       restore();
 
+      // S6: this frame's cameras and model matrices are next frame's "last".
+      mPrevViewProj = viewProjPlain;
+      mHavePrevViewProj = true;
+      for (size_t i = 0; i < draw.size(); i++)
+         if (mSlots[i].drawable)
+         {
+            mSlots[i].prevModel = draw[i]->GetModelMatrix();
+            mSlots[i].prevSource = draw[i];
+         }
+
       // HDR -> RGBA8: bloom, tonemap, sRGB. With the HDRI behind, everything
       // is tonemapped; otherwise the plain background shows where nothing was
-      // drawn (depth 1), as in Render 3D.
+      // drawn (depth 1), as in Render 3D - under TAA by the history's coverage.
+      if (taaOn)
+      {
+         const unsigned int resolved = RunTaa(f, viewProj, viewProjPlain, jx, jy);
+         if (envBackground)
+            return mPost.Finish(resolved, f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold, f.bloomRadius,
+                                false, 0u, f.bg);
+         return mPost.FinishTaa(resolved, mTaaCov[mTaaCur], f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold,
+                                f.bloomRadius, f.bg, 1.0f);
+      }
       return mPost.Finish(mColor, f.width, f.height, f.tonemap, f.bloom, f.bloomThreshold, f.bloomRadius, false,
                           envBackground ? 0u : mDepth, f.bg);
    }
@@ -1388,7 +1555,8 @@ namespace
       }
       mSlots.clear();
       unsigned int* textures[] = { &mColor, &mNormal, &mDepth, &mPref, &mIrr, &mDfg, &mShadowTex, &mDepthCopy,
-                                   &mAoZ, &mAo[0], &mAo[1] };
+                                   &mAoZ, &mAo[0], &mAo[1], &mVelocity, &mTaaHist[0], &mTaaHist[1],
+                                   &mTaaCov[0], &mTaaCov[1] };
       for (unsigned int* t : textures)
       {
          if (*t != 0)
@@ -1404,7 +1572,7 @@ namespace
       mShadowFbo = mDepthCopyFbo = mCmpSampler = mRawSampler = 0;
       if (mEmptyVao != 0) glDeleteVertexArrays(1, &mEmptyVao);
       unsigned int* programs[] = { &mPre.id, &mSurf.id, &mSph.id, &mShadowProg.id, &mSphShadow.id, &mBg.id, &mIbl.id,
-                                   &mAoProg.depth, &mAoProg.gtao, &mAoProg.blur };
+                                   &mAoProg.depth, &mAoProg.gtao, &mAoProg.blur, &mTaaProg.id };
       for (unsigned int* p : programs)
       {
          if (*p != 0)

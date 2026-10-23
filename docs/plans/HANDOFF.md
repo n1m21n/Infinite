@@ -61,27 +61,26 @@ O plano da 0.71 (Render 3D HQ com referência no Filament + varredura de lentid�
 `HQ-071-STRATEGY.md`, em sessões S0-S9 e P1 com estado na seção 6. A lista abaixo é a de antes
 desse plano e entra nele como P1 (desempenho) e S4-S7 (render).
 
-### Próxima sessão: S6 (TAA do Filament)
+### Próxima sessão: S7 (GPU Points HQ + 1M)
 
-Estado (2026-10-23): branch `feature/render3d-hq`, S0 a S5 feitas. Commits: `87e33c07` (S0-S4),
-`0a370ae5` (sombra do Render 3D embaixo dos objetos: passe de sombra sem culling + redesenho quando o
-mapa esperava os limites; pedido do dono). S5 (GTAO) no commit seguinte, sem push. Tudo o que foi feito:
-- S1-S4: ver `RENDER-3D-HQ-FILAMENT.md` §6-§9 (nó, PBR, esferas, sombras).
-- S5: `RENDER-3D-HQ-FILAMENT.md` §10 - `hq_ao_depth/hq_gtao/hq_ao_blur.comp.glsl`, `RunAo()` depois do
-  pré-passe, `ssaoVisibility()` em `hq_lighting.glsl` (upsample bilateral), só na luz indireta.
-  Parâmetros `ao`, `aoRadius` (1,0), `aoIntensity`, `aoShow`. +0,5 ms na F a 1080p.
-- Cenas de teste versionadas (pedido do dono): `examples/hq/{raster,filament}/G_shadow_contact.inf` (sombra embaixo de
-  objetos encostados / a 2 e 20 cm do chão, materiais variados) e `H_ao_contact.inf` (vinco chão-parede
-  e contatos, com um terceiro render HQ em "só AO"), geradas pelo `scripts/make_hq_scenes.py`.
+Estado (2026-10-23): branch `feature/render3d-hq`, S0 a S6 feitas e commitadas (sem push). Commits:
+`87e33c07` S0-S4, `0a370ae5` sombra do Render 3D, `ff4cc756` S5 GTAO + cenas G/H, `fdca788b` exemplos
+em `examples/hq/raster/` e `examples/hq/filament/` (um renderizador por patch, HDRI girando na A), S6 no
+commit seguinte. Detalhes por sessão: `RENDER-3D-HQ-FILAMENT.md` §6-§11.
+- Retorno do dono que guiou a S6: serrilhado / resolução baixa no output e AO piscando em objetos
+  pequenos (resolvidos pelo TAA: bordas suaves, cintilação 2,7x menor, medido no `HQTEST`). Ele acha o
+  HQ melhor que o RTX. Ficar atento a não arrastar defeito visual para a próxima etapa: olhar as
+  capturas de `examples/hq/filament` (A-H) a cada sessão, não só os números.
+- Cenas de teste: `examples/hq/{raster,filament}/G_shadow_contact.inf` (sombra embaixo de objetos) e
+  `H_ao_contact.inf` (vinco chão-parede, contatos; no HQ marcar "show AO only"), geradas pelo
+  `scripts/make_hq_scenes.py`.
 
-S6, plano (`filament-notes.md` §5): jitter Halton(2,3) x16 pulando os 409 primeiros, reprojeção de
-câmera (o Filament não tem buffer de velocidade; o HQ deve usar o de `Render3DMotion` para objetos e
-partículas por `PartId`), histórico com Catmull-Rom, reconstrução Lanczos-2 da entrada, caixa de
-vizinhança 5/9 amostras com clipping por raio no RGB tonemapeado, feedback 0,12, `varianceGamma` 0,7.
-Decidir se reaproveita `Render3DTemporal` (TAA da 0.70, FSR) ou porta o `taa.mat` em shader próprio
-`hq_taa.comp.glsl` (recomendado: porte próprio + kit de movimento compartilhado). O AO e as contact
-shadows ficam mais limpos com TAA (ruído 4x4 do GTAO integrado no tempo). Check: teste de ghosting com
-movimento rápido no `HQTEST`, capturas A-F, perf F. Depois: S7 (1M), S8, S9.
+S7, plano: 1M de pontos estáveis e baratos no HQ - LOD das esferas por tamanho projetado (abaixo de
+~1-2 px desenhar um ponto/quad simples em vez do impostor com ray-sphere), culling por frustum na GPU
+(o `Render3DCull` do kit faz frustum + LOD para instâncias: avaliar reaproveitar), nada de readback.
+Benchmarks 100k / 1M / 2M estáticos e animados (cena F e variantes geradas no scratchpad). Instance
+PointZ (malhas instanciadas por ponto) ainda é ignorada pelo HQ (`LastSkipped`): entra aqui. Depois:
+S8 (pós/presets), P1 (lentidão), S9.
 
 ## Próximos passos (0.71), por valor medido
 

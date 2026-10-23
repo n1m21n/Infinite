@@ -64,6 +64,10 @@ struct HqFrame
    float aoRadius = 1.0f;
    float aoIntensity = 1.0f;
    bool aoShow = false;
+   // S6: temporal anti-aliasing (Filament's TAA: jittered frames blended
+   // into a history); dt: seconds since the last frame (particle velocity).
+   bool taa = true;
+   float dt = 1.0f / 60.0f;
 };
 
 class HqRenderer

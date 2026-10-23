@@ -1848,6 +1848,9 @@
          ModSlider("intensity", &n->aoIntensity, 0.0f, 1.0f, "%.3f", colW);
          ModCheckbox("show AO only", &n->aoShow);
       }
+      // S6: last, so the controls above keep their ordinals.
+      NodeSeparator("anti-aliasing", colW);
+      ModCheckbox("TAA", &n->taa);
       ImGui::EndGroup();
    }
 

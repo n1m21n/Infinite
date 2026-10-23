@@ -27,6 +27,10 @@ uniform float uIntensity;
 uniform float uPower;
 uniform float uMaxLevel;
 uniform vec2 uFullTexel;        // 1 / frame size
+// S6: with TAA, the slice directions and the first step turn every frame
+// (golden-ratio steps over the spatial 4x4 pattern) so the history averages
+// many more directions than 4 - small objects stop flickering. 0 = static.
+uniform int uNoiseFrame;
 
 // Filament's GtaoOptions defaults.
 const float kSliceCount = 4.0;
@@ -93,6 +97,8 @@ void main()
    float ssRadius = uOrtho == 1 ? uProjectionScale * uRadius : -(uProjectionScale * uRadius / origin.z);
    float noiseDirection = float((((p.x + p.y) & 3) << 2) | (p.x & 3)) * (1.0 / 16.0);
    float initialRayStep = fract(0.25 * float((p.y - p.x) & 3));
+   noiseDirection = fract(noiseDirection + 0.6180340 * float(uNoiseFrame));
+   initialRayStep = fract(initialRayStep + 0.7548777 * float(uNoiseFrame));
    float stepRadius = ssRadius / (kStepsPerSlice + 1.0);
    vec2 texel = 1.0 / vec2(uSize);
 

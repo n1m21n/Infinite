@@ -321,6 +321,38 @@ chão, tonemap desligado): visibilidade ~0,7 no vinco depois do blur (teórico 0
 (+0,5 ms). `HQTEST`: AO ligado × desligado muda a imagem, "só AO" tem pixels ocluídos e abertos,
 0,17 × 0,13 ms a 500×500.
 ## 11. TAA (S6)
+
+Motivo (teste do dono, 2026-10-23): o HQ não tinha antialias nenhum (sem MSAA, sem TAA): bordas
+serrilhadas, imagem "de resolução baixa" no output, e o GTAO de meia resolução piscando em objetos
+pequenos. O TAA é o antialias do HQ (ligado por padrão, parâmetro `taa`).
+
+- **Jitter e vetores de movimento** do kit compartilhado (`Render3DTemporal`: Halton(2,3) ×16,
+  `JitteredProjection`, `MotionVectors`). O pré-passe grava a **velocidade** (attachment 2, RGBA16F,
+  pixels sem jitter, B = 1): malhas pela matriz de modelo e câmera do quadro anterior; esferas pelo
+  centro, com `P − PartVel·dt` (partículas da GPU) e a matriz anterior. O Filament só reprojeta a
+  câmera; aqui objetos e partículas em movimento seguem o próprio movimento (menos ghosting).
+- **Resolve** (`hq_taa.comp.glsl`, porte do `taa.mat` com os padrões do Filament): histórico
+  Catmull-Rom de 5 amostras, reconstrução Lanczos-2 do centro do pixel a partir do 3×3 com jitter
+  (de-ringing), caixa AABB metade cruz de 5 / metade 3×3, clipping preciso (raio contra a caixa) no
+  espaço `c/(1+max(c))`, feedback 0,12. Movimento lido no pixel mais à frente do 3×3 (silhuetas
+  andam com o objeto). A cobertura da geometria acompanha o histórico para o fundo liso
+  (`Render3DPost::FinishTaa`); com HDRI de fundo, `Finish` normal.
+- **GTAO + TAA**: a direção das fatias e o passo inicial giram a cada quadro (razão áurea sobre o
+  padrão 4×4), então o histórico integra muito mais direções; a cadeia de profundidade e o AO usam a
+  projeção com jitter (a mesma da profundidade).
+- **Achado no caminho**: sem TAA, o fundo liso saía com alpha 0 (o alvo era limpo com alpha 0 e o
+  acabamento copia o alpha do fundo). Agora limpa com alpha 1 (fundo opaco, como o Render 3D).
+
+**Medidas** (`HQTEST`): cena parada converge (dois quadros seguidos diferem 0,00012); TAA × sem TAA
+0,00112 (só bordas); depois de um objeto andar 0,08/quadro por 10 quadros e parar, 0,00108 (igual às
+bordas: sem rastro). **Cintilação de objetos pequenos** (10k esferas, AO ligado, órbita lenta, média
+de |f(t+1) − 2f(t) + f(t−1)|): 0,00745 sem TAA → 0,00281 com (2,7× menos). **Custo** na F (1080p,
+só HQ, `perf.ps1` 5 rodadas): 11,68 → 12,42 ms (+0,74 ms). Visual: bordas de esferas e do nó suaves,
+moiré das partículas da cena B bem menor (capturas `build/hq/s6`).
+
+Fica para depois: viés de mip −1 nas texturas com TAA (o Filament usa) e nitidez pós-TAA (RCAS do
+FSR 1, já no kit) se a imagem parecer macia demais; `depthDisocclusion` do Filament só se aparecer
+ghosting em desoclusão.
 ## 12. Pós, presets e parâmetros (S8)
 ## 13. Benchmarks medidos e capturas BEFORE/AFTER (S9)
 ## 14. Licenças
@@ -333,6 +365,7 @@ chão, tonemap desligado): visibilidade ~0,7 no vinco depois do blur (teórico 0
 | `shaders/hq_shadows.glsl` | técnicas de `shaders/src/surface_shadowing.fs` como as notas descrevem (PCF LOW de Castaño, contact shadows); valores de `LightManager.h` `ShadowOptions` |
 | `shaders/hq_ao_depth.comp.glsl` | `filament/src/materials/ssao/mipmapDepth.mat` (sem a grade rotacionada, ver §10) |
 | `shaders/hq_gtao.comp.glsl` | `filament/src/materials/ssao/gtaoImpl.fs`, `gtao.mat`; valores de `Options.h` `AmbientOcclusionOptions` / `Gtao` |
+| `shaders/hq_taa.comp.glsl` | `filament/src/materials/antiAliasing/taa/taa.mat`; valores de `Options.h` `TemporalAntiAliasingOptions`; jitter de `PostProcessManager.cpp` (via o kit da 0.70) |
 | `shaders/hq_ao_blur.comp.glsl`, `ssaoVisibility()` em `hq_lighting.glsl` | `filament/src/materials/ssao/bilateralBlur.mat`; upsample de `shaders/src/surface_ambient_occlusion.fs` |
 
 Também listado em `THIRD_PARTY_NOTICES.md`. Nenhum código do Filament é linkado.

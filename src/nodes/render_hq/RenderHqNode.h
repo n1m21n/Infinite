@@ -48,6 +48,8 @@ public:
       // S5.
       v.Bool("ao", ao); v.Float("aoRadius", aoRadius); v.Float("aoIntensity", aoIntensity);
       v.Bool("aoShow", aoShow);
+      // S6 (Render 3D's key; on by default for the HQ, set in the constructor).
+      v.Bool("taa", taa);
    }
 
    // S5: GTAO on the indirect light, on by default (the finished picture);
@@ -80,4 +82,5 @@ private:
    int mOutW = 0, mOutH = 0;
    int mLastFrame = -1;
    unsigned long long mRevision = 0;
+   double mLastCookSeconds = -1.0; // S6: dt for particle velocity
 };

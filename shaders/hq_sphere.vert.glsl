@@ -11,8 +11,17 @@ layout(location = 0) in vec3 aP;       // P, divisor 1
 layout(location = 1) in float aPScale; // PScale, divisor 1
 layout(location = 2) in vec4 aColor;   // Color, divisor 1
 layout(location = 3) in float aActive; // Active, divisor 1
+layout(location = 4) in vec3 aVel;     // S6: PartVel (units / second; 0 when the PointZ has none), divisor 1
 
 uniform mat4 uViewProj;
+// S6 (prepass velocity): unjittered cameras and last frame's model; the
+// centre last frame is P - PartVel * uVelDt.
+uniform mat4 uCurViewProj;
+uniform mat4 uPrevViewProj;
+uniform mat4 uPrevModel;
+uniform float uVelDt;
+flat out vec4 vCurClip;
+flat out vec4 vPrevClip;
 uniform mat4 uModel;
 uniform vec3 uCamPos;
 uniform float uRadiusScale; // PointBaseSize (x 0.02 without PScale) x the model's scale
@@ -28,6 +37,8 @@ void main()
 {
    vec2 corner = vec2(float(gl_VertexID & 1), float(gl_VertexID >> 1)) * 2.0 - 1.0;
    vec3 c = (uModel * vec4(aP, 1.0)).xyz;
+   vCurClip = uCurViewProj * vec4(c, 1.0);
+   vPrevClip = uPrevViewProj * (uPrevModel * vec4(aP - aVel * uVelDt, 1.0));
    float r = aPScale * uRadiusScale;
    vec3 toC = (uOrtho == 1) ? uViewDir : c - uCamPos;
    float d = length(toC);

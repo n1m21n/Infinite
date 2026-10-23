@@ -5988,6 +5988,7 @@
          RenderHqNode hq;
          for (int s = 0; s < Render3DNode::kSlots; s++)
             hq.geometry[s] = r->geometry[s];
+         hq.taa = false; // the checks below compare single frames; S6's block turns it on
          bool all = true;
          while (glGetError() != GL_NO_ERROR) {}
          auto check = [&](int w, int h) {
@@ -6156,6 +6157,79 @@
             }
          }
 
+         // S6: TAA - a still scene converges (two late frames nearly equal) and
+         // differs from no TAA at the edges; an object that moves fast and stops
+         // leaves no ghost (the history settles to the still picture); cost.
+         if (HqModuleBuilt())
+         {
+            auto* g0 = static_cast<GeometryNode*>(gNodes[0].node.get());
+            auto meanDiff = [](const std::vector<float>& a, const std::vector<float>& b) {
+               if (a.empty() || a.size() != b.size())
+                  return 1.0;
+               double d = 0.0;
+               for (size_t i = 0; i < a.size(); i++)
+                  d += std::fabs(a[i] - b[i]);
+               return d / (double)a.size();
+            };
+            auto frameOf = [&]() { return read(hq.GetOutputTexture(), hq.GetOutputWidth(), hq.GetOutputHeight()); };
+            hq.ao = false; // AO noise turns under TAA: keep this about the edges
+            hq.taa = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> plain = frameOf();
+            hq.taa = true;
+            for (int k = 0; k < 32; k++)
+               hq.CookIfNeeded(++frame);
+            const std::vector<float> settledA = frameOf();
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> settledB = frameOf();
+            const double still = meanDiff(settledA, settledB), edges = meanDiff(settledA, plain);
+            // Fast motion, then 40 still frames.
+            const float savedX = g0->posX;
+            for (int k = 0; k < 10; k++)
+            {
+               g0->posX += 0.08f;
+               hq.CookIfNeeded(++frame);
+            }
+            for (int k = 0; k < 40; k++)
+               hq.CookIfNeeded(++frame);
+            const std::vector<float> after = frameOf();
+            hq.taa = false;
+            hq.CookIfNeeded(++frame);
+            const std::vector<float> afterPlain = frameOf();
+            const double ghost = meanDiff(after, afterPlain);
+            g0->posX = savedX;
+            // Cost per frame, TAA on vs off (glFinish: test only).
+            auto timeIt = [&](bool on) {
+               hq.taa = on;
+               hq.CookIfNeeded(++frame);
+               glFinish();
+               const auto t0 = std::chrono::steady_clock::now();
+               for (int k = 0; k < 20; k++)
+                  hq.CookIfNeeded(++frame);
+               glFinish();
+               return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 20.0;
+            };
+            const double msOff = timeIt(false), msOn = timeIt(true);
+            hq.ao = true;
+            const GLenum err = glGetError();
+            bool finite = !after.empty();
+            for (size_t i = 0; finite && i < after.size(); i++)
+               finite = std::isfinite(after[i]) && std::isfinite(settledA[i]);
+            const bool ok = finite && err == GL_NO_ERROR && still < 0.004 && edges > 1e-4 &&
+                            ghost < std::max(1.5 * edges, 0.0015);
+            printf("  TAA: still %.5f, vs no TAA %.5f, after fast motion %.5f, %.2f ms vs %.2f off, finite %d, "
+                   "gl 0x%x  %s\n", still, edges, ghost, msOn, msOff, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
+            all = all && ok;
+            if (const char* png = getenv("INFINITE_HQTEST_PNGTAA")) // eyeball it (bottom-up rows)
+            {
+               std::vector<unsigned char> rgba(settledA.size());
+               for (size_t k = 0; k < settledA.size(); k++)
+                  rgba[k] = (unsigned char)std::clamp(settledA[k] * 255.0f + 0.5f, 0.0f, 255.0f);
+               if (!rgba.empty())
+                  stbi_write_png(png, hq.GetOutputWidth(), hq.GetOutputHeight(), 4, rgba.data(), hq.GetOutputWidth() * 4);
+            }
+         }
+
          // S3: PointZ points as sphere impostors and PointZ triangles straight
          // from the GPU; then 30 frames with the camera orbiting and an object
          // moving (the picture follows, stays finite; GPU time per frame).
@@ -6232,6 +6306,39 @@
             printf("  orbit + moving object, 30 frames: diff %.4f, %.2f ms/frame (CPU+GPU), finite %d, gl 0x%x  %s\n",
                    moved, ms, finite ? 1 : 0, err, ok ? "ok" : "FAIL");
             all = all && ok;
+            // S6: flicker of small objects (10k spheres, GTAO on) under a slow
+            // orbit - the mean second difference in time |f(t+1) - 2 f(t) + f(t-1)|
+            // is low for smooth motion, high for shimmer. TAA must cut it.
+            {
+               auto flicker = [&](bool taaOn) {
+                  ph.taa = taaOn;
+                  ph.ao = true;
+                  std::vector<std::vector<float>> frames;
+                  for (int k = 0; k < 24; k++)
+                  {
+                     ph.camAzimuth += 0.25f;
+                     ph.CookIfNeeded(++frame);
+                     if (k >= 18)
+                        frames.push_back(read(ph.GetOutputTexture(), ph.GetOutputWidth(), ph.GetOutputHeight()));
+                  }
+                  double sum = 0.0;
+                  size_t n = 0;
+                  for (size_t t = 1; t + 1 < frames.size(); t++)
+                     for (size_t i = 0; i < frames[t].size(); i++)
+                        if (i % 4 != 3)
+                        {
+                           sum += std::fabs(frames[t + 1][i] - 2.0f * frames[t][i] + frames[t - 1][i]);
+                           n++;
+                        }
+                  return n ? sum / (double)n : 1.0;
+               };
+               const double off = flicker(false), on = flicker(true);
+               err = glGetError();
+               ok = err == GL_NO_ERROR && on < off;
+               printf("  small-object flicker (10k spheres, AO, slow orbit): %.5f without TAA, %.5f with  %s\n", off, on,
+                      ok ? "ok" : "FAIL");
+               all = all && ok;
+            }
             if (const char* png = getenv("INFINITE_HQTEST_PNG3")) // eyeball the spheres (bottom-up rows)
             {
                std::vector<unsigned char> rgba(last.size());

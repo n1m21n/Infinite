@@ -12,8 +12,11 @@ in vec3 vWorldPos;
 flat in vec3 vCentre;
 flat in float vRadius;
 flat in vec4 vColor;
+flat in vec4 vCurClip;
+flat in vec4 vPrevClip;
 
 uniform mat4 uView;
+uniform vec2 uFrameSize;
 uniform int uOrtho;
 uniform vec3 uViewDir;
 uniform int uPrepass;
@@ -22,6 +25,7 @@ uniform int uEarlyDepth; // shading pass: the prepass depth is in uSceneDepth
 layout(depth_greater) out float gl_FragDepth;
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outNormal;
+layout(location = 2) out vec4 outVelocity; // S6: prepass, as hq_prepass.frag (the centre's motion)
 
 //@include hq_common.glsl
 //@include hq_brdf.glsl
@@ -51,6 +55,9 @@ void main()
       if (!hit)
          discard;
       outNormal = vec4(normalize(mat3(uView) * n), uRoughness);
+      vec2 v = vPrevClip.w > 1e-6 ? (vCurClip.xy / vCurClip.w - vPrevClip.xy / vPrevClip.w) * 0.5 * uFrameSize
+                                  : vec2(0.0);
+      outVelocity = vec4(v, 1.0, 0.0);
       return;
    }
 

@@ -24,6 +24,8 @@ RenderHqNode::RenderHqNode()
    shadowsEnabled = true;
    shadowQuality = 1;
    shadowSoftness = 0.0f;
+   // S6: TAA on (the HQ has no MSAA: the TAA is its anti-aliasing).
+   taa = true;
 }
 
 RenderHqNode::~RenderHqNode() = default;
@@ -158,6 +160,11 @@ void RenderHqNode::CookIfNeeded(int frameId)
    f.aoRadius = std::max(0.001f, aoRadius);
    f.aoIntensity = std::max(0.0f, aoIntensity);
    f.aoShow = aoShow;
+   f.taa = taa;
+   // Seconds since the last frame, for particle velocity (PartVel x dt).
+   const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+   f.dt = mLastCookSeconds < 0.0 ? 1.0f / 60.0f : (float)std::clamp(now - mLastCookSeconds, 0.0, 0.1);
+   mLastCookSeconds = now;
 
    mOut = mRenderer->Render(f);
    mOutW = f.width;
