@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -272,6 +273,12 @@ public:
       v.Bool("monitor", monitor); v.Float("volume", volume); v.Float("gain", gain);
       v.Float("attack", attack); v.Float("release", release);
       v.Float("pitch", pitch);
+      // A patch, OSC or RPC set stores any finite float; hold these to the knob
+      // ranges (B-K-036: volume 1e9 played ~5e8 loud, pitch 1e9 made the read
+      // position NaN).
+      volume = std::clamp(volume, 0.0f, 1.0f);
+      gain = std::clamp(gain, 0.1f, 16.0f);
+      pitch = std::clamp(pitch, -24.0f, 24.0f);
    }
 
    // Reloads from whatever path a patch restored. Called after loading.

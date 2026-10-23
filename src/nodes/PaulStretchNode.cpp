@@ -692,6 +692,13 @@ void PaulStretchNode::VisitParams(ParamVisitor& v)
    v.Float("end", end);
    v.Float("position", position);
    v.Bool("loop", loop);
+   // A patch, OSC or RPC set stores any finite float; hold these to the knob
+   // ranges (B-K-036: volume 1e9 played ~5e8 loud, pitch or speed 1e9 overflowed
+   // the read position).
+   volume = std::clamp(volume, 0.0f, 2.0f);
+   pitchShift = std::clamp(pitchShift, -24.0f, 24.0f);
+   fineTune = std::clamp(fineTune, -100.0f, 100.0f);
+   freqShift = std::clamp(freqShift, -1000.0f, 1000.0f);
    v.Int("rateFix", rateFix); // not a control: 0 = plays the file at the device rate (saved before the fix)
 }
 

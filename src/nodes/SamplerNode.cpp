@@ -718,6 +718,13 @@ void SamplerNode::VisitParams(ParamVisitor& v)
    v.Bool("loop", loop);
    v.Int("rateFix", rateFix); // not a control: 0 = plays the file at the device rate (saved before the fix)
    v.Bool("reverse", reverse);
+   // A patch, OSC or RPC set stores any finite float; hold these to the knob
+   // ranges (B-K-036: volume 1e9 played ~5e8 loud, pitch or speed 1e9 overflowed
+   // the read position).
+   pitch = std::clamp(pitch, -24.0f, 24.0f);
+   finetune = std::clamp(finetune, -50.0f, 50.0f);
+   speed = std::clamp(speed, -2.0f, 2.0f);
+   volume = std::clamp(volume, 0.0f, 1.0f);
    v.Bool("pingpong", pingpong);
 }
 
