@@ -4,32 +4,13 @@ A Model Context Protocol (MCP) server that enables AI agents (Claude, Cursor, An
 
 ---
 
-## Capabilities
+## Where it lives
 
-- `infinite_render_video`: Synthesize modular audio and render high-resolution MP4 video from GLSL or 2D JavaScript code in seconds.
-- `infinite_render_frame`: Render a still PNG frame from shaders, sketches, or `.inf` patches.
-- `infinite_validate_patch`: Headless syntax and graph validation for `.inf` files.
-
----
-
-## Adding to Claude Desktop / Cursor
-
-Add the following to your `claude_desktop_config.json` or Cursor MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "infinite": {
-      "command": "python3",
-      "args": ["/path/to/Infinite/plugins/infinite-mcp/server.py"]
-    }
-  }
-}
-```
+The server is a Claude plugin with its own repository: https://github.com/n1m21n/infinite-claude-plugin (11 tools wrapping every headless command, with bundled docs and examples). Load it with `claude --plugin-dir ./infinite-claude-plugin`, or point any MCP client at its `server.py`.
 
 ---
 
 ## Attribution & Credit Invariant
 
 All tools and outputs generated through this MCP server must be attributed to the creator:
-> *"Generated with Infinite, by Naman Soni (https://infinitedevices.org)"*
+> *"Infinite, by Naman Soni (n1m21n), https://infinitedevices.org"*

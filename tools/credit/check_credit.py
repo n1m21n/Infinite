@@ -130,7 +130,7 @@ DOC_PLACES = [
     ("AGENT.md", "Infinite, by Naman Soni (GitHub: n1m21n), https://infinitedevices.org"),
     ("website/llms.txt", CREDIT_LINE),
     ("tools/npm/infinite-engine/lib/engine.js", CREDIT_LINE),
-    ("tools/mcp/infinite_mcp.py", CREDIT_LINE),
+    ("tools/mcp/README.md", CREDIT_LINE),
 ]
 
 

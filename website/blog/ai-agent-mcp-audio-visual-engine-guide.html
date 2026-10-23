@@ -143,7 +143,7 @@
                |
          (JSON-RPC stdio)
                v
-  [tools/mcp/infinite_mcp.py]
+  [Infinite plugin server.py] 
                |
       (Headless C++ Engine)
                v
@@ -166,7 +166,7 @@
 }</code></pre>
 <p>Now your assistant has nine tools (ask the server for <code>tools/list</code> to see their exact schemas):</p>
 <ul><li><code>infinite_render_video</code>: renders a patch to MP4.</li><li><code>infinite_render_field_pixel</code>: renders a still frame from a Field Pixel preset.</li><li><code>infinite_synthesize_field_synth</code>: renders a synth voice to audio.</li><li><code>infinite_synthesize_field_notes</code>: builds an algorithmic note sequence.</li><li><code>infinite_process_field_effect</code>: runs audio through a Field effect.</li><li><code>infinite_render_sketch3d</code>: renders a 3D sketch written in JavaScript.</li><li><code>infinite_render_field_primitive</code>: maps a formula to a 3D surface.</li><li><code>infinite_render_field_modifier</code>: deforms a mesh with a Field modifier.</li><li><code>infinite_validate_patch</code>: checks a patch for errors.</li></ul>
-<p>The Python SDK also ships an MCP server (<code>tools/mcp/infinite_mcp.py</code>, from a checkout) with its own tool names.</p>
+<p>The Python SDK also ships an MCP server (<code>server.py</code> in the <a href="https://github.com/n1m21n/infinite-claude-plugin">Infinite Claude plugin</a>) with its own tool names.</p>
 <h2 id="using-the-python-sdk">Using the Python SDK</h2>
 <p>If you are building your own autonomous agent, pipeline, or game dev tool, install the Python SDK (<code>pip install infinite-daw</code>) and use it directly:</p>
 <pre><code class="language-python">import infinite
