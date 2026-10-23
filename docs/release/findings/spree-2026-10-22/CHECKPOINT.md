@@ -6,13 +6,16 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
 
 ## Where things stand
 
-- **Findings:** 46 filed (B-A-001 … B-K-028). Every one is fixed except three:
+- **Findings:** 48 filed (B-A-001 … B-K-030). Every one is fixed except three:
   - B-G-001 and B-H-001: P3, need a quiet-Mac re-run.
   - B-J-001: the Windows headless hang, P5.
 - **New on 2026-10-23** (all merged to main):
   - **B-K-025:** reloading a Molder patch re-rolled its seed and generation, so a saved patch never came back the same. This was the "Molder not reproducible" lead.
   - **B-K-026:** patch values past int range (±1e30, inf, 3e9) hit float-to-int UB in 30+ nodes. Now the patch reader drops floats past ±2³¹ and saturates ints. Unsigned seed casts and sample-count products are saturated where they're cast (Simulation, FieldRandom, NoteNodes, GeometryTable).
   - **B-K-027:** Palette seeds of 2 and up all mapped to the same RNG seed, so every seed gave the same palette.
+  - **B-K-029:** a Molder patch with generation 2^31 froze the UI for about 7 minutes on load and on every re-render. The generation is now capped at 10000.
+  - **B-K-030:** Note Echo with more than 15 repeats, from a file or remote set, left notes stuck because voices shared repeat ids. Repeats and transpose are now clamped to the knob ranges.
+  - Both were found by auditing int params whose UI range the node never enforces. The int sweep passed both nodes because it gives them no file and no notes, so the loops never ran. The next step for the kit is a stimulus per kind.
   - **B-K-028:** a NaN phase in Wavetable/Wavetable Shaper was UB, `(int)NaN`. This was found by DSPTEST under ASan.
 - **Since the 2026-10-22 morning checkpoint:**
   - **B-K-020:** a damaged WAV/AIFF/W64 chunk size hung the decode.
@@ -43,7 +46,7 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
 2. `param_fuzz.py --kind text` and `--kind mod` over every type, on the ASan+UBSan build.
 3. The signal sweep again, on the ASan+UBSan build. The earlier sweep missed B-K-028.
 4. A coverage report from the fixed coverage build. Wipe the stale `$SP/prof` first.
-5. Re-time Join Geometry, Difference, Intersect, Revolve 100000 and Remove Background alone on a release build, to confirm they are slow and not hangs.
+5. Re-time Join Geometry, Difference, Intersect, Distribute Points on Faces (density 1e9 gives the full 200k-point cap; it timed out under ASan), Revolve 100000 and Remove Background alone on a release build, to confirm they are slow and not hangs.
 
 ## Leads, not yet filed
 
