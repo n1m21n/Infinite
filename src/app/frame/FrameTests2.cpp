@@ -3736,6 +3736,24 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
       gArrangeAssigningClipId = cid;
       check(Arrange::LaneOfClip(gArrange, gArrangeAssigningClipId) != nullptr, "assigning id resolves for a slot clip");
       gArrangeAssigningClipId = 0;
+      // Destructive actions with the clip selected, the inspector showing it and its menu context set.
+      const Arrange::Lane* a1 = Arrange::FindLane(gArrange, laneA1);
+      const uint64_t kick = a1->slots[0].clip.id;
+      gArrangeSel = { kick };
+      gArrangeCtxClipId = kick;
+      gArrangeClipSettingsPanelOpen = true;
+      gArrangeSettingsPanelTarget = kick;
+      const size_t tlBefore = a1->clips.size();
+      ArrangeSessionRunActionForTest(0, laneA1, 0);
+      check(Arrange::FindLane(gArrange, laneA1)->clips.size() > tlBefore, "Place on Timeline writes a clip to the arrangement");
+      ArrangeSessionRunActionForTest(1, laneA1, 0);
+      check(Arrange::FindClip(gArrange, kick) != nullptr, "Duplicate keeps the original selected clip");
+      ArrangeSessionRunActionForTest(2, laneA1, 0);
+      check(Arrange::FindClip(gArrange, kick) == nullptr && gArrangeSel.empty(), "Clear Slot removes the clip and the selection");
+      ArrangeSessionRunActionForTest(2, laneA1, 0);
+      ArrangeSessionRunActionForTest(1, laneA1, 99);
+      check(Arrange::FindLane(gArrange, laneA1)->slots.size() >= 1, "actions on a cleared or missing slot are no-ops");
+      check(Arrange::Validate(gArrange, nullptr), "arrangement still validates");
    }
    if (frameId == 20)
    {

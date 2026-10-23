@@ -699,8 +699,11 @@ namespace app
 
       // Keyboard focus claim
       if (overPanel && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
+      {
          gArrangeClaimedKeys = true;
-      gArrangeFocused = gArrangeClaimedKeys;
+         gSessionClaimedKeys = false;
+      }
+      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys;
 
       Transport& tr = Transport::Instance();
 
@@ -743,7 +746,7 @@ namespace app
       // the clip. Suppressing every single-key shortcut while the pointer is
       // over a field is deliberate: the pointer being there is exactly the
       // statement that the next keystroke is a value, not a command.
-      if (gArrangeFocused && !ImGui::GetIO().WantTextInput && !ArrangeFieldHot() &&
+      if (gArrangeClaimedKeys && !ImGui::GetIO().WantTextInput && !ArrangeFieldHot() &&
           !scrubEscaped && !ArrangeRenderBusy() &&
           gArrangeDrag.mode == kArrangeDragNone && !gArrangeGestureOpen && !gArrangeScrubbing &&
           gArrangeMarkerDragId == 0)

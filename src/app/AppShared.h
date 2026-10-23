@@ -901,6 +901,7 @@ extern uint64_t gArrangeFlashClipId;
 extern double   gArrangeFlashStart;
 
 extern bool  gArrangeClaimedKeys;
+extern bool  gSessionClaimedKeys;
 
 extern bool  gArrangeFocused;
 
@@ -4994,6 +4995,7 @@ bool ArrangeAudioRebuildIfStale();
    void DrawArrangeSessionSlotMenuItems(uint64_t clipId);
    // Applies the slot action a menu row queued; call after the clip menu has ended.
    void ArrangeSessionApplyMenuAction();
+void ArrangeSessionRunActionForTest(int kind, uint64_t laneId, int row);
 
 bool StartAudioEngine(std::string& outError);
 

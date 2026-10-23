@@ -1565,3 +1565,4 @@ Show the video the launched clips produce.	起動したクリップが生成す�
 Session - launch clips by scene	セッション - シーン単位でクリップを起動
 Select one clip on this kind of track first.	まずこの種類のトラック上のクリップを1つ選択してください。
 Click a node on the canvas to assign it. Esc cancels.	キャンバス上のノードをクリックして割り当てます。Escでキャンセル。
+Settings of the selected clip. Double-click a clip to open it.	選択したクリップの設定。クリップをダブルクリックで開きます。

@@ -124,8 +124,13 @@ void DrawLayout(FrameCtx& fc)
             (m.x >= gPerfPanelRectMin.x && m.x <= gPerfPanelRectMax.x &&
              m.y >= gPerfPanelRectMin.y && m.y <= gPerfPanelRectMax.y);
 
+         const bool inSession = gSessionPanelOpen &&
+            (m.x >= gSessionPanelRectMin.x && m.x <= gSessionPanelRectMax.x &&
+             m.y >= gSessionPanelRectMin.y && m.y <= gSessionPanelRectMax.y);
+
          gArrangeClaimedKeys = inArrange;
-         gArrangeFocused = inArrange;
+         gSessionClaimedKeys = inSession;
+         gArrangeFocused = inArrange || inSession;
 
          gPerfMatrixClaimedKeys = inPerf;
          gPerfMatrixFocused = inPerf && gPerfEditMode;
@@ -133,14 +138,10 @@ void DrawLayout(FrameCtx& fc)
       else
       {
          if (!gArrangePanelOpen)
-         {
             gArrangeClaimedKeys = false;
-            gArrangeFocused = false;
-         }
-         else
-         {
-            gArrangeFocused = gArrangeClaimedKeys;
-         }
+         if (!gSessionPanelOpen)
+            gSessionClaimedKeys = false;
+         gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys;
 
          if (!gPerfPanelOpen)
          {

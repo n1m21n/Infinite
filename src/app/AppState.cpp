@@ -581,6 +581,8 @@ bool gHeadlessNeedProbe = false;
 
    bool  gArrangeClaimedKeys = false;
 
+   bool  gSessionClaimedKeys = false;
+
    bool  gArrangeFocused = false;
 
    AudioMode gAudioMode = AudioMode::Canvas;

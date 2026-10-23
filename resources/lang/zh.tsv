@@ -1565,3 +1565,4 @@ Show the video the launched clips produce.	显示已启动片段生成的视频�
 Session - launch clips by scene	会话——按场景启动片段
 Select one clip on this kind of track first.	请先选择此类轨道上的一个片段。
 Click a node on the canvas to assign it. Esc cancels.	点击画布上的节点进行指定。按 Esc 取消。
+Settings of the selected clip. Double-click a clip to open it.	所选片段的设置。双击片段即可打开。

@@ -326,14 +326,10 @@ void DrawKeyboard(FrameCtx& fc)
       // keyboard focus, keystrokes (Delete, Backspace, Cmd+C, Cmd+V, Cmd+D)
       // belong strictly to the timeline clips, not the graph canvas.
       if (!gArrangePanelOpen)
-      {
          gArrangeClaimedKeys = false;
-         gArrangeFocused = false;
-      }
-      else
-      {
-         gArrangeFocused = gArrangeClaimedKeys;
-      }
+      if (!gSessionPanelOpen)
+         gSessionClaimedKeys = false;
+      gArrangeFocused = gArrangeClaimedKeys || gSessionClaimedKeys;
 
       bool doDelete = gRequestDelete ||
          (!typing && !gPerfMatrixFocused && !gArrangeFocused && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||

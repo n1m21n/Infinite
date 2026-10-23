@@ -43,6 +43,13 @@ namespace app
          { I18N_KEY("1 Bar"), 1.0 }, { I18N_KEY("2 Bars"), 2.0 }, { I18N_KEY("4 Bars"), 4.0 }, { I18N_KEY("8 Bars"), 8.0 }
       };
 
+      // The keyboard cursor: the last cell clicked or arrowed to (an empty cell has no clip id to select).
+      uint64_t sCurLaneId = 0;
+      int sCurRow = -1;
+      // Copy / cut buffer for slots (a slot keeps its launch settings; the lane type gates where it can land).
+      struct SlotClipboard { bool has = false; int laneType = 0; Arrange::SessionSlot slot; };
+      SlotClipboard sSlotClip;
+
       uint64_t sCtxLaneId = 0;
       int sCtxRow = -1;
       bool sClipCtxRequest = false;
@@ -611,7 +618,23 @@ namespace app
                ArrangeSessionRelease(laneId, row);
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
             {
-               if (ss != nullptr)
+               sCurLaneId = laneId;
+               sCurRow = row;
+               // Clicking anywhere but the clip waiting for a node abandons the assign.
+               if (gArrangeAssigningClipId != 0 && (ss == nullptr || ss->clip.id != gArrangeAssigningClipId))
+               {
+                  gArrangeAssigningClipId = 0;
+                  gArrangeAssignTargetIds.clear();
+               }
+               if (ss != nullptr && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+               {
+                  // Double-click opens (or closes) the inspector on this clip, as in the Timeline.
+                  gArrangeSelAnchor = ss->clip.id;
+                  gArrangeSel = { ss->clip.id };
+                  gArrangeSettingsPanelTarget = ss->clip.id;
+                  gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
+               }
+               else if (ss != nullptr)
                {
                   ArrangeSessionLaunch(laneId, row);
                   gArrangeSel = { ss->clip.id };
@@ -622,6 +645,8 @@ namespace app
             }
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
             {
+               sCurLaneId = laneId;
+               sCurRow = row;
                sCtxLaneId = laneId;
                sCtxRow = row;
                if (ss != nullptr)
@@ -708,6 +733,41 @@ namespace app
                   dl->AddLine(ImVec2(pc.x, pc.y - 6.0f), ImVec2(pc.x, pc.y + 6.0f), pcol, 1.5f);
                   HelpTip("%s", isVideo ? T("Click to add a clip. You can also drop a video or image file here.")
                                         : T("Click to add a clip. You can also drop an audio file here."));
+               }
+            }
+
+            // The keyboard cursor / selected clip.
+            if ((ss != nullptr && gArrangeSel.count(ss->clip.id) != 0) || (laneId == sCurLaneId && row == sCurRow))
+               dl->AddRect(ImVec2(a.x - 1.0f, a.y - 1.0f), ImVec2(b.x + 1.0f, b.y + 1.0f),
+                           WithAlpha(TextCol(1.0f), gSessionClaimedKeys ? 0.9f : 0.45f), tok::radius_field, 0, 1.5f);
+            if (ss != nullptr && gArrangeRenamingClipId == ss->clip.id)
+            {
+               static uint64_t sRenameFocusedId = 0;
+               ImGui::SetCursorScreenPos(ImVec2(a.x + 22.0f, a.y + 3.0f));
+               ImGui::SetNextItemWidth(std::max(20.0f, b.x - a.x - 28.0f));
+               if (sRenameFocusedId != ss->clip.id)
+               {
+                  ImGui::SetKeyboardFocusHere();
+                  sRenameFocusedId = ss->clip.id;
+               }
+               const bool commit = FieldWell::InputText("##renamingslot", gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer),
+                                                        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               if (commit || ImGui::IsItemDeactivated())
+               {
+                  const std::string newName = gArrangeRenameClipBuffer;
+                  const uint64_t rid = ss->clip.id;
+                  if (!ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+                     ArrangeEdit([&]() {
+                        if (Arrange::Clip* c = Arrange::FindClip(gArrange, rid))
+                           if (c->name != newName)
+                           {
+                              c->name = newName;
+                              gArrange.revision++;
+                           }
+                     });
+                  gArrangeRenamingClipId = 0;
+                  gArrangeRenameTargetIds.clear();
+                  sRenameFocusedId = 0;
                }
             }
 
@@ -863,6 +923,13 @@ namespace app
       }
    }
 
+   // Test hook: 0 = Place on Timeline, 1 = Duplicate, 2 = Clear, queued and applied exactly as the menu does it.
+   void ArrangeSessionRunActionForTest(int kind, uint64_t laneId, int row)
+   {
+      sMenuAction = { kind == 0 ? MenuAction::PlaceOnTimeline : (kind == 1 ? MenuAction::Duplicate : MenuAction::Clear), laneId, row };
+      ArrangeSessionApplyMenuAction();
+   }
+
    // The rows only a session slot has, appended to the shared clip menu.
    void DrawArrangeSessionSlotMenuItems(uint64_t clipId)
    {
@@ -999,8 +1066,165 @@ namespace app
          ImGui::EndChild();
       }
 
+      // ---- keyboard: the Session panel's shortcuts, live only while it owns the keys (a click inside it claims
+      // them; a click in the Timeline or on the canvas releases them). Every destructive one goes through the same
+      // queued action the menus use, so a menu or inspector showing the clip never holds a stale pointer.
+      void SessionCursorFromSelection()
+      {
+         const uint64_t sid = ArrangeSelectedSlotId();
+         if (sid == 0)
+            return;
+         const Arrange::Loc loc = Arrange::FindSlot(gArrange, sid);
+         if (loc.lane >= 0 && loc.slot >= 0)
+         {
+            sCurLaneId = gArrange.lanes[(size_t)loc.lane].id;
+            sCurRow = loc.slot;
+         }
+      }
+
+      void SelectCursorCell()
+      {
+         const Arrange::Lane* l = Arrange::FindLane(gArrange, sCurLaneId);
+         const Arrange::SessionSlot* ss = l != nullptr ? SlotOf(*l, sCurRow) : nullptr;
+         gArrangeSel.clear();
+         if (ss != nullptr)
+         {
+            gArrangeSel = { ss->clip.id };
+            gArrangeSelAnchor = ss->clip.id;
+         }
+      }
+
+      void HandleSessionKeys()
+      {
+         const ImGuiIO& io = ImGui::GetIO();
+         if (!gSessionClaimedKeys || io.WantTextInput || ArrangeFieldHot() || ArrangeRenderBusy() || gArrangeRenamingClipId != 0 ||
+             gArrangeGestureOpen || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+            return;
+         if (gArrange.lanes.empty())
+            return;
+         const bool cmd = io.KeySuper || io.KeyCtrl;
+         auto pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, false); };
+         SessionCursorFromSelection();
+         int laneIdx = -1;
+         for (size_t i = 0; i < gArrange.lanes.size(); i++)
+            if (gArrange.lanes[i].id == sCurLaneId)
+               laneIdx = (int)i;
+         if (laneIdx < 0)
+         {
+            laneIdx = 0;
+            sCurLaneId = gArrange.lanes[0].id;
+            if (sCurRow < 0)
+               sCurRow = 0;
+         }
+         const int maxRow = std::max(kMinRows, (int)gArrange.scenes.size()) - 1;
+         sCurRow = std::clamp(sCurRow, 0, maxRow);
+         const Arrange::Lane& lane = gArrange.lanes[(size_t)laneIdx];
+         const Arrange::SessionSlot* ss = SlotOf(lane, sCurRow);
+
+         if (!cmd && !io.KeyAlt && (pressed(ImGuiKey_LeftArrow) || pressed(ImGuiKey_RightArrow) ||
+                                    pressed(ImGuiKey_UpArrow) || pressed(ImGuiKey_DownArrow)))
+         {
+            const int dx = (pressed(ImGuiKey_RightArrow) ? 1 : 0) - (pressed(ImGuiKey_LeftArrow) ? 1 : 0);
+            const int dy = (pressed(ImGuiKey_DownArrow) ? 1 : 0) - (pressed(ImGuiKey_UpArrow) ? 1 : 0);
+            const int nl = std::clamp(laneIdx + dx, 0, (int)gArrange.lanes.size() - 1);
+            sCurLaneId = gArrange.lanes[(size_t)nl].id;
+            sCurRow = std::clamp(sCurRow + dy, 0, maxRow);
+            SelectCursorCell();
+         }
+         else if (!cmd && !io.KeyAlt && (pressed(ImGuiKey_Enter) || pressed(ImGuiKey_KeypadEnter)))
+         {
+            if (io.KeyShift)
+               ArrangeSessionLaunchScene(sCurRow);
+            else if (ss != nullptr)
+               ArrangeSessionLaunch(sCurLaneId, sCurRow);
+            else
+               AddSlotClip(sCurLaneId, sCurRow);
+         }
+         else if (cmd && pressed(ImGuiKey_C) && ss != nullptr)
+         {
+            sSlotClip = { true, lane.type, *ss };
+         }
+         else if (cmd && pressed(ImGuiKey_X) && ss != nullptr)
+         {
+            sSlotClip = { true, lane.type, *ss };
+            sMenuAction = { MenuAction::Clear, sCurLaneId, sCurRow };
+            ArrangeSessionApplyMenuAction();
+         }
+         else if (cmd && pressed(ImGuiKey_V) && sSlotClip.has && sSlotClip.laneType == lane.type)
+         {
+            const uint64_t laneId = sCurLaneId;
+            const int row = sCurRow;
+            Arrange::SessionSlot copy = sSlotClip.slot;
+            uint64_t made = 0;
+            ArrangeEdit([&]() {
+               if (Arrange::Lane* l = Arrange::FindLane(gArrange, laneId))
+               {
+                  EnsureRow(*l, row);
+                  copy.clip.id = made = gArrange.NewId();
+                  l->slots[(size_t)row] = copy;
+                  gArrange.revision++;
+               }
+            });
+            if (made != 0)
+            {
+               gArrangeSel = { made };
+               gArrangeSelAnchor = made;
+            }
+         }
+         else if (cmd && pressed(ImGuiKey_D) && ss != nullptr)
+         {
+            sMenuAction = { MenuAction::Duplicate, sCurLaneId, sCurRow };
+            ArrangeSessionApplyMenuAction();
+         }
+         else if (!cmd && (pressed(ImGuiKey_Delete) || pressed(ImGuiKey_Backspace)) && ss != nullptr)
+         {
+            sMenuAction = { MenuAction::Clear, sCurLaneId, sCurRow };
+            ArrangeSessionApplyMenuAction();
+         }
+         else if (cmd && !io.KeyShift && pressed(ImGuiKey_R) && ss != nullptr)
+         {
+            gArrangeRenamingClipId = ss->clip.id;
+            gArrangeRenameTargetIds.clear();
+            snprintf(gArrangeRenameClipBuffer, sizeof(gArrangeRenameClipBuffer), "%s", SlotLabel(ss->clip).c_str());
+         }
+         else if (!cmd && !io.KeyShift && !io.KeyAlt && (pressed(ImGuiKey_0) || pressed(ImGuiKey_Keypad0)) && ss != nullptr)
+         {
+            const uint64_t cid = ss->clip.id;
+            ArrangeEdit([&]() {
+               if (Arrange::Clip* c = Arrange::FindClip(gArrange, cid))
+               {
+                  c->enabled = !c->enabled;
+                  gArrange.revision++;
+               }
+            });
+         }
+         else if (cmd && io.KeyShift && pressed(ImGuiKey_I))
+         {
+            ArrangeEdit([&]() {
+               gArrange.scenes.push_back(Arrange::Scene{});
+               gArrange.revision++;
+            });
+         }
+         else if (cmd && pressed(ImGuiKey_Period))
+            ArrangeSessionStopAll();
+         else if (!cmd && pressed(ImGuiKey_Escape))
+         {
+            if (gArrangeAssigningClipId != 0)
+            {
+               gArrangeAssigningClipId = 0;
+               gArrangeAssignTargetIds.clear();
+            }
+            else
+            {
+               gArrangeSel.clear();
+               sCurRow = -1;
+            }
+         }
+      }
+
       void DrawSessionPanelContent()
       {
+         HandleSessionKeys();
          ArrangePruneSelection();
          ArrangePollMediaImports();
          const ImVec2 panelSize = ImGui::GetContentRegionAvail();
@@ -1014,6 +1238,11 @@ namespace app
             sSessionShowMonitor = !sSessionShowMonitor;
          if (ImGui::IsItemHovered())
             HelpTip("%s", T("Show the video the launched clips produce."));
+         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + tok::space_1, ImGui::GetItemRectMin().y));
+         if (ChipButton::Draw(gArrangeClipSettingsPanelOpen ? "Inspector##sessinsp" : "Inspector Off##sessinsp", gArrangeClipSettingsPanelOpen, tok::tile))
+            gArrangeClipSettingsPanelOpen = !gArrangeClipSettingsPanelOpen;
+         if (ImGui::IsItemHovered())
+            HelpTip("%s", T("Settings of the selected clip. Double-click a clip to open it."));
          const float toolbarBottom = ImGui::GetItemRectMax().y;
          {
             const ImVec2 m = ImGui::GetIO().MousePos;
