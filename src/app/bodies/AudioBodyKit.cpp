@@ -786,7 +786,7 @@ namespace app
 
    float AudioNodeWidth(INode* node)
    {
-      if (dynamic_cast<MpcNode*>(node) != nullptr)
+      if (dynamic_cast<MpcNode*>(node) != nullptr || dynamic_cast<VmpcNode*>(node) != nullptr)
          return MpcNodeWidth();
       if (auto* mixer = dynamic_cast<MixerNode*>(node))
          return std::max(280.0f, (float)mixer->numChannels * 80.0f);

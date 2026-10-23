@@ -3695,6 +3695,10 @@ void MpcDropFiles(MpcNode* n, float cx, float cy, const std::vector<std::string>
 
 void DrawMpcBody(GraphNode& gn, MpcNode* n);
 
+void VmpcDropFiles(VmpcNode* n, float cx, float cy, const std::vector<std::string>& paths);
+
+void DrawVmpcBody(GraphNode& gn, VmpcNode* n);
+
 const std::vector<std::string>& MediaTypeFilterNames();
 
 // `dirKey` (a SampleScanner::PathKey) limits the result to files inside that folder: its own files only, or
@@ -5744,6 +5748,7 @@ bool SavePatchWithMediaTo(const std::string& path, std::string& report);
 void SavePatchWithMediaInteractive();
 bool RunSaveWithMediaTest();
 bool RunFormulaShadertoyTest();
+bool RunVmpcTest();
 bool RunBlockSetTest();
 extern bool gShowSaveMediaModal;
 

@@ -1713,6 +1713,8 @@ namespace app
          drum->ReloadFromPaths();
       if (auto* mpc = dynamic_cast<MpcNode*>(node))
          mpc->ReloadFromPaths();
+      if (auto* vmpc = dynamic_cast<VmpcNode*>(node))
+         vmpc->ReloadFromPaths();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
          video->ReloadFromPath();
       if (auto* palette = dynamic_cast<PaletteNode*>(node))

@@ -52,6 +52,8 @@ void DrawDropHandling(FrameCtx& fc)
          AudioPluginNode* dropTargetPlugin = FindNodeUnderCanvasPoint<AudioPluginNode>(canvasPos);
          ModelSourceNode* dropTargetModel = FindNodeUnderCanvasPoint<ModelSourceNode>(canvasPos);
          VideoSourceNode* dropTargetVideo = FindNodeUnderCanvasPoint<VideoSourceNode>(canvasPos);
+         VmpcNode* dropTargetVmpc = FindNodeUnderCanvasPoint<VmpcNode>(canvasPos);
+         std::vector<std::string> vmpcDropPaths;
          ImageSourceNode* dropTargetImage = FindNodeUnderCanvasPoint<ImageSourceNode>(canvasPos);
          FieldElementNode* dropTargetFieldElement = FindNodeUnderCanvasPoint<FieldElementNode>(canvasPos);
          FieldPrimitiveNode* dropTargetFieldPrimitive = FindNodeUnderCanvasPoint<FieldPrimitiveNode>(canvasPos);
@@ -488,6 +490,11 @@ void DrawDropHandling(FrameCtx& fc)
             }
             else if (HasExtension(path, kVideoExt))
             {
+               if (dropTargetVmpc != nullptr)
+               {
+                  vmpcDropPaths.push_back(path); // loaded together below, so a multi-file drop fills successive pads
+                  continue;
+               }
                if (dropTargetVideo != nullptr)
                {
                   ensureDroppedCheckpoint();
@@ -522,6 +529,12 @@ void DrawDropHandling(FrameCtx& fc)
          {
             ensureDroppedCheckpoint();
             MpcDropFiles(dropTargetMpc, canvasPos.x, canvasPos.y, mpcDropPaths);
+            gPatchDirty = true;
+         }
+         if (dropTargetVmpc != nullptr && !vmpcDropPaths.empty())
+         {
+            ensureDroppedCheckpoint();
+            VmpcDropFiles(dropTargetVmpc, canvasPos.x, canvasPos.y, vmpcDropPaths);
             gPatchDirty = true;
          }
          if (!pendingAudioDropPaths.empty())

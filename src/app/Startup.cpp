@@ -1108,6 +1108,15 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return ok ? 0 : 1;
    }
 
+   if (getenv("INFINITE_VMPCTEST") != nullptr)
+   {
+      // VMPC decodes real clips and composites on the GPU, so it needs the GL context.
+      const bool ok = RunVmpcTest();
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      return ok ? 0 : 1;
+   }
+
    if (getenv("INFINITE_FORMULASTTEST") != nullptr)
    {
       // Formula's Shadertoy mode compiles and cooks real passes, so it needs the GL context.

@@ -275,6 +275,7 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/DrumPatterns.h"
 #include "nodes/LooperNode.h"
 #include "nodes/MpcNode.h"
+#include "nodes/VmpcNode.h"
 #include "nodes/AudioPluginNode.h"
 #include "audio/SampleScanner.h"
 #include "audio/PluginScanner.h"
