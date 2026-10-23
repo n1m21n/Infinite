@@ -2961,6 +2961,24 @@ bool RunMolderFixture()
                 respawned.Seed(), respawned.Generation(), fresh.Generation(),
                 keptOk && rolledOk ? "OK" : "FAIL");
          ok = ok && keptOk && rolledOk;
+
+         // A patch or remote set can carry any int. The reload's render dispatch
+         // replays one Mutate per generation on the main thread, so 2^31 used to
+         // freeze the UI for minutes; it is capped at kMaxGeneration.
+         for (auto& kv : saved)
+            if (kv.first == "i generation") kv.second = "2147483647";
+         MolderNode huge;
+         Patch::LoadParams(&huge, saved);
+         const auto t0 = std::chrono::steady_clock::now();
+         huge.ReloadFromPath();
+         const double reloadSec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+         const int loadedGen = huge.Generation();
+         huge.Roll();
+         const bool hugeOk = loadedGen == MolderNode::kMaxGeneration &&
+                             huge.Generation() == MolderNode::kMaxGeneration && reloadSec < 2.0;
+         printf("MOLDERTEST generation 2147483647 is capped (gen %d, after roll %d, reload %.3f s) %s\n",
+                loadedGen, huge.Generation(), reloadSec, hugeOk ? "OK" : "FAIL");
+         ok = ok && hugeOk;
       }
    }
 

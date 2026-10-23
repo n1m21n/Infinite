@@ -294,7 +294,8 @@ MolderDsp::Genome MolderNode::BuildDesiredGenome() const
    MolderDsp::Genome g;
    {
       MolderDsp::Rng rng((uint32_t)mSeed);
-      for (int i = 0; i < mGeneration; ++i)
+      const int generations = std::clamp(mGeneration, 0, kMaxGeneration);
+      for (int i = 0; i < generations; ++i)
          MolderDsp::Mutate(g, chaos, rng);
    }
 
@@ -524,6 +525,7 @@ void MolderNode::VisitParams(ParamVisitor& v)
    v.Bool("pingpong", pingpong);
    v.Int("seed", mSeed);
    v.Int("generation", mGeneration);
+   mGeneration = std::clamp(mGeneration, 0, kMaxGeneration);
 }
 
 float MolderNode::HarmonicityPercent() const
@@ -684,7 +686,7 @@ void MolderNode::Iterate()
 
 void MolderNode::Roll()
 {
-   ++mGeneration;
+   mGeneration = std::min(mGeneration, kMaxGeneration - 1) + 1;
    if (mAnalysis.valid && !mWorking.load(std::memory_order_relaxed))
       LaunchJob(Job::RenderOnly);
 }
