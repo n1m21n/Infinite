@@ -444,14 +444,32 @@ namespace app
          return ArrangeTickField(label, cur, lo, hi, unit, fieldW, out);
       };
 
-      auto drawPaletteSwatches = [&](const std::function<void(uint32_t)>& onSelect)
+      // Hands onSelect the palette index; clips/lanes decode kArrangePalette[i].col with ColorConvertU32ToFloat4
+      // (index 0 = Default = no tint), as the Timeline's Color Tint menu does. `current` marks the swatch in use.
+      auto drawPaletteSwatches = [&](const std::function<void(int)>& onSelect, const float* currentRGB = nullptr)
       {
          constexpr int n = IM_ARRAYSIZE(kArrangePalette);
          ImU32 cols[n];
          const char* names[n];
-         for (int i = 0; i < n; ++i) { cols[i] = kArrangePalette[i].col; names[i] = kArrangePalette[i].name; }
-         const int hit = FieldWell::SwatchRow(cols, names, n, -1, 15.0f);
-         if (hit >= 0) onSelect(ArrangeMarkerRGBA(kArrangePalette[hit].col));
+         int selected = -1;
+         for (int i = 0; i < n; ++i)
+         {
+            cols[i] = kArrangePalette[i].col;
+            names[i] = kArrangePalette[i].name;
+            if (currentRGB != nullptr && selected < 0)
+            {
+               const ImVec4 cv = ImGui::ColorConvertU32ToFloat4(cols[i]);
+               const bool none = currentRGB[0] <= 0.001f && currentRGB[1] <= 0.001f && currentRGB[2] <= 0.001f;
+               if (i == 0 ? none : (std::fabs(cv.x - currentRGB[0]) < 0.01f && std::fabs(cv.y - currentRGB[1]) < 0.01f &&
+                                    std::fabs(cv.z - currentRGB[2]) < 0.01f))
+                  selected = i;
+            }
+         }
+         const int hit = FieldWell::SwatchRow(cols, names, n, selected, 15.0f);
+         if (hit >= 0) onSelect(hit);
+      };
+      auto paletteRGB = [](int i) {
+         return i == 0 ? ImVec4(0.0f, 0.0f, 0.0f, 0.0f) : ImGui::ColorConvertU32ToFloat4(kArrangePalette[i].col);
       };
 
       if (clip != nullptr)
@@ -768,34 +786,43 @@ namespace app
             }
          }
 
-         ImGui::Spacing();
-         SectionHeader(T("Speed"));
+         // Speed and Reverse move a file's playhead (an audio file or a video file); a synth or a shader has no
+         // position to move, so a clip on one would show two controls that do nothing.
+         const GraphNode* speedSrc = FindNodeByUid(clip->srcUid);
+         const bool hasFilePosition = speedSrc != nullptr && (dynamic_cast<const AudioFileNode*>(speedSrc->node.get()) != nullptr ||
+                                                              dynamic_cast<const VideoSourceNode*>(speedSrc->node.get()) != nullptr);
+         if (hasFilePosition)
          {
-            float speed = clip->speed;
-            RowLabel("Speed");
-            ImGui::SetNextItemWidth(fieldW);
-            if (ArrangeSliderFloat("##clipspeed", &speed, Arrange::kClipSpeedMin, Arrange::kClipSpeedMax,
-                                   "%.2fx", ImGuiSliderFlags_Logarithmic))
-               ArrangeEdit([&]() { ArrangeSetClipSpeed(clipId, speed); });
-            bool reverse = clip->reverse;
-            if (ToggleChip(L("Reverse##clipreverse"), &reverse, ImGui::GetContentRegionAvail().x))
-               ArrangeEdit([&]() { ArrangeSetClipReverse(clipId, reverse); });
+            ImGui::Spacing();
+            SectionHeader(T("Speed"));
+            {
+               float speed = clip->speed;
+               RowLabel("Speed");
+               ImGui::SetNextItemWidth(fieldW);
+               if (ArrangeSliderFloat("##clipspeed", &speed, Arrange::kClipSpeedMin, Arrange::kClipSpeedMax,
+                                      "%.2fx", ImGuiSliderFlags_Logarithmic))
+                  ArrangeEdit([&]() { ArrangeSetClipSpeed(clipId, speed); });
+               bool reverse = clip->reverse;
+               if (ToggleChip(L("Reverse##clipreverse"), &reverse, ImGui::GetContentRegionAvail().x))
+                  ArrangeEdit([&]() { ArrangeSetClipReverse(clipId, reverse); });
+            }
          }
 
          ImGui::Spacing();
          SectionHeader(T("Color Tint"));
-         drawPaletteSwatches([&](uint32_t col) {
+         const float clipRGB[3] = { clip->colorR, clip->colorG, clip->colorB };
+         drawPaletteSwatches([&](int pi) {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
                {
-                  const ImVec4 cv = ImGui::ColorConvertU32ToFloat4(col);
+                  const ImVec4 cv = paletteRGB(pi);
                   c->colorR = cv.x;
                   c->colorG = cv.y;
                   c->colorB = cv.z;
                   gArrange.revision++;
                }
             });
-         });
+         }, clipRGB);
 
          ImGui::Spacing();
          SectionHeader(T("Source Node"));
@@ -940,9 +967,9 @@ namespace app
 
          ImGui::Spacing();
          SectionHeader(T("Color Tint"));
-         drawPaletteSwatches([&](uint32_t col) {
+         drawPaletteSwatches([&](int pi) {
             ArrangeEdit([&]() {
-               const ImVec4 cv = ImGui::ColorConvertU32ToFloat4(col);
+               const ImVec4 cv = paletteRGB(pi);
                for (uint64_t id : gArrangeSel)
                {
                   if (Arrange::Clip* c = Arrange::FindClip(gArrange, id))
@@ -1086,11 +1113,11 @@ namespace app
 
             ImGui::Spacing();
             SectionHeader(T("Track Tint"));
-            drawPaletteSwatches([&](uint32_t col) {
+            drawPaletteSwatches([&](int pi) {
                ArrangeEdit([&]() {
                   if (Arrange::Lane* l = Arrange::FindLane(gArrange, rowId))
                   {
-                     const ImVec4 c = ImGui::ColorConvertU32ToFloat4(col);
+                     const ImVec4 c = paletteRGB(pi);
                      l->colorR = c.x;
                      l->colorG = c.y;
                      l->colorB = c.z;
@@ -1144,9 +1171,9 @@ namespace app
 
             ImGui::Spacing();
             SectionHeader(T("Group Color"));
-            drawPaletteSwatches([&](uint32_t col) {
+            drawPaletteSwatches([&](int pi) {
                ArrangeEdit([&]() {
-                  Arrange::RecolorTrackGroup(gArrange, rowId, col);
+                  Arrange::RecolorTrackGroup(gArrange, rowId, ArrangeMarkerRGBA(kArrangePalette[pi].col));
                });
             });
 

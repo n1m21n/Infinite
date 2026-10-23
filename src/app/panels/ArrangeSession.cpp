@@ -648,6 +648,20 @@ namespace app
          sPendingTempoAt = -1;
       }
 
+      // A deleted track takes its launches with it (else Stop All and the
+      // scene follow keep seeing a lane that no longer exists).
+      if (sBuiltArrangeRevision != gArrange.revision)
+         for (auto it = sSchedule.begin(); it != sSchedule.end();)
+         {
+            if (Arrange::FindLane(gArrange, it->first) == nullptr)
+            {
+               it = sSchedule.erase(it);
+               sDirty = true;
+            }
+            else
+               ++it;
+         }
+
       const bool wasActive = sActive;
       const bool wantActive = AnyScheduled() || SessionMode();
       if (sDirty || (wantActive && (sBuiltArrangeRevision != gArrange.revision || now > sHorizon - kRebuildLeadTicks)) ||
@@ -850,6 +864,69 @@ namespace app
             if (s.at > now && s.slot < 0)
                st.stopQueued = true;
       return st;
+   }
+
+
+   // The schedule names clips by row, so row edits remap it: a playing or
+   // queued clip keeps playing from its new row, and one whose row is
+   // deleted stops instead of handing over to the clip that slides up.
+   void ArrangeSessionShiftRows(int row, int delta)
+   {
+      if (delta == 0 || row < 0)
+         return;
+      auto shift = [&](int slot) {
+         if (slot < row)
+            return slot;
+         if (delta < 0 && slot < row - delta)
+            return -1;
+         return slot + delta;
+      };
+      for (auto& kv : sSchedule)
+         for (SessSeg& sg : kv.second)
+            if (sg.slot >= 0)
+               sg.slot = shift(sg.slot);
+      // The last build's runs too: the rebuild re-anchors from them.
+      for (SessRun& r : sRuns)
+         if (r.slot >= 0)
+            r.slot = shift(r.slot);
+      for (SessRecEntry& e : sRecLog)
+         if (e.slot >= 0)
+            e.slot = shift(e.slot);
+      if (sSceneNext.scene >= 0)
+      {
+         const int next = shift(sSceneNext.scene);
+         if (next < 0)
+            CancelSceneNext();
+         else
+            sSceneNext.scene = next;
+      }
+      sDirty = true;
+   }
+
+
+   // A clip moved from one cell to another: what was scheduled at `from`
+   // follows it within its lane (stops if it left the lane), and a clip it
+   // replaced stops. from < 0 = a copy landed; only the replaced clip stops.
+   void ArrangeSessionMoveScheduled(uint64_t fromLaneId, int from, uint64_t toLaneId, int to)
+   {
+      auto it = sSchedule.find(toLaneId);
+      if (it != sSchedule.end() && to >= 0)
+         for (SessSeg& sg : it->second)
+            if (sg.slot == to)
+               sg.slot = -1;
+      it = sSchedule.find(fromLaneId);
+      if (it != sSchedule.end() && from >= 0)
+         for (SessSeg& sg : it->second)
+            if (sg.slot == from)
+               sg.slot = fromLaneId == toLaneId ? to : -1;
+      for (SessRun& r : sRuns)
+      {
+         if (r.laneId == toLaneId && r.slot == to)
+            r.slot = -1;
+         else if (r.laneId == fromLaneId && from >= 0 && r.slot == from)
+            r.slot = fromLaneId == toLaneId ? to : -1;
+      }
+      sDirty = true;
    }
 
 

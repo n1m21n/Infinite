@@ -55,6 +55,10 @@ namespace app
       // Copy / cut buffer for slots (a slot keeps its launch settings; the lane type gates where it can land).
       struct SlotClipboard { bool has = false; int laneType = 0; Arrange::SessionSlot slot; };
       SlotClipboard sSlotClip;
+      // A press on a clip: a Trigger clip launches on release unless the press became a drag, which moves the
+      // clip to the cell it is dropped on (Option copies it).
+      struct SlotDrag { uint64_t laneId = 0; int row = -1; bool dragging = false; bool launchOnRelease = false; };
+      SlotDrag sDrag;
 
       uint64_t sCtxLaneId = 0;
       int sCtxRow = -1;
@@ -360,6 +364,7 @@ namespace app
                   l.slots.insert(l.slots.begin() + row, Arrange::SessionSlot{});
             gArrange.revision++;
          });
+         ArrangeSessionShiftRows(row, 1);
       }
 
       void DuplicateScene(int row)
@@ -379,6 +384,7 @@ namespace app
             }
             gArrange.revision++;
          });
+         ArrangeSessionShiftRows(row + 1, 1);
          sSelScene = row + 1;
       }
 
@@ -393,6 +399,7 @@ namespace app
                   l.slots.erase(l.slots.begin() + row);
             gArrange.revision++;
          });
+         ArrangeSessionShiftRows(row, -1);
          gArrangeSel.clear();
          sSelScene = gArrange.scenes.empty() ? -1 : std::min(row, (int)gArrange.scenes.size() - 1);
       }
@@ -706,9 +713,17 @@ namespace app
             const bool hov = ImGui::IsItemHovered();
             const bool held = ImGui::IsItemActive();
             if (ss != nullptr && ImGui::IsItemDeactivated() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+            {
                ArrangeSessionRelease(laneId, row);
+               if (sDrag.launchOnRelease && !sDrag.dragging && sDrag.laneId == laneId && sDrag.row == row)
+                  ArrangeSessionLaunch(laneId, row);
+            }
+            if (held && ss != nullptr && sDrag.laneId == laneId && sDrag.row == row && !sDrag.dragging &&
+                ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f))
+               sDrag.dragging = true;
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
             {
+               sDrag = {};   // a double-click's second press must not launch (and so stop) the clip again
                sCurLaneId = laneId;
                sCurRow = row;
                // Clicking anywhere but the clip waiting for a node abandons the assign.
@@ -730,8 +745,10 @@ namespace app
                else if (ss != nullptr)
                {
                   // GarageBand: a click launches the cell, a click on a playing (or waiting) cell stops it
-                  // at the next quantize point. Cmd-click only selects, for copy and paste.
-                  if (!selectOnly)
+                  // at the next quantize point. Cmd-click only selects, for copy and paste. A Trigger clip
+                  // acts on release so the press can become a drag; a Gate clip plays while held.
+                  sDrag = { laneId, row, false, !selectOnly && ss->launchMode != 1 };
+                  if (!selectOnly && ss->launchMode == 1)
                      ArrangeSessionLaunch(laneId, row);
                   gArrangeSel = { ss->clip.id };
                   gArrangeSelAnchor = ss->clip.id;
@@ -917,6 +934,39 @@ namespace app
          ImGui::PopID();
       }
 
+      // A clip being dragged: outline the cell it would land in and carry its name at the cursor.
+      if (sDrag.dragging)
+      {
+         const int li = (int)std::floor((mouse.x - (o.x + kSceneColW)) / colW);
+         const int row = (int)std::floor((mouse.y - bodyTop) / kRowH);
+         const Arrange::Lane* srcLane = Arrange::FindLane(gArrange, sDrag.laneId);
+         const bool inGrid = li >= 0 && li < laneCount && row >= 0 && row < rows;
+         const bool fits = inGrid && srcLane != nullptr && gArrange.lanes[(size_t)li].type == srcLane->type &&
+                           !(gArrange.lanes[(size_t)li].id == sDrag.laneId && row == sDrag.row);
+         const bool copy = ImGui::GetIO().KeyAlt;
+         if (fits)
+         {
+            const float x0 = o.x + kSceneColW + colW * (float)li, y0 = bodyTop + kRowH * (float)row;
+            dl->AddRect(ImVec2(x0 + kGap - 1.0f, y0 + kGap - 1.0f), ImVec2(x0 + colW - kGap + 1.0f, y0 + kRowH - kGap + 1.0f),
+                        TextCol(0.95f), tok::radius_field, 0, 2.0f);
+         }
+         if (srcLane != nullptr && SlotOf(*srcLane, sDrag.row) != nullptr)
+         {
+            const std::string label = SlotLabel(srcLane->slots[(size_t)sDrag.row].clip);
+            ImGui::GetForegroundDrawList()->AddText(ImVec2(mouse.x + 14.0f, mouse.y + 4.0f), TextCol(fits ? 0.95f : 0.45f),
+                                                    (copy ? "+ " + label : label).c_str());
+         }
+         ImGui::SetMouseCursor(fits ? ImGuiMouseCursor_Hand : ImGuiMouseCursor_NotAllowed);
+         if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+         {
+            if (fits)
+               ArrangeSessionMoveSlot(sDrag.laneId, sDrag.row, gArrange.lanes[(size_t)li].id, row, copy);
+            sDrag = {};
+         }
+      }
+      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+         sDrag = {};
+
       // Hairline under the headers and above the stop row: the grid's frame.
       dl->AddLine(ImVec2(o.x, bodyTop - 0.5f), ImVec2(o.x + gridW, bodyTop - 0.5f), TextCol(0.10f), 1.0f);
       dl->AddLine(ImVec2(o.x, footerTop + 0.5f), ImVec2(o.x + gridW, footerTop + 0.5f), TextCol(0.10f), 1.0f);
@@ -1070,6 +1120,39 @@ namespace app
                                             MenuAction::Copy, MenuAction::Paste, MenuAction::Cut };
       sMenuAction = { kKinds[std::clamp(kind, 0, 5)], laneId, row };
       ArrangeSessionApplyMenuAction();
+   }
+
+   // Moves a slot (clip and launch settings) to another cell of a same-type track, replacing what is there;
+   // `copy` leaves the original in place. False when the move cannot land.
+   bool ArrangeSessionMoveSlot(uint64_t srcLaneId, int srcRow, uint64_t dstLaneId, int dstRow, bool copy)
+   {
+      const Arrange::Lane* src = Arrange::FindLane(gArrange, srcLaneId);
+      const Arrange::Lane* dst = Arrange::FindLane(gArrange, dstLaneId);
+      if (src == nullptr || dst == nullptr || src->type != dst->type || dstRow < 0 || SlotOf(*src, srcRow) == nullptr ||
+          (srcLaneId == dstLaneId && srcRow == dstRow))
+         return false;
+      Arrange::SessionSlot moved = src->slots[(size_t)srcRow];
+      ArrangeEdit([&]() {
+         Arrange::Lane* s = Arrange::FindLane(gArrange, srcLaneId);
+         Arrange::Lane* d = Arrange::FindLane(gArrange, dstLaneId);
+         if (s == nullptr || d == nullptr)
+            return;
+         if (copy)
+            moved.clip.id = gArrange.NewId();
+         else
+            s->slots[(size_t)srcRow] = Arrange::SessionSlot{};
+         EnsureRow(*d, dstRow);
+         d->slots[(size_t)dstRow] = moved;
+         gArrange.revision++;
+      });
+      ArrangeSessionMoveScheduled(srcLaneId, copy ? -1 : srcRow, dstLaneId, dstRow);
+      gArrangeSel = { moved.clip.id };
+      gArrangeSelAnchor = moved.clip.id;
+      gArrangeFlashClipId = moved.clip.id;
+      gArrangeFlashStart = ImGui::GetTime();
+      sCurLaneId = dstLaneId;
+      sCurRow = dstRow;
+      return true;
    }
 
    // The rows only a session slot has, appended to the shared clip menu.
@@ -1631,14 +1714,13 @@ namespace app
                ImGui::SetCursorScreenPos(ImVec2(right - audioW - tok::space_1 - takeW, toolbarOrigin.y));
                if (ChipButton::Draw(takeLabel, false, tok::tile))
                {
-                  // The take is already on the Timeline: render its span with the Timeline's dialog (audio and
-                  // video together, saved to the folder you pick there).
+                  // Record wrote the take onto the Timeline; the render dialog opens right here with its span
+                  // set (audio and video together, saved to the folder you pick).
                   ArrangeEdit([&]() {
                      gArrange.settings.renderRangeKind = kArrangeRangeCustom;
                      gArrange.settings.renderRangeStart = from;
                      gArrange.settings.renderRangeEnd = to;
                   });
-                  gArrangePanelOpen = true;
                   gArrangeRenderPopupRequest = true;
                }
                if (ImGui::IsItemHovered())
@@ -1654,6 +1736,7 @@ namespace app
                 !ImGui::IsPopupOpen("##sessiondockctx"))
                ImGui::OpenPopup("##sessiondockctx");
          }
+         DrawArrangeRenderDialogs();
          if (MenuParts::BeginPopup("##sessiondockctx"))
          {
             // Session shares the Timeline's dock edge, so either panel's menu moves both.
@@ -1680,10 +1763,12 @@ namespace app
             MenuParts::EndPopup();
          }
          {
-            const float ly = toolbarBottom + 2.0f;
+            // Same gaps as the Timeline: its toolbar ends one item spacing above an ImGui::Separator.
+            const float gapY = ImGui::GetStyle().ItemSpacing.y;
+            const float ly = toolbarBottom + gapY;
             ImGui::GetWindowDrawList()->AddLine(ImVec2(ImGui::GetWindowPos().x, ly), ImVec2(ImGui::GetWindowPos().x + panelSize.x, ly),
                                                 ImGui::GetColorU32(ImGuiCol_Separator));
-            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetStyle().WindowPadding.x, ly + 4.0f));
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetStyle().WindowPadding.x, ly + 1.0f + gapY));
          }
 
          const bool isWide = panelSize.x >= 720.0f;

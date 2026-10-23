@@ -4998,6 +4998,8 @@ bool ArrangeAudioRebuildIfStale();
    bool ArrangeSessionLastTake(Arrange::Tick& from, Arrange::Tick& to);
    // Set to open the Timeline's Render dialog next frame (Session's Render Take presets the range first).
    extern bool gArrangeRenderPopupRequest;
+   // The render dialog (and its overwrite prompt); either panel draws it so Render works with the other closed.
+   void DrawArrangeRenderDialogs();
    void DrawArrangeSessionGrid(float width);
    // The clip right-click menu shared by the Timeline lanes and the Session grid; `openClipCtx` opens it this call.
    void DrawArrangeClipContextMenu(bool openClipCtx);
@@ -5011,6 +5013,12 @@ bool ArrangeAudioRebuildIfStale();
    bool DrawArrangeSessionSlotInspector(uint64_t clipId, float fieldW);
 void ArrangeSessionSendSceneToTimeline(int row);
 void ArrangeSessionRunActionForTest(int kind, uint64_t laneId, int row);
+// Moves a session slot to another cell of a same-type track (copy keeps the original); false if it cannot land.
+bool ArrangeSessionMoveSlot(uint64_t srcLaneId, int srcRow, uint64_t dstLaneId, int dstRow, bool copy);
+// Row edits (insert/duplicate/delete scene) and clip moves keep the launch
+// schedule on the same clips.
+void ArrangeSessionShiftRows(int row, int delta);
+void ArrangeSessionMoveScheduled(uint64_t fromLaneId, int from, uint64_t toLaneId, int to);
 
 bool StartAudioEngine(std::string& outError);
 

@@ -419,6 +419,9 @@ void DrawLayout(FrameCtx& fc)
       // dock side (it can run before OR after this block, depending on
       // Arrange::Settings::dockSide), so this canvas handler must not race it
       // for gDroppedFiles by consuming/clearing paths meant for the timeline.
-      dropInsideArrangePanel = gDropPos.x >= gArrangePanelRectMin.x && gDropPos.x < gArrangePanelRectMax.x &&
-         gDropPos.y >= gArrangePanelRectMin.y && gDropPos.y < gArrangePanelRectMax.y;}
+      // The Session panel's cells take Finder drops the same way, so the canvas must not take those either.
+      dropInsideArrangePanel = (gDropPos.x >= gArrangePanelRectMin.x && gDropPos.x < gArrangePanelRectMax.x &&
+                                gDropPos.y >= gArrangePanelRectMin.y && gDropPos.y < gArrangePanelRectMax.y) ||
+                               (gSessionPanelOpen && gDropPos.x >= gSessionPanelRectMin.x && gDropPos.x < gSessionPanelRectMax.x &&
+                                gDropPos.y >= gSessionPanelRectMin.y && gDropPos.y < gSessionPanelRectMax.y);}
 }

@@ -551,6 +551,370 @@ namespace app
 
    }
 
+   // The Render dialog and its overwrite prompt, opened by gArrangeRenderPopupRequest: the Timeline's Render
+   // button and the Session's Render Take both raise it, so each panel can render without the other open.
+   void DrawArrangeRenderDialogs()
+   {
+   Arrange::Settings& rset = gArrange.settings;
+   static std::string sArrangeRenderFileName = "infinite_timeline";
+   static int sArrangeRenderMarkerA = 0;
+   static int sArrangeRenderMarkerB = 1;
+   static ArrangeRenderJob sArrangePendingJob;
+   static bool sArrangePendingStartNow = false;
+   static bool sArrangeOpenOverwrite = false;
+
+   const Arrange::Tick renderableEnd = ArrangeRenderableEndTick();
+
+   // Is there anything for a timeline *video* source to draw in a
+   // given range? Decides the video source's default and whether
+   // "Timeline clips" is offered at all.
+   auto rangeHasVideoClips = [](Arrange::Tick a, Arrange::Tick b) -> int {
+      return ArrangeRenderVideoClipsInRange(a, b);
+   };
+
+   // The range the current settings describe, in ticks.
+   auto currentRange = [&](Arrange::Tick& outA, Arrange::Tick& outB) {
+      ArrangeRenderResolveRange(rset.renderRangeKind, sArrangeRenderMarkerA, sArrangeRenderMarkerB,
+                                rset.renderRangeStart, rset.renderRangeEnd, outA, outB);
+   };
+
+   Arrange::Tick rangeA = 0, rangeB = 0;
+   currentRange(rangeA, rangeB);
+
+   // -1 means "decide at draw time", which is what makes the default
+   // track the monitoring mode instead of freezing whatever it was
+   // when the patch was saved ("render what you hear", WP7 #6b).
+   auto effectiveAudioSource = []() -> int {
+      return ArrangeRenderEffectiveAudioSource();
+   };
+   auto effectiveVideoSource = [&]() -> int {
+      return ArrangeRenderEffectiveVideoSource(rangeA, rangeB);
+   };
+
+   auto renderExtension = [&]() -> const char* {
+      if (effectiveVideoSource() == kArrangeVideoNone)
+         return ".wav";
+      return rset.renderFormat == 1 ? ".mov" : ".mp4";
+   };
+   auto renderFullPath = [&]() -> std::string {
+      std::string folder = rset.renderFolder;
+      if (folder.empty())
+      {
+         folder = AppPaths::DesktopDir();
+      }
+      while (!folder.empty() && (folder.back() == '/' || folder.back() == '\\'))
+         folder.pop_back();
+      return folder + "/" + sArrangeRenderFileName + renderExtension();
+   };
+
+   // A request opens the dialog in whichever panel draws first this frame.
+   if (gArrangeRenderPopupRequest && !ArrangeRenderBusy())
+   {
+      if (rset.renderFolder.empty())
+         rset.renderFolder = AppPaths::DesktopDir();
+      ImGui::OpenPopup("##arrangeRenderPopup");
+   }
+   gArrangeRenderPopupRequest = false;
+
+   if (ImGui::GetFrameCount() == 30 && getenv("INFINITE_RENDERPOPUPTEST") != nullptr)   // design review shot
+   {
+      ImGui::OpenPopup("##arrangeRenderPopup");
+      ImGui::SetNextWindowPos(ImVec2(24.0f, 120.0f));
+   }
+   ImGui::SetNextWindowSize(ImVec2(344.0f, 0.0f));
+   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));
+   const bool renderPopupOpen = ImGui::BeginPopup("##arrangeRenderPopup");
+   ImGui::PopStyleVar();
+   if (renderPopupOpen)
+   {
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
+      FieldWell::PushStyle();
+      SectionCard::BeginWindow();
+      const float fieldW = ImGui::GetContentRegionAvail().x - SectionCard::kLabelW;
+      SectionCard::Title(T("Render Timeline"));
+
+      // ---- Time range ----
+      SectionCard::Begin(T("Range"));
+      SectionCard::RowLabel(T("Span"));
+      ImGui::SetNextItemWidth(fieldW);
+      int rangeKind = std::clamp(rset.renderRangeKind, 0, 3);
+      if (WellCombo("##arrRangeKind", &rangeKind, I18n::TList("Whole arrangement\0Loop\0Marker A -> B\0Custom\0")))
+      {
+         rset.renderRangeKind = rangeKind;
+         gPatchDirty = true;
+      }
+
+      if (rset.renderRangeKind == kArrangeRangeMarkers)
+      {
+         const int markerCount = (int)gArrange.markers.size();
+         if (markerCount < 2)
+         {
+            ImGui::TextDisabled("%s", T("(needs two markers)"));
+         }
+         else
+         {
+            std::string markerItems;
+            for (const Arrange::Marker& mk : gArrange.markers)
+            {
+               markerItems += mk.name.empty() ? ArrangeFormatPos(mk.pos) : mk.name;
+               markerItems.push_back('\0');
+            }
+            markerItems.push_back('\0');
+            sArrangeRenderMarkerA = std::clamp(sArrangeRenderMarkerA, 0, markerCount - 1);
+            sArrangeRenderMarkerB = std::clamp(sArrangeRenderMarkerB, 0, markerCount - 1);
+            SectionCard::RowLabel(T("Markers"));
+            ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
+            WellCombo("##arrMarkA", &sArrangeRenderMarkerA, markerItems.c_str());
+            ImGui::SameLine(0.0f, tok::space_1);
+            ImGui::TextDisabled("->");
+            ImGui::SameLine(0.0f, tok::space_1);
+            ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
+            WellCombo("##arrMarkB", &sArrangeRenderMarkerB, markerItems.c_str());
+         }
+      }
+      else if (rset.renderRangeKind == kArrangeRangeCustom)
+      {
+         // Typed in whichever unit the timeline is showing (WP6's
+         // ArrangeParsePos/ArrangeFormatPos), so a range reads the
+         // same way as every other position in the panel.
+         auto tickField = [&](const char* id, Arrange::Tick& t) {
+            char buf[48];
+            snprintf(buf, sizeof(buf), "%s", ArrangeFormatPos(t).c_str());
+            ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
+            if (FieldWell::InputText(id, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+               const Arrange::Tick parsed = ArrangeParsePos(buf);
+               if (parsed >= 0)
+               {
+                  t = parsed;
+                  gPatchDirty = true;
+               }
+            }
+         };
+         SectionCard::RowLabel(T("Custom"));
+         tickField("##arrRangeStart", rset.renderRangeStart);
+         ImGui::SameLine(0.0f, tok::space_1);
+         ImGui::TextDisabled("->");
+         ImGui::SameLine(0.0f, tok::space_1);
+         tickField("##arrRangeEnd", rset.renderRangeEnd);
+      }
+      currentRange(rangeA, rangeB);
+
+      const bool audioOnly = effectiveVideoSource() == kArrangeVideoNone;
+
+      // ---- Resolution / fps (video jobs only) ----
+      if (!audioOnly)
+      {
+         SectionCard::Begin(T("Video"));
+         SectionCard::RowLabel(T("Size"));
+         static int sArrangeRenderResPreset = 0; // 0=Match Clips, 1..4 fixed, 5=Custom
+         int detectedClipW = 0, detectedClipH = 0;
+         ArrangeRenderDetectClipSize(detectedClipW, detectedClipH);
+         const char* kResPresets[] = { T("Match Clips"), "1080p", "4K", "720p", T("Vertical"), T("Custom") };
+         ImGui::SetNextItemWidth(fieldW);
+         std::string resItems;
+         for (const char* r : kResPresets)
+         {
+            resItems += r;
+            resItems.push_back('\0');
+         }
+         resItems.push_back('\0');
+         if (WellCombo("##arrResPreset", &sArrangeRenderResPreset, resItems.c_str()))
+         {
+            if (sArrangeRenderResPreset == 0) { rset.renderWidth = detectedClipW; rset.renderHeight = detectedClipH; }
+            else if (sArrangeRenderResPreset == 1) { rset.renderWidth = 1920; rset.renderHeight = 1080; }
+            else if (sArrangeRenderResPreset == 2) { rset.renderWidth = 3840; rset.renderHeight = 2160; }
+            else if (sArrangeRenderResPreset == 3) { rset.renderWidth = 1280; rset.renderHeight = 720; }
+            else if (sArrangeRenderResPreset == 4) { rset.renderWidth = 1080; rset.renderHeight = 1920; }
+            gPatchDirty = true;
+         }
+         SectionCard::RowLabel("");
+         ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
+         if (FieldWell::InputInt("##arrResW", &rset.renderWidth, 0, 0))
+            gPatchDirty = true;
+         ImGui::SameLine(0.0f, tok::space_1);
+         ImGui::TextDisabled("%s", T("x"));
+         ImGui::SameLine(0.0f, tok::space_1);
+         ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
+         if (FieldWell::InputInt("##arrResH", &rset.renderHeight, 0, 0))
+            gPatchDirty = true;
+         rset.renderWidth = std::clamp(rset.renderWidth, 16, 7680);
+         rset.renderHeight = std::clamp(rset.renderHeight, 16, 4320);
+
+         SectionCard::RowLabel(T("Rate"));
+         ImGui::SetNextItemWidth(fieldW);
+         if (FieldWell::InputInt("##arrRenderFps", &rset.renderFps, 0, 0))
+            gPatchDirty = true;
+         rset.renderFps = std::clamp(rset.renderFps, 1, 240);
+      }
+
+      // ---- Output file ----
+      SectionCard::Begin(T("Output"));
+      SectionCard::RowLabel(T("Name"));
+      char renderNameBuf[256];
+      snprintf(renderNameBuf, sizeof(renderNameBuf), "%s", sArrangeRenderFileName.c_str());
+      ImGui::SetNextItemWidth(fieldW - 36.0f);
+      if (FieldWell::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
+         sArrangeRenderFileName = renderNameBuf;
+      ImGui::SameLine(0.0f, tok::space_1);
+      ImGui::TextDisabled("%s", renderExtension());
+
+      char renderFolderBuf[512];
+      snprintf(renderFolderBuf, sizeof(renderFolderBuf), "%s", rset.renderFolder.c_str());
+      SectionCard::RowLabel(T("Folder"));
+      ImGui::SetNextItemWidth(fieldW);
+      if (FieldWell::InputText("##arrangeRenderFolder", renderFolderBuf, sizeof(renderFolderBuf)))
+      {
+         rset.renderFolder = renderFolderBuf;
+         gPatchDirty = true;
+      }
+
+      // Format follows the video source: an audio-only job is a WAV
+      // by definition (the extension beside the name already says
+      // so), so the container buttons stand down rather than
+      // offering a choice that cannot apply (WP7 #1).
+      if (!audioOnly)
+      {
+         const int fmtActive = rset.renderFormat == 1 ? 1 : 0;
+         SectionCard::RowLabel(T("Format"));
+         if (ChipButton::Draw(".mp4##arrRenderMp4", fmtActive == 0, 24.0f, 56.0f))
+         {
+            rset.renderFormat = 0;
+            gPatchDirty = true;
+         }
+         ImGui::SameLine(0.0f, tok::space_1);
+         if (ChipButton::Draw(".mov##arrRenderMov", fmtActive == 1, 24.0f, 56.0f))
+         {
+            rset.renderFormat = 1;
+            gPatchDirty = true;
+         }
+      }
+      SectionCard::End();
+      ImGui::Dummy(ImVec2(0.0f, tok::space_1));
+
+      // Builds the job the two submit buttons share, so "Render Now"
+      // and "Add to Queue" can never disagree about what was asked
+      // for - they differ only in where the job is put.
+      auto buildJob = [&]() -> ArrangeRenderJob {
+         ArrangeRenderJob job;
+         job.rangeKind = rset.renderRangeKind;
+         job.startTick = rangeA;
+         job.endTick = rangeB;
+         job.audioSource = effectiveAudioSource();
+         job.videoSource = effectiveVideoSource();
+         // Always 0: this modal renders the timeline. The canvas
+         // Output-node take is the Output node's own record button,
+         // not a source choice hidden inside the timeline's render
+         // dialog - which is what the removed dropdowns were.
+         job.canvasVideoUid = 0;
+         job.width = rset.renderWidth;
+         job.height = rset.renderHeight;
+         job.fps = rset.renderFps;
+         // Follows Settings -> Audio, not rset.renderSampleRate: the
+         // graph only knows how to generate at the rate its nodes
+         // were prepared at, so a per-arrangement rate would be a
+         // choice nothing downstream could honour.
+         job.sampleRate = (int)llround(ArrangeRenderActiveSampleRate());
+         job.format = job.videoSource == kArrangeVideoNone ? 2 : (rset.renderFormat == 1 ? 1 : 0);
+         job.path = renderFullPath();
+         return job;
+      };
+      auto commitJob = [](ArrangeRenderJob job, bool startNow) {
+         job.id = gArrangeRenderNextJobId++;
+         job.status = kArrangeJobQueued;
+         if (startNow)
+         {
+            // Ahead of anything already parked, so "Render Now"
+            // means this job, not "whatever is first in the queue".
+            gArrangeRenderQueue.insert(gArrangeRenderQueue.begin(), job);
+            gArrangeRenderQueueRunning = true;
+         }
+         else
+         {
+            gArrangeRenderQueue.push_back(job);
+         }
+      };
+      auto submitJob = [&](bool startNow) {
+         ArrangeRenderJob job = buildJob();
+         std::error_code ec;
+         const bool collides =
+            std::filesystem::exists(AppPaths::FsPath(job.path), ec) || ArrangeRenderPathQueued(job.path, 0);
+         if (collides)
+         {
+            // Asking before the queue gets there, not while it runs:
+            // a job that silently overwrote yesterday's export is
+            // only noticed once it is already gone (WP7 #8).
+            sArrangePendingJob = job;
+            sArrangePendingStartNow = startNow;
+            sArrangeOpenOverwrite = true;
+         }
+         else
+         {
+            commitJob(job, startNow);
+         }
+      };
+
+      // effectiveAudioSource() is always Timeline here, so there is
+      // always an audio stream to write; only the filename can be
+      // missing.
+      const bool canRender = !sArrangeRenderFileName.empty();
+      ImGui::BeginDisabled(!canRender || ArrangeRenderBusy());
+      if (ChipButton::Draw(L("Render Now"), true, 28.0f, 140.0f))
+      {
+         submitJob(true);
+         ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine(0.0f, tok::space_2);
+      if (ChipButton::Draw(L("Cancel"), false, 28.0f, 88.0f))
+         ImGui::CloseCurrentPopup();
+      SectionCard::EndWindow();
+      FieldWell::PopStyle();
+      ImGui::PopStyleVar();
+      ImGui::EndPopup();
+   }
+
+   // ---- overwrite / duplicate-path prompt (WP7 #8) ----
+   // Drawn at toolbar level rather than inside the render popup: the
+   // popup closes on submit, and a modal owned by a closed popup
+   // never opens.
+   if (sArrangeOpenOverwrite)
+   {
+      ImGui::OpenPopup(L("Overwrite file?##arrangeOverwrite"));
+      sArrangeOpenOverwrite = false;
+   }
+   if (DialogParts::Begin(L("Overwrite file?##arrangeOverwrite")))
+   {
+      DialogParts::Title(T("Overwrite file?"));
+      const bool queuedClash = ArrangeRenderPathQueued(sArrangePendingJob.path, 0);
+      DialogParts::Message(queuedClash ? T("Another queued job already writes:") : T("This file already exists:"));
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
+      DialogParts::Message(sArrangePendingJob.path.c_str());
+      ImGui::PopTextWrapPos();
+      const int pick = DialogParts::Buttons({ L("Cancel"), L("Auto-rename"), L("Overwrite") });
+      if (pick == 1 || pick == 2)
+      {
+         ArrangeRenderJob job = sArrangePendingJob;
+         if (pick == 1)
+            job.path = ArrangeRenderUniquePath(job.path);
+         job.id = gArrangeRenderNextJobId++;
+         job.status = kArrangeJobQueued;
+         if (sArrangePendingStartNow)
+         {
+            gArrangeRenderQueue.insert(gArrangeRenderQueue.begin(), job);
+            gArrangeRenderQueueRunning = true;
+         }
+         else
+         {
+            gArrangeRenderQueue.push_back(job);
+         }
+      }
+      if (pick >= 0)
+         ImGui::CloseCurrentPopup();
+      DialogParts::End();
+   }
+   }
+
    void DrawArrangePanelContent()
    {
       // Every id this panel holds (selection, anchor, rename/context/assign
@@ -947,57 +1311,6 @@ namespace app
             // (WP7 #7). Only the file's name and the marker picks are
             // session-local: a filename belongs to a take, not to a document.
             Arrange::Settings& rset = gArrange.settings;
-            static std::string sArrangeRenderFileName = "infinite_timeline";
-            static int sArrangeRenderMarkerA = 0;
-            static int sArrangeRenderMarkerB = 1;
-            static ArrangeRenderJob sArrangePendingJob;
-            static bool sArrangePendingStartNow = false;
-            static bool sArrangeOpenOverwrite = false;
-
-            const Arrange::Tick renderableEnd = ArrangeRenderableEndTick();
-
-            // Is there anything for a timeline *video* source to draw in a
-            // given range? Decides the video source's default and whether
-            // "Timeline clips" is offered at all.
-            auto rangeHasVideoClips = [](Arrange::Tick a, Arrange::Tick b) -> int {
-               return ArrangeRenderVideoClipsInRange(a, b);
-            };
-
-            // The range the current settings describe, in ticks.
-            auto currentRange = [&](Arrange::Tick& outA, Arrange::Tick& outB) {
-               ArrangeRenderResolveRange(rset.renderRangeKind, sArrangeRenderMarkerA, sArrangeRenderMarkerB,
-                                         rset.renderRangeStart, rset.renderRangeEnd, outA, outB);
-            };
-
-            Arrange::Tick rangeA = 0, rangeB = 0;
-            currentRange(rangeA, rangeB);
-
-            // -1 means "decide at draw time", which is what makes the default
-            // track the monitoring mode instead of freezing whatever it was
-            // when the patch was saved ("render what you hear", WP7 #6b).
-            auto effectiveAudioSource = []() -> int {
-               return ArrangeRenderEffectiveAudioSource();
-            };
-            auto effectiveVideoSource = [&]() -> int {
-               return ArrangeRenderEffectiveVideoSource(rangeA, rangeB);
-            };
-
-            auto renderExtension = [&]() -> const char* {
-               if (effectiveVideoSource() == kArrangeVideoNone)
-                  return ".wav";
-               return rset.renderFormat == 1 ? ".mov" : ".mp4";
-            };
-            auto renderFullPath = [&]() -> std::string {
-               std::string folder = rset.renderFolder;
-               if (folder.empty())
-               {
-                  folder = AppPaths::DesktopDir();
-               }
-               while (!folder.empty() && (folder.back() == '/' || folder.back() == '\\'))
-                  folder.pop_back();
-               return folder + "/" + sArrangeRenderFileName + renderExtension();
-            };
-
             const char* renderLabel = ArrangeRenderBusy() ? "Rendering..." : "Render";
             const float renderBtnW = ImGui::CalcTextSize(renderLabel).x + 2.0f * tok::space_2;
             const ImVec2 renderBtnPos(audioBtnPos.x - renderBtnW - tok::space_2, panelOrigin.y);
@@ -1008,322 +1321,13 @@ namespace app
                if (rset.renderRangeKind == kArrangeRangeCustom && rset.renderRangeEnd <= rset.renderRangeStart)
                {
                   rset.renderRangeStart = 0;
-                  rset.renderRangeEnd = std::max<Arrange::Tick>(renderableEnd, Arrange::kPPQ);
+                  rset.renderRangeEnd = std::max<Arrange::Tick>(ArrangeRenderableEndTick(), Arrange::kPPQ);
                }
-               if (rset.renderFolder.empty())
-               {
-                  rset.renderFolder = AppPaths::DesktopDir();
-               }
-               ImGui::OpenPopup("##arrangeRenderPopup");
+               gArrangeRenderPopupRequest = true;
             }
             ImGui::EndDisabled();
             ImGui::SetCursorScreenPos(savedCursor);
-            // Session's Render Take: the range is already set.
-            if (gArrangeRenderPopupRequest && !ArrangeRenderBusy())
-            {
-               if (rset.renderFolder.empty())
-                  rset.renderFolder = AppPaths::DesktopDir();
-               ImGui::OpenPopup("##arrangeRenderPopup");
-            }
-            gArrangeRenderPopupRequest = false;
-
-            if (ImGui::GetFrameCount() == 30 && getenv("INFINITE_RENDERPOPUPTEST") != nullptr)   // design review shot
-            {
-               ImGui::OpenPopup("##arrangeRenderPopup");
-               ImGui::SetNextWindowPos(ImVec2(24.0f, 120.0f));
-            }
-            ImGui::SetNextWindowSize(ImVec2(344.0f, 0.0f));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tok::space_3, tok::space_3));
-            const bool renderPopupOpen = ImGui::BeginPopup("##arrangeRenderPopup");
-            ImGui::PopStyleVar();
-            if (renderPopupOpen)
-            {
-               ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(tok::space_2, tok::space_2));
-               FieldWell::PushStyle();
-               SectionCard::BeginWindow();
-               const float fieldW = ImGui::GetContentRegionAvail().x - SectionCard::kLabelW;
-               SectionCard::Title(T("Render Timeline"));
-
-               // ---- Time range ----
-               SectionCard::Begin(T("Range"));
-               SectionCard::RowLabel(T("Span"));
-               ImGui::SetNextItemWidth(fieldW);
-               int rangeKind = std::clamp(rset.renderRangeKind, 0, 3);
-               if (WellCombo("##arrRangeKind", &rangeKind, I18n::TList("Whole arrangement\0Loop\0Marker A -> B\0Custom\0")))
-               {
-                  rset.renderRangeKind = rangeKind;
-                  gPatchDirty = true;
-               }
-
-               if (rset.renderRangeKind == kArrangeRangeMarkers)
-               {
-                  const int markerCount = (int)gArrange.markers.size();
-                  if (markerCount < 2)
-                  {
-                     ImGui::TextDisabled("%s", T("(needs two markers)"));
-                  }
-                  else
-                  {
-                     std::string markerItems;
-                     for (const Arrange::Marker& mk : gArrange.markers)
-                     {
-                        markerItems += mk.name.empty() ? ArrangeFormatPos(mk.pos) : mk.name;
-                        markerItems.push_back('\0');
-                     }
-                     markerItems.push_back('\0');
-                     sArrangeRenderMarkerA = std::clamp(sArrangeRenderMarkerA, 0, markerCount - 1);
-                     sArrangeRenderMarkerB = std::clamp(sArrangeRenderMarkerB, 0, markerCount - 1);
-                     SectionCard::RowLabel(T("Markers"));
-                     ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
-                     WellCombo("##arrMarkA", &sArrangeRenderMarkerA, markerItems.c_str());
-                     ImGui::SameLine(0.0f, tok::space_1);
-                     ImGui::TextDisabled("->");
-                     ImGui::SameLine(0.0f, tok::space_1);
-                     ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
-                     WellCombo("##arrMarkB", &sArrangeRenderMarkerB, markerItems.c_str());
-                  }
-               }
-               else if (rset.renderRangeKind == kArrangeRangeCustom)
-               {
-                  // Typed in whichever unit the timeline is showing (WP6's
-                  // ArrangeParsePos/ArrangeFormatPos), so a range reads the
-                  // same way as every other position in the panel.
-                  auto tickField = [&](const char* id, Arrange::Tick& t) {
-                     char buf[48];
-                     snprintf(buf, sizeof(buf), "%s", ArrangeFormatPos(t).c_str());
-                     ImGui::SetNextItemWidth((fieldW - 24.0f - 2.0f * tok::space_1) * 0.5f);
-                     if (FieldWell::InputText(id, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
-                     {
-                        const Arrange::Tick parsed = ArrangeParsePos(buf);
-                        if (parsed >= 0)
-                        {
-                           t = parsed;
-                           gPatchDirty = true;
-                        }
-                     }
-                  };
-                  SectionCard::RowLabel(T("Custom"));
-                  tickField("##arrRangeStart", rset.renderRangeStart);
-                  ImGui::SameLine(0.0f, tok::space_1);
-                  ImGui::TextDisabled("->");
-                  ImGui::SameLine(0.0f, tok::space_1);
-                  tickField("##arrRangeEnd", rset.renderRangeEnd);
-               }
-               currentRange(rangeA, rangeB);
-
-               const bool audioOnly = effectiveVideoSource() == kArrangeVideoNone;
-
-               // ---- Resolution / fps (video jobs only) ----
-               if (!audioOnly)
-               {
-                  SectionCard::Begin(T("Video"));
-                  SectionCard::RowLabel(T("Size"));
-                  static int sArrangeRenderResPreset = 0; // 0=Match Clips, 1..4 fixed, 5=Custom
-                  int detectedClipW = 0, detectedClipH = 0;
-                  ArrangeRenderDetectClipSize(detectedClipW, detectedClipH);
-                  const char* kResPresets[] = { T("Match Clips"), "1080p", "4K", "720p", T("Vertical"), T("Custom") };
-                  ImGui::SetNextItemWidth(fieldW);
-                  std::string resItems;
-                  for (const char* r : kResPresets)
-                  {
-                     resItems += r;
-                     resItems.push_back('\0');
-                  }
-                  resItems.push_back('\0');
-                  if (WellCombo("##arrResPreset", &sArrangeRenderResPreset, resItems.c_str()))
-                  {
-                     if (sArrangeRenderResPreset == 0) { rset.renderWidth = detectedClipW; rset.renderHeight = detectedClipH; }
-                     else if (sArrangeRenderResPreset == 1) { rset.renderWidth = 1920; rset.renderHeight = 1080; }
-                     else if (sArrangeRenderResPreset == 2) { rset.renderWidth = 3840; rset.renderHeight = 2160; }
-                     else if (sArrangeRenderResPreset == 3) { rset.renderWidth = 1280; rset.renderHeight = 720; }
-                     else if (sArrangeRenderResPreset == 4) { rset.renderWidth = 1080; rset.renderHeight = 1920; }
-                     gPatchDirty = true;
-                  }
-                  SectionCard::RowLabel("");
-                  ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
-                  if (FieldWell::InputInt("##arrResW", &rset.renderWidth, 0, 0))
-                     gPatchDirty = true;
-                  ImGui::SameLine(0.0f, tok::space_1);
-                  ImGui::TextDisabled("%s", T("x"));
-                  ImGui::SameLine(0.0f, tok::space_1);
-                  ImGui::SetNextItemWidth((fieldW - 12.0f - 2.0f * tok::space_1) * 0.5f);
-                  if (FieldWell::InputInt("##arrResH", &rset.renderHeight, 0, 0))
-                     gPatchDirty = true;
-                  rset.renderWidth = std::clamp(rset.renderWidth, 16, 7680);
-                  rset.renderHeight = std::clamp(rset.renderHeight, 16, 4320);
-
-                  SectionCard::RowLabel(T("Rate"));
-                  ImGui::SetNextItemWidth(fieldW);
-                  if (FieldWell::InputInt("##arrRenderFps", &rset.renderFps, 0, 0))
-                     gPatchDirty = true;
-                  rset.renderFps = std::clamp(rset.renderFps, 1, 240);
-               }
-
-               // ---- Output file ----
-               SectionCard::Begin(T("Output"));
-               SectionCard::RowLabel(T("Name"));
-               char renderNameBuf[256];
-               snprintf(renderNameBuf, sizeof(renderNameBuf), "%s", sArrangeRenderFileName.c_str());
-               ImGui::SetNextItemWidth(fieldW - 36.0f);
-               if (FieldWell::InputText("##arrangeRenderName", renderNameBuf, sizeof(renderNameBuf)))
-                  sArrangeRenderFileName = renderNameBuf;
-               ImGui::SameLine(0.0f, tok::space_1);
-               ImGui::TextDisabled("%s", renderExtension());
-
-               char renderFolderBuf[512];
-               snprintf(renderFolderBuf, sizeof(renderFolderBuf), "%s", rset.renderFolder.c_str());
-               SectionCard::RowLabel(T("Folder"));
-               ImGui::SetNextItemWidth(fieldW);
-               if (FieldWell::InputText("##arrangeRenderFolder", renderFolderBuf, sizeof(renderFolderBuf)))
-               {
-                  rset.renderFolder = renderFolderBuf;
-                  gPatchDirty = true;
-               }
-
-               // Format follows the video source: an audio-only job is a WAV
-               // by definition (the extension beside the name already says
-               // so), so the container buttons stand down rather than
-               // offering a choice that cannot apply (WP7 #1).
-               if (!audioOnly)
-               {
-                  const int fmtActive = rset.renderFormat == 1 ? 1 : 0;
-                  SectionCard::RowLabel(T("Format"));
-                  if (ChipButton::Draw(".mp4##arrRenderMp4", fmtActive == 0, 24.0f, 56.0f))
-                  {
-                     rset.renderFormat = 0;
-                     gPatchDirty = true;
-                  }
-                  ImGui::SameLine(0.0f, tok::space_1);
-                  if (ChipButton::Draw(".mov##arrRenderMov", fmtActive == 1, 24.0f, 56.0f))
-                  {
-                     rset.renderFormat = 1;
-                     gPatchDirty = true;
-                  }
-               }
-               SectionCard::End();
-               ImGui::Dummy(ImVec2(0.0f, tok::space_1));
-
-               // Builds the job the two submit buttons share, so "Render Now"
-               // and "Add to Queue" can never disagree about what was asked
-               // for - they differ only in where the job is put.
-               auto buildJob = [&]() -> ArrangeRenderJob {
-                  ArrangeRenderJob job;
-                  job.rangeKind = rset.renderRangeKind;
-                  job.startTick = rangeA;
-                  job.endTick = rangeB;
-                  job.audioSource = effectiveAudioSource();
-                  job.videoSource = effectiveVideoSource();
-                  // Always 0: this modal renders the timeline. The canvas
-                  // Output-node take is the Output node's own record button,
-                  // not a source choice hidden inside the timeline's render
-                  // dialog - which is what the removed dropdowns were.
-                  job.canvasVideoUid = 0;
-                  job.width = rset.renderWidth;
-                  job.height = rset.renderHeight;
-                  job.fps = rset.renderFps;
-                  // Follows Settings -> Audio, not rset.renderSampleRate: the
-                  // graph only knows how to generate at the rate its nodes
-                  // were prepared at, so a per-arrangement rate would be a
-                  // choice nothing downstream could honour.
-                  job.sampleRate = (int)llround(ArrangeRenderActiveSampleRate());
-                  job.format = job.videoSource == kArrangeVideoNone ? 2 : (rset.renderFormat == 1 ? 1 : 0);
-                  job.path = renderFullPath();
-                  return job;
-               };
-               auto commitJob = [](ArrangeRenderJob job, bool startNow) {
-                  job.id = gArrangeRenderNextJobId++;
-                  job.status = kArrangeJobQueued;
-                  if (startNow)
-                  {
-                     // Ahead of anything already parked, so "Render Now"
-                     // means this job, not "whatever is first in the queue".
-                     gArrangeRenderQueue.insert(gArrangeRenderQueue.begin(), job);
-                     gArrangeRenderQueueRunning = true;
-                  }
-                  else
-                  {
-                     gArrangeRenderQueue.push_back(job);
-                  }
-               };
-               auto submitJob = [&](bool startNow) {
-                  ArrangeRenderJob job = buildJob();
-                  std::error_code ec;
-                  const bool collides =
-                     std::filesystem::exists(AppPaths::FsPath(job.path), ec) || ArrangeRenderPathQueued(job.path, 0);
-                  if (collides)
-                  {
-                     // Asking before the queue gets there, not while it runs:
-                     // a job that silently overwrote yesterday's export is
-                     // only noticed once it is already gone (WP7 #8).
-                     sArrangePendingJob = job;
-                     sArrangePendingStartNow = startNow;
-                     sArrangeOpenOverwrite = true;
-                  }
-                  else
-                  {
-                     commitJob(job, startNow);
-                  }
-               };
-
-               // effectiveAudioSource() is always Timeline here, so there is
-               // always an audio stream to write; only the filename can be
-               // missing.
-               const bool canRender = !sArrangeRenderFileName.empty();
-               ImGui::BeginDisabled(!canRender || ArrangeRenderBusy());
-               if (ChipButton::Draw(L("Render Now"), true, 28.0f, 140.0f))
-               {
-                  submitJob(true);
-                  ImGui::CloseCurrentPopup();
-               }
-               ImGui::EndDisabled();
-               ImGui::SameLine(0.0f, tok::space_2);
-               if (ChipButton::Draw(L("Cancel"), false, 28.0f, 88.0f))
-                  ImGui::CloseCurrentPopup();
-               SectionCard::EndWindow();
-               FieldWell::PopStyle();
-               ImGui::PopStyleVar();
-               ImGui::EndPopup();
-            }
-
-            // ---- overwrite / duplicate-path prompt (WP7 #8) ----
-            // Drawn at toolbar level rather than inside the render popup: the
-            // popup closes on submit, and a modal owned by a closed popup
-            // never opens.
-            if (sArrangeOpenOverwrite)
-            {
-               ImGui::OpenPopup(L("Overwrite file?##arrangeOverwrite"));
-               sArrangeOpenOverwrite = false;
-            }
-            if (DialogParts::Begin(L("Overwrite file?##arrangeOverwrite")))
-            {
-               DialogParts::Title(T("Overwrite file?"));
-               const bool queuedClash = ArrangeRenderPathQueued(sArrangePendingJob.path, 0);
-               DialogParts::Message(queuedClash ? T("Another queued job already writes:") : T("This file already exists:"));
-               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 400.0f);
-               DialogParts::Message(sArrangePendingJob.path.c_str());
-               ImGui::PopTextWrapPos();
-               const int pick = DialogParts::Buttons({ L("Cancel"), L("Auto-rename"), L("Overwrite") });
-               if (pick == 1 || pick == 2)
-               {
-                  ArrangeRenderJob job = sArrangePendingJob;
-                  if (pick == 1)
-                     job.path = ArrangeRenderUniquePath(job.path);
-                  job.id = gArrangeRenderNextJobId++;
-                  job.status = kArrangeJobQueued;
-                  if (sArrangePendingStartNow)
-                  {
-                     gArrangeRenderQueue.insert(gArrangeRenderQueue.begin(), job);
-                     gArrangeRenderQueueRunning = true;
-                  }
-                  else
-                  {
-                     gArrangeRenderQueue.push_back(job);
-                  }
-               }
-               if (pick >= 0)
-                  ImGui::CloseCurrentPopup();
-               DialogParts::End();
-            }
+            DrawArrangeRenderDialogs();
          }
 
          // Add/delete track now live in each row's right-click menu, and
