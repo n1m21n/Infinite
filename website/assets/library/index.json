@@ -1725,7 +1725,7 @@
         "3d",
         "parametric"
       ],
-      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold Kähler manifold with interlocking compactified sheets.",
+      "description": "3D cross-section projection of the 6D Calabi-Yau quintic threefold K\u00e4hler manifold with interlocking compactified sheets.",
       "price": 0,
       "domain": "sketch",
       "category": "Sketch 3D",
@@ -1863,6 +1863,194 @@
       "file": "assets/library/pixel/voronoi-bioluminescence.field",
       "preview": "assets/library/previews/voronoi-bioluminescence.jpg",
       "bytes": 2103
+    },
+    {
+      "id": "rabinovich-fabrikant",
+      "name": "Rabinovich-Fabrikant",
+      "kind": "Generator",
+      "tags": [
+        "chaos",
+        "attractor",
+        "math"
+      ],
+      "description": "Mikhail Rabinovich and Anatoly Fabrikant chaotic attractor (1979) featuring dual intertwined hyperbolic spiral vortices.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 6,
+      "file": "assets/library/sketch/rabinovich-fabrikant.js",
+      "preview": "assets/library/previews/rabinovich-fabrikant.jpg",
+      "bytes": 2586
+    },
+    {
+      "id": "penrose-tiling",
+      "name": "Penrose Tiling",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "tiling",
+        "quasicrystal",
+        "math"
+      ],
+      "description": "Aperiodic Penrose P3 tiling with fivefold decagonal quasicrystal symmetry and recursive golden-ratio subdivision.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/penrose-tiling.js",
+      "preview": "assets/library/previews/penrose-tiling.jpg",
+      "bytes": 3428
+    },
+    {
+      "id": "scherk-surface-3d",
+      "name": "Scherk Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "minimal-surface"
+      ],
+      "description": "Heinrich Scherk's doubly periodic minimal surface (1834) with orthogonal intersecting saddle bridges and asymptotic towers.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 6,
+      "file": "assets/library/sketch/scherk-surface-3d.js",
+      "preview": "assets/library/previews/scherk-surface-3d.jpg",
+      "bytes": 2185
+    },
+    {
+      "id": "catalan-surface-3d",
+      "name": "Catalan Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "ruled-surface"
+      ],
+      "description": "Eug\u00e8ne Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 8,
+      "file": "assets/library/sketch/catalan-surface-3d.js",
+      "preview": "assets/library/previews/catalan-surface-3d.jpg",
+      "bytes": 2488
+    },
+    {
+      "id": "vosim-voice-synth",
+      "name": "VOSIM Voice Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "vosim",
+        "voice",
+        "audio",
+        "dsp"
+      ],
+      "description": "VOSIM micro-acoustic voice synthesizer using decaying squared-sine pulse bursts with formant control and sub-harmonic body.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/vosim-voice-synth.inf",
+      "preview": "assets/library/previews/vosim-voice-synth.jpg",
+      "bytes": 1908
+    },
+    {
+      "id": "west-coast-fold-synth",
+      "name": "West Coast Fold Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "west-coast",
+        "wavefolding",
+        "fm",
+        "dsp"
+      ],
+      "description": "Buchla-inspired West Coast synthesizer featuring complex through-zero FM carrier-modulator pairing and multi-stage nonlinear wavefolding.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/west-coast-fold-synth.inf",
+      "preview": "assets/library/previews/west-coast-fold-synth.jpg",
+      "bytes": 1756
+    },
+    {
+      "id": "bbd-bucket-brigade-fx",
+      "name": "BBD Bucket Brigade FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "bbd",
+        "delay",
+        "chorus",
+        "dsp"
+      ],
+      "description": "Analog bucket brigade device (BBD) delay line model with discrete stage transfer, clock rate modulation and dark tape warmth.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 6,
+      "file": "assets/templates/bbd-bucket-brigade-fx.inf",
+      "preview": "assets/library/previews/bbd-bucket-brigade-fx.jpg",
+      "bytes": 1834
+    },
+    {
+      "id": "dynamic-transient-shaper-fx",
+      "name": "Dynamic Transient Shaper FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "transient",
+        "dynamics",
+        "dsp"
+      ],
+      "description": "Dual-envelope transient designer and harmonic exciter with independent attack punch enhancement and soft saturating tape ceiling.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/dynamic-transient-shaper-fx.inf",
+      "preview": "assets/library/previews/dynamic-transient-shaper-fx.jpg",
+      "bytes": 1796
+    },
+    {
+      "id": "ferrofluid-spikes",
+      "name": "Ferrofluid Spikes",
+      "kind": "Generator",
+      "tags": [
+        "Physics",
+        "Audio-Reactive",
+        "Simulation"
+      ],
+      "description": "Magnetic liquid ferrofluid simulation with audio-reactive Rosensweig hedgehog spikes, surface meniscus tension and specular obsidian iridescence.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/ferrofluid-spikes.field",
+      "preview": "assets/library/previews/ferrofluid-spikes.jpg",
+      "bytes": 1700
+    },
+    {
+      "id": "prismatic-hologram",
+      "name": "Prismatic Hologram",
+      "kind": "Generator",
+      "tags": [
+        "Optical",
+        "Audio-Reactive",
+        "Hologram"
+      ],
+      "description": "Transmission diffraction grating with holographic interference fringe patterns, audio-reactive chromatic phase shifts and optical shimmer.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/prismatic-hologram.field",
+      "preview": "assets/library/previews/prismatic-hologram.jpg",
+      "bytes": 2010
     }
   ]
 }

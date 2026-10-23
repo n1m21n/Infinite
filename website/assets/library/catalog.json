@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 167,
+ "count": 177,
  "items": [
   {
    "id": "first-sound",
@@ -2006,6 +2006,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/voronoi-bioluminescence.field",
    "preview": "https://infinitedevices.org/assets/library/previews/voronoi-bioluminescence.jpg",
    "page": "https://infinitedevices.org/library/voronoi-bioluminescence.html"
+  },
+  {
+   "id": "rabinovich-fabrikant",
+   "name": "Rabinovich-Fabrikant",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Mikhail Rabinovich and Anatoly Fabrikant chaotic attractor (1979) featuring dual intertwined hyperbolic spiral vortices.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/rabinovich-fabrikant.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/rabinovich-fabrikant.jpg",
+   "page": "https://infinitedevices.org/library/rabinovich-fabrikant.html"
+  },
+  {
+   "id": "penrose-tiling",
+   "name": "Penrose Tiling",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Aperiodic Penrose P3 tiling with fivefold decagonal quasicrystal symmetry and recursive golden-ratio subdivision.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/penrose-tiling.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/penrose-tiling.jpg",
+   "page": "https://infinitedevices.org/library/penrose-tiling.html"
+  },
+  {
+   "id": "scherk-surface-3d",
+   "name": "Scherk Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Heinrich Scherk's doubly periodic minimal surface (1834) with orthogonal intersecting saddle bridges and asymptotic towers.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/scherk-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/scherk-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/scherk-surface-3d.html"
+  },
+  {
+   "id": "catalan-surface-3d",
+   "name": "Catalan Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Eugène Charles Catalan's cycloidal ruled minimal surface (1842) featuring undulating helical ribbons.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/catalan-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/catalan-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/catalan-surface-3d.html"
+  },
+  {
+   "id": "vosim-voice-synth",
+   "name": "VOSIM Voice Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "VOSIM micro-acoustic voice synthesizer using decaying squared-sine pulse bursts with formant control and sub-harmonic body.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/vosim-voice-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/vosim-voice-synth.jpg",
+   "page": "https://infinitedevices.org/library/vosim-voice-synth.html"
+  },
+  {
+   "id": "west-coast-fold-synth",
+   "name": "West Coast Fold Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Buchla-inspired West Coast synthesizer featuring complex through-zero FM carrier-modulator pairing and multi-stage nonlinear wavefolding.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/west-coast-fold-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/west-coast-fold-synth.jpg",
+   "page": "https://infinitedevices.org/library/west-coast-fold-synth.html"
+  },
+  {
+   "id": "bbd-bucket-brigade-fx",
+   "name": "BBD Bucket Brigade FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Analog bucket brigade device (BBD) delay line model with discrete stage transfer, clock rate modulation and dark tape warmth.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/bbd-bucket-brigade-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/bbd-bucket-brigade-fx.jpg",
+   "page": "https://infinitedevices.org/library/bbd-bucket-brigade-fx.html"
+  },
+  {
+   "id": "dynamic-transient-shaper-fx",
+   "name": "Dynamic Transient Shaper FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Dual-envelope transient designer and harmonic exciter with independent attack punch enhancement and soft saturating tape ceiling.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/dynamic-transient-shaper-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/dynamic-transient-shaper-fx.jpg",
+   "page": "https://infinitedevices.org/library/dynamic-transient-shaper-fx.html"
+  },
+  {
+   "id": "ferrofluid-spikes",
+   "name": "Ferrofluid Spikes",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Magnetic liquid ferrofluid simulation with audio-reactive Rosensweig hedgehog spikes, surface meniscus tension and specular obsidian iridescence.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/ferrofluid-spikes.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/ferrofluid-spikes.jpg",
+   "page": "https://infinitedevices.org/library/ferrofluid-spikes.html"
+  },
+  {
+   "id": "prismatic-hologram",
+   "name": "Prismatic Hologram",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Transmission diffraction grating with holographic interference fringe patterns, audio-reactive chromatic phase shifts and optical shimmer.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/prismatic-hologram.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/prismatic-hologram.jpg",
+   "page": "https://infinitedevices.org/library/prismatic-hologram.html"
   }
  ]
 }

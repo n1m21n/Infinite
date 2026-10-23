@@ -1,0 +1,44 @@
+infinite-patch 1
+# VOSIM Voice Synth: VOSIM micro-acoustic voice synthesizer with decaying squared-sine bursts
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i rangeLow 36
+  i rangeHigh 64
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float formantFreq = 1400.0 [300.0, 3800.0]\nparam float pulseCount = 4.0 [1.0, 10.0]\nparam float decay = 0.68 [0.1, 0.98]\nparam float filterCutoff = 5200.0 [200.0, 14000.0]\nparam float subWeight = 0.35 [0.0, 1.0]\nstate float fundPhase = 0\nstate float subPhase = 0\nstate float env = 0\nstate float lp = 0\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0)\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.18, env * 0.9995)\n\nfStep = clamp(freq, 20.0, 4000.0) / sr\nfundPhase = (fundPhase + fStep) % 1.0\nsubPhase = (subPhase + fStep * 0.5) % 1.0\n\nfRatio = clamp(formantFreq / max(freq, 20.0), 1.0, 32.0)\npulseIdx = floor(fundPhase * fRatio)\npulseFrac = (fundPhase * fRatio) % 1.0\n\nvosimPulse = if(pulseIdx < pulseCount, sin(3.14159265 * pulseFrac) * sin(3.14159265 * pulseFrac) * pow(decay, pulseIdx), 0.0)\nsubSig = sin(6.2831853 * subPhase) * subWeight\n\nraw = (vosimPulse * 1.5 + subSig) * env\n\nfCut = clamp(filterCutoff / sr * 2.0, 0.01, 0.48)\nlp = lp + fCut * (raw - lp)\n\nout = lp * 0.85\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text VOSIM Voice Synth. VOSIM micro-acoustic voice synthesizer using decaying squared-sine pulse bursts with formant control.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

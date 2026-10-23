@@ -1,0 +1,44 @@
+infinite-patch 1
+# West Coast Fold Synth: Buchla-inspired through-zero FM and multi-stage nonlinear wavefolding
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.25
+  i rangeLow 32
+  i rangeHigh 60
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float fmRatio = 2.0 [0.5, 8.0]\nparam float fmIndex = 1.2 [0.0, 5.0]\nparam float foldAmount = 2.5 [1.0, 6.0]\nparam float symmetry = 0.15 [-0.5, 0.5]\nparam float decay = 0.8 [0.1, 4.0]\nstate float carPhase = 0\nstate float modPhase = 0\nstate float env = 0\nstate float lp = 0\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0)\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.2, env * 0.9996)\n\nfStep = clamp(freq, 20.0, 4000.0) / sr\nmodPhase = (modPhase + fStep * fmRatio) % 1.0\nmodulator = sin(6.2831853 * modPhase) * fmIndex * env\n\ncarPhase = (carPhase + fStep + modulator * fStep) % 1.0\ncore = sin(6.2831853 * carPhase) + symmetry\n\nfolded1 = sin(core * foldAmount * 1.5707963)\nfolded2 = sin(folded1 * (1.0 + foldAmount * 0.6) * 1.5707963)\n\nraw = folded2 * env\nfCut = clamp(6000.0 / sr * 2.0, 0.01, 0.48)\nlp = lp + fCut * (raw - lp)\n\nout = lp * 0.8\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.28
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text West Coast Fold Synth. Buchla-inspired complex FM oscillator pairing and multi-stage nonlinear wavefolding.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

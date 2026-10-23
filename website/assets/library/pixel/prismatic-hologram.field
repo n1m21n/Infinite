@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Prismatic Hologram",
+    "author": "Infinite",
+    "description": "Transmission diffraction grating with holographic interference fringe patterns, audio-reactive chromatic phase shifts, anisotropic spectral streaks and optical shimmer.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float audio_high = 0.5 [0.0, 2.0];\nparam float grating = 24.0 [8.0, 64.0];\nparam float dispersion = 1.2 [0.2, 3.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\nrot = t * 0.25 + audio_bass * 0.3;\nang = a + rot;\n\ng1 = sin((p.x * 0.707 + p.y * 0.707) * grating + t * 2.0 + audio_bass * 3.0);\ng2 = sin((p.x * 0.707 - p.y * 0.707) * grating - t * 1.8 + audio_mid * 2.5);\nfringes = g1 * g2;\n\nfringeR = sin(fringes * 4.0 + dispersion * 1.5 + t);\nfringeG = sin(fringes * 4.0 + dispersion * 0.0 + t);\nfringeB = sin(fringes * 4.0 - dispersion * 1.5 + t);\n\niris = vec3(fringeR * 0.5 + 0.5, fringeG * 0.5 + 0.5, fringeB * 0.5 + 0.5);\n\nring = smoothstep(0.06, 0.0, abs(r - 0.35 - 0.08 * sin(ang * 6.0 + t * 3.0) - 0.1 * audio_bass));\nstreaks = pow(abs(cos(ang * 8.0 - t * 2.0)), 12.0) * (0.4 + 0.8 * audio_high);\n\nmidnight = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.208);\n\nholoTint = mix(signal, emerald, sin(r * 12.0 - t) * 0.5 + 0.5);\nholoTint = mix(holoTint, ember, streaks);\n\nfinalHolo = iris * holoTint * (0.7 + ring * 1.4 + streaks * 1.2);\nmask = smoothstep(0.7, 0.1, r);\n\ncol = mix(midnight, finalHolo, mask * clamp(abs(fringes) * 0.9 + ring + streaks, 0.0, 1.0));\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "audio_high": 0.5,
+      "grating": 24.0,
+      "dispersion": 1.2
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

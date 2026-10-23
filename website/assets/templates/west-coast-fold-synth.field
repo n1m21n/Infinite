@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "West Coast Fold Synth",
+    "author": "Infinite",
+    "description": "Buchla-inspired West Coast synthesizer featuring complex through-zero FM carrier-modulator pairing and multi-stage nonlinear wavefolding.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float fmRatio = 2.0 [0.5, 8.0];\nparam float fmIndex = 1.2 [0.0, 5.0];\nparam float foldAmount = 2.5 [1.0, 6.0];\nparam float symmetry = 0.15 [-0.5, 0.5];\nparam float decay = 0.8 [0.1, 4.0];\nstate float carPhase = 0;\nstate float modPhase = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0);\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.2, env * 0.9996);\n\nfStep = clamp(freq, 20.0, 4000.0) / sr;\nmodPhase = (modPhase + fStep * fmRatio) % 1.0;\nmodulator = sin(6.2831853 * modPhase) * fmIndex * env;\n\ncarPhase = (carPhase + fStep + modulator * fStep) % 1.0;\ncore = sin(6.2831853 * carPhase) + symmetry;\n\nfolded1 = sin(core * foldAmount * 1.5707963);\nfolded2 = sin(folded1 * (1.0 + foldAmount * 0.6) * 1.5707963);\n\nraw = folded2 * env;\nfCut = clamp(6000.0 / sr * 2.0, 0.01, 0.48);\nlp = lp + fCut * (raw - lp);\n\nout = lp * 0.8;\n",
+    "params": {
+      "fmRatio": 2.0,
+      "fmIndex": 1.2,
+      "foldAmount": 2.5,
+      "symmetry": 0.15,
+      "decay": 0.8
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "BBD Bucket Brigade FX",
+    "author": "Infinite",
+    "description": "Analog bucket brigade device (BBD) delay line model with discrete stage transfer, clock rate modulation, compander dynamics and dark tape warmth.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float delayMs = 35.0 [5.0, 150.0];\nparam float depth = 0.4 [0.0, 1.0];\nparam float rateHz = 1.2 [0.1, 8.0];\nparam float feedback = 0.45 [0.0, 0.95];\nparam float warmth = 0.6 [0.0, 1.0];\nparam float mix = 0.5 [0.0, 1.0];\nstate float lfoPhase = 0;\nstate float s1 = 0;\nstate float s2 = 0;\nstate float s3 = 0;\nstate float lp = 0;\nstate float fb = 0;\n\nlfoPhase = (lfoPhase + rateHz / sr) % 1.0;\nlfo = sin(6.2831853 * lfoPhase);\n\ncurSig = in + fb * feedback;\nsatIn = tanh(curSig * (1.0 + warmth * 0.5));\n\nclockMod = clamp(delayMs * 0.001 * sr * (1.0 + lfo * depth * 0.3), 10.0, 4000.0);\ndecayFactor = clamp(1.0 / (clockMod * 0.33), 0.001, 0.4);\n\ns1 = s1 + (satIn - s1) * decayFactor;\ns2 = s2 + (s1 - s2) * decayFactor;\ns3 = s3 + (s2 - s3) * decayFactor;\n\nbbdOut = s3;\nfb = bbdOut;\nlp = lp + clamp(4200.0 / sr * 2.0 * (1.0 - warmth * 0.4), 0.02, 0.45) * (bbdOut - lp);\n\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "delayMs": 35.0,
+      "depth": 0.4,
+      "rateHz": 1.2,
+      "feedback": 0.45,
+      "warmth": 0.6,
+      "mix": 0.5
+    },
+    "nodeSettings": {}
+  }
+}

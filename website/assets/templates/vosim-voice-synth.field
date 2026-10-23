@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "VOSIM Voice Synth",
+    "author": "Infinite",
+    "description": "VOSIM micro-acoustic voice synthesizer using decaying squared-sine pulse bursts with variable pulse count, formant control and sub-harmonic body.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float formantFreq = 1400.0 [300.0, 3800.0];\nparam float pulseCount = 4.0 [1.0, 10.0];\nparam float decay = 0.68 [0.1, 0.98];\nparam float filterCutoff = 5200.0 [200.0, 14000.0];\nparam float subWeight = 0.35 [0.0, 1.0];\nstate float fundPhase = 0;\nstate float subPhase = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntargetEnv = if(gate > 0.5, 1.0, 0.0);\nenv = if(targetEnv > env, env + (targetEnv - env) * 0.18, env * 0.9995);\n\nfStep = clamp(freq, 20.0, 4000.0) / sr;\nfundPhase = (fundPhase + fStep) % 1.0;\nsubPhase = (subPhase + fStep * 0.5) % 1.0;\n\nfRatio = clamp(formantFreq / max(freq, 20.0), 1.0, 32.0);\npulseIdx = floor(fundPhase * fRatio);\npulseFrac = (fundPhase * fRatio) % 1.0;\n\nvosimPulse = if(pulseIdx < pulseCount, sin(3.14159265 * pulseFrac) * sin(3.14159265 * pulseFrac) * pow(decay, pulseIdx), 0.0);\nsubSig = sin(6.2831853 * subPhase) * subWeight;\n\nraw = (vosimPulse * 1.5 + subSig) * env;\n\nfCut = clamp(filterCutoff / sr * 2.0, 0.01, 0.48);\nlp = lp + fCut * (raw - lp);\n\nout = lp * 0.85;\n",
+    "params": {
+      "formantFreq": 1400.0,
+      "pulseCount": 4.0,
+      "decay": 0.68,
+      "filterCutoff": 5200.0,
+      "subWeight": 0.35
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}

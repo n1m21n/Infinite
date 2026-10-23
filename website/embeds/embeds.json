@@ -170,6 +170,16 @@
       "slug": "voronoi-bioluminescence",
       "title": "Voronoi Bioluminescence",
       "description": "Living Voronoi cellular foam tissue with audio-reactive cytoplasmic currents, phosphorescent organelle cores and iridescent membrane tension."
+    },
+    {
+      "slug": "ferrofluid-spikes",
+      "title": "Ferrofluid Spikes",
+      "description": "Magnetic liquid ferrofluid simulation with audio-reactive Rosensweig hedgehog spikes, surface meniscus tension and specular obsidian iridescence."
+    },
+    {
+      "slug": "prismatic-hologram",
+      "title": "Prismatic Hologram",
+      "description": "Transmission diffraction grating with holographic interference fringe patterns, audio-reactive chromatic phase shifts and optical shimmer."
     }
   ]
 }

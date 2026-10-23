@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Dynamic Transient Shaper FX",
+    "author": "Infinite",
+    "description": "Dual-envelope transient designer and harmonic exciter with independent attack punch enhancement, sustain tail sculpting and soft saturating tape ceiling.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float attackPunch = 1.4 [0.0, 3.0];\nparam float sustainTail = 1.2 [0.0, 3.0];\nparam float speed = 1.0 [0.2, 3.0];\nparam float drive = 0.3 [0.0, 1.0];\nparam float mix = 1.0 [0.0, 1.0];\nstate float fastEnv = 0;\nstate float slowEnv = 0;\nstate float lp = 0;\n\nabsIn = abs(in);\n\nfastRate = clamp(1.0 / (0.005 * sr / speed), 0.001, 0.5);\nslowRate = clamp(1.0 / (0.06 * sr / speed), 0.0001, 0.1);\n\nfastEnv = fastEnv + if(absIn > fastEnv, 0.4, fastRate) * (absIn - fastEnv);\nslowEnv = slowEnv + if(absIn > slowEnv, 0.08, slowRate) * (absIn - slowEnv);\n\ntransientDiff = max(0.0, fastEnv - slowEnv);\nsustainWeight = max(0.0, slowEnv);\n\ngainMod = 1.0 + (transientDiff * (attackPunch - 1.0) * 3.5) + ((sustainTail - 1.0) * sustainWeight * 1.5);\nshaped = in * clamp(gainMod, 0.0, 4.0);\n\nwet = tanh(shaped * (1.0 + drive * 0.8));\n\nout = in * (1.0 - mix) + wet * mix;\n",
+    "params": {
+      "attackPunch": 1.4,
+      "sustainTail": 1.2,
+      "speed": 1.0,
+      "drive": 0.3,
+      "mix": 1.0
+    },
+    "nodeSettings": {}
+  }
+}

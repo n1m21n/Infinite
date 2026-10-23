@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Ferrofluid Spikes",
+    "author": "Infinite",
+    "description": "Magnetic liquid ferrofluid simulation with audio-reactive Rosensweig hedgehog spikes, surface meniscus tension and specular obsidian iridescence.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float audio_bass = 0.5 [0.0, 2.0];\nparam float audio_mid = 0.5 [0.0, 2.0];\nparam float audio_high = 0.5 [0.0, 2.0];\nparam float spikes = 12.0 [6.0, 24.0];\nparam float tension = 0.8 [0.2, 2.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\na = atan2(p.y, p.x);\n\nrot = t * 0.35;\nang = a + rot;\n\nharm1 = sin(ang * spikes);\nharm2 = cos(ang * spikes * 0.5 + t);\nspikeMod = (harm1 * 0.7 + harm2 * 0.3) * (0.15 + 0.22 * audio_bass);\n\nspikeR = 0.28 + spikeMod;\ndistCore = r - spikeR;\n\nrings = sin(r * 32.0 - t * 2.5 + audio_mid * 3.0);\nfieldLines = smoothstep(0.2, 0.05, abs(rings));\n\ncore = smoothstep(0.04, -0.04, distCore);\nedge = smoothstep(0.08, 0.0, abs(distCore));\n\nmidnight = vec3(0.082, 0.098, 0.188);\nsignal = vec3(0.655, 0.694, 1.0);\nemerald = vec3(0.306, 0.949, 0.722);\nember = vec3(1.0, 0.42, 0.208);\n\nsheen = mix(signal, emerald, sin(ang * 3.0 + t) * 0.5 + 0.5);\nsheen = mix(sheen, ember, edge * (0.4 + audio_high * 0.6));\n\nglow = sheen * (edge * 1.8 + core * 0.8 + fieldLines * 0.5);\ncol = mix(midnight, glow, clamp(core + edge + fieldLines * 0.3, 0.0, 1.0));\n",
+    "params": {
+      "audio_bass": 0.5,
+      "audio_mid": 0.5,
+      "audio_high": 0.5,
+      "spikes": 12.0,
+      "tension": 0.8
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

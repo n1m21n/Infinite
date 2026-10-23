@@ -62,6 +62,8 @@
   <url><loc>https://infinitedevices.org/embeds/cymatic-liquid-matrix.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/crystal-polytope.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/voronoi-bioluminescence.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/ferrofluid-spikes.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/prismatic-hologram.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-23</lastmod><priority>0.7</priority></url>
@@ -241,6 +243,16 @@
   <url><loc>https://infinitedevices.org/library/spectral-gate-stutter-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/crystal-polytope.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/voronoi-bioluminescence.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/rabinovich-fabrikant.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/penrose-tiling.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/scherk-surface-3d.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/catalan-surface-3d.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/vosim-voice-synth.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/west-coast-fold-synth.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/bbd-bucket-brigade-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/dynamic-transient-shaper-fx.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ferrofluid-spikes.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/prismatic-hologram.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-23</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-23</lastmod><priority>0.5</priority></url>
