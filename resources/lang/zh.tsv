@@ -1241,3 +1241,254 @@ Ready: nothing missing, every device and output in place	就绪：没有缺失�
 Lock: no drag, delete or undo, knobs still play. Panic stops the sound now; press again to resume	锁定：不能拖动、删除或撤销，旋钮仍可操作。紧急静音立即停声；再按一次恢复
 Lock the canvas for a live show: no node drag, cable drag, delete or undo. Knobs, sliders and the keyboard keep working	为现场演出锁定画布：不能拖动节点或线缆，不能删除或撤销。旋钮、滑块和键盘仍可使用
 Silence everything now: notes off on every MIDI Out and plugin, the sound fades in 5 ms, the transport stops and each projector holds its last frame. Press again to resume	立即全部静音：所有 MIDI Out 和插件的音符关闭，声音在 5 毫秒内淡出，走带停止，每个投影保持最后一帧。再按一次恢复
+  (not found)	  （未找到）
+ missing (kept as they are)	 缺失（保持原样）
+ to copy	 待复制
+ used twice (copied once)	 使用了两次（只复制一次）
+%zu bodies, %zu tris	%zu 个刚体，%zu 个三角形
+%zu segments, %zu tris	%zu 段，%zu 个三角形
+16-pad video player: per-pad mode (one shot / gate / loop), sync, start / end window, speed, opacity, fade in / out; cut, crossfade or dip between clips; pads playable by mouse, CV pin or note 36-51.	16 打击垫视频播放器：每个打击垫独立模式（one shot / gate / loop）、同步、起止窗口、速度、不透明度、淡入 / 淡出；片段之间可硬切、交叉淡化或经黑场过渡；可用鼠标、CV 引脚或音符 36-51 演奏打击垫。
+4-operator FM synth: 11 algorithms, ratio or fixed frequency, a level and ADSR per operator, and feedback on operator 4.	4 算子 FM 合成器：11 种算法，比率或固定频率，每个算子各有电平和 ADSR，算子 4 带反馈。
+A 4-operator FM synth: four sine operators wired by one of 11 algorithms, from a 4>3>2>1 stack to four carriers side by side. Each operator follows the note at a ratio, or sits at a fixed frequency, and has its own level and ADSR; a carrier's level is how loud it is, a modulator's is how far it bends what it feeds. Feedback lets operator 4 modulate itself, from a brighter sine to a buzz. 8 voices, note-driven, rendered at 8x so high notes stay clean.	一台 4 算子 FM 合成器：四个正弦算子按 11 种算法之一连接，从 4>3>2>1 串联到四个载波并排。每个算子按比率跟随音符，或固定在某个频率，并有自己的电平和 ADSR；载波的电平就是它的响度，调制器的电平是它对所驱动算子的弯曲程度。Feedback 让算子 4 调制自身，从更明亮的正弦到嗡嗡声。8 个复音，由音符驱动，以 8 倍过采样渲染，高音依然干净。
+A compressor in four styles (clean, bus, opto, FET) with peak or RMS detection, threshold, ratio, attack, release, makeup and an external sidechain input, over a live static transfer curve. Limiter is its own separate node.	四种风格的压缩器（clean、bus、opto、FET），支持峰值或 RMS 检测、threshold、ratio、attack、release、makeup 和外部侧链输入，并实时显示静态传输曲线。Limiter 是单独的节点。
+A compressor: style, threshold, ratio, attack, release, makeup, a peak/RMS detector switch, and a sidechain switch that feeds the detector from the second input pin instead of the main signal. Style picks the character: clean (exact, a 6 dB knee), bus (VCA glue: the release waits until the attack lets go, a 10 dB knee), opto (a light cell: slow to catch small peaks, a fast then slow release, an 18 dB knee) or FET (the detector hears the output, so it grabs fast, a 2 dB knee). Warm adds transformers either side and rolls the top off as the gain comes down. The graph shows the static transfer curve - input dB in, output dB out.	压缩器：style、threshold、ratio、attack、release、makeup、一个峰值/RMS 检测开关，以及一个侧链开关，让检测器从第二个输入引脚而不是主信号取样。Style 选择特性：clean（精确，6 dB 拐点）、bus（VCA 胶合：release 要等 attack 松开后才开始，10 dB 拐点）、opto（光敏元件：抓小峰值较慢，先快后慢的释放，18 dB 拐点）或 FET（检测器监听输出，因此抓得快，2 dB 拐点）。Warm 在前后加入变压器，并随增益下降削减高频。图表显示静态传输曲线：输入 dB，输出 dB。
+A different value for each note of a chord. Cable it into an Analog or Wavetable knob (cutoff, pan, detune, ...) and every note gets its own setting between low and high, by its place among the keys held when it started: linear spaces them evenly, golden ratio scatters them so each new note lands in the biggest gap, primes spaces them unevenly, alternate goes out from the middle, one side then the other. After count notes the pattern repeats. Into anything that is not a synth knob it gives the first note's value.	为和弦中的每个音符提供不同的值。把它连到 Analog 或 Wavetable 的旋钮（cutoff、pan、detune 等），每个音符都会在 low 和 high 之间得到自己的设置，取决于它开始时在所按键中的位置：linear 均匀分布，golden ratio 让每个新音符落在最大的空隙里，primes 不均匀分布，alternate 从中间向外，一边一次交替。count 个音符之后图案重复。连到非合成器旋钮的地方时，输出第一个音符的值。
+A drawn shape played over time: breakpoints with a bend per segment, tempo-synced, with a loop or sustain point and retrigger from the trig input.	随时间播放的手绘形状：每段可弯曲的断点，与速度同步，带循环点或延音点，可从 trig 输入重新触发。
+A fractional delay line: time (tempo-synced by default, or free ms with 'sync to tempo' off), tone (bipolar tilt on the repeats), feedback (past 100% on purpose for self-oscillation - the output is soft-clipped, not the feedback itself), pan, duck (sidechains the wet signal off the dry input) and a bounce switch that cross-feeds left/right instead of repeating in place. The tape switch puts a tape machine in the loop: wow (slow pitch drift), flutter (fast wobble), saturation (the repeats round off and lose a little level each pass, like a hot tape) and diffusion (the repeats smear into a wash without changing their timing), with the band-limit filters it always had.	分数延迟线：time（默认与速度同步，关闭 'sync to tempo' 后为自由毫秒）、tone（对重复声的双极倾斜）、feedback（可有意超过 100%，用于自激振荡；软削波的是输出，而不是反馈本身）、pan、duck（用干输入对湿信号做侧链闪避）以及一个 bounce 开关，让左右交叉反馈，而不是原地重复。tape 开关在回路中加入一台磁带机：wow（缓慢的音高漂移）、flutter（快速抖动）、saturation（重复声逐次变圆并损失一点电平，像录得很热的磁带）和 diffusion（重复声晕染成一片，而不改变时值），外加一直都有的限带滤波器。
+A hardware-free note source: click-and-drag the on-screen piano, or hover the node (or select it alone) and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all.	无需硬件的音符源：在屏幕钢琴上点击拖动，或把鼠标悬停在节点上（或单独选中它），用笔记本键盘弹奏（Logic/GarageBand 的 Musical Typing 布局：ZXCVBNM... 是一个八度，QWERTY... 是上一个八度），无需任何 MIDI 控制器即可测试补丁。
+A mesh built by a JavaScript sketch you write: the loop-and-recursion counterpart of Field Primitive. Its param() calls become modulatable knobs, and the result patches into Render 3D like any other geometry.	由你编写的 JavaScript 草图构建的网格：Field Primitive 的循环与递归版。其中的 param() 调用会变成可调制的旋钮，结果可以像其他几何体一样接入 Render 3D。
+A new random value every step, with adjustable smoothing between steps. The rate is synced to a note division, free beats or Hz. Seeded and deterministic, so rewinding replays the same sequence.	每一步一个新的随机值，步与步之间可调平滑。速率可同步到音符时值、自由拍数或 Hz。有种子且确定，因此倒回会重放同一序列。
+A note node whose body is a Field script. The script runs per sample against the transport beat; note(pitch, vel, len) inside an if sends a note out (len in beats, 0 holds as long as the incoming note). tick(div) fires on each beat division, deg(d) is a scale degree under Root/Scale, rand() is 0..1. Wire it into any synth or MIDI-out.	内容为 Field 脚本的音符节点。脚本按采样、对照走带的拍运行；在 if 中调用 note(pitch, vel, len) 会发出一个音符（len 以拍为单位，0 表示与输入音符一样长）。tick(div) 在每个拍分处触发，deg(d) 是 Root/Scale 下的音阶级数，rand() 为 0..1。可接入任何合成器或 MIDI 输出。
+A reverb whose room you design: shape (room, hall, chamber, tunnel), size, material (soft and dull to hard and bright), distance from the source, decay time and stereo spread. The node builds that room's impulse response in the background and the picture shows it. 'load file' uses a recorded impulse response instead (up to 10 s); the design controls then grey out. It adds no latency.	由你设计房间的混响：形状（room、hall、chamber、tunnel）、大小、材质（从柔软沉闷到坚硬明亮）、与声源的距离、衰减时间和立体声宽度。节点会在后台生成该房间的脉冲响应，图中显示的就是它。'load file' 改用录制的脉冲响应（最长 10 秒），此时设计控件变灰。不增加延迟。
+A shape you draw, played over time. Click empty space to add a point, drag to move it, right-click to remove it; the small ring on each segment bends it. rate is how long one pass takes (beats, a synced division, or Hz). With nothing patched to trig it follows the transport. A trig cable starts the shape on each rising edge: loop off plays it once and holds the last value; loop on repeats the part between loop start and loop end while trig stays high and plays on to the end when it drops. Loop start = loop end is a sustain point.	你绘制的形状，随时间播放。在空白处点击添加点，拖动移动，右键删除；每段上的小圆环用于弯曲该段。rate 是播放一遍的时长（拍、同步时值或 Hz）。trig 未连接时跟随走带。trig 连线在每个上升沿启动形状：loop 关闭时播放一次并保持最后的值；loop 打开时，只要 trig 保持高电平就重复 loop start 与 loop end 之间的部分，trig 回落后播放到结尾。Loop start = loop end 即为延音点。
+A value per note of a chord, spread across low..high: linear, golden ratio, primes or alternate.	和弦中每个音符一个值，分布在 low..high 之间：linear、golden ratio、primes 或 alternate。
+About Infinite	关于 Infinite
+Add a Keyboard, a synth and an Audio Out, wired and ready to play	添加一个 Keyboard、一个合成器和一个 Audio Out，已连好，可直接演奏
+Add a Sphere, Camera and Light wired into a Render 3D	添加 Sphere、Camera 和 Light，并连入一个 Render 3D
+Add a folder to build the library	添加一个文件夹来建立素材库
+Add an Audio File, Filter, Delay and Reverb into an Audio Out, ready for a sample	添加 Audio File、Filter、Delay 和 Reverb，接入 Audio Out，可直接放入采样
+Adds a small note to the file info of videos, audio and images you export: Made with Infinite, by Naman Soni, and the website. It is metadata only: nothing is drawn on your picture or mixed into your sound, and your work stays yours. Turn it off any time.	在你导出的视频、音频和图像的文件信息中加入一条小注释：Made with Infinite、by Naman Soni 以及网站。这只是元数据：不会在你的画面上绘制任何内容，也不会混入你的声音，作品始终属于你。可随时关闭。
+Agent	代理
+All	全部
+Already driven by something else	已由其他来源驱动
+An image drawn by a JavaScript sketch you write: the loop-and-recursion counterpart of Field Pixel. Its param() calls become modulatable knobs, and it can load and animate an SVG.	由你编写的 JavaScript 草图绘制的图像：Field Pixel 的循环与递归版。其中的 param() 调用会变成可调制的旋钮，并且可以加载和动画化 SVG。
+Applies an ADSR contour to an incoming modulator instead of generating its own trigger: rising above threshold starts attack/decay/sustain, falling back below it starts release. Patch an LFO in and its swing gets shaped by the ADSR, retriggering once per LFO cycle. Output 'ADSR' is the envelope itself, 0 at rest up to 1 at the peak, with stage times exact at any frame rate. Output 'centred' (what older patches load with) collapses toward 0.5 as the level falls, so at level 0 the input has no say and at level 1 it passes through. Hold keeps the peak before decay; each curve bends its stage (positive falls fast first, like an analog envelope). With 'per voice' on and the ADSR output cabled straight into an Analog or Wavetable knob, every note runs its own envelope, gated by its own note-on and note-off.	将 ADSR 包络形状应用到输入的调制器上，而不是自己产生触发：升过 threshold 开始 attack/decay/sustain，回落到其下开始 release。接入一个 LFO，它的摆动就会被 ADSR 塑形，每个 LFO 周期重新触发一次。输出 'ADSR' 就是包络本身，静止时为 0，峰值为 1，各阶段时间在任何帧率下都准确。输出 'centred'（旧补丁加载时使用）随电平下降向 0.5 收拢：电平为 0 时输入不起作用，电平为 1 时原样通过。Hold 在 decay 前保持峰值；每条曲线弯曲其所在阶段（正值先快速下降，像模拟包络）。打开 'per voice' 并把 ADSR 输出直接连到 Analog 或 Wavetable 的旋钮时，每个音符都运行自己的包络，由自己的 note-on 和 note-off 门控。
+Asks GitHub Releases once when Infinite starts. Nothing else is sent.	Infinite 启动时向 GitHub Releases 查询一次。不发送其他任何内容。
+Audio clipped	音频削波
+Author	作者
+Author (optional)	作者（可选）
+Blurs the image with a Gaussian-weighted kernel - a smooth, natural blur. Radius sets how far it samples; Quality Smooth samples every pixel for a cleaner result.	使用高斯加权核模糊图像：平滑、自然的模糊。Radius 决定采样范围；Quality Smooth 对每个像素采样，效果更干净。
+Builds 3D geometry from a JavaScript sketch you write: draw(t) calls box, sphere, cylinder, cone, torus, tube and beginShape/vertex/endShape, moved with translate, rotate and scale (push/pop to nest). param("name", default, lo, hi) makes a modulatable knob. Patch it into Render 3D or any geometry operator. A mistake shows its line number and the last working mesh stays. No file or network access.	用你编写的 JavaScript 草图构建 3D 几何体：draw(t) 调用 box、sphere、cylinder、cone、torus、tube 和 beginShape/vertex/endShape，用 translate、rotate 和 scale 移动（push/pop 用于嵌套）。param("name", default, lo, hi) 生成一个可调制的旋钮。可接入 Render 3D 或任何几何操作节点。出错时显示行号，并保留上一次可用的网格。无文件或网络访问权限。
+Can't reach the extension catalog. Check your connection and try again.	无法连接扩展目录。请检查网络连接后重试。
+Carries a profile curve along a path curve to make a surface: pipes, rails, rims, cables, ribbons. Patch the shape into the first pin and the route into the second; with no profile it sweeps a round one, so a path alone gives a tube. The profile does not spin where the path bends. Start and End scale taper it, Twist turns it along the way, and Caps closes the ends of a closed profile on an open path. A closed profile on a closed path is a watertight ring.	沿路径曲线扫掠轮廓曲线来生成曲面：管道、轨道、轮辋、线缆、带子。把形状接到第一个引脚，路径接到第二个；没有轮廓时扫掠一个圆形，因此只有路径时得到一根管子。路径转弯处轮廓不会自转。Start 和 End scale 让它渐细，Twist 让它沿途扭转，Caps 在开放路径上封闭闭合轮廓的两端。闭合轮廓沿闭合路径扫掠得到一个封闭的环。
+Carries up to eight geometry inputs through one pin into Render 3D (or into another Group 3D), so a scene is not limited to Render 3D's four geometry pins. Nothing is merged: each input keeps its own material, texture, mapping and transform. Anything else downstream, like Transform or Join Geometry, receives the inputs merged into one mesh, each placed where Render 3D would draw it; that merged copy keeps tints as vertex colour but not per-input materials.	通过一个引脚把最多八路几何输入送进 Render 3D（或另一个 Group 3D），让场景不受 Render 3D 四个几何引脚的限制。不做任何合并：每路输入保留自己的材质、纹理、映射和变换。下游的其他节点（如 Transform 或 Join Geometry）收到的是合并成一个网格的输入，每路放在 Render 3D 会绘制它的位置；这份合并副本把着色保留为顶点颜色，但不保留每路输入的材质。
+Changes you make will be listed here	你所做的更改会列在这里
+Check on launch	启动时检查
+Checking for packs...	正在检查扩展包...
+Choose folder and share	选择文件夹并分享
+Clear SVG	清除 SVG
+Click an edit to go back or forward to it.	点击某次编辑即可回到或前进到该处。
+Click or press Esc to cancel	点击或按 Esc 取消
+Code	代码
+Collect	收集
+Collect diagnostics	收集诊断信息
+Collect diagnostics...	收集诊断信息...
+Contributors	贡献者
+Cook times	烹调耗时
+Copies every file this patch reads into a "<name> media" folder next to it, and saves the patch pointing there, so the two move together. The originals stay where they are.	把此补丁读取的每个文件复制到旁边的 "<name> media" 文件夹，并让补丁指向那里保存，这样两者可以一起移动。原文件保持原位。
+Copy system info	复制系统信息
+Could not paste those nodes: 	无法粘贴这些节点：
+Credit Infinite in exported files	在导出的文件中注明 Infinite
+Curve in, curve out. Resample spaces points evenly along the length, Simplify drops points that barely change the shape (within 'tolerance'), Smooth relaxes corners while the ends stay put, Offset draws a parallel curve at a signed distance in the XY plane with round outer corners. The result can still drive a Path and shows as a thin tube.	曲线进，曲线出。Resample 沿长度均匀分布点，Simplify 删除几乎不改变形状的点（在 'tolerance' 范围内），Smooth 在保持端点不动的同时放松拐角，Offset 在 XY 平面上以带符号距离绘制一条平行曲线，外角为圆角。结果仍可驱动 Path，并显示为一根细管。
+Damps another modulator. Amount is a simple moving average (the default); Time glides with a time constant; Spring overshoots and settles with a frequency and damping. All three are the same at any frame rate.	为另一个调制器加阻尼。Amount 是简单移动平均（默认）；Time 以时间常数滑行；Spring 会过冲，再按频率和阻尼稳定下来。三者在任何帧率下表现相同。
+Diagnostics	诊断
+Download	下载
+Downloading	正在下载
+Drag from a modulator's output onto a parameter pin	从调制器的输出拖到参数引脚上
+Draws an image from a JavaScript sketch you write in the node - loops, arrays and recursion with a p5.js-style API (rect, circle, line, beginShape, push/pop, translate, rotate, text). param("name", default, lo, hi) in the script becomes a knob you can modulate. A mistake shows its line number and the last working picture stays up. Drop an .svg on the canvas (or onto a Sketch) to animate it by id with svgSet, svgText, svgBox and svgDraw. No file or network access.	用你在节点中编写的 JavaScript 草图绘制图像：循环、数组和递归，配合 p5.js 风格的 API（rect、circle、line、beginShape、push/pop、translate、rotate、text）。脚本中的 param("name", default, lo, hi) 会变成可调制的旋钮。出错时显示行号，并保留上一张可用的画面。把 .svg 拖到画布上（或拖到 Sketch 上），即可用 svgSet、svgText、svgBox 和 svgDraw 按 id 对其做动画。无文件或网络访问权限。
+Drops every separate piece of the input mesh as a rigid body - box, sphere or convex-hull collider - that falls, collides and stacks on a ground plane and optional walls. Mass, friction, bounce, damping, gravity, starting velocity and spin, and a timed kick. The same patch plays back identically every time. 'Reset' drops them again.	把输入网格的每个独立部件作为刚体（盒体、球体或凸包碰撞体）投下，它们会下落、碰撞并堆叠在地面和可选的墙壁上。质量、摩擦、弹性、阻尼、重力、初速度和自旋，以及定时冲击。同一个补丁每次播放都完全相同。'Reset' 让它们重新落下。
+Each note's own MPE pressure or slide, per voice into a synth knob.	每个音符各自的 MPE 压力或滑动，按复音送入合成器旋钮。
+Each note's own MPE pressure or slide. Turn on mpe on MIDI Notes, then cable this into an Analog or Wavetable knob (cutoff, volume, wavetable position, ...): every voice follows the pressure or slide (CC74) of the finger playing it, between low and high, smoothed over 5 ms so it never zippers. Into anything that is not a synth knob it follows the channel moved last.	每个音符各自的 MPE 压力或滑动。在 MIDI Notes 上打开 mpe，然后把它连到 Analog 或 Wavetable 的旋钮（cutoff、volume、wavetable position 等）：每个复音都跟随弹奏它的手指的压力或滑动（CC74），在 low 和 high 之间，经过 5 ms 平滑，绝不会有拉链噪声。连到非合成器旋钮的地方时，跟随最后变动的通道。
+Earliest kept state	最早保留的状态
+Edit History	编辑历史
+Edit history - jump back to any earlier edit	编辑历史：跳回任意一次之前的编辑
+Empty folder	空文件夹
+Extensions	扩展
+Field notes editor	Field 音符编辑器
+Field notes kernel (per-sample, audio thread). Reserved: noteOn, noteNum, noteVel, beat, sr, n. Emit notes with note(pitch, vel, len) inside an if.	Field 音符内核（逐采样，音频线程）。保留名：noteOn、noteNum、noteVel、beat、sr、n。在 if 中用 note(pitch, vel, len) 发出音符。
+File paths are removed; media is not included.	文件路径会被移除；不包含媒体文件。
+Files appear when the scan finishes	扫描完成后会显示文件
+Find	查找
+Find a node by title, type, comment text or param name. Up / Down step, Enter jumps to it, Esc closes	按标题、类型、注释文字或参数名查找节点。上 / 下 逐个切换，Enter 跳转，Esc 关闭
+Folder	文件夹
+Format	格式
+Globals	全局变量
+Grows a plant or fractal from text. Type an axiom (the starting string) and rewrite rules such as X=F+[[X]-X]-F[-FX]+X;F=FF (separate rules with a semicolon), set the angle and the number of generations, and a 3D turtle draws it: F draws forward, f moves without drawing, + and - turn, & and ^ pitch, \\ and / roll, | turns around, [ and ] start and end a branch. Length and radius shrink on each branch by the scale controls. The result is a tube mesh and a curve a Path can follow, and the same text always grows the same shape.	从文本生长出植物或分形。输入一个公理（起始字符串）和改写规则，例如 X=F+[[X]-X]-F[-FX]+X;F=FF（规则之间用分号隔开），设置角度和代数，一只 3D 海龟会把它画出来：F 向前画，f 移动但不画，+ 和 - 转向，& 和 ^ 俯仰，\\ 和 / 翻滚，| 掉头，[ 和 ] 开始和结束一个分支。长度和半径在每个分支上按缩放控件缩小。结果是一个管状网格和一条可供 Path 跟随的曲线，同样的文本总会生长出同样的形状。
+Hand tracking: your hand becomes modulators	手部追踪：你的手变成调制器
+Hide	隐藏
+History	历史
+Hit Rescan plugins	点击 Rescan plugins
+Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. "open" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn "configure" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged. A plugin with a sidechain input (most compressors and gates) gets a "sidechain" pin: patch the key signal there, and switch the plugin itself to its external sidechain.	承载第三方 Audio Unit 效果器。从 Plugins 面板拖入一个（在那里点 Rescan 会索引已安装的插件；列表有缓存，因此启动时从不重新扫描），或从访达拖入一个 .component 包。"open" 会在单独的窗口中显示插件自带的编辑器。节点上的滑块是你选择公开的插件参数：打开 "configure"，在插件窗口中触碰一个控件，它就会作为映射行出现在这里；也可以从下拉菜单中选，因为并非每个插件编辑器都会告诉宿主触碰了什么。每个映射行都是一个真正的参数，有自己的调制引脚，因此 Ramp 或 Envelope 可以驱动它。右键点击一行可取消映射。未加载插件或处于旁通时，音频原样通过。带侧链输入的插件（大多数压缩器和门限器）会得到一个 "sidechain" 引脚：把触发信号接到那里，并在插件本身中切换到外部侧链。
+Hosts third-party Audio Unit and VST3 effects, with full state save/restore and parameter automation through mapped modulation pins. The plugin's own editor opens in its own native window. A plugin with a sidechain input (most compressors and gates) gets a "sidechain" pin: patch the key signal there, and switch the plugin itself to its external sidechain.	承载第三方 Audio Unit 和 VST3 效果器，完整保存/恢复状态，并通过映射的调制引脚自动化参数。插件自带的编辑器在它自己的原生窗口中打开。带侧链输入的插件（大多数压缩器和门限器）会得到一个 "sidechain" 引脚：把触发信号接到那里，并在插件本身中切换到外部侧链。
+Hosts third-party VST3 effects, with full state save/restore and parameter automation through mapped modulation pins. The plugin's own editor opens in its own X11 window. Audio Units are a macOS-only format and are not available here. A plugin with a sidechain input (most compressors and gates) gets a "sidechain" pin: patch the key signal there, and switch the plugin itself to its external sidechain.	承载第三方 VST3 效果器，完整保存/恢复状态，并通过映射的调制引脚自动化参数。插件自带的编辑器在它自己的 X11 窗口中打开。Audio Units 是 macOS 专有格式，此处不可用。带侧链输入的插件（大多数压缩器和门限器）会得到一个 "sidechain" 引脚：把触发信号接到那里，并在插件本身中切换到外部侧链。
+Hosts third-party VST3 effects, with full state save/restore and parameter automation through mapped modulation pins. The plugin's own editor opens in its own native window. Audio Units are a macOS-only format and are not available here. A plugin with a sidechain input (most compressors and gates) gets a "sidechain" pin: patch the key signal there, and switch the plugin itself to its external sidechain.	承载第三方 VST3 效果器，完整保存/恢复状态，并通过映射的调制引脚自动化参数。插件自带的编辑器在它自己的原生窗口中打开。Audio Units 是 macOS 专有格式，此处不可用。带侧链输入的插件（大多数压缩器和门限器）会得到一个 "sidechain" 引脚：把触发信号接到那里，并在插件本身中切换到外部侧链。
+Hover and toggle eases become instant. Nothing in the UI animates a value.	悬停和切换时的过渡变为即时。界面中不再有任何数值动画。
+How far each part of the picture moved since the last frame, as a vector per pixel (red and green carry x and y, in pixels of the input; blue is speed). Pyramidal Lucas-Kanade on the GPU. View Colour shows direction as hue and speed as brightness. Use it to push particles or displace a picture along the motion of a video.	画面每个部分自上一帧以来移动了多远，以每像素一个向量表示（红和绿表示 x 和 y，单位为输入的像素；蓝表示速度）。在 GPU 上运行的金字塔 Lucas-Kanade。View Colour 以色相表示方向、以亮度表示速度。可用它推动粒子，或让画面沿视频的运动方向位移。
+How to use: drop video clips onto the pads (or click an empty pad, or Load... / Folder... for the first 16 clips of a folder), wire the video out into an Output, then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad video player laid out like the MPC: pad 1 is bottom-left, every tile shows a frame of its clip, its number and mode, and every pad has its own CV pin. A hit follows the pad's mode: one shot plays the clip's window once and a new hit restarts it; gate plays while held and fades out over fade out on release; loop toggles a looping playback. The picture is the most recently hit pad that is still playing; transition (cut, crossfade, dip to black over time) sets how it takes over from what was showing, and when it ends the previous playing pad comes back the same way. With nothing playing the picture goes to black, or holds its last frame when hold frame is on. Click selects a pad (right-click selects without playing); the rows below edit it: sync and rate (Synced latches a hit to the next grid line, a synced loop restarts on every division), start and end (the window, as a percentage of the clip), speed (negative plays backwards), opacity, mode, and fade in / fade out (ms). The filmstrip shows the selected clip with its window; hover it to read the time. The audio out carries the visible clips' own soundtracks when soundtrack is on, each at the weight its picture is shown with. Every param of every pad can be modulated; a cable stays on its own pad when you select another, and an orange dot marks a pad with a modulated param. Clip paths and pad settings are saved with the patch; the clips are re-opened on load. The idea comes from Ricardo Palmieri's Infinite-Turbo fork; this is a fresh implementation.	用法：把视频片段拖到打击垫上（或点击空打击垫，或用 Load... / Folder... 载入文件夹中的前 16 个片段），把视频输出接到 Output，然后点击打击垫或向 notes 输入发送音符：音符 36 到 51 演奏打击垫 1 到 16。一台按 MPC 布局排列的 16 打击垫视频播放器：打击垫 1 在左下角，每个格子显示其片段的一帧、编号和模式，每个打击垫都有自己的 CV 引脚。敲击遵循打击垫的模式：one shot 播放片段窗口一次，再次敲击会重新开始；gate 按住时播放，松开时在 fade out 时间内淡出；loop 切换循环播放。画面是最近敲击且仍在播放的打击垫；transition（cut、crossfade、在 time 内 dip to black）决定它如何接替之前显示的内容，它结束时，之前仍在播放的打击垫以同样方式回来。没有任何播放时画面变黑，打开 hold frame 时则保持最后一帧。点击选中一个打击垫（右键选中但不播放）；下方各行用于编辑它：sync 和 rate（Synced 把敲击对齐到下一条网格线，同步的循环在每个时值处重新开始）、start 和 end（窗口，以片段的百分比表示）、speed（负值倒放）、opacity、mode，以及 fade in / fade out（毫秒）。胶片条显示选中的片段及其窗口；悬停即可读出时间。打开 soundtrack 时，音频输出携带可见片段自身的音轨，各自按其画面显示的权重混合。每个打击垫的每个参数都可调制；选择另一个打击垫时连线仍留在原打击垫上，橙色圆点标记有调制参数的打击垫。片段路径和打击垫设置随补丁保存；加载时重新打开片段。这个想法来自 Ricardo Palmieri 的 Infinite-Turbo 分支；这里是全新的实现。
+Include the open patch	包含当前打开的补丁
+Infinite	=en
+Infinite %s is available	Infinite %s 已发布
+Infinite didn't close properly last time.	Infinite 上次没有正常关闭。
+Install	安装
+Install from file...	从文件安装...
+Install the Tracking pack: Settings > Extensions	安装 Tracking 扩展包：设置 > 扩展
+Installed v%s	已安装 v%s
+Installed v%s, up to date	已安装 v%s，已是最新
+Installed v%s, v%s available	已安装 v%s，可更新到 v%s
+JavaScript, p5-style: define draw(t). Globals: width, height, t, beat, frame.	p5 风格的 JavaScript：定义 draw(t)。全局变量：width、height、t、beat、frame。
+JavaScript: define draw(t) that builds geometry. Globals: t, beat, frame.	JavaScript：定义一个构建几何体的 draw(t)。全局变量：t、beat、frame。
+Joins points that are closer than Radius with thin lines (plexus and constellation looks). Point cloud in, mesh of lines out. Max per point and Max lines keep a dense cloud from turning solid; each pair is drawn once, nearest first. Thickness is the line radius. Lines take their colour from the points when the points have colour.	用细线连接距离小于 Radius 的点（丛状和星座效果）。点云进，线网格出。Max per point 和 Max lines 防止密集点云变成实心；每对点只画一次，最近的优先。Thickness 是线的半径。点有颜色时，线会继承点的颜色。
+Kernel	内核
+Launch	启动
+Licence	许可证
+Listening...	正在监听...
+Loop In / Out	循环入点 / 出点
+Loop On / Off	循环开 / 关
+MIDI learn	MIDI 学习
+MIT licensed	MIT 许可
+Make block	创建区块
+Markers	标记
+Mixes audio in 3D for headphones and plays it straight to the output (no output pin; it also records its own WAV/FLAC, 16 or 24 bit, always facing front): each input is a dot around a head, and its angle, distance and height (scroll on a dot) change how it is heard. Drop a cable on the empty + pin to add a source; alt-drag a dot for its level; H pins a source in front of your head. Ears use a measured dummy-head set (MIT KEMAR) or a spherical-head model; a limiter holds -1 dB and the meter shows loudness. Head tracking (AirPods Pro/Max etc.) works on macOS 14+ only and turns the room with your head; elsewhere the head stays fixed.	为耳机做 3D 混音并直接播放到输出（没有输出引脚；它也会录制自己的 WAV/FLAC，16 或 24 位，始终面朝前方）：每个输入是头部周围的一个点，它的角度、距离和高度（在点上滚动滚轮）会改变听感。把连线拖到空的 + 引脚上可添加声源；按住 Alt 拖动一个点可调其电平；H 把声源固定在你的正前方。双耳使用实测的人工头数据集（MIT KEMAR）或球形头部模型；限幅器保持 -1 dB，表头显示响度。头部追踪（AirPods Pro/Max 等）仅在 macOS 14+ 上可用，会让空间随你的头转动；在其他系统上头部保持固定。
+Name	名称
+New 3D Scene	新建 3D 场景
+New Effect Chain	新建效果链
+New Synth	新建合成器
+No SVG yet: drop an .svg on the canvas, or copy SVG text and press Paste SVG.	还没有 SVG：把 .svg 拖到画布上，或复制 SVG 文本后按 Paste SVG。
+No active viewport cards	没有活动的视口卡片
+No edits yet	还没有编辑
+No files in this folder	此文件夹中没有文件
+No folders yet	还没有文件夹
+No modulation yet	还没有调制
+No packs to download right now. You can install one from a file.	现在没有可下载的扩展包。你可以从文件安装。
+No plugins found	未找到插件
+No plugins indexed	没有已索引的插件
+None of those nodes exist in this build	这些节点在此版本中都不存在
+Nothing indexed	没有已索引的内容
+Nothing on this page	此页没有内容
+Nothing to paste	没有可粘贴的内容
+Nothing to show	没有可显示的内容
+One line about it (optional)	一句话介绍（可选）
+Opens as an untitled copy. The original is never changed.	以未命名副本打开。原文件永远不会被修改。
+Particle System is a 3D emitter with gravity, drag and turbulence. Cloth is a pinned position-based sheet with wind and an optional ground plane.	Particle System 是带重力、阻力和湍流的 3D 发射器。Cloth 是一块被固定住的、基于位置的布料，带风力和可选的地面。
+Paste SVG	粘贴 SVG
+Pause and restart on	暂停和重新开始对齐到
+Pauses on the next grid line	在下一条网格线处暂停
+Playing %s. Load into instead:	正在播放 %s。改为载入到：
+Plays a hardware MIDI synth from a note cable. Pick the device and the channel (1-16); notes sent here do not reach Audio Out, so the synth makes its own sound. Four CC rows send a controller number and a modulatable value, only when it changes, so any LFO or macro can turn a knob on the synth. 'clock' makes Infinite the master clock (24 pulses per beat, with Start, Stop, Continue and song position) and switches itself off while Infinite follows an incoming clock. 'offset' shifts everything by -50 to +50 ms to line up with the synth's latency. Every note still held is released when you delete or bypass the node, change device, stop the transport or press panic. Pick "Infinite (virtual)" to publish a source called Infinite that DAWs and other apps list as a MIDI input.	通过音符连线演奏硬件 MIDI 合成器。选择设备和通道（1-16）；发到这里的音符不会到达 Audio Out，由合成器自己发声。四行 CC 发送控制器编号和一个可调制的值，只在变化时发送，因此任何 LFO 或宏都可以转动合成器上的旋钮。'clock' 让 Infinite 成为主时钟（每拍 24 个脉冲，包含 Start、Stop、Continue 和歌曲位置），当 Infinite 跟随外部时钟时会自行关闭。'offset' 把一切平移 -50 到 +50 ms，以对齐合成器的延迟。删除或旁通节点、更换设备、停止走带或按下 panic 时，所有仍按住的音符都会被释放。选择 "Infinite (virtual)" 会发布一个名为 Infinite 的源，DAW 和其他应用会把它列为 MIDI 输入。
+Plays a hardware MIDI synth from a note cable. Pick the device and the channel (1-16); notes sent here do not reach Audio Out, so the synth makes its own sound. Four CC rows send a controller number and a modulatable value, only when it changes, so any LFO or macro can turn a knob on the synth. 'clock' makes Infinite the master clock (24 pulses per beat, with Start, Stop, Continue and song position) and switches itself off while Infinite follows an incoming clock. 'offset' shifts everything by -50 to +50 ms to line up with the synth's latency. Every note still held is released when you delete or bypass the node, change device, stop the transport or press panic. Pick "Infinite (virtual)" to publish an ALSA port called Infinite that other apps can subscribe to (aconnect or the DAW's MIDI settings).	通过音符连线演奏硬件 MIDI 合成器。选择设备和通道（1-16）；发到这里的音符不会到达 Audio Out，由合成器自己发声。四行 CC 发送控制器编号和一个可调制的值，只在变化时发送，因此任何 LFO 或宏都可以转动合成器上的旋钮。'clock' 让 Infinite 成为主时钟（每拍 24 个脉冲，包含 Start、Stop、Continue 和歌曲位置），当 Infinite 跟随外部时钟时会自行关闭。'offset' 把一切平移 -50 到 +50 ms，以对齐合成器的延迟。删除或旁通节点、更换设备、停止走带或按下 panic 时，所有仍按住的音符都会被释放。选择 "Infinite (virtual)" 会发布一个名为 Infinite 的 ALSA 端口，其他应用可以订阅它（用 aconnect 或 DAW 的 MIDI 设置）。
+Plays a hardware MIDI synth from a note cable. Pick the device and the channel (1-16); notes sent here do not reach Audio Out, so the synth makes its own sound. Four CC rows send a controller number and a modulatable value, only when it changes, so any LFO or macro can turn a knob on the synth. 'clock' makes Infinite the master clock (24 pulses per beat, with Start, Stop, Continue and song position) and switches itself off while Infinite follows an incoming clock. 'offset' shifts everything by -50 to +50 ms to line up with the synth's latency. Every note still held is released when you delete or bypass the node, change device, stop the transport or press panic. Windows cannot publish a virtual MIDI port: to reach another app, install loopMIDI, create a port, and pick it here. Timing is about 1 ms.	通过音符连线演奏硬件 MIDI 合成器。选择设备和通道（1-16）；发到这里的音符不会到达 Audio Out，由合成器自己发声。四行 CC 发送控制器编号和一个可调制的值，只在变化时发送，因此任何 LFO 或宏都可以转动合成器上的旋钮。'clock' 让 Infinite 成为主时钟（每拍 24 个脉冲，包含 Start、Stop、Continue 和歌曲位置），当 Infinite 跟随外部时钟时会自行关闭。'offset' 把一切平移 -50 到 +50 ms，以对齐合成器的延迟。删除或旁通节点、更换设备、停止走带或按下 panic 时，所有仍按住的音符都会被释放。Windows 无法发布虚拟 MIDI 端口：要连到其他应用，请安装 loopMIDI，创建一个端口，然后在这里选择它。时间精度约为 1 ms。
+Plugins appear when the scan finishes	扫描完成后会显示插件
+Point cloud in (a mesh is flagged red and ignored), one polygon cell per point out, for cracked-glass, cell and fracture looks: every cell is the region closer to its point than to any other. Points on the outer hull have unbounded cells and are skipped. 'inset' pulls each cell toward its point to leave gaps between them.	点云进（网格会被标红并忽略），每个点生成一个多边形单元，用于碎玻璃、细胞和断裂效果：每个单元是离它的点比离其他任何点都近的区域。外壳上的点单元无界，会被跳过。'inset' 把每个单元向其点收缩，在单元之间留出缝隙。
+Point cloud in (a mesh is flagged red and ignored; use Mesh to Points first), triangulated surface out. Use it to turn a scatter into a terrain or low-poly surface. Points are projected onto the chosen plane, joined into Delaunay triangles (no sliver-prone long edges), and lifted back to their real 3D positions, so a scatter with height becomes a terrain. 'max points' thins very large clouds.	点云进（网格会被标红并忽略；请先用 Mesh to Points），三角化曲面出。可把散点变成地形或低多边形曲面。点被投影到所选平面，连成 Delaunay 三角形（没有容易产生细长碎片的长边），再抬回它们真实的 3D 位置，因此带高度的散点会变成地形。'max points' 对非常大的点云做稀疏。
+Preset	预设
+Presets	预设
+Procedural noise: value, fBm, ridged, Voronoi, Worley edges, white, plus gradient Perlin and Simplex (single and fBm) that are identical on every GPU. Domain warping, octaves and colour mapping included.	程序化噪声：value、fBm、ridged、Voronoi、Worley 边缘、white，以及在任何 GPU 上都完全一致的梯度 Perlin 和 Simplex（单层和 fBm）。包含域扭曲、八度和颜色映射。
+Range	范围
+Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. An HDRI node patched into the env input replaces the procedural sky gradient for background, reflections and ambient light. With hdr on (the default for a new node) light is kept above white until one tonemap at the end, so bloom glows only from what is truly bright; the background colour stays exact. Projection also offers Equirect 360 (2:1 for VR players; add 360 metadata with a tool such as Spatial Media Metadata Injector), Cubemap 3x2 and Fisheye dome (dome angle and tilt); these draw the scene six times, so they cost about six times a normal render, and they use the built-in camera.	将几何体/相机/灯光/材质图光栅化为图像。输出尺寸较大时会自动降低抗锯齿，以保持在 GPU 限制之内。超过约 200 万个三角形的场景渲染会明显变重。接到 env 输入的 HDRI 节点会替代程序化天空渐变，用作背景、反射和环境光。打开 hdr（新节点的默认设置）时，光照会一直保持在白色以上，直到最后统一做一次色调映射，因此泛光只来自真正明亮的部分；背景色保持精确。Projection 还提供 Equirect 360（2:1，适用于 VR 播放器；可用 Spatial Media Metadata Injector 等工具添加 360 元数据）、Cubemap 3x2 和 Fisheye dome（穹顶角度和倾斜）；这些模式会把场景绘制六次，开销约为普通渲染的六倍，并使用内置相机。
+Rate	速率
+Ready. Infinite restarts on the new version.	完成。Infinite 将以新版本重新启动。
+Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear, constant, Oklab or OKLCh interpolation (the Oklab modes mix perceptually, so blue-to-yellow stays bright instead of going grey; OKLCh also keeps saturation by travelling around the hue wheel). Unlike Gradient Map, it has no shape of its own - the shape comes from upstream.	用你设定的色标（最多 32 个）为任意 0-1 灰度输入重新着色，支持线性、常量、Oklab 或 OKLCh 插值（Oklab 模式按感知混合，因此蓝到黄保持明亮而不会变灰；OKLCh 还会沿色相环行进以保持饱和度）。与 Gradient Map 不同，它没有自己的形状：形状来自上游。
+Reduce motion	减少动态效果
+Reduces the image to a few Levels per channel like Posterize, but spreads the rounding error as a fixed pattern so gradients keep their tone instead of banding. Mode picks an ordered Bayer matrix (2, 4 or 8) or a noise pattern; Mix blends back toward the original.	像 Posterize 一样把图像减少到每通道少数几个 Levels，但把舍入误差以固定图案分散，使渐变保持色调而不出现色带。Mode 选择有序 Bayer 矩阵（2、4 或 8）或噪声图案；Mix 向原图回混。
+Reduces triangle count while keeping the overall shape (quadric error edge collapse). 'keep' is the fraction of triangles to leave; 'lock border' holds open edges in place. UVs, colours and hard shading survive; very low settings stop when no safe collapse remains.	在保持整体形状的同时减少三角形数量（二次误差边折叠）。'keep' 是保留的三角形比例；'lock border' 固定开放边。UV、颜色和硬边着色都会保留；设置过低时，在没有安全折叠可做时停止。
+Refresh all to scan your folders	全部刷新以扫描你的文件夹
+Releases	版本发布
+Relinked 	已重新链接：
+Remove block	移除区块
+Render Timeline	渲染 Timeline
+Rendering	正在渲染
+Restart to update	重启以更新
+Restarts on the next grid line	在下一条网格线处重新开始
+Reveal logs	显示日志
+Reverb from a room you design (shape, size, material, distance, decay, spread) or from a loaded impulse response file.	来自你设计的房间（形状、大小、材质、距离、衰减、宽度）或载入的脉冲响应文件的混响。
+Reverse	反向
+Rounds or chamfers every sharp edge (angle above 'sharp angle'). 'width' is the bevel size, 'segments' 1 gives a flat chamfer and more give a smooth round. Result stays closed; width is limited by the shortest sharp edge.	对每条锐边（角度大于 'sharp angle'）做圆角或倒角。'width' 是倒角大小，'segments' 为 1 时得到平倒角，更多则得到平滑圆角。结果保持封闭；width 受最短锐边限制。
+SVG: %s (%d KB). svgSet("#id", "attr", value), svgText, svgBox, svgDraw(x, y, w, h)	SVG：%s（%d KB）。svgSet("#id", "attr", value)、svgText、svgBox、svgDraw(x, y, w, h)
+Save with media	连同媒体一起保存
+Save with media...	连同媒体一起保存...
+Save...	保存...
+Scanning folders - found so far	正在扫描文件夹，目前已找到
+Scanning plugins - found so far	正在扫描插件，目前已找到
+Scanning...	正在扫描...
+Script	脚本
+Select nodes & press Shift+V or right-click to add	选择节点后按 Shift+V 或右键添加
+Sends a note cable to a hardware or virtual MIDI device on one channel, so Infinite can play an external synth. Panic releases anything stuck.	把音符连线在一个通道上发送到硬件或虚拟 MIDI 设备，让 Infinite 演奏外部合成器。Panic 会释放所有卡住的音符。
+Set the loop region's start or end at the playhead	把循环区域的起点或终点设到播放头处
+Shadertoy	=en
+Shapes an incoming modulator with an AHDSR contour (curved stages), gated by it crossing threshold, or per voice by each note of the synth it drives.	用 AHDSR 包络（带弯曲的阶段）塑形输入的调制器，由其越过 threshold 门控，或按复音由所驱动合成器的每个音符门控。
+Share Patch...	分享补丁...
+Share patch as:	将补丁分享为：
+Shared with another track.	与另一条轨道共享。
+Shared with another video track.	与另一条视频轨道共享。
+Show Lock	显示锁定
+Show the whole arrangement, from the start to the end of the last clip	显示整个编排，从开头到最后一个片段的结尾
+Showing the last %d edits; older ones are dropped.	显示最近 %d 次编辑；更早的已丢弃。
+Shows each pixel from a different moment: it keeps the last frames and a grey map (the second input) says how far back every pixel looks, black is now and white is the oldest frame. A left-to-right ramp, the default with no map, gives a slit-scan. Length sets how many frames are kept (up to 60), Resolution how large they are stored (memory grows with it), Invert flips the map.	每个像素显示不同时刻的画面：它保留最近的若干帧，一张灰度图（第二个输入）决定每个像素回看多远，黑色是现在，白色是最旧的帧。从左到右的渐变（没有图时的默认值）得到狭缝扫描效果。Length 设置保留多少帧（最多 60），Resolution 设置存储尺寸（内存随之增长），Invert 反转该图。
+Shows how long each node takes to cook, on the node.	在节点上显示每个节点的烹调耗时。
+Shrinks each face region inward by 'width' and raises it by 'depth' (negative sinks it), with a wall around it. Works on the Select marked faces, or on all faces with selection-only off.	把每个面区域向内收缩 'width'，并抬高 'depth'（负值则下沉），四周带一圈侧壁。作用于 Select 标记的面，关闭 selection-only 时作用于所有面。
+Sine, triangle, saw up/down, square and seeded sample-and-hold. Rate as a synced division, free beats or Hz; phase from the transport, free-running, or restarted by the trig input; plus phase and an output range.	正弦、三角、上/下锯齿、方波以及带种子的采样保持。速率可设为同步时值、自由拍数或 Hz；相位来自走带、自由运行或由 trig 输入重启；另有 phase 和输出范围。
+Sketch 3D editor	Sketch 3D 编辑器
+Sketch editor	Sketch 编辑器
+Smooths another modulator to damp jittery or steppy sources like Random or Pattern. Amount is a moving average whose response is the same at any frame rate (older patches keep the per-frame version); Time uses a time constant in seconds; Spring follows the input like a mass on a spring, with frequency and damping, and can overshoot.	平滑另一个调制器，以抑制 Random 或 Pattern 这类抖动或阶梯状的源。Amount 是移动平均，其响应在任何帧率下都相同（旧补丁保留逐帧版本）；Time 使用以秒为单位的时间常数；Spring 像弹簧上的质量一样跟随输入，带频率和阻尼，可能过冲。
+Source code	源代码
+Span	跨度
+Speed	速度
+Spins a profile curve around the X, Y or Z axis to make a surface of revolution: vases, bowls, rings, wine glasses, columns. Draw half the outline (a Curve works well) and set the axis it turns about. A closed profile turned all the way round is a solid; a part-turn is closed with flat caps when Caps is on; an open profile gives an open shell. Segments sets how smooth the turn is.	把轮廓曲线绕 X、Y 或 Z 轴旋转，生成旋转曲面：花瓶、碗、环、酒杯、柱子。画出一半轮廓（用 Curve 很合适），并设置它绕哪根轴旋转。闭合轮廓转满一圈得到实体；部分旋转在打开 Caps 时用平盖封闭；开放轮廓得到开放的壳。Segments 设置旋转的平滑程度。
+Start	开始
+Switch to Edit Mode to add controls	切换到 Edit Mode 以添加控件
+System info, logs, settings (home folder hidden) and recent crash reports go into one zip on your Desktop. Nothing is sent anywhere.	系统信息、日志、设置（隐藏主目录）和最近的崩溃报告会打包成一个 zip 放到你的桌面上。不会发送到任何地方。
+Template library	模板库
+Template library...	模板库...
+The Arrangement Timeline is driving audio. Click to hand it back to the canvas.	Arrangement Timeline 正在驱动音频。点击把它交还给画布。
+The audio routing family. Audio Out is the terminal node. Every audio input pin takes exactly one cable, so Mixer is the only node that sums (4-8 slots, each with gain/pan/mute/solo) and Splitter is the only fan-out point (or, with bands set, a 2-4 band Linkwitz-Riley crossover whose bands sum flat). Gain is a single dB stage with a meter; Blend Audio is an equal-power crossfade between two inputs.	音频路由家族。Audio Out 是终端节点。每个音频输入引脚只接受一根连线，因此 Mixer 是唯一会求和的节点（4-8 个通道，每个带 gain/pan/mute/solo），Splitter 是唯一的分发点（或者在设置 bands 后成为 2-4 段的 Linkwitz-Riley 分频器，各频段相加后频响平直）。Gain 是带表头的单级 dB 增益；Blend Audio 是两路输入之间的等功率交叉淡化。
+The explicit fan-out point for audio: an ordinary audio output feeds exactly one destination, so sending one signal to several places needs this node. Its own output is the one exempt from that rule. In copy mode it is a plain copy. Set bands to 2, 3 or 4 and the pins become frequency bands, low to high, split by Linkwitz-Riley crossovers at split1-3; the bands add back up to the input with a flat response, so you can process each band on its own and mix them again.	音频的显式分发点：普通音频输出只能接一个目标，因此要把一个信号送到多处就需要这个节点。它自己的输出是该规则唯一的例外。在 copy 模式下它只是简单复制。把 bands 设为 2、3 或 4，引脚就变成从低到高的频段，由 split1-3 处的 Linkwitz-Riley 分频器分开；各频段加回去就是频响平直的输入，因此可以分别处理每个频段再混合回来。
+The file was written, but its audio went over full scale and is clipped.	文件已写入，但其音频超过满刻度，出现了削波。
+The render stopped before it finished. Your patch was not changed.	渲染在完成前停止了。你的补丁没有被修改。
+Third-party notices	第三方声明
+This patch reads no files. It will be saved on its own.	此补丁不读取任何文件。它将单独保存。
+Those nodes were copied from a newer Infinite; update to paste them	这些节点是从更新版本的 Infinite 复制的；请更新后再粘贴
+Three saturation stages (tube, tape, diode, fold, rectify, crush), wired serial, parallel, mid-side, 3-band or feedback.	三级饱和（tube、tape、diode、fold、rectify、crush），可串联、并联、中侧、三频段或反馈连接。
+Three saturation stages, each with its own curve (tube, tape, diode, fold, rectify, crush) and amount (up to 36 dB of drive; crush goes from 16 bits down to 2). Routing wires them serial, parallel (averaged), mid-side (stage 1 on mid, 2 on side, 3 on left/right), 3-band (low/mid/high split at 250 Hz and 2.5 kHz) or feedback (serial, with the output fed back through a 1 ms delay; the feedback knob is the loop gain after the drive, so it colours the sound and never howls). Runs at 8x with anti-aliased curves.	三级饱和，每级都有自己的曲线（tube、tape、diode、fold、rectify、crush）和强度（最高 36 dB 驱动；crush 从 16 位降到 2 位）。Routing 将它们串联、并联（取平均）、中侧（第 1 级处理中间，第 2 级处理两侧，第 3 级处理左/右）、三频段（在 250 Hz 和 2.5 kHz 分成低/中/高）或反馈（串联，输出经 1 ms 延迟回送；feedback 旋钮是驱动之后的回路增益，因此会为声音染色而绝不会啸叫）。以 8 倍运行，曲线带抗混叠。
+Toggle the docked list of edits; click one to jump to it	显示或隐藏停靠的编辑列表；点击一项即可跳转到该处
+Toggle the loop region	开关循环区域
+Tracks one face from an image or camera wire: head position, turn, nod and tilt, each eye open or closed, brows, mouth open, smile, and where the eyes look. A small preview shows what is tracked. Needs the Tracking pack (Settings > Extensions).	从图像或摄像头连线追踪一张脸：头部位置、转头、点头和侧倾，每只眼睛的睁闭、眉毛、张嘴、微笑以及视线方向。一个小预览显示追踪内容。需要 Tracking 扩展包（设置 > 扩展）。
+Tracks one hand from an image or camera wire and turns it into modulators: palm and fingertip position, pinch, open, roll and size, plus six gestures (fist, point, peace, thumbs up, ok, rock) that read 1 while you make them. A small preview shows what is tracked. Needs the Tracking pack (Settings > Extensions).	从图像或摄像头连线追踪一只手并把它变成调制器：手掌和指尖位置、捏合、张开、翻转和大小，以及六种手势（握拳、指向、剪刀手、竖拇指、OK、摇滚手势），做出手势时读数为 1。一个小预览显示追踪内容。需要 Tracking 扩展包（设置 > 扩展）。
+Tracks one person's body from an image or camera wire: head, both wrists, how high each arm is raised, how far apart the wrists are, lean and distance. Keep the upper body in view. A small preview shows what is tracked. Needs the Tracking pack (Settings > Extensions).	从图像或摄像头连线追踪一个人的身体：头部、双腕、每只手臂抬起的高度、两腕间的距离、倾斜和远近。请让上半身保持在画面中。一个小预览显示追踪内容。需要 Tracking 扩展包（设置 > 扩展）。
+Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror, Screw, Decimate, Bevel and Inset - plus Select and the ops that act only on its marked faces (Delete / Transform / Extrude Selected), Join Geometry's booleans (Union, Intersect, Difference), Displacement, Wrap and Merge by Distance.	Transform、Array、Subdivide、Solidify、Extrude、Wireframe、Triangulate、Normals、Explode、Twist、Smooth、Mirror、Screw、Decimate、Bevel 和 Inset，另有 Select 以及只作用于其标记面的操作（Delete / Transform / Extrude Selected）、Join Geometry 的布尔运算（Union、Intersect、Difference）、Displacement、Wrap 和 Merge by Distance。
+Try clearing the search or filter	试试清除搜索或筛选
+Type to find. Up/Down step, Enter jumps, Esc closes.	输入以查找。上/下 逐个切换，Enter 跳转，Esc 关闭。
+Unsaved changes	未保存的更改
+Update now	立即更新
+Use + Add Control to place a knob, pad or switch	使用 + Add Control 放置旋钮、打击垫或开关
+Website	网站
+With a grid set, Pause and Rewind wait for the next line while playing; Play starts at once. Sequencers, arps and MIDI files follow. Manual Switcher changes wait for the line too	设置网格后，播放中的 Pause 和 Rewind 会等到下一条网格线；Play 立即开始。音序器、琶音器和 MIDI 文件随之对齐。Manual Switcher 的切换也会等到网格线
+Your work from %s was saved automatically. Recover it to carry on, or discard it; your saved patch files are untouched.	你在 %s 的工作已自动保存。恢复它以继续，或丢弃它；你已保存的补丁文件不受影响。
+Your work was saved automatically. Recover it to carry on, or discard it; your saved patch files are untouched.	你的工作已自动保存。恢复它以继续，或丢弃它；你已保存的补丁文件不受影响。
+Zoom Timeline In / Out	放大 / 缩小 Timeline
+Zoom Timeline to Fit	缩放 Timeline 以适应
+Zoom around the playhead (the view's centre when the playhead is off screen)	围绕播放头缩放（播放头在屏幕外时围绕视图中心）
+box, sphere, cylinder, cone, torus, plane, tube, beginShape/vertex/endShape; translate, rotate, scale, push/pop; fill(r,g,b) 0..1.	box、sphere、cylinder、cone、torus、plane、tube、beginShape/vertex/endShape；translate、rotate、scale、push/pop；fill(r,g,b) 0..1。
+build %s, %s	构建 %s，%s
+copy	复制
+find nodes, comments, params...	查找节点、注释、参数...
+folder	文件夹
+missing	缺失
+param("name", default, lo, hi) makes a modulatable knob. Colours are 0..1; hsl(h,s,l) returns one.	param("name", default, lo, hi) 生成一个可调制的旋钮。颜色取值 0..1；hsl(h,s,l) 返回一个颜色。
+paste each tab from shadertoy.com; iChannel0-3 are the pins, or buffer A-D when unwired	从 shadertoy.com 粘贴每个标签页；iChannel0-3 是引脚，未连接时为缓冲区 A-D
+search...	搜索...
+uniform float name; // 0..1 = 0.5   adds a knob	uniform float name; // 0..1 = 0.5   添加一个旋钮
+used twice	使用了两次
+v%s	=en
+v%s, %.0f MB download	v%s，下载 %.0f MB
+version %s	版本 %s
+version %s is available (you have %s) - click to update, right-click to dismiss	版本 %s 已发布（你使用的是 %s）：点击更新，右键忽略

@@ -1241,3 +1241,254 @@ Ready: nothing missing, every device and output in place	準備完了: 欠けて
 Lock: no drag, delete or undo, knobs still play. Panic stops the sound now; press again to resume	ロック: ドラッグ・削除・取り消しは無効、ノブは操作できます。パニックは即座に音を止め、もう一度押すと再開します
 Lock the canvas for a live show: no node drag, cable drag, delete or undo. Knobs, sliders and the keyboard keep working	ライブショー用にキャンバスをロック: ノード/ケーブルのドラッグ、削除、取り消しを無効に。ノブ、スライダー、キーボードは使えます
 Silence everything now: notes off on every MIDI Out and plugin, the sound fades in 5 ms, the transport stops and each projector holds its last frame. Press again to resume	すべてを即座に無音化: 全MIDI Outとプラグインのノートをオフ、音は5 msでフェードアウト、トランスポート停止、各プロジェクターは最後のフレームを保持。もう一度押すと再開
+  (not found)	  （見つかりません）
+ missing (kept as they are)	 不足（そのまま残します）
+ to copy	 コピー対象
+ used twice (copied once)	 2 回使用（コピーは 1 回）
+%zu bodies, %zu tris	%zu 個の剛体、%zu 個の三角形
+%zu segments, %zu tris	%zu 個のセグメント、%zu 個の三角形
+16-pad video player: per-pad mode (one shot / gate / loop), sync, start / end window, speed, opacity, fade in / out; cut, crossfade or dip between clips; pads playable by mouse, CV pin or note 36-51.	16 パッドのビデオプレーヤー：パッドごとのモード（one shot / gate / loop）、同期、開始 / 終了ウィンドウ、速度、不透明度、フェードイン / アウト。クリップ間はカット、クロスフェード、黒へのディップ。パッドはマウス、CV ピン、ノート 36-51 で演奏できます。
+4-operator FM synth: 11 algorithms, ratio or fixed frequency, a level and ADSR per operator, and feedback on operator 4.	4 オペレーター FM シンセ：11 種類のアルゴリズム、レシオまたは固定周波数、オペレーターごとのレベルと ADSR、オペレーター 4 にフィードバック。
+A 4-operator FM synth: four sine operators wired by one of 11 algorithms, from a 4>3>2>1 stack to four carriers side by side. Each operator follows the note at a ratio, or sits at a fixed frequency, and has its own level and ADSR; a carrier's level is how loud it is, a modulator's is how far it bends what it feeds. Feedback lets operator 4 modulate itself, from a brighter sine to a buzz. 8 voices, note-driven, rendered at 8x so high notes stay clean.	4 オペレーターの FM シンセ：4 つのサイン波オペレーターを 11 種類のアルゴリズムのいずれかで接続します。4>3>2>1 の直列から、4 つのキャリアの並列まで。各オペレーターはノートにレシオで追従するか固定周波数にとどまり、それぞれ独自のレベルと ADSR を持ちます。キャリアのレベルは音量、モジュレーターのレベルは接続先をどれだけ曲げるかです。Feedback でオペレーター 4 が自分自身を変調し、明るいサイン波からバズ音までつくれます。8 ボイス、ノート駆動、高音でもクリーンなよう 8 倍で処理します。
+A compressor in four styles (clean, bus, opto, FET) with peak or RMS detection, threshold, ratio, attack, release, makeup and an external sidechain input, over a live static transfer curve. Limiter is its own separate node.	4 つのスタイル（clean、bus、opto、FET）を持つコンプレッサー。ピークまたは RMS 検出、threshold、ratio、attack、release、makeup、外部サイドチェイン入力を備え、静的な伝達カーブをライブ表示します。Limiter は別のノードです。
+A compressor: style, threshold, ratio, attack, release, makeup, a peak/RMS detector switch, and a sidechain switch that feeds the detector from the second input pin instead of the main signal. Style picks the character: clean (exact, a 6 dB knee), bus (VCA glue: the release waits until the attack lets go, a 10 dB knee), opto (a light cell: slow to catch small peaks, a fast then slow release, an 18 dB knee) or FET (the detector hears the output, so it grabs fast, a 2 dB knee). Warm adds transformers either side and rolls the top off as the gain comes down. The graph shows the static transfer curve - input dB in, output dB out.	コンプレッサー：style、threshold、ratio、attack、release、makeup、ピーク/RMS の検出切替、そして検出器をメイン信号ではなく 2 番目の入力ピンから駆動するサイドチェインスイッチ。Style でキャラクターを選びます：clean（正確、6 dB のニー）、bus（VCA グルー：アタックが離れるまでリリースが待つ、10 dB のニー）、opto（光セル：小さなピークは捕まえるのが遅く、速く始まって遅く終わるリリース、18 dB のニー）、FET（検出器が出力を聴くので素早くつかむ、2 dB のニー）。Warm は前後にトランスを加え、ゲインが下がるにつれて高域を丸めます。グラフは静的な伝達カーブ（入力 dB から出力 dB）を示します。
+A different value for each note of a chord. Cable it into an Analog or Wavetable knob (cutoff, pan, detune, ...) and every note gets its own setting between low and high, by its place among the keys held when it started: linear spaces them evenly, golden ratio scatters them so each new note lands in the biggest gap, primes spaces them unevenly, alternate goes out from the middle, one side then the other. After count notes the pattern repeats. Into anything that is not a synth knob it gives the first note's value.	和音の各ノートに別々の値を与えます。Analog や Wavetable のノブ（cutoff、pan、detune など）につなぐと、各ノートは発音時に押されていたキーの中での位置に応じて low と high の間の独自の値を持ちます：linear は均等に配置、golden ratio は新しいノートがいちばん大きな隙間に入るよう散らし、primes は不均等に配置、alternate は中央から外へ左右交互に広げます。count 個のノートの後、パターンが繰り返されます。シンセのノブ以外につないだ場合は、最初のノートの値を出力します。
+A drawn shape played over time: breakpoints with a bend per segment, tempo-synced, with a loop or sustain point and retrigger from the trig input.	描いた形を時間に沿って再生：セグメントごとにカーブを付けられるブレークポイント、テンポ同期、ループ点またはサステイン点、trig 入力からのリトリガー。
+A fractional delay line: time (tempo-synced by default, or free ms with 'sync to tempo' off), tone (bipolar tilt on the repeats), feedback (past 100% on purpose for self-oscillation - the output is soft-clipped, not the feedback itself), pan, duck (sidechains the wet signal off the dry input) and a bounce switch that cross-feeds left/right instead of repeating in place. The tape switch puts a tape machine in the loop: wow (slow pitch drift), flutter (fast wobble), saturation (the repeats round off and lose a little level each pass, like a hot tape) and diffusion (the repeats smear into a wash without changing their timing), with the band-limit filters it always had.	分数ディレイライン：time（デフォルトはテンポ同期、'sync to tempo' をオフにすると自由な ms）、tone（リピートへのバイポーラなチルト）、feedback（自己発振のため意図的に 100% 超まで。ソフトクリップされるのは出力で、フィードバック自体ではありません）、pan、duck（ドライ入力でウェット信号をサイドチェインダッキング）、そして同じ位置で繰り返す代わりに左右をクロスフィードする bounce スイッチ。tape スイッチはループ内にテープマシンを入れます：wow（ゆっくりしたピッチの揺れ）、flutter（速い揺れ）、saturation（ホットなテープのように、リピートが通るたびに丸まり少しずつレベルを失う）、diffusion（タイミングを変えずにリピートをにじませて響きにする）、そして従来からの帯域制限フィルター。
+A hardware-free note source: click-and-drag the on-screen piano, or hover the node (or select it alone) and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all.	ハードウェア不要のノートソース：画面上の鍵盤をクリック＆ドラッグするか、ノードにカーソルを重ねて（または単独で選択して）ノートパソコンのキーボードで弾きます（Logic/GarageBand の Musical Typing 配列：ZXCVBNM... が 1 オクターブ、QWERTY... がその上のオクターブ）。MIDI コントローラーなしでパッチを試せます。
+A mesh built by a JavaScript sketch you write: the loop-and-recursion counterpart of Field Primitive. Its param() calls become modulatable knobs, and the result patches into Render 3D like any other geometry.	あなたが書く JavaScript スケッチで作るメッシュ：Field Primitive のループと再帰版です。param() の呼び出しは変調可能なノブになり、結果は他のジオメトリと同様に Render 3D へパッチできます。
+A new random value every step, with adjustable smoothing between steps. The rate is synced to a note division, free beats or Hz. Seeded and deterministic, so rewinding replays the same sequence.	ステップごとに新しいランダム値。ステップ間のスムージングを調整できます。レートは音符の分割、自由な拍数、または Hz に同期します。シード付きで決定的なので、巻き戻すと同じシーケンスが再生されます。
+A note node whose body is a Field script. The script runs per sample against the transport beat; note(pitch, vel, len) inside an if sends a note out (len in beats, 0 holds as long as the incoming note). tick(div) fires on each beat division, deg(d) is a scale degree under Root/Scale, rand() is 0..1. Wire it into any synth or MIDI-out.	中身が Field スクリプトのノートノード。スクリプトはトランスポートの拍に対してサンプルごとに実行されます。if の中で note(pitch, vel, len) を呼ぶとノートを送ります（len は拍単位、0 なら入力ノートと同じ長さ保持）。tick(div) は拍の分割ごとに発火し、deg(d) は Root/Scale における音階度数、rand() は 0..1 です。任意のシンセや MIDI 出力につなげます。
+A reverb whose room you design: shape (room, hall, chamber, tunnel), size, material (soft and dull to hard and bright), distance from the source, decay time and stereo spread. The node builds that room's impulse response in the background and the picture shows it. 'load file' uses a recorded impulse response instead (up to 10 s); the design controls then grey out. It adds no latency.	部屋を自分で設計するリバーブ：形状（room、hall、chamber、tunnel）、サイズ、素材（柔らかく鈍いものから硬く明るいものまで）、音源からの距離、減衰時間、ステレオの広がり。ノードはその部屋のインパルス応答をバックグラウンドで生成し、画像に表示します。'load file' は代わりに録音されたインパルス応答（最大 10 秒）を使い、その間は設計用のコントロールがグレー表示になります。レイテンシーは加わりません。
+A shape you draw, played over time. Click empty space to add a point, drag to move it, right-click to remove it; the small ring on each segment bends it. rate is how long one pass takes (beats, a synced division, or Hz). With nothing patched to trig it follows the transport. A trig cable starts the shape on each rising edge: loop off plays it once and holds the last value; loop on repeats the part between loop start and loop end while trig stays high and plays on to the end when it drops. Loop start = loop end is a sustain point.	自分で描いた形を時間に沿って再生します。空いている場所をクリックして点を追加、ドラッグで移動、右クリックで削除。各セグメント上の小さなリングで曲げられます。rate は 1 回の再生にかかる長さ（拍、同期した分割、または Hz）です。trig に何もつながっていなければトランスポートに追従します。trig のケーブルは立ち上がりエッジごとに形を開始します：loop オフでは 1 回再生して最後の値を保持し、loop オンでは trig が high の間 loop start と loop end の間を繰り返し、下がると最後まで再生します。Loop start = loop end はサステイン点になります。
+A value per note of a chord, spread across low..high: linear, golden ratio, primes or alternate.	和音のノートごとの値を low..high に配分：linear、golden ratio、primes、alternate。
+About Infinite	Infinite について
+Add a Keyboard, a synth and an Audio Out, wired and ready to play	Keyboard、シンセ、Audio Out を追加（接続済みですぐ演奏可能）
+Add a Sphere, Camera and Light wired into a Render 3D	Sphere、Camera、Light を追加して Render 3D に接続
+Add a folder to build the library	フォルダーを追加してライブラリを作成
+Add an Audio File, Filter, Delay and Reverb into an Audio Out, ready for a sample	Audio File、Filter、Delay、Reverb を Audio Out に接続して追加（サンプルを入れるだけ）
+Adds a small note to the file info of videos, audio and images you export: Made with Infinite, by Naman Soni, and the website. It is metadata only: nothing is drawn on your picture or mixed into your sound, and your work stays yours. Turn it off any time.	書き出す動画・音声・画像のファイル情報に小さな注記を加えます：Made with Infinite、by Naman Soni、そしてウェブサイト。メタデータのみで、画像に何かが描かれたり音に何かが混ざったりすることはなく、作品はあなたのものです。いつでもオフにできます。
+Agent	エージェント
+All	すべて
+Already driven by something else	すでに別のものが制御しています
+An image drawn by a JavaScript sketch you write: the loop-and-recursion counterpart of Field Pixel. Its param() calls become modulatable knobs, and it can load and animate an SVG.	あなたが書く JavaScript スケッチで描く画像：Field Pixel のループと再帰版です。param() の呼び出しは変調可能なノブになり、SVG を読み込んでアニメーションさせることもできます。
+Applies an ADSR contour to an incoming modulator instead of generating its own trigger: rising above threshold starts attack/decay/sustain, falling back below it starts release. Patch an LFO in and its swing gets shaped by the ADSR, retriggering once per LFO cycle. Output 'ADSR' is the envelope itself, 0 at rest up to 1 at the peak, with stage times exact at any frame rate. Output 'centred' (what older patches load with) collapses toward 0.5 as the level falls, so at level 0 the input has no say and at level 1 it passes through. Hold keeps the peak before decay; each curve bends its stage (positive falls fast first, like an analog envelope). With 'per voice' on and the ADSR output cabled straight into an Analog or Wavetable knob, every note runs its own envelope, gated by its own note-on and note-off.	自分でトリガーを生成する代わりに、入力されたモジュレーターに ADSR の形を適用します：threshold を上回ると attack/decay/sustain が始まり、下回ると release が始まります。LFO をつなぐと、その揺れが ADSR で整形され、LFO の周期ごとにリトリガーされます。出力 'ADSR' はエンベロープそのもので、静止時 0 からピークで 1、各ステージの時間はどのフレームレートでも正確です。出力 'centred'（古いパッチはこれで読み込まれます）はレベルが下がるにつれて 0.5 に収束し、レベル 0 では入力は影響せず、レベル 1 ではそのまま通ります。Hold は decay の前にピークを保持し、各カーブはそのステージを曲げます（正の値ははじめ速く下がる、アナログエンベロープ風）。'per voice' をオンにして ADSR 出力を Analog や Wavetable のノブに直接つなぐと、各ノートが自分の note-on と note-off でゲートされる独自のエンベロープで動きます。
+Asks GitHub Releases once when Infinite starts. Nothing else is sent.	Infinite の起動時に GitHub Releases へ一度だけ問い合わせます。それ以外は何も送信しません。
+Audio clipped	オーディオがクリップしました
+Author	作者
+Author (optional)	作者（任意）
+Blurs the image with a Gaussian-weighted kernel - a smooth, natural blur. Radius sets how far it samples; Quality Smooth samples every pixel for a cleaner result.	ガウス重み付けカーネルで画像をぼかします。滑らかで自然なぼかしです。Radius はサンプリングの範囲、Quality Smooth はすべてのピクセルをサンプリングしてよりきれいな結果にします。
+Builds 3D geometry from a JavaScript sketch you write: draw(t) calls box, sphere, cylinder, cone, torus, tube and beginShape/vertex/endShape, moved with translate, rotate and scale (push/pop to nest). param("name", default, lo, hi) makes a modulatable knob. Patch it into Render 3D or any geometry operator. A mistake shows its line number and the last working mesh stays. No file or network access.	あなたが書く JavaScript スケッチから 3D ジオメトリを作ります：draw(t) が box、sphere、cylinder、cone、torus、tube、beginShape/vertex/endShape を呼び出し、translate、rotate、scale で動かします（push/pop で入れ子）。param("name", default, lo, hi) で変調可能なノブを作れます。Render 3D や任意のジオメトリ演算にパッチしてください。エラーは行番号を表示し、最後に動いていたメッシュが残ります。ファイルやネットワークにはアクセスできません。
+Can't reach the extension catalog. Check your connection and try again.	拡張機能カタログに接続できません。接続を確認して、もう一度お試しください。
+Carries a profile curve along a path curve to make a surface: pipes, rails, rims, cables, ribbons. Patch the shape into the first pin and the route into the second; with no profile it sweeps a round one, so a path alone gives a tube. The profile does not spin where the path bends. Start and End scale taper it, Twist turns it along the way, and Caps closes the ends of a closed profile on an open path. A closed profile on a closed path is a watertight ring.	プロファイルカーブをパスカーブに沿って動かして面を作ります：パイプ、レール、リム、ケーブル、リボン。形を 1 番目のピンに、経路を 2 番目のピンにパッチします。プロファイルがなければ円形を掃引するので、パスだけでもチューブになります。パスが曲がる場所でもプロファイルはねじれません。Start と End scale で先細りに、Twist で道に沿ってねじり、Caps は開いたパス上の閉じたプロファイルの両端を閉じます。閉じたパス上の閉じたプロファイルは水密なリングになります。
+Carries up to eight geometry inputs through one pin into Render 3D (or into another Group 3D), so a scene is not limited to Render 3D's four geometry pins. Nothing is merged: each input keeps its own material, texture, mapping and transform. Anything else downstream, like Transform or Join Geometry, receives the inputs merged into one mesh, each placed where Render 3D would draw it; that merged copy keeps tints as vertex colour but not per-input materials.	最大 8 つのジオメトリ入力を 1 本のピンで Render 3D（または別の Group 3D）へ送り、シーンが Render 3D の 4 つのジオメトリピンに縛られないようにします。何も結合されません：各入力は独自のマテリアル、テクスチャ、マッピング、トランスフォームを保ちます。Transform や Join Geometry など下流の他のノードには、入力が 1 つのメッシュに結合されて届き、それぞれ Render 3D が描く位置に置かれます。この結合コピーは色付けを頂点カラーとして保持しますが、入力ごとのマテリアルは保持しません。
+Changes you make will be listed here	行った変更がここに一覧表示されます
+Check on launch	起動時に確認
+Checking for packs...	パックを確認中...
+Choose folder and share	フォルダーを選んで共有
+Clear SVG	SVG を消去
+Click an edit to go back or forward to it.	編集をクリックすると、その時点に戻るか進みます。
+Click or press Esc to cancel	クリックまたは Esc でキャンセル
+Code	コード
+Collect	収集
+Collect diagnostics	診断情報を収集
+Collect diagnostics...	診断情報を収集...
+Contributors	コントリビューター
+Cook times	クック時間
+Copies every file this patch reads into a "<name> media" folder next to it, and saves the patch pointing there, so the two move together. The originals stay where they are.	このパッチが読み込むすべてのファイルを隣の "<name> media" フォルダーにコピーし、そこを参照するようにパッチを保存します。これで両方を一緒に移動できます。元のファイルはそのままです。
+Copy system info	システム情報をコピー
+Could not paste those nodes: 	これらのノードを貼り付けられませんでした：
+Credit Infinite in exported files	書き出したファイルに Infinite のクレジットを入れる
+Curve in, curve out. Resample spaces points evenly along the length, Simplify drops points that barely change the shape (within 'tolerance'), Smooth relaxes corners while the ends stay put, Offset draws a parallel curve at a signed distance in the XY plane with round outer corners. The result can still drive a Path and shows as a thin tube.	カーブを入れてカーブを出します。Resample は長さに沿って点を均等に配置し、Simplify は形をほとんど変えない点を削除し（'tolerance' の範囲内）、Smooth は端を固定したまま角を緩め、Offset は XY 平面上で符号付き距離の平行カーブを外側の角を丸めて描きます。結果は引き続き Path を駆動でき、細いチューブとして表示されます。
+Damps another modulator. Amount is a simple moving average (the default); Time glides with a time constant; Spring overshoots and settles with a frequency and damping. All three are the same at any frame rate.	別のモジュレーターを減衰させます。Amount は単純移動平均（デフォルト）、Time は時定数で滑らかに追従、Spring は周波数と減衰でオーバーシュートしてから落ち着きます。3 つともどのフレームレートでも同じ挙動です。
+Diagnostics	診断
+Download	ダウンロード
+Downloading	ダウンロード中
+Drag from a modulator's output onto a parameter pin	モジュレーターの出力からパラメータのピンへドラッグします
+Draws an image from a JavaScript sketch you write in the node - loops, arrays and recursion with a p5.js-style API (rect, circle, line, beginShape, push/pop, translate, rotate, text). param("name", default, lo, hi) in the script becomes a knob you can modulate. A mistake shows its line number and the last working picture stays up. Drop an .svg on the canvas (or onto a Sketch) to animate it by id with svgSet, svgText, svgBox and svgDraw. No file or network access.	ノード内で書く JavaScript スケッチから画像を描きます：p5.js 風の API（rect、circle、line、beginShape、push/pop、translate、rotate、text）によるループ、配列、再帰。スクリプト内の param("name", default, lo, hi) は変調できるノブになります。エラーは行番号を表示し、最後に動いていた画像が残ります。.svg をキャンバス（または Sketch の上）にドロップすると、svgSet、svgText、svgBox、svgDraw で id ごとにアニメーションできます。ファイルやネットワークにはアクセスできません。
+Drops every separate piece of the input mesh as a rigid body - box, sphere or convex-hull collider - that falls, collides and stacks on a ground plane and optional walls. Mass, friction, bounce, damping, gravity, starting velocity and spin, and a timed kick. The same patch plays back identically every time. 'Reset' drops them again.	入力メッシュの分かれた各パーツを剛体（ボックス、球、凸包のコライダー）として落とし、地面と任意の壁の上で落下、衝突、積み重ねさせます。質量、摩擦、反発、減衰、重力、初速と回転、そして時間指定の衝撃。同じパッチは毎回まったく同じに再生されます。'Reset' で再び落とします。
+Each note's own MPE pressure or slide, per voice into a synth knob.	各ノート固有の MPE プレッシャーまたはスライドを、ボイスごとにシンセのノブへ。
+Each note's own MPE pressure or slide. Turn on mpe on MIDI Notes, then cable this into an Analog or Wavetable knob (cutoff, volume, wavetable position, ...): every voice follows the pressure or slide (CC74) of the finger playing it, between low and high, smoothed over 5 ms so it never zippers. Into anything that is not a synth knob it follows the channel moved last.	各ノート固有の MPE プレッシャーまたはスライド。MIDI Notes で mpe をオンにし、これを Analog や Wavetable のノブ（cutoff、volume、wavetable position など）につなぎます：各ボイスは、それを弾いている指のプレッシャーまたはスライド（CC74）に low と high の間で追従し、5 ms でスムージングされるのでジッパーノイズは出ません。シンセのノブ以外につないだ場合は、最後に動いたチャンネルに追従します。
+Earliest kept state	保持されている最も古い状態
+Edit History	編集履歴
+Edit history - jump back to any earlier edit	編集履歴：以前の任意の編集に戻る
+Empty folder	空のフォルダー
+Extensions	拡張機能
+Field notes editor	Field ノートエディター
+Field notes kernel (per-sample, audio thread). Reserved: noteOn, noteNum, noteVel, beat, sr, n. Emit notes with note(pitch, vel, len) inside an if.	Field ノートカーネル（サンプルごと、オーディオスレッド）。予約語：noteOn、noteNum、noteVel、beat、sr、n。if の中で note(pitch, vel, len) を使ってノートを出力します。
+File paths are removed; media is not included.	ファイルパスは削除され、メディアは含まれません。
+Files appear when the scan finishes	スキャンが終わるとファイルが表示されます
+Find	検索
+Find a node by title, type, comment text or param name. Up / Down step, Enter jumps to it, Esc closes	タイトル、種類、コメントのテキスト、パラメータ名でノードを検索します。上 / 下 で移動、Enter でジャンプ、Esc で閉じる
+Folder	フォルダー
+Format	フォーマット
+Globals	グローバル
+Grows a plant or fractal from text. Type an axiom (the starting string) and rewrite rules such as X=F+[[X]-X]-F[-FX]+X;F=FF (separate rules with a semicolon), set the angle and the number of generations, and a 3D turtle draws it: F draws forward, f moves without drawing, + and - turn, & and ^ pitch, \\ and / roll, | turns around, [ and ] start and end a branch. Length and radius shrink on each branch by the scale controls. The result is a tube mesh and a curve a Path can follow, and the same text always grows the same shape.	テキストから植物やフラクタルを成長させます。公理（開始文字列）と X=F+[[X]-X]-F[-FX]+X;F=FF のような書き換え規則（規則はセミコロンで区切る）を入力し、角度と世代数を設定すると、3D のタートルが描きます：F は前進して描画、f は描かずに移動、+ と - は旋回、& と ^ はピッチ、\\ と / はロール、| は反転、[ と ] は枝の開始と終了。長さと半径は scale のコントロールに従って枝ごとに縮みます。結果はチューブメッシュと Path がたどれるカーブで、同じテキストは常に同じ形に育ちます。
+Hand tracking: your hand becomes modulators	ハンドトラッキング：あなたの手がモジュレーターになります
+Hide	隠す
+History	履歴
+Hit Rescan plugins	Rescan plugins をクリック
+Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. "open" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn "configure" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged. A plugin with a sidechain input (most compressors and gates) gets a "sidechain" pin: patch the key signal there, and switch the plugin itself to its external sidechain.	サードパーティの Audio Unit エフェクトをホストします。Plugins パネルからドラッグするか（そこで Rescan するとインストール済みのものがインデックスされます。リストはキャッシュされるので起動時に再スキャンはしません）、Finder から .component バンドルをドロップします。"open" はプラグイン独自のエディターを別ウィンドウで表示します。ノード上のスライダーは公開を選んだプラグインのパラメータです："configure" をオンにしてプラグインのウィンドウでコントロールに触れると、ここにマッピングされた行として現れます。プラグインのエディターがすべて触れたものをホストに伝えるわけではないので、ドロップダウンから選ぶこともできます。マッピングされた各行は独自の変調ピンを持つ本物のパラメータなので、Ramp や Envelope で駆動できます。行を右クリックするとマッピングを解除します。何も読み込まれていないかバイパス時は、音声はそのまま通過します。サイドチェイン入力を持つプラグイン（ほとんどのコンプレッサーやゲート）には "sidechain" ピンが付きます：そこにキー信号をパッチし、プラグイン側で外部サイドチェインに切り替えてください。
+Hosts third-party Audio Unit and VST3 effects, with full state save/restore and parameter automation through mapped modulation pins. The plugin's own editor opens in its own native window. A plugin with a sidechain input (most compressors and gates) gets a "sidechain" pin: patch the key signal there, and switch the plugin itself to its external sidechain.	サードパーティの Audio Unit と VST3 エフェクトをホストします。状態の完全な保存/復元と、マッピングした変調ピンによるパラメータのオートメーションに対応。プラグイン独自のエディターは専用のネイティブウィンドウで開きます。サイドチェイン入力を持つプラグイン（ほとんどのコンプレッサーやゲート）には "sidechain" ピンが付きます：そこにキー信号をパッチし、プラグイン側で外部サイドチェインに切り替えてください。
+Hosts third-party VST3 effects, with full state save/restore and parameter automation through mapped modulation pins. The plugin's own editor opens in its own X11 window. Audio Units are a macOS-only format and are not available here. A plugin with a sidechain input (most compressors and gates) gets a "sidechain" pin: patch the key signal there, and switch the plugin itself to its external sidechain.	サードパーティの VST3 エフェクトをホストします。状態の完全な保存/復元と、マッピングした変調ピンによるパラメータのオートメーションに対応。プラグイン独自のエディターは専用の X11 ウィンドウで開きます。Audio Units は macOS 専用のフォーマットのため、ここでは使えません。サイドチェイン入力を持つプラグイン（ほとんどのコンプレッサーやゲート）には "sidechain" ピンが付きます：そこにキー信号をパッチし、プラグイン側で外部サイドチェインに切り替えてください。
+Hosts third-party VST3 effects, with full state save/restore and parameter automation through mapped modulation pins. The plugin's own editor opens in its own native window. Audio Units are a macOS-only format and are not available here. A plugin with a sidechain input (most compressors and gates) gets a "sidechain" pin: patch the key signal there, and switch the plugin itself to its external sidechain.	サードパーティの VST3 エフェクトをホストします。状態の完全な保存/復元と、マッピングした変調ピンによるパラメータのオートメーションに対応。プラグイン独自のエディターは専用のネイティブウィンドウで開きます。Audio Units は macOS 専用のフォーマットのため、ここでは使えません。サイドチェイン入力を持つプラグイン（ほとんどのコンプレッサーやゲート）には "sidechain" ピンが付きます：そこにキー信号をパッチし、プラグイン側で外部サイドチェインに切り替えてください。
+Hover and toggle eases become instant. Nothing in the UI animates a value.	ホバーや切り替え時のイージングが即時になります。UI で値がアニメーションすることはありません。
+How far each part of the picture moved since the last frame, as a vector per pixel (red and green carry x and y, in pixels of the input; blue is speed). Pyramidal Lucas-Kanade on the GPU. View Colour shows direction as hue and speed as brightness. Use it to push particles or displace a picture along the motion of a video.	画像の各部分が前のフレームからどれだけ動いたかを、ピクセルごとのベクトルとして出力します（赤と緑が入力のピクセル単位の x と y、青が速度）。GPU 上のピラミッド型 Lucas-Kanade です。View Colour は方向を色相、速度を明るさで表示します。パーティクルを押したり、動画の動きに沿って画像をずらしたりするのに使えます。
+How to use: drop video clips onto the pads (or click an empty pad, or Load... / Folder... for the first 16 clips of a folder), wire the video out into an Output, then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad video player laid out like the MPC: pad 1 is bottom-left, every tile shows a frame of its clip, its number and mode, and every pad has its own CV pin. A hit follows the pad's mode: one shot plays the clip's window once and a new hit restarts it; gate plays while held and fades out over fade out on release; loop toggles a looping playback. The picture is the most recently hit pad that is still playing; transition (cut, crossfade, dip to black over time) sets how it takes over from what was showing, and when it ends the previous playing pad comes back the same way. With nothing playing the picture goes to black, or holds its last frame when hold frame is on. Click selects a pad (right-click selects without playing); the rows below edit it: sync and rate (Synced latches a hit to the next grid line, a synced loop restarts on every division), start and end (the window, as a percentage of the clip), speed (negative plays backwards), opacity, mode, and fade in / fade out (ms). The filmstrip shows the selected clip with its window; hover it to read the time. The audio out carries the visible clips' own soundtracks when soundtrack is on, each at the weight its picture is shown with. Every param of every pad can be modulated; a cable stays on its own pad when you select another, and an orange dot marks a pad with a modulated param. Clip paths and pad settings are saved with the patch; the clips are re-opened on load. The idea comes from Ricardo Palmieri's Infinite-Turbo fork; this is a fresh implementation.	使い方：ビデオクリップをパッドにドロップし（または空のパッドをクリックするか、フォルダーの最初の 16 クリップなら Load... / Folder...）、ビデオ出力を Output につないでから、パッドをクリックするか notes 入力にノートを送ります。ノート 36 から 51 がパッド 1 から 16 を鳴らします。MPC のようにレイアウトされた 16 パッドのビデオプレーヤーです：パッド 1 は左下、各タイルにはクリップのフレーム、番号、モードが表示され、各パッドに独自の CV ピンがあります。ヒットはパッドのモードに従います：one shot はクリップのウィンドウを 1 回再生し、新しいヒットで最初からやり直します。gate は押している間再生し、離すと fade out の時間でフェードアウトします。loop はループ再生をオン/オフします。映像は最後にヒットされてまだ再生中のパッドです。transition（cut、crossfade、time かけての dip to black）は、それまでの表示からどう切り替わるかを決め、終わると直前に再生していたパッドが同じ方法で戻ります。何も再生していないと映像は黒になり、hold frame がオンなら最後のフレームを保持します。クリックでパッドを選択（右クリックは再生せずに選択）し、下の行で編集します：sync と rate（Synced はヒットを次のグリッド線に合わせ、同期したループは分割ごとに再スタート）、start と end（ウィンドウ、クリップに対するパーセンテージ）、speed（負の値で逆再生）、opacity、mode、fade in / fade out（ms）。フィルムストリップは選択中のクリップとそのウィンドウを表示し、カーソルを重ねると時間を読めます。soundtrack がオンのとき、オーディオ出力は表示中のクリップ自身のサウンドトラックを、映像が表示されている比率で流します。各パッドのすべてのパラメータが変調可能です。別のパッドを選んでもケーブルは元のパッドに残り、オレンジの点が変調されたパラメータを持つパッドを示します。クリップのパスとパッドの設定はパッチと一緒に保存され、読み込み時にクリップが再び開かれます。このアイデアは Ricardo Palmieri の Infinite-Turbo フォークから来ています。これは新しい実装です。
+Include the open patch	開いているパッチを含める
+Infinite	=en
+Infinite %s is available	Infinite %s が利用可能です
+Infinite didn't close properly last time.	Infinite は前回正しく終了しませんでした。
+Install	インストール
+Install from file...	ファイルからインストール...
+Install the Tracking pack: Settings > Extensions	Tracking パックをインストール：設定 > 拡張機能
+Installed v%s	v%s をインストール済み
+Installed v%s, up to date	v%s をインストール済み、最新です
+Installed v%s, v%s available	v%s をインストール済み、v%s が利用可能
+JavaScript, p5-style: define draw(t). Globals: width, height, t, beat, frame.	p5 風の JavaScript：draw(t) を定義します。グローバル：width、height、t、beat、frame。
+JavaScript: define draw(t) that builds geometry. Globals: t, beat, frame.	JavaScript：ジオメトリを作る draw(t) を定義します。グローバル：t、beat、frame。
+Joins points that are closer than Radius with thin lines (plexus and constellation looks). Point cloud in, mesh of lines out. Max per point and Max lines keep a dense cloud from turning solid; each pair is drawn once, nearest first. Thickness is the line radius. Lines take their colour from the points when the points have colour.	Radius より近い点同士を細い線で結びます（プレクサスや星座のような表現）。点群を入れて線のメッシュを出します。Max per point と Max lines で密な点群が塗りつぶされないようにします。各ペアは 1 回だけ、近いものから描かれます。Thickness は線の半径です。点に色があれば、線は点の色を受け継ぎます。
+Kernel	カーネル
+Launch	起動
+Licence	ライセンス
+Listening...	待機中...
+Loop In / Out	ループ イン / アウト
+Loop On / Off	ループ オン / オフ
+MIDI learn	MIDI ラーン
+MIT licensed	MIT ライセンス
+Make block	ブロックを作成
+Markers	マーカー
+Mixes audio in 3D for headphones and plays it straight to the output (no output pin; it also records its own WAV/FLAC, 16 or 24 bit, always facing front): each input is a dot around a head, and its angle, distance and height (scroll on a dot) change how it is heard. Drop a cable on the empty + pin to add a source; alt-drag a dot for its level; H pins a source in front of your head. Ears use a measured dummy-head set (MIT KEMAR) or a spherical-head model; a limiter holds -1 dB and the meter shows loudness. Head tracking (AirPods Pro/Max etc.) works on macOS 14+ only and turns the room with your head; elsewhere the head stays fixed.	ヘッドホン向けに音声を 3D でミックスし、直接出力に再生します（出力ピンはありません。常に正面向きで、自前の WAV/FLAC を 16 または 24 ビットで録音もします）：各入力は頭の周りの点で、その角度、距離、高さ（点の上でスクロール）で聞こえ方が変わります。空の + ピンにケーブルをドロップしてソースを追加、点を Alt+ドラッグでレベル調整、H でソースを頭の正面に固定します。耳には実測のダミーヘッドデータ（MIT KEMAR）か球形頭部モデルを使い、リミッターが -1 dB を保ち、メーターがラウドネスを示します。ヘッドトラッキング（AirPods Pro/Max など）は macOS 14 以降でのみ動作し、頭の動きに合わせて空間が回ります。それ以外では頭は固定です。
+Name	名前
+New 3D Scene	新規 3D シーン
+New Effect Chain	新規エフェクトチェーン
+New Synth	新規シンセ
+No SVG yet: drop an .svg on the canvas, or copy SVG text and press Paste SVG.	まだ SVG がありません：.svg をキャンバスにドロップするか、SVG テキストをコピーして Paste SVG を押してください。
+No active viewport cards	アクティブなビューポートカードはありません
+No edits yet	まだ編集はありません
+No files in this folder	このフォルダーにファイルはありません
+No folders yet	まだフォルダーがありません
+No modulation yet	まだ変調はありません
+No packs to download right now. You can install one from a file.	今ダウンロードできるパックはありません。ファイルからインストールできます。
+No plugins found	プラグインが見つかりません
+No plugins indexed	インデックス済みのプラグインはありません
+None of those nodes exist in this build	これらのノードはこのビルドには存在しません
+Nothing indexed	インデックス済みの項目はありません
+Nothing on this page	このページには何もありません
+Nothing to paste	貼り付けるものがありません
+Nothing to show	表示するものがありません
+One line about it (optional)	ひとこと説明（任意）
+Opens as an untitled copy. The original is never changed.	無題のコピーとして開きます。元のファイルは変更されません。
+Particle System is a 3D emitter with gravity, drag and turbulence. Cloth is a pinned position-based sheet with wind and an optional ground plane.	Particle System は重力、抵抗、乱流を持つ 3D エミッターです。Cloth はピン留めされた位置ベースのシートで、風と任意の地面があります。
+Paste SVG	SVG を貼り付け
+Pause and restart on	一時停止と再開の位置
+Pauses on the next grid line	次のグリッド線で一時停止します
+Playing %s. Load into instead:	%s を再生中。代わりに読み込む先：
+Plays a hardware MIDI synth from a note cable. Pick the device and the channel (1-16); notes sent here do not reach Audio Out, so the synth makes its own sound. Four CC rows send a controller number and a modulatable value, only when it changes, so any LFO or macro can turn a knob on the synth. 'clock' makes Infinite the master clock (24 pulses per beat, with Start, Stop, Continue and song position) and switches itself off while Infinite follows an incoming clock. 'offset' shifts everything by -50 to +50 ms to line up with the synth's latency. Every note still held is released when you delete or bypass the node, change device, stop the transport or press panic. Pick "Infinite (virtual)" to publish a source called Infinite that DAWs and other apps list as a MIDI input.	ノートケーブルからハードウェア MIDI シンセを演奏します。デバイスとチャンネル（1-16）を選びます。ここに送られたノートは Audio Out に届かないので、シンセ自身が音を出します。4 つの CC 行がコントローラー番号と変調可能な値を、変化したときだけ送るので、どの LFO やマクロでもシンセのノブを回せます。'clock' は Infinite をマスタークロックにし（1 拍 24 パルス、Start、Stop、Continue、ソングポジション付き）、Infinite が外部クロックに従っている間は自動でオフになります。'offset' はシンセのレイテンシーに合わせて全体を -50 から +50 ms ずらします。ノードを削除またはバイパスしたとき、デバイスを変えたとき、トランスポートを止めたとき、panic を押したときには、押されたままのノートがすべて解放されます。"Infinite (virtual)" を選ぶと、DAW や他のアプリが MIDI 入力として表示する Infinite という名前のソースを公開します。
+Plays a hardware MIDI synth from a note cable. Pick the device and the channel (1-16); notes sent here do not reach Audio Out, so the synth makes its own sound. Four CC rows send a controller number and a modulatable value, only when it changes, so any LFO or macro can turn a knob on the synth. 'clock' makes Infinite the master clock (24 pulses per beat, with Start, Stop, Continue and song position) and switches itself off while Infinite follows an incoming clock. 'offset' shifts everything by -50 to +50 ms to line up with the synth's latency. Every note still held is released when you delete or bypass the node, change device, stop the transport or press panic. Pick "Infinite (virtual)" to publish an ALSA port called Infinite that other apps can subscribe to (aconnect or the DAW's MIDI settings).	ノートケーブルからハードウェア MIDI シンセを演奏します。デバイスとチャンネル（1-16）を選びます。ここに送られたノートは Audio Out に届かないので、シンセ自身が音を出します。4 つの CC 行がコントローラー番号と変調可能な値を、変化したときだけ送るので、どの LFO やマクロでもシンセのノブを回せます。'clock' は Infinite をマスタークロックにし（1 拍 24 パルス、Start、Stop、Continue、ソングポジション付き）、Infinite が外部クロックに従っている間は自動でオフになります。'offset' はシンセのレイテンシーに合わせて全体を -50 から +50 ms ずらします。ノードを削除またはバイパスしたとき、デバイスを変えたとき、トランスポートを止めたとき、panic を押したときには、押されたままのノートがすべて解放されます。"Infinite (virtual)" を選ぶと、他のアプリが購読できる Infinite という名前の ALSA ポートを公開します（aconnect または DAW の MIDI 設定で）。
+Plays a hardware MIDI synth from a note cable. Pick the device and the channel (1-16); notes sent here do not reach Audio Out, so the synth makes its own sound. Four CC rows send a controller number and a modulatable value, only when it changes, so any LFO or macro can turn a knob on the synth. 'clock' makes Infinite the master clock (24 pulses per beat, with Start, Stop, Continue and song position) and switches itself off while Infinite follows an incoming clock. 'offset' shifts everything by -50 to +50 ms to line up with the synth's latency. Every note still held is released when you delete or bypass the node, change device, stop the transport or press panic. Windows cannot publish a virtual MIDI port: to reach another app, install loopMIDI, create a port, and pick it here. Timing is about 1 ms.	ノートケーブルからハードウェア MIDI シンセを演奏します。デバイスとチャンネル（1-16）を選びます。ここに送られたノートは Audio Out に届かないので、シンセ自身が音を出します。4 つの CC 行がコントローラー番号と変調可能な値を、変化したときだけ送るので、どの LFO やマクロでもシンセのノブを回せます。'clock' は Infinite をマスタークロックにし（1 拍 24 パルス、Start、Stop、Continue、ソングポジション付き）、Infinite が外部クロックに従っている間は自動でオフになります。'offset' はシンセのレイテンシーに合わせて全体を -50 から +50 ms ずらします。ノードを削除またはバイパスしたとき、デバイスを変えたとき、トランスポートを止めたとき、panic を押したときには、押されたままのノートがすべて解放されます。Windows は仮想 MIDI ポートを公開できません：他のアプリへ送るには loopMIDI をインストールしてポートを作り、ここで選んでください。タイミングの精度は約 1 ms です。
+Plugins appear when the scan finishes	スキャンが終わるとプラグインが表示されます
+Point cloud in (a mesh is flagged red and ignored), one polygon cell per point out, for cracked-glass, cell and fracture looks: every cell is the region closer to its point than to any other. Points on the outer hull have unbounded cells and are skipped. 'inset' pulls each cell toward its point to leave gaps between them.	点群を入れ（メッシュは赤く表示されて無視されます）、点ごとに 1 つの多角形セルを出します。割れたガラス、細胞、破砕の表現に：各セルは、他のどの点よりも自分の点に近い領域です。外側の凸包上の点はセルが無限に広がるためスキップされます。'inset' は各セルを点の方へ縮め、セル間に隙間を残します。
+Point cloud in (a mesh is flagged red and ignored; use Mesh to Points first), triangulated surface out. Use it to turn a scatter into a terrain or low-poly surface. Points are projected onto the chosen plane, joined into Delaunay triangles (no sliver-prone long edges), and lifted back to their real 3D positions, so a scatter with height becomes a terrain. 'max points' thins very large clouds.	点群を入れ（メッシュは赤く表示されて無視されます。先に Mesh to Points を使ってください）、三角形分割した面を出します。散布した点を地形やローポリの面に変えるのに使います。点は選んだ平面に投影され、ドロネー三角形で結ばれ（細長い破片になりやすい長い辺はできません）、本来の 3D 位置に戻されるので、高さのある散布は地形になります。'max points' は非常に大きな点群を間引きます。
+Preset	プリセット
+Presets	プリセット
+Procedural noise: value, fBm, ridged, Voronoi, Worley edges, white, plus gradient Perlin and Simplex (single and fBm) that are identical on every GPU. Domain warping, octaves and colour mapping included.	プロシージャルノイズ：value、fBm、ridged、Voronoi、Worley エッジ、white、さらにどの GPU でも同一になるグラディエント Perlin と Simplex（シングルと fBm）。ドメインワーピング、オクターブ、カラーマッピングを含みます。
+Range	範囲
+Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. An HDRI node patched into the env input replaces the procedural sky gradient for background, reflections and ambient light. With hdr on (the default for a new node) light is kept above white until one tonemap at the end, so bloom glows only from what is truly bright; the background colour stays exact. Projection also offers Equirect 360 (2:1 for VR players; add 360 metadata with a tool such as Spatial Media Metadata Injector), Cubemap 3x2 and Fisheye dome (dome angle and tilt); these draw the scene six times, so they cost about six times a normal render, and they use the built-in camera.	ジオメトリ/カメラ/ライト/マテリアルのグラフを画像にラスタライズします。出力サイズが大きいときは、GPU の制限内に収まるようアンチエイリアスが自動で下がります。約 200 万三角形を超えるシーンは、レンダリングがはっきり重くなります。env 入力にパッチした HDRI ノードは、背景、反射、環境光のためのプロシージャルな空のグラデーションを置き換えます。hdr がオン（新しいノードのデフォルト）のとき、光は最後の 1 回のトーンマップまで白を超えたまま保たれるので、ブルームは本当に明るいものからだけ光ります。背景色は正確に保たれます。Projection には Equirect 360（VR プレーヤー向けの 2:1。360 メタデータは Spatial Media Metadata Injector などのツールで追加）、Cubemap 3x2、Fisheye dome（ドームの角度と傾き）もあります。これらはシーンを 6 回描くため通常のレンダリングの約 6 倍のコストがかかり、内蔵カメラを使います。
+Rate	レート
+Ready. Infinite restarts on the new version.	準備完了。Infinite は新しいバージョンで再起動します。
+Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear, constant, Oklab or OKLCh interpolation (the Oklab modes mix perceptually, so blue-to-yellow stays bright instead of going grey; OKLCh also keeps saturation by travelling around the hue wheel). Unlike Gradient Map, it has no shape of its own - the shape comes from upstream.	0-1 の任意のグレースケール入力を、自分で作ったカラーストップ（最大 32 個）で色付けし直します。補間は線形、定数、Oklab、OKLCh（Oklab モードは知覚的に混ぜるので、青から黄色でも灰色にならず明るさを保ちます。OKLCh はさらに色相環を回って彩度を保ちます）。Gradient Map と違って独自の形はなく、形は上流から来ます。
+Reduce motion	モーションを減らす
+Reduces the image to a few Levels per channel like Posterize, but spreads the rounding error as a fixed pattern so gradients keep their tone instead of banding. Mode picks an ordered Bayer matrix (2, 4 or 8) or a noise pattern; Mix blends back toward the original.	Posterize のように画像をチャンネルごとに少数の Levels に減らしますが、丸め誤差を固定パターンとして分散させるので、グラデーションがバンディングせずトーンを保ちます。Mode で組織的な Bayer 行列（2、4、8）かノイズパターンを選び、Mix で元の画像に戻して混ぜます。
+Reduces triangle count while keeping the overall shape (quadric error edge collapse). 'keep' is the fraction of triangles to leave; 'lock border' holds open edges in place. UVs, colours and hard shading survive; very low settings stop when no safe collapse remains.	全体の形を保ちながら三角形の数を減らします（二次誤差によるエッジ縮約）。'keep' は残す三角形の割合、'lock border' は開いたエッジを固定します。UV、カラー、ハードシェーディングは保たれます。非常に低い設定では、安全な縮約がなくなった時点で止まります。
+Refresh all to scan your folders	すべて更新してフォルダーをスキャン
+Releases	リリース
+Relinked 	再リンクしました：
+Remove block	ブロックを削除
+Render Timeline	Timeline をレンダリング
+Rendering	レンダリング中
+Restart to update	再起動して更新
+Restarts on the next grid line	次のグリッド線で再開します
+Reveal logs	ログを表示
+Reverb from a room you design (shape, size, material, distance, decay, spread) or from a loaded impulse response file.	自分で設計した部屋（形状、サイズ、素材、距離、減衰、広がり）または読み込んだインパルス応答ファイルによるリバーブ。
+Reverse	リバース
+Rounds or chamfers every sharp edge (angle above 'sharp angle'). 'width' is the bevel size, 'segments' 1 gives a flat chamfer and more give a smooth round. Result stays closed; width is limited by the shortest sharp edge.	鋭いエッジ（'sharp angle' を超える角度）をすべて丸めるか面取りします。'width' はベベルの大きさ、'segments' が 1 なら平らな面取り、それ以上で滑らかな丸みになります。結果は閉じたまま保たれ、width は最も短い鋭いエッジで制限されます。
+SVG: %s (%d KB). svgSet("#id", "attr", value), svgText, svgBox, svgDraw(x, y, w, h)	SVG：%s（%d KB）。svgSet("#id", "attr", value)、svgText、svgBox、svgDraw(x, y, w, h)
+Save with media	メディアごと保存
+Save with media...	メディアごと保存...
+Save...	保存...
+Scanning folders - found so far	フォルダーをスキャン中：これまでに見つかった数
+Scanning plugins - found so far	プラグインをスキャン中：これまでに見つかった数
+Scanning...	スキャン中...
+Script	スクリプト
+Select nodes & press Shift+V or right-click to add	ノードを選択して Shift+V を押すか、右クリックで追加
+Sends a note cable to a hardware or virtual MIDI device on one channel, so Infinite can play an external synth. Panic releases anything stuck.	ノートケーブルを 1 つのチャンネルでハードウェアまたは仮想 MIDI デバイスに送り、Infinite で外部シンセを演奏できるようにします。Panic で鳴りっぱなしのノートをすべて解放します。
+Set the loop region's start or end at the playhead	ループ範囲の開始または終了を再生ヘッドの位置に設定
+Shadertoy	=en
+Shapes an incoming modulator with an AHDSR contour (curved stages), gated by it crossing threshold, or per voice by each note of the synth it drives.	入力されたモジュレーターを AHDSR の形（曲線のステージ）で整形します。threshold を越えることでゲートされるか、ボイスごとに駆動先シンセの各ノートでゲートされます。
+Share Patch...	パッチを共有...
+Share patch as:	パッチの共有形式：
+Shared with another track.	別のトラックと共有中です。
+Shared with another video track.	別のビデオトラックと共有中です。
+Show Lock	ロックを表示
+Show the whole arrangement, from the start to the end of the last clip	アレンジ全体を表示（先頭から最後のクリップの終わりまで）
+Showing the last %d edits; older ones are dropped.	最新 %d 件の編集を表示しています。それより古いものは破棄されます。
+Shows each pixel from a different moment: it keeps the last frames and a grey map (the second input) says how far back every pixel looks, black is now and white is the oldest frame. A left-to-right ramp, the default with no map, gives a slit-scan. Length sets how many frames are kept (up to 60), Resolution how large they are stored (memory grows with it), Invert flips the map.	各ピクセルを異なる瞬間から表示します：直近のフレームを保持し、グレーマップ（2 番目の入力）が各ピクセルがどれだけ過去を見るかを決めます。黒が現在、白が最も古いフレームです。左から右へのランプ（マップがないときのデフォルト）でスリットスキャンになります。Length は保持するフレーム数（最大 60）、Resolution は保存サイズ（メモリはそれに応じて増えます）、Invert はマップを反転します。
+Shows how long each node takes to cook, on the node.	各ノードのクックにかかる時間をノード上に表示します。
+Shrinks each face region inward by 'width' and raises it by 'depth' (negative sinks it), with a wall around it. Works on the Select marked faces, or on all faces with selection-only off.	各面の領域を 'width' だけ内側に縮め、'depth' だけ持ち上げます（負の値で沈む）。周囲には壁ができます。Select で印を付けた面、または selection-only がオフならすべての面に作用します。
+Sine, triangle, saw up/down, square and seeded sample-and-hold. Rate as a synced division, free beats or Hz; phase from the transport, free-running, or restarted by the trig input; plus phase and an output range.	サイン、三角、上昇/下降ノコギリ、矩形、シード付きサンプル＆ホールド。レートは同期した分割、自由な拍数、または Hz。位相はトランスポート由来、フリーラン、または trig 入力で再スタート。さらに phase と出力範囲。
+Sketch 3D editor	Sketch 3D エディター
+Sketch editor	Sketch エディター
+Smooths another modulator to damp jittery or steppy sources like Random or Pattern. Amount is a moving average whose response is the same at any frame rate (older patches keep the per-frame version); Time uses a time constant in seconds; Spring follows the input like a mass on a spring, with frequency and damping, and can overshoot.	別のモジュレーターを平滑化して、Random や Pattern のようなジッターや段差のあるソースを抑えます。Amount は移動平均で、応答はどのフレームレートでも同じです（古いパッチはフレームごとの版を保持）。Time は秒単位の時定数を使います。Spring はばねにつけた質量のように入力に追従し、周波数と減衰を持ち、オーバーシュートすることがあります。
+Source code	ソースコード
+Span	スパン
+Speed	速度
+Spins a profile curve around the X, Y or Z axis to make a surface of revolution: vases, bowls, rings, wine glasses, columns. Draw half the outline (a Curve works well) and set the axis it turns about. A closed profile turned all the way round is a solid; a part-turn is closed with flat caps when Caps is on; an open profile gives an open shell. Segments sets how smooth the turn is.	プロファイルカーブを X、Y、Z 軸のまわりに回転させて回転体の面を作ります：花瓶、ボウル、リング、ワイングラス、柱。輪郭の半分を描き（Curve が便利です）、回転の軸を設定します。閉じたプロファイルを一周させるとソリッドになり、部分的な回転は Caps がオンなら平らなキャップで閉じられ、開いたプロファイルは開いたシェルになります。Segments で回転の滑らかさを設定します。
+Start	開始
+Switch to Edit Mode to add controls	Edit Mode に切り替えてコントロールを追加
+System info, logs, settings (home folder hidden) and recent crash reports go into one zip on your Desktop. Nothing is sent anywhere.	システム情報、ログ、設定（ホームフォルダーは伏せ字）、最近のクラッシュレポートを 1 つの zip にまとめてデスクトップに置きます。どこにも送信しません。
+Template library	テンプレートライブラリ
+Template library...	テンプレートライブラリ...
+The Arrangement Timeline is driving audio. Click to hand it back to the canvas.	Arrangement Timeline が音声を駆動しています。クリックしてキャンバスに戻します。
+The audio routing family. Audio Out is the terminal node. Every audio input pin takes exactly one cable, so Mixer is the only node that sums (4-8 slots, each with gain/pan/mute/solo) and Splitter is the only fan-out point (or, with bands set, a 2-4 band Linkwitz-Riley crossover whose bands sum flat). Gain is a single dB stage with a meter; Blend Audio is an equal-power crossfade between two inputs.	オーディオルーティングのファミリー。Audio Out は終端ノードです。各オーディオ入力ピンはちょうど 1 本のケーブルを受けるので、加算するノードは Mixer だけ（4-8 スロット、各スロットに gain/pan/mute/solo）、分岐点は Splitter だけです（bands を設定すると 2-4 バンドの Linkwitz-Riley クロスオーバーになり、バンドを足すとフラットになります）。Gain はメーター付きの単一の dB ステージ、Blend Audio は 2 つの入力間の等パワークロスフェードです。
+The explicit fan-out point for audio: an ordinary audio output feeds exactly one destination, so sending one signal to several places needs this node. Its own output is the one exempt from that rule. In copy mode it is a plain copy. Set bands to 2, 3 or 4 and the pins become frequency bands, low to high, split by Linkwitz-Riley crossovers at split1-3; the bands add back up to the input with a flat response, so you can process each band on its own and mix them again.	オーディオの明示的な分岐点：通常のオーディオ出力はちょうど 1 つの行き先にしか送れないので、1 つの信号を複数の場所へ送るにはこのノードが必要です。このノード自身の出力だけがそのルールの例外です。copy モードでは単純なコピーです。bands を 2、3、4 にすると、ピンは低域から高域への周波数バンドになり、split1-3 の Linkwitz-Riley クロスオーバーで分割されます。バンドを足すとフラットな特性で入力に戻るので、各バンドを個別に処理して再び混ぜられます。
+The file was written, but its audio went over full scale and is clipped.	ファイルは書き出されましたが、音声がフルスケールを超えてクリップしています。
+The render stopped before it finished. Your patch was not changed.	レンダリングは完了前に停止しました。パッチは変更されていません。
+Third-party notices	サードパーティに関する通知
+This patch reads no files. It will be saved on its own.	このパッチはファイルを読み込みません。パッチ単体で保存されます。
+Those nodes were copied from a newer Infinite; update to paste them	これらのノードは新しい Infinite からコピーされたものです。貼り付けるにはアップデートしてください
+Three saturation stages (tube, tape, diode, fold, rectify, crush), wired serial, parallel, mid-side, 3-band or feedback.	3 段のサチュレーション（tube、tape、diode、fold、rectify、crush）。直列、並列、ミッドサイド、3 バンド、フィードバックで接続。
+Three saturation stages, each with its own curve (tube, tape, diode, fold, rectify, crush) and amount (up to 36 dB of drive; crush goes from 16 bits down to 2). Routing wires them serial, parallel (averaged), mid-side (stage 1 on mid, 2 on side, 3 on left/right), 3-band (low/mid/high split at 250 Hz and 2.5 kHz) or feedback (serial, with the output fed back through a 1 ms delay; the feedback knob is the loop gain after the drive, so it colours the sound and never howls). Runs at 8x with anti-aliased curves.	3 段のサチュレーション。各段に独自のカーブ（tube、tape、diode、fold、rectify、crush）と量（最大 36 dB のドライブ。crush は 16 ビットから 2 ビットまで）。Routing でそれらを直列、並列（平均）、ミッドサイド（1 段目がミッド、2 段目がサイド、3 段目が左右）、3 バンド（250 Hz と 2.5 kHz で低/中/高に分割）、フィードバック（直列で、出力を 1 ms のディレイ経由で戻す。feedback ノブはドライブ後のループゲインなので、音に色を付けるだけでハウリングはしません）に接続します。8 倍・アンチエイリアスのカーブで動作します。
+Toggle the docked list of edits; click one to jump to it	ドッキングされた編集リストの表示を切り替え。項目をクリックするとそこへジャンプ
+Toggle the loop region	ループ範囲の切り替え
+Tracks one face from an image or camera wire: head position, turn, nod and tilt, each eye open or closed, brows, mouth open, smile, and where the eyes look. A small preview shows what is tracked. Needs the Tracking pack (Settings > Extensions).	画像またはカメラのケーブルから 1 つの顔を追跡します：頭の位置、左右の向き、うなずき、傾き、それぞれの目の開閉、眉、口の開き、笑顔、視線の向き。小さなプレビューに追跡内容が表示されます。Tracking パックが必要です（設定 > 拡張機能）。
+Tracks one hand from an image or camera wire and turns it into modulators: palm and fingertip position, pinch, open, roll and size, plus six gestures (fist, point, peace, thumbs up, ok, rock) that read 1 while you make them. A small preview shows what is tracked. Needs the Tracking pack (Settings > Extensions).	画像またはカメラのケーブルから 1 つの手を追跡し、モジュレーターに変えます：手のひらと指先の位置、ピンチ、開き、回転、大きさ、さらに 6 つのジェスチャー（グー、指差し、ピース、サムズアップ、OK、ロック）は、その形をしている間 1 になります。小さなプレビューに追跡内容が表示されます。Tracking パックが必要です（設定 > 拡張機能）。
+Tracks one person's body from an image or camera wire: head, both wrists, how high each arm is raised, how far apart the wrists are, lean and distance. Keep the upper body in view. A small preview shows what is tracked. Needs the Tracking pack (Settings > Extensions).	画像またはカメラのケーブルから 1 人の体を追跡します：頭、両手首、それぞれの腕の上がり具合、手首同士の距離、傾き、距離。上半身が映るようにしてください。小さなプレビューに追跡内容が表示されます。Tracking パックが必要です（設定 > 拡張機能）。
+Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror, Screw, Decimate, Bevel and Inset - plus Select and the ops that act only on its marked faces (Delete / Transform / Extrude Selected), Join Geometry's booleans (Union, Intersect, Difference), Displacement, Wrap and Merge by Distance.	Transform、Array、Subdivide、Solidify、Extrude、Wireframe、Triangulate、Normals、Explode、Twist、Smooth、Mirror、Screw、Decimate、Bevel、Inset。さらに Select と、その印を付けた面だけに作用する操作（Delete / Transform / Extrude Selected）、Join Geometry のブーリアン（Union、Intersect、Difference）、Displacement、Wrap、Merge by Distance。
+Try clearing the search or filter	検索やフィルターをクリアしてみてください
+Type to find. Up/Down step, Enter jumps, Esc closes.	入力して検索。上/下 で移動、Enter でジャンプ、Esc で閉じる。
+Unsaved changes	未保存の変更
+Update now	今すぐアップデート
+Use + Add Control to place a knob, pad or switch	+ Add Control でノブ、パッド、スイッチを配置します
+Website	ウェブサイト
+With a grid set, Pause and Rewind wait for the next line while playing; Play starts at once. Sequencers, arps and MIDI files follow. Manual Switcher changes wait for the line too	グリッドを設定すると、再生中の Pause と Rewind は次の線まで待ちます。Play はすぐに始まります。シーケンサー、アルペジエーター、MIDI ファイルも従います。Manual Switcher の切り替えも線を待ちます
+Your work from %s was saved automatically. Recover it to carry on, or discard it; your saved patch files are untouched.	%s の作業は自動保存されています。復元して続けるか、破棄してください。保存済みのパッチファイルには影響しません。
+Your work was saved automatically. Recover it to carry on, or discard it; your saved patch files are untouched.	作業は自動保存されています。復元して続けるか、破棄してください。保存済みのパッチファイルには影響しません。
+Zoom Timeline In / Out	Timeline をズームイン / アウト
+Zoom Timeline to Fit	Timeline を全体表示
+Zoom around the playhead (the view's centre when the playhead is off screen)	再生ヘッドを中心にズーム（再生ヘッドが画面外のときは表示の中央）
+box, sphere, cylinder, cone, torus, plane, tube, beginShape/vertex/endShape; translate, rotate, scale, push/pop; fill(r,g,b) 0..1.	box、sphere、cylinder、cone、torus、plane、tube、beginShape/vertex/endShape；translate、rotate、scale、push/pop；fill(r,g,b) 0..1。
+build %s, %s	ビルド %s、%s
+copy	コピー
+find nodes, comments, params...	ノード、コメント、パラメータを検索...
+folder	フォルダー
+missing	見つかりません
+param("name", default, lo, hi) makes a modulatable knob. Colours are 0..1; hsl(h,s,l) returns one.	param("name", default, lo, hi) で変調可能なノブを作ります。色は 0..1 で、hsl(h,s,l) が色を返します。
+paste each tab from shadertoy.com; iChannel0-3 are the pins, or buffer A-D when unwired	shadertoy.com の各タブを貼り付けます。iChannel0-3 はピン、未接続ならバッファ A-D です
+search...	検索...
+uniform float name; // 0..1 = 0.5   adds a knob	uniform float name; // 0..1 = 0.5   ノブを追加します
+used twice	2 回使用
+v%s	=en
+v%s, %.0f MB download	v%s、%.0f MB のダウンロード
+version %s	バージョン %s
+version %s is available (you have %s) - click to update, right-click to dismiss	バージョン %s が利用可能です（現在 %s）：クリックでアップデート、右クリックで閉じる
