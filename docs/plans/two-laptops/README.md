@@ -36,7 +36,7 @@ Brand surfaces follow `docs/brand/BRAND.md`. No film renders until the owner ask
 | Thing | Shared? | How |
 |---|---|---|
 | Code, branches, commits | yes | git: each laptop is a remote of the other (`air` on the Pro, `pro` on the Air) |
-| Skills, agents, `AGENTS.md`, `docs/NOW.md` (claims, decisions) | yes | they are in the repo, so they travel with git |
+| Skills, agents, `AGENTS.md`, `docs/DECISIONS.md` | yes | they are in the repo, so they travel with git |
 | Claude memory (`~/.claude/projects/-Users-namansoni-infinte/memory/`) | yes, manual | `scripts/sync_laptops.sh memory` (newest file wins, nothing deleted) |
 | Global skills `~/.claude/skills/` (with their scripts), `~/.claude/CLAUDE.md` | yes, every 5 min | the `tick` job, newest file wins |
 | Machine installs in `~/.local/bin` (`heygen`, `graphify`, `repowise`) | no | install per laptop |
@@ -53,10 +53,10 @@ Brand surfaces follow `docs/brand/BRAND.md`. No film renders until the owner ask
 start of session (either laptop)
   1. scripts/sync_laptops.sh status      who is on what, what differs
   2. scripts/sync_laptops.sh fetch       get the other laptop's branches
-  3. read docs/NOW.md, add a claim row   Session name starts with pro- or air-
+  3. check worktrees and branches       Session name starts with pro- or air-
 work on ONE branch per ask               feature/<x> or bugfix/<x>, commit per step
 end of session
-  4. commit (WIP is fine), update NOW.md, remove the claim
+  4. commit (WIP is fine)
   5. scripts/sync_laptops.sh memory      merge memory both ways
 merge point (one laptop only)
   6. fetch the other laptop, merge both branches into main here
@@ -68,7 +68,7 @@ merge point (one laptop only)
 | Rule | Why |
 |---|---|
 | One branch has one owner laptop. Never edit the same branch on both | no conflicts to resolve |
-| The claim row in `docs/NOW.md` names the laptop (`pro-...` / `air-...`) | the other account sees it after a fetch |
+| Air branches are named `air/<slug>` | the other account sees whose a branch is after a fetch |
 | Pro: the long v0.6 block work, builds, benches | the main machine; `feature/v06-sound` lives here |
 | Air: independent lanes that touch different files: sweeps and audits (no bench), docs and research, site, films, review | little overlap with the Pro's files |
 | Both can run a bench, but one bench per laptop at a time | each laptop is its own quiet machine |
@@ -109,6 +109,4 @@ own worktree, and may not push or merge. Tools allowed: Read, Edit, Write, Glob,
 
 ## Rules of thumb
 
-- If the claim table is stale on the other laptop, run `fetch` first, then read its `NOW.md` from `air/<branch>`.
-- Conflicts in `docs/NOW.md` are expected; keep both rows.
 - If you forget which laptop has the newest work: `scripts/sync_laptops.sh status`.

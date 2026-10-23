@@ -1,7 +1,7 @@
 # Air brief: Blender and Ableton bridges, Phase 1 (no engine build, no Infinite binary)
 
-Work in your own worktree on `air/bridges`. Read `docs/NOW.md` first. Add a claim row, commit per
-step, remove the claim at the end, do not merge or push. No Co-Authored-By or "Generated with" lines.
+Work in your own worktree on `air/bridges`. Commit per
+step, do not merge or push. No Co-Authored-By or "Generated with" lines.
 Python 3 standard library plus Blender's own `bpy` (run as `Blender -b -P`). Load skills `tool-first`,
 `infinite-lifecycle`. Never open Blender source or Ableton internals; only their documented APIs and files.
 

@@ -30,7 +30,7 @@ If this skill and `PROTOCOL.md` disagree, `PROTOCOL.md` wins; if the protocol an
 
 ## Procedure
 
-1. **Start a release.** Read `docs/NOW.md`. Copy the structure of `docs/release/v0.6.md` to `docs/release/<version>.md`; do step 0 (reconcile the gate with the protocol) and write the result there. Copy `CHECKLIST_TEMPLATE.md` to `docs/release/checklists/<version>.md`.
+1. **Start a release.** Copy the structure of `docs/release/v0.6.md` to `docs/release/<version>.md`; do step 0 (reconcile the gate with the protocol) and write the result there. Copy `CHECKLIST_TEMPLATE.md` to `docs/release/checklists/<version>.md`.
 2. **Entry.** Check the six entry criteria in PROTOCOL.md section 4. Load known issues into the tracker: `python3 tools/release/findings.py new --version <v> ...`.
 3. **P1.** `tools/release/run_gate.sh --phase P1` (static checks, no build, no app launch). `--list` first shows what would run.
 4. **P2.** Confirm one build only: `pgrep -fl "cmake --build|make|clang"` shows nothing, the candidate binary is built (the runner never builds). Then `tools/release/run_gate.sh --phase P2`. It is serial and slow; run it in the background and wait for the notification (do not poll).

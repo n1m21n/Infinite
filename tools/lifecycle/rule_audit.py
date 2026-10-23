@@ -128,7 +128,7 @@ def main() -> None:
 
     out += ["## Next step", "",
             "Bring the top five items to the owner one at a time: keep, merge into the owning skill, or retire.",
-            "Record each answer in docs/NOW.md under Decisions."]
+            "Record each answer that matters later in docs/DECISIONS.md."]
     text = "\n".join(out) + "\n"
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

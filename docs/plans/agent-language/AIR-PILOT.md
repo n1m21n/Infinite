@@ -1,8 +1,8 @@
 # Brief: agent language, Phase 2 pilot (Air, runs `claude -p`, spends the Air account's quota)
 
-Two-laptop rules: work only in this worktree, claim row `air-agent-language-pilot` in `docs/NOW.md`, commit per step,
-remove the claim when done, do not merge or push. No Co-Authored-By or "Generated with" lines anywhere.
-Read `docs/NOW.md` first, then `docs/plans/agent-language/README.md` (the design and the gate).
+Two-laptop rules: work only in this worktree, commit per step,
+do not merge or push. No Co-Authored-By or "Generated with" lines anywhere.
+Read `docs/plans/agent-language/README.md` (the design and the gate).
 
 Step 0: `git merge --no-edit pro/agent-language-p2` (the Pro put this branch on this laptop; it carries your Phase 1 plus the harness).
 
