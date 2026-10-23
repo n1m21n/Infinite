@@ -73,3 +73,23 @@ Table, the Agent's stats) sees exactly what it saw before.
 B11 before/after table in this file; frame compare passes; `render-pipeline-sweep` and
 `geometry-transform-sweep` drivers pass; `windows-parity` / `linux-parity` reviewed (GL 3.3 core
 only: `texelFetch`, MRT, `GL_SAMPLES_PASSED`, RGBA32F render targets are all core 3.0-3.3).
+
+## Status (2026-10-23, dev build, steps 1-4)
+
+- Frame compare (`GPUPOINTSTEST`): 1828 points both ways, occlusion count equal, 3 of 1M pixels
+  differ (max 37, one sprite edge). Pass.
+- `run-infinite-hygiene` group 3d: 23/23. `render-pipeline-sweep`'s other fixtures
+  (RENDER3DCACHE, RENDER3DLIVE, DISTRIBUTE, PHASE4, INSTANCESELECT, SELECT, CLOTH, PARTICLE): all OK.
+  `geometry-transform-sweep`'s three sweeps are in group 3d. (Both sweep drivers default to
+  `build/`, the Release tree; these ran against `build-dev` by hand.)
+- Parity review: every new GL call (`glGetFragDataLocation`, `glDrawBuffers`, `glGenQueries`,
+  `glBeginQuery`/`glEndQuery`, `glGetQueryObjectuiv`) is GL 3.0-3.3 core and in glad; shaders stay
+  `#version 150` (`texelFetch`, `gl_InstanceID`); no `Platform::` or `#ifdef` code. Sampler units:
+  `uPointPos`/`uPointColor` sit on 11/12 when drawing and default to 0 otherwise, which holds only
+  `sampler2D`s (the one `sampler2DShadow` is on 1), so strict drivers see no mixed-type unit.
+- B11 before/after: pending a Release build.
+
+Step 6 is larger than its line above: Render 3D's instanced draw, its shadow pass, translucent
+instance sorting, the scene signature and ~25 other files read `InstanceTransforms()` on the CPU.
+Its per-frame cost only exists when the cloud changes every frame, which nothing in steps 1-4 does,
+so it waits for the B11 numbers and naturally pairs with step 7 (GPU particles).
