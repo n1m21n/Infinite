@@ -70,6 +70,7 @@ One owner per topic: if two files seem to disagree, the skill named in this tabl
 | `linux-parity` | Platform | Writing Linux-safe code; the container+Xvfb rig |
 | `pillar-parity-audit` | Platform | Cross-platform feature coverage audit |
 | `plugin-host-hardening` | Platform | Plugin host robustness |
+| `build-discipline` | Process | Before ANY build: ibuild gate, -j from RAM, one build at a time, dev/ASan/release/Linux modes, semi-builds (8 GB Mac hangs otherwise) |
 | `run-infinite-hygiene` | Release | Build/test/self-test harness; owns the "Efficient routes" table |
 | `ci-failure-triage` | Release | Read a failed CI run once, name the cause, fix every candidate in one push (owns the CL.exe crash recipe) |
 | `ship-infinite` | Release | Full release/build/publish workflow |
