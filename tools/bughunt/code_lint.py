@@ -37,6 +37,13 @@ loaded-loop     `v.Int("key", m)` in a VisitParams, then `m` (or `n.m`, `node->m
                 file is a hang. Molder replayed one Mutate per generation on
                 the main thread (B-K-029).
 
+shader-loop     A GLSL loop (inside a C++ string literal) whose bound is not an
+                integer literal. A bound fed by a uniform runs as many times as
+                the CPU side uploads: dither looped uMode + 1 times and a patch
+                value of 1e9 hung the GPU, then the app aborted (B-K-035). Trace
+                the bound to its upload and check it is clamped there (or that
+                its node clamps the param on load), then --update-baseline.
+
 Exit 1 on any hit not in the baseline (--all: on any hit). Test: `code_lint.py selftest`.
 """
 import glob
@@ -144,6 +151,18 @@ def unbounded_int(files, texts):
     return hits
 
 
+SHADER_LOOP = re.compile(r'^\s*R?"[^"\n]*\bfor\s*\(\s*int\s+(\w+)\s*=[^;]*;\s*\1\s*<=?\s*([^;]+?)\s*;')
+
+
+def shader_loop(path, text):
+    hits = []
+    for i, line in enumerate(text.splitlines()):
+        m = SHADER_LOOP.search(line)
+        if m and not re.fullmatch(r"\d+", m.group(2)):
+            hits.append(("shader-loop", f"{rel(path)}:{i + 1}", f"{m.group(1)} < {m.group(2)}"))
+    return hits
+
+
 def run(paths=None):
     files = paths or src_files()
     texts = {p: open(p, encoding="utf-8", errors="replace").read() for p in files}
@@ -154,6 +173,8 @@ def run(paths=None):
     hits += loaded_index(files, texts)
     hits += unbounded_int(files, texts)
     hits += loaded_loop(files, texts)
+    for p in files:
+        hits += shader_loop(p, texts[p])
     return hits
 
 
@@ -195,6 +216,9 @@ void Push(const X& n) { mVoices.store(std::clamp(n.voices, 1, 16)); }
 int Steps() const { return steps < 1 ? 1 : steps; }
 void Build() { v.Int("generation", gen); for (int i = 0; i < gen; ++i) Mutate(); }
 float t[4]; float g() { return t[count]; }
+const char* kFrag = "uniform int uMode;\\n"
+    "   for (int i = 0; i < uMode; i++) {\\n"
+    "   for (int k = 0; k < 16; k++) {\\n";
 """)
     hits = run([a, b])
     rules = sorted((h[0], h[2].split(" ")[0]) for h in hits)
@@ -208,6 +232,8 @@ float t[4]; float g() { return t[count]; }
     assert ("loaded-loop", "generation") in rules, hits
     assert not any(r[0] == "loaded-loop" and r[1] == "count" for r in rules), hits
     assert not any(r[0] == "unbounded-int" and r[1] in ("voices", "steps") for r in rules), hits
+    assert ("shader-loop", "i") in rules, hits
+    assert len([r for r in rules if r[0] == "shader-loop"]) == 1, hits
     print("code_lint selftest ok")
 
 
