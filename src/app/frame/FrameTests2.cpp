@@ -3732,12 +3732,36 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
          for (const Arrange::Clip& c : l.clips)
             onlySlots = onlySlots && (c.id & (1ull << 62)) != 0;
       check(onlySlots && !Arrange::FindLane(gArrange, laneA1)->clips.empty(), "Session audio leaves the Timeline's clips silent");
+      // Row edits remap the launch schedule: a playing clip follows its row as scenes are inserted above it.
+      ArrangeEdit([&]() {
+         Arrange::Lane* l = Arrange::FindLane(gArrange, laneA1);
+         l->slots.insert(l->slots.begin(), Arrange::SessionSlot{});
+         gArrange.revision++;
+      });
+      ArrangeSessionShiftRows(0, 1);
+      ArrangeSessionTick();
+      check(ArrangeSessionQuery(laneA1, 1).playing && !ArrangeSessionQuery(laneA1, 0).playing,
+            "a scene inserted above a playing clip leaves that clip playing");
+      ArrangeEdit([&]() {
+         Arrange::Lane* l = Arrange::FindLane(gArrange, laneA1);
+         l->slots.erase(l->slots.begin());
+         gArrange.revision++;
+      });
+      ArrangeSessionShiftRows(0, -1);
+      ArrangeSessionTick();
+      check(ArrangeSessionQuery(laneA1, 0).playing, "deleting the scene above keeps the clip playing on its new row");
       ArrangeSessionLaunch(laneA1, 0);
       check(ArrangeSessionLaneQuery(laneA1).stopQueued, "clicking the playing clip queues its stop on the next bar");
       ArrangeSessionLaunch(laneA2, 0);
       ArrangeSessionLaunch(laneA2, 0);
       check(ArrangeSessionLaneQuery(laneA2).playingSlot < 0 && !ArrangeSessionQuery(laneA2, 0).queued,
             "clicking a queued clip again takes the launch back");
+      // Deleting the playing clip's own row stops it rather than playing whatever slides up.
+      ArrangeSessionShiftRows(0, -1);
+      ArrangeSessionShiftRows(0, 1);
+      ArrangeSessionTick();
+      check(!ArrangeSessionQuery(laneA1, 0).playing && !ArrangeSessionQuery(laneA1, 1).playing,
+            "a deleted row's clip stops");
    }
    if (frameId == 13)
    {
@@ -3813,6 +3837,16 @@ void FrameTest_SESSIONVIEWTEST(int frameId, GLFWwindow* window)
          check(v1->slots.empty() || !v1->slots[0].Has(), "an audio clip is never pasted onto a video track");
          ArrangeSessionRunActionForTest(5, laneA2, 5);
          check(!Arrange::FindLane(gArrange, laneA2)->slots[5].Has(), "Cut empties the cell");
+         // Drag: a move keeps the clip (same id) in the new cell, Option-drag copies, other track types refuse it.
+         const uint64_t subId = Arrange::FindLane(gArrange, laneA2)->slots[0].clip.id;
+         check(ArrangeSessionMoveSlot(laneA2, 0, laneA2, 6, false), "a clip drags to another cell");
+         const Arrange::Lane* l3 = Arrange::FindLane(gArrange, laneA2);
+         check(!l3->slots[0].Has() && l3->slots.size() > 6 && l3->slots[6].clip.id == subId, "the moved clip leaves its cell");
+         check(ArrangeSessionMoveSlot(laneA2, 6, laneA2, 0, true), "Option-drag copies a clip");
+         l3 = Arrange::FindLane(gArrange, laneA2);
+         check(l3->slots[6].clip.id == subId && l3->slots[0].Has() && l3->slots[0].clip.id != subId, "the copy is a new clip, the original stays");
+         check(!ArrangeSessionMoveSlot(laneA2, 6, laneV1, 1, false), "an audio clip never drags onto a video track");
+         check(!ArrangeSessionMoveSlot(laneA2, 6, laneA2, 6, false), "dropping a clip on its own cell does nothing");
       }
       check(Arrange::Validate(gArrange, nullptr), "arrangement still validates");
    }
