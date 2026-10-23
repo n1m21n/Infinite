@@ -39,7 +39,7 @@ static void DrawPanelRail()
    if (PanelRail::Item("##railArrange", groupTop + 3.0f * step, IconsInfinite::Cube, nullptr, gArrangePanelOpen,
                        T("Arrangement timeline")))
       gArrangePanelOpen = !gArrangePanelOpen;
-   if (PanelRail::Item("##railSession", groupTop + 4.0f * step, IconsInfinite::Play, nullptr, gSessionPanelOpen,
+   if (PanelRail::Item("##railSession", groupTop + 4.0f * step, IconsInfinite::Session, nullptr, gSessionPanelOpen,
                        T("Session - launch clips by scene")))
       gSessionPanelOpen = !gSessionPanelOpen;
    if (PanelRail::Item("##railHistory", groupTop + 5.0f * step, IconsInfinite::History, nullptr, gHistoryOpen,
