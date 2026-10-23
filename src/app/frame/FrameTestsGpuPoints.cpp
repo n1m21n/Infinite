@@ -5,6 +5,10 @@
 
 #include "GpuPoints.h"
 
+// Geometry3DNodes.cpp: route opaque mesh draws through the no-discard program.
+void Render3DSetOpaqueVariantForTest(bool enabled);
+int Render3DOpaqueVariantDrawsForTest();
+
 namespace app
 {
 
@@ -60,15 +64,20 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
    xf.rotY = 35.0f;
    xf.offsetX = 0.3f;
 
-   Render3DNode render;
-   render.geometry[0] = &xf;
-
+   // A fresh Render 3D per frame: one node would hand back its cached image
+   // whenever the scene signature matches, and the signature does not (and
+   // should not) know which path drew the points.
    int frame = 41001;
+   int w = 0, h = 0;
    auto renderOnce = [&](bool gpu)
    {
       GpuPointsGL::SetEnabledForTest(gpu);
+      Render3DNode render;
+      render.geometry[0] = &xf;
       render.CookIfNeeded(frame++);
-      return ReadRgba(render.GetOutputTexture(), render.GetOutputWidth(), render.GetOutputHeight());
+      w = render.GetOutputWidth();
+      h = render.GetOutputHeight();
+      return ReadRgba(render.GetOutputTexture(), w, h);
    };
 
    const std::vector<unsigned char> cpuFrame = renderOnce(false);
@@ -81,7 +90,7 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
    // The occlusion count lands a cook later; a still image must report the
    // same number of kept points as the CPU build did.
    for (int i = 0; i < 4; i++)
-      render.CookIfNeeded(frame++);
+      renderOnce(true);
    const size_t gpuCount = i2p.PointCount();
 
    // The same scene with no points, to prove the points are what is drawn.
@@ -89,7 +98,6 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
    const std::vector<unsigned char> emptyFrame = renderOnce(true);
    i2p.bypassed = false;
 
-   const int w = render.GetOutputWidth(), h = render.GetOutputHeight();
    size_t drawn = 0, differ = 0;
    int maxDiff = 0;
    for (size_t i = 0; i + 3 < cpuFrame.size() && i + 3 < gpuFrame.size(); i += 4)
@@ -127,6 +135,66 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
    report("CPU cloud still built on demand", lazy != nullptr && lazy->size() == cpuCount);
 
    GpuPointsGL::SetEnabledForTest(wasEnabled);
+
+   // Step 5: opaque mesh draws use a program with discard compiled out. It
+   // must draw the same pixels as the full one: overlapping instanced cubes
+   // (opaque variant), a blended sphere (full program, switched to and back
+   // in the same frame) and a cutout sphere (must still discard).
+   {
+      GeometryNode points;
+      points.shape = 2; // sphere
+      GeometryNode cube;
+      cube.shape = 1;
+      InstanceOnPointsNode inst;
+      inst.pointSource = &points;
+      inst.instanceShape = &cube;
+      inst.pointMode = 0; // vertices
+      inst.maxPoints = 400;
+      inst.instanceScale = 0.3f;
+
+      GeometryNode glass;
+      glass.shape = 2;
+      glass.posX = 0.6f;
+      glass.opacity = 0.5f;
+      GeometryNode cutout;
+      cutout.shape = 2;
+      cutout.posX = -0.6f;
+      cutout.opacity = 0.8f;
+      cutout.alphaCutoff = 0.5f;
+
+      auto renderMesh = [&](bool variant)
+      {
+         Render3DSetOpaqueVariantForTest(variant);
+         Render3DNode meshRender; // fresh, for the same reason as renderOnce
+         meshRender.geometry[0] = &inst;
+         meshRender.geometry[1] = &glass;
+         meshRender.geometry[2] = &cutout;
+         meshRender.CookIfNeeded(frame++);
+         return ReadRgba(meshRender.GetOutputTexture(), meshRender.GetOutputWidth(), meshRender.GetOutputHeight());
+      };
+      const std::vector<unsigned char> fullFrame = renderMesh(false);
+      const int variantDrawsBefore = Render3DOpaqueVariantDrawsForTest();
+      const std::vector<unsigned char> variantFrame = renderMesh(true);
+      const int variantDraws = Render3DOpaqueVariantDrawsForTest() - variantDrawsBefore;
+      Render3DSetOpaqueVariantForTest(true);
+
+      size_t meshDiffer = 0, lit = 0;
+      for (size_t i = 0; i + 3 < fullFrame.size() && i + 3 < variantFrame.size(); i += 4)
+      {
+         if (fullFrame[i] != variantFrame[i] || fullFrame[i + 1] != variantFrame[i + 1] ||
+             fullFrame[i + 2] != variantFrame[i + 2] || fullFrame[i + 3] != variantFrame[i + 3])
+            meshDiffer++;
+         if (fullFrame[i] != fullFrame[0] || fullFrame[i + 1] != fullFrame[1] || fullFrame[i + 2] != fullFrame[2])
+            lit++;
+      }
+      printf("opaque variant: %zu instances, %d variant draws, %zu pixels differ from background, %zu differ between programs\n",
+             inst.InstanceCount(), variantDraws, lit, meshDiffer);
+      report("mesh scene draws something", inst.InstanceCount() > 0 && lit > fullFrame.size() / 4 / 100);
+      // Instances take it; the blended and cutout spheres must not.
+      report("the opaque variant ran for the instances only", variantDraws == 1);
+      report("opaque variant draws the same pixels as the full program", !fullFrame.empty() && meshDiffer == 0);
+   }
+
    printf("%s\n", allOk ? "GPU POINTS TEST OK" : "GPU POINTS TEST FAIL");
 }
 

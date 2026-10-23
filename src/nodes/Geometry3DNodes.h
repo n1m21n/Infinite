@@ -975,7 +975,13 @@ private:
    unsigned int mSceneColorTex = 0;
    float mSceneMaxLod = 0.0f;
 
+   // The program draws go through, one of the two below: every uniform call
+   // names mProgram, so switching it switches where they land.
    unsigned int mProgram = 0;
+   unsigned int mProgramFull = 0;
+   // Same shader with both discards compiled out (INF_NO_DISCARD), for opaque
+   // mesh draws with no alpha cutoff; 0 if it failed to link.
+   unsigned int mProgramOpaque = 0;
    bool mShaderTried = false;
    unsigned int mEnvBgProgram = 0;
    bool mEnvBgShaderTried = false;

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cmath>
+#include <string>
 
 #include "Transport.h"
 #include "BenchReport.h"
@@ -370,8 +371,18 @@ namespace
       "   gl_Position = uViewProj * vec4(worldPos, 1.0);\n"
       "}\n";
 
+   // Linked twice (EnsureShader): once as is, and once with INF_NO_DISCARD
+   // defined, for opaque mesh draws with no alpha cutoff. A shader that can
+   // discard at all stops a tile GPU (Apple) from removing hidden fragments
+   // before shading them, uniform branch or not; the variant draws the same
+   // pixels because those draws never take either discard.
    const char* kFragSrc =
       "#version 150\n"
+      "#ifdef INF_NO_DISCARD\n"
+      "#define KILL_FRAGMENT\n"
+      "#else\n"
+      "#define KILL_FRAGMENT discard\n"
+      "#endif\n"
       "in vec3 vWorldPos;\n"
       "in vec3 vLocalPos;\n"
       "in vec3 vNormal;\n"
@@ -673,11 +684,11 @@ namespace
       "   }\n"
       "   if (uIsSprite == 1 && uSpriteShape == 0) {\n"
       "      vec2 d = vUv * 2.0 - 1.0;\n"
-      "      if (dot(d, d) > 1.0) discard;\n"
+      "      if (dot(d, d) > 1.0) KILL_FRAGMENT;\n"
       "   }\n"
       "   float alpha = uOpacity;\n"
       "   if (uTextureAlpha == 1 && uHasTexture == 1) alpha *= sampleMap(uTexture, normalize(vNormal), computeMapUv(normalize(vNormal))).a;\n"
-      "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) discard;\n"
+      "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) KILL_FRAGMENT;\n"
       "   vec3 n = normalize(vNormal);\n"
       "   if (uRenderPass == 1) {\n"
       "      float d = clamp((length(vWorldPos - uCamPos) - uNear) / max(0.001, uFar - uNear), 0.0, 1.0);\n"
@@ -809,11 +820,17 @@ namespace
       "      }\n"
       "      vec3 specular = (d * g * f) / max(4.0 * nDotV * nDotL, 1e-7);\n"
       "\n"
-      "      float ccRough = clamp(uClearcoatRoughness, 0.02, 1.0);\n"
-      "      float ccD = distributionGGX(nDotH, ccRough);\n"
-      "      float ccG = geometrySchlickGGX(nDotV, ccRough) * geometrySchlickGGX(nDotL, ccRough);\n"
-      "      float ccF = 0.04 + 0.96 * pow(clamp(1.0 - max(dot(halfway, viewDir), 0.0), 0.0, 1.0), 5.0);\n"
-      "      float clearcoatSpec = (ccD * ccG * ccF) / max(4.0 * nDotV * nDotL, 1e-7) * cc;\n"
+      // Every term is finite (ccRough >= 0.02), so with no clearcoat the lobe
+      // is exactly 0 and skipping it changes no pixel - it is a GGX, two
+      // Schlicks and a pow per light per pixel on every draw otherwise.
+      "      float clearcoatSpec = 0.0;\n"
+      "      if (cc != 0.0) {\n"
+      "         float ccRough = clamp(uClearcoatRoughness, 0.02, 1.0);\n"
+      "         float ccD = distributionGGX(nDotH, ccRough);\n"
+      "         float ccG = geometrySchlickGGX(nDotV, ccRough) * geometrySchlickGGX(nDotL, ccRough);\n"
+      "         float ccF = 0.04 + 0.96 * pow(clamp(1.0 - max(dot(halfway, viewDir), 0.0), 0.0, 1.0), 5.0);\n"
+      "         clearcoatSpec = (ccD * ccG * ccF) / max(4.0 * nDotV * nDotL, 1e-7) * cc;\n"
+      "      }\n"
       "\n"
       "      vec3 sheenSpec = vec3(0.0);\n"
       "      if (sh > 0.0) {\n"
@@ -1274,7 +1291,8 @@ Render3DNode::~Render3DNode()
    ReleaseShadowTargets();
    for (GpuMesh& gpu : mGpu)
       ReleaseGpuMesh(gpu);
-   if (mProgram != 0) glDeleteProgram(mProgram);
+   if (mProgramFull != 0) glDeleteProgram(mProgramFull);
+   if (mProgramOpaque != 0) glDeleteProgram(mProgramOpaque);
    if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
    if (mEnvBgProgram != 0) glDeleteProgram(mEnvBgProgram);
    if (mEnvBgVao != 0) glDeleteVertexArrays(1, &mEnvBgVao);
@@ -1290,6 +1308,15 @@ void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
    if (gpu.vao != 0) { glDeleteVertexArrays(1, &gpu.vao); gpu.vao = 0; }
    gpu = GpuMesh();
 }
+
+// GPUPOINTSTEST renders the same scene with and without the opaque variant
+// and requires the same pixels.
+static bool sOpaqueVariantEnabled = true;
+void Render3DSetOpaqueVariantForTest(bool enabled) { sOpaqueVariantEnabled = enabled; }
+// Draws that went through the opaque variant, so the test can tell "same
+// pixels" from "the variant never ran".
+static int sOpaqueVariantDraws = 0;
+int Render3DOpaqueVariantDrawsForTest() { return sOpaqueVariantDraws; }
 
 bool Render3DNode::EnsureShader()
 {
@@ -1314,37 +1341,49 @@ bool Render3DNode::EnsureShader()
       return shader;
    };
 
+   auto link = [](unsigned int vert, unsigned int frag) -> unsigned int {
+      unsigned int program = glCreateProgram();
+      glBindAttribLocation(program, 0, "aPos");
+      glBindAttribLocation(program, 1, "aNormal");
+      glBindAttribLocation(program, 2, "aUv");
+      glBindAttribLocation(program, 3, "aInstance"); // occupies locations 3..6
+      glBindAttribLocation(program, 7, "aInstanceColor");
+      glBindAttribLocation(program, 8, "aVertexColor");
+      glAttachShader(program, vert);
+      glAttachShader(program, frag);
+      glLinkProgram(program);
+
+      GLint linked = 0;
+      glGetProgramiv(program, GL_LINK_STATUS, &linked);
+      if (!linked)
+      {
+         char log[1024];
+         glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+         fprintf(stderr, "Render3D link error: %s\n", log);
+         glDeleteProgram(program);
+         return 0u;
+      }
+      return program;
+   };
+
    const unsigned int vert = compile(GL_VERTEX_SHADER, kVertSrc);
    const unsigned int frag = compile(GL_FRAGMENT_SHADER, kFragSrc);
-   if (vert == 0 || frag == 0)
-      return false;
-
-   mProgram = glCreateProgram();
-   glBindAttribLocation(mProgram, 0, "aPos");
-   glBindAttribLocation(mProgram, 1, "aNormal");
-   glBindAttribLocation(mProgram, 2, "aUv");
-   glBindAttribLocation(mProgram, 3, "aInstance"); // occupies locations 3..6
-   glBindAttribLocation(mProgram, 7, "aInstanceColor");
-   glBindAttribLocation(mProgram, 8, "aVertexColor");
-   glAttachShader(mProgram, vert);
-   glAttachShader(mProgram, frag);
-   glLinkProgram(mProgram);
-   glDeleteShader(vert);
-   glDeleteShader(frag);
-
-   GLint linked = 0;
-   glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
-   if (!linked)
+   // The same source with INF_NO_DISCARD defined after the #version line.
+   std::string opaqueSrc = kFragSrc;
+   opaqueSrc.insert(opaqueSrc.find('\n') + 1, "#define INF_NO_DISCARD\n");
+   const unsigned int opaqueFrag = compile(GL_FRAGMENT_SHADER, opaqueSrc.c_str());
+   if (vert != 0 && frag != 0)
    {
-      char log[1024];
-      glGetProgramInfoLog(mProgram, sizeof(log), nullptr, log);
-      fprintf(stderr, "Render3D link error: %s\n", log);
-      glDeleteProgram(mProgram);
-      mProgram = 0;
-      return false;
+      mProgramFull = link(vert, frag);
+      // Optional: without it every draw uses the full program, as before.
+      if (opaqueFrag != 0)
+         mProgramOpaque = link(vert, opaqueFrag);
    }
-
-   return true;
+   if (vert != 0) glDeleteShader(vert);
+   if (frag != 0) glDeleteShader(frag);
+   if (opaqueFrag != 0) glDeleteShader(opaqueFrag);
+   mProgram = mProgramFull;
+   return mProgram != 0;
 }
 
 bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
@@ -2011,58 +2050,67 @@ void Render3DNode::CookOnce(int frameId)
    glEnable(GL_BLEND);
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-   glUseProgram(mProgram);
+   mProgram = mProgramFull;
    mLastTriangles = 0;
    mLastDrawCalls = 0;
    mLastUploads = 0;
 
-   glUniformMatrix4fv(glGetUniformLocation(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
-   glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, view.m);
-   glUniform3fv(glGetUniformLocation(mProgram, "uCamRight"), 1, camRight);
-   glUniform3fv(glGetUniformLocation(mProgram, "uCamUp"), 1, camUp);
-   glUniform1i(glGetUniformLocation(mProgram, "uSpriteShape"), spriteShape);
-   glUniform1i(glGetUniformLocation(mProgram, "uSpriteSizeMode"), spriteSizeMode);
-   glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kLightSlots, lightDirs);
-   glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kLightSlots, lightCols);
-   glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kLightSlots, lightPower);
-   glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kLightSlots, lightTypes);
-   glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotAngle"), kLightSlots, lightSpotAngle);
-   glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kLightSlots, lightSpotPenumbra);
-   glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kLightSlots, lightArea);
-   glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
-   glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, ambientColor);
-   glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
-   glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
-   glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
-   glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
-   glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
-   glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
-   glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
-   glActiveTexture(GL_TEXTURE1);
-   glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
-   glUniform1i(glGetUniformLocation(mProgram, "uShadowMap"), 1);
-   glUniform1i(glGetUniformLocation(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
-   glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBias);
-   glUniform1f(glGetUniformLocation(mProgram, "uShadowSoftness"),
-               lightTypes[0] == 5 ? shadowSoftness * (1.0f + 1.5f * std::max(lightArea[0], lightArea[1])) : shadowSoftness);
-   glUniform1f(glGetUniformLocation(mProgram, "uShadowStrength"), shadowStrength);
-   glUniform1f(glGetUniformLocation(mProgram, "uShadowTexel"),
-               mShadowSize > 0 ? 1.0f / (float)mShadowSize : 0.0f);
-   glUniformMatrix4fv(glGetUniformLocation(mProgram, "uLightViewProj"), 1, GL_FALSE,
-                      mLightViewProj.m);
-   glActiveTexture(GL_TEXTURE0);
+   // Frame-wide uniforms go to both programs, so a draw can switch between
+   // them (drawSlot) without re-sending any of this.
+   for (const unsigned int program : { mProgramOpaque, mProgramFull })
+   {
+      if (program == 0)
+         continue;
+      mProgram = program;
+      glUseProgram(mProgram);
+      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uViewProj"), 1, GL_FALSE, viewProj.m);
+      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, view.m);
+      glUniform3fv(glGetUniformLocation(mProgram, "uCamRight"), 1, camRight);
+      glUniform3fv(glGetUniformLocation(mProgram, "uCamUp"), 1, camUp);
+      glUniform1i(glGetUniformLocation(mProgram, "uSpriteShape"), spriteShape);
+      glUniform1i(glGetUniformLocation(mProgram, "uSpriteSizeMode"), spriteSizeMode);
+      glUniform3fv(glGetUniformLocation(mProgram, "uLightDir"), kLightSlots, lightDirs);
+      glUniform3fv(glGetUniformLocation(mProgram, "uLightColor"), kLightSlots, lightCols);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightIntensity"), kLightSlots, lightPower);
+      glUniform1iv(glGetUniformLocation(mProgram, "uLightType"), kLightSlots, lightTypes);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotAngle"), kLightSlots, lightSpotAngle);
+      glUniform1fv(glGetUniformLocation(mProgram, "uLightSpotPenumbra"), kLightSlots, lightSpotPenumbra);
+      glUniform2fv(glGetUniformLocation(mProgram, "uLightArea"), kLightSlots, lightArea);
+      glUniform1i(glGetUniformLocation(mProgram, "uLightCount"), lightCount);
+      glUniform3fv(glGetUniformLocation(mProgram, "uAmbient"), 1, ambientColor);
+      glUniform1f(glGetUniformLocation(mProgram, "uRim"), rimIntensity);
+      glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, eye);
+      glUniform1f(glGetUniformLocation(mProgram, "uExposure"), exposure);
+      glUniform1i(glGetUniformLocation(mProgram, "uTonemap"), HdrActive() ? 0 : tonemap);
+      glUniform1i(glGetUniformLocation(mProgram, "uRenderPass"), renderPass);
+      glUniform1f(glGetUniformLocation(mProgram, "uNear"), nearPlane);
+      glUniform1f(glGetUniformLocation(mProgram, "uFar"), farPlane);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, shadowsActive ? mShadowTex : DummyShadowTexture());
+      glUniform1i(glGetUniformLocation(mProgram, "uShadowMap"), 1);
+      glUniform1i(glGetUniformLocation(mProgram, "uShadowsOn"), shadowsActive ? 1 : 0);
+      glUniform1f(glGetUniformLocation(mProgram, "uShadowBias"), shadowBias);
+      glUniform1f(glGetUniformLocation(mProgram, "uShadowSoftness"),
+                  lightTypes[0] == 5 ? shadowSoftness * (1.0f + 1.5f * std::max(lightArea[0], lightArea[1])) : shadowSoftness);
+      glUniform1f(glGetUniformLocation(mProgram, "uShadowStrength"), shadowStrength);
+      glUniform1f(glGetUniformLocation(mProgram, "uShadowTexel"),
+                  mShadowSize > 0 ? 1.0f / (float)mShadowSize : 0.0f);
+      glUniformMatrix4fv(glGetUniformLocation(mProgram, "uLightViewProj"), 1, GL_FALSE,
+                         mLightViewProj.m);
+      glActiveTexture(GL_TEXTURE0);
 
-   glUniform3fv(glGetUniformLocation(mProgram, "uEnvSky"), 1, envSky);
-   glUniform3fv(glGetUniformLocation(mProgram, "uEnvHorizon"), 1, envHorizon);
-   glUniform3fv(glGetUniformLocation(mProgram, "uEnvGround"), 1, envGround);
-   glUniform1f(glGetUniformLocation(mProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
-   glUniform1i(glGetUniformLocation(mProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
-   glUniform1f(glGetUniformLocation(mProgram, "uEnvRotation"), envRotationRad);
-   glUniform1f(glGetUniformLocation(mProgram, "uEnvMaxLod"), envMaxLod);
-   glActiveTexture(GL_TEXTURE6);
-   glBindTexture(GL_TEXTURE_2D, hasEnvMap ? envTex : DummyEnvTexture());
-   glUniform1i(glGetUniformLocation(mProgram, "uEnvMap"), 6);
-   glActiveTexture(GL_TEXTURE0);
+      glUniform3fv(glGetUniformLocation(mProgram, "uEnvSky"), 1, envSky);
+      glUniform3fv(glGetUniformLocation(mProgram, "uEnvHorizon"), 1, envHorizon);
+      glUniform3fv(glGetUniformLocation(mProgram, "uEnvGround"), 1, envGround);
+      glUniform1f(glGetUniformLocation(mProgram, "uEnvIntensity"), envIntensity * envHdriIntensity);
+      glUniform1i(glGetUniformLocation(mProgram, "uHasEnvMap"), hasEnvMap ? 1 : 0);
+      glUniform1f(glGetUniformLocation(mProgram, "uEnvRotation"), envRotationRad);
+      glUniform1f(glGetUniformLocation(mProgram, "uEnvMaxLod"), envMaxLod);
+      glActiveTexture(GL_TEXTURE6);
+      glBindTexture(GL_TEXTURE_2D, hasEnvMap ? envTex : DummyEnvTexture());
+      glUniform1i(glGetUniformLocation(mProgram, "uEnvMap"), 6);
+      glActiveTexture(GL_TEXTURE0);
+   }
 
    // Point-cloud slots draw an instanced unit quad, billboarded against the
    // camera in the vertex shader (uIsSprite), instead of geometry[]'s
@@ -2070,8 +2118,19 @@ void Render3DNode::CookOnce(int frameId)
    // Shares the mesh path's instance-buffer layout (aInstance /
    // aInstanceColor) so it needs no new GPU upload machinery, just a
    // different way of filling that buffer.
+   auto useProgram = [&](unsigned int program)
+   {
+      if (program != mProgram)
+      {
+         mProgram = program;
+         glUseProgram(mProgram);
+      }
+   };
+
    auto drawCloudSlot = [&](int i, IGeometrySource* cloud)
    {
+      // Round sprites discard their corners.
+      useProgram(mProgramFull);
       const GpuPoints* gpuPoints = cloud->GetGpuPoints();
       GpuMesh& gpu = mGpu[i];
 
@@ -2390,6 +2449,17 @@ void Render3DNode::CookOnce(int frameId)
       {
          drawCloudSlot(i, source);
          return;
+      }
+      {
+         // Blended, cutout and transmissive draws keep the full program; the
+         // rest never discard, so they take the variant without discard and
+         // the GPU may skip their hidden fragments.
+         const Material m = source->GetMaterial();
+         const bool opaque = m.alphaCutoff <= 0.0f && m.opacity >= 0.999f && !m.textureAlpha &&
+                             m.transmission <= 0.001f;
+         const bool variant = opaque && mProgramOpaque != 0 && sOpaqueVariantEnabled;
+         useProgram(variant ? mProgramOpaque : mProgramFull);
+         sOpaqueVariantDraws += variant ? 1 : 0;
       }
       glUniform1i(glGetUniformLocation(mProgram, "uIsSprite"), 0);
       glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), 0);
@@ -2837,6 +2907,7 @@ void Render3DNode::CookOnce(int frameId)
       glGenerateMipmap(GL_TEXTURE_2D);
       glBindTexture(GL_TEXTURE_2D, 0);
 
+      mProgram = mProgramFull; // transmissive draws use the full program
       glUseProgram(mProgram);
       glActiveTexture(GL_TEXTURE7);
       glBindTexture(GL_TEXTURE_2D, mSceneColorTex);
@@ -2912,6 +2983,7 @@ void Render3DNode::CookOnce(int frameId)
                        [](const TranslucentDraw& a, const TranslucentDraw& b) { return a.depth < b.depth; });
       if (!translucent.empty())
       {
+         mProgram = mProgramFull; // blended draws use the full program
          glUseProgram(mProgram);
          glDepthMask(GL_FALSE);
          for (const TranslucentDraw& t : translucent)
