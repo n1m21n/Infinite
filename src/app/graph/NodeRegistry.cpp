@@ -23,6 +23,7 @@ namespace app
       REGISTER_NODE(SketchNode, Sketch, "Source");
       REGISTER_NODE(TextNode, Text, "Source");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
+      REGISTER_NODE(VmpcNode, VMPC, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");
       // Syphon In is a source (an image feed into the patch), but grouped
       // with Utility rather than Source - alongside Syphon Out and the other

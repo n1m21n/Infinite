@@ -657,6 +657,8 @@ namespace app
          DrawDrumSequencerBody(gn, n);
       else if (auto* n = dynamic_cast<MpcNode*>(gn.node.get()))
          DrawMpcBody(gn, n);
+      else if (auto* n = dynamic_cast<VmpcNode*>(gn.node.get()))
+         DrawVmpcBody(gn, n);
       else if (auto* n = dynamic_cast<LooperNode*>(gn.node.get()))
          DrawLooperBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))

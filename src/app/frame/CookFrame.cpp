@@ -681,7 +681,8 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame)
           (dynamic_cast<FieldPixelNode*>(gn.node.get()) != nullptr ||
            dynamic_cast<FieldPrimitiveNode*>(gn.node.get()) != nullptr ||
            dynamic_cast<Sketch3DNode*>(gn.node.get()) != nullptr ||
-           dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr))
+           dynamic_cast<FieldElementNode*>(gn.node.get()) != nullptr ||
+           dynamic_cast<VmpcNode*>(gn.node.get()) != nullptr))
       {
          CookProbe::Scope probe(gn.node.get());
          gn.node->CookIfNeeded(frameId);

@@ -459,6 +459,7 @@ set(COMMON_SOURCES
     src/app/bodies/PreviewBodies.cpp
     src/app/bodies/SamplerBodies.cpp
     src/app/bodies/SpatialMixerBody.cpp
+    src/app/bodies/VmpcBody.cpp
     src/app/frame/CookFrame.cpp
     src/app/frame/FrameStatics.cpp
     src/app/frame/FrameTests1.cpp
@@ -542,6 +543,7 @@ set(COMMON_SOURCES
     src/app/selftest/Headless.cpp
     src/app/selftest/I18nTests.cpp
     src/app/selftest/MiscTests.cpp
+    src/app/selftest/VmpcTests.cpp
     src/app/selftest/SpatialTests.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp
@@ -790,6 +792,7 @@ set(COMMON_SOURCES
     src/nodes/SamplerNode.cpp
     src/nodes/LooperNode.cpp
     src/nodes/MpcNode.cpp
+    src/nodes/VmpcNode.cpp
     src/nodes/SlicerNode.cpp
     src/nodes/PaulStretchNode.cpp
     src/nodes/MolderNode.cpp
