@@ -578,7 +578,7 @@ void MolderNode::RebuildPartialCache()
       partialBars[i] = mAnalysis.valid ? mAnalysis.envelopeAmp[i] : 0.0f;
 }
 
-bool MolderNode::LoadFile(const std::string& path)
+bool MolderNode::LoadFile(const std::string& path, bool keepGenome)
 {
    if (path.empty())
       return false;
@@ -612,9 +612,12 @@ bool MolderNode::LoadFile(const std::string& path)
    mOriginalMono = mono;
    mOriginalSR = sr;
 
-   std::random_device rd;
-   mSeed = (int)rd();
-   mGeneration = 0;
+   if (!keepGenome)
+   {
+      std::random_device rd;
+      mSeed = (int)rd();
+      mGeneration = 0;
+   }
 
    LaunchJob(Job::AnalyzeThenRender, mono, sr, /*isOriginalSource=*/true);
    return true;
@@ -623,7 +626,7 @@ bool MolderNode::LoadFile(const std::string& path)
 void MolderNode::ReloadFromPath()
 {
    if (!mFilePath.empty())
-      LoadFile(mFilePath);
+      LoadFile(mFilePath, /*keepGenome=*/true);
 }
 
 void MolderNode::StartRecording()
