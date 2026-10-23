@@ -84,6 +84,7 @@ void FrameTest_MAPPINGSWEEPTEST(int frameId, GLFWwindow* window);
 void FrameTest_MATERIALSWEEPTEST(int frameId, GLFWwindow* window);
 void FrameTest_TEXTURESWEEPTEST(int frameId, GLFWwindow* window);
 void FrameTest_POINTCLOUDSWEEPTEST(int frameId, GLFWwindow* window);
+void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window);
 void FrameTest_COLOURSWEEPTEST(int frameId, GLFWwindow* window);
 void FrameTest_INSTANCESWEEPTEST(int frameId, GLFWwindow* window);
 void FrameTest_CHAINFUZZTEST(int frameId, GLFWwindow* window);

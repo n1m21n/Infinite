@@ -466,6 +466,7 @@ set(COMMON_SOURCES
     src/app/frame/FrameTests2.cpp
     src/app/frame/FrameTests3.cpp
     src/app/frame/FrameTests4.cpp
+    src/app/frame/FrameTestsGpuPoints.cpp
     src/app/frame/FrameTests5.cpp
     src/app/frame/FrameTests6.cpp
     src/app/frame/StageBenchHarness.cpp
