@@ -1494,8 +1494,6 @@ version %s is available (you have %s) - click to update, right-click to dismiss	
 %d bar	%d 小節
 %d bars	%d 小節
 Add a track in Timeline view, then drop audio or video files onto its cells here.	タイムラインビューでトラックを追加し、ここでそのセルにオーディオまたはビデオファイルをドロップします。
-Clear Slot	スロットをクリア
-Click to launch. Right-click for follow actions.	クリックで起動。右クリックでフォローアクション。
 Delete Scene	シーンを削除
 Duplicate Scene	シーンを複製
 Empty slot: drop a video or image file here	空のスロット：ビデオまたは画像ファイルをここにドロップ
@@ -1504,14 +1502,11 @@ Follow Action	フォローアクション
 Follow After	フォロー時間
 Insert Scene Above	上にシーンを挿入
 Launch Scene	シーンを起動
-Launch this row on every track (right-click to rename or set a tempo)	この行をすべてのトラックで起動（右クリックで名前変更やテンポ設定）
 Launching this scene sets the project tempo. 0 leaves the tempo alone.	このシーンを起動するとプロジェクトのテンポが設定されます。0 ならテンポは変わりません。
 No Follow Action	フォローアクションなし
 No tracks yet	トラックがありません
-Paste Selected Clip	選択したクリップを貼り付け
 Place on Timeline at Playhead	再生ヘッドの位置でタイムラインに配置
 Random	ランダム
-Record to Timeline: what the launched clips play is written into the arrangement.	タイムラインに録音：起動したクリップの再生内容がアレンジに書き込まれます。
 Right-click to rename this scene or set its tempo	右クリックでこのシーンの名前変更やテンポ設定
 Scene %d	シーン %d
 Scene name	シーン名
@@ -1519,9 +1514,7 @@ Select one clip on this kind of track in Timeline view first.	まずタイムラ
 Session: launch clips by scene	セッション：シーンごとにクリップを起動
 Stop	停止
 Stop Track	トラックを停止
-Stop every track: the whole panel goes back to playing the Timeline	すべてのトラックを停止：パネル全体がタイムラインの再生に戻ります
 Stop this track	このトラックを停止
-Stop this track: it goes back to playing the Timeline	このトラックを停止：タイムラインの再生に戻ります
 Tempo: unchanged	テンポ：変更なし
 This slot is inactive	このスロットは無効です
 This slot's source is missing	このスロットのソースが見つかりません
@@ -1543,19 +1536,14 @@ Ungroup Track	トラックのグループ化を解除
 8 Bars	8小節
 Clip Length	クリップの長さ
 Gate	ゲート
-Global	グローバル
 Keep Other Tracks Playing	他のトラックを再生し続ける
 Launch Mode	起動モード
 Launch Quantize	起動クオンタイズ
 Loop Length	ループの長さ
 None	なし
-Toggle	トグル
 Trigger	トリガー
-Duplicate Slot	スロットを複製
 Launch Row in Group	グループ内の行を起動
 Add a video or audio track	ビデオまたはオーディオトラックを追加
-Click to add a clip. You can also drop a video or image file here.	クリックしてクリップを追加。動画または画像ファイルをここにドロップすることもできます。
-Click to add a clip. You can also drop an audio file here.	クリックしてクリップを追加。音声ファイルをここにドロップすることもできます。
 Session	セッション
 Show Session	セッションを表示
 Close Session	セッションを閉じる
@@ -1570,7 +1558,6 @@ Copies this scene's clips onto the Timeline at the playhead. Render from the Tim
 Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first	ドッキングしたセッションパネル（クリップランチャー）を切り替えます。以下のキーはセッションパネルにフォーカスがある時のみ有効です。先にパネル内をクリックしてください
 Move Cell	セルを移動
 Move the cell cursor between tracks and scenes; a clip under it is selected	トラックとシーンの間でセルカーソルを移動します。その下のクリップが選択されます
-Launch the clip under the cursor; on an empty cell, add an unassigned clip there	カーソル下のクリップを起動します。空のセルでは未割り当てのクリップを追加します
 Launch every clip of the cursor's scene	カーソルのシーンのすべてのクリップを起動します
 Copy / Cut / Paste Clip	クリップをコピー / カット / ペースト
 Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind	スロットをコピーまたはカットし（起動設定も一緒）、同じ種類のトラックにペーストします
@@ -1585,7 +1572,6 @@ Mute the clip (it draws hatched) or bring it back	クリップをミュート（
 Add Scene	シーンを追加
 Add a scene row at the bottom	下にシーン行を追加します
 Stop All	すべて停止
-Stop every playing clip; each track goes back to the Timeline	再生中のクリップをすべて停止し、各トラックはタイムラインに戻ります
 Abandon a click-to-assign on a clip, otherwise clear the selection	クリップのクリック割り当てをキャンセル、それ以外は選択を解除します
 Monitor: Visible. Shows the video the launched clips produce.	モニター：表示中。起動したクリップの映像を表示します。
 Clip Inspector: Open	クリップインスペクター：表示中
@@ -1593,3 +1579,48 @@ Turn the group off: its nodes stop cooking and go silent	グループをオフ�
 Turn the group on	グループをオン
 Turn Group Off	グループをオフ
 Turn Group On	グループをオン
+After	次の後
+Click to launch this row on every track, click again to stop it. Right-click for its tempo and what plays next.	クリックでこの行を全トラックで起動、もう一度クリックで停止。右クリックでテンポと次に再生するものを設定。
+Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions.	クリックで起動、もう一度クリックで停止。Cmd-クリックで選択。右クリックでコピー、ペースト、フォローアクション。
+Clip	クリップ
+Copy	コピー
+Cut	カット
+Double-click to add a clip. Click selects the cell to paste into. You can also drop a video or image file here.	ダブルクリックでクリップを追加。クリックでペースト先のセルを選択。ビデオや画像ファイルをここにドロップすることもできます。
+Double-click to add a clip. Click selects the cell to paste into. You can also drop an audio file here.	ダブルクリックでクリップを追加。クリックでペースト先のセルを選択。オーディオファイルをここにドロップすることもできます。
+Enable Session Audio	セッションオーディオを有効化
+Follow Action: what this track plays once this clip has run for Follow After	フォローアクション:このクリップがフォロー後の長さだけ再生された後にこのトラックが再生するもの
+How long one pass of the clip runs before it loops (or stops, with Loop off)	クリップ1回分の長さ(その後ループ、またはループオフで停止)
+Launch Quantize: launches and stops wait for this grid line, so everything stays in time	起動クオンタイズ:起動と停止はこのグリッド線を待つので、すべてがタイミングに合います
+Length	長さ
+Mode	モード
+Next Scene After	次のシーンまで
+Off	オフ
+On	オン
+Paste Selected Timeline Clip	選択したタイムラインクリップをペースト
+Record your performance: the clips and scenes you launch are written into the Timeline, ready to render with Render Take.	演奏を録音:起動したクリップとシーンがタイムラインに書き込まれ、「テイクをレンダー」でレンダーできます。
+Recording: every clip and scene you launch is written into the Timeline. Click to stop.	録音中:起動したすべてのクリップとシーンがタイムラインに書き込まれます。クリックで停止。
+Render Take	テイクをレンダー
+Render the last recording, audio and video, to a movie file in a folder you choose	最後の録音をオーディオとビデオ込みで、選んだフォルダのムービーファイルにレンダー
+Scene Length	シーンの長さ
+Scenes	シーン
+Session Audio On	セッションオーディオ オン
+Session Audio: you hear and see the clips you launch here; the Timeline's clips stay silent	セッションオーディオ:ここで起動したクリップが聞こえて見えます。タイムラインのクリップは無音になります
+Session Default	セッションの既定
+Stop All (.): every track stops at the next quantize point	すべて停止 (.):各トラックが次のクオンタイズ位置で停止
+Stop Scene	シーンを停止
+Stop this track at the next quantize point	次のクオンタイズ位置でこのトラックを停止
+The Session's launched clips are driving audio. Click to hand it back to the canvas.	セッションの起動中クリップがオーディオを鳴らしています。クリックでキャンバスに戻します。
+The Session's launched clips will drive audio once the engine is started.	エンジンが起動すると、セッションの起動中クリップがオーディオを鳴らします。
+Then	次に
+Then Play Next Scene	次のシーンを再生
+Trigger: a click starts it, a click while it plays stops it. Gate: it plays while you hold the mouse or key.	トリガー:クリックで開始、再生中にクリックで停止。ゲート:マウスやキーを押している間だけ再生。
+When this scene has played, the next scene launches. Turn it on for every scene to play them in order.	このシーンが再生し終わると次のシーンが起動します。すべてのシーンでオンにすると順番に再生されます。
+Launch / Stop	起動 / 停止
+Launch or stop the scene and select it: Delete removes it, the Duplicate shortcut copies it, Up / Down move the selection	シーンを起動または停止して選択:Deleteで削除、複製ショートカットでコピー、上 / 下で選択を移動
+Launch the clip; on a playing or waiting clip, stop it at the next quantize point. Enter on an empty cell adds a clip	クリップを起動。再生中や待機中のクリップは次のクオンタイズ位置で停止。空のセルでEnterを押すとクリップを追加
+Select Clip	クリップを選択
+Select Scene	シーンを選択
+Select a clip without launching it, for copy and paste. A click on an empty cell selects it as the paste target	起動せずにクリップを選択(コピー&ペースト用)。空のセルをクリックするとペースト先として選択
+Stop every playing clip at the next quantize point	再生中のすべてのクリップを次のクオンタイズ位置で停止
+Session at Bottom	セッションを下に配置
+Session at Top	セッションを上に配置

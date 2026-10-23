@@ -499,10 +499,15 @@ namespace app
          }
 
          ImGui::Spacing();
-         SectionHeader(T("Timing & Position"));
+         // A session slot has no place on the Timeline: its card says how it launches instead of where it starts.
+         const bool isSlot = DrawArrangeSessionSlotInspector(clipId, fieldW);
+         if (isSlot)
+            ImGui::Spacing();
+         SectionHeader(isSlot ? T("Clip") : T("Timing & Position"));
          Arrange::Tick newTick = 0;
-         RowLabel("Start");
-         if (tickField("##clipstart", clip->start, 0, Arrange::kMaxTick, ArrangeTickUnit::Position, &newTick))
+         if (!isSlot)
+            RowLabel("Start");
+         if (!isSlot && tickField("##clipstart", clip->start, 0, Arrange::kMaxTick, ArrangeTickUnit::Position, &newTick))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))

@@ -626,6 +626,16 @@ void DrawMenuBar(FrameCtx& fc)
                      ? T("The Arrangement Timeline is driving audio. Click to hand it back to the canvas.")
                      : T("The Arrangement Timeline will drive audio once the engine is started."));
             }
+            else if (gAudioMode == AudioMode::Session)
+            {
+               TopBarSameLine(4.0f);
+               if (ChipButton::Draw(L("Session##sessionbadge"), true, tok::tile, 0.0f, true))
+                  gAudioMode = AudioMode::Canvas;
+               if (ImGui::IsItemHovered())
+                  HelpTip(engineOn
+                     ? T("The Session's launched clips are driving audio. Click to hand it back to the canvas.")
+                     : T("The Session's launched clips will drive audio once the engine is started."));
+            }
          };
 
          // Left cluster ends here: menus, transport, audio. Tempo, meter, click and key sit centred in the
@@ -956,7 +966,7 @@ void DrawMenuBar(FrameCtx& fc)
          // Width of the centred group, measured for next frame's placement.
          sCentreW = ImGui::GetItemRectMax().x - centreStartScreenX;
          float centreEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
-         if (gAudioMode == AudioMode::Timeline)
+         if (gAudioMode != AudioMode::Canvas)
          {
             drawTimelineBadge();
             centreEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;

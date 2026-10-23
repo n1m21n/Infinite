@@ -1494,8 +1494,6 @@ version %s is available (you have %s) - click to update, right-click to dismiss	
 %d bar	%d 小节
 %d bars	%d 小节
 Add a track in Timeline view, then drop audio or video files onto its cells here.	请先在时间线视图中添加轨道，然后将音频或视频文件拖到这里的单元格上。
-Clear Slot	清空槽位
-Click to launch. Right-click for follow actions.	点击启动。右键查看后续动作。
 Delete Scene	删除场景
 Duplicate Scene	复制场景
 Empty slot: drop a video or image file here	空槽位：将视频或图像文件拖到此处
@@ -1504,14 +1502,11 @@ Follow Action	后续动作
 Follow After	跟随时间
 Insert Scene Above	在上方插入场景
 Launch Scene	启动场景
-Launch this row on every track (right-click to rename or set a tempo)	在每条轨道上启动此行（右键可重命名或设置速度）
 Launching this scene sets the project tempo. 0 leaves the tempo alone.	启动此场景会设置项目速度。0 表示不改变速度。
 No Follow Action	无后续动作
 No tracks yet	还没有轨道
-Paste Selected Clip	粘贴所选片段
 Place on Timeline at Playhead	放置到播放头处的时间线
 Random	随机
-Record to Timeline: what the launched clips play is written into the arrangement.	录制到时间线：已启动片段播放的内容会写入编排。
 Right-click to rename this scene or set its tempo	右键可重命名此场景或设置其速度
 Scene %d	场景 %d
 Scene name	场景名称
@@ -1519,9 +1514,7 @@ Select one clip on this kind of track in Timeline view first.	请先在时间线
 Session: launch clips by scene	会话：按场景启动片段
 Stop	停止
 Stop Track	停止轨道
-Stop every track: the whole panel goes back to playing the Timeline	停止所有轨道：整个面板恢复播放时间线
 Stop this track	停止此轨道
-Stop this track: it goes back to playing the Timeline	停止此轨道：恢复播放时间线
 Tempo: unchanged	速度：不变
 This slot is inactive	此槽位未启用
 This slot's source is missing	此槽位的源文件缺失
@@ -1543,19 +1536,14 @@ Ungroup Track	取消轨道编组
 8 Bars	8 小节
 Clip Length	片段长度
 Gate	门控
-Global	全局
 Keep Other Tracks Playing	保持其他轨道播放
 Launch Mode	启动模式
 Launch Quantize	启动量化
 Loop Length	循环长度
 None	无
-Toggle	切换
 Trigger	触发
-Duplicate Slot	复制单元格
 Launch Row in Group	启动组内此行
 Add a video or audio track	添加视频或音频轨道
-Click to add a clip. You can also drop a video or image file here.	点击添加片段。也可以把视频或图片文件拖到这里。
-Click to add a clip. You can also drop an audio file here.	点击添加片段。也可以把音频文件拖到这里。
 Session	会话
 Show Session	显示会话
 Close Session	关闭会话
@@ -1570,7 +1558,6 @@ Copies this scene's clips onto the Timeline at the playhead. Render from the Tim
 Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first	切换停靠的会话面板（片段启动器）。下面每个按键都需要会话面板获得焦点——请先在其中点击
 Move Cell	移动单元格
 Move the cell cursor between tracks and scenes; a clip under it is selected	在轨道和场景之间移动单元格光标；光标下的片段会被选中
-Launch the clip under the cursor; on an empty cell, add an unassigned clip there	启动光标下的片段；在空单元格上则添加一个未指定的片段
 Launch every clip of the cursor's scene	启动光标所在场景的所有片段
 Copy / Cut / Paste Clip	复制 / 剪切 / 粘贴片段
 Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind	复制或剪切一个槽位（连同启动设置），并粘贴到同类型的轨道上
@@ -1585,7 +1572,6 @@ Mute the clip (it draws hatched) or bring it back	静音片段（显示为斜线
 Add Scene	添加场景
 Add a scene row at the bottom	在底部添加一行场景
 Stop All	全部停止
-Stop every playing clip; each track goes back to the Timeline	停止所有正在播放的片段；每条轨道回到时间轴
 Abandon a click-to-assign on a clip, otherwise clear the selection	取消片段的点击指定，否则清除选择
 Monitor: Visible. Shows the video the launched clips produce.	监视器：可见。显示已启动片段产生的视频。
 Clip Inspector: Open	片段检查器：已打开
@@ -1593,3 +1579,48 @@ Turn the group off: its nodes stop cooking and go silent	关闭分组：组内�
 Turn the group on	打开分组
 Turn Group Off	关闭分组
 Turn Group On	打开分组
+After	之后
+Click to launch this row on every track, click again to stop it. Right-click for its tempo and what plays next.	点击在所有轨道上启动这一行,再次点击停止。右键设置速度和接下来播放的内容。
+Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions.	点击启动,再次点击停止。Cmd-点击仅选择。右键可复制、粘贴和设置跟随动作。
+Clip	片段
+Copy	复制
+Cut	剪切
+Double-click to add a clip. Click selects the cell to paste into. You can also drop a video or image file here.	双击添加片段。单击选择要粘贴的格子。也可以把视频或图片文件拖到这里。
+Double-click to add a clip. Click selects the cell to paste into. You can also drop an audio file here.	双击添加片段。单击选择要粘贴的格子。也可以把音频文件拖到这里。
+Enable Session Audio	启用会话音频
+Follow Action: what this track plays once this clip has run for Follow After	跟随动作:此片段播放了“跟随时长”后,这条轨道接着播放什么
+How long one pass of the clip runs before it loops (or stops, with Loop off)	片段一遍播放多长,然后循环(关闭循环则停止)
+Launch Quantize: launches and stops wait for this grid line, so everything stays in time	启动量化:启动和停止都等待这条网格线,让一切保持在拍子上
+Length	长度
+Mode	模式
+Next Scene After	下一场景时长
+Off	关
+On	开
+Paste Selected Timeline Clip	粘贴所选时间线片段
+Record your performance: the clips and scenes you launch are written into the Timeline, ready to render with Render Take.	录制你的演奏:你启动的片段和场景会写入时间线,可用“渲染录制”导出。
+Recording: every clip and scene you launch is written into the Timeline. Click to stop.	录制中:你启动的每个片段和场景都会写入时间线。点击停止。
+Render Take	渲染录制
+Render the last recording, audio and video, to a movie file in a folder you choose	把最近一次录制(音频和视频)渲染为影片文件,保存到你选择的文件夹
+Scene Length	场景长度
+Scenes	场景
+Session Audio On	会话音频已开启
+Session Audio: you hear and see the clips you launch here; the Timeline's clips stay silent	会话音频:你会听到并看到在这里启动的片段;时间线上的片段保持静音
+Session Default	会话默认
+Stop All (.): every track stops at the next quantize point	全部停止 (.):每条轨道在下一个量化点停止
+Stop Scene	停止场景
+Stop this track at the next quantize point	在下一个量化点停止这条轨道
+The Session's launched clips are driving audio. Click to hand it back to the canvas.	会话中已启动的片段正在驱动音频。点击交还给画布。
+The Session's launched clips will drive audio once the engine is started.	引擎启动后,会话中已启动的片段将驱动音频。
+Then	然后
+Then Play Next Scene	然后播放下一场景
+Trigger: a click starts it, a click while it plays stops it. Gate: it plays while you hold the mouse or key.	触发:点击开始,播放时再点击停止。门控:按住鼠标或按键时播放。
+When this scene has played, the next scene launches. Turn it on for every scene to play them in order.	这个场景播放完后,下一个场景启动。为每个场景开启它即可按顺序播放。
+Launch / Stop	启动 / 停止
+Launch or stop the scene and select it: Delete removes it, the Duplicate shortcut copies it, Up / Down move the selection	启动或停止场景并选中它:Delete 删除,复制快捷键复制它,上 / 下移动选择
+Launch the clip; on a playing or waiting clip, stop it at the next quantize point. Enter on an empty cell adds a clip	启动片段;对正在播放或等待的片段,在下一个量化点停止。在空格子上按 Enter 添加片段
+Select Clip	选择片段
+Select Scene	选择场景
+Select a clip without launching it, for copy and paste. A click on an empty cell selects it as the paste target	选择片段但不启动,用于复制和粘贴。单击空格子会把它选为粘贴目标
+Stop every playing clip at the next quantize point	在下一个量化点停止所有正在播放的片段
+Session at Bottom	会话置于底部
+Session at Top	会话置于顶部

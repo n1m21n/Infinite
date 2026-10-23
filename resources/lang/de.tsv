@@ -1494,8 +1494,6 @@ version %s is available (you have %s) - click to update, right-click to dismiss	
 %d bar	%d Takt
 %d bars	%d Takte
 Add a track in Timeline view, then drop audio or video files onto its cells here.	Füge in der Timeline-Ansicht eine Spur hinzu und ziehe dann Audio- oder Videodateien auf ihre Zellen.
-Clear Slot	Slot leeren
-Click to launch. Right-click for follow actions.	Klicken zum Starten. Rechtsklick für Folgeaktionen.
 Delete Scene	Szene löschen
 Duplicate Scene	Szene duplizieren
 Empty slot: drop a video or image file here	Leerer Slot: Video- oder Bilddatei hier ablegen
@@ -1504,14 +1502,11 @@ Follow Action	Folgeaktion
 Follow After	Folgen nach
 Insert Scene Above	Szene darüber einfügen
 Launch Scene	Szene starten
-Launch this row on every track (right-click to rename or set a tempo)	Diese Zeile auf jeder Spur starten (Rechtsklick zum Umbenennen oder für ein Tempo)
 Launching this scene sets the project tempo. 0 leaves the tempo alone.	Beim Starten dieser Szene wird das Projekttempo gesetzt. 0 lässt das Tempo unverändert.
 No Follow Action	Keine Folgeaktion
 No tracks yet	Noch keine Spuren
-Paste Selected Clip	Ausgewählten Clip einfügen
 Place on Timeline at Playhead	Am Abspielkopf auf die Timeline legen
 Random	Zufall
-Record to Timeline: what the launched clips play is written into the arrangement.	In Timeline aufnehmen: Was die gestarteten Clips abspielen, wird in das Arrangement geschrieben.
 Right-click to rename this scene or set its tempo	Rechtsklick zum Umbenennen dieser Szene oder für ihr Tempo
 Scene %d	Szene %d
 Scene name	Szenenname
@@ -1519,9 +1514,7 @@ Select one clip on this kind of track in Timeline view first.	Wähle zuerst in d
 Session: launch clips by scene	Session: Clips szenenweise starten
 Stop	Stopp
 Stop Track	Spur stoppen
-Stop every track: the whole panel goes back to playing the Timeline	Alle Spuren stoppen: das ganze Panel spielt wieder die Timeline
 Stop this track	Diese Spur stoppen
-Stop this track: it goes back to playing the Timeline	Diese Spur stoppen: sie spielt wieder die Timeline
 Tempo: unchanged	Tempo: unverändert
 This slot is inactive	Dieser Slot ist inaktiv
 This slot's source is missing	Die Quelle dieses Slots fehlt
@@ -1543,19 +1536,14 @@ Ungroup Track	Spur aus Gruppe lösen
 8 Bars	8 Takte
 Clip Length	Cliplänge
 Gate	Gate
-Global	Global
 Keep Other Tracks Playing	Andere Spuren weiterspielen
 Launch Mode	Startmodus
 Launch Quantize	Start-Quantisierung
 Loop Length	Loop-Länge
 None	Keine
-Toggle	Umschalten
 Trigger	Trigger
-Duplicate Slot	Slot duplizieren
 Launch Row in Group	Zeile in Gruppe starten
 Add a video or audio track	Video- oder Audiospur hinzufügen
-Click to add a clip. You can also drop a video or image file here.	Klicken, um einen Clip hinzuzufügen. Du kannst auch eine Video- oder Bilddatei hierher ziehen.
-Click to add a clip. You can also drop an audio file here.	Klicken, um einen Clip hinzuzufügen. Du kannst auch eine Audiodatei hierher ziehen.
 Session	Session
 Show Session	Session anzeigen
 Close Session	Session schließen
@@ -1570,7 +1558,6 @@ Copies this scene's clips onto the Timeline at the playhead. Render from the Tim
 Toggle the docked Session panel (clip launcher). Every key below needs the Session panel focused - click inside it first	Das angedockte Session-Panel (Clip-Launcher) ein-/ausblenden. Jede Taste unten braucht den Fokus im Session-Panel - zuerst hineinklicken
 Move Cell	Zelle bewegen
 Move the cell cursor between tracks and scenes; a clip under it is selected	Zellenmarker zwischen Spuren und Szenen bewegen; ein Clip darunter wird ausgewählt
-Launch the clip under the cursor; on an empty cell, add an unassigned clip there	Den Clip unter dem Cursor starten; in einer leeren Zelle einen nicht zugewiesenen Clip anlegen
 Launch every clip of the cursor's scene	Alle Clips der Szene unter dem Cursor starten
 Copy / Cut / Paste Clip	Clip kopieren / ausschneiden / einfügen
 Copy or cut a slot (its launch settings come with it) and paste it on a track of the same kind	Einen Slot kopieren oder ausschneiden (samt Startoptionen) und auf einer Spur gleicher Art einfügen
@@ -1585,7 +1572,6 @@ Mute the clip (it draws hatched) or bring it back	Den Clip stummschalten (er wir
 Add Scene	Szene hinzufügen
 Add a scene row at the bottom	Unten eine Szenenzeile hinzufügen
 Stop All	Alle stoppen
-Stop every playing clip; each track goes back to the Timeline	Alle laufenden Clips stoppen; jede Spur kehrt zur Timeline zurück
 Abandon a click-to-assign on a clip, otherwise clear the selection	Eine Klick-Zuweisung eines Clips abbrechen, sonst die Auswahl aufheben
 Monitor: Visible. Shows the video the launched clips produce.	Monitor: Sichtbar. Zeigt das Video der gestarteten Clips.
 Clip Inspector: Open	Clip-Inspektor: Geöffnet
@@ -1593,3 +1579,48 @@ Turn the group off: its nodes stop cooking and go silent	Gruppe ausschalten: ihr
 Turn the group on	Gruppe einschalten
 Turn Group Off	Gruppe ausschalten
 Turn Group On	Gruppe einschalten
+After	Nach
+Click to launch this row on every track, click again to stop it. Right-click for its tempo and what plays next.	Klicken startet diese Reihe auf allen Spuren, erneut klicken stoppt sie. Rechtsklick für Tempo und was danach spielt.
+Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions.	Klicken startet, erneut klicken stoppt. Cmd-Klick wählt aus. Rechtsklick für Kopieren, Einfügen und Folgeaktionen.
+Clip	Clip
+Copy	Kopieren
+Cut	Ausschneiden
+Double-click to add a clip. Click selects the cell to paste into. You can also drop a video or image file here.	Doppelklick fügt einen Clip hinzu. Klick wählt die Zelle zum Einfügen. Du kannst auch eine Video- oder Bilddatei hier ablegen.
+Double-click to add a clip. Click selects the cell to paste into. You can also drop an audio file here.	Doppelklick fügt einen Clip hinzu. Klick wählt die Zelle zum Einfügen. Du kannst auch eine Audiodatei hier ablegen.
+Enable Session Audio	Session-Audio aktivieren
+Follow Action: what this track plays once this clip has run for Follow After	Folgeaktion: was diese Spur spielt, nachdem dieser Clip für „Folgen nach“ gelaufen ist
+How long one pass of the clip runs before it loops (or stops, with Loop off)	Wie lange ein Durchlauf des Clips dauert, bevor er loopt (oder ohne Loop stoppt)
+Launch Quantize: launches and stops wait for this grid line, so everything stays in time	Start-Quantisierung: Starts und Stopps warten auf diese Rasterlinie, damit alles im Takt bleibt
+Length	Länge
+Mode	Modus
+Next Scene After	Nächste Szene nach
+Off	Aus
+On	An
+Paste Selected Timeline Clip	Ausgewählten Timeline-Clip einfügen
+Record your performance: the clips and scenes you launch are written into the Timeline, ready to render with Render Take.	Nimm deine Performance auf: die Clips und Szenen, die du startest, werden in die Timeline geschrieben, bereit für „Take rendern“.
+Recording: every clip and scene you launch is written into the Timeline. Click to stop.	Aufnahme: jeder Clip und jede Szene, die du startest, wird in die Timeline geschrieben. Klicken zum Stoppen.
+Render Take	Take rendern
+Render the last recording, audio and video, to a movie file in a folder you choose	Die letzte Aufnahme, Audio und Video, als Filmdatei in einen Ordner deiner Wahl rendern
+Scene Length	Szenenlänge
+Scenes	Szenen
+Session Audio On	Session-Audio an
+Session Audio: you hear and see the clips you launch here; the Timeline's clips stay silent	Session-Audio: du hörst und siehst die Clips, die du hier startest; die Clips der Timeline bleiben stumm
+Session Default	Session-Standard
+Stop All (.): every track stops at the next quantize point	Alle stoppen (.): jede Spur stoppt am nächsten Quantisierungspunkt
+Stop Scene	Szene stoppen
+Stop this track at the next quantize point	Diese Spur am nächsten Quantisierungspunkt stoppen
+The Session's launched clips are driving audio. Click to hand it back to the canvas.	Die gestarteten Clips der Session steuern das Audio. Klicken, um es an die Arbeitsfläche zurückzugeben.
+The Session's launched clips will drive audio once the engine is started.	Die gestarteten Clips der Session steuern das Audio, sobald die Engine gestartet ist.
+Then	Dann
+Then Play Next Scene	Dann nächste Szene spielen
+Trigger: a click starts it, a click while it plays stops it. Gate: it plays while you hold the mouse or key.	Trigger: ein Klick startet, ein Klick während der Wiedergabe stoppt. Gate: spielt, solange du Maus oder Taste hältst.
+When this scene has played, the next scene launches. Turn it on for every scene to play them in order.	Wenn diese Szene gespielt hat, startet die nächste. Schalte es für jede Szene ein, um sie der Reihe nach zu spielen.
+Launch / Stop	Starten / Stoppen
+Launch or stop the scene and select it: Delete removes it, the Duplicate shortcut copies it, Up / Down move the selection	Szene starten oder stoppen und auswählen: Entf löscht sie, das Duplizieren-Kürzel kopiert sie, Auf / Ab bewegt die Auswahl
+Launch the clip; on a playing or waiting clip, stop it at the next quantize point. Enter on an empty cell adds a clip	Clip starten; bei einem laufenden oder wartenden Clip am nächsten Quantisierungspunkt stoppen. Enter auf einer leeren Zelle fügt einen Clip hinzu
+Select Clip	Clip auswählen
+Select Scene	Szene auswählen
+Select a clip without launching it, for copy and paste. A click on an empty cell selects it as the paste target	Einen Clip auswählen, ohne ihn zu starten, zum Kopieren und Einfügen. Ein Klick auf eine leere Zelle wählt sie als Einfügeziel
+Stop every playing clip at the next quantize point	Jeden laufenden Clip am nächsten Quantisierungspunkt stoppen
+Session at Bottom	Session unten
+Session at Top	Session oben
