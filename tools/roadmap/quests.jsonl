@@ -3436,3 +3436,60 @@
 {"ts": "2026-10-22T21:38:09+05:30", "event": "add", "id": "R881", "after": [], "user": false, "src": "merge:9e0470f", "track": "engine", "kind": "feature", "horizon": "later", "title": "Bugfix/decode-nonfinite-samples (bug-hunt spree 2026-10-22)", "why": "merged into main (9e0470f)", "origin": "merge"}
 {"ts": "2026-10-22T21:38:10+05:30", "event": "done", "id": "R881", "why": "merged into main (9e0470f)"}
 {"ts": "2026-10-22T21:38:10+05:30", "event": "edit", "id": "R881", "opened": "2026-10-22T21:38:09+05:30", "closed": "2026-10-22T21:38:10+05:30", "release": "", "commits": ["9e0470f"]}
+{"ts": "2026-10-22T20:48:35+05:30", "event": "add", "id": "R882", "after": [], "user": false, "src": "merge:feature/agent-credit-metadata", "track": "timeline", "kind": "feature", "horizon": "later", "title": "Agent credit metadata", "why": "merged into main (994801f)", "origin": "merge"}
+{"ts": "2026-10-23T05:40:39+05:30", "event": "done", "id": "R882", "why": "merged into main (994801f)"}
+{"ts": "2026-10-23T05:40:39+05:30", "event": "edit", "id": "R882", "opened": "2026-10-22T20:48:35+05:30", "closed": "2026-10-23T05:40:39+05:30", "release": "", "commits": ["994801f"]}
+{"ts": "2026-10-22T22:26:26+05:30", "event": "add", "id": "R883", "after": [], "user": false, "src": "merge:bugfix/molder-reload-seed", "track": "engine", "kind": "fix", "horizon": "later", "title": "Molder reload seed", "why": "merged into main (b6e0f79)", "origin": "merge"}
+{"ts": "2026-10-23T06:09:15+05:30", "event": "done", "id": "R883", "why": "merged into main (b6e0f79)"}
+{"ts": "2026-10-23T06:09:15+05:30", "event": "edit", "id": "R883", "opened": "2026-10-22T22:26:26+05:30", "closed": "2026-10-23T06:09:15+05:30", "release": "", "commits": ["b6e0f79"]}
+{"ts": "2026-10-23T05:20:39+05:30", "event": "add", "id": "R884", "after": [], "user": false, "src": "merge:bugfix/float-param-int-range", "track": "engine", "kind": "fix", "horizon": "later", "title": "Float param int range", "why": "merged into main (8b89aff)", "origin": "merge"}
+{"ts": "2026-10-23T06:09:16+05:30", "event": "done", "id": "R884", "why": "merged into main (8b89aff)"}
+{"ts": "2026-10-23T06:09:16+05:30", "event": "edit", "id": "R884", "opened": "2026-10-23T05:20:39+05:30", "closed": "2026-10-23T06:09:16+05:30", "release": "", "commits": ["8b89aff"]}
+{"ts": "2026-10-23T05:43:12+05:30", "event": "add", "id": "R885", "after": [], "user": false, "src": "merge:bugfix/palette-seed", "track": "engine", "kind": "fix", "horizon": "later", "title": "Palette seed", "why": "merged into main (2d9ef53)", "origin": "merge"}
+{"ts": "2026-10-23T06:09:17+05:30", "event": "done", "id": "R885", "why": "merged into main (2d9ef53)"}
+{"ts": "2026-10-23T06:09:17+05:30", "event": "edit", "id": "R885", "opened": "2026-10-23T05:43:12+05:30", "closed": "2026-10-23T06:09:17+05:30", "release": "", "commits": ["2d9ef53"]}
+{"ts": "2026-10-23T06:01:17+05:30", "event": "add", "id": "R886", "after": [], "user": false, "src": "merge:bugfix/wavetable-nan-phase", "track": "engine", "kind": "fix", "horizon": "later", "title": "Wavetable nan phase", "why": "merged into main (20a0221)", "origin": "merge"}
+{"ts": "2026-10-23T06:09:18+05:30", "event": "done", "id": "R886", "why": "merged into main (20a0221)"}
+{"ts": "2026-10-23T06:09:18+05:30", "event": "edit", "id": "R886", "opened": "2026-10-23T06:01:17+05:30", "closed": "2026-10-23T06:09:18+05:30", "release": "", "commits": ["20a0221"]}
+{"ts": "2026-10-23T06:19:27+05:30", "event": "add", "id": "R887", "after": [], "user": false, "src": "merge:bugfix/molder-generation-cap", "track": "ux", "kind": "fix", "horizon": "later", "title": "Molder generation cap", "why": "merged into main (f8e1faf)", "origin": "merge"}
+{"ts": "2026-10-23T06:44:46+05:30", "event": "done", "id": "R887", "why": "merged into main (f8e1faf)"}
+{"ts": "2026-10-23T06:44:46+05:30", "event": "edit", "id": "R887", "opened": "2026-10-23T06:19:27+05:30", "closed": "2026-10-23T06:44:46+05:30", "release": "", "commits": ["f8e1faf"]}
+{"ts": "2026-10-23T06:21:36+05:30", "event": "add", "id": "R888", "after": [], "user": false, "src": "merge:bugfix/note-echo-range", "track": "engine", "kind": "fix", "horizon": "later", "title": "Note echo range", "why": "merged into main (368c37e)", "origin": "merge"}
+{"ts": "2026-10-23T06:44:47+05:30", "event": "done", "id": "R888", "why": "merged into main (368c37e)"}
+{"ts": "2026-10-23T06:44:47+05:30", "event": "edit", "id": "R888", "opened": "2026-10-23T06:21:36+05:30", "closed": "2026-10-23T06:44:47+05:30", "release": "", "commits": ["368c37e"]}
+{"ts": "2026-10-23T06:48:58+05:30", "event": "add", "id": "R889", "after": [], "user": false, "src": "merge:tooling/range-lint-file-stimulus", "track": "engine", "kind": "feature", "horizon": "later", "title": "Range lint file stimulus", "why": "merged into main (8d72d1b)", "origin": "merge"}
+{"ts": "2026-10-23T06:49:02+05:30", "event": "done", "id": "R889", "why": "merged into main (8d72d1b)"}
+{"ts": "2026-10-23T06:49:02+05:30", "event": "edit", "id": "R889", "opened": "2026-10-23T06:48:58+05:30", "closed": "2026-10-23T06:49:02+05:30", "release": "", "commits": ["8d72d1b"]}
+{"ts": "2026-10-23T06:58:13+05:30", "event": "add", "id": "R890", "after": [], "user": false, "src": "merge:303d67a", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Branches 'bugfix/effect-param-range', 'bugfix/node-gain-range', 'bugfix/wavetable-param-ra", "why": "merged into main (303d67a)", "origin": "merge"}
+{"ts": "2026-10-23T07:23:05+05:30", "event": "done", "id": "R890", "why": "merged into main (303d67a)"}
+{"ts": "2026-10-23T07:23:05+05:30", "event": "edit", "id": "R890", "opened": "2026-10-23T06:58:13+05:30", "closed": "2026-10-23T07:23:05+05:30", "release": "", "commits": ["303d67a"]}
+{"ts": "2026-10-23T07:40:57+05:30", "event": "add", "id": "R891", "after": [], "user": false, "src": "merge:bugfix/filter-param-range", "track": "nodes", "kind": "fix", "horizon": "later", "title": "Filter param range", "why": "merged into main (6b80b25)", "origin": "merge"}
+{"ts": "2026-10-23T07:46:01+05:30", "event": "done", "id": "R891", "why": "merged into main (6b80b25)"}
+{"ts": "2026-10-23T07:46:01+05:30", "event": "edit", "id": "R891", "opened": "2026-10-23T07:40:57+05:30", "closed": "2026-10-23T07:46:01+05:30", "release": "", "commits": ["6b80b25"]}
+{"ts": "2026-10-23T07:47:18+05:30", "event": "add", "id": "R892", "after": [], "user": false, "src": "merge:tooling/param-fuzz-inproc", "track": "engine", "kind": "feature", "horizon": "later", "title": "Param fuzz inproc", "why": "merged into main (9f86952)", "origin": "merge"}
+{"ts": "2026-10-23T07:57:16+05:30", "event": "done", "id": "R892", "why": "merged into main (9f86952)"}
+{"ts": "2026-10-23T07:57:16+05:30", "event": "edit", "id": "R892", "opened": "2026-10-23T07:47:18+05:30", "closed": "2026-10-23T07:57:16+05:30", "release": "", "commits": ["9f86952"]}
+{"ts": "2026-10-23T07:57:43+05:30", "event": "add", "id": "R893", "after": [], "user": false, "src": "merge:bugfix/sample-player-param-range", "track": "engine", "kind": "fix", "horizon": "later", "title": "Sample player param range", "why": "merged into main (c5952e7)", "origin": "merge"}
+{"ts": "2026-10-23T08:07:45+05:30", "event": "done", "id": "R893", "why": "merged into main (c5952e7)"}
+{"ts": "2026-10-23T08:07:45+05:30", "event": "edit", "id": "R893", "opened": "2026-10-23T07:57:43+05:30", "closed": "2026-10-23T08:07:45+05:30", "release": "", "commits": ["c5952e7"]}
+{"ts": "2026-10-23T08:02:59+05:30", "event": "add", "id": "R894", "after": [], "user": false, "src": "merge:bugfix/palette-offset-overflow", "track": "nodes", "kind": "fix", "horizon": "later", "title": "Palette offset overflow", "why": "merged into main (8d135f3)", "origin": "merge"}
+{"ts": "2026-10-23T08:14:54+05:30", "event": "done", "id": "R894", "why": "merged into main (8d135f3)"}
+{"ts": "2026-10-23T08:14:54+05:30", "event": "edit", "id": "R894", "opened": "2026-10-23T08:02:59+05:30", "closed": "2026-10-23T08:14:54+05:30", "release": "", "commits": ["8d135f3"]}
+{"ts": "2026-10-23T08:04:58+05:30", "event": "add", "id": "R895", "after": [], "user": false, "src": "merge:bugfix/image-size-cap", "track": "engine", "kind": "fix", "horizon": "later", "title": "Image size cap", "why": "merged into main (664a151)", "origin": "merge"}
+{"ts": "2026-10-23T08:15:02+05:30", "event": "done", "id": "R895", "why": "merged into main (664a151)"}
+{"ts": "2026-10-23T08:15:02+05:30", "event": "edit", "id": "R895", "opened": "2026-10-23T08:04:58+05:30", "closed": "2026-10-23T08:15:02+05:30", "release": "", "commits": ["664a151"]}
+{"ts": "2026-10-23T08:22:48+05:30", "event": "add", "id": "R896", "after": [], "user": false, "src": "merge:feature/show-set-revert", "track": "ux", "kind": "feature", "horizon": "later", "title": "Show set revert", "why": "merged into main (92fe281)", "origin": "merge"}
+{"ts": "2026-10-23T08:22:49+05:30", "event": "done", "id": "R896", "why": "merged into main (92fe281)"}
+{"ts": "2026-10-23T08:22:49+05:30", "event": "edit", "id": "R896", "opened": "2026-10-23T08:22:48+05:30", "closed": "2026-10-23T08:22:49+05:30", "release": "", "commits": ["92fe281"]}
+{"ts": "2026-10-23T08:49:42+05:30", "event": "add", "id": "R897", "after": [], "user": false, "src": "merge:feature/vmpc", "track": "growth", "kind": "feature", "horizon": "later", "title": "Vmpc", "why": "merged into main (8c3746a)", "origin": "merge"}
+{"ts": "2026-10-23T08:49:46+05:30", "event": "done", "id": "R897", "why": "merged into main (8c3746a)"}
+{"ts": "2026-10-23T08:49:46+05:30", "event": "edit", "id": "R897", "opened": "2026-10-23T08:49:42+05:30", "closed": "2026-10-23T08:49:46+05:30", "release": "", "commits": ["8c3746a"]}
+{"ts": "2026-10-23T09:02:57+05:30", "event": "add", "id": "R898", "after": [], "user": false, "src": "merge:feature/hdr-render3d", "track": "engine", "kind": "feature", "horizon": "later", "title": "Hdr render3d", "why": "merged into main (047179b)", "origin": "merge"}
+{"ts": "2026-10-23T09:02:58+05:30", "event": "done", "id": "R898", "why": "merged into main (047179b)"}
+{"ts": "2026-10-23T09:02:58+05:30", "event": "edit", "id": "R898", "opened": "2026-10-23T09:02:57+05:30", "closed": "2026-10-23T09:02:58+05:30", "release": "", "commits": ["047179b"]}
+{"ts": "2026-10-23T09:15:32+05:30", "event": "add", "id": "R899", "after": [], "user": false, "src": "merge:feature/render3d-360", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Render3d 360", "why": "merged into main (e205de2)", "origin": "merge"}
+{"ts": "2026-10-23T09:15:32+05:30", "event": "done", "id": "R899", "why": "merged into main (e205de2)"}
+{"ts": "2026-10-23T09:15:32+05:30", "event": "edit", "id": "R899", "opened": "2026-10-23T09:15:32+05:30", "closed": "2026-10-23T09:15:32+05:30", "release": "", "commits": ["e205de2"]}
+{"ts": "2026-10-23T09:25:17+05:30", "event": "add", "id": "R900", "after": [], "user": false, "src": "merge:chore/vmpc-sweep-baseline", "track": "timeline", "kind": "infra", "horizon": "later", "title": "Vmpc sweep baseline", "why": "merged into main (1ea9dc3)", "origin": "merge"}
+{"ts": "2026-10-23T09:25:17+05:30", "event": "done", "id": "R900", "why": "merged into main (1ea9dc3)"}
+{"ts": "2026-10-23T09:25:17+05:30", "event": "edit", "id": "R900", "opened": "2026-10-23T09:25:17+05:30", "closed": "2026-10-23T09:25:17+05:30", "release": "", "commits": ["1ea9dc3"]}
