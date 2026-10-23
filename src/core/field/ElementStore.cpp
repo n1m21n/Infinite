@@ -216,6 +216,12 @@ namespace Field
          for (size_t i = 0; i < n; ++i)
             size->second.data[0][i] = points[i].scale;
       }
+      auto life = mUserAttribs.find(kPointLifeAttrib);
+      if (life != mUserAttribs.end() && life->second.lanes == 1)
+      {
+         for (size_t i = 0; i < n; ++i)
+            life->second.data[0][i] = PointLifeFraction(points[i]);
+      }
    }
 
    void ElementStore::ToParticles(std::vector<Particle>& out, const MeshWriteMask& mask, const std::vector<Particle>& source) const

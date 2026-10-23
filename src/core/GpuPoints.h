@@ -19,7 +19,9 @@ struct GpuPoints
    // a cell under the threshold, a dead particle.
    unsigned int posTex = 0;
    // RGBA32F: rgb = point colour (full float, so a tint reads back exactly as
-   // the CPU path's float colour does).
+   // the CPU path's float colour does); a = how far through its life the
+   // point is (PointLifeFraction: age / life, 0 for anything not a mortal
+   // particle), which Field Modifier reads as its `life` attrib.
    unsigned int colorTex = 0;
    int texW = 0;
    int texH = 0;
@@ -87,8 +89,8 @@ namespace GpuPointsGL
                      const std::function<void()>& setup, const char* label);
    // GLSL 150 prelude for RunPointPass programs. Declares the inputs and the
    // two outputs, and defines `P` (position after uPointMatrix), `W` (sprite
-   // half-size, 0 = hidden), `Cd` (colour) and `index` for the point this
-   // fragment owns. The program's main() ends with `outPos = vec4(P, W);
-   // outColor = vec4(Cd, 1.0);`.
+   // half-size, 0 = hidden), `Cd` (colour), `Life` (life fraction, colour
+   // alpha) and `index` for the point this fragment owns. The program's main()
+   // ends with `outPos = vec4(P, W); outColor = vec4(Cd, Life);`.
    extern const char* const kPointPassHeader;
 }

@@ -719,7 +719,7 @@ const GpuPoints* GeometryOpNode::GetGpuPoints()
          "   else if (uAxis == 0) P.yz = Turn(P.yz, uAngle * P.x);\n"
          "   else P.xy = Turn(P.xy, uAngle * P.z);\n"
          "   outPos = vec4(P, W);\n"
-         "   outColor = vec4(Cd, 1.0);\n"
+         "   outColor = vec4(Cd, Life);\n"
          "}\n";
       mTwistProgram = GLUtil::CompileProgram(fs.c_str());
    }
@@ -1135,7 +1135,7 @@ const GpuPoints* DisplacementNode::GetGpuPoints()
          "      else P.z += (0.299 * s.r + 0.587 * s.g + 0.114 * s.b - uMidlevel) * uStrength;\n"
          "   }\n"
          "   outPos = vec4(P, W);\n"
-         "   outColor = vec4(Cd, 1.0);\n"
+         "   outColor = vec4(Cd, Life);\n"
          "}\n";
       mGpuProgram = GLUtil::CompileProgram(fs.c_str());
    }

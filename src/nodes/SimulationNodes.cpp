@@ -696,7 +696,7 @@ namespace
       "   float size = mix(uStartSize, uEndSize, pow(t, uSizeCurve));\n"
       "   outPos = vec4(a.xyz, size * uBaseSize);\n"
       "   outColor = vec4(uCopyColor == 1 ? texelFetch(uStateC, cell, 0).rgb\n"
-      "                                   : mix(uStartColor, uEndColor, pow(t, uColorCurve)), 1.0);\n"
+      "                                   : mix(uStartColor, uEndColor, pow(t, uColorCurve)), t);\n"
       "}\n";
 
    // Min/max of the living particles' positions (and their top speed), 16 x 16

@@ -131,7 +131,7 @@ namespace GpuPointsGL
          float* q = &pos[(size_t)i * 4];
          float* c = &color[(size_t)i * 4];
          q[0] = p.px; q[1] = p.py; q[2] = p.pz;
-         c[0] = p.r; c[1] = p.g; c[2] = p.b; c[3] = 1.0f;
+         c[0] = p.r; c[1] = p.g; c[2] = p.b; c[3] = PointLifeFraction(p);
          if (!p.alive)
             continue; // w stays 0: hidden, like the CPU draw's skip
          q[3] = p.scale * baseSize;
@@ -177,13 +177,16 @@ namespace GpuPointsGL
       "vec3 P;\n"
       "float W;\n"
       "vec3 Cd;\n"
+      "float Life;\n"
       "int index;\n"
       "void LoadPoint() {\n"
       "   ivec2 cell = ivec2(gl_FragCoord.xy);\n"
       "   vec4 p = texelFetch(uPointPos, cell, 0);\n"
       "   P = (uPointMatrix * vec4(p.xyz, 1.0)).xyz;\n"
       "   W = p.w;\n"
-      "   Cd = texelFetch(uPointColor, cell, 0).rgb;\n"
+      "   vec4 c = texelFetch(uPointColor, cell, 0);\n"
+      "   Cd = c.rgb;\n"
+      "   Life = c.a;\n"
       "   index = cell.y * uPointTexW + cell.x;\n"
       "}\n";
 

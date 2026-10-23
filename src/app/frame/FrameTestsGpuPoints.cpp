@@ -1074,6 +1074,208 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
       std::filesystem::remove_all(dir, ec);
    }
 
+   // Step 12: the Field Modifier point presets. Each runs over a cloud of
+   // mortal particles (ages 0..life, a few immortal) on both paths: the
+   // preset must compile to GLSL, change the points, and the GPU texels -
+   // life fraction in colour alpha included - must equal the CPU cloud. Then
+   // each preset's own promise: sizes spread, colours differ, the stagger
+   // follows the index, and age runs young colour -> old colour while the
+   // sprite shrinks.
+   {
+      struct LifeCloud : IGeometrySource
+      {
+         std::vector<Particle> points;
+         unsigned long long revision = NextMeshRevision();
+         GpuPointsGL::Target target;
+         GpuPoints gpu;
+         unsigned long long uploaded = 0;
+         bool valid = false;
+         Mesh empty;
+         ~LifeCloud() { GpuPointsGL::DestroyTarget(target); }
+         const Mesh& GetMesh() override { return empty; }
+         unsigned long long MeshRevision() override { return revision; }
+         Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+         Material GetMaterial() const override { return Material(); }
+         const std::vector<Particle>* GetPointCloud() override { return &points; }
+         unsigned long long PointCloudRevision() override { return revision; }
+         const GpuPoints* GetGpuPoints() override
+         {
+            if (!GpuPointsGL::Enabled())
+               return nullptr;
+            if (uploaded != revision)
+            {
+               uploaded = revision;
+               valid = GpuPointsGL::Upload(target, gpu, points, 1.0f, "GpuPointsTest_LifeCloud");
+               gpu.revision = revision;
+            }
+            return valid ? &gpu : nullptr;
+         }
+      };
+      LifeCloud cloud;
+      const int n = 600;
+      for (int k = 0; k < n; k++)
+      {
+         Particle p;
+         p.px = (float)(k % 30) / 15.0f - 1.0f;
+         p.py = (float)(k / 30) / 10.0f - 1.0f;
+         p.pz = std::sin((float)k * 0.37f) * 0.2f;
+         p.scale = 0.04f;
+         p.r = 0.6f; p.g = 0.8f; p.b = 1.0f;
+         p.hasColor = true;
+         p.life = (k % 50 == 7) ? 0.0f : 2.0f; // every 50th from 7 is immortal
+         p.age = 2.0f * (float)k / (float)(n - 1);
+         cloud.points.push_back(p);
+      }
+
+      auto readTex = [](unsigned int tex, int w, int h)
+      {
+         std::vector<float> px((size_t)w * (size_t)h * 4, 0.0f);
+         glBindTexture(GL_TEXTURE_2D, tex);
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         return px;
+      };
+
+      GpuPointsGL::SetEnabledForTest(true);
+      {
+         const GpuPoints* g = cloud.GetGpuPoints();
+         float errL = 1e9f;
+         if (g != nullptr)
+         {
+            const std::vector<float> col = readTex(g->colorTex, g->texW, g->texH);
+            errL = 0.0f;
+            for (int k = 0; k < n; k++)
+               errL = std::max(errL, std::fabs(col[(size_t)k * 4 + 3] - PointLifeFraction(cloud.points[k])));
+         }
+         report("Upload carries each point's life fraction in colour alpha", g != nullptr && errL < 1e-6f);
+      }
+
+      const char* const names[] = { "Points: Random Size", "Points: Random Colour", "Points: Stagger over Index",
+                                    "Points: Age to Colour" };
+      for (const char* name : names)
+      {
+         int index = -1;
+         for (size_t k = 0; k < FieldElementNode::Presets().size(); k++)
+            if (FieldElementNode::Presets()[k].name == std::string(name))
+               index = (int)k;
+         char label[200];
+         if (index < 0)
+         {
+            snprintf(label, sizeof(label), "%s: preset exists", name);
+            report(label, false);
+            continue;
+         }
+
+         FieldElementNode fe;
+         fe.input = &cloud;
+         fe.LoadPreset(index);
+         GpuPointsGL::SetEnabledForTest(false);
+         fe.CookIfNeeded(frame++);
+         const bool cpuNone = fe.GetGpuPoints() == nullptr;
+         std::vector<Particle> cpuCloud;
+         if (const std::vector<Particle>* cc = fe.GetPointCloud())
+            cpuCloud = *cc;
+         GpuPointsGL::SetEnabledForTest(true);
+         fe.CookIfNeeded(frame - 1 + 1000000); // a new cook at the same time
+         const GpuPoints* g = fe.GetGpuPoints();
+
+         float moved = 0.0f;
+         if ((int)cpuCloud.size() == n)
+            for (int k = 0; k < n; k++)
+            {
+               const Particle& a = cloud.points[k];
+               const Particle& b = cpuCloud[k];
+               moved = std::max(moved, std::fabs(a.py - b.py) + std::fabs(a.r - b.r) + std::fabs(a.g - b.g) +
+                                       std::fabs(a.b - b.b) + std::fabs(a.scale - b.scale));
+            }
+         float errP = 1e9f, errW = 1e9f, errC = 1e9f, errL = 1e9f;
+         if (g != nullptr && g->count == n && (int)cpuCloud.size() == n)
+         {
+            const std::vector<float> pos = readTex(g->posTex, g->texW, g->texH);
+            const std::vector<float> col = readTex(g->colorTex, g->texW, g->texH);
+            errP = errW = errC = errL = 0.0f;
+            for (int k = 0; k < n; k++)
+            {
+               const Particle& p = cpuCloud[k];
+               const float* q = &pos[(size_t)k * 4];
+               const float* c = &col[(size_t)k * 4];
+               errP = std::max(errP, std::fabs(q[0] - p.px) + std::fabs(q[1] - p.py) + std::fabs(q[2] - p.pz));
+               errW = std::max(errW, std::fabs(q[3] - p.scale * fe.PointBaseSize()));
+               errC = std::max(errC, std::fabs(c[0] - p.r) + std::fabs(c[1] - p.g) + std::fabs(c[2] - p.b));
+               errL = std::max(errL, std::fabs(c[3] - PointLifeFraction(p)));
+            }
+         }
+
+         // The preset's own promise, on the CPU cloud.
+         bool promise = (int)cpuCloud.size() == n;
+         std::string what;
+         if (promise && index >= 0)
+         {
+            const std::string nm = name;
+            if (nm == "Points: Random Size")
+            {
+               float lo = 1e9f, hi = 0.0f;
+               for (const Particle& p : cpuCloud)
+               {
+                  lo = std::min(lo, p.scale);
+                  hi = std::max(hi, p.scale);
+               }
+               promise = lo > 0.0f && hi / lo > 3.0f && hi <= 0.04f * 1.8f + 1e-5f;
+               what = "sizes " + std::to_string(lo) + " .. " + std::to_string(hi);
+            }
+            else if (nm == "Points: Random Colour")
+            {
+               float spread = 0.0f;
+               for (int k = 1; k < n; k++)
+                  spread = std::max(spread, std::fabs(cpuCloud[k].r - cpuCloud[0].r) +
+                                            std::fabs(cpuCloud[k].g - cpuCloud[0].g) +
+                                            std::fabs(cpuCloud[k].b - cpuCloud[0].b));
+               promise = spread > 0.8f;
+               what = "colour spread " + std::to_string(spread);
+            }
+            else if (nm == "Points: Stagger over Index")
+            {
+               // Neighbours in index move nearly together; far ones apart.
+               float near = 0.0f, far = 0.0f;
+               for (int k = 0; k + 1 < n; k++)
+               {
+                  const float d0 = cpuCloud[k].py - cloud.points[k].py;
+                  near = std::max(near, std::fabs(d0 - (cpuCloud[k + 1].py - cloud.points[k + 1].py)));
+                  far = std::max(far, std::fabs(d0 - (cpuCloud[(k + n / 6) % n].py - cloud.points[(k + n / 6) % n].py)));
+               }
+               promise = near < 0.01f && far > 0.1f;
+               what = "neighbour diff " + std::to_string(near) + ", far diff " + std::to_string(far);
+            }
+            else
+            {
+               const Particle& young = cpuCloud[0];
+               const Particle& old = cpuCloud[n - 1];
+               const Particle& immortal = cpuCloud[7];
+               const bool colours = std::fabs(young.r - 1.0f) + std::fabs(young.g - 0.92f) + std::fabs(young.b - 0.55f) < 1e-4f &&
+                                    std::fabs(old.r - 0.35f) + std::fabs(old.g - 0.08f) + std::fabs(old.b - 0.45f) < 1e-4f &&
+                                    std::fabs(immortal.g - 0.92f) < 1e-4f;
+               const bool shrinks = std::fabs(young.scale - 0.04f) < 1e-6f && std::fabs(old.scale - 0.04f * 0.3f) < 1e-6f;
+               promise = colours && shrinks;
+               what = "young (" + std::to_string(young.r) + ", " + std::to_string(young.g) + ", " +
+                      std::to_string(young.b) + ") size " + std::to_string(young.scale) + ", old (" +
+                      std::to_string(old.r) + ", " + std::to_string(old.g) + ", " + std::to_string(old.b) +
+                      ") size " + std::to_string(old.scale);
+            }
+         }
+
+         printf("%s: moved %.3f, err pos %.6f size %.6f colour %.6f life %.6f; %s%s%s\n", name, moved, errP, errW,
+                errC, errL, what.c_str(), fe.PointGpuFallback().empty() ? "" : "; fallback: ",
+                fe.PointGpuFallback().c_str());
+         snprintf(label, sizeof(label), "%s: compiles to GLSL, GPU points only on the GPU path", name);
+         report(label, fe.PointGpuFallback().empty() && cpuNone && g != nullptr);
+         snprintf(label, sizeof(label), "%s: GPU texels (life alpha too) equal the CPU cloud", name);
+         report(label, moved > 0.01f && errP < 1e-3f && errW < 1e-4f && errC < 1e-3f && errL < 1e-6f);
+         snprintf(label, sizeof(label), "%s: does what its name says", name);
+         report(label, promise);
+      }
+      GpuPointsGL::SetEnabledForTest(wasEnabled);
+   }
+
    printf("%s\n", allOk ? "GPU POINTS TEST OK" : "GPU POINTS TEST FAIL");
 }
 

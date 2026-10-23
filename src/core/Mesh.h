@@ -275,6 +275,17 @@ struct Particle
    bool alive = true;
 };
 
+// How far through its life a particle is, 0..1: what GpuPoints' colour alpha
+// and Field Modifier's `life` attrib carry. 0 for an immortal particle (and
+// for any point that is not a simulated particle).
+inline float PointLifeFraction(const Particle& p)
+{
+   if (p.life <= 0.0f)
+      return 0.0f;
+   const float f = p.age / p.life;
+   return f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f);
+}
+
 // An ordered chain of points in space. Curves, extracted mesh boundaries and
 // plane-slice contours all reduce to this, so anything that can follow one can
 // follow all of them.

@@ -50,8 +50,12 @@ namespace Field
       // kPointSizeAttrib starts at each point's scale and, when the kernel
       // writes it, sets that scale (clamped at 0). Every particle takes an
       // element, dead ones too, so `i` is the particle's index; ToParticles
-      // copies everything it does not write from `source`.
+      // copies everything it does not write from `source`. A float `attrib`
+      // named kPointLifeAttrib reads how far through its life each point is
+      // (age / life, 0..1; 0 for an immortal particle or a point that is not
+      // one); writing it changes nothing on the points.
       static constexpr const char* kPointSizeAttrib = "size";
+      static constexpr const char* kPointLifeAttrib = "life";
       void FromParticles(const std::vector<Particle>& points);
       void ToParticles(std::vector<Particle>& out, const MeshWriteMask& mask, const std::vector<Particle>& source) const;
 

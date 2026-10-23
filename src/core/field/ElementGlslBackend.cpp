@@ -694,8 +694,9 @@ namespace Field
       }
       if (!e.Ok()) return res;
 
-      // Attribs are locals from the top: 0, except `size`, which starts at
-      // the point's own size (the CPU path's ElementStore::FromParticles).
+      // Attribs are locals from the top: 0, except `size` and `life`, which
+      // start at the point's own size and life fraction (the CPU path's
+      // ElementStore::FromParticles).
       for (const auto& a : program.declaredAttribs)
       {
          const int lanes = FieldType::GetLanesForType(a.second);
@@ -703,6 +704,7 @@ namespace Field
          std::string init = TypeName(lanes) + "(0.0)";
          const bool isSize = a.first == ElementStore::kPointSizeAttrib && lanes == 1;
          if (isSize) init = "(fld_baseSize != 0.0 ? W / fld_baseSize : 0.0)";
+         if (a.first == ElementStore::kPointLifeAttrib && lanes == 1) init = "Life";
          const std::string var = e.DeclareLocal(a.first, lanes, init);
          if (isSize) e.sizeVar = var;
       }
@@ -731,7 +733,7 @@ namespace Field
       else
          src << "   float fld_w = W;\n";
       src << "   outPos = vec4(P, fld_w);\n";
-      src << "   outColor = vec4(Cd, 1.0);\n";
+      src << "   outColor = vec4(Cd, Life);\n";
       src << "}\n";
       res.source = src.str();
       return res;

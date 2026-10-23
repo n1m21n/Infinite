@@ -78,8 +78,9 @@ the steps above, in the order they will be done:
 10. Field Modifier compiles to GLSL (`src/core/field/ElementGlslBackend.cpp`) when its input is GPU
     points. Done (section below).
 11. Model 3D reads `.ply` point clouds as points. Done (section below).
-12. Field Modifier presets for point jobs: random size, random colour, colour from image, stagger
-    over index, age to colour.
+12. Field Modifier presets for point jobs: random size, random colour, stagger over index, age to
+    colour. Done (section below). Colour from image is not shipped: it needs image reads in element
+    kernels, which is new language surface (owner decision).
 
 ## Done check (Lane 3)
 
@@ -343,3 +344,52 @@ bytes, the same code on all three platforms.
 **Parity.** No `Platform::` code and no `#ifdef`. The file opens through `AppPaths::FsPath`, so a
 UTF-8 path works on Windows. Binary reads assemble bytes explicitly, so endianness does not depend
 on the host. The Windows open dialog already lists `*.ply`.
+
+## Step 12: Field Modifier point presets (2026-10-24, dev build)
+
+Four new Field Modifier presets for point jobs. Each one compiles to GLSL, so it runs on the GPU
+when its input has GPU points, and on the CPU otherwise.
+- **Points: Random Size.** Each point gets a steady random size between `smallest` and `largest`
+  (squared, so most points are small), with a light shade to match. `flicker` re-rolls it over time.
+- **Points: Random Colour.** A random hue per point. `saturation` goes from white to full colour,
+  and `keep` mixes back toward the incoming colour.
+- **Points: Stagger over Index.** A wave runs along the point order: each point lifts, grows and
+  brightens a little after the one before. Controls: `speed`, `spread` (waves over the cloud),
+  `lift` and `pulse`.
+- **Points: Age to Colour.** Particles go young (warm white) to mid (coral) to old (dim violet)
+  over their life, shrink by `shrink` and rise by `rise`. Immortal points stay young.
+
+**New: the `life` attrib.** `attrib float life = 0` reads each point's life fraction, age / life
+clamped to 0..1 (0 when a point is immortal or not a particle). It is read-only: writes are
+dropped. To carry it on the GPU, the colour texture's alpha is now the life fraction on every
+path:
+- `GpuPointsGL::Upload` fills it (`PointLifeFraction` in `Mesh.h`).
+- The Particle System present pass writes it.
+- Image to Points writes 0.
+- Every point pass reads it as `Life` and writes it back (`outColor = vec4(Cd, Life)`): Twist,
+  Displacement and Field Modifier.
+
+Nothing drew colour alpha before this step, so frames do not change.
+
+**Colour from image: not shipped.** A Field Modifier kernel cannot read an image; image reads only
+exist in pixel kernels. Adding them to element kernels means new language surface on both
+backends, so it needs the owner's OK. Until then, Image to Points already colours its points from
+an image.
+
+**Checks.**
+- `GPUPOINTSTEST` step 12 section, all pass. It uses a test cloud of 600 mortal particles (ages 0
+  to life, every 50th immortal):
+  - The upload carries each point's life fraction in colour alpha (error 0).
+  - For each preset:
+    - It compiles to GLSL; GPU points appear only on the GPU path.
+    - The GPU texels (position, size, colour, life alpha) equal the CPU cloud (error at most 1e-6).
+    - It does what its name says:
+      - Random Size: sizes span 0.012..0.061.
+      - Random Colour: colour spread 1.55.
+      - Stagger over Index: neighbours differ by 0.002 and points a sixth apart by 0.15.
+      - Age to Colour: exact young and old colours; the oldest point is at 0.3x size.
+- `FIELDELEMENTTEST` (every preset compiles) and `FIELDTEST` pass.
+- `run-infinite-hygiene --group 3d` 23/23 and `render-pipeline-sweep` 23/23.
+
+**Parity.** GLSL stays `#version 150`. There is no `Platform::` code and no `#ifdef`. The presets
+are Field source, which is the same on every platform.

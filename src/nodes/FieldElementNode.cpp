@@ -364,7 +364,55 @@ const std::vector<FieldElementNode::Preset>& FieldElementNode::Presets()
         "P.z = rz\n"
         "Cd = vec3(1.0, 0.5 + 0.5 * sin(age * 4.0), 0.15)\n"
         "output frame float maxTravel = travel\n"
-        "publish = maxTravel\n" }
+        "publish = maxTravel\n" },
+      // Point jobs (docs/plans/gpu-points step 12). Meant for point clouds
+      // (Image/Mesh to Points, Model 3D .ply, Particle System), where `size`
+      // is each sprite's size and `life` how far through its life a particle
+      // is; on a mesh both are plain attribs and only Cd/P show. All four
+      // compile to GLSL, so over GPU points they run on the GPU.
+      { "Points: Random Size",
+        "param float smallest = 0.3 [0.0, 2.0]\n"
+        "param float largest = 1.8 [0.0, 4.0]\n"
+        "param float seed = 1.0 [0.0, 100.0]\n"
+        "param float flicker = 0.0 [0.0, 4.0]\n"
+        "attrib float size = 1\n"
+        "r = rand(0.0, 1.0, flicker, i + seed * 7919.0)\n"
+        "size *= mix(smallest, largest, r * r)\n"
+        "Cd *= 0.75 + 0.25 * r\n"
+        "publish = largest\n" },
+      { "Points: Random Colour",
+        "param float saturation = 0.8 [0.0, 1.0]\n"
+        "param float keep = 0.0 [0.0, 1.0]\n"
+        "param float seed = 1.0 [0.0, 100.0]\n"
+        "param float flicker = 0.0 [0.0, 4.0]\n"
+        "h = rand(0.0, 1.0, flicker, i + seed * 7919.0)\n"
+        "hue = 0.5 + 0.5 * cos(6.28318 * (h + vec3(0.0, 0.33, 0.67)))\n"
+        "Cd = mix(mix(vec3(1.0, 1.0, 1.0), hue, saturation), Cd, keep)\n"
+        "publish = saturation\n" },
+      { "Points: Stagger over Index",
+        "param float speed = 2.0 [0.0, 10.0]\n"
+        "param float spread = 3.0 [0.0, 20.0]\n"
+        "param float lift = 0.15 [0.0, 1.0]\n"
+        "param float pulse = 0.6 [0.0, 1.0]\n"
+        "attrib float size = 1\n"
+        "ph = t * speed - i / max(count, 1.0) * spread * 6.28318\n"
+        "w = 0.5 + 0.5 * sin(ph)\n"
+        "P.y += (w - 0.5) * lift\n"
+        "size *= mix(1.0 - pulse, 1.0, w)\n"
+        "Cd *= 0.35 + 0.65 * w\n"
+        "publish = 0.5 + 0.5 * sin(t * speed)\n" },
+      { "Points: Age to Colour",
+        "param float shrink = 0.7 [0.0, 1.0]\n"
+        "param float rise = 0.0 [0.0, 2.0]\n"
+        "attrib float life = 0\n"
+        "attrib float size = 1\n"
+        "young = vec3(1.0, 0.92, 0.55)\n"
+        "mid = vec3(1.0, 0.38, 0.12)\n"
+        "old = vec3(0.35, 0.08, 0.45)\n"
+        "Cd = mix(mix(young, mid, clamp(life * 2.0, 0.0, 1.0)), old, clamp(life * 2.0 - 1.0, 0.0, 1.0))\n"
+        "size *= 1.0 - life * shrink\n"
+        "P.y += life * life * rise\n"
+        "publish = shrink\n" }
    };
    return kPresets;
 }

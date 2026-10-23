@@ -459,7 +459,7 @@ bool ImageToPointsNode::BuildGpuPoints(int n)
          "   vec2 uv = (vec2(cell) + 0.5) / uN;\n"
          "   float s = max(0.001, uPointSize * (1.0 + (luma - 0.5) * 2.0 * uSizeFromLuma));\n"
          "   outPos = vec4((uv.x - 0.5) * uWidth, (uv.y - 0.5) * uHeight, depth * uDepthScale, s * uBaseSize);\n"
-         "   outColor = vec4(uUseImageColor == 1 ? c.rgb * uTint : uTint, 1.0);\n"
+         "   outColor = vec4(uUseImageColor == 1 ? c.rgb * uTint : uTint, 0.0);\n" // alpha: life fraction, 0 = not a particle
          "}\n");
    }
    if (mGpuProgram == 0)
