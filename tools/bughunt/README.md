@@ -4,11 +4,12 @@ The bug-hunt kit. Each tool targets a bug class that earlier sprees found by han
 
 ## Order of a spree
 
-1. **Static:** `code_lint.py` (seconds). Only new hits fail; review each one. It has four rules:
+1. **Static:** `code_lint.py` (seconds). Only new hits fail; review each one. It has five rules:
    - stack-control: a widget given `&local`;
    - loaded-index: a loaded int used as an array index;
    - unbounded-int: a ranged int widget whose member the node never bounds;
    - loaded-loop: a loaded int used as a loop bound with no upper clamp.
+   - shader-loop: a GLSL loop whose bound isn't a literal. A uniform bound is a GPU hang from one large value (B-K-035).
 
    The last two found B-K-029 and B-K-030 after the int sweep passed both nodes.
 2. **Decoders:** `fuzz/build.sh` then 5–10 min per target (no app build needed).
@@ -100,3 +101,4 @@ OUT/fuzz_hap OUT/crash-<hash>          # replay
 - **Fix a NaN where it is stored, not where it shows.** One central check per host (AudioEffectNode after the kernel *and* its dry path; the decoder for files) beat 19 per-kernel fixes. Check every state the host owns: the first guard missed Drive's dry oversampler.
 - **A silent base run proves nothing.** Check that the stimulus reached the sink before trusting a clean result.
 - **A knob range is not the param's domain.** A central load clamp built from every knob's range was tried and dropped, because `clamp_check.py` found real patches it would have changed. Ranges change with mode: Select draws `selectC` as 1..32, −1..1 or −3..3, and Frequency Shifter's range toggle switches `shift` between ±100 and ±10000. Other gestures also write past the knob: the viewport camera writes `camDistance`, and reseed writes `seed`. Clamp in the node, to the range its maths needs, and run `clamp_check.py` first.
+- **A GPU hang shows as a plain abort.** dither 1e9 exited -6 with no sanitizer log; stderr had Metal's "Caused GPU Hang Error". When a row aborts without a report, re-run it with stderr kept (the sweep sends stderr to /dev/null).
