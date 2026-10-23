@@ -183,15 +183,19 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
-   const std::vector<Particle>& GetPoints() { return mPoints; }
+   // The CPU cloud is built on first ask after a cook when the points live on
+   // the GPU (GetGpuPoints), so a frame nobody reads it in skips the readback.
+   const std::vector<Particle>& GetPoints() { EnsureCpuPoints(); return mPoints; }
    unsigned long long PointRevision() { return mRevision; }
    const std::vector<Particle>* GetPointCloud() override
    {
       if (bypassed)
          return nullptr;
+      EnsureCpuPoints();
       return &mPoints;
    }
    unsigned long long PointCloudRevision() override { return bypassed ? 0 : mRevision; }
+   const GpuPoints* GetGpuPoints() override;
    // Matches the swatch-quad sizing GetMesh() used to bake per point before
    // the D5 fix (geometry-domains audit, Phase 4) made it honestly empty, so
    // Render3D's sprite draw still agrees on what p.scale = 1.0 measures.
@@ -222,7 +226,10 @@ public:
    // Image in, points out: there is nothing of the same kind to pass, so a
    // bypassed Image to Points is removed (empty cloud), never its image.
    INode* BypassSource() override { return nullptr; }
-   size_t PointCount() const { return mPoints.size(); }
+   // Points kept by the threshold. On the GPU path this is the occlusion
+   // count from the last cook whose query has landed (a frame late); before
+   // the first one lands it builds the CPU cloud to answer exactly.
+   size_t PointCount();
 
    // Sampling grid, not source resolution: a 4000px image at density 128 still
    // yields 128x128 points, so the cloud size is predictable from the parameter
@@ -254,6 +261,11 @@ private:
    // Resolves the source into a density x density target before reading back,
    // so the CPU never sees the full-resolution image.
    bool EnsureDownsampler(int n);
+   // Reads mSmall back and builds mPoints/mPointUv from it (the CPU path).
+   void BuildCpuPoints(int n);
+   void EnsureCpuPoints();
+   // The GPU path: one pass over mSmall writes position and colour textures.
+   bool BuildGpuPoints(int n);
 
    ImageCable mInput;
    std::vector<Particle> mPoints;
@@ -270,4 +282,33 @@ private:
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
+
+   // What the last build was made from; an identical cook keeps its revision.
+   struct CookKey
+   {
+      unsigned int tex = 0;
+      unsigned long long texRevision = 0;
+      int n = 0;
+      float width = 0, height = 0, depthScale = 0, pointSize = 0, threshold = 0, sizeFromLuma = 0;
+      float tint[3] = { 0, 0, 0 };
+      int depthSource = 0;
+      bool useImageColor = false;
+      bool gpu = false;
+      bool operator==(const CookKey& o) const;
+   };
+   CookKey mCookKey;
+   bool mHasCookKey = false;
+   // n and params of the build mSmall currently holds, for the lazy CPU cloud.
+   int mCookN = 0;
+   unsigned long long mCpuRevision = 0;
+
+   GpuPointsGL::Target mGpuTarget;
+   GpuPoints mGpuPoints;
+   bool mGpuValid = false;
+   unsigned int mGpuProgram = 0;
+   bool mGpuShaderTried = false;
+   unsigned int mCountQuery = 0;
+   bool mCountQueryPending = false;
+   bool mCountStale = false;
+   long long mLiveCount = -1;
 };

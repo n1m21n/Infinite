@@ -235,25 +235,75 @@ void MeshResynthNode::CookIfNeeded(int frameId)
       mRevision = NextMeshRevision();
 }
 
+bool ImageToPointsNode::CookKey::operator==(const CookKey& o) const
+{
+   return tex == o.tex && texRevision == o.texRevision && n == o.n && width == o.width &&
+          height == o.height && depthScale == o.depthScale && pointSize == o.pointSize &&
+          threshold == o.threshold && sizeFromLuma == o.sizeFromLuma && tint[0] == o.tint[0] &&
+          tint[1] == o.tint[1] && tint[2] == o.tint[2] && depthSource == o.depthSource &&
+          useImageColor == o.useImageColor && gpu == o.gpu;
+}
+
 void ImageToPointsNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
       return;
    mLastCookFrame = frameId;
 
+   // Last cook's kept count, if the GPU has it yet; never wait for it.
+   if (mCountQueryPending)
+   {
+      GLuint available = 0;
+      glGetQueryObjectuiv(mCountQuery, GL_QUERY_RESULT_AVAILABLE, &available);
+      if (available)
+      {
+         GLuint samples = 0;
+         glGetQueryObjectuiv(mCountQuery, GL_QUERY_RESULT, &samples);
+         mLiveCount = (long long)samples;
+         mGpuPoints.liveCount = (int)samples;
+         mCountQueryPending = false;
+      }
+   }
+
    const unsigned int tex = mInput.Pull(frameId);
    if (tex == 0)
    {
+      mHasCookKey = false;
+      mGpuValid = false;
       if (!mPoints.empty())
       {
          mPoints.clear();
          mPointUv.clear();
          mRevision = NextMeshRevision();
+         mCpuRevision = mRevision;
       }
       return;
    }
 
    const int n = std::max(2, std::min(density, 512));
+
+   // Same image, same params: same points. Keeping the revision lets Render 3D
+   // and the mini viewport skip their re-upload, and skips the work here.
+   CookKey key;
+   key.tex = tex;
+   key.texRevision = mInput.Revision();
+   key.n = n;
+   key.width = width; key.height = height; key.depthScale = depthScale;
+   key.pointSize = pointSize; key.threshold = threshold; key.sizeFromLuma = sizeFromLuma;
+   key.tint[0] = tint[0]; key.tint[1] = tint[1]; key.tint[2] = tint[2];
+   key.depthSource = depthSource;
+   key.useImageColor = useImageColor;
+   key.gpu = GpuPointsGL::Enabled();
+   if (mHasCookKey && key == mCookKey)
+   {
+      // A build made while the previous count query was still in flight has
+      // no count of its own; redo the (identical) pass once to get one, so a
+      // still image does not keep an older image's count for good.
+      if (mGpuValid && mCountStale && !mCountQueryPending)
+         BuildGpuPoints(mCookN);
+      return;
+   }
+
    if (!EnsureDownsampler(n))
       return;
 
@@ -261,7 +311,8 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
    // texture straight back to the CPU is a pipeline stall measured in
    // milliseconds, every frame, where an n x n target is ~36 KB. The sampling
    // is still a sparse sample of the source (bilinear only averages four
-   // texels), it just happens on the GPU.
+   // texels), it just happens on the GPU. The GPU path reads this same RGBA8
+   // grid, so both paths see identical 8-bit colours.
    GLUtil::RunShaderPass(mSmall, mProgram, [this, tex]()
    {
       glActiveTexture(GL_TEXTURE0);
@@ -271,7 +322,46 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
       glBindTexture(GL_TEXTURE_2D, tex);
       glUniform1i(glGetUniformLocation(mProgram, "uTex"), 0);
    });
+   mCookN = n;
+   mCookKey = key;
+   mHasCookKey = true;
 
+   mGpuValid = key.gpu && BuildGpuPoints(n);
+   mRevision = NextMeshRevision();
+   if (mGpuValid)
+   {
+      mGpuPoints.revision = mRevision;
+      return; // the CPU cloud waits for someone to ask (EnsureCpuPoints)
+   }
+   BuildCpuPoints(n);
+   mCpuRevision = mRevision;
+}
+
+void ImageToPointsNode::EnsureCpuPoints()
+{
+   if (mCpuRevision == mRevision || mCookN <= 0 || mSmall.tex == 0)
+      return;
+   BuildCpuPoints(mCookN);
+   mCpuRevision = mRevision;
+}
+
+size_t ImageToPointsNode::PointCount()
+{
+   if (!mGpuValid || mCpuRevision == mRevision || mLiveCount < 0)
+   {
+      EnsureCpuPoints();
+      return mPoints.size();
+   }
+   return (size_t)mLiveCount;
+}
+
+const GpuPoints* ImageToPointsNode::GetGpuPoints()
+{
+   return (bypassed || !mGpuValid) ? nullptr : &mGpuPoints;
+}
+
+void ImageToPointsNode::BuildCpuPoints(int n)
+{
    mPixels.resize((size_t)n * (size_t)n * 4);
    glBindTexture(GL_TEXTURE_2D, mSmall.tex);
    glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -331,8 +421,120 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
          mPointUv.push_back({ u, v });
       }
    }
+}
 
-   mRevision = NextMeshRevision();
+bool ImageToPointsNode::BuildGpuPoints(int n)
+{
+   if (mGpuProgram == 0 && !mGpuShaderTried)
+   {
+      mGpuShaderTried = true;
+      // BuildCpuPoints, one fragment per grid cell. Keep the two in step:
+      // the frame compare selftest renders both and expects the same picture.
+      mGpuProgram = GLUtil::CompileProgram(
+         "#version 150\n"
+         "uniform sampler2D uSmall;\n"
+         "uniform float uN;\n"
+         "uniform float uWidth;\n"
+         "uniform float uHeight;\n"
+         "uniform float uDepthScale;\n"
+         "uniform float uPointSize;\n"
+         "uniform float uThreshold;\n"
+         "uniform float uSizeFromLuma;\n"
+         "uniform float uBaseSize;\n"
+         "uniform int uDepthSource;\n"
+         "uniform int uUseImageColor;\n"
+         "uniform vec3 uTint;\n"
+         "out vec4 outPos;\n"
+         "out vec4 outColor;\n"
+         "void main() {\n"
+         "   ivec2 cell = ivec2(gl_FragCoord.xy);\n"
+         "   vec4 c = texelFetch(uSmall, cell, 0);\n"
+         "   float luma = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;\n"
+         // Dropped cells keep the pass's clear (0), and w == 0 hides a point.
+         "   if (luma < uThreshold || c.a < uThreshold) discard;\n"
+         "   float depth = luma;\n"
+         "   if (uDepthSource == 1) depth = c.r;\n"
+         "   else if (uDepthSource == 2) depth = c.a;\n"
+         "   else if (uDepthSource == 3) depth = 0.0;\n"
+         "   vec2 uv = (vec2(cell) + 0.5) / uN;\n"
+         "   float s = max(0.001, uPointSize * (1.0 + (luma - 0.5) * 2.0 * uSizeFromLuma));\n"
+         "   outPos = vec4((uv.x - 0.5) * uWidth, (uv.y - 0.5) * uHeight, depth * uDepthScale, s * uBaseSize);\n"
+         "   outColor = vec4(uUseImageColor == 1 ? c.rgb * uTint : uTint, 1.0);\n"
+         "}\n");
+   }
+   if (mGpuProgram == 0)
+      return false;
+   const bool resized = mGpuTarget.w != n || mGpuTarget.h != n;
+   if (!GpuPointsGL::EnsureTarget(mGpuTarget, n, n, "ImageToPoints_GpuPoints"))
+      return false;
+   if (resized)
+      GpuPointsGL::BindOutputs(mGpuTarget, mGpuProgram, "outPos", "outColor");
+
+   // RunShaderPass wants a GLUtil::Fbo; this one carries the MRT framebuffer,
+   // whose draw buffers BindOutputs set (they are framebuffer state).
+   GLUtil::Fbo target;
+   target.fbo = mGpuTarget.fbo;
+   target.tex = mGpuTarget.posTex;
+   target.w = n;
+   target.h = n;
+   target.internalFormat = GL_RGBA32F;
+
+   if (mCountQuery == 0)
+      glGenQueries(1, &mCountQuery);
+   const bool query = !mCountQueryPending;
+   const float baseSize = PointBaseSize();
+   const GLboolean prevBlend = glIsEnabled(GL_BLEND);
+   glDisable(GL_BLEND); // positions are data: no blending into the clear
+   if (query)
+      glBeginQuery(GL_SAMPLES_PASSED, mCountQuery);
+   GLUtil::RunShaderPass(target, mGpuProgram, [&]()
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, mSmall.tex);
+      glUniform1i(glGetUniformLocation(mGpuProgram, "uSmall"), 0);
+      glUniform1f(glGetUniformLocation(mGpuProgram, "uN"), (float)n);
+      glUniform1f(glGetUniformLocation(mGpuProgram, "uWidth"), width);
+      glUniform1f(glGetUniformLocation(mGpuProgram, "uHeight"), height);
+      glUniform1f(glGetUniformLocation(mGpuProgram, "uDepthScale"), depthScale);
+      glUniform1f(glGetUniformLocation(mGpuProgram, "uPointSize"), pointSize);
+      glUniform1f(glGetUniformLocation(mGpuProgram, "uThreshold"), threshold);
+      glUniform1f(glGetUniformLocation(mGpuProgram, "uSizeFromLuma"), sizeFromLuma);
+      glUniform1f(glGetUniformLocation(mGpuProgram, "uBaseSize"), baseSize);
+      glUniform1i(glGetUniformLocation(mGpuProgram, "uDepthSource"), depthSource);
+      glUniform1i(glGetUniformLocation(mGpuProgram, "uUseImageColor"), useImageColor ? 1 : 0);
+      glUniform3fv(glGetUniformLocation(mGpuProgram, "uTint"), 1, tint);
+   });
+   if (query)
+   {
+      glEndQuery(GL_SAMPLES_PASSED);
+      mCountQueryPending = true;
+   }
+   mCountStale = !query;
+   if (prevBlend)
+      glEnable(GL_BLEND);
+
+   mGpuPoints.posTex = mGpuTarget.posTex;
+   mGpuPoints.colorTex = mGpuTarget.colorTex;
+   mGpuPoints.texW = n;
+   mGpuPoints.texH = n;
+   mGpuPoints.count = n * n;
+   mGpuPoints.pointMatrix = Mat4::Identity();
+
+   // Bounds from the grid itself, no readback: every cell centre, depth over
+   // its full 0..1 range, and the largest size the luma term can give.
+   const float half = 0.5f / (float)n;
+   mGpuPoints.lo[0] = (half - 0.5f) * width;  mGpuPoints.hi[0] = (0.5f - half) * width;
+   mGpuPoints.lo[1] = (half - 0.5f) * height; mGpuPoints.hi[1] = (0.5f - half) * height;
+   mGpuPoints.lo[2] = std::min(0.0f, depthScale);
+   mGpuPoints.hi[2] = std::max(0.0f, depthScale);
+   for (int k = 0; k < 2; k++)
+      if (mGpuPoints.lo[k] > mGpuPoints.hi[k])
+         std::swap(mGpuPoints.lo[k], mGpuPoints.hi[k]);
+   const float maxScale = std::max(0.001f, pointSize * (1.0f + std::fabs(sizeFromLuma)));
+   const float minScale = std::max(0.001f, pointSize * (1.0f - std::fabs(sizeFromLuma)));
+   mGpuPoints.maxHalfSize = std::max(maxScale, minScale) * baseSize;
+   mGpuPoints.hasBounds = true;
+   return true;
 }
 
 const Mesh& ImageToPointsNode::GetMesh()
@@ -378,6 +580,11 @@ ImageToPointsNode::~ImageToPointsNode()
    GLUtil::DestroyFbo(mSmall);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
+   GpuPointsGL::DestroyTarget(mGpuTarget);
+   if (mGpuProgram != 0)
+      glDeleteProgram(mGpuProgram);
+   if (mCountQuery != 0)
+      glDeleteQueries(1, &mCountQuery);
 }
 
 bool ImageToPointsNode::EnsureDownsampler(int n)
