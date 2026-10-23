@@ -1,1 +1,0 @@
-../../plugins/infinite-mcp/server.py
