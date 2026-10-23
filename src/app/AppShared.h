@@ -6164,6 +6164,7 @@ int RunExtensionsTest();
 int RunTrackingTest();
 
 int RunAudioParamSweepTest();
+int RunParamFuzzTest();
 
 bool RunFmModeDebugCheck();
 

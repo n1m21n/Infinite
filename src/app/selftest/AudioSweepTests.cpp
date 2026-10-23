@@ -1,6 +1,8 @@
 // Audio-node sweep discovery + AUDIOPARAMSWEEPTEST / FM checks (moved verbatim from main.cpp).
 #include "app/AppShared.h"
 
+#include <chrono>
+
 namespace app
 {
 inline AudioNodeShape ProbeAudioNodeShape(INode* node)
@@ -801,6 +803,111 @@ int RunAudioParamSweepTest()
 
    printf("%s\n", overallOk ? "AUDIO PARAM SWEEP OK" : "AUDIO PARAM SWEEP FAIL");
    return overallOk ? 0 : 1;
+}
+
+// ===================================================== INFINITE_PARAMFUZZ
+//
+// The in-process half of tools/bughunt/param_fuzz.py, for the audio classes:
+// every float and int param of every audio node is loaded at each hostile
+// value through the real Patch::LoadParams (the route a patch file, OSC, RPC
+// and presets share), then the node renders on the AUDIOPARAMSWEEPTEST rig
+// (drive tone on every audio input, a held note on note inputs). One process
+// covers what the app-launch sweep takes hours for. Flags, all failing:
+//   NAN   a non-finite output sample
+//   HOT   an output peak past kHotPeak (the drive tone peaks at 0.4)
+//   SLOW  one load + render past kSlowSec (a loop sized by the value)
+// Each row's name is printed and flushed before it runs, so a crash or a hang
+// (run it under an alarm) names its row as the last line.
+// INFINITE_PARAMFUZZ=Type,Type limits the sweep to those node types.
+int RunParamFuzzTest()
+{
+   using namespace AudioParamSweep;
+
+   const double sampleRate = 48000.0;
+   const int blockSize = 256;
+   const int kBlocks = 48; // 0.26 s
+   const float kHotPeak = 100.0f; // +40 dB over full scale; EQ and resonance stay far below
+   const double kSlowSec = 5.0;
+   static const char* kFloatValues[] = { "1e9", "-1e9", "-1", "0" };
+   static const char* kIntValues[] = { "1000000000", "-1000000000", "-1", "0" };
+   int frame = 1;
+
+   std::vector<std::string> only;
+   {
+      const std::string list = getenv("INFINITE_PARAMFUZZ");
+      size_t a = 0;
+      while (a <= list.size())
+      {
+         const size_t b = std::min(list.find(',', a), list.size());
+         if (b > a && list.substr(a, b - a) != "1")
+            only.push_back(list.substr(a, b - a));
+         a = b + 1;
+      }
+   }
+
+   std::vector<AudioSweepCandidate> candidates =
+      DiscoverAudioSweepCandidates([](const AudioNodeShape& s) { return s.HasAudioNode(); });
+
+   int rows = 0, flagged = 0, types = 0;
+   for (const AudioSweepCandidate& cand : candidates)
+   {
+      if (!only.empty() && std::find(only.begin(), only.end(), cand.name) == only.end())
+         continue;
+      std::unique_ptr<INode> probe(NodeFactory::Instance().MakeNode(cand.name));
+      std::vector<std::pair<std::string, std::string>> base;
+      Patch::SaveParams(probe.get(), base);
+      types++;
+      for (size_t k = 0; k < base.size(); k++)
+      {
+         const bool isFloat = base[k].first.rfind("f ", 0) == 0;
+         const bool isInt = base[k].first.rfind("i ", 0) == 0;
+         if (!isFloat && !isInt)
+            continue;
+         for (const char* value : isFloat ? kFloatValues : kIntValues)
+         {
+            printf("PARAMFUZZ try %s.%s=%s\n", cand.name.c_str(), base[k].first.c_str() + 2, value);
+            fflush(stdout);
+            const auto t0 = std::chrono::steady_clock::now();
+            Rig rig;
+            if (!BuildRig(cand, sampleRate, blockSize, rig))
+               continue;
+            std::vector<std::pair<std::string, std::string>> hostile = base;
+            hostile[k].second = value;
+            Patch::LoadParams(rig.node.get(), hostile);
+            rig.node->CookIfNeeded(frame++);
+            int nonFinite = 0;
+            float peak = 0.0f;
+            for (int b = 0; b < kBlocks; b++)
+            {
+               if (b % 4 == 0)
+                  rig.node->CookIfNeeded(frame++);
+               RunOneBlock(rig, blockSize);
+               if (rig.mode != ReadMode::kPcm)
+                  continue;
+               for (int i = 0; i < blockSize; i++)
+                  for (float v : { rig.scratchL[i], rig.scratchR[i] })
+                  {
+                     if (!std::isfinite(v))
+                        nonFinite++;
+                     else
+                        peak = std::max(peak, std::fabs(v));
+                  }
+            }
+            const double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            rows++;
+            const char* flag = nonFinite > 0 ? "NAN" : peak > kHotPeak ? "HOT" : sec > kSlowSec ? "SLOW" : nullptr;
+            if (flag != nullptr)
+            {
+               flagged++;
+               printf("PARAMFUZZ %s %s.%s=%s  non-finite %d, peak %.3g, %.1f s\n", flag, cand.name.c_str(),
+                      base[k].first.c_str() + 2, value, nonFinite, peak, sec);
+            }
+         }
+      }
+   }
+   Transport::Instance().SetPlaying(false);
+   printf("PARAMFUZZ %d types, %d rows, %d flagged  %s\n", types, rows, flagged, flagged == 0 && rows > 0 ? "OK" : "FAIL");
+   return flagged == 0 && rows > 0 ? 0 : 1;
 }
 
 // fmMode is a plain atomic pushed straight from CookIfNeeded, not a value
