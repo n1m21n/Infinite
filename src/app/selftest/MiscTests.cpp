@@ -698,7 +698,7 @@ bool RunAppearanceSelfTest()
 
    // 1. Coverage - for all 10 presets x all 10 categories, ColorFor() returns a non-fallback color
    const auto& presetNames = CategoryColors::PresetNames();
-   check(presetNames.size() == 10, "preset count is 10");
+   check(presetNames.size() == 15, "preset count is 15");
    const auto& catNames = CategoryColors::CategoryNames();
    check(catNames.size() == 11, "category count is 11");
 
