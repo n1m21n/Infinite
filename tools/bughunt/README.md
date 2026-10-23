@@ -4,7 +4,13 @@ The bug-hunt kit. Each tool targets a bug class that earlier sprees found by han
 
 ## Order of a spree
 
-1. **Static:** `code_lint.py` (seconds). Only new hits fail; review each one.
+1. **Static:** `code_lint.py` (seconds). Only new hits fail; review each one. It has four rules:
+   - stack-control: a widget given `&local`;
+   - loaded-index: a loaded int used as an array index;
+   - unbounded-int: a ranged int widget whose member the node never bounds;
+   - loaded-loop: a loaded int used as a loop bound with no upper clamp.
+
+   The last two found B-K-029 and B-K-030 after the int sweep passed both nodes.
 2. **Decoders:** `fuzz/build.sh` then 5–10 min per target (no app build needed).
 3. **Nodes:** `param_fuzz.py` with every kind against a sanitizer build of the app.
 4. **Group:** `triage.py OUTDIR --stubs DIR` turns BAD rows into one draft finding per distinct bug.
@@ -43,6 +49,10 @@ In signal mode:
 - HOTSTUCK needs the last second to sit 20 dB over base *and* not be falling (within 3 dB of the second before), so a reverb tail dying away doesn't count.
 
 If the Mac sleeps during a row, the row is re-run. A slept row otherwise shows as a TIMEOUT hours long, because the app's own `--timeout` counts the sleep. The check is `kern.waketime`.
+
+In the int, float and mod kinds, file players (any node with a `path`/`filePath` param) get a clean sine WAV as their file. Without one, their per-file work never runs: Molder's generation loop only runs once a file is analysed (B-K-029). The text kind leaves the path to the fuzz value.
+
+The sweep measures frames and audio, not note pairing. A note node that leaves notes stuck still renders fine, so stuck notes are NOTEAUDIT's job (`INFINITE_NOTEAUDIT=1`, PAIR and LOAD). Add a NOTEAUDIT case, as was done for Note Echo x20, rather than expect the sweep to see it.
 
 Float values are ±1e30, nan, inf, 1e9 and -1. 1e9 casts to int fine but can size a buffer. -1 is UB once it's cast to an unsigned seed.
 

@@ -20,6 +20,23 @@ loaded-index    `v.Int("key", m)` in a VisitParams, then `m` used as an array
                 so known hits live in code_lint_baseline.txt and only NEW hits
                 fail. Review a new hit; if it is guarded, --update-baseline.
 
+unbounded-int   An int widget with a range (ModSliderInt, KnobInt, AudioSliderInt
+                given `&n->m, lo, hi`) whose member `m` is never bounded outside
+                src/app: no std::clamp/min/max of `m` or of its audio-side copy
+                `mM`, and no `m < x ?` range check. The widget's range binds
+                only the UI; a patch file or remote set stores any int. Molder's
+                generation looped 2^31 Mutates on the main thread (B-K-029);
+                Note Echo's repeats past 15 shared voice ids (B-K-030). The int
+                sweep missed both because the loops need a file or notes.
+                Bounded deeper (Mesh::Screw caps steps) is a false positive:
+                review it and --update-baseline.
+
+loaded-loop     `v.Int("key", m)` in a VisitParams, then `m` (or `n.m`, `node->m`)
+                as a for-loop bound (`i < m`, `i <= m`) in that file, with no
+                clamp of `m` anywhere in the file. 2^31 iterations from a patch
+                file is a hang. Molder replayed one Mutate per generation on
+                the main thread (B-K-029).
+
 Exit 1 on any hit not in the baseline (--all: on any hit). Test: `code_lint.py selftest`.
 """
 import glob
@@ -36,6 +53,7 @@ BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "code_lint_b
 REGISTERING = r"\b(?:ModSlider|ModKnob|AudioSlider|AudioKnob)"
 CALL = re.compile(REGISTERING + r"\s*\(\s*[^,]+,\s*&\s*([A-Za-z_]\w*)\s*[,)]")
 FUNC_START = re.compile(r"^\s{0,3}[A-Za-z_][\w:<>,\s\*&]*\b[\w:~]+\s*\([^;]*\)\s*(const)?\s*(\{|$)")
+RANGED = re.compile(r'\b(?:ModSliderInt|KnobInt|AudioSliderInt)\(\s*"[^"]*"\s*,\s*&\s*\w+(?:->|\.)(?:\w+(?:->|\.))*(\w+)\s*,\s*([^,)]+),\s*([^,)]+)')
 LOAD = re.compile(r'\bv\.Int\(\s*"([^"]+)"\s*,\s*&?\s*([A-Za-z_]\w*(?:\.\w+)?)\s*\)')
 
 
@@ -88,6 +106,44 @@ def loaded_index(files, texts):
     return hits
 
 
+def loaded_loop(files, texts):
+    hits = []
+    for path in files:
+        text = texts[path]
+        for m in LOAD.finditer(text):
+            member = m.group(2).split(".")[-1]
+            # only an upper bound stops a runaway loop: std::max(0, m - 1) does not count,
+            # a local of the same name taken from a clamped atomic (`n = std::clamp(mN...`) does
+            if re.search(r"(std::clamp|std::min|Clamp)\s*\([^;]*\b" + member + r"\b", text) or \
+                    re.search(r"\b" + member + r"\s*=\s*(std::clamp|std::min|Clamp)\s*\(", text):
+                continue
+            loop = re.search(r"for\s*\([^;]*;[^;]*<=?\s*(?:\w+(?:->|\.))?" + member + r"\s*;", text)
+            if loop:
+                line = text.count("\n", 0, loop.start()) + 1
+                hits.append(("loaded-loop", f"{rel(path)}:{line}", f"{m.group(1)} -> loop bound {member}"))
+    return hits
+
+
+def unbounded_int(files, texts):
+    node_side = "\n".join(t for p, t in texts.items() if "/src/app/" not in p)
+    hits, seen = [], set()
+    for path in files:
+        if "/src/app/bodies/" not in path:
+            continue
+        for i, line in enumerate(texts[path].splitlines()):
+            for m in RANGED.finditer(line):
+                member = m.group(1)
+                if member in seen:
+                    continue
+                seen.add(member)
+                names = member + "|m" + member[:1].upper() + member[1:]
+                bounded = re.search(r"(std::clamp|std::min|std::max|Clamp)\s*\([^;]*\b(" + names + r")\b", node_side) or \
+                    re.search(r"\b(" + names + r")\s*[<>]=?\s*[\w.:]+\s*\?", node_side)
+                if not bounded:
+                    hits.append(("unbounded-int", f"{rel(path)}:{i + 1}", f"{member} [{m.group(2).strip()},{m.group(3).strip()}] not bounded outside the UI"))
+    return hits
+
+
 def run(paths=None):
     files = paths or src_files()
     texts = {p: open(p, encoding="utf-8", errors="replace").read() for p in files}
@@ -96,6 +152,8 @@ def run(paths=None):
         if "/app/" in p:
             hits += stack_control(p, texts[p].splitlines())
     hits += loaded_index(files, texts)
+    hits += unbounded_int(files, texts)
+    hits += loaded_loop(files, texts)
     return hits
 
 
@@ -120,6 +178,9 @@ def selftest():
    ModSlider("s", &s, 0, 1, "%.2f");
    KnobFloat("raw", &u, 0, 1, "%.2f");
    names[n->mode];
+   row.KnobInt("repeats", &n->repeats, 1, 8);
+   ModSliderInt("voices", &n->voices, 1, 16);
+   ModSliderInt("steps", &n->steps, 1, 64);
 }
 """)
     b = os.path.join(d, "src", "nodes", "XNode.h")
@@ -130,15 +191,23 @@ def selftest():
    count = std::clamp(count, 1, 8);
    v.Int("free", freeInt);
 }
+void Push(const X& n) { mVoices.store(std::clamp(n.voices, 1, 16)); }
+int Steps() const { return steps < 1 ? 1 : steps; }
+void Build() { v.Int("generation", gen); for (int i = 0; i < gen; ++i) Mutate(); }
 float t[4]; float g() { return t[count]; }
 """)
     hits = run([a, b])
     rules = sorted((h[0], h[2].split(" ")[0]) for h in hits)
     assert ("stack-control", "&u") in rules, hits
-    assert not any("&s" == r[1] or "seed" in r[1] for r in rules), hits
+    assert not any(r[0] == "stack-control" and ("&s" == r[1] or "seed" in r[1]) for r in rules), hits
     assert ("loaded-index", "mode") in rules, hits
     assert not any(r[1] in ("count", "free") for r in rules), hits
     assert len([r for r in rules if r[0] == "stack-control"]) == 1, hits
+    assert ("unbounded-int", "repeats") in rules, hits
+    assert not any(r[0] == "unbounded-int" and r[1] == "tmpI" for r in rules), hits
+    assert ("loaded-loop", "generation") in rules, hits
+    assert not any(r[0] == "loaded-loop" and r[1] == "count" for r in rules), hits
+    assert not any(r[0] == "unbounded-int" and r[1] in ("voices", "steps") for r in rules), hits
     print("code_lint selftest ok")
 
 
