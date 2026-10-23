@@ -32,5 +32,10 @@ fi
 if [[ ! -f "$BASE_DIR/build/CMakeCache.txt" ]]; then
    cmake -S "$BASE_DIR" -B "$BASE_DIR/build" -DCMAKE_BUILD_TYPE=Release >&2
 fi
-cmake --build "$BASE_DIR/build" -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)" >&2
+# Same gate as every build (skill build-discipline): machine-wide lock, -j from free RAM, nice 10.
+if [[ -f "$ROOT/scripts/ibuild.py" ]] && command -v python3 >/dev/null; then
+   python3 "$ROOT/scripts/ibuild.py" run -- cmake --build "$BASE_DIR/build" -j"$(python3 "$ROOT/scripts/ibuild.py" jobs)" >&2
+else
+   cmake --build "$BASE_DIR/build" -j2 >&2
+fi
 echo "$BASE_DIR/build/Infinite.app"
