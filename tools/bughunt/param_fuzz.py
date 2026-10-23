@@ -48,7 +48,9 @@ import time
 
 VALUES = {
     "int": ["2147483647", "-2147483648", "100000", "-100000"],
-    "float": ["1e30", "-1e30", "nan", "inf"],
+    # 1e30 overflows any int cast; 1e9 casts fine but sizes a buffer or loop
+    # (width, steps, voices); -1 is UB once cast to an unsigned seed or index
+    "float": ["1e30", "-1e30", "nan", "inf", "1e9", "-1"],
     # label=value; values are already patch-escaped (one line, \\n for newlines)
     "text": ["big=" + "A" * 1000000, "parens=" + "(" * 50000, "brackets=" + "[" * 50000,
              "fmt=" + "%s%n%x%999999d" * 8, "path=../../../../../../../../etc/passwd",
@@ -198,7 +200,33 @@ def bad_num(x):
     return False
 
 
+def _wake_stamp():
+    """macOS kern.waketime; it changes whenever the machine wakes from sleep."""
+    try:
+        return subprocess.run(["sysctl", "-n", "kern.waketime"], capture_output=True,
+                              text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
 def run_case(binp, out, tag, text, audio, timeout, signal=False):
+    """run_case_once, re-run if the machine slept during it.
+
+    A laptop that sleeps mid-row turns into a TIMEOUT (the app's own --timeout
+    counts the sleep) with hours of wall time; that row proves nothing.
+    """
+    for _ in range(3):
+        w0 = _wake_stamp()
+        res = run_case_once(binp, out, tag, text, audio, timeout, signal)
+        if _wake_stamp() == w0:
+            return res
+        for f in os.listdir(out):
+            if f.startswith(tag + ".san"):
+                os.remove(os.path.join(out, f))
+    return res
+
+
+def run_case_once(binp, out, tag, text, audio, timeout, signal=False):
     """(rc, codes, sanitizer reports, secs, last whole second's LUFS or None)."""
     path = os.path.join(out, tag + ".inf")
     with open(path, "w", encoding="utf-8") as f:
@@ -373,6 +401,7 @@ def selftest():
     assert "lfo" not in text
     sink = {"type": "S", "category": "C", "params": [], "inputs": [{"kind": "audio", "slot": 0}], "outputs": []}
     assert patch_for(sink, "int", None)[1], "a sink with no outputs runs as audio"
+    assert isinstance(_wake_stamp(), str)
     assert bad_num({"a": [1.0, float("nan")]}) and not bad_num({"integrated_lufs": float("nan")})
     text, _ = patch_for(t, "signal", "nan", "/x/nan.wav")
     assert "aud a 0 fsig" in text and "s path /x/nan.wav" in text and "fsyn" not in text, text
