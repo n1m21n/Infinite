@@ -3643,7 +3643,7 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       else if (const char* bench11Arg = getenv("INFINITE_BENCH_B11"))
       {
          // B11 points fixture (P8 phase 0, docs/plans/perf/benchmark-suite.md §4).
-         // INFINITE_BENCH_B11=<a|b|c>, INFINITE_BENCH_B11N=<points>.
+         // INFINITE_BENCH_B11=<a|b|c|d>, INFINITE_BENCH_B11N=<points>.
          const std::string scene = bench11Arg;
          const char* nEnv = getenv("INFINITE_BENCH_B11N");
          const int n = nEnv ? std::max(1, atoi(nEnv)) : 100000;

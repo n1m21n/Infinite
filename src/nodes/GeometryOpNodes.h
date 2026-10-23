@@ -15,6 +15,11 @@ InstanceOnPointsNode* FindInstancer(IGeometrySource* source);
 bool WrapsInstancer(IGeometrySource* source);
 const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, InstanceOnPointsNode* instancer);
 const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source);
+// The instancer's GPU points (InstanceOnPointsNode::GpuInstancePoints) when
+// nothing between `source` and it edits the copies on the CPU - a selection or
+// an override list - so a drawer may build them in its vertex shader.
+// nullptr = draw ResolveInstanceTransforms() instead.
+const GpuPoints* ResolveGpuInstances(IGeometrySource* source, InstanceOnPointsNode* instancer);
 
 // Bakes what a Group 3D carries into one mesh: nested groups expanded, each leaf placed by its own model matrix
 // (or realized through its instancer), a tinted leaf's colour baked into vertex colour. `signature` is the
@@ -695,13 +700,27 @@ public:
    // Per-instance colours, parallel to InstanceTransforms(). Empty when the
    // instances all share the node's own material, which is the mesh-sampling
    // case; a point cloud fills it so particles can vary.
-   const std::vector<float>& InstanceColors() const { return mColors; }
+   const std::vector<float>& InstanceColors() const { EnsureCloudTransforms(); return mColors; }
 
    // Instanced draw data, consumed by Render3DNode. The transforms carry their
    // own stamp, separate from the mesh one: nudging the scatter re-uploads a few
    // hundred matrices without touching the instanced mesh itself.
-   const std::vector<Mat4>& InstanceTransforms() const { return mTransforms; }
-   size_t InstanceCount() const { return mTransforms.size(); }
+   const std::vector<Mat4>& InstanceTransforms() const { EnsureCloudTransforms(); return mTransforms; }
+   // While the cloud is on the GPU (below) and nothing has asked for the
+   // matrices, this is the GPU point count, so a node label or a "> 0" test
+   // does not build them.
+   size_t InstanceCount() const;
+
+   // GPU points (docs/plans/gpu-points step 6): when the cloud input offers
+   // them, Render 3D builds each copy's matrix in its vertex shader from the
+   // point's texel - T(pointMatrix * pos) * S(GpuInstanceSizeScale() * w) *
+   // GpuInstanceShapeModel(), the same matrix Rebuild() makes on the CPU - and
+   // InstanceTransforms() / InstanceColors() are built only when a CPU
+   // consumer asks. nullptr = use InstanceTransforms().
+   const GpuPoints* GpuInstancePoints() const;
+   // instanceScale / the cloud's PointBaseSize(): w is p.scale * base.
+   float GpuInstanceSizeScale() const;
+   Mat4 GpuInstanceShapeModel() const { return mBuiltShapeModel; }
    unsigned long long InstanceRevision() const { return mInstanceRevision; }
    size_t TriangleCount() const;
 
@@ -772,9 +791,15 @@ private:
    // rotation) and the per-point scale jitter are cached so a scale-only change
    // skips mesh transform, welding, sampling and random generation.
    void ApplyScale();
+   // The cloud path's matrices, from GetPointCloud(); deferred while the
+   // cloud is on the GPU (mCloudStale) until a CPU consumer asks.
+   void BuildCloudTransforms() const;
+   void EnsureCloudTransforms() const { if (mCloudStale) BuildCloudTransforms(); }
 
-   std::vector<Mat4> mTransforms;
-   std::vector<float> mColors; // rgb triples, or empty for a uniform material
+   mutable std::vector<Mat4> mTransforms;
+   mutable std::vector<float> mColors; // rgb triples, or empty for a uniform material
+   bool mGpuCloud = false;          // this cook's cloud came with GPU points
+   mutable bool mCloudStale = false; // mTransforms not yet built for it
    std::vector<Mat4> mPoses;       // mesh-sampling path only
    std::vector<float> mScaleJitter; // 1 + (r0 - 0.5) * 2 * scaleRandom, per pose
    bool mPosesValid = false;

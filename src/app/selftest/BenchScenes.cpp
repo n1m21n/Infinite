@@ -440,7 +440,7 @@ bool BuildBenchB11Scene(const std::string& scene, int n, const std::string& clip
    // The point chain's last node, whatever the scene; Render 3D draws it.
    IGeometrySource* chainEnd = nullptr;
 
-   if (scene == "a")
+   if (scene == "a" || scene == "d")
    {
       // A moving picture re-cooks Image to Points every frame (readback +
       // rebuild + upload), and Transform's spin moves the whole cloud on top:
@@ -469,6 +469,20 @@ bool BuildBenchB11Scene(const std::string& scene, int n, const std::string& clip
       xf->op = GeometryOpNode::kTransform;
       xf->spin = 0.25f;
       chainEnd = xf;
+
+      if (scene == "d")
+      {
+         // The same moving cloud stamped with cubes: Instance on Points
+         // rebuilds a matrix per point every frame unless it reads the
+         // cloud's GPU points (P8 step 6).
+         const int cubeIdx = SpawnNode("Cube", "3D", 520.0f, 260.0f)->index;
+         const int instIdx = SpawnNode("Instance on Points", "3D", 780.0f, 260.0f)->index;
+         auto* inst = static_cast<InstanceOnPointsNode*>(nodeAt(instIdx));
+         inst->cloudSource = xf;
+         inst->instanceShape = static_cast<GeometryNode*>(nodeAt(cubeIdx));
+         inst->instanceScale = 0.8f;
+         chainEnd = inst;
+      }
    }
    else if (scene == "b" || scene == "c")
    {
@@ -499,7 +513,7 @@ bool BuildBenchB11Scene(const std::string& scene, int n, const std::string& clip
    }
    else
    {
-      outError = "unknown B11 scene '" + scene + "' (a, b or c)";
+      outError = "unknown B11 scene '" + scene + "' (a, b, c or d)";
       return false;
    }
 

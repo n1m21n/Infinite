@@ -35,12 +35,28 @@ namespace
       "uniform mat3 uNormalMatrix;\n"
       "uniform int uInstanced;\n"
       "uniform int uHasVertexColor;\n"
+      // GPU instances (Instance on Points over GPU points): each copy's
+      // matrix from its point texel, as Render3DNode's vertex shader does.
+      "uniform int uGpuPoints;\n"
+      "uniform sampler2D uPointPos;\n"
+      "uniform int uPointTexW;\n"
+      "uniform mat4 uPointModel;\n"
+      "uniform float uPointSizeScale;\n"
+      "uniform mat4 uInstanceGroup;\n"
+      "uniform mat4 uShapeModel;\n"
       "out vec3 vNormal;\n"
       "out vec3 vWorldPos;\n"
       "out vec2 vUv;\n"
       "out vec3 vVertexColor;\n"
       "void main() {\n"
       "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "   if (uGpuPoints == 1) {\n"
+      "      vec4 point = texelFetch(uPointPos, ivec2(gl_InstanceID % uPointTexW, gl_InstanceID / uPointTexW), 0);\n"
+      "      float s = point.w * uPointSizeScale;\n"
+      "      vec3 p = (uPointModel * vec4(point.xyz, 1.0)).xyz;\n"
+      "      model = uInstanceGroup * mat4(vec4(s, 0.0, 0.0, 0.0), vec4(0.0, s, 0.0, 0.0),\n"
+      "                                    vec4(0.0, 0.0, s, 0.0), vec4(p, 1.0)) * uShapeModel;\n"
+      "   }\n"
       "   vec4 world = model * vec4(aPos, 1.0);\n"
       "   vWorldPos = world.xyz;\n"
       // Per-instance matrices skip the CPU-computed inverse-transpose
@@ -853,8 +869,40 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    glUniform1i(glGetUniformLocation(program, "uTexture"), 0);
    glUniform1i(glGetUniformLocation(program, "uHasTexture"), surfaceTexture != 0 ? 1 : 0);
 
+   // A stamp with its own face selection keeps the CPU matrices: the overlay
+   // below reads them through aInstance.
+   const GpuPoints* gpuInstances =
+      (instanced && mesh.faceMask.empty()) ? ResolveGpuInstances(geo, instancer) : nullptr;
+   glUniform1i(glGetUniformLocation(program, "uGpuPoints"), gpuInstances != nullptr ? 1 : 0);
+
    glBindVertexArray(mVao);
-   if (instanced)
+   if (gpuInstances != nullptr)
+   {
+      if (mInstanceAttribsOn)
+      {
+         for (int col = 0; col < 4; col++)
+         {
+            glDisableVertexAttribArray(2 + col);
+            glVertexAttribDivisor(2 + col, 0);
+         }
+         mInstanceAttribsOn = false;
+      }
+      // Unit 1: unit 0 holds the surface texture.
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, gpuInstances->posTex);
+      glActiveTexture(GL_TEXTURE0);
+      glUniform1i(glGetUniformLocation(program, "uPointPos"), 1);
+      glUniform1i(glGetUniformLocation(program, "uPointTexW"), gpuInstances->texW);
+      glUniformMatrix4fv(glGetUniformLocation(program, "uPointModel"), 1, GL_FALSE, gpuInstances->pointMatrix.m);
+      glUniform1f(glGetUniformLocation(program, "uPointSizeScale"), instancer->GpuInstanceSizeScale());
+      glUniformMatrix4fv(glGetUniformLocation(program, "uInstanceGroup"), 1, GL_FALSE, instanceGroupMatrix.m);
+      const Mat4 shapeModel = instancer->GpuInstanceShapeModel();
+      glUniformMatrix4fv(glGetUniformLocation(program, "uShapeModel"), 1, GL_FALSE, shapeModel.m);
+      mInstanceCount = gpuInstances->count;
+      glDrawElementsInstanced(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, nullptr,
+                              (GLsizei)mInstanceCount);
+   }
+   else if (instanced)
    {
       if (mInstanceVbo == 0)
          glGenBuffers(1, &mInstanceVbo);

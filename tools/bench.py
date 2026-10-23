@@ -3,7 +3,7 @@
 
 Usage:
   python3 tools/bench.py b9 [--scene b2|b4|all] [--frames N] [--app PATH]
-  python3 tools/bench.py b11 [--scene a|b|c|all] [--n N] [--app PATH] [--json-out FILE]
+  python3 tools/bench.py b11 [--scene a|b|c|d|all] [--n N] [--app PATH] [--json-out FILE]
   python3 tools/bench.py b2 [--scale s|m|l] [--anim 0|1] [--app PATH]
   python3 tools/bench.py b4 [--scale s|m|l] [--shadow off|1024|2048|4096] [--anim 0|1] [--app PATH]
   python3 tools/bench.py b1 [--buffer 64|128|256|512] [--seconds S] [--app PATH]
@@ -340,6 +340,8 @@ B11_MATRIX = {
     "a": [57600, 230400, 921600],
     "b": [10000, 100000, 200000],
     "c": [10000, 100000],
+    # a's video cloud stamped with cubes (P8 step 6: Instance on Points on GPU points).
+    "d": [57600, 230400],
 }
 
 
@@ -348,13 +350,13 @@ def cmd_b11(args):
     if not os.path.exists(app):
         print(f"Error: binary '{app}' does not exist. Build first via: scripts/ibuild.py build", file=sys.stderr)
         return 1
-    scenes = ["a", "b", "c"] if args.scene == "all" else [args.scene]
+    scenes = ["a", "b", "c", "d"] if args.scene == "all" else [args.scene]
     rows = []
     for s in scenes:
         for n in ([args.n] if args.n else B11_MATRIX[s]):
             print(f"Running B11 points scene={s} n={n} ...", file=sys.stderr)
             env = {"INFINITE_BENCH_B11": s, "INFINITE_BENCH_B11N": str(n)}
-            if s == "a":
+            if s in ("a", "d"):
                 env["INFINITE_BENCH_B8MEDIA"] = str(Path(__file__).resolve().parent.parent / "bench" / "media")
             try:
                 results, out, err, code = run_process_for_json(app, env, exitafter=100000)
@@ -396,7 +398,7 @@ def main():
 
     # B11
     p_b11 = subparsers.add_parser("b11", help="Run B11 (points: P8 phase 0)")
-    p_b11.add_argument("--scene", choices=["a", "b", "c", "all"], default="all")
+    p_b11.add_argument("--scene", choices=["a", "b", "c", "d", "all"], default="all")
     p_b11.add_argument("--n", type=int, default=0, help="One point count instead of the plan's sizes")
     p_b11.add_argument("--app", type=str, default=None, help="Path to Infinite executable")
     p_b11.add_argument("--json-out", type=str, default=None, help="File to write jsonl results")

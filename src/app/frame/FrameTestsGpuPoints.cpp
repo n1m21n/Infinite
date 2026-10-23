@@ -8,6 +8,7 @@
 // Geometry3DNodes.cpp: route opaque mesh draws through the no-discard program.
 void Render3DSetOpaqueVariantForTest(bool enabled);
 int Render3DOpaqueVariantDrawsForTest();
+int Render3DGpuInstanceDrawsForTest();
 
 namespace app
 {
@@ -193,6 +194,70 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
       // Instances take it; the blended and cutout spheres must not.
       report("the opaque variant ran for the instances only", variantDraws == 1);
       report("opaque variant draws the same pixels as the full program", !fullFrame.empty() && meshDiffer == 0);
+   }
+
+   // Step 6: Instance on Points over GPU points builds each copy in the
+   // vertex shader. Same chain as above into cubes, wrapped in a Transform
+   // (the group matrix), shadows on (the shadow pass builds them too); the
+   // frame must match the CPU matrices' frame, and the CPU list must still
+   // come out right when something asks for it.
+   {
+      GeometryNode cube;
+      cube.shape = 1;
+      cube.rotY = 20.0f; // the stamp's own model matrix
+      InstanceOnPointsNode inst;
+      inst.cloudSource = &xf;
+      inst.instanceShape = &cube;
+      inst.instanceScale = 0.6f;
+      GeometryOpNode group;
+      group.op = GeometryOpNode::kTransform;
+      group.input = &inst;
+      group.rotX = 25.0f;
+      group.offsetY = -0.2f;
+
+      auto renderInst = [&](bool gpu)
+      {
+         GpuPointsGL::SetEnabledForTest(gpu);
+         Render3DNode instRender; // fresh, for the same reason as renderOnce
+         instRender.geometry[0] = &group;
+         instRender.shadowsEnabled = true;
+         instRender.CookIfNeeded(frame++);
+         return ReadRgba(instRender.GetOutputTexture(), instRender.GetOutputWidth(), instRender.GetOutputHeight());
+      };
+      const std::vector<unsigned char> cpuInst = renderInst(false);
+      const size_t cpuInstances = inst.InstanceCount();
+      const int gpuDrawsBefore = Render3DGpuInstanceDrawsForTest();
+      std::vector<unsigned char> gpuInst = renderInst(true);
+      for (int i = 0; i < 3; i++) // the occlusion count lands a cook later
+         gpuInst = renderInst(true);
+      const int gpuDraws = Render3DGpuInstanceDrawsForTest() - gpuDrawsBefore;
+      const bool offered = inst.GpuInstancePoints() != nullptr;
+      const size_t gpuInstances = inst.InstanceCount(); // the GPU count, nothing built
+      const size_t lazyInstances = inst.InstanceTransforms().size();
+
+      size_t instDiffer = 0, instLit = 0;
+      int instMax = 0;
+      for (size_t i = 0; i + 3 < cpuInst.size() && i + 3 < gpuInst.size(); i += 4)
+      {
+         int d = 0;
+         for (int c = 0; c < 3; c++)
+            d = std::max(d, std::abs((int)cpuInst[i + c] - (int)gpuInst[i + c]));
+         if (d > 2)
+            instDiffer++;
+         instMax = std::max(instMax, d);
+         if (cpuInst[i] != cpuInst[0] || cpuInst[i + 1] != cpuInst[1] || cpuInst[i + 2] != cpuInst[2])
+            instLit++;
+      }
+      const size_t instTotal = std::max<size_t>(1, cpuInst.size() / 4);
+      printf("gpu instances: cpu %zu, gpu count %zu, lazy list %zu, %d gpu draws, lit %zu, differ %zu (max %d)\n",
+             cpuInstances, gpuInstances, lazyInstances, gpuDraws, instLit, instDiffer, instMax);
+      report("instances drawn", cpuInstances > 0 && instLit > instTotal / 100);
+      report("Instance on Points offers its cloud's GPU points", offered);
+      report("Render 3D built the copies on the GPU", gpuDraws > 0);
+      report("GPU instance frame matches the CPU frame", instDiffer * 2000 <= instTotal);
+      report("instance count without the CPU list matches", gpuInstances == cpuInstances);
+      report("CPU list still built on demand", lazyInstances == cpuInstances);
+      GpuPointsGL::SetEnabledForTest(wasEnabled);
    }
 
    printf("%s\n", allOk ? "GPU POINTS TEST OK" : "GPU POINTS TEST FAIL");

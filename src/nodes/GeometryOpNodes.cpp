@@ -83,6 +83,21 @@ const std::vector<Mat4>& ResolveInstanceTransforms(IGeometrySource* source, Inst
    return instancer->InstanceTransforms();
 }
 
+const GpuPoints* ResolveGpuInstances(IGeometrySource* source, InstanceOnPointsNode* instancer)
+{
+   const GpuPoints* gp = instancer ? instancer->GpuInstancePoints() : nullptr;
+   if (gp == nullptr || gp->count <= 0)
+      return nullptr;
+   for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
+   {
+      if (s == static_cast<IGeometrySource*>(instancer))
+         break;
+      if (s->InstanceTransformOverride() != nullptr || s->InstanceSelection() != nullptr)
+         return nullptr;
+   }
+   return gp;
+}
+
 const std::vector<unsigned char>* ResolveInstanceSelection(IGeometrySource* source)
 {
    for (IGeometrySource* s = source; s != nullptr; s = s->PassthroughSource())
@@ -868,7 +883,54 @@ size_t InstanceOnPointsNode::TriangleCount() const
 {
    if (instanceShape == nullptr)
       return 0;
-   return (const_cast<IGeometrySource*>(instanceShape)->GetMesh().indices.size() / 3) * mTransforms.size();
+   return (const_cast<IGeometrySource*>(instanceShape)->GetMesh().indices.size() / 3) * InstanceCount();
+}
+
+size_t InstanceOnPointsNode::InstanceCount() const
+{
+   if (mCloudStale)
+   {
+      if (const GpuPoints* gp = GpuInstancePoints())
+         return (size_t)(gp->liveCount >= 0 ? gp->liveCount : gp->count);
+   }
+   return InstanceTransforms().size();
+}
+
+const GpuPoints* InstanceOnPointsNode::GpuInstancePoints() const
+{
+   if (!mGpuCloud || cloudSource == nullptr || !GpuPointsGL::Enabled())
+      return nullptr;
+   return cloudSource->GetGpuPoints();
+}
+
+float InstanceOnPointsNode::GpuInstanceSizeScale() const
+{
+   const float base = cloudSource ? cloudSource->PointBaseSize() : 1.0f;
+   return base > 0.0f ? instanceScale / base : 0.0f;
+}
+
+void InstanceOnPointsNode::BuildCloudTransforms() const
+{
+   mCloudStale = false;
+   mTransforms.clear();
+   mColors.clear();
+   const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
+   if (cloud == nullptr)
+      return;
+   mTransforms.reserve(cloud->size());
+   mColors.reserve(cloud->size() * 3);
+   for (const Particle& p : *cloud)
+   {
+      if (!p.alive)
+         continue;
+      const float s = instanceScale * p.scale;
+      Mat4 m = Mat4::Scale(s, s, s);
+      m = Mat4::Multiply(Mat4::Translation(p.px, p.py, p.pz), m);
+      mTransforms.push_back(Mat4::Multiply(m, mBuiltShapeModel));
+      mColors.push_back(p.r);
+      mColors.push_back(p.g);
+      mColors.push_back(p.b);
+   }
 }
 
 Material InstanceOnPointsNode::GetMaterial() const
@@ -930,23 +992,17 @@ void InstanceOnPointsNode::Rebuild()
 
    // A patched point cloud replaces mesh sampling: the positions already exist,
    // so there is nothing to sample.
-   const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
-   if (cloud != nullptr)
+   // On the GPU the copies are built by Render 3D's vertex shader; the CPU
+   // list waits until something asks (BuildCloudTransforms).
+   mGpuCloud = cloudSource != nullptr && GpuPointsGL::Enabled() && cloudSource->GetGpuPoints() != nullptr;
+   mCloudStale = false;
+   if (cloudSource != nullptr && (mGpuCloud || cloudSource->GetPointCloud() != nullptr))
    {
-      mTransforms.reserve(cloud->size());
-      mColors.reserve(cloud->size() * 3);
-      for (const Particle& p : *cloud)
-      {
-         if (!p.alive)
-            continue;
-         const float s = instanceScale * p.scale;
-         Mat4 m = Mat4::Scale(s, s, s);
-         m = Mat4::Multiply(Mat4::Translation(p.px, p.py, p.pz), m);
-         mTransforms.push_back(Mat4::Multiply(m, shapeModel));
-         mColors.push_back(p.r);
-         mColors.push_back(p.g);
-         mColors.push_back(p.b);
-      }
+      mBuiltShapeModel = shapeModel; // read by BuildCloudTransforms, stamped again by the cook
+      if (mGpuCloud)
+         mCloudStale = true;
+      else
+         BuildCloudTransforms();
       return;
    }
 
@@ -1060,7 +1116,10 @@ void InstanceOnPointsNode::CookIfNeeded(int frameId)
    // matrices baked into Rebuild() have to be compared directly to catch that.
    const Mat4 pointModel = pointSource ? pointSource->GetModelMatrix() : Mat4::Identity();
    const Mat4 shapeModel = instanceShape ? instanceShape->GetModelMatrix() : Mat4::Identity();
-   const bool poseDirty =
+   // Whether the cloud is on the GPU can change with no revision (its first
+   // cook, INFINITE_GPU_POINTS), and decides which list Rebuild() keeps.
+   const bool gpuCloud = cloudSource != nullptr && GpuPointsGL::Enabled() && cloudSource->GetGpuPoints() != nullptr;
+   const bool poseDirty = gpuCloud != mGpuCloud ||
       mBuiltPointSource != pointSource || mBuiltShape != instanceShape ||
       mBuiltCloud != (const void*)cloudSource || mBuiltCloudRevision != cloudRevision ||
       mBuiltPointRevision != pointRevision || mBuiltShapeRevision != shapeRevision ||

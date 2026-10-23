@@ -4,6 +4,7 @@
 #include "gl3.h"
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cmath>
 #include <string>
 
@@ -63,8 +64,23 @@ namespace
       "uniform mat4 uModel;\n"
       "uniform int uInstanced;\n"
       "uniform mat4 uLightViewProj;\n"
+      // GPU instances: the same matrix as kVertSrc's mesh branch builds.
+      "uniform int uGpuPoints;\n"
+      "uniform sampler2D uPointPos;\n"
+      "uniform int uPointTexW;\n"
+      "uniform mat4 uPointModel;\n"
+      "uniform float uPointSizeScale;\n"
+      "uniform mat4 uInstanceGroup;\n"
+      "uniform mat4 uShapeModel;\n"
       "void main() {\n"
       "   mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "   if (uGpuPoints == 1) {\n"
+      "      vec4 point = texelFetch(uPointPos, ivec2(gl_InstanceID % uPointTexW, gl_InstanceID / uPointTexW), 0);\n"
+      "      float s = point.w * uPointSizeScale;\n"
+      "      vec3 p = (uPointModel * vec4(point.xyz, 1.0)).xyz;\n"
+      "      model = uInstanceGroup * mat4(vec4(s, 0.0, 0.0, 0.0), vec4(0.0, s, 0.0, 0.0),\n"
+      "                                    vec4(0.0, 0.0, s, 0.0), vec4(p, 1.0)) * uShapeModel;\n"
+      "   }\n"
       "   gl_Position = uLightViewProj * model * vec4(aPos, 1.0);\n"
       "}\n";
 
@@ -321,6 +337,11 @@ namespace
       "uniform int uPointTexW;\n"
       "uniform mat4 uPointModel;\n"
       "uniform float uPointSizeScale;\n"
+      // GPU instances (Instance on Points over GPU points, mesh branch): each
+      // copy is uInstanceGroup * T(uPointModel * pos) * S(w * uPointSizeScale)
+      // * uShapeModel, the matrix InstanceOnPointsNode builds on the CPU.
+      "uniform mat4 uInstanceGroup;\n"
+      "uniform mat4 uShapeModel;\n"
       "out vec4 vLightSpacePos;\n"
       "out vec3 vWorldPos;\n"
       "out vec3 vLocalPos;\n"
@@ -351,6 +372,15 @@ namespace
       "      worldNormal = normalize(uCamPos - worldPos);\n"
       "   } else {\n"
       "      mat4 model = (uInstanced == 1) ? aInstance : uModel;\n"
+      "      if (uGpuPoints == 1) {\n"
+      "         ivec2 texel = ivec2(gl_InstanceID % uPointTexW, gl_InstanceID / uPointTexW);\n"
+      "         vec4 point = texelFetch(uPointPos, texel, 0);\n"
+      "         float s = point.w * uPointSizeScale;\n"
+      "         vec3 p = (uPointModel * vec4(point.xyz, 1.0)).xyz;\n"
+      "         model = uInstanceGroup * mat4(vec4(s, 0.0, 0.0, 0.0), vec4(0.0, s, 0.0, 0.0),\n"
+      "                                       vec4(0.0, 0.0, s, 0.0), vec4(p, 1.0)) * uShapeModel;\n"
+      "         instanceColor = texelFetch(uPointColor, texel, 0).rgb;\n"
+      "      }\n"
       "      vec4 world = model * vec4(aPos, 1.0);\n"
       "      worldPos = world.xyz;\n"
       "      worldNormal = (uInstanced == 1)\n"
@@ -1311,12 +1341,51 @@ void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
 
 // GPUPOINTSTEST renders the same scene with and without the opaque variant
 // and requires the same pixels.
-static bool sOpaqueVariantEnabled = true;
+// INFINITE_RENDER3D_OPAQUE_VARIANT=0 draws everything with the full program
+// (B11 A/B of step 5 in one binary).
+static bool sOpaqueVariantEnabled = []
+{
+   const char* v = getenv("INFINITE_RENDER3D_OPAQUE_VARIANT");
+   return v == nullptr || v[0] != '0';
+}();
 void Render3DSetOpaqueVariantForTest(bool enabled) { sOpaqueVariantEnabled = enabled; }
 // Draws that went through the opaque variant, so the test can tell "same
 // pixels" from "the variant never ran".
 static int sOpaqueVariantDraws = 0;
 int Render3DOpaqueVariantDrawsForTest() { return sOpaqueVariantDraws; }
+static int sGpuInstanceDraws = 0;
+int Render3DGpuInstanceDrawsForTest() { return sGpuInstanceDraws; }
+
+// GPU points step 6: ResolveGpuInstances, unless the blended draw needs its
+// copies sorted back to front (a CPU job). nullptr = upload InstanceTransforms().
+static const GpuPoints* GpuInstancesFor(IGeometrySource* source, InstanceOnPointsNode* instancer,
+                                        const Material& material)
+{
+   if ((material.opacity < 0.999f || material.textureAlpha) && material.transmission <= 0.001f)
+      return nullptr;
+   return ResolveGpuInstances(source, instancer);
+}
+
+// Points `program` at the GPU instances: textures on units 11/12 (as the
+// sprite path), the point matrix, the size factor, the wrapping group matrix
+// and the stamp's own model.
+static void BindGpuInstances(unsigned int program, const GpuPoints& gp, InstanceOnPointsNode& instancer,
+                             const Mat4& groupMatrix)
+{
+   glActiveTexture(GL_TEXTURE11);
+   glBindTexture(GL_TEXTURE_2D, gp.posTex);
+   glActiveTexture(GL_TEXTURE12);
+   glBindTexture(GL_TEXTURE_2D, gp.colorTex);
+   glActiveTexture(GL_TEXTURE0);
+   glUniform1i(glGetUniformLocation(program, "uPointPos"), 11);
+   glUniform1i(glGetUniformLocation(program, "uPointColor"), 12);
+   glUniform1i(glGetUniformLocation(program, "uPointTexW"), gp.texW);
+   glUniformMatrix4fv(glGetUniformLocation(program, "uPointModel"), 1, GL_FALSE, gp.pointMatrix.m);
+   glUniform1f(glGetUniformLocation(program, "uPointSizeScale"), instancer.GpuInstanceSizeScale());
+   glUniformMatrix4fv(glGetUniformLocation(program, "uInstanceGroup"), 1, GL_FALSE, groupMatrix.m);
+   const Mat4 shape = instancer.GpuInstanceShapeModel();
+   glUniformMatrix4fv(glGetUniformLocation(program, "uShapeModel"), 1, GL_FALSE, shape.m);
+}
 
 bool Render3DNode::EnsureShader()
 {
@@ -1631,7 +1700,10 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
          // entries than the raw instancer - reflected here so a mask/override
          // change that happens not to bump meshRev[i] (it always does today,
          // but this is the honest count either way) still shows up.
-         sig.instanceCount[i] = ResolveInstanceTransforms(source, instancer).size();
+         // GPU instances: the texel count, without building the CPU list.
+         const GpuPoints* gpuInstances = GpuInstancesFor(source, instancer, sig.material[i]);
+         sig.instanceCount[i] = gpuInstances != nullptr ? (size_t)gpuInstances->count
+                                                        : ResolveInstanceTransforms(source, instancer).size();
          sig.instanceGroupMatrix[i] = source->GetInstanceGroupMatrix();
       }
       for (int m = kMapRoughness; m < kMapCount; m++)
@@ -1933,13 +2005,18 @@ void Render3DNode::CookOnce(int frameId)
             glBindVertexArray(mGpu[i].vao);
             const Mat4 model = source->GetModelMatrix();
             auto* instancer = FindInstancer(source);
-            const bool instanced = instancer != nullptr && mGpu[i].instanceCount > 0 &&
-                                   mGpu[i].instanceAttribsOn;
+            const GpuPoints* gpuInstances = GpuInstancesFor(source, instancer, source->GetMaterial());
+            const int instanceCount = gpuInstances != nullptr ? gpuInstances->count : mGpu[i].instanceCount;
+            const bool instanced = instancer != nullptr && instanceCount > 0 &&
+                                   (mGpu[i].instanceAttribsOn || gpuInstances != nullptr);
             glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uModel"), 1, GL_FALSE, model.m);
             glUniform1i(glGetUniformLocation(mShadowProgram, "uInstanced"), instanced ? 1 : 0);
+            glUniform1i(glGetUniformLocation(mShadowProgram, "uGpuPoints"), (instanced && gpuInstances) ? 1 : 0);
+            if (instanced && gpuInstances != nullptr)
+               BindGpuInstances(mShadowProgram, *gpuInstances, *instancer, source->GetInstanceGroupMatrix());
             if (instanced)
                glDrawElementsInstanced(GL_TRIANGLES, mGpu[i].indexCount, GL_UNSIGNED_INT,
-                                       nullptr, (GLsizei)mGpu[i].instanceCount);
+                                       nullptr, (GLsizei)instanceCount);
             else
                glDrawElements(GL_TRIANGLES, mGpu[i].indexCount, GL_UNSIGNED_INT, nullptr);
          }
@@ -2624,9 +2701,33 @@ void Render3DNode::CookOnce(int frameId)
       // Instanced sources upload a transform per copy and draw them all at
       // once; ten thousand instances stay a single draw call.
       auto* instancer = FindInstancer(source);
-      const bool instanced = instancer != nullptr && instancer->InstanceCount() > 0;
+      const GpuPoints* gpuInstances = GpuInstancesFor(source, instancer, material);
+      const bool instanced = instancer != nullptr &&
+                             (gpuInstances != nullptr || instancer->InstanceCount() > 0);
       glUniform1i(glGetUniformLocation(mProgram, "uInstanced"), instanced ? 1 : 0);
-      if (instanced)
+      glUniform1i(glGetUniformLocation(mProgram, "uGpuPoints"), gpuInstances != nullptr ? 1 : 0);
+      if (gpuInstances != nullptr)
+      {
+         // The copies come from the point textures; the per-instance
+         // attributes go off (they would read as constants) and the next CPU
+         // upload is forced by instanceAttribsOn.
+         if (gpu.instanceAttribsOn)
+         {
+            for (int col = 0; col < 4; col++)
+            {
+               glDisableVertexAttribArray(3 + col);
+               glVertexAttribDivisor(3 + col, 0);
+            }
+            glDisableVertexAttribArray(7);
+            glVertexAttribDivisor(7, 0);
+            gpu.instanceAttribsOn = false;
+         }
+         BindGpuInstances(mProgram, *gpuInstances, *instancer, source->GetInstanceGroupMatrix());
+         gpu.instanceCount = gpuInstances->count;
+         gpu.instanceColored = true;
+         sGpuInstanceDraws++;
+      }
+      else if (instanced)
       {
          if (gpu.instanceVbo == 0)
             glGenBuffers(1, &gpu.instanceVbo);
