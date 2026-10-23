@@ -273,7 +273,11 @@ void PaletteNode::Extract(unsigned int srcTex)
    const int k = std::max(1, std::min(swatchCount, std::min(kMaxSwatches, n)));
 
    // --- k-means++ seeding ---
-   Rng rng((unsigned int)(std::fabs(seed) * 2654435761.0f) + 1u);
+   // The float product passes 2^32 from seed 1.62 up, where the cast was
+   // undefined (on arm64 it saturated, so every seed above ~1.6 gave the same
+   // palette). Wrapping mod 2^32 keeps seeds below 1.62 on their old stream.
+   const float seedHash = std::isfinite(seed) ? std::fabs(seed) * 2654435761.0f : 0.0f;
+   Rng rng((unsigned int)std::fmod((double)seedHash, 4294967296.0) + 1u);
    float centers[kMaxSwatches][3];
    std::vector<float> nearest((size_t)n, 3.4e38f);
 
