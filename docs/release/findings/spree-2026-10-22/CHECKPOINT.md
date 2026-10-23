@@ -1,4 +1,4 @@
-# Spree checkpoint, 2026-10-22 (updated late in the day)
+# Spree checkpoint, 2026-10-23 (morning)
 
 Resume from here. Everything below is merged into local **main**. Nothing is pushed.
 
@@ -6,10 +6,15 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
 
 ## Where things stand
 
-- **Findings:** 42 filed (B-A-001 … B-K-024). Every one is fixed except three:
+- **Findings:** 46 filed (B-A-001 … B-K-028). Every one is fixed except three:
   - B-G-001 and B-H-001: P3, need a quiet-Mac re-run.
   - B-J-001: the Windows headless hang, P5.
-- **Since the morning checkpoint:**
+- **New on 2026-10-23** (all merged to main):
+  - **B-K-025:** reloading a Molder patch re-rolled its seed and generation, so a saved patch never came back the same. This was the "Molder not reproducible" lead.
+  - **B-K-026:** patch values past int range (±1e30, inf, 3e9) hit float-to-int UB in 30+ nodes. Now the patch reader drops floats past ±2³¹ and saturates ints. Unsigned seed casts and sample-count products are saturated where they're cast (Simulation, FieldRandom, NoteNodes, GeometryTable).
+  - **B-K-027:** Palette seeds of 2 and up all mapped to the same RNG seed, so every seed gave the same palette.
+  - **B-K-028:** a NaN phase in Wavetable/Wavetable Shaper was UB, `(int)NaN`. This was found by DSPTEST under ASan.
+- **Since the 2026-10-22 morning checkpoint:**
   - **B-K-020:** a damaged WAV/AIFF/W64 chunk size hung the decode.
   - **B-K-021:** a HAP sample table allocated gigabytes.
   - **B-K-022:** a WAV header's frame count was trusted.
@@ -30,15 +35,25 @@ The raw run logs are in `docs/release/runs/spree-2026-10-22` (not committed). Se
 
 - **TSan:** `build-tsan`, run with `tools/bughunt/tsan_selftests.sh` over 14 live-engine selftests. 0 warnings. A canary confirmed reports are logged. CONVOLUTIONTEST fails only its CPU-cost budget, as expected under TSan.
 
+- **Float sweep** (main@6f79f6f6, ASan+UBSan, 305 types): 181 BAD rows, mostly float-to-int UB, which is B-K-026. A re-run with the fixes plus new values 1e9 and -1 is in progress on the verify build (`verify/spree-batch3`).
+
 ## Not yet run
 
-1. `param_fuzz.py --kind float`, `--kind text` and `--kind mod` over every type, on an ASan+UBSan build of current main. build-asan needs a rebuild first, since it predates today's merges.
-2. A coverage report from the fixed coverage build. Wipe the stale `$SP/prof` first.
-3. Re-time Join Geometry, Revolve 100000 and Remove Background alone on a release build, to confirm they are slow and not hangs.
+1. Finish the float re-sweep and triage its 1e9/-1 rows. These are values that fit an int but sit outside a param's range, which can size a buffer or index past the end.
+2. `param_fuzz.py --kind text` and `--kind mod` over every type, on the ASan+UBSan build.
+3. The signal sweep again, on the ASan+UBSan build. The earlier sweep missed B-K-028.
+4. A coverage report from the fixed coverage build. Wipe the stale `$SP/prof` first.
+5. Re-time Join Geometry, Difference, Intersect, Revolve 100000 and Remove Background alone on a release build, to confirm they are slow and not hangs.
 
 ## Leads, not yet filed
 
-- Headless renders of Molder are not reproducible. Its analysis runs on a worker thread, which `--audio-summary` doesn't wait for, and it seeds from `random_device`. The same patch went silent for 0, 1 or 3 s across three runs. Probably belongs with the census's "nondeterministic" tag rather than being a bug. Decide before filing.
+- **Huge param values make audio NaN or hot** (float sweep, before the fixes):
+  - NANAUDIO: Gain 1e30, Mixer 1e30, Analog ±1e30, Velocity Curve -1e30.
+  - HOTAUDIO: Oscillator ±1e30, Stereo 1e30.
+
+  Check these again after the re-sweep. Those values are now dropped on load, but they can still be typed into the inspector or reached through an expression.
+- **CSG under ASan:** Difference and Intersect time out on the base row, and Union takes about 92 s. Re-time them on a release build (item 5 above).
+- **Molder render timing:** the analysis still runs on a worker thread, and `--audio-summary` doesn't wait for it. Its seed is now restored on reload (B-K-025).
 
 ## Decisions waiting on the owner
 

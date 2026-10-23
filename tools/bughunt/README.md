@@ -8,7 +8,8 @@ The bug-hunt kit. Each tool targets a bug class that earlier sprees found by han
 2. **Decoders:** `fuzz/build.sh` then 5–10 min per target (no app build needed).
 3. **Nodes:** `param_fuzz.py` with every kind against a sanitizer build of the app.
 4. **Group:** `triage.py OUTDIR --stubs DIR` turns BAD rows into one draft finding per distinct bug.
-5. **Gaps:** `coverage.py` over the runs above. Its zero-hit list is where to aim the next harness.
+5. **Selftests under the sanitizer build:** `INFINITE_DSPTEST=1` and the other headless selftests. They reach states the sweeps don't. B-K-028 was found this way after the signal sweep missed it.
+6. **Gaps:** `coverage.py` over the runs above. Its zero-hit list is where to aim the next harness.
 
 ## Builds
 
