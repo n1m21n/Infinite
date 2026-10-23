@@ -2,6 +2,9 @@
 #include "app/AppShared.h"
 
 #include <chrono>
+#if defined(__x86_64__)
+   #include <xmmintrin.h>
+#endif
 
 namespace app
 {
@@ -1045,5 +1048,117 @@ bool RunFmRenderCheck()
 
    printf("%s\n", ok ? "FM RENDER CHECK OK" : "FM RENDER CHECK FAIL");
    return ok;
+}
+
+// DSP cost of every audio node at its defaults: 48 kHz, 256-frame blocks, so
+// one block's real-time budget is 5.33 ms. Each node is built on the same rig
+// AUDIOPARAMSWEEPTEST uses (audio inputs fed a 300 Hz stereo tone, a held note
+// on note inputs), cooked every 4 blocks as the main thread would, and timed over 360 blocks after 40 warm-up blocks, with
+// flush-to-zero set the way the audio thread sets it. Note-input nodes are run
+// twice, with 1 held note and with an 8-note chord, since voice count is what
+// usually drives a synth's cost. Prints median and p99 per block and the share
+// of the budget; "silent" marks a node that made no sound (a sequencer with no
+// pattern, say), whose number then says little. A measurement, not a gate.
+int RunAudioCostSweepTest()
+{
+   using namespace AudioParamSweep;
+
+#if defined(__x86_64__)
+   _mm_setcsr(_mm_getcsr() | 0x8040);
+#elif defined(__aarch64__)
+   uint64_t fpcr;
+   __asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
+   fpcr |= (1ULL << 24);
+   __asm__ __volatile__("msr fpcr, %0" : : "r"(fpcr));
+#endif
+
+   const double sampleRate = 48000.0;
+   const int blockSize = 256;
+   const double budgetMs = 1000.0 * blockSize / sampleRate;
+   const char* only = getenv("INFINITE_AUDIOCOSTSWEEPTEST");
+
+   struct Row { std::string category, name, scenario; double med = 0, p99 = 0; bool silent = false; };
+   std::vector<Row> rows;
+
+   std::vector<AudioSweepCandidate> candidates =
+      DiscoverAudioSweepCandidates([](const AudioNodeShape& s) { return s.HasAudioNode(); });
+   for (const AudioSweepCandidate& cand : candidates)
+   {
+      if (only[0] != '\0' && only[0] != '1' && cand.name != only)
+         continue;
+      if (cand.name == "Plugin")
+         continue;
+      const bool notes = cand.shape.noteInputSlots > 0;
+      for (int voices : { 1, 8 })
+      {
+         if (voices == 8 && !notes)
+            continue;
+         auto rig = std::make_unique<Rig>();
+         if (!BuildRig(cand, sampleRate, blockSize, *rig))
+            continue;
+         if (rig->node->IsHardwareDriven())
+            break;
+         if (auto* src = dynamic_cast<IAudioSource*>(rig->node.get()); src != nullptr && src->IsHardwareDriven())
+            break;
+         if (voices == 8)
+         {
+            static const int kChord[7] = { 57, 60, 64, 67, 71, 74, 77 };
+            for (int note : kChord)
+            {
+               NoteEvent on;
+               on.note = note;
+               on.velocity = 0.5f;
+               on.isNoteOn = true;
+               on.frameOffset = 0;
+               rig->inbox.Push(on);
+            }
+         }
+         fprintf(stderr, "[audiocost] %s / %s x%d\n", cand.category.c_str(), cand.name.c_str(), voices);
+         fflush(stderr);
+
+         std::vector<double> times;
+         float peak = 0.0f;
+         int cookFrame = 1;
+         for (int b = 0; b < 400; b++)
+         {
+            // The main thread's per-frame cook is what hands params to the
+            // audio side; about one frame per 4 blocks, kept out of the timing.
+            if (b % 4 == 0)
+               rig->node->CookIfNeeded(cookFrame++);
+            const auto t0 = std::chrono::steady_clock::now();
+            (void)RunOneBlock(*rig, blockSize);
+            const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            if (b >= 40)
+               times.push_back(ms);
+            if (b >= 200)
+               for (int i = 0; i < blockSize; i++)
+                  peak = std::max(peak, std::max(std::fabs(rig->scratchL[i]), std::fabs(rig->scratchR[i])));
+         }
+         std::sort(times.begin(), times.end());
+         Row r;
+         r.category = cand.category;
+         r.name = cand.name;
+         r.scenario = !notes ? "tone" : (voices == 1 ? "1 note" : "8 notes");
+         r.med = times[times.size() / 2];
+         r.p99 = times[(times.size() * 99) / 100];
+         r.silent = peak < 1e-5f && rig->mode == ReadMode::kPcm;
+         printf("AUDIOCOSTSWEEP row %-12s %-26s %-8s median %7.3f ms  p99 %7.3f ms  %5.1f%% of budget%s\n",
+                r.category.c_str(), r.name.c_str(), r.scenario.c_str(), r.med, r.p99,
+                100.0 * r.med / budgetMs, r.silent ? "  (silent)" : "");
+         fflush(stdout);
+         rows.push_back(r);
+      }
+   }
+   Transport::Instance().SetPlaying(false);
+
+   std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.med > b.med; });
+   printf("AUDIOCOSTSWEEP --- heaviest (median per 256-frame block, budget %.2f ms) ---\n", budgetMs);
+   for (size_t i = 0; i < rows.size() && i < 30; i++)
+      printf("AUDIOCOSTSWEEP top %-12s %-26s %-8s median %7.3f ms  p99 %7.3f ms  %5.1f%%%s\n",
+             rows[i].category.c_str(), rows[i].name.c_str(), rows[i].scenario.c_str(), rows[i].med,
+             rows[i].p99, 100.0 * rows[i].med / budgetMs, rows[i].silent ? "  (silent)" : "");
+   printf("AUDIOCOSTSWEEP %zu measurements  DONE\n", rows.size());
+   fflush(stdout);
+   return 0;
 }
 }

@@ -2435,6 +2435,13 @@ void DrawFrameTestsA(FrameCtx& fc)
       // back to the exact full-resolution curve as soon as it stops.
       FrameTest_FILTERCURVECACHETEST(frameId, window);
 
+      // Text moved by posX/posY shifts a cached sheet instead of redrawing,
+      // and is drawn exactly again once it holds still.
+      FrameTest_TEXTMOVETEST(frameId, window);
+
+      // Cook cost of every node type: cold, idle and while animated.
+      FrameTest_COOKSWEEPTEST(frameId, window);
+
       FrameTest_BYPASSRULETEST(frameId, window);
 
       FrameTest_BYPASSSWEEPTEST(frameId, window);

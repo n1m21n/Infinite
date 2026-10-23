@@ -33,6 +33,7 @@ public:
    int GetOutputWidth() const override { return mOut.w; }
    int GetOutputHeight() const override { return mOut.h; }
    void CookIfNeeded(int frameId) override;
+   unsigned long long TextureRevision() const override { return mRevision; }
 
    int textureType = 0; // Voronoi / Brick / Magic / Wave / Musgrave / Checker / Gradient / Clouds / Marble / Wood
    float width = 1024.0f;
@@ -163,4 +164,10 @@ private:
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
+   // Every uniform comes from a visited param, so an unchanged snapshot means
+   // an unchanged picture: the cook is skipped and the revision held, which
+   // lets everything downstream cache too (as NoiseNode does).
+   ParamSnapshot mBuiltParams;
+   bool mHasBuilt = false;
+   unsigned long long mRevision = 0;
 };

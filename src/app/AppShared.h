@@ -6166,6 +6166,8 @@ int RunTrackingTest();
 int RunAudioParamSweepTest();
 int RunParamFuzzTest();
 
+int RunAudioCostSweepTest();
+
 bool RunFmModeDebugCheck();
 
 bool RunFmRenderCheck();

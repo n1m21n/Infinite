@@ -613,24 +613,30 @@ namespace app
    void DrawMaterialParams(MaterialNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
-      if (n->MapInput(kMapNormal).IsConnected())
-      {
-         ModCheckbox("bump (height map)##matNormalBump", &n->normalBump);
-         ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f);
-      }
 
       gParamWidthLive = kParamWidthBase;   // two-column body keeps its column width; only single-column bodies stretch to the header (R3)
       const float colW = kParamWidth;
       const float gutter = 16.0f;
 
+      // As Render 3D: both columns draw every row every frame, and a row that does not apply right now
+      // is greyed, never dropped, so the body never grows or shifts as a value crosses zero. The rows
+      // keep their registration order (the left column, then the right), which is what saved
+      // modulation is keyed on. Left: normal map, surface, emission (17). Right: coat & sheen, optics (18).
+      const bool pbrUnused = n->shading != 0 && !gParamRegisterOnly;   // Normals/UV/Flat ignore the lighting model
+
       // --- Left Column ---
       ImGui::BeginGroup();
+
+      NodeSeparator("normal map", colW);
+      ImGui::BeginDisabled(!n->MapInput(kMapNormal).IsConnected());
+      ModCheckbox("bump (height map)##matNormalBump", &n->normalBump);
+      ModSlider("normal strength", &n->normalStrength, 0.0f, 4.0f, "%.3f", colW);
+      ImGui::EndDisabled();
 
       NodeSeparator("surface", colW);
       DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; }, colW);
       DropdownButton("wrap", MaterialNode::WrapModeNames(), n->wrapMode, [n](int i) { n->wrapMode = i; }, colW);
       ColorSwatch("colour", n->color, n);
-      const bool pbrUnused = n->shading != 0 && !gParamRegisterOnly;   // Normals/UV/Flat ignore the lighting model
       ImGui::BeginDisabled(pbrUnused);
       ModSlider("metallic", &n->metallic, 0.0f, 1.0f, "%.3f", colW);
       ModSlider("roughness", &n->roughness, 0.02f, 1.0f, "%.3f", colW);
@@ -639,8 +645,15 @@ namespace app
       ImGui::EndDisabled();
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f, "%.3f", colW);
       ModCheckbox("texture alpha", &n->textureAlpha);
-      if (n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha)
-         ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::BeginDisabled(!(n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha));
+      ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
+
+      ImGui::BeginDisabled(pbrUnused);
+      NodeSeparator("emission", colW);
+      ColorSwatch("emission", n->emissionColor, n);
+      ModSlider("emission", &n->emission, 0.0f, 8.0f, "%.3f", colW);
+      ImGui::EndDisabled();
 
       ImGui::EndGroup();
 
@@ -649,43 +662,37 @@ namespace app
       ImGui::BeginGroup();
 
       ImGui::BeginDisabled(pbrUnused);
-      NodeSeparator("emission", colW);
-      ColorSwatch("emission", n->emissionColor, n);
-      ModSlider("emission", &n->emission, 0.0f, 8.0f, "%.3f", colW);
-
       NodeSeparator("coat & sheen", colW);
       ModSlider("clearcoat", &n->clearcoat, 0.0f, 1.0f, "%.3f", colW);
-      if (n->clearcoat > 0.0f || n->MapInput(kMapClearcoat).IsConnected())
-         ModSlider("coat roughness", &n->clearcoatRoughness, 0.02f, 1.0f, "%.3f", colW);
+      ImGui::BeginDisabled(!(n->clearcoat > 0.0f || n->MapInput(kMapClearcoat).IsConnected()));
+      ModSlider("coat roughness", &n->clearcoatRoughness, 0.02f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
       ModSlider("sheen", &n->sheen, 0.0f, 1.0f, "%.3f", colW);
-      if (n->sheen > 0.0f || n->MapInput(kMapSheen).IsConnected())
-      {
-         ColorSwatch("sheen tint", n->sheenColor, n);
-         ModSlider("sheen roughness", &n->sheenRoughness, 0.01f, 1.0f, "%.3f", colW);
-      }
+      ImGui::BeginDisabled(!(n->sheen > 0.0f || n->MapInput(kMapSheen).IsConnected()));
+      ColorSwatch("sheen tint", n->sheenColor, n);
+      ModSlider("sheen roughness", &n->sheenRoughness, 0.01f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
 
       NodeSeparator("optics", colW);
       ModSlider("anisotropy", &n->anisotropy, -1.0f, 1.0f, "%.3f", colW);
-      if (n->anisotropy != 0.0f)
-         ModSlider("aniso rotation", &n->anisotropyRotation, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::BeginDisabled(n->anisotropy == 0.0f);
+      ModSlider("aniso rotation", &n->anisotropyRotation, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
       ModSlider("iridescence", &n->iridescence, 0.0f, 1.0f, "%.3f", colW);
-      if (n->iridescence > 0.0f)
-      {
-         ModSlider("irid IOR", &n->iridescenceIor, 1.0f, 3.0f, "%.3f", colW);
-         ModSlider("irid thickness", &n->iridescenceThickness, 100.0f, 1000.0f, "%.0f nm", colW);
-      }
+      ImGui::BeginDisabled(n->iridescence <= 0.0f);
+      ModSlider("irid IOR", &n->iridescenceIor, 1.0f, 3.0f, "%.3f", colW);
+      ModSlider("irid thickness", &n->iridescenceThickness, 100.0f, 1000.0f, "%.0f nm", colW);
+      ImGui::EndDisabled();
       ModSlider("transmission", &n->transmission, 0.0f, 1.0f, "%.3f", colW);
-      if (n->transmission > 0.0f)
-      {
-         ModSlider("trans rough", &n->transmissionRoughness, 0.0f, 1.0f, "%.3f", colW);
-         ModSlider("dispersion", &n->dispersion, 0.0f, 1.0f, "%.3f", colW);
-      }
+      ImGui::BeginDisabled(n->transmission <= 0.0f);
+      ModSlider("trans rough", &n->transmissionRoughness, 0.0f, 1.0f, "%.3f", colW);
+      ModSlider("dispersion", &n->dispersion, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
       ModSlider("subsurface", &n->subsurface, 0.0f, 1.0f, "%.3f", colW);
-      if (n->subsurface > 0.0f)
-      {
-         ColorSwatch("sss colour", n->subsurfaceColor, n);
-         ModSlider("sss radius", &n->subsurfaceRadius, 0.0f, 1.0f, "%.3f", colW);
-      }
+      ImGui::BeginDisabled(n->subsurface <= 0.0f);
+      ColorSwatch("sss colour", n->subsurfaceColor, n);
+      ModSlider("sss radius", &n->subsurfaceRadius, 0.0f, 1.0f, "%.3f", colW);
+      ImGui::EndDisabled();
       ImGui::EndDisabled();
 
       ImGui::EndGroup();

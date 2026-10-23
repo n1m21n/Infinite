@@ -367,6 +367,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       RegisterNodes();
       return RunParamFuzzTest();
    }
+   if (getenv("INFINITE_AUDIOCOSTSWEEPTEST") != nullptr)
+   {
+      // DSP cost of every audio node at its defaults; headless like the param sweep below.
+      RegisterNodes();
+      return RunAudioCostSweepTest();
+   }
    if (getenv("INFINITE_AUDIOPARAMSWEEPTEST") != nullptr)
    {
       // Needs the registry populated (DiscoverAudioSweepCandidates walks

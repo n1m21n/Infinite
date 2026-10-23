@@ -524,4 +524,415 @@ void FrameTest_CACHETEST(int frameId, GLFWwindow* window)
                 frameId, work, idle ? 1 : 0, sIdleStreak);
       }
 }
+
+// Text node moved by posX/posY (TextNode's sheet path). The oct19.inf case:
+// a large outlined, fitted, stretched text whose position is animated every
+// frame used to re-rasterize on the CPU each frame (43 ms on an M1 Air).
+// Checks: moving draws no new raster after the one sheet; it costs well under
+// the full redraw it replaces; moved text lands where an exact draw puts it,
+// near an edge too; holding still returns a bit-identical exact draw; an
+// off-canvas anchor still draws exactly.
+void FrameTest_TEXTMOVETEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_TEXTMOVETEST") == nullptr)
+      return;
+   if (frameId == 4)
+   {
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+      return;
+   }
+   if (frameId != 3)
+      return;
+
+   bool ok = true;
+   int cookId = 1000000;
+   auto setup = [](TextNode& t)
+   {
+      t.text = "women of desire";
+      t.fontName = TextNode::AvailableFonts().front();
+      t.fontSize = 297.0f;
+      t.tracking = -10.0f;
+      t.align = 2;
+      t.scaleY = 4.0f;
+      t.wordWrap = true;
+      t.fitToBox = true;
+      t.outlineWidth = 7.36f;
+      t.outlineColor[0] = 1.0f; t.outlineColor[1] = 0.06f; t.outlineColor[2] = 0.06f;
+      t.outlineOnly = true;
+      t.width = 1440.0f;
+      t.height = 1920.0f;
+      t.posX = 0.49f;
+      t.posY = 0.54f;
+   };
+   auto timedCook = [&](TextNode& t) -> double
+   {
+      const auto t0 = std::chrono::steady_clock::now();
+      t.CookIfNeeded(cookId++);
+      glFinish();
+      return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+   };
+   auto median = [](std::vector<double> v) -> double
+   {
+      std::sort(v.begin(), v.end());
+      return v.empty() ? 0.0 : v[v.size() / 2];
+   };
+   unsigned int scratchFbo = 0;
+   auto read = [&](TextNode& t, std::vector<float>& out) -> bool
+   {
+      return GLUtil::ReadTexturePixels(scratchFbo, t.GetOutputTexture(), t.GetOutputWidth(),
+                                       t.GetOutputHeight(), out);
+   };
+   // Alpha-weighted centroid and total coverage, to compare placement.
+   struct Mass { double sum = 0, cx = 0, cy = 0; };
+   auto mass = [](const std::vector<float>& px, int w, int h) -> Mass
+   {
+      Mass m;
+      for (int y = 0; y < h; y++)
+         for (int x = 0; x < w; x++)
+         {
+            const double a = px[((size_t)y * w + x) * 4 + 3];
+            m.sum += a; m.cx += a * x; m.cy += a * y;
+         }
+      if (m.sum > 0) { m.cx /= m.sum; m.cy /= m.sum; }
+      return m;
+   };
+   // Moved output at the node's current pos against a fresh exact draw there.
+   auto checkPlacement = [&](TextNode& moved, const char* what)
+   {
+      TextNode exact;
+      setup(exact);
+      exact.posX = moved.posX;
+      exact.posY = moved.posY;
+      exact.CookIfNeeded(cookId++);
+      std::vector<float> a, b;
+      if (!moved.ShowingMoved() || !read(moved, a) || !read(exact, b))
+      {
+         printf("TEXTMOVETEST placement %s: moved=%d readback failed  FAIL\n", what, moved.ShowingMoved() ? 1 : 0);
+         ok = false;
+         return;
+      }
+      const int w = moved.GetOutputWidth(), h = moved.GetOutputHeight();
+      const Mass ma = mass(a, w, h), mb = mass(b, w, h);
+      const double drift = std::hypot(ma.cx - mb.cx, ma.cy - mb.cy);
+      const double cover = mb.sum > 0 ? ma.sum / mb.sum : 0.0;
+      const bool pass = mb.sum > 0 && drift <= 1.0 && cover > 0.97 && cover < 1.03;
+      printf("TEXTMOVETEST placement %s: centroid off by %.2f px, coverage %.3f of exact  %s\n", what, drift,
+             cover, pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   };
+
+   // 1) The old cost: every move a full raster (forced here by a style change).
+   TextNode t;
+   setup(t);
+   t.CookIfNeeded(cookId++);
+   std::vector<double> exactMs;
+   for (int i = 0; i < 12; i++)
+   {
+      t.color[1] = (i % 2) ? 1.0f : 0.999f;
+      t.posX = 0.3f + 0.01f * (float)i;
+      exactMs.push_back(timedCook(t));
+   }
+   t.color[1] = 1.0f;
+   t.CookIfNeeded(cookId++);
+
+   // 2) Position only, every cook, like a gesture or LFO.
+   const unsigned long long rastersBefore = t.RasterCount();
+   std::vector<double> movedMs;
+   for (int i = 0; i < 60; i++)
+   {
+      t.posX = 0.5f + 0.3f * sinf((float)i * 0.13f);
+      t.posY = 0.5f + 0.2f * cosf((float)i * 0.09f);
+      const double ms = timedCook(t);
+      if (i > 0) // the first builds the sheet
+         movedMs.push_back(ms);
+   }
+   const unsigned long long rastersWhileMoving = t.RasterCount() - rastersBefore;
+   const double exactMed = median(exactMs), movedMed = median(movedMs);
+   {
+      const bool pass = rastersWhileMoving == 0 && t.SheetCount() == 1 && t.ShowingMoved();
+      printf("TEXTMOVETEST moving: %llu rasters, %llu sheet over 60 moves  %s\n", rastersWhileMoving,
+             t.SheetCount(), pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+   {
+      const bool pass = movedMed * 2.0 < exactMed;
+      printf("TEXTMOVETEST cost: move %.2f ms vs full redraw %.2f ms (median)  %s\n", movedMed, exactMed,
+             pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+   checkPlacement(t, "mid-move");
+
+   // 3) Near the left edge, so part of the text is off the canvas.
+   t.posX = 0.03f;
+   t.posY = 0.97f;
+   t.CookIfNeeded(cookId++);
+   checkPlacement(t, "at the edge");
+
+   // 4) Holding still: exact again, bit for bit.
+   for (int i = 0; i < 4; i++)
+      t.CookIfNeeded(cookId++);
+   {
+      TextNode fresh;
+      setup(fresh);
+      fresh.posX = t.posX;
+      fresh.posY = t.posY;
+      fresh.CookIfNeeded(cookId++);
+      std::vector<float> a, b;
+      const bool readOk = read(t, a) && read(fresh, b);
+      const bool pass = readOk && !t.ShowingMoved() && a == b;
+      printf("TEXTMOVETEST settled: moved=%d bit-identical to a fresh draw=%s  %s\n", t.ShowingMoved() ? 1 : 0,
+             readOk && a == b ? "yes" : "no", pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 5) An anchor off the canvas is outside the sheet: drawn exactly.
+   {
+      const unsigned long long before = t.RasterCount();
+      t.posX = 1.2f;
+      t.CookIfNeeded(cookId++);
+      t.posX = 1.25f;
+      t.CookIfNeeded(cookId++);
+      const bool pass = t.RasterCount() - before == 2 && !t.ShowingMoved();
+      printf("TEXTMOVETEST off-canvas: %llu exact draws for 2 moves  %s\n", t.RasterCount() - before,
+             pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   if (scratchFbo != 0)
+      glDeleteFramebuffers(1, &scratchFbo);
+   printf("TEXTMOVETEST %s\n", ok ? "PASS" : "FAIL");
+}
+
+// Cook cost of every registered node type, one type per frame. Each is spawned
+// the way the editor spawns it, fed a 1920x1080 noise image on every image
+// input, and timed three ways, wall clock with glFinish so GPU
+// work counts:
+//   cold   - the first cook (includes shader compiles and allocations)
+//   idle   - median of 8 cooks on new frames with nothing changed (the feed
+//            holds one revision); well above zero means the node redraws
+//            every frame even in a static patch
+//   forced - median of 8 cooks with a fresh input revision on every pull and
+//            every float param nudged
+//            by a hair, i.e. what the node costs while something animates it
+// Geometry sources also have GetMesh() timed inside each cook. Hardware-driven
+// and outward-facing nodes (camera, NDI, Syphon, OSC, MIDI, projection, audio
+// out, plugins) are skipped. A measurement, not a gate: the verdict line is
+// DONE unless a type could not be spawned.
+namespace
+{
+   class CookSweepFeed : public INode
+   {
+   public:
+      unsigned int tex = 0;
+      int w = 1, h = 1;
+      unsigned int GetOutputTexture() override { return tex; }
+      int GetOutputWidth() const override { return w; }
+      int GetOutputHeight() const override { return h; }
+      void CookIfNeeded(int) override {}
+      // Held during the idle pass, a fresh stamp on every pull otherwise.
+      bool hold = false;
+      unsigned long long held = NextTextureRevision();
+      unsigned long long TextureRevision() const override { return hold ? held : NextTextureRevision(); }
+   };
+
+   class CookSweepNudge : public ParamVisitor
+   {
+   public:
+      std::vector<float> orig;
+      bool capture = true, up = false;
+      size_t i = 0;
+      void Float(const char*, float& v) override
+      {
+         if (capture) { orig.push_back(v); return; }
+         if (i < orig.size())
+            v = up ? orig[i] + std::max(1e-6f, std::fabs(orig[i]) * 1e-4f) : orig[i];
+         i++;
+      }
+      void Int(const char*, int&) override {}
+      void Bool(const char*, bool&) override {}
+      void Text(const char*, std::string&) override {}
+      void Color(const char*, float*) override {}
+   };
+
+   struct CookSweepRow
+   {
+      std::string category, name;
+      double cold = 0, idle = 0, forced = 0;
+      int idleWork = 0, forcedWork = 0;
+   };
+}
+
+void FrameTest_COOKSWEEPTEST(int frameId, GLFWwindow* window)
+{
+   if (getenv("INFINITE_COOKSWEEPTEST") == nullptr)
+      return;
+   struct Item { std::string name, category; };
+   static std::vector<Item> sItems;
+   static size_t sNext = 0;
+   static bool sListed = false;
+   static std::vector<CookSweepRow> sRows;
+   static std::vector<std::string> sSkipped, sFailed;
+   static std::unique_ptr<INode> sNoise;
+   static CookSweepFeed sFeed;
+   static int sCookId = 2000000;
+   if (frameId < 3)
+      return;
+
+   const char* only = getenv("INFINITE_COOKSWEEPTEST");
+   if (!sListed)
+   {
+      sListed = true;
+      for (const std::string& category : NodeFactory::Instance().GetCategories())
+         for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
+            if (only[0] == '\0' || only[0] == '1' || name == only)
+               sItems.push_back({ name, category });
+      while (!gNodes.empty())
+         RemoveNodeByIndex(gNodes.back().index);
+      sNoise.reset(NodeFactory::Instance().MakeNode("Noise"));
+      if (auto* noise = dynamic_cast<NoiseNode*>(sNoise.get()))
+      {
+         noise->width = 1920.0f;
+         noise->height = 1080.0f;
+      }
+      if (sNoise != nullptr)
+      {
+         sNoise->CookIfNeeded(sCookId++);
+         glFinish();
+         sFeed.tex = sNoise->GetOutputTexture();
+         sFeed.w = sNoise->GetOutputWidth();
+         sFeed.h = sNoise->GetOutputHeight();
+      }
+      printf("COOKSWEEPTEST %zu node type(s), feed %dx%d\n", sItems.size(), sFeed.w, sFeed.h);
+      return;
+   }
+
+   auto median = [](std::vector<double> v) -> double
+   {
+      std::sort(v.begin(), v.end());
+      return v.empty() ? 0.0 : v[v.size() / 2];
+   };
+
+   if (sNext >= sItems.size())
+   {
+      std::vector<CookSweepRow> byForced = sRows;
+      std::sort(byForced.begin(), byForced.end(),
+                [](const CookSweepRow& a, const CookSweepRow& b) { return a.forced > b.forced; });
+      printf("COOKSWEEPTEST --- slowest while animated (forced ms) ---\n");
+      for (size_t i = 0; i < byForced.size() && i < 30; i++)
+         printf("COOKSWEEPTEST top %-12s %-28s forced %8.2f  idle %7.2f  cold %8.2f\n",
+                byForced[i].category.c_str(), byForced[i].name.c_str(),
+                byForced[i].forced, byForced[i].idle, byForced[i].cold);
+      printf("COOKSWEEPTEST --- redraws with nothing changed (idle >= 0.5 ms) ---\n");
+      for (const CookSweepRow& r : byForced)
+         if (r.idle >= 0.5)
+            printf("COOKSWEEPTEST idle %-12s %-28s idle %7.2f  (work %d/8)\n",
+                   r.category.c_str(), r.name.c_str(), r.idle, r.idleWork);
+      printf("COOKSWEEPTEST --- slow first cook (cold >= 100 ms) ---\n");
+      for (const CookSweepRow& r : byForced)
+         if (r.cold >= 100.0)
+            printf("COOKSWEEPTEST cold %-12s %-28s cold %8.2f\n", r.category.c_str(), r.name.c_str(), r.cold);
+      printf("COOKSWEEPTEST skipped %zu:", sSkipped.size());
+      for (const std::string& s : sSkipped)
+         printf(" [%s]", s.c_str());
+      printf("\n");
+      if (sFailed.empty())
+         printf("COOKSWEEPTEST %zu types timed  DONE\n", sRows.size());
+      else
+      {
+         printf("COOKSWEEPTEST FAIL: %zu type(s) could not be spawned:", sFailed.size());
+         for (const std::string& s : sFailed)
+            printf(" [%s]", s.c_str());
+         printf("\n");
+      }
+      fflush(stdout);
+      sNoise.reset();
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+      return;
+   }
+
+   const Item it = sItems[sNext++];
+   static const char* kSkipNames[] = { "Plugin", "Projection", "NDI Out", "Syphon Out", "OSC Send",
+                                       "OSC Receive", "MIDI Out", "Audio Out", "Output", "Comment" };
+   for (const char* s : kSkipNames)
+      if (it.name == s)
+      {
+         sSkipped.push_back(it.name);
+         return;
+      }
+   {
+      std::unique_ptr<INode> probe(NodeFactory::Instance().MakeNode(it.name));
+      if (probe != nullptr)
+      {
+         auto* audio = dynamic_cast<IAudioSource*>(probe.get());
+         if (probe->IsHardwareDriven() || (audio != nullptr && audio->IsHardwareDriven()))
+         {
+            sSkipped.push_back(it.name);
+            return;
+         }
+      }
+   }
+
+   // Stderr before touching the node, so a crash names the type that caused it.
+   fprintf(stderr, "[cooksweep] %s / %s\n", it.category.c_str(), it.name.c_str());
+   fflush(stderr);
+   GraphNode* gn = SpawnNode(it.name, it.category, 20.0f, 20.0f);
+   if (gn == nullptr)
+   {
+      sFailed.push_back(it.name);
+      return;
+   }
+   for (int slot = 0; slot < InputCountFor(*gn); slot++)
+      if (ImageCable* cable = CableFor(*gn, slot))
+         cable->Connect(&sFeed);
+
+   INode* node = gn->node.get();
+   auto* geo = dynamic_cast<IGeometrySource*>(node);
+   auto timedCook = [&](int& work) -> double
+   {
+      glFinish();
+      const unsigned long long w0 = NodeWorkCounter();
+      const auto t0 = std::chrono::steady_clock::now();
+      node->CookIfNeeded(sCookId++);
+      if (geo != nullptr)
+         (void)geo->GetMesh();
+      glFinish();
+      const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+      if (NodeWorkCounter() != w0)
+         work++;
+      return ms;
+   };
+
+   CookSweepRow row;
+   row.category = it.category;
+   row.name = it.name;
+   int coldWork = 0;
+   row.cold = timedCook(coldWork);
+   (void)timedCook(coldWork); // settle anything the first cook deferred
+   std::vector<double> idle, forced;
+   sFeed.hold = true;
+   (void)timedCook(coldWork); // let input-keyed caches see the held revision once
+   for (int i = 0; i < 8; i++)
+      idle.push_back(timedCook(row.idleWork));
+   sFeed.hold = false;
+   CookSweepNudge nudge;
+   node->VisitParams(nudge);
+   nudge.capture = false;
+   for (int i = 0; i < 8; i++)
+   {
+      nudge.i = 0;
+      nudge.up = (i % 2) == 0;
+      node->VisitParams(nudge);
+      forced.push_back(timedCook(row.forcedWork));
+   }
+   nudge.i = 0;
+   nudge.up = false;
+   node->VisitParams(nudge);
+   row.idle = median(idle);
+   row.forced = median(forced);
+   printf("COOKSWEEPTEST row %-12s %-28s cold %8.2f  idle %7.2f (work %d/8)  forced %8.2f (work %d/8)\n",
+          row.category.c_str(), row.name.c_str(), row.cold, row.idle, row.idleWork, row.forced, row.forcedWork);
+   fflush(stdout);
+   sRows.push_back(row);
+   RemoveNodeByIndex(gn->index);
+}
 }

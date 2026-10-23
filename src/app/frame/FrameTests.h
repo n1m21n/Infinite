@@ -156,4 +156,6 @@ void FrameTest_CULLDRIVENTEST(int frameId, GLFWwindow* window);
 void FrameTest_MODCURVETEST(int frameId, GLFWwindow* window);
 void FrameTest_CACHETEST(int frameId, GLFWwindow* window);
 void FrameTest_PERFBOUNDSTEST(int frameId, GLFWwindow* window);
+void FrameTest_TEXTMOVETEST(int frameId, GLFWwindow* window);
+void FrameTest_COOKSWEEPTEST(int frameId, GLFWwindow* window);
 }

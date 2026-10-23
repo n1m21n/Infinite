@@ -141,6 +141,7 @@ def nav_html(rel):
             out.append(f'          <a href="{href(path, p)}"{link_attrs(path)}{c}>{nav_icon(path)}<span>{text}</span></a>')
         out.append("        </div>")
         out.append("      </div>")
+    out.append(f'      <a class="btn btn-primary nav-sheet-cta" href="{p}index.html#setup">Download Infinite</a>')
     out.append('      <div class="nav-sheet-social">')
     out.append(icon_links("        ", "{n}"))
     out.append("      </div>")

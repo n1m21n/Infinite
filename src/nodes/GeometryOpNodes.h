@@ -614,6 +614,9 @@ private:
    unsigned long long mTexGeneration = 0;
    unsigned long long mTexHash = 0;
    bool mHasTexHash = false;
+   // What the last readback was taken from, so an unchanged input skips it.
+   unsigned long long mTexReadRev = 0;
+   unsigned int mTexReadTex = 0;
 };
 
 // --- Mesh to Points / Instance on Points --------------------------------
@@ -946,6 +949,9 @@ private:
    unsigned long long mTexGeneration = 0;
    unsigned long long mTexHash = 0;
    bool mHasTexHash = false;
+   // What the last readback was taken from, so an unchanged input skips it.
+   unsigned long long mTexReadRev = 0;
+   unsigned int mTexReadTex = 0;
 };
 
 // --- Wrap (Shrinkwrap-style "Nearest Surface Point") ---------------------

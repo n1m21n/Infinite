@@ -406,6 +406,12 @@ void TextureNode::CookIfNeeded(int frameId)
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
+   ParamSnapshot params;
+   VisitParams(params);
+   if (mHasBuilt && params == mBuiltParams && mOut.w == w && mOut.h == h)
+      return;
+
+   NodeWorkCounter()++;
    GLUtil::RunShaderPass(mOut, mProgram, [this]()
    {
       glUniform1i(glGetUniformLocation(mProgram, "uType"), textureType);
@@ -464,4 +470,7 @@ void TextureNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uWoodTurbulence"), woodTurbulence);
       glUniform1f(glGetUniformLocation(mProgram, "uWoodNoiseScale"), woodNoiseScale);
    });
+   mBuiltParams = std::move(params);
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }
