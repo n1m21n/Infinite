@@ -13,9 +13,10 @@ The bug-hunt kit. Each tool targets a bug class that earlier sprees found by han
    The last two found B-K-029 and B-K-030 after the int sweep passed both nodes.
 2. **Decoders:** `fuzz/build.sh` then 5–10 min per target (no app build needed).
 3. **Nodes:** `param_fuzz.py` with every kind against a sanitizer build of the app.
-4. **Group:** `triage.py OUTDIR --stubs DIR` turns BAD rows into one draft finding per distinct bug.
-5. **Selftests under the sanitizer build:** `INFINITE_DSPTEST=1` and the other headless selftests. They reach states the sweeps don't. B-K-028 was found this way after the signal sweep missed it.
-6. **Gaps:** `coverage.py` over the runs above. Its zero-hit list is where to aim the next harness.
+4. **Before a clamp fix ships:** `clamp_check.py "Type.key=LO..HI" ...` (under a second). It lists every tracked patch the clamp would change. Any hit means look before clamping.
+5. **Group:** `triage.py OUTDIR --stubs DIR` turns BAD rows into one draft finding per distinct bug.
+6. **Selftests under the sanitizer build:** `INFINITE_DSPTEST=1` and the other headless selftests. They reach states the sweeps don't. B-K-028 was found this way after the signal sweep missed it.
+7. **Gaps:** `coverage.py` over the runs above. Its zero-hit list is where to aim the next harness.
 
 ## Builds
 
@@ -65,6 +66,14 @@ Resumable: re-running skips rows already written. `--types-from results.tsv` re-
 - Headless renders process audio on the main thread, so they can't show audio-thread races. Use these instead.
 - Baseline on 2026-10-22 (main@c2ab99be): 0 warnings in all 14. A racy canary program confirmed reports reach `log_path` on this setup.
 
+## clamp_check.py — a clamp's blast radius on saved patches
+
+`clamp_check.py "Type.key=LO..HI" ...` or `clamp_check.py --knobs DESCRIBE.json [Type ...]`
+
+Parses every tracked `.inf` (855 on 2026-10-23) and prints each saved float that the given range would change. Exit 1 on any hit. `--in DIR` scans another folder, such as a user's patch folder.
+
+Baseline with every knob range from `--describe`: 11 hits in 4 keys, all legitimate values (see the lesson below). The B-K-031..034 clamps: 287 keys, 0 hits.
+
 ## fuzz/ — decoders, coverage-guided
 
 `fuzz/build.sh [OUT] [hap patch gltf audio_decode]`
@@ -90,3 +99,4 @@ OUT/fuzz_hap OUT/crash-<hash>          # replay
 - **`--start` seeks the transport,** and file players follow it. To test what happens *after* an event, render from 0 and read the later seconds (`loudness_per_second`).
 - **Fix a NaN where it is stored, not where it shows.** One central check per host (AudioEffectNode after the kernel *and* its dry path; the decoder for files) beat 19 per-kernel fixes. Check every state the host owns: the first guard missed Drive's dry oversampler.
 - **A silent base run proves nothing.** Check that the stimulus reached the sink before trusting a clean result.
+- **A knob range is not the param's domain.** A central load clamp built from every knob's range was tried and dropped, because `clamp_check.py` found real patches it would have changed. Ranges change with mode: Select draws `selectC` as 1..32, −1..1 or −3..3, and Frequency Shifter's range toggle switches `shift` between ±100 and ±10000. Other gestures also write past the knob: the viewport camera writes `camDistance`, and reseed writes `seed`. Clamp in the node, to the range its maths needs, and run `clamp_check.py` first.
