@@ -559,6 +559,7 @@ const std::vector<Particle>* GeometryOpNode::GetPointCloud()
 
    const unsigned long long upstreamRev = input->PointCloudRevision();
    const Mat4 m = TransformMatrix();
+   StampPointCloudRevision(upstreamRev, m);
    if (mHasPointCloudCache && mPointCloudBuiltUpstream == input &&
        mPointCloudBuiltUpstreamRevision == upstreamRev && mPointCloudBuiltMatrix == m)
       return &mPointCloudCache;
@@ -584,8 +585,36 @@ const std::vector<Particle>* GeometryOpNode::GetPointCloud()
    mPointCloudBuiltUpstream = input;
    mPointCloudBuiltUpstreamRevision = upstreamRev;
    mPointCloudBuiltMatrix = m;
-   mPointCloudRevision = NextMeshRevision();
    return &mPointCloudCache;
+}
+
+void GeometryOpNode::StampPointCloudRevision(unsigned long long upstreamRev, const Mat4& m)
+{
+   if (mHasPointCloudStamp && mPointCloudStampUpstream == input &&
+       mPointCloudStampUpstreamRevision == upstreamRev && mPointCloudStampMatrix == m)
+      return;
+   mHasPointCloudStamp = true;
+   mPointCloudStampUpstream = input;
+   mPointCloudStampUpstreamRevision = upstreamRev;
+   mPointCloudStampMatrix = m;
+   mPointCloudRevision = NextMeshRevision();
+}
+
+const GpuPoints* GeometryOpNode::GetGpuPoints()
+{
+   if (input == nullptr)
+      return nullptr;
+   const GpuPoints* src = input->GetGpuPoints();
+   if (src == nullptr || bypassed || op != kTransform)
+      return src;
+   // Same matrix GetPointCloud() bakes into each position, and like it, the
+   // sprite size is left alone (Render 3D sizes from the model matrix only).
+   const Mat4 m = TransformMatrix();
+   StampPointCloudRevision(input->PointCloudRevision(), m);
+   mGpuPoints = *src;
+   mGpuPoints.pointMatrix = Mat4::Multiply(m, src->pointMatrix);
+   mGpuPoints.revision = mPointCloudRevision;
+   return &mGpuPoints;
 }
 
 const Polyline* GeometryOpNode::GetCurve()
@@ -642,7 +671,9 @@ unsigned long long GeometryOpNode::PointCloudRevision()
       return input->PointCloudRevision();
    if (op != kTransform)
       return input->PointCloudRevision();
-   GetPointCloud();
+   // Stamped from (upstream, revision, matrix) without building the CPU copy:
+   // asking whether the cloud changed must not cost the copy itself.
+   StampPointCloudRevision(input->PointCloudRevision(), TransformMatrix());
    return mPointCloudRevision;
 }
 

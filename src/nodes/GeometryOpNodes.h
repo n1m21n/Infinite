@@ -130,6 +130,10 @@ public:
    // it passes the cloud through untouched rather than guessing.
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
+   // Transform hands GPU points on with its matrix folded into pointMatrix,
+   // no copy; every other op (and bypass) forwards the input's as is, the
+   // same way GetPointCloud() forwards the input's cloud.
+   const GpuPoints* GetGpuPoints() override;
    // When this node (or the chain of GeometryOpNodes it's wired through) sits
    // downstream of an InstanceOnPoints and op is kTransform, GetMesh() leaves
    // the stamp mesh alone and this returns the move/rotate/scale as a matrix
@@ -402,6 +406,14 @@ private:
    unsigned long long mPointCloudBuiltUpstreamRevision = 0;
    Mat4 mPointCloudBuiltMatrix;
    unsigned long long mPointCloudRevision = 0;
+   // What mPointCloudRevision was stamped for: it moves iff these do, whether
+   // or not the CPU copy above was ever built (GPU points never need it).
+   bool mHasPointCloudStamp = false;
+   const void* mPointCloudStampUpstream = nullptr;
+   unsigned long long mPointCloudStampUpstreamRevision = 0;
+   Mat4 mPointCloudStampMatrix;
+   void StampPointCloudRevision(unsigned long long upstreamRev, const Mat4& m);
+   GpuPoints mGpuPoints;
    // kTransform's curve cache - see GetCurve().
    Polyline mCurveCache;
    bool mHasCurveCache = false;

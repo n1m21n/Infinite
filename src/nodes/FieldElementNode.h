@@ -169,6 +169,7 @@ public:
    unsigned long long InstanceSelectionRevision() const override { return input ? input->InstanceSelectionRevision() : 0; }
    const std::vector<Mat4>* InstanceTransformOverride() const override { return input ? input->InstanceTransformOverride() : nullptr; }
    const std::vector<Particle>* GetPointCloud() override { return input ? input->GetPointCloud() : nullptr; }
+   const GpuPoints* GetGpuPoints() override { return input ? input->GetGpuPoints() : nullptr; }
    unsigned long long PointCloudRevision() override { return input ? input->PointCloudRevision() : 0; }
    float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }

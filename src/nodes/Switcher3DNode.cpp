@@ -163,6 +163,12 @@ const std::vector<Particle>* Switcher3DNode::GetPointCloud()
    return active ? active->GetPointCloud() : nullptr;
 }
 
+const GpuPoints* Switcher3DNode::GetGpuPoints()
+{
+   IGeometrySource* active = Active();
+   return active ? active->GetGpuPoints() : nullptr;
+}
+
 unsigned long long Switcher3DNode::PointCloudRevision()
 {
    IGeometrySource* active = Active();
