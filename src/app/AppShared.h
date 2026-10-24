@@ -6242,6 +6242,7 @@ int RunMidiParseTest();
 int RunCVRecorderTest();
 
 int RunMidiCC14Test();
+int RunAsioTest();
 int RunNdiTest();
 int RunExtensionsTest();
 int RunTrackingTest();

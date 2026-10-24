@@ -8,6 +8,7 @@ ASSERT=(
   "DSPTEST:1"              # oscillator amplitude/frequency, gain smoothing, filter
                            # passband + sweep attenuation, meter rings
   "AUDIOPCMTEST:1"         # the platform's PCM conversion, per-OS implementation
+  "ASIOTEST:1"             # ASIO sample formats, driver list, buffer pick, settings round trip
   "AUDIOPDCTEST:1"         # plugin delay compensation: branches aligned, the
                            # slowest branch left alone, zero-latency allocates nothing
   "RESONATORTEST:1"
