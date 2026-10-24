@@ -2816,6 +2816,197 @@
       "file": "assets/library/pixel/quantum-chromodynamic-lattice.field",
       "preview": "assets/library/previews/quantum-chromodynamic-lattice.jpg",
       "bytes": 1650
+    },
+    {
+      "id": "ulam-spiral-primes",
+      "name": "Ulam Spiral Primes",
+      "kind": "Generator",
+      "tags": [
+        "primes",
+        "spiral",
+        "math",
+        "geometry"
+      ],
+      "description": "Ulam prime number polar spiral constellation highlighting diagonal prime alignments, quadratic polynomial trajectories, and breathing harmonic nodes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/ulam-spiral-primes.js",
+      "preview": "assets/library/previews/ulam-spiral-primes.jpg",
+      "bytes": 2683
+    },
+    {
+      "id": "mandelbrot-buddhabrot-path",
+      "name": "Buddhabrot Orbit Trajectory",
+      "kind": "Generator",
+      "tags": [
+        "fractal",
+        "buddhabrot",
+        "chaos",
+        "complex"
+      ],
+      "description": "Buddhabrot escaping orbit trajectory probability filaments in the complex plane with rotating critical traps and glowing probability nodes.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/mandelbrot-buddhabrot-path.js",
+      "preview": "assets/library/previews/mandelbrot-buddhabrot-path.jpg",
+      "bytes": 2617
+    },
+    {
+      "id": "cross-cap-surface-3d",
+      "name": "Cross-Cap Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "topology",
+        "surface"
+      ],
+      "description": "Non-orientable cross-cap immersion of the real projective plane RP2 with Whitney pinch point singularities, parametric meridian lines, and orbital rings.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/cross-cap-surface-3d.js",
+      "preview": "assets/library/previews/cross-cap-surface-3d.jpg",
+      "bytes": 2405
+    },
+    {
+      "id": "barth-sextic-surface-3d",
+      "name": "Barth Sextic Surface 3D",
+      "kind": "Generator",
+      "tags": [
+        "geometry",
+        "3d",
+        "algebraic",
+        "icosahedral"
+      ],
+      "description": "Degree-6 Barth sextic algebraic surface featuring 65 ordinary double points, complete icosahedral symmetry, golden ratio geometry, and nodal halos.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/barth-sextic-surface-3d.js",
+      "preview": "assets/library/previews/barth-sextic-surface-3d.jpg",
+      "bytes": 2264
+    },
+    {
+      "id": "buchla-complex-oscillator-synth",
+      "name": "Buchla Complex Oscillator Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "west-coast",
+        "wavefolding",
+        "dsp"
+      ],
+      "description": "Dual complex oscillator synthesizer with primary triangle core, audio-rate exponential FM cross-modulation, and multi-stage timbre wavefolding.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/buchla-complex-oscillator-synth.inf",
+      "preview": "assets/library/previews/buchla-complex-oscillator-synth.jpg",
+      "bytes": 1808
+    },
+    {
+      "id": "string-resonator-modal-synth",
+      "name": "String Resonator Modal Synth",
+      "kind": "Generator",
+      "tags": [
+        "synth",
+        "modal",
+        "physical-modeling",
+        "dsp"
+      ],
+      "description": "Bank of 8 coupled inharmonic modal resonators with dispersive stiffness, non-linear hammer strike impulse, and sympathetic acoustic decay.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/string-resonator-modal-synth.inf",
+      "preview": "assets/library/previews/string-resonator-modal-synth.jpg",
+      "bytes": 2226
+    },
+    {
+      "id": "hilbert-frequency-shifter-fx",
+      "name": "Hilbert Frequency Shifter FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "frequency-shifter",
+        "hilbert",
+        "dsp"
+      ],
+      "description": "Single-sideband analytic frequency shifter using a 90-degree Hilbert quadrature network and quadrature carrier oscillator for true linear spectrum translation.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/hilbert-frequency-shifter-fx.inf",
+      "preview": "assets/library/previews/hilbert-frequency-shifter-fx.jpg",
+      "bytes": 1706
+    },
+    {
+      "id": "granular-pitch-shifter-delay-fx",
+      "name": "Granular Pitch Shifter Delay FX",
+      "kind": "Filter",
+      "tags": [
+        "effects",
+        "granular",
+        "pitch-shifter",
+        "delay",
+        "dsp"
+      ],
+      "description": "Multi-head micro-loop granular pitch shifter with Hann envelope grain cross-fading, pitch interval transposition, and diffuse regeneration.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/granular-pitch-shifter-delay-fx.inf",
+      "preview": "assets/library/previews/granular-pitch-shifter-delay-fx.jpg",
+      "bytes": 1834
+    },
+    {
+      "id": "superconducting-magnetic-vortex",
+      "name": "Superconducting Magnetic Vortex",
+      "kind": "Generator",
+      "tags": [
+        "Quantum",
+        "Superconductor",
+        "Vortex",
+        "Magnetic"
+      ],
+      "description": "Abrikosov flux vortex lattice in a type-II superconductor with circulating Cooper pair supercurrents and audio-reactive magnetic penetration depth. Bass pulses flux pinning spacing, mids induce relativistic flux flow velocity, highs ignite quantum phase slips.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/superconducting-magnetic-vortex.field",
+      "preview": "assets/library/previews/superconducting-magnetic-vortex.jpg",
+      "bytes": 1847
+    },
+    {
+      "id": "gravitational-caustic-microlens",
+      "name": "Gravitational Caustic Microlens",
+      "kind": "Generator",
+      "tags": [
+        "Space",
+        "Relativity",
+        "Gravitational",
+        "Caustic"
+      ],
+      "description": "Binary gravitational lens caustic curves with astroid critical folds, relativistic photon deflection, and intense chromatic caustic flare singularities. Bass contracts the Einstein ring radius, mids warp the fold and cusp caustic topology, highs explode micro-caustic relativistic amplification.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/gravitational-caustic-microlens.field",
+      "preview": "assets/library/previews/gravitational-caustic-microlens.jpg",
+      "bytes": 2080
     }
   ]
 }

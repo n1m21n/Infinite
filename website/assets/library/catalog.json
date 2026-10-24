@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 229,
+ "count": 243,
  "items": [
   {
    "id": "first-sound",
@@ -542,6 +542,54 @@
    "file": "https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/harmonic-tremolo-panner-fx.webp",
    "page": "https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html"
+  },
+  {
+   "id": "buchla-complex-oscillator-synth",
+   "name": "Buchla Complex Oscillator Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Dual complex oscillator synthesizer with primary triangle core, audio-rate exponential FM cross-modulation, and multi-stage timbre wavefolding.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/buchla-complex-oscillator-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/buchla-complex-oscillator-synth.webp",
+   "page": "https://infinitedevices.org/library/buchla-complex-oscillator-synth.html"
+  },
+  {
+   "id": "string-resonator-modal-synth",
+   "name": "String Resonator Modal Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Bank of 8 coupled inharmonic modal resonators with dispersive stiffness, non-linear hammer strike impulse, and sympathetic acoustic decay.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/string-resonator-modal-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/string-resonator-modal-synth.webp",
+   "page": "https://infinitedevices.org/library/string-resonator-modal-synth.html"
+  },
+  {
+   "id": "hilbert-frequency-shifter-fx",
+   "name": "Hilbert Frequency Shifter FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Single-sideband analytic frequency shifter using a 90-degree Hilbert quadrature network and quadrature carrier oscillator for true linear spectrum translation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/hilbert-frequency-shifter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/hilbert-frequency-shifter-fx.webp",
+   "page": "https://infinitedevices.org/library/hilbert-frequency-shifter-fx.html"
+  },
+  {
+   "id": "granular-pitch-shifter-delay-fx",
+   "name": "Granular Pitch Shifter Delay FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Multi-head micro-loop granular pitch shifter with Hann envelope grain cross-fading, pitch interval transposition, and diffuse regeneration.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/granular-pitch-shifter-delay-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/granular-pitch-shifter-delay-fx.webp",
+   "page": "https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -2750,6 +2798,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/quantum-chromodynamic-lattice.field",
    "preview": "https://infinitedevices.org/assets/library/previews/quantum-chromodynamic-lattice.jpg",
    "page": "https://infinitedevices.org/library/quantum-chromodynamic-lattice.html"
+  },
+  {
+   "id": "ulam-spiral-primes",
+   "name": "Ulam Spiral Primes",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Ulam prime number polar spiral constellation highlighting diagonal prime alignments, quadratic polynomial trajectories, and breathing harmonic nodes.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/ulam-spiral-primes.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/ulam-spiral-primes.jpg",
+   "page": "https://infinitedevices.org/library/ulam-spiral-primes.html"
+  },
+  {
+   "id": "mandelbrot-buddhabrot-path",
+   "name": "Buddhabrot Orbit Trajectory",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Buddhabrot escaping orbit trajectory probability filaments in the complex plane with rotating critical traps and glowing probability nodes.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/mandelbrot-buddhabrot-path.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/mandelbrot-buddhabrot-path.jpg",
+   "page": "https://infinitedevices.org/library/mandelbrot-buddhabrot-path.html"
+  },
+  {
+   "id": "cross-cap-surface-3d",
+   "name": "Cross-Cap Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Non-orientable cross-cap immersion of the real projective plane RP2 with Whitney pinch point singularities, parametric meridian lines, and orbital rings.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/cross-cap-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/cross-cap-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/cross-cap-surface-3d.html"
+  },
+  {
+   "id": "barth-sextic-surface-3d",
+   "name": "Barth Sextic Surface 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Degree-6 Barth sextic algebraic surface featuring 65 ordinary double points, complete icosahedral symmetry, golden ratio geometry, and nodal halos.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/barth-sextic-surface-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/barth-sextic-surface-3d.jpg",
+   "page": "https://infinitedevices.org/library/barth-sextic-surface-3d.html"
+  },
+  {
+   "id": "buchla-complex-oscillator-synth",
+   "name": "Buchla Complex Oscillator Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Dual complex oscillator synthesizer with primary triangle core, audio-rate exponential FM cross-modulation, and multi-stage timbre wavefolding.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/buchla-complex-oscillator-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/buchla-complex-oscillator-synth.jpg",
+   "page": "https://infinitedevices.org/library/buchla-complex-oscillator-synth.html"
+  },
+  {
+   "id": "string-resonator-modal-synth",
+   "name": "String Resonator Modal Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Bank of 8 coupled inharmonic modal resonators with dispersive stiffness, non-linear hammer strike impulse, and sympathetic acoustic decay.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/string-resonator-modal-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/string-resonator-modal-synth.jpg",
+   "page": "https://infinitedevices.org/library/string-resonator-modal-synth.html"
+  },
+  {
+   "id": "hilbert-frequency-shifter-fx",
+   "name": "Hilbert Frequency Shifter FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Single-sideband analytic frequency shifter using a 90-degree Hilbert quadrature network and quadrature carrier oscillator for true linear spectrum translation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/hilbert-frequency-shifter-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/hilbert-frequency-shifter-fx.jpg",
+   "page": "https://infinitedevices.org/library/hilbert-frequency-shifter-fx.html"
+  },
+  {
+   "id": "granular-pitch-shifter-delay-fx",
+   "name": "Granular Pitch Shifter Delay FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Multi-head micro-loop granular pitch shifter with Hann envelope grain cross-fading, pitch interval transposition, and diffuse regeneration.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/granular-pitch-shifter-delay-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/granular-pitch-shifter-delay-fx.jpg",
+   "page": "https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html"
+  },
+  {
+   "id": "superconducting-magnetic-vortex",
+   "name": "Superconducting Magnetic Vortex",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Abrikosov flux vortex lattice in a type-II superconductor with circulating Cooper pair supercurrents and audio-reactive magnetic penetration depth. Bass pulses flux pinning spacing, mids induce relativistic flux flow velocity, highs ignite quantum phase slips.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/superconducting-magnetic-vortex.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/superconducting-magnetic-vortex.jpg",
+   "page": "https://infinitedevices.org/library/superconducting-magnetic-vortex.html"
+  },
+  {
+   "id": "gravitational-caustic-microlens",
+   "name": "Gravitational Caustic Microlens",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Binary gravitational lens caustic curves with astroid critical folds, relativistic photon deflection, and intense chromatic caustic flare singularities. Bass contracts the Einstein ring radius, mids warp the fold and cusp caustic topology, highs explode micro-caustic relativistic amplification.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/gravitational-caustic-microlens.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/gravitational-caustic-microlens.jpg",
+   "page": "https://infinitedevices.org/library/gravitational-caustic-microlens.html"
   }
  ]
 }

@@ -73,6 +73,8 @@
   <url><loc>https://infinitedevices.org/embeds/magnetar-quantum-flux.html</loc><lastmod>2026-10-24</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/stellar-nursery-nebula.html</loc><lastmod>2026-10-24</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/quantum-chromodynamic-lattice.html</loc><lastmod>2026-10-24</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/superconducting-magnetic-vortex.html</loc><lastmod>2026-10-24</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/gravitational-caustic-microlens.html</loc><lastmod>2026-10-24</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-24</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-24</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-24</lastmod><priority>0.7</priority></url>
@@ -130,6 +132,10 @@
   <url><loc>https://infinitedevices.org/library/resonant-brass-synth.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/biquad-morph-filter-fx.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/buchla-complex-oscillator-synth.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/string-resonator-modal-synth.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hilbert-frequency-shifter-fx.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
@@ -314,6 +320,16 @@
   <url><loc>https://infinitedevices.org/library/harmonic-tremolo-panner-fx.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/stellar-nursery-nebula.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/quantum-chromodynamic-lattice.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ulam-spiral-primes.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/mandelbrot-buddhabrot-path.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cross-cap-surface-3d.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/barth-sextic-surface-3d.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/buchla-complex-oscillator-synth.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/string-resonator-modal-synth.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/hilbert-frequency-shifter-fx.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/superconducting-magnetic-vortex.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/gravitational-caustic-microlens.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-24</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-24</lastmod><priority>0.5</priority></url>

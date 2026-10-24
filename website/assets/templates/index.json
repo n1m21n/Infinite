@@ -721,6 +721,70 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "buchla-complex-oscillator-synth",
+      "name": "Buchla Complex Oscillator Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Dual complex oscillator synthesizer with primary triangle core, audio-rate exponential FM cross-modulation, and multi-stage timbre wavefolding.",
+      "price": 0,
+      "preview": "assets/templates/buchla-complex-oscillator-synth.webp",
+      "file": "assets/templates/buchla-complex-oscillator-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "string-resonator-modal-synth",
+      "name": "String Resonator Modal Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Bank of 8 coupled inharmonic modal resonators with dispersive stiffness, non-linear hammer strike impulse, and sympathetic acoustic decay.",
+      "price": 0,
+      "preview": "assets/templates/string-resonator-modal-synth.webp",
+      "file": "assets/templates/string-resonator-modal-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "hilbert-frequency-shifter-fx",
+      "name": "Hilbert Frequency Shifter FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Single-sideband analytic frequency shifter using a 90-degree Hilbert quadrature network and quadrature carrier oscillator for true linear spectrum translation.",
+      "price": 0,
+      "preview": "assets/templates/hilbert-frequency-shifter-fx.webp",
+      "file": "assets/templates/hilbert-frequency-shifter-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "granular-pitch-shifter-delay-fx",
+      "name": "Granular Pitch Shifter Delay FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Multi-head micro-loop granular pitch shifter with Hann envelope grain cross-fading, pitch interval transposition, and diffuse regeneration.",
+      "price": 0,
+      "preview": "assets/templates/granular-pitch-shifter-delay-fx.webp",
+      "file": "assets/templates/granular-pitch-shifter-delay-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }

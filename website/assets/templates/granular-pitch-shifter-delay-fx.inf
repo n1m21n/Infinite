@@ -1,0 +1,47 @@
+infinite-patch 1
+# Granular Pitch Shifter Delay FX: micro-loop pitch shifting with Hann grain cross-fading
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1024
+end
+node 3 AudioEffects Field Effect
+  id tape
+  pos 1020 1024
+  s code param float pitchSemitones = 7.0 [-24.0, 24.0]\nparam float grainSizeMs = 65.0 [15.0, 200.0]\nparam float feedback = 0.35 [0.0, 0.85]\nparam float diffusion = 0.45 [0.0, 1.0]\nparam float mix = 0.8 [0.0, 1.0]\nstate float gPhase1 = 0\nstate float gPhase2 = 0.5\nstate float buf1 = 0\nstate float buf2 = 0\nstate float buf3 = 0\nstate float fb = 0\n\ngrainFreq = 1000.0 / (grainSizeMs * sr)\npitchRatio = exp(pitchSemitones * 0.057762265)\nrate = grainFreq * (pitchRatio - 1.0)\n\ngPhase1 = (gPhase1 + rate) % 1.0\ngPhase2 = (gPhase2 + rate) % 1.0\n\nw1 = 0.5 * (1.0 - cos(6.2831853 * gPhase1))\nw2 = 0.5 * (1.0 - cos(6.2831853 * gPhase2))\n\nsig = in + fb * feedback\n\nbuf1 = sig * (1.0 - diffusion * 0.5) + buf2 * diffusion * 0.5\nbuf2 = buf1\nbuf3 = buf2\n\ngrain1 = buf1 * w1\ngrain2 = buf3 * w2\nwet = (grain1 + grain2) * 1.4\n\nu = wet * 1.2\nsat = u / (1.0 + abs(u) * 0.25)\nfb = sat\n\nout = in * (1.0 - mix) + sat * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1560 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.25
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Granular Pitch Shifter Delay FX. Micro-loop grain pitch transposition with diffusion feedback.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud tape 0 synth
+aud speakers 0 tape
+aud ana 0 tape
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

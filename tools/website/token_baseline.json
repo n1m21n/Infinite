@@ -97,6 +97,10 @@
    "hex": 5,
    "radius": 1
   },
+  "embeds/gravitational-caustic-microlens.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/gravitational-lensing.html": {
    "font-size": 2,
    "hex": 6
@@ -110,6 +114,10 @@
    "hex": 6
   },
   "embeds/hyper-torus.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/hyperbolic-disk-fractal.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -149,6 +157,10 @@
    "radius": 1
   },
   "embeds/liquid-glass.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/magnetar-quantum-flux.html": {
    "font-size": 2,
    "hex": 6
   },
@@ -202,6 +214,10 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/quantum-chromodynamic-lattice.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/quantum-field-lattice.html": {
    "font-size": 2,
    "hex": 6
@@ -233,6 +249,14 @@
    "hex": 6
   },
   "embeds/spectrum-bars.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/stellar-nursery-nebula.html": {
+   "font-size": 2,
+   "hex": 6
+  },
+  "embeds/superconducting-magnetic-vortex.html": {
    "font-size": 2,
    "hex": 6
   },

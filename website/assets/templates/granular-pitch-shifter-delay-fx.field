@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Granular Pitch Shifter Delay FX",
+    "author": "Infinite",
+    "description": "Multi-head micro-loop granular pitch shifter with Hann envelope grain cross-fading, pitch interval transposition, and diffuse regeneration.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float pitchSemitones = 7.0 [-24.0, 24.0];\nparam float grainSizeMs = 65.0 [15.0, 200.0];\nparam float feedback = 0.35 [0.0, 0.85];\nparam float diffusion = 0.45 [0.0, 1.0];\nparam float mix = 0.8 [0.0, 1.0];\nstate float gPhase1 = 0;\nstate float gPhase2 = 0.5;\nstate float buf1 = 0;\nstate float buf2 = 0;\nstate float buf3 = 0;\nstate float fb = 0;\n\ngrainFreq = 1000.0 / (grainSizeMs * sr);\npitchRatio = exp(pitchSemitones * 0.057762265);\nrate = grainFreq * (pitchRatio - 1.0);\n\ngPhase1 = (gPhase1 + rate) % 1.0;\ngPhase2 = (gPhase2 + rate) % 1.0;\n\nw1 = 0.5 * (1.0 - cos(6.2831853 * gPhase1));\nw2 = 0.5 * (1.0 - cos(6.2831853 * gPhase2));\n\nsig = in + fb * feedback;\n\nbuf1 = sig * (1.0 - diffusion * 0.5) + buf2 * diffusion * 0.5;\nbuf2 = buf1;\nbuf3 = buf2;\n\ngrain1 = buf1 * w1;\ngrain2 = buf3 * w2;\nwet = (grain1 + grain2) * 1.4;\n\nu = wet * 1.2;\nsat = u / (1.0 + abs(u) * 0.25);\nfb = sat;\n\nout = in * (1.0 - mix) + sat * mix;\n",
+    "params": {
+      "pitchSemitones": 7.0,
+      "grainSizeMs": 65.0,
+      "feedback": 0.35,
+      "diffusion": 0.45,
+      "mix": 0.8
+    },
+    "nodeSettings": {}
+  }
+}

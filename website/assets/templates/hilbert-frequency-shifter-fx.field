@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Hilbert Frequency Shifter FX",
+    "author": "Infinite",
+    "description": "Single-sideband analytic frequency shifter using a 90-degree Hilbert quadrature network and quadrature carrier oscillator for true linear spectrum translation.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float shiftHz = 45.0 [-500.0, 500.0];\nparam float feedback = 0.25 [0.0, 0.85];\nparam float drive = 1.6 [1.0, 4.0];\nparam float sideband = 1.0 [-1.0, 1.0];\nparam float mix = 0.85 [0.0, 1.0];\nstate float cPhase = 0;\nstate float a1 = 0;\nstate float a2 = 0;\nstate float b1 = 0;\nstate float b2 = 0;\nstate float fb = 0;\n\ncPhase = (cPhase + shiftHz / sr) % 1.0;\ncarrierCos = cos(6.2831853 * cPhase);\ncarrierSin = sin(6.2831853 * cPhase);\n\nsig = in + fb * feedback;\nu = sig * drive;\nsat = u / (1.0 + abs(u) * 0.2);\n\napA1 = sat * 0.16 + a1 * 0.84;\na1 = sat;\napA2 = apA1 * 0.5 + a2 * 0.5;\na2 = apA1;\n\napB1 = sat * 0.32 + b1 * 0.68;\nb1 = sat;\napB2 = apB1 * 0.78 + b2 * 0.22;\nb2 = apB1;\n\nssb = apA2 * carrierCos - apB2 * carrierSin * sideband;\nfb = ssb;\n\nout = in * (1.0 - mix) + ssb * mix;\n",
+    "params": {
+      "shiftHz": 45.0,
+      "feedback": 0.25,
+      "drive": 1.6,
+      "sideband": 1.0,
+      "mix": 0.85
+    },
+    "nodeSettings": {}
+  }
+}

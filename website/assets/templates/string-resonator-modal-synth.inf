@@ -1,0 +1,44 @@
+infinite-patch 1
+# String Resonator Modal Synth: coupled inharmonic modal resonators with hammer strike
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 1.0
+  i rangeLow 40
+  i rangeHigh 64
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float decay = 2.4 [0.2, 6.0]\nparam float stiffness = 0.045 [0.001, 0.2]\nparam float damping = 0.35 [0.05, 0.9]\nparam float brightness = 0.65 [0.1, 1.0]\nparam float strike = 1.6 [0.5, 4.0]\nstate float p1 = 0\nstate float p2 = 0\nstate float p3 = 0\nstate float p4 = 0\nstate float env = 0\nstate float hammerEnv = 0\nstate float hammerPhase = 0\n\ntarget = if(gate > 0.5, 1.0, 0.0)\nenv = if(target > env, 1.0, env - env * (1.0 / (decay * sr)))\n\nhammerTarget = if(target > 0.5, 1.0, 0.0)\nhammerEnv = if(hammerTarget > hammerEnv, 1.0, hammerEnv - hammerEnv * 0.02)\nhammerPhase = (hammerPhase + 0.08) % 1.0\nhammerNoise = sin(6.2831853 * hammerPhase * 17.0) * hammerEnv * strike\n\nbaseFreq = clamp(freq, 30.0, 3500.0) / sr\nf1 = baseFreq\nf2 = baseFreq * 2.0 * (1.0 + stiffness * 4.0)\nf3 = baseFreq * 3.0 * (1.0 + stiffness * 9.0)\nf4 = baseFreq * 4.0 * (1.0 + stiffness * 16.0)\n\np1 = (p1 + f1) % 1.0\np2 = (p2 + f2) % 1.0\np3 = (p3 + f3) % 1.0\np4 = (p4 + f4) % 1.0\n\nm1 = sin(6.2831853 * p1)\nm2 = sin(6.2831853 * p2) * (1.0 - damping * 0.3) * brightness\nm3 = sin(6.2831853 * p3) * (1.0 - damping * 0.6) * brightness * 0.6\nm4 = sin(6.2831853 * p4) * (1.0 - damping * 0.8) * brightness * 0.35\n\nmodal = m1 * 0.5 + m2 * 0.28 + m3 * 0.16 + m4 * 0.09 + hammerNoise * 0.15\nu = modal * 1.5\nsat = u / (1.0 + abs(u) * 0.25)\n\nout = sat * env * 0.45\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.25
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text String Resonator Modal Synth. Dispersive inharmonic modal resonators with hammer excitation.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

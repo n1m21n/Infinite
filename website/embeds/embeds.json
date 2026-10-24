@@ -220,6 +220,16 @@
       "slug": "quantum-chromodynamic-lattice",
       "title": "Quantum Chromodynamic Lattice",
       "description": "4D spacetime SU(3) gluon flux tubes and topological instanton vortex lines. Bass pulses the color gauge potential, mids twist topological winding, highs shimmer quantum fluctuations."
+    },
+    {
+      "slug": "superconducting-magnetic-vortex",
+      "title": "Superconducting Magnetic Vortex",
+      "description": "Abrikosov flux vortex lattice in a type-II superconductor with circulating Cooper pair supercurrents and audio-reactive magnetic penetration depth. Bass pulses flux pinning spacing, mids induce relativistic flux flow velocity, highs ignite quantum phase slips."
+    },
+    {
+      "slug": "gravitational-caustic-microlens",
+      "title": "Gravitational Caustic Microlens",
+      "description": "Binary gravitational lens caustic curves with astroid critical folds, relativistic photon deflection, and intense chromatic caustic flare singularities. Bass contracts the Einstein ring radius, mids warp the fold and cusp caustic topology, highs explode micro-caustic relativistic amplification."
     }
   ]
 }

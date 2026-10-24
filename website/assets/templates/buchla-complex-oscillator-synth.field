@@ -1,0 +1,23 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Buchla Complex Oscillator Synth",
+    "author": "Infinite",
+    "description": "Dual complex oscillator synthesizer with primary triangle core, audio-rate exponential FM cross-modulation, and multi-stage timbre wavefolding.",
+    "domain": "synth"
+  },
+  "device": {
+    "code": "param float fmRatio = 1.5 [0.25, 8.0];\nparam float fmIndex = 1.8 [0.0, 5.0];\nparam float timbre = 0.55 [0.0, 1.0];\nparam float symmetry = 0.5 [0.1, 0.9];\nparam float warmth = 0.7 [0.0, 1.0];\nstate float pCore = 0;\nstate float pMod = 0;\nstate float env = 0;\nstate float lp = 0;\n\ntarget = if(gate > 0.5, 1.0, 0.0);\nenv = if(target > env, env + (target - env) * 0.03, env - env * 0.0004);\n\nbaseFreq = clamp(freq, 20.0, 4000.0) / sr;\nmodFreq = baseFreq * fmRatio;\n\npMod = (pMod + modFreq) % 1.0;\nmodVal = sin(6.2831853 * pMod) * fmIndex;\n\npCore = (pCore + baseFreq * (1.0 + modVal)) % 1.0;\n\ntri = if(pCore < symmetry, pCore / symmetry, (1.0 - pCore) / (1.0 - symmetry)) * 2.0 - 1.0;\n\nfoldInput = tri * (1.0 + timbre * 3.5);\nfolded = sin(foldInput * 3.14159265);\n\nu = folded * 1.6;\nsat = u / (1.0 + abs(u) * 0.32);\n\nfCut = clamp(baseFreq * 8.0 * (1.0 + timbre), 0.01, 0.45);\nlp = lp + fCut * (sat - lp);\n\nout = lp * env * (0.35 + warmth * 0.25);\n",
+    "params": {
+      "fmRatio": 1.5,
+      "fmIndex": 1.8,
+      "timbre": 0.55,
+      "symmetry": 0.5,
+      "warmth": 0.7
+    },
+    "nodeSettings": {
+      "maxVoices": 8
+    }
+  }
+}
