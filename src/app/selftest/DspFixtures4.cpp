@@ -3,6 +3,7 @@
 // AudioEffectNode -> AudioEffectRuntime -> kernel pipeline, one sample per
 // block, so what is measured is what a patch hears.
 #include "app/AppShared.h"
+#include "audio/dsp/EquationDsp.h"
 #include <algorithm>
 #include <climits>
 #include <limits>
@@ -836,6 +837,27 @@ bool RunEffectMixAndLimiterFixture()
                       GLUtil::TargetSide(1920.0f, 16) == 1920 &&
                       GLUtil::TargetSide(8.0f, 16) == 16;
       printf("DSPTEST render target sides are capped: %s\n", ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
+   // Equation Synth's formula is free text from a patch or the inspector. The
+   // recursive-descent parser had no depth limit: 50000 '(' overflowed the
+   // stack and killed the app (B-K-040). Deep input is a parse error; an
+   // ordinary formula still parses.
+   {
+      bool refused = true;
+      for (const std::string& text : { std::string(50000, '('), std::string(50000, '-') + "1",
+                                       std::string(20000, '!') + "1", [] { std::string t; for (int i = 0; i < 20000; i++) t += "sin("; return t; }() })
+      {
+         EquationDsp::AstNodePtr ast;
+         std::string err;
+         refused &= !EquationDsp::Parser::Parse(text, ast, err) && !err.empty();
+      }
+      EquationDsp::AstNodePtr ast;
+      std::string err;
+      const bool plainOk = EquationDsp::Parser::Parse("sin(2*pi*x) + (((x)))", ast, err);
+      const bool ok = refused && plainOk;
+      printf("DSPTEST equation parser refuses deep nesting: refused=%d plain=%d  %s\n", refused, plainOk, ok ? "OK" : "FAIL");
       all &= ok;
    }
 
