@@ -191,6 +191,17 @@ namespace AnalogSynthCore
       -0.82f, 0.47f, 0.93f, -0.31f, 0.18f, -0.67f, 0.74f, -0.12f
    };
 
+   // Osc 1's frequency multiplier for osc 2's value `m` in [-1, +1]. Exponential
+   // (1 V/oct, as on analog FM): the old linear 1 + 2.5 m fm went negative above
+   // fm 0.4, stalled osc 1 at the 10 Hz floor and sounded like pitch dives. The
+   // small-signal slope at fm 0 is the old 2.5 (ln 2 * kOctaves); depth is
+   // capped at 3 octaves so fm 1 stays musical rather than sweeping to Nyquist.
+   inline float FmRatio(float m, float fm)
+   {
+      constexpr float kOctaves = 2.5f / 0.6931472f;
+      return exp2f(std::clamp(m * fm * kOctaves, -3.0f, 3.0f));
+   }
+
    // Equal-power pan from position [-1, +1] to a pair of gains whose squares
    // sum to 1. Scaled by sqrt(2) so a centred source returns 1.0 per side -
    // i.e. pan 0 is bit-identical to the mono path it replaces.
@@ -703,7 +714,7 @@ public:
             const float osc1Cents = oct1 * 1200.0f + semi1 * 100.0f + fine1;
             const float osc1BaseHz = std::clamp(baseHz * powf(2.0f, osc1Cents / 1200.0f),
                                                 10.0f, (float)mSampleRate * 0.45f);
-            const float fmRatio = std::max(0.0f, 1.0f + osc2Fm * fm * 2.5f);
+            const float fmRatio = FmRatio(osc2Fm, fm);
             const float osc1ModHz = std::clamp(osc1BaseHz * fmRatio, 10.0f, (float)mSampleRate * 0.45f);
 
             // Osc 1 Unison, summed into two signal paths at once. Each
@@ -843,7 +854,7 @@ public:
                const float osc1Cents = vk.oct1 * 1200.0f + vk.semi1 * 100.0f + vk.fine1;
                const float osc1BaseHz = std::clamp(voiceBaseHz * powf(2.0f, osc1Cents / 1200.0f),
                                                    10.0f, (float)mSampleRate * 0.45f);
-               const float fmRatio = std::max(0.0f, 1.0f + osc2Fm * vk.fm * 2.5f);
+               const float fmRatio = FmRatio(osc2Fm, vk.fm);
                const float osc1ModHz = std::clamp(osc1BaseHz * fmRatio, 10.0f, (float)mSampleRate * 0.45f);
 
                // Osc 1 Unison - see the free-running path for why the same
