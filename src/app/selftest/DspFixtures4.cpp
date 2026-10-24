@@ -321,7 +321,10 @@ bool RunEffectMixAndLimiterFixture()
            { { "volume", 0.0f, 2.0f }, { "pitchShift", -24.0f, 24.0f }, { "fineTune", -100.0f, 100.0f },
              { "start", 0.0f, 1.0f }, { "end", 0.0f, 1.0f } } },
          { "Sampler", [] { return (INode*)new SamplerNode(); },
-           { { "pitch", -24.0f, 24.0f }, { "finetune", -50.0f, 50.0f }, { "speed", -2.0f, 2.0f }, { "volume", 0.0f, 1.0f } } },
+           { { "pitch", -24.0f, 24.0f }, { "finetune", -50.0f, 50.0f }, { "speed", -2.0f, 2.0f }, { "volume", 0.0f, 1.0f },
+             { "start", 0.0f, 1.0f }, { "end", 0.0f, 1.0f }, { "position", 0.0f, 1.0f } } }, // B-K-039
+         // B-K-039: ballSize 1e9 reached ImGui's circle segment count as a float-to-int overflow
+         { "Bouncing Balls", [] { return (INode*)new BouncingBallsNode(); }, { { "ballSize", 0.01f, 0.3f } } },
          { "Drum Sequencer", [] { return (INode*)new DrumSequencerNode(); }, drum },
       };
       int outOfRange = 0, checked = 0;
