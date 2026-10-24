@@ -64,8 +64,6 @@ float ValueNoise(float x, float y, float z)
    }
    return l(r[0], r[1], zf);
 }
-} // namespace
-
 // One compiled program: its own runtime so a failed recompile can't disturb the
 // working one.
 struct Program
@@ -105,6 +103,10 @@ struct Program
    }
 };
 
+} // namespace
+
+// Program stays in the anonymous namespace: both sketch engines define one, and a shared
+// external name lets the linker merge their inline members across the two layouts.
 struct SketchEngine::Impl
 {
    Program* prog = nullptr;

@@ -69,8 +69,6 @@ V3 Norm(V3 a)
    const float l = std::sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
    return l > 1e-12f ? V3{a.x / l, a.y / l, a.z / l} : V3{0, 1, 0};
 }
-} // namespace
-
 struct Program
 {
    JSRuntime* rt = nullptr;
@@ -189,6 +187,8 @@ struct Program
          else    Tri(c, ring[j], ring[j + 1]);
    }
 };
+
+} // namespace
 
 struct Sketch3DEngine::Impl
 {
