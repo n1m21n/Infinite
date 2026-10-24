@@ -367,15 +367,22 @@ def cmd_b11(args):
                 print(f"  no BENCH_JSON (exit {code}):\n{err[-2000:]}", file=sys.stderr)
                 continue
             rows += results
-    print(f"{'scene':<6}{'asked':>9}{'points':>9}{'filled':>8}{'p50 ms':>9}{'p99 ms':>9}{'fps p50':>9}{'cook ms':>9}{'tris':>11}")
+    # gpu ms: sum of the GPU stage timers (p50). foot MB: process footprint at the end, which on
+    # Apple silicon includes GPU allocations. up/down MB: CPU->GPU and GPU->CPU bytes per frame.
+    print(f"{'scene':<6}{'asked':>9}{'points':>9}{'filled':>8}{'p50 ms':>9}{'p99 ms':>9}{'fps p50':>9}{'cook ms':>9}"
+          f"{'gpu ms':>9}{'foot MB':>9}{'gpu MB':>9}{'up MB/f':>9}{'down MB/f':>10}{'tris':>11}")
     for r in rows:
         kv = _kv(r.get("variant"))
         pts = r.get("points") or {}
         fm = r.get("frame_ms") or {}
+        mem = r.get("mem") or {}
         p50 = fm.get("p50", 0) or 0
+        gpu = sum(v for v in (r.get("stages_gpu_ms") or {}).values() if _num(v) is not None)
         print(f"{kv.get('scene', '?'):<6}{pts.get('asked', 0):>9}{pts.get('count', 0):>9}{str(pts.get('filled')):>8}"
               f"{p50:>9.2f}{fm.get('p99', 0):>9.2f}{1000.0 / max(p50, 0.001):>9.1f}"
-              f"{(r.get('stages_cpu_ms') or {}).get('cook', 0):>9.2f}{r.get('tris', 0):>11,}")
+              f"{(r.get('stages_cpu_ms') or {}).get('cook', 0):>9.2f}{gpu:>9.2f}"
+              f"{mem.get('footprint_mb', -1):>9.0f}{mem.get('gpu_est_mb', -1):>9.0f}"
+              f"{pts.get('upload_mb_per_frame', -1):>9.2f}{pts.get('readback_mb_per_frame', -1):>10.2f}{r.get('tris', 0):>11,}")
     if args.json_out and rows:
         with open(args.json_out, "w") as f:
             for r in rows:

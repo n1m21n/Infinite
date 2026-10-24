@@ -1,4 +1,5 @@
 #include "GeometryFeedbackNode.h"
+#include "BenchReport.h"
 #include "gl3.h"
 #include <algorithm>
 #include <cfloat>
@@ -202,6 +203,7 @@ void GeometryFeedbackNode::ReadBack()
    glBindTexture(GL_TEXTURE_2D, mGpu.colorTex);
    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, col.data());
    glBindTexture(GL_TEXTURE_2D, 0);
+   Bench::GpuMem::NoteReadback((pos.size() + col.size()) * sizeof(float));
    mCloud.resize((size_t)n);
    const float base = mBaseSize > 0.0f ? mBaseSize : 1.0f;
    for (int k = 0; k < n; k++)

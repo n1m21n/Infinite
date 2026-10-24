@@ -1,4 +1,5 @@
 #include "GenerativeNodes.h"
+#include "BenchReport.h"
 
 #include "gl3.h"
 #include <algorithm>
@@ -367,6 +368,7 @@ void ImageToPointsNode::BuildCpuPoints(int n)
    glPixelStorei(GL_PACK_ALIGNMENT, 1);
    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, mPixels.data());
    glBindTexture(GL_TEXTURE_2D, 0);
+   Bench::GpuMem::NoteReadback(mPixels.size());
 
    mPoints.clear();
    mPoints.reserve((size_t)n * (size_t)n);

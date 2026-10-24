@@ -313,6 +313,10 @@ void DrawBenchHarness(FrameCtx& fc)
                   sAsked = ip->density * ip->density; // the grid is square
          }
          static bool sFilled = false;
+         static unsigned long long sUpAt = 0, sDownAt = 0; // CPU<->GPU bytes at the window start
+         static double sFootStartMb = -1.0;
+         if (frameId == 2)
+            sFootStartMb = Bench::ProcessFootprintMb();
          if (frameId >= 32 && sBenchB11SampleStart < 0)
          {
             sFilled = cloudSize() >= (long long)(0.95 * sAsked);
@@ -320,6 +324,8 @@ void DrawBenchHarness(FrameCtx& fc)
             {
                sBenchB11SampleStart = frameId + 1;
                sBenchB2FboAtF32 = GLUtil::FboAllocationCount();
+               sUpAt = Bench::GpuMem::UploadBytes();
+               sDownAt = Bench::GpuMem::ReadbackBytes();
             }
          }
          const int s0 = sBenchB11SampleStart;
@@ -347,11 +353,20 @@ void DrawBenchHarness(FrameCtx& fc)
             report.stagesGpuMs = sGpuTimerRing.ToJsonP50();
             report.memRssStartMb = sBenchB2RssStartMb;
             report.memRssEndMb = Bench::ProcessRssMb();
+            // Footprint counts GPU allocations too on Apple silicon (unified memory).
+            report.memFootStartMb = sFootStartMb;
+            report.memFootEndMb = Bench::ProcessFootprintMb();
+            const Bench::GpuMemBreakdown gpuBd = Bench::GpuMem::GetBreakdown();
+            report.memGpuEstMb = gpuBd.TotalMb();
+            report.memGpuEstBreakdown = gpuBd.ToJson();
+            const double mb = 1024.0 * 1024.0;
             report.points = {
                { "asked", sAsked },
                { "count", cloudSize() },
                { "filled", sFilled },
                { "fill_s", glfwGetTime() - sFillStartS },
+               { "upload_mb_per_frame", (double)(Bench::GpuMem::UploadBytes() - sUpAt) / mb / 120.0 },
+               { "readback_mb_per_frame", (double)(Bench::GpuMem::ReadbackBytes() - sDownAt) / mb / 120.0 },
             };
             if (GraphNode* gn = FindNodeByIndex(sBenchB2Render3DIdx))
                if (auto* r = dynamic_cast<Render3DNode*>(gn->node.get()))

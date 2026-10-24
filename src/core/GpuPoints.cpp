@@ -148,6 +148,7 @@ namespace GpuPointsGL
       glBindTexture(GL_TEXTURE_2D, t.colorTex);
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_FLOAT, color.data());
       glBindTexture(GL_TEXTURE_2D, 0);
+      Bench::GpuMem::NoteUpload((pos.size() + color.size()) * sizeof(float));
 
       out.posTex = t.posTex;
       out.colorTex = t.colorTex;

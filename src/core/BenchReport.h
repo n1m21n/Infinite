@@ -370,6 +370,14 @@ namespace Bench
       void RecordBuffer(unsigned int id, GpuMemCategory cat, size_t bytes, const char* nodeType = nullptr);
       void ReleaseBuffer(unsigned int id);
 
+      // Bytes moved between CPU and GPU since start. RecordBuffer counts its
+      // bytes as uploaded (every caller passes the data it just wrote);
+      // texture uploads and readbacks note themselves.
+      void NoteUpload(size_t bytes);
+      void NoteReadback(size_t bytes);
+      unsigned long long UploadBytes();
+      unsigned long long ReadbackBytes();
+
       GpuMemBreakdown GetBreakdown();
       double GetTotalMb();
       void Reset();

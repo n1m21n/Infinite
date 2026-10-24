@@ -430,7 +430,15 @@ namespace Bench
          if (id == 0)
             return;
          sBuffers[id] = AllocationEntry{ cat, bytes, nodeType ? nodeType : "" };
+         NoteUpload(bytes);
       }
+
+      static unsigned long long sUploadBytes = 0;
+      static unsigned long long sReadbackBytes = 0;
+      void NoteUpload(size_t bytes) { sUploadBytes += bytes; }
+      void NoteReadback(size_t bytes) { sReadbackBytes += bytes; }
+      unsigned long long UploadBytes() { return sUploadBytes; }
+      unsigned long long ReadbackBytes() { return sReadbackBytes; }
 
       void ReleaseBuffer(unsigned int id)
       {

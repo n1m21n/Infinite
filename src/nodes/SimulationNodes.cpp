@@ -1263,6 +1263,7 @@ void ParticleSystemNode::EnsureCpuParticles()
    glReadBuffer(GL_COLOR_ATTACHMENT1);
    glReadPixels(0, 0, texW, rows, GL_RGBA, GL_FLOAT, col.data());
    glReadBuffer(GL_COLOR_ATTACHMENT0);
+   Bench::GpuMem::NoteReadback((a.size() + b.size() + pos.size() + col.size()) * sizeof(float));
    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
 
    const float base = std::max(1e-8f, PointBaseSize());
