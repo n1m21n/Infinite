@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="paper">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P855CS2V');</script>
+  <!-- End Google Tag Manager -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script src="../theme.js?v=2"></script>
+  <title>Every Synthesizer in Infinite: 20 Audio Nodes Explained</title>
+  <meta name="description" content="The complete guide to all 20 synthesizer nodes in Infinite: subtractive, wavetable, FM, physical modeling, granular, spectral resynthesis, and DSP kernels.">
+  <link rel="canonical" href="https://infinitedevices.org/blog/every-synthesizer-node-in-infinite-sound-design-guide.html">
+  <meta property="og:title" content="Every Synthesizer in Infinite: 20 Audio Nodes Explained">
+  <meta property="og:description" content="The complete guide to all 20 synthesizer nodes in Infinite: subtractive, wavetable, FM, physical modeling, granular, spectral resynthesis, and DSP kernels.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/blog_sound_design_synth.png">
+  <meta property="og:url" content="https://infinitedevices.org/blog/every-synthesizer-node-in-infinite-sound-design-guide.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Every Synthesizer in Infinite: 20 Audio Nodes Explained">
+  <meta name="twitter:description" content="The complete guide to all 20 synthesizer nodes in Infinite: subtractive, wavetable, FM, physical modeling, granular, spectral resynthesis, and DSP kernels.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/blog_sound_design_synth.png">
+  <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
+  <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css?v=36336012">
+  <link rel="stylesheet" href="../style.css?v=d046c735">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=823c9183">
+  <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ZC4TYX1WCL');
+  </script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Every synthesizer node in Infinite: the complete sound design guide", "description": "The complete guide to all 20 synthesizer nodes in Infinite: subtractive, wavetable, FM, physical modeling, granular, spectral resynthesis, and DSP kernels.", "datePublished": "2026-10-24", "dateModified": "2026-10-24", "mainEntityOfPage": "https://infinitedevices.org/blog/every-synthesizer-node-in-infinite-sound-design-guide.html", "url": "https://infinitedevices.org/blog/every-synthesizer-node-in-infinite-sound-design-guide.html", "image": ["https://infinitedevices.org/assets/blog_sound_design_synth.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "synthesizers, sound design, modular synth, dsp, wavetable, physical modeling", "wordCount": 3205, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "Every synthesizer node in Infinite: the complete sound design guide", "item": "https://infinitedevices.org/blog/every-synthesizer-node-in-infinite-sound-design-guide.html"}]}</script>
+  <link rel="stylesheet" href="../system.css?v=23625436">
+  <link rel="stylesheet" href="../scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="../neumo.css?v=3a020cee">
+  <link rel="stylesheet" href="../search.css?v=96e10ca3">
+</head>
+<body class="blog-page blog-post">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="../index.html#top" class="brand" aria-label="Infinite home">
+        <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+      <button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span class="search-label">Search</span></button>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+          <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+          <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+        </div>
+      </div>
+      <div class="nav-group" data-current>
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+        </div>
+      </div>
+      <a class="btn btn-primary nav-sheet-cta" href="../index.html#setup">Download Infinite</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn hide-sm" aria-label="View on GitHub" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn sm-only" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <article class="post">
+      <div class="container post-wrap">
+        <nav class="crumbs mono" aria-label="Breadcrumb"><a href="../index.html">Infinite</a> / <a href="./">Blog</a></nav>
+        <header class="post-head">
+          <p class="post-kicker mono">Creative</p>
+          <h1>Every synthesizer node in Infinite: the complete sound design guide</h1>
+          <p class="post-lede">The complete guide to all 20 synthesizer nodes in Infinite: subtractive, wavetable, FM, physical modeling, granular, spectral resynthesis, and DSP kernels.</p>
+          <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">24 October 2026 · 15 min read</span></span></p>
+        </header>
+        <figure class="post-hero"><img src="../assets/thumbs/blog_sound_design_synth-1200.webp" alt="modular synthesizer nodes and sound design instruments in Infinite DAW" width="1200" height="675" decoding="async"></figure>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#1-oscillator-dual-oscillator-subtractive-fm-engine">1. Oscillator: dual-oscillator subtractive &amp; FM engine</a></li><li><a href="#2-wavetable-64-table-morphing-synth-with-unison">2. Wavetable: 64-table morphing synth with unison</a></li><li><a href="#3-analog-polyphonic-virtual-analog-with-nonlinear-filters">3. Analog: polyphonic virtual analog with nonlinear filters</a></li><li><a href="#4-fm-4-operator-frequency-modulation-synthesizer">4. FM: 4-operator frequency modulation synthesizer</a></li><li><a href="#5-partials-64-harmonic-additive-formant-resynthesis">5. Partials: 64-harmonic additive formant resynthesis</a></li><li><a href="#6-string-karplus-strong-physical-modeling-waveguide">6. String: Karplus-Strong physical modeling waveguide</a></li><li><a href="#7-wave-terrain-topographic-image-to-sound-synthesis">7. Wave Terrain: topographic image-to-sound synthesis</a></li><li><a href="#8-equation-synth-desmos-style-mathematical-synthesis">8. Equation Synth: Desmos-style mathematical synthesis</a></li><li><a href="#9-spectral-synth-real-time-spectrogram-resynthesis">9. Spectral Synth: real-time spectrogram resynthesis</a></li><li><a href="#10-metallic-modal-physical-resonator-for-bells-and-plates">10. Metallic: modal physical resonator for bells and plates</a></li><li><a href="#11-sampler-polyphonic-multisample-engine">11. Sampler: polyphonic multisample engine</a></li><li><a href="#12-slicer-transient-detecting-beat-chopper">12. Slicer: transient-detecting beat chopper</a></li><li><a href="#13-paulstretch-extreme-spectral-time-stretching">13. PaulStretch: extreme spectral time-stretching</a></li><li><a href="#14-molder-harmonic-partial-decomposition-and-waveshaping">14. Molder: harmonic partial decomposition and waveshaping</a></li><li><a href="#15-grain-molder-granular-feature-sorting-and-risers">15. Grain Molder: granular feature sorting and risers</a></li><li><a href="#16-granular-real-time-polyphonic-granular-cloud-engine">16. Granular: real-time polyphonic granular cloud engine</a></li><li><a href="#17-field-synth-programmable-per-sample-jit-dsp-kernel">17. Field Synth: programmable per-sample JIT DSP kernel</a></li><li><a href="#18-drum-sequencer-16-step-polyphonic-drum-engine">18. Drum Sequencer: 16-step polyphonic drum engine</a></li><li><a href="#19-mpc-16-pad-vintage-sampling-groovebox">19. MPC: 16-pad vintage sampling groovebox</a></li><li><a href="#20-looper-multi-layer-live-performance-phrase-looper">20. Looper: multi-layer live performance phrase looper</a></li><li><a href="#synthesis-on-a-unified-graph">Synthesis on a unified graph</a></li></ol></details>
+        <div class="prose">
+<p>Most digital audio workstations isolate sound generation inside third-party plugins. You purchase an instrument, load a floating window, navigate vendor-specific preset systems, and route stereo audio into a rigid mixer channel.</p>
+<p>Infinite approaches synthesis from a different foundation. Every synthesizer lives directly on the open canvas as a modular node. Notes, audio streams, modulation voltages, and visual textures share the same graph and memory space. A single LFO can sweep a wavetable position while warping a 3D geometry mesh, and a reaction-diffusion simulation can directly generate polyphonic audio timbre.</p>
+<p>Infinite features twenty native synthesizer engines, spanning virtual analog, morphing wavetables, 4-operator frequency modulation, Karplus-Strong waveguides, granular cloud generators, extreme spectral time-stretchers, and per-sample programmable JIT kernels.</p>
+<p>Here is an architectural breakdown of every synthesizer node in Infinite, how their sound engines work, and how to patch them.</p>
+<hr>
+<h2 id="1-oscillator-dual-oscillator-subtractive-fm-engine">1. Oscillator: dual-oscillator subtractive &amp; FM engine</h2>
+<p>The <strong>Oscillator</strong> node is Infinite's foundational sound generator, built upon bandlimited anti-aliased wavetables with linear frequency modulation and phase synchronization.</p>
+<figure><img src="../assets/nodes/hd/oscillator.webp" alt="Oscillator node in Infinite" width="307" height="550" loading="lazy" decoding="async"><figcaption>Oscillator node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Waveforms</strong>: Sine, Triangle, Sawtooth, and Square with variable Pulse Width (<code>0.01</code> to <code>0.99</code>).</li><li><strong>Pitch controls</strong>: Coarse frequency (<code>20 Hz</code> to <code>8000 Hz</code>), octave shift (<code>-4</code> to <code>+4</code>), semitone offset (<code>-12</code> to <code>+12</code>), and fine detune (<code>-50</code> to <code>+50</code> cents).</li><li><strong>Linear FM input</strong>: An audio-rate <code>fm_in</code> pin enables modulation from a secondary oscillator, producing rich sidebands for metallic chimes, FM brass, and aggressive growls.</li><li><strong>Portamento</strong>: Continuous glide parameter (<code>0</code> to <code>2</code> seconds) providing constant-rate pitch transitions between notes.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Patch a secondary Oscillator set to a high octave into the <code>fm_in</code> port, modulate FM Depth with an Envelope, and route through an Audio Filter for crisp metallic bells.</p>
+<pre><code>Random Note Generator -&gt; Oscillator -&gt; Audio Filter -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="2-wavetable-64-table-morphing-synth-with-unison">2. Wavetable: 64-table morphing synth with unison</h2>
+<p>The <strong>Wavetable</strong> node is Infinite's flagship polyphonic wavetable instrument, featuring 64 factory wavetables that morph smoothly across eight distinct single-cycle frames.</p>
+<figure><img src="../assets/nodes/hd/wavetable.webp" alt="Wavetable node in Infinite" width="434" height="550" loading="lazy" decoding="async"><figcaption>Wavetable node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>2D table scanning</strong>: Continuous position interpolation across 8 frames per table, eliminating step clicks or boundary artifacts.</li><li><strong>Unison detune &amp; stereo spread</strong>: Stacks up to 8 voices per note with adjustable frequency detuning and wide stereo placement.</li><li><strong>Sub-oscillator</strong>: Integrated sub-harmonic generator providing dedicated low-end weight independently of table morphing.</li><li><strong>Modulatable position</strong>: The position parameter can be cabled directly to LFOs, envelope followers, or hand tracking modulators.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Wire an LFO into the table position input so the waveform continually evolves, then layer chorus for a lush cinematic pad.</p>
+<pre><code>Arpeggiator -&gt; Wavetable -&gt; Chorus -&gt; Reverb -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="3-analog-polyphonic-virtual-analog-with-nonlinear-filters">3. Analog: polyphonic virtual analog with nonlinear filters</h2>
+<p>The <strong>Analog</strong> node models the physical circuit behaviour of vintage analog synthesizers, complete with subtle oscillator drift, saturation stages, and four distinct nonlinear filter topologies.</p>
+<figure><img src="../assets/nodes/hd/analog.webp" alt="Analog node in Infinite" width="275" height="550" loading="lazy" decoding="async"><figcaption>Analog node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Twin drift-stabilized oscillators</strong>: Dual oscillators with saw, square, triangle, and sine options, pulse width modulation, sub-oscillator, and a pink/white noise source.</li><li><strong>Circuit-modeled filters</strong>: Switchable between a 4-pole Moog transistor ladder, Korg MS-20 resonant lowpass, diode ladder, and state-variable filter (SVF).</li><li><strong>4x oversampling</strong>: Drives and non-linear filter stages run at 4x internal oversampling to keep aliasing strictly under -80 dB across all octaves.</li><li><strong>Dual ADSR envelopes</strong>: Dedicated amplitude and filter envelopes with exponential decay curves.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Stack three detuned unison voices, select the MS-20 filter model with medium resonance, and sweep cutoff with an envelope for an authentic acid bassline.</p>
+<pre><code>MIDI Notes -&gt; Analog -&gt; Delay -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="4-fm-4-operator-frequency-modulation-synthesizer">4. FM: 4-operator frequency modulation synthesizer</h2>
+<p>The <strong>FM</strong> node delivers classic frequency modulation synthesis using four sine operators configured across eleven classic routing algorithms.</p>
+<figure><img src="../assets/nodes/hd/fm.webp" alt="FM node in Infinite" width="281" height="550" loading="lazy" decoding="async"><figcaption>FM node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>11 routing algorithms</strong>: Ranging from a pure vertical cascade (<code>4 -&amp;gt; 3 -&amp;gt; 2 -&amp;gt; 1</code>) for complex harmonic teeth, to parallel carriers for additive electric pianos.</li><li><strong>Harmonic frequency ratios</strong>: Per-operator integer and fractional frequency multipliers (<code>0.5x</code> to <code>32x</code>).</li><li><strong>Feedback loop</strong>: Operator 4 includes self-modulation feedback, transitioning from smooth sines to saw waves and broadband noise.</li><li><strong>Per-operator envelopes</strong>: Individual envelope generators shaping the modulation index over time.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Select algorithm 5 (two parallel carrier-modulator stacks), tune operator 2 to a 3.5x non-harmonic ratio, and add a brief decay envelope for a crystalline mallet sound.</p>
+<pre><code>Arpeggiator -&gt; FM -&gt; Reverb -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="5-partials-64-harmonic-additive-formant-resynthesis">5. Partials: 64-harmonic additive formant resynthesis</h2>
+<p>The <strong>Partials</strong> node performs real-time additive resynthesis, tracking harmonic partials and reproducing acoustic instruments and voices without pitch artifacts.</p>
+<figure><img src="../assets/nodes/hd/partials.webp" alt="Partials node in Infinite" width="616" height="550" loading="lazy" decoding="async"><figcaption>Partials node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Formant preservation</strong>: When transposing incoming audio across octaves, Partials keeps the spectral formant envelope locked in place, avoiding the unnatural "chipmunk" timbre common to conventional samplers.</li><li><strong>Spectral tilt &amp; odd/even balance</strong>: Continuous control over harmonic roll-off slope and the ratio between even and odd harmonics.</li><li><strong>Inharmonic stretching</strong>: Stretches partial frequencies away from integer multiples for bell and metallic timbres.</li><li><strong>Residual noise tracking</strong>: Models the turbulent air and breath left behind by harmonic analysis.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Load a vocal syllable or acoustic cello sample into Partials, trigger it across three octaves, and hear natural vocal character preserved across the entire keyboard.</p>
+<pre><code>MIDI Notes -&gt; Partials -&gt; Convolution Reverb -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="6-string-karplus-strong-physical-modeling-waveguide">6. String: Karplus-Strong physical modeling waveguide</h2>
+<p>The <strong>String</strong> node models the physical acoustics of vibrating strings stretched over a resonating wooden body using Karplus-Strong waveguide synthesis.</p>
+<figure><img src="../assets/nodes/hd/string.webp" alt="String node in Infinite" width="719" height="550" loading="lazy" decoding="async"><figcaption>String node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Physical waveguide loop</strong>: A delay line length tuned exactly to the note's fundamental frequency, coupled with an internal lowpass reflection filter.</li><li><strong>Three exciter modes</strong>: </li><li><em>Pluck</em>: Impulse burst simulating a guitar plectrum or finger pick.</li><li><em>Bow</em>: Continuous friction noise simulating a violin or cello bow.</li><li><em>Strike</em>: Felt hammer excitation simulating an acoustic piano or hammered dulcimer.</li><li><strong>Body resonance &amp; pickup position</strong>: Configurable acoustic body model and spatial pickup location along the string length.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Set the exciter mode to Bow, slow the attack time slightly, and play sustained chords for a lush acoustic string ensemble.</p>
+<pre><code>Chorder -&gt; String -&gt; Reverb -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="7-wave-terrain-topographic-image-to-sound-synthesis">7. Wave Terrain: topographic image-to-sound synthesis</h2>
+<p>The <strong>Wave Terrain</strong> node turns any 2D image, video capture, reaction-diffusion simulation, or procedural texture into a continuous 3D acoustic terrain surface <code>z = T(u, v)</code>.</p>
+<figure><img src="../assets/nodes/hd/wave-terrain.webp" alt="Wave Terrain node in Infinite" width="221" height="550" loading="lazy" decoding="async"><figcaption>Wave Terrain node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Audio-rate orbital paths</strong>: An oscillator traces a closed orbital trajectory <code>(u(t), v(t))</code> across the image (circle, ellipse, Lissajous curve, or lemniscate).</li><li><strong>Surface height as amplitude</strong>: As the orbital scan travels across pixels, the image luminance <code>z</code> becomes the instantaneous audio amplitude.</li><li><strong>10-level Fourier MIP antialiasing</strong>: Sampling raw image pixels causes harsh aliasing; Infinite computes an internal Real Discrete Fourier Transform (RDFT) MIP pyramid across 10 octaves, ensuring pristine, alias-free polyphonic synthesis across all 8 octaves.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Feed a live Reaction Diffusion texture into Wave Terrain, route an LFO to orbit radius, and listen to the sound morph as the organic visual pattern blooms.</p>
+<pre><code>Reaction Diffusion -&gt; Wave Terrain -&gt; Saturator -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="8-equation-synth-desmos-style-mathematical-synthesis">8. Equation Synth: Desmos-style mathematical synthesis</h2>
+<p>The <strong>Equation Synth</strong> node evaluates custom mathematical expressions <code>y = f(x, a, b, c, d)</code> directly at 48kHz audio rates, turning formulas into playable instruments.</p>
+<figure><img src="../assets/nodes/hd/equation-synth.webp" alt="Equation Synth node in Infinite" width="285" height="550" loading="lazy" decoding="async"><figcaption>Equation Synth node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Inline formula parsing</strong>: Type formulas directly using standard mathematical functions (<code>sin</code>, <code>cos</code>, <code>tan</code>, <code>pow</code>, <code>abs</code>, <code>tanh</code>, <code>floor</code>).</li><li><strong>Real-time parameter knobs</strong>: Four continuous parameters (<code>knobA</code>, <code>knobB</code>, <code>knobC</code>, <code>knobD</code>) exposed as modulation pins.</li><li><strong>Compile-time bandlimiting</strong>: Evaluated curves are compiled into bandlimited wavetable mipmaps, preventing mathematical sharp edges from creating audible foldback distortion.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Type <code>sin(x) + a * sin(x * 3) + b * sin(x * 5)</code>, wire an LFO to <code>knobA</code>, and listen to third and fifth harmonics fade in and out with algebraic purity.</p>
+<pre><code>MIDI Notes -&gt; Equation Synth -&gt; Formant Filter -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="9-spectral-synth-real-time-spectrogram-resynthesis">9. Spectral Synth: real-time spectrogram resynthesis</h2>
+<p>The <strong>Spectral Synth</strong> node scans an image or visual canvas horizontally as a spectrogram, converting visual pixels into audible frequencies.</p>
+<figure><img src="../assets/nodes/hd/spectral-synth.webp" alt="Spectral Synth node in Infinite" width="203" height="550" loading="lazy" decoding="async"><figcaption>Spectral Synth node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Horizontal scan line</strong>: A playhead travels across the texture from left to right at tempo-synced rates.</li><li><strong>Vertical frequency mapping</strong>: The vertical $y$-axis maps to acoustic frequency (low frequencies at the bottom, high frequencies at the top), while pixel brightness sets partial amplitude.</li><li><strong>Spectral freeze</strong>: Freeze the playhead at any point along the image to produce an indefinite, unmoving spectral chord.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Draw three horizontal brush strokes in a Draw node at low, mid, and high positions, patch the texture into Spectral Synth, and hear your sketch played back as a triad.</p>
+<pre><code>Draw Canvas -&gt; Spectral Synth -&gt; Delay -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="10-metallic-modal-physical-resonator-for-bells-and-plates">10. Metallic: modal physical resonator for bells and plates</h2>
+<p>The <strong>Metallic</strong> node models the physical vibrations of acoustic metal and glass objects struck by hard or soft mallets using a bank of coupled two-pole bandpass resonators.</p>
+<figure><img src="../assets/nodes/hd/metallic.webp" alt="Metallic node in Infinite" width="374" height="550" loading="lazy" decoding="async"><figcaption>Metallic node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>8 material presets</strong>: Steel, Brass, Bell Bronze, Aluminium, Glass, Wood, Ceramic, and Titanium.</li><li><strong>Modal dispersion</strong>: Modes follow non-integer frequency ratios corresponding to the physical vibration equations of circular plates and rectangular bars.</li><li><strong>Stiffness &amp; decay</strong>: Stiffness controls modal frequency clustering, while decay adjusts the acoustic damping rate across high versus low modes.</li><li><strong>Strike hardness</strong>: Blends from a soft felt mallet impulse to a sharp metal point impact.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Trigger Metallic from the Bouncing Balls note generator for an acoustic gamelan performance where notes ring and decay naturally in space.</p>
+<pre><code>Bouncing Balls -&gt; Metallic -&gt; Reverb -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="11-sampler-polyphonic-multisample-engine">11. Sampler: polyphonic multisample engine</h2>
+<p>The <strong>Sampler</strong> node provides polyphonic sample playback with precision loop boundaries, pitch tracking, and real-time live audio recording.</p>
+<figure><img src="../assets/nodes/hd/sampler.webp" alt="Sampler node in Infinite" width="527" height="550" loading="lazy" decoding="async"><figcaption>Sampler node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Playback modes</strong>: One-Shot, Forward Loop, Reverse Loop, and Ping-Pong bidirectional loop.</li><li><strong>Live buffer recording</strong>: An audio <code>record_in</code> port allows capturing incoming microphone feeds, guitar inputs, or synth stems straight into memory.</li><li><strong>Root pitch tracking</strong>: Tracks MIDI keyboard pitch relative to a configurable base key with crossfade loop smoothing.</li><li><strong>Envelope shaping</strong>: Built-in ADSR envelope for smooth sample transitions.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Record an ambient field recording through <code>record_in</code>, set the loop mode to Ping-Pong with a 100ms crossfade, and play rich chords across the keyboard.</p>
+<pre><code>Microphone -&gt; Sampler (Record In) -&gt; MIDI Notes -&gt; Sampler -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="12-slicer-transient-detecting-beat-chopper">12. Slicer: transient-detecting beat chopper</h2>
+<p>The <strong>Slicer</strong> node analyzes incoming audio loops, detects transient attacks, and slices the recording into individual hits mapped across MIDI notes.</p>
+<figure><img src="../assets/nodes/hd/slicer.webp" alt="Slicer node in Infinite" width="521" height="550" loading="lazy" decoding="async"><figcaption>Slicer node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Onset detection</strong>: High-precision transient peak detection algorithm automatically finding drum hits and percussive transients.</li><li><strong>Metric grid fallback</strong>: Option to slice by strict musical divisions (1/8, 1/16, or 1/32 notes) locked to transport BPM.</li><li><strong>Per-slice control</strong>: Individual start/end offsets, pitch offsets, and reverse triggers per slice.</li><li><strong>MIDI pad mapping</strong>: Slices automatically map upward from MIDI note C1 for instant pad controller performance.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Feed a drum break into Slicer, connect an Arpeggiator with a random pattern, and generate an endless supply of breakbeat permutations.</p>
+<pre><code>Drum Loop -&gt; Slicer -&gt; Arpeggiator -&gt; Slicer -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="13-paulstretch-extreme-spectral-time-stretching">13. PaulStretch: extreme spectral time-stretching</h2>
+<p>The <strong>PaulStretch</strong> node implements the legendary Paul Nasca spectral time-stretch algorithm, expanding audio recordings from 10x to 1000x their original length without pitch shifts.</p>
+<figure><img src="../assets/nodes/hd/paulstretch.webp" alt="PaulStretch node in Infinite" width="532" height="550" loading="lazy" decoding="async"><figcaption>PaulStretch node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Windowed FFT analysis</strong>: Deconstructs incoming audio into heavily overlapping spectral windows (typically 0.25 to 2.0 seconds wide).</li><li><strong>Phase randomization</strong>: Completely randomizes the phase angle of every frequency bin while preserving original magnitude, eliminating comb filtering and phase cancellation.</li><li><strong>Extreme stretch factors</strong>: Stretches a 3-second vocal sample into a 5-minute ambient drone that retains acoustic warmth.</li><li><strong>Unison &amp; detune</strong>: Adds multi-voice spectral unison for shimmering cinematic textures.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Load a short acoustic piano chord into PaulStretch, set Stretch to 50x, open the FFT window to 1.5 seconds, and send the result into a Limiter for an ambient soundscape.</p>
+<pre><code>Piano Sample -&gt; PaulStretch (50x) -&gt; Limiter -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="14-molder-harmonic-partial-decomposition-and-waveshaping">14. Molder: harmonic partial decomposition and waveshaping</h2>
+<p>The <strong>Molder</strong> node decomposes incoming audio into tracked sinusoidal partials and residual noise, then applies nonlinear wavefolding and dynamic mutation curves.</p>
+<figure><img src="../assets/nodes/hd/molder.webp" alt="Molder node in Infinite" width="515" height="550" loading="lazy" decoding="async"><figcaption>Molder node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Sinusoidal tracking</strong>: Extracts frequency tracks and energy envelopes from any incoming sample.</li><li><strong>Mutation roll</strong>: The Roll button mutates frequency tracks, introducing harmonic permutations and metallic shifts.</li><li><strong>Nonlinear folding</strong>: Compresses partial amplitudes through polynomial folding curves, producing grit and analog saturation.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Send a clean acoustic vocal recording into Molder, trigger the Roll parameter via a macro button, and listen to the voice transform into alien harmonic drones.</p>
+<pre><code>Sampler -&gt; Molder -&gt; Chorus -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="15-grain-molder-granular-feature-sorting-and-risers">15. Grain Molder: granular feature sorting and risers</h2>
+<p>The <strong>Grain Molder</strong> node chops an audio buffer into thousands of overlapping micro-grains, analyzes their acoustic properties (loudness, spectral centroid, or pitch), and sorts them in ascending or descending order.</p>
+<figure><img src="../assets/nodes/hd/grain-molder.webp" alt="Grain Molder node in Infinite" width="539" height="550" loading="lazy" decoding="async"><figcaption>Grain Molder node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Micro-grain slicing</strong>: Deconstructs buffers into grains between 20ms and 150ms with Hann window envelopes.</li><li><strong>Acoustic feature classification</strong>: Measures root-mean-square (RMS) energy, brightness, and pitch density for every grain.</li><li><strong>Sorting engine</strong>: Reorders grains along the playback timeline according to the chosen metric.</li><li><strong>Amount slider</strong>: Morphs continuously from original chronological playback to fully sorted granular order.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Load a busy drum break, set Sort Mode to Level, and automate the Amount slider from 0% to 100% over four bars to produce a natural granular riser.</p>
+<pre><code>Drum Loop -&gt; Grain Molder (Amount) -&gt; Audio Filter -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="16-granular-real-time-polyphonic-granular-cloud-engine">16. Granular: real-time polyphonic granular cloud engine</h2>
+<p>The <strong>Granular</strong> node shreds recorded or live audio into micro-sound grains (10ms to 500ms), scattering them across space and time to produce granular clouds, textures, and pitch-shifted shimmers.</p>
+<figure><img src="../assets/nodes/hd/granular.webp" alt="Granular node in Infinite" width="462" height="550" loading="lazy" decoding="async"><figcaption>Granular node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Grain density &amp; size</strong>: Generates up to 64 simultaneous overlapping grains with customizable duration and emission rate.</li><li><strong>Position scrub &amp; spray</strong>: Controls the center read head position in the buffer, while Spray introduces random time offsets.</li><li><strong>Pitch randomization</strong>: Randomly scatters grain playback speeds across customizable semitone windows.</li><li><strong>Freeze toggle</strong>: Instantly locks the read head to sample an infinitesimal sliver of sound indefinitely.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Pipe a live guitar input into Granular, hit Freeze during a sustained chord, and widen Pitch Spray to turn a single strum into an ethereal cloud of sound.</p>
+<pre><code>Audio In -&gt; Granular (Freeze) -&gt; Stereo Delay -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="17-field-synth-programmable-per-sample-jit-dsp-kernel">17. Field Synth: programmable per-sample JIT DSP kernel</h2>
+<p>The <strong>Field Synth</strong> node is Infinite's most flexible sound engine: a polyphonic synthesizer whose entire voice algorithm is written in Infinite's bare-name Field language and compiled directly into native machine code.</p>
+<figure><img src="../assets/nodes/hd/field-synth.webp" alt="Field Synth node in Infinite" width="245" height="550" loading="lazy" decoding="async"><figcaption>Field Synth node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Bare-name syntax</strong>: Write DSP code with plain algebraic expressions (<code>freq</code>, <code>phase</code>, <code>out</code>) without sigils or boilerplate.</li><li><strong>Per-sample execution</strong>: Runs on the audio thread at 48kHz with zero garbage collection or allocation overhead.</li><li><strong>Dynamic user knobs</strong>: Define custom parameters in code that automatically expose modulatable pins on the node body.</li><li><strong>Polyphonic voice architecture</strong>: The engine handles note allocation, voice stealing, and per-voice registers automatically.</li></ul>
+<h3 id="example-resonant-dual-oscillator-kernel">Example: resonant dual-oscillator kernel</h3>
+<pre><code class="language-field">// inputs: f (frequency), t (time), gate (0..1)
+state p1 = 0.0
+state p2 = 0.0
+
+// phase accumulators
+let inc = f * (6.2831853 / 48000.0)
+p1 = p1 + inc
+if p1 &gt; 6.2831853 { p1 = p1 - 6.2831853 }
+
+p2 = p2 + inc * 1.005 // slight detune
+if p2 &gt; 6.2831853 { p2 = p2 - 6.2831853 }
+
+// soft-clipped sum
+let raw = sin(p1) * 0.5 + sin(p2) * 0.5
+out = tanh(raw * 1.5) * gate</code></pre>
+<h3 id="try-it">Try it</h3>
+<p>Drop a Field Synth, paste the kernel above, connect MIDI Notes, and immediately enjoy a clean, detuned analog lead with zero external dependencies.</p>
+<pre><code>MIDI Notes -&gt; Field Synth -&gt; Limiter -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="18-drum-sequencer-16-step-polyphonic-drum-engine">18. Drum Sequencer: 16-step polyphonic drum engine</h2>
+<p>The <strong>Drum Sequencer</strong> node is an integrated 8-track, 16-step drum machine combining analog drum synthesis circuits with an intuitive pattern grid.</p>
+<figure><img src="../assets/nodes/hd/drum-sequencer.webp" alt="Drum Sequencer node in Infinite" width="293" height="550" loading="lazy" decoding="async"><figcaption>Drum Sequencer node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>8 synthesized drum voices</strong>: Dedicated circuits for Kick, Snare, Closed Hat, Open Hat, Clap, Low Tom, High Tom, and Percussion.</li><li><strong>Individual audio outputs</strong>: Includes a master stereo mix output plus eight individual audio outs (<code>1</code> to <code>8</code>) for per-channel external processing and mixing.</li><li><strong>Step velocity &amp; swing</strong>: Per-step velocity sliders with configurable shuffle percentage.</li><li><strong>Transport lock</strong>: Automatically locks to Infinite's global BPM and timeline transport.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Wire individual output 1 (Kick) to an Audio Analyze node, and use its bass energy output to drive the scale of a 3D Sphere in sync with the beat.</p>
+<pre><code>Drum Sequencer (Kick Out) -&gt; Audio Analyze -&gt; 3D Sphere (Scale)</code></pre>
+<hr>
+<h2 id="19-mpc-16-pad-vintage-sampling-groovebox">19. MPC: 16-pad vintage sampling groovebox</h2>
+<p>The <strong>MPC</strong> node captures the tactile immediacy and groove feel of classic 16-pad hardware samplers.</p>
+<figure><img src="../assets/nodes/hd/mpc.webp" alt="MPC node in Infinite" width="321" height="550" loading="lazy" decoding="async"><figcaption>MPC node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>16 dynamic sample pads</strong>: Drag and drop audio files onto any of the 16 pads.</li><li><strong>16-level velocity mode</strong>: Spreads either volume or pitch across all 16 pads for expressive melodic playing of a single sample.</li><li><strong>Note repeat</strong>: Hold a pad while pressing Note Repeat to generate rhythmic rolls quantized to 1/8, 1/16, or 1/32 triplets.</li><li><strong>Choke groups</strong>: Assign pads to mutually exclusive mute groups (such as open and closed hi-hats).</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Load a vocal chop onto pad 1, turn on 16-Level Tuning, and play pitched vocal melodies straight from a MIDI keyboard or pad controller.</p>
+<pre><code>MIDI Notes -&gt; MPC -&gt; Saturator -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="20-looper-multi-layer-live-performance-phrase-looper">20. Looper: multi-layer live performance phrase looper</h2>
+<p>The <strong>Looper</strong> node is designed for live improvisation, enabling bar-quantized audio phrase recording, seamless overdubbing, and speed manipulation.</p>
+<figure><img src="../assets/nodes/hd/looper.webp" alt="Looper node in Infinite" width="565" height="550" loading="lazy" decoding="async"><figcaption>Looper node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Bar-quantized punch-in</strong>: Automatically rounds start and stop commands to the nearest bar boundary (1, 2, 4, 8, or 16 bars).</li><li><strong>Non-destructive overdubbing</strong>: Layer takes indefinitely with an adjustable decay feedback control to prevent buildup.</li><li><strong>Reverse &amp; half-speed</strong>: Instant reverse toggle and half-speed playback for tape-style pitch drop effects.</li><li><strong>Boundary crossfades</strong>: Applies 5ms micro-crossfades across loop seams, eliminating clicks on imperfect takes.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Record a 2-bar guitar or vocal loop, hit Dub to add counter-melodies, and toggle Reverse for an immediate backwards psychedelic texture.</p>
+<pre><code>Audio In -&gt; Looper -&gt; Stereo Delay -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="synthesis-on-a-unified-graph">Synthesis on a unified graph</h2>
+<p>Because Infinite shares a single execution graph across audio, 2D compositing, and 3D geometry, these twenty synthesizers are not confined to traditional DAW audio tracks.</p>
+<p>You can drive a Wavetable position from a particle system's average kinetic energy, strike a Metallic resonator whenever a 3D bouncing sphere collides with a floor plane, or scan a generative reaction-diffusion texture through Wave Terrain at 48kHz.</p>
+<p>Drop any synthesizer onto the canvas, wire it up, and explore sound design unconstrained by plugin windows.</p>
+        </div>
+        <aside class="post-cta" aria-label="Try Infinite">
+          <p class="hand">your turn</p>
+          <h2>Make something with it</h2>
+          <p>Infinite is free and open source for macOS, Windows and Linux. Start from a template in the Library, or read how the nodes fit together.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="../library.html">Browse the Library</a></p>
+        </aside>
+        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="paulstretch-extreme-spectral-time-stretching.html"><span class="mono">Creative</span><b>PaulStretch on Mac: extreme spectral time stretching in Infinite</b></a><a class="rel-card" href="electronic-music-sound-design-sub-bass-pluck-pad.html"><span class="mono">Creative</span><b>Sound design in Infinite: sub bass, plucks, and pads</b></a><a class="rel-card" href="original-audiovisual-nodes-wave-terrain-shape-resonator-cymatics.html"><span class="mono">Creative</span><b>unique nodes in infinite: wave terrain, shape resonator, cymatics</b></a></div></section>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <div class="signup-row">
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="../signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="../artists.html">Artists</a>
+          <a href="../musicians.html">Musicians</a>
+          <a href="../vjs.html">VJs</a>
+          <a href="../creative-coders.html">Creative coders</a>
+          <a href="../developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="../library.html">Library</a>
+          <a href="../artworks.html">Art gallery</a>
+          <a href="../nodes/">Nodes</a>
+          <a href="../embeds/">Embeds</a>
+          <a href="../extensions.html">Extensions</a>
+          <a href="../benchmarks.html">Benchmarks</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="../index.html#learn">Get started</a>
+          <a href="../philosophy.html">Philosophy</a>
+          <a href="../blog/">Blog</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
+          <a href="../assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
+          <a href="../assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="../assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
+    </div>
+  </footer>
+  <script src="../site.js?v=21" defer></script>
+<nav class="dock" id="dock" aria-label="Main">
+  <div class="dock-bar">
+    <span class="dock-thumb" aria-hidden="true"></span>
+    <a class="dock-stop" href="../index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+    <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" data-current aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+    <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+    <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+    <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+    <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+    <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+    <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+    <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+    <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+    <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+    <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+    <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+    <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+    <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+  </div>
+</nav>
+  <script src="../search.js?v=d89de447" defer></script>
+  <script src="../bird.js?v=d8c589b1" defer></script>
+</body>
+</html>

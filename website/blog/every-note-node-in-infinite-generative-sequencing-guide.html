@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en" data-mode="paper">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P855CS2V');</script>
+  <!-- End Google Tag Manager -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FBFAF6">
+  <script>window.INFINITE_DEFAULT_MODE = 'paper';</script>
+  <script src="../theme.js?v=2"></script>
+  <title>Every Note Node in Infinite: 24 Generative MIDI Nodes</title>
+  <meta name="description" content="Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.">
+  <link rel="canonical" href="https://infinitedevices.org/blog/every-note-node-in-infinite-generative-sequencing-guide.html">
+  <meta property="og:title" content="Every Note Node in Infinite: 24 Generative MIDI Nodes">
+  <meta property="og:description" content="Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.">
+  <meta property="og:image" content="https://infinitedevices.org/assets/blog_hardware_midi.png">
+  <meta property="og:url" content="https://infinitedevices.org/blog/every-note-node-in-infinite-generative-sequencing-guide.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Infinite">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Every Note Node in Infinite: 24 Generative MIDI Nodes">
+  <meta name="twitter:description" content="Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.">
+  <meta name="twitter:image" content="https://infinitedevices.org/assets/blog_hardware_midi.png">
+  <link rel="alternate" type="application/rss+xml" href="https://infinitedevices.org/blog/feed.xml" title="Infinite blog">
+  <link rel="alternate" type="text/plain" href="../llms.txt" title="Plain-text summary for language models">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../brand.css?v=36336012">
+  <link rel="stylesheet" href="../style.css?v=d046c735">
+  <link rel="stylesheet" href="../glass.css?v=c25dae44">
+  <link rel="stylesheet" href="../blog.css?v=823c9183">
+  <script>addEventListener('load',function(){setTimeout(function(){var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL';document.head.appendChild(s)},2500)})</script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ZC4TYX1WCL');
+  </script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "headline": "Every note node in Infinite: generative arpeggiators and algorithmic sequencing", "description": "Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.", "datePublished": "2026-10-24", "dateModified": "2026-10-24", "mainEntityOfPage": "https://infinitedevices.org/blog/every-note-node-in-infinite-generative-sequencing-guide.html", "url": "https://infinitedevices.org/blog/every-note-node-in-infinite-generative-sequencing-guide.html", "image": ["https://infinitedevices.org/assets/blog_hardware_midi.png"], "author": {"@type": "Person", "name": "Naman Soni", "alternateName": "n1m21n", "url": "https://github.com/n1m21n"}, "publisher": {"@type": "Organization", "name": "Infinite", "url": "https://infinitedevices.org/", "logo": {"@type": "ImageObject", "url": "https://infinitedevices.org/assets/icon.png"}}, "keywords": "midi nodes, generative music, sequencing, algorithmic composition, arpeggiator", "wordCount": 3313, "inLanguage": "en-GB", "isPartOf": {"@type": "Blog", "name": "Infinite blog", "url": "https://infinitedevices.org/blog/"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Infinite", "item": "https://infinitedevices.org/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://infinitedevices.org/blog/"}, {"@type": "ListItem", "position": 3, "name": "Every note node in Infinite: generative arpeggiators and algorithmic sequencing", "item": "https://infinitedevices.org/blog/every-note-node-in-infinite-generative-sequencing-guide.html"}]}</script>
+  <link rel="stylesheet" href="../system.css?v=23625436">
+  <link rel="stylesheet" href="../scale.css?v=f0c66d50">
+  <link rel="stylesheet" href="../neumo.css?v=3a020cee">
+  <link rel="stylesheet" href="../search.css?v=96e10ca3">
+</head>
+<body class="blog-page blog-post">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P855CS2V"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+        <span></span><span></span>
+      </button>
+      <a href="../index.html#top" class="brand" aria-label="Infinite home">
+        <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
+        <span class="brand-name">Infinite</span>
+      </a>
+      <button type="button" class="search-btn" id="search-btn" aria-label="Search the site" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span class="search-label">Search</span></button>
+
+      <nav class="nav-links" id="nav-links" aria-label="Main">
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-for">Who it's for</button>
+        <div class="nav-menu" id="nav-menu-for">
+          <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+          <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+          <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+          <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+          <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-explore">Explore</button>
+        <div class="nav-menu" id="nav-menu-explore">
+          <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+          <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+          <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+          <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+          <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+          <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+        </div>
+      </div>
+      <div class="nav-group" data-current>
+        <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="nav-menu-learn">Learn</button>
+        <div class="nav-menu" id="nav-menu-learn">
+          <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+          <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+          <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+        </div>
+      </div>
+      <a class="btn btn-primary nav-sheet-cta" href="../index.html#setup">Download Infinite</a>
+      <div class="nav-sheet-social">
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+        <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+      </div>
+    </nav>
+
+      <div class="nav-actions">
+        <button type="button" class="icon-btn" data-mode-toggle aria-label="Switch to light mode" title="Light mode"><svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+        <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" class="icon-btn hide-sm" aria-label="View on GitHub" title="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg>
+        </a>
+        <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" class="icon-btn" aria-label="Join the Discord server" title="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg>
+        </a>
+        <a href="https://www.youtube.com/watch?v=vXRjrDhSq24" target="_blank" rel="noopener" class="icon-btn sm-only" aria-label="Watch the YouTube tutorial" title="Watch the tutorial">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </a>
+        <a href="../index.html#download" class="btn btn-primary btn-sm nav-download" data-download-link>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <article class="post">
+      <div class="container post-wrap">
+        <nav class="crumbs mono" aria-label="Breadcrumb"><a href="../index.html">Infinite</a> / <a href="./">Blog</a></nav>
+        <header class="post-head">
+          <p class="post-kicker mono">Creative</p>
+          <h1>Every note node in Infinite: generative arpeggiators and algorithmic sequencing</h1>
+          <p class="post-lede">Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.</p>
+          <p class="post-by"><img class="by-av" src="../assets/icon-96.png" alt="" width="40" height="40" decoding="async"><span class="by-text"><a href="https://github.com/n1m21n" rel="noopener">Naman Soni</a><span class="by-meta">24 October 2026 · 15 min read</span></span></p>
+        </header>
+        <figure class="post-hero"><img src="../assets/thumbs/blog_hardware_midi-1200.webp" alt="generative midi note nodes and algorithmic sequencers in Infinite DAW" width="1200" height="675" decoding="async"></figure>
+        <details class="toc" open><summary class="mono">on this page</summary><ol><li><a href="#1-midi-notes-hardware-controller-mpe-input-bridge">1. MIDI Notes: hardware controller &amp; MPE input bridge</a></li><li><a href="#2-keyboard-interactive-on-screen-playable-piano">2. Keyboard: interactive on-screen playable piano</a></li><li><a href="#3-note-filter-range-channel-and-velocity-gate">3. Note Filter: range, channel, and velocity gate</a></li><li><a href="#4-note-transpose-chromatic-and-scale-aware-pitch-shifting">4. Note Transpose: chromatic and scale-aware pitch shifting</a></li><li><a href="#5-pitch-bend-expressive-pitch-deflection-router">5. Pitch Bend: expressive pitch deflection router</a></li><li><a href="#6-velocity-curve-dynamic-touch-and-curve-response">6. Velocity Curve: dynamic touch and curve response</a></li><li><a href="#7-gate-rhythmic-duration-and-articulation-shaper">7. Gate: rhythmic duration and articulation shaper</a></li><li><a href="#8-humanizer-micro-timing-shuffle-and-organic-dynamics">8. Humanizer: micro-timing shuffle and organic dynamics</a></li><li><a href="#9-quantizer-musical-scale-and-modal-pitch-snapping">9. Quantizer: musical scale and modal pitch snapping</a></li><li><a href="#10-glide-monophonic-portamento-and-polyphonic-slide">10. Glide: monophonic portamento and polyphonic slide</a></li><li><a href="#11-note-echo-algorithmic-midi-delay-and-rhythmic-repeats">11. Note Echo: algorithmic MIDI delay and rhythmic repeats</a></li><li><a href="#12-note-router-dynamic-keyboard-splitting-and-voice-dispatching">12. Note Router: dynamic keyboard splitting and voice dispatching</a></li><li><a href="#13-note-merge-unified-polyphonic-stream-combiner">13. Note Merge: unified polyphonic stream combiner</a></li><li><a href="#14-note-switcher-modulated-phrase-selector">14. Note Switcher: modulated phrase selector</a></li><li><a href="#15-arpeggiator-algorithmic-pattern-and-chord-engine">15. Arpeggiator: algorithmic pattern and chord engine</a></li><li><a href="#16-note-sequencer-16-step-polyphonic-pitch-gate-grid">16. Note Sequencer: 16-step polyphonic pitch &amp; gate grid</a></li><li><a href="#17-random-note-generator-constrained-generative-melody-engine">17. Random Note Generator: constrained generative melody engine</a></li><li><a href="#18-midi-file-standard-midi-file-canvas-player">18. MIDI File: standard MIDI file canvas player</a></li><li><a href="#19-chorder-single-note-harmonizer-and-chord-voicings">19. Chorder: single-note harmonizer and chord voicings</a></li><li><a href="#20-note-stack-interval-and-octave-voice-layering">20. Note Stack: interval and octave voice layering</a></li><li><a href="#21-note-capturer-live-performance-buffer-recorder">21. Note Capturer: live performance buffer recorder</a></li><li><a href="#22-bouncing-balls-physics-based-rhythmic-trigger-generator">22. Bouncing Balls: physics-based rhythmic trigger generator</a></li><li><a href="#23-note-strum-realistic-acoustic-chord-strumming">23. Note Strum: realistic acoustic chord strumming</a></li><li><a href="#24-field-notes-programmable-algorithmic-note-generation">24. Field Notes: programmable algorithmic note generation</a></li><li><a href="#modular-note-architecture">Modular note architecture</a></li></ol></details>
+        <div class="prose">
+<p>In traditional music production environments, MIDI is treated as a static piano roll. Notes are clicked onto a grid, quantised rigidly, and routed through a single linear track directly into a virtual instrument.</p>
+<p>Infinite re-imagines MIDI and musical timing as an open, modular stream of discrete note events. Notes are not passive rows in an arrangement; they are first-class signals that flow through cables, branch across splitters, undergo algorithmic transformations, and drive both sound engines and 3D visual geometry in real time.</p>
+<p>Infinite provides twenty-four dedicated note processing nodes, spanning hardware input bridges, rhythmic arpeggiators, Markov-chain phrase predictors, physics-based trigger simulations, scale quantizers, and programmable algorithmic note generators.</p>
+<p>Here is an architectural guide to every note node in Infinite, how they process musical events, and how to patch generative music systems on the canvas.</p>
+<hr>
+<h2 id="1-midi-notes-hardware-controller-mpe-input-bridge">1. MIDI Notes: hardware controller &amp; MPE input bridge</h2>
+<p>The <strong>MIDI Notes</strong> node connects physical MIDI keyboards, pad controllers, and MPE (MIDI Polyphonic Expression) devices to the Infinite canvas.</p>
+<figure><img src="../assets/nodes/hd/midi-notes.webp" alt="MIDI Notes node in Infinite" width="537" height="550" loading="lazy" decoding="async"><figcaption>MIDI Notes node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Multi-channel routing</strong>: Listens on all channels (Omni) or binds to a specific MIDI channel (<code>1</code> to <code>16</code>).</li><li><strong>MPE support</strong>: Full per-note polyphonic pitch bend, slide, and pressure/aftertouch tracking.</li><li><strong>Port activity visualization</strong>: Real-time visual LEDs displaying active note-on gates, polyphonic voice count, and pitch numbers.</li><li><strong>Event stream outputs</strong>: Outputs polyphonic note events cleanly buffered for sample-accurate scheduling.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Connect a USB MIDI keyboard, wire MIDI Notes into an Analog synth, and route per-note MPE pressure into the filter cutoff knob.</p>
+<pre><code>MIDI Notes -&gt; Analog -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="2-keyboard-interactive-on-screen-playable-piano">2. Keyboard: interactive on-screen playable piano</h2>
+<p>The <strong>Keyboard</strong> node provides a playable virtual piano keyboard directly inside the node canvas, supporting mouse clicks, multi-touch, and computer QWERTY keyboard typing.</p>
+<figure><img src="../assets/nodes/hd/keyboard.webp" alt="Keyboard node in Infinite" width="772" height="550" loading="lazy" decoding="async"><figcaption>Keyboard node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Octave range navigation</strong>: Configurable key span with quick octave shift controls.</li><li><strong>Musical scale highlighting</strong>: Highlights active scale notes across white and black keys, preventing accidental off-key inputs during live performance.</li><li><strong>Velocity sensitivity</strong>: Clicking near the bottom of a key triggers high velocity (up to 127), while clicking near the top triggers soft pianissimo notes.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Select the Dorian scale in the inspector, highlight the scale keys, and jam melodies using your computer keyboard without opening external controllers.</p>
+<pre><code>Keyboard -&gt; FM -&gt; Reverb -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="3-note-filter-range-channel-and-velocity-gate">3. Note Filter: range, channel, and velocity gate</h2>
+<p>The <strong>Note Filter</strong> node acts as a selective filter for incoming note streams, allowing only notes meeting specific musical criteria to pass downstream.</p>
+<figure><img src="../assets/nodes/hd/note-filter.webp" alt="Note Filter node in Infinite" width="752" height="550" loading="lazy" decoding="async"><figcaption>Note Filter node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Pitch key zones</strong>: Set minimum and maximum note limits (e.g. <code>C1</code> to <code>B2</code> for bass, <code>C3</code> to <code>C6</code> for leads) to create multi-instrument keyboard splits.</li><li><strong>Velocity window</strong>: Filters notes by dynamics, passing only ghost notes (low velocity) or accents (high velocity).</li><li><strong>Channel filtering</strong>: Strips out or isolates specific MIDI channels from multi-timbral controllers.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Wire one MIDI Notes output into two Note Filters: set filter 1 to notes below C3 for a sub bass synth, and filter 2 to notes above C3 for a shimmering lead.</p>
+<pre><code>MIDI Notes -&gt; Note Filter (Low) -&gt; Analog (Bass)
+MIDI Notes -&gt; Note Filter (High) -&gt; Wavetable (Lead)</code></pre>
+<hr>
+<h2 id="4-note-transpose-chromatic-and-scale-aware-pitch-shifting">4. Note Transpose: chromatic and scale-aware pitch shifting</h2>
+<p>The <strong>Note Transpose</strong> node shifts the pitch of incoming note events by octaves and semitones while optionally constraining the shifted notes to a selected musical scale.</p>
+<figure><img src="../assets/nodes/hd/note-transpose.webp" alt="Note Transpose node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Note Transpose node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Octave &amp; semitone offsets</strong>: Shift notes up or down by up to 4 octaves and 12 semitones.</li><li><strong>Modulatable transposition</strong>: The semitone parameter is modulatable, allowing an LFO or step sequencer to modulate chord progressions automatically.</li><li><strong>Scale snapping</strong>: Forces transposed notes onto the nearest valid scale degree to prevent dissonant pitch clashes.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Modulate Note Transpose with a Slow Step Sequencer to shift an arpeggio across root, fourth, and fifth chords every four bars.</p>
+<pre><code>Arpeggiator -&gt; Note Transpose -&gt; Wavetable -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="5-pitch-bend-expressive-pitch-deflection-router">5. Pitch Bend: expressive pitch deflection router</h2>
+<p>The <strong>Pitch Bend</strong> node routes and scales continuous pitch bend wheel messages and modulation signals for connected synthesizers.</p>
+<figure><img src="../assets/nodes/hd/pitch-bend.webp" alt="Pitch Bend node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Pitch Bend node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Configurable bend range</strong>: Adjust the pitch bend semitone window from 1 semitone to a full octave (<code>-12</code> to <code>+12</code> semitones).</li><li><strong>Bipolar modulation input</strong>: Accepts LFO or envelope modulation to produce automatic vibrato and dive bombs.</li><li><strong>Smoothing</strong>: Built-in 14-bit interpolation prevents audible stepping during aggressive wheel movements.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Wire a slow triangle LFO into Pitch Bend to add subtle, expressive pitch wander to vintage synth leads.</p>
+<pre><code>LFO -&gt; Pitch Bend -&gt; Analog -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="6-velocity-curve-dynamic-touch-and-curve-response">6. Velocity Curve: dynamic touch and curve response</h2>
+<p>The <strong>Velocity Curve</strong> node remaps the velocity dynamics of incoming note events, tailoring keyboard touch response to performance preferences.</p>
+<figure><img src="../assets/nodes/hd/velocity-curve.webp" alt="Velocity Curve node in Infinite" width="281" height="550" loading="lazy" decoding="async"><figcaption>Velocity Curve node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Curve profiles</strong>: Linear, Exponential (emphasising soft touches), Logarithmic (punchy and responsive), and S-curve (compressed dynamics).</li><li><strong>Min/max clamping</strong>: Sets minimum velocity floor and maximum ceiling limits.</li><li><strong>Fixed velocity mode</strong>: Locks all incoming notes to a single uniform velocity level (such as 100 for consistent organ or synth-pop lines).</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Apply an Exponential velocity curve to a physical Karplus-Strong String synth for natural acoustic response when playing delicate arpeggios.</p>
+<pre><code>MIDI Notes -&gt; Velocity Curve (Exp) -&gt; String -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="7-gate-rhythmic-duration-and-articulation-shaper">7. Gate: rhythmic duration and articulation shaper</h2>
+<p>The <strong>Gate</strong> node controls the duration of active note events, turning sustained chords into short staccato bursts or stretching short taps into legato drones.</p>
+<figure><img src="../assets/nodes/hd/gate.webp" alt="Gate node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Gate node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Time and beat modes</strong>: Set gate length in milliseconds (<code>5ms</code> to <code>2000ms</code>) or metric musical divisions (<code>1/16</code>, <code>1/8</code>, <code>1/4</code>).</li><li><strong>Fixed gate vs proportional</strong>: Choose between fixed note lengths or proportional scaling (e.g. 50% staccato of incoming note length).</li><li><strong>Legato tie mode</strong>: Automatically bridges notes together when consecutive keys overlap.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Feed an Arpeggiator into Gate set to 15% length to transform an arpeggio into tight, robotic 16th-note staccato plucks.</p>
+<pre><code>Arpeggiator -&gt; Gate (15%) -&gt; FM -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="8-humanizer-micro-timing-shuffle-and-organic-dynamics">8. Humanizer: micro-timing shuffle and organic dynamics</h2>
+<p>The <strong>Humanizer</strong> node injects subtle, natural human imperfections into rigid, computer-quantized note streams.</p>
+<figure><img src="../assets/nodes/hd/humanizer.webp" alt="Humanizer node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Humanizer node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Timing jitter</strong>: Introduces microscopic Gaussian time offsets (from <code>0ms</code> to <code>35ms</code>) to note onsets, simulating the slight imprecisions of live human performance.</li><li><strong>Velocity spread</strong>: Randomizes note velocity around the played value by a customizable percentage window.</li><li><strong>Pitch drift</strong>: Adds minute micro-tuning offsets for analog acoustic warmth.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Place Humanizer between a rigid 16-step Note Sequencer and a drum machine or piano synth to make programmed patterns breathe naturally.</p>
+<pre><code>Note Sequencer -&gt; Humanizer -&gt; Sampler (Piano) -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="9-quantizer-musical-scale-and-modal-pitch-snapping">9. Quantizer: musical scale and modal pitch snapping</h2>
+<p>The <strong>Quantizer</strong> node forces arbitrary pitch numbers, microtonal frequencies, and random pitch modulators onto chosen musical scales and temperaments.</p>
+<figure><img src="../assets/nodes/hd/quantizer.webp" alt="Quantizer node in Infinite" width="686" height="550" loading="lazy" decoding="async"><figcaption>Quantizer node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Over 40 musical scales</strong>: Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic Minor, Melodic Minor, Pentatonic, Blues, Hirajoshi, Insen, Raga, and microtonal modes.</li><li><strong>Root note transposition</strong>: Set the tonic key to any pitch (<code>C</code> through <code>B</code>).</li><li><strong>Snap algorithms</strong>: Snaps to the nearest scale degree either upward, downward, or to the absolute closest interval.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Feed a Random Modulator or CV voltage into Quantizer set to Japanese Hirajoshi, and pipe the output into a Metallic resonator for generative gamelan melodies.</p>
+<pre><code>Random -&gt; Quantizer (Hirajoshi) -&gt; Metallic -&gt; Delay -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="10-glide-monophonic-portamento-and-polyphonic-slide">10. Glide: monophonic portamento and polyphonic slide</h2>
+<p>The <strong>Glide</strong> node produces smooth pitch glides between consecutive notes, featuring both classic analog monophonic portamento and multi-voice polyphonic slide.</p>
+<figure><img src="../assets/nodes/hd/glide.webp" alt="Glide node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Glide node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Glide time</strong>: Continuous portamento rate control (<code>0ms</code> to <code>3000ms</code>).</li><li><strong>Legato-only mode</strong>: Glides only when two notes overlap in time, leaving non-overlapping notes with instant attack.</li><li><strong>Constant time vs constant rate</strong>: Select whether pitch transitions take the same amount of time regardless of distance, or glide at a fixed semitones-per-second velocity.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Enable Legato Glide on a bass synth patch, hold a low note while tapping octaves higher, and enjoy smooth analog pitch slides.</p>
+<pre><code>MIDI Notes -&gt; Glide (Legato) -&gt; Analog (Acid Bass) -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="11-note-echo-algorithmic-midi-delay-and-rhythmic-repeats">11. Note Echo: algorithmic MIDI delay and rhythmic repeats</h2>
+<p>The <strong>Note Echo</strong> node creates rhythmic echoing MIDI notes, repeating incoming note events across musical intervals with decay and transposition.</p>
+<figure><img src="../assets/nodes/hd/note-echo.webp" alt="Note Echo node in Infinite" width="310" height="550" loading="lazy" decoding="async"><figcaption>Note Echo node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Tempo-synced delay time</strong>: Set delay intervals to standard, dotted, or triplet metric divisions (<code>1/16</code>, <code>1/8d</code>, <code>1/4t</code>).</li><li><strong>Feedback &amp; count</strong>: Controls the number of echo repeats (<code>1</code> to <code>32</code>).</li><li><strong>Velocity decay</strong>: Gradually scales down the velocity of successive repeats for natural fading.</li><li><strong>Semitone pitch transpose</strong>: Shifts each repeat up or down by a set semitone interval, turning a single key press into an ascending or descending staircase.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Set Note Echo to a dotted 8th note (<code>1/8d</code>) with a <code>+7 semitones</code> (fifth) pitch shift, and play single notes to create layered arpeggiated patterns.</p>
+<pre><code>MIDI Notes -&gt; Note Echo (1/8d, +7) -&gt; Wavetable -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="12-note-router-dynamic-keyboard-splitting-and-voice-dispatching">12. Note Router: dynamic keyboard splitting and voice dispatching</h2>
+<p>The <strong>Note Router</strong> node directs incoming notes across up to four separate output ports based on pitch thresholds, velocity ranges, or voice allocation.</p>
+<figure><img src="../assets/nodes/hd/note-router.webp" alt="Note Router node in Infinite" width="489" height="550" loading="lazy" decoding="async"><figcaption>Note Router node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Split mode</strong>: Routes notes below a split point to Output 1, and notes above to Output 2.</li><li><strong>Velocity dispatch</strong>: Sends soft notes to an intimate electric piano, and hard accents to a brass synth.</li><li><strong>Round-robin voice allocation</strong>: Cycles notes sequentially across Outputs 1, 2, 3, and 4, allowing four distinct synthesizers to share parts of a polyphonic phrase.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Set Note Router to Round-Robin and connect three different synths (Analog, FM, and String) to play dynamic hocketing melodies where every note has a unique timbre.</p>
+<pre><code>Arpeggiator -&gt; Note Router (Round Robin) -&gt; [Analog, FM, String]</code></pre>
+<hr>
+<h2 id="13-note-merge-unified-polyphonic-stream-combiner">13. Note Merge: unified polyphonic stream combiner</h2>
+<p>The <strong>Note Merge</strong> node combines multiple independent note streams into a single unified polyphonic stream with intelligent collision handling.</p>
+<figure><img src="../assets/nodes/hd/note-merge.webp" alt="Note Merge node in Infinite" width="683" height="550" loading="lazy" decoding="async"><figcaption>Note Merge node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Multi-input bus</strong>: Combines up to four note sources into one stream.</li><li><strong>Duplicate note suppression</strong>: Prevents hanging notes and double-trigger clicks when two input streams send the same pitch simultaneously.</li><li><strong>Voice priority</strong>: Option to prioritize higher or lower notes during polyphony overflow.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Merge an algorithmic Arpeggiator pattern with live keyboard playing so you can play expressive solo counter-melodies over automated sequences.</p>
+<pre><code>[Arpeggiator, Keyboard] -&gt; Note Merge -&gt; Analog -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="14-note-switcher-modulated-phrase-selector">14. Note Switcher: modulated phrase selector</h2>
+<p>The <strong>Note Switcher</strong> node selects which of several incoming note streams passes downstream, controlled via a macro knob or logic trigger.</p>
+<figure><img src="../assets/nodes/hd/note-switcher.webp" alt="Note Switcher node in Infinite" width="435" height="550" loading="lazy" decoding="async"><figcaption>Note Switcher node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Multi-channel selector</strong>: Seamlessly switches between alternate note patterns without dropping active note-off events.</li><li><strong>Modulatable selection index</strong>: Switch patterns automatically using a slow square LFO or timeline automation track.</li><li><strong>Smooth transition handling</strong>: Sends clean note-off messages to active voices before switching to prevent stuck notes.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Wire a verse bassline into Input 1 and a chorus bassline into Input 2, then automate the selector with a Macro Toggle for arrangement transitions.</p>
+<pre><code>[Pattern A, Pattern B] -&gt; Note Switcher -&gt; Analog -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="15-arpeggiator-algorithmic-pattern-and-chord-engine">15. Arpeggiator: algorithmic pattern and chord engine</h2>
+<p>The <strong>Arpeggiator</strong> node takes held chords and breaks them into rhythmic, tempo-synced melodic sequences.</p>
+<figure><img src="../assets/nodes/hd/arpeggiator.webp" alt="Arpeggiator node in Infinite" width="684" height="550" loading="lazy" decoding="async"><figcaption>Arpeggiator node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Directional modes</strong>: Up, Down, Up/Down, Down/Up, Random, Chord Repeat, and As-Played.</li><li><strong>Octave span</strong>: Sweeps arpeggios across <code>1</code> to <code>4</code> octaves with cyclical or ping-pong octave progression.</li><li><strong>Gate &amp; swing</strong>: Adjusts note duration percentage and metric shuffle.</li><li><strong>Hold toggle</strong>: Latches played chords so the arpeggio continues cycling after keys are released.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Hold a minor ninth chord, set Arpeggiator to Up/Down across 3 octaves at 1/16th notes, and route through an analog filter sweep.</p>
+<pre><code>Keyboard -&gt; Arpeggiator (Up/Down) -&gt; Analog -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="16-note-sequencer-16-step-polyphonic-pitch-gate-grid">16. Note Sequencer: 16-step polyphonic pitch &amp; gate grid</h2>
+<p>The <strong>Note Sequencer</strong> node is a classic 16-step grid sequencer with per-step pitch, velocity, octave shift, and gate tie controls.</p>
+<figure><img src="../assets/nodes/hd/note-sequencer.webp" alt="Note Sequencer node in Infinite" width="549" height="550" loading="lazy" decoding="async"><figcaption>Note Sequencer node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Interactive step matrix</strong>: 16 dedicated pitch knobs with visual semitone displays.</li><li><strong>Per-step ties &amp; mutes</strong>: Tie steps together for long sustained bass notes, or mute steps for syncopated rests.</li><li><strong>Variable step length</strong>: Set pattern length from 1 to 16 steps to create odd-meter polyrhythms (such as 5/16 or 7/16).</li><li><strong>Direction modes</strong>: Forward, Reverse, Ping-Pong, and Brownian random walk.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Set the sequencer length to 7 steps over 16th notes to produce a shifting polyrhythmic ostinato that cycles across the 4/4 bar line.</p>
+<pre><code>Note Sequencer (7 Steps) -&gt; FM -&gt; Delay -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="17-random-note-generator-constrained-generative-melody-engine">17. Random Note Generator: constrained generative melody engine</h2>
+<p>The <strong>Random Note Generator</strong> node creates constrained melodic phrases and basslines algorithmically in real time.</p>
+<figure><img src="../assets/nodes/hd/random-note-generator.webp" alt="Random Note Generator node in Infinite" width="833" height="550" loading="lazy" decoding="async"><figcaption>Random Note Generator node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Key &amp; scale constraints</strong>: Restricts generated notes strictly to a selected musical key and scale.</li><li><strong>Interval jump weighting</strong>: Biases random generation toward small melodic steps (seconds and thirds) rather than wide, disjointed leaps.</li><li><strong>Rhythmic density</strong>: Controls the probability of active note triggers per clock tick, introducing musical rests.</li><li><strong>Seed repeatability</strong>: Freeze the random seed to loop an inspiring generated phrase indefinitely.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Set the scale to Minor Pentatonic, set density to 60%, and pipe the generated notes into a Wavetable pad for an endless generative ambient performance.</p>
+<pre><code>Random Note Generator -&gt; Wavetable -&gt; Reverb -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="18-midi-file-standard-midi-file-canvas-player">18. MIDI File: standard MIDI file canvas player</h2>
+<p>The <strong>MIDI File</strong> node loads and plays standard <code>.mid</code> sequence files directly on the canvas, locked to the global transport clock.</p>
+<figure><img src="../assets/nodes/hd/midi-file.webp" alt="MIDI File node in Infinite" width="735" height="550" loading="lazy" decoding="async"><figcaption>MIDI File node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Drag and drop loading</strong>: Drop standard Type 0 or Type 1 MIDI files directly onto the node body.</li><li><strong>Track isolation</strong>: Choose which MIDI track to output, or sum all tracks into one polyphonic stream.</li><li><strong>Transport synchronization</strong>: Automatically tracks project tempo, loop markers, and timeline playhead location.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Drag a complex classical piano MIDI file onto the canvas, route note outputs to a String synth, and use note velocities to drive 3D particle bursts.</p>
+<pre><code>MIDI File -&gt; String -&gt; Audio Out
+MIDI File (Velocity) -&gt; Particle System (Speed)</code></pre>
+<hr>
+<h2 id="19-chorder-single-note-harmonizer-and-chord-voicings">19. Chorder: single-note harmonizer and chord voicings</h2>
+<p>The <strong>Chorder</strong> node converts single incoming note taps into rich multi-voice polyphonic chords.</p>
+<figure><img src="../assets/nodes/hd/chorder.webp" alt="Chorder node in Infinite" width="833" height="550" loading="lazy" decoding="async"><figcaption>Chorder node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Pre-configured chord types</strong>: Major, Minor, Sus2, Sus4, Dominant 7th, Major 7th, Minor 7th, 9th, and Diminished.</li><li><strong>Custom chord editor</strong>: Define custom interval offsets (e.g. <code>[0, +7, +12, +16]</code>) for signature chords.</li><li><strong>Root-relative transposition</strong>: Voicings transpose across the keyboard relative to the incoming note pitch.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Select Minor 9th voicing, set Arpeggiator downstream, and play single bass notes to trigger sweeping impressionist arpeggios.</p>
+<pre><code>Keyboard -&gt; Chorder (Min 9) -&gt; Arpeggiator -&gt; Wavetable -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="20-note-stack-interval-and-octave-voice-layering">20. Note Stack: interval and octave voice layering</h2>
+<p>The <strong>Note Stack</strong> node layers harmonic interval copies on top of played notes to thicken synth leads and basslines.</p>
+<figure><img src="../assets/nodes/hd/note-stack.webp" alt="Note Stack node in Infinite" width="686" height="550" loading="lazy" decoding="async"><figcaption>Note Stack node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Up to 4 interval layers</strong>: Add octave below (<code>-12</code>), fifth above (<code>+7</code>), octave above (<code>+12</code>), or custom intervals.</li><li><strong>Per-voice detuning</strong>: Applies subtle pitch detuning between stacked voices for rich chorus effects.</li><li><strong>Velocity scaling</strong>: Scales the velocity of stacked intervals relative to the primary note.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Add an octave below (<code>-12</code>) and a fifth above (<code>+7</code>) to an analog saw lead to produce a classic vintage stadium rock synth sound.</p>
+<pre><code>MIDI Notes -&gt; Note Stack (-12, +7) -&gt; Analog -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="21-note-capturer-live-performance-buffer-recorder">21. Note Capturer: live performance buffer recorder</h2>
+<p>The <strong>Note Capturer</strong> node acts as a live MIDI scratchpad, recording incoming performances into a circular memory buffer for playback or loop export.</p>
+<figure><img src="../assets/nodes/hd/note-capturer.webp" alt="Note Capturer node in Infinite" width="894" height="550" loading="lazy" decoding="async"><figcaption>Note Capturer node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Retrospective recording</strong>: Keeps a continuous rolling buffer of your recent playing, allowing you to capture spontaneous improvisation after it occurs.</li><li><strong>Bar quantization</strong>: Trims captured phrases cleanly to musical bar boundaries.</li><li><strong>Loop playback</strong>: Plays captured takes in a continuous loop while leaving the keyboard free for additional layers.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Improvise freely on your keyboard, press Capture to grab the last 4 bars, and immediately loop the phrase while designing synth patches.</p>
+<pre><code>MIDI Notes -&gt; Note Capturer (Loop) -&gt; Analog -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="22-bouncing-balls-physics-based-rhythmic-trigger-generator">22. Bouncing Balls: physics-based rhythmic trigger generator</h2>
+<p>The <strong>Bouncing Balls</strong> node runs an internal physics simulation where virtual spheres bounce inside a gravity well, triggering note events whenever a ball collides with the floor.</p>
+<figure><img src="../assets/nodes/hd/bouncing-balls.webp" alt="Bouncing Balls node in Infinite" width="438" height="550" loading="lazy" decoding="async"><figcaption>Bouncing Balls node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Gravity &amp; elasticity</strong>: Balls bounce with physically realistic gravitational acceleration, bouncing rapidly as they reach the floor.</li><li><strong>Multi-ball polyphony</strong>: Simulate up to 8 independent bouncing spheres with differing drop heights and restitution coefficients.</li><li><strong>Collision pitch mapping</strong>: Map collision velocity to note velocity, and bounce frequency to musical pitch.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Route Bouncing Balls into a Metallic resonator or physical String synth to hear organic, accelerating acoustic impacts mimicking raindrops or dropped marbles.</p>
+<pre><code>Bouncing Balls -&gt; Metallic Resonator -&gt; Reverb -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="23-note-strum-realistic-acoustic-chord-strumming">23. Note Strum: realistic acoustic chord strumming</h2>
+<p>The <strong>Note Strum</strong> node emulates guitar and harp playing by staggering the onset times of notes in a polyphonic chord.</p>
+<figure><img src="../assets/nodes/hd/note-strum.webp" alt="Note Strum node in Infinite" width="543" height="550" loading="lazy" decoding="async"><figcaption>Note Strum node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Strum speed</strong>: Sets the time delay between consecutive notes (<code>2ms</code> to <code>150ms</code>).</li><li><strong>Direction control</strong>: Down-strum (low notes to high notes), Up-strum (high notes to low notes), or Alternating.</li><li><strong>Velocity decay</strong>: Gradually tapers velocity across the strum to emulate natural hand dynamics.</li></ul>
+<h3 id="try-it">Try it</h3>
+<p>Place Note Strum between a Chorder and a String physical modeling synth for convincing nylon-string acoustic guitar chord strumming.</p>
+<pre><code>Keyboard -&gt; Chorder -&gt; Note Strum -&gt; String -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="24-field-notes-programmable-algorithmic-note-generation">24. Field Notes: programmable algorithmic note generation</h2>
+<p>The <strong>Field Notes</strong> node allows you to script custom generative algorithms, Markov-chain phrase models, and rhythmic logic directly in Infinite's bare-name Field language.</p>
+<figure><img src="../assets/nodes/hd/field-notes.webp" alt="Field Notes node in Infinite" width="331" height="550" loading="lazy" decoding="async"><figcaption>Field Notes node in Infinite</figcaption></figure>
+<h3 id="how-it-works">How it works</h3>
+<ul><li><strong>Event-driven execution</strong>: Executes on every clock tick or MIDI input trigger.</li><li><strong>State registers</strong>: Retains history across steps to calculate Euclidean rhythms, Fibonacci sequences, or cellular automata.</li><li><strong>Output note generation</strong>: Emits note pitch, velocity, and gate events directly to downstream synths.</li></ul>
+<h3 id="example-fibonacci-sequence-arpeggiator">Example: Fibonacci sequence arpeggiator</h3>
+<pre><code class="language-field">// registers: step_counter, prev_a, prev_b
+state a = 1
+state b = 1
+state step = 0
+
+// advance Fibonacci sequence modulo 12
+let next_fib = (a + b) % 12
+a = b
+b = next_fib
+step = step + 1
+
+// map to minor pentatonic scale
+let root = 60
+let intervals = [0, 3, 5, 7, 10]
+let note_out = root + intervals[next_fib % 5]
+
+emit_note(note_out, 90, 120) // pitch, velocity, duration_ms</code></pre>
+<h3 id="try-it">Try it</h3>
+<p>Drop a Field Notes node, enter your own algorithmic rules, and explore generative compositions impossible in conventional static DAWs.</p>
+<pre><code>Clock -&gt; Field Notes -&gt; FM -&gt; Delay -&gt; Audio Out</code></pre>
+<hr>
+<h2 id="modular-note-architecture">Modular note architecture</h2>
+<p>Because Infinite unifies note processing, audio synthesis, and visual rendering onto a single real-time execution graph, these note nodes can drive both sound and visual form simultaneously.</p>
+<p>An Arpeggiator can trigger a synth lead while stepping through colors in an Audio Color Ramp, and the physical collisions of a Bouncing Balls node can displace 3D geometry meshes at the exact microsecond an acoustic chime rings out.</p>
+<p>Drop any note node onto the canvas, cable it into an instrument, and build generative musical systems unconstrained by linear timelines.</p>
+        </div>
+        <aside class="post-cta" aria-label="Try Infinite">
+          <p class="hand">your turn</p>
+          <h2>Make something with it</h2>
+          <p>Infinite is free and open source for macOS, Windows and Linux. Start from a template in the Library, or read how the nodes fit together.</p>
+          <p class="cta-row"><a class="btn btn-primary" href="../index.html#download">Download Infinite</a><a class="btn btn-ghost" href="../library.html">Browse the Library</a></p>
+        </aside>
+        <section class="post-related" aria-label="More posts"><h2>Keep reading</h2><div class="rel-grid"><a class="rel-card" href="euclidean-rhythm-sequencer-algorithm.html"><span class="mono">Creative</span><b>Euclidean rhythm sequencer algorithms for modular music</b></a><a class="rel-card" href="every-synthesizer-node-in-infinite-sound-design-guide.html"><span class="mono">Creative</span><b>Every synthesizer node in Infinite: the complete sound design guide</b></a><a class="rel-card" href="raymarching-signed-distance-fields-in-real-time-glsl.html"><span class="mono">Creative</span><b>Raymarching signed distance fields in real-time GLSL</b></a></div></section>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-line perch">A DAW for <em class="hand">you</em><span class="dot-accent">.</span></p>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="brand">
+            <img src="../assets/icon-96.png" alt="" class="brand-icon" width="30" height="30" loading="lazy" decoding="async">
+            <span class="brand-name">Infinite</span>
+          </div>
+          <p>Visuals, music and code on one infinite canvas.</p>
+          <form class="signup" data-signup data-endpoint="/api/subscribe" data-audience="general" novalidate>
+            <div class="signup-row">
+              <input id="signup-email" name="email" aria-label="Email address" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+              <input name="company" class="signup-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+              <button type="submit" class="btn btn-primary btn-sm">Sign up</button>
+            </div>
+            <p class="signup-note" role="status" aria-live="polite">We email only to confirm and when something ships. Unsubscribe in one click.</p>
+          </form>
+          <script src="../signup.js?v=1" defer></script>
+          <div class="footer-social">
+            <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener" aria-label="Infinite on GitHub" title="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55 0-.27-.01-1.160-.02-2.1-3.17.69-3.84-1.35-3.84-1.35-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.750 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.72-1.53-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 2.86-.39c.97 0 1.95.13 2.86.39 2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.370-2.67 5.34-5.21 5.62.41.36.77 1.06.77 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55C20.24 21.27 23.5 17.01 23.5 12 23.5 5.73 18.27.5 12 .5z"/></svg></a>
+            <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener" aria-label="Infinite on Discord" title="Discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.211.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.736 19.736 0 0 0 3.677 4.492a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.030.077.077 0 0 0 .032-.055c.5-5.094-.838-9.52-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/></svg></a>
+            <a href="https://www.instagram.com/infinite.devices/" target="_blank" rel="noopener" aria-label="Infinite on Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg></a>
+            <a href="https://www.youtube.com/@infinite.devices" target="_blank" rel="noopener" aria-label="Infinite on YouTube" title="YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor" stroke="none"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Who it's for</p>
+          <a href="../artists.html">Artists</a>
+          <a href="../musicians.html">Musicians</a>
+          <a href="../vjs.html">VJs</a>
+          <a href="../creative-coders.html">Creative coders</a>
+          <a href="../developers.html">Developers</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Explore</p>
+          <a href="../library.html">Library</a>
+          <a href="../artworks.html">Art gallery</a>
+          <a href="../nodes/">Nodes</a>
+          <a href="../embeds/">Embeds</a>
+          <a href="../extensions.html">Extensions</a>
+          <a href="../benchmarks.html">Benchmarks</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Learn</p>
+          <a href="../index.html#learn">Get started</a>
+          <a href="../philosophy.html">Philosophy</a>
+          <a href="../blog/">Blog</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Docs</p>
+          <a href="../assets/Infinite_Node_Reference_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Node reference</a>
+          <a href="../assets/Field_Language_Manual.pdf" target="_blank" rel="noopener" type="application/pdf">Field language</a>
+          <a href="../assets/Infinite_Headless_User_Guide.pdf" target="_blank" rel="noopener" type="application/pdf">Headless guide</a>
+          <a href="../assets/Infinite_Benchmark_Report.pdf" target="_blank" rel="noopener" type="application/pdf">Benchmark report</a>
+        </div>
+        <div class="footer-col">
+          <p class="footer-h">Open source</p>
+          <a href="https://github.com/n1m21n/Infinite" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/n1m21n/Infinite/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/mcp" target="_blank" rel="noopener">MCP server</a>
+          <a href="https://github.com/n1m21n/Infinite/tree/main/tools/python_sdk" target="_blank" rel="noopener">Python SDK</a>
+          <a href="https://discord.gg/7cpQfCxnx" target="_blank" rel="noopener">Discord</a>
+          <a href="https://paypal.me/namansoniii" target="_blank" rel="noopener">Donate</a>
+        </div>
+      </div>
+      <p class="footer-bottom">© 2026 Infinite, made by <a href="https://github.com/n1m21n" target="_blank" rel="noopener">Naman Soni (n1m21n)</a>. MIT source, GPLv3 binary by default (bundled VST3 hosting).</p>
+    </div>
+  </footer>
+  <script src="../site.js?v=21" defer></script>
+<nav class="dock" id="dock" aria-label="Main">
+  <div class="dock-bar">
+    <span class="dock-thumb" aria-hidden="true"></span>
+    <a class="dock-stop" href="../index.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Home</span></a>
+    <button type="button" class="dock-stop" data-group="for" aria-expanded="false" aria-controls="dock-sheet-for"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>For you</span></button>
+    <button type="button" class="dock-stop" data-group="explore" aria-expanded="false" aria-controls="dock-sheet-explore"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Explore</span></button>
+    <button type="button" class="dock-stop" data-group="learn" data-current aria-expanded="false" aria-controls="dock-sheet-learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Learn</span></button>
+    <button type="button" class="dock-stop dock-search" data-search aria-label="Search the site" aria-haspopup="dialog"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.6" cy="8.6" r="5.1"/><path d="M12.4 12.4 16.5 16.5"/></svg><span>Search</span></button>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-for" data-group="for" hidden>
+    <a href="../artists.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><rect x="7.5" y="7.5" width="9" height="9" rx="2"/></svg><span>Artists</span></a>
+    <a href="../musicians.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5V4.5l7-1.5v10"/><circle cx="6.5" cy="14.5" r="2" fill="currentColor" stroke="none"/><circle cx="13.5" cy="13" r="2" fill="currentColor" stroke="none"/></svg><span>Musicians</span></a>
+    <a href="../vjs.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none"/><path d="M5.2 12.4A5.4 5.4 0 0 0 7.6 14.8"/><path d="M14.8 7.6A5.4 5.4 0 0 0 12.4 5.2"/></svg><span>VJs</span></a>
+    <a href="../creative-coders.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.5H5.5A1.5 1.5 0 0 0 4 6v8.5A1.5 1.5 0 0 0 5.5 16H14a1.5 1.5 0 0 0 1.5-1.5V11"/><path d="M15.2 3.8a1.4 1.4 0 0 1 1 2.4L9.4 13l-2.6.7.7-2.6 6.8-6.8a1.4 1.4 0 0 1 .9-.5Z"/></svg><span>Creative coders</span></a>
+    <a href="../developers.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Developers</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-explore" data-group="explore" hidden>
+    <a href="../library.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="3.4" width="2.8" height="13.2" rx="1"/><rect x="7.4" y="3.4" width="2.8" height="13.2" rx="1"/><path d="M12.2 4.9 14.7 4.2 17.2 15.1 14.7 15.8Z"/></svg><span>Library</span></a>
+    <a href="../artworks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="9.5" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>Art gallery</span></a>
+    <a href="../nodes/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2 16.2 6.7V13.4L10 16.9 3.8 13.4V6.7Z"/><path d="M10 10.05V3.2M10 10.05 16.2 13.4M10 10.05 3.8 13.4"/></svg><span>Nodes</span></a>
+    <a href="../embeds/"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="5.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="5.4" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="10" cy="14.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.6" cy="14.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Embeds</span></a>
+    <a href="../extensions.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.8 15 9.2l-4.2 1.3-1.6 4.3Z"/></svg><span>Extensions</span></a>
+    <a href="../benchmarks.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5H4.5v11h2M13.5 4.5h2v11h-2"/><path d="M8.5 10h3"/></svg><span>Benchmarks</span></a>
+  </div>
+  <div class="dock-sheet" id="dock-sheet-learn" data-group="learn" hidden>
+    <a href="../index.html#learn"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.8 15 10 7 15.2Z"/></svg><span>Get started</span></a>
+    <a href="../philosophy.html"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10V9a3 3 0 0 1 3-3h8M12.5 3.5 15 6l-2.5 2.5M16 10v1a3 3 0 0 1-3 3H5M7.5 11.5 5 14l2.5 2.5"/></svg><span>Philosophy</span></a>
+    <a href="../blog/" aria-current="page"><svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l.8-3.6L13.5 3.7a1.7 1.7 0 0 1 2.4 0l.4.4a1.7 1.7 0 0 1 0 2.4L7.6 15.2Z"/><path d="M12 5.2l2.8 2.8"/></svg><span>Blog</span></a>
+  </div>
+</nav>
+  <script src="../search.js?v=d89de447" defer></script>
+  <script src="../bird.js?v=d8c589b1" defer></script>
+</body>
+</html>

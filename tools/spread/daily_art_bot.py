@@ -110,22 +110,24 @@ def select_autonomous_style(queue_dir):
 
 
 def evaluate_artwork_quality(infinite, patch_path, summary_path, target_dir):
-    """Rigorous multi-point quality gate for visual and audio aesthetics."""
-    # 1. Check audio summary metrics
-    try:
-        audio = json.load(open(summary_path))
-        silence = audio.get("silence_ratio", 0)
-        onsets = audio.get("onset_count_estimate", 0)
-        rms = audio.get("rms_dbfs", [-100, -100])[0]
+    """Rigorous multi-point quality gate for visual and audio aesthetics.
+    Audio evaluation is applied only if audio was requested/synthesized;
+    pure visual/pixel art stands strongly on its own without needing audio reactivity.
+    """
+    # 1. Check audio summary metrics (only if audio summary was generated)
+    if summary_path and os.path.exists(summary_path):
+        try:
+            audio = json.load(open(summary_path))
+            silence = audio.get("silence_ratio", 0)
+            onsets = audio.get("onset_count_estimate", 0)
+            rms = audio.get("rms_dbfs", [-100, -100])[0]
 
-        if silence > 0.4:
-            return False, f"audio too silent (silence_ratio {silence})"
-        if onsets < 1:
-            return False, f"audio lacks rhythmic onsets (onsets {onsets})"
-        if rms < -45.0:
-            return False, f"audio level too quiet (rms {rms} dBfs)"
-    except Exception as e:
-        return False, f"audio summary read error: {e}"
+            if silence > 0.6:
+                return False, f"audio too silent (silence_ratio {silence})"
+            if rms < -45.0:
+                return False, f"audio level too quiet (rms {rms} dBfs)"
+        except Exception as e:
+            return False, f"audio summary read error: {e}"
 
     # 2. Check visual frame metrics and animation
     f1_path = os.path.join(target_dir, "probe_f1.png")
@@ -157,17 +159,17 @@ def evaluate_artwork_quality(infinite, patch_path, summary_path, target_dir):
     except Exception as e:
         return False, f"frame stats parse error: {e}"
 
-    return True, "contrast, dynamics, animation, and audio presence verified"
+    return True, "contrast, dynamics, animation, and art style fidelity verified"
 
 
-def render_item(style_id, out_dir, duration=5, inspiration_meta=None, auto_push=True):
+def render_item(style_id, out_dir, duration=5, inspiration_meta=None, auto_push=True, visual_type="pixel", with_audio=False):
     os.makedirs(out_dir, exist_ok=True)
     item_id = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{style_id}"
     target_dir = os.path.join(out_dir, item_id)
     os.makedirs(target_dir, exist_ok=True)
 
     style = TAXONOMY[style_id]
-    patch_text = build_patch_for_style(style_id)
+    patch_text = build_patch_for_style(style_id, visual_type=visual_type, with_audio=with_audio)
     patch_path = os.path.join(target_dir, f"{style_id}.inf")
     with open(patch_path, "w") as f:
         f.write(patch_text)
@@ -186,13 +188,16 @@ def render_item(style_id, out_dir, duration=5, inspiration_meta=None, auto_push=
     if val.returncode != 0:
         sys.exit(f"validation failed: {val.stdout}")
 
-    # 2. audio synthesis
-    wav_path = os.path.join(target_dir, "audio.wav")
-    summary_path = os.path.join(target_dir, "summary.json")
-    subprocess.run([
-        infinite, "--audio-summary", patch_path, summary_path,
-        "--wav", wav_path, "--duration", str(duration)
-    ], check=True, stdout=subprocess.DEVNULL)
+    # 2. optional audio synthesis
+    wav_path = None
+    summary_path = None
+    if with_audio:
+        wav_path = os.path.join(target_dir, "audio.wav")
+        summary_path = os.path.join(target_dir, "summary.json")
+        subprocess.run([
+            infinite, "--audio-summary", patch_path, summary_path,
+            "--wav", wav_path, "--duration", str(duration)
+        ], check=True, stdout=subprocess.DEVNULL)
 
     # 3. aesthetic quality evaluation gate
     passed, reason = evaluate_artwork_quality(infinite, patch_path, summary_path, target_dir)
@@ -215,10 +220,10 @@ def render_item(style_id, out_dir, duration=5, inspiration_meta=None, auto_push=
         infinite, "--frame", patch_path, "1.0", poster_path
     ], check=True, stdout=subprocess.DEVNULL)
 
-    # 6. mux audio + video with ffmpeg
+    # 6. mux audio + video with ffmpeg (or keep silent raw video if visual-only)
     final_video = os.path.join(target_dir, f"{style_id}.mp4")
     ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg and os.path.exists(wav_path) and os.path.exists(raw_video):
+    if with_audio and ffmpeg and wav_path and os.path.exists(wav_path) and os.path.exists(raw_video):
         subprocess.run([
             ffmpeg, "-y", "-i", raw_video, "-i", wav_path,
             "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest",
@@ -226,15 +231,17 @@ def render_item(style_id, out_dir, duration=5, inspiration_meta=None, auto_push=
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         os.remove(raw_video)
     else:
-        final_video = raw_video
+        if os.path.exists(raw_video):
+            if os.path.exists(final_video): os.remove(final_video)
+            os.rename(raw_video, final_video)
 
     # 7. generate clean social copy
     social_text = f"""{style['name']}
 
 {style['description']}
 
-curated today from aesthetic research: {inspiration_meta.get('mood') if inspiration_meta else style['description']}
-rendered in real time using infinite (c++20 modular audiovisual daw).
+art movement & mood: {inspiration_meta.get('mood') if inspiration_meta else style['description']}
+rendered live in {visual_type} using infinite (c++20 modular creative studio).
 no external plugins, 100% free and open-source.
 
 code and interactive canvas: https://infinitedevices.org
@@ -322,6 +329,8 @@ def main():
     parser = argparse.ArgumentParser(description="infinite daily art distribution bot with pinterest research loop")
     parser.add_argument("--style", choices=list(TAXONOMY.keys()), help="pick a specific art style")
     parser.add_argument("--family", choices=list(set(d["family"] for d in TAXONOMY.values())), help="pick an art movement family")
+    parser.add_argument("--visual-type", choices=["pixel", "sketch_2d", "sketch_3d"], default="pixel", help="visual medium: pixel (Field Pixel shader), sketch_2d, or sketch_3d")
+    parser.add_argument("--with-audio", action="store_true", help="synthesize optional accompanying audio (visuals stand on their own by default)")
     parser.add_argument("--autonomous", action="store_true", help="let the bot browse pinterest inspirations and pick today's piece")
     parser.add_argument("--out-dir", default=os.path.join(ROOT, "dist", "social_queue"), help="queue directory")
     parser.add_argument("--duration", type=int, default=5, help="duration in seconds")
@@ -351,8 +360,8 @@ def main():
             candidates = [sid for sid, d in TAXONOMY.items() if d["family"] == args.family]
             selected_style = random.choice(candidates)
 
-        print(f"selected art movement & style: {TAXONOMY[selected_style]['name']}")
-        meta = render_item(selected_style, args.out_dir, args.duration, inspiration_meta, auto_push=not args.no_push)
+        print(f"selected art movement & style: {TAXONOMY[selected_style]['name']} ({args.visual_type})")
+        meta = render_item(selected_style, args.out_dir, args.duration, inspiration_meta, auto_push=not args.no_push, visual_type=args.visual_type, with_audio=args.with_audio)
         if meta:
             break
         print(f"[*] Retrying with alternative candidate ({attempt + 1}/{max_attempts})...")

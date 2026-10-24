@@ -1,5 +1,23 @@
 [
  {
+  "slug": "every-note-node-in-infinite-generative-sequencing-guide",
+  "title": "Every note node in Infinite: generative arpeggiators and algorithmic sequencing",
+  "description": "Explore all 24 note nodes in Infinite: algorithmic arpeggiators, scale quantizers, Markov chains, chord generators, humanizers, and generative note logic.",
+  "date": "2026-10-24",
+  "updated": "2026-10-24",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/every-note-node-in-infinite-generative-sequencing-guide.html"
+ },
+ {
+  "slug": "every-synthesizer-node-in-infinite-sound-design-guide",
+  "title": "Every synthesizer node in Infinite: the complete sound design guide",
+  "description": "The complete guide to all 20 synthesizer nodes in Infinite: subtractive, wavetable, FM, physical modeling, granular, spectral resynthesis, and DSP kernels.",
+  "date": "2026-10-24",
+  "updated": "2026-10-24",
+  "category": "creative",
+  "url": "https://infinitedevices.org/blog/every-synthesizer-node-in-infinite-sound-design-guide.html"
+ },
+ {
   "slug": "raymarching-signed-distance-fields-in-real-time-glsl",
   "title": "Raymarching signed distance fields in real-time GLSL",
   "description": "How to build a real-time raymarcher in GLSL: sphere tracing algorithm, primitive distance functions, smooth blending, normals, and audio-reactive scenes.",
@@ -104,7 +122,7 @@
   "description": "why infinite's audio engine is written in modern c++ without a framework, and what that changes for real-time safety.",
   "date": "2026-10-19",
   "updated": "2026-10-19",
-  "category": "engineering",
+  "category": "product",
   "url": "https://infinitedevices.org/blog/dsp-without-juce.html"
  },
  {
