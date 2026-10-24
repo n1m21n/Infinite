@@ -12,7 +12,7 @@ hang, sanitizer report, NaN or >+12 dBFS audio the base run did not have, or an
 error code the base run did not have.
 
   param_fuzz.py BIN OUTDIR [--kind int|float|text|mod|signal|all] [--only TYPE]... [--jobs N]
-                           [--max-timeout S] [--types-from results.tsv]
+                           [--max-timeout S] [--types-from results.tsv] [--values V,V]
 
   --kind mod     one run per type: every modulatable control on a 32-beat LFO,
                  unipolar and bipolar, full depth (catches controls registered
@@ -29,6 +29,10 @@ error code the base run did not have.
                  keep 1 when the machine is also timing something.
   --max-timeout  per-case cap in seconds (default 90). Each type's budget is
                  5x its own base run, at least 20 s, at most this cap.
+  --values V,V   run only these values of the kind (by value, or by label
+                 for text, e.g. --values 1e9,-1). Since B-K-026 the reader
+                 drops ±1e30, nan and inf, so those float rows only re-test
+                 the base.
   --types-from   re-run only the types that have a BAD row in an earlier
                  results file (the verify step after a fix).
 
@@ -58,6 +62,7 @@ VALUES = {
     "mod": ["uni=0", "bi=1"],
     "signal": ["nan", "inf", "denorm", "huge", "dc", "square"],
 }
+PICK = set()  # --values: empty runs every value of the kind
 PREFIX = {"int": "i", "float": "f", "text": "s"}
 HOT_PEAK = 4.0  # +12 dBFS
 # --start seeks the transport and Audio File follows it, so the whole file
@@ -313,7 +318,7 @@ def fuzz_type(binp, out, kind, t, prior, max_timeout, write):
     budget = max_timeout
     if base is not None and base[0] != "TIMEOUT":
         budget = min(max_timeout, max(20.0, 5.0 * base[1]))
-    for v in ["base"] + VALUES[kind]:
+    for v in ["base"] + [x for x in VALUES[kind] if not PICK or x in PICK or x.split("=")[0] in PICK]:
         label = label_of(kind, v)
         if label in prior:
             continue
@@ -439,6 +444,8 @@ def main():
         only |= bad_types(a[a.index("--types-from") + 1])
     jobs = int(a[a.index("--jobs") + 1]) if "--jobs" in a else 1
     max_timeout = float(a[a.index("--max-timeout") + 1]) if "--max-timeout" in a else 90.0
+    if "--values" in a:
+        PICK.update(a[a.index("--values") + 1].split(","))
     os.makedirs(out, exist_ok=True)
     kinds = ["int", "float", "text", "mod", "signal"] if kind == "all" else [kind]
     total = sum(run_kind(binp, out, k, only, jobs, max_timeout) for k in kinds)
