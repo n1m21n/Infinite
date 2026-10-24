@@ -1,7 +1,7 @@
 {
  "name": "Infinite Library",
  "url": "https://infinitedevices.org/library.html",
- "count": 243,
+ "count": 257,
  "items": [
   {
    "id": "first-sound",
@@ -590,6 +590,54 @@
    "file": "https://infinitedevices.org/assets/templates/granular-pitch-shifter-delay-fx.inf",
    "preview": "https://infinitedevices.org/assets/templates/granular-pitch-shifter-delay-fx.webp",
    "page": "https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html"
+  },
+  {
+   "id": "cyber-acid-303-synth",
+   "name": "Cyber Acid 303 Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Saturated diode ladder acid bassline synthesizer with accented envelope decay, nonlinear transistor feedback saturation, and resonant chirp modulation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/cyber-acid-303-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/cyber-acid-303-synth.webp",
+   "page": "https://infinitedevices.org/library/cyber-acid-303-synth.html"
+  },
+  {
+   "id": "spectral-resonator-bell-synth",
+   "name": "Spectral Resonator Bell Synth",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Physical acoustic model of metallic inharmonic bells and gamelan plates with modal strike impulse, dispersive overtone damping, and shimmering acoustic resonance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/spectral-resonator-bell-synth.inf",
+   "preview": "https://infinitedevices.org/assets/templates/spectral-resonator-bell-synth.webp",
+   "page": "https://infinitedevices.org/library/spectral-resonator-bell-synth.html"
+  },
+  {
+   "id": "analog-tape-warble-fx",
+   "name": "Analog Tape Warble FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Magnetic tape deck emulator with hysteresis saturation, dual-rate wow and flutter motor instability, and head azimuth high-frequency loss.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/analog-tape-warble-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/analog-tape-warble-fx.webp",
+   "page": "https://infinitedevices.org/library/analog-tape-warble-fx.html"
+  },
+  {
+   "id": "spectral-freeze-reverb-fx",
+   "name": "Spectral Freeze Reverb FX",
+   "category": "Templates",
+   "type": "Template",
+   "description": "Infinite-tail ambient shimmer reverb with prime feedback delay network, spectral absorption tilt, and infinite freeze hold matrix.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/spectral-freeze-reverb-fx.inf",
+   "preview": "https://infinitedevices.org/assets/templates/spectral-freeze-reverb-fx.webp",
+   "page": "https://infinitedevices.org/library/spectral-freeze-reverb-fx.html"
   },
   {
    "id": "terrain-mandala",
@@ -2918,6 +2966,126 @@
    "file": "https://infinitedevices.org/assets/library/pixel/gravitational-caustic-microlens.field",
    "preview": "https://infinitedevices.org/assets/library/previews/gravitational-caustic-microlens.jpg",
    "page": "https://infinitedevices.org/library/gravitational-caustic-microlens.html"
+  },
+  {
+   "id": "riso-halftone-manga",
+   "name": "Riso Halftone Manga",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Risograph manga screen-tone halftone lattice with mechanical dot clusters, CMYK spot ink misregistration jitter, and dynamic action speedlines.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/riso-halftone-manga.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/riso-halftone-manga.jpg",
+   "page": "https://infinitedevices.org/library/riso-halftone-manga.html"
+  },
+  {
+   "id": "ukiyoe-wave-strata",
+   "name": "Ukiyo-e Wave Strata",
+   "category": "Sketch",
+   "type": "Generator",
+   "description": "Traditional woodblock wave strata with tiered bokashi indigo gradients, curling sea-claw foam filigrees, and rhythmic cartographic tidal swells.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/ukiyoe-wave-strata.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/ukiyoe-wave-strata.jpg",
+   "page": "https://infinitedevices.org/library/ukiyoe-wave-strata.html"
+  },
+  {
+   "id": "swiss-brutalist-monolith-3d",
+   "name": "Swiss Brutalist Monolith 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Modular constructivist concrete monolith with cantilevered architectural slabs, tension beam matrices, and recessed negative-space light channels.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/swiss-brutalist-monolith-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/swiss-brutalist-monolith-3d.jpg",
+   "page": "https://infinitedevices.org/library/swiss-brutalist-monolith-3d.html"
+  },
+  {
+   "id": "kinetic-moire-sculpture-3d",
+   "name": "Kinetic Moire Sculpture 3D",
+   "category": "Sketch 3D",
+   "type": "Generator",
+   "description": "Concentric nested hyperboloid cages rotating with differential angular velocity, generating optical moiré interference lattices and topological phase shifts.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/sketch/kinetic-moire-sculpture-3d.js",
+   "preview": "https://infinitedevices.org/assets/library/previews/kinetic-moire-sculpture-3d.jpg",
+   "page": "https://infinitedevices.org/library/kinetic-moire-sculpture-3d.html"
+  },
+  {
+   "id": "cyber-acid-303-synth",
+   "name": "Cyber Acid 303 Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Saturated diode ladder acid bassline synthesizer with accented envelope decay, nonlinear transistor feedback saturation, and resonant chirp modulation.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/cyber-acid-303-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/cyber-acid-303-synth.jpg",
+   "page": "https://infinitedevices.org/library/cyber-acid-303-synth.html"
+  },
+  {
+   "id": "spectral-resonator-bell-synth",
+   "name": "Spectral Resonator Bell Synth",
+   "category": "Synths",
+   "type": "Generator",
+   "description": "Physical acoustic model of metallic inharmonic bells and gamelan plates with modal strike impulse, dispersive overtone damping, and shimmering acoustic resonance.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/spectral-resonator-bell-synth.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/spectral-resonator-bell-synth.jpg",
+   "page": "https://infinitedevices.org/library/spectral-resonator-bell-synth.html"
+  },
+  {
+   "id": "analog-tape-warble-fx",
+   "name": "Analog Tape Warble FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Magnetic tape deck emulator with hysteresis saturation, dual-rate wow and flutter motor instability, and head azimuth high-frequency loss.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/analog-tape-warble-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/analog-tape-warble-fx.jpg",
+   "page": "https://infinitedevices.org/library/analog-tape-warble-fx.html"
+  },
+  {
+   "id": "spectral-freeze-reverb-fx",
+   "name": "Spectral Freeze Reverb FX",
+   "category": "Audio Effects",
+   "type": "Filter",
+   "description": "Infinite-tail ambient shimmer reverb with prime feedback delay network, spectral absorption tilt, and infinite freeze hold matrix.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/templates/spectral-freeze-reverb-fx.inf",
+   "preview": "https://infinitedevices.org/assets/library/previews/spectral-freeze-reverb-fx.jpg",
+   "page": "https://infinitedevices.org/library/spectral-freeze-reverb-fx.html"
+  },
+  {
+   "id": "riso-pop-screen",
+   "name": "Riso Pop Screen",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Risograph screen print halftone matrix with dual fluorescent ink misregistration, mechanical dot stamping, and audio-reactive ink bleed. Bass impacts the dot diameter punch, mids shift color plate registration, highs flicker screen tone density.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/riso-pop-screen.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/riso-pop-screen.jpg",
+   "page": "https://infinitedevices.org/library/riso-pop-screen.html"
+  },
+  {
+   "id": "analog-crt-vhs-glitch",
+   "name": "Analog CRT VHS Glitch",
+   "category": "Pixel",
+   "type": "Generator",
+   "description": "Cathode-ray tube phosphor raster with curved barrel glass distortion, RGB triad subpixel grid, VHS tracking tear bar, and magnetic beam deflection. Bass sags the power supply beam width, mids warp VHS sync tracking displacement, highs inject phosphor noise burst.",
+   "author": "",
+   "price": 0,
+   "file": "https://infinitedevices.org/assets/library/pixel/analog-crt-vhs-glitch.field",
+   "preview": "https://infinitedevices.org/assets/library/previews/analog-crt-vhs-glitch.jpg",
+   "page": "https://infinitedevices.org/library/analog-crt-vhs-glitch.html"
   }
  ]
 }

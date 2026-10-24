@@ -3007,6 +3007,203 @@
       "file": "assets/library/pixel/gravitational-caustic-microlens.field",
       "preview": "assets/library/previews/gravitational-caustic-microlens.jpg",
       "bytes": 2080
+    },
+    {
+      "id": "riso-halftone-manga",
+      "name": "Riso Halftone Manga",
+      "kind": "Generator",
+      "tags": [
+        "manga",
+        "risograph",
+        "print",
+        "pop"
+      ],
+      "description": "Risograph manga screen-tone halftone lattice with mechanical dot clusters, CMYK spot ink misregistration jitter, and dynamic action speedlines.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/riso-halftone-manga.js",
+      "preview": "assets/library/previews/riso-halftone-manga.jpg",
+      "bytes": 3108
+    },
+    {
+      "id": "ukiyoe-wave-strata",
+      "name": "Ukiyo-e Wave Strata",
+      "kind": "Generator",
+      "tags": [
+        "woodblock",
+        "ukiyo-e",
+        "waves",
+        "print"
+      ],
+      "description": "Traditional woodblock wave strata with tiered bokashi indigo gradients, curling sea-claw foam filigrees, and rhythmic cartographic tidal swells.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch",
+      "params": 5,
+      "file": "assets/library/sketch/ukiyoe-wave-strata.js",
+      "preview": "assets/library/previews/ukiyoe-wave-strata.jpg",
+      "bytes": 3291
+    },
+    {
+      "id": "swiss-brutalist-monolith-3d",
+      "name": "Swiss Brutalist Monolith 3D",
+      "kind": "Generator",
+      "tags": [
+        "brutalism",
+        "architecture",
+        "3d",
+        "constructivism"
+      ],
+      "description": "Modular constructivist concrete monolith with cantilevered architectural slabs, tension beam matrices, and recessed negative-space light channels.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/swiss-brutalist-monolith-3d.js",
+      "preview": "assets/library/previews/swiss-brutalist-monolith-3d.jpg",
+      "bytes": 2192
+    },
+    {
+      "id": "kinetic-moire-sculpture-3d",
+      "name": "Kinetic Moire Sculpture 3D",
+      "kind": "Generator",
+      "tags": [
+        "op-art",
+        "kinetic",
+        "moire",
+        "3d",
+        "sculpture"
+      ],
+      "description": "Concentric nested hyperboloid cages rotating with differential angular velocity, generating optical moir\u00e9 interference lattices and topological phase shifts.",
+      "price": 0,
+      "domain": "sketch",
+      "category": "Sketch 3D",
+      "params": 5,
+      "file": "assets/library/sketch/kinetic-moire-sculpture-3d.js",
+      "preview": "assets/library/previews/kinetic-moire-sculpture-3d.jpg",
+      "bytes": 2206
+    },
+    {
+      "id": "cyber-acid-303-synth",
+      "name": "Cyber Acid 303 Synth",
+      "kind": "Generator",
+      "tags": [
+        "acid",
+        "synth",
+        "bass",
+        "303",
+        "dsp"
+      ],
+      "description": "Saturated diode ladder acid bassline synthesizer with accented envelope decay, nonlinear transistor feedback saturation, and resonant chirp modulation.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/cyber-acid-303-synth.inf",
+      "preview": "assets/library/previews/cyber-acid-303-synth.jpg",
+      "bytes": 1832
+    },
+    {
+      "id": "spectral-resonator-bell-synth",
+      "name": "Spectral Resonator Bell Synth",
+      "kind": "Generator",
+      "tags": [
+        "bell",
+        "modal",
+        "synth",
+        "resonator",
+        "dsp"
+      ],
+      "description": "Physical acoustic model of metallic inharmonic bells and gamelan plates with modal strike impulse, dispersive overtone damping, and shimmering acoustic resonance.",
+      "price": 0,
+      "domain": "synth",
+      "category": "Synths",
+      "params": 5,
+      "file": "assets/templates/spectral-resonator-bell-synth.inf",
+      "preview": "assets/library/previews/spectral-resonator-bell-synth.jpg",
+      "bytes": 1880
+    },
+    {
+      "id": "analog-tape-warble-fx",
+      "name": "Analog Tape Warble FX",
+      "kind": "Filter",
+      "tags": [
+        "tape",
+        "warble",
+        "effects",
+        "saturation",
+        "dsp"
+      ],
+      "description": "Magnetic tape deck emulator with hysteresis saturation, dual-rate wow and flutter motor instability, and head azimuth high-frequency loss.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/analog-tape-warble-fx.inf",
+      "preview": "assets/library/previews/analog-tape-warble-fx.jpg",
+      "bytes": 1604
+    },
+    {
+      "id": "spectral-freeze-reverb-fx",
+      "name": "Spectral Freeze Reverb FX",
+      "kind": "Filter",
+      "tags": [
+        "reverb",
+        "shimmer",
+        "freeze",
+        "effects",
+        "dsp"
+      ],
+      "description": "Infinite-tail ambient shimmer reverb with prime feedback delay network, spectral absorption tilt, and infinite freeze hold matrix.",
+      "price": 0,
+      "domain": "sample",
+      "category": "Audio Effects",
+      "params": 5,
+      "file": "assets/templates/spectral-freeze-reverb-fx.inf",
+      "preview": "assets/library/previews/spectral-freeze-reverb-fx.jpg",
+      "bytes": 1585
+    },
+    {
+      "id": "riso-pop-screen",
+      "name": "Riso Pop Screen",
+      "kind": "Generator",
+      "tags": [
+        "risograph",
+        "halftone",
+        "pop",
+        "print",
+        "pixel"
+      ],
+      "description": "Risograph screen print halftone matrix with dual fluorescent ink misregistration, mechanical dot stamping, and audio-reactive ink bleed. Bass impacts the dot diameter punch, mids shift color plate registration, highs flicker screen tone density.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/riso-pop-screen.field",
+      "preview": "assets/library/previews/riso-pop-screen.jpg",
+      "bytes": 2100
+    },
+    {
+      "id": "analog-crt-vhs-glitch",
+      "name": "Analog CRT VHS Glitch",
+      "kind": "Generator",
+      "tags": [
+        "crt",
+        "vhs",
+        "glitch",
+        "retro",
+        "pixel"
+      ],
+      "description": "Cathode-ray tube phosphor raster with curved barrel glass distortion, RGB triad subpixel grid, VHS tracking tear bar, and magnetic beam deflection. Bass sags the power supply beam width, mids warp VHS sync tracking displacement, highs inject phosphor noise burst.",
+      "price": 0,
+      "domain": "pixel",
+      "category": "Pixel",
+      "params": 5,
+      "file": "assets/library/pixel/analog-crt-vhs-glitch.field",
+      "preview": "assets/library/previews/analog-crt-vhs-glitch.jpg",
+      "bytes": 1836
     }
   ]
 }

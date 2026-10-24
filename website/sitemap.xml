@@ -78,6 +78,8 @@
   <url><loc>https://infinitedevices.org/embeds/quantum-chromodynamic-lattice.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/superconducting-magnetic-vortex.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/embeds/gravitational-caustic-microlens.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/riso-pop-screen.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
+  <url><loc>https://infinitedevices.org/embeds/analog-crt-vhs-glitch.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/developers.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/philosophy.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
   <url><loc>https://infinitedevices.org/artists.html</loc><lastmod>2026-10-25</lastmod><priority>0.7</priority></url>
@@ -139,6 +141,10 @@
   <url><loc>https://infinitedevices.org/library/string-resonator-modal-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/hilbert-frequency-shifter-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cyber-acid-303-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spectral-resonator-bell-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-tape-warble-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spectral-freeze-reverb-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/terrain-mandala.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/glitch-feedback.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/shifted-blend.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
@@ -333,6 +339,16 @@
   <url><loc>https://infinitedevices.org/library/granular-pitch-shifter-delay-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/superconducting-magnetic-vortex.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/library/gravitational-caustic-microlens.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/riso-halftone-manga.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/ukiyoe-wave-strata.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/swiss-brutalist-monolith-3d.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/kinetic-moire-sculpture-3d.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/cyber-acid-303-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spectral-resonator-bell-synth.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-tape-warble-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/spectral-freeze-reverb-fx.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/riso-pop-screen.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
+  <url><loc>https://infinitedevices.org/library/analog-crt-vhs-glitch.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/</loc><lastmod>2026-10-25</lastmod><priority>0.8</priority></url>
   <url><loc>https://infinitedevices.org/nodes/add-noise.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>
   <url><loc>https://infinitedevices.org/nodes/alpha-from-luma.html</loc><lastmod>2026-10-25</lastmod><priority>0.5</priority></url>

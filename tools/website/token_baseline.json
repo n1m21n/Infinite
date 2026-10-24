@@ -33,6 +33,10 @@
    "font-size": 2,
    "hex": 6
   },
+  "embeds/analog-crt-vhs-glitch.html": {
+   "font-size": 2,
+   "hex": 6
+  },
   "embeds/analog_crt.html": {
    "font-size": 2,
    "hex": 5,
@@ -234,6 +238,10 @@
    "font-size": 2,
    "hex": 5,
    "radius": 1
+  },
+  "embeds/riso-pop-screen.html": {
+   "font-size": 2,
+   "hex": 6
   },
   "embeds/riso_manga_zine.html": {
    "font-size": 2,

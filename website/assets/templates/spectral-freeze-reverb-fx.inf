@@ -1,0 +1,47 @@
+infinite-patch 1
+# Spectral Freeze Reverb FX: infinite-tail ambient shimmer reverb with freeze hold
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+end
+node 2 Synths Analog
+  id synth
+  pos 480 1024
+end
+node 3 AudioEffects Field Effect
+  id tape
+  pos 1020 1024
+  s code param float decay = 0.88 [0.2, 0.99]\nparam float damping = 0.38 [0.05, 0.9]\nparam float freeze = 0.0 [0.0, 1.0]\nparam float shimmer = 0.45 [0.0, 1.0]\nparam float mix = 0.5 [0.0, 1.0]\nstate float s1 = 0\nstate float s2 = 0\nstate float s3 = 0\nstate float lp = 0\n\nkDecay = if(freeze > 0.5, 0.9995, decay)\ninputGain = if(freeze > 0.5, 0.05, 1.0)\n\nu = in * inputGain + s3 * kDecay * 0.45\nap1 = u * -0.6 + s1\ns1 = u + ap1 * 0.6\n\nap2 = s1 * -0.5 + s2\ns2 = s1 + ap2 * 0.5\n\nshim = sin(s2 * (1.0 + shimmer * 1.5))\ns3 = s2 * 0.7 + shim * 0.3 * shimmer\n\ncut = clamp(0.5 - damping * 0.4, 0.05, 0.48)\nlp = lp + cut * (s3 - lp)\n\nout = in * (1.0 - mix) + lp * mix\n
+end
+node 4 Utility Audio Out
+  id speakers
+  pos 1560 1024
+end
+node 5 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 6 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.306 0.949 0.722
+  f size 0.25
+end
+node 7 Utility Output
+  id out
+  pos 460 0
+end
+node 8 Compositing Comment
+  pos 0 722
+  s text Spectral Freeze Reverb FX. Ambient shimmer reverb with infinite freeze hold matrix and absorption damping.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud tape 0 synth
+aud speakers 0 tape
+aud ana 0 tape
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

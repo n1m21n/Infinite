@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Analog Tape Warble FX",
+    "author": "Infinite",
+    "description": "Magnetic tape deck emulator with hysteresis saturation, dual-rate wow and flutter motor instability, and head azimuth high-frequency loss.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float drive = 2.2 [1.0, 5.0];\nparam float wow = 0.45 [0.0, 1.0];\nparam float flutter = 0.35 [0.0, 1.0];\nparam float tapeLoss = 0.55 [0.0, 1.0];\nparam float mix = 0.95 [0.0, 1.0];\nstate float pWow = 0;\nstate float pFlut = 0;\nstate float d1 = 0;\nstate float d2 = 0;\nstate float lp = 0;\n\npWow = (pWow + 0.6 / sr) % 1.0;\npFlut = (pFlut + 6.2 / sr) % 1.0;\nmod = sin(6.2831853 * pWow) * wow * 0.4 + sin(6.2831853 * pFlut) * flutter * 0.2;\n\nu = in * drive;\nsat = u / (1.0 + abs(u) * 0.35);\n\nd2 = d1;\nd1 = sat;\nwetRaw = d1 * (0.6 + mod * 0.3) + d2 * (0.4 - mod * 0.3);\n\ncut = clamp(0.45 - tapeLoss * 0.35, 0.05, 0.48);\nlp = lp + cut * (wetRaw - lp);\n\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "drive": 2.2,
+      "wow": 0.45,
+      "flutter": 0.35,
+      "tapeLoss": 0.55,
+      "mix": 0.95
+    },
+    "nodeSettings": {}
+  }
+}

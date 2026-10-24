@@ -1,0 +1,44 @@
+infinite-patch 1
+# Spectral Resonator Bell Synth: physical acoustic model of metallic inharmonic bells
+node 1 Notes Random Note Generator
+  id notes
+  pos 0 1024
+  f rateBeats 0.5
+  i rangeLow 48
+  i rangeHigh 72
+end
+node 2 Synths Field Synth
+  id synth
+  pos 480 1024
+  s code param float strike = 0.85 [0.1, 2.0]\nparam float brightness = 0.72 [0.1, 1.0]\nparam float damping = 0.45 [0.05, 0.95]\nparam float inharmonicity = 1.35 [0.5, 3.0]\nparam float decay = 2.5 [0.4, 8.0]\nstate float prevGate = 0\nstate float imp = 0\nstate float m1_x = 0\nstate float m1_y = 0\nstate float m2_x = 0\nstate float m2_y = 0\n\ntrig = if(gate > 0.5 && prevGate <= 0.5, 1.0, 0.0)\nprevGate = gate\nimp = if(trig > 0.5, strike, imp * 0.92)\n\nf0 = clamp(freq, 30.0, 2400.0) / sr\nw1 = f0 * 6.2831853\nw2 = w1 * (2.0 + inharmonicity * 0.76)\n\nd1 = clamp(1.0 - (damping * 0.0003 + 0.00008), 0.99, 0.9999)\nd2 = clamp(1.0 - (damping * 0.0008 + 0.0002), 0.98, 0.9998)\n\nm1_x = (m1_x + w1 * m1_y + imp * 0.6) * d1\nm1_y = (m1_y - w1 * m1_x) * d1\n\nm2_x = (m2_x + w2 * m2_y + imp * 0.4 * brightness) * d2\nm2_y = (m2_y - w2 * m2_x) * d2\n\novertone = sin((m1_y + m2_y) * (1.0 + inharmonicity * 2.0))\nraw = m1_y * 0.6 + m2_y * 0.35 + overtone * 0.25 * brightness\nu = raw * 1.6\nout = u / (1.0 + abs(u) * 0.28)\n
+end
+node 3 Utility Audio Out
+  id speakers
+  pos 1020 1024
+end
+node 4 Modulators Audio Analyze
+  id ana
+  pos 0 2200
+end
+node 5 Source Shape
+  id pic
+  pos 0 162
+  c fillColor 0.655 0.694 1.0
+  f size 0.25
+end
+node 6 Utility Output
+  id out
+  pos 460 0
+end
+node 7 Compositing Comment
+  pos 0 722
+  s text Spectral Resonator Bell Synth. Physical modal synthesis of metallic bells and inharmonic plates.
+  f width 340
+  f height 120
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ana 0 synth
+cable out 0 pic
+mod pic sizeX ana 0 0 1 0.5 0.15 0.45
+mod pic sizeY ana 0 0 1 0.5 0.15 0.45

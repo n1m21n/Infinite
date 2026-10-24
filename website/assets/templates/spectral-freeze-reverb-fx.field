@@ -1,0 +1,21 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Spectral Freeze Reverb FX",
+    "author": "Infinite",
+    "description": "Infinite-tail ambient shimmer reverb with prime feedback delay network, spectral absorption tilt, and infinite freeze hold matrix.",
+    "domain": "sample"
+  },
+  "device": {
+    "code": "param float decay = 0.88 [0.2, 0.99];\nparam float damping = 0.38 [0.05, 0.9];\nparam float freeze = 0.0 [0.0, 1.0];\nparam float shimmer = 0.45 [0.0, 1.0];\nparam float mix = 0.5 [0.0, 1.0];\nstate float s1 = 0;\nstate float s2 = 0;\nstate float s3 = 0;\nstate float lp = 0;\n\nkDecay = if(freeze > 0.5, 0.9995, decay);\ninputGain = if(freeze > 0.5, 0.05, 1.0);\n\nu = in * inputGain + s3 * kDecay * 0.45;\nap1 = u * -0.6 + s1;\ns1 = u + ap1 * 0.6;\n\nap2 = s1 * -0.5 + s2;\ns2 = s1 + ap2 * 0.5;\n\nshim = sin(s2 * (1.0 + shimmer * 1.5));\ns3 = s2 * 0.7 + shim * 0.3 * shimmer;\n\ncut = clamp(0.5 - damping * 0.4, 0.05, 0.48);\nlp = lp + cut * (s3 - lp);\n\nout = in * (1.0 - mix) + lp * mix;\n",
+    "params": {
+      "decay": 0.88,
+      "damping": 0.38,
+      "freeze": 0.0,
+      "shimmer": 0.45,
+      "mix": 0.5
+    },
+    "nodeSettings": {}
+  }
+}

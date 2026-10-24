@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Analog CRT VHS Glitch",
+    "author": "Infinite",
+    "description": "Cathode-ray tube phosphor raster with curved barrel glass distortion, RGB triad subpixel grid, VHS tracking tear bar, and magnetic beam deflection. Bass sags the power supply beam width, mids warp VHS sync tracking displacement, highs inject phosphor noise burst.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float barrelWarp = 0.28 [0.0, 0.8];\nparam float scanlineDensity = 240.0 [60.0, 600.0];\nparam float vhsTracking = 0.65 [0.0, 2.0];\nparam float phosphorGlow = 1.4 [0.2, 3.0];\nparam float chromaticAberration = 0.035 [0.0, 0.1];\n\np0 = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr2 = dot(p0, p0);\n\np = p0 * (1.0 + barrelWarp * r2);\n\nbarY = fract(t * 0.18);\ndistBar = abs(p.y - (barY - 0.5));\njitter = if(distBar < 0.08, sin(p.y * 120.0 + t * 40.0) * vhsTracking * 0.04, 0.0);\np.x = p.x + jitter;\n\nr = length(p);\nang = atan2(p.y, p.x);\nring = sin(r * 22.0 - t * 3.0 + ang * 4.0) * 0.5 + 0.5;\n\npRed = p * (1.0 + chromaticAberration);\npBlue = p * (1.0 - chromaticAberration);\n\nvalR = sin(length(pRed) * 22.0 - t * 3.0) * 0.5 + 0.5;\nvalG = ring;\nvalB = sin(length(pBlue) * 22.0 - t * 3.0) * 0.5 + 0.5;\n\nscan = sin(p.y * scanlineDensity * 6.2831853) * 0.25 + 0.75;\n\ncGround = vec3(0.082, 0.098, 0.188);\ncPhosphor = vec3(valR * 1.1, valG * 0.95, valB * 1.3) * phosphorGlow * scan;\n\nvignette = clamp(1.0 - r2 * 1.8, 0.0, 1.0);\ncol = mix(cGround, cPhosphor, vignette);\nalpha = 1.0;\n",
+    "params": {
+      "barrelWarp": 0.28,
+      "scanlineDensity": 240.0,
+      "vhsTracking": 0.65,
+      "phosphorGlow": 1.4,
+      "chromaticAberration": 0.035
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

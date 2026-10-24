@@ -1,0 +1,25 @@
+{
+  "format": "field",
+  "version": 1,
+  "meta": {
+    "name": "Riso Pop Screen",
+    "author": "Infinite",
+    "description": "Risograph screen print halftone matrix with dual fluorescent ink misregistration, mechanical dot stamping, and audio-reactive ink bleed. Bass impacts the dot diameter punch, mids shift color plate registration, highs flicker screen tone density.",
+    "domain": "pixel"
+  },
+  "device": {
+    "code": "param float dotScale = 36.0 [12.0, 80.0];\nparam float inkBleed = 1.2 [0.2, 3.0];\nparam float misregistration = 0.025 [0.0, 0.08];\nparam float paperGrain = 0.45 [0.0, 1.0];\nparam float contrast = 1.6 [0.5, 3.0];\n\np = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);\nr = length(p);\nang = atan2(p.y, p.x);\n\nmotif = sin(r * 18.0 - t * 2.5 + ang * 5.0) * 0.5 + 0.5;\ncore = exp(-r * 3.5);\nval = clamp((motif * 0.7 + core * 0.5) * contrast, 0.0, 1.0);\n\nrotC = 0.26;\npC = vec2(p.x * cos(rotC) - p.y * sin(rotC), p.x * sin(rotC) + p.y * cos(rotC)) + vec2(misregistration, 0.0);\ndotC = length(fract(pC * dotScale) - 0.5) * 2.0;\ninkC = smoothstep(val * inkBleed, (val * inkBleed) + 0.25, dotC);\n\nrotM = 1.31;\npM = vec2(p.x * cos(rotM) - p.y * sin(rotM), p.x * sin(rotM) + p.y * cos(rotM)) - vec2(misregistration, misregistration * 0.5);\ndotM = length(fract(pM * dotScale) - 0.5) * 2.0;\ninkM = smoothstep((1.0 - val) * inkBleed, ((1.0 - val) * inkBleed) + 0.25, dotM);\n\ncPaper = vec3(0.96, 0.94, 0.91);\ncPink = vec3(1.0, 0.0, 0.5);\nccyan = vec3(0.0, 0.85, 0.95);\ncGround = vec3(0.082, 0.098, 0.188);\n\ngrain = (fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * paperGrain * 0.12;\n\npaper = cPaper + vec3(grain);\ncol = paper * (1.0 - (1.0 - cPink) * (1.0 - inkM)) * (1.0 - (1.0 - ccyan) * (1.0 - inkC));\nfade = clamp((2.2 - r * 2.0), 0.0, 1.0);\ncol = mix(cGround, col, fade);\nalpha = 1.0;\n",
+    "params": {
+      "dotScale": 36.0,
+      "inkBleed": 1.2,
+      "misregistration": 0.025,
+      "paperGrain": 0.45,
+      "contrast": 1.6
+    },
+    "nodeSettings": {
+      "width": 1280.0,
+      "height": 720.0,
+      "animate": 1.0
+    }
+  }
+}

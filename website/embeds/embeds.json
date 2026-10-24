@@ -230,6 +230,16 @@
       "slug": "gravitational-caustic-microlens",
       "title": "Gravitational Caustic Microlens",
       "description": "Binary gravitational lens caustic curves with astroid critical folds, relativistic photon deflection, and intense chromatic caustic flare singularities. Bass contracts the Einstein ring radius, mids warp the fold and cusp caustic topology, highs explode micro-caustic relativistic amplification."
+    },
+    {
+      "slug": "riso-pop-screen",
+      "title": "Riso Pop Screen",
+      "description": "Risograph screen print halftone matrix with dual fluorescent ink misregistration, mechanical dot stamping, and audio-reactive ink bleed. Bass impacts the dot diameter punch, mids shift color plate registration, highs flicker screen tone density."
+    },
+    {
+      "slug": "analog-crt-vhs-glitch",
+      "title": "Analog CRT VHS Glitch",
+      "description": "Cathode-ray tube phosphor raster with curved barrel glass distortion, RGB triad subpixel grid, VHS tracking tear bar, and magnetic beam deflection. Bass sags the power supply beam width, mids warp VHS sync tracking displacement, highs inject phosphor noise burst."
     }
   ]
 }

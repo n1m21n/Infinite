@@ -785,6 +785,70 @@
         "Field Effect",
         "Audio Out"
       ]
+    },
+    {
+      "id": "cyber-acid-303-synth",
+      "name": "Cyber Acid 303 Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Saturated diode ladder acid bassline synthesizer with accented envelope decay, nonlinear transistor feedback saturation, and resonant chirp modulation.",
+      "price": 0,
+      "preview": "assets/templates/cyber-acid-303-synth.webp",
+      "file": "assets/templates/cyber-acid-303-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "spectral-resonator-bell-synth",
+      "name": "Spectral Resonator Bell Synth",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Synths",
+      "description": "Physical acoustic model of metallic inharmonic bells and gamelan plates with modal strike impulse, dispersive overtone damping, and shimmering acoustic resonance.",
+      "price": 0,
+      "preview": "assets/templates/spectral-resonator-bell-synth.webp",
+      "file": "assets/templates/spectral-resonator-bell-synth.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Synth",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "analog-tape-warble-fx",
+      "name": "Analog Tape Warble FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Magnetic tape deck emulator with hysteresis saturation, dual-rate wow and flutter motor instability, and head azimuth high-frequency loss.",
+      "price": 0,
+      "preview": "assets/templates/analog-tape-warble-fx.webp",
+      "file": "assets/templates/analog-tape-warble-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Effect",
+        "Audio Out"
+      ]
+    },
+    {
+      "id": "spectral-freeze-reverb-fx",
+      "name": "Spectral Freeze Reverb FX",
+      "category": "Templates",
+      "kind": "Template",
+      "group": "Audio effects",
+      "description": "Infinite-tail ambient shimmer reverb with prime feedback delay network, spectral absorption tilt, and infinite freeze hold matrix.",
+      "price": 0,
+      "preview": "assets/templates/spectral-freeze-reverb-fx.webp",
+      "file": "assets/templates/spectral-freeze-reverb-fx.inf",
+      "nodes": [
+        "Random Note Generator",
+        "Field Effect",
+        "Audio Out"
+      ]
     }
   ]
 }
