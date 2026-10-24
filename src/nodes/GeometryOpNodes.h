@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "DisplaceNoise.h"
 #include "Geometry3DNodes.h"
 #include "Palette.h"
 
@@ -472,13 +473,19 @@ private:
 // GeometryOpNode table, since none of the other operators need a texture
 // input and giving every one of them an unused pin would be a worse fit than
 // its own small class (see MaterialNode for the same geometry+texture shape).
+// Source = Noise swaps the texture for 3D noise sampled at each vertex or
+// point (DisplaceNoise.h), animated over transport time, so a surface or a
+// cloud moves with no noise texture made and mapped first.
 class DisplacementNode : public INode, public IGeometrySource
 {
 public:
    const std::string& CookWarning() const override { return mCookWarning; }
    enum Mode { kScalar = 0, kVector };
+   enum Source { kTexture = 0, kNoise };
 
    static INode* Create() { return new DisplacementNode(); }
+   static const std::vector<std::string>& NoiseTypeNames();
+   static const std::vector<std::string>& AffectsNames();
    ~DisplacementNode() override;
 
 
@@ -558,6 +565,16 @@ public:
    int mode = kScalar;
    float strength = 1.0f;
    float midlevel = 0.5f;
+   // Noise source (DisplaceNoise::Type / ::Affects). Old patches have no
+   // "source" key and load as Texture, today's behaviour.
+   int source = kTexture;
+   int noiseType = 2; // Curl
+   float frequency = 1.0f;
+   float speed = 0.5f;
+   int octaves = 3;
+   float noiseRoughness = 0.5f; // 'roughness' is the material's
+   int seed = 0;
+   int affects = 0; // Position; Colour and Size act on points only
    bool flatShade = false, flipNormals = false;
    bool inheritMaterial = true;
    // See GeometryOpNode::selectionOnly - same convention, restricted here to
@@ -599,6 +616,9 @@ public:
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("mode", mode); v.Float("strength", strength); v.Float("midlevel", midlevel);
+      v.Int("source", source); v.Int("noiseType", noiseType); v.Float("frequency", frequency);
+      v.Float("speed", speed); v.Int("octaves", octaves); v.Float("noiseRoughness", noiseRoughness);
+      v.Int("seed", seed); v.Int("affects", affects);
       v.Bool("flat", flatShade); v.Bool("flip", flipNormals);
       v.Bool("inherit", inheritMaterial);
       v.Bool("selectionOnly", selectionOnly);
@@ -616,6 +636,21 @@ public:
 
 private:
    std::string mCookWarning;
+   // Everything the Noise source reads, time included (`w` = transport
+   // seconds x speed, taken once per cook); all zero for the Texture source.
+   struct NoiseKey
+   {
+      int source = 0, type = 0, octaves = 0, affects = 0, seed = 0;
+      float frequency = 0, w = 0, roughness = 0;
+      bool operator==(const NoiseKey& o) const
+      {
+         return source == o.source && type == o.type && octaves == o.octaves && affects == o.affects &&
+                seed == o.seed && frequency == o.frequency && w == o.w && roughness == o.roughness;
+      }
+   };
+   NoiseKey CurrentNoiseKey() const;
+   DisplaceNoise::Params NoiseParams() const;
+   float mNoiseW = 0.0f;
    struct Signature
    {
       int mode = -1;
@@ -628,12 +663,13 @@ private:
       // CookIfNeeded), so a static texture doesn't fake a change every frame
       // while a Noise/Voronoi with real animation still keeps driving the mesh.
       unsigned long long texGeneration = 0;
+      NoiseKey noise;
       bool operator==(const Signature& o) const
       {
          return mode == o.mode && strength == o.strength && midlevel == o.midlevel &&
                 flat == o.flat && flip == o.flip && selectionOnly == o.selectionOnly &&
                 upstream == o.upstream && upstreamRevision == o.upstreamRevision &&
-                texGeneration == o.texGeneration;
+                texGeneration == o.texGeneration && noise == o.noise;
       }
    };
 
@@ -680,10 +716,11 @@ private:
       int mode = -1;
       float strength = 0, midlevel = 0;
       unsigned long long texKey = 0;
+      NoiseKey noise;
       bool operator==(const PointSignature& o) const
       {
          return upstream == o.upstream && upstreamRevision == o.upstreamRevision && mode == o.mode &&
-                strength == o.strength && midlevel == o.midlevel && texKey == o.texKey;
+                strength == o.strength && midlevel == o.midlevel && texKey == o.texKey && noise == o.noise;
       }
    };
    PointSignature mPointStamp;

@@ -571,6 +571,7 @@ set(COMMON_SOURCES
     src/core/Mesh.cpp
     src/core/GpuPoints.cpp
     src/core/PlyPoints.cpp
+    src/core/DisplaceNoise.cpp
     src/core/Delaunay.cpp
     src/core/CurveOps.cpp
     src/core/SweepRevolve.cpp

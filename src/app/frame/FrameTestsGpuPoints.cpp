@@ -3,11 +3,14 @@
 // with GPU points off, then on, and compares the two frames.
 #include "app/AppShared.h"
 
+#include "DisplaceNoise.h"
 #include "GpuPoints.h"
 #include "PlyPoints.h"
 
 #include <filesystem>
 #include <fstream>
+#include <map>
+#include <tuple>
 
 // Geometry3DNodes.cpp: route opaque mesh draws through the no-discard program.
 void Render3DSetOpaqueVariantForTest(bool enabled);
@@ -1272,6 +1275,272 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
          report(label, moved > 0.01f && errP < 1e-3f && errW < 1e-4f && errC < 1e-3f && errL < 1e-6f);
          snprintf(label, sizeof(label), "%s: does what its name says", name);
          report(label, promise);
+      }
+      GpuPointsGL::SetEnabledForTest(wasEnabled);
+   }
+
+   // Step 5a: Displacement's Noise source. The C++ and GLSL noise are one
+   // definition in two languages (DisplaceNoise.h), so every type, moving the
+   // point (scalar and vector), tinting it or resizing it, must land the GPU
+   // texels on the CPU cloud. Then the noise itself: each type spans roughly
+   // -1..1, Curl is divergence free, a mesh keeps its seams closed, speed
+   // animates with the transport and speed 0 holds still, and a default
+   // Displacement still reads its texture.
+   {
+      struct NoiseCloud : IGeometrySource
+      {
+         std::vector<Particle> points;
+         unsigned long long revision = NextMeshRevision();
+         GpuPointsGL::Target target;
+         GpuPoints gpu;
+         unsigned long long uploaded = 0;
+         bool valid = false;
+         Mesh empty;
+         ~NoiseCloud() { GpuPointsGL::DestroyTarget(target); }
+         const Mesh& GetMesh() override { return empty; }
+         unsigned long long MeshRevision() override { return revision; }
+         Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+         Material GetMaterial() const override { return Material(); }
+         const std::vector<Particle>* GetPointCloud() override { return &points; }
+         unsigned long long PointCloudRevision() override { return revision; }
+         const GpuPoints* GetGpuPoints() override
+         {
+            if (!GpuPointsGL::Enabled())
+               return nullptr;
+            if (uploaded != revision)
+            {
+               uploaded = revision;
+               valid = GpuPointsGL::Upload(target, gpu, points, 1.0f, "GpuPointsTest_NoiseCloud");
+               gpu.revision = revision;
+            }
+            return valid ? &gpu : nullptr;
+         }
+      };
+      NoiseCloud cloud;
+      const int n = 900;
+      for (int k = 0; k < n; k++)
+      {
+         Particle p;
+         p.px = (float)(k % 30) / 10.0f - 1.5f;
+         p.py = (float)(k / 30) / 10.0f - 1.5f;
+         p.pz = std::sin((float)k * 0.37f) * 0.7f;
+         p.scale = 0.05f;
+         p.r = 0.5f; p.g = 0.6f; p.b = 0.7f;
+         p.hasColor = true;
+         cloud.points.push_back(p);
+      }
+
+      auto readTex = [](unsigned int tex, int w, int h)
+      {
+         std::vector<float> px((size_t)w * (size_t)h * 4, 0.0f);
+         glBindTexture(GL_TEXTURE_2D, tex);
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, px.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+         return px;
+      };
+
+      const char* const typeNames[] = { "Smooth", "Fractal", "Curl", "Ridged", "Cells" };
+      struct Use { const char* name; int mode; int affects; };
+      const Use uses[] = {
+         { "scalar position", DisplacementNode::kScalar, DisplaceNoise::kPosition },
+         { "vector position", DisplacementNode::kVector, DisplaceNoise::kPosition },
+         { "scalar colour", DisplacementNode::kScalar, DisplaceNoise::kColour },
+         { "vector colour", DisplacementNode::kVector, DisplaceNoise::kColour },
+         { "size", DisplacementNode::kScalar, DisplaceNoise::kSize },
+      };
+      for (int type = 0; type < 5; type++)
+      {
+         float worstP = 0.0f, worstW = 0.0f, worstC = 0.0f, leastMoved = 1e9f;
+         bool allOffered = true, allCpuNone = true;
+         for (const Use& u : uses)
+         {
+            DisplacementNode d;
+            d.input = &cloud;
+            d.source = DisplacementNode::kNoise;
+            d.noiseType = type;
+            d.mode = u.mode;
+            d.affects = u.affects;
+            d.strength = 0.4f;
+            d.frequency = 1.3f;
+            d.speed = 0.7f;
+            d.seed = 17 + type;
+            GpuPointsGL::SetEnabledForTest(false);
+            d.CookIfNeeded(frame++);
+            allCpuNone = allCpuNone && d.GetGpuPoints() == nullptr;
+            std::vector<Particle> cpuCloud;
+            if (const std::vector<Particle>* cc = d.GetPointCloud())
+               cpuCloud = *cc;
+            GpuPointsGL::SetEnabledForTest(true);
+            const GpuPoints* g = d.GetGpuPoints();
+            allOffered = allOffered && g != nullptr;
+            float moved = 0.0f, errP = 1e9f, errW = 1e9f, errC = 1e9f;
+            if ((int)cpuCloud.size() == n)
+               for (int k = 0; k < n; k++)
+               {
+                  const Particle& a = cloud.points[k];
+                  const Particle& b = cpuCloud[k];
+                  moved = std::max(moved, std::fabs(a.px - b.px) + std::fabs(a.py - b.py) + std::fabs(a.pz - b.pz) +
+                                          std::fabs(a.r - b.r) + std::fabs(a.g - b.g) + std::fabs(a.b - b.b) +
+                                          std::fabs(a.scale - b.scale) * 10.0f);
+               }
+            if (g != nullptr && g->count == n && (int)cpuCloud.size() == n)
+            {
+               const std::vector<float> pos = readTex(g->posTex, g->texW, g->texH);
+               const std::vector<float> col = readTex(g->colorTex, g->texW, g->texH);
+               errP = errW = errC = 0.0f;
+               for (int k = 0; k < n; k++)
+               {
+                  const Particle& p = cpuCloud[k];
+                  const float* q = &pos[(size_t)k * 4];
+                  const float* c = &col[(size_t)k * 4];
+                  errP = std::max(errP, std::fabs(q[0] - p.px) + std::fabs(q[1] - p.py) + std::fabs(q[2] - p.pz));
+                  errW = std::max(errW, std::fabs(q[3] - p.scale));
+                  errC = std::max(errC, std::fabs(c[0] - p.r) + std::fabs(c[1] - p.g) + std::fabs(c[2] - p.b));
+               }
+            }
+            printf("noise %s %s: moved %.3f, err pos %.6f size %.6f colour %.6f\n", typeNames[type], u.name, moved,
+                   errP, errW, errC);
+            worstP = std::max(worstP, errP);
+            worstW = std::max(worstW, errW);
+            worstC = std::max(worstC, errC);
+            leastMoved = std::min(leastMoved, moved);
+         }
+         char label[200];
+         snprintf(label, sizeof(label), "Noise %s: GPU points only on the GPU path", typeNames[type]);
+         report(label, allOffered && allCpuNone);
+         snprintf(label, sizeof(label), "Noise %s: position, colour and size all change the cloud", typeNames[type]);
+         report(label, leastMoved > 0.02f);
+         snprintf(label, sizeof(label), "Noise %s: GPU texels equal the CPU cloud", typeNames[type]);
+         report(label, worstP < 2e-3f && worstW < 1e-4f && worstC < 2e-3f);
+      }
+
+      // The noise's own range, over a 3D grid: spans most of -1..1 and stays
+      // inside it (a little headroom for the gain).
+      for (int type = 0; type < 5; type++)
+      {
+         DisplaceNoise::Params np;
+         np.type = type;
+         np.frequency = 1.0f;
+         np.w = 0.3f;
+         float lo = 1e9f, hi = -1e9f, sum = 0.0f;
+         int count = 0;
+         for (int x = 0; x < 24; x++)
+            for (int y = 0; y < 24; y++)
+               for (int z = 0; z < 8; z++)
+               {
+                  float v[3];
+                  DisplaceNoise::Vector(np, x * 0.29f - 3.4f, y * 0.31f - 3.6f, z * 0.43f - 1.7f, v);
+                  for (float c : v)
+                  {
+                     lo = std::min(lo, c);
+                     hi = std::max(hi, c);
+                     sum += c;
+                     count++;
+                  }
+               }
+         printf("noise %s range: %.3f .. %.3f, mean %.3f\n", typeNames[type], lo, hi, sum / (float)count);
+         char label[200];
+         snprintf(label, sizeof(label), "Noise %s spans roughly -1..1", typeNames[type]);
+         report(label, lo > -1.3f && hi < 1.3f && hi - lo > 0.9f);
+      }
+
+      // Curl is divergence free: its divergence is small next to the size of
+      // its own derivatives.
+      {
+         DisplaceNoise::Params np;
+         np.type = DisplaceNoise::kCurl;
+         const float h = 0.002f;
+         double divSum = 0.0, derivSum = 0.0;
+         for (int k = 0; k < 400; k++)
+         {
+            const float x = std::sin(k * 1.7f) * 2.0f, y = std::cos(k * 0.9f) * 2.0f, z = std::sin(k * 0.31f) * 2.0f;
+            float a[3], b[3];
+            float div = 0.0f;
+            for (int axis = 0; axis < 3; axis++)
+            {
+               const float dx = axis == 0 ? h : 0.0f, dy = axis == 1 ? h : 0.0f, dz = axis == 2 ? h : 0.0f;
+               DisplaceNoise::Vector(np, x + dx, y + dy, z + dz, a);
+               DisplaceNoise::Vector(np, x - dx, y - dy, z - dz, b);
+               div += (a[axis] - b[axis]) / (2.0f * h);
+               for (int c = 0; c < 3; c++)
+                  derivSum += std::fabs((a[c] - b[c]) / (2.0f * h));
+            }
+            divSum += std::fabs(div);
+         }
+         const double ratio = divSum / std::max(1e-9, derivSum / 9.0);
+         printf("curl: mean |div| / mean |dV| = %.4f\n", ratio);
+         report("Noise Curl is divergence free", ratio < 0.1);
+      }
+
+      // A mesh: vertices move, and vertices that shared a position before
+      // still share one after (the sphere's UV seam stays closed).
+      {
+         GeometryNode sphere;
+         sphere.shape = 2;
+         DisplacementNode d;
+         d.input = &sphere;
+         d.source = DisplacementNode::kNoise;
+         d.noiseType = DisplaceNoise::kFractal;
+         d.strength = 0.2f;
+         d.speed = 0.0f;
+         d.CookIfNeeded(frame++);
+         const Mesh& in = sphere.GetMesh();
+         const Mesh out = d.GetMesh();
+         float moved = 0.0f, seam = 0.0f;
+         int shared = 0;
+         if (in.vertices.size() == out.vertices.size())
+         {
+            std::map<std::tuple<float, float, float>, size_t> first;
+            for (size_t k = 0; k < in.vertices.size(); k++)
+            {
+               const Vertex& a = in.vertices[k];
+               const Vertex& b = out.vertices[k];
+               moved = std::max(moved, std::fabs(a.px - b.px) + std::fabs(a.py - b.py) + std::fabs(a.pz - b.pz));
+               auto key = std::make_tuple(a.px, a.py, a.pz);
+               auto it = first.find(key);
+               if (it == first.end())
+                  first[key] = k;
+               else
+               {
+                  const Vertex& c = out.vertices[it->second];
+                  seam = std::max(seam, std::fabs(c.px - b.px) + std::fabs(c.py - b.py) + std::fabs(c.pz - b.pz));
+                  shared++;
+               }
+            }
+         }
+         printf("noise mesh: %zu vertices, moved %.3f, %d shared, seam gap %.6f\n", out.vertices.size(), moved, shared,
+                seam);
+         report("Noise on a mesh moves its vertices", moved > 0.02f);
+         report("Noise on a mesh keeps its seams closed", shared > 0 && seam < 1e-5f);
+
+         // Speed 0 holds still as the transport moves; speed > 0 animates.
+         const unsigned long long rev0 = d.MeshRevision();
+         Transport::Instance().Seek(Transport::Instance().Seconds() + 1.25);
+         d.CookIfNeeded(frame++);
+         d.GetMesh();
+         const bool still = d.MeshRevision() == rev0;
+         d.speed = 0.8f;
+         d.CookIfNeeded(frame++);
+         d.GetMesh();
+         const unsigned long long rev1 = d.MeshRevision();
+         Transport::Instance().Seek(Transport::Instance().Seconds() + 1.25);
+         d.CookIfNeeded(frame++);
+         const Mesh later = d.GetMesh();
+         float animated = 0.0f;
+         if (later.vertices.size() == out.vertices.size())
+            for (size_t k = 0; k < later.vertices.size(); k++)
+               animated = std::max(animated, std::fabs(later.vertices[k].px - out.vertices[k].px) +
+                                             std::fabs(later.vertices[k].py - out.vertices[k].py) +
+                                             std::fabs(later.vertices[k].pz - out.vertices[k].pz));
+         printf("noise mesh over time: speed 0 still %d, speed 0.8 moved %.3f\n", still ? 1 : 0, animated);
+         report("Noise at speed 0 holds still as the transport moves", still);
+         report("Noise at speed > 0 animates with the transport", d.MeshRevision() != rev1 && animated > 0.01f);
+      }
+
+      // A new Displacement reads its texture, as every saved patch expects.
+      {
+         DisplacementNode d;
+         report("Displacement's default source is Texture", d.source == DisplacementNode::kTexture);
       }
       GpuPointsGL::SetEnabledForTest(wasEnabled);
    }

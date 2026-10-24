@@ -208,7 +208,7 @@ namespace app
          { "Text 3D", I18N_KEY("Extrudes text into a 3D mesh, with depth, bevel and letter tracking, using any font installed on the system.") },
          { "Ocean", I18N_KEY("A simulated ocean surface mesh - Gerstner-style waves with amplitude, wavelength, steepness, choppiness, direction and octaves for layered swell.") },
          { "Material", I18N_KEY("Applies shading, colour, metallic/roughness/opacity and emission to a geometry input, plus an optional normal map input (its strength slider only appears once something is patched into it).") },
-         { "Displacement", I18N_KEY("Displaces a geometry's vertices along their normals using a texture's luminance. Needs both a geometry input and a texture input to do anything.") },
+         { "Displacement", I18N_KEY("Moves a geometry's vertices, or a cloud's points, by a texture or by 3D noise. Texture: luminance pushes along the normals, or RGB moves in XYZ. Noise: Smooth, Fractal, Curl (swirling flow), Ridged or Cells, animated with the transport; on points it can tint or resize them instead of moving them.") },
          { "Mapping", I18N_KEY("Transforms the UV or 3D texture coordinates used by materials/textures downstream - translate, rotate and scale, independent of moving the geometry itself.") },
          { "Particle System", I18N_KEY("A GPU particle emitter - shape, rate, lifetime, launch speed/spread/direction, gravity/drag/turbulence, and start/end size and colour over each particle's life.") },
          { "Cloth", I18N_KEY("A cloth simulation over an input mesh - stiffness, iterations, damping, mass and shape retention, plus gravity, wind and optional ground collision. 'Reset' re-drops the cloth from its rest pose.") },

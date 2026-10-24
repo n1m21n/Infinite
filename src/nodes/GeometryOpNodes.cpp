@@ -869,6 +869,46 @@ DisplacementNode::~DisplacementNode()
       glDeleteProgram(mGpuProgram);
 }
 
+const std::vector<std::string>& DisplacementNode::NoiseTypeNames()
+{
+   static const std::vector<std::string> k = { "Smooth", "Fractal", "Curl (flow)", "Ridged", "Cells" };
+   return k;
+}
+
+const std::vector<std::string>& DisplacementNode::AffectsNames()
+{
+   static const std::vector<std::string> k = { "Position", "Colour (points)", "Size (points)" };
+   return k;
+}
+
+DisplacementNode::NoiseKey DisplacementNode::CurrentNoiseKey() const
+{
+   NoiseKey k;
+   if (source != kNoise)
+      return k;
+   k.source = source;
+   k.type = noiseType;
+   k.octaves = octaves;
+   k.affects = affects;
+   k.seed = seed;
+   k.frequency = frequency;
+   k.w = mNoiseW;
+   k.roughness = noiseRoughness;
+   return k;
+}
+
+DisplaceNoise::Params DisplacementNode::NoiseParams() const
+{
+   DisplaceNoise::Params p;
+   p.type = noiseType;
+   p.frequency = frequency;
+   p.w = mNoiseW;
+   p.octaves = octaves;
+   p.roughness = noiseRoughness;
+   p.seed = (unsigned int)seed;
+   return p;
+}
+
 DisplacementNode::Signature DisplacementNode::CurrentSignature() const
 {
    Signature s;
@@ -880,7 +920,8 @@ DisplacementNode::Signature DisplacementNode::CurrentSignature() const
    s.selectionOnly = selectionOnly;
    s.upstream = input;
    s.upstreamRevision = input ? input->MeshRevision() : 0;
-   s.texGeneration = mTexGeneration;
+   s.texGeneration = source == kNoise ? 0 : mTexGeneration;
+   s.noise = CurrentNoiseKey();
    return s;
 }
 
@@ -897,6 +938,9 @@ const Mesh& DisplacementNode::GetMesh()
       mCookWarning.clear();
    else
       mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
+   if (mCookWarning.empty() && source == kNoise && affects != DisplaceNoise::kPosition &&
+       !input->GetMesh().vertices.empty())
+      mCookWarning = "Colour and Size act on points; a mesh is passed through unchanged";
 
    const Signature sig = CurrentSignature();
    if (mHasBuilt && sig == mBuilt)
@@ -904,9 +948,14 @@ const Mesh& DisplacementNode::GetMesh()
 
    const Mesh& src = input->GetMesh();
    const std::vector<unsigned char> vertexMask = MeshOps::VertexSelectionFromFaces(src);
-   mCache = MeshOps::Displace(src, mTexPixels, mTexW, mTexH, mode, strength, midlevel,
-                              flatShade, flipNormals,
-                              (selectionOnly && !src.faceMask.empty()) ? &vertexMask : nullptr);
+   const std::vector<unsigned char>* mask = (selectionOnly && !src.faceMask.empty()) ? &vertexMask : nullptr;
+   if (source == kNoise)
+      mCache = DisplaceNoise::DisplaceMesh(src, NoiseParams(), mode,
+                                           affects == DisplaceNoise::kPosition ? strength : 0.0f,
+                                           flatShade, flipNormals, mask);
+   else
+      mCache = MeshOps::Displace(src, mTexPixels, mTexW, mTexH, mode, strength, midlevel,
+                                 flatShade, flipNormals, mask);
 
    mBuilt = sig;
    mHasBuilt = true;
@@ -974,6 +1023,12 @@ void DisplacementNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
+
+   // Noise reads the transport clock, so it pauses and scrubs with it; the
+   // texture pin is not pulled at all while Source is Noise.
+   mNoiseW = source == kNoise ? (float)(Transport::Instance().Seconds() * (double)speed) : 0.0f;
+   if (source == kNoise)
+      return;
 
    if (mTextureInput.IsConnected())
    {
@@ -1068,7 +1123,8 @@ unsigned long long DisplacementNode::PointCloudRevision()
    sig.mode = mode;
    sig.strength = strength;
    sig.midlevel = midlevel;
-   sig.texKey = mTexKey;
+   sig.texKey = source == kNoise ? 0 : mTexKey;
+   sig.noise = CurrentNoiseKey();
    if (!mHasPointStamp || !(sig == mPointStamp))
    {
       mPointStamp = sig;
@@ -1088,10 +1144,15 @@ const std::vector<Particle>* DisplacementNode::GetPointCloud()
    const unsigned long long rev = PointCloudRevision();
    if (mPointCacheRevision == rev)
       return &mPointCache;
-   if (mTexPixelsStale)
-      ReadTexture();
    mPointCache = *src;
-   MeshOps::DisplacePoints(mPointCache, mTexPixels, mTexW, mTexH, mode, strength, midlevel);
+   if (source == kNoise)
+      DisplaceNoise::DisplacePoints(mPointCache, NoiseParams(), mode, strength, affects);
+   else
+   {
+      if (mTexPixelsStale)
+         ReadTexture();
+      MeshOps::DisplacePoints(mPointCache, mTexPixels, mTexW, mTexH, mode, strength, midlevel);
+   }
    mPointCacheRevision = rev;
    return &mPointCache;
 }
@@ -1108,7 +1169,8 @@ const GpuPoints* DisplacementNode::GetGpuPoints()
       mGpuShaderTried = true;
       // MeshOps::DisplacePoints, with its wrapped bilinear sample done by
       // hand on texelFetch so it reads the texels the CPU readback holds.
-      const std::string fs = std::string(GpuPointsGL::kPointPassHeader) +
+      const std::string fs = std::string(GpuPointsGL::kPointPassHeader) + DisplaceNoise::kGlsl +
+         "uniform int uSource;\n"
          "uniform sampler2D uTex;\n"
          "uniform ivec2 uTexSize;\n"
          "uniform int uHasTex;\n"
@@ -1122,7 +1184,8 @@ const GpuPoints* DisplacementNode::GetGpuPoints()
          "}\n"
          "void main() {\n"
          "   LoadPoint();\n"
-         "   if (uHasTex == 1) {\n"
+         "   if (uSource == 1) DnApply(P, Cd, W);\n"
+         "   else if (uHasTex == 1) {\n"
          "      vec2 uv = P.xy * 0.5 + 0.5;\n"
          "      uv = uv - floor(uv);\n"
          "      vec2 f = uv * vec2(uTexSize) - 0.5;\n"
@@ -1156,6 +1219,16 @@ const GpuPoints* DisplacementNode::GetGpuPoints()
          glUniform1i(glGetUniformLocation(mGpuProgram, "uMode"), mode);
          glUniform1f(glGetUniformLocation(mGpuProgram, "uStrength"), strength);
          glUniform1f(glGetUniformLocation(mGpuProgram, "uMidlevel"), midlevel);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uSource"), source == kNoise ? 1 : 0);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnType"), noiseType);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnFreq"), frequency);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnW"), mNoiseW);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnOctaves"), octaves);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnRough"), noiseRoughness);
+         glUniform1ui(glGetUniformLocation(mGpuProgram, "uDnSeed"), (unsigned int)seed);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnMode"), mode);
+         glUniform1f(glGetUniformLocation(mGpuProgram, "uDnStrength"), strength);
+         glUniform1i(glGetUniformLocation(mGpuProgram, "uDnAffects"), affects);
       }, "Displacement_GpuPoints");
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, 0);
@@ -1183,7 +1256,17 @@ const GpuPoints* DisplacementNode::GetGpuPoints()
                hi[k] = std::max(hi[k], w);
             }
          }
-         if (hasTex)
+         if (source == kNoise)
+         {
+            // The noise stays within about -1..1 (curl a little past it).
+            if (affects == DisplaceNoise::kPosition)
+               for (int k = 0; k < 3; k++)
+               {
+                  lo[k] -= 2.0f * std::fabs(strength);
+                  hi[k] += 2.0f * std::fabs(strength);
+               }
+         }
+         else if (hasTex)
          {
             const float s = std::fabs(strength);
             if (mode == kVector)
@@ -1210,6 +1293,8 @@ const GpuPoints* DisplacementNode::GetGpuPoints()
    }
    mGpuPoints.liveCount = src->liveCount;
    mGpuPoints.maxHalfSize = src->maxHalfSize;
+   if (source == kNoise && affects == DisplaceNoise::kSize)
+      mGpuPoints.maxHalfSize *= 1.0f + 2.0f * std::fabs(strength);
    mGpuPoints.count = src->count;
    mGpuPoints.revision = rev;
    return &mGpuPoints;

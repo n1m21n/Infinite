@@ -4,6 +4,8 @@ The owner's standing decisions that still steer work. Newest first. Add one only
 to a later session; plan-level detail belongs in the plan doc, not here.
 
 ## Product and direction
+- 2026-10-24 Owner: P8 Phase 3 is approved: Displacement gets a Noise source (5a), Feedback carries
+  geometry (5b), and Point Trails is a new node (5c). Plan: `docs/plans/gpu-points/README.md`.
 - 2026-10-23 Owner: a group is a block. There is no separate "Make block": every group has a power
 - 2026-10-23 Owner: Session works like GarageBand's Live Loops. Session Audio is its own audio mode (twin of Timeline Audio On): only launched clips play, the Timeline's clips stay silent. Clicking a playing or queued clip or scene stops or takes it back on the grid; Stop All stays in the toolbar. The Session has its own launch quantize, 1 bar by default. Launch modes are Trigger and Gate (Toggle retired: Trigger now stops on a second click). Scenes can play in order with "Then Play Next Scene". Record writes the performance to the Timeline and Render Take renders that span, audio and video, to a folder the user picks.
   button in its frame, and off means its nodes stop cooking and go silent (fade out).

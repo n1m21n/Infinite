@@ -728,7 +728,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Depth Projection` | depth:image, color:image | out:geometry | 35 |  |
 | `Difference` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry | out:geometry | 23 |  |
 | `Disc` | texture:image | out:geometry | 51 | bypass |
-| `Displacement` | geo:geometry, texture:image | out:geometry | 23 |  |
+| `Displacement` | geo:geometry, texture:image | out:geometry | 31 |  |
 | `Distribute Points in Grid` | none | out:geometry | 8 | bypass |
 | `Distribute Points on Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Dodecahedron` | texture:image | out:geometry | 51 | bypass |

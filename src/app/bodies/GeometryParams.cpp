@@ -1396,11 +1396,29 @@ namespace app
       if (n->input != nullptr)
          ImGui::TextDisabled("%zu triangles", n->TriangleCount());
 
+      static const std::vector<std::string> kSourceNames = { "Texture", "Noise" };
+      DropdownButton("source", kSourceNames, n->source, [n](int i) { n->source = i; });
+      const bool noise = n->source == DisplacementNode::kNoise;
       static const std::vector<std::string> kModeNames = { "Scalar (along normal)", "Vector (RGB = XYZ)" };
-      DropdownButton("mode", kModeNames, n->mode, [n](int i) { n->mode = i; });
+      static const std::vector<std::string> kNoiseModeNames = { "Scalar (along normal)", "Vector (XYZ)" };
+      DropdownButton("mode", noise ? kNoiseModeNames : kModeNames, n->mode, [n](int i) { n->mode = i; });
       ModSlider("strength", &n->strength, -2.0f, 2.0f);
-      if (n->mode == DisplacementNode::kScalar)
+      if (n->mode == DisplacementNode::kScalar && !noise)
          ModSlider("midlevel", &n->midlevel, 0.0f, 1.0f);
+      if (noise || gParamRegisterOnly)
+      {
+         NodeSeparator("noise");
+         DropdownButton("type", DisplacementNode::NoiseTypeNames(), n->noiseType, [n](int i) { n->noiseType = i; });
+         DropdownButton("affects", DisplacementNode::AffectsNames(), n->affects, [n](int i) { n->affects = i; });
+         ModSlider("frequency", &n->frequency, 0.01f, 20.0f);
+         ModSlider("speed", &n->speed, 0.0f, 10.0f);
+         // Detail and grain only shape the octave types.
+         ImGui::BeginDisabled(n->noiseType != 1 && n->noiseType != 3 && !gParamRegisterOnly);
+         ModSliderInt("detail", &n->octaves, 1, 8);
+         ModSlider("grain", &n->noiseRoughness, 0.0f, 1.0f);
+         ImGui::EndDisabled();
+         ModSliderInt("seed", &n->seed, 0, 999);
+      }
       ModCheckbox("flat shade", &n->flatShade);
       ModCheckbox("flip normals", &n->flipNormals);
       ModCheckbox("selection only", &n->selectionOnly);

@@ -2,7 +2,8 @@
 
 Status: in progress on `feature/p8-gpu-points` (started 2026-10-23). Owner said go on the Mac
 benchmark alone ("keep going, I don't have Ricardo's laptop", 2026-10-23); the Windows/fork runs
-are not waited for. Phase 3 (new nodes and modes) is out of scope here and still needs the owner.
+are not waited for. Phase 3 (new nodes and modes) was approved by the owner on 2026-10-24 ("Start
+Phase 3"): 5a Displacement noise, 5b Feedback carries geometry, 5c Point Trails.
 Full background, the PointZ mapping and the phase 0 table: `claude-context/P8_POINTS_PLAN.md`.
 
 ## What the measurements say (B11, Mac14,7 Release, 1080p, `tools/bench.py b11`)
@@ -81,6 +82,12 @@ the steps above, in the order they will be done:
 12. Field Modifier presets for point jobs: random size, random colour, stagger over index, age to
     colour. Done (section below). Colour from image is not shipped: it needs image reads in element
     kernels, which is new language surface (owner decision).
+
+Phase 3 (`claude-context/P8_POINTS_PLAN.md` section 5), owner OK 2026-10-24:
+
+- 5a. Displacement gets a Noise source. Done (section below).
+- 5b. Feedback carries geometry.
+- 5c. Point Trails, a new node.
 
 ## Done check (Lane 3)
 
@@ -393,3 +400,58 @@ an image.
 
 **Parity.** GLSL stays `#version 150`. There is no `Platform::` code and no `#ifdef`. The presets
 are Field source, which is the same on every platform.
+
+## Phase 3, 5a: Displacement's Noise source (2026-10-24, dev build)
+
+Displacement has a new **source** dropdown: Texture (the default, so saved patches are unchanged)
+or **Noise**. Noise moves geometry with 3D noise sampled at each vertex or point, so a surface or a
+cloud can move without first making and mapping a noise texture.
+
+**Controls (noise group).**
+- `type`: Smooth, Fractal, Curl (flow), Ridged or Cells.
+- `affects`: Position, Colour (points) or Size (points).
+- `frequency` (0.01-20), `speed` (0-10), `detail` (octaves 1-8) and `grain` (roughness 0-1).
+  `detail` and `grain` only shape Fractal and Ridged, and are greyed out otherwise.
+- `seed` (0-999).
+- The existing `mode` is the direction: Scalar moves along the normal (+Z on points, which have
+  none), Vector moves in XYZ. Curl is always a vector. `midlevel` is not used with Noise.
+- The saved key for `grain` is `noiseRoughness`, because Displacement's material already saves
+  `roughness`.
+
+**Time.** The noise evolves with transport time multiplied by `speed`: two noise layers, one per
+whole step, faded into each other. It pauses and scrubs with the transport. At speed 0 it holds
+still and the mesh is not rebuilt.
+
+**Colour and Size act on points only.** A mesh vertex has no colour or size of its own. On a mesh,
+those two modes leave it unchanged and show a cook warning.
+
+**One noise, two languages.** `src/core/DisplaceNoise.h/.cpp` holds the C++ noise (meshes and CPU
+clouds) and `kGlsl`, the same maths for the GPU point pass. Both use the same integer hash and the
+same order of operations. Change one, change the other: GPUPOINTSTEST compares them.
+
+**Checks.**
+- `GPUPOINTSTEST` 5a section, all pass. It uses a 900-point test cloud. For each of the five types
+  and each use (scalar position, vector position, scalar colour, vector colour, size):
+  - GPU points appear only on the GPU path.
+  - The cloud changes (moved at least 0.10).
+  - The GPU texels equal the CPU cloud: position error at most 4e-6, colour 2e-6, size 0.
+- Measured ranges on a 3D grid:
+
+  | Type | Range | Mean |
+  |---|---|---|
+  | Smooth | -0.82..0.91 | 0.00 |
+  | Fractal | -0.63..0.61 | 0.00 |
+  | Curl | -1.12..1.16 | 0.00 |
+  | Ridged | -0.72..0.97 | 0.33 |
+  | Cells | -0.97..1.00 | 0.05 |
+
+  Ridged leans positive by nature, so scalar Ridged also swells a mesh a little.
+- Curl is divergence free: mean |div| / mean |dV| = 0.0007.
+- On a sphere, vertices move (0.137) and the 64 seam vertices stay together (gap 0).
+- Speed 0 holds still as the transport moves; speed 0.8 moves the surface by 0.155 over 1.25 s.
+- A new Displacement's source is Texture.
+- `run-infinite-hygiene --group 3d` 23/23 and `render-pipeline-sweep` 23/23.
+
+**Parity.** GLSL stays `#version 150`, with `uint` and bit operations (core since GLSL 1.30). The
+C++ uses only `<cmath>` and fixed-width unsigned arithmetic, so the hash wraps the same on every
+compiler. There is no `Platform::` code and no `#ifdef`.
