@@ -401,7 +401,7 @@ int DrawFloating(FrameCtx& fc)
             if (stage == SelfUpdate::Stage::Downloading)
             {
                const float p = SelfUpdate::Progress();
-               ImGui::ProgressBar(p < 0.0f ? -1.0f * (float)ImGui::GetTime() : p, ImVec2(400.0f, 0.0f), T("Downloading"));
+               DialogParts::Progress(T("Downloading"), p);
                if (DialogParts::Buttons({ L("Hide") }) == 0)
                   ImGui::CloseCurrentPopup();
             }
