@@ -1123,7 +1123,18 @@ namespace Platform
          }
       }
 
+#ifdef INFINITE_VST3_SCANNER
+      // The scanner process ends right after the batch (scanner_main_win.cpp terminates it without teardown), so
+      // nothing is unloaded here. ExitDll and FreeLibrary run the plugin's own shutdown code (JUCE and DPF plugins
+      // such as Surge XT and Cardinal, and Native Instruments ones, crash in it), and a crash there came before the
+      // "@done" line was printed: the parent read it as the plugin crashing during the scan and blocklisted a plugin
+      // that had described itself fine. Leaking the module and factory for the life of the child is harmless.
+      (void)factory.take();
+      (void)factory2.take();
+      (void)module;
+#else
       UnloadVST3Module(module);
+#endif
       ClearSentinel();
       return foundAny;
    }
