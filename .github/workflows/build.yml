@@ -45,6 +45,12 @@ on:
       - 'smithery.yaml'
       - '.cursorrules'
   workflow_dispatch:
+    inputs:
+      only:
+        description: "Run only one platform (a manual run; a push always runs everything)"
+        type: choice
+        options: [all, windows, linux, macos]
+        default: all
 
 # On branches, a force-push mid-run should cancel the superseded run, not
 # queue behind it. On main every run is allowed to finish: cancelling there
@@ -70,17 +76,19 @@ jobs:
       - uses: actions/checkout@v4
       - id: check
         run: |
-          if [ -f src/platform/win/PlatformWin.cpp ]; then
+          only="${{ inputs.only }}"
+          [ -z "$only" ] && only=all
+          if [ -f src/platform/win/PlatformWin.cpp ] && { [ "$only" = all ] || [ "$only" = windows ]; }; then
             echo "has_windows=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_windows=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No src/platform/win - skipping the Windows jobs."
+            echo "::notice::Skipping the Windows jobs (no src/platform/win, or another platform was picked)."
           fi
-          if [ -f src/platform/linux/PlatformLinux.cpp ]; then
+          if [ -f src/platform/linux/PlatformLinux.cpp ] && { [ "$only" = all ] || [ "$only" = linux ]; }; then
             echo "has_linux=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_linux=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No src/platform/linux - skipping the Linux jobs."
+            echo "::notice::Skipping the Linux jobs (no src/platform/linux, or another platform was picked)."
           fi
 
   design-ratchet:
@@ -182,14 +190,13 @@ jobs:
           Select-Xml -Xml $xml -Namespace $ns -XPath "//m:ItemDefinitionGroup[contains(@Condition,'Release')]/m:ClCompile" |
             ForEach-Object { $_.Node.OuterXml }
 
-      # Serial, and NOT `-m`: with compile batching disabled each TU is its own
-      # CL invocation, so a serial build gives a log where the filename printed
-      # last is genuinely the file that failed. That is what finally attributed
-      # the crash to main.cpp.
-      # NB: use MSBuild's explicit /maxcpucount:1 - `-m:1` is rejected with
+      # Two projects at a time, NOT `-m` (unbounded). The main.cpp crash that once forced a fully serial
+      # build is fixed at the source; if a CL.exe crash comes back, set this to 1 to get a log where the
+      # last filename printed is the file that failed (see .claude/skills/ci-failure-triage).
+      # NB: use MSBuild's explicit /maxcpucount:2 - `-m:2` is rejected with
       # MSB1031 "Specify the maximum number of CPUs" when passed this way.
       - name: Build
-        run: cmake --build build --config Release -- /maxcpucount:1
+        run: cmake --build build --config Release -- /maxcpucount:2
 
       # Skipped on ARM64: the x64 runner's binary is native there, but an
       # ARM64 binary cannot be executed by an x64 host and vice versa. The
