@@ -25,6 +25,15 @@ void Text3DNode::RebuildIfNeeded()
    mMesh.vertices.clear();
    mMesh.indices.clear();
 
+   // The extrude cost grows about with the square of the length: 20000
+   // characters took 9 s of a frame, 50000 took 56 s (B-K-042).
+   if (text.size() > kMaxTextLength)
+   {
+      mStatus = "text too long (max " + std::to_string(kMaxTextLength) + " characters)";
+      mMeshRevision = NextMeshRevision();
+      return;
+   }
+
    std::vector<Platform::TextContour> contours;
    std::string error;
    if (!Platform::GetTextOutlines(text, fontName, letterSpacing, contours, error))

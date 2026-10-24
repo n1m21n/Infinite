@@ -4,6 +4,7 @@
 // block, so what is measured is what a patch hears.
 #include "app/AppShared.h"
 #include "audio/dsp/EquationDsp.h"
+#include "nodes/Text3DNode.h"
 #include <algorithm>
 #include <climits>
 #include <limits>
@@ -859,6 +860,21 @@ bool RunEffectMixAndLimiterFixture()
       const bool plainOk = EquationDsp::Parser::Parse("sin(2*pi*x) + (((x)))", ast, err);
       const bool ok = refused && plainOk;
       printf("DSPTEST equation parser refuses deep nesting: refused=%d plain=%d  %s\n", refused, plainOk, ok ? "OK" : "FAIL");
+      all &= ok;
+   }
+
+   // Text 3D's extrude cost grows roughly with the square of the length: 50000
+   // characters took 56 s of a frame. Text past the cap builds nothing and
+   // says why; ordinary text still builds (B-K-042).
+   {
+      Text3DNode longText;
+      longText.text = std::string(5000, 'A');
+      const bool refused = longText.GetMesh().indices.empty() && !longText.Status().empty();
+      Text3DNode plain;
+      plain.text = "Hi";
+      const bool plainOk = !plain.GetMesh().indices.empty();
+      const bool ok = refused && plainOk;
+      printf("DSPTEST text 3D refuses over-long text: refused=%d plain=%d  %s\n", refused, plainOk, ok ? "OK" : "FAIL");
       all &= ok;
    }
 
