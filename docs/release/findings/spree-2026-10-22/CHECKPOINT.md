@@ -4,11 +4,12 @@
 
 ## Final state
 
-- **57 findings** (B-A-001 … B-K-039). 54 are fixed. Three are not fixed:
+- **59 findings** (B-A-001 … B-K-041). 55 are fixed. Four are not fixed (B-K-041 is wontfix):
 
   | Finding | Decision |
   |---|---|
   | B-G-001, B-H-001 (P3 timing) | Moved to the perf initiative (docs/plans/perf/README.md). A quiet-Mac re-run is not possible while other sessions build. |
+  | B-K-041 (Analog/Oscillator resonance 1 on SVF LP36 peaks +28 dBFS) | Wontfix: knob at max, finite; a fix changes saved patches' sound. |
   | B-J-001 (Windows headless hang) | Deferred: the self-test hang is gone, and the smoke and render steps are re-checked on the next push. See the finding. |
 
 - **Closing work on 2026-10-24:**
@@ -27,10 +28,34 @@
   - **Projection (E_RENDER):** setting every warp point to 1e9 collapses the mesh. The app reports a handled "no image" error.
 - **Dropped:**
   - The coverage report: it only measures.
-  - The mod and text sweeps: B-K-026 and the per-node clamps cover them, and the yield did not justify hours.
+  - ~~The mod and text sweeps~~ **Reopened and run on 2026-10-24** (see "Mod and text sweeps" below). The earlier line was wrong: B-K-026 only guards numbers coming from a patch, OSC or RPC.
   - LSan, RTSan and libFuzzer: Linux-only, follow-ups for a later spree.
   - The old RELEASE_BUGHUNT_PLAN.md: superseded by this folder.
 - **Lessons from the spree:** see the end of `tools/bughunt/README.md`. Before any long job, budget it: estimate rows × seconds and what it can find that the last run did not, then stop once new rows only repeat known classes.
+
+## Mod and text sweeps, 2026-10-24
+
+**Code read.** Modulation cannot write past a knob range. Every writer in `ApplyModulationAndPalette` (LFO and other modulators, predictors, macro number box, expressions) ends in `ShapeToParam`, which snaps to `step`, clamps to `ref.minValue..maxValue` and replaces NaN with the held value. So the per-node clamps of B-K-031..039 (which cover values that skip the knob: patch, OSC, RPC) do not need a second copy for modulation, and no shared fix was needed.
+
+**Mod sweep** (release app, 873 rows in 20 min, 19 types left over budget): 12 BAD, none a crash or NaN.
+
+| Rows | Class | Verdict |
+|---|---|---|
+| Array, Depth Projection, Audio Texture (E_BAD_PARAM) | the sweep binds conditional controls (e.g. Array `radial`) that only register in another mode; the schema check rejects the line | Harness limit, not an app bug. Those types' mod rows are untested. |
+| Dynamics, EQ, Saturator, Transient Shaper, Wavetable Shaper (HOTAUDIO, bi) | output/makeup gain knob at +12/+24 dB | Knob at max, not a bug |
+| Analog, Oscillator (HOTAUDIO, uni) | resonance 1 on SVF LP36 | B-K-041, wontfix |
+
+**Text sweep** (release app, 520 rows, 64 BAD): one crash.
+
+| Rows | Class | Verdict |
+|---|---|---|
+| Equation Synth `parens` (exit -11) | parser recursion | B-K-040, fixed |
+| Formula, Field Modifier/Primitive/Effect, Equation Synth, Sketch (E_FORMULA_COMPILE, E_FIELD_COMPILE, E_RENDER; 61 rows) | garbage text is rejected with a handled error | Not bugs |
+| Text 3D `big` (1 MB) and `parens` (50000 chars): timeout at 25 s | extruding that many glyphs | Lead, not re-timed or fixed: finite work on a pathological input |
+
+B-K-040 was verified with a standalone build of `EquationDsp.h` (old header segfaults, new header refuses). The in-app DSPTEST case is committed but was not run: the fresh worktree had no build dir and a full first build did not fit the budget. Run `INFINITE_DSPTEST=1` on the next build.
+
+**Left over:** the 19 mod types past the budget, and the Array/Depth Projection/Audio Texture mod rows. Run `param_fuzz.py ... --kind mod` again to resume; a harness change that drops keys the schema rejects would cover the three.
 
 ---
 
