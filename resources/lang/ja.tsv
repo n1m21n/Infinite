@@ -1580,7 +1580,8 @@ Turn the group on	グループをオン
 Turn Group Off	グループをオフ
 Turn Group On	グループをオン
 After	次の後
-Click to launch this row on every track, click again to stop it. Right-click for its tempo and what plays next.	クリックでこの行を全トラックで起動、もう一度クリックで停止。右クリックでテンポと次に再生するものを設定。
+Click to launch this row on every track, click again to stop it. Drag to reorder. Right-click for its tempo and what plays next.	クリックでこの行を全トラックで起動、もう一度クリックで停止。ドラッグで並べ替え。右クリックでテンポと次に再生するものを設定。
+Drag to reorder tracks. Right-click for more.	ドラッグでトラックを並べ替え。右クリックでその他の操作。
 Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions.	クリックで起動、もう一度クリックで停止。Cmd-クリックで選択。右クリックでコピー、ペースト、フォローアクション。
 Clip	クリップ
 Copy	コピー

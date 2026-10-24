@@ -1580,7 +1580,8 @@ Turn the group on	Включить группу
 Turn Group Off	Выключить группу
 Turn Group On	Включить группу
 After	Через
-Click to launch this row on every track, click again to stop it. Right-click for its tempo and what plays next.	Щелчок запускает эту строку на всех дорожках, повторный щелчок останавливает. Правый щелчок — темп и что играет дальше.
+Click to launch this row on every track, click again to stop it. Drag to reorder. Right-click for its tempo and what plays next.	Щелчок запускает эту строку на всех дорожках, повторный щелчок останавливает. Перетащите, чтобы изменить порядок. Правый щелчок — темп и что играет дальше.
+Drag to reorder tracks. Right-click for more.	Перетащите, чтобы изменить порядок дорожек. Правый щелчок — другие действия.
 Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions.	Щелчок запускает, повторный щелчок останавливает. Cmd-щелчок выделяет. Правый щелчок — копирование, вставка и последующие действия.
 Clip	Клип
 Copy	Копировать

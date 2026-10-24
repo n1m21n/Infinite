@@ -1580,7 +1580,8 @@ Turn the group on	打开分组
 Turn Group Off	关闭分组
 Turn Group On	打开分组
 After	之后
-Click to launch this row on every track, click again to stop it. Right-click for its tempo and what plays next.	点击在所有轨道上启动这一行,再次点击停止。右键设置速度和接下来播放的内容。
+Click to launch this row on every track, click again to stop it. Drag to reorder. Right-click for its tempo and what plays next.	点击在所有轨道上启动这一行,再次点击停止。拖动可重新排序。右键设置速度和接下来播放的内容。
+Drag to reorder tracks. Right-click for more.	拖动可重新排序轨道。右键查看更多。
 Click to launch, click again to stop. Cmd-click selects. Right-click for copy, paste and follow actions.	点击启动,再次点击停止。Cmd-点击仅选择。右键可复制、粘贴和设置跟随动作。
 Clip	片段
 Copy	复制
