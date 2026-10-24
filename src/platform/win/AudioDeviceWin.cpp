@@ -25,6 +25,7 @@
 
 #include "WinCommon.h"
 
+#include "../common/AsioCore.h"
 #include "../common/AudioAnalysis.h"
 #include "dsp/PortableFft.h"
 
@@ -45,16 +46,44 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <chrono>
 #include <cstring>
+#include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
+
+// Steinberg's ASIO SDK (common/iasiodrv.h) is fetched at configure time and
+// never committed; INFINITE_ENABLE_ASIO is defined only when it was found.
+// Keep this include last: asiosys.h defines WINDOWS / LINUX / PPC style
+// macros, and iasiodrv.h has no include guard.
+#if defined(INFINITE_ENABLE_ASIO)
+#include <iasiodrv.h>
+#endif
 
 // Defined in AudioEngine.cpp (the macOS backend reaches it the same way, see
 // Platform.mm). Bumps AudioEngine's OS-reported xrun counter; atomic-only.
 // This file is not compiled into infinite-vst3-scanner, so the symbol always
 // links.
 extern "C" void AudioEngine_NotifyProcessorOverload(void* engineInstance);
+
+// The ASIO host (defined further down, after the input ring it feeds).
+// Without the SDK these are stubs that report why ASIO is unavailable.
+namespace WinAsio
+{
+   bool Built();
+   bool Open(Platform::AudioRenderCallback callback, void* userData, double requestedRate,
+             int requestedFrames, double& outRate, std::string& outError);
+   void Close();
+   bool Active();
+   uint32_t BufferFrames();
+   uint32_t RoundTripFrames();
+   bool PollStalled();
+   std::vector<std::string> DriverNames();
+   void SetDriver(const std::string& name);
+   std::string ActiveName();
+}
 
 namespace
 {
@@ -78,9 +107,17 @@ namespace
 
    std::atomic<bool> gConfigChangedFlag{ false };
 
+   // Output mode 3 is ASIO. gAsioRetry is true while ASIO was asked for but the
+   // app is running on WASAPI instead; gAsioNote says why (shown in Settings).
+   std::atomic<bool> gAsioRetry{ false };
+   // Set whenever the endpoint list was re-read behind AudioListDevices' back.
+   std::atomic<bool> gDeviceCacheDirty{ true };
+   std::mutex gAsioNoteMutex;
+   std::string gAsioNote;
+
    // Output-stream mode (Platform::AudioSetOutputMode): 0 standard shared
    // (today's behaviour, the default), 1 IAudioClient3 low-latency shared,
-   // 2 WASAPI exclusive. `Active` is what the open stream really runs after
+   // 2 WASAPI exclusive, 3 ASIO (WinAsio; WASAPI mode 0 when it cannot open). `Active` is what the open stream really runs after
    // fallback. `Disabled` latches when an exclusive stream dies at runtime
    // (device invalidated, format changed under us) so the recovery restart
    // that follows does not walk straight back into the same failure; it is
@@ -117,8 +154,21 @@ namespace
       }
 
       // IMMNotificationClient - everything we don't care about succeeds idle.
-      STDMETHODIMP OnDeviceStateChanged(LPCWSTR, DWORD) override { return S_OK; }
-      STDMETHODIMP OnDeviceAdded(LPCWSTR) override { return S_OK; }
+      // A USB interface coming back after an unplug shows up as a new WASAPI
+      // endpoint too: if the app fell back from ASIO, that is the cue to try
+      // the ASIO driver again (see gAsioRetry).
+      STDMETHODIMP OnDeviceStateChanged(LPCWSTR, DWORD) override
+      {
+         if (gAsioRetry.load(std::memory_order_acquire))
+            gConfigChangedFlag.store(true, std::memory_order_release);
+         return S_OK;
+      }
+      STDMETHODIMP OnDeviceAdded(LPCWSTR) override
+      {
+         if (gAsioRetry.load(std::memory_order_acquire))
+            gConfigChangedFlag.store(true, std::memory_order_release);
+         return S_OK;
+      }
       STDMETHODIMP OnDeviceRemoved(LPCWSTR) override
       {
          gConfigChangedFlag.store(true, std::memory_order_release);
@@ -897,6 +947,32 @@ namespace Platform
 
       AudioDeviceClose(); // idempotent restart path
 
+      // ASIO is one driver for input and output, so it replaces the whole
+      // WASAPI device resolution below. Any failure leaves a note and falls
+      // through to the standard WASAPI path: a bad choice never means no audio.
+      const int wantedMode = gOutputModeRequested.load(std::memory_order_acquire);
+      {
+         std::lock_guard<std::mutex> lock(gAsioNoteMutex);
+         gAsioNote.clear();
+      }
+      gAsioRetry.store(false, std::memory_order_release);
+      if (wantedMode == 3)
+      {
+         std::string asioError;
+         if (WinAsio::Open(callback, userData, requestedSampleRate, requestedBufferFrames,
+                           outSampleRate, asioError))
+            return true;
+         {
+            std::lock_guard<std::mutex> lock(gAsioNoteMutex);
+            gAsioNote = asioError;
+         }
+         // Only a driver that is installed but not answering can come back by
+         // itself (unplugged interface); a missing SDK or driver cannot.
+         gAsioRetry.store(WinAsio::Built(), std::memory_order_release);
+         fprintf(stderr, "audio: ASIO unavailable (%s), using Windows audio\n", asioError.c_str());
+         outSampleRate = 0.0;
+      }
+
       {
          ComScope com;
          if (com.ok)
@@ -908,6 +984,7 @@ namespace Platform
                 enumerator != nullptr)
             {
                RefreshDeviceList(enumerator);
+               gDeviceCacheDirty.store(true, std::memory_order_release);
                enumerator->Release();
             }
          }
@@ -977,7 +1054,7 @@ namespace Platform
       gRender.channels = 0;
       gRender.bufferFrames = 0;
       gRender.mode = 0;
-      gRender.requestedMode = std::clamp(gOutputModeRequested.load(std::memory_order_acquire), 0, 2);
+      gRender.requestedMode = std::clamp(wantedMode, 0, 2); // 3 (ASIO) fell through: standard
 
       gRender.stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
       gRender.bufferEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
@@ -1028,11 +1105,14 @@ namespace Platform
 
    void AudioDeviceClose()
    {
+      WinAsio::Close();
       gRender.Stop();
    }
 
    uint32_t AudioDeviceBufferFrames(uint32_t deviceId)
    {
+      if (WinAsio::Active())
+         return WinAsio::BufferFrames();
       if (deviceId == 0 && gRender.running.load(std::memory_order_acquire) &&
           gRender.bufferFrames > 0)
          return gRender.bufferFrames;
@@ -1087,13 +1167,15 @@ namespace Platform
 
    void AudioSetOutputMode(int mode)
    {
-      const int clamped = std::clamp(mode, 0, 2);
+      const int clamped = std::clamp(mode, 0, 3);
       if (gOutputModeRequested.exchange(clamped, std::memory_order_acq_rel) != clamped)
          gExclusiveDisabled.store(false, std::memory_order_release); // a fresh choice deserves a fresh try
    }
 
    int AudioOutputModeActive()
    {
+      if (WinAsio::Active())
+         return 3;
       if (!gRender.running.load(std::memory_order_acquire))
          return 0;
       return gOutputModeActive.load(std::memory_order_acquire);
@@ -1146,6 +1228,10 @@ namespace Platform
 
    bool AudioDeviceConfigDidChange()
    {
+      // A driver that was unplugged without sending a reset request just stops
+      // calling back; treat two silent seconds as a device change.
+      if (WinAsio::PollStalled())
+         gConfigChangedFlag.store(true, std::memory_order_release);
       return gConfigChangedFlag.exchange(false, std::memory_order_acq_rel);
    }
 
@@ -1154,7 +1240,61 @@ namespace Platform
       gConfigChangedFlag.store(true, std::memory_order_release);
    }
 
+   bool AudioAsioAvailable()
+   {
+      return WinAsio::Built();
+   }
+
+   std::vector<std::string> AudioAsioDrivers()
+   {
+      return WinAsio::DriverNames();
+   }
+
+   void AudioSetAsioDriver(const std::string& name)
+   {
+      WinAsio::SetDriver(name);
+   }
+
+   std::string AudioAsioActiveName()
+   {
+      return WinAsio::ActiveName();
+   }
+
+   std::string AudioDriverNote()
+   {
+      std::lock_guard<std::mutex> lock(gAsioNoteMutex);
+      return gAsioNote;
+   }
+
+   // Settings reads this every frame while its Audio tab is open, and every
+   // call used to enumerate the endpoints (a COM round trip per device, which
+   // is audible on a running stream). Keep the answer for ~3 s; opening a
+   // device and a device change both drop it.
+   static std::vector<AudioDeviceInfo> ScanAudioDevices();
+
    std::vector<AudioDeviceInfo> AudioListDevices()
+   {
+      using Clock = std::chrono::steady_clock;
+      static std::mutex sCacheMutex;
+      static std::vector<AudioDeviceInfo> sCache;
+      static Clock::time_point sCacheTime;
+      static bool sCacheValid = false;
+      {
+         std::lock_guard<std::mutex> lock(sCacheMutex);
+         if (sCacheValid && !gDeviceCacheDirty.load(std::memory_order_acquire) &&
+             Clock::now() - sCacheTime < std::chrono::seconds(3))
+            return sCache;
+      }
+      gDeviceCacheDirty.store(false, std::memory_order_release);
+      std::vector<AudioDeviceInfo> fresh = ScanAudioDevices();
+      std::lock_guard<std::mutex> lock(sCacheMutex);
+      sCache = fresh;
+      sCacheTime = Clock::now();
+      sCacheValid = true;
+      return fresh;
+   }
+
+   static std::vector<AudioDeviceInfo> ScanAudioDevices()
    {
       std::vector<AudioDeviceInfo> out;
 
@@ -1579,6 +1719,567 @@ namespace
    std::atomic<uint64_t> gTapReadCursor{ 0 };
 }
 
+// ---------------------------------------------------------------------------
+// ASIO host
+// ---------------------------------------------------------------------------
+// One ASIO driver is one device for input and output. A dedicated control
+// thread (STA, like JUCE and Steinberg's own host sample) creates the driver,
+// negotiates rate / buffer size, runs it, and tears it down, so every call
+// into the driver comes from the one thread that opened it. Audio runs on the
+// driver's own callback thread: it converts the input buffers into the shared
+// input ring (the Audio In node reads it), runs the engine callback, and
+// converts the result into the driver's output buffers. That path allocates
+// nothing and takes no lock; every buffer is sized in Open.
+//
+// Anything that asks for a restart (kAsioResetRequest, a buffer-size change,
+// a sample-rate change, a driver that stops calling back) only latches
+// gConfigChangedFlag; PollAudioRecovery does the close and re-open on the main
+// thread, exactly as for a WASAPI device change.
+namespace WinAsio
+{
+#if defined(INFINITE_ENABLE_ASIO)
+   namespace
+   {
+      struct Session
+      {
+         Platform::AudioRenderCallback callback = nullptr;
+         void* userData = nullptr;
+         AsioCore::DriverEntry driver;
+         double requestedRate = 0.0;
+         int requestedFrames = 0;
+
+         // Written by the control thread before `state` flips to 1.
+         std::atomic<int> state{ 0 }; // 0 starting, 1 running, 2 failed
+         std::string error;
+         double sampleRate = 0.0;
+         long bufferFrames = 0;
+         int nIn = 0;
+         int nOut = 0;
+         int outUsed = 0; // channels handed to the engine (the rest stay silent)
+         int inType[kMaxChannels] = {};
+         int outType[kMaxChannels] = {};
+         ASIOBufferInfo infos[2 * kMaxChannels] = {};
+         std::vector<float> planar;   // outUsed * kPlanarCapacity
+         std::vector<float> inPlanar; // nIn * kPlanarCapacity
+         bool outputReady = false;
+         IASIO* drv = nullptr;
+
+         std::atomic<long> inLatency{ 0 };
+         std::atomic<long> outLatency{ 0 };
+         std::atomic<bool> latenciesDirty{ false };
+         std::atomic<bool> running{ false };
+         std::atomic<uint64_t> beats{ 0 };
+
+         HANDLE stopEvent = nullptr;
+         std::thread thread;
+      };
+
+      std::shared_ptr<Session> gSession;       // main thread only
+      std::atomic<Session*> gCurrent{ nullptr }; // what the driver callbacks see
+      std::mutex gConfigMutex;
+      std::string gWantedDriver;
+      std::vector<AsioCore::DriverEntry> gDriverCache;
+      std::chrono::steady_clock::time_point gDriverCacheTime;
+      bool gDriverCacheValid = false;
+
+      std::vector<AsioCore::DriverEntry> ScanDrivers()
+      {
+         std::vector<std::pair<std::string, std::string>> raw;
+         HKEY root = nullptr;
+         if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\ASIO", 0, KEY_READ, &root) != ERROR_SUCCESS)
+            return {};
+         for (DWORD i = 0;; i++)
+         {
+            wchar_t name[256] = {};
+            DWORD len = 255;
+            const LONG rc = RegEnumKeyExW(root, i, name, &len, nullptr, nullptr, nullptr, nullptr);
+            if (rc == ERROR_NO_MORE_ITEMS)
+               break;
+            if (rc != ERROR_SUCCESS)
+               continue;
+            HKEY key = nullptr;
+            if (RegOpenKeyExW(root, name, 0, KEY_READ, &key) != ERROR_SUCCESS)
+               continue;
+            wchar_t clsid[96] = {};
+            DWORD size = sizeof(clsid) - sizeof(wchar_t);
+            DWORD type = 0;
+            if (RegQueryValueExW(key, L"CLSID", nullptr, &type, reinterpret_cast<BYTE*>(clsid), &size) == ERROR_SUCCESS &&
+                type == REG_SZ)
+               raw.emplace_back(WinCommon::WideToUtf8(name), WinCommon::WideToUtf8(clsid));
+            RegCloseKey(key);
+         }
+         RegCloseKey(root);
+         return AsioCore::BuildDriverList(raw);
+      }
+
+      // ---- driver callbacks (the driver's thread) ---------------------------
+
+      void OnBufferSwitch(long index, ASIOBool)
+      {
+         Session* s = gCurrent.load(std::memory_order_acquire);
+         if (s == nullptr || !s->running.load(std::memory_order_acquire) || index < 0 || index > 1)
+            return;
+         s->beats.fetch_add(1, std::memory_order_relaxed);
+
+         const int total = (int)s->bufferFrames;
+         float* outPtrs[kMaxChannels];
+         for (int ch = 0; ch < s->outUsed; ch++)
+            outPtrs[ch] = s->planar.data() + (size_t)ch * kPlanarCapacity;
+
+         for (int done = 0; done < total;)
+         {
+            const int n = std::min(total - done, kPlanarCapacity);
+
+            if (s->nIn > 0)
+            {
+               for (int ch = 0; ch < s->nIn; ch++)
+               {
+                  const uint8_t* src = static_cast<const uint8_t*>(s->infos[ch].buffers[index]) +
+                                       (size_t)done * AsioCore::BytesPerSample(s->inType[ch]);
+                  AsioCore::ToFloat(s->inType[ch], src, s->inPlanar.data() + (size_t)ch * kPlanarCapacity, n);
+               }
+               float frame[kMaxChannels];
+               for (int i = 0; i < n; i++)
+               {
+                  for (int ch = 0; ch < s->nIn; ch++)
+                     frame[ch] = s->inPlanar[(size_t)ch * kPlanarCapacity + i];
+                  gTap.ring.PushFrame(frame);
+               }
+            }
+
+            for (int ch = 0; ch < s->outUsed; ch++)
+               std::fill(outPtrs[ch], outPtrs[ch] + n, 0.0f);
+            s->callback(outPtrs, s->outUsed, n, s->userData);
+
+            for (int ch = 0; ch < s->nOut; ch++)
+            {
+               uint8_t* dst = static_cast<uint8_t*>(s->infos[s->nIn + ch].buffers[index]) +
+                              (size_t)done * AsioCore::BytesPerSample(s->outType[ch]);
+               if (ch < s->outUsed)
+                  AsioCore::FromFloat(s->outType[ch], outPtrs[ch], dst, n);
+               else
+                  std::memset(dst, 0, (size_t)n * AsioCore::BytesPerSample(s->outType[ch]));
+            }
+            done += n;
+         }
+         if (s->outputReady && s->drv != nullptr)
+            s->drv->outputReady();
+      }
+
+      ASIOTime* OnBufferSwitchTimeInfo(ASIOTime* params, long index, ASIOBool direct)
+      {
+         // Not offered to the driver (kAsioSupportsTimeInfo answers 0), but
+         // a driver that calls it anyway gets the plain path.
+         OnBufferSwitch(index, direct);
+         return params;
+      }
+
+      void OnSampleRateChanged(ASIOSampleRate)
+      {
+         gConfigChangedFlag.store(true, std::memory_order_release);
+      }
+
+      long OnAsioMessage(long selector, long value, void*, double*)
+      {
+         switch (selector)
+         {
+            case kAsioSelectorSupported:
+               switch (value)
+               {
+                  case kAsioEngineVersion: case kAsioResetRequest: case kAsioBufferSizeChange:
+                  case kAsioResyncRequest: case kAsioLatenciesChanged: case kAsioOverload:
+                     return 1;
+                  default:
+                     return 0;
+               }
+            case kAsioEngineVersion:
+               return 2;
+            case kAsioResetRequest:
+            case kAsioBufferSizeChange:
+               // Never reset from inside a driver callback: ask the main thread.
+               gConfigChangedFlag.store(true, std::memory_order_release);
+               return 1;
+            case kAsioResyncRequest:
+               return 1;
+            case kAsioLatenciesChanged:
+               if (Session* s = gCurrent.load(std::memory_order_acquire))
+                  s->latenciesDirty.store(true, std::memory_order_release);
+               return 1;
+            case kAsioOverload:
+               return 1;
+            default:
+               return 0;
+         }
+      }
+
+      ASIOCallbacks gCallbacks = { OnBufferSwitch, OnSampleRateChanged, OnAsioMessage, OnBufferSwitchTimeInfo };
+
+      // ---- control thread ---------------------------------------------------
+
+      void Fail(Session& s, const std::string& what)
+      {
+         s.error = what;
+         if (s.drv != nullptr)
+         {
+            char msg[128] = {};
+            s.drv->getErrorMessage(msg);
+            if (msg[0] != 0 && what.find(msg) == std::string::npos)
+               s.error += std::string(" (") + msg + ")";
+         }
+         s.state.store(2, std::memory_order_release);
+      }
+
+      void ReadLatencies(Session& s)
+      {
+         long in = 0, out = 0;
+         if (s.drv->getLatencies(&in, &out) == ASE_OK)
+         {
+            s.inLatency.store(in, std::memory_order_release);
+            s.outLatency.store(out, std::memory_order_release);
+         }
+      }
+
+      // Opens the driver and negotiates everything; false leaves s.error set.
+      bool Setup(Session& s)
+      {
+         GUID clsid;
+         if (FAILED(CLSIDFromString(WinCommon::Utf8ToWide(s.driver.clsid).c_str(), &clsid)))
+         {
+            Fail(s, "bad driver id");
+            return false;
+         }
+         // ASIO convention: the driver's class id doubles as its interface id.
+         const IID iid = clsid;
+         if (FAILED(CoCreateInstance(clsid, nullptr, CLSCTX_INPROC_SERVER, iid, reinterpret_cast<void**>(&s.drv))) ||
+             s.drv == nullptr)
+         {
+            Fail(s, "could not load the driver");
+            return false;
+         }
+         if (!s.drv->init(GetDesktopWindow()))
+         {
+            Fail(s, "the driver would not start (is the interface connected?)");
+            return false;
+         }
+
+         long inCh = 0, outCh = 0;
+         if (s.drv->getChannels(&inCh, &outCh) != ASE_OK || outCh <= 0)
+         {
+            Fail(s, "the driver has no outputs");
+            return false;
+         }
+         s.nIn = (int)std::min<long>(inCh, kMaxChannels);
+         s.nOut = (int)std::min<long>(outCh, kMaxChannels);
+         s.outUsed = s.nOut;
+
+         // Sample rate: ask for the requested one, else keep the driver's own;
+         // a driver that reports none gets 48 kHz, then 44.1 kHz.
+         ASIOSampleRate rate = 0.0;
+         if (s.requestedRate > 0.0 && s.drv->canSampleRate(s.requestedRate) == ASE_OK)
+            s.drv->setSampleRate(s.requestedRate);
+         if (s.drv->getSampleRate(&rate) != ASE_OK || rate <= 0.0)
+         {
+            rate = 0.0;
+            for (double candidate : { 48000.0, 44100.0 })
+               if (s.drv->canSampleRate(candidate) == ASE_OK && s.drv->setSampleRate(candidate) == ASE_OK)
+               {
+                  rate = candidate;
+                  break;
+               }
+         }
+         if (rate <= 0.0)
+         {
+            Fail(s, "the driver reports no sample rate");
+            return false;
+         }
+         s.sampleRate = rate;
+
+         long minSize = 0, maxSize = 0, preferred = 0, granularity = 0;
+         if (s.drv->getBufferSize(&minSize, &maxSize, &preferred, &granularity) != ASE_OK)
+         {
+            Fail(s, "the driver reports no buffer size");
+            return false;
+         }
+         s.bufferFrames = AsioCore::PickBufferSize(s.requestedFrames, (int)minSize, (int)maxSize, (int)preferred,
+                                                   (int)granularity);
+         if (s.bufferFrames <= 0)
+         {
+            Fail(s, "the driver offers no usable buffer size");
+            return false;
+         }
+
+         // Buffers: inputs first, then outputs; a sample type we cannot convert
+         // refuses the driver rather than playing noise.
+         for (int ch = 0; ch < s.nIn + s.nOut; ch++)
+         {
+            const bool isInput = ch < s.nIn;
+            ASIOChannelInfo info = {};
+            info.channel = isInput ? ch : ch - s.nIn;
+            info.isInput = isInput ? ASIOTrue : ASIOFalse;
+            if (s.drv->getChannelInfo(&info) != ASE_OK || !AsioCore::SampleTypeSupported((int)info.type))
+            {
+               Fail(s, "the driver uses a sample format Infinite does not support");
+               return false;
+            }
+            (isInput ? s.inType[ch] : s.outType[ch - s.nIn]) = (int)info.type;
+            s.infos[ch].isInput = info.isInput;
+            s.infos[ch].channelNum = info.channel;
+            s.infos[ch].buffers[0] = s.infos[ch].buffers[1] = nullptr;
+         }
+         s.planar.assign((size_t)std::max(1, s.outUsed) * kPlanarCapacity, 0.0f);
+         s.inPlanar.assign((size_t)std::max(1, s.nIn) * kPlanarCapacity, 0.0f);
+
+         // The Audio In node reads the same ring a WASAPI tap would fill.
+         // Allocated here, before the driver can call back.
+         gTap.Stop();
+         gTap.ready.store(false, std::memory_order_release);
+         gTap.channels = std::max(1, s.nIn);
+         gTap.ring.Init(gTap.channels);
+         gTap.sampleRate = rate;
+
+         gCurrent.store(&s, std::memory_order_release);
+         if (s.drv->createBuffers(s.infos, s.nIn + s.nOut, (long)s.bufferFrames, &gCallbacks) != ASE_OK)
+         {
+            gCurrent.store(nullptr, std::memory_order_release);
+            Fail(s, "could not create the audio buffers");
+            return false;
+         }
+         s.outputReady = s.drv->outputReady() == ASE_OK;
+         ReadLatencies(s);
+         if (s.inLatency.load() + s.outLatency.load() == 0)
+            s.outLatency.store(s.bufferFrames); // a driver that reports none: one buffer is the floor
+
+         s.running.store(true, std::memory_order_release); // before start(): it may call back at once
+         gTap.ready.store(true, std::memory_order_release);
+         if (s.drv->start() != ASE_OK)
+         {
+            s.running.store(false, std::memory_order_release);
+            gTap.ready.store(false, std::memory_order_release);
+            gCurrent.store(nullptr, std::memory_order_release);
+            s.drv->disposeBuffers();
+            Fail(s, "the driver would not start streaming");
+            return false;
+         }
+         return true;
+      }
+
+      void ControlThread(std::shared_ptr<Session> sp)
+      {
+         Session& s = *sp;
+         const HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+         const bool comOwned = SUCCEEDED(hr);
+
+         if (Setup(s))
+         {
+            s.state.store(1, std::memory_order_release);
+            for (;;)
+            {
+               const DWORD wait = MsgWaitForMultipleObjects(1, &s.stopEvent, FALSE, 250, QS_ALLINPUT);
+               if (wait == WAIT_OBJECT_0)
+                  break;
+               MSG msg;
+               while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
+               {
+                  TranslateMessage(&msg);
+                  DispatchMessageW(&msg);
+               }
+               if (s.latenciesDirty.exchange(false, std::memory_order_acq_rel))
+                  ReadLatencies(s);
+            }
+            s.running.store(false, std::memory_order_release);
+            gTap.ready.store(false, std::memory_order_release);
+            s.drv->stop();
+            gCurrent.store(nullptr, std::memory_order_release);
+            s.drv->disposeBuffers();
+         }
+         if (s.drv != nullptr)
+         {
+            s.drv->Release();
+            s.drv = nullptr;
+         }
+         if (comOwned)
+            CoUninitialize();
+      }
+   } // namespace
+
+   bool Built()
+   {
+      return true;
+   }
+
+   std::vector<std::string> DriverNames()
+   {
+      std::lock_guard<std::mutex> lock(gConfigMutex);
+      const auto now = std::chrono::steady_clock::now();
+      if (!gDriverCacheValid || now - gDriverCacheTime > std::chrono::seconds(3))
+      {
+         gDriverCache = ScanDrivers();
+         gDriverCacheTime = now;
+         gDriverCacheValid = true;
+      }
+      std::vector<std::string> names;
+      for (const AsioCore::DriverEntry& e : gDriverCache)
+         names.push_back(e.name);
+      return names;
+   }
+
+   void SetDriver(const std::string& name)
+   {
+      std::lock_guard<std::mutex> lock(gConfigMutex);
+      gWantedDriver = name;
+   }
+
+   bool Open(Platform::AudioRenderCallback callback, void* userData, double requestedRate, int requestedFrames,
+             double& outRate, std::string& outError)
+   {
+      Close();
+
+      std::string wanted;
+      {
+         std::lock_guard<std::mutex> lock(gConfigMutex);
+         wanted = gWantedDriver;
+         gDriverCache = ScanDrivers(); // opening is the one place a fresh scan is worth it
+         gDriverCacheTime = std::chrono::steady_clock::now();
+         gDriverCacheValid = true;
+      }
+      std::vector<AsioCore::DriverEntry> drivers;
+      {
+         std::lock_guard<std::mutex> lock(gConfigMutex);
+         drivers = gDriverCache;
+      }
+      if (drivers.empty())
+      {
+         outError = "no ASIO driver is installed";
+         return false;
+      }
+      const int pick = AsioCore::FindDriver(drivers, wanted);
+      if (pick < 0)
+      {
+         outError = "the ASIO driver \"" + wanted + "\" is not installed";
+         return false;
+      }
+
+      auto s = std::make_shared<Session>();
+      s->callback = callback;
+      s->userData = userData;
+      s->driver = drivers[(size_t)pick];
+      s->requestedRate = requestedRate;
+      s->requestedFrames = requestedFrames;
+      s->stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+      if (s->stopEvent == nullptr)
+      {
+         outError = "could not create sync events";
+         return false;
+      }
+      s->thread = std::thread(ControlThread, s);
+
+      // Drivers can take a few seconds to wake an interface.
+      for (int waitedMs = 0; waitedMs < 10000 && s->state.load(std::memory_order_acquire) == 0; waitedMs += 10)
+         Sleep(10);
+
+      const int state = s->state.load(std::memory_order_acquire);
+      if (state != 1)
+      {
+         const std::string why = state == 2 ? s->error : std::string("the driver did not answer in time");
+         SetEvent(s->stopEvent);
+         if (state == 2)
+            s->thread.join();
+         else
+            s->thread.detach(); // a driver stuck in init: abandon it rather than freeze the app
+         CloseHandle(s->stopEvent);
+         outError = "ASIO \"" + s->driver.name + "\": " + why;
+         return false;
+      }
+      gSession = s;
+      outRate = s->sampleRate;
+      return true;
+   }
+
+   void Close()
+   {
+      if (!gSession)
+         return;
+      std::shared_ptr<Session> s = std::move(gSession);
+      gSession.reset();
+      s->running.store(false, std::memory_order_release);
+      SetEvent(s->stopEvent);
+      if (s->thread.joinable())
+         s->thread.join();
+      CloseHandle(s->stopEvent);
+      gCurrent.store(nullptr, std::memory_order_release);
+   }
+
+   bool Active()
+   {
+      return gSession != nullptr && gSession->running.load(std::memory_order_acquire);
+   }
+
+   uint32_t BufferFrames()
+   {
+      return Active() ? (uint32_t)gSession->bufferFrames : 0;
+   }
+
+   uint32_t RoundTripFrames()
+   {
+      if (!Active())
+         return 0;
+      return (uint32_t)std::max<long>(0, gSession->inLatency.load(std::memory_order_acquire) +
+                                             gSession->outLatency.load(std::memory_order_acquire));
+   }
+
+   std::string ActiveName()
+   {
+      return Active() ? gSession->driver.name : std::string();
+   }
+
+   bool PollStalled()
+   {
+      using Clock = std::chrono::steady_clock;
+      static const Session* sSeen = nullptr;
+      static uint64_t sBeats = 0;
+      static Clock::time_point sChanged;
+      if (!Active())
+      {
+         sSeen = nullptr;
+         return false;
+      }
+      const uint64_t beats = gSession->beats.load(std::memory_order_relaxed);
+      const Clock::time_point now = Clock::now();
+      if (sSeen != gSession.get() || beats != sBeats)
+      {
+         sSeen = gSession.get();
+         sBeats = beats;
+         sChanged = now;
+         return false;
+      }
+      if (now - sChanged > std::chrono::seconds(2))
+      {
+         sChanged = now;
+         return true;
+      }
+      return false;
+   }
+
+#else // no ASIO SDK in this build
+
+   bool Built() { return false; }
+   bool Open(Platform::AudioRenderCallback, void*, double, int, double&, std::string& outError)
+   {
+      outError = "this build of Infinite has no ASIO support";
+      return false;
+   }
+   void Close() {}
+   bool Active() { return false; }
+   uint32_t BufferFrames() { return 0; }
+   uint32_t RoundTripFrames() { return 0; }
+   bool PollStalled() { return false; }
+   std::vector<std::string> DriverNames() { return {}; }
+   void SetDriver(const std::string&) {}
+   std::string ActiveName() { return {}; }
+
+#endif
+} // namespace WinAsio
+
 namespace Platform
 {
    // ---- audio input analysis -----------------------------------------------
@@ -1680,6 +2381,9 @@ namespace Platform
 
    uint32_t AudioRoundTripLatencyFrames(uint32_t /*outputDeviceId*/)
    {
+      // ASIO drivers report input and output latency themselves (buffers included).
+      if (WinAsio::Active())
+         return WinAsio::RoundTripFrames();
       // Output side: measured off the open stream by the render thread.
       // Nothing open means nothing to report.
       const uint32_t outFrames = gOutputLatencyFrames.load(std::memory_order_acquire);
@@ -1742,6 +2446,8 @@ namespace Platform
       outError.clear();
       if (gTapRefs.load(std::memory_order_relaxed) <= 0)
          return;
+      if (WinAsio::Active())
+         return; // the ASIO driver fills the same ring
       const uint32_t reqDevice = gRequestedInputDeviceId.load(std::memory_order_relaxed);
       if (gTap.running.load(std::memory_order_acquire) && gTap.sampleRate > 0.0)
       {
@@ -1760,7 +2466,7 @@ namespace Platform
       // gTap.ready, not gTap.sampleRate: sampleRate is a plain double written
       // by the capture thread, and it used to open this gate before the ring
       // behind it existed - see CaptureTapEngine::ready.
-      return gTap.running.load(std::memory_order_acquire) &&
+      return (gTap.running.load(std::memory_order_acquire) || WinAsio::Active()) &&
              gTap.ready.load(std::memory_order_acquire);
    }
 
