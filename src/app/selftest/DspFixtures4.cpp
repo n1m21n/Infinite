@@ -847,7 +847,8 @@ bool RunEffectMixAndLimiterFixture()
    {
       bool refused = true;
       for (const std::string& text : { std::string(50000, '('), std::string(50000, '-') + "1",
-                                       std::string(20000, '!') + "1", [] { std::string t; for (int i = 0; i < 20000; i++) t += "sin("; return t; }() })
+                                       std::string(20000, '!') + "1", [] { std::string t; for (int i = 0; i < 20000; i++) t += "sin("; return t; }(),
+                                       [] { std::string t = "1"; for (int i = 0; i < 200000; i++) t += "+1"; return t; }() })
       {
          EquationDsp::AstNodePtr ast;
          std::string err;
