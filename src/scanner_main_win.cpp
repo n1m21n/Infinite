@@ -6,6 +6,8 @@
 #include <fcntl.h>
 #include <io.h>
 #include <windows.h>
+#include <objbase.h>
+#include <ole2.h>
 
 #include "Platform.h"
 #include "PluginVST3.h"
@@ -38,6 +40,12 @@ int main(int argc, char** argv)
             c = ' ';
       return s;
    };
+
+   // A plugin host loads plugins on a thread with COM/OLE initialised (JUCE's
+   // message thread does). Some plugins register OLE services or call into COM
+   // while loading, and fault in a bare console process where a real host
+   // would not.
+   OleInitialize(nullptr);
 
    int startIdx = 1;
    if (std::strcmp(argv[1], "--batch") == 0)

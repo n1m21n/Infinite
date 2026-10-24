@@ -918,6 +918,24 @@ namespace
          }
          else
          {
+            // A death inside a batch is not proof the bundle is the cause: an
+            // earlier plugin's own thread can fault while this one loads. Try
+            // it once alone in a fresh process, as a JUCE host's scan does one
+            // plugin at a time; only a second death earns the (persistent) ban.
+            std::string retryOut;
+            bool retryTimedOut = false, retryClean = false;
+            if (RunProbeChild(exe, { "--batch", offender }, std::chrono::seconds(45), retryOut, retryTimedOut, retryClean))
+            {
+               const std::vector<std::string> retryDone = ParseProbeDoneMarkers(retryOut);
+               if (std::find(retryDone.begin(), retryDone.end(), offender) != retryDone.end())
+               {
+                  VST3Trace("bundle died in a batch but scans alone, keeping: %s", offender.c_str());
+                  for (Platform::PluginDesc& d : ParseProbeOutput(retryOut))
+                     out.push_back(std::move(d));
+                  eraseAll(offender);
+                  continue;
+               }
+            }
             VST3Trace("bundle crashed the scanner, blocklisting: %s", offender.c_str());
             std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
             AddToBlocklistLocked(offender);

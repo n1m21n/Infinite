@@ -5,7 +5,7 @@ v0.6.6 fixes Infinite not opening for some Windows users and takes a first step 
 ### Fixes
 
 - Windows: Infinite no longer fails to open when its saved sample or media list cannot be read. A bad entry in the cached index is skipped, and the folders are rescanned on request
-- Windows VST3 scanning: a plugin that crashes while it is being unloaded is no longer blocklisted.
+- Windows VST3 scanning: a plugin that crashes while it is being unloaded is no longer blocklisted, and one that dies during a batch scan gets a second try on its own before it is blocklisted. These are known causes, not the whole problem
 
 ### Session view
 
