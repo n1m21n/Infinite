@@ -687,7 +687,9 @@ void SamplerNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioSamplerNode>();
-   position = std::clamp(position, start, end);
+   // end can sit below start (a loaded patch, a modulated knob); std::clamp with hi < lo is undefined
+   // and aborts under _GLIBCXX_ASSERTIONS. The audio side reads end as at least start + 0.001 the same way.
+   position = std::clamp(position, start, std::max(start + 0.001f, end));
    mAudioNode->PushParams(pitch, finetune, speed, volume, start, end, position, decay, fadeIn, fadeOut, loop, reverse, pingpong);
    mAudioNode->SetRateFix(rateFix != 0);
    mAudioNode->DrainRetired();

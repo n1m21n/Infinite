@@ -5,6 +5,7 @@
 #include "audio/MusicTime.h"
 
 #include <chrono>
+#include <filesystem>
 
 namespace app
 {
@@ -1230,9 +1231,11 @@ bool RunMidiFileFixture()
       check(MidiFile::Parse(om.data(), om.size(), os, err) && os.events.size() == 4 && !os.events[2].on && !os.events[3].on, "unclosed notes get an off");
    }
 
-   const std::string path = "/tmp/infinite_midifiletest.mid";
+   // The system temp folder: "/tmp" does not exist on Windows.
+   const std::filesystem::path file = std::filesystem::temp_directory_path() / "infinite_midifiletest.mid";
+   const std::string path = file.u8string();
    {
-      std::ofstream f(path, std::ios::binary);
+      std::ofstream f(file, std::ios::binary);
       f.write((const char*)bytes.data(), (std::streamsize)bytes.size());
    }
    MidiFileNode node;
