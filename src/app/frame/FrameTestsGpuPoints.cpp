@@ -1597,6 +1597,11 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
          unsigned long long PointCloudRevision() override { return revision; }
       };
 
+      // The loop follows the transport (it holds while the clock is still), so
+      // every cook moves the clock a beat; the test must not depend on what an
+      // earlier step left in the transport.
+      double feedbackBeat = 1.0;
+      auto NextFeedbackBeat = [&]() { Transport::Instance().SeekBeats(feedbackBeat += 1.0); };
       auto runLoop = [&](bool gpu, int cooks, float& meanX, size_t& count)
       {
          GpuPointsGL::SetEnabledForTest(gpu);
@@ -1611,6 +1616,7 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
          fb.loop = &step;
          for (int i = 0; i < cooks; i++)
          {
+            NextFeedbackBeat();
             step.CookIfNeeded(frame++);
             fb.GetGpuPoints(); // what a GPU Render 3D would pull
          }
@@ -1647,7 +1653,10 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
          fb.seed = &seed;
          fb.loop = &step;
          for (int i = 0; i < 3; i++)
+         {
+            NextFeedbackBeat();
             step.CookIfNeeded(frame++);
+         }
          fb.Reset();
          fb.CookIfNeeded(frame++);
          const std::vector<Particle>* c = fb.GetPointCloud();
@@ -1674,7 +1683,10 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
          box.CookIfNeeded(frame);
          const Mesh seedMesh = box.GetMesh();
          for (int i = 0; i < 4; i++)
+         {
+            NextFeedbackBeat();
             step.CookIfNeeded(frame++);
+         }
          const Mesh& out = fb.GetMesh();
          float dy = 0.0f;
          if (!out.vertices.empty() && out.vertices.size() == seedMesh.vertices.size())

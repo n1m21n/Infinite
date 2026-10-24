@@ -13,6 +13,8 @@ SRC="${1:-build/Infinite.app}"
 DST="$HOME/Desktop/Infinite.app"
 LS=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 [ -d "$SRC" ] || { echo "no build at $SRC"; exit 2; }
+# Never put a dev/debug build on the Desktop: it shows debug-only menu items and is slower.
+python3 "$(dirname "$0")/check_release_binary.py" "$SRC" || exit 2
 if pgrep -x Infinite >/dev/null; then echo "Infinite is running - quit it, then rerun"; exit 1; fi
 rm -rf "$DST" && cp -R "$SRC" "$DST"
 "$LS" -dump 2>/dev/null | grep -E '^path: .*/Infinite\.app ' | sed -E 's/^path: +//; s/ \(0x[0-9a-f]+\)$//' | sort -u |
