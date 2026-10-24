@@ -549,7 +549,7 @@ namespace app
                }
                const std::string driverNote = Platform::AudioDriverNote();
                if (!driverNote.empty())
-                  ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.25f, 1.0f), "%s", driverNote.c_str());
+                  ImGui::TextColored(app::AccentEmphasisSelected(), "%s", driverNote.c_str());
             }
 #endif
 
