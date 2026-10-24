@@ -236,6 +236,15 @@ bool RunFormulaShadertoyTest()
       ok &= refused;
    }
 
+   {
+      // The Shadertoy node is this engine fixed in Shadertoy mode, with its four channel pins.
+      ShadertoyNode st;
+      FormulaNode expr;
+      const bool own = st.IsShadertoy() && st.ChannelCount() == FormulaNode::kChannels && !expr.IsShadertoy() && expr.ChannelCount() == 0;
+      printf("FORMULAST own node %s\n", own ? "OK" : "FAIL");
+      ok &= own;
+   }
+
    printf("FORMULAST TEST %s\n", ok ? "OK" : "FAIL");
    return ok;
 }

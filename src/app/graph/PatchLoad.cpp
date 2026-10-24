@@ -82,7 +82,15 @@ namespace app
       {
          if (keepIndices)
             gNextIndex = rec.index;
-         GraphNode* spawned = SpawnNode(rec.typeName, rec.category, rec.x, rec.y);
+         // Shadertoy used to be a mode of Formula; a patch that saved one in that mode opens as the Shadertoy node.
+         std::string typeName = rec.typeName;
+         if (typeName == "Formula")
+         {
+            for (const auto& kv : rec.params)
+               if (kv.first == "i mode" && kv.second == "1") // saved keys carry their type letter
+                  typeName = "Shadertoy";
+         }
+         GraphNode* spawned = SpawnNode(typeName, rec.category, rec.x, rec.y);
          if (spawned == nullptr)
          {
             // A patch naming a node type this build does not have still opens;

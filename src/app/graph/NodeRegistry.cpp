@@ -19,6 +19,7 @@ namespace app
             [i]() -> INode* { return ShapeNode::CreateFor(i); }, "Source");
       }
       REGISTER_NODE(FormulaNode, Formula, "Source");
+      REGISTER_NODE(ShadertoyNode, Shadertoy, "Source");
       REGISTER_NODE(FieldPixelNode, FieldPixel, "Source");
       REGISTER_NODE(SketchNode, Sketch, "Source");
       REGISTER_NODE(TextNode, Text, "Source");
@@ -47,8 +48,8 @@ namespace app
       REGISTER_NODE(OceanNode, Ocean, "3D");
       REGISTER_NODE(MaterialNode, Material, "3D");
       REGISTER_NODE(DisplacementNode, Displacement, "3D");
-      REGISTER_NODE(AudioDisplacementNode, Audio Displacement, "3D");
       REGISTER_NODE(GeometryFeedbackNode, Feedback 3D, "3D");
+      REGISTER_NODE(AudioDisplacementNode, Audio Displacement, "3D");
       REGISTER_NODE(AudioRibbonNode, Audio Ribbon, "3D");
       REGISTER_NODE(MappingNode, Mapping, "3D");
       REGISTER_NODE(ParticleSystemNode, Particle System, "3D");

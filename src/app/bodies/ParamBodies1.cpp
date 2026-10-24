@@ -389,9 +389,9 @@ namespace app
       // the user's saved .infdev devices into one control (plan §6), rather
       // than a bare preset picker - FormulaNode's device.params stays empty
       // (plan §7), only `formula` round-trips.
-      // Shadertoy mode: paste a shader from shadertoy.com as it is (mainImage, its
+      // The Shadertoy node: paste a shader from shadertoy.com as it is (mainImage, its
       // buffers, iChannel pins); its `uniform float x; // lo..hi` lines become knobs.
-      DropdownButton("mode", FormulaNode::ModeNames(), n->mode, [n](int i) { n->mode = i; n->Apply(); });
+      // Shadertoy is its own node (ShadertoyNode), so there is no mode picker here.
       if (n->IsShadertoy())
          DropdownButton("buffers", FormulaNode::BufferNames(), n->buffers, [n](int i) { n->buffers = i; n->Apply(); });
       else

@@ -128,7 +128,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-339 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+342 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -466,6 +466,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Rectangle` | none | out:image | 20 | bypass |
 | `Ring` | none | out:image | 20 | bypass |
 | `Rounded Rect` | none | out:image | 20 | bypass |
+| `Shadertoy` | ichannel0:image, ichannel1:image, ichannel2:image, ichannel3:image | out:image | 25 |  |
 | `Shape` | none | out:image | 20 | bypass |
 | `Sketch` | none | out:image | 8 | bypass |
 | `Slideshow` | none | out:image | 7 | bypass |

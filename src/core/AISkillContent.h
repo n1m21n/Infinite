@@ -701,7 +701,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-339 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+342 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -758,10 +758,10 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Points` | geo:geometry | out:geometry | 22 | bypass |
-| `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
-| `Mirror` | geo:geometry | out:geometry | 72 | bypass |
 )AISKILL"
-R"AISKILL(| `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
+R"AISKILL(| `Metaballs` | cloud:geometry | out:geometry | 28 | bypass |
+| `Mirror` | geo:geometry | out:geometry | 72 | bypass |
+| `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
 | `Model 3D` | texture:image | out:geometry | 28 | bypass |
 | `Normals` | geo:geometry | out:geometry | 72 | bypass |
 | `Null 3D` | geo:geometry | out:geometry | 0 | bypass |
@@ -959,11 +959,11 @@ R"AISKILL(| `Mobius Strip` | texture:image | out:geometry | 51 | bypass |
 | `Mod Depth` | in:modulator | out:modulator | 2 | bypass |
 | `Note Expression` | none | out:modulator | 3 | bypass |
 | `Note to CV` | notes:note | out:modulator | 3 | bypass |
-| `Null Modulator` | in:modulator | out:modulator | 1 | bypass |
+)AISKILL"
+R"AISKILL(| `Null Modulator` | in:modulator | out:modulator | 1 | bypass |
 | `Palette` | ref:image | out:palette | 14 | bypass |
 | `Path` | curve:geometry, geo:geometry | x:modulator, y:modulator, z:modulator, t:modulator | 14 |  |
-)AISKILL"
-R"AISKILL(| `Pattern` | none | out:modulator | 24 | bypass |
+| `Pattern` | none | out:modulator | 24 | bypass |
 | `Pose Track` | input:image | present:modulator, body x:modulator, body y:modulator, head x:modulator, head y:modulator, wrist L x:modulator, wrist L y:modulator, wrist R x:modulator, wrist R y:modulator, arm L:modulator, arm R:modulator, spread:modulator, lean:modulator, size:modulator | 3 | bypass |
 | `Random` | none | out:modulator | 9 | bypass |
 | `Range to Range` | in:modulator | out:modulator | 6 | bypass |
@@ -1041,6 +1041,7 @@ R"AISKILL(| `Pattern` | none | out:modulator | 24 | bypass |
 | `Rectangle` | none | out:image | 20 | bypass |
 | `Ring` | none | out:image | 20 | bypass |
 | `Rounded Rect` | none | out:image | 20 | bypass |
+| `Shadertoy` | ichannel0:image, ichannel1:image, ichannel2:image, ichannel3:image | out:image | 25 |  |
 | `Shape` | none | out:image | 20 | bypass |
 | `Sketch` | none | out:image | 8 | bypass |
 | `Slideshow` | none | out:image | 7 | bypass |

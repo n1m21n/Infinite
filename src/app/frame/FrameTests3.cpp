@@ -1896,6 +1896,10 @@ void FrameTest_ROUNDTRIPTEST(int frameId, GLFWwindow* window)
                else if (dynamic_cast<PredictiveNotesNode*>(a.get()) ||
                         dynamic_cast<PredictiveRhythmNode*>(a.get()))
                   learnedKey = "model";
+               // Shadertoy knob names are re-parsed from the code on paste (the paste
+               // recompiles), so a mutated name list that the code does not declare goes.
+               else if (dynamic_cast<FormulaNode*>(a.get()) && static_cast<FormulaNode*>(a.get())->IsShadertoy())
+                  learnedKey = "stKnobNames";
                if (learnedKey != nullptr)
                {
                   expectB.erase(std::remove_if(expectB.begin(), expectB.end(),
