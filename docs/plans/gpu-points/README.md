@@ -436,8 +436,9 @@ Nothing drew colour alpha before this step, so frames do not change.
 
 **Colour from image: not shipped.** A Field Modifier kernel cannot read an image; image reads only
 exist in pixel kernels. Adding them to element kernels means new language surface on both
-backends, so it needs the owner's OK. Until then, Image to Points already colours its points from
-an image.
+backends. Decided 2026-10-24: not built. Image to Points already colours its points from an image,
+and new kernel surface on both backends is not worth it for the users we have. Reopen if a user asks
+for particles coloured by an image.
 
 **Checks.**
 - `GPUPOINTSTEST` step 12 section, all pass. It uses a test cloud of 600 mortal particles (ages 0
@@ -641,4 +642,4 @@ Trails). Every step in this file is done.
 - Feedback 3D runs every cook, including while the transport is paused, like the 2D Feedback.
 - Feedback 3D: the life attribute reads back as a fraction of a one-second life (see `ReadBack`).
 - Sketch 3D hang on Debug `--describe`: fixed in 41b94296 (duplicate `struct Program`, see Patch facts).
-- Colour from an image (for points) is not shipped.
+- Colour from an image (for points): decided not to build (see step 12); Image to Points covers it.
