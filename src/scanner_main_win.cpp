@@ -5,6 +5,7 @@
 
 #include <fcntl.h>
 #include <io.h>
+#include <windows.h>
 
 #include "Platform.h"
 #include "PluginVST3.h"
@@ -62,5 +63,12 @@ int main(int argc, char** argv)
       std::printf("@done\t%s\n", bundlePath);
       std::fflush(stdout);
    }
+   // Leave without running static destructors or unloading the plugin DLLs.
+   // Several plugins (notably Native Instruments) crash while being torn down,
+   // which turned a successful scan into a non-zero exit that the parent reads
+   // as "the bundle crashed" and blocklists. Everything useful has already
+   // been written and flushed above.
+   std::fflush(stdout);
+   TerminateProcess(GetCurrentProcess(), 0);
    return 0;
 }
