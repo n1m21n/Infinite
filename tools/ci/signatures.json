@@ -1,0 +1,170 @@
+{
+  "_doc": "Known CI failure signatures. classify.py matches a failed job's log (and failed step name) against these. Add a row the first time a NEW failure is understood; the next time it costs seconds. Fields: id, class (see docs/ci/README.md), step (regex on the failed step name, optional), log (regex on the job log, optional), cause, fix, preflight (the local check that catches it, or none), blocking (false = never hold a release).",
+  "signatures": [
+    {
+      "id": "msvc-ice",
+      "class": "toolchain",
+      "step": "^Build$",
+      "log": "CL!RaiseException|exited with code -5297",
+      "cause": "MSVC internal compiler error or heap exhaustion on one translation unit; not a diagnostic about our code",
+      "fix": "triage.sh names the last-started file; scope /Od to it AND its siblings in one push (ci-failure-triage step 3)",
+      "preflight": "none (cannot run MSVC on the Mac)",
+      "blocking": true
+    },
+    {
+      "id": "msvc-link",
+      "class": "build-graph",
+      "log": "error LNK\\d+|unresolved external",
+      "cause": "A target is missing a source or a library in CMakeLists.txt",
+      "fix": "Add the missing library or source to the target; compare with the infinite-vst3-scanner opengl32 fix",
+      "preflight": "none",
+      "blocking": true
+    },
+    {
+      "id": "unix-link",
+      "class": "build-graph",
+      "log": "undefined reference to|ld: symbol\\(s\\) not found|Undefined symbols for architecture",
+      "cause": "A source file is not in CMakeLists.txt, or a Platform:: function lacks one of its three sides",
+      "fix": "Add the source, or write the missing platform side (windows-parity, linux-parity)",
+      "preflight": "ibuild.py build catches it on macOS; Linux needs ibuild.py linux",
+      "blocking": true
+    },
+    {
+      "id": "compile-error",
+      "class": "portability",
+      "log": ": error: (?!.*Performing)|error C\\d{4}",
+      "cause": "Code that compiles on this Mac but not on one compiler or standard library (clang vs gcc vs MSVC)",
+      "fix": "Fix the exact line named; check windows-parity and linux-parity traps first",
+      "preflight": "ibuild.py linux for the Linux half",
+      "blocking": true
+    },
+    {
+      "id": "stale-golden",
+      "class": "stale-artifact",
+      "step": "^Render goldens",
+      "log": "mismatch|exceeds tolerance|differs from golden",
+      "cause": "A committed golden image no longer matches intended rendering",
+      "fix": "If the change is intended: python3 tools/render-check.py --update, review the diff of the PNGs, commit them",
+      "preflight": "preflight.py mirror (Render goldens step)",
+      "blocking": true
+    },
+    {
+      "id": "stale-driver-entry",
+      "class": "stale-artifact",
+      "log": "no verdict printed|no '[^']+' in output",
+      "cause": "run-infinite-hygiene/driver.sh or headless-tests.sh lists a test that no longer exists or changed its verdict line",
+      "fix": "Delete or update the entry in the driver list",
+      "preflight": "preflight.py driver-tests",
+      "blocking": true
+    },
+    {
+      "id": "stale-baseline",
+      "class": "stale-artifact",
+      "log": "stale baseline entries",
+      "cause": "known-test-failures.txt lists a test that passes now (informational line in the driver)",
+      "fix": "Delete the listed lines from known-test-failures.txt",
+      "preflight": "preflight.py driver-tests",
+      "blocking": false
+    },
+    {
+      "id": "test-fails-one-compiler",
+      "class": "state-dependence",
+      "log": "\\[FAIL\\]",
+      "cause": "A test failed. If the same test passes on the other compilers, it depends on global state (Transport, singletons, test order) or undefined behaviour, not on the compiler",
+      "fix": "Pin the global state inside the test (Feedback 3D: advance the transport per cook); run the group alone with the same env var; use the sanitizers log for UB",
+      "preflight": "run the failing INFINITE_<NAME>=1 group locally, also alone",
+      "blocking": true
+    },
+    {
+      "id": "sanitizer",
+      "class": "memory",
+      "log": "AddressSanitizer|runtime error:|LeakSanitizer|ThreadSanitizer",
+      "cause": "Memory or undefined-behaviour bug; the log names file and line",
+      "fix": "Fix the named line directly; no /Od or flag changes",
+      "preflight": "ibuild.py build --mode asan for the one subsystem",
+      "blocking": true
+    },
+    {
+      "id": "clang-tidy",
+      "class": "lint",
+      "step": "tidy",
+      "log": "warning:.*\\[(bugprone|clang-analyzer|performance)",
+      "cause": "A static-analysis finding",
+      "fix": "Fix the named line",
+      "preflight": "none",
+      "blocking": false
+    },
+    {
+      "id": "brand-lint",
+      "class": "lint",
+      "log": "em dash|NOT a brand|brand_lint",
+      "cause": "A brand-surface file contains an em dash or off-brand font",
+      "fix": "Fix the source (tools/manual/build.py, cards_base.json), rebuild PDFs, rerun pdf_check.py",
+      "preflight": "preflight.py manuals",
+      "blocking": true
+    },
+    {
+      "id": "i18n-missing",
+      "class": "lint",
+      "log": "[1-9]\\d* (missing|unwrapped literal|format mismatch)",
+      "cause": "A new UI string has no translation in one of the five languages, or lost a format specifier",
+      "fix": "python3 tools/i18n/extract.py report; add the missing rows to resources/lang/*.tsv",
+      "preflight": "preflight.py i18n",
+      "blocking": true
+    },
+    {
+      "id": "design-ratchet",
+      "class": "lint",
+      "step": "Literal colours",
+      "cause": "A raw colour or widget was added where the design system has a component",
+      "fix": "Use the component or token (infinite-design-system); regenerate tokens if tokens.json changed",
+      "preflight": "preflight.py mirror (design-ratchet job)",
+      "blocking": true
+    },
+    {
+      "id": "utf8-paths",
+      "class": "portability",
+      "step": "narrow file opens",
+      "cause": "A file open that bypasses AppPaths breaks non-ASCII paths on Windows",
+      "fix": "Route the open through AppPaths",
+      "preflight": "preflight.py mirror (design-ratchet job)",
+      "blocking": true
+    },
+    {
+      "id": "debug-build-shipped",
+      "class": "release",
+      "log": "NOT A RELEASE BUILD",
+      "cause": "A dev/debug build was about to be packaged or deployed",
+      "fix": "Build with ibuild.py build --mode release (or package.sh); never deploy build-dev",
+      "preflight": "preflight.py release-app",
+      "blocking": true
+    },
+    {
+      "id": "signpath",
+      "class": "external",
+      "log": "SignPath|Failed to retrieve GitHub App token",
+      "cause": "Code signing service or its GitHub App is unavailable (account side)",
+      "fix": "Nothing in code. The step is continue-on-error; unsigned binaries still publish. Fix the SignPath account separately",
+      "preflight": "none",
+      "blocking": false
+    },
+    {
+      "id": "github-side",
+      "class": "external",
+      "log": "Failed to create deployment|Multiple artifacts named|status: 5\\d\\d|The operation was canceled|runner has received a shutdown signal",
+      "cause": "GitHub infrastructure, not our code",
+      "fix": "Check githubstatus.com; start a fresh workflow_dispatch rather than re-running",
+      "preflight": "none",
+      "blocking": false
+    },
+    {
+      "id": "network-flake",
+      "class": "external",
+      "log": "Could not resolve host|Connection timed out|curl: \\(\\d+\\)|ETIMEDOUT|download.steinberg.net",
+      "cause": "A download during configure failed (apt, ASIO SDK, submodule)",
+      "fix": "Re-run the job once; if it repeats, check the URL and its pinned hash",
+      "preflight": "none",
+      "blocking": false
+    }
+  ]
+}

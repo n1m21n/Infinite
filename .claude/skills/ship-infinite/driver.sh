@@ -77,6 +77,48 @@ step_nodediff() {
     return 0
 }
 
+# ------------------------------------------------------------- ci helpers ---
+# The successful Build run for an exact commit, from ANY branch. A bugfix/ or feature/ push
+# that went green and was then fast-forwarded into main is the same commit, so its run is
+# the proof; requiring a second run on main only repeated the whole matrix (30+ minutes).
+ci_run_for_head() {
+    gh run list --workflow=build.yml --status success --json databaseId,headSha --limit 60 \
+        --jq "[.[] | select(.headSha == \"$1\")][0].databaseId" 2>/dev/null
+}
+
+# Refuses to release a commit CI has not passed. Override only with SHIP_INFINITE_SKIP_CI_GATE=1.
+step_ci_gate() {
+    local sha run_id
+    sha=$(git rev-parse HEAD)
+    run_id=$(ci_run_for_head "$sha")
+    if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+        echo "    !! no successful Build run for HEAD $sha"
+        echo "    !! Push the branch, wait for every job to go green, fast-forward main to that same commit."
+        echo "    !! (A commit made after the green run, even docs-only, needs its own run.)"
+        echo "    !! Set SHIP_INFINITE_SKIP_CI_GATE=1 to override."
+        [ "${SHIP_INFINITE_SKIP_CI_GATE:-}" = "1" ] && { echo "    SHIP_INFINITE_SKIP_CI_GATE=1 set - proceeding"; return 0; }
+        return 1
+    fi
+    echo "    Build run $run_id is green for HEAD - ok"
+}
+
+# After every upload: the release must hold the DMG, both Windows zips and the AppImage.
+# The release-windows / release-linux steps are best-effort and print a warning on a miss;
+# this is the loud check that a release is not missing a platform. Usage: verify-assets <tag>
+step_verify_assets() {
+    local tag="${1:?tag required}" names missing=0 want
+    names=$(gh release view "$tag" --json assets -q '.assets[].name' 2>/dev/null)
+    for want in "Infinite.dmg" "Infinite-windows-x64.zip" "Infinite-windows-ARM64.zip" "Infinite-x86_64.AppImage"; do
+        if printf '%s\n' "$names" | grep -qx "$want"; then
+            echo "    ok       $want"
+        else
+            echo "    MISSING  $want"
+            missing=1
+        fi
+    done
+    [ "$missing" = "0" ] || { echo "    !! release $tag is missing assets above"; return 1; }
+}
+
 # ----------------------------------------------------------------- release ---
 # Builds the universal Release .app + DMG via package.sh, which also copies
 # the DMG into website/assets/Infinite.dmg. Slow (minutes, two-arch build).
@@ -116,8 +158,15 @@ step_release() {
         return 1
     fi
 
+    echo "==> release: CI must be green for this exact commit (scripts: ci_run_for_head)"
+    step_ci_gate || return 1
+
     echo "==> release: package.sh (build + DMG + copy into website/assets)"
     ./package.sh
+
+    echo "==> release: the packaged app must be a release build (no debug-only UI)"
+    python3 scripts/check_release_binary.py build-dist/Infinite.app || {
+        echo "    !! refusing to upload a debug build"; return 1; }
 
     echo "==> release: syncing website/assets/Infinite.dmg onto the latest GitHub Release"
     if ! command -v gh >/dev/null 2>&1; then
@@ -206,9 +255,7 @@ step_release_windows() {
     local sha
     sha=$(git rev-parse HEAD)
     local run_id
-    run_id=$(gh run list --workflow=build.yml --branch main --status success \
-        --json databaseId,headSha --limit 20 \
-        --jq "[.[] | select(.headSha == \"$sha\")][0].databaseId" 2>/dev/null)
+    run_id=$(ci_run_for_head "$sha")
     if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
         echo "    no successful CI run found yet for $sha - skipping Windows asset sync"
         echo "    (CI may still be running; re-run 'release' once it's green, or upload manually)"
@@ -253,9 +300,7 @@ step_release_linux() {
     local sha
     sha=$(git rev-parse HEAD)
     local run_id
-    run_id=$(gh run list --workflow=build.yml --branch main --status success \
-        --json databaseId,headSha --limit 20 \
-        --jq "[.[] | select(.headSha == \"$sha\")][0].databaseId" 2>/dev/null)
+    run_id=$(ci_run_for_head "$sha")
     if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
         echo "    no successful CI run found yet for $sha - skipping Linux asset sync"
         echo "    (CI may still be running; re-run 'release' once it's green, or upload manually)"
@@ -339,6 +384,8 @@ case "$STEP" in
     release) step_release ;;
     release-windows) shift; step_release_windows "$@" ;;
     release-linux) shift; step_release_linux "$@" ;;
+    verify-assets) shift; step_verify_assets "$@" ;;
+    ci-gate) step_ci_gate ;;
     whatsnew) shift; step_whatsnew "$@" ;;
     cleanup) step_cleanup ;;
     all)
