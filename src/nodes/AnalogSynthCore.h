@@ -191,15 +191,16 @@ namespace AnalogSynthCore
       -0.82f, 0.47f, 0.93f, -0.31f, 0.18f, -0.67f, 0.74f, -0.12f
    };
 
-   // Osc 1's frequency multiplier for osc 2's value `m` in [-1, +1]. Exponential
-   // (1 V/oct, as on analog FM): the old linear 1 + 2.5 m fm went negative above
-   // fm 0.4, stalled osc 1 at the 10 Hz floor and sounded like pitch dives. The
-   // small-signal slope at fm 0 is the old 2.5 (ln 2 * kOctaves); depth is
-   // capped at 3 octaves so fm 1 stays musical rather than sweeping to Nyquist.
+   // Osc 1's frequency multiplier for osc 2's value `m` in [-1, +1]. Linear, so a
+   // zero-mean modulator leaves osc 1's mean pitch exactly where it was (an
+   // exponential ratio drifts sharp as depth rises). Depth x = 2.5 fm is bent
+   // to x / (1 + x), which keeps |m d| < 1: the old 1 + 2.5 m fm went negative
+   // above fm 0.4, stalled osc 1 at the 10 Hz floor and sounded like pitch
+   // dives. Slope at fm 0 is the old 2.5; fm 1 reaches +-0.71.
    inline float FmRatio(float m, float fm)
    {
-      constexpr float kOctaves = 2.5f / 0.6931472f;
-      return exp2f(std::clamp(m * fm * kOctaves, -3.0f, 3.0f));
+      const float x = fm * 2.5f;
+      return 1.0f + m * (x / (1.0f + x));
    }
 
    // Equal-power pan from position [-1, +1] to a pair of gains whose squares

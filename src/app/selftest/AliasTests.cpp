@@ -361,14 +361,14 @@ bool RunAliasTest()
            n.oscMix = 1.0f;
         },
         -91.0 },
-      // FM depth kept under the point where the frequency ratio clips at 0 Hz
-      // (1 + 2.5 fm > 0 throughout), so the output stays periodic at the note.
+      // Zero-mean modulator, bounded depth (FmRatio): the output stays periodic at the note.
+      // Gate -54 -> -51 dB when FM went from linear 1 + 2.5 fm to the bounded depth: measures -52.7.
       { "Analog FM 0.3 (sine osc2 -> saw) 1.75 kHz", 597,
         [](AnalogNode& n) {
            n.wave2 = kAWaveSine;
            n.fm = 0.3f;
         },
-        -54.0 },
+        -51.0 },
       { "Analog saw + drive 100% 1.75 kHz", 597, [](AnalogNode& n) { n.drive = 1.0f; }, -76.0 },
       { "Analog saw -> ladder 8 kHz res 0.5 1.75 kHz", 597,
         [](AnalogNode& n) {
