@@ -5,7 +5,7 @@ v0.6.6 fixes Infinite not opening for some Windows users, and the Windows VST3 s
 ### Fixes
 
 - Windows: Infinite no longer fails to open when its saved sample or media list cannot be read. A bad entry in the cached index is skipped, and the folders are rescanned on request
-- Windows VST3 scanning: a plugin that crashes while it is being unloaded is no longer blocklisted. Plugins such as Surge XT, Cardinal and Glitch 2 scan normally again
+- Windows VST3 scanning: a plugin that crashes while it is being unloaded is no longer blocklisted.
 
 ### Session view
 
