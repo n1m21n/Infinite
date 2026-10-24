@@ -892,6 +892,29 @@ namespace app
    }
 
 
+   void DrawPointTrailsParams(PointTrailsNode* n)
+   {
+      ImGui::TextDisabled("%zu tails, %d points tracked", n->TrailCount(), n->TrackedPoints());
+      ModSliderInt("length", &n->length, 2, 240);
+      ModSliderInt("sample every", &n->sampleEvery, 1, 10);
+      ModSlider("width", &n->width, 0.0005f, 0.2f, "%.4f");
+      ModSlider("fade", &n->fade, 0.0f, 1.0f);
+      ModSlider("taper", &n->taper, 0.0f, 1.0f);
+      DropdownButton("colour", PointTrailsNode::ColorModeNames(), n->colorMode,
+                     [n](int i) { PushUndoCheckpoint(); n->colorMode = i; });
+      if (n->colorMode == PointTrailsNode::kColorGradient)
+      {
+         ColorSwatch("head", n->headColor, n);
+         ColorSwatch("tail", n->tailColor, n);
+      }
+      DropdownButton("match by", PointTrailsNode::MatchModeNames(), n->matchMode,
+                     [n](int i) { PushUndoCheckpoint(); n->matchMode = i; });
+      ModSliderInt("point limit", &n->pointLimit, 1, 100000);
+      if (ActionButton::Draw("Clear", ImVec2(kPreviewSize, 0)))
+         n->Clear();
+   }
+
+
    void DrawCurveOpsParams(CurveOpsNode* n)
    {
       if (n->input != nullptr)

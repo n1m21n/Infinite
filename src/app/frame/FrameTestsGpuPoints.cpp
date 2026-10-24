@@ -1705,6 +1705,203 @@ void FrameTest_GPUPOINTSTEST(int frameId, GLFWwindow* window)
       GpuPointsGL::SetEnabledForTest(wasEnabled);
    }
 
+   // Step 5c: Point Trails. A cloud moved a step each cook leaves tails of
+   // `length` samples behind it, in world space, tapered and faded; a paused
+   // input freezes them; sample every N thins the samples; a reborn particle
+   // starts a new tail by ID but not by index; a dead point draws none; the
+   // sample budget caps tracked points; and a Particle System on the GPU path
+   // gives tails through its readback.
+   {
+      struct MovingCloud : IGeometrySource
+      {
+         std::vector<Particle> points;
+         unsigned long long revision = NextMeshRevision();
+         Mat4 model = Mat4::Identity();
+         Mesh empty;
+         const Mesh& GetMesh() override { return empty; }
+         unsigned long long MeshRevision() override { return 0; }
+         Mat4 GetModelMatrix() const override { return model; }
+         Material GetMaterial() const override { return Material(); }
+         const std::vector<Particle>* GetPointCloud() override { return &points; }
+         unsigned long long PointCloudRevision() override { return revision; }
+         void Step(float dx)
+         {
+            for (Particle& p : points)
+            {
+               p.px += dx;
+               p.age += 0.1f;
+            }
+            revision = NextMeshRevision();
+         }
+      };
+      auto makeCloud = [](MovingCloud& c, int n)
+      {
+         c.points.clear();
+         for (int k = 0; k < n; k++)
+         {
+            Particle p;
+            p.py = (float)k * 0.5f;
+            p.r = 0.5f; p.g = 0.25f; p.b = 1.0f; p.hasColor = true;
+            p.life = 100.0f;
+            c.points.push_back(p);
+         }
+      };
+      // Max |offset from the ring centre| over one ring's three vertices: the radius.
+      auto ringRadius = [](const Mesh& m, size_t ring, const float* centre)
+      {
+         float r = 0.0f;
+         for (size_t j = 0; j < 3; j++)
+         {
+            const Vertex& v = m.vertices[ring * 3 + j];
+            const float dx = v.px - centre[0], dy = v.py - centre[1], dz = v.pz - centre[2];
+            r = std::max(r, std::sqrt(dx * dx + dy * dy + dz * dz));
+         }
+         return r;
+      };
+
+      MovingCloud cloud;
+      makeCloud(cloud, 8);
+      cloud.model.m[14] = 2.0f; // world z = 2
+      PointTrailsNode trails;
+      trails.input = &cloud;
+      trails.length = 5;
+      trails.width = 0.02f;
+      trails.taper = 0.5f;
+      trails.fade = 1.0f;
+      trails.CookIfNeeded(frame++);
+      for (int i = 0; i < 9; i++)
+      {
+         cloud.Step(0.1f);
+         trails.CookIfNeeded(frame++);
+      }
+      const Mesh& tm = trails.GetMesh();
+      const bool shape = trails.TrailCount() == 8 && tm.vertices.size() == 8 * 5 * 3 && tm.indices.size() == 8 * 4 * 18 &&
+                         tm.vertexColor.size() == tm.vertices.size() * 3;
+      // Point 0's head ring is at its live position (x 0.9, z 2), its tail 4 steps back.
+      const float head[3] = { 0.9f, 0.0f, 2.0f }, tail[3] = { 0.5f, 0.0f, 2.0f };
+      const float headR = shape ? ringRadius(tm, 0, head) : 0.0f, tailR = shape ? ringRadius(tm, 4, tail) : 0.0f;
+      const float headC = shape ? tm.vertexColor[2] : 0.0f, tailC = shape ? tm.vertexColor[4 * 9 + 2] : 1.0f;
+      printf("point trails: %zu tails, %zu vertices, head r %.4f tail r %.4f, head blue %.3f tail blue %.3f\n",
+             trails.TrailCount(), tm.vertices.size(), headR, tailR, headC, tailC);
+      report("Point Trails: one tail of `length` samples per point", shape);
+      report("Point Trails: tails sit in world space, head at the point, tail behind it",
+             shape && std::fabs(headR - 0.02f) < 1e-4f && std::fabs(tailR - 0.01f) < 1e-4f);
+      report("Point Trails: taper and fade over age, colour from the points",
+             shape && std::fabs(headC - 1.0f) < 1e-5f && std::fabs(tailC) < 1e-5f);
+
+      const unsigned long long rev = trails.MeshRevision();
+      const int samples = trails.SamplesTaken();
+      trails.CookIfNeeded(frame++);
+      trails.CookIfNeeded(frame++);
+      report("Point Trails: a paused input freezes the tails",
+             trails.MeshRevision() == rev && trails.SamplesTaken() == samples);
+      trails.width = 0.04f;
+      trails.colorMode = PointTrailsNode::kColorGradient;
+      trails.fade = 0.0f;
+      trails.CookIfNeeded(frame++);
+      const Mesh& gm = trails.GetMesh();
+      const bool gradient = gm.vertexColor.size() >= 4 * 9 + 3 &&
+                            std::fabs(gm.vertexColor[0] - trails.headColor[0]) < 1e-5f &&
+                            std::fabs(gm.vertexColor[4 * 9] - trails.tailColor[0]) < 1e-5f;
+      report("Point Trails: a look change rebuilds without sampling (gradient over age)",
+             trails.MeshRevision() != rev && trails.SamplesTaken() == samples && gradient &&
+             std::fabs(ringRadius(gm, 0, head) - 0.04f) < 1e-4f);
+
+      // Sample every 2: the first cook samples, then every second change.
+      {
+         MovingCloud c2;
+         makeCloud(c2, 4);
+         PointTrailsNode t2;
+         t2.input = &c2;
+         t2.sampleEvery = 2;
+         t2.CookIfNeeded(frame++);
+         for (int i = 0; i < 9; i++)
+         {
+            c2.Step(0.1f);
+            t2.CookIfNeeded(frame++);
+         }
+         report("Point Trails: sample every 2 takes every other frame", t2.SamplesTaken() == 5);
+      }
+
+      // Rebirth and death.
+      {
+         auto rebirth = [&](int match)
+         {
+            MovingCloud c3;
+            makeCloud(c3, 3);
+            PointTrailsNode t3;
+            t3.input = &c3;
+            t3.length = 10;
+            t3.matchMode = match;
+            t3.CookIfNeeded(frame++);
+            for (int i = 0; i < 4; i++)
+            {
+               c3.Step(0.1f);
+               t3.CookIfNeeded(frame++);
+            }
+            c3.points[1].age = 0.0f;   // slot 1 is a new particle
+            c3.points[2].alive = false; // slot 2 died
+            c3.Step(0.1f);
+            t3.CookIfNeeded(frame++);
+            return t3.TrailCount();
+         };
+         const size_t byId = rebirth(PointTrailsNode::kMatchParticleId);
+         const size_t byIndex = rebirth(PointTrailsNode::kMatchIndex);
+         printf("point trails: rebirth/death leave %zu tails by ID, %zu by index\n", byId, byIndex);
+         report("Point Trails: a reborn particle starts a new tail by ID, keeps it by index; a dead one has none",
+                byId == 1 && byIndex == 2);
+      }
+
+      // The sample budget: 240 x 100k is more than kMaxSamples.
+      {
+         MovingCloud c4;
+         makeCloud(c4, 2);
+         PointTrailsNode t4;
+         t4.input = &c4;
+         t4.length = 240;
+         t4.pointLimit = 100000;
+         t4.CookIfNeeded(frame++);
+         report("Point Trails: the sample budget caps tracked points",
+                t4.TrackedPoints() == PointTrailsNode::kMaxSamples / 240);
+      }
+
+      // Particle System on the GPU path -> Point Trails.
+      {
+         Transport& tr = Transport::Instance();
+         const bool wasPlaying = tr.IsPlaying();
+         const float wasTempo = tr.Tempo();
+         tr.SetPlaying(false);
+         tr.SetTempo(120.0f);
+         GpuPointsGL::SetEnabledForTest(true);
+         ParticleSystemNode ps;
+         ps.maxParticles = 2000;
+         ps.emitRate = 600.0f;
+         ps.lifetime = 1.0f;
+         PointTrailsNode t5;
+         t5.input = &ps;
+         t5.length = 20;
+         double beat = 0.0;
+         tr.SeekBeats(beat);
+         t5.CookIfNeeded(frame++);
+         for (int i = 0; i < 40; i++)
+         {
+            beat += 1.0 / 30.0;
+            tr.SeekBeats(beat);
+            t5.CookIfNeeded(frame++);
+         }
+         bool finite = true;
+         for (const Vertex& v : t5.GetMesh().vertices)
+            finite = finite && std::isfinite(v.px) && std::isfinite(v.py) && std::isfinite(v.pz);
+         printf("point trails over GPU particles: %zu tails, %zu vertices, gpu points %d\n", t5.TrailCount(),
+                t5.GetMesh().vertices.size(), ps.GetGpuPoints() != nullptr);
+         report("Point Trails: GPU particles give tails", ps.GetGpuPoints() != nullptr && t5.TrailCount() > 50 && finite);
+         tr.SeekBeats(0.0);
+         tr.SetTempo(wasTempo);
+         tr.SetPlaying(wasPlaying);
+      }
+      GpuPointsGL::SetEnabledForTest(wasEnabled);
+   }
+
    printf("%s\n", allOk ? "GPU POINTS TEST OK" : "GPU POINTS TEST FAIL");
 }
 

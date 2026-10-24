@@ -1,6 +1,6 @@
 # GPU points (P8 phases 1-2): design and steps
 
-Status: in progress on `feature/p8-gpu-points` (started 2026-10-23). Owner said go on the Mac
+Status: built on `feature/p8-gpu-points` (started 2026-10-23, every step done 2026-10-24; not merged). Owner said go on the Mac
 benchmark alone ("keep going, I don't have Ricardo's laptop", 2026-10-23); the Windows/fork runs
 are not waited for. Phase 3 (new nodes and modes) was approved by the owner on 2026-10-24 ("Start
 Phase 3"): 5a Displacement noise, 5b Feedback carries geometry, 5c Point Trails.
@@ -86,8 +86,8 @@ the steps above, in the order they will be done:
 Phase 3 (`claude-context/P8_POINTS_PLAN.md` section 5), owner OK 2026-10-24:
 
 - 5a. Displacement gets a Noise source. Done (section below).
-- 5b. Feedback carries geometry.
-- 5c. Point Trails, a new node.
+- 5b. Feedback carries geometry, as a new Feedback 3D node. Done (section below).
+- 5c. Point Trails, a new node. Done (section below).
 
 ## Done check (Lane 3)
 
@@ -498,18 +498,70 @@ cloud is read back only when a CPU consumer asks. A CPU capture is uploaded once
 **Parity.** The node is plain C++ and GLSL 150 with no `Platform::` code and no `#ifdef`. It reads
 textures back with `glGetTexImage`, which Step 9 already uses on all three platforms.
 
+## Phase 3, 5c: Point Trails (2026-10-24, dev build)
+
+A new 3D node, **Point Trails** (`src/nodes/PointTrailsNode.h`): points in, a mesh of tails out.
+Particle System > Point Trails > Render 3D gives comet tails the camera can fly through.
+
+**How it works.**
+- Each point keeps a ring of its last `length` positions and colours, in world space (the input's
+  model matrix applied), so a moving source leaves its tails behind. The output matrix is identity.
+- A sample is taken when the input's points or matrix change, every `sample every`-th change. A
+  paused input freezes the tails instead of collapsing them.
+- The tails are three-sided prisms, the same lines Proximity Lines draws, so they take materials
+  and draw in Render 3D, its shadows and the mini viewport like any mesh. Vertex colour carries
+  the tail colour.
+- A look param (width, fade, taper, colour) rebuilds the mesh from the ring without sampling.
+- Material, textures and mapping forward from the input; `PassthroughSource` is null (the mesh
+  starts here). A plain mesh input trails its vertices.
+
+**Params** (all saved, the sliders modulatable): length 2..240 (30), sample every 1..10 (1), width
+0.0005..0.2 (0.01, the head radius), fade 0..1 (1, the tail darkens to black), taper 0..1 (0.5, the
+tail radius is width x (1 - taper)), colour From points / Gradient over age (head and tail swatches
+in gradient mode), match by Particle ID / Index, point limit 1..100,000 (10,000), and a Clear button.
+
+**Matching.** Point i is tracked as slot i, which is how both particle paths store particles: a
+particle keeps its slot for life, and a dead slot is reused. By Particle ID, a slot whose age went
+back (a new particle in it) starts a new tail, so no line joins a death to the next birth. By Index,
+the slot is followed regardless (static clouds, Image to Points). A dead or size-0 point breaks
+its tail either way.
+
+**Where it differs from the plan, on purpose.**
+- Width has no 0 = 1-pixel lines: Render 3D draws no GL lines, so the floor is 0.0005.
+- Tails are prisms, not camera-facing ribbons: a geometry node does not know the camera, and a
+  prism reads from every side.
+- Fade darkens toward black, not toward transparent: vertex colour has no alpha, and opacity is per
+  material. On a dark background the two look the same.
+- The ring lives on the CPU. GPU particles are read back once a sample (the readback Proximity
+  Lines and MetaBall already use); the output has to be a mesh for Render 3D anyway.
+- A sample budget: at most 1,000,000 samples (points x length), so length 240 tracks at most 4,166
+  points whatever the point limit says.
+
+**Checks.**
+- `GPUPOINTSTEST` 5c section, all pass:
+  - 8 points moved 0.1 a cook with length 5: 8 tails of 5 rings (120 vertices, 576 indices). The
+    head ring sits on the live point in world space (model z = 2), the tail 4 steps back; the head
+    radius is the width (0.02) and the tail half of it (taper 0.5); head colour = point colour,
+    tail colour 0 (fade 1).
+  - Two cooks with no input change: same mesh revision, no new sample.
+  - Width and gradient changes rebuild (new revision) without a sample; colours are exactly head
+    and tail.
+  - Sample every 2 over 10 changing cooks takes 5 samples.
+  - A reborn particle starts over by ID (1 tail left of 3) and keeps its tail by index (2 left); the
+    dead one has none either way.
+  - Length 240 with a 100k limit tracks 4,166 points.
+  - A Particle System on the GPU path (600/s for 40 frames) gives 389 tails, all finite.
+- Against `build-dev`: `run-infinite-hygiene --group 3d` 23/23, `render-pipeline-sweep` 23/23,
+  `geometry-transform-sweep` all pass, and ROUNDTRIPTEST save/load and copy/paste pass for Point
+  Trails (the one copy/paste failure, Shadertoy, is other uncommitted work in this checkout).
+
+**Parity.** Plain C++ (`<cmath>`, `<algorithm>`), no GL, no `Platform::` and no `#ifdef`.
+
 ## Handoff (2026-10-24)
 
 Commits on `feature/p8-gpu-points` (not merged, not pushed): 093bb6b6, 283f9757, a03c9dd0,
-7e2267c4, 45094715, 7656ee6e, dcbfc000 (5a), and the 5b commit (Feedback 3D).
-
-**Not started: 5c Point Trails** (plan: `claude-context/P8_POINTS_PLAN.md` §5c). A new 3D node,
-geometry in, lines out.
-- Params: Length 2..240 (30), Sample every 1..10 (1), Width 0..0.2 (0.01), Fade 0..1 (1),
-  Taper 0..1 (0.5), Colour (From points / Gradient over age), Match by (Particle ID / Index),
-  Point limit up to 100k.
-- Follow `new-geometry-node`. Add a GPUPOINTSTEST section, a facts row in the three facts tables,
-  and a README section like the ones above.
+7e2267c4, 45094715, 7656ee6e, dcbfc000 (5a), 80fbd3af (5b, Feedback 3D) and the 5c commit (Point
+Trails). Every step in this file is done.
 
 **Open limits and follow-ups.**
 - Feedback 3D: patch load does not refuse a geometry cycle written by hand into a `.inf`.

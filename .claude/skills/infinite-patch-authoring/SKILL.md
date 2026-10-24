@@ -195,6 +195,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Octahedron` | texture:image | out:geometry | 51 | bypass |
 | `Particle System` | emit:geometry | out:geometry | 30 | bypass |
 | `Plane` | texture:image | out:geometry | 51 | bypass |
+| `Point Trails` | points:geometry | out:geometry | 10 | bypass |
 | `Points to Vertices` | points:geometry | out:geometry | 18 | bypass |
 | `Prism` | texture:image | out:geometry | 51 | bypass |
 | `Proximity Lines` | points:geometry | out:geometry | 12 | bypass |

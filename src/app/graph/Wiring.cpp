@@ -429,6 +429,8 @@ namespace app
          return 1;
       if (dynamic_cast<ProximityLinesNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<PointTrailsNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<DelaunayMeshNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<CurveOpsNode*>(gn.node.get()) != nullptr)

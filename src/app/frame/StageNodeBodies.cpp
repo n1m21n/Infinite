@@ -1023,6 +1023,8 @@ void DrawNodeBodies(FrameCtx& fc)
                   DrawPointsToVerticesParams(n);
                else if (auto* n = dynamic_cast<ProximityLinesNode*>(gn.node.get()))
                   DrawProximityLinesParams(n);
+               else if (auto* n = dynamic_cast<PointTrailsNode*>(gn.node.get()))
+                  DrawPointTrailsParams(n);
                else if (auto* n = dynamic_cast<CurveOpsNode*>(gn.node.get()))
                   DrawCurveOpsParams(n);
                else if (auto* n = dynamic_cast<SweepNode*>(gn.node.get()))
