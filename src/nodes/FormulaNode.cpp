@@ -692,6 +692,10 @@ void FormulaNode::CookShadertoy(int frameId)
       return;
 
    const int numBuffers = BufferCount();
+   for (int b = numBuffers; b < 4; b++)   // buffers the shader no longer uses give their memory back
+      for (int k = 0; k < 2; k++)
+         if (mBuf[b][k].fbo != 0)
+            GLUtil::DestroyFbo(mBuf[b][k]);
    for (int b = 0; b < numBuffers; b++)
       for (int k = 0; k < 2; k++)
       {

@@ -947,6 +947,7 @@ private:
    void CookPano(int frameId);
    bool EnsurePanoShaders();
    void ReleasePano();
+   void ReleasePanoTargets();   // frees the cube and output targets, keeps the compiled programs
    int mFaceOverride = -1;
    int mFaceSide = 0;
    bool mPanoValid = false;

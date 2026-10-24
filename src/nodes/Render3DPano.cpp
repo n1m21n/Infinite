@@ -121,6 +121,18 @@ void Render3DNode::ReleasePano()
    mPanoValid = false;
 }
 
+void Render3DNode::ReleasePanoTargets()
+{
+   GLUtil::DestroyFbo(mPano);
+   GLUtil::DestroyFbo(mPanoDepth);
+   if (mCubeColor != 0) { glDeleteTextures(1, &mCubeColor); mCubeColor = 0; }
+   if (mCubeDepth != 0) { glDeleteTextures(1, &mCubeDepth); mCubeDepth = 0; }
+   if (mCubeFbo != 0) { glDeleteFramebuffers(1, &mCubeFbo); mCubeFbo = 0; }
+   mCubeSide = 0;
+   mPanoValid = false;
+   mHasPanoSig = false;
+}
+
 void Render3DNode::CookPano(int frameId)
 {
    if (!EnsurePanoShaders())
@@ -155,10 +167,16 @@ void Render3DNode::CookPano(int frameId)
       return;
 
    const bool hdrOn = HdrActive();
+   if (!hdrOn && mCubeDepth != 0)   // the depth cube is only read by the HDR finish
+   {
+      glDeleteTextures(1, &mCubeDepth);
+      mCubeDepth = 0;
+   }
    if (mCubeSide != side || mCubeColor == 0 || (hdrOn && mCubeDepth == 0))
    {
       AllocCube(mCubeColor, side, GL_RGBA16F, GL_RGBA);
-      AllocCube(mCubeDepth, side, GL_R32F, GL_RED);
+      if (hdrOn)
+         AllocCube(mCubeDepth, side, GL_R32F, GL_RED);
       mCubeSide = side;
    }
    if (mCubeFbo == 0)

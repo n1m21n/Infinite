@@ -1742,6 +1742,8 @@ void Render3DNode::CookIfNeeded(int frameId)
       CookPano(frameId);
       return;
    }
+   if (mCubeColor != 0 || mPano.tex != 0)   // projection went back to Perspective: give the cube memory back
+      ReleasePanoTargets();
    mPanoValid = false;
    // Supersampling only ever adds passes on an offline render; a live cook is
    // always the single pass so the real-time cost never changes.

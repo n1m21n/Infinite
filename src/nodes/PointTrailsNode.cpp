@@ -31,6 +31,12 @@ void PointTrailsNode::CookIfNeeded(int frameId)
    if (auto* upstream = dynamic_cast<INode*>(input))
       upstream->CookIfNeeded(frameId);
 
+   if (bypassed)   // the outputs pass the input through; do not sample or read back
+   {
+      mClear = true;
+      return;
+   }
+
    if (input == nullptr)
    {
       if (!mMesh.vertices.empty())

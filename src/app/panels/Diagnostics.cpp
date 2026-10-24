@@ -182,7 +182,7 @@ bool WriteDiagnosticsZip(const std::string& zipPath, const std::string& systemIn
       }
    }
    for (const fs::path& crash : RecentCrashReports())
-      entries.emplace_back("crash/" + crash.filename().u8string(), ReadFileBytes(crash, 16u << 20));
+      entries.emplace_back("crash/" + crash.filename().u8string(), RedactHome(ReadFileBytes(crash, 16u << 20)));
    if (!patchPath.empty())
    {
       const fs::path pp = AppPaths::FsPath(patchPath);

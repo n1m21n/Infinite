@@ -31,7 +31,8 @@ namespace app
       auto MovesTheGraph = [](const std::string& m)
       {
          return m == "delete_node" || m == "connect" || m == "disconnect" || m == "set_node_position" ||
-                m == "auto_wire_inputs" || m == "undo" || m == "redo";
+                m == "auto_wire_inputs" || m == "undo" || m == "redo" ||
+                m == "load_patch" || m == "load_patch_text" || m == "new_patch";
       };
       bool movesGraph = MovesTheGraph(method);
       if (method == "batch" && params.contains("calls") && params["calls"].is_array())
