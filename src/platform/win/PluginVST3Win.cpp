@@ -762,8 +762,59 @@ namespace
       return true;
    }
 
+   // Scan mode. Persisted as a one-word file beside the blocklist; absent means the default (separate process).
+   std::atomic<int> gScanInProcess{-1};      // -1 unread, 0 separate process, 1 within Infinite
+   std::atomic<bool> gScanFellBack{false};
+
+   std::string VST3ScanModePath()
+   {
+      const std::string dir = SettingsDirForVST3();
+      return dir.empty() ? std::string() : dir + "\\PluginVST3ScanMode.txt";
+   }
+
+   bool ScanInProcessSetting()
+   {
+      int v = gScanInProcess.load();
+      if (v < 0)
+      {
+         v = 0;
+         const std::string path = VST3ScanModePath();
+         if (!path.empty())
+         {
+            if (FILE* f = fopen(path.c_str(), "rb"))
+            {
+               char buf[16] = {};
+               const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+               fclose(f);
+               v = (n >= 9 && strncmp(buf, "inprocess", 9) == 0) ? 1 : 0;
+            }
+         }
+         gScanInProcess.store(v);
+      }
+      return v == 1;
+   }
+
+   // Describe each bundle inside this process. DescribeVST3Bundle writes the sentinel around the load, so a
+   // plugin that takes the process down is blocklisted on the next launch. The scan thread needs an OLE
+   // apartment the way a host's message thread has one; a plugin's editor and some factories expect it.
+   void DescribeVST3BundlesInProcess(const std::vector<std::string>& bundles, std::vector<Platform::PluginDesc>& out)
+   {
+      const HRESULT oleHr = OleInitialize(nullptr);
+      for (const std::string& b : bundles)
+         if (!Platform::DescribeVST3Bundle(b, out))
+            RecordScanFailure(b);
+      if (SUCCEEDED(oleHr))
+         OleUninitialize();
+   }
+
    void ProbeVST3BundlesBatch(std::vector<std::string> bundlesToScan, std::vector<Platform::PluginDesc>& out)
    {
+      gScanFellBack.store(false);
+      if (ScanInProcessSetting())
+      {
+         DescribeVST3BundlesInProcess(bundlesToScan, out);
+         return;
+      }
       const std::string exe = Platform::ScannerExecutablePath();
       if (exe.empty() || !fsProbe::exists(exe))
       {
@@ -795,9 +846,12 @@ namespace
 
       if (!ScannerCanRun(exe))
       {
-         for (const auto& b : bundlesToScan)
-            RecordScanFailure(b);
-         return; // nothing blocklisted: the scanner is the problem, not the plugins
+         // The scanner is the problem, not the plugins: blame none of them, and scan in this process so the
+         // user is not left without plugins. The panel says this happened.
+         VST3Trace("scanner cannot run; scanning within the process instead");
+         gScanFellBack.store(true);
+         DescribeVST3BundlesInProcess(bundlesToScan, out);
+         return;
       }
 
       // Hard bound on the loop below. Every pass removes at least one bundle
@@ -958,6 +1012,34 @@ namespace Platform
       std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
       LoadBlocklistLocked();
       return gBlocklist;
+   }
+
+   bool VST3ScanInProcess()
+   {
+      return ScanInProcessSetting();
+   }
+
+   void SetVST3ScanInProcess(bool inProcess)
+   {
+      gScanInProcess.store(inProcess ? 1 : 0);
+      const std::string path = VST3ScanModePath();
+      if (path.empty())
+         return;
+      if (inProcess)
+      {
+         if (FILE* f = fopen(path.c_str(), "wb"))
+         {
+            fputs("inprocess", f);
+            fclose(f);
+         }
+      }
+      else
+         remove(path.c_str());
+   }
+
+   bool VST3ScanFellBack()
+   {
+      return gScanFellBack.load();
    }
 
    void ClearVST3Blocklist()

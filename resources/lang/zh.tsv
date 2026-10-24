@@ -1649,3 +1649,8 @@ ASIO driver	ASIO 驱动
 None installed	未安装
 ASIO driver in use: %s	正在使用的 ASIO 驱动：%s
 An ASIO driver is one device for input and output. Pick it under ASIO driver.	ASIO 驱动同时负责输入和输出。请在“ASIO 驱动”中选择。
+VST3 scanning	VST3 扫描
+Separate process (safer)	独立进程(更安全)
+Within Infinite (compatible)	Infinite 内部(兼容性更好)
+Rescan plugins after changing this. Within Infinite, a plugin that crashes closes Infinite once, then is skipped.	更改后请重新扫描插件。在 Infinite 内部扫描时,崩溃的插件会让 Infinite 关闭一次,之后会被跳过。
+The separate scanner could not start, so the last scan ran within Infinite.	独立扫描器无法启动,因此上次扫描在 Infinite 内部运行。

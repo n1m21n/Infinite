@@ -1649,3 +1649,8 @@ ASIO driver	ASIO-Treiber
 None installed	Keiner installiert
 ASIO driver in use: %s	Verwendeter ASIO-Treiber: %s
 An ASIO driver is one device for input and output. Pick it under ASIO driver.	Ein ASIO-Treiber ist ein Gerät für Ein- und Ausgang. Wähle ihn unter ASIO-Treiber.
+VST3 scanning	VST3-Suche
+Separate process (safer)	Eigener Prozess (sicherer)
+Within Infinite (compatible)	Innerhalb von Infinite (kompatibel)
+Rescan plugins after changing this. Within Infinite, a plugin that crashes closes Infinite once, then is skipped.	Nach der Änderung Plugins neu scannen. Innerhalb von Infinite beendet ein abstürzendes Plugin Infinite einmal und wird danach übersprungen.
+The separate scanner could not start, so the last scan ran within Infinite.	Der separate Scanner konnte nicht starten, daher lief der letzte Scan innerhalb von Infinite.

@@ -966,6 +966,21 @@ namespace Platform
       return gBlocklist;
    }
 
+   bool VST3ScanInProcess()
+   {
+      return false;
+   }
+
+   void SetVST3ScanInProcess(bool inProcess)
+   {
+      (void)inProcess;
+   }
+
+   bool VST3ScanFellBack()
+   {
+      return false;
+   }
+
    void ClearVST3Blocklist()
    {
       std::lock_guard<std::mutex> lock(gVST3SafetyMutex);

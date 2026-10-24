@@ -1649,3 +1649,8 @@ ASIO driver	Controlador ASIO
 None installed	Ninguno instalado
 ASIO driver in use: %s	Controlador ASIO en uso: %s
 An ASIO driver is one device for input and output. Pick it under ASIO driver.	Un controlador ASIO es un único dispositivo de entrada y salida. Elígelo en Controlador ASIO.
+VST3 scanning	Análisis de VST3
+Separate process (safer)	Proceso aparte (más seguro)
+Within Infinite (compatible)	Dentro de Infinite (compatible)
+Rescan plugins after changing this. Within Infinite, a plugin that crashes closes Infinite once, then is skipped.	Vuelve a analizar los plugins tras cambiar esto. Dentro de Infinite, un plugin que falla cierra Infinite una vez y después se omite.
+The separate scanner could not start, so the last scan ran within Infinite.	El analizador independiente no pudo iniciarse, así que el último análisis se hizo dentro de Infinite.

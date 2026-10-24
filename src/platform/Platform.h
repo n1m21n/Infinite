@@ -739,6 +739,15 @@ namespace Platform
    std::vector<std::string> VST3Blocklist();
    void ClearVST3Blocklist();
 
+   // Windows VST3 scanning runs in a separate process by default so a plugin that crashes while loading
+   // cannot take Infinite with it. "Within Infinite" scans in this process instead, for machines where the
+   // separate scanner cannot do its job; a plugin that crashes then is blocklisted on the next launch.
+   // VST3ScanInProcess persists across launches; VST3ScanFellBack is true when the last scan switched to
+   // in-process on its own because the scanner could not run.
+   bool VST3ScanInProcess();
+   void SetVST3ScanInProcess(bool inProcess);
+   bool VST3ScanFellBack();
+
    // Bundles the most recent EnumerateVST3Plugins() call could not describe
    // (corrupt bundle, wrong CPU architecture, no usable audio-effect class) by
    // path. Reset at the start of every call; read immediately after it

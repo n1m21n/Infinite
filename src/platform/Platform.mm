@@ -6170,6 +6170,21 @@ namespace Platform
    {
    }
 
+   bool VST3ScanInProcess()
+   {
+      return false;
+   }
+
+   void SetVST3ScanInProcess(bool inProcess)
+   {
+      (void)inProcess;
+   }
+
+   bool VST3ScanFellBack()
+   {
+      return false;
+   }
+
    std::vector<std::string> VST3ScanFailures()
    {
       return {};

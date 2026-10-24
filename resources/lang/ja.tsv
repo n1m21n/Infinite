@@ -1649,3 +1649,8 @@ ASIO driver	ASIO ドライバー
 None installed	インストールされていません
 ASIO driver in use: %s	使用中の ASIO ドライバー：%s
 An ASIO driver is one device for input and output. Pick it under ASIO driver.	ASIO ドライバーは入力と出力を兼ねる 1 台のデバイスです。「ASIO ドライバー」で選択してください。
+VST3 scanning	VST3スキャン
+Separate process (safer)	別プロセス(より安全)
+Within Infinite (compatible)	Infinite内(互換性重視)
+Rescan plugins after changing this. Within Infinite, a plugin that crashes closes Infinite once, then is skipped.	変更後はプラグインを再スキャンしてください。Infinite内では、クラッシュするプラグインがあるとInfiniteが一度終了し、その後はスキップされます。
+The separate scanner could not start, so the last scan ran within Infinite.	別プロセスのスキャナーを起動できなかったため、直前のスキャンはInfinite内で実行されました。

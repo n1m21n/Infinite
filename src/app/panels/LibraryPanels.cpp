@@ -1,5 +1,6 @@
 // Library / plugin / field search panels (moved verbatim from main.cpp).
 #include <unordered_set>
+#include "app/ui/design/components/FormParts.h"
 #include "app/ui/design/components/MenuParts.h"
 #include "app/ui/design/GlyphDraw.h"
 #include "app/ui/design/components/EmptyState.h"
@@ -817,6 +818,25 @@ namespace app
       // VST3 folder management: AU is discovered entirely through the OS
       // component registry and needs none of this, but VST3 has no registry -
       // only the two OS-standard directories plus whatever the user adds here.
+#ifdef _WIN32
+      // Windows scans VST3 in a separate process so a plugin that crashes while loading cannot take Infinite down.
+      // "Within Infinite" is for machines where that scanner cannot do its job.
+      {
+         const bool inProcess = Platform::VST3ScanInProcess();
+         const char* modeNames[2] = { T("Separate process (safer)"), T("Within Infinite (compatible)") };
+         if (FormParts::BeginCombo(T("VST3 scanning"), modeNames[inProcess ? 1 : 0]))
+         {
+            for (int i = 0; i < 2; ++i)
+               if (MenuParts::Choice(modeNames[i], (i == 1) == inProcess))
+                  Platform::SetVST3ScanInProcess(i == 1);
+            FormParts::EndCombo();
+         }
+         ImGui::TextDisabled("%s", T("Rescan plugins after changing this. Within Infinite, a plugin that crashes closes Infinite once, then is skipped."));
+         if (Platform::VST3ScanFellBack())
+            ImGui::TextDisabled("%s", T("The separate scanner could not start, so the last scan ran within Infinite."));
+      }
+#endif
+
       if (ImGui::TreeNodeEx(L("VST3 search folders"), ImGuiTreeNodeFlags_None))
       {
          // Snapshot rather than iterate gPluginScanner.Folders() directly:
